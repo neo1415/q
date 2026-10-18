@@ -214,8 +214,9 @@ describe("QFOR-003 · candidates become suggestions, not answers", () => {
   });
 
   it("surfaces a candidate it cannot suggest for review rather than dropping it", async () => {
+    // A reading the step's vocabulary cannot hold (no "mezzanine" stage).
     const { plan } = await prepare(
-      outcome({ candidates: [candidate("stage", "Seed")] }),
+      outcome({ candidates: [candidate("stage", "Mezzanine")] }),
       NOTHING_ANSWERED,
     );
     expect(plan.suggestions).toHaveLength(0);
@@ -396,5 +397,42 @@ describe("QFOR-007 · passages carry where they came from", () => {
       5,
     );
     expect(passages).toHaveLength(5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Owner template 2026-10-16 · the company profile sections
+// ---------------------------------------------------------------------------
+
+describe("company profile sections are filled from the material first", () => {
+  it("a deck's problem, solution and moats become proposals for their v6 steps", async () => {
+    const { plan } = await prepare(
+      outcome({
+        candidates: [
+          candidate("problem", "Clinics lose a third of test results."),
+          candidate("solution", "A strip reader that files results itself."),
+          candidate("moats", "Exclusive data from 40 clinics."),
+        ],
+      }),
+      NOTHING_ANSWERED,
+    );
+    expect(plan.suggestions.map((s) => s.stepKey).sort()).toEqual(
+      ["F9.moats", "F9.problem", "F9.solution"].sort(),
+    );
+    expect(plan.suggestions[0]?.suggestedValue).toMatchObject({ type: "TEXT" });
+  });
+
+  it("a section the deck already proposed is not proposed again from the transcript", async () => {
+    const { plan } = await prepare(
+      outcome({
+        candidates: [candidate("problem", "Said again in the pitch.")],
+      }),
+      {
+        responses: [],
+        pendingSuggestionSteps: ["F9.problem"],
+        narrative: null,
+      },
+    );
+    expect(plan.suggestions.map((s) => s.stepKey)).not.toContain("F9.problem");
   });
 });

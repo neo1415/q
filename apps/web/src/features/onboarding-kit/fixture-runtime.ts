@@ -455,6 +455,8 @@ export function createFixtureRuntime(
             responseType: value.type,
             value,
             sourceModality: value.type === "TEXT" ? "TYPED_TEXT" : "SELECTION",
+            note: null,
+            channel: "FORM",
             createdAt: STARTED_AT,
           } as const);
     };
@@ -604,7 +606,7 @@ export function createFixtureRuntime(
         persist({ ...state, failNextSave: false });
         throw new OnboardingClientError(
           "NETWORK",
-          "Couldn't reach Capital Q. Please try again.",
+          "Couldn't reach Capital Q. Try again.",
         );
       }
       const step = eligibleStep(stepKey);

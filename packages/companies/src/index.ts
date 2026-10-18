@@ -33,6 +33,37 @@ export {
   CompanyVersionConflictError,
 } from "./domain/errors.js";
 export {
+  describeRequirement,
+  evaluateMarketplaceReadiness,
+  MARKETPLACE_READINESS_POLICY_VERSION,
+  outstandingRequirementIds,
+  VERIFICATION_CLAIM_STANDINGS,
+  type MarketplaceReadinessEvaluation,
+  type MarketplaceReadinessSnapshot,
+  type MarketplaceVerificationFacts,
+  type VerificationClaimStanding,
+} from "./domain/marketplace-readiness.js";
+export {
+  createAssessMarketplaceReadiness,
+  createGetMarketplaceReadiness,
+  createReconcileMarketplaceReadinessAsSystem,
+  reconcileMarketplaceReadinessInTransaction,
+  SYSTEM_READINESS_ACTOR,
+  type ReconcileMarketplaceReadinessAsSystemCommand,
+  type SystemReadinessActor,
+  type SystemReadinessOutcome,
+  type AssessMarketplaceReadinessCommand,
+  type GetMarketplaceReadinessQuery,
+  type MarketplaceReadinessReconciliation,
+} from "./application/marketplace-readiness.js";
+export { createUnavailableVerificationClaimsPort } from "./infrastructure/unavailable-verification-claims.js";
+export {
+  KNOWN_MARKETPLACE_READINESS_STATES,
+  MARKETPLACE_PARTICIPATION,
+  marketplaceParticipationOf,
+  type MarketplaceParticipation,
+} from "./domain/marketplace-participation.js";
+export {
   COMPANY_SLUG_FALLBACK,
   COMPANY_SLUG_MAX_LENGTH,
   COMPANY_SLUG_MAX_SUFFIX,
@@ -50,6 +81,9 @@ export {
   CompanySearchCursorError,
   type CompanyCreationRecord,
   type CompanyCreationRequestStore,
+  type CompanyInvestmentProfile,
+  type CompanyMarketplaceFacts,
+  type CompanyMarketplaceQueryPort,
   type CompanyProfileChanges,
   type CompanyProfileFacts,
   type CompanyQueryPort,
@@ -59,6 +93,7 @@ export {
   type CompanySearchQuery,
   type CompanyVisibilityFacts,
   type FounderProfileOwnershipFacts,
+  type VerificationClaimsPort,
   type NewCompany,
 } from "./application/ports.js";
 export type { CompanyServiceDependencies } from "./application/dependencies.js";
@@ -85,6 +120,7 @@ export {
 
 export {
   createPostgresCompanyCreationRequestStore,
+  createPostgresCompanyMarketplaceQueryPort,
   createPostgresCompanyQueryPort,
   createPostgresCompanyRepository,
 } from "./infrastructure/postgres-company-repository.js";
@@ -134,3 +170,64 @@ export {
 } from "./infrastructure/postgres-team-repositories.js";
 
 export const PACKAGE_NAME = "@capital-q/companies" as const;
+
+export {
+  COMPANY_VISIBILITY_CHOICES,
+  declaredFactsForNetwork,
+  isNetworkVisible,
+  NETWORK_PROJECTION_DESCRIPTION_MAX,
+  projectCompanyForNetwork,
+  type CompanyVisibilityChoice,
+  type NetworkProjectionSource,
+  type NetworkVisibleCompanyProfile,
+} from "./domain/network-projection.js";
+export {
+  createSetCompanyVisibility,
+  type SetCompanyVisibilityCommand,
+} from "./application/set-company-visibility.js";
+// P14 item 7: an unclaimed company made public (or back to the network) by a platform admin.
+export {
+  createPlatformCompanyPublishing,
+  type PlatformCompanyPublishing,
+  type PlatformPublishingOutcome,
+} from "./application/platform-publishing.js";
+export {
+  CompanyVisibilityChangedEvent,
+  companyVisibilityChangedEvent,
+} from "./events/index.js";
+
+export {
+  projectTeamForNetwork,
+  type TeamProjectionSource,
+} from "./domain/team-projection.js";
+export { createPostgresCompanyTeamProjection } from "./infrastructure/postgres-team-projection.js";
+export {
+  ageFrom,
+  projectFounderPerson,
+  type FounderPersonSource,
+} from "./domain/founder-person.js";
+export { createPostgresFounderPersonSource } from "./infrastructure/postgres-founder-person.js";
+
+// F3: "Find my startup": find a visible company and ask to claim or join it.
+export {
+  createCompanyClaims,
+  emailAtCompany,
+  type ClaimSearcher,
+  type ClaimCodeMailer,
+  type ClaimEvidenceStorage,
+  type CompanyClaims,
+} from "./claims/company-claims.js";
+
+// P13: one reading and ranking of a typed company search, for every surface.
+export {
+  foldSearchText,
+  isTransposition,
+  isDescriptiveSearch,
+  parseCompanySearch,
+  scoreCompanySearch,
+  searchKey,
+  searchLetters,
+  trigramSimilarity,
+  type CompanySearchDocument,
+  type ParsedCompanySearch,
+} from "./domain/company-search.js";

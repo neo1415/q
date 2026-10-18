@@ -8,12 +8,52 @@
  * auth-locks the whole application.
  */
 
+/*
+ * Every route in the `(app)` and `(onboarding)` groups belongs here, and
+ * `proxy.ts` must match each one (test/route-policy.test.ts holds both).
+ * A protected route the proxy does not run on still renders -- the layout
+ * guard verifies the session -- but an expired access token is then
+ * refreshed inside a Server Component, which cannot write cookies: the
+ * rotated session is thrown away and the browser keeps the old one, so the
+ * refresh repeats on every such page until something else writes it.
+ */
 export const PROTECTED_PATH_PREFIXES = [
   "/home",
+  "/welcome",
   "/discover",
   "/capital",
+  "/company",
+  "/pitch",
+  "/investors",
+  "/find",
+  "/search",
+  // Explore (ADR 0055): what Search became.
+  "/explore",
+  "/verification",
   "/profile",
   "/onboarding",
+  "/relationships",
+  // CRM (2026-10-15): the alias of the relationship workspace.
+  "/crm",
+  // Q Pitch (2026-10-15): the guided tour entry; signed in only.
+  "/q-pitch",
+  "/settings",
+  // AUTO (ADR 0030): Q's work.
+  "/work",
+  // DAILY: The Q Daily reader.
+  "/daily",
+  "/gateway",
+  // F2: GateQ's own page (founder applications, investor inbox and gate).
+  "/gateq",
+  "/rehearsals",
+  "/results",
+  "/reviews",
+  // DOCS: their documents and brand kit.
+  "/documents",
+  "/admin",
+  "/paused",
+  // G1/G2: an invitation's link; a new person signs up and comes back.
+  "/join",
   // Setting a new password needs the recovery session the callback created.
   "/auth/update-password",
 ] as const;

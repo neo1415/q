@@ -1,10 +1,14 @@
+import { createHash } from "node:crypto";
+
 import type { z } from "zod";
 
 import {
   allowsModelFallback,
   isRetryableModelFailure,
+  messagesCarryImages,
   ModelGatewayRequestSchema,
   ModelGatewayResultMetadataSchema,
+  usagePurposeOf,
   type ModelAttemptRecord,
   type ModelCandidateDecision,
   type ModelCost,
@@ -31,13 +35,18 @@ import {
   type TenantModelPolicyPort,
 } from "./ports.js";
 import { estimateInputTokens, priceUsage } from "./policy/cost.js";
+import type { SyntheticDemoRoutingAllowance } from "./policy/synthetic-demo.js";
 import {
   planRoute,
   selectRoutingPolicy,
   type EligibleCandidate,
 } from "./policy/eligibility.js";
 import { alwaysHealthy } from "./policy/health.js";
-import { acceptStructuredOutput } from "./policy/structured.js";
+import type { ModelSpendCap } from "./policy/spend-cap.js";
+import {
+  acceptStructuredOutput,
+  type InvalidListItems,
+} from "./policy/structured.js";
 
 /**
  * The Model Gateway (doc 12 §24; packet §8).
@@ -65,6 +74,17 @@ export type ModelGatewayDependencies = {
   readonly usage: ModelUsageRepository;
   readonly health?: ProviderHealthPort | undefined;
   readonly tenantPolicies?: TenantModelPolicyPort | undefined;
+  /**
+   * Attestation that this deployment's material is synthetic demo data
+   * (doc 15 §62). Absent everywhere a real customer is served, which is
+   * what makes a SYNTHETIC_DEMO posture inert there.
+   */
+  readonly syntheticDemo?: SyntheticDemoRoutingAllowance | null | undefined;
+  /**
+   * The aggregate daily spend cap (audit F-D8; policy/spend-cap.ts).
+   * Absent: no aggregate cap, only the per-request and per-feature ones.
+   */
+  readonly spendCap?: ModelSpendCap | undefined;
   readonly clock?: ModelClock | undefined;
   readonly logger?: Logger | undefined;
   /** Injectable for deterministic tests; production waits for real. */
@@ -78,6 +98,58 @@ export type ModelGatewayExecuteOptions<T> = {
   readonly schema?: z.ZodType<T> | undefined;
   /** The caller's cancellation. A cancelled request never falls back. */
   readonly signal?: AbortSignal | undefined;
+  /**
+   * Called with each piece of text as the model writes it, in order.
+   *
+   * Asking for this changes what a failure means. Retrying a model and
+   * falling back to another are invisible precisely because nothing has
+   * left the building yet; once a fragment has gone out, a second attempt
+   * would say the opening of the answer twice, and on a voice call it
+   * would say it out loud. So the gateway stops retrying the moment it
+   * has spoken, and the failure becomes the caller's to handle.
+   *
+   * In practice that costs little: the failures actually seen — a refused
+   * request, a spent quota, a malformed tool call, a provider hiccup —
+   * all arrive before the first token. What it buys is that a person
+   * hears the answer as it is written instead of after it.
+   */
+  readonly onTextDelta?: ((text: string) => void) | undefined;
+  /**
+   * How long the FIRST model may take, when another eligible model waits
+   * behind it (CQ-VOICE-010). Never longer than the budget's own
+   * `attemptTimeoutMs`. A first model that runs out of this is not asked a
+   * second time: the next model is.
+   *
+   * For a caller with a person waiting on the answer. In the hosted ledger
+   * the preferred dialogue model answered inside 3.4 s at p95 on a healthy
+   * day. When it hung, the turn paid the whole attempt timeout before any
+   * fallback was tried. Once it hung twice, because a timeout was retried
+   * on the same model.
+   */
+  readonly firstAttemptTimeoutMs?: number | undefined;
+  /**
+   * STRUCTURED output only: whether one refused element of a list refuses
+   * the whole object (REFUSE, the default) or is dropped and logged
+   * (DROP). For callers whose lists are independent readings.
+   */
+  readonly invalidListItems?: InvalidListItems | undefined;
+  /**
+   * STRUCTURED output only: top-level fields that are dropped (and so take
+   * their schema default) instead of refusing the object when only they
+   * are wrong. Dropped paths ride on the result.
+   */
+  readonly lenientFields?: readonly string[] | undefined;
+  /** STRUCTURED output only: stand-ins for enum labels outside the set, by dotted path. */
+  readonly enumFallbacks?: Readonly<Record<string, string>> | undefined;
+  /** STRUCTURED output only: drop (and count) root keys the schema does not know. */
+  readonly unknownRootKeys?: "REFUSE" | "DROP" | undefined;
+};
+
+type AcceptOptions = {
+  readonly invalidListItems: InvalidListItems | undefined;
+  readonly lenientFields: readonly string[] | undefined;
+  readonly enumFallbacks: Readonly<Record<string, string>> | undefined;
+  readonly unknownRootKeys: "REFUSE" | "DROP" | undefined;
 };
 
 export type ModelGateway = {
@@ -103,6 +175,14 @@ type AttemptOutcome<T> =
       readonly failureClass: ModelFailureClass;
       readonly retryAfterMs: number | undefined;
       readonly cause: unknown;
+      /**
+       * The answer was cut off at the output ceiling rather than written
+       * badly. Observed in production: a long structured answer stopped at
+       * exactly maxOutputTokens, so the JSON never closed and every
+       * following attempt reproduced it on a different model. The next
+       * attempt raises the ceiling instead of blaming the next model.
+       */
+      readonly truncated?: boolean;
     };
 
 class AbortedError extends Error {
@@ -130,6 +210,31 @@ function defaultSleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/**
+ * The prompt-cache routing key for a request: who is asking, for which kind
+ * of task, with which tools on offer. Calls sharing all four share the long
+ * system prefix, so steering them to the same cache shard is what lets a
+ * first round hit a warm prefix. Hashed, because the key travels to the
+ * vendor: no tenant id, user id or tool list leaves in clear. A user's key
+ * is theirs alone, so a cache shard is never shared across users or
+ * tenants on our account even though the vendor's cache is
+ * prefix-exact anyway.
+ */
+export function promptCacheKeyOf(request: ModelGatewayRequest): string {
+  const tools = request.tools.map((tool) => tool.name).sort();
+  return createHash("sha256")
+    .update(
+      JSON.stringify([
+        request.attribution.tenantId,
+        request.attribution.userId ?? null,
+        request.taskClass,
+        tools,
+      ]),
+    )
+    .digest("hex")
+    .slice(0, 32);
+}
+
 function estimatedUsage(inputTokens: number, text: string): ModelUsage {
   return {
     inputTokens,
@@ -155,9 +260,21 @@ export function createModelGateway(
     failures: meter.createCounter("q.model.failures"),
     attempts: meter.createCounter("q.model.attempts"),
     fallbacks: meter.createCounter("q.model.fallbacks"),
+    /** Requests that also asked the next model after hedgeAfterMs (L1). */
+    hedges: meter.createCounter("q.model.hedges"),
     rateLimits: meter.createCounter("q.model.rate_limits"),
+    /** Failures that arrived after part of the answer had already gone out. */
+    spokenFailures: meter.createCounter("q.model.spoken_failures"),
     policyIneligible: meter.createCounter("q.model.policy_ineligible"),
     budgetRejected: meter.createCounter("q.model.budget_rejected"),
+    /**
+     * Structured output refused, by task class and the first refusal code
+     * (a field path and a Zod code, never a value): which schema field a
+     * model cannot produce (live 2026-10-16: "tool:custom").
+     */
+    structuredRefusals: meter.createCounter("q.model.structured_refusals"),
+    /** Structured output kept after a lenient field or element was dropped. */
+    structuredRepairs: meter.createCounter("q.model.structured_repairs"),
     usageRecordFailures: meter.createCounter("q.model.usage_record_failures"),
     latencyMs: meter.createHistogram("q.model.provider_latency_ms"),
     tokensIn: meter.createHistogram("q.model.tokens_in"),
@@ -183,6 +300,9 @@ export function createModelGateway(
   async function recordUsage(
     entry: Parameters<ModelUsageRepository["record"]>[0],
   ): Promise<void> {
+    // Counted toward the daily cap whether or not the ledger write lands:
+    // the provider charged for it either way.
+    if (entry.costUsd !== undefined) dependencies.spendCap?.note(entry.costUsd);
     try {
       await dependencies.usage.record(entry);
     } catch (error: unknown) {
@@ -203,6 +323,16 @@ export function createModelGateway(
     attemptNumber: number,
     schema: z.ZodType<T> | undefined,
     callerSignal: AbortSignal,
+    // Set after an attempt ran out of room: ask this model for everything
+    // it will give rather than for the task's usual allowance.
+    reachForModelMaximum: boolean,
+    /** Where text goes as it is written, when the caller wants it. */
+    onTextDelta: ((text: string) => void) | undefined,
+    /** Set by this attempt the first time it emits; read by the caller. */
+    spoke: { spoke: boolean },
+    /** This attempt's wall clock: the budget's, or a first model's shorter one. */
+    timeoutMs: number,
+    accept: AcceptOptions,
   ): Promise<AttemptOutcome<T> & { readonly record: ModelAttemptRecord }> {
     const labels = {
       provider: candidate.provider.code,
@@ -221,14 +351,14 @@ export function createModelGateway(
       },
       async (span) => {
         const startedAt = Date.now();
-        const timeoutSignal = AbortSignal.timeout(
-          request.budget.attemptTimeoutMs,
-        );
+        const timeoutSignal = AbortSignal.timeout(timeoutMs);
         const signal = AbortSignal.any([callerSignal, timeoutSignal]);
-        const outputTokens = Math.min(
-          request.budget.maxOutputTokens,
-          candidate.model.maxOutputTokens,
-        );
+        const outputTokens = reachForModelMaximum
+          ? candidate.model.maxOutputTokens
+          : Math.min(
+              request.budget.maxOutputTokens,
+              candidate.model.maxOutputTokens,
+            );
         let outcome: AttemptOutcome<T>;
         let usage: ModelUsage | undefined;
         let cost: ModelCost | undefined;
@@ -242,12 +372,23 @@ export function createModelGateway(
               maxOutputTokens: outputTokens,
               temperature: request.temperature,
               reasoning: request.reasoning,
+              ...(candidate.model.supportsPromptCache
+                ? { cacheKey: promptCacheKeyOf(request) }
+                : {}),
             },
             {
               signal,
-              attemptTimeoutMs: request.budget.attemptTimeoutMs,
+              attemptTimeoutMs: timeoutMs,
               attempt: attemptNumber,
               correlationId: request.attribution.correlationId,
+              ...(onTextDelta === undefined
+                ? {}
+                : {
+                    onTextDelta: (text: string) => {
+                      spoke.spoke = true;
+                      onTextDelta(text);
+                    },
+                  }),
             },
           );
           const latencyMs = Date.now() - startedAt;
@@ -306,15 +447,64 @@ export function createModelGateway(
                 },
               );
             }
-            const accepted = acceptStructuredOutput(result.text, schema);
+            const accepted = acceptStructuredOutput(result.text, schema, {
+              invalidListItems: accept.invalidListItems,
+              lenientFields: accept.lenientFields,
+              enumFallbacks: accept.enumFallbacks,
+              unknownRootKeys: accept.unknownRootKeys,
+            });
+            if (accepted.ok && (accepted.dropped?.length ?? 0) > 0) {
+              metrics.structuredRepairs.add(1, {
+                ...labels,
+                repair: (accepted.dropped?.[0] ?? "").slice(0, 80),
+              });
+              // Paths and codes only, never a value the model wrote.
+              logger?.warn(
+                {
+                  ...labels,
+                  qRunId: request.attribution.qRunId,
+                  dropped: accepted.dropped,
+                },
+                "structured output kept; refused list elements were dropped",
+              );
+            }
             if (!accepted.ok) {
+              // Room, not competence: the model was still writing when the
+              // ceiling stopped it, so the object it was building could not
+              // close. Retrying the same request at the same ceiling on any
+              // model reproduces this exactly.
+              const truncated = result.finish === "MAX_OUTPUT_TOKENS";
               outcome = {
                 kind: "FAILURE",
                 failureClass: "INVALID_MODEL_OUTPUT",
                 retryAfterMs: undefined,
                 cause: undefined,
+                ...(truncated ? { truncated: true } : {}),
               };
               span.setAttribute("q.model.invalid_output_stage", accepted.stage);
+              metrics.structuredRefusals.add(1, {
+                ...labels,
+                stage: accepted.stage,
+                refusal: (accepted.refusals?.[0] ?? "none").slice(0, 80),
+                truncated,
+              });
+              // The stage, and nothing the model wrote: which step of
+              // acceptance refused it is ours to act on, and it is the
+              // difference between "the model is wrong" and "our schema is
+              // asking for something this model cannot produce".
+              logger?.warn(
+                {
+                  ...labels,
+                  qRunId: request.attribution.qRunId,
+                  stage: accepted.stage,
+                  truncated,
+                  refusals: accepted.refusals ?? [],
+                },
+                "structured output refused",
+              );
+              if (truncated) {
+                span.setAttribute("q.model.output_truncated", true);
+              }
             } else {
               outcome = {
                 kind: "SUCCESS",
@@ -327,7 +517,13 @@ export function createModelGateway(
                   result.finish,
                   cost,
                   result.providerReference,
-                  { kind: "STRUCTURED", value: accepted.value },
+                  {
+                    kind: "STRUCTURED",
+                    value: accepted.value,
+                    ...((accepted.dropped?.length ?? 0) > 0
+                      ? { dropped: accepted.dropped }
+                      : {}),
+                  },
                 ),
               };
             }
@@ -364,6 +560,7 @@ export function createModelGateway(
         await recordUsage({
           tenantId: request.attribution.tenantId,
           userId: request.attribution.userId,
+          purpose: usagePurposeOf(request.attribution),
           qRunId: request.attribution.qRunId,
           taskClass: request.taskClass,
           providerId: candidate.provider.id,
@@ -395,9 +592,22 @@ export function createModelGateway(
           metrics.rateLimits.add(1, labels);
         }
         if (failureClass === undefined) {
-          health.recordSuccess(provider.code, clock.now());
+          health.recordSuccess(
+            provider.code,
+            candidate.model.modelCode,
+            clock.now(),
+          );
         } else {
-          health.recordFailure(provider.code, failureClass, clock.now());
+          health.recordFailure(
+            provider.code,
+            candidate.model.modelCode,
+            failureClass,
+            clock.now(),
+            latencyMs,
+            outcome.kind === "FAILURE" &&
+              outcome.cause instanceof ModelProviderFailure &&
+              outcome.cause.accountExhausted,
+          );
         }
         span.setAttribute("q.model.result", result);
         span.setAttribute("q.model.latency_ms", latencyMs);
@@ -470,13 +680,27 @@ export function createModelGateway(
         attributes: {
           "q.model.task_class": request.taskClass,
           "q.model.sensitivity": request.sensitivity,
+          "q.model.data_posture": request.dataPosture,
           "q.run_id": request.attribution.qRunId ?? "",
           "q.tenant_id": request.attribution.tenantId,
         },
       },
       async (span) => {
         try {
-          return await route(request, options.schema, callerSignal, span);
+          return await route(
+            request,
+            options.schema,
+            callerSignal,
+            span,
+            options.onTextDelta,
+            options.firstAttemptTimeoutMs,
+            {
+              invalidListItems: options.invalidListItems,
+              lenientFields: options.lenientFields,
+              enumFallbacks: options.enumFallbacks,
+              unknownRootKeys: options.unknownRootKeys,
+            },
+          );
         } finally {
           span.end();
         }
@@ -491,6 +715,9 @@ export function createModelGateway(
     span: {
       setAttribute: (key: string, value: string | number | boolean) => unknown;
     },
+    onTextDelta: ((text: string) => void) | undefined,
+    firstAttemptTimeoutMs: number | undefined,
+    accept: AcceptOptions,
   ): Promise<ModelGatewayResult<T>> {
     if (callerSignal.aborted) {
       throw new ModelGatewayError("model request cancelled before routing", {
@@ -498,6 +725,34 @@ export function createModelGateway(
         attempts: 0,
         candidates: [],
       });
+    }
+    if (dependencies.spendCap !== undefined) {
+      const verdict = await dependencies.spendCap.check();
+      if (!verdict.allowed) {
+        metrics.budgetRejected.add(1, {
+          task_class: request.taskClass,
+          scope: "DAILY_AGGREGATE",
+        });
+        // One structured line an operator can alert on: the Q failure
+        // class, the cap and today's spend, never content.
+        logger?.error(
+          {
+            qFailureClass: "BUDGET",
+            failureClass: "BUDGET_EXCEEDED",
+            spendCap: "DAILY_AGGREGATE",
+            capUsd: verdict.capUsd,
+            spentUsd: Number(verdict.spentUsd.toFixed(4)),
+            taskClass: request.taskClass,
+            qRunId: request.attribution.qRunId,
+          },
+          "daily model spend cap reached; request refused",
+        );
+        throw new ModelGatewayError("the daily model spend cap is reached", {
+          failureClass: "BUDGET_EXCEEDED",
+          attempts: 0,
+          candidates: [],
+        });
+      }
     }
     const now = clock.now();
     const catalog: ModelCatalog = indexCatalog(
@@ -516,6 +771,7 @@ export function createModelGateway(
       });
     }
     span.setAttribute("q.model.routing_policy", policy.code);
+    const hedgeAfterMs = policy.hedgeAfterMs ?? null;
     const tenantPolicy =
       request.tenantPolicy ??
       (await tenantPolicies.policyFor(request.attribution.tenantId));
@@ -527,7 +783,9 @@ export function createModelGateway(
         request,
         requiredCapabilities: requiredCapabilitiesFor(
           request.output,
-          request.requiredCapabilities,
+          messagesCarryImages(request.messages)
+            ? [...request.requiredCapabilities, "VISION"]
+            : request.requiredCapabilities,
           request.tools,
         ),
         estimatedInputTokens: estimateInputTokens(
@@ -535,6 +793,7 @@ export function createModelGateway(
           request.tools,
         ),
         tenantPolicy,
+        syntheticDemo: dependencies.syntheticDemo,
         now,
       },
       policy,
@@ -582,6 +841,12 @@ export function createModelGateway(
     let lastFailure: ModelFailureClass | undefined;
     let lastCause: unknown;
     let attemptNumber = 0;
+    /**
+     * An earlier answer hit the ceiling; later attempts ask for more. Held
+     * on an object rather than in a local so that reading it before an
+     * attempt does not depend on what that attempt turns out to be.
+     */
+    const room: { ranOut: boolean } = { ranOut: false };
 
     for (const candidate of plan.eligible) {
       const provider = dependencies.registry.get(candidate.provider.code);
@@ -619,29 +884,135 @@ export function createModelGateway(
           metrics.budgetRejected.add(1, { task_class: request.taskClass });
           break;
         }
+        // Whether another eligible model could take this request if this
+        // one does not answer.
+        const anotherCandidateWaits = plan.eligible.some(
+          (other) =>
+            other.candidateIndex > candidate.candidateIndex &&
+            dependencies.registry.get(other.provider.code) !== undefined,
+        );
+        // The first model is held to the caller's shorter patience only
+        // when there is somewhere else to go. A last resort gets the whole
+        // attempt budget.
+        const timeoutMs =
+          attemptNumber === 0 &&
+          anotherCandidateWaits &&
+          firstAttemptTimeoutMs !== undefined
+            ? Math.min(firstAttemptTimeoutMs, request.budget.attemptTimeoutMs)
+            : request.budget.attemptTimeoutMs;
         attemptNumber += 1;
         attemptsOnCandidate += 1;
-        const outcome = await attempt(
-          request,
-          candidate,
-          provider,
-          policy.id,
-          attemptNumber,
-          schema,
-          callerSignal,
-        );
-        attempts.push(outcome.record);
+        const spoke = { spoke: false };
+        const run = (
+          which: EligibleCandidate,
+          whichProvider: ModelProvider,
+          number: number,
+          signal: AbortSignal,
+          ms: number,
+        ) =>
+          attempt(
+            request,
+            which,
+            whichProvider,
+            policy.id,
+            number,
+            schema,
+            signal,
+            room.ranOut,
+            onTextDelta,
+            spoke,
+            ms,
+            accept,
+          );
+        // A hedge (L1): the first attempt of a request nobody is listening
+        // to word by word, with the policy's hedge configured and a second
+        // model eligible, asks that model too once hedgeAfterMs has passed.
+        const hedgeTo =
+          attemptNumber === 1 &&
+          onTextDelta === undefined &&
+          hedgeAfterMs !== null &&
+          request.budget.maxAttempts >= 2
+            ? plan.eligible.find(
+                (other) =>
+                  other.candidateIndex > candidate.candidateIndex &&
+                  dependencies.registry.get(other.provider.code) !==
+                    undefined &&
+                  spentUsd +
+                    candidate.estimatedAttemptCostUsd +
+                    other.estimatedAttemptCostUsd <=
+                    request.budget.maxEstimatedCostUsd,
+              )
+            : undefined;
+        const hedgeProvider =
+          hedgeTo === undefined
+            ? undefined
+            : dependencies.registry.get(hedgeTo.provider.code);
+        const settled =
+          hedgeTo === undefined ||
+          hedgeProvider === undefined ||
+          hedgeAfterMs === null
+            ? {
+                outcome: await run(
+                  candidate,
+                  provider,
+                  attemptNumber,
+                  callerSignal,
+                  timeoutMs,
+                ),
+                served: candidate,
+                extra: [] as ModelAttemptRecord[],
+              }
+            : await hedged({
+                first: (signal) =>
+                  run(candidate, provider, attemptNumber, signal, timeoutMs),
+                second: (signal) =>
+                  run(
+                    hedgeTo,
+                    hedgeProvider,
+                    attemptNumber + 1,
+                    signal,
+                    request.budget.attemptTimeoutMs,
+                  ),
+                firstCandidate: candidate,
+                secondCandidate: hedgeTo,
+                hedgeAfterMs,
+                callerSignal,
+                onHedge: () => {
+                  attemptNumber += 1;
+                  metrics.hedges.add(1, {
+                    task_class: request.taskClass,
+                    provider: hedgeTo.provider.code,
+                  });
+                  logger?.info(
+                    {
+                      taskClass: request.taskClass,
+                      routingPolicy: policy.code,
+                      first: `${candidate.provider.code}/${candidate.model.modelCode}`,
+                      second: `${hedgeTo.provider.code}/${hedgeTo.model.modelCode}`,
+                      hedgeAfterMs,
+                      qRunId: request.attribution.qRunId,
+                    },
+                    "model request hedged",
+                  );
+                },
+              });
+        const outcome = settled.outcome;
+        const served = settled.served;
+        attempts.push(outcome.record, ...settled.extra);
         spentUsd +=
-          outcome.record.cost?.amount ?? candidate.estimatedAttemptCostUsd;
+          outcome.record.cost?.amount ?? served.estimatedAttemptCostUsd;
+        for (const record of settled.extra) {
+          spentUsd += record.cost?.amount ?? 0;
+        }
 
         if (outcome.kind === "SUCCESS") {
           metrics.successes.add(1, {
             task_class: request.taskClass,
-            provider: candidate.provider.code,
-            model: candidate.model.modelCode,
+            provider: served.provider.code,
+            model: served.model.modelCode,
           });
           const fallbackUsed =
-            candidate.candidateIndex !== plan.eligible[0]?.candidateIndex;
+            served.candidateIndex !== plan.eligible[0]?.candidateIndex;
           const result: ModelGatewayResult<T> = {
             ...outcome.result,
             routingPolicyCode: policy.code,
@@ -651,7 +1022,7 @@ export function createModelGateway(
               routingPolicyCode: policy.code,
               routingPolicyVersion: policy.version,
               candidates: [...plan.decisions],
-              selectedCandidateIndex: candidate.candidateIndex,
+              selectedCandidateIndex: served.candidateIndex,
               fallbackUsed,
             },
           };
@@ -659,9 +1030,10 @@ export function createModelGateway(
           logger?.info(
             {
               taskClass: request.taskClass,
-              provider: candidate.provider.code,
-              model: candidate.model.modelCode,
+              provider: served.provider.code,
+              model: served.model.modelCode,
               routingPolicy: policy.code,
+              dataPosture: request.dataPosture,
               attempts: attempts.length,
               fallbackUsed,
               latencyMs: result.latencyMs,
@@ -676,6 +1048,28 @@ export function createModelGateway(
 
         lastFailure = outcome.failureClass;
         lastCause = outcome.cause;
+        if (spoke.spoke) {
+          // Part of the answer is already with the person. Another attempt
+          // would repeat it, and on a voice call it has been said aloud.
+          metrics.spokenFailures.add(1, {
+            task_class: request.taskClass,
+            provider: candidate.provider.code,
+          });
+          throw new ModelGatewayError(
+            "the model stopped after the answer had begun",
+            {
+              failureClass: outcome.failureClass,
+              attempts: attempts.length,
+              candidates: plan.decisions,
+              routingPolicyCode: policy.code,
+              cause: lastCause,
+            },
+          );
+        }
+        // Once an answer has been cut off, every later attempt asks for the
+        // most the chosen model will write. It never goes back down: the
+        // question that needed the room still needs it.
+        room.ranOut = room.ranOut || outcome.truncated === true;
         if (outcome.failureClass === "CANCELLED") {
           // The person stopped it. No retry, no fallback, no second answer.
           throw new ModelGatewayError("model request cancelled", {
@@ -686,8 +1080,21 @@ export function createModelGateway(
             cause: lastCause,
           });
         }
+        // A per-minute quota is spent for the whole minute: when another
+        // eligible model is waiting, moving to it now beats sleeping on
+        // this one. The same model is retried only when it is the last.
+        //
+        // A timeout is the same (CQ-VOICE-010). A model that has just used
+        // up a whole attempt without answering is the likeliest of all to
+        // do it again, and a second wait on it was the 24-second turn in
+        // the hosted ledger. With another model waiting, ask that one.
         const canRetryHere =
           isRetryableModelFailure(outcome.failureClass) &&
+          !(
+            (outcome.failureClass === "RATE_LIMIT" ||
+              outcome.failureClass === "TIMEOUT") &&
+            anotherCandidateWaits
+          ) &&
           attemptsOnCandidate < ATTEMPTS_PER_CANDIDATE &&
           attemptNumber < request.budget.maxAttempts;
         if (canRetryHere) {
@@ -739,6 +1146,100 @@ export function createModelGateway(
   }
 
   return { execute };
+}
+
+type Attempted<T> = AttemptOutcome<T> & {
+  readonly record: ModelAttemptRecord;
+};
+
+/**
+ * A hedged first attempt (L1 latency sweep, 2026-10-06).
+ *
+ * The first model is asked; if it has not settled after `hedgeAfterMs`,
+ * the second is asked too, WITHOUT stopping the first. The first success
+ * is the answer and the other attempt is cancelled (its own record lands
+ * in the usage ledger as CANCELLED). If both fail, the first's failure is
+ * returned for the loop to judge as before, with the second's record kept.
+ *
+ * Only for requests that stream nothing (the caller checks): two models
+ * must never both be heard.
+ */
+async function hedged<T>(input: {
+  readonly first: (signal: AbortSignal) => Promise<Attempted<T>>;
+  readonly second: (signal: AbortSignal) => Promise<Attempted<T>>;
+  readonly firstCandidate: EligibleCandidate;
+  readonly secondCandidate: EligibleCandidate;
+  readonly hedgeAfterMs: number;
+  readonly callerSignal: AbortSignal;
+  readonly onHedge: () => void;
+}): Promise<{
+  readonly outcome: Attempted<T>;
+  readonly served: EligibleCandidate;
+  readonly extra: ModelAttemptRecord[];
+}> {
+  const firstStop = new AbortController();
+  const first = input.first(
+    AbortSignal.any([input.callerSignal, firstStop.signal]),
+  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const hedgeTime = new Promise<"HEDGE">((resolve) => {
+    timer = setTimeout(() => {
+      resolve("HEDGE");
+    }, input.hedgeAfterMs);
+  });
+  const early = await Promise.race([first, hedgeTime]);
+  clearTimeout(timer);
+  if (early !== "HEDGE" || input.callerSignal.aborted) {
+    return {
+      outcome: early === "HEDGE" ? await first : early,
+      served: input.firstCandidate,
+      extra: [],
+    };
+  }
+  input.onHedge();
+  const secondStop = new AbortController();
+  const second = input.second(
+    AbortSignal.any([input.callerSignal, secondStop.signal]),
+  );
+  const winner = await new Promise<"FIRST" | "SECOND" | null>((resolve) => {
+    let failed = 0;
+    const settle = (which: "FIRST" | "SECOND", success: boolean) => {
+      if (success) {
+        resolve(which);
+        return;
+      }
+      failed += 1;
+      if (failed === 2) resolve(null);
+    };
+    first.then(
+      (outcome) => {
+        settle("FIRST", outcome.kind === "SUCCESS");
+      },
+      () => {
+        settle("FIRST", false);
+      },
+    );
+    second.then(
+      (outcome) => {
+        settle("SECOND", outcome.kind === "SUCCESS");
+      },
+      () => {
+        settle("SECOND", false);
+      },
+    );
+  });
+  if (winner === "FIRST") {
+    secondStop.abort();
+    second.catch(() => undefined);
+    return { outcome: await first, served: input.firstCandidate, extra: [] };
+  }
+  if (winner === "SECOND") {
+    firstStop.abort();
+    first.catch(() => undefined);
+    return { outcome: await second, served: input.secondCandidate, extra: [] };
+  }
+  const [a, b] = await Promise.all([first, second]);
+  return { outcome: a, served: input.firstCandidate, extra: [b.record] };
 }
 
 function stripOutput<T>(

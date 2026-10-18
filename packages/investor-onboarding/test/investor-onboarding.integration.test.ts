@@ -34,6 +34,7 @@ import {
   createOnboardingService,
   OnboardingSessionIdSchema,
   OnboardingSessionNotFoundError,
+  OnboardingSessionStateError,
   OnboardingSessionVersionConflictError,
   type OnboardingActor,
   type OnboardingService,
@@ -53,6 +54,7 @@ import { TAXONOMY_EVENTS } from "@capital-q/taxonomy/events";
 import {
   createInvestorDomainServices,
   createInvestorOnboardingIntegration,
+  INVESTOR_REVISABLE_STEPS,
   INVESTOR_STEPS,
   InvestorHandoffContextSchema,
   InvestorMandatesContextSchema,
@@ -206,6 +208,7 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
       outbox,
       writeTargets: investor.writeTargets,
       stepContextProviders: investor.stepContextProviders,
+      revisableSteps: { investor: INVESTOR_REVISABLE_STEPS },
       subjectResolvers: [
         createInvestorOrganisationOnboardingSubjectResolver(
           createPostgresInvestorOrganisationQueryPort({ sql: tx.sql }),
@@ -253,6 +256,7 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
       value: OnboardingResponseValue,
     ) => Promise<OnboardingSessionView>;
     readonly skip: (stepKey: string) => Promise<OnboardingSessionView>;
+    readonly withdraw: (stepKey: string) => Promise<OnboardingSessionView>;
     readonly back: (targetStepKey?: string) => Promise<OnboardingSessionView>;
     readonly refresh: () => Promise<OnboardingSessionView>;
   };
@@ -292,6 +296,17 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
       skip: async (stepKey) =>
         remember(
           await runtime.skipStep({
+            actor,
+            sessionId: id(),
+            stepKey,
+            expectedSessionVersion: current.session.version,
+            idempotencyKey: randomUUID(),
+            correlationId: CORRELATION(),
+          }),
+        ),
+      withdraw: async (stepKey) =>
+        remember(
+          await runtime.withdrawResponse({
             actor,
             sessionId: id(),
             stepKey,
@@ -635,6 +650,41 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
           value_jsonb: { kind: "codes", values: ["gambling"] },
         },
       ]);
+      // CQ-QX-008: an answer taken back leaves the mandate as if it was
+      // never given, and its history stays; a required step cannot be
+      // emptied; a new answer after a withdrawal is a new current row.
+      await journey.withdraw(INVESTOR_STEPS.avoid);
+      const afterWithdrawal = (await constraints(tx, mandateId)).filter(
+        (c) => c.dimension === "red_flag",
+      );
+      expect(afterWithdrawal.map((c) => c.importance)).toEqual([
+        "HARD_EXCLUSION",
+      ]);
+      expect(
+        journey
+          .view()
+          .responses.some((r) => r.stepKey === INVESTOR_STEPS.avoid),
+      ).toBe(false);
+      const history = await tx.sql<{ withdrawn: boolean }[]>`
+        select withdrawn_at is not null as withdrawn from onboarding.responses
+         where session_id = ${journey.view().session.id} and step_key = ${INVESTOR_STEPS.avoid}`;
+      expect(history).toEqual([{ withdrawn: true }]);
+      await expect(journey.withdraw(INVESTOR_STEPS.avoid)).rejects.toThrow();
+      await expect(journey.withdraw(INVESTOR_STEPS.stages)).rejects.toThrow();
+      // The move that motivated it: the only red flag on the softer list
+      // can now go to never-show.
+      await journey.submit(
+        INVESTOR_STEPS.hardExclusions,
+        multi(["gambling", "hardware_heavy"]),
+      );
+      await journey.submit(INVESTOR_STEPS.hardExclusions, multi(["gambling"]));
+      await journey.submit(INVESTOR_STEPS.avoid, multi(["hardware_heavy"]));
+      expect(
+        (await constraints(tx, mandateId))
+          .filter((c) => c.dimension === "red_flag")
+          .map((c) => c.importance),
+      ).toEqual(["AVOID", "HARD_EXCLUSION"]);
+
       expect(all.find((c) => c.dimension === "green_flag")).toMatchObject({
         importance: "STRONG",
         value_jsonb: {
@@ -750,6 +800,65 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
         correlationId: CORRELATION(),
       });
       expect(completed.session.status).toBe("COMPLETED");
+
+      // ADR 0024: a completed answer is revised through the same write
+      // targets, merged by dimension: new sectors replace the sectors only,
+      // the geographies stay, and the session stays completed.
+      const [sectorD] = await tx.sql<{ id: string }[]>`
+        select n.id from taxonomy.nodes n join taxonomy.vocabularies v on v.id = n.vocabulary_id
+         where v.code = 'industry' and n.status = 'ACTIVE' order by n.depth, n.canonical_code offset 3 limit 1`;
+      if (sectorD === undefined) throw new Error("industry seed missing");
+      const completedId = OnboardingSessionIdSchema.parse(completed.session.id);
+      const revise = (
+        stepKey: string,
+        value: OnboardingResponseValue,
+        version: number,
+      ) =>
+        world.service.runtime.reviseResponse({
+          actor: newcomer,
+          sessionId: completedId,
+          stepKey,
+          response: { value },
+          expectedSessionVersion: version,
+          idempotencyKey: randomUUID(),
+          correlationId: CORRELATION(),
+        });
+      const revised = await revise(
+        INVESTOR_STEPS.sectors,
+        nodes([sectorA, sectorD.id]),
+        completed.session.version,
+      );
+      expect(revised.session.status).toBe("COMPLETED");
+      const after = new Map(
+        (
+          await tx.sql<{ node_id: string; preference_strength: string }[]>`
+            select node_id, preference_strength from taxonomy.mandate_preferences where mandate_id = ${mandateId}`
+        ).map((p) => [p.node_id, p.preference_strength]),
+      );
+      expect(after.get(sectorD.id)).toBe("STRONG");
+      expect(after.get(sectorA)).toBe("STRONG");
+      expect(after.get(nigeria)).toBe("MUST");
+      const restaged = await revise(
+        INVESTOR_STEPS.stages,
+        multi(["seed"]),
+        revised.session.version,
+      );
+      expect(await mandateRow(tx, mandateId)).toMatchObject({
+        status: "ACTIVE",
+        min_stage_code: "seed",
+        max_stage_code: "seed",
+      });
+      // Not a revisable step, and a stale version: refused, nothing written.
+      await expect(
+        revise(
+          INVESTOR_STEPS.organisationName,
+          text("Renamed"),
+          restaged.session.version,
+        ),
+      ).rejects.toBeInstanceOf(OnboardingSessionStateError);
+      await expect(
+        revise(INVESTOR_STEPS.stages, multi(["seed"]), revised.session.version),
+      ).rejects.toBeInstanceOf(OnboardingSessionVersionConflictError);
 
       // Events: canonical facts come from the Investor domain, not from onboarding.
       const events = await tx.sql<{ event_type: string; payload: unknown }[]>`
@@ -988,6 +1097,38 @@ describe("@capital-q/investor-onboarding against local PostgreSQL", () => {
       expect(
         (await mandateRow(tx, other.mandateId))?.min_stage_code,
       ).toBeNull();
+    });
+  });
+
+  it("keeps a stage said before I1 on the investor's one draft, which I1 then offers (CQ-ACCEPT-001)", async () => {
+    await withWorld(async (world) => {
+      const { tx, newcomer } = world;
+      const journey = await startInvestor(world, newcomer);
+      await journey.submit(INVESTOR_STEPS.investorType, single("vc"));
+      await journey.submit(
+        INVESTOR_STEPS.organisationName,
+        text("Harmattan Ventures"),
+      );
+      // Said up front, before deployment status or a mandate choice: kept.
+      await journey.submit(INVESTOR_STEPS.stages, multi(["seed"]));
+      const investorId = investorIdOf(journey.view());
+      const drafts = await tx.sql<{ id: string; min_stage_code: string }[]>`
+        select id, min_stage_code from core.investor_mandates
+         where investor_organisation_id = ${investorId}`;
+      expect(drafts).toHaveLength(1);
+      expect(drafts[0]?.min_stage_code).toBe("seed");
+
+      // The deployment step creates nothing more, and I1 offers that draft.
+      await journey.skip(INVESTOR_STEPS.businessTitle);
+      await journey.submit(
+        INVESTOR_STEPS.deploymentStatus,
+        single("actively_investing"),
+      );
+      const offered = InvestorMandatesContextSchema.parse(
+        (await journey.refresh()).currentStep?.context,
+      );
+      expect(offered.candidates).toHaveLength(1);
+      expect(offered.suggestedMandateId).toBe(drafts[0]?.id);
     });
   });
 

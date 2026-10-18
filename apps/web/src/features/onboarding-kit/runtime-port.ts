@@ -1,6 +1,8 @@
 import type {
+  OnboardingResponseChannel,
   OnboardingResponseValue,
   OnboardingSessionView,
+  SayOnboardingResponse,
 } from "@capital-q/contracts";
 
 import {
@@ -28,6 +30,12 @@ export type RuntimePort = {
     readonly value: OnboardingResponseValue;
     readonly expectedSessionVersion: number;
     readonly idempotencyKey: string;
+    /**
+     * Which surface the answer was given in (lane ob1's response channel):
+     * provenance so coverage can say "from the form" or "from your
+     * conversation with Q". Absent when re-sending an answer already held.
+     */
+    readonly channel?: OnboardingResponseChannel | undefined;
   }) => Promise<OnboardingSessionView>;
   readonly skip: (input: {
     readonly sessionId: string;
@@ -49,6 +57,49 @@ export type RuntimePort = {
         readonly expectedSessionVersion: number;
         readonly idempotencyKey: string;
       }) => Promise<OnboardingSessionView>)
+    | undefined;
+  /**
+   * Answer or set aside one of Q's persisted questions (CQ-PRE-REC-001).
+   * Answering commits a normal validated response to the step the question
+   * (or one of its options) names. Absent on a port without the path.
+   */
+  readonly answerQuestion?:
+    | ((input: {
+        readonly sessionId: string;
+        readonly questionId: string;
+        readonly stepKey: string;
+        readonly value: OnboardingResponseValue;
+        readonly expectedSessionVersion: number;
+        readonly idempotencyKey: string;
+      }) => Promise<OnboardingSessionView>)
+    | undefined;
+  readonly dismissQuestion?:
+    | ((input: {
+        readonly sessionId: string;
+        readonly questionId: string;
+        readonly expectedSessionVersion: number;
+        readonly idempotencyKey: string;
+      }) => Promise<OnboardingSessionView>)
+    | undefined;
+  /**
+   * One turn of the conversational interview (CQ-PRE-REC-001 §16-§21):
+   * what the person said about the current step, placed by the runtime or
+   * recorded for Q's reading. Absent on a port without the path.
+   */
+  readonly say?:
+    | ((input: {
+        readonly sessionId: string;
+        readonly text: string;
+        readonly expectedSessionVersion: number;
+        readonly idempotencyKey: string;
+        /** The exchange so far, oldest first: same context typed as aloud. */
+        readonly recentTurns: readonly {
+          readonly role: "person" | "q";
+          readonly text: string;
+        }[];
+        /** The founder profile section they came to fill (Overview link). */
+        readonly focus?: string | undefined;
+      }) => Promise<SayOnboardingResponse>)
     | undefined;
   /**
    * Upload one document for a document-gathering step. Absent on a port
@@ -130,6 +181,7 @@ export type JourneyModel<
   readonly planSubmissions: (
     group: JourneyGroup,
     response: TResponse,
+    view: OnboardingSessionView,
   ) => readonly Submission[];
   readonly toPresentation: (
     view: OnboardingSessionView,
@@ -201,15 +253,19 @@ export function createRuntimeClient<
     if (!model.isSupportedVersion(view)) {
       throw new OnboardingClientError(
         "UNAVAILABLE",
-        "This version of Capital Q can't show your setup journey yet. Please refresh later.",
+        "This version of Capital Q can't show your setup journey yet. Reload the page later.",
       );
     }
     const group = model.currentGroup(view);
-    return model.toPresentation(
+    const presentation = model.toPresentation(
       view,
       source,
       await model.enrich(view, group, port),
     );
+    // The runtime view itself travels with the presentation: the
+    // conversational interview asks one runtime step at a time and needs
+    // its prompt, options and reasons, not the composite screen.
+    return { ...presentation, raw: view };
   };
 
   const eligibleStatus = (view: OnboardingSessionView, stepKey: string) =>
@@ -353,7 +409,7 @@ export function createRuntimeClient<
               if (resolve === undefined) {
                 throw new OnboardingClientError(
                   "UNAVAILABLE",
-                  "Capital Q can't record that decision on this build yet.",
+                  "Capital Q can't record that decision yet. Use the form for this step.",
                 );
               }
               const view = await session();
@@ -377,12 +433,142 @@ export function createRuntimeClient<
             }),
         }),
 
+    ...(port.answerQuestion === undefined
+      ? {}
+      : {
+          answerQuestion: (input: {
+            readonly questionId: string;
+            readonly stepKey: string;
+            readonly value: OnboardingResponseValue;
+          }) =>
+            guarded(async () => {
+              const answer = port.answerQuestion;
+              if (answer === undefined) {
+                throw new OnboardingClientError(
+                  "UNAVAILABLE",
+                  "Capital Q can't record that answer yet. Use the form for this step.",
+                );
+              }
+              const view = await session();
+              return present(
+                remember(
+                  await answer({
+                    sessionId: view.session.id,
+                    questionId: input.questionId,
+                    stepKey: input.stepKey,
+                    value: input.value,
+                    expectedSessionVersion: view.session.version,
+                    idempotencyKey: crypto.randomUUID(),
+                  }),
+                ),
+              );
+            }),
+        }),
+
+    reload: () =>
+      guarded(async () => {
+        latest = null;
+        return present(await session());
+      }),
+
+    // A tapped option is the same submission the form makes for that step:
+    // one validated response, the version the session is at, no text
+    // round trip through interpretation.
+    submitValue: (input: {
+      readonly stepKey: string;
+      readonly value: OnboardingResponseValue;
+    }) =>
+      guarded(async () => {
+        const view = await session();
+        return present(
+          remember(
+            await port.submit({
+              sessionId: view.session.id,
+              stepKey: input.stepKey,
+              value: input.value,
+              expectedSessionVersion: view.session.version,
+              idempotencyKey: crypto.randomUUID(),
+              // A tapped option in the conversation with Q.
+              channel: "CONVERSATION",
+            }),
+          ),
+        );
+      }),
+
+    ...(port.say === undefined
+      ? {}
+      : {
+          say: (input: {
+            readonly text: string;
+            readonly recentTurns: readonly {
+              readonly role: "person" | "q";
+              readonly text: string;
+            }[];
+            readonly focus?: string | undefined;
+          }) =>
+            guarded(async () => {
+              const say = port.say;
+              if (say === undefined) {
+                throw new OnboardingClientError(
+                  "UNAVAILABLE",
+                  "Capital Q can't take that yet. Use the form for this step.",
+                );
+              }
+              const view = await session();
+              const outcome = await say({
+                sessionId: view.session.id,
+                text: input.text,
+                expectedSessionVersion: view.session.version,
+                idempotencyKey: crypto.randomUUID(),
+                recentTurns: input.recentTurns,
+                ...(input.focus === undefined ? {} : { focus: input.focus }),
+              });
+              return {
+                view: await present(remember(outcome.view)),
+                understood: outcome.understood,
+                reply: outcome.reply,
+                navigate: outcome.navigate,
+                researching: outcome.researching,
+                askingAbout: outcome.askingAbout,
+                conduct: outcome.conduct,
+                gestures: outcome.gestures,
+              };
+            }),
+        }),
+
+    ...(port.dismissQuestion === undefined
+      ? {}
+      : {
+          dismissQuestion: (input: { readonly questionId: string }) =>
+            guarded(async () => {
+              const dismiss = port.dismissQuestion;
+              if (dismiss === undefined) {
+                throw new OnboardingClientError(
+                  "UNAVAILABLE",
+                  "Capital Q can't record that yet. Use the form for this step.",
+                );
+              }
+              const view = await session();
+              return present(
+                remember(
+                  await dismiss({
+                    sessionId: view.session.id,
+                    questionId: input.questionId,
+                    expectedSessionVersion: view.session.version,
+                    idempotencyKey: crypto.randomUUID(),
+                  }),
+                ),
+              );
+            }),
+        }),
+
     saveResponse: ({ stepId, response }) =>
       guarded(async () => {
         const group = requireGroup(stepId);
+        let view = await session();
         let plan: readonly Submission[];
         try {
-          plan = model.planSubmissions(group, response);
+          plan = model.planSubmissions(group, response, view);
         } catch (error) {
           throw new OnboardingClientError(
             "REJECTED",
@@ -391,7 +577,6 @@ export function createRuntimeClient<
               : "That answer couldn't be saved.",
           );
         }
-        let view = await session();
         for (const submission of plan) {
           const status = eligibleStatus(view, submission.stepKey);
           if (status === undefined || submission.action === "leave") {
@@ -415,6 +600,7 @@ export function createRuntimeClient<
                 value: submission.value,
                 expectedSessionVersion: view.session.version,
                 idempotencyKey: crypto.randomUUID(),
+                channel: "FORM",
               }),
             );
           } else if (status !== "SKIPPED") {

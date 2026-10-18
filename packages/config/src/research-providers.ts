@@ -1,0 +1,157 @@
+import { z } from "zod";
+
+import { ProviderCredential } from "./model-providers.js";
+
+/**
+ * Public-web research providers (CQ-Q-RESEARCH-001). Keys are server-only,
+ * revealed once at composition and handed to the adapter.
+ *
+ * Tavily: search + extract. Bright Data: the SERP API (search) and Web
+ * Unlocker (extract) when their zones are named, and the LinkedIn public
+ * profile datasets with the API key alone. Absent keys mean the matching
+ * tools are not composed; nothing falls back to a provider that was not
+ * configured.
+ */
+
+export const RESEARCH_PROVIDER_ENV_NAMES = [
+  "TAVILY_API_KEY",
+  "BRIGHT_DATA_API_KEY",
+  "SERP_API_KEY",
+  "SERPER_API_KEY",
+  "SCRAPING_BEE_API",
+  "SCRAPIG_BEE_API",
+] as const;
+
+const apiKey = z
+  .string()
+  .trim()
+  .min(16, "expected a provider API key")
+  .max(512, "expected a provider API key");
+
+const zone = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9_]{2,64}$/, "expected a Bright Data zone name");
+
+export const researchProviderEnvShape = {
+  TAVILY_API_KEY: apiKey.optional(),
+  BRIGHT_DATA_API_KEY: apiKey.optional(),
+  /** SerpApi (serpapi.com): a second Google index for search, behind Tavily. */
+  SERP_API_KEY: apiKey.optional(),
+  /** Serper.dev (google.serper.dev): Google results by one POST. */
+  SERPER_API_KEY: apiKey.optional(),
+  /** ScrapingBee: Google search and an HTML fetch for pages our egress cannot reach. */
+  SCRAPING_BEE_API: apiKey.optional(),
+  /** The same key under the name it was first deployed with (a typo kept for compatibility). */
+  SCRAPIG_BEE_API: apiKey.optional(),
+  /** The SERP API zone (control panel → Zones); search goes through Bright Data only when set. */
+  BRIGHT_DATA_SERP_ZONE: zone.optional(),
+  /** The Web Unlocker zone; page extraction goes through Bright Data only when set. */
+  BRIGHT_DATA_UNLOCKER_ZONE: zone.optional(),
+  /** UK Companies House REST API key (BIZ-009); absent means the registry is skipped. */
+  COMPANIES_HOUSE_API_KEY: z.string().trim().min(8).max(200).optional(),
+  /**
+   * SEC EDGAR's required contact User-Agent ("Capital Q ops@example.com",
+   * BIZ-009); absent means EDGAR is skipped.
+   */
+  SEC_EDGAR_USER_AGENT: z.string().trim().min(8).max(200).optional(),
+};
+
+export type BrightDataSecrets = {
+  readonly apiKey: ProviderCredential;
+  readonly serpZone: string | undefined;
+  readonly unlockerZone: string | undefined;
+};
+
+export type ResearchProviderSecrets = {
+  /** Tavily search + extract; absent means the research tools are not composed. */
+  readonly tavily: ProviderCredential | undefined;
+  /** Bright Data; absent means no profile lookups and no Bright Data search. */
+  readonly brightData: BrightDataSecrets | undefined;
+  /** SerpApi search; absent means one search index only. */
+  readonly serpApi: ProviderCredential | undefined;
+  /** Serper.dev search + page scrape; absent means that index is skipped. */
+  readonly serper?: ProviderCredential | undefined;
+  /** ScrapingBee Google search + HTML fetch; absent means that index is skipped. */
+  readonly scrapingBee?: ProviderCredential | undefined;
+  /** Companies House; absent means investor research skips it. */
+  readonly companiesHouse?: ProviderCredential | undefined;
+  /** The contact EDGAR requires; absent means investor research skips it. */
+  readonly secEdgarUserAgent?: string | undefined;
+};
+
+export type ResearchProviderConfigStatus = {
+  readonly tavily: "configured" | "unconfigured";
+  readonly brightData: "configured" | "unconfigured";
+  /** Both zones named: search and extraction may go through Bright Data. */
+  readonly brightDataZones: "configured" | "unconfigured";
+  readonly serpApi: "configured" | "unconfigured";
+  readonly serper: "configured" | "unconfigured";
+  readonly scrapingBee: "configured" | "unconfigured";
+};
+
+export function toResearchProviderSecrets(parsed: {
+  readonly TAVILY_API_KEY?: string | undefined;
+  readonly BRIGHT_DATA_API_KEY?: string | undefined;
+  readonly BRIGHT_DATA_SERP_ZONE?: string | undefined;
+  readonly BRIGHT_DATA_UNLOCKER_ZONE?: string | undefined;
+  readonly SERP_API_KEY?: string | undefined;
+  readonly SERPER_API_KEY?: string | undefined;
+  readonly SCRAPING_BEE_API?: string | undefined;
+  readonly SCRAPIG_BEE_API?: string | undefined;
+  readonly COMPANIES_HOUSE_API_KEY?: string | undefined;
+  readonly SEC_EDGAR_USER_AGENT?: string | undefined;
+}): ResearchProviderSecrets {
+  return {
+    companiesHouse:
+      parsed.COMPANIES_HOUSE_API_KEY === undefined
+        ? undefined
+        : new ProviderCredential(parsed.COMPANIES_HOUSE_API_KEY),
+    secEdgarUserAgent: parsed.SEC_EDGAR_USER_AGENT,
+    serper:
+      parsed.SERPER_API_KEY === undefined
+        ? undefined
+        : new ProviderCredential(parsed.SERPER_API_KEY),
+    scrapingBee:
+      (parsed.SCRAPING_BEE_API ?? parsed.SCRAPIG_BEE_API) === undefined
+        ? undefined
+        : new ProviderCredential(
+            parsed.SCRAPING_BEE_API ?? parsed.SCRAPIG_BEE_API ?? "",
+          ),
+    serpApi:
+      parsed.SERP_API_KEY === undefined
+        ? undefined
+        : new ProviderCredential(parsed.SERP_API_KEY),
+    tavily:
+      parsed.TAVILY_API_KEY === undefined
+        ? undefined
+        : new ProviderCredential(parsed.TAVILY_API_KEY),
+    brightData:
+      parsed.BRIGHT_DATA_API_KEY === undefined
+        ? undefined
+        : {
+            apiKey: new ProviderCredential(parsed.BRIGHT_DATA_API_KEY),
+            serpZone: parsed.BRIGHT_DATA_SERP_ZONE,
+            unlockerZone: parsed.BRIGHT_DATA_UNLOCKER_ZONE,
+          },
+  };
+}
+
+export function researchProviderConfigStatus(
+  secrets: ResearchProviderSecrets,
+): ResearchProviderConfigStatus {
+  return {
+    tavily: secrets.tavily === undefined ? "unconfigured" : "configured",
+    brightData:
+      secrets.brightData === undefined ? "unconfigured" : "configured",
+    brightDataZones:
+      secrets.brightData?.serpZone !== undefined &&
+      secrets.brightData.unlockerZone !== undefined
+        ? "configured"
+        : "unconfigured",
+    serpApi: secrets.serpApi === undefined ? "unconfigured" : "configured",
+    serper: secrets.serper === undefined ? "unconfigured" : "configured",
+    scrapingBee:
+      secrets.scrapingBee === undefined ? "unconfigured" : "configured",
+  };
+}

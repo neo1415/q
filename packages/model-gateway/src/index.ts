@@ -92,6 +92,12 @@ export {
   type ProviderHealthOptions,
 } from "./policy/health.js";
 export {
+  createSyntheticDemoRoutingAllowance,
+  SyntheticDemoRoutingRefusedError,
+  type SyntheticDemoRoutingAllowance,
+  type SyntheticDemoRoutingOptions,
+} from "./policy/synthetic-demo.js";
+export {
   acceptStructuredOutput,
   type StructuredOutcome,
 } from "./policy/structured.js";
@@ -114,5 +120,27 @@ export {
   createInMemoryModelUsageRepository,
   createPostgresModelUsageRepository,
 } from "./infrastructure/postgres-usage.js";
+export { createPostgresDailySpendReader } from "./infrastructure/postgres-daily-spend.js";
+export {
+  createDailySpendCap,
+  parseDailySpendCapUsd,
+  type DailySpendCapOptions,
+  type ModelSpendCap,
+  type SpendCapVerdict,
+} from "./policy/spend-cap.js";
+export {
+  createPostgresUsageReader,
+  monthOf,
+  type AdminMonthUsage,
+  type OwnMonthUsage,
+  type UsageReader,
+  type WorkforceCostRow,
+} from "./infrastructure/usage-reader.js";
 
 export const PACKAGE_NAME = "@capital-q/model-gateway" as const;
+
+export {
+  withTestRouting,
+  TestRoutingRefusedError,
+  type TestRoutingOptions,
+} from "./policy/test-route.js";

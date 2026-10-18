@@ -16,6 +16,7 @@ import {
   runRef,
   type QRunRecord,
 } from "@capital-q/q-runtime";
+import { createRecommendationNarrator } from "@capital-q/q-specialists";
 
 import {
   Q_EVAL_HARD_INVARIANTS,
@@ -38,6 +39,7 @@ import {
   type QEvalWorld,
   type QEvalWorldOptions,
 } from "../fixtures/world.js";
+import { driveGateQInterview } from "./gateq-interview.js";
 import { graderById, type QEvalObservation } from "../graders/index.js";
 
 /**
@@ -239,7 +241,7 @@ async function runCase(
           graderVersion: "1",
           kind: "DETERMINISTIC",
           verdict: "FAIL",
-          detail: `runner error: ${error instanceof Error ? error.name : typeof error}`,
+          detail: `runner error: ${error instanceof Error ? `${error.name}: ${error.message}` : typeof error}`,
         },
       ],
     };
@@ -326,6 +328,7 @@ async function execute(
   const { execution } = evalCase;
   world.recorder.reset();
   world.setProposer(null);
+  world.resetProviderHealth();
   switch (execution.kind) {
     case "Q_RUN":
     case "STREAM":
@@ -336,7 +339,64 @@ async function execute(
       return executeActionGate(world, evalCase, keepAnswers);
     case "ROUTING":
       return executeRouting(world, evalCase);
+    case "EXPLANATION":
+      return executeExplanation(world, evalCase);
+    case "GATEQ_INTERVIEW":
+      return executeGateQInterview(world, evalCase, keepAnswers);
   }
+}
+
+/**
+ * One GateQ applicant turn, through the real interviewer (CQ-GATE-002R
+ * §13).
+ *
+ * No run, no database, no intake service: the interviewer is handed a
+ * gateway, a frozen policy and GATE-001's answer, and may only propose.
+ * The reply is kept for the marker graders and for a person to read; it
+ * never reaches a baseline.
+ */
+async function executeGateQInterview(
+  world: QEvalWorld,
+  evalCase: QEvalCase,
+  keepAnswers: boolean,
+): Promise<QEvalObservation> {
+  const before = snapshot(world);
+  const startedAt = Date.now();
+  const { observation, reply } = await driveGateQInterview(world, evalCase);
+  const calls = world.recorder.calls();
+  return {
+    record: {
+      ...emptyRecord(world),
+      runCreation: "REFUSED",
+      latencyMs: Date.now() - startedAt,
+      providerAttempts: calls.length,
+      failedAttempts: observation.unavailable ? calls.length : 0,
+      answerCharacters: reply?.length ?? null,
+      // Kept only when a person asked to read the turns. The marker
+      // graders read `answerText` below either way; this is the copy that
+      // reaches the report a reviewer opens.
+      answerText: keepAnswers ? (reply?.slice(0, 8000) ?? null) : null,
+    },
+    providerCalls: calls,
+    answerText: reply,
+    analyst: null,
+    events: [],
+    logLines: world.logLines.slice(before.logCursor),
+    scenario: {
+      approvalsCreated: 0,
+      executionsBefore: before.executions,
+      executionsAfter: world.executions(),
+      gateOutcome: null,
+      approvalStatusAfter: null,
+      streamSequences: null,
+      streamConverged: null,
+      providerCallsAfterCancel: null,
+      routing: null,
+      explanation: null,
+      comparison: null,
+      gateq: observation,
+    },
+  };
 }
 
 type RunOutcome = {
@@ -355,7 +415,11 @@ async function driveRun(
   presetOverride?: "BALANCED" | "DIRECT",
 ): Promise<RunOutcome> {
   const execution = evalCase.execution;
-  if (execution.kind === "ROUTING") {
+  if (
+    execution.kind === "ROUTING" ||
+    execution.kind === "EXPLANATION" ||
+    execution.kind === "GATEQ_INTERVIEW"
+  ) {
     throw new Error("not a run");
   }
   const input = execution.input;
@@ -590,7 +654,9 @@ async function executeRun(
       streamConverged,
       providerCallsAfterCancel: outcome.providerCallsAfterCancel,
       routing: null,
+      explanation: null,
       comparison,
+      gateq: null,
     },
   };
 }
@@ -713,7 +779,9 @@ async function executeActionGate(
       streamConverged: null,
       providerCallsAfterCancel: null,
       routing: null,
+      explanation: null,
       comparison: null,
+      gateq: null,
     },
   };
 }
@@ -728,9 +796,13 @@ async function executeRouting(
   }
   const before = snapshot(world);
   const person = world.people.FOUNDER;
+  // The reviewed ceiling is CONFIDENTIAL (gpt-5.6-luna, 20261006100000; the
+  // routing policies name no other reviewed model since 20261008120000), so
+  // the request no configured provider may serve is HIGHLY_CONFIDENTIAL;
+  // INTERNAL still has exactly one route.
   const sensitivity =
     execution.scenario === "INELIGIBLE_PROVIDER_EXCLUDED"
-      ? "CONFIDENTIAL"
+      ? "HIGHLY_CONFIDENTIAL"
       : "INTERNAL";
   if (world.providerMode === "FAKE") {
     world.setScript(
@@ -799,7 +871,9 @@ async function executeRouting(
       streamConverged: null,
       providerCallsAfterCancel: null,
       routing: { attemptsByProvider, outcome },
+      explanation: null,
       comparison: null,
+      gateq: null,
     },
   };
 }
@@ -807,6 +881,182 @@ async function executeRouting(
 // ---------------------------------------------------------------------------
 // Aggregation
 // ---------------------------------------------------------------------------
+
+/**
+ * The factors an explanation case hands the narrator.
+ *
+ * One realistic slate item: a preference that matched, one that did not,
+ * and one the ranker could not establish. Deliberately NOT every dimension
+ * -- cheque and the semantic signal are absent, so a model that reaches for
+ * either is inventing a reason, and the grounding rule can say so.
+ */
+const EXPLANATION_FACTORS = {
+  matched: [
+    {
+      dimension: "STAGE",
+      outcome: "MATCH" as const,
+      label: "Seed, inside the declared range",
+    },
+  ],
+  mismatched: [
+    {
+      dimension: "GEOGRAPHY",
+      outcome: "MISMATCH" as const,
+      label: "outside the declared markets",
+    },
+  ],
+  uncertainties: [
+    {
+      dimension: "TAXONOMY",
+      outcome: "UNKNOWN" as const,
+      label: "sector not established",
+    },
+  ],
+};
+
+const EXPLANATION_COMPANY =
+  "A synthetic company invented for this suite. It makes industrial sensors.";
+const EXPLANATION_INVESTOR =
+  "A synthetic mandate invented for this suite: pre-seed to seed, named markets.";
+
+/** A schema-valid narration the grounding rules accept. */
+function narration(overrides: Record<string, unknown> = {}): FakeBehaviour {
+  return {
+    kind: "JSON",
+    value: {
+      explanation:
+        "Stage lines up with what you have said you invest in. Geography is not: the company sits outside the markets your mandate names. The sector has not been established, so it stays open.",
+      matched: ["stage"],
+      notMatched: ["geography"],
+      hardConstraintsFailed: [],
+      unknowns: ["sector"],
+      confidence: "MODERATE",
+      overallFitRestated: null,
+      ...overrides,
+    },
+    usage: { inputTokens: 400, cachedInputTokens: 0, outputTokens: 90 },
+  };
+}
+
+/**
+ * One recommendation explanation, through the real narrator, the real
+ * gateway and the real catalogue (CQ-REC-007 C).
+ *
+ * No Q run is created: the narrator is not asked a question. It is handed
+ * factors REC-005 already produced and allowed only to phrase them, which
+ * is the whole of doc 19 section 59. What is observed is what the narrator
+ * decided and which providers it reached -- never the sentence, which
+ * belongs to the run and not to a baseline.
+ */
+async function executeExplanation(
+  world: QEvalWorld,
+  evalCase: QEvalCase,
+): Promise<QEvalObservation> {
+  const execution = evalCase.execution;
+  if (execution.kind !== "EXPLANATION") {
+    throw new Error("not an explanation case");
+  }
+  const before = snapshot(world);
+  const { scenario } = execution;
+
+  if (world.providerMode === "FAKE") {
+    world.setScript(
+      scenario === "MODEL_UNAVAILABLE_FALLS_BACK"
+        ? [{ kind: "FAIL", failureClass: "PROVIDER_OUTAGE" }]
+        : scenario === "QUANTITY_INVENTED"
+          ? [
+              narration({
+                explanation:
+                  "Stage lines up, and overall this is about 80 percent of what you look for.",
+              }),
+            ]
+          : scenario === "DIMENSION_NOT_SUPPLIED"
+            ? [
+                narration({
+                  explanation:
+                    "Stage lines up with what you have said you invest in, and the cheque you write fits too.",
+                }),
+              ]
+            : scenario === "UNKNOWN_CLAIMED_AS_MATCH"
+              ? [
+                  narration({
+                    matched: ["stage", "the sector matches your mandate"],
+                  }),
+                ]
+              : scenario === "OVERALL_FIT_INVENTED"
+                ? [narration({ overallFitRestated: "strong fit" })]
+                : [narration()],
+    );
+  }
+
+  // A real customer's material carries no posture; the demo one attests.
+  const posture =
+    scenario === "SYNTHETIC_DEMO_MAY_USE_FREE_TIER"
+      ? ("SYNTHETIC_DEMO" as const)
+      : ("REAL_CUSTOMER" as const);
+  const narrator = createRecommendationNarrator({
+    gateway: world.gateway,
+    dataPosture: posture,
+  });
+
+  const person = world.people.INVESTOR;
+  const empty = scenario === "NOTHING_TO_EXPLAIN";
+  const startedAt = Date.now();
+  const result = await narrator.narrate({
+    tenantId: person.actor.tenantId,
+    userId: person.actor.userId,
+    correlationId: CORRELATION(),
+    companyDescription: EXPLANATION_COMPANY,
+    investorDescription: EXPLANATION_INVESTOR,
+    matchedFactors: empty ? [] : EXPLANATION_FACTORS.matched,
+    mismatchedFactors: empty ? [] : EXPLANATION_FACTORS.mismatched,
+    uncertainties: empty ? [] : EXPLANATION_FACTORS.uncertainties,
+  });
+
+  const calls = world.recorder.calls();
+  const attemptsByProvider: Record<string, number> = {};
+  for (const call of calls) {
+    attemptsByProvider[call.providerCode] =
+      (attemptsByProvider[call.providerCode] ?? 0) + 1;
+  }
+  const record: QEvalExecutionRecord = {
+    ...emptyRecord(world),
+    runCreation: "REFUSED",
+    latencyMs: Date.now() - startedAt,
+    providerAttempts: calls.length,
+    failedAttempts: result.kind === "NARRATED" ? 0 : calls.length,
+  };
+  return {
+    record,
+    providerCalls: calls,
+    // Held for the marker graders only; it is never written to a baseline.
+    answerText: result.kind === "NARRATED" ? result.summary : null,
+    analyst: null,
+    events: [],
+    logLines: world.logLines.slice(before.logCursor),
+    scenario: {
+      approvalsCreated: 0,
+      executionsBefore: before.executions,
+      executionsAfter: world.executions(),
+      gateOutcome: null,
+      approvalStatusAfter: null,
+      streamSequences: null,
+      streamConverged: null,
+      providerCallsAfterCancel: null,
+      routing: null,
+      explanation: {
+        outcome:
+          result.kind === "NARRATED"
+            ? "NARRATED"
+            : `UNAVAILABLE:${result.reason}`,
+        attemptsByProvider,
+        syntheticDemoAttested: world.syntheticDemo !== null,
+      },
+      comparison: null,
+      gateq: null,
+    },
+  };
+}
 
 function aggregate(input: {
   readonly runId: string;

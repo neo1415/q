@@ -4,6 +4,9 @@ import type {
   StoredObjectMetadata,
   StoredObjectRef,
   StoredObjectStream,
+  DirectDownloadAuthorization,
+  PrivateBatchDownloadAuthorizer,
+  PrivateDocumentDownloadAuthorizer,
 } from "../application/storage-port.js";
 import { DocumentStorageUnavailableError } from "../domain/errors.js";
 
@@ -31,14 +34,6 @@ export type SupabaseStorageProviderOptions = {
   readonly timeoutMs?: number | undefined;
 };
 
-/**
- * Supabase mints signed upload tokens with a fixed two-hour lifetime; it is
- * not configurable per request. Capital Q's own upload session closes well
- * before that, and finalization fails closed once it does, so a token that
- * outlives the session cannot produce a document version.
- */
-const PROVIDER_UPLOAD_TTL_SECONDS = 7200;
-
 /** Generous for a 25 MiB read over a local network, bounded all the same. */
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -49,32 +44,38 @@ function encodeKey(key: string): string {
     .join("/");
 }
 
-/** Reads `exp` from our own freshly minted token; falls back to the documented TTL. */
+/** Read the actual expiry from the token minted by our authenticated provider.
+ * A documented TTL is not proof of this authorization's lifetime. */
 function providerExpiryFromToken(token: string): string {
-  const fallback = new Date(
-    Date.now() + PROVIDER_UPLOAD_TTL_SECONDS * 1000,
-  ).toISOString();
-  const payload = token.split(".")[1];
-  if (payload === undefined) return fallback;
   try {
+    const parts = token.split(".");
+    if (parts.length !== 3 || parts[1] === undefined)
+      throw new DocumentStorageUnavailableError();
     const decoded: unknown = JSON.parse(
-      Buffer.from(payload, "base64url").toString("utf8"),
+      Buffer.from(parts[1], "base64url").toString("utf8"),
     );
-    const exp =
+    const exp: unknown =
       typeof decoded === "object" && decoded !== null
-        ? (decoded as { readonly exp?: unknown }).exp
+        ? Reflect.get(decoded, "exp")
         : undefined;
-    return typeof exp === "number" && Number.isFinite(exp)
-      ? new Date(exp * 1000).toISOString()
-      : fallback;
+    if (
+      typeof exp !== "number" ||
+      !Number.isSafeInteger(exp) ||
+      exp * 1000 <= Date.now()
+    )
+      throw new DocumentStorageUnavailableError();
+    return new Date(exp * 1000).toISOString();
   } catch {
-    return fallback;
+    // No token or provider response may enter the public error.
+    throw new DocumentStorageUnavailableError();
   }
 }
 
 export function createSupabaseDocumentStorageProvider(
   options: SupabaseStorageProviderOptions,
-): PrivateDocumentStorageProvider {
+): PrivateDocumentStorageProvider &
+  PrivateDocumentDownloadAuthorizer &
+  PrivateBatchDownloadAuthorizer {
   const base = `${options.supabaseUrl.replace(/\/+$/, "")}/storage/v1`;
   const call = options.fetch ?? fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -127,9 +128,19 @@ export function createSupabaseDocumentStorageProvider(
       if (typeof signedPath !== "string" || typeof token !== "string") {
         throw new DocumentStorageUnavailableError();
       }
+      const uploadUrl = new URL(`${base}${signedPath}`);
+      const expectedUrl = new URL(
+        `${base}/object/upload/sign/${objectPath(input.object)}`,
+      );
+      if (
+        uploadUrl.origin !== expectedUrl.origin ||
+        uploadUrl.pathname !== expectedUrl.pathname ||
+        uploadUrl.searchParams.get("token") !== token
+      )
+        throw new DocumentStorageUnavailableError();
       return {
         method: "PUT",
-        url: `${base}${signedPath}`,
+        url: uploadUrl.toString(),
         headers: {
           "content-type": input.contentType,
           // The token already refuses to replace an existing object; saying
@@ -138,6 +149,74 @@ export function createSupabaseDocumentStorageProvider(
         },
         providerExpiresAt: providerExpiryFromToken(token),
       };
+    },
+
+    createDownloadAuthorization: async (
+      input,
+    ): Promise<DirectDownloadAuthorization> => {
+      const response = await request(
+        `/object/sign/${objectPath(input.object)}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ expiresIn: input.expiresInSeconds }),
+        },
+      );
+      if (!response.ok) throw new DocumentStorageUnavailableError();
+      const body: unknown = await response.json().catch(() => null);
+      const signed =
+        typeof body === "object" && body !== null
+          ? (body as { readonly signedURL?: unknown }).signedURL
+          : undefined;
+      if (typeof signed !== "string" || !signed.startsWith("/object/sign/")) {
+        throw new DocumentStorageUnavailableError();
+      }
+      const download =
+        input.downloadFilename === undefined
+          ? ""
+          : `&download=${encodeURIComponent(input.downloadFilename)}`;
+      return {
+        url: `${base}${signed}${download}`,
+        providerExpiresAt: new Date(
+          Date.now() + input.expiresInSeconds * 1000,
+        ).toISOString(),
+      };
+    },
+
+    // Many objects of one bucket in one call (a list's pictures). An entry
+    // the provider could not sign is null; nothing here decides who reads.
+    createDownloadAuthorizations: async (input) => {
+      if (input.keys.length === 0) return [];
+      const response = await request(
+        `/object/sign/${encodeURIComponent(input.bucket)}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            expiresIn: input.expiresInSeconds,
+            paths: input.keys,
+          }),
+        },
+      );
+      if (!response.ok) throw new DocumentStorageUnavailableError();
+      const body: unknown = await response.json().catch(() => null);
+      if (!Array.isArray(body)) throw new DocumentStorageUnavailableError();
+      const byPath = new Map<string, string>();
+      for (const entry of body as readonly unknown[]) {
+        if (typeof entry !== "object" || entry === null) continue;
+        const { path, signedURL } = entry as {
+          readonly path?: unknown;
+          readonly signedURL?: unknown;
+        };
+        if (
+          typeof path === "string" &&
+          typeof signedURL === "string" &&
+          signedURL.startsWith("/object/sign/")
+        ) {
+          byPath.set(path, `${base}${signedURL}`);
+        }
+      }
+      return input.keys.map((key) => byPath.get(key) ?? null);
     },
 
     statObject: async (object): Promise<StoredObjectMetadata | null> => {

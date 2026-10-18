@@ -1,0 +1,440 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+
+import { buttonClassName } from "@capital-q/ui/button";
+import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
+
+import { QAperture } from "@/features/q-aperture";
+import { useHomeHref } from "@/features/q/active-conversation";
+import {
+  describeMoment,
+  momentDraft,
+  type QMoment,
+  type QMomentSource,
+} from "@/features/q/q-moment";
+import { ArrivalDock } from "@/features/briefing/arrival-dock";
+import { AnswerChip } from "@/features/q/answer-chip";
+import { setScreenFocusSource } from "@/features/q/screen";
+import { QSessionProvider, useQSessionOptional } from "@/features/q/q-session";
+import {
+  QSubjectProvider,
+  useQAboutLabel,
+  useQSubject,
+  type QSubject,
+} from "@/features/q/q-subject";
+import { QSounds } from "@/features/q-sound/q-sounds";
+import { QEdgeFlow } from "@/features/q-swarm/q-edge-flow";
+import { WakeWord } from "@/features/wake/wake-word";
+import { useT } from "@/features/i18n/language";
+
+/**
+ * P9: the side panel's conversation is code most page views never run,
+ * so it is not in every page's first download. It is fetched when the
+ * person reaches for Q (pointer or focus on the trigger) or, failing that,
+ * once the page has gone quiet, so opening it later is still immediate.
+ */
+const loadQSheet = () => import("@/features/q/q-sheet");
+const QSheetConversation = dynamic(
+  () => loadQSheet().then((m) => m.QSheetConversation),
+  { ssr: false, loading: () => <QSheetPending /> },
+);
+let qSheetRequested = false;
+function preloadQSheet(): void {
+  if (qSheetRequested) return;
+  qSheetRequested = true;
+  // A failed preload is retried by the real open (next/dynamic imports again).
+  loadQSheet().catch(() => {
+    qSheetRequested = false;
+  });
+}
+
+/** Holds the panel's shape while its code arrives; no spinner. */
+function QSheetPending() {
+  const t = useT();
+  return (
+    <div
+      className="flex flex-1 flex-col gap-3 p-4"
+      aria-busy="true"
+      aria-label={t("Opening Q")}
+    >
+      <div className="h-4 w-2/3 bg-(--cq-surface-subtle)" />
+      <div className="h-4 w-1/2 bg-(--cq-surface-subtle)" />
+      <div className="mt-auto h-12 w-full bg-(--cq-surface-subtle)" />
+    </div>
+  );
+}
+
+/**
+ * Q, present on every page (ADR 0017 F1): the one conversation store, the
+ * sidebar's Q entry, the floating dock (features/q-dock) and the panel it
+ * opens, all around the same conversation.
+ *
+ * The panel is Q beside the page, about whatever the page is looking at.
+ * On the Q page, which is Q, it never opens: the page is the full view of
+ * the same conversation. Nothing here touches the microphone until the
+ * person asks to talk.
+ */
+
+type GlobalQValue = {
+  readonly open: boolean;
+  readonly setOpen: (open: boolean) => void;
+  readonly connected: boolean;
+  /** A draft question the panel opens with; null for an empty composer. */
+  readonly seed: string | null;
+  readonly askAbout: (seed: string) => void;
+  /**
+   * Run a whole question now (C8, founder brief 2026-10-05): a suggestion
+   * Q wrote is sent as tapped, never put in a box to send again.
+   */
+  readonly askNow: (question: string) => void;
+  /** The question waiting to be sent by `askNow`, once per id. */
+  readonly run: { readonly id: number; readonly text: string } | null;
+  /** Where in a pitch the person was when this opening happened. */
+  readonly moment: QMoment | null;
+  readonly registerMomentSource: (source: QMomentSource | null) => void;
+};
+
+const GlobalQContext = createContext<GlobalQValue>({
+  open: false,
+  setOpen: () => undefined,
+  connected: false,
+  seed: null,
+  askAbout: () => undefined,
+  askNow: () => undefined,
+  run: null,
+  moment: null,
+  registerMomentSource: () => undefined,
+});
+
+const Q_PAGE = "/home";
+
+export function GlobalQProvider({
+  subject,
+  connected,
+  children,
+  dock,
+}: {
+  /** The person's own subject, resolved on the server. */
+  readonly subject: QSubject;
+  /** False when this build has no Q API. */
+  readonly connected: boolean;
+  readonly children: ReactNode;
+  /** The floating presence, rendered inside the store. */
+  readonly dock?: ReactNode | undefined;
+}) {
+  const pathname = usePathname();
+  const onQPage = pathname === Q_PAGE;
+  const [requested, setRequested] = useState(false);
+  const [seed, setSeed] = useState<string | null>(null);
+  const [moment, setMoment] = useState<QMoment | null>(null);
+  /**
+   * What the page says is on screen, asked at the instant Q opens --
+   * whichever way it was opened (the rail, the dock, Ctrl/Cmd+K). Read
+   * then and not tracked, because a playback position changes every frame
+   * and only the one at the moment of asking means anything.
+   */
+  const momentSource = useRef<QMomentSource | null>(null);
+  const registerMomentSource = useCallback((source: QMomentSource | null) => {
+    momentSource.current = source;
+    // R21: the same source answers every turn's screen, not just opening.
+    setScreenFocusSource(source);
+  }, []);
+  const openWith = useCallback((explicitSeed: string | null) => {
+    const read = momentSource.current?.() ?? null;
+    const at = read?.kind === "PITCH_MOMENT" ? read : null;
+    setMoment(at);
+    setSeed(explicitSeed ?? (at === null ? null : momentDraft(at)));
+    setRequested(true);
+  }, []);
+  // A draft and a moment belong to the opening that asked for them;
+  // closing drops both so the next plain "Ask Q" starts empty.
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (next) {
+        openWith(null);
+        return;
+      }
+      setRequested(false);
+      setSeed(null);
+      setMoment(null);
+    },
+    [openWith],
+  );
+  const openQ = useCallback(() => {
+    openWith(null);
+  }, [openWith]);
+  const askAbout = useCallback(
+    (next: string) => {
+      openWith(next);
+    },
+    [openWith],
+  );
+  // Arriving on the Q page closes the panel: the page is the same
+  // conversation in full. Derived, so the panel is gone in the very
+  // render that shows the page -- which is what lets the aperture morph
+  // from one to the other in the navigation's transition.
+  const [run, setRun] = useState<{
+    readonly id: number;
+    readonly text: string;
+  } | null>(null);
+  const askNow = useCallback(
+    (question: string) => {
+      const text = question.trim();
+      if (text.length === 0) return;
+      // Off the Q page the panel opens on the answer as it comes.
+      if (!onQPage) openWith(null);
+      setRun((current) => ({ id: (current?.id ?? 0) + 1, text }));
+    },
+    [onQPage, openWith],
+  );
+  const open = requested && !onQPage;
+  const [closedFor, setClosedFor] = useState(pathname);
+  if (closedFor !== pathname) {
+    setClosedFor(pathname);
+    if (onQPage && requested) {
+      setRequested(false);
+      setSeed(null);
+      setMoment(null);
+    }
+  }
+
+  // Control/Command+K opens Q from anywhere (doc 17 §164); on the Q page
+  // it goes to the command bar.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "k") return;
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      event.preventDefault();
+      if (window.location.pathname === Q_PAGE) {
+        document.getElementById("home-q")?.focus();
+        return;
+      }
+      openWith(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openWith]);
+
+  // P9: off the Q page, fetch the panel's code once the page has settled,
+  // so a later open is immediate even on a slow line. Never on Save-Data.
+  useEffect(() => {
+    if (onQPage) return;
+    const connection = (
+      navigator as Navigator & { connection?: { saveData?: boolean } }
+    ).connection;
+    if (connection?.saveData === true) return;
+    const timer = window.setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        window.requestIdleCallback(preloadQSheet, { timeout: 4000 });
+      } else {
+        preloadQSheet();
+      }
+    }, 4000);
+    return () => window.clearTimeout(timer);
+  }, [onQPage]);
+
+  const value = useMemo<GlobalQValue>(
+    () => ({
+      open,
+      setOpen,
+      connected,
+      seed,
+      askAbout,
+      askNow,
+      run,
+      moment,
+      registerMomentSource,
+    }),
+    [
+      open,
+      setOpen,
+      connected,
+      seed,
+      askAbout,
+      askNow,
+      run,
+      moment,
+      registerMomentSource,
+    ],
+  );
+  return (
+    <QSubjectProvider own={subject}>
+      <QSessionProvider connected={connected}>
+        <GlobalQContext.Provider value={value}>
+          {children}
+          <GlobalQSheet />
+          <GlobalQRunner />
+          <AnswerChip />
+          {/* The arrival briefing beside the dock on every other page. */}
+          <ArrivalDock />
+          <QSounds />
+          {/* ADR 0062: particles around the page edge while Q works. */}
+          <QEdgeFlow />
+          {/* D1: "Hey Q"; off by default, and nothing loads while off. */}
+          <WakeWord openQ={openQ} />
+          {dock}
+        </GlobalQContext.Provider>
+      </QSessionProvider>
+    </QSubjectProvider>
+  );
+}
+
+/**
+ * Open Q beside the page, from the page.
+ *
+ * `QPageSubject` says what Q is looking at; this says when to show it.
+ * Neither grants anything: the subject is resolved and authorised again
+ * by the Q API on every run. `askAbout` opens with a draft question the
+ * person edits or sends, never a message sent for them (CQ-WEB-024).
+ */
+export function useGlobalQ(): {
+  readonly open: boolean;
+  readonly setOpen: (open: boolean) => void;
+  readonly askAbout: (seed: string) => void;
+  readonly askNow: (question: string) => void;
+} {
+  const { open, setOpen, askAbout, askNow } = useContext(GlobalQContext);
+  return { open, setOpen, askAbout, askNow };
+}
+
+/**
+ * Let Q know where in a pitch the person is, whenever they open it from
+ * this page. The source is read at the instant of opening; it is cleared
+ * when the page unmounts.
+ */
+export function useQMomentSource(source: QMomentSource): void {
+  const { registerMomentSource } = useContext(GlobalQContext);
+  const latest = useRef(source);
+  useEffect(() => {
+    latest.current = source;
+  }, [source]);
+  useEffect(() => {
+    registerMomentSource(() => latest.current());
+    return () => registerMomentSource(null);
+  }, [registerMomentSource]);
+}
+
+/** The opening's moment, for the Q surface to show. */
+export function useQMoment(): QMoment | null {
+  return useContext(GlobalQContext).moment;
+}
+
+/** The sidebar's Q entry: it stays beside the dock (ADR 0017 F1). */
+export function GlobalQTrigger({
+  variant,
+}: {
+  readonly variant: "sidebar" | "header";
+}) {
+  const t = useT();
+  const pathname = usePathname();
+  const { open, setOpen } = useContext(GlobalQContext);
+  const session = useQSessionOptional();
+  const home = useHomeHref();
+  const presence = (
+    <QAperture
+      state={session?.presence.state ?? "IDLE"}
+      size={variant === "sidebar" ? "chrome" : 32}
+    />
+  );
+  if (pathname === Q_PAGE) {
+    // The Q page is Q. The press lands on the command bar rather than
+    // opening a second Q beside the first.
+    return (
+      <Link
+        href={`${home}#home-q`}
+        aria-label={t("Ask Q")}
+        className={buttonClassName(
+          "secondary",
+          "regular",
+          variant === "sidebar" ? "w-full justify-start" : "size-11 p-0",
+        )}
+        data-global-q="home"
+      >
+        {presence}
+        {variant === "sidebar" ? t("Ask Q") : null}
+      </Link>
+    );
+  }
+  return (
+    <button
+      type="button"
+      aria-label={t("Ask Q")}
+      aria-expanded={open}
+      onPointerEnter={preloadQSheet}
+      onFocus={preloadQSheet}
+      onClick={() => setOpen(true)}
+      className={buttonClassName(
+        "secondary",
+        "regular",
+        variant === "sidebar" ? "w-full justify-start" : "size-11 p-0",
+      )}
+      data-global-q="trigger"
+      data-global-q-state={session?.presence.state ?? "IDLE"}
+    >
+      {presence}
+      {variant === "sidebar" ? t("Ask Q") : null}
+    </button>
+  );
+}
+
+function GlobalQSheet() {
+  const { open, setOpen, connected, seed, moment } = useContext(GlobalQContext);
+  const subject = useQSubject();
+  const label = useQAboutLabel();
+  const about =
+    moment !== null
+      ? `${describeMoment(moment)}.`
+      : label !== null
+        ? `About ${label}.`
+        : subject.kind === "NONE"
+          ? "About what you're looking at."
+          : "About this.";
+  return (
+    <SheetRoot open={open} onOpenChange={setOpen}>
+      {open ? (
+        <SheetContent side="side" title="Q" description={about}>
+          <QSheetConversation
+            connected={connected}
+            seed={seed}
+            moment={moment}
+          />
+        </SheetContent>
+      ) : null}
+    </SheetRoot>
+  );
+}
+
+/**
+ * Sends what `askNow` was given, once: down an open voice line when there
+ * is one, otherwise as a question in the one conversation.
+ */
+function GlobalQRunner() {
+  const { run } = useContext(GlobalQContext);
+  const session = useQSessionOptional();
+  const sent = useRef(0);
+  const ask = session?.q.ask;
+  const voice = session?.voice;
+  useEffect(() => {
+    if (run === null || ask === undefined || sent.current >= run.id) return;
+    sent.current = run.id;
+    if (voice?.active === true && voice.client.connected) {
+      voice.client.sendText(run.text);
+    } else {
+      void ask(run.text);
+    }
+  }, [run, ask, voice]);
+  return null;
+}

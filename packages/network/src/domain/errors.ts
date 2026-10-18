@@ -32,6 +32,69 @@ export class RelationshipEventTypeUnknownError extends Error {
   }
 }
 
+/**
+ * The actor cannot express interest: they are not acting for an investor
+ * organisation, or their role does not carry the capability. Safe to say:
+ * it describes the caller, never a company.
+ */
+export class InterestNotPermittedError extends Error {
+  constructor() {
+    super("Only a member of an investor organisation can express interest.");
+    this.name = "InterestNotPermittedError";
+  }
+}
+
+/**
+ * The company does not exist or is not visible to this investor. One error
+ * for both, so the command cannot be used to ask which.
+ */
+export class InterestCompanyNotFoundError extends Error {
+  constructor() {
+    super("The company was not found.");
+    this.name = "InterestCompanyNotFoundError";
+  }
+}
+
+/** The idempotency key was already used for a different Express Interest request. */
+export class InterestIdempotencyConflictError extends Error {
+  constructor() {
+    super("This idempotency key was already used with a different request.");
+    this.name = "InterestIdempotencyConflictError";
+  }
+}
+
+/**
+ * No interest the caller may answer: absent, withdrawn, or addressed to a
+ * company the caller's organisation does not own. One error for all, so
+ * the command cannot be used to ask which (CQ-NET-011).
+ */
+export class InterestNotFoundError extends Error {
+  constructor() {
+    super("The interest was not found.");
+    this.name = "InterestNotFoundError";
+  }
+}
+
+/** The interest was already answered the other way; an answer is never overwritten. */
+/**
+ * The pair is already connected (live 2026-10-02: two founders' Connection
+ * Requests were recorded on relationships already connected, and the
+ * projector rightly kept them as anomalies). Asking again is refused.
+ */
+export class RelationshipAlreadyConnectedError extends Error {
+  constructor() {
+    super("You're already connected.");
+    this.name = "RelationshipAlreadyConnectedError";
+  }
+}
+
+export class InterestAlreadyAnsweredError extends Error {
+  constructor() {
+    super("This interest has already been answered.");
+    this.name = "InterestAlreadyAnsweredError";
+  }
+}
+
 /** The chosen visibility scope is not allowed for this event type. */
 export class RelationshipEventVisibilityNotAllowedError extends Error {
   readonly eventType: string;
@@ -42,5 +105,71 @@ export class RelationshipEventVisibilityNotAllowedError extends Error {
     this.name = "RelationshipEventVisibilityNotAllowedError";
     this.eventType = eventType;
     this.visibilityScope = visibilityScope;
+  }
+}
+
+/**
+ * The investor does not take Connection Requests from this founder: they
+ * chose closed, have not said, or (qualified) this company does not meet
+ * the rules they declared (ADR 0023). Safe to say: it describes the
+ * investor's own public choice, never anything private.
+ */
+export class ConnectionNotAcceptedError extends Error {
+  readonly reason: "CLOSED" | "NOT_STATED" | "NOT_QUALIFIED";
+
+  constructor(reason: "CLOSED" | "NOT_STATED" | "NOT_QUALIFIED") {
+    super(
+      reason === "NOT_QUALIFIED"
+        ? "This investor only takes requests from companies that meet the criteria they set, and yours doesn't yet."
+        : "This investor isn't taking requests from founders right now.",
+    );
+    this.name = "ConnectionNotAcceptedError";
+    this.reason = reason;
+  }
+}
+
+/** The actor is not acting for a company, or their role cannot send requests. */
+export class ConnectionNotPermittedError extends Error {
+  constructor() {
+    super(
+      "Only a member of a company on Capital Q can send a Connection Request.",
+    );
+    this.name = "ConnectionNotPermittedError";
+  }
+}
+
+/** Fail closed rather than publish a truncated pipeline or export. */
+export class RelationshipPipelineLimitError extends Error {
+  constructor() {
+    super(
+      "The pipeline read could not be completed within its safe processing limit.",
+    );
+    this.name = "RelationshipPipelineLimitError";
+  }
+}
+
+export class RelationshipPipelineQueryError extends Error {
+  constructor() {
+    super(
+      "This pipeline view changed or its cursor is invalid. Start the view again.",
+    );
+    this.name = "RelationshipPipelineQueryError";
+  }
+}
+
+export class RelationshipViewLimitError extends Error {
+  constructor() {
+    super(
+      "This workspace has reached its saved view limit. Remove an unused view and try again.",
+    );
+    this.name = "RelationshipViewLimitError";
+  }
+}
+
+/** The note named as replaced was already corrected by another note. */
+export class RelationshipNoteSupersededError extends Error {
+  constructor() {
+    super("That note was already corrected. Reload to see the latest.");
+    this.name = "RelationshipNoteSupersededError";
   }
 }

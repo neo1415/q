@@ -5,7 +5,9 @@ import { useState, type FormEvent } from "react";
 import { ChoiceList } from "@capital-q/ui/choice-list";
 import { Input } from "@capital-q/ui/input";
 
+import { useRegistrationDefaults } from "../../onboarding-kit/registration-defaults";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * I0. Investor type describes the organisation; the firm name creates or
@@ -18,13 +20,25 @@ export function InvestorRoleStep({
   busy,
   actions,
 }: StepProps<"investor_role">) {
+  const t = useT();
   const saved = step.response;
   const [investorType, setInvestorType] = useState<string | undefined>(
     saved?.investorType,
   );
+  // A saved answer wins; otherwise the firm typed at sign-up, confirmed by
+  // continuing (owner directive 2026-10-16: never re-asked).
+  const registered = useRegistrationDefaults().organisationName;
+  const savedName =
+    saved?.organisationName === undefined || saved.organisationName === ""
+      ? null
+      : saved.organisationName;
   const [organisationName, setOrganisationName] = useState(
-    saved?.organisationName ?? "",
+    savedName ?? registered ?? "",
   );
+  const fromRegistration =
+    savedName === null &&
+    registered !== null &&
+    organisationName === registered;
   const [businessTitle, setBusinessTitle] = useState(
     saved?.businessTitle ?? "",
   );
@@ -75,8 +89,12 @@ export function InvestorRoleStep({
       />
       <Input
         id="investor-organisation"
-        label="Your firm"
-        description={`Investing personally? Keep “${step.personalWorkspaceName}”. Typing another firm's name never joins it.`}
+        label={t("Your firm")}
+        description={
+          fromRegistration
+            ? "From your sign-up. Typing another firm's name never joins it."
+            : `Investing personally? Keep “${step.personalWorkspaceName}”. Typing another firm's name never joins it.`
+        }
         autoComplete="organization"
         value={organisationName}
         disabled={busy}
@@ -88,9 +106,11 @@ export function InvestorRoleStep({
       />
       <Input
         id="investor-title"
-        label="Your role there"
-        description="Optional. A title is descriptive only; it grants no permissions."
-        placeholder="Partner, Principal, Angel"
+        label={t("Your role there")}
+        description={t(
+          "Optional. Shown with your name; it changes nothing you can do.",
+        )}
+        placeholder={t("Partner, Principal, Angel")}
         autoComplete="organization-title"
         value={businessTitle}
         disabled={busy}

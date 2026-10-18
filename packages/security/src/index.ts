@@ -41,6 +41,15 @@ export {
 } from "./identity/ids.js";
 
 export {
+  effectivePersonChanges,
+  PersonProfileNotFoundError,
+  PersonProfileVersionConflictError,
+  type PersonProfile,
+  type PersonProfileChanges,
+  type PersonProfileStore,
+} from "./identity/person-profile.js";
+
+export {
   AuthenticatedPrincipalSchema,
   type AuthenticatedPrincipal,
 } from "./identity/principal.js";
@@ -78,6 +87,11 @@ export {
 } from "./actor-context/resolver.js";
 
 export { isActorContext, requireActorContext } from "./actor-context/guards.js";
+
+export {
+  PERSONAL_BOOTSTRAP_TENANT_ID,
+  personalActorContext,
+} from "./actor-context/personal.js";
 
 export * from "./authorization/index.js";
 

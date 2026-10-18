@@ -17,8 +17,14 @@ import type { SubjectRelation } from "./catalogue.js";
  * may need at most. Everything downstream can only remove from it.
  *
  * Minimum sufficient context is a property of this table: a plain answer
- * about one's own company gets its profile and capital objective, not its
- * financial model, its document corpus or its investor relationships.
+ * about one's own company gets its profile, its capital objective and the
+ * evidence its own people uploaded, not its financial model or its investor
+ * relationships. Evidence is a candidate for a plain answer because a
+ * founder who asks what their deck said is asking about their own material
+ * (CQ-PRE-REC-001 §11: what was uploaded once is reused, never re-asked
+ * for); whether the actor may actually see it stays the permission layer's
+ * answer (owner only, `document.view`), and the specialist still prefers a
+ * canonical fact over a passage where both speak to the same thing.
  */
 
 export type SubjectSummary = {
@@ -36,9 +42,34 @@ export function deriveTaskClass(
   if (capability === "COMPARE") {
     return "COMPARISON";
   }
-  const entity = subjects.filter(
+  const all = subjects.filter(
     (subject) => subject.kind !== "USER" && subject.kind !== "ORGANISATION",
   );
+  /**
+   * The actor's OWN investor organisation, carried beside a company they
+   * are asking about, is context — their declared mandate — not what the
+   * question is about (CQ-QX-007). It must not turn "is this company worth
+   * my time?" into an investor question: the company stays on the side of
+   * the firewall its relation puts it, and the counterparty rules keep
+   * applying to it. The own organisation's scopes are still evaluated on
+   * their own merits (owner rights), so this changes the class and
+   * nothing about what either subject may reach.
+   */
+  const companyShaped = all.some(
+    (subject) =>
+      subject.kind === "COMPANY" ||
+      subject.kind === "CAPITAL_OBJECTIVE" ||
+      subject.kind === "DOCUMENT",
+  );
+  const entity = companyShaped
+    ? all.filter(
+        (subject) =>
+          !(
+            subject.kind === "INVESTOR_ORGANISATION" &&
+            subject.relation === "OWNER"
+          ),
+      )
+    : all;
   if (entity.length === 0) {
     return "GENERAL_QUESTION";
   }
@@ -68,7 +99,12 @@ export function candidateScopeKinds(
     case "COMPANY":
       switch (capability) {
         case "ANSWER":
-          return ["COMPANY_PROFILE", "COMPANY_CAPITAL_OBJECTIVE"];
+          return [
+            "COMPANY_PROFILE",
+            "COMPANY_CAPITAL_OBJECTIVE",
+            "EVIDENCE_DOCUMENTS",
+            "OWN_PUBLIC_PRESENCE",
+          ];
         case "INVESTIGATE":
         case "ASSESS":
           return [
@@ -76,6 +112,7 @@ export function candidateScopeKinds(
             "COMPANY_CAPITAL_OBJECTIVE",
             "COMPANY_PRIVATE_FINANCIALS",
             "EVIDENCE_DOCUMENTS",
+            "OWN_PUBLIC_PRESENCE",
           ];
         case "COMPARE":
           return ["COMPANY_PROFILE", "COMPANY_CAPITAL_OBJECTIVE"];
@@ -89,7 +126,11 @@ export function candidateScopeKinds(
         case "ANSWER":
         case "INVESTIGATE":
         case "ASSESS":
-          return ["INVESTOR_PROFILE", "INVESTOR_MANDATE"];
+          return [
+            "INVESTOR_PROFILE",
+            "INVESTOR_MANDATE",
+            "OWN_PUBLIC_PRESENCE",
+          ];
         case "COMPARE":
         case "CLASSIFY":
         case "PREPARE_ACTION":
@@ -103,7 +144,13 @@ export function candidateScopeKinds(
     case "DOCUMENT":
       return ["EVIDENCE_DOCUMENTS"];
     case "USER":
-      return ["OWN_Q_CONVERSATION"];
+      // A USER subject is only ever oneself. What Capital Q understands
+      // about the person from their own public footprint belongs to the
+      // person, and answering "what do you know about me" without it means
+      // the arrival research was performed and thrown away.
+      return capability === "CLASSIFY"
+        ? ["OWN_Q_CONVERSATION"]
+        : ["OWN_Q_CONVERSATION", "OWN_PUBLIC_PRESENCE"];
     case "ORGANISATION":
       // An organisation is a context, not knowledge.
       return [];
@@ -119,6 +166,9 @@ export function actorWideScopeKinds(
     ? ["GENERAL_MODEL_KNOWLEDGE"]
     : [
         "OWN_Q_CONVERSATION",
+        // Who the person is, from their own onboarding (CQ-QX-007): Home Q
+        // told an onboarded investor it could not say who they were.
+        "OWN_ONBOARDING",
         "NETWORK_VISIBLE_DATA",
         "PUBLIC_EXTERNAL_DATA",
         "GENERAL_MODEL_KNOWLEDGE",

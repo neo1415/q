@@ -52,15 +52,48 @@ const KNOWLEDGE_BACKED_SCOPE_KINDS = new Set([
   "COMPANY_PROFILE",
   "NETWORK_VISIBLE_DATA",
   "PUBLIC_EXTERNAL_DATA",
+  // What Capital Q understands about a subject's own public footprint.
+  // Without this the presence build wrote understandings no read could
+  // ever reach, which is research performed and discarded.
+  "OWN_PUBLIC_PRESENCE",
 ]);
 
+/**
+ * Which subjects a scope confines a knowledge read to. `null` means the
+ * scope is not subject-bound at all (network-visible, public), and the
+ * labels do the confining instead.
+ *
+ * All three subject kinds an understanding can be about are recognised,
+ * not companies alone: a scope bound to the person themselves must narrow
+ * to that person, or it would either return nothing or, worse, stop
+ * narrowing.
+ */
 function subjectsFor(
   scope: QAuthorisedKnowledgeScope,
 ): readonly string[] | null {
   if (scope.filter.companyId !== undefined) {
     return [scope.filter.companyId];
   }
-  return scope.subject?.kind === "COMPANY" ? [scope.subject.companyId] : null;
+  if (scope.filter.investorOrganisationId !== undefined) {
+    return [scope.filter.investorOrganisationId];
+  }
+  const subject = scope.subject;
+  if (subject === undefined) {
+    return null;
+  }
+  switch (subject.kind) {
+    case "COMPANY":
+      return [subject.companyId];
+    case "INVESTOR_ORGANISATION":
+      return [subject.investorOrganisationId];
+    case "USER":
+      return [subject.userId];
+    case "RELATIONSHIP":
+    case "CAPITAL_OBJECTIVE":
+    case "DOCUMENT":
+    case "ORGANISATION":
+      return null;
+  }
 }
 
 /**

@@ -50,4 +50,60 @@ export {
   Q_RESUMABLE_ORCHESTRATION_VERSIONS,
 } from "./version.js";
 
+// AUTO block: Q's delegated work (ADR 0030).
+export {
+  createQWorkEngine,
+  delegationThreadId,
+  laneThreadId,
+  Q_WORK_GRAPH_VERSION,
+  type AdvanceOutcome,
+  type LaneStart,
+  type QWorkEngine,
+} from "./work/engine.js";
+export { groundedPicks, MAX_CANDIDATES } from "./work/outreach.js";
+export { MAX_STAND_IN_REPLIES } from "./work/stand-in.js";
+export {
+  CallWindowSchema,
+  LANE_STAGES,
+  OutreachGrantSchema,
+  PersonAnswerSchema,
+  Q2Q_DAILY_CAP,
+  WAIT_NUDGE_AFTER_DAYS,
+  WAIT_TELL_OWNER_AFTER_DAYS,
+  Q2Q_INTENTS,
+  QEnvelopeSchema,
+  StandInGrantSchema,
+  workPath,
+  type CallWindow,
+  type Candidate,
+  type ConverseInput,
+  type ConverseResult,
+  type DelegationRef,
+  type InterviewAnswer,
+  type InterviewTurnInput,
+  type InterviewTurnResult,
+  type LaneObservation,
+  type LanePatch,
+  type LaneStage,
+  type Notice,
+  type ObservedMessage,
+  type OutreachGrant,
+  type PersonAnswer,
+  type Q2QIntent,
+  type QEnvelope,
+  type QWorkPorts,
+  type ShortlistPick,
+  type Slot,
+  type StandInGrant,
+  type StandInObservation,
+  type StandInReplyInput,
+  type StandInReplyResult,
+  type StandInThread,
+} from "./work/types.js";
+// end AUTO block
+
+// WORKFORCE block (founder brief J1-J9): Q's workforce of agents.
+export * from "./workforce/index.js";
+// end WORKFORCE block
+
 export const PACKAGE_NAME = "@capital-q/q-orchestrator" as const;

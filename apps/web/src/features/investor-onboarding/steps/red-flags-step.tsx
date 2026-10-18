@@ -8,13 +8,16 @@ import { Input } from "@capital-q/ui/input";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
+import { redFlagConflictMessage } from "../models/journey";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * I7. Two clearly different lists. "I'd rather not see" is a soft
  * negative (AVOID): it can still appear. "Never show me" is a hard
  * exclusion: not shown in standard discovery, whatever the discovery style.
- * The same flag cannot be in both.
+ * The same flag cannot be in both: ticking it in one list moves it out of
+ * the other, and a conflict that still reaches submission is named (§41).
  */
 export function RedFlagsStep({
   step,
@@ -22,6 +25,7 @@ export function RedFlagsStep({
   busy,
   actions,
 }: StepProps<"red_flags">) {
+  const t = useT();
   const saved = step.response;
   const [avoid, setAvoid] = useState<readonly string[]>(saved?.avoid ?? []);
   const [hard, setHard] = useState<readonly string[]>(saved?.hard ?? []);
@@ -53,9 +57,7 @@ export function RedFlagsStep({
     event.preventDefault();
     const overlap = avoid.filter((code) => hard.includes(code));
     if (overlap.length > 0) {
-      setError(
-        "A red flag is either something to avoid or something never to show, not both.",
-      );
+      setError(redFlagConflictMessage(overlap));
       return;
     }
     if (avoid.length === 0 && hard.length === 0 && sectors.length === 0) {
@@ -73,6 +75,9 @@ export function RedFlagsStep({
   const offered = candidates.filter(
     (c) => !sectors.some((s) => s.nodeId === c.nodeId),
   );
+  const moved = step.preferredSectors.filter((preferred) =>
+    sectors.some((s) => s.nodeId === preferred.nodeId),
+  );
 
   return (
     <form id={formId} onSubmit={handleSubmit} className="flex flex-col gap-7">
@@ -82,12 +87,18 @@ export function RedFlagsStep({
           id="red-flags-avoid"
           name="avoid"
           legend="I'd rather not see"
-          description="A soft preference. These can still appear, ranked lower."
+          description={t(
+            "A soft preference. These can still appear, ranked lower.",
+          )}
           options={step.options}
           values={avoid}
           disabled={busy}
           onChange={(next) => {
             setAvoid(next);
+            // Moved, not copied: what is now avoided is no longer excluded.
+            setHard((current) =>
+              current.filter((code) => !next.includes(code)),
+            );
             setError(undefined);
           }}
         />
@@ -97,28 +108,35 @@ export function RedFlagsStep({
           id="red-flags-hard"
           name="hard"
           legend="Never show me"
-          description="A hard exclusion. Opportunities matching these are not shown in standard discovery, whatever the discovery style."
+          description={t(
+            "A hard exclusion. Companies that match these are not shown in your recommendations, whatever your discovery style.",
+          )}
           options={step.options}
           values={hard}
           disabled={busy}
           onChange={(next) => {
             setHard(next);
+            setAvoid((current) =>
+              current.filter((code) => !next.includes(code)),
+            );
             setError(undefined);
           }}
         />
       </section>
       <fieldset className="flex flex-col gap-3" data-red-flags="sectors">
         <legend className="cq-label text-(--cq-text-primary)">
-          Sectors to exclude outright
+          {t("Sectors to exclude outright")}
         </legend>
-        <InlineNotice tone="info" title="Hard exclusion">
-          Companies in these categories are not shown in standard discovery.
-          This is not a preference.
+        <InlineNotice tone="info" title={t("Hard exclusion")}>
+          {t(
+            "Companies in these categories are not shown in your recommendations. This is not a preference: excluding a sector you listed as a preference moves it here.",
+          )}
         </InlineNotice>
         <div className="flex items-end gap-2">
           <Input
             id="red-flags-search"
-            label="Search sectors"
+            label={t("Search sectors or product areas")}
+            placeholder={t("Search sectors or product areas…")}
             value={query}
             disabled={busy}
             onChange={(event) => setQuery(event.target.value)}
@@ -135,11 +153,14 @@ export function RedFlagsStep({
             disabled={busy}
             onClick={() => void search()}
           >
-            Suggest
+            {t("Suggest")}
           </Button>
         </div>
         {offered.length > 0 ? (
-          <ul className="flex flex-wrap gap-2" aria-label="Suggested sectors">
+          <ul
+            className="flex flex-wrap gap-2"
+            aria-label={t("Suggested sectors")}
+          >
             {offered.map((candidate) => (
               <li key={candidate.nodeId}>
                 <Button
@@ -156,7 +177,10 @@ export function RedFlagsStep({
           </ul>
         ) : null}
         {sectors.length > 0 ? (
-          <ul className="flex flex-wrap gap-2" aria-label="Excluded sectors">
+          <ul
+            className="flex flex-wrap gap-2"
+            aria-label={t("Excluded sectors")}
+          >
             {sectors.map((item) => (
               <li key={item.nodeId}>
                 <Button
@@ -177,6 +201,12 @@ export function RedFlagsStep({
               </li>
             ))}
           </ul>
+        ) : null}
+        {moved.length > 0 ? (
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            Moved out of your preferences when you continue:{" "}
+            {moved.map((item) => item.label).join(", ")}.
+          </p>
         ) : null}
       </fieldset>
       {error !== undefined ? (

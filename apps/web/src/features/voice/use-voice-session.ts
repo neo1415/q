@@ -1,0 +1,254 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { useDeepgramVoiceSession } from "./provider/deepgram-session";
+import { useDuplexVoiceSession } from "./provider/duplex-session";
+import { useElevenLabsVoiceSession } from "./provider/elevenlabs-session";
+import {
+  askLiveAvailability,
+  forgetLiveAvailability,
+  liveAvailabilityFor,
+} from "./live/availability";
+import { LIVE_TRIAL_SPENT_NOTICE, takeLiveTrialNotice } from "./live/trial";
+import { releaseVoiceAudio, type VoiceAudioOwner } from "./voice-audio";
+import {
+  LIVE_FALLBACK_NOTICE,
+  useLiveVoiceSession,
+} from "./provider/live-session";
+import type {
+  VoiceSessionClient,
+  VoiceSessionEvents,
+  VoiceSessionStart,
+} from "./session";
+
+/**
+ * How long the window may be out of focus before the microphone pauses.
+ * A glance at another window is not leaving; dictating into another app
+ * for a minute is (founder live 2026-10-01).
+ */
+export const AWAY_BLUR_PAUSE_MS = 10_000;
+
+/**
+ * One voice client over two transports. The Q API's credential says which
+ * provider carries this session; the matching adapter is used and the
+ * other stays idle. Everything above this line sees one client.
+ *
+ * An open line pauses its microphone when the person leaves -- the tab is
+ * hidden, the page is put away or the device locks, or the window stays
+ * out of focus for AWAY_BLUR_PAUSE_MS -- and it resumes only when they
+ * unmute themselves (founder live 2026-10-01: Q stored a long dictation
+ * to someone else, then answered from it). Nothing they say elsewhere
+ * reaches Q while they are away.
+ */
+export function useVoiceSession(
+  events: VoiceSessionEvents = {},
+  options: {
+    /** V: false where a line must never be GPT-Live (a rehearsal). */
+    readonly live?: boolean | undefined;
+  } = {},
+): VoiceSessionClient {
+  const elevenLabs = useElevenLabsVoiceSession(events);
+  const deepgram = useDeepgramVoiceSession(events);
+  const duplex = useDuplexVoiceSession(events);
+  // ONE line plays per tab (founder 2026-10-09, "two voices at the same
+  // time"): this client claims the tab's audio for all its transports
+  // before any of them starts, which stops every other client's line and
+  // any standalone GPT-Live call first. Stopping this one ends all of its
+  // transports.
+  const endAllRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const startsRef = useRef(0);
+  const [owner] = useState<VoiceAudioOwner>(() => ({
+    stop: () => {
+      startsRef.current += 1;
+      return endAllRef.current();
+    },
+  }));
+  const liveLine = useLiveVoiceSession(events, { audioOwner: owner });
+  const [active, setActive] = useState<
+    "elevenlabs" | "deepgram" | "duplex" | "live"
+  >("elevenlabs");
+  const client =
+    active === "live"
+      ? liveLine
+      : active === "duplex"
+        ? duplex
+        : active === "deepgram"
+          ? deepgram
+          : elevenLabs;
+  const eventsRef = useRef(events);
+  useEffect(() => {
+    eventsRef.current = events;
+  }, [events]);
+  // Asked as the surface mounts, so the first voice start does not wait.
+  const allowLive = options.live !== false;
+  useEffect(() => {
+    if (allowLive) void askLiveAvailability();
+  }, [allowLive]);
+  const [pausedAway, setPausedAway] = useState(false);
+
+  const start = useCallback(
+    async (input: VoiceSessionStart) => {
+      const provider = input.credential.provider ?? "elevenlabs";
+      setPausedAway(false);
+      const mine = (startsRef.current += 1);
+      // No audio claim here: surfaces that open lines through this client
+      // are serialised by the voice line (`voice-line.ts`), whose release
+      // resets the surface properly. Ending another client's transports
+      // underneath its surface made that surface reconnect, and two
+      // surfaces fought over the line (2026-10-09, k-incident voice red).
+      // Ended, or started again, while GPT-Live was opening: no fallback
+      // line is opened after it (a late fallback would be a second voice).
+      // The duplex and standard path is exactly as it was before GPT-Live.
+      const current = () => startsRef.current === mine;
+      // V (founder 2026-10-09): GPT-Live is the voice for the people it is
+      // switched on for, at every entry point. If it cannot open, the
+      // duplex or standard line takes the same credential at once, and
+      // the person is told in one line.
+      // A known answer costs no wait; one still on its way is waited for
+      // at most LIVE_AVAILABLE_TIMEOUT_MS, then the existing line opens
+      // (2026-10-09: a late answer used to read as "no" for the whole tab).
+      const liveOnly = input.credential.liveOnly === true;
+      // A server-issued LIVE-only binding already selects the metered path;
+      // no second availability request can change that authority.
+      const available =
+        liveOnly || (allowLive ? await liveAvailabilityFor() : false);
+      // Ended, or started again, while it waited: nothing opens.
+      if (!current()) return;
+      const offered = available === true;
+      let quota = false;
+      // A trial that ran out on the call before this one says so once.
+      const say = (notice: string) => {
+        eventsRef.current.onLinkStatus?.(notice);
+        setTimeout(() => {
+          eventsRef.current.onLinkStatus?.(null);
+        }, 6_000);
+      };
+      const spentNotice = takeLiveTrialNotice();
+      if (offered) {
+        setActive("live");
+        const outcome = await liveLine.start(input);
+        if (outcome === "LIVE" || !current()) return;
+        if (liveOnly) {
+          say(
+            outcome === "TRIAL_SPENT"
+              ? LIVE_TRIAL_SPENT_NOTICE
+              : "Live voice isn't available right now.",
+          );
+          eventsRef.current.onError?.(
+            outcome === "TRIAL_SPENT"
+              ? LIVE_TRIAL_SPENT_NOTICE
+              : "Live voice isn't available right now.",
+          );
+          return;
+        }
+        // A spent trial is like a provider out of quota: the duplex line
+        // is OpenAI too, so the standard voice comes up at once.
+        quota = outcome === "QUOTA" || outcome === "TRIAL_SPENT";
+        if (outcome !== "TRIAL_SPENT") forgetLiveAvailability();
+        say(
+          outcome === "TRIAL_SPENT"
+            ? LIVE_TRIAL_SPENT_NOTICE
+            : LIVE_FALLBACK_NOTICE,
+        );
+      } else if (spentNotice !== null) {
+        quota = true;
+        say(spentNotice);
+      }
+      // DUPLEX: the full-duplex line first when the server brokered one;
+      // if it does not come up, the standard line on the same credential,
+      // at once and without a word to the person.
+      // Out of OpenAI quota: the duplex line is OpenAI too, so it is not
+      // tried; the standard voice comes up at once.
+      if (input.credential.duplex !== undefined && !quota) {
+        setActive("duplex");
+        if (await duplex.start(input)) return;
+      }
+      setActive(provider);
+      await (provider === "deepgram" ? deepgram : elevenLabs).start(input);
+    },
+    [deepgram, duplex, elevenLabs, liveLine, allowLive],
+  );
+
+  const transportSetMuted = client.setMuted;
+  const setMuted = useCallback(
+    (next: boolean) => {
+      // The person's own choice, either way, ends an away pause.
+      setPausedAway(false);
+      transportSetMuted(next);
+    },
+    [transportSetMuted],
+  );
+
+  const live = useRef({ connected: false, muted: false });
+  useEffect(() => {
+    live.current = { connected: client.connected, muted: client.muted };
+  }, [client.connected, client.muted]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    let blurTimer: ReturnType<typeof setTimeout> | null = null;
+    const pause = () => {
+      if (!live.current.connected || live.current.muted) return;
+      transportSetMuted(true);
+      setPausedAway(true);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") pause();
+    };
+    const onBlur = () => {
+      if (blurTimer !== null) clearTimeout(blurTimer);
+      blurTimer = setTimeout(pause, AWAY_BLUR_PAUSE_MS);
+    };
+    const onFocus = () => {
+      if (blurTimer !== null) clearTimeout(blurTimer);
+      blurTimer = null;
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    document.addEventListener("freeze", pause);
+    window.addEventListener("pagehide", pause);
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      if (blurTimer !== null) clearTimeout(blurTimer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("freeze", pause);
+      window.removeEventListener("pagehide", pause);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [transportSetMuted]);
+
+  /**
+   * Every transport, not only the one shown: a duplex line that fell back
+   * inside `start` leaves the standard one current, and an end that
+   * reached only one of them could leave the other listening.
+   */
+  const endDuplex = duplex.end;
+  const endDeepgram = deepgram.end;
+  const endElevenLabs = elevenLabs.end;
+  const endLive = liveLine.end;
+  const endTransports = useCallback(async () => {
+    await Promise.all([endLive(), endDuplex(), endDeepgram(), endElevenLabs()]);
+  }, [endLive, endDuplex, endDeepgram, endElevenLabs]);
+  useEffect(() => {
+    endAllRef.current = endTransports;
+  }, [endTransports]);
+  const end = useCallback(async () => {
+    // An end pressed while a start is still connecting stops that start too.
+    startsRef.current += 1;
+    releaseVoiceAudio(owner);
+    await endTransports();
+  }, [endTransports, owner]);
+  useEffect(
+    () => () => {
+      releaseVoiceAudio(owner);
+    },
+    [owner],
+  );
+
+  return useMemo(
+    () => ({ ...client, start, end, setMuted, pausedAway }),
+    [client, start, end, setMuted, pausedAway],
+  );
+}

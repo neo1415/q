@@ -49,6 +49,7 @@ describe("embedding configuration", () => {
       "172.16.4.4",
       "embeddings",
       "capital-q-embeddings",
+      "capital-qembeddings.railway.internal",
     ]) {
       expect(isPrivateEmbeddingHost(host)).toBe(true);
       expect(
@@ -66,6 +67,8 @@ describe("embedding configuration", () => {
       "https://embeddings.some-vendor.io:443",
       "http://8.8.8.8:8080",
       "https://huggingface.co",
+      "http://internal.example.com",
+      "http://railway.internal.example.com",
     ]) {
       expect(isPrivateEmbeddingHost(new URL(url).hostname)).toBe(false);
       expect(() =>
@@ -102,7 +105,48 @@ describe("embedding configuration", () => {
       parseEmbeddingConfig({ ...base, Q_EMBEDDING_MAX_BATCH_ITEMS: "9999" }),
     ).toThrow(ConfigurationError);
     expect(() =>
-      parseEmbeddingConfig({ ...base, Q_EMBEDDING_PROVIDER: "openai" }),
+      parseEmbeddingConfig({ ...base, Q_EMBEDDING_PROVIDER: "cohere" }),
     ).toThrow(ConfigurationError);
+  });
+});
+
+describe("no loopback default outside local", () => {
+  for (const env of ["preview", "staging", "production"] as const) {
+    it(`${env}: an unset runtime URL is named in missing and nothing is guessed`, () => {
+      const config = parseEmbeddingConfig({
+        NODE_ENV: "production",
+        CAPITAL_Q_ENV: env,
+      });
+      expect(config.baseUrl).toBeUndefined();
+      expect(config.missing).toEqual(["Q_EMBEDDING_BASE_URL"]);
+      expect(JSON.stringify(config)).not.toMatch(/127\.0\.0\.1|localhost/);
+    });
+  }
+
+  it("a configured private runtime is used as given, with nothing missing", () => {
+    const config = parseEmbeddingConfig({
+      NODE_ENV: "production",
+      CAPITAL_Q_ENV: "production",
+      Q_EMBEDDING_BASE_URL: "http://embeddings.railway.internal:8080",
+    });
+    expect(config.baseUrl).toBe("http://embeddings.railway.internal:8080");
+    expect(config.missing).toEqual([]);
+  });
+
+  it("local keeps the laptop default", () => {
+    expect(parseEmbeddingConfig(base).missing).toEqual([]);
+  });
+
+  it("openai (Q.02) needs no runtime address, outside local too", () => {
+    const config = parseEmbeddingConfig({
+      ...base,
+      CAPITAL_Q_ENV: "staging",
+      Q_EMBEDDING_PROVIDER: "openai",
+    });
+    expect(config).toMatchObject({
+      provider: "openai",
+      baseUrl: undefined,
+      missing: [],
+    });
   });
 });

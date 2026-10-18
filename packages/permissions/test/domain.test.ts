@@ -105,6 +105,7 @@ describe("canonical vocabularies (§8-10, §39, §42, §223)", () => {
       "capital_objective",
       "relationship",
       "relationship_event",
+      "document",
     ]);
     expect(
       DisclosureResourceRefSchema.safeParse({

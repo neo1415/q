@@ -38,6 +38,12 @@ export {
   type LocalTeiProviderOptions,
 } from "./infrastructure/local-tei-provider.js";
 export {
+  createOpenAIEmbeddingProvider,
+  OPENAI_EMBEDDING_PROVIDER_CODE,
+  OPENAI_TE3_SMALL_1024_CONFIGURATION,
+  type OpenAIEmbeddingProviderOptions,
+} from "./infrastructure/openai-provider.js";
+export {
   createFakeEmbeddingProvider,
   deterministicVector,
   FAKE_EMBEDDING_CONFIGURATION,

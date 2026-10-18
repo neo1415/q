@@ -9,7 +9,7 @@ import { cx } from "../primitives/class-names.js";
  */
 export function linkClassName(className?: string): string {
   return cx(
-    "rounded-xs font-medium text-(--cq-accent) underline decoration-(--cq-accent-soft) decoration-2 underline-offset-4 transition-colors duration-(--cq-motion-fast) hover:decoration-(--cq-accent)",
+    "font-medium text-(--cq-accent) underline decoration-(--cq-accent-soft) decoration-2 underline-offset-4 transition-colors duration-(--cq-motion-fast) hover:decoration-(--cq-accent)",
     className,
   );
 }

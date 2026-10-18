@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { z } from "zod";
 
 import {
@@ -12,6 +14,7 @@ import type { TransactionContext } from "@capital-q/database";
 import type { ActorContext } from "@capital-q/security";
 
 import {
+  LIVE_PITCHES_MAX,
   MediaAssetIdSchema,
   toCompanyPitch,
   type CompanyPitch,
@@ -21,7 +24,9 @@ import {
 } from "../contracts/index.js";
 import {
   MediaAssetNotFoundError,
+  MediaIdempotencyConflictError,
   MediaReplacementConflictError,
+  MediaRuleError,
 } from "../domain/errors.js";
 import {
   mediaAssetCreatedEvent,
@@ -63,10 +68,9 @@ const PITCH = "FOUNDER_PITCH" as const;
 export const CreateCompanyPitchInputSchema = z
   .object({
     /**
-     * The asset the caller believes is current, when replacing one. Its
-     * absence means "there is none"; a mismatch is refused rather than
-     * resolved, because guessing which of two pitches is the pitch is the
-     * ambiguity the single-primary rule exists to prevent.
+     * The live video this one replaces. Absent: this is another video,
+     * added beside the company's others (ADR 0022). A video that is not
+     * live and theirs is refused, never guessed at.
      */
     replacesMediaAssetId: MediaAssetIdSchema.optional(),
   })
@@ -79,6 +83,12 @@ export type CreateCompanyPitchCommand = {
   readonly actor: ActorContext;
   readonly companyId: string;
   readonly input: CreateCompanyPitchInput;
+  /**
+   * The client's key for this intended change, reused on retry. With it a
+   * retry whose first answer was lost gets that same asset back instead of
+   * a conflict (or, worse, a second replacement).
+   */
+  readonly idempotencyKey?: string | undefined;
   readonly correlationId: CorrelationId;
 };
 
@@ -86,20 +96,45 @@ export type CompanyPitchResult = {
   readonly asset: MediaAsset;
   /** The predecessor, when this call replaced one. */
   readonly replaced: MediaAsset | null;
+  /** True when a retried request was answered with what it created. */
+  readonly replayed: boolean;
 };
+
+function sha256Hex(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+/** Namespaced so a key reused for another command can never collide. */
+export function hashPitchIdempotencyKey(key: string): string {
+  return sha256Hex(`media.pitch.create:${key}`);
+}
+
+/** What the request meant: which company, and which pitch it replaces. */
+function hashCreatePitchRequest(
+  companyId: string,
+  replacesMediaAssetId: string | undefined,
+): string {
+  return sha256Hex(
+    JSON.stringify({
+      companyId,
+      replacesMediaAssetId: replacesMediaAssetId ?? null,
+    }),
+  );
+}
 
 function companyRef(companyId: string): MediaOwnerRef {
   return { ownerType: "COMPANY", ownerId: companyId };
 }
 
 /**
- * Creates the company's pitch asset, or replaces the current one.
+ * Adds a pitch video to the company, or replaces one of its live videos.
  *
  * Replacement never overwrites: a new asset is created, the predecessor is
  * marked superseded, and the lineage link between them survives. Both the
- * supersede and the insert happen in one transaction under a row lock, and
- * the database's single-current-pitch index is the final arbiter — two
- * simultaneous replacements cannot both succeed.
+ * supersede and the insert happen in one transaction under the
+ * predecessor's row lock; the conditional supersede and the one-successor
+ * index make two simultaneous replacements of the same video resolve to
+ * one winner.
  */
 export function createCreateCompanyPitch(
   dependencies: MediaServiceDependencies,
@@ -123,30 +158,82 @@ export function createCreateCompanyPitch(
       resource: ownerScope(actor, owner),
     });
 
-    return transactions.run(async (tx: TransactionContext) => {
-      const current = await repositories.mediaAssets.lockCurrentForOwner(
-        tx,
-        owner.tenantId,
-        owner,
-        PITCH,
+    const requests = repositories.pitchRequests;
+    const key = command.idempotencyKey;
+    if (key !== undefined && requests === undefined) {
+      throw new MediaRuleError(
+        "This deployment cannot honour an idempotency key for a pitch.",
       );
+    }
 
-      if (input.replacesMediaAssetId === undefined) {
-        if (current !== null) {
-          // A company has one primary pitch. Adding a second is not a
-          // creation, it is a replacement, and the caller must say so.
-          throw new MediaReplacementConflictError(
-            "This company already has a current pitch; replace it explicitly.",
+    return transactions.run(async (tx: TransactionContext) => {
+      const keyHash = key === undefined ? null : hashPitchIdempotencyKey(key);
+      const requestHash = hashCreatePitchRequest(
+        owner.ownerId,
+        input.replacesMediaAssetId,
+      );
+      if (keyHash !== null && requests !== undefined) {
+        await requests.lock(tx, actor.userId, organisationId, keyHash);
+        const previous = await requests.find(
+          tx,
+          actor.userId,
+          organisationId,
+          keyHash,
+        );
+        if (previous !== null) {
+          if (previous.requestHash !== requestHash) {
+            throw new MediaIdempotencyConflictError();
+          }
+          const asset = await repositories.mediaAssets.findById(
+            tx.sql,
+            owner.tenantId,
+            previous.mediaAssetId,
           );
+          if (asset === null) throw new MediaIdempotencyConflictError();
+          const replaced =
+            asset.replacesMediaAssetId === null
+              ? null
+              : await repositories.mediaAssets.findById(
+                  tx.sql,
+                  owner.tenantId,
+                  asset.replacesMediaAssetId,
+                );
+          return { asset, replaced, replayed: true };
         }
-      } else if (
-        current === null ||
-        current.id !== input.replacesMediaAssetId
-      ) {
-        throw new MediaReplacementConflictError();
       }
 
-      if (current !== null) {
+      // Several videos may be live at once (ADR 0022). Without a named
+      // predecessor this adds another; with one, exactly that live video
+      // is replaced, under its row lock, and its lineage kept.
+      let current: MediaAsset | null = null;
+      if (input.replacesMediaAssetId === undefined) {
+        const live = await repositories.mediaAssets.countLiveForOwner(
+          tx,
+          owner.tenantId,
+          owner,
+          PITCH,
+        );
+        if (live >= LIVE_PITCHES_MAX) {
+          throw new MediaRuleError(
+            `A company can have at most ${String(LIVE_PITCHES_MAX)} live videos. Delete one to add another.`,
+          );
+        }
+      } else {
+        current = await repositories.mediaAssets.lockById(
+          tx,
+          owner.tenantId,
+          input.replacesMediaAssetId,
+        );
+        if (
+          current === null ||
+          current.ownerType !== owner.ownerType ||
+          current.ownerId !== owner.ownerId ||
+          current.purpose !== PITCH ||
+          current.deletedAt !== null ||
+          current.supersededAt !== null
+        ) {
+          throw new MediaReplacementConflictError();
+        }
         const superseded = await repositories.mediaAssets.markSuperseded(tx, {
           tenantId: owner.tenantId,
           mediaAssetId: current.id,
@@ -167,8 +254,26 @@ export function createCreateCompanyPitch(
         // until a deliberate later decision widens it.
         playbackPolicy: "PRIVATE",
         createdByUserId: actor.userId,
-        ...(current === null ? {} : { replacesMediaAssetId: current.id }),
+        // A replacement is the same video re-recorded: it keeps the name
+        // and audience its owner gave it.
+        ...(current === null
+          ? {}
+          : {
+              replacesMediaAssetId: current.id,
+              title: current.title,
+              audience: current.audience,
+            }),
       });
+      if (keyHash !== null && requests !== undefined) {
+        await requests.record(tx, {
+          userId: actor.userId,
+          organisationId,
+          tenantId: owner.tenantId,
+          idempotencyKeyHash: keyHash,
+          requestHash,
+          mediaAssetId: asset.id,
+        });
+      }
 
       await audit.record(tx, {
         ...auditActorFromContext(actor),
@@ -212,7 +317,7 @@ export function createCreateCompanyPitch(
             }),
       );
 
-      return { asset, replaced: current };
+      return { asset, replaced: current, replayed: false };
     });
   };
 }
@@ -284,13 +389,38 @@ export type DeleteCompanyPitchCommand = {
  * governed by its own lineage rules rather than cascading from here.
  *
  * Deleting is consequential, so it needs `media.manage`, and it is audited.
+ *
+ * The bytes are a different matter from the record: once the row says
+ * DELETED, the provider's copy is deleted too (doc 20 §20.4), after the
+ * transaction and outside it, as the upload cancel does. It is best-effort
+ * and retried by repeating the delete: the record is already honest, the
+ * viewer path already refuses a DELETED asset, and a provider outage must
+ * not turn a founder's decision into an error.
  */
 export function createDeleteCompanyPitch(
   dependencies: MediaServiceDependencies,
 ) {
-  const { repositories, transactions, audit, outbox } = dependencies;
+  const { repositories, transactions, audit, outbox, videoProvider } =
+    dependencies;
+
+  const release = async (asset: MediaAsset): Promise<void> => {
+    if (asset.providerAssetId === null) return;
+    try {
+      await videoProvider.deleteAsset(asset.providerAssetId);
+    } catch {
+      // Left for the next delete of the same pitch to retry.
+    }
+  };
 
   return async (command: DeleteCompanyPitchCommand): Promise<MediaAsset> => {
+    const deleted = await deleteRecord(command);
+    await release(deleted);
+    return deleted;
+  };
+
+  async function deleteRecord(
+    command: DeleteCompanyPitchCommand,
+  ): Promise<MediaAsset> {
     const { actor } = command;
     const organisationId = activeOrganisation(actor);
     const owner = await ownedResource(
@@ -365,7 +495,7 @@ export function createDeleteCompanyPitch(
       );
       return deleted;
     });
-  };
+  }
 }
 
 /**

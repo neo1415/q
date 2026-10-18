@@ -5,95 +5,69 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createQStreamState,
   reduceQStream,
-  streamQRunEvents,
   type QStreamState,
   type QStreamTransportStatus,
 } from "@capital-q/api-client";
-import { isTerminalQStreamEvent, type QMessage } from "@capital-q/contracts";
+import type { QMessage, QViewingMoment } from "@capital-q/contracts";
 
 import {
-  askQAction,
+  approveQApprovalAction,
   cancelQRunAction,
   continueQRunAction,
-  readQRunAction,
+  pendingQApprovalsAction,
+  readQConversationAction,
+  rejectQApprovalAction,
+  type QStartedRun,
+  type QSubjectInput,
 } from "./actions";
+import { carriedApproval, type CarriedApproval } from "./carried-approval";
 import type { PendingTurn } from "./conversation";
+import { navigationHeard } from "./control/fast-navigation";
+import { askQ } from "./ask-route";
+import { noteLiveRun, noteTypedRun } from "./follow-navigation";
+import { loadWire } from "./wire";
+import { currentScreen, currentViewing } from "./screen";
+import {
+  forgetPendingAsk,
+  readPendingAsk,
+  rememberPendingAsk,
+} from "./pending-ask";
 
 /**
- * One live Q conversation in the browser (CQ-C5-R1 §13-§16).
+ * One live Q conversation in the browser (CQ-C5-R1 §13-§16; ADR 0012).
  *
  * The order below is the Q API's, not this hook's invention:
  *
- *   create run (or append to the one still open) → connect to that run's
- *   event stream → reduce durable events and deltas → terminal event →
- *   the next question opens a new run in the SAME conversation
+ *   open a conversation (or none) → create run (or append to the one
+ *   still open) → connect to that run's event stream → reduce durable
+ *   events and deltas → terminal event → the next question opens a new
+ *   run in the SAME conversation
  *
- * Three things it deliberately does not do. It does not own the
- * conversation: the server does, every message here arrived as a durable
- * event, and a reload rebuilds from the server rather than from memory. It
- * does not invent a stage, a status or an answer. And it never touches the
- * Q API directly — the session token lives in an HttpOnly cookie, so writes
- * go through server actions and the stream through the web app's own
- * single-purpose route.
+ * The conversation is the server's. Which one this surface is in comes
+ * from the caller (the URL), and reopening it reads the recorded turns
+ * back from the Q API under the person's own session: nothing is cached
+ * in the browser, so what reappears after a refresh is what was said, and
+ * a conversation this person may no longer read simply does not open. A
+ * run still in flight when the page loads is followed from where it is.
  *
  * Why the two message lists: the stream reducer is per run, and correctly
  * refuses deltas once a run is terminal. A conversation outlives its runs,
  * so completed runs' messages move to `history` and the reducer starts
- * clean for the next one. Neither list is authoritative — both are what the
- * server sent.
+ * clean for the next one. Neither list is authoritative — both are what
+ * the server sent.
  */
 
 /** Where the browser reaches the Q event stream. Same origin, cookie-authenticated. */
 const STREAM_BASE_URL = "/api/q-stream";
 
-/**
- * Which runs this tab has been following, so a refresh reopens the whole
- * conversation rather than only its last exchange.
- *
- * Run ids, and nothing else. The turns themselves are never cached here: on
- * reload each run is read back from the Q API under the person's own
- * session, so what reappears is what the server recorded — not a browser's
- * account of it, which could outlive the access that produced it. A run this
- * person may no longer read simply does not come back.
- *
- * Why a list: a conversation is made of runs, one per question, and there is
- * no endpoint that reads a conversation whole. Remembering which runs
- * belonged to this exchange is the smallest thing that restores it honestly;
- * a conversation history product is a different piece of work.
- */
-const RUN_STORAGE_KEY = "cq.q.runs";
+/** Something changed in this person's conversations: the list should be read again. */
+export const Q_CONVERSATIONS_CHANGED_EVENT = "cq:q-conversations-changed";
 
-/** Bounded: a tab's working conversation, not an archive. */
-const REMEMBERED_RUNS_MAX = 20;
-
-function rememberRuns(runIds: readonly string[]): void {
+export function announceConversationsChanged(): void {
   try {
-    if (runIds.length === 0) {
-      window.sessionStorage.removeItem(RUN_STORAGE_KEY);
-    } else {
-      window.sessionStorage.setItem(
-        RUN_STORAGE_KEY,
-        JSON.stringify(runIds.slice(-REMEMBERED_RUNS_MAX)),
-      );
-    }
+    window.dispatchEvent(new CustomEvent(Q_CONVERSATIONS_CHANGED_EVENT));
   } catch {
-    // Storage can be unavailable or full. Losing the pointers costs a
-    // reopened conversation, never a lost one: the server still has it.
-  }
-}
-
-function rememberedRuns(): readonly string[] {
-  try {
-    const raw = window.sessionStorage.getItem(RUN_STORAGE_KEY);
-    if (raw === null) {
-      return [];
-    }
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((value): value is string => typeof value === "string")
-      : [];
-  } catch {
-    return [];
+    // Nothing listens, or no window: nothing to announce.
   }
 }
 
@@ -104,24 +78,135 @@ const FINISHED_STATUSES = new Set([
   "EXPIRED",
 ]);
 
+/** The record holds its newest run's outcome: nothing more will land. */
+export function recordSettled(
+  latestRun: { readonly status: string } | null,
+): boolean {
+  return latestRun === null || FINISHED_STATUSES.has(latestRun.status);
+}
+
 export type QConversation = {
   /** The current run's stream state, with the conversation's earlier turns folded in. */
   readonly state: QStreamState;
   readonly pending: readonly PendingTurn[];
   readonly transport: QStreamTransportStatus | null;
-  /** True from submit until the run's stream ends. */
+  /** True from submit until the run's stream ends, except while the run waits on the person's approval. */
   readonly working: boolean;
+  /** True while the conversation named by the caller is being read back. */
+  readonly loading: boolean;
   /** Something that went wrong outside the stream. Plain wording only. */
   readonly notice: string | null;
   readonly runId: string | null;
-  readonly ask: (question: string) => Promise<void>;
+  /** The conversation this surface is in, once the server has named it. */
+  readonly conversationId: string | null;
+  /** `viewing`: where in a pitch the person was; sent only when a run starts. */
+  readonly ask: (
+    question: string,
+    extras?: {
+      readonly viewing?: QViewingMoment | undefined;
+      /** What the surface said first; sent only when a conversation starts. */
+      readonly opening?: string | undefined;
+    },
+  ) => Promise<void>;
   readonly stop: () => Promise<void>;
+  /**
+   * Read the open conversation back from the server. For turns recorded
+   * by another channel -- a voice line -- which this surface's stream
+   * never carried, so their result blocks (a document card, companies)
+   * reach the stage and the Board. Does nothing while a typed run is
+   * still streaming: that stream is the source of truth for it.
+   *
+   * Resolves true once the record holds the conversation's newest run as
+   * finished (its answer, and the answer's cards, are in what was read);
+   * false when it could not read, or the run is still going, so a voice
+   * turn's caller knows to read again (P10).
+   */
+  readonly refresh: () => Promise<boolean>;
+  /**
+   * voice-cards: Q's answer as the room feed delivered it (a run this
+   * page did not start: a spoken one, the duplex line's ask_q). Added to
+   * this conversation once, by message id, unless the stream or the
+   * record already holds it; never guarded on a run being in flight.
+   */
+  readonly absorb: (message: QMessage) => void;
+  /** Decide on what Q has prepared and is waiting for (CQ-Q-008). */
+  readonly approve: () => Promise<void>;
+  readonly decline: () => Promise<void>;
+  /**
+   * The person edited what Q prepared (BIZ-007: an email's words). The
+   * server voided the old approval and requested a new one on the same
+   * run; follow the run again so the new proposal arrives as the first did.
+   */
+  readonly revised: () => void;
 };
 
 export type QConversationOptions = {
   /** The company this surface's questions are about, resolved on the server. */
   readonly companyId?: string | undefined;
+  /** Or the investor organisation, for an investor. Never both. */
+  readonly investorOrganisationId?: string | undefined;
+  /** Or a relationship itself, for either of its parties (never with the others). */
+  readonly relationshipId?: string | undefined;
+  /**
+   * The conversation to open, from the URL. Null opens nothing: the next
+   * question starts a new one, and `onConversation` says which.
+   */
+  readonly conversationId?: string | null | undefined;
+  /** The server named (or changed) the conversation this surface is in. */
+  readonly onConversation?: ((conversationId: string) => void) | undefined;
+  /**
+   * The subject above is the page's (ambient), not one the person picked
+   * for this question. An ambient company or investor organisation is not
+   * sent as a named subject: the screen context carries it, and the server
+   * lets the company on screen lead (lead decision, 16 Oct; run 6: a stale
+   * page subject sent as named outranked the profile on screen). A
+   * relationship has no place in the screen context yet, so it is still
+   * named.
+   */
+  readonly ambient?: boolean | undefined;
 };
+
+/** The one subject a surface names, in the order the options document. */
+/**
+ * The subject sent as named with a question: the surface's own, or, for an
+ * ambient page subject, only a relationship (see `ambient`).
+ */
+export function namedSubject(options: QConversationOptions): {
+  readonly companyId?: string;
+  readonly investorOrganisationId?: string;
+  readonly relationshipId?: string;
+} {
+  if (options.ambient === true) {
+    return options.relationshipId === undefined
+      ? {}
+      : { relationshipId: options.relationshipId };
+  }
+  return {
+    ...(options.companyId === undefined
+      ? {}
+      : { companyId: options.companyId }),
+    ...(options.investorOrganisationId === undefined
+      ? {}
+      : { investorOrganisationId: options.investorOrganisationId }),
+    ...(options.relationshipId === undefined
+      ? {}
+      : { relationshipId: options.relationshipId }),
+  };
+}
+
+function subjectInputOf(options: {
+  readonly companyId?: string | undefined;
+  readonly investorOrganisationId?: string | undefined;
+  readonly relationshipId?: string | undefined;
+}): QSubjectInput | undefined {
+  return options.companyId !== undefined
+    ? { companyId: options.companyId }
+    : options.investorOrganisationId !== undefined
+      ? { investorOrganisationId: options.investorOrganisationId }
+      : options.relationshipId !== undefined
+        ? { relationshipId: options.relationshipId }
+        : undefined;
+}
 
 export function useQConversation(
   options: QConversationOptions = {},
@@ -135,16 +220,28 @@ export function useQConversation(
   /** A submit in flight: the run has been asked for but is not streaming yet. */
   const [submitting, setSubmitting] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
+  const [conversationIdState, setConversationIdState] = useState<string | null>(
+    options.conversationId ?? null,
+  );
+  /** A change still waiting in this conversation whose run is not the open one. */
+  const [carried, setCarried] = useState<CarriedApproval | null>(null);
 
   const conversationId = useRef<string | null>(null);
+  /** The conversation id last taken from the caller, so a URL the hook itself wrote is not reopened. */
+  const opened = useRef<string | null | undefined>(undefined);
   const openRun = useRef<string | null>(null);
-  /** Every run of this conversation, oldest first. */
-  const runIds = useRef<readonly string[]>([]);
   /** Whether the open run has reached a terminal event. True when none is open. */
   const finished = useRef(true);
   const abort = useRef<AbortController | null>(null);
+  /** Recovers a question a reload interrupted (H1); set below, once `begin` exists. */
+  const recoverRef = useRef<() => void>(() => undefined);
+  const onConversation = useRef(options.onConversation);
+  useEffect(() => {
+    onConversation.current = options.onConversation;
+  }, [options.onConversation]);
 
   useEffect(
     () => () => {
@@ -154,26 +251,43 @@ export function useQConversation(
   );
 
   const follow = useCallback((run: string) => {
+    // Seen live by this page: its answer may move them (follow-navigation).
+    noteLiveRun(run);
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
     setStreaming(true);
-    void streamQRunEvents({ baseUrl: STREAM_BASE_URL, accessToken: "" }, run, {
-      signal: controller.signal,
-      onStatus: (status) => {
-        setTransport(status);
-      },
-      onEvent: (event) => {
-        setRunState((current) => reduceQStream(current, event));
-        if (isTerminalQStreamEvent(event)) {
-          finished.current = true;
-        }
-      },
-    })
+    // The answer's cards arrive with its completed message and stay hidden
+    // until their code and contracts are in. Those load as the run starts,
+    // so a card shows the moment it lands, rather than after the stage's
+    // idle prefetch (800 ms + idle, up to 5 s).
+    void loadWire().catch(() => undefined);
+    void import("./answer-canvas").catch(() => undefined);
+    void import("./stage-canvas").catch(() => undefined);
+    // W7: the stream (and the contracts it checks events against) loads
+    // with the first run followed, not with the page.
+    void import("./q-stream-transport")
+      .then(({ streamQRunEvents, isTerminalQStreamEvent }) =>
+        streamQRunEvents({ baseUrl: STREAM_BASE_URL, accessToken: "" }, run, {
+          signal: controller.signal,
+          onStatus: (status) => {
+            setTransport(status);
+          },
+          onEvent: (event) => {
+            setRunState((current) => reduceQStream(current, event));
+            if (isTerminalQStreamEvent(event)) {
+              finished.current = true;
+              // A finished run may have named the conversation for the
+              // first time; the list is read again either way.
+              announceConversationsChanged();
+            }
+          },
+        }),
+      )
       .catch(() => {
         // A refusal on the stream is not a failed run — the run may still
         // be recorded and answered. Say so plainly; do not claim it failed.
-        setNotice("I lost the connection to Q. Please try again.");
+        setNotice("I lost the connection to Q. Try again.");
       })
       .finally(() => {
         if (abort.current === controller) {
@@ -182,63 +296,177 @@ export function useQConversation(
       });
   }, []);
 
-  // Reopen the conversation this tab was in (sections 15, 44). Every run is
-  // read back from the server, so a refresh shows the turns that were
-  // actually recorded; a run this person may no longer read does not return,
-  // and its absence is simply a shorter conversation rather than an error.
+  const reset = useCallback(() => {
+    abort.current?.abort();
+    abort.current = null;
+    setRunState(createQStreamState());
+    setHistory([]);
+    setPending([]);
+    setTransport(null);
+    setStreaming(false);
+    setNotice(null);
+    setRunId(null);
+    openRun.current = null;
+    finished.current = true;
+  }, []);
+
+  // Open the conversation the caller named, or start clean when it named
+  // none. Every turn is read back from the server, so a refresh shows
+  // what was actually recorded; a run still in flight is followed from
+  // its cursor rather than reconstructed.
+  const wanted = options.conversationId ?? null;
   useEffect(() => {
-    const remembered = rememberedRuns();
-    if (remembered.length === 0) {
+    if (opened.current === wanted) {
+      return;
+    }
+    /**
+     * What this effect had opened before, so an abandoned open can be
+     * taken back (QX-003A).
+     *
+     * The mark below says "this conversation is open". It is set before
+     * the read it guards, which is correct only if the read then happens.
+     * When the effect is cleaned up first the read never lands, and a
+     * second invocation used to find the conversation already marked open
+     * and return early — leaving the surface empty for the rest of the
+     * page's life, with a successful read, a correct merge and no error
+     * anywhere to show for it.
+     *
+     * React's development double-invoke is the reliable way to produce
+     * that second invocation, but it is not the only one: any remount of
+     * this surface does the same thing in any build.
+     */
+    const previously = opened.current;
+    opened.current = wanted;
+    if (wanted !== null && wanted === conversationId.current) {
+      // Named by this hook a moment ago and written to the URL by the
+      // caller: already open, nothing to read back.
       return;
     }
     let cancelled = false;
-    void Promise.all(remembered.map((run) => readQRunAction(run))).then(
-      (results) => {
-        if (cancelled) {
+    /** True until the open has run; a cleanup before that abandons it. */
+    let opening = true;
+    // One microtask later, so the state changes belong to the open rather
+    // than to the render that scheduled it.
+    void Promise.resolve()
+      .then(() => {
+        if (cancelled) return null;
+        reset();
+        conversationId.current = wanted;
+        setConversationIdState(wanted);
+        if (wanted === null) {
+          // A surface that names no conversation may be a reload of one
+          // whose first question was still being accepted (H1, below).
+          // Asked from here, after the reset, so nothing clears it again,
+          // and only by the open that was not abandoned.
+          recoverRef.current();
+          return null;
+        }
+        setLoading(true);
+        return readQConversationAction(wanted);
+      })
+      .then((result) => {
+        if (cancelled || result === null) return;
+        if (!result.ok) {
+          // Not theirs, or gone: the surface starts clean and says so.
+          conversationId.current = null;
+          setConversationIdState(null);
+          setNotice(result.message);
           return;
         }
-        const readable = results.flatMap((result) =>
-          result.ok ? [result.value] : [],
-        );
-        const last = readable.at(-1);
-        if (last === undefined) {
-          rememberRuns([]);
-          return;
-        }
-        // Only the runs that came back are still worth remembering.
-        runIds.current = readable.map((run) => run.runId);
-        rememberRuns(runIds.current);
-        openRun.current = last.runId;
-        conversationId.current = last.conversationId ?? null;
-        setRunId(last.runId);
-        setHistory(readable.flatMap((run) => run.messages ?? []));
-        // A run still in flight keeps streaming; a finished one does not
-        // reconnect, because there is nothing further to receive.
-        const live = !FINISHED_STATUSES.has(last.status);
-        finished.current = !live;
+        const detail = result.value;
+        const latest = detail.latestRun;
+        const live = latest !== null && !FINISHED_STATUSES.has(latest.status);
         if (live) {
-          // Its own turns arrive again on the stream, so they are not also
-          // taken from the summary above.
+          // Q's side of the live run arrives again on the stream, so it is
+          // not also taken from the recorded thread. The person's own
+          // question is not on the stream at all: it is only ever in the
+          // record, so it stays. Dropping it left a conversation opened
+          // mid-run (a Home card that started the run, then /home?c=)
+          // showing Q's answer to a question nobody asked.
           setHistory(
-            readable.slice(0, -1).flatMap((run) => run.messages ?? []),
+            detail.messages.filter(
+              (message) =>
+                message.runId !== latest.runId || message.role === "USER",
+            ),
           );
-          follow(last.runId);
+          openRun.current = latest.runId;
+          finished.current = false;
+          setRunId(latest.runId);
+          follow(latest.runId);
+        } else {
+          setHistory(detail.messages);
+          openRun.current = latest?.runId ?? null;
+          finished.current = true;
+          setRunId(latest?.runId ?? null);
         }
-      },
-    );
+      })
+      .finally(() => {
+        opening = false;
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
+      if (opening) {
+        // Abandoned before it opened anything: the mark would otherwise
+        // claim a conversation is open that was never read.
+        opened.current = previously;
+      }
     };
-  }, [follow]);
+  }, [wanted, follow, reset]);
 
+  /** A run the Q API accepted: this surface is now in its conversation, following it. */
+  const begin = useCallback(
+    (started: QStartedRun) => {
+      // The finished run's turns become the conversation's history, and
+      // the reducer starts clean for the run about to begin.
+      setHistory((current) => [...current, ...runState.messages]);
+      setRunState(createQStreamState());
+      finished.current = false;
+      const named = started.conversationId ?? conversationId.current;
+      const isNew = named !== null && named !== conversationId.current;
+      conversationId.current = named;
+      setConversationIdState(named);
+      openRun.current = started.runId;
+      setRunId(started.runId);
+      // Started from a typed question (ask, or its resume after a reload).
+      noteTypedRun(started.runId);
+      if (isNew && named !== null) {
+        // The caller writes it to the URL; that change is ours, not a
+        // request to reopen.
+        opened.current = named;
+        onConversation.current?.(named);
+        announceConversationsChanged();
+      }
+      follow(started.runId);
+    },
+    [follow, runState.messages],
+  );
+
+  const awaitingPerson = runState.approval !== null;
   const ask = useCallback(
-    async (question: string) => {
+    async (
+      question: string,
+      extras?: {
+        readonly viewing?: QViewingMoment | undefined;
+        /**
+         * What the surface said before this question (Home's welcome), so
+         * a new conversation starts with it; ignored when one is open.
+         */
+        readonly opening?: string | undefined;
+      },
+    ) => {
       const text = question.trim();
-      if (text.length === 0 || submitting || streaming) {
+      // A run paused on an approval is waiting for the person, not busy:
+      // what they type starts the conversation's next turn ("go ahead"
+      // approves through the Approval Engine, the same as the card).
+      if (text.length === 0 || submitting || (streaming && !awaitingPerson)) {
         return;
       }
       setNotice(null);
       setSubmitting(true);
+      // RECOVERY-2026-10 (C, "stupid fast"): a typed "open X" moves the
+      // screen now, beside the run; the answer does not move it again.
+      void navigationHeard(text);
       const placeholder: PendingTurn = {
         id: crypto.randomUUID(),
         text,
@@ -253,7 +481,13 @@ export function useQConversation(
 
       try {
         const open = openRun.current;
-        if (open !== null && !finished.current) {
+        // A run paused on an approval takes no more turns: a message
+        // appended to it is stored and never answered (live 2026-09-28 #4:
+        // "go ahead" sat unanswered and the change stayed "approval
+        // needed"). What they type then is a new turn of the conversation,
+        // where Q approves the waiting change through the Approval Engine
+        // exactly as the card does.
+        if (open !== null && !finished.current && !awaitingPerson) {
           // The run is still live: this is its next turn, and the stream
           // already open will carry the answer.
           const appended = await continueQRunAction(open, text);
@@ -264,35 +498,115 @@ export function useQConversation(
           return;
         }
 
-        const started = await askQAction(
+        // A question that starts a conversation is remembered for this
+        // tab until the conversation is named, so a reload in between
+        // reopens it (CQ-QX-007 H1; pending-ask.ts).
+        const idempotencyKey = crypto.randomUUID();
+        const startsConversation = conversationId.current === null;
+        const named = namedSubject({
+          companyId: options.companyId,
+          investorOrganisationId: options.investorOrganisationId,
+          relationshipId: options.relationshipId,
+          ambient: options.ambient,
+        });
+        if (startsConversation) {
+          rememberPendingAsk({
+            idempotencyKey,
+            text,
+            at: placeholder.at,
+            ...named,
+          });
+        }
+        const started = await askQ(
           text,
           conversationId.current ?? undefined,
-          options.companyId,
+          subjectInputOf(named),
+          idempotencyKey,
+          // R18/R21: the pitch on screen as they ask, read now (the dock
+          // may have opened on another card); else the opening's moment.
+          currentViewing() ?? extras?.viewing,
+          // R21: the screen they asked from, resolved or dropped server-side.
+          currentScreen(),
+          startsConversation ? extras?.opening : undefined,
         );
         if (!started.ok) {
+          forgetPendingAsk(idempotencyKey);
           drop();
           setNotice(started.message);
           return;
         }
-
-        // The finished run's turns become the conversation's history, and
-        // the reducer starts clean for the run about to begin.
-        setHistory((current) => [...current, ...runState.messages]);
-        setRunState(createQStreamState());
-        finished.current = false;
-        conversationId.current =
-          started.value.conversationId ?? conversationId.current;
-        openRun.current = started.value.runId;
-        runIds.current = [...runIds.current, started.value.runId];
-        setRunId(started.value.runId);
-        rememberRuns(runIds.current);
-        follow(started.value.runId);
+        begin(started.value);
+        forgetPendingAsk(idempotencyKey);
       } finally {
         setSubmitting(false);
       }
     },
-    [follow, options.companyId, runState.messages, streaming, submitting],
+    [
+      begin,
+      options.companyId,
+      options.investorOrganisationId,
+      options.relationshipId,
+      options.ambient,
+      streaming,
+      submitting,
+      awaitingPerson,
+    ],
   );
+
+  /**
+   * A reload while the question that started this conversation was still
+   * being accepted (CQ-QX-007 H1). The same question is asked again under
+   * the same key: the Q API hands back the run it already created — or
+   * creates it, if the first request never arrived — and the page is in
+   * that conversation, following that run, as if it had never reloaded.
+   * Only on a surface that names no conversation and is about the same
+   * subject the question was asked about.
+   */
+  useEffect(() => {
+    recoverRef.current = () => {
+      const remembered = readPendingAsk();
+      if (
+        remembered === null ||
+        remembered.companyId !== options.companyId ||
+        remembered.investorOrganisationId !== options.investorOrganisationId ||
+        remembered.relationshipId !== options.relationshipId
+      ) {
+        return;
+      }
+      const placeholder: PendingTurn = {
+        id: crypto.randomUUID(),
+        text: remembered.text,
+        at: remembered.at,
+      };
+      setPending((current) => [...current, placeholder]);
+      setSubmitting(true);
+      void askQ(
+        remembered.text,
+        undefined,
+        subjectInputOf(remembered),
+        remembered.idempotencyKey,
+      )
+        .then((started) => {
+          forgetPendingAsk(remembered.idempotencyKey);
+          if (!started.ok) {
+            setPending((current) =>
+              current.filter((turn) => turn.id !== placeholder.id),
+            );
+            setNotice(started.message);
+            return;
+          }
+          begin(started.value);
+        })
+        .finally(() => {
+          setSubmitting(false);
+        });
+    };
+  }, [
+    begin,
+    options.companyId,
+    options.investorOrganisationId,
+    options.relationshipId,
+  ]);
 
   const stop = useCallback(async () => {
     const open = openRun.current;
@@ -305,16 +619,155 @@ export function useQConversation(
     }
   }, []);
 
+  // The change still waiting in this conversation, found again whenever
+  // the thread settles: its card stays until it is decided (QA 2026-10-01).
+  const live = runState.approval !== null;
+  useEffect(() => {
+    if (streaming || live || conversationIdState === null) return;
+    let current = true;
+    const id = conversationIdState;
+    void pendingQApprovalsAction().then((result) => {
+      if (!current || !result.ok) return;
+      setCarried(carriedApproval(id, history, result.value));
+    });
+    return () => {
+      current = false;
+    };
+  }, [streaming, live, conversationIdState, history]);
+
+  // A decision on the open run's proposal. The run resumes on the server
+  // after a yes and its remaining events are followed again from the
+  // cursor, so what the gate did arrives the same way the answer did.
+  const decide = useCallback(
+    async (decision: "APPROVE" | "REJECT") => {
+      if (runState.approval === null && carried !== null) {
+        // A change from an earlier run of this conversation: decided by
+        // the same engine calls; the thread is read back once it has run.
+        const result =
+          decision === "APPROVE"
+            ? await approveQApprovalAction(carried.approval.approvalId)
+            : await rejectQApprovalAction(carried.approval.approvalId);
+        if (!result.ok) {
+          setNotice(result.message);
+          return;
+        }
+        setCarried(null);
+        const id = conversationId.current;
+        if (id !== null) {
+          for (const wait of [3_000, 10_000]) {
+            setTimeout(() => {
+              void readQConversationAction(id).then((read) => {
+                if (
+                  read.ok &&
+                  conversationId.current === id &&
+                  finished.current
+                ) {
+                  setHistory(read.value.messages);
+                }
+              });
+            }, wait);
+          }
+        }
+        return;
+      }
+      const approval = runState.approval;
+      const open = openRun.current;
+      if (approval === null || open === null) {
+        return;
+      }
+      const result =
+        decision === "APPROVE"
+          ? await approveQApprovalAction(approval.approvalId)
+          : await rejectQApprovalAction(approval.approvalId);
+      if (!result.ok) {
+        setNotice(result.message);
+        return;
+      }
+      setRunState((current) => ({ ...current, approval: null }));
+      if (decision === "APPROVE") {
+        finished.current = false;
+        follow(open);
+      }
+    },
+    [follow, runState.approval, carried],
+  );
+  const approve = useCallback(() => decide("APPROVE"), [decide]);
+  const revised = useCallback(() => {
+    const open = openRun.current;
+    if (open === null) return;
+    setRunState((current) => ({ ...current, approval: null }));
+    finished.current = false;
+    follow(open);
+  }, [follow]);
+  const decline = useCallback(() => decide("REJECT"), [decide]);
+
+  const refresh = useCallback(async (): Promise<boolean> => {
+    const id = conversationId.current;
+    if (id === null || !finished.current) return false;
+    const result = await readQConversationAction(id);
+    // Only if nothing moved while the read was out: same conversation, and
+    // no typed run started in the meantime.
+    if (!result.ok || conversationId.current !== id || !finished.current) {
+      return false;
+    }
+    setHistory(result.value.messages);
+    // Every finished run's messages are in the record now; keeping the
+    // streamed copy as well would show them twice.
+    setRunState(createQStreamState());
+    return recordSettled(result.value.latestRun);
+  }, []);
+
+  const streamedMessages = useRef<readonly QMessage[]>([]);
+  useEffect(() => {
+    streamedMessages.current = runState.messages;
+  }, [runState.messages]);
+  const absorb = useCallback((message: QMessage) => {
+    if (
+      streamedMessages.current.some(
+        (streamed) => streamed.messageId === message.messageId,
+      )
+    ) {
+      return;
+    }
+    setHistory((current) =>
+      current.some((held) => held.messageId === message.messageId)
+        ? current
+        : [...current, message],
+    );
+  }, []);
+
   return {
-    state: { ...runState, messages: [...history, ...runState.messages] },
+    state: {
+      ...runState,
+      messages: [...history, ...runState.messages],
+      ...(runState.approval === null && carried !== null
+        ? {
+            approval: carried.approval,
+            proposals: runState.proposals.some(
+              (proposal) => proposal.proposalId === carried.proposal.proposalId,
+            )
+              ? runState.proposals
+              : [...runState.proposals, carried.proposal],
+          }
+        : {}),
+    },
     pending,
     transport,
     // A run is "working" from the moment it is asked for until its stream
     // ends. Never inferred from elapsed time or the absence of text.
-    working: submitting || streaming,
+    // A run paused on the person's approval is not working: the composer
+    // stays open for "go ahead", and nothing says "Q is working".
+    working: submitting || (streaming && !awaitingPerson),
+    loading,
     notice,
     runId,
+    conversationId: conversationIdState,
     ask,
     stop,
+    approve,
+    decline,
+    revised,
+    refresh,
+    absorb,
   };
 }

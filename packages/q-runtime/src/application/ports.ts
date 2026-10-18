@@ -3,6 +3,7 @@ import type {
   QMessageId,
   QRunId,
   QRunStatus,
+  QSubjectRef,
   QVisibleStage,
   UtcTimestamp,
 } from "@capital-q/contracts";
@@ -16,6 +17,7 @@ import type {
   NewQRun,
   NewQRunEvent,
   QConversation,
+  QConversationDigest,
   QConversationMessage,
   QRunEventRecord,
   QRunRecord,
@@ -36,6 +38,14 @@ import type {
  * under the version the caller read.
  */
 
+/** A bounded search of one owner's conversations; see `searchForOwner`. */
+export type QConversationSearch = {
+  readonly companyIds: readonly string[];
+  readonly terms: readonly string[];
+  readonly except: readonly string[];
+  readonly limit: number;
+};
+
 export type QConversationRepository = {
   readonly insert: (
     tx: TransactionContext,
@@ -52,6 +62,62 @@ export type QConversationRepository = {
     executor: DatabaseExecutor,
     conversationId: QConversationId,
   ) => Promise<{ readonly tenantId: TenantId; readonly userId: UserId } | null>;
+  /**
+   * What the conversation is about, replaced.
+   *
+   * Set when a turn names a subject, so the next turn inherits it. Each
+   * subject is re-resolved for the actor on every run, so recording one
+   * here grants nothing: it is a memory of what was being discussed, not
+   * a standing permission.
+   */
+  readonly setSubjects: (
+    tx: TransactionContext,
+    tenantId: TenantId,
+    conversationId: QConversationId,
+    subjects: readonly QSubjectRef[],
+  ) => Promise<void>;
+  /**
+   * The owner's open conversations, newest activity first, bounded.
+   * `before` pages by last activity. Owner and tenant, always.
+   */
+  readonly listForOwner: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    userId: UserId,
+    page: {
+      readonly limit: number;
+      readonly before?: UtcTimestamp | undefined;
+    },
+  ) => Promise<readonly QConversation[]>;
+  /**
+   * The owner's own summarised conversations that look relevant to what
+   * they are asking now, for cross-conversation memory: those whose
+   * subjects name one of `companyIds`, or whose title or summary contains
+   * one of `terms`. Tenant, owner and not archived, always; `except` is
+   * left out. Exact company-subject matches come first, then newest activity
+   * within each group. The implementation bounds it (at most
+   * 4 rows, 8 terms of 3-60 characters) whatever the caller asks.
+   */
+  readonly searchForOwner: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    userId: UserId,
+    query: QConversationSearch,
+  ) => Promise<readonly QConversation[]>;
+  /** Other recent conversations of the owner, for cross-conversation memory: identifiers, titles and summaries only. */
+  readonly setDigest: (
+    tx: TransactionContext,
+    tenantId: TenantId,
+    conversationId: QConversationId,
+    digest: QConversationDigest,
+  ) => Promise<void>;
+  /** Archives the owner's conversation; idempotent; null when it is not theirs. */
+  readonly archiveForOwner: (
+    tx: TransactionContext,
+    tenantId: TenantId,
+    userId: UserId,
+    conversationId: QConversationId,
+  ) => Promise<QConversation | null>;
 };
 
 export type QRunTransition = {
@@ -68,6 +134,46 @@ export type QRunTransition = {
   readonly modelPolicyVersion?: string | undefined;
   /** The prompt bundle the answer was produced under (CQ-Q-006). */
   readonly promptBundleVersion?: string | undefined;
+};
+
+/**
+ * S2: a chain of lifecycle moves and its event as ONE statement. The
+ * caller has already checked, from the lifecycle map, that every move in
+ * the chain is legal from each status in `allowedFrom`; the statement
+ * applies the whole chain only to a run that is the actor's, in the
+ * tenant, and in one of those statuses at the instant it holds the row
+ * lock. A run anywhere else (already moved by a replay, terminal,
+ * cancel-requested, someone else's) updates nothing and returns null, and
+ * the caller falls back to the locked, step-by-step path.
+ */
+export type QRunMoveChain = {
+  readonly tenantId: TenantId;
+  readonly actorUserId: UserId;
+  readonly runId: QRunId;
+  /** The statuses the chain may start from. */
+  readonly allowedFrom: readonly QRunStatus[];
+  /** How many lifecycle moves the chain is (the version rises by this). */
+  readonly steps: number;
+  readonly status: QRunStatus;
+  readonly startedAt?: UtcTimestamp | undefined;
+  readonly completedAt?: UtcTimestamp | undefined;
+  readonly failureCode?: QFailureDiagnosticCode | undefined;
+  readonly orchestrationVersion?: string | undefined;
+  readonly modelPolicyVersion?: string | undefined;
+  readonly promptBundleVersion?: string | undefined;
+  /**
+   * The one event the chain appends, if any. With `onlyIfStageDiffers`
+   * it is appended only when the run's latest visible stage is not
+   * already that stage (a replay never duplicates a stage event).
+   */
+  readonly event?:
+    | {
+        readonly eventType: string;
+        readonly visibleStage: QVisibleStage | null;
+        readonly payload: unknown;
+        readonly onlyIfStageDiffers: boolean;
+      }
+    | undefined;
 };
 
 export type QRunRepository = {
@@ -88,6 +194,33 @@ export type QRunRepository = {
     readonly tenantId: TenantId;
     readonly actorUserId: UserId;
   } | null>;
+  /**
+   * Non-terminal runs that have shown no sign of life (no durable event,
+   * no start, no creation) since the given instants, oldest first,
+   * bounded. In-flight and paused runs have separate windows: a run paused
+   * for a person is not orphaned by being quiet. For the orphan sweep,
+   * which must never touch a run another process is still working on.
+   */
+  readonly listStale: (
+    executor: DatabaseExecutor,
+    input: {
+      readonly inFlightSilentSince: UtcTimestamp;
+      readonly pausedSilentSince: UtcTimestamp;
+      /**
+       * G-D24: an in-flight run whose engine heartbeats is orphaned once
+       * its heartbeat is older than this. Absent: the in-flight window.
+       */
+      readonly engineSilentSince?: UtcTimestamp | undefined;
+      readonly limit: number;
+    },
+  ) => Promise<readonly QRunRecord[]>;
+  /** The newest run of a conversation, for reopening it where it stopped. Owner-scoped. */
+  readonly findLatestForConversation: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    userId: UserId,
+    conversationId: QConversationId,
+  ) => Promise<QRunRecord | null>;
   /** Row lock for a lifecycle decision made from the current state. */
   readonly lockForActor: (
     tx: TransactionContext,
@@ -103,6 +236,13 @@ export type QRunRepository = {
     tx: TransactionContext,
     input: QRunTransition,
   ) => Promise<QRunRecord | null>;
+  /** S2: see QRunMoveChain. Absent: the caller uses `transition`. */
+  readonly moveChain?:
+    | ((
+        executor: DatabaseExecutor,
+        input: QRunMoveChain,
+      ) => Promise<QRunRecord | null>)
+    | undefined;
   /**
    * Claims the next per-run event sequence under the run's row lock. Two
    * concurrent writers receive distinct consecutive numbers; neither is
@@ -132,6 +272,51 @@ export type QConversationMessageRepository = {
     runId: QRunId,
     limit: number,
   ) => Promise<readonly QConversationMessage[]>;
+  /**
+   * The most recent messages of the CONVERSATION the run belongs to,
+   * oldest first, bounded.
+   *
+   * A voice turn is its own run, so run-scoped history meant Q could not
+   * see the sentence it had spoken a moment earlier: it named a company,
+   * was asked "tell me more about it", and answered that no company had
+   * been named. A conversation is the thing a person is having; a run is
+   * one turn of it.
+   */
+  readonly listRecentForConversationOfRun: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    runId: QRunId,
+    limit: number,
+  ) => Promise<readonly QConversationMessage[]>;
+  /** The most recent messages of a conversation, oldest first, bounded. Tenant-scoped; the caller has checked ownership. */
+  readonly listRecentForConversation: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    conversationId: QConversationId,
+    limit: number,
+    /**
+     * readBack: what Q may read back (memory learning): marked lines --
+     * speech for someone else, lines the person hid -- are left out. The
+     * person's own history view keeps them.
+     */
+    options?: { readonly readBack?: boolean | undefined },
+  ) => Promise<readonly QConversationMessage[]>;
+  /**
+   * Keep lines out of what Q reads back, append-only (20261110030000):
+   * the person's lines not meant for Q, and Q's replies to them. Only
+   * lines of this conversation are marked; marking twice is a no-op.
+   */
+  readonly mark?: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: TenantId;
+      readonly conversationId: string;
+      readonly messageIds: readonly string[];
+      readonly mark: "NOT_ADDRESSED_TO_Q" | "HIDDEN_BY_PERSON";
+      readonly markedBy: "Q_READING" | "PERSON";
+      readonly runId?: string | undefined;
+    },
+  ) => Promise<void>;
 };
 
 export type QRunEventRepository = {
@@ -140,6 +325,19 @@ export type QRunEventRepository = {
     tx: TransactionContext,
     input: NewQRunEvent,
   ) => Promise<QRunEventRecord>;
+  /**
+   * R5: allocate the run's next sequence and append the event in ONE
+   * statement (the same row lock, the same consecutive numbering, the same
+   * unique (run_id, sequence) arbiter). Null when the run does not exist.
+   * Optional: a store without it is used through allocate + append.
+   */
+  readonly appendNext?: (
+    // Only the executor is used: the statement is atomic by itself, so a
+    // caller with no transaction of its own may pass its request client
+    // (S2: a stage event was BEGIN, the event, COMMIT).
+    tx: { readonly sql: DatabaseExecutor },
+    input: Omit<NewQRunEvent, "sequence">,
+  ) => Promise<QRunEventRecord | null>;
   /** Ordered by sequence; `afterSequence` is the replay cursor. */
   readonly listForRun: (
     executor: DatabaseExecutor,

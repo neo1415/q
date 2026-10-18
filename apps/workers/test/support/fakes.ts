@@ -93,6 +93,7 @@ export function makeDocument(
     title: "Deck",
     visibilityScope: "founder_private",
     sensitivityClass: "CONFIDENTIAL",
+    downloadAudience: "ORGANISATION",
     currentVersionId: version.id,
     status: "ACTIVE",
     createdByUserId: UserIdSchema.parse(randomUUID()),
@@ -258,6 +259,14 @@ export function createFakeEvidence(options: {
   const findDocumentExtraction: DocumentProcessingService["findDocumentExtraction"] =
     () => Promise.resolve(null);
 
+  // The pipeline under test never backfills pages; nothing is missing.
+  const backfillDocumentPages: DocumentProcessingService["backfillDocumentPages"] =
+    () => Promise.resolve({ examined: 0, pagesWritten: 0, failed: 0 });
+
+  // Nor does it read an unpaged document back for onboarding.
+  const readOwnDocumentText: DocumentProcessingService["readOwnDocumentText"] =
+    () => Promise.resolve("");
+
   return {
     service: {
       resolveProcessingTarget,
@@ -267,6 +276,8 @@ export function createFakeEvidence(options: {
       completeDocumentProcessing,
       recordDocumentExtraction,
       findDocumentExtraction,
+      backfillDocumentPages,
+      readOwnDocumentText,
     },
     calls,
     status: () => requireRun().status,

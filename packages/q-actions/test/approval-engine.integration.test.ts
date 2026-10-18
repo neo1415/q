@@ -51,6 +51,9 @@ import {
 import {
   createTestConfirmRequiredAction,
   TEST_CONFIRM_REQUIRED,
+  TEST_SELF,
+  TEST_SELF_SETTER,
+  TEST_SETTER,
   type TestActionExecutorState,
 } from "../src/testing/index.js";
 
@@ -236,7 +239,26 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
       transactions: db.transactions,
       repositories: createPostgresQActionRepositories(),
       runtime: repositories,
-      registry: createQActionRegistry([test.definition]),
+      registry: createQActionRegistry([
+        test.definition,
+        // The same action as a setter (lead 2026-10-03): newer replaces older.
+        createTestConfirmRequiredAction({
+          actionType: TEST_SETTER,
+          supersedes: true,
+        }).definition,
+        // G-D23: an action on the proposer's own records (no target).
+        createTestConfirmRequiredAction({
+          actionType: TEST_SELF,
+          selfOnly: true,
+        }).definition,
+        // A setter with no declared target, keyed by the company it sets.
+        createTestConfirmRequiredAction({
+          actionType: TEST_SELF_SETTER,
+          selfOnly: true,
+          supersedes: true,
+          supersedeKey: (payload) => payload.companyId,
+        }).definition,
+      ]),
       authorization: createAuthorizationService(
         createPostgresAuthorizationPolicySource({ sql: db.sql }),
       ),
@@ -330,21 +352,26 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     return run;
   }
 
+  let proposals = 0;
   async function propose(
     world: World,
     person: Person,
     payload: Record<string, unknown>,
     run?: QRunRecord,
+    actionType: typeof TEST_CONFIRM_REQUIRED = TEST_CONFIRM_REQUIRED,
   ) {
     const current = run ?? (await synthesisRun(world, person));
+    proposals += 1;
     return world.service.propose({
       actor: person.actor,
       runId: current.id,
       correlationId: CORRELATION(),
-      actionType: TEST_CONFIRM_REQUIRED,
+      actionType,
       payload: {
         companyId: COMPANY,
-        note: `Please record this. ${MARKERS.payload}`,
+        // Each call its own change: the same change still waiting is
+        // returned, not proposed again (lead 2026-10-03).
+        note: `Please record this. ${MARKERS.payload} (#${String(proposals)})`,
         ...payload,
       },
     });
@@ -497,6 +524,13 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
         (a) => a.action_type === "q.action.approved",
       );
       expect(approvedAudit?.actor_type).toBe("human");
+      // A tap on the card: recorded as such, with the idempotency key.
+      expect(approvedAudit?.metadata).toMatchObject({
+        decidedVia: "CARD",
+        evidenceRef: null,
+        idempotencyKey: action.idempotencyKey,
+        approvalPayloadHash: action.payloadHash,
+      });
       assertNoMarkers(JSON.stringify(audit));
 
       // Domain events went through the outbox, without content.
@@ -512,6 +546,142 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
       assertNoMarkers(JSON.stringify(outbox));
       expect(JSON.stringify(outbox)).not.toContain("sha256:");
       assertNoMarkers(world.logLines.join("\n"));
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("approval by words (owner 2026-10-16): recorded as the person's, with its channel and the message as evidence; the same checks as the card", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder } = world;
+      const { action, approval } = await propose(world, founder, {
+        note: `Send the follow-up. ${MARKERS.payload}`,
+      });
+      const messageId = randomUUID();
+      const decided = await world.service.approve({
+        actor: founder.actor,
+        approvalId: approval.id,
+        correlationId: CORRELATION(),
+        via: { channel: "TEXT", evidenceRef: messageId },
+      });
+      expect(decided.decided).toBe(true);
+      expect(decided.approval.approvedByUserId).toBe(founder.actor.userId);
+      expect(decided.approval.approvalPayloadHash).toBe(action.payloadHash);
+      const rows = await db.sql<
+        {
+          actor_type: string;
+          authority_user_id: string | null;
+          metadata: Record<string, unknown>;
+        }[]
+      >`
+        select actor_type, authority_user_id, metadata from audit.material_actions
+         where resource_id = ${action.id} and action_type = 'q.action.approved'`;
+      expect(rows).toHaveLength(1);
+      // The human's approval, never the model's.
+      expect(rows[0]?.actor_type).toBe("human");
+      expect(rows[0]?.authority_user_id).toBe(founder.actor.userId);
+      expect(rows[0]?.metadata).toMatchObject({
+        decidedVia: "TEXT",
+        evidenceRef: messageId,
+        idempotencyKey: action.idempotencyKey,
+        approvalPayloadHash: action.payloadHash,
+      });
+      assertNoMarkers(JSON.stringify(rows));
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("ONE CARD PER CHANGE (lead 2026-10-03): the same change asked for again, in any run or conversation, returns the card already waiting; a different value is a second card", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder } = world;
+      const same = { note: `Share the raise. ${MARKERS.payload}` };
+      const setter = (payload: Record<string, unknown>) =>
+        propose(world, founder, payload, undefined, TEST_SETTER);
+      const first = await setter(same);
+      // Another run: another turn, or another conversation, of theirs.
+      const again = await setter(same);
+      expect(again.existing).toBe(true);
+      expect(again.action.id).toBe(first.action.id);
+      expect(again.approval.id).toBe(first.approval.id);
+      // Nothing new was written, and the second run does not wait.
+      const [count] = await db.sql<{ n: number }[]>`
+        select count(*)::int as n from q_runtime.actions
+         where proposed_by_user_id = ${founder.actor.userId}
+           and action_type = ${TEST_SETTER}`;
+      expect(count?.n).toBe(1);
+      // Same target, another value: the newer card replaces the older one
+      // (lead 2026-10-03, run a4618f34: opposite deck audiences).
+      const different = await setter({
+        note: `Share the raise, only the deck. ${MARKERS.payload}`,
+      });
+      expect(different.existing).toBeUndefined();
+      expect(different.action.id).not.toBe(first.action.id);
+      expect(different.superseded?.map((a) => a.id)).toEqual([first.action.id]);
+      // The older card can never be approved, and says why.
+      await expect(
+        world.service.approve({
+          actor: founder.actor,
+          approvalId: first.approval.id,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toThrow(
+        "This card was replaced by a newer one or withdrawn, so it can't be approved.",
+      );
+      // History kept, not deleted: withdrawn, revoked, audited, its run ended.
+      const [old] = await db.sql<
+        { status: string; approval: string; run: string }[]
+      >`
+        select a.status, p.status as approval, r.status as run
+          from q_runtime.actions a
+          join q_runtime.approvals p on p.action_id = a.id
+          join q_runtime.runs r on r.id = a.run_id
+         where a.id = ${first.action.id}`;
+      expect(old).toEqual({
+        status: "WITHDRAWN",
+        approval: "REVOKED",
+        run: "COMPLETED",
+      });
+      const audited = await db.sql<{ metadata: Record<string, unknown> }[]>`
+        select metadata from audit.material_actions
+         where resource_id = ${first.action.id}
+           and action_type = 'q.action.superseded'`;
+      expect(audited).toHaveLength(1);
+      expect(audited[0]?.metadata).toMatchObject({
+        supersededBy: different.action.id,
+      });
+      // The newer card is approvable.
+      const approved = await world.service.approve({
+        actor: founder.actor,
+        approvalId: different.approval.id,
+        correlationId: CORRELATION(),
+      });
+      expect(approved.approval.status).toBe("APPROVED");
+      // Another target is another thing: both cards wait.
+      const forAda = await setter({ recipientUserId: randomUUID() });
+      const forBola = await setter({ recipientUserId: randomUUID() });
+      expect(forBola.superseded).toBeUndefined();
+      const pending = await db.sql<{ n: number }[]>`
+        select count(*)::int as n from q_runtime.approvals
+         where id = any(${[forAda.approval.id, forBola.approval.id]}::uuid[])
+           and status = 'PENDING'`;
+      expect(pending[0]?.n).toBe(2);
+      // Additive actions coexist (lead 2026-10-03): two different
+      // requests or messages to one target both wait.
+      const askOne = await propose(world, founder, {
+        note: `Please send the management accounts. ${MARKERS.payload}`,
+      });
+      const askTwo = await propose(world, founder, {
+        note: `Please send the cap table. ${MARKERS.payload}`,
+      });
+      expect(askTwo.superseded).toBeUndefined();
+      const additive = await db.sql<{ n: number }[]>`
+        select count(*)::int as n from q_runtime.approvals
+         where id = any(${[askOne.approval.id, askTwo.approval.id]}::uuid[])
+           and status = 'PENDING'`;
+      expect(additive[0]?.n).toBe(2);
     } finally {
       await cleanup(world);
     }
@@ -581,6 +751,98 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     }
   });
 
+  it("REVISION (BIZ-007): an edit voids the old approval; only the new words execute, once", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder, colleague, service, executor } = world;
+      const { action, approval } = await propose(world, founder, {});
+      const revised = await service.revise({
+        actor: founder.actor,
+        approvalId: approval.id,
+        correlationId: CORRELATION(),
+        payload: {
+          companyId: COMPANY,
+          note: "Please record this, edited by one word.",
+        },
+      });
+      // A new proposal on the same run, bound to a new hash.
+      expect(revised.action.runId).toBe(action.runId);
+      expect(revised.action.id).not.toBe(action.id);
+      expect(revised.action.payloadHash).not.toBe(action.payloadHash);
+      expect(revised.approval.status).toBe("PENDING");
+      expect(await runStatus(action.runId)).toBe("AWAITING_APPROVAL");
+
+      // The old approval is void: it can be neither approved nor executed.
+      const old = await service.getApproval({
+        actor: founder.actor,
+        approvalId: approval.id,
+      });
+      expect(old.status).toBe("REVOKED");
+      expect(old.action.actionStatus).toBe("WITHDRAWN");
+      await expect(
+        service.approve({
+          actor: founder.actor,
+          approvalId: approval.id,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toThrow();
+      expect(
+        await service.executeApproved({
+          actor: founder.actor,
+          runId: action.runId,
+          tenantId: founder.actor.tenantId,
+          correlationId: CORRELATION(),
+          actionId: action.id,
+        }),
+      ).toMatchObject({ kind: "NOT_APPROVED" });
+
+      // Another target is another action, and only the approver may edit.
+      await expect(
+        service.revise({
+          actor: founder.actor,
+          approvalId: revised.approval.id,
+          correlationId: CORRELATION(),
+          payload: { companyId: randomUUID(), note: "Elsewhere." },
+        }),
+      ).rejects.toThrow();
+      await expect(
+        service.revise({
+          actor: colleague.actor,
+          approvalId: revised.approval.id,
+          correlationId: CORRELATION(),
+          payload: { companyId: COMPANY, note: "Mine now." },
+        }),
+      ).rejects.toThrow();
+
+      // Approve the revision; the run resumes with the ORIGINAL action id
+      // and the port resolves it to the revision. Twice executes once.
+      await service.approve({
+        actor: founder.actor,
+        approvalId: revised.approval.id,
+        correlationId: CORRELATION(),
+      });
+      const current = await service.currentRevision(
+        founder.actor.tenantId,
+        action.runId,
+        action.id,
+      );
+      expect(current).toBe(revised.action.id);
+      const execute = () =>
+        service.executeApproved({
+          actor: founder.actor,
+          runId: action.runId,
+          tenantId: founder.actor.tenantId,
+          correlationId: CORRELATION(),
+          actionId: current,
+        });
+      expect(await execute()).toEqual({ kind: "EXECUTED" });
+      expect(await execute()).toEqual({ kind: "ALREADY_EXECUTED" });
+      expect(executor.executions()).toBe(1);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
   it("changing targets or the definition version also invalidates an approval (hash covers them)", async () => {
     const world = await commitWorld();
     try {
@@ -636,7 +898,7 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     const world = await commitWorld();
     try {
       const { founder, colleague, outsider, service } = world;
-      const { approval } = await propose(world, founder, {});
+      const { approval, action: proposed } = await propose(world, founder, {});
       // Another tenant's action carries its own marker in the summary.
       const foreign = await propose(world, outsider, {
         note: MARKERS.crossTenant,
@@ -715,6 +977,32 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
         approvalId: approval.id,
       });
       expect(view.status).toBe("PENDING");
+
+      // R35: the pending list is the single read's predicate as a list —
+      // the approver sees their own; nobody else sees it, and the foreign
+      // tenant's never appears.
+      const mine = await service.listPendingApprovals({ actor: founder.actor });
+      expect(mine.map((item) => item.approvalId)).toEqual([approval.id]);
+      expect(mine[0]?.runId).toBe(proposed.runId);
+      for (const actor of [
+        colleague.actor,
+        { ...founder.actor, organisationId: world.orgB },
+        {
+          ...founder.actor,
+          organisationId: undefined,
+          membershipId: undefined,
+        },
+      ]) {
+        expect(
+          await service.listPendingApprovals({ actor: actor as ActorContext }),
+        ).toEqual([]);
+      }
+      const theirs = await service.listPendingApprovals({
+        actor: outsider.actor,
+      });
+      expect(theirs.map((item) => item.approvalId)).toEqual([
+        foreign.approval.id,
+      ]);
     } finally {
       await cleanup(world);
     }
@@ -894,6 +1182,165 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
       >`select status from q_runtime.actions where id = ${approved.action.id}`;
       expect(expiredAction?.status).toBe("EXPIRED");
       expect(executor.executions()).toBe(0);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("STRANDED CARD (live 2026-10-16): a card whose run stopped waiting is revoked for good, and an ended run's cards are never listed as waiting", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder, service } = world;
+      // The run stopped waiting (a cancellation in flight): approving is
+      // refused, and the revocation now commits instead of rolling back.
+      const moved = await propose(world, founder, { note: "Stranded one." });
+      await db.sql`
+        update q_runtime.runs set status = 'CANCEL_REQUESTED'
+         where id = ${moved.action.runId}`;
+      await expect(
+        service.approve({
+          actor: founder.actor,
+          approvalId: moved.approval.id,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(QApprovalAlreadyDecidedError);
+      const [revoked] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${moved.approval.id}`;
+      expect(revoked?.status).toBe("REVOKED");
+      const [withdrawn] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.actions where id = ${moved.action.id}`;
+      expect(withdrawn?.status).toBe("WITHDRAWN");
+
+      // A run that ends takes its open card with it, and the card is no
+      // longer counted as waiting; another run's card is untouched.
+      const ending = await propose(world, founder, {
+        note: "Ends with its run.",
+      });
+      const open = await propose(world, founder, { note: "Still waiting." });
+      await db.sql`
+        update q_runtime.runs
+           set status = 'CANCELLED', completed_at = now(), failure_code = 'RUN_CANCELLED'
+         where id = ${ending.action.runId}`;
+      const [ended] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${ending.approval.id}`;
+      expect(ended?.status).toBe("REVOKED");
+      const waiting = await service.listPendingApprovals({
+        actor: founder.actor,
+      });
+      const ids = waiting.map((row) => row.approvalId);
+      expect(ids).not.toContain(ending.approval.id);
+      expect(ids).not.toContain(moved.approval.id);
+      expect(ids).toContain(open.approval.id);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("EAGER EXPIRY (recovery D2, audit D-01): the sweep expires a lapsed card and its action without anyone deciding; an open one is left", async () => {
+    // A one-second TTL: the sweep only ever touches rows already lapsed.
+    const world = await commitWorld({ policy: { approvalTtlMs: 1_000 } });
+    try {
+      const { founder, service, clock } = world;
+      const lapsing = await propose(world, founder, {});
+      clock.advanceMs(2_000);
+      const fresh = await propose(world, founder, {});
+      const expireLapsed = service.expireLapsed;
+      if (expireLapsed === undefined) throw new Error("no sweep");
+      expect(await expireLapsed({ limit: 500 })).toBeGreaterThanOrEqual(1);
+
+      const [approval] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${lapsing.approval.id}`;
+      expect(approval?.status).toBe("EXPIRED");
+      const [action] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.actions where id = ${lapsing.action.id}`;
+      expect(action?.status).toBe("EXPIRED");
+      // The card proposed after the clock moved is still open.
+      const [open] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${fresh.approval.id}`;
+      expect(open?.status).toBe("PENDING");
+      // A second sweep finds nothing more of ours to do, and changes nothing.
+      await expireLapsed({ limit: 500 });
+      const [still] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${lapsing.approval.id}`;
+      expect(still?.status).toBe("EXPIRED");
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("G-D23: an action on the person's own records (no declared target) is proposed, bound to them, and awaits their approval", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder, service } = world;
+      // Before the fix this threw QActionNotPermittedError: the card the
+      // tool had called PREPARED never existed.
+      const proposed = await propose(world, founder, {}, undefined, TEST_SELF);
+      const [action] = await db.sql<{ status: string; target_refs: unknown }[]>`
+        select status, target_refs from q_runtime.actions where id = ${proposed.action.id}`;
+      expect(action?.status).toBe("AWAITING_APPROVAL");
+      expect(action?.target_refs).toEqual([
+        { kind: "USER", userId: founder.actor.userId },
+      ]);
+      const [approval] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${proposed.approval.id}`;
+      expect(approval?.status).toBe("PENDING");
+      const decided = await service.approve({
+        actor: founder.actor,
+        approvalId: proposed.approval.id,
+        correlationId: CORRELATION(),
+      });
+      expect(decided.view.status).toBe("APPROVED");
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("G-D23 follow-up: a card with no declared target can be revised (same default target)", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder, service } = world;
+      const proposed = await propose(world, founder, {}, undefined, TEST_SELF);
+      const revised = await service.revise({
+        actor: founder.actor,
+        approvalId: proposed.approval.id,
+        correlationId: CORRELATION(),
+        payload: { companyId: COMPANY, note: "Please record this, edited." },
+      });
+      expect(revised.action.id).not.toBe(proposed.action.id);
+      expect(revised.action.targets).toEqual([
+        { kind: "USER", userId: founder.actor.userId },
+      ]);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("G-D23 follow-up: a setter with no declared target replaces only the card for the same resource, never another's", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder } = world;
+      const setter = (payload: Record<string, unknown>) =>
+        propose(world, founder, payload, undefined, TEST_SELF_SETTER);
+      const elsewhere = randomUUID();
+      const first = await setter({
+        companyId: COMPANY,
+        note: "Folder level A.",
+      });
+      // Another resource: both cards wait.
+      const other = await setter({
+        companyId: elsewhere,
+        note: "Folder level B.",
+      });
+      expect(other.superseded ?? []).toEqual([]);
+      const [still] = await db.sql<{ status: string }[]>`
+        select status from q_runtime.approvals where id = ${first.approval.id}`;
+      expect(still?.status).toBe("PENDING");
+      // The same resource, another value: the newer replaces the older.
+      const again = await setter({
+        companyId: COMPANY,
+        note: "Folder level C.",
+      });
+      expect(again.superseded?.map((one) => one.id)).toEqual([first.action.id]);
     } finally {
       await cleanup(world);
     }

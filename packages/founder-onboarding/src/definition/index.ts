@@ -24,6 +24,7 @@ export {
   FUNCTION_OPTIONS,
   GROWTH_OPTIONS,
   INSTRUMENT_CODES,
+  instrumentLabel,
   INSTRUMENT_OPTIONS,
   INTENT_OPTIONS,
   LATER_STAGE_OPTIONS,
@@ -48,6 +49,37 @@ export {
   type FounderMaterialDocumentType,
 } from "./founder-v2.js";
 export {
+  FOUNDER_DEFINITION_V3,
+  FOUNDER_DEFINITION_V3_VERSION,
+  SIGNAL_OPTIONS_V3,
+} from "./founder-v3.js";
+export {
+  FOUNDER_DEFINITION_V4,
+  FOUNDER_DEFINITION_V4_VERSION,
+  FOUNDER_FINANCIAL_STEPS,
+  FOUNDER_FINANCIAL_WRITE_TARGET,
+  REVENUE_TREND_OPTIONS,
+} from "./founder-v4.js";
+export {
+  COUNTRY_OPTIONS_V5,
+  FOUNDER_DEFINITION_V5,
+  FOUNDER_DEFINITION_V5_VERSION,
+  GCC_COUNTRY_OPTIONS,
+} from "./founder-v5.js";
+/**
+ * The version new founder sessions pin to, for code that reads the journey
+ * (labels, step order, the interview). It is a superset of v2-v5, so an
+ * older session reads correctly through it.
+ */
+export {
+  FOUNDER_DEFINITION_V6,
+  FOUNDER_DEFINITION_V6 as FOUNDER_DEFINITION_CURRENT,
+  FOUNDER_DEFINITION_V6_VERSION,
+  FOUNDER_PROFILE_PHASE,
+  FOUNDER_PROFILE_SECTION_STEPS,
+  FOUNDER_REVISABLE_STEPS,
+} from "./founder-v6.js";
+export {
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
   FounderSnapshotContextSchema,
@@ -55,3 +87,16 @@ export {
   type FounderReviewContext,
   type FounderSnapshotContext,
 } from "./contexts.js";
+
+export { FOUNDER_UTTERANCE_ALIASES } from "./utterance-aliases.js";
+export { FOUNDER_COVERAGE_PROFILE } from "./coverage.js";
+
+export {
+  FOUNDER_PROFILE_SECTION_SOURCES,
+  FOUNDER_PROFILE_SECTIONS,
+  FOUNDER_PROFILE_SECTIONS_VERSION,
+  FOUNDER_PROFILE_STEPS,
+  founderProfileSectionOf,
+  type FounderProfileSection,
+  type FounderProfileSectionSource,
+} from "./profile-sections.js";

@@ -1,0 +1,114 @@
+[
+  {
+    "page": "root",
+    "viewport": "mobile",
+    "file": "root-mobile.png",
+    "url": "http://127.0.0.1:3000/auth/sign-in?next=%2Fhome",
+    "note": "landing / redirect target when signed out"
+  },
+  {
+    "page": "auth-sign-up",
+    "viewport": "mobile",
+    "file": "auth-sign-up-mobile.png",
+    "url": "http://127.0.0.1:3000/auth/sign-up",
+    "note": ""
+  },
+  {
+    "page": "auth-sign-in",
+    "viewport": "mobile",
+    "file": "auth-sign-in-mobile.png",
+    "url": "http://127.0.0.1:3000/auth/sign-in",
+    "note": ""
+  },
+  {
+    "page": "auth-sign-in-error",
+    "viewport": "mobile",
+    "file": "auth-sign-in-error-mobile.png",
+    "url": "http://127.0.0.1:3000/auth/sign-in",
+    "note": "wrong credentials"
+  },
+  {
+    "page": "auth-forgot-password",
+    "viewport": "mobile",
+    "file": "auth-forgot-password-mobile.png",
+    "url": "http://127.0.0.1:3000/auth/forgot-password",
+    "note": ""
+  },
+  {
+    "page": "auth-check-email",
+    "viewport": "mobile",
+    "file": "auth-check-email-mobile.png",
+    "url": "http://127.0.0.1:3000/auth/check-email",
+    "note": ""
+  },
+  {
+    "page": "auth-update-password",
+    "viewport": "mobile",
+    "file": "auth-update-password-mobile.png",
+    "url": "http://127.0.0.1:3000/auth/sign-in",
+    "note": "reached without a recovery session"
+  },
+  {
+    "page": "home-signed-out-redirect",
+    "viewport": "mobile",
+    "file": "home-signed-out-redirect-mobile.png",
+    "url": "http://127.0.0.1:3000/auth/sign-in?next=%2Fhome",
+    "note": "signed-out visit to /home"
+  },
+  {
+    "page": "after-sign-in-landing",
+    "viewport": "mobile",
+    "file": "after-sign-in-landing-mobile.png",
+    "url": "http://127.0.0.1:3000/welcome",
+    "note": "where sign-in lands a fresh person"
+  },
+  {
+    "page": "welcome",
+    "viewport": "mobile",
+    "file": "welcome-mobile.png",
+    "url": "http://127.0.0.1:3000/welcome?again=1",
+    "note": "arrival: Q introduces itself"
+  },
+  {
+    "page": "welcome-started",
+    "viewport": "mobile",
+    "file": "welcome-started-mobile.png",
+    "url": "http://127.0.0.1:3000/welcome?again=1",
+    "note": "after Start: the role choice"
+  },
+  {
+    "page": "home-fresh",
+    "viewport": "mobile",
+    "file": "home-fresh-mobile.png",
+    "url": "http://127.0.0.1:3000/home",
+    "note": "Home with no organisation context"
+  },
+  {
+    "page": "home-q-working",
+    "viewport": "mobile",
+    "file": "home-q-working-mobile.png",
+    "url": "http://127.0.0.1:3000/home",
+    "note": "Q working state right after a question"
+  },
+  {
+    "page": "home-q-answer",
+    "viewport": "mobile",
+    "file": "home-q-answer-mobile.png",
+    "url": "http://127.0.0.1:3000/home?c=585f3b77-3e7e-4909-a4e0-d3a649313a3a",
+    "note": "Q answer on Home"
+  },
+  {
+    "page": "discover-fresh",
+    "viewport": "mobile",
+    "file": "discover-fresh-mobile.png",
+    "url": "http://127.0.0.1:3000/discover",
+    "note": "Discover with no context"
+  },
+  {
+    "page": "fresh-person-failure",
+    "viewport": "mobile",
+    "file": "fresh-person-failure-mobile.png",
+    "url": "http://127.0.0.1:3000/capital",
+    "note": "TimeoutError: page.goto: Timeout 45000ms exceeded.\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:3000/capital\", wait"
+  }
+]

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
+  CQ_TRACE_HEADER,
   LAST_EVENT_ID_HEADER,
   Q_RUN_EVENTS_SUFFIX,
   Q_RUNS_PATH,
@@ -9,6 +10,7 @@ import {
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { getSessionAccessToken } from "@/auth/session";
+import { forwardedTraceId } from "@/features/q/request-trace";
 
 /**
  * The Q run stream, reachable from the browser (CQ-C5-R1 §13, §16).
@@ -60,7 +62,7 @@ export async function GET(
 ): Promise<NextResponse | Response> {
   const { qApiBaseUrl } = loadWebServerConfig();
   if (qApiBaseUrl === undefined) {
-    return plain(503, "Q isn't connected on this build yet.");
+    return plain(503, "Q isn't available right now. Try again later.");
   }
 
   const { runId } = await context.params;
@@ -74,10 +76,11 @@ export async function GET(
 
   const accessToken = await getSessionAccessToken();
   if (accessToken === null) {
-    return plain(401, "Please sign in again to continue.");
+    return plain(401, "Your session ended. Sign in again to continue.");
   }
 
   const cursor = lastEventId(request);
+  const trace = await forwardedTraceId();
   let upstream: Response;
   try {
     upstream = await fetch(
@@ -88,6 +91,7 @@ export async function GET(
           accept: Q_SSE_CONTENT_TYPE,
           authorization: `Bearer ${accessToken}`,
           ...(cursor === null ? {} : { [LAST_EVENT_ID_HEADER]: cursor }),
+          ...(trace === undefined ? {} : { [CQ_TRACE_HEADER]: trace }),
         },
         cache: "no-store",
         // The client's abort must reach the Q API, or a closed tab would
@@ -96,19 +100,19 @@ export async function GET(
       },
     );
   } catch {
-    return plain(502, "I lost the connection to Q. Please try again.");
+    return plain(502, "I lost the connection to Q. Try again.");
   }
 
   if (!upstream.ok || upstream.body === null) {
     // The upstream problem document is server-authored, but it describes the
     // Q API to an operator, not this person. One plain sentence per class.
     if (upstream.status === 401 || upstream.status === 403) {
-      return plain(401, "Please sign in again to continue.");
+      return plain(401, "Your session ended. Sign in again to continue.");
     }
     if (upstream.status === 404) {
       return plain(404, "I couldn't find that conversation.");
     }
-    return plain(502, "I couldn't follow that answer. Please try again.");
+    return plain(502, "I couldn't follow that answer. Try again.");
   }
 
   return new Response(upstream.body, {

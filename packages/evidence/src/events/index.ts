@@ -17,6 +17,7 @@ import type { ActorContext } from "@capital-q/security";
 import {
   ClaimChangeKindSchema,
   ClaimEvidenceRelationshipSchema,
+  DocumentDownloadAudienceSchema,
   DocumentTypeSchema,
   EvidenceSourceTypeSchema,
   EvidenceSubjectTypeSchema,
@@ -105,6 +106,49 @@ export const DocumentVersionCreatedEvent = defineEvent({
     "An immutable file version was registered and became the document's current version. Carries no storage identity.",
 });
 
+export const DocumentDownloadAudienceChangedEvent = defineEvent({
+  name: "evidence.document.download_audience_changed",
+  version: 1,
+  owner: EVIDENCE_EVENT_OWNER,
+  producer: EVIDENCE_EVENT_PRODUCER,
+  consumers: CONSUMERS,
+  sensitivity: "CONFIDENTIAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      documentId: UuidSchema,
+      ownerOrganisationId: UuidSchema,
+      companyId: UuidSchema.nullable(),
+      downloadAudience: DocumentDownloadAudienceSchema,
+      documentVersion: z.number().int().min(1),
+    })
+    .strict(),
+  description:
+    "Who may download a pitch deck changed (ADR 0041): its organisation only, or also investors the company is viewable to. Never the file, its title or its storage.",
+});
+
+export const DocumentDetailsChangedEvent = defineEvent({
+  name: "evidence.document.details_changed",
+  version: 1,
+  owner: EVIDENCE_EVENT_OWNER,
+  producer: EVIDENCE_EVENT_PRODUCER,
+  consumers: CONSUMERS,
+  sensitivity: "CONFIDENTIAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      documentId: UuidSchema,
+      ownerOrganisationId: UuidSchema,
+      companyId: UuidSchema.nullable(),
+      change: z.enum(["RENAME", "ARCHIVE", "RESTORE"]),
+      status: z.enum(["ACTIVE", "ARCHIVED"]),
+      documentVersion: z.number().int().min(1),
+    })
+    .strict(),
+  description:
+    "The owner renamed, deleted (archived) or restored a document (P3 documents page). Never the title, the file or its storage.",
+});
+
 export const ClaimChangedEvent = defineEvent({
   name: "evidence.claim.changed",
   version: 1,
@@ -182,6 +226,8 @@ export const EVIDENCE_EVENTS: readonly EventDefinition[] = [
   DocumentReadyEvent,
   ClaimChangedEvent,
   EvidenceItemCreatedEvent,
+  DocumentDownloadAudienceChangedEvent,
+  DocumentDetailsChangedEvent,
 ];
 
 type Context = {
@@ -255,6 +301,18 @@ export function documentVersionCreatedEvent(
   );
 }
 
+export function documentDownloadAudienceChangedEvent(
+  context: Context,
+  data: z.infer<typeof DocumentDownloadAudienceChangedEvent.dataSchema>,
+) {
+  return envelope(
+    DocumentDownloadAudienceChangedEvent,
+    context,
+    { type: "document", id: data.documentId, version: data.documentVersion },
+    data,
+  );
+}
+
 export function claimChangedEvent(
   context: Context,
   data: z.infer<typeof ClaimChangedEvent.dataSchema> & {
@@ -315,6 +373,39 @@ export function documentReadyEvent(
       id: data.documentVersionId,
       version: 1,
     },
+    data,
+  };
+}
+
+export function documentDetailsChangedEvent(
+  context: Context,
+  data: z.infer<typeof DocumentDetailsChangedEvent.dataSchema>,
+) {
+  return envelope(
+    DocumentDetailsChangedEvent,
+    context,
+    { type: "document", id: data.documentId, version: data.documentVersion },
+    data,
+  );
+}
+
+/** Application-private version fact; no human actor or organisation attribution. */
+export function applicationDocumentVersionCreatedEvent(
+  context: { readonly tenantId: string; readonly correlationId: CorrelationId },
+  data: z.infer<typeof DocumentVersionCreatedEvent.dataSchema>,
+): CapitalQEvent<z.infer<typeof DocumentVersionCreatedEvent.dataSchema>> {
+  return {
+    specVersion: "1.0",
+    id: EventIdSchema.parse(randomUUID()),
+    type: DocumentVersionCreatedEvent.name,
+    source: DocumentVersionCreatedEvent.producer,
+    time: UtcTimestampSchema.parse(new Date().toISOString()),
+    subject: `document_version/${data.documentVersionId}`,
+    dataContentType: "application/json",
+    eventVersion: 1,
+    tenantId: context.tenantId,
+    correlationId: context.correlationId,
+    aggregate: { type: "document", id: data.documentId, version: 2 },
     data,
   };
 }

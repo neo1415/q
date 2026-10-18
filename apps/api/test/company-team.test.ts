@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 
 import {
+  type Company,
   CompanyIdSchema,
   CompanyMemberIdSchema,
   FounderProfileIdSchema,
@@ -44,6 +45,29 @@ const CONTEXT: ActorContext = {
   actorType: "HUMAN",
 };
 const NOW = "2026-09-03T09:00:00.000Z";
+
+const COMPANY_A: Company = {
+  id: COMPANY,
+  tenantId: TENANT,
+  organisationId: ORG,
+  canonicalName: "Acme",
+  legalName: null,
+  slug: "acme",
+  websiteUrl: null,
+  foundedDate: null,
+  headquartersCountry: null,
+  headquartersCity: null,
+  currentStageCode: null,
+  primaryDescription: null,
+  shortDescription: null,
+  companyStatus: "active",
+  marketplaceVisibility: "organisation_private",
+  marketplaceReadinessState: "not_assessed",
+  logoStorageKey: null,
+  version: 1,
+  createdAt: "2026-09-03T09:00:00.000Z",
+  updatedAt: "2026-09-03T09:00:00.000Z",
+};
 
 const MEMBER: CompanyMember = {
   id: CompanyMemberIdSchema.parse("e0000000-0000-4000-8000-0000000000aa"),
@@ -97,6 +121,19 @@ function fakeService(overrides: Partial<CompanyService> = {}) {
       calls["upsert"]?.push(command);
       return Promise.resolve(MEMBER);
     },
+    setCompanyVisibility: (command) => {
+      calls.visibility?.push(command);
+      return Promise.resolve({
+        ...COMPANY_A,
+        marketplaceVisibility: command.input.visibility,
+        version: 2,
+      });
+    },
+    getMarketplaceReadiness: () => Promise.reject(new Error("not under test")),
+    assessMarketplaceReadiness: () =>
+      Promise.reject(new Error("not under test")),
+    reconcileMarketplaceReadinessAsSystem: () =>
+      Promise.reject(new Error("not under test")),
     getMyFounderProfile: () => Promise.resolve(PROFILE),
     updateMyFounderProfile: (command) => {
       calls["profile"]?.push(command);

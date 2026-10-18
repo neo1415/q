@@ -3,8 +3,11 @@ import type { OrganisationId, TenantId, UserId } from "@capital-q/security";
 
 import type {
   CompanyStatus,
+  MarketplaceReadinessState,
   MarketplaceVisibility,
 } from "@capital-q/contracts";
+
+import type { MarketplaceVerificationFacts } from "../domain/marketplace-readiness.js";
 
 import type {
   Company,
@@ -80,6 +83,47 @@ export type CompanyRepository = {
       readonly changes: CompanyProfileChanges;
     },
   ) => Promise<Company | null>;
+  /**
+   * Sets who may see the declared profile, only when the stored version
+   * equals `expectedVersion`, incrementing it. Returns null when no row
+   * matched. The only column this touches is marketplace_visibility.
+   */
+  readonly updateVisibility: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: TenantId;
+      readonly organisationId: OrganisationId;
+      readonly companyId: CompanyId;
+      readonly expectedVersion: number;
+      readonly visibility: MarketplaceVisibility;
+    },
+  ) => Promise<Company | null>;
+  /**
+   * Locks every company the organisation owns in its tenant, ordered by
+   * id, for the rest of the transaction. Used only by the system
+   * reconciliation after a verification decision (CQ-VERIFY-002), which
+   * knows the organisation a claim belongs to and not a company id.
+   */
+  readonly lockByOrganisation: (
+    tx: TransactionContext,
+    tenantId: TenantId,
+    organisationId: OrganisationId,
+  ) => Promise<readonly Company[]>;
+  /**
+   * Written only by the marketplace-readiness reconciliation, under the
+   * row lock, with the state the policy decided. No profile PATCH, no
+   * visibility change and no client field reaches this method.
+   */
+  readonly updateReadiness: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: TenantId;
+      readonly organisationId: OrganisationId;
+      readonly companyId: CompanyId;
+      readonly expectedVersion: number;
+      readonly readinessState: MarketplaceReadinessState;
+    },
+  ) => Promise<Company | null>;
   /** Serialises slug allocation for one (tenant, base slug) until commit. */
   readonly lockSlug: (
     tx: TransactionContext,
@@ -145,6 +189,14 @@ export type CompanyQueryPort = {
     companyId: CompanyId,
   ) => Promise<CompanyIdentity | null>;
   /**
+   * S5 (lane S): the same identities for many companies in one read, for
+   * list views that would otherwise read them one by one. Absent ids are
+   * left out. Optional: callers fall back to findCanonicalCompany.
+   */
+  readonly findCanonicalCompanies?: (
+    companyIds: readonly CompanyId[],
+  ) => Promise<readonly CompanyIdentity[]>;
+  /**
    * The company's ownership and intrinsic disclosure classification for the
    * Permissions bounded context (CQ-PERM-001). marketplace_visibility stays
    * owned here; disclosure reads it through this port and never copies it.
@@ -152,6 +204,13 @@ export type CompanyQueryPort = {
   readonly findCanonicalCompanyVisibility: (
     companyId: CompanyId,
   ) => Promise<CompanyVisibilityFacts | null>;
+  /**
+   * S2: `findCanonicalCompanyVisibility` for many companies in one read.
+   * A company that does not exist is simply absent from the result.
+   */
+  readonly findCanonicalCompanyVisibilities: (
+    companyIds: readonly CompanyId[],
+  ) => Promise<readonly CompanyVisibilityFacts[]>;
   /**
    * A founder profile's ownership (the Person) and its intrinsic
    * visibility_scope, tenant-agnostic, for disclosure resolution. No
@@ -181,6 +240,16 @@ export type CompanyQueryPort = {
   readonly searchCompanies: (
     query: CompanySearchQuery,
   ) => Promise<CompanySearchPage>;
+  /**
+   * The one company an organisation owns, for its own members' context
+   * (Q knowing whose company "my company" is). Null when the organisation
+   * owns none, or more than one, since then "my company" names nothing.
+   * Permission-neutral; callers authorise separately.
+   */
+  readonly findOrganisationCompany?: (
+    tenantId: TenantId,
+    organisationId: OrganisationId,
+  ) => Promise<CompanyIdentity | null>;
 };
 
 /** Profile core + trusted ownership/classification. Permission-neutral. */
@@ -251,6 +320,103 @@ export type CompanyVisibilityFacts = {
   readonly tenantId: TenantId;
   readonly organisationId: OrganisationId;
   readonly marketplaceVisibility: MarketplaceVisibility;
+};
+
+/**
+ * What investor discovery is allowed to know about a company before any
+ * comparison happens: ownership, lifecycle, the two marketplace switches and
+ * the two canonical hard-criterion fields (stage, headquarters country).
+ * Permission-neutral and tenant-agnostic by design — a discovery candidate
+ * lives in another tenant — so the caller must still put every id through
+ * disclosure. No name, description, founder, financial, evidence, score, Q
+ * or memory content: a port that cannot express it cannot leak it.
+ */
+export type CompanyMarketplaceFacts = {
+  readonly id: CompanyId;
+  readonly tenantId: TenantId;
+  readonly organisationId: OrganisationId;
+  readonly companyStatus: CompanyStatus;
+  readonly marketplaceVisibility: MarketplaceVisibility;
+  /** Raw readiness state; read it through `marketplaceParticipationOf`. */
+  readonly marketplaceReadinessState: string;
+  readonly currentStageCode: string | null;
+  readonly headquartersCountry: string | null;
+};
+
+/**
+ * The read port the Recommendation context consumes for hard eligibility
+ * (CQ-REC-001). Batch by construction so a candidate set is one query, not
+ * one per company; unknown ids are simply absent.
+ */
+/**
+ * The investor-visible investment profile of a discoverable company
+ * (CQ-REC-003; doc 19 §25). Exactly the canonical fields the Discover slate
+ * already shows an investor about a network_visible company — name, short
+ * description, stage, headquarters — plus the row version as a source
+ * fingerprint. Deliberately absent: the primary description (a founder
+ * profile field no investor projection reads), the capital objective,
+ * evidence, documents, Q memory, conversations and research: a port that
+ * cannot express them cannot embed them.
+ */
+export type CompanyInvestmentProfile = CompanyMarketplaceFacts & {
+  readonly canonicalName: string;
+  readonly shortDescription: string | null;
+  /** The canonical row version: changes whenever any profile field does. */
+  readonly version: number;
+};
+
+export type CompanyMarketplaceQueryPort = {
+  readonly findCanonicalMarketplaceFacts: (
+    companyIds: readonly CompanyId[],
+  ) => Promise<readonly CompanyMarketplaceFacts[]>;
+  /**
+   * Investment profiles of active companies whose declared classification
+   * is network_visible or public_external, either the named ids (others
+   * are absent, a private company included) or, with null, a bounded,
+   * id-ordered slice of every discoverable company for representation
+   * refresh. Cross-tenant by design; readiness and disclosure decide each
+   * one downstream (REC-001).
+   */
+  readonly listDiscoverableInvestmentProfiles: (input: {
+    readonly companyIds: readonly CompanyId[] | null;
+    readonly limit: number;
+  }) => Promise<readonly CompanyInvestmentProfile[]>;
+  /**
+   * Structured candidate retrieval (CQ-REC-002): active companies whose
+   * declared classification is network_visible or public_external and
+   * whose canonical stage or headquarters country is one of the codes.
+   * Either filter may be null (not applied); both null is refused, so no
+   * caller can list the platform. Bounded, ordered by id, cross-tenant by
+   * design: classification chooses candidates, disclosure and readiness
+   * decide each one downstream.
+   */
+  readonly listDiscoverableCompanies: (input: {
+    readonly stageCodes: readonly string[] | null;
+    readonly headquartersCountries: readonly string[] | null;
+    readonly limit: number;
+  }) => Promise<readonly CompanyMarketplaceFacts[]>;
+};
+
+/**
+ * The Verification seam readiness reads (doc 13 §24; PADL #147). Claims
+ * are specific — a founder's identity, the organisation's identity — and
+ * are answered by the Verification context's own query port when it
+ * exists. Until then the production adapter says "unavailable" and the
+ * only other implementation is a synthetic fixture that refuses to run
+ * anywhere but a local database. Nothing in this port can be satisfied by
+ * a document, a public page, Q, or the person themselves.
+ */
+export type VerificationClaimsPort = {
+  /** Recorded on every audited readiness transition so a synthetic answer can never pass as a real one. */
+  readonly sourceLabel:
+    | "VERIFICATION_UNAVAILABLE"
+    | "SYNTHETIC_LOCAL_FIXTURE"
+    | `VERIFICATION_${string}`;
+  readonly currentStandings: (subject: {
+    readonly tenantId: TenantId;
+    readonly organisationId: OrganisationId;
+    readonly companyId: CompanyId;
+  }) => Promise<MarketplaceVerificationFacts>;
 };
 
 /** Trusted ownership + classification of a founder profile. No content. */

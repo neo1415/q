@@ -1,0 +1,337 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
+import { z } from "zod";
+
+import { qArtifactExportFormats } from "@capital-q/contracts";
+import { buttonClassName, IconButton } from "@capital-q/ui/button";
+import { DialogRoot, DialogViewerContent } from "@capital-q/ui/dialog";
+import {
+  CircleAlert,
+  FileText,
+  ICON_SIZE,
+  ICON_STROKE,
+  Presentation,
+  X,
+} from "@capital-q/ui/icons";
+
+import { useGlobalQ } from "@/components/app-shell/global-q";
+import { useDockAvoid } from "@/features/q-dock/dock-avoid";
+import { ArtifactDownloads } from "@/features/q/artifact-download";
+import { artifactTypeLabel } from "@/features/q/artifact-type";
+import { useT } from "@/features/i18n/language";
+
+function OpeningDocument() {
+  const t = useT();
+  return (
+    <div
+      className="min-h-[60vh] w-full bg-(--cq-surface-subtle)"
+      aria-busy="true"
+      aria-label={t("Opening the document")}
+    />
+  );
+}
+
+/**
+ * P9: the viewer (pages, slides, pictures) is code a page view rarely runs;
+ * it loads when a document is opened, not with every page of the shell.
+ */
+const ArtifactViewer = dynamic(
+  () => import("@/features/q/artifact-viewer").then((m) => m.ArtifactViewer),
+  {
+    ssr: false,
+    loading: () => <OpeningDocument />,
+  },
+);
+
+import {
+  announceDocument,
+  dismissDocument,
+  openDocumentViewer,
+  readyChanges,
+  useReadyDocuments,
+  useViewingDocument,
+  useWatchSignal,
+  watching,
+  type KnownDocuments,
+  type ListedDocument,
+  type ReadyDocument,
+} from "./document-ready";
+
+/**
+ * The document-ready card, on every page (DOCS spec §3 F2; founder
+ * directive 2026-10-01: "a download/open card pops up anywhere on screen
+ * like a notification").
+ *
+ * The one owner: mounted once in the app shell, it watches the person's
+ * own newest documents and shows a card when one becomes ready or gets a
+ * new version, with Open (the viewer, in place) and the downloads. It
+ * checks often while something is being prepared and slowly otherwise,
+ * and only while the tab is visible. Nothing here decides what anybody
+ * may read: the list and every file come through the session's own
+ * narrow routes.
+ */
+
+const RESTING_MS = 30_000;
+const WATCHING_MS = 4_000;
+/** How long a card stays when nobody is looking at it. */
+const AUTO_DISMISS_MS = 12_000;
+const FIRST_CHECK_DELAY_MS = 2_000;
+
+const RecentSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        artifactId: z.string(),
+        type: z.string(),
+        status: z.string(),
+        title: z.string(),
+        currentVersion: z.number().int(),
+        updatedAt: z.string(),
+      }),
+    )
+    .max(20),
+});
+
+async function listRecent(): Promise<readonly ListedDocument[] | null> {
+  try {
+    const response = await fetch("/api/q-artifact/recent", {
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const parsed = RecentSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data.items : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Polls the person's newest documents and announces what changed. */
+export function useDocumentWatch(connected: boolean): void {
+  const signal = useWatchSignal();
+  const known = useRef<KnownDocuments>(new Map());
+  const openedAt = useRef<number>(0);
+  useEffect(() => {
+    if (openedAt.current === 0) openedAt.current = Date.now();
+  }, []);
+
+  useEffect(() => {
+    if (!connected) return;
+    let alive = true;
+    let timer: number | undefined;
+    const check = async () => {
+      if (document.visibilityState !== "visible") return;
+      // Offline: nothing to ask; the next tick (or `online`) asks again.
+      if (navigator.onLine === false) return;
+      const items = await listRecent();
+      if (!alive || items === null) return;
+      const changes = readyChanges(known.current, items, openedAt.current);
+      known.current = changes.known;
+      for (const ready of changes.announce) announceDocument(ready);
+    };
+    const schedule = () => {
+      const anyPreparing = [...known.current.values()].some(
+        (entry) => entry.status === "PREPARING",
+      );
+      timer = window.setTimeout(
+        () => {
+          void check().finally(() => {
+            if (alive) schedule();
+          });
+        },
+        watching() || anyPreparing ? WATCHING_MS : RESTING_MS,
+      );
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void check();
+    };
+    // P9: the first check waits for the page to settle, unless something
+    // is being watched (a document Q is preparing right now), so the
+    // shell's poll never competes with the page's own first reads.
+    const first = window.setTimeout(
+      () => {
+        void check().finally(() => {
+          if (alive) schedule();
+        });
+      },
+      watching() ? 0 : FIRST_CHECK_DELAY_MS,
+    );
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onVisible);
+    return () => {
+      alive = false;
+      window.clearTimeout(first);
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onVisible);
+    };
+    // `signal` restarts the loop at the fast pace when watching begins.
+  }, [connected, signal]);
+}
+
+function ReadyCard({
+  document: ready,
+  onOpen,
+}: {
+  readonly document: ReadyDocument;
+  readonly onOpen: (artifactId: string) => void;
+}) {
+  const t = useT();
+
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (held) return;
+    const timer = window.setTimeout(() => {
+      dismissDocument(ready.artifactId);
+    }, AUTO_DISMISS_MS);
+    return () => window.clearTimeout(timer);
+  }, [held, ready.artifactId, ready.version]);
+
+  const failed = ready.status === "FAILED";
+  const Icon = failed
+    ? CircleAlert
+    : ready.type === "PITCH_DECK"
+      ? Presentation
+      : FileText;
+  const what = artifactTypeLabel(ready.type);
+  const state = failed
+    ? "Q couldn't finish this one"
+    : ready.version > 1
+      ? `Version ${String(ready.version)} ready`
+      : "Ready";
+
+  return (
+    <section
+      role="status"
+      aria-live="polite"
+      aria-label={t(`${what}: ${ready.title}. ${state}.`)}
+      data-document-ready={ready.artifactId}
+      data-document-ready-status={ready.status}
+      onPointerEnter={() => setHeld(true)}
+      onPointerLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={(event) => {
+        const next = event.relatedTarget;
+        if (!(next instanceof Node) || !event.currentTarget.contains(next)) {
+          setHeld(false);
+        }
+      }}
+      className="cq-document-ready pointer-events-auto flex w-full flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-overlay)"
+    >
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className="flex size-10 shrink-0 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)"
+        >
+          <Icon size={ICON_SIZE.regular} strokeWidth={ICON_STROKE} />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            {t(what)} · {t(state)}
+          </p>
+          <p className="cq-body-sm line-clamp-2 font-medium text-(--cq-text-primary)">
+            {t(ready.title)}
+          </p>
+        </div>
+        <IconButton
+          aria-label={t("Dismiss")}
+          variant="quiet"
+          onClick={() => dismissDocument(ready.artifactId)}
+          data-document-ready-dismiss
+        >
+          <X size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} aria-hidden />
+        </IconButton>
+      </div>
+      {failed ? null : (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className={buttonClassName("primary", "regular")}
+            onClick={() => onOpen(ready.artifactId)}
+            data-document-ready-open
+          >
+            {t("Open")}
+          </button>
+          <ArtifactDownloads
+            artifactId={ready.artifactId}
+            formats={qArtifactExportFormats(ready.type)}
+            version={ready.version}
+          />
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function DocumentReadyCenter({
+  connected,
+}: {
+  readonly connected: boolean;
+}) {
+  const t = useT();
+
+  useDocumentWatch(connected);
+  const ready = useReadyDocuments();
+  const open = useViewingDocument();
+  const setOpen = openDocumentViewer;
+  const pathname = usePathname();
+  const { askNow } = useGlobalQ();
+  const stack = useRef<HTMLDivElement | null>(null);
+  useDockAvoid(stack, ready.length > 0);
+
+  return (
+    <>
+      {ready.length === 0 ? null : (
+        <div
+          ref={stack}
+          data-document-ready-stack
+          data-q-notice="TOAST:DONE"
+          className="pointer-events-none fixed inset-x-4 bottom-[calc(var(--cq-bottom-nav-height)+var(--cq-safe-bottom)+8px)] z-(--cq-z-toast) mx-auto flex max-w-sm flex-col gap-2 lg:end-6 lg:bottom-6 lg:start-auto lg:mx-0 lg:w-96"
+        >
+          {ready.map((document) => (
+            <ReadyCard
+              key={`${document.artifactId}:${String(document.version)}`}
+              document={document}
+              onOpen={(artifactId) => {
+                dismissDocument(artifactId);
+                setOpen(artifactId);
+              }}
+            />
+          ))}
+        </div>
+      )}
+      <DialogRoot
+        open={open !== null}
+        onOpenChange={(next) => {
+          if (!next) setOpen(null);
+        }}
+      >
+        {open === null ? null : (
+          <DialogViewerContent
+            title={t("Document")}
+            onSwipeDismiss={() => setOpen(null)}
+          >
+            <ArtifactViewer
+              artifactId={open}
+              onClose={() => setOpen(null)}
+              // On the Q page the page is the conversation; elsewhere the
+              // edit goes to Q beside the page.
+              {...(pathname === "/home"
+                ? {}
+                : {
+                    onEditWithQ: (title: string) => {
+                      setOpen(null);
+                      askNow(
+                        `Edit "${title}" with me — what would you change first?`,
+                      );
+                    },
+                  })}
+            />
+          </DialogViewerContent>
+        )}
+      </DialogRoot>
+    </>
+  );
+}

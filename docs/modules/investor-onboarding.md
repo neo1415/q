@@ -119,6 +119,67 @@ needs to re-parse onboarding text.
 **No ranking exists yet, and none is claimed.** CQ-Q-022 prepares the input;
 Wave 6 does the matching. No model ranks companies, here or anywhere.
 
+## Conversational interview (CQ-PRE-REC-001)
+
+The same Q-led workspace drives Investor Definition v1. `INVESTOR_UTTERANCE_ALIASES`
+lets "Seed and Series A", "we lead" or "dollars" land on the right options
+through the runtime's `say` path; anything richer — a cheque band, a sector
+list, "never show me gambling" — is recorded as an utterance and read by the
+mandate synthesis (`createMandateReview.onUtterance`), which proposes
+suggestions on the structured steps and EXCLUSION_CONFIRMATION questions.
+A hard exclusion is still created only by the investor's explicit answer;
+no reading writes one.
+
+### Structured inputs (CQ-PRE-REC-001 §38–§41)
+
+- **Mandate context (I1).** The step before it ensures one DRAFT exists
+  when the investor has no open mandate. With exactly one open mandate the
+  step is answered for the investor, once, with a line saying which
+  mandate ("You have one mandate, Primary mandate. That's the one we'll
+  define.") — in the form and in the conversation, where the runtime's
+  `say` path also accepts a mandate by name when there are several. With
+  several, the choice is explicit; nothing is picked by position.
+- **Geography and sectors (I3).** Real multi-select over canonical
+  taxonomy nodes, labelled in the group's words ("Search countries or
+  regions…", "Search sectors or product areas…"). Only geography says that
+  an empty list means anywhere; a sector list never does. Ids are canonical
+  node ids internally; the screen shows display names, and a revisit
+  renders the persisted selection.
+- **Avoid and hard exclusion (I7).** Two lists that coexist. Ticking a flag
+  in one list moves it out of the other; a conflict that still reaches
+  submission is refused and names the flag ("Gambling is listed both as
+  something to avoid and as something never to show. Keep it in one list.")
+  — the validation is kept, on the client and in `exclusionConstraints`.
+  A sector excluded at I7 that I3 holds as a preference is moved: the plan
+  writes the reduced I3 list first, then the exclusion; and a sector
+  preferred at I3 leaves the I7 exclusions the same way. The server-side
+  check in `taxonomyPreferencesFromResponses` still refuses a node in both
+  buckets, naming the category.
+
+### Chat-first mandate (CQ-PRE-REC-001 §44)
+
+- An investor can describe the mandate in one breath at the stages step.
+  The options the sentence names are placed; the sentence is read by the
+  mandate synthesis, which proposes the typical cheque, the geography and
+  the sectors as suggestions and asks an EXCLUSION_CONFIRMATION question for
+  "we never touch gambling" with two answers — "Never show me gambling"
+  (I7 hard exclusion) or "Just show it lower" (I7 avoid). Only the
+  investor's answer writes either.
+- An ambiguity is asked in words that name what is open. The synthesis
+  prompt gives the model one example question (about exclusion) and a
+  model sometimes repeats it for a range; `ambiguityQuestion` builds the
+  question for TYPICAL_OR_LIMIT and IMPRECISE_VALUE from the dimension and
+  the quote ("You wrote “between 1 and 3 million dollars”. Is that your
+  largest cheque as a rule, or a limit you never go past?") and keeps the
+  model's wording only for SCOPE_OR_EXCLUSION or a genuinely specific
+  question.
+- Verified live: a fresh family office described its mandate in one
+  sentence, kept what Q picked up, confirmed the gambling exclusion
+  explicitly, left mid-way, signed out and back in, was greeted with what
+  was covered, finished with plain-word answers where a form was not needed
+  (a form for the pick-lists), and activated the mandate; Home Q answered
+  the hard exclusion and stages from the same mandate.
+
 ## Security
 
 - All model access through the Model Gateway; no provider SDK in this
@@ -144,3 +205,13 @@ See the CQ-Q-022 postflight. In short: the semantics, the synthesis service
 and the confirmation gate are real and tested; the I11 review screen still
 renders the deterministic projection of what the investor selected rather
 than Q's reading, and nothing yet calls the synthesis from the live session.
+
+## Interview cues (CQ-Q-VOICE-001 A)
+
+`INVESTOR_INTERVIEW_CUES` (`definition/interview-cues.ts`): "$250k to $1m" is the
+cheque range (I2.cheque_min / I2.cheque_max); a figure near "typically", "usually",
+"sweet spot" is the typical cheque; any mention of a red-flag option ("we never
+invest in gambling", "hardware isn't our thing") becomes an EXCLUSION_CONFIRMATION
+question with two real answers — never show, or rank lower — because the only route
+to a hard exclusion remains the investor's own answer. Stages named in a sentence
+are proposed on I2.stages.

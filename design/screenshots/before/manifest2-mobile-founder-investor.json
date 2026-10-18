@@ -1,0 +1,324 @@
+[
+  {
+    "page": "founder-f1-company",
+    "viewport": "mobile",
+    "file": "founder-f1-company-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Your company"
+  },
+  {
+    "page": "founder-f1-company",
+    "viewport": "mobile",
+    "file": "founder-f1-company-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Your company"
+  },
+  {
+    "page": "founder-f1-stage",
+    "viewport": "mobile",
+    "file": "founder-f1-stage-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "What stage is the company at?"
+  },
+  {
+    "page": "founder-f1-stage",
+    "viewport": "mobile",
+    "file": "founder-f1-stage-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "What stage is the company at?"
+  },
+  {
+    "page": "founder-f1-description",
+    "viewport": "mobile",
+    "file": "founder-f1-description-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "In a sentence or two, what does the company do?"
+  },
+  {
+    "page": "founder-f1-categories",
+    "viewport": "mobile",
+    "file": "founder-f1-categories-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "How would you categorise the company?"
+  },
+  {
+    "page": "founder-f1-categories",
+    "viewport": "mobile",
+    "file": "founder-f1-categories-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "How would you categorise the company?"
+  },
+  {
+    "page": "founder-f2-materials",
+    "viewport": "mobile",
+    "file": "founder-f2-materials-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "What do you already have?"
+  },
+  {
+    "page": "founder-f3-review",
+    "viewport": "mobile",
+    "file": "founder-f3-review-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Here's what I understood"
+  },
+  {
+    "page": "founder-f3-review",
+    "viewport": "mobile",
+    "file": "founder-f3-review-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Here's what I understood"
+  },
+  {
+    "page": "founder-f4-team",
+    "viewport": "mobile",
+    "file": "founder-f4-team-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Your founding team"
+  },
+  {
+    "page": "founder-f4-team",
+    "viewport": "mobile",
+    "file": "founder-f4-team-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Your founding team"
+  },
+  {
+    "page": "founder-f5-traction",
+    "viewport": "mobile",
+    "file": "founder-f5-traction-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Business and traction"
+  },
+  {
+    "page": "founder-f5-traction",
+    "viewport": "mobile",
+    "file": "founder-f5-traction-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Business and traction"
+  },
+  {
+    "page": "home-founder",
+    "viewport": "mobile",
+    "file": "home-founder-mobile.png",
+    "url": "http://127.0.0.1:3000/home",
+    "note": "Home with founder context"
+  },
+  {
+    "page": "home-founder-q-working",
+    "viewport": "mobile",
+    "file": "home-founder-q-working-mobile.png",
+    "url": "http://127.0.0.1:3000/home",
+    "note": "Q working"
+  },
+  {
+    "page": "home-founder-q-answer",
+    "viewport": "mobile",
+    "file": "home-founder-q-answer-mobile.png",
+    "url": "http://127.0.0.1:3000/home?c=ed46104e-8d22-4377-9a0d-915d8f5ab454",
+    "note": "Q answer for a founder"
+  },
+  {
+    "page": "discover-founder",
+    "viewport": "mobile",
+    "file": "discover-founder-mobile.png",
+    "url": "http://127.0.0.1:3000/discover",
+    "note": ""
+  },
+  {
+    "page": "company-visibility-founder",
+    "viewport": "mobile",
+    "file": "company-visibility-founder-mobile.png",
+    "url": "http://127.0.0.1:3000/company/visibility",
+    "note": ""
+  },
+  {
+    "page": "capital-founder",
+    "viewport": "mobile",
+    "file": "capital-founder-mobile.png",
+    "url": "http://127.0.0.1:3000/capital",
+    "note": ""
+  },
+  {
+    "page": "profile-founder",
+    "viewport": "mobile",
+    "file": "profile-founder-mobile.png",
+    "url": "http://127.0.0.1:3000/profile",
+    "note": ""
+  },
+  {
+    "page": "investor-i3-sectors",
+    "viewport": "mobile",
+    "file": "investor-i3-sectors-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Which sectors and product areas?"
+  },
+  {
+    "page": "investor-i3-sectors",
+    "viewport": "mobile",
+    "file": "investor-i3-sectors-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Which sectors and product areas?"
+  },
+  {
+    "page": "investor-i4-attributes",
+    "viewport": "mobile",
+    "file": "investor-i4-attributes-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Business attributes"
+  },
+  {
+    "page": "investor-i4-attributes",
+    "viewport": "mobile",
+    "file": "investor-i4-attributes-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Business attributes"
+  },
+  {
+    "page": "investor-i5-founder-preferences",
+    "viewport": "mobile",
+    "file": "investor-i5-founder-preferences-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Founding-team capabilities that matter to you"
+  },
+  {
+    "page": "investor-i5-founder-preferences",
+    "viewport": "mobile",
+    "file": "investor-i5-founder-preferences-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Founding-team capabilities that matter to you"
+  },
+  {
+    "page": "investor-i6-green-flags",
+    "viewport": "mobile",
+    "file": "investor-i6-green-flags-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Green flags"
+  },
+  {
+    "page": "investor-i7-red-flags",
+    "viewport": "mobile",
+    "file": "investor-i7-red-flags-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Red flags"
+  },
+  {
+    "page": "investor-i7-red-flags",
+    "viewport": "mobile",
+    "file": "investor-i7-red-flags-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Red flags"
+  },
+  {
+    "page": "investor-i8-portfolio",
+    "viewport": "mobile",
+    "file": "investor-i8-portfolio-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "A few representative portfolio companies"
+  },
+  {
+    "page": "investor-i9-discovery-style",
+    "viewport": "mobile",
+    "file": "investor-i9-discovery-style-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "How adventurous should discovery be?"
+  },
+  {
+    "page": "investor-i9-discovery-style",
+    "viewport": "mobile",
+    "file": "investor-i9-discovery-style-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "How adventurous should discovery be?"
+  },
+  {
+    "page": "investor-i10-inbound",
+    "viewport": "mobile",
+    "file": "investor-i10-inbound-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "How should founders reach you?"
+  },
+  {
+    "page": "investor-i10-inbound",
+    "viewport": "mobile",
+    "file": "investor-i10-inbound-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "How should founders reach you?"
+  },
+  {
+    "page": "investor-i11-additional",
+    "viewport": "mobile",
+    "file": "investor-i11-additional-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Add something we missed"
+  },
+  {
+    "page": "investor-i11-mandate-review",
+    "viewport": "mobile",
+    "file": "investor-i11-mandate-review-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Here's the mandate you've defined"
+  },
+  {
+    "page": "investor-i11-mandate-review",
+    "viewport": "mobile",
+    "file": "investor-i11-mandate-review-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Here's the mandate you've defined"
+  },
+  {
+    "page": "investor-i12-handoff",
+    "viewport": "mobile",
+    "file": "investor-i12-handoff-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Your mandate is ready"
+  },
+  {
+    "page": "home-investor",
+    "viewport": "mobile",
+    "file": "home-investor-mobile.png",
+    "url": "http://127.0.0.1:3000/home",
+    "note": "Home with investor context"
+  },
+  {
+    "page": "home-investor-q-working",
+    "viewport": "mobile",
+    "file": "home-investor-q-working-mobile.png",
+    "url": "http://127.0.0.1:3000/home?c=1059cf16-4f63-43cf-b578-62fc0c1326b8",
+    "note": "Q working"
+  },
+  {
+    "page": "home-investor-q-answer",
+    "viewport": "mobile",
+    "file": "home-investor-q-answer-mobile.png",
+    "url": "http://127.0.0.1:3000/home?c=1059cf16-4f63-43cf-b578-62fc0c1326b8",
+    "note": "Q answer for a investor"
+  },
+  {
+    "page": "discover-investor",
+    "viewport": "mobile",
+    "file": "discover-investor-mobile.png",
+    "url": "http://127.0.0.1:3000/discover",
+    "note": ""
+  },
+  {
+    "page": "company-visibility-investor",
+    "viewport": "mobile",
+    "file": "company-visibility-investor-mobile.png",
+    "url": "http://127.0.0.1:3000/company/visibility",
+    "note": ""
+  },
+  {
+    "page": "capital-investor",
+    "viewport": "mobile",
+    "file": "capital-investor-mobile.png",
+    "url": "http://127.0.0.1:3000/capital",
+    "note": ""
+  },
+  {
+    "page": "profile-investor",
+    "viewport": "mobile",
+    "file": "profile-investor-mobile.png",
+    "url": "http://127.0.0.1:3000/profile",
+    "note": ""
+  }
+]

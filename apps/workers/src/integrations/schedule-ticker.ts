@@ -1,0 +1,56 @@
+import type { MeetingMailer, ScheduleService } from "@capital-q/communication";
+import { createCorrelationId } from "@capital-q/observability";
+
+import { abortableSleep, type RunnerLogger } from "../outbox-runner.js";
+
+/**
+ * Reminders and prep briefs (BIZ-008).
+ *
+ * Every 30 seconds: due reminders go to Needs you (once, by dedupe key)
+ * and, where asked, by email over SMTP (retried for an hour if the relay
+ * fails), so a meeting's T-15 email lands within a minute of its time.
+ * Prep briefs for calls in the next 24 hours are composed on the same
+ * tick; each is written once. One failed tick is logged and the next runs.
+ */
+
+export const SCHEDULE_TICK_INTERVAL_MS = 30 * 1000;
+
+export async function runScheduleTicker(options: {
+  readonly schedule: Pick<
+    ScheduleService,
+    "deliverDue" | "prepareBriefs" | "refreshMeetLinks"
+  >;
+  /** The booked-call email to every participant (founder report 2026-10-02). */
+  readonly meetingMail?: Pick<MeetingMailer, "tick"> | undefined;
+  readonly signal: AbortSignal;
+  readonly logger: RunnerLogger;
+  readonly intervalMs?: number | undefined;
+  readonly sleep?:
+    ((ms: number, signal: AbortSignal) => Promise<void>) | undefined;
+}): Promise<void> {
+  const sleep = options.sleep ?? abortableSleep;
+  const intervalMs = options.intervalMs ?? SCHEDULE_TICK_INTERVAL_MS;
+  while (!options.signal.aborted) {
+    const correlationId = createCorrelationId();
+    try {
+      const reminders = await options.schedule.deliverDue(correlationId);
+      const briefs = await options.schedule.prepareBriefs(correlationId);
+      // AUTO (2026-10-02): a Meet link Google attached after the booking.
+      const links = await options.schedule.refreshMeetLinks(correlationId);
+      if (links.found > 0) {
+        options.logger.info({ ...links }, "meet links attached");
+      }
+      // After the link refresh, so a late link is in the same pass's email.
+      const mail = (await options.meetingMail?.tick()) ?? { sent: 0 };
+      if (mail.sent > 0) {
+        options.logger.info({ ...mail }, "meeting emails sent");
+      }
+      if (reminders.delivered + reminders.emailed + briefs > 0) {
+        options.logger.info({ ...reminders, briefs }, "schedule tick");
+      }
+    } catch {
+      options.logger.warn({}, "schedule tick failed; retrying next interval");
+    }
+    await sleep(intervalMs, options.signal);
+  }
+}

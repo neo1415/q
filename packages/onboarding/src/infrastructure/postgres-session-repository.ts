@@ -277,9 +277,12 @@ const ResponseRow = z.object({
   response_type: OnboardingResponseTypeSchema,
   response_jsonb: OnboardingResponseValueSchema,
   raw_text: z.string().nullable(),
+  note: z.string().nullable(),
   source_modality: OnboardingSourceModalitySchema,
+  channel: z.enum(["FORM", "CONVERSATION"]).nullable().default(null),
   created_at: Timestamp,
   superseded_by_response_id: OnboardingResponseIdSchema.nullable(),
+  withdrawn_at: Timestamp.nullable(),
 });
 
 function toResponse(row: unknown): OnboardingResponse {
@@ -291,16 +294,20 @@ function toResponse(row: unknown): OnboardingResponse {
     responseType: r.response_type,
     value: r.response_jsonb,
     rawText: r.raw_text,
+    note: r.note,
     sourceModality: r.source_modality,
+    channel: r.channel,
     createdAt: r.created_at,
     supersededByResponseId: r.superseded_by_response_id,
+    withdrawnAt: r.withdrawn_at,
   };
 }
 
 function responseSelect(executor: DatabaseExecutor) {
   return executor`
     select r.id, r.session_id, r.step_key, r.response_type, r.response_jsonb, r.raw_text,
-           r.source_modality, r.created_at, r.superseded_by_response_id
+           r.note, r.source_modality, r.channel, r.created_at, r.superseded_by_response_id,
+           r.withdrawn_at
       from onboarding.responses r`;
 }
 
@@ -309,7 +316,9 @@ export function createPostgresOnboardingResponseRepository(): OnboardingResponse
     listCurrent: async (executor, sessionId) => {
       const rows = await executor`
         ${responseSelect(executor)}
-         where r.session_id = ${sessionId} and r.superseded_by_response_id is null
+         where r.session_id = ${sessionId}
+           and r.superseded_by_response_id is null
+           and r.withdrawn_at is null
          order by r.step_key`;
       return rows.map(toResponse);
     },
@@ -329,19 +338,32 @@ export function createPostgresOnboardingResponseRepository(): OnboardingResponse
       const { response } = input;
       const rows = await tx.sql`
         insert into onboarding.responses
-          (id, session_id, step_key, response_type, response_jsonb, raw_text, source_modality)
+          (id, session_id, step_key, response_type, response_jsonb, raw_text, note, source_modality, channel)
         values
           (${input.responseId}, ${input.sessionId}, ${response.stepKey}, ${response.responseType},
-           ${JSON.stringify(response.value)}::text::jsonb, ${response.rawText}, ${response.sourceModality})
-        returning id, session_id, step_key, response_type, response_jsonb, raw_text, source_modality,
-                  created_at, superseded_by_response_id`;
+           ${JSON.stringify(response.value)}::text::jsonb, ${response.rawText}, ${response.note}, ${response.sourceModality},
+           ${response.channel ?? null})
+        returning id, session_id, step_key, response_type, response_jsonb, raw_text, note, source_modality, channel,
+                  created_at, superseded_by_response_id, withdrawn_at`;
       return toResponse(rows[0]);
     },
     supersede: async (tx, previousResponseId, replacementResponseId) => {
       await tx.sql`
         update onboarding.responses r
            set superseded_by_response_id = ${replacementResponseId}
-         where r.id = ${previousResponseId} and r.superseded_by_response_id is null`;
+         where r.id = ${previousResponseId}
+           and r.superseded_by_response_id is null
+           and r.withdrawn_at is null`;
+    },
+    withdraw: async (tx, responseId) => {
+      const rows = await tx.sql`
+        update onboarding.responses r
+           set withdrawn_at = clock_timestamp()
+         where r.id = ${responseId}
+           and r.superseded_by_response_id is null
+           and r.withdrawn_at is null
+        returning r.id`;
+      return rows.length === 1;
     },
   };
 }
@@ -362,6 +384,7 @@ const SuggestionRow = z.object({
   model_run_id: UuidSchema.nullable(),
   created_at: Timestamp,
   resolved_at: Timestamp.nullable(),
+  rationale: z.string().nullable().default(null),
 });
 
 function toSuggestion(row: unknown): OnboardingSuggestion {
@@ -378,13 +401,15 @@ function toSuggestion(row: unknown): OnboardingSuggestion {
     modelRunId: r.model_run_id,
     createdAt: r.created_at,
     resolvedAt: r.resolved_at,
+    rationale: r.rationale,
   };
 }
 
 function suggestionSelect(executor: DatabaseExecutor) {
   return executor`
     select g.id, g.session_id, g.step_key, g.target_field, g.suggested_value, g.source_refs,
-           g.confidence::text as confidence, g.status, g.model_run_id, g.created_at, g.resolved_at
+           g.confidence::text as confidence, g.status, g.model_run_id, g.created_at, g.resolved_at,
+           g.rationale
       from onboarding.suggestions g`;
 }
 
@@ -405,11 +430,11 @@ export function createPostgresOnboardingSuggestionRepository(): OnboardingSugges
     insert: async (tx, input) => {
       const rows = await tx.sql`
         insert into onboarding.suggestions
-          (session_id, step_key, target_field, suggested_value, source_refs, confidence, model_run_id)
+          (session_id, step_key, target_field, suggested_value, source_refs, confidence, model_run_id, rationale)
         values
           (${input.sessionId}, ${input.stepKey}, ${input.targetField},
            ${JSON.stringify(input.suggestedValue)}::text::jsonb, ${JSON.stringify(input.sourceRefs)}::text::jsonb,
-           ${input.confidence}::text::numeric, ${input.modelRunId})
+           ${input.confidence}::text::numeric, ${input.modelRunId}, ${input.rationale ?? null})
         returning id`;
       const id = z
         .object({ id: OnboardingSuggestionIdSchema })
@@ -425,6 +450,19 @@ export function createPostgresOnboardingSuggestionRepository(): OnboardingSugges
          where g.id = ${suggestionId} and g.status = 'PENDING'
         returning g.id`;
       return rows.length === 1;
+    },
+    listRejectedValues: async (executor, sessionId, stepKey) => {
+      const rows = await executor`
+        select g.suggested_value
+          from onboarding.suggestions g
+         where g.session_id = ${sessionId}
+           and g.step_key = ${stepKey}
+           and g.status = 'REJECTED'
+         limit 50`;
+      return rows.map(
+        (row) =>
+          z.object({ suggested_value: z.unknown() }).parse(row).suggested_value,
+      );
     },
   };
 }

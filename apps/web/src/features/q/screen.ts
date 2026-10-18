@@ -1,0 +1,256 @@
+import type {
+  QScreenContext,
+  QScreenRoute,
+  QViewingMoment,
+} from "@capital-q/contracts";
+
+import { currentManifest } from "./manifest";
+import { viewingOf, type QMomentSource } from "./q-moment";
+
+/**
+ * What is on screen as the person asks Q (R21): the route mapped onto the
+ * closed screen list, and the canonical entity ids the route names. Not
+ * pixels, and never authority: the Q API resolves each id for the asker or
+ * drops it. The pitch being watched travels separately (`viewing`, R18).
+ */
+const EXACT: Readonly<Record<string, QScreenRoute>> = {
+  "/home": "HOME",
+  // Q's first minute is the start of onboarding (founder live 2026-10-05).
+  "/welcome": "ONBOARDING",
+  "/discover": "DISCOVER",
+  "/capital": "CAPITAL",
+  "/profile": "PROFILE",
+  "/company/visibility": "COMPANY_VISIBILITY",
+  "/relationships": "RELATIONSHIPS",
+  "/company/interest": "COMPANY_INTEREST",
+  "/pitch": "PITCH",
+  "/verification": "VERIFICATION",
+  "/daily": "DAILY",
+  // voiceq-63: their documents, and Q's work page.
+  "/documents": "DOCUMENTS",
+  "/work": "WORK",
+};
+
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function screenOf(pathname: string, search = ""): QScreenContext {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  // Capital is the CRM's Capital tab (owner 2026-10-16): still Capital to Q.
+  if (
+    path === "/relationships" &&
+    new URLSearchParams(search).get("view") === "capital"
+  )
+    return { route: "CAPITAL" };
+  const exact = EXACT[path];
+  if (exact !== undefined) return { route: exact };
+  const segments = path.split("/").filter((segment) => segment.length > 0);
+  const [first, second, third] = segments;
+  if (first === "onboarding") return { route: "ONBOARDING" };
+  if (first === "company" && second !== undefined && UUID.test(second)) {
+    return { route: "COMPANY", companyId: second.toLowerCase() };
+  }
+  if (first === "relationships" && third !== undefined && UUID.test(third)) {
+    if (second === "company") {
+      return { route: "RELATIONSHIP_COMPANY", companyId: third.toLowerCase() };
+    }
+    if (second === "investor") {
+      return {
+        route: "RELATIONSHIP_INVESTOR",
+        investorOrganisationId: third.toLowerCase(),
+      };
+    }
+  }
+  return { route: "OTHER" };
+}
+
+/**
+ * The document open in Q's viewer, if any (R21): one per tab, set by the
+ * Q session while its viewer shows it. Part of what is on screen, so a
+ * typed or spoken "what's in this?" is about that document.
+ */
+let openDocumentId: string | null = null;
+
+export function setOpenDocument(documentId: string | null): void {
+  openDocumentId =
+    documentId !== null && UUID.test(documentId)
+      ? documentId.toLowerCase()
+      : null;
+}
+
+/**
+ * R0: a company's data-room document Q opened in the viewer on this tab.
+ * On screen like the company it belongs to; the server resolves both for
+ * the asker as it would any named subject, and drops what does not.
+ */
+let materialDocument: {
+  readonly companyId: string;
+  readonly documentId: string;
+  /** Q room W3: the page open in the room's viewer. */
+  readonly page: number | null;
+} | null = null;
+
+export function setMaterialDocument(
+  document: { readonly companyId: string; readonly documentId: string } | null,
+  page?: number,
+): void {
+  materialDocument =
+    document !== null &&
+    UUID.test(document.companyId) &&
+    UUID.test(document.documentId)
+      ? {
+          companyId: document.companyId.toLowerCase(),
+          documentId: document.documentId.toLowerCase(),
+          page:
+            page !== undefined &&
+            Number.isInteger(page) &&
+            page >= 1 &&
+            page <= 10_000
+              ? page
+              : null,
+        }
+      : null;
+}
+
+/**
+ * The document open in the app's document viewer on this tab (the
+ * Documents page and the ready toast open it; voiceq-63: Q opened the prep
+ * PDF there and could not read it). This tab only: never another tab or
+ * app. Set by the viewer; Q's own viewer above wins while it is open.
+ */
+let viewerDocumentId: string | null = null;
+
+export function setViewerDocument(artifactId: string | null): void {
+  viewerDocumentId =
+    artifactId !== null && UUID.test(artifactId)
+      ? artifactId.toLowerCase()
+      : null;
+}
+
+/**
+ * Q room W5 (R8): the deck open in the Q room, its slide and the version
+ * on screen. Wins over the other viewers while the room shows it.
+ */
+let roomDeck: {
+  readonly artifactId: string;
+  readonly slide: number;
+  readonly version: number | null;
+} | null = null;
+
+export function setRoomDeck(
+  deck: {
+    readonly artifactId: string;
+    readonly slide: number;
+    readonly version: number | null;
+  } | null,
+): void {
+  roomDeck =
+    deck !== null &&
+    UUID.test(deck.artifactId) &&
+    Number.isInteger(deck.slide) &&
+    deck.slide >= 1 &&
+    deck.slide <= 24
+      ? {
+          artifactId: deck.artifactId.toLowerCase(),
+          slide: deck.slide,
+          version:
+            deck.version !== null &&
+            Number.isInteger(deck.version) &&
+            deck.version >= 1
+              ? deck.version
+              : null,
+        }
+      : null;
+}
+
+/**
+ * What the page says is in front of the person (R18/R21): the Discover
+ * card's company, and its pitch and position when one is playing or
+ * paused. Registered by the page (through the global Q moment source) and
+ * read at every turn, so "what is this about?" asked into an open dock or
+ * a live voice line is about the card on screen at that instant -- not
+ * the one showing when Q was opened.
+ */
+let focusSource: QMomentSource | null = null;
+
+export function setScreenFocusSource(source: QMomentSource | null): void {
+  focusSource = source;
+}
+
+function focusNow() {
+  try {
+    return focusSource?.() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** The pitch moment on screen now, as the run contract carries it; or none. */
+export function currentViewing(): QViewingMoment | undefined {
+  const focus = focusNow();
+  return focus?.kind === "PITCH_MOMENT" && UUID.test(focus.companyId)
+    ? viewingOf(focus)
+    : undefined;
+}
+
+/** What is on screen now: the route's context, the focused company, the open document. */
+export function currentScreen(
+  pathname: string = window.location.pathname,
+): QScreenContext {
+  let screen = screenOf(
+    pathname,
+    typeof window === "undefined" ? "" : window.location.search,
+  );
+  const focus = focusNow();
+  if (
+    screen.companyId === undefined &&
+    focus !== null &&
+    UUID.test(focus.companyId)
+  ) {
+    screen = { ...screen, companyId: focus.companyId.toLowerCase() };
+  }
+  if (materialDocument !== null) {
+    screen = {
+      ...screen,
+      companyId: materialDocument.companyId,
+      documentId: materialDocument.documentId,
+      ...(materialDocument.page === null
+        ? {}
+        : { documentPage: materialDocument.page }),
+    };
+  }
+  const zone = deviceTimeZone();
+  if (zone !== undefined) screen = { ...screen, timeZone: zone };
+  // What Q's viewers show are documents Q made for them (artifacts): they
+  // ride as artifactId, read on the server through read_my_document.
+  const open = openDocumentId ?? viewerDocumentId;
+  if (roomDeck !== null) {
+    screen = {
+      ...screen,
+      artifactId: roomDeck.artifactId,
+      artifactSlide: roomDeck.slide,
+      ...(roomDeck.version === null
+        ? {}
+        : { artifactVersion: roomDeck.version }),
+    };
+  } else if (open !== null) screen = { ...screen, artifactId: open };
+  // Q room R1: the whole page, as ids and closed kinds only.
+  const manifest = currentManifest();
+  return manifest === undefined ? screen : { ...screen, manifest };
+}
+
+const ZONE = /^[A-Za-z]+(\/[A-Za-z0-9_+-]+){0,2}$/;
+
+/**
+ * The device's IANA zone, so "tomorrow at 2 PM" is resolved where the
+ * person is (live test 2026-09-28 #2). Anything the contract would refuse
+ * is left out rather than failing the question.
+ */
+function deviceTimeZone(): string | undefined {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return ZONE.test(zone) && zone.length <= 64 ? zone : undefined;
+  } catch {
+    return undefined;
+  }
+}

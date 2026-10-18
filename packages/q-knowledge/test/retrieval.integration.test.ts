@@ -272,7 +272,7 @@ describe("authorised hybrid retrieval against local PostgreSQL", () => {
     return {
       planId: randomUUID(),
       planFingerprint: "a".repeat(64),
-      policyVersion: "context-firewall-v1",
+      policyVersion: "context-firewall-v2",
       tenantId: seed.tenantId,
       actorUserId: seed.userId,
       organisationId: seed.orgId,

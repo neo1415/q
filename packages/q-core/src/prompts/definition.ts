@@ -24,21 +24,179 @@ import type { ModelTextTaskClass } from "@capital-q/contracts";
 
 export const PROMPT_IDS = [
   "Q_SYSTEM",
+  "Q_SYSTEM_VOICE",
   "FOUNDER_ONBOARDING_EXTRACTION",
+  "INTERVIEW_CONDUCTOR",
+  "WELCOME_CONDUCTOR",
   "CLAIM_EXTRACTION",
   "INVESTOR_MANDATE_SYNTHESIS",
   "COMPANY_ANALYST",
   "FIT_EXPLANATION",
+  "PRESENCE_READER",
+  "DECISION_READER",
+  "MEMORY_EXTRACTOR",
+  /** Founder direction 2026-09-29: Q's notes on a call it attended. */
+  "MEETING_NOTES",
+  /** CQ-GATE-002: Q interviewing somebody applying to a gateway. */
+  "GATEQ_INTERVIEWER",
+  /** QX-003F: rewriting the prose of a document Q already composed. */
+  "ARTIFACT_REVISION",
+  /** CQ-QX-005: what one turn to Q was, before Q answers it. */
+  "TURN_READER",
+  /** ADR 0016: the onboarding interview as a tool-calling Q run. */
+  "INTERVIEW_AGENT",
+  /** Which onboarding choices the person just handed to Q. */
+  "DELEGATION_READER",
+  /** BIZ-009: an investor's own public pages, read into their mandate's shape. */
+  "INVESTOR_RESEARCH_READER",
+  /** Founder direction 2026-09-29: Q replying inside an approved errand. */
+  "ERRAND_REPLY",
+  /** Founder direction 2026-09-30: an investor, for a rehearsal Q plays. */
+  "INVESTOR_PERSONA",
+  /** Founder direction 2026-09-30: Q plays that investor in a rehearsal. */
+  "INVESTOR_TWIN_TURN",
+  /** Founder direction 2026-09-30: Q coaches the founder after it. */
+  "REHEARSAL_SCORE",
+  /** Founder direction 2026-09-30: a company's own pages, read during setup. */
+  "FOUNDER_RESEARCH_READER",
+  // AUTO block (ADR 0030): Q's delegated work.
+  "WORK_SHORTLIST",
+  "WORK_CONVERSE",
+  "WORK_INTERVIEW_TURN",
+  "WORK_INTERVIEW_REPORT",
+  "WORK_STAND_IN_REPLY",
+  "WORK_SLOT_READER",
+  /** ADR 0043: a standing instruction's next steps, as declared actions. */
+  "INSTRUCTION_PLAN",
+  /** ADR 0043 §6: the quarantined thread reader -- typed fields only. */
+  "INSTRUCTION_THREAD_READER",
+  // DOCS block: the wording pass over a composed deck.
+  "DOCUMENT_POLISH",
+  /** Deck wave 8: the vision check of a rendered deck. */
+  "DOCUMENT_CRITIQUE",
+  // DAILY block: The Q Daily's story writer and Q's take column.
+  "DAILY_STORY_WRITER",
+  "DAILY_Q_TAKE",
+  // MEET-HOST block (ADR 0037): Q as a live participant in a booked call.
+  "MEETING_HOST_TURN",
+  /** Founder brief P5 2026-10-06: Q's private note on a shared screen. */
+  "MEETING_SCREEN_NOTE",
+  /** 2026-10-08: Q's private note on a camera tile (behaviour, setup, objects). */
+  "MEETING_CAMERA_NOTE",
+  /** HARDEN P0 2026-10-02: public sources onto their profile's open fields. */
+  "PROFILE_GAP_READER",
+  /** HARDEN 2026-10-02 (ADR 0040): one app action's inputs from their words. */
+  "APP_ACTION_ARGUMENTS",
+  /** HARDEN 2026-10-03: which one declared app action a request asks for. */
+  "APP_ACTION_ROUTER",
+  /** 2026-10-04: Q's one line on a document shared in diligence. */
+  "DILIGENCE_DOCUMENT_SUMMARY",
+  /** Founder brief J1-J9 2026-10-06: Q's workforce of agents. */
+  "DRAFT_REVIEW",
+  "DRAFT_REDRAFT",
+  "REPLY_READER",
+  "JOB_PLAN",
+  "SUBSTANCE_CRITIQUE",
+  "DILIGENCE_QUESTIONS",
+  "DILIGENCE_QUESTIONS_SHORTEN",
+  /** Founder brief J7 2026-10-06: people's words read by meaning. */
+  "ONBOARDING_MOVE_READER",
+  "PREFERENCE_POLARITY",
+  "MEETING_OUTCOME_READER",
+  "UTTERANCE_CHECK",
+  /** Founder brief B4 2026-10-05 (ADR 0052): Q's view beside a computed fit. */
+  "FIT_Q_VIEW",
+  /** Overnight A5 2026-10-06: a pitch deck into the twelve standard sections. */
+  "DECK_EXTRACTION",
+  /** Lane ov 2026-10-16: a pitch transcript into the profile's sections. */
+  "PITCH_SECTION_EXTRACTION",
+  /** Founder live 2026-10-08: a code-built answer said in Q's own words. */
+  "SPOKEN_REPLY",
+  /** Zino 2026-10-08: their own words about the briefing's cards, as verbs. */
+  "BRIEFING_COMMAND",
+  /** RECOVERY-2026-10 B5: small talk, answered in one tool-free call. */
+  "SMALL_TALK",
+  /** K (founder brief 2026-10-09): a short first read of a turn, for the fast lane. */
+  "TURN_SKIM",
+  /** W2 (2026-10-10): public pages about a person or organisation, read into a quoted brief. */
+  "PERSON_BRIEF_READER",
+  /** Lead decision 2026-10-15: Q's cited, nonbinding reading of a GateQ submission. */
+  "GATEQ_DOSSIER_SYNTHESIS",
+  /** Owner live 2026-10-17: a follow-up answered from what Q already showed. */
+  "CONVERSATION_RECALL",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
 export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   Q_SYSTEM: "q-system",
+  Q_SYSTEM_VOICE: "q-system-voice",
   FOUNDER_ONBOARDING_EXTRACTION: "founder-onboarding-extraction",
+  INTERVIEW_CONDUCTOR: "interview-conductor",
+  WELCOME_CONDUCTOR: "welcome-conductor",
   CLAIM_EXTRACTION: "claim-extraction",
   INVESTOR_MANDATE_SYNTHESIS: "investor-mandate-synthesis",
   COMPANY_ANALYST: "company-analyst",
   FIT_EXPLANATION: "fit-explanation",
+  FIT_Q_VIEW: "fit-q-view",
+  PRESENCE_READER: "presence-reader",
+  DECISION_READER: "decision-reader",
+  MEMORY_EXTRACTOR: "memory-extractor",
+  MEETING_NOTES: "meeting-notes",
+  MEETING_HOST_TURN: "meeting-host-turn",
+  MEETING_SCREEN_NOTE: "meeting-screen-note",
+  MEETING_CAMERA_NOTE: "meeting-camera-note",
+  PROFILE_GAP_READER: "profile-gap-reader",
+  APP_ACTION_ARGUMENTS: "app-action-arguments",
+  APP_ACTION_ROUTER: "app-action-router",
+  GATEQ_INTERVIEWER: "gateq-interviewer",
+  GATEQ_DOSSIER_SYNTHESIS: "gateq-dossier-synthesis",
+  ARTIFACT_REVISION: "artifact-revision",
+  TURN_READER: "turn-reader",
+  INTERVIEW_AGENT: "interview-agent",
+  DELEGATION_READER: "delegation-reader",
+  INVESTOR_RESEARCH_READER: "investor-research-reader",
+  ERRAND_REPLY: "errand-reply",
+  DILIGENCE_DOCUMENT_SUMMARY: "diligence-document-summary",
+  DECK_EXTRACTION: "deck-extraction",
+  PITCH_SECTION_EXTRACTION: "pitch-section-extraction",
+  SPOKEN_REPLY: "spoken-reply",
+  BRIEFING_COMMAND: "briefing-command",
+  INVESTOR_PERSONA: "investor-persona",
+  INVESTOR_TWIN_TURN: "investor-twin-turn",
+  REHEARSAL_SCORE: "rehearsal-score",
+  FOUNDER_RESEARCH_READER: "founder-research-reader",
+  // AUTO block (ADR 0030)
+  WORK_SHORTLIST: "work-shortlist",
+  WORK_CONVERSE: "work-converse",
+  WORK_INTERVIEW_TURN: "work-interview-turn",
+  WORK_INTERVIEW_REPORT: "work-interview-report",
+  WORK_STAND_IN_REPLY: "work-stand-in-reply",
+  WORK_SLOT_READER: "work-slot-reader",
+  INSTRUCTION_PLAN: "instruction-plan",
+  INSTRUCTION_THREAD_READER: "instruction-thread-reader",
+  // DOCS block.
+  DOCUMENT_POLISH: "document-polish",
+  DOCUMENT_CRITIQUE: "document-critique",
+  // DAILY block
+  DAILY_STORY_WRITER: "daily-story-writer",
+  DAILY_Q_TAKE: "daily-q-take",
+  // WORKFORCE block (founder brief J1-J9).
+  DRAFT_REVIEW: "draft-review",
+  DRAFT_REDRAFT: "draft-redraft",
+  REPLY_READER: "reply-reader",
+  JOB_PLAN: "job-plan",
+  SUBSTANCE_CRITIQUE: "substance-critique",
+  DILIGENCE_QUESTIONS: "diligence-questions",
+  DILIGENCE_QUESTIONS_SHORTEN: "diligence-questions-shorten",
+  // Founder brief J7.
+  ONBOARDING_MOVE_READER: "onboarding-move-reader",
+  PREFERENCE_POLARITY: "preference-polarity",
+  MEETING_OUTCOME_READER: "meeting-outcome-reader",
+  UTTERANCE_CHECK: "utterance-check",
+  SMALL_TALK: "small-talk",
+  CONVERSATION_RECALL: "conversation-recall",
+  TURN_SKIM: "turn-skim",
+  PERSON_BRIEF_READER: "person-brief-reader",
 };
 
 export type PromptKind = "CHARTER" | "TASK";
@@ -111,12 +269,21 @@ export function templateVariables(template: string): readonly string[] {
 }
 
 function neutraliseFences(text: string): string {
-  // Content cannot close or reopen a fence: the markers themselves are data.
+  // Content cannot close or reopen a fence, and it cannot look like a
+  // template token. A Wikipedia or Wiktionary page is full of literal
+  // "{{...}}" markup; left alone it survives rendering and trips the
+  // unrendered-token guard below, which would fail a whole turn because a
+  // page quoted a brace. Neutralising it here also means content can never
+  // be mistaken for a variable by anything downstream.
   return text
     .split(UNTRUSTED_CLOSE)
     .join("<<<END_UNTRUSTED_CONTENT (literal)>>>")
     .split(UNTRUSTED_OPEN)
-    .join("<<<UNTRUSTED_CONTENT (literal)");
+    .join("<<<UNTRUSTED_CONTENT (literal)")
+    .split("{{")
+    .join("{ {")
+    .split("}}")
+    .join("} }");
 }
 
 function formatValue(value: unknown): string {
@@ -129,7 +296,10 @@ function formatValue(value: unknown): string {
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
-  return JSON.stringify(value, null, 2);
+  // Compact: indentation is whitespace a model does not need and a small
+  // model's request budget pays for — several hundred tokens a turn on
+  // the interview's open-step list alone (CQ-QX-005).
+  return JSON.stringify(value);
 }
 
 export function fenceUntrusted(source: string, value: unknown): string {

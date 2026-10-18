@@ -1,0 +1,448 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  ArrivalSnapshotSchema,
+  type QDailyEdition,
+  relationshipMessagesPath,
+  relationshipPagePath,
+} from "@capital-q/contracts";
+import { ActorContextSchema } from "@capital-q/security";
+
+import {
+  buildArrivalSnapshot,
+  createArrivalSnapshots,
+  DEFAULT_TRUST_MS,
+} from "../src/composition/arrival-snapshot.js";
+import { arrivalLines, liveContextPackage } from "../src/voice/live/context.js";
+import {
+  COUNTERPART,
+  NOW,
+  REL,
+  tensorGateBrief,
+  tensorGateReport,
+} from "./arrival-snapshot.fixtures.js";
+
+const ACTOR = ActorContextSchema.parse({
+  userId: "7b1c0e55-0000-4000-8000-0000000000a1",
+  tenantId: "7b1c0e55-0000-4000-8000-0000000000a2",
+  organisationId: "7b1c0e55-0000-4000-8000-0000000000a3",
+  membershipId: "7b1c0e55-0000-4000-8000-0000000000a4",
+  actorType: "HUMAN",
+});
+
+describe("buildArrivalSnapshot", () => {
+  const snapshot = buildArrivalSnapshot({
+    report: tensorGateReport(),
+    briefs: [tensorGateBrief()],
+    now: NOW,
+  });
+  const item = snapshot.items[0];
+
+  it("is a valid, versioned contract with every headline's facts", () => {
+    expect(() => ArrivalSnapshotSchema.parse(snapshot)).not.toThrow();
+    expect(snapshot.contractVersion).toBe("arrival-snapshot.v2");
+    expect(snapshot.items).toHaveLength(2);
+    expect(snapshot.unread).toEqual(["REMINDER"]);
+    expect(item?.headline).toContain("TensorGate");
+    expect(item?.availability).toBe("OK");
+  });
+
+  it("answers what's the request, what they said, and whether the time is booked", () => {
+    expect(item?.facts.request).toMatchObject({
+      kind: "CONNECTION_OR_INTEREST",
+      from: "TensorGate",
+    });
+    expect(item?.facts.theirLatestMessage?.text).toBe(
+      "Could we do Thursday 3pm for a call?",
+    );
+    expect(item?.facts.theirLatestMessage?.from).toBe("OTHER_SIDE");
+    expect(item?.facts.messageCount).toBe(2);
+    expect(item?.facts.meeting).toMatchObject({
+      status: "SCHEDULED",
+      booked: true,
+      timing: "UPCOMING",
+    });
+    expect(item?.facts.suggestedNextAction?.kind).toBe("ANSWER_INTEREST");
+    expect(item?.facts.openRequests[0]?.title).toBe("Latest cap table");
+    expect(item?.facts.documents[0]?.title).toBe("Pitch deck v3");
+    expect(item?.ids).toMatchObject({
+      relationshipId: REL,
+      investorOrganisationId: COUNTERPART,
+      companyId: null,
+    });
+    expect(item?.sourceVersions.historySequence).toBe(7);
+    expect(item?.evidence.map((e) => e.source)).toContain("THREAD");
+  });
+
+  it("opens the conversation at the relationship's messages route", () => {
+    expect(item?.openPath).toBe(
+      relationshipMessagesPath("INVESTOR_ORGANISATION", COUNTERPART),
+    );
+    expect(item?.openPath).toBe(
+      `/relationships/investor/${COUNTERPART}/messages`,
+    );
+  });
+
+  it("a pending relationship has no conversation: its path is the relationship page", () => {
+    const pending = buildArrivalSnapshot({
+      report: tensorGateReport(),
+      briefs: [tensorGateBrief({ state: "INTEREST_EXPRESSED" })],
+      now: NOW,
+    });
+    expect(pending.items[0]?.hasConversation).toBe(false);
+    expect(pending.items[0]?.openPath).toBe(
+      relationshipPagePath("INVESTOR_ORGANISATION", COUNTERPART),
+    );
+    expect(item?.hasConversation).toBe(true);
+    expect(item?.openPath).toContain("/messages");
+  });
+
+  it("bounds the message preview", () => {
+    const long = buildArrivalSnapshot({
+      report: tensorGateReport(),
+      briefs: [tensorGateBrief({ theirText: "x".repeat(900) })],
+      now: NOW,
+    });
+    // The brief caps at 240; the snapshot never widens it.
+    expect(
+      long.items[0]?.facts.theirLatestMessage?.text?.length,
+    ).toBeLessThanOrEqual(240);
+  });
+
+  it("marks the headline UNAVAILABLE rather than guessing when the thread was not read", () => {
+    const partial = buildArrivalSnapshot({
+      report: tensorGateReport(),
+      briefs: [tensorGateBrief({ messagesUnavailable: true })],
+      now: NOW,
+    });
+    expect(partial.items[0]?.availability).toBe("UNAVAILABLE");
+    expect(partial.items[0]?.facts.theirLatestMessage).toBeNull();
+    const none = buildArrivalSnapshot({
+      report: tensorGateReport(),
+      briefs: null,
+      now: NOW,
+    });
+    expect(none.briefsRead).toBe(false);
+    expect(none.items[0]?.availability).toBe("UNAVAILABLE");
+    expect(none.items[0]?.openPath).toBeNull();
+    // A notice has no relationship behind it: its own note is its fact.
+    expect(none.items[1]?.availability).toBe("OK");
+    expect(none.items[1]?.facts.note).toBe("An investor opened your profile.");
+  });
+
+  it("changes version when a fact changes, not when only the clock does", () => {
+    const later = buildArrivalSnapshot({
+      report: tensorGateReport(),
+      briefs: [tensorGateBrief()],
+      now: new Date(NOW.getTime() + 60_000),
+    });
+    expect(later.version).toBe(snapshot.version);
+    const changed = buildArrivalSnapshot({
+      report: tensorGateReport(),
+      briefs: [tensorGateBrief({ sequence: 8, meetingStatus: "CANCELLED" })],
+      now: NOW,
+    });
+    expect(changed.version).not.toBe(snapshot.version);
+    expect(changed.items[0]?.facts.meeting?.booked).toBe(false);
+  });
+});
+
+describe("the live context package", () => {
+  it("carries the arrival facts inside the cap, keeping the base", () => {
+    const snapshot = buildArrivalSnapshot({
+      report: tensorGateReport(),
+      briefs: [tensorGateBrief()],
+      now: NOW,
+    });
+    const text = liveContextPackage({
+      firstName: "Ada",
+      role: "founder",
+      facts: {
+        side: "COMPANY",
+        organisation: "Acme",
+        facts: ["a".repeat(150), "b".repeat(150), "c".repeat(150)],
+      },
+      referents: ["TensorGate"],
+      arrival: arrivalLines(snapshot),
+    });
+    expect(text).not.toBeNull();
+    expect(text?.length).toBeLessThanOrEqual(1_600);
+    expect(text).toContain("Could we do Thursday 3pm for a call?");
+    expect(text).toContain("TensorGate wants to connect");
+    expect(text).toContain("Who: Ada");
+  });
+});
+
+describe("createArrivalSnapshots freshness", () => {
+  function scene(options?: { trustMs?: number }) {
+    let clock = NOW.getTime();
+    const counts = { probe: 0, attention: 0, briefs: 0 };
+    const state = { epoch: "a".repeat(32), stamp: "s1", sequence: 7 };
+    const snapshots = createArrivalSnapshots({
+      now: () => new Date(clock),
+      trustMs: options?.trustMs ?? DEFAULT_TRUST_MS,
+      attention: () => {
+        counts.attention += 1;
+        return Promise.resolve(tensorGateReport());
+      },
+      briefs: () => {
+        counts.briefs += 1;
+        return Promise.resolve([tensorGateBrief({ sequence: state.sequence })]);
+      },
+      probe: () => {
+        counts.probe += 1;
+        return Promise.resolve({ epoch: state.epoch, stamp: state.stamp });
+      },
+    });
+    return {
+      snapshots,
+      counts,
+      state,
+      advance: (ms: number) => {
+        clock += ms;
+      },
+    };
+  }
+
+  it("builds once and serves a follow-up with no probe at all", async () => {
+    const s = scene();
+    const first = await s.snapshots.forActor(ACTOR);
+    expect(s.counts).toEqual({ probe: 1, attention: 1, briefs: 1 });
+    s.advance(3_000);
+    const second = await s.snapshots.forActor(ACTOR);
+    expect(second).toBe(first);
+    expect(s.counts).toEqual({ probe: 1, attention: 1, briefs: 1 });
+  });
+
+  it("past the trust window asks the probe once; unchanged data is not rebuilt", async () => {
+    const s = scene();
+    const first = await s.snapshots.forActor(ACTOR);
+    s.advance(DEFAULT_TRUST_MS + 5_000);
+    expect(await s.snapshots.forActor(ACTOR)).toBe(first);
+    expect(s.counts).toEqual({ probe: 2, attention: 1, briefs: 1 });
+  });
+
+  it("a changed source version builds a new snapshot with a new version", async () => {
+    const s = scene({ trustMs: 0 });
+    const first = await s.snapshots.forActor(ACTOR);
+    s.state.stamp = "s2";
+    s.state.sequence = 8;
+    const next = await s.snapshots.forActor(ACTOR);
+    expect(next).not.toBe(first);
+    expect(next?.version).not.toBe(first?.version);
+    expect(s.counts.attention).toBe(2);
+  });
+
+  it("a changed authorisation epoch never serves the old entry", async () => {
+    const s = scene({ trustMs: 0 });
+    await s.snapshots.forActor(ACTOR);
+    s.state.epoch = "b".repeat(32);
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.attention).toBe(2);
+  });
+
+  it("an invalidation (their own write) ends trust at once", async () => {
+    const s = scene();
+    await s.snapshots.forActor(ACTOR);
+    s.snapshots.invalidateActor(ACTOR.userId);
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.probe).toBe(2);
+    expect(s.counts.attention).toBe(2);
+  });
+
+  it("a read right after a Q turn (25 s later) sends no query; past 30 s exactly one probe", async () => {
+    const s = scene();
+    await s.snapshots.forActor(ACTOR); // the turn's own read
+    s.advance(25_000); // the turn ran; a Q turn never invalidates
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.probe).toBe(1);
+    s.advance(10_000);
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.probe).toBe(2);
+    expect(s.counts.attention).toBe(1);
+  });
+
+  it("is never built for a non-human actor", async () => {
+    const s = scene();
+    const q = ActorContextSchema.parse({ ...ACTOR, actorType: "Q" });
+    expect(await s.snapshots.forActor(q)).toBeNull();
+    expect(s.counts.probe).toBe(0);
+  });
+});
+
+describe("P4: the snapshot carries the person's prepared Q Daily stories", () => {
+  const EDITION_ID = "7b1c0e55-0000-4000-8000-0000000000e1";
+  const edition = {
+    id: EDITION_ID,
+    number: 1,
+    editionDate: "2026-10-09",
+    frequency: "WEEKLY",
+    readerName: null,
+    topics: [],
+    lead: {
+      id: "lead1",
+      section: "LEAD",
+      headline: "Lead news",
+      standfirst: "The gist.",
+      paragraphs: [],
+      quotes: [],
+      sources: [
+        {
+          url: "https://techcabal.com/a",
+          publisher: "TechCabal",
+          title: "t",
+          publishedAt: null,
+        },
+      ],
+      image: null,
+      deal: null,
+      written: true,
+    },
+    sections: [],
+    briefs: [],
+    chart: null,
+    qTake: null,
+    generatedAt: NOW.toISOString(),
+  } as unknown as QDailyEdition;
+
+  function build(read: () => Promise<QDailyEdition | null>) {
+    let reads = 0;
+    const snapshots = createArrivalSnapshots({
+      now: () => NOW,
+      attention: () => Promise.resolve(tensorGateReport()),
+      briefs: () => Promise.resolve([tensorGateBrief({ sequence: 7 })]),
+      probe: () => Promise.resolve({ epoch: "a".repeat(32), stamp: "s1" }),
+      daily: () => {
+        reads += 1;
+        return read();
+      },
+    });
+    return { snapshots, reads: () => reads };
+  }
+
+  it("adds the stories, moves the version, and reads the edition once per window", async () => {
+    const s = build(() => Promise.resolve(edition));
+    const plain = await createArrivalSnapshots({
+      now: () => NOW,
+      attention: () => Promise.resolve(tensorGateReport()),
+      briefs: () => Promise.resolve([tensorGateBrief({ sequence: 7 })]),
+      probe: () => Promise.resolve({ epoch: "a".repeat(32), stamp: "s1" }),
+    }).forActor(ACTOR);
+    const snapshot = await s.snapshots.forActor(ACTOR);
+    expect(snapshot?.daily[0]).toMatchObject({
+      storyId: "lead1",
+      path: `/daily/${EDITION_ID}#story-lead1`,
+    });
+    expect(snapshot?.version).not.toBe(plain?.version);
+    await s.snapshots.forActor(ACTOR);
+    expect(s.reads()).toBe(1);
+  });
+
+  it("a failed or empty edition read is no stories, never an error", async () => {
+    const failed = build(() => Promise.reject(new Error("db down")));
+    expect((await failed.snapshots.forActor(ACTOR))?.daily).toEqual([]);
+    const none = build(() => Promise.resolve(null));
+    expect((await none.snapshots.forActor(ACTOR))?.daily).toEqual([]);
+  });
+});
+
+/**
+ * S5 (lane S, 2026-10-15): a person who keeps using Q never pays the cold
+ * build (live: 1.4 s, 126 round trips) because ten minutes passed, and a
+ * write of theirs rebuilds in the background so the next read is warm.
+ * Authorisation is unchanged: entries live under the actor's epoch.
+ */
+describe("arrival snapshot refresh-ahead (S5)", () => {
+  function scene() {
+    let clock = NOW.getTime();
+    const counts = { probe: 0, builds: 0 };
+    const state = { epoch: "a".repeat(32), stamp: "s1" };
+    const snapshots = createArrivalSnapshots({
+      now: () => new Date(clock),
+      trustMs: 0,
+      cacheTtlMs: 10 * 60_000,
+      attention: () => {
+        counts.builds += 1;
+        return Promise.resolve(tensorGateReport());
+      },
+      briefs: () => Promise.resolve([tensorGateBrief({ sequence: 7 })]),
+      probe: () => {
+        counts.probe += 1;
+        return Promise.resolve({ epoch: state.epoch, stamp: state.stamp });
+      },
+    });
+    return {
+      snapshots,
+      counts,
+      state,
+      advance: (ms: number) => {
+        clock += ms;
+      },
+    };
+  }
+
+  it("a validated entry is renewed, so steady use never rebuilds past ten minutes", async () => {
+    const s = scene();
+    await s.snapshots.forActor(ACTOR);
+    for (let i = 0; i < 6; i += 1) {
+      s.advance(4 * 60_000);
+      await s.snapshots.forActor(ACTOR);
+    }
+    // 24 minutes of use, one build; each read still probed.
+    expect(s.counts.builds).toBe(1);
+    expect(s.counts.probe).toBe(7);
+  });
+
+  it("without use the entry still expires: nothing lives past its lifetime unprobed", async () => {
+    const s = scene();
+    await s.snapshots.forActor(ACTOR);
+    s.advance(11 * 60_000);
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.builds).toBe(2);
+  });
+
+  it("a renewal never survives changed data or a changed epoch", async () => {
+    const s = scene();
+    const first = await s.snapshots.forActor(ACTOR);
+    s.advance(6 * 60_000);
+    s.state.stamp = "s2";
+    expect(await s.snapshots.forActor(ACTOR)).not.toBe(first);
+    s.state.epoch = "b".repeat(32);
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.builds).toBe(3);
+  });
+
+  it("after their write, the rebuild happens in the background and the next read is warm", async () => {
+    const s = scene();
+    await s.snapshots.forActor(ACTOR);
+    s.state.stamp = "s2";
+    s.snapshots.refreshAfterWrite(ACTOR);
+    await s.snapshots.settled();
+    expect(s.counts.builds).toBe(2);
+    const probes = s.counts.probe;
+    await s.snapshots.forActor(ACTOR);
+    // Served from the rebuilt entry: one probe, no build on the read path.
+    expect(s.counts.builds).toBe(2);
+    expect(s.counts.probe).toBe(probes + 1);
+  });
+
+  it("a second write during the rebuild forces the next read to probe and rebuild", async () => {
+    const s = scene();
+    await s.snapshots.forActor(ACTOR);
+    s.state.stamp = "s2";
+    s.snapshots.refreshAfterWrite(ACTOR);
+    s.snapshots.invalidateActor(ACTOR.userId);
+    s.state.stamp = "s3";
+    await s.snapshots.settled();
+    const builds = s.counts.builds;
+    await s.snapshots.forActor(ACTOR);
+    expect(s.counts.builds).toBe(builds + 1);
+  });
+
+  it("a non-human actor is never rebuilt in the background", async () => {
+    const s = scene();
+    s.snapshots.refreshAfterWrite({ ...ACTOR, actorType: "SERVICE" } as never);
+    await s.snapshots.settled();
+    expect(s.counts.builds).toBe(0);
+  });
+});

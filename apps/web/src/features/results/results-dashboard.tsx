@@ -1,0 +1,1046 @@
+import Link from "next/link";
+
+import { PagedList } from "@/components/paged-list";
+import { Panel as SurfacePanel, panelLinkClassName } from "@/components/panel";
+import type { ReactNode } from "react";
+
+import type {
+  FounderResults,
+  InvestorResults,
+  QUsageDto,
+  ResultsActivity,
+} from "@capital-q/contracts";
+import { cx } from "@capital-q/ui";
+import { buttonClassName } from "@capital-q/ui/button";
+import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
+
+import { OpenPdfButton } from "@/features/documents/in-app-reader";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
+
+import { ActivityBars } from "./activity-bars";
+import {
+  activityTotals,
+  commitmentLines,
+  money,
+  orderedStages,
+  pageHref,
+  plural,
+  RESULTS_PERIODS,
+  sentenceCase,
+  stageHref,
+  stateWord,
+  waitWords,
+  type KnownRange,
+} from "./results-words";
+import { serverTNow } from "@/features/i18n/server-now";
+
+/**
+ * The Results dashboard (founder critique 2026-10-05: "imagine when there's
+ * so many things happening"). Server-rendered from the Results read and,
+ * for an investor, Q's usage this month. Every number is a recorded count;
+ * an unknown is said in words. Picking a pipeline stage lists who is at it
+ * (a link, so it works without script and can be shared).
+ */
+
+const REASON_WORDS: Readonly<Record<string, string>> = {
+  STAGE_IN_RANGE: "Stage",
+  SECTOR_MATCH: "Sector",
+  GEOGRAPHY_MATCH: "Geography",
+  BUSINESS_MODEL_MATCH: "Business model",
+  CUSTOMER_TYPE_MATCH: "Customer type",
+  DECLARED_DEPLOYING: "Deploying",
+  PROFILE_COMPLETE: "Profile complete",
+};
+
+export type ResultsDashboardProps = {
+  readonly basePath: string;
+  /** Null: the page's own header names it (the CRM Overview). */
+  readonly heading?: string | null;
+  readonly headingLevel?: 1 | 2;
+  /** Hub filters do not yet bind report exports; keep them on Results. */
+  readonly showReports?: boolean;
+  readonly range: KnownRange;
+  readonly stage: string | null;
+  /** Query string for the report downloads (the period asked for). */
+  readonly download: string;
+  /** Q's usage this month; null when it couldn't be read. */
+  readonly usage: QUsageDto | null;
+  readonly results: FounderResults | InvestorResults;
+};
+
+/**
+ * One question of the period, as a bordered panel under "This period"
+ * (redesign 2026-10-16: sections were hard to tell apart). Its heading
+ * sits one level under the period's.
+ */
+function Panel({
+  id,
+  title,
+  description,
+  action,
+  children,
+  className,
+  flush = false,
+}: {
+  readonly id: string;
+  readonly title: string;
+  readonly description?: string | undefined;
+  readonly action?: ReactNode;
+  readonly children: ReactNode;
+  readonly className?: string;
+  readonly flush?: boolean;
+}) {
+  const tr = serverTNow();
+
+  return (
+    <SurfacePanel
+      id={id}
+      title={tr(title)}
+      description={description}
+      headingLevel={3}
+      action={action}
+      flush={flush}
+      className={className}
+    >
+      {children}
+    </SurfacePanel>
+  );
+}
+
+function Tile({
+  label,
+  value,
+  note,
+  href,
+  figure = /^\d/.test(value),
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly note?: string | undefined;
+  readonly href?: string | undefined;
+  /**
+   * A known measure, drawn as a figure even in words ("Under 1 h"; live
+   * check 2026-10-16: it sat smaller than its neighbours). Unknowns stay
+   * small words.
+   */
+  readonly figure?: boolean | undefined;
+}) {
+  const tr = serverTNow();
+
+  const body = (
+    <>
+      <span className="cq-body-sm text-(--cq-text-secondary)">{tr(label)}</span>
+      {figure ? (
+        <span className="text-[1.625rem] leading-tight font-semibold tracking-[-0.01em] tabular-nums text-(--cq-text-primary) sm:text-[1.875rem]">
+          {tr(value)}
+        </span>
+      ) : (
+        // An unknown is said in words, never drawn as large as a number.
+        <span className="cq-body flex min-h-[2.25rem] items-end font-medium text-(--cq-text-primary)">
+          {tr(value)}
+        </span>
+      )}
+      {note === undefined ? null : (
+        <span className="cq-caption text-(--cq-text-secondary)">{note}</span>
+      )}
+    </>
+  );
+  // One cell of the stat strip; the strip, not each figure, is the surface.
+  // Hairlines between cells, none around them: two by two on a phone, one
+  // row of four from large screens.
+  const frame =
+    "flex min-w-0 flex-col gap-1 border-(--cq-border-subtle) p-4 even:border-s sm:p-5 [&:nth-child(n+3)]:border-t lg:border-s lg:first:border-s-0 lg:[&:nth-child(n+3)]:border-t-0";
+  return href === undefined ? (
+    <div className={frame}>{body}</div>
+  ) : (
+    <Link
+      href={href}
+      className={cx(
+        frame,
+        "transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
+      )}
+    >
+      {body}
+    </Link>
+  );
+}
+
+function Header({
+  props,
+  name,
+}: {
+  readonly props: ResultsDashboardProps;
+  readonly name: string;
+}) {
+  const tr = serverTNow();
+
+  const Heading = props.headingLevel === 2 ? "h2" : "h1";
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-1">
+        {props.heading === null ? null : (
+          <Heading
+            className={cx(
+              props.headingLevel === 2 ? "cq-title-md" : "cq-title-xl",
+              "text-(--cq-text-primary)",
+            )}
+          >
+            {props.heading ?? tr("Results")}
+          </Heading>
+        )}
+        <p className="cq-body-sm text-(--cq-text-secondary)">
+          {name} · {tr(props.results.window.label.toLowerCase())}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <nav
+          aria-label={tr("Period")}
+          className="inline-flex border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
+        >
+          {RESULTS_PERIODS.map((period) => {
+            const active = props.range === period.value;
+            return (
+              <Link
+                key={period.value}
+                href={pageHref(props.basePath, { range: period.value })}
+                aria-current={active ? "page" : undefined}
+                className={cx(
+                  "cq-body-sm inline-flex min-h-11 items-center px-3 transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-10",
+                  active
+                    ? "bg-(--cq-surface-strong) font-semibold text-(--cq-text-primary)"
+                    : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
+                )}
+              >
+                {tr(period.label)}
+              </Link>
+            );
+          })}
+        </nav>
+        {props.showReports === false ? null : (
+          <>
+            {/* Owner 2026-10-17: the report opens here, in the app; the
+                reader offers "Save a copy". The CSV is a data export, so
+                it stays a download and says so. */}
+            <OpenPdfButton
+              title={`${tr("Report")} · ${name}`}
+              url={`/results/report?format=pdf&${props.download}`}
+              className={buttonClassName("secondary")}
+              dataAttribute="data-results-report"
+            >
+              {tr("Open report")}
+            </OpenPdfButton>
+            <a
+              href={`/results/report?format=csv&${props.download}`}
+              className={buttonClassName("quiet")}
+              download
+            >
+              {tr("Download CSV")}
+            </a>
+          </>
+        )}
+      </div>
+    </header>
+  );
+}
+
+function Activity({
+  activity,
+  first,
+}: {
+  readonly activity: ResultsActivity | undefined;
+  readonly first: string;
+}) {
+  const tr = serverTNow();
+
+  if (activity === undefined) return null;
+  const totals = activityTotals(activity);
+  return (
+    <Panel id="activity" title={tr("Activity")}>
+      {activity.points.length === 0 || totals === null ? (
+        <p className="cq-body-sm text-(--cq-text-secondary)">
+          {tr("Nothing recorded yet.")}
+        </p>
+      ) : (
+        <div className="grid gap-6 sm:grid-cols-3">
+          <ActivityBars
+            title={tr(first)}
+            total={totals.interests}
+            bucket={activity.bucket}
+            points={activity.points.map((p) => ({
+              start: p.start,
+              value: p.interests,
+            }))}
+          />
+          <ActivityBars
+            title={tr("Connections")}
+            total={totals.connections}
+            bucket={activity.bucket}
+            points={activity.points.map((p) => ({
+              start: p.start,
+              value: p.connections,
+            }))}
+          />
+          <ActivityBars
+            title={tr("Meetings held")}
+            total={totals.meetings}
+            bucket={activity.bucket}
+            points={activity.points.map((p) => ({
+              start: p.start,
+              value: p.meetings,
+            }))}
+          />
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+type DrillRow = {
+  readonly key: string;
+  readonly state: string;
+  readonly name: string;
+  readonly detail: string;
+  readonly href: string | null;
+  readonly avatar: ReactNode;
+};
+
+/** Pipeline rows per page on the Overview. */
+const PIPELINE_PAGE = 8;
+
+function Pipeline({
+  props,
+  side,
+  byState,
+  rows,
+  unlisted,
+}: {
+  readonly props: ResultsDashboardProps;
+  readonly side: "FOUNDER" | "INVESTOR";
+  readonly byState: readonly {
+    readonly state: string;
+    readonly count: number;
+  }[];
+  readonly rows: readonly DrillRow[];
+  /** Stages the list does not carry (said, never shown as empty). */
+  readonly unlisted: readonly string[];
+}) {
+  const tr = serverTNow();
+
+  const stages = orderedStages(byState);
+  const max = Math.max(1, ...stages.map((s) => s.count));
+  const picked = stages.some((s) => s.state === props.stage)
+    ? props.stage
+    : null;
+  const shown =
+    picked === null ? rows : rows.filter((row) => row.state === picked);
+  return (
+    <Panel
+      id="pipeline"
+      title={tr("Pipeline")}
+      // Now, not the period: "Interest sent" above counts the period's
+      // interest; this counts where each relationship stands today.
+      description={tr("Where each relationship stands now.")}
+      action={
+        picked === null ? null : (
+          <Link
+            href={stageHref(props.basePath, props.range, null)}
+            className={panelLinkClassName}
+          >
+            Show everyone
+          </Link>
+        )
+      }
+    >
+      {stages.length === 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {side === "INVESTOR"
+              ? tr(
+                  "No relationships yet. They start when you express interest.",
+                )
+              : tr(
+                  "No relationships yet. They start when an investor expresses interest.",
+                )}
+          </p>
+          <Link
+            href={side === "INVESTOR" ? "/discover" : "/profile"}
+            className={buttonClassName("primary", "compact")}
+          >
+            {side === "INVESTOR"
+              ? tr("Find founders")
+              : tr("Polish your profile")}
+          </Link>
+        </div>
+      ) : (
+        <>
+          <ul className="flex flex-col gap-0.5">
+            {stages.map((stage) => {
+              const on = picked === stage.state;
+              return (
+                <li key={stage.state}>
+                  <Link
+                    href={stageHref(
+                      props.basePath,
+                      props.range,
+                      on ? null : stage.state,
+                    )}
+                    aria-current={on ? "true" : undefined}
+                    className={cx(
+                      "grid min-h-11 grid-cols-[7.5rem_1fr_2.5rem] items-center gap-3 px-2 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
+                      on
+                        ? "bg-(--cq-accent-soft) font-semibold"
+                        : "hover:bg-(--cq-surface-subtle)",
+                    )}
+                  >
+                    <span className="cq-body-sm truncate text-(--cq-text-primary)">
+                      {tr(stateWord(stage.state, side))}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className="h-2 bg-(--cq-surface-subtle)"
+                    >
+                      <span
+                        className="block h-2 bg-(--cq-accent)"
+                        style={{
+                          width: `${String(Math.max(4, Math.round((stage.count / max) * 100)))}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="cq-body-sm text-end tabular-nums text-(--cq-text-primary)">
+                      {stage.count}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          {picked !== null && unlisted.includes(picked) ? (
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              {tr(stateWord(picked, side))}{" "}
+              {tr(
+                "relationships aren’t listed here. Find them on Relationships.",
+              )}
+            </p>
+          ) : shown.length === 0 ? null : (
+            // A pipeline longer than a screen pages by cursor (owner
+            // 2026-10-16), eight rows at a time.
+            <PagedList
+              items={shown.map((row, index) => {
+                const inner = (
+                  <>
+                    {row.avatar}
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="cq-body truncate text-(--cq-text-primary)">
+                        {row.name}
+                      </span>
+                      <span className="cq-caption truncate text-(--cq-text-secondary)">
+                        {picked === null
+                          ? `${stateWord(row.state, side)} · ${row.detail}`
+                          : row.detail}
+                      </span>
+                    </span>
+                  </>
+                );
+                return {
+                  key: `${row.state}:${row.key}:${String(index)}`,
+                  node:
+                    row.href === null ? (
+                      <span className="flex min-h-14 items-center gap-3 px-1 py-2">
+                        {inner}
+                      </span>
+                    ) : (
+                      <Link
+                        href={row.href}
+                        className="flex min-h-14 items-center gap-3 px-1 py-2 hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                      >
+                        {inner}
+                        <ChevronRight
+                          size={ICON_SIZE.regular}
+                          aria-hidden="true"
+                          className="shrink-0 text-(--cq-text-tertiary)"
+                        />
+                      </Link>
+                    ),
+                };
+              })}
+              pageSize={PIPELINE_PAGE}
+              noun="relationships"
+              className="divide-y divide-(--cq-border-subtle) border-t border-(--cq-border-subtle)"
+              footerClassName="border-t border-(--cq-border-subtle) pt-3"
+            />
+          )}
+        </>
+      )}
+    </Panel>
+  );
+}
+
+function Lines({
+  items,
+}: {
+  readonly items: readonly {
+    readonly label: string;
+    readonly value: string;
+  }[];
+}) {
+  const tr = serverTNow();
+
+  return (
+    <dl className="divide-y divide-(--cq-border-subtle)">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className="flex min-h-10 items-center justify-between gap-3 py-1.5"
+        >
+          <dt className="cq-body-sm text-(--cq-text-secondary)">
+            {tr(item.label)}
+          </dt>
+          <dd className="cq-body-sm text-end tabular-nums text-(--cq-text-primary)">
+            {tr(item.value)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function responseTile(
+  label: string,
+  response: InvestorResults["responseTime"],
+) {
+  if (response === undefined) {
+    return { label, value: "Unknown", note: undefined, figure: false };
+  }
+  return {
+    label,
+    figure: response.medianHours !== null,
+    value:
+      response.medianHours === null
+        ? "No answers yet"
+        : waitWords(response.medianHours),
+    note:
+      response.medianHours === null
+        ? response.waiting === 0
+          ? undefined
+          : `${plural(response.waiting, "waiting", "waiting")}`
+        : `Median of ${String(response.answered)}${response.waiting === 0 ? "" : ` · ${String(response.waiting)} waiting`}`,
+  };
+}
+
+/**
+ * The investor's funnel for the period. "Seen" counts feed views only;
+ * when fewer companies were seen than saved or sent interest, the views
+ * were not all recorded and Seen is unknown (null), never a 0.
+ */
+export function funnelSteps(f: InvestorResults["funnel"]): {
+  readonly label: string;
+  readonly value: number | null;
+}[] {
+  const acted = Math.max(f.saved, f.interest);
+  return [
+    { label: "Seen", value: f.seen < acted ? null : f.seen },
+    { label: "Saved", value: f.saved },
+    { label: "Interest", value: f.interest },
+    { label: "Connected", value: f.connected },
+    { label: "Met", value: f.met },
+    { label: "Committed", value: f.committed },
+  ];
+}
+
+function InvestorDashboard(
+  props: ResultsDashboardProps & {
+    readonly results: InvestorResults;
+  },
+) {
+  const tr = serverTNow();
+
+  const { results, usage } = props;
+  const interest = results.interest;
+  const commitments = commitmentLines(results.commitments ?? []);
+  const live = commitments
+    .filter((line) => line.status !== "WITHDRAWN")
+    .reduce((sum, line) => sum + line.count, 0);
+  const confirmed = commitments[0];
+  const response = responseTile("Founders answer in", results.responseTime);
+  const rows: DrillRow[] = results.pipelineFit.map((row) => ({
+    key: row.companyId ?? row.companyName,
+    state: row.state,
+    name: row.companyName,
+    detail: row.excluded
+      ? "Hits one of your exclusions"
+      : row.reasons.length === 0
+        ? results.hasMandate
+          ? "Nothing in common yet"
+          : "Add your mandate to see fit"
+        : row.reasons
+            .map(
+              (r) =>
+                `${REASON_WORDS[r.kind] ?? sentenceCase(r.kind)}: ${r.detail}`,
+            )
+            .join(" · "),
+    href:
+      row.companyId === undefined
+        ? null
+        : `/relationships/company/${encodeURIComponent(row.companyId)}`,
+    avatar: (
+      <EntityAvatar
+        kind="company"
+        name={row.companyName}
+        companyId={row.companyId}
+        size="sm"
+        decorative
+      />
+    ),
+  }));
+  const byState =
+    results.pipeline?.byState ??
+    Object.entries(
+      results.pipelineFit.reduce<Record<string, number>>((acc, row) => {
+        acc[row.state] = (acc[row.state] ?? 0) + 1;
+        return acc;
+      }, {}),
+    ).map(([state, count]) => ({ state, count }));
+  const f = results.funnel;
+  const runs = results.qWork.runs;
+  const answers = runs
+    .filter((r) => r.capability.toUpperCase() === "ANSWER")
+    .reduce((sum, r) => sum + r.runs, 0);
+  const prepared = runs
+    .filter((r) => r.capability.toUpperCase() !== "ANSWER")
+    .reduce((sum, r) => sum + r.runs, 0);
+  return (
+    <div className="flex flex-col gap-4 sm:gap-5">
+      <Header props={props} name={results.organisationName} />
+      <div
+        className="grid grid-cols-2 border border-(--cq-border-subtle) bg-(--cq-surface) lg:grid-cols-4"
+        data-stat-strip
+      >
+        <Tile
+          label={tr("Interest sent")}
+          value={String(interest?.sent ?? f.interest)}
+          note={
+            interest === undefined
+              ? undefined
+              : tr(
+                  `${String(interest.accepted)} accepted · ${String(interest.declined)} declined`,
+                )
+          }
+          href={stageHref(props.basePath, props.range, "INTEREST_EXPRESSED")}
+        />
+        <Tile {...response} />
+        <Tile
+          label={tr("Meetings held")}
+          value={String(results.meetings.held)}
+          note={
+            results.meetings.upcoming.length === 0
+              ? tr("None coming up")
+              : tr(`${String(results.meetings.upcoming.length)} coming up`)
+          }
+        />
+        <Tile
+          label={tr("Commitments")}
+          value={results.commitments === undefined ? "Unknown" : String(live)}
+          note={
+            results.commitments === undefined || confirmed === undefined
+              ? undefined
+              : tr(`${String(confirmed.count)} confirmed, not yet received`)
+          }
+          href="#commitments"
+        />
+      </div>
+
+      <Activity activity={results.activity} first="Interest sent" />
+
+      <div className="grid items-start gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
+        <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+          <Pipeline
+            props={props}
+            side="INVESTOR"
+            byState={byState}
+            rows={rows}
+            unlisted={["DECLINED", "CLOSED"]}
+          />
+          <Panel
+            id="deal-flow"
+            title={tr("Funnel")}
+            description={tr("Companies this period, each counted once.")}
+          >
+            <ol className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+              {funnelSteps(f).map(({ label, value }) => (
+                <li key={label} className="flex flex-col gap-0.5">
+                  <span className="cq-caption text-(--cq-text-secondary)">
+                    {tr(label)}
+                  </span>
+                  {value === null ? (
+                    // Fewer seen than acted on: views are not all recorded
+                    // (interest also comes from search, profiles and Q), so
+                    // the count is unknown, never a 0 beside 10.
+                    <span className="cq-body-sm min-h-7 text-(--cq-text-secondary)">
+                      {tr("Not recorded")}
+                    </span>
+                  ) : (
+                    <span className="cq-title-sm tabular-nums text-(--cq-text-primary)">
+                      {value}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </Panel>
+        </div>
+        <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+          <Panel
+            id="commitments"
+            title={tr("Commitments")}
+            action={
+              <Link
+                href="/relationships?view=capital"
+                className={panelLinkClassName}
+              >
+                Open Capital
+              </Link>
+            }
+          >
+            {results.commitments === undefined ? (
+              <p className="cq-body-sm text-(--cq-text-secondary)">
+                {tr("Commitments couldn’t be read just now.")}
+              </p>
+            ) : (
+              <Lines
+                items={commitments.map((line) => ({
+                  label: line.label,
+                  value:
+                    line.count === 0
+                      ? "0"
+                      : `${String(line.count)} · ${line.amounts.join(", ")}`,
+                }))}
+              />
+            )}
+          </Panel>
+          <Panel
+            id="q-work"
+            title={tr("Q’s work")}
+            action={
+              <Link href="/settings/usage" className={panelLinkClassName}>
+                Usage
+              </Link>
+            }
+          >
+            <Lines
+              items={[
+                { label: "Questions answered", value: String(answers) },
+                {
+                  label: "Prepared for your approval",
+                  value: String(prepared),
+                },
+                { label: "Errands done", value: String(results.qWork.errands) },
+                {
+                  label: "Documents prepared",
+                  value: String(results.qWork.documents),
+                },
+                {
+                  label: "Spend this month",
+                  value:
+                    usage === null
+                      ? "Unknown"
+                      : `USD ${Number(usage.totalUsd).toFixed(2)}`,
+                },
+              ]}
+            />
+          </Panel>
+          {results.meetings.upcoming.length === 0 ? null : (
+            <Panel id="upcoming" title={tr("Coming up")}>
+              <Lines
+                items={results.meetings.upcoming.slice(0, 5).map((m) => ({
+                  label: m.companyName,
+                  value: new Date(m.startsAt).toLocaleString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }),
+                }))}
+              />
+            </Panel>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RaisePanel({ results }: { readonly results: FounderResults }) {
+  const tr = serverTNow();
+
+  const raise = results.raise;
+  if (raise === null) {
+    return (
+      <Panel id="raise" title={tr("Your round")}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="cq-body-sm text-(--cq-text-secondary)">
+            {tr("Set your round on Capital to see what’s raised against it.")}
+          </p>
+          <Link
+            className={buttonClassName("primary", "compact")}
+            href="/relationships?view=capital"
+          >
+            {tr("Set your round")}
+          </Link>
+        </div>
+      </Panel>
+    );
+  }
+  const target = raise.target;
+  const own =
+    target === null
+      ? undefined
+      : raise.totals.find((t) => t.currencyCode === target.currencyCode);
+  const ratio = (amount: string) =>
+    target === null || Number(target.amount) <= 0
+      ? 0
+      : Math.min(100, (Number(amount) / Number(target.amount)) * 100);
+  const confirmedPct = own === undefined ? 0 : ratio(own.confirmed);
+  const softPct =
+    own === undefined ? 0 : Math.min(100, confirmedPct + ratio(own.soft));
+  return (
+    <Panel
+      id="raise"
+      title={tr("Your round")}
+      action={
+        <Link href="/relationships?view=capital" className={panelLinkClassName}>
+          Open Capital
+        </Link>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-[1.625rem] leading-tight font-semibold tabular-nums text-(--cq-text-primary) sm:text-[1.875rem]">
+            {own === undefined
+              ? target === null
+                ? tr("Target not set")
+                : money(target.currencyCode, "0")
+              : money(own.currencyCode, own.confirmed)}
+          </span>
+          <span className="cq-body-sm text-(--cq-text-secondary)">
+            {target === null
+              ? "confirmed"
+              : tr(`confirmed of ${money(target.currencyCode, target.amount)}`)}
+          </span>
+        </p>
+        {target === null ? null : (
+          <div
+            role="img"
+            aria-label={tr(
+              `${String(Math.round(confirmedPct))}% confirmed, ${String(Math.round(softPct))}% with soft commitments`,
+            )}
+            className="relative h-2.5 overflow-hidden bg-(--cq-surface-subtle)"
+          >
+            <span
+              className="absolute inset-y-0 start-0 bg-(--cq-accent-soft) [background-image:repeating-linear-gradient(135deg,transparent_0_4px,var(--cq-border)_4px_5px)]"
+              style={{ width: `${String(softPct)}%` }}
+            />
+            <span
+              className="absolute inset-y-0 start-0 bg-(--cq-accent)"
+              style={{ width: `${String(confirmedPct)}%` }}
+            />
+          </div>
+        )}
+        <p className="cq-caption text-(--cq-text-secondary)">
+          {tr(
+            [
+              own === undefined || Number(own.soft) === 0
+                ? null
+                : `${money(own.currencyCode, own.soft)} soft`,
+              raise.remaining === null || target === null
+                ? null
+                : `${money(target.currencyCode, raise.remaining)} to go`,
+              `${plural(raise.inConversation, "investor", "investors")} in conversation`,
+            ]
+              .filter((part): part is string => part !== null)
+              .join(" · "),
+          )}
+        </p>
+      </div>
+      {raise.committedInvestors.length === 0 ? null : (
+        <Lines
+          items={raise.committedInvestors.map((i) => ({
+            label: i.investorName,
+            value: `${money(i.currencyCode, i.amount)} · ${i.bucket === "CONFIRMED" ? "confirmed" : "soft"}`,
+          }))}
+        />
+      )}
+    </Panel>
+  );
+}
+
+function FounderDashboard(
+  props: ResultsDashboardProps & {
+    readonly results: FounderResults;
+  },
+) {
+  const tr = serverTNow();
+
+  const { results } = props;
+  const e = results.engagement;
+  const rows: DrillRow[] = results.pipeline.rows.map((row) => ({
+    key: row.investorOrganisationId ?? `${row.investorName}-${row.since}`,
+    state: row.state,
+    name: row.investorName,
+    detail: `since ${new Date(row.since).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`,
+    href:
+      row.investorOrganisationId === undefined
+        ? null
+        : `/relationships/investor/${encodeURIComponent(row.investorOrganisationId)}`,
+    avatar: (
+      <EntityAvatar
+        kind="investor"
+        name={row.investorName}
+        investorOrganisationId={row.investorOrganisationId}
+        size="sm"
+        decorative
+      />
+    ),
+  }));
+  const floored = (value: { value: number | null; belowFloor: boolean }) =>
+    value.belowFloor ? "Fewer than 3" : String(value.value ?? 0);
+  const scored = results.rehearsals.filter((r) => r.score !== null);
+  const latest = scored[0];
+  const before = scored[1];
+  const change =
+    typeof latest?.score === "number" && typeof before?.score === "number"
+      ? latest.score - before.score
+      : null;
+  return (
+    <div className="flex flex-col gap-4 sm:gap-5">
+      <Header props={props} name={results.organisationName} />
+      <div
+        className="grid grid-cols-2 border border-(--cq-border-subtle) bg-(--cq-surface) lg:grid-cols-4"
+        data-stat-strip
+      >
+        <Tile
+          label={tr("Investors engaged")}
+          value={
+            results.investorsEngaged === undefined
+              ? String(e.connections)
+              : String(results.investorsEngaged)
+          }
+          note={tr(
+            `${plural(e.interestsReceived, "interest", "interests")} received`,
+          )}
+          href={stageHref(props.basePath, props.range, null)}
+        />
+        <Tile
+          label={tr("Meetings held")}
+          value={String(e.meetingsHeld)}
+          note={tr(
+            `${plural(e.connections, "new connection", "new connections")}`,
+          )}
+        />
+        <Tile
+          label={tr("Diligence requests")}
+          value={
+            results.diligence === undefined
+              ? "Unknown"
+              : String(results.diligence.requested)
+          }
+          note={
+            results.diligence === undefined
+              ? undefined
+              : tr(`${String(results.diligence.fulfilled)} answered`)
+          }
+        />
+        <Tile {...responseTile("You answer in", results.responseTime)} />
+      </div>
+
+      {/* fdr.06.*: the founder track lights these while Q explains them. */}
+      <div data-qp-anchor="fdr.06.crm.raise">
+        <RaisePanel results={results} />
+      </div>
+
+      <div data-qp-anchor="fdr.06.crm.activity">
+        <Activity activity={results.activity} first="Interest received" />
+      </div>
+
+      <div className="grid items-start gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
+        <div className="min-w-0" data-qp-anchor="fdr.06.crm.pipeline">
+          <Pipeline
+            props={props}
+            side="FOUNDER"
+            byState={results.pipeline.byState}
+            rows={rows}
+            unlisted={[]}
+          />
+        </div>
+        <div
+          className="flex min-w-0 flex-col gap-4 sm:gap-5"
+          data-qp-anchor="fdr.06.crm.seen"
+        >
+          <Panel
+            id="rehearsals"
+            title={tr("Rehearsals")}
+            action={
+              <Link href="/rehearsals" className={panelLinkClassName}>
+                Rehearse
+              </Link>
+            }
+          >
+            {latest === undefined ? (
+              <p className="cq-body-sm text-(--cq-text-secondary)">
+                {tr("None in this period.")}
+              </p>
+            ) : (
+              <Lines
+                items={[
+                  {
+                    label: "Rehearsed",
+                    value: plural(results.rehearsals.length, "time", "times"),
+                  },
+                  {
+                    label: `Latest, with ${latest.counterpart}`,
+                    value: `${String(latest.score)} / 100${
+                      change === null
+                        ? ""
+                        : ` (${change >= 0 ? "+" : ""}${String(change)})`
+                    }`,
+                  },
+                ]}
+              />
+            )}
+          </Panel>
+          <Panel id="seen" title={tr("Seen by investors")}>
+            <Lines
+              items={[
+                {
+                  label: "Firms that opened your profile",
+                  value: floored(e.profileOpens),
+                },
+                {
+                  label: "Firms that watched your pitch",
+                  value: floored(e.pitchWatches),
+                },
+              ]}
+            />
+          </Panel>
+          {results.documents.length === 0 ? null : (
+            <Panel id="documents" title={tr("Documents Q made")}>
+              <Lines
+                items={results.documents.map((d) => ({
+                  label: sentenceCase(d.type),
+                  value: String(d.count),
+                }))}
+              />
+            </Panel>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ResultsDashboard(props: ResultsDashboardProps) {
+  return props.results.side === "FOUNDER" ? (
+    <FounderDashboard {...props} results={props.results} />
+  ) : (
+    <InvestorDashboard {...props} results={props.results} />
+  );
+}

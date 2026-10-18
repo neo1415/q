@@ -4,6 +4,10 @@ import { Menu as BaseMenu } from "@base-ui/react/menu";
 import type { ReactElement, ReactNode } from "react";
 
 import { cx } from "../primitives/class-names.js";
+import {
+  POPUP_LAYER_CLASS,
+  useOverlayLayer,
+} from "../primitives/overlay-layer.js";
 
 /**
  * Dropdown menu on Base UI. Keyboard navigation, typeahead, focus return and
@@ -22,21 +26,29 @@ export function MenuContent({
   children,
   align = "start",
   className,
+  layer,
 }: {
   readonly children: ReactNode;
   readonly align?: "start" | "center" | "end" | undefined;
   readonly className?: string | undefined;
+  /**
+   * `modal` for a menu opened from inside a dialog: the menu is portalled
+   * to the body, so on the page layer it would open behind the dialog.
+   * Unset: whatever the nearest sheet or dialog says (page outside one).
+   */
+  readonly layer?: "page" | "modal" | undefined;
 }) {
+  const inherited = useOverlayLayer();
   return (
     <BaseMenu.Portal>
       <BaseMenu.Positioner
         align={align}
         sideOffset={6}
-        className="z-(--cq-z-popover)"
+        className={POPUP_LAYER_CLASS[layer ?? inherited]}
       >
         <BaseMenu.Popup
           className={cx(
-            "min-w-48 rounded-md border border-(--cq-border) bg-(--cq-surface-raised) p-1 shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-fast) data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0",
+            "min-w-48 border border-(--cq-border) bg-(--cq-surface-raised) p-1 shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-fast) data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0",
             className,
           )}
         >
@@ -63,12 +75,65 @@ export function MenuItem({
       onClick={onClick}
       disabled={disabled}
       className={cx(
-        "flex min-h-10 cursor-default select-none items-center gap-2 rounded-sm px-2.5 cq-body-sm outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-(--cq-surface-subtle)",
+        "flex min-h-11 cursor-default select-none items-center gap-2 px-2.5 cq-body-sm outline-none data-[disabled]:opacity-50 data-[highlighted]:bg-(--cq-surface-subtle)",
         tone === "danger" ? "text-(--cq-danger)" : "text-(--cq-text-primary)",
       )}
     >
       {children}
     </BaseMenu.Item>
+  );
+}
+
+/**
+ * A one-of-several choice inside a menu (the theme, for instance): radio
+ * semantics, so assistive technology hears which option is current, and
+ * a check mark beside it, so the choice never rests on colour alone.
+ */
+export function MenuRadioGroup({
+  value,
+  onValueChange,
+  children,
+  label,
+}: {
+  readonly value: string;
+  readonly onValueChange: (value: string) => void;
+  readonly children: ReactNode;
+  readonly label?: string | undefined;
+}) {
+  return (
+    <BaseMenu.RadioGroup
+      value={value}
+      onValueChange={(next: unknown) => {
+        if (typeof next === "string") onValueChange(next);
+      }}
+      aria-label={label}
+    >
+      {children}
+    </BaseMenu.RadioGroup>
+  );
+}
+
+export function MenuRadioItem({
+  value,
+  children,
+  indicator,
+}: {
+  readonly value: string;
+  readonly children: ReactNode;
+  /** The mark shown beside the current option. */
+  readonly indicator: ReactNode;
+}) {
+  return (
+    <BaseMenu.RadioItem
+      value={value}
+      closeOnClick
+      className="flex min-h-11 cursor-default select-none items-center gap-2 px-2.5 cq-body-sm text-(--cq-text-primary) outline-none data-[highlighted]:bg-(--cq-surface-subtle)"
+    >
+      {children}
+      <BaseMenu.RadioItemIndicator className="ms-auto inline-flex text-(--cq-text-primary)">
+        {indicator}
+      </BaseMenu.RadioItemIndicator>
+    </BaseMenu.RadioItem>
   );
 }
 

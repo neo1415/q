@@ -1,0 +1,193 @@
+import { describe, expect, it } from "vitest";
+
+import type { QAnswerCardsBlock } from "@capital-q/contracts";
+import type { QToolCallOutcome } from "@capital-q/q-runtime";
+
+import {
+  companiesInOutcome,
+  createRunCompanies,
+  namedCompanySubjects,
+  withCardSubjects,
+} from "../src/q/card-subjects.js";
+
+/**
+ * R0 (Zino live 2026-10-06): every answer card came with subject null, so
+ * a card could never open its company. The id comes only from this run's
+ * own tool results, matched by the card's name.
+ */
+const HALYARD = "1ab2cc02-160f-4812-a6b1-8be7e43afd3e";
+const CLEARWATER = "2ab2cc02-160f-4812-a6b1-8be7e43afd3e";
+
+const outcome = (
+  data: unknown,
+  ok = true,
+): Pick<QToolCallOutcome, "result"> => ({
+  result: ok
+    ? { ok: true, data }
+    : { ok: false, error: { code: "NOT_AVAILABLE", safeMessage: "no" } },
+});
+
+const card = (name: string) => ({
+  key: name.toLowerCase().replace(/\s+/gu, "-"),
+  name,
+  line: null,
+  hue: 1,
+  fit: null,
+  reasons: ["Seed stage in your range"],
+  measures: [],
+  view: null,
+  said: null,
+  sourceCount: 0,
+  subject: null,
+});
+
+describe("answer card subjects", () => {
+  it("reads company ids and names from a tool's authorised output", () => {
+    expect(
+      companiesInOutcome(
+        outcome({
+          items: [
+            { companyId: HALYARD, name: "Halyard Security" },
+            { id: CLEARWATER, canonicalName: "Clearwater Assurance" },
+          ],
+        }),
+      ),
+    ).toEqual([
+      { companyId: HALYARD, name: "Halyard Security" },
+      { companyId: CLEARWATER, name: "Clearwater Assurance" },
+    ]);
+    expect(companiesInOutcome(outcome({}, false))).toEqual([]);
+  });
+
+  it("gives a card the company its name means; a name no tool returned keeps none", () => {
+    const runs = createRunCompanies();
+    runs.note(
+      "run-1",
+      outcome({ items: [{ companyId: HALYARD, name: "Halyard Security" }] }),
+    );
+    const block: QAnswerCardsBlock = {
+      kind: "ANSWER_CARDS",
+      shape: "RANKED",
+      title: "Top for your mandate",
+      cards: [card("Halyard security"), card("Tensorgate")],
+      followUps: [],
+    };
+    const out = withCardSubjects(block, runs.take("run-1"));
+    expect(out.cards.map((c) => c.subject)).toEqual([
+      { kind: "COMPANY", companyId: HALYARD },
+      null,
+    ]);
+    // Taken once: another answer of the same run starts empty.
+    expect(runs.take("run-1").size).toBe(0);
+  });
+});
+
+describe("explicit company finding attribution", () => {
+  const profile = (
+    companyId = HALYARD,
+    canonicalName = "Halyard Security",
+  ) => ({
+    companyId,
+    canonicalName,
+    legalName: null,
+    websiteUrl: null,
+    foundedDate: null,
+    headquartersCountry: null,
+    headquartersCity: null,
+    currentStageCode: null,
+    shortDescription: null,
+    primaryDescription: null,
+    companyStatus: "active",
+    relationToYou: "SHARED",
+    truthClass: "USER_CLAIM",
+  });
+  const complete = (data = profile()): QToolCallOutcome => ({
+    callId: "profile",
+    toolName: "company.get",
+    toolVersion: 1,
+    classification: "READ_ONLY",
+    status: "SUCCEEDED",
+    failureCode: null,
+    sensitivity: "PUBLIC",
+    result: { ok: true, data },
+    latencyMs: 1,
+  });
+  it("accepts a complete authorised read and a whole canonical name, never a name embedded in another", () => {
+    const runs = createRunCompanies();
+    runs.note("r", complete());
+    const read = runs.take("r");
+    expect(
+      namedCompanySubjects("What does Halyard Security do?", read),
+    ).toEqual([{ kind: "COMPANY", companyId: HALYARD }]);
+    expect(
+      namedCompanySubjects("What does Superhalyard Security do?", read),
+    ).toEqual([]);
+    expect(namedCompanySubjects("What does this company do?", read)).toEqual(
+      [],
+    );
+  });
+  it("does not reuse a previous run's authorized profile or a consumed answer", () => {
+    const runs = createRunCompanies();
+    runs.note("previous", complete());
+    expect(runs.read("current").profiles.has(HALYARD)).toBe(false);
+    expect(
+      namedCompanySubjects("Halyard Security", runs.take("current")),
+    ).toEqual([]);
+    expect(runs.take("previous").profiles.has(HALYARD)).toBe(true);
+    expect(runs.read("previous").profiles.has(HALYARD)).toBe(false);
+    runs.note("previous", {
+      ...complete(),
+      status: "DENIED",
+      result: {
+        ok: false,
+        error: { code: "NOT_AVAILABLE", safeMessage: "Access revoked" },
+      },
+    });
+    expect(runs.read("previous").profiles.has(HALYARD)).toBe(false);
+  });
+  it.each(["search", "denied", "malformed", "failed", "unclassified"])(
+    "does not attribute findings from %s output",
+    (kind) => {
+      const runs = createRunCompanies();
+      const base = complete();
+      const read: QToolCallOutcome = {
+        ...base,
+        ...(kind === "search" ? { toolName: "company.search" } : {}),
+        ...(kind === "denied" ? { status: "DENIED" as const } : {}),
+        ...(kind === "failed"
+          ? {
+              result: {
+                ok: false as const,
+                error: { code: "NOT_AVAILABLE", safeMessage: "Not available" },
+              },
+            }
+          : {}),
+        ...(kind === "malformed"
+          ? {
+              result: {
+                ok: true as const,
+                data: { companyId: HALYARD, canonicalName: "Halyard Security" },
+              },
+            }
+          : {}),
+      };
+      runs.note("r", kind === "unclassified" ? { result: read.result } : read);
+      expect(namedCompanySubjects("Halyard Security", runs.take("r"))).toEqual(
+        [],
+      );
+    },
+  );
+  it("leaves duplicate identities and multi-company claims unattributed", () => {
+    for (const otherName of ["Halyard Security", "Clearwater Assurance"]) {
+      const runs = createRunCompanies();
+      runs.note("r", complete());
+      runs.note("r", complete(profile(CLEARWATER, otherName)));
+      expect(
+        namedCompanySubjects(
+          "Compare Halyard Security and Clearwater Assurance",
+          runs.take("r"),
+        ),
+      ).toEqual([]);
+    }
+  });
+});

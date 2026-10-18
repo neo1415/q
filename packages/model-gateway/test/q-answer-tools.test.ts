@@ -6,6 +6,7 @@ import {
   PermittedContextPlanSchema,
   Q_CONTEXT_FIREWALL_POLICY_VERSION,
   type PermittedContextPlan,
+  MODEL_TOOL_CALLS_MAX,
 } from "@capital-q/contracts";
 import type { CompanyAnalystResult } from "@capital-q/q-core";
 import type {
@@ -28,11 +29,15 @@ import {
   type FakeBehaviour,
 } from "../src/index.js";
 import {
+  CLIENT_ACTION_DONE_LINE,
   createModelGatewayQAnswer,
+  noAuthorisedContext,
   Q_TOOL_LOOP_MAX_CALLS,
   Q_TOOL_LOOP_MAX_ROUNDS,
+  type QAuthorisedContextPort,
 } from "../src/q/index.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
+import { fitFixture } from "./fit-fixture.js";
 
 /**
  * The bounded tool loop in the answer seam (CQ-Q-007 §63-§66, §102) over
@@ -148,6 +153,7 @@ function denied(proposal: QToolProposal): QToolCallOutcome {
 function build(options: {
   readonly script: readonly FakeBehaviour[];
   readonly tools?: QToolPort | undefined;
+  readonly context?: QAuthorisedContextPort | undefined;
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -177,9 +183,13 @@ function build(options: {
     },
   ];
   const stages: string[] = [];
+  const completed: unknown[] = [];
   const repositories = {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
+      // The seam reads the conversation, not the run; the fake has one
+      // conversation, so both return the same thing.
+      listRecentForConversationOfRun: () => Promise.resolve([...messages]),
       insert: (
         _tx: unknown,
         input: { role: "USER" | "Q"; content: string },
@@ -199,7 +209,17 @@ function build(options: {
     runEvents: {
       // Stages only: the durable q.message.completed the seam now appends
       // (CQ-Q-009) carries no visible stage.
-      append: (_tx: unknown, input: { visibleStage: string | null }) => {
+      append: (
+        _tx: unknown,
+        input: {
+          visibleStage: string | null;
+          eventType?: string;
+          payload?: unknown;
+        },
+      ) => {
+        if (input.eventType === "q.message.completed") {
+          completed.push(input.payload);
+        }
         if (input.visibleStage !== null) {
           stages.push(input.visibleStage);
         }
@@ -221,6 +241,7 @@ function build(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     tools: options.tools,
+    ...(options.context === undefined ? {} : { context: options.context }),
     logger,
   });
   const request: QAnswerRequest = {
@@ -238,7 +259,7 @@ function build(options: {
     retrieval: { kind: "NOT_CONFIGURED" },
     plan: plan(),
   };
-  return { seam, alpha, messages, stages, logLines, request };
+  return { seam, alpha, messages, stages, logLines, request, completed };
 }
 
 const call = (
@@ -247,6 +268,583 @@ const call = (
 ): FakeBehaviour => ({
   kind: "TOOL_CALLS",
   calls: [{ callId: id, name: "get_company", arguments: args }],
+});
+
+const SET_THEME_OFFERED: QOfferedTool = {
+  toolName: "client.theme.set",
+  toolVersion: 1,
+  classification: "SIDE_EFFECT",
+  definition: {
+    name: "set_theme",
+    description: "Switches the appearance.",
+    inputJsonSchema: { type: "object", properties: {} },
+  },
+  visibleStage: null,
+};
+
+describe("named-company evidence binding", () => {
+  it.each([
+    [false, "COMPANY"],
+    [true, "COMPANY"],
+    [false, "DISCOVER"],
+    [true, "DISCOVER"],
+  ] as const)(
+    "binds findings to the explicitly named authorised profile, warm=%s screen=%s",
+    async (warm, route) => {
+      const screen = randomUUID();
+      const target = randomUUID();
+      const profile = (companyId: string, canonicalName: string) => ({
+        companyId,
+        canonicalName,
+        legalName: null,
+        websiteUrl: null,
+        foundedDate: null,
+        headquartersCountry: null,
+        headquartersCity: null,
+        currentStageCode: "seed",
+        shortDescription: "Declared company profile",
+        primaryDescription: null,
+        companyStatus: "active",
+        relationToYou: "SHARED",
+        truthClass: "USER_CLAIM",
+      });
+      const tools = toolPort([GET_COMPANY], (p) =>
+        succeeded(
+          p,
+          profile(
+            p.callId === "named-profile" ? target : screen,
+            p.callId === "named-profile"
+              ? "Named Founder"
+              : "Incidental Screen Company",
+          ),
+        ),
+      );
+      const { seam, request, messages, completed, alpha } = build({
+        tools,
+        script: [
+          call("named-profile", { companyId: target }),
+          {
+            kind: "TEXT",
+            text: JSON.stringify({
+              ...analystResult(
+                "Named Founder's declared profile is seed stage.",
+              ),
+              findings: [
+                {
+                  statement: "Declared seed stage.",
+                  type: "FACT",
+                  confidence: "MODERATE",
+                  truthClass: "USER_CLAIM",
+                  evidenceStatus: "SELF_REPORTED",
+                },
+              ],
+            }),
+          },
+        ],
+      });
+      if (messages[0])
+        messages.splice(0, 1, {
+          ...messages[0],
+          content: "What does Named Founder do?",
+        });
+      const bound = {
+        ...request,
+        subjects: [{ kind: "COMPANY" as const, companyId: screen }],
+        plan: {
+          ...request.plan,
+          screen: { route, companyId: screen },
+        },
+      };
+      if (warm) {
+        const warmAnswer = seam.warm;
+        if (warmAnswer === undefined) throw new Error("Warm reads unavailable");
+        warmAnswer(bound);
+      }
+      await seam.answer({ ...bound, aboutNamedOther: true });
+      const payload = completed.at(-1) as {
+        message: {
+          blocks: Array<{
+            kind: string;
+            finding?: { subjects: unknown[] };
+            companyId?: string;
+          }>;
+        };
+      };
+      expect(
+        payload.message.blocks.find((b) => b.kind === "FINDING")?.finding
+          ?.subjects,
+      ).toEqual([{ kind: "COMPANY", companyId: target }]);
+      expect(
+        payload.message.blocks
+          .filter((b) => b.kind === "COMPANY_REFERENCE")
+          .map((b) => b.companyId),
+      ).toEqual([target]);
+      expect(JSON.stringify(alpha.calls[0]?.request)).toContain(
+        "Resolve the company named in the current question",
+      );
+    },
+  );
+});
+
+describe("fresh selected-company follow-ups reuse authorized identity", () => {
+  it.each(
+    (
+      [
+        ["What are the risks for this company?", "FRESH", false],
+        ["What are the risks for this company?", "MULTIPLE", false],
+        ["What are the risks for this company?", "OTHER_ONLY", true],
+        [
+          "What traction, material risks and missing evidence are on record for this company? Distinguish claims from verified facts.",
+          "FRESH",
+          false,
+        ],
+        // S3 (live 69e50e45): words naming no other company.
+        ["What are the main risks here?", "FRESH", false],
+        ["What are Selected Company's main risks?", "FRESH", false],
+        ["What are the main risks here?", "REVOKED", true],
+        ["What are the risks of Different Target?", "FRESH", true],
+        ["What does Different Target do?", "FRESH", true],
+        ["Compare this company with Different Target", "FRESH", true],
+        ["What are the risks for these companies?", "FRESH", true],
+        ["What are the risks for this company?", "MALFORMED", true],
+        ["What are the risks for this company?", "REVOKED", true],
+        ["What are the risks for this company?", "UNREAD", true],
+        ["What are the risks for this company?", "NO_SELECTED_CONTEXT", true],
+        ["What are the risks for this company?", "MISMATCHED_CONTEXT", true],
+        ["What are the risks for this company?", "NO_SELECTED_SUBJECT", true],
+      ] as const
+    ).flatMap(([text, access, lookup]) =>
+      (["COMPANY", "DISCOVER"] as const).map(
+        (route) => [text, access, lookup, route] as const,
+      ),
+    ),
+  )(
+    "%s / %s preserves lookup=%s on %s",
+    async (text, access, lookup, route) => {
+      const companyId = randomUUID();
+      const otherId = randomUUID();
+      const tools = toolPort(access === "UNREAD" ? [] : [GET_COMPANY], (p) =>
+        access === "REVOKED"
+          ? denied(p)
+          : access === "MALFORMED"
+            ? succeeded(p, { companyId, canonicalName: "Selected Company" })
+            : succeeded(p, {
+                companyId:
+                  access === "OTHER_ONLY" || p.callId === "additional-profile"
+                    ? otherId
+                    : companyId,
+                canonicalName:
+                  access === "OTHER_ONLY" || p.callId === "additional-profile"
+                    ? "Other Company"
+                    : "Selected Company",
+                legalName: null,
+                websiteUrl: null,
+                foundedDate: null,
+                headquartersCountry: null,
+                headquartersCity: null,
+                currentStageCode: "seed",
+                shortDescription: "Declared company profile",
+                primaryDescription: null,
+                companyStatus: "active",
+                relationToYou: "SHARED",
+                truthClass: "USER_CLAIM",
+              }),
+      );
+      const { seam, request, messages, alpha, completed } = build({
+        tools,
+        script: [
+          ...(access === "MULTIPLE"
+            ? [call("additional-profile", { companyId: otherId })]
+            : []),
+          {
+            kind: "TEXT",
+            text: JSON.stringify({
+              ...analystResult(
+                "The authorized profile has declared claims; missing evidence stays unknown.",
+              ),
+              findings: [
+                {
+                  statement: "Declared seed stage.",
+                  type: "FACT",
+                  confidence: "MODERATE",
+                  truthClass: "USER_CLAIM",
+                  evidenceStatus: "SELF_REPORTED",
+                },
+              ],
+            }),
+          },
+        ],
+      });
+      if (messages[0]) messages[0] = { ...messages[0], content: text };
+      await seam.answer({
+        ...request,
+        aboutNamedOther: true,
+        subjects:
+          access === "NO_SELECTED_SUBJECT"
+            ? [{ kind: "COMPANY", companyId: otherId }]
+            : [{ kind: "COMPANY", companyId }],
+        plan: {
+          ...request.plan,
+          screen:
+            access === "NO_SELECTED_CONTEXT"
+              ? { route }
+              : {
+                  route,
+                  companyId:
+                    access === "MISMATCHED_CONTEXT" ? otherId : companyId,
+                },
+        },
+      });
+      const prompt = JSON.stringify(alpha.calls[0]?.request);
+      expect(
+        prompt.includes(
+          "Resolve the company named in the current question through search_companies and get_company",
+        ),
+      ).toBe(lookup);
+      const payload = completed.at(-1) as {
+        message: {
+          blocks: Array<{ kind: string; finding?: { subjects: unknown[] } }>;
+        };
+      };
+      expect(
+        payload.message.blocks.find((block) => block.kind === "FINDING")
+          ?.finding?.subjects,
+      ).toEqual(lookup ? [] : [{ kind: "COMPANY", companyId }]);
+      if (!lookup) {
+        expect(prompt).toContain("freshly read authorized profile");
+        expect(
+          tools.executed.filter((p) => p.name === "get_company"),
+        ).toHaveLength(access === "MULTIPLE" ? 2 : 1);
+      }
+    },
+  );
+});
+
+describe("selected-company analysis stays out of the candidate sweep", () => {
+  it.each([
+    [false, false, "COMPANY"],
+    [true, false, "COMPANY"],
+    [false, true, "COMPANY"],
+    [true, true, "COMPANY"],
+    [false, true, "DISCOVER"],
+    [true, true, "DISCOVER"],
+  ])(
+    "answers the profile question with a late FIT reading, warm=%s, other=%s, screen=%s",
+    async (warm, aboutNamedOther, screenRoute) => {
+      const companyId = randomUUID();
+      const investorOrganisationId = randomUUID();
+      const topOffer = {
+        ...GET_COMPANY,
+        toolName: "fit.top_candidates",
+        definition: { ...GET_COMPANY.definition, name: "fit_top_candidates" },
+      };
+      const tools = toolPort(
+        [
+          GET_COMPANY,
+          topOffer,
+          {
+            ...topOffer,
+            toolName: "fit.profile",
+            definition: { ...topOffer.definition, name: "fit_profile" },
+          },
+        ],
+        (p) => {
+          if (p.name === "fit_top_candidates") {
+            const fit = fitFixture(
+              companyId,
+              "Selected Company",
+              { STAGE: "STRONG" },
+              "STRONG_FIT",
+            );
+            const data = fit.result.data as { name: string; profile: unknown };
+            return {
+              ...succeeded(p, {
+                status: "OK",
+                comparison: {
+                  entries: [
+                    { name: data.name, line: null, profile: data.profile },
+                  ],
+                },
+              }),
+              toolName: "fit.top_candidates",
+            };
+          }
+          if (p.name === "fit_profile")
+            return {
+              ...succeeded(
+                p,
+                fitFixture(
+                  companyId,
+                  "Selected Company",
+                  { STAGE: "STRONG" },
+                  "STRONG_FIT",
+                ).result.data,
+              ),
+              toolName: "fit.profile",
+            };
+          return succeeded(p, {
+            companyId,
+            canonicalName: "Selected Company",
+            legalName: null,
+            websiteUrl: null,
+            foundedDate: null,
+            headquartersCountry: null,
+            headquartersCity: null,
+            currentStageCode: "seed",
+            shortDescription: "Declared company profile",
+            primaryDescription: null,
+            companyStatus: "active",
+            relationToYou: "SHARED",
+            truthClass: "USER_CLAIM",
+          });
+        },
+      );
+      const text =
+        "What does this company actually do and why does it fit my mandate? Use its Capital Q records.";
+      const answer =
+        "Selected Company's declared profile is seed stage; missing fit evidence remains unknown.";
+      const { seam, request, messages, completed, alpha } = build({
+        tools,
+        script: [
+          {
+            kind: "TEXT",
+            text: JSON.stringify({
+              ...analystResult(answer),
+              findings: [
+                {
+                  statement: "Declared seed stage.",
+                  type: "FACT",
+                  confidence: "MODERATE",
+                  truthClass: "USER_CLAIM",
+                  evidenceStatus: "SELF_REPORTED",
+                },
+              ],
+            }),
+          },
+        ],
+      });
+      if (messages[0]) messages[0] = { ...messages[0], content: text };
+      const bound = {
+        ...request,
+        subjects: [{ kind: "COMPANY" as const, companyId }],
+        plan: PermittedContextPlanSchema.parse({
+          ...request.plan,
+          screen: { route: screenRoute, companyId },
+          scopes: [
+            {
+              kind: "INVESTOR_MANDATE" as const,
+              contextLabel: "investor_private",
+              sensitivity: "CONFIDENTIAL",
+              layer: "STRUCTURED_STATE",
+              factCategories: ["INVESTOR_THESIS"],
+              projection: "FULL",
+              rights: {
+                canUseForReasoning: true,
+                canDiscloseExistence: true,
+                canQuote: true,
+                canProvideLink: false,
+              },
+              filter: { tenantId: TENANT, investorOrganisationId },
+              isEvidence: true,
+              subject: {
+                kind: "INVESTOR_ORGANISATION" as const,
+                investorOrganisationId,
+              },
+            },
+          ],
+        }),
+      };
+      if (warm) {
+        if (!seam.warm) throw new Error("Warm seam missing");
+        seam.warm(bound);
+      }
+      await seam.answer({
+        ...bound,
+        aboutNamedOther,
+        fitQuestion: { text, count: null },
+      });
+      expect(
+        tools.executed.filter((p) => p.name === "fit_top_candidates"),
+      ).toHaveLength(0);
+      expect(tools.executed.some((p) => p.name === "get_company")).toBe(true);
+      expect(alpha.calls).toHaveLength(1);
+      expect(JSON.stringify(completed)).toContain(answer);
+      const payload = completed.at(-1) as {
+        message: {
+          blocks: Array<{
+            kind: string;
+            companyId?: string;
+            finding?: { subjects: unknown[] };
+          }>;
+        };
+      };
+      expect(
+        payload.message.blocks
+          .filter((b) => b.kind === "COMPANY_REFERENCE")
+          .map((b) => b.companyId),
+      ).toEqual([companyId]);
+      expect(
+        payload.message.blocks.find((b) => b.kind === "FINDING")?.finding
+          ?.subjects,
+      ).toEqual([{ kind: "COMPANY", companyId }]);
+    },
+  );
+});
+
+describe("client actions and the screen reach the answer (R20/R21/R33)", () => {
+  it("a client-action tool's authorised result rides on the answer as a UI_INTENT block", async () => {
+    const tools = toolPort([SET_THEME_OFFERED], (p) => ({
+      ...succeeded(p, {
+        status: "SCREEN_WILL_DO_IT",
+        clientAction: { kind: "SET_THEME", theme: "dark" },
+      }),
+      toolName: "client.theme.set",
+      classification: "SIDE_EFFECT",
+    }));
+    const { seam, request, completed } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            { callId: "t1", name: "set_theme", arguments: { theme: "dark" } },
+          ],
+        },
+        {
+          kind: "TEXT",
+          text: JSON.stringify(analystResult("Dark mode is on.")),
+        },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const last = completed.at(-1) as { message: { blocks?: unknown[] } };
+    expect(last.message.blocks).toEqual([
+      { kind: "UI_INTENT", intent: { kind: "SET_THEME", theme: "dark" } },
+    ]);
+  });
+
+  it("an empty closing answer after a screen action still delivers the action (founder live 2026-09-30)", async () => {
+    const tools = toolPort([SET_THEME_OFFERED], (p) => ({
+      ...succeeded(p, {
+        status: "SCREEN_WILL_DO_IT",
+        clientAction: { kind: "SET_THEME", theme: "dark" },
+      }),
+      toolName: "client.theme.set",
+      classification: "SIDE_EFFECT",
+    }));
+    const { seam, request, completed } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            { callId: "t1", name: "set_theme", arguments: { theme: "dark" } },
+          ],
+        },
+        { kind: "TEXT", text: JSON.stringify(analystResult("")) },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const last = completed.at(-1) as {
+      message: { text: string; blocks?: unknown[] };
+    };
+    expect(last.message.text).toBe(CLIENT_ACTION_DONE_LINE);
+    expect(last.message.blocks).toEqual([
+      { kind: "UI_INTENT", intent: { kind: "SET_THEME", theme: "dark" } },
+    ]);
+  });
+
+  it("a revised document's card rides on the answer from the tool's own result (founder directive 2026-09-28)", async () => {
+    const REVISE_OFFERED: QOfferedTool = {
+      toolName: "documents.own.revise",
+      toolVersion: 1,
+      classification: "SIDE_EFFECT",
+      definition: {
+        name: "revise_my_document",
+        description: "Revises one of their documents.",
+        inputJsonSchema: { type: "object", properties: {} },
+      },
+      visibleStage: null,
+    };
+    const document = {
+      artifactId: "00000000-0000-4000-8000-00000000a111",
+      type: "PITCH_DECK",
+      status: "READY",
+      title: "Alpha deck",
+      currentVersion: 2,
+    };
+    const tools = toolPort([REVISE_OFFERED], (p) => ({
+      ...succeeded(p, { status: "DOCUMENT_UPDATED", document }),
+      toolName: "documents.own.revise",
+      classification: "SIDE_EFFECT",
+    }));
+    const { seam, request, completed } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "r1",
+              name: "revise_my_document",
+              arguments: {
+                artifactId: document.artifactId,
+                changes: "Shorter summary",
+              },
+            },
+          ],
+        },
+        {
+          kind: "TEXT",
+          text: JSON.stringify(analystResult("Updated: version 2.")),
+        },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const last = completed.at(-1) as { message: { blocks?: unknown[] } };
+    expect(last.message.blocks).toEqual([
+      {
+        kind: "ARTIFACT_REFERENCE",
+        artifactId: document.artifactId,
+        type: "PITCH_DECK",
+        status: "READY",
+        title: "Alpha deck",
+      },
+    ]);
+  });
+
+  it("a failed or unrelated tool result carries no client action", async () => {
+    const tools = toolPort([GET_COMPANY], (p) =>
+      succeeded(p, { clientAction: { kind: "RELOAD_PAGE" } }),
+    );
+    const { seam, request, completed } = build({
+      script: [
+        call("c1"),
+        { kind: "TEXT", text: JSON.stringify(analystResult("ok")) },
+      ],
+      tools,
+    });
+    await seam.answer(request);
+    const last = completed.at(-1) as { message: { blocks?: unknown[] } };
+    expect(last.message.blocks ?? []).toEqual([]);
+  });
+
+  it("the planner is told which screen the person is on, from the plan (typed and voice alike)", async () => {
+    const { seam, alpha, request } = build({
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("ok")) }],
+    });
+    await seam.answer({
+      ...request,
+      plan: { ...request.plan, screen: { route: "PROFILE" } },
+    });
+    const sent = alpha.calls[0]?.request.messages ?? [];
+    const note = sent.find((m) =>
+      m.content.includes("WHAT YOU CAN DO IN THIS CONVERSATION"),
+    );
+    expect(note?.content).toContain("WHERE THEY ARE NOW");
+    expect(note?.content).toContain("on their profile");
+    expect(note?.content).toContain("never say you cannot see their screen");
+  });
 });
 
 describe("answer seam tool loop", () => {
@@ -259,13 +857,19 @@ describe("answer seam tool loop", () => {
     expect(alpha.calls).toHaveLength(1);
     expect(alpha.calls[0]?.request.tools).toEqual([]);
     expect(alpha.calls[0]?.request.output.kind).toBe("STRUCTURED");
-    expect(alpha.calls[0]?.request.messages[0]?.content).toContain(
-      "No tools are available",
-    );
+    // This turn's notes ride in the user tail since company-analyst/v16
+    // (prompt-cache order), so the whole prompt is what is asserted.
+    expect(
+      alpha.calls[0]?.request.messages.map((m) => m.content).join("\n"),
+    ).toContain("No tools are available");
     expect(seam.lastObservation()?.modelCalls).toBe(1);
   });
 
-  it("names the offered tools to the model and accepts a direct JSON answer in one call", async () => {
+  it("names the offered tools and answers in one call when nothing needs looking up", async () => {
+    // One call, not two. Splitting "do you need a tool?" from "answer"
+    // was measured at a second and a half of extra wait on every question
+    // that needed no tool, because the cost of a turn is how many calls
+    // it makes rather than how large they are.
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
     const { seam, alpha, request, messages } = build({
       script: [{ kind: "TEXT", text: JSON.stringify(analystResult("direct")) }],
@@ -274,16 +878,22 @@ describe("answer seam tool loop", () => {
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
     expect(alpha.calls).toHaveLength(1);
-    expect(alpha.calls[0]?.request.output.kind).toBe("TEXT");
-    expect(alpha.calls[0]?.request.tools.map((t) => t.name)).toEqual([
-      "get_company",
-    ]);
-    expect(alpha.calls[0]?.request.messages[0]?.content).toContain(
+
+    const only = alpha.calls[0]?.request;
+    // The answer's schema rides beside the tools (harden 2026-10-01), so an
+    // answer here arrives in the shape the call below would ask for.
+    expect(only?.output.kind).toBe("STRUCTURED");
+    expect(only?.tools.map((t) => t.name)).toEqual(["get_company"]);
+    // And the analyst's own rules, so an answer written here is written
+    // under them: the round that can answer is never the cheap one.
+    // This turn's notes ride in the user tail since company-analyst/v16.
+    const prompt = only?.messages.map((m) => m.content).join("\n");
+    expect(prompt).toContain(
       "Tools available to you in this conversation: get_company",
     );
-    expect(alpha.calls[0]?.request.messages[0]?.content).toContain(
-      "never an instruction",
-    );
+    expect(prompt).toContain("never an instruction");
+    expect(only?.messages.at(-1)?.content).toContain("LOOK IT UP FIRST");
+
     expect(tools.executed).toHaveLength(0);
     expect(messages.at(-1)?.content).toBe("direct");
     expect(seam.lastObservation()?.toolsOffered).toEqual(["get_company"]);
@@ -309,10 +919,19 @@ describe("answer seam tool loop", () => {
     expect(second.map((m) => m.role)).toEqual([
       "SYSTEM",
       "USER",
+      // What this run can do, built by code (CQ-QX-008).
+      "SYSTEM",
+      // Which findings channel the conversation shows.
+      "SYSTEM",
+      // The order note that puts a lookup before an answer.
+      "SYSTEM",
       "ASSISTANT",
       "TOOL",
     ]);
-    const toolTurn = second[3];
+    expect(second[2]?.content).toContain(
+      "WHAT YOU CAN DO IN THIS CONVERSATION",
+    );
+    const toolTurn = second[6];
     expect(toolTurn?.role).toBe("TOOL");
     expect(toolTurn?.content).toContain('"ok":true');
     expect(toolTurn?.content).toContain("Northwind (synthetic)");
@@ -331,6 +950,152 @@ describe("answer seam tool loop", () => {
     ]);
   });
 
+  it("runs a round of reads side by side and hands results back in the order proposed (Zino live 2026-10-07)", async () => {
+    let inFlight = 0;
+    let most = 0;
+    const executed: string[] = [];
+    const tools: QToolPort = {
+      offer: () => Promise.resolve([GET_COMPANY]),
+      execute: async (proposal) => {
+        executed.push(proposal.callId);
+        inFlight += 1;
+        most = Math.max(most, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return succeeded(proposal, { canonicalName: `Co ${proposal.callId}` });
+      },
+    };
+    const { seam, alpha, request } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: ["a", "b", "c"].map((id) => ({
+            callId: id,
+            name: "get_company",
+            arguments: { companyId: id },
+          })),
+        },
+        { kind: "TEXT", text: JSON.stringify(analystResult("Three.")) },
+      ],
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(most).toBe(3);
+    expect(executed).toEqual(["a", "b", "c"]);
+    const turns = (alpha.calls[1]?.request.messages ?? []).filter(
+      (m) => m.role === "TOOL",
+    );
+    expect(turns.map((m) => /Co (\w)/u.exec(m.content)?.[1])).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+  });
+
+  it.each([
+    ["a list", ["I need to retrieve your companies first."]],
+    // The shape a model actually wrote live: one string, not a list.
+    [
+      "a string, in the wrong shape",
+      "I need to retrieve your companies first.",
+    ],
+  ])(
+    "an answer that describes doing something instead of calling the tool gets one more round (actionTalk as %s; founder live 2026-10-01)",
+    async (_label, actionTalk) => {
+      const tools = toolPort([GET_COMPANY], (p) =>
+        succeeded(p, { canonicalName: "Northwind (synthetic)" }),
+      );
+      const { seam, alpha, request, messages } = build({
+        script: [
+          {
+            kind: "TEXT",
+            text: JSON.stringify({
+              ...analystResult("I can list them once I retrieve them."),
+              actionTalk,
+            }),
+          },
+          call("c1"),
+          { kind: "TEXT", text: JSON.stringify(analystResult("Northwind.")) },
+        ],
+        tools,
+      });
+      const outcome = await seam.answer(request);
+      expect(outcome.kind).toBe("ANSWERED");
+      // The tool was called on the extra round, and the answer is from it.
+      expect(tools.executed).toHaveLength(1);
+      const second = alpha.calls[1]?.request;
+      expect(second?.tools.map((t) => t.name)).toEqual(["get_company"]);
+      expect(second?.messages.at(-1)?.content).toContain("instead of doing it");
+      expect(messages.at(-1)?.content).toBe("Northwind.");
+    },
+  );
+
+  it("an answer that asks who 'this person' is, on a company's page, gets one more round naming the screen's company (founder live 2026-10-01)", async () => {
+    const tools = toolPort([GET_COMPANY], (p) =>
+      succeeded(p, { canonicalName: "Kazikit (synthetic)" }),
+    );
+    const company = randomUUID();
+    const { seam, alpha, request, messages } = build({
+      script: [
+        {
+          kind: "TEXT",
+          text: JSON.stringify({
+            ...analystResult("Who should I arrange the meeting with?"),
+            clarifyingQuestions: [
+              { question: "Who should I arrange the meeting with?", why: "" },
+            ],
+          }),
+        },
+        call("c1", { companyId: company }),
+        { kind: "TEXT", text: JSON.stringify(analystResult("Kazikit.")) },
+      ],
+      tools,
+    });
+    await seam.answer({
+      ...request,
+      plan: {
+        ...request.plan,
+        screen: { route: "COMPANY", companyId: company },
+      },
+    });
+    const second = alpha.calls[1]?.request.messages ?? [];
+    expect(second.at(-1)?.content).toContain(`the company ${company}`);
+    expect(tools.executed).toHaveLength(1);
+    expect(messages.at(-1)?.content).toBe("Kazikit.");
+  });
+
+  it("keeps a question back when the screen shows nothing in particular", async () => {
+    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const { seam, alpha, request } = build({
+      script: [
+        {
+          kind: "TEXT",
+          text: JSON.stringify({
+            ...analystResult("Which company?"),
+            clarifyingQuestions: [{ question: "Which company?", why: "" }],
+          }),
+        },
+      ],
+      tools,
+    });
+    await seam.answer({
+      ...request,
+      plan: { ...request.plan, screen: { route: "HOME" } },
+    });
+    expect(alpha.calls).toHaveLength(1);
+  });
+
+  it("does not add a round when the answer talks about nothing it should have done", async () => {
+    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const { seam, alpha, request } = build({
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("direct")) }],
+      tools,
+    });
+    await seam.answer(request);
+    expect(alpha.calls).toHaveLength(1);
+  });
+
   it("hands a denial back to the model as data and never the private material", async () => {
     const tools = toolPort([GET_COMPANY], denied);
     const { seam, alpha, request, logLines } = build({
@@ -341,7 +1106,7 @@ describe("answer seam tool loop", () => {
       tools,
     });
     await seam.answer(request);
-    const toolTurn = alpha.calls[1]?.request.messages[3];
+    const toolTurn = alpha.calls[1]?.request.messages[6];
     expect(toolTurn?.content).toContain('"ok":false');
     expect(toolTurn?.content).toContain("NOT_AVAILABLE");
     expect(JSON.stringify(alpha.calls)).not.toContain(PRIVATE);
@@ -351,23 +1116,34 @@ describe("answer seam tool loop", () => {
 
   it("bounds rounds and calls, then finishes with one structured call without tools", async () => {
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
-    const many: FakeBehaviour = {
+    // Each round proposes as many distinct calls as a reply may carry; together
+    // they propose more than the turn's budget.
+    const many = (round: string): FakeBehaviour => ({
       kind: "TOOL_CALLS",
-      calls: Array.from({ length: Q_TOOL_LOOP_MAX_CALLS + 2 }, (_v, i) => ({
-        callId: `c${String(i)}`,
+      calls: Array.from({ length: MODEL_TOOL_CALLS_MAX }, (_v, i) => ({
+        callId: `${round}${String(i)}`,
         name: "get_company",
-        arguments: {},
+        // Distinct reads: identical concurrent ones share a call (K4).
+        arguments: { companyId: `${round}-${String(i)}` },
       })),
-    };
+    });
+    expect(MODEL_TOOL_CALLS_MAX * Q_TOOL_LOOP_MAX_ROUNDS).toBeGreaterThan(
+      Q_TOOL_LOOP_MAX_CALLS,
+    );
     const { seam, alpha, request } = build({
-      script: [many, { kind: "JSON", value: analystResult("bounded") }],
+      script: [
+        ...Array.from({ length: Q_TOOL_LOOP_MAX_ROUNDS }, (_v, i) =>
+          many(`m${String(i)}`),
+        ),
+        { kind: "JSON", value: analystResult("bounded") },
+      ],
       tools,
     });
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
-    // The round proposed more than the budget: the surplus is never executed.
+    // The rounds proposed more than the budget: the surplus is never executed.
     expect(tools.executed).toHaveLength(Q_TOOL_LOOP_MAX_CALLS);
-    expect(alpha.calls).toHaveLength(2);
+    expect(alpha.calls).toHaveLength(Q_TOOL_LOOP_MAX_ROUNDS + 1);
     const finalCall = alpha.calls.at(-1)?.request;
     expect(finalCall?.output.kind).toBe("STRUCTURED");
     expect(finalCall?.tools).toEqual([]);
@@ -376,8 +1152,9 @@ describe("answer seam tool loop", () => {
     const perRound = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
     const rounds = build({
       script: [
+        // Distinct reads: a read this run already made is kept (2026-10-16).
         ...Array.from({ length: Q_TOOL_LOOP_MAX_ROUNDS }, (_v, i) =>
-          call(`r${String(i)}`),
+          call(`r${String(i)}`, { companyId: `r-${String(i)}` }),
         ),
         { kind: "JSON", value: analystResult("rounds") },
       ],
@@ -388,6 +1165,40 @@ describe("answer seam tool loop", () => {
     expect(perRound.executed).toHaveLength(Q_TOOL_LOOP_MAX_ROUNDS);
     expect(rounds.alpha.calls).toHaveLength(Q_TOOL_LOOP_MAX_ROUNDS + 1);
     expect(rounds.alpha.calls.at(-1)?.request.output.kind).toBe("STRUCTURED");
+  });
+
+  it("autopilot P1: a look-up may follow a look-up in the same turn, and the second round may answer at once", async () => {
+    expect(Q_TOOL_LOOP_MAX_ROUNDS).toBeGreaterThanOrEqual(2);
+    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const { seam, alpha, request, messages } = build({
+      script: [
+        call("first", { companyId: "a" }),
+        call("second", { companyId: "b" }),
+        { kind: "JSON", value: analystResult("chained") },
+      ],
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(tools.executed.map((one) => one.arguments)).toEqual([
+      { companyId: "a" },
+      { companyId: "b" },
+    ]);
+    // The second round still held the tools: it was a real chained step.
+    expect(alpha.calls[1]?.request.tools.length).toBeGreaterThan(0);
+    expect(messages.at(-1)?.content).toBe("chained");
+
+    // Answered in the second round: no extra tool-less call is paid.
+    const quick = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const once = build({
+      script: [
+        call("only"),
+        { kind: "JSON", value: analystResult("answered in round two") },
+      ],
+      tools: quick,
+    });
+    expect((await once.seam.answer(once.request)).kind).toBe("ANSWERED");
+    expect(once.alpha.calls).toHaveLength(2);
   });
 
   it("repairs a non-JSON text answer with a final structured call", async () => {
@@ -402,7 +1213,11 @@ describe("answer seam tool loop", () => {
     const outcome = await seam.answer(request);
     expect(outcome.kind).toBe("ANSWERED");
     expect(alpha.calls).toHaveLength(2);
-    expect(alpha.calls[1]?.request.output.kind).toBe("STRUCTURED");
+    // Parity eval 2026-10-02: a refused structured round is asked again in
+    // text with the tools kept (a model that meant to act still can); its
+    // answer is accepted by the same schema.
+    expect(alpha.calls[1]?.request.output.kind).toBe("TEXT");
+    expect(alpha.calls[1]?.request.tools.length).toBeGreaterThan(0);
     expect(messages.at(-1)?.content).toBe("repaired");
   });
 
@@ -425,5 +1240,699 @@ describe("answer seam tool loop", () => {
       diagnosticCode: "RUN_CANCELLED",
     });
     expect(alpha.calls).toHaveLength(1);
+  });
+});
+
+describe("use_capability: a tool outside the turn's focus, loaded and called in the same turn (lead 2026-10-04)", () => {
+  const USE_CAPABILITY: QOfferedTool = {
+    toolName: "q.capability.use",
+    toolVersion: 1,
+    classification: "READ_ONLY",
+    definition: {
+      name: "use_capability",
+      description: "Loads a tool.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const PROPOSE_MEETING: QOfferedTool = {
+    toolName: "relationship.meeting.propose",
+    toolVersion: 1,
+    classification: "SIDE_EFFECT",
+    definition: {
+      name: "propose_meeting",
+      description: "Prepares a meeting.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const port = (available: readonly QOfferedTool[], loads: string[]) => {
+    const executed: { name: string; focusTools: readonly string[] }[] = [];
+    const tools: QToolPort = {
+      offer: () => Promise.resolve([USE_CAPABILITY, GET_COMPANY]),
+      available: () => Promise.resolve(available),
+      execute: (proposal, context) => {
+        executed.push({
+          name: proposal.name,
+          focusTools: context.focus?.tools ?? [],
+        });
+        return Promise.resolve(
+          succeeded(
+            proposal,
+            proposal.name === "use_capability"
+              ? {
+                  loaded: loads.map((name) => ({ name, does: "" })),
+                  message: "Loaded.",
+                }
+              : { status: "PREPARED" },
+          ),
+        );
+      },
+    };
+    return { tools, executed };
+  };
+  const script = (): FakeBehaviour[] => [
+    {
+      kind: "TOOL_CALLS",
+      calls: [
+        {
+          callId: "u1",
+          name: "use_capability",
+          arguments: { need: "book a call" },
+        },
+      ],
+    },
+    {
+      kind: "TOOL_CALLS",
+      calls: [{ callId: "m1", name: "propose_meeting", arguments: {} }],
+    },
+    { kind: "TEXT", text: JSON.stringify(analystResult("Prepared.")) },
+  ];
+
+  it("loads it for the next step, then executes it in the same turn", async () => {
+    const { tools, executed } = port(
+      [USE_CAPABILITY, GET_COMPANY, PROPOSE_MEETING],
+      ["propose_meeting"],
+    );
+    const { seam, alpha, request, logLines } = build({
+      script: script(),
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    // Sent in one stable name order (K7: the cached prefix holds).
+    expect(alpha.calls[0]?.request.tools.map((t) => t.name)).toEqual([
+      "get_company",
+      "use_capability",
+    ]);
+    expect(alpha.calls[1]?.request.tools.map((t) => t.name)).toEqual([
+      "get_company",
+      "propose_meeting",
+      "use_capability",
+    ]);
+    expect(executed.map((e) => e.name)).toEqual([
+      "use_capability",
+      "propose_meeting",
+    ]);
+    // Executed under a focus that names it, as a named tool would be.
+    expect(executed[1]?.focusTools).toContain("propose_meeting");
+    expect(logLines.some((line) => line.includes("q.capability_loaded"))).toBe(
+      true,
+    );
+  });
+
+  it("never loads a tool the run's available list does not hold", async () => {
+    // The loader names it, but the plan does not allow it: not offered.
+    const { tools, executed } = port(
+      [USE_CAPABILITY, GET_COMPANY],
+      ["propose_meeting"],
+    );
+    const { seam, alpha, request } = build({ script: script(), tools });
+    await seam.answer(request);
+    for (const attempt of alpha.calls) {
+      expect(attempt.request.tools.map((t) => t.name)).not.toContain(
+        "propose_meeting",
+      );
+    }
+    expect(executed.at(-1)?.focusTools ?? []).not.toContain("propose_meeting");
+  });
+});
+
+describe("approval by conversation (live 2026-09-27 #1, #2)", () => {
+  const APPROVE: QOfferedTool = {
+    toolName: "proposal.pending.approve",
+    toolVersion: 1,
+    classification: "SIDE_EFFECT",
+    definition: {
+      name: "approve_pending_proposal",
+      description: "Approves the one change waiting for their decision.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const approveCall: FakeBehaviour = {
+    kind: "TOOL_CALLS",
+    calls: [
+      {
+        callId: "a1",
+        name: "approve_pending_proposal",
+        arguments: { proposalId: "p-1" },
+      },
+    ],
+  };
+  const result = (outcome: string, status: string | null) => ({
+    outcome,
+    proposal:
+      status === null
+        ? null
+        : { proposalId: "p-1", summary: "Headline", status },
+    pending: [],
+  });
+
+  const answerAfter = async (data: unknown, text: string) => {
+    const tools = toolPort([APPROVE], (p) => ({
+      ...succeeded(p, data),
+      toolName: "proposal.pending.approve",
+      classification: "SIDE_EFFECT",
+    }));
+    const { seam, request, messages } = build({
+      script: [
+        approveCall,
+        { kind: "TEXT", text: JSON.stringify(analystResult(text)) },
+      ],
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(tools.executed.map((p) => p.name)).toEqual([
+      "approve_pending_proposal",
+    ]);
+    return messages.at(-1)?.content ?? "";
+  };
+
+  it("says saved only from the tool's SAVED result", async () => {
+    const saved = await answerAfter(
+      result("SAVED", "SAVED"),
+      "Anything else for your profile?",
+    );
+    expect(saved.startsWith("Saved.")).toBe(true);
+
+    const lapsed = await answerAfter(
+      result("EXPIRED", "EXPIRED"),
+      "Anything else for your profile?",
+    );
+    expect(lapsed).toMatch(/^Not saved/);
+    expect(lapsed).not.toMatch(/^Saved/);
+
+    const repeat = await answerAfter(
+      result("ALREADY_DECIDED", "SAVED"),
+      "Anything else?",
+    );
+    expect(repeat.startsWith("Already saved.")).toBe(true);
+  });
+
+  it("adds no status when nothing was approved, leaving the question to the model", async () => {
+    const none = await answerAfter(
+      result("SEVERAL_PENDING", null),
+      "Which one do you want to approve?",
+    );
+    expect(none).toBe("Which one do you want to approve?");
+  });
+});
+
+// RECOVERY-2026-10 G-D3: "I've prepared that reminder for you to approve."
+// after a propose_* round failed the whole turn and lost the proposal.
+// Prepared-but-not-executed is truthful when a proposal exists this turn.
+describe("a natural answer after a proposal (G-D3)", () => {
+  const PROPOSE_REMINDER: QOfferedTool = {
+    toolName: "schedule.reminder.propose",
+    toolVersion: 1,
+    classification: "SIDE_EFFECT",
+    definition: {
+      name: "propose_reminder",
+      description: "Prepares a reminder for their approval.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: null,
+  };
+  const proposed = (proposal: QToolProposal): QToolCallOutcome => ({
+    ...succeeded(proposal, { status: "PREPARED" }),
+    toolName: "schedule.reminder.propose",
+    classification: "SIDE_EFFECT",
+  });
+
+  it.each([
+    ["I've prepared that reminder for you to approve.", true],
+    ["I've prepared that reminder for you to approve.", false],
+    ["I've set up the reminder for tomorrow; approve it on the card.", false],
+  ])(
+    "%j (marked as action talk: %s) keeps the turn and the proposal",
+    async (said, marked) => {
+      const tools = toolPort([PROPOSE_REMINDER], proposed);
+      const { seam, request, messages } = build({
+        script: [
+          {
+            kind: "TOOL_CALLS",
+            calls: [
+              {
+                callId: "r1",
+                name: "propose_reminder",
+                arguments: { title: "Call Savanna Seed", remindAt: "tomorrow" },
+              },
+            ],
+          },
+          {
+            kind: "TEXT",
+            text: JSON.stringify(
+              marked
+                ? { ...analystResult(said), actionTalk: [said] }
+                : analystResult(said),
+            ),
+          },
+        ],
+        tools,
+      });
+      const outcome = await seam.answer(request);
+      expect(outcome.kind).toBe("ANSWERED");
+      expect(tools.executed.map((p) => p.name)).toEqual(["propose_reminder"]);
+      // Something truthful about the waiting card is said, never "done".
+      const answer = messages.at(-1)?.content ?? "";
+      expect(messages.at(-1)?.role).toBe("Q");
+      expect(answer.length).toBeGreaterThan(0);
+      expect(answer).not.toMatch(/\b(?:is now set|has been set|done)\b/iu);
+    },
+  );
+});
+
+describe("compound fit questions retain the synthesis path", () => {
+  it.each([
+    ["Which companies fit my mandate?", "FIT", false],
+    [
+      "Which companies have we discussed recently that fit my mandate, what did your agents find, and which unresolved risks remain?",
+      "THEIR_OWN_RECORDS",
+      true,
+    ],
+    [
+      "Which companies fit my mandate and what did Q learn about them?",
+      "THEIR_OWN_RECORDS",
+      true,
+    ],
+    [
+      "Which companies fit my mandate and what are their weaknesses?",
+      "THEIR_OWN_RECORDS",
+      true,
+    ],
+  ] as const)(
+    "reuses authorized computed fit reads for %s (%s), synthesis=%s",
+    async (text, questionKind, compound) => {
+      const companyId = randomUUID();
+      const investorOrganisationId = randomUUID();
+      const topOffer: QOfferedTool = {
+        ...GET_COMPANY,
+        toolName: "fit.top_candidates",
+        definition: { ...GET_COMPANY.definition, name: "fit_top_candidates" },
+      };
+      const profileOffer: QOfferedTool = {
+        ...topOffer,
+        toolName: "fit.profile",
+        definition: { ...topOffer.definition, name: "fit_profile" },
+      };
+      const fit = fitFixture(
+        companyId,
+        "Selected Company",
+        { STAGE: "STRONG" },
+        "STRONG_FIT",
+      );
+      const data = fit.result.data as { name: string; profile: unknown };
+      const tools = toolPort([topOffer, profileOffer], (proposal) => ({
+        ...succeeded(proposal, {
+          status: "OK",
+          comparison: {
+            entries: [{ name: data.name, line: null, profile: data.profile }],
+          },
+        }),
+        toolName: "fit.top_candidates",
+      }));
+      const answer =
+        "The reviewer revised the memo; unresolved evidence remains unknown.";
+      const { seam, request, messages, completed, alpha } = build({
+        tools,
+        script: [{ kind: "TEXT", text: JSON.stringify(analystResult(answer)) }],
+      });
+      if (messages[0]) messages[0] = { ...messages[0], content: text };
+      const bound = {
+        ...request,
+        plan: PermittedContextPlanSchema.parse({
+          ...request.plan,
+          scopes: [
+            {
+              kind: "INVESTOR_MANDATE",
+              contextLabel: "investor_private",
+              sensitivity: "CONFIDENTIAL",
+              layer: "STRUCTURED_STATE",
+              factCategories: ["INVESTOR_THESIS"],
+              projection: "FULL",
+              rights: {
+                canUseForReasoning: true,
+                canDiscloseExistence: true,
+                canQuote: true,
+                canProvideLink: false,
+              },
+              filter: { tenantId: TENANT, investorOrganisationId },
+              isEvidence: true,
+              subject: {
+                kind: "INVESTOR_ORGANISATION",
+                investorOrganisationId,
+              },
+            },
+          ],
+        }),
+      };
+      // The same authorized plan is prepared before the actual reading.
+      if (!seam.warm) throw new Error("Warm seam missing");
+      seam.warm(bound);
+      await seam.answer({ ...bound, questionKind });
+      expect(
+        tools.executed.filter((p) => p.name === "fit_top_candidates"),
+      ).toHaveLength(1);
+      expect(alpha.calls).toHaveLength(compound ? 1 : 0);
+      if (compound) expect(JSON.stringify(completed)).toContain(answer);
+    },
+  );
+});
+
+/**
+ * S3a (live 2026-10-15 on #107): a company the turn names, read ahead of
+ * the model, was looked up again because the note said to resolve it.
+ * Once its authorised profile is in hand, the note says so, with its id.
+ */
+describe("a named company read ahead of the model is not looked up again", () => {
+  const SEARCH: QOfferedTool = {
+    ...GET_COMPANY,
+    toolName: "company.search",
+    definition: { ...GET_COMPANY.definition, name: "search_companies" },
+  };
+  it.each([false, true])(
+    "aboutNamedOther=%s: the note names the read profile and drops the lookup instruction",
+    async (aboutNamedOther) => {
+      const target = randomUUID();
+      const tools = toolPort([SEARCH, GET_COMPANY], (p) =>
+        p.name === "search_companies"
+          ? {
+              ...succeeded(p, {
+                items: [
+                  {
+                    companyId: target,
+                    canonicalName: "Northwind Ledger",
+                    currentStageCode: "seed",
+                    headquartersCountry: null,
+                    shortDescription: null,
+                  },
+                ],
+                nextCursor: null,
+                truthClass: "USER_CLAIM",
+              }),
+              toolName: "company.search",
+            }
+          : succeeded(p, {
+              companyId: target,
+              canonicalName: "Northwind Ledger",
+              legalName: null,
+              websiteUrl: null,
+              foundedDate: null,
+              headquartersCountry: null,
+              headquartersCity: null,
+              currentStageCode: "seed",
+              shortDescription: "Declared company profile",
+              primaryDescription: null,
+              companyStatus: "active",
+              relationToYou: "SHARED",
+              truthClass: "USER_CLAIM",
+            }),
+      );
+      const { seam, request, messages, alpha } = build({
+        tools,
+        script: [
+          {
+            kind: "TEXT",
+            text: JSON.stringify(
+              analystResult("Northwind Ledger declares a seed stage."),
+            ),
+          },
+        ],
+      });
+      if (messages[0])
+        messages[0] = {
+          ...messages[0],
+          content: "What are the risks with Northwind Ledger?",
+        };
+      await seam.answer({ ...request, aboutNamedOther });
+      const prompt = JSON.stringify(alpha.calls[0]?.request);
+      expect(prompt).toContain(
+        "Already read for this turn through get_company",
+      );
+      expect(prompt).toContain(`Northwind Ledger (company id ${target})`);
+      expect(prompt).not.toContain(
+        "Resolve the company named in the current question through search_companies and get_company before answering",
+      );
+      // Read once, ahead of the model; the model was not asked to look again.
+      expect(
+        tools.executed.filter((p) => p.name === "get_company"),
+      ).toHaveLength(1);
+    },
+  );
+});
+
+/**
+ * S3 (live 2026-10-15 run f854c339, a GateQ dossier question): on a screen
+ * focused on one record the wide reads start when the turn is warmed,
+ * beside the readers, rather than after the reading.
+ */
+describe("wide reads start at warm on a focused screen", () => {
+  const SEARCH: QOfferedTool = {
+    ...GET_COMPANY,
+    toolName: "company.search",
+    definition: { ...GET_COMPANY.definition, name: "search_companies" },
+  };
+  it.each([true, false])("focused=%s", async (focused) => {
+    const tools = toolPort([SEARCH, GET_COMPANY], (p) =>
+      succeeded(p, { items: [], nextCursor: null, truthClass: "USER_CLAIM" }),
+    );
+    const { seam, request, messages } = build({
+      tools,
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) }],
+    });
+    if (messages[0])
+      messages[0] = {
+        ...messages[0],
+        content: "What are the risks with Northwind Ledger?",
+      };
+    const bound = {
+      ...request,
+      plan: {
+        ...request.plan,
+        screen: {
+          route: "OTHER" as const,
+          ...(focused
+            ? {
+                manifest: {
+                  v: 2,
+                  seq: 1,
+                  focus: { kind: "GATEQ_APPLICATION", id: randomUUID() },
+                  inView: [],
+                  dialogs: [],
+                  controls: [],
+                  sections: [],
+                },
+              }
+            : {}),
+        },
+      },
+    } as typeof request;
+    if (!seam.warm) throw new Error("Warm seam missing");
+    seam.warm(bound);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const before = tools.executed.filter(
+      (p) => p.name === "search_companies",
+    ).length;
+    expect(before > 0).toBe(focused);
+    await seam.answer(bound);
+    // Read once either way: the warm read is the one the answer takes.
+    expect(
+      tools.executed.filter((p) => p.name === "search_companies"),
+    ).toHaveLength(1);
+  });
+});
+
+/**
+ * S6 (live 2026-10-15 run ddf0738b, a GateQ dossier review): the screen's
+ * own reads -- here the selected application's summarise -- start from the
+ * run's tool set, beside context assembly, not after it; and are read once.
+ */
+describe("the selected dossier is read beside context assembly", () => {
+  const SUMMARISE: QOfferedTool = {
+    ...GET_COMPANY,
+    toolName: "app.gateq.inbox.summarise",
+    definition: { ...GET_COMPANY.definition, name: "gateq_inbox_summarise" },
+  };
+  it("starts before assembly settles and is read once", async () => {
+    const tools = toolPort([SUMMARISE], (p) =>
+      succeeded(p, { status: "NOT_DONE", says: "Not in your inbox." }),
+    );
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let assembling = 0;
+    const context: QAuthorisedContextPort = {
+      assemble: async (request) => {
+        assembling += 1;
+        await held;
+        return noAuthorisedContext.assemble(request);
+      },
+    };
+    const { seam, request } = build({
+      tools,
+      context,
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) }],
+    });
+    const applicationId = randomUUID();
+    const bound = {
+      ...request,
+      plan: {
+        ...request.plan,
+        screen: {
+          route: "OTHER" as const,
+          manifest: {
+            v: 2,
+            seq: 1,
+            focus: { kind: "GATEQ_APPLICATION", id: applicationId },
+            inView: [],
+            dialogs: [],
+            controls: [],
+            sections: [],
+          },
+        },
+      },
+    } as typeof request;
+    const answered = seam.answer(bound);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(assembling).toBe(1);
+    // Assembly is still held: the summarise has already been asked.
+    expect(
+      tools.executed.filter((p) => p.name === "gateq_inbox_summarise"),
+    ).toEqual([expect.objectContaining({ arguments: { applicationId } })]);
+    release();
+    await answered;
+    expect(
+      tools.executed.filter((p) => p.name === "gateq_inbox_summarise"),
+    ).toHaveLength(1);
+  });
+
+  it.each([
+    ["the dossier read", true, "PREPARED_CONTEXT", 0],
+    ["the dossier refused", false, "DEEP_ANALYSIS", 1],
+  ] as const)(
+    "a review of %s routes over it with no tools, or keeps the full path",
+    async (_label, read, path, toolsOffered) => {
+      const applicationId = randomUUID();
+      const tools = toolPort([SUMMARISE], (p) =>
+        succeeded(
+          p,
+          read
+            ? {
+                status: "DONE",
+                says: "Read the application.",
+                reading: {
+                  v: 1,
+                  subject: {
+                    kind: "GATEQ_SUBMISSION",
+                    gatewayId: randomUUID(),
+                    applicationId,
+                    reference: "ga_submitted",
+                    submittedAt: "2026-10-14T13:12:00.000Z",
+                    dossierSchemaVersion: "gateq-dossier.v1",
+                  },
+                  text: "Customers pay by the litre [truth=USER_CLAIM]",
+                  sources: [],
+                },
+              }
+            : { status: "NOT_DONE", says: "Not in your inbox." },
+        ),
+      );
+      const { seam, request, logLines } = build({
+        tools,
+        script: [
+          { kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) },
+        ],
+      });
+      const bound = {
+        ...request,
+        turnKind: "QUESTION_TO_Q",
+        questionKind: "ADVICE",
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        plan: {
+          ...request.plan,
+          screen: {
+            route: "OTHER" as const,
+            manifest: {
+              v: 2,
+              seq: 1,
+              focus: { kind: "GATEQ_APPLICATION", id: applicationId },
+              inView: [],
+              dialogs: [],
+              controls: [],
+              sections: [],
+            },
+          },
+        },
+      } as typeof request;
+      await seam.answer(bound);
+      const logged = logLines
+        .map((line) => JSON.parse(line) as [Record<string, unknown>, string])
+        .find(([, message]) => message === "q answer path");
+      expect(logged?.[0]).toMatchObject({ path, tools: toolsOffered });
+    },
+  );
+});
+
+/**
+ * Lane S 2026-10-15 (lane A): "put those three in a table" after an answer
+ * is a re-render: no public-web tool is offered and none is run, even when
+ * the turn's reading asked for research.
+ */
+describe("a re-render ask never reaches the public web", () => {
+  const WEB: QOfferedTool = {
+    ...GET_COMPANY,
+    toolName: "public_web.search",
+    definition: { ...GET_COMPANY.definition, name: "research_public_web" },
+  };
+  it.each([
+    ["put those three in a table", 1],
+    ["What are the risks with Northwind Ledger?", 2],
+  ] as const)("%s -> %s tools offered", async (said, offeredCount) => {
+    const tools = toolPort([WEB, GET_COMPANY], (p) => succeeded(p, {}));
+    const { seam, request, messages, logLines } = build({
+      tools,
+      script: [{ kind: "TEXT", text: JSON.stringify(analystResult("Noted.")) }],
+    });
+    const first = messages[0];
+    if (first === undefined) throw new Error("fixture");
+    messages.splice(
+      0,
+      1,
+      { ...first, content: "Which three companies fit my mandate?" },
+      {
+        ...first,
+        id: randomUUID() as QConversationMessage["id"],
+        role: "Q",
+        content: "Ledgerfold, Baridi and Maji Loop fit best.",
+      },
+      {
+        ...first,
+        id: randomUUID() as QConversationMessage["id"],
+        content: said,
+      },
+    );
+    await seam.answer({
+      ...request,
+      turnKind: "QUESTION_TO_Q",
+      research: Promise.resolve({
+        mode: "EXPLICIT",
+        announceSourceChange: false,
+      }),
+    });
+    const path = logLines
+      .map((line) => JSON.parse(line) as [Record<string, unknown>, string])
+      .find(([, message]) => message === "q answer path");
+    expect(path?.[0]).toMatchObject({ tools: offeredCount });
+    if (offeredCount === 1) {
+      expect(tools.executed.some((p) => p.name === "research_public_web")).toBe(
+        false,
+      );
+    }
   });
 });

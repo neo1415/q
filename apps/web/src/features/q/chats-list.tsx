@@ -1,0 +1,249 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+
+import type { QConversationSummary } from "@capital-q/contracts";
+import { cx } from "@capital-q/ui";
+import { buttonClassName } from "@capital-q/ui/button";
+import { ChevronDown, ICON_SIZE, ICON_STROKE, Plus } from "@capital-q/ui/icons";
+
+import {
+  archiveQConversationAction,
+  listQConversationsAction,
+} from "./actions";
+import { NEW_CHAT_HREF } from "./active-conversation";
+import { Q_CONVERSATIONS_CHANGED_EVENT } from "./use-q-conversation";
+import { formatStamp } from "@/components/date-format";
+import { useT } from "@/features/i18n/language";
+
+/**
+ * A person's conversations with Q, as a collapsible list (ADR 0012).
+ *
+ * The server's list, read on mount, whenever a conversation changes on
+ * this screen, and whenever the route changes; never a browser copy. The
+ * only thing kept in the browser is whether the list is folded, which is
+ * this viewer's convenience and nothing more. Each entry opens Home in
+ * that conversation; "New chat" opens Home in none.
+ */
+
+export const Q_CONVERSATION_PARAM = "c";
+
+const FOLD_KEY = "cq.q.chats.folded";
+
+function readFolded(): boolean {
+  try {
+    return window.localStorage.getItem(FOLD_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeFolded(folded: boolean): void {
+  try {
+    window.localStorage.setItem(FOLD_KEY, folded ? "1" : "0");
+  } catch {
+    // A preference that cannot be kept is simply not kept.
+  }
+}
+
+const whenLabel = (iso: string) => formatStamp(iso);
+
+export function ChatsList({
+  variant = "sidebar",
+  active = null,
+}: {
+  readonly variant?: "sidebar" | "inline";
+  /**
+   * The conversation currently open, or null when none is.
+   *
+   * Taken as a prop rather than read from the URL here (QX-003A). A
+   * caller that already knows it — Home resolves it on the server — can
+   * then render this list in the page shell. Reading it here would make
+   * every caller suspend, and React reveals a suspended boundary's
+   * content on a `requestAnimationFrame` that never fires while the tab
+   * is hidden, so the list simply never appeared in a background tab.
+   */
+  readonly active?: string | null;
+}) {
+  const t = useT();
+  const router = useRouter();
+  const [items, setItems] = useState<readonly QConversationSummary[] | null>(
+    null,
+  );
+  const [folded, setFolded] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const result = await listQConversationsAction();
+    if (result.ok) {
+      setItems(result.value.items);
+      setNotice(null);
+    } else {
+      setItems((current) => current ?? []);
+      setNotice(result.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    // The fold is a per-viewer convenience read after mount, one
+    // microtask later so it belongs to the load rather than the render.
+    void Promise.resolve().then(() => {
+      setFolded(readFolded());
+      return load();
+    });
+    const onChange = () => void load();
+    window.addEventListener(Q_CONVERSATIONS_CHANGED_EVENT, onChange);
+    return () => {
+      window.removeEventListener(Q_CONVERSATIONS_CHANGED_EVENT, onChange);
+    };
+  }, [load]);
+
+  const toggle = () => {
+    setFolded((current) => {
+      writeFolded(!current);
+      return !current;
+    });
+  };
+
+  const archive = async (conversationId: string) => {
+    const result = await archiveQConversationAction(conversationId);
+    if (!result.ok) {
+      setNotice(result.message);
+      return;
+    }
+    setItems((current) =>
+      (current ?? []).filter((item) => item.conversationId !== conversationId),
+    );
+    if (active === conversationId) {
+      router.push(NEW_CHAT_HREF);
+    }
+  };
+
+  const listId = `cq-chats-${variant}`;
+  return (
+    <section
+      aria-labelledby={`${listId}-heading`}
+      className={cx(
+        "flex min-h-0 flex-col gap-2",
+        variant === "sidebar" ? "px-3 pt-6" : "",
+      )}
+      data-q-chats
+    >
+      <div className="flex items-center justify-between gap-2 px-2">
+        <button
+          type="button"
+          id={`${listId}-heading`}
+          aria-expanded={!folded}
+          aria-controls={listId}
+          onClick={toggle}
+          className="flex min-h-10 items-center gap-1 px-1 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+        >
+          <ChevronDown
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+            className={cx(
+              "transition-transform duration-(--cq-motion-fast)",
+              folded ? "-rotate-90" : "",
+            )}
+          />
+          {t("Chats")}
+        </button>
+        <Link
+          href={NEW_CHAT_HREF}
+          aria-label={t("New chat")}
+          title={t("New chat")}
+          className={buttonClassName("quiet", "compact", "min-h-10")}
+        >
+          <Plus
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+          />
+          <span className={variant === "sidebar" ? "sr-only" : ""}>
+            {t("New chat")}
+          </span>
+        </Link>
+      </div>
+      {folded ? null : (
+        <div id={listId} className="min-h-0 overflow-y-auto">
+          {items === null ? (
+            <p className="px-3 py-2 cq-caption text-(--cq-text-tertiary)">
+              {t("Loading your chats…")}
+            </p>
+          ) : items.length === 0 ? (
+            <p className="px-3 py-2 cq-caption text-(--cq-text-tertiary)">
+              {notice ?? "Your chats with Q appear here."}
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-0.5">
+              {items.map((item) => {
+                const current = item.conversationId === active;
+                return (
+                  <li key={item.conversationId} className="group relative">
+                    <Link
+                      href={`/home?${Q_CONVERSATION_PARAM}=${encodeURIComponent(item.conversationId)}`}
+                      aria-current={current ? "page" : undefined}
+                      className={cx(
+                        "flex min-h-10 flex-col justify-center gap-0.5 py-1.5 pe-16 ps-3 transition-colors duration-(--cq-motion-fast)",
+                        current
+                          ? "bg-(--cq-accent-soft) text-(--cq-text-primary)"
+                          : "text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)",
+                      )}
+                    >
+                      <span className="cq-body-sm truncate">{item.title}</span>
+                      <span className="cq-caption text-(--cq-text-tertiary)">
+                        {whenLabel(item.lastMessageAt)}
+                      </span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void archive(item.conversationId)}
+                      className={cx(
+                        "absolute top-1/2 end-1 -translate-y-1/2 px-2 py-1 cq-caption text-(--cq-text-tertiary) hover:text-(--cq-text-primary) focus-visible:opacity-100",
+                        current
+                          ? "opacity-100"
+                          : "opacity-0 group-hover:opacity-100",
+                      )}
+                      aria-label={`Archive ${item.title}`}
+                    >
+                      {t("Archive")}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * The same list, for a caller that cannot be told which conversation is
+ * open (QX-003A).
+ *
+ * The desktop sidebar is rendered by a layout, and a layout has no
+ * `searchParams`, so this reads the URL. That makes it suspend, so it
+ * needs a Suspense boundary around it — and inherits the background-tab
+ * reveal delay described above. Home does not use this: it is told.
+ */
+export function ChatsListForRoute({
+  variant = "sidebar",
+}: {
+  readonly variant?: "sidebar" | "inline";
+}) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  return (
+    <ChatsList
+      variant={variant}
+      active={
+        pathname === "/home" ? searchParams.get(Q_CONVERSATION_PARAM) : null
+      }
+    />
+  );
+}

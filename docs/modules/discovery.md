@@ -1,0 +1,1007 @@
+# Discovery (doc 19)
+
+Who an investor or a founder could reasonably meet, chosen by declared
+eligibility and declared fit, ranked deterministically, and explained from
+the fields that produced it.
+
+## The order
+
+```
+hard eligibility → candidate generation → declared hard exclusions
+  → explicit fit → deterministic rank
+```
+
+Semantic fit, evidence weighting and exploration are later steps in that
+same order and are deliberately absent rather than approximated. A pretend
+relevance score is worse than an honest gap, and the order above is the
+part that has to be right first.
+
+No model runs in this path. The slate is reproducible from the rows alone:
+the same inputs give the same order, and `DISCOVERY_RANKING_VERSION`
+changes whenever a weight, a signal or the order does.
+
+## Cross-tenant, because that is what the word means
+
+This packet began as a bug. `network_visible` means visible to
+authenticated Capital Q participants (ADR-001), but the only search that
+existed scoped candidates to the caller's own tenant — and every
+organisation has its own tenant. A founder could make their company
+discoverable and no investor could ever see it, which is exactly what
+happened in the browser.
+
+The candidate queries in
+`packages/discovery/src/infrastructure/postgres-discovery-repository.ts`
+are cross-tenant and say so in SQL. The filter is the declared visibility
+column; the caller's own organisation is the only exclusion, because their
+own company is the subject of their own conversations rather than a
+discovery result. Classification chooses candidates; the disclosure layer
+still decides each one.
+
+## What may be matched on, in each direction
+
+**Investor → companies.** The investor's own mandate, against the
+company's declared, network-visible profile. Their data, used for them:
+declared stage range, and taxonomy preferences by strength (MUST 40,
+STRONG 25, NICE 10) against the company's active classifications. A
+mandate preference marked as an exclusion is a removal, never a low score,
+and only declared rules can exclude.
+
+**Founder → investors.** The declared investor profile and nothing else:
+whether they say they are deploying, and whether the profile is filled in.
+An investor's mandate is investor-private, and doc 19 §204.9 makes it
+release-blocking that private investor behaviour must not shape what a
+founder sees. The slate always carries
+`RANKED_ON_DECLARED_PROFILE_ONLY` so the screen can say so. When an
+investor deliberately publishes a mandate, that is the packet that may
+change this, and not before.
+
+## What does not exist here
+
+No popularity, no trending, no view count, no dwell, no
+recency-of-activity, no pay-to-rank. There is no port for "what this
+person looked at", because a port that cannot express it cannot be misused
+later. Viewing is not interest.
+
+The score never reaches the wire. `rank` exists so a slate can be
+reproduced and audited; the API drops it and the screen shows the reasons
+instead, in the person's own declared vocabulary.
+
+## Surfaces
+
+- `GET /v1/discovery/companies` and `GET /v1/discovery/investors`, cursor-paged.
+- `/discover` in the web app picks the direction from the person's own context.
+- `discovery.slate` is the Q tool. It exists because the question people
+  actually ask is "who can you tell me about?" — which a name search
+  cannot answer, since it needs a name. Q asks the platform which side the
+  person is on rather than guessing.
+
+## Why a slate is thin
+
+Every slate carries notes, so a person who sees three results knows
+whether that is the network or their own mandate:
+`NO_ACTIVE_MANDATE`, `MANDATE_HAS_NO_PREFERENCES`,
+`NO_DISCOVERABLE_COUNTERPARTS`, `RANKED_ON_DECLARED_PROFILE_ONLY`.
+
+An eligible counterpart with nothing declared in common still appears, last
+and unexplained. Eligible is not the same as recommended, and hiding them
+would be a ranking decision dressed as a filter.
+
+## Hard eligibility (CQ-REC-001)
+
+`src/eligibility/` is the gate before candidate generation (doc 19 §12–§13,
+DMR-008/009). It answers one question — may this company legitimately
+enter the pipeline for this investor in this context — and refuses to
+answer any other: no score, no rank, no probability, no prose.
+
+**Vocabulary.** `ELIGIBLE` when every applicable hard gate passes;
+`INELIGIBLE` when an explicit hard rule is definitively violated;
+`UNDETERMINED` when a hard rule exists and the canonical fact it needs is
+absent. A FAIL outranks an UNKNOWN; an UNKNOWN never becomes a FAIL.
+Unknown is not mismatch. Every result carries
+`ELIGIBILITY_POLICY_VERSION` (`eligibility.v2`), the mandate id and
+version, the taxonomy versions when supplied, one `CriterionResult` per
+criterion in fixed order (`PASS | FAIL | UNKNOWN | NOT_APPLICABLE`) and
+sorted, stable reason codes. `evaluatedAt` is the only field two
+evaluations of the same snapshot may differ in.
+
+**Criteria, in order, and where each fact comes from.**
+
+| Criterion                   | Source                                                                                                                                         | Missing data                                                                                                                   |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `COMPANY_ACTIVE`            | Companies: `company_status`                                                                                                                    | —                                                                                                                              |
+| `MARKETPLACE_PARTICIPATION` | Companies: `marketplaceParticipationOf(marketplace_readiness_state)`                                                                           | `not_assessed` and unknown states are NOT_ELIGIBLE (fail closed)                                                               |
+| `COUNTERPART_DISTINCT`      | company organisation ≠ investor organisation                                                                                                   | —                                                                                                                              |
+| `INVESTOR_DISCOVERABILITY`  | Companies: visibility classification **and** Permissions: disclosure                                                                           | —                                                                                                                              |
+| `ACTIVE_MANDATE`            | Investors: the one ACTIVE mandate (or the pinned one, if the actor's)                                                                          | none → `NO_ACTIVE_MANDATE`; two → `ACTIVE_MANDATE_AMBIGUOUS`; DRAFT/CLOSED pinned → `MANDATE_NOT_ACTIVE` — all UNDETERMINED    |
+| `HARD_EXCLUSION_TAXONOMY`   | Investors: `isExclusion` preferences from `user_selected`/`admin_curated` vs Taxonomy: ACTIVE assignments from `user_selected`/`admin_curated` | nothing declared in the excluded node's vocabulary → `COMPANY_TAXONOMY_UNKNOWN`                                                |
+| `HARD_EXCLUSION_STAGE`      | Investors: HARD_EXCLUSION `stage` constraint vs `current_stage_code`                                                                           | `COMPANY_STAGE_UNKNOWN`                                                                                                        |
+| `HARD_EXCLUSION_GEOGRAPHY`  | HARD_EXCLUSION `geography.country` vs `headquarters_country`                                                                                   | `COMPANY_GEOGRAPHY_UNKNOWN`                                                                                                    |
+| `HARD_EXCLUSION_OTHER`      | HARD_EXCLUSION on `red_flag`, `business.attribute`, `founder.business_attribute`, `sector`, `investment_role`                                  | always `HARD_CRITERION_NOT_EVALUABLE`: no canonical company field answers these yet                                            |
+| `CHEQUE_COMPATIBILITY`      | —                                                                                                                                              | always NOT_APPLICABLE: cheque is a fit factor, never a hard gate in v1                                                         |
+| `RELATIONSHIP_STANDING`     | Network: `relationships.current_state`                                                                                                         | none/DISCOVERED pass; `RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY` is empty in v1; any other state → `RELATIONSHIP_STATE_UNKNOWN` |
+
+For a HARD_EXCLUSION constraint the operator names the excluded set:
+`EQ`/`IN` exclude the listed codes ("never show Series B"); `NEQ`/`NOT_IN`
+exclude everything outside them ("Seed only"). MUST is a preference and
+AVOID a soft negative; neither is read here. `custom.text` is MANUAL_ONLY
+and never a rule. The investor's `min_cheque`/`max_cheque` carry no
+importance and an investor whose maximum is below a company's total round
+may fund part of it, so no cheque rule is invented — the criterion says so
+rather than staying silent.
+
+**Declared on both sides (`eligibility.v2`).** A taxonomy hard exclusion
+compares declared mandate exclusions with declared company
+classifications only (`DECLARED_TAXONOMY_SOURCES`: `user_selected`,
+`admin_curated`). A `q_inferred`, `document_extracted` or `integration`
+row is a candidate awaiting confirmation (ADR 0006 point 5): it neither
+excludes the company nor answers the vocabulary. A company whose only
+classifications in an excluded node's vocabulary are undeclared is
+UNKNOWN (`COMPANY_TAXONOMY_UNKNOWN`), so UNDETERMINED — never PASS, never
+FAIL. Confirming the suggestion (it becomes `user_selected`) is what makes
+it exclude. `eligibility.v1` counted every ACTIVE row, so a Q inference on
+an excluded node silently removed a company from an investor's
+discovery. The port still returns every row with its `source`; the pure
+policy decides which count, so the rule is versioned where the decision
+is.
+
+**What it cannot read.** `EligibilityPorts` has no port for Q memory,
+conversations, documents, evidence text, public research, embeddings,
+observed behaviour or model output, and
+`test/eligibility-boundary.test.ts` fails the build if the subtree ever
+imports a Q, evidence, media, onboarding or model package, names one of
+their tables, or contains SQL. `test/eligibility.integration.test.ts`
+inserts a founder-private memory item carrying
+`REC_PRIVATE_FOUNDER_MEMORY_MUST_NOT_AFFECT_ELIGIBILITY`, a founder
+conversation summary and a PUBLIC_WEB source into the real tables and
+proves the decision and reasons do not move, then closes the company and
+proves they do.
+
+**Service.** `createEligibilityService` resolves the investor organisation
+from the trusted actor, reads the ACTIVE mandate once, reads company facts
+and disclosure in batches (`ELIGIBILITY_BATCH_MAX` = 200) and hands
+snapshots to the pure `evaluateHardEligibility`. Only `INVESTOR_DISCOVER`
+is evaluated; GateQ and the other doc 19 modes throw
+`RecommendationModeUnsupportedError` rather than being approximated.
+`createDomainEligibilityPorts` assembles the ports from the owning
+contexts' public query ports — Companies, Taxonomy, Investors, Network,
+Permissions — with no SQL of its own. Diagnostics are counts, versions and
+duration; never a company, a mandate value or a reason per company.
+
+**Not wired yet, on purpose.** The pre-REC slate above still gates on the
+visibility column alone. REC-002 routes candidates through this service,
+at which point marketplace readiness applies. The Companies context now
+owns that assessment (CQ-MKT-001, `docs/modules/companies.md`): a company
+is `marketplace_ready` only when its readiness policy says so, and in
+production that needs a Verification context that does not exist yet, so
+no real company is ELIGIBLE today. Locally, `pnpm dev:marketplace-ready`
+produces one legitimately ready synthetic company. Nothing in
+Recommendation decides readiness.
+
+## Structured candidate generation (CQ-REC-002)
+
+`src/candidates/` is Candidate Generator A (doc 19 §23), the structured
+mandate generator: `STRUCTURED_MANDATE`, version `structured-mandate.v2`.
+Candidate generation seeks recall; ranking (a later packet) buys
+precision. Nothing here scores, ranks, counts matches, calls a model or
+adds randomness.
+
+**Input scope.** The actor's own investor organisation and its single
+ACTIVE mandate, resolved through the same ports REC-001 uses. No ACTIVE
+mandate, or more than one, is the typed `NO_ACTIVE_MANDATE` result; a
+DRAFT is never read and there is no newest-by-date fallback. Positive
+intent is derived from the mandate alone (`deriveStructuredIntent`):
+
+| Dimension | Source of intent                                                                                                  | Company field                                                                                               | Reason code                                        |
+| --------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| STAGE     | positive `stage` constraints (EQ/IN name codes; NEQ/NOT_IN name the rest of the ladder) plus the min/max range    | `current_stage_code`                                                                                        | `STAGE_OVERLAP`                                    |
+| GEOGRAPHY | positive `geography.country` constraints (EQ/IN only; "anywhere but" narrows nothing)                             | `headquarters_country`                                                                                      | `GEOGRAPHY_OVERLAP`                                |
+| GEOGRAPHY | positive geography-vocabulary preference nodes, expanded to their reference descendants; `global` narrows nothing | ACTIVE geography classification                                                                             | `GEOGRAPHY_REGION_OVERLAP`                         |
+| TAXONOMY  | positive preference nodes in every other vocabulary, expanded to their reference descendants                      | ACTIVE classification, exact node or a descendant                                                           | `TAXONOMY_OVERLAP` / `TAXONOMY_DESCENDANT_OVERLAP` |
+| CHEQUE    | mandate cheque range                                                                                              | none: the capital objective is organisation-internal and its disclosure-safe projection is a later contract | never produced; the seam reports `NOT_COMPUTABLE`  |
+
+Positive means MUST, STRONG or NICE. AVOID never retrieves and never
+removes; HARD_EXCLUSION is REC-001's; a taxonomy preference counts only
+from a `user_selected` or `admin_curated` source; MANUAL_ONLY constraints
+are ignored. The same holds on the company side (`structured-mandate.v2`):
+taxonomy and geography-region retrieval match only declared company
+classifications, filtered inside the Taxonomy query
+(`listCurrentByNodes(..., assignmentSources)`) so undeclared rows never
+consume the bound; v1 matched any provenance. Descendant matching reuses the taxonomy query port's
+`listDescendants` (reference hierarchy, bounded depth), with its own
+reason code so an exact ask and an inherited one stay distinguishable.
+
+**Retrieval.** Each dimension runs independently through the owning
+contexts' ports (`createDomainCandidatePorts`, no SQL here): Companies
+`listDiscoverableCompanies` (active, network_visible or public_external,
+indexed on visibility + stage) and Taxonomy `listCurrentByNodes` (ACTIVE
+assignments under the asked nodes, `entity_assignments_node_idx`),
+intersected with the Companies discoverable projection so a private or
+closed company never enters the pool even as an id. Every retrieval is
+bounded (`CANDIDATE_DIMENSION_LIMIT` = 200) and ordered by canonical id.
+
+**Merge.** Hits are unioned and deduplicated by canonical company id
+(`mergeDimensionHits`): one candidate, every dimension and reason it
+earned, matched nodes as ids only, sorted, then ordered by company id and
+cut at `CANDIDATE_POOL_MAX` (200, the existing discovery budget). The
+order is reproducibility, not desirability. Never merged by name, slug,
+website or founder.
+
+**Eligibility.** The deduplicated pool goes to REC-001 in one batch. Only
+ELIGIBLE candidates leave; INELIGIBLE never do and UNDETERMINED is
+counted, not promoted. A structured unknown (no stage on the company) is
+not an eligibility unknown: the company is simply not found by that
+dimension, and another may find it — but a company REC-001 cannot decide
+is not rankable, whatever found it. Result: `StructuredCandidateResult`
+with generator id and version, the eligibility policy version, the
+recommendation context, the candidates with provenance and their
+eligibility result, and safe diagnostics (raw hits by dimension, raw,
+deduped, truncated, eligible, ineligible, undetermined, cheque seam
+status, duration).
+
+**Privacy.** The retrieval ports return ids, codes and matched node ids
+over declared mandate intent and discovery-classified canonical state.
+`eligibility-boundary.test.ts` now covers `src/candidates` and the
+candidate adapter; `candidates.integration.test.ts` inserts a founder-
+private memory item, a private conversation summary and a PUBLIC_WEB
+source carrying `REC002_PRIVATE_FOUNDER_CONTEXT_MUST_NOT_AFFECT_CANDIDATES`
+and proves ids, provenance and order do not move.
+
+**Deferred, on purpose.** Semantic retrieval and its merge (REC-003),
+feature computation and ranking, slates and the feed, portfolio,
+relationship, freshness and exploration generators, GateQ, and a cheque
+dimension once a disclosure-safe raise projection exists.
+
+## Semantic candidate generation (CQ-REC-003)
+
+Candidate Generator B (doc 19 §24–§26): the investor's ACTIVE mandate as a
+query vector against precomputed vectors over a purpose-approved company
+representation, through pgvector, into REC-001. It supplements the
+structured generator where exact taxonomy misses nuance; it replaces
+nothing, ranks nothing and enforces nothing.
+
+- **Generator** `SEMANTIC_MANDATE` / `semantic-mandate.v1`, in
+  `src/semantic/`. Same `CompanyId`, same eligibility result, same "ELIGIBLE
+  only, canonical id order" output shape as REC-002. Provenance carries a
+  cosine `similarity` in [-1, 1] and every version that could change it
+  (representation versions, embedding configuration, instruction versions).
+  The number is retrieval provenance for the ranker: never a percentage, a
+  probability, a match or a threshold. No similarity cut-off rejects a
+  company; top-K (`SEMANTIC_TOP_K` = 200, the structured dimension budget)
+  bounds retrieval.
+- **Company investment representation** `company-investment-representation.v1`
+  (`buildCompanyInvestmentRepresentation`): a deterministic labelled text —
+  `Company`, `Stage`, `Headquarters`, one line per canonical vocabulary,
+  `Summary` — built only from the fields the Discover slate already shows an
+  investor about a discoverable company (canonical name, short description,
+  stage, headquarters country, ACTIVE canonical classifications). The input
+  type has no field for memory, conversations, documents, evidence, research
+  or a Q summary, so none can be embedded; business model, customer type,
+  raise and traction are omitted because no canonical discovery-safe field
+  exists for them yet. Same snapshot, same version, same text and sha256.
+- **Investor representation** `investor-mandate-representation.v1`
+  (`buildInvestorMandateRepresentation`): mandate name, the declared
+  narrative (`raw_mandate_text`, investor-private), positive stage and
+  country intent and positive taxonomy preferences, exactly as
+  `deriveStructuredIntent` reads them. Hard exclusions and AVOID never enter
+  the text: a "never" is REC-001's, and a soft avoidance is not a retrieval
+  signal. Stored under the investor's tenant only; never joined into any
+  founder-facing projection.
+- **Embeddings** through `@capital-q/q-embeddings` unchanged: the local Qwen
+  runtime (`Qwen/Qwen3-Embedding-0.6B`, 1024 dimensions, L2 unit vectors),
+  documents without an instruction (`none-v1`), the mandate under the
+  registered `MANDATE_MATCHING` task (`capital-q-mandate-matching-v1`). No
+  hosted embedding provider, no Gemini, Groq, Tavily or ElevenLabs anywhere
+  in the path. The runtime being down is a typed `UNAVAILABLE` result — never
+  a zero, random or substitute vector.
+- **Storage** is the server-only `recommendation` schema (migration
+  `20260927090000`): `company_representations` and
+  `mandate_representations` (one CURRENT row per subject, purpose and
+  version; content immutable; superseded, never edited) and
+  `company_embeddings` / `mandate_embeddings` (pgvector `vector(1024)`, work
+  identity unique, immutable, cascade with their canonical row). RLS on, no
+  policy, no browser grant; pgTAP `400_recommendation_semantic`. Not
+  `q_knowledge.embeddings`: that store keys vectors to Q's private chunks.
+  Exact scan under a `(configuration_version, instruction_version)`
+  prefilter, as the q_knowledge store does at this volume; an approximate
+  index is a later, measured decision.
+- **Freshness** is `refreshCompanyRepresentations`: rebuild the text, compare
+  its sha256 with the CURRENT row, supersede and insert on change, reuse an
+  existing vector for identical content, embed the rest in one bounded
+  batch. A row version bump without a visible change is not a new
+  embedding. No worker yet: REC-004/REC-006 may automate the call from
+  company and classification events.
+- **Current discoverability wins**: the nearest-neighbour query joins
+  `core.companies` for `active` and `network_visible` / `public_external`
+  on every run, so a company that went private or closed never returns from
+  a stale vector; readiness, disclosure and exclusions are then REC-001's.
+- **Hybrid pool** `hybrid-candidate-pool.v1` (`src/hybrid/`): structured
+  UNION semantic by canonical id, both provenances kept, canonical order,
+  bounded by the pool budget. A semantic outage leaves the structured pool
+  exactly as generated and says so (`semanticUnavailable`).
+- **Boundary**: `eligibility-boundary.test.ts` scans `src/semantic`,
+  `src/hybrid` and the two adapters: the embedding boundary is the only
+  Q-side import allowed; no private store, generation provider or research
+  tool is named; only the store adapter contains SQL, and only over its own
+  schema and `core.companies`.
+
+Golden scenarios A–O live in `semantic.test.ts` (deterministic concept
+embedder, in-memory store, real REC-001 policy) and
+`semantic.integration.test.ts` (real adapters, real store, local PostgreSQL;
+the live Qwen block runs when the TEI runtime answers and is skipped
+otherwise).
+
+## Recommendation feature registry and privacy firewall (CQ-REC-004)
+
+The governed, typed, versioned list of signals a ranker may read (doc 19
+§38–§42, §92, §111, §144–§147), and the only legitimate input surface for
+REC-005. Nothing here weighs, scores, ranks or explains.
+
+- **Schema** `recommendation-features.v1` (`FEATURE_SCHEMA_VERSION`), separate
+  from `eligibility.v2`, `structured-mandate.v2`, `semantic-mandate.v1`, the
+  representation versions and any ranking version. A ranker declares the
+  schema it understands and asks `registry.featuresFor(mode)`; a snapshot is
+  validated against the registry (`registry.validateSnapshot`), never
+  discovered by scanning rows.
+- **Definitions** (`RECOMMENDATION_FEATURES`, frozen, validated at module
+  load): id, version, group, data type, allowed contexts, source classes,
+  sensitivity (the canonical six-class vocabulary), missing policy,
+  description, and for categories/numbers the closed set or the range and
+  direction. Identity is meaning, not code location; a changed meaning is a
+  new version.
+
+| Feature                              | Type                                            | Sources                                             | Sensitivity  | Missing                                                                                                                     |
+| ------------------------------------ | ----------------------------------------------- | --------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `eligibility.hard_gate` v1           | boolean                                         | ELIGIBILITY_RESULT                                  | INTERNAL     | a gate reference, always true for rankable input, never weighted                                                            |
+| `declared_fit.stage` v1              | MATCH / NO_MATCH                                | DECLARED_MANDATE + CANONICAL_COMPANY_STATE          | CONFIDENTIAL | MISSING when stage unknown; NOT_APPLICABLE without positive stage intent                                                    |
+| `declared_fit.geography` v1          | COUNTRY_MATCH / REGION_MATCH / NO_MATCH         | + CANONICAL_TAXONOMY + TAXONOMY_REFERENCE_HIERARCHY | CONFIDENTIAL | MISSING when country and geography classification unknown; NOT_APPLICABLE without intent or with only the unrestricted node |
+| `declared_fit.taxonomy` v1           | EXACT_OVERLAP / DESCENDANT_OVERLAP / NO_OVERLAP | DECLARED_MANDATE + CANONICAL_TAXONOMY + hierarchy   | CONFIDENTIAL | MISSING when the company has no declared classification in an asked vocabulary; Q-proposed rows never count                 |
+| `declared_fit.cheque` v1             | number [0, 1]                                   | DECLARED_MANDATE + CANONICAL_COMPANY_STATE          | CONFIDENTIAL | always MISSING (`CHEQUE_NOT_COMPUTABLE`): no discovery-safe raise projection exists                                         |
+| `semantic_fit.mandate_similarity` v1 | number [-1, 1]                                  | SEMANTIC_CANDIDATE_PROVENANCE                       | CONFIDENTIAL | MISSING (`SEMANTIC_NOT_RETRIEVED`) unless REC-003 retrieved the company; reused, never recomputed                           |
+
+Every V1 feature allows `INVESTOR_DISCOVER` only. Any other context fails
+closed (`FeatureContextNotAllowedError`), for the whole set and per feature.
+The missing policy of every V1 feature is `PRESERVE_MISSING`: a reader never
+imputes. Deferred groups — company state, evidence/confidence, portfolio,
+behaviour, relationship, freshness, exploration, exposure — have no
+definition and therefore no value, not a zero.
+
+- **Firewall.** Feature computation reads typed projections tagged with the
+  source class they are (`CANONICAL_COMPANY_STATE`, `CANONICAL_TAXONOMY`,
+  `TAXONOMY_REFERENCE_HIERARCHY`, the two candidate provenances, the
+  eligibility result, the ACTIVE mandate). A definition names the classes
+  it accepts; a projection of any other class yields MISSING with
+  `SOURCE_NOT_AUTHORISED` and a scope-violation count. The private classes
+  (Q memory, conversations, transcripts, documents, evidence, data room,
+  research, Q inference) are not in the vocabulary and cannot be named. The
+  boundary guard holds `src/features` and its adapters to the eligibility
+  list; the store adapter may touch `recommendation.feature_snapshots` only.
+- **Values** (`FeatureValue`): id, version, status PRESENT / MISSING /
+  NOT_APPLICABLE, typed value or null, bounded missing reason, contributing
+  source classes, sensitivity, bounded provenance (ids, codes, versions;
+  never text). Type-checked against the definition; JSON never coerces.
+- **Snapshots** (`RecommendationFeatureSnapshot`): context, mandate and
+  version, company and projection version, eligibility policy and
+  decision, candidate provenance (generator, representation and
+  configuration versions, reason codes), the values in registry order, the
+  artifact's sensitivity (its most sensitive value; mandate-derived values
+  are CONFIDENTIAL) and a sha256 fingerprint over the semantic inputs and
+  values — never `computedAt` or an id. Same inputs, same fingerprint.
+- **Service** (`createFeatureService`): refuses the context before any read,
+  resolves the ACTIVE mandate through REC-001's ports, refuses any candidate
+  that is not ELIGIBLE for this investor and mandate, reads company state
+  and declared taxonomy in one batch and the preference hierarchy once, and
+  computes purely. A candidate that is no longer discoverable gets no
+  snapshot. Six statements per run, none per feature or per candidate.
+- **Store** `recommendation.feature_snapshots` (migration `20260928090000`):
+  one CURRENT row per investor organisation, mandate, company, context and
+  schema version; identical fingerprint reused, changed fingerprint
+  supersedes; content immutable; cascades with its canonical rows; RLS on,
+  no policy, no browser grant; pgTAP `410_recommendation_features`. Rebuild
+  and event-driven invalidation are REC-006's.
+- **REC-005 seam.** The ranker consumes `ComputeFeaturesResult.snapshots`
+  (or the CURRENT rows) under `recommendation-features.v1`, binds weights in
+  its own versioned config, and never reaches around the service.
+
+Golden scenarios A–W live in `features.test.ts` (registry, pure policy,
+service over a fake world with founder-private markers in memory,
+conversation, document and research) and `features.integration.test.ts`
+(the real hybrid pool, the real store, markers in the real private tables,
+ACTIVE/DRAFT changes, an unauthorised context).
+
+## Deterministic V1 ranker (CQ-REC-005)
+
+The first implementation of doc 19 §108's `Ranker`: REC-004 feature
+snapshots in, an internal ordering out. Its only inputs are the snapshots
+and one ranking config; it reads no database, calls no model, draws no
+random number and reads no clock.
+
+- **Identity.** Ranker `DETERMINISTIC`, implementation `deterministic-ranker.v1`,
+  config `ranking-config.v1`, required feature schema
+  `recommendation-features.v1`, context `INVESTOR_DISCOVER` only. Three
+  separate versions; a result records all of them.
+- **`ranking-config.v1`** (`RANKING_CONFIG_V1`, deep-frozen, validated
+  against the registry at construction). Status `INITIAL_HEURISTIC_UNCALIBRATED`:
+  no ADR fixes weights and doc 19 §53 leaves exact scoring open until
+  outcome data exists, so v1 is the simplest transparent baseline.
+
+| Factor                               | Weight | Normalization                                            |
+| ------------------------------------ | ------ | -------------------------------------------------------- |
+| `declared_fit.stage` v1              | 1      | MATCH 1 · NO_MATCH 0                                     |
+| `declared_fit.geography` v1          | 1      | COUNTRY_MATCH 1 · REGION_MATCH 0.75 · NO_MATCH 0         |
+| `declared_fit.taxonomy` v1           | 1      | EXACT_OVERLAP 1 · DESCENDANT_OVERLAP 0.75 · NO_OVERLAP 0 |
+| `semantic_fit.mandate_similarity` v1 | 1      | (similarity + 1) / 2, clamped to [0, 1]                  |
+
+Inactive, accounted for explicitly: `eligibility.hard_gate` (GATE_ONLY,
+validated, never weighted) and `declared_fit.cheque` (NOT_COMPUTABLE).
+Thresholds: `minimumFit` unset. Tie-break: score descending, then
+canonical company id ascending; unscored after scored, by company id.
+Score precision 12 decimal places. Exploration and diversity: `NONE` here,
+because REC-009 is a separate stage over this one's output rather than a
+term in its score. Every registry feature allowed in the context must be either
+a factor or inactive, so a new feature can be neither silently scored
+nor silently ignored; a feature version change fails config validation.
+
+- **Score.** For the factors whose feature is PRESENT:
+  `Σ(normalized × weight) ÷ Σ(weight)`, in [0, 1]. MISSING and
+  NOT_APPLICABLE factors are excluded from the denominator, never zero.
+  With no present factor the candidate is unscored (`internalScore` null,
+  reason `NO_SCOREABLE_FEATURES`), never "poor". Coverage
+  (`availableWeight ÷ configuredWeight`) is a diagnostic, not a penalty.
+  The number orders one pool under one config; it is not a probability, a
+  quality score, readiness, or anything a user sees.
+- **Output** (`RankedCandidate`): rank, internal score or null, ranker /
+  config / schema versions, the snapshot fingerprint with mandate and
+  company projection versions, both candidate provenances, one
+  `FactorResult` per configured factor (value, normalized value, weight,
+  contribution, polarity POSITIVE / SOFT_MISMATCH / SIGNAL, reason code,
+  source classes) and bounded reason codes. Contributions sum to the score.
+  No prose, no mandate text, no private data.
+- **Refusal, fail closed** (`RankingInputError`): another context, tenant,
+  investor, mandate or mandate version; another company or a duplicate;
+  another feature schema; an unregistered, other-context or GateQ feature;
+  a feature version the config was not written for; an ineligible
+  decision or a false gate; content that no longer matches its
+  fingerprint (a tampered value or client-supplied score).
+- **Service** (`createRankingService`): one call ranks a pool — REC-004
+  snapshots (computed now, reused on an identical fingerprint), then the
+  ranker bound to the server's config. A caller names an actor, the mode,
+  optionally its own mandate and the pool; never a config, weight, score or
+  feature.
+- **Boundary.** The ranking subtree is held to the eligibility list, may
+  not import a domain context, the database or an infrastructure adapter,
+  and may not contain randomness, clock reads or popularity terms.
+- **REC-006 seam.** Persist `RankedCandidate[]` with its three versions and
+  snapshot fingerprints on a slate; rebuild when snapshots supersede.
+
+Golden cases A–R and GM-01..04 live in `ranking.test.ts`; the live local
+ranking over the full pipeline in `ranking.integration.test.ts`, with the
+reusable world in `test/support/recommendation-world.ts`.
+
+Upstream versions. The ranker also refuses a snapshot computed under a
+superseded eligibility policy (`ELIGIBILITY_POLICY_MISMATCH`) or candidate
+generator (`CANDIDATE_VERSION_MISMATCH`): a v1-era snapshot is
+self-consistent, so its fingerprint alone cannot reveal that it is stale.
+It currently requires `eligibility.v2` and `structured-mandate.v2`, where
+only declared company classifications decide exclusion and retrieval; a
+Q-inferred classification on an excluded node changes no ranking (proved
+in the integration privacy test).
+
+The legacy Discover slate (`domain/ranking.ts`, `DISCOVERY_RANKING_VERSION`)
+still serves the founder side; the investor side is served from persisted
+slates built on this pipeline (REC-006, below).
+
+## Persisted recommendation slates and background refresh (CQ-REC-006)
+
+Doc 19 §62–§65 and doc 20 §76–§81 made concrete: the ranker's in-memory
+ordering becomes a durable, versioned, immutable slate that a worker
+builds and the API serves by cursor. A slate is derived infrastructure:
+never company or investor truth, never a relationship, never an interest.
+
+- **Store** (migration `20260929090000_recommendation_slates.sql`, schema
+  `recommendation`, RLS on, no policy, no browser grant).
+  `slates`: one row per pipeline run for one investor organisation,
+  ACTIVE mandate and context, with every version that produced it
+  (`eligibility_policy_version`, `structured_generator_version`,
+  `semantic_generator_version` or null when degraded,
+  `feature_schema_version`, `ranker_version`, `ranking_config_version`,
+  `taxonomy_version`), a sha256 `generation_fingerprint`, bounded
+  `diagnostics` counts, and the lifecycle `BUILDING → CURRENT | FAILED`,
+  `CURRENT → SUPERSEDED | INVALIDATED | EXPIRED` enforced by trigger.
+  Partial unique indexes keep one CURRENT and one BUILDING per key.
+  Identity, versions and (once published) content are immutable.
+  `slate_items`: rank, internal score in [0, 1] or null, REC-005 reason
+  codes, the exact `feature_snapshot_id` ranked (RESTRICT) and the
+  candidate provenance; unique per (slate, rank) and (slate, company);
+  insertable only while BUILDING, never updated. `refresh_requests`: one
+  coalescing claim row per key with a monotonic `request_sequence`,
+  `claimed_sequence`, priority and bounded reason. Queues
+  `recommendation-refresh` / `recommendation-refresh-dead` (pgmq).
+- **Builder** (`createSlateBuilder`): resolves the investor and ACTIVE
+  mandate, runs the hybrid pool, ranks the ELIGIBLE candidates, verifies
+  each ranked candidate against its stored CURRENT feature snapshot by
+  fingerprint, derives the generation fingerprint from the key, every
+  version and the ranked items' snapshot fingerprints (never a time, an
+  id or a count), and stops when the unexpired CURRENT slate already has
+  it. Otherwise BUILDING → items → one transaction that flips the new
+  slate to CURRENT and the previous CURRENT to SUPERSEDED under row locks.
+  A degraded semantic run is a structured-only slate with a null semantic
+  version and its own fingerprint. Any failure after the claim leaves a
+  FAILED row under a bounded code and the served slate untouched; a
+  concurrent build stands down. Policy `slate-policy.v1`: TTL 24 h, page
+  10 default / 20 max, pool 200, semantic top-K 200.
+- **Refresh and invalidation** (`refreshDirectiveFor`,
+  `createSlateInvalidationService`, `createRefreshRequester`). Domain
+  events map to a directive: mandate activated → HIGH rebuild; a
+  `HARD_EXCLUSION` change → invalidate `MANDATE_HARD_CHANGED`, HIGH; other
+  mandate edits → NORMAL; mandate closed → invalidate, no rebuild; a
+  company withdrawn from discovery or the marketplace, or a revoked
+  company disclosure → invalidate the slates that serve it
+  (`VISIBILITY_CHANGED`, `MARKETPLACE_DISABLED`, `SECURITY_RESTRICTION`),
+  HIGH; profile, taxonomy, relationship and newly discoverable changes →
+  NORMAL over the containing slates or a bounded (500) fan-out to every
+  CURRENT slate. Invalidation moves lifecycle only. The requester upserts
+  the claim row and sends one bounded job
+  (`recommendation.slate.refresh`: identifiers, reason, priority,
+  sequence; nothing of the mandate) per real change, always for HIGH.
+- **Worker** (`apps/workers`): the `recommendation-refresh` consumer claims
+  the row (nothing pending → done), resolves the build principal — the
+  mandate's creator as an active member of the investor organisation,
+  because the disclosure evaluator denies every non-human principal — runs
+  the builder, completes the row and sends one more message when a request
+  landed mid-build. Outcomes: DONE; RETRY for an in-progress build, a
+  store race or an outage; PERMANENT for a ranker refusal, no member or an
+  invalid job. The domain-event consumer offers every validated event to
+  the invalidation. One composition (`createRecommendationPipeline`) over
+  the same disclosure evaluator q-api uses and the local embedding
+  runtime.
+- **Reader** (`createSlateReadService`, `GET /v1/discovery/companies`):
+  the servable slate is CURRENT, or SUPERSEDED while inside its expiry so
+  a client mid-scroll keeps one ordering; a page is the items after the
+  cursor's rank, re-checked for this actor by REC-001 in one batch —
+  what is no longer ELIGIBLE is withheld, never replaced — joined to the
+  declared cards. The cursor is an opaque `(slate, rank)` position, never
+  authority: a forged, stale or another investor's cursor is refused
+  alike (400, no hint); an invalidated or expired slate restarts from the
+  current one with `SLATE_RESTARTED`; no servable slate returns an empty
+  page, asks for a rebuild and says `RECOMMENDATIONS_REFRESHING`; an empty
+  slate is a valid answer. The DTO carries `slateId`, the card and
+  declared-alignment `reasonCodes`; the internal score, snapshot,
+  provenance and missingness codes never leave the store. Explanations
+  are REC-007's.
+- **Privacy.** Q memory, conversations, documents, private sources and Q
+  inferences are not inputs: adding them changes no fingerprint and
+  appears in no row (`REC006_PRIVATE_FOUNDER_DATA_MUST_NOT_CHANGE_SLATE`,
+  proved live). The slate subtree is held to the eligibility list and
+  contains no SQL; the store adapter reads and writes its three tables
+  and nothing else.
+- **Cost.** A page of two is served in ~30 executor calls: a fixed cost
+  (investor organisation and mandate read by the reader and again by the
+  eligibility service, the slate, the page, taxonomy versions, disclosure
+  policies, the cards) plus the REC-001 ports' own reads, which batch per
+  company tenant and per relationship pair. Batching those across tenants
+  and pairs is a REC-001 port follow-up, not a slate concern.
+- **Known limits (V1).** The founder side (`/v1/discovery/investors`)
+  still reads the deterministic visibility slate. A build principal is a
+  person, so a person-specific grant seen at build time is re-checked at
+  read time for the requester, but a company disclosed only to a member
+  other than the mandate's creator does not enter the slate until the
+  organisation-level principal exists. New discoverable companies join
+  slates on the fan-out or at expiry. No scheduled rebuild yet: expiry is
+  served as "refreshing" and the next page asks for one.
+
+Tests: `slates.test.ts` (builder over fakes), `slates-refresh.test.ts`,
+`slates-reader.test.ts`, `slates.integration.test.ts` (store, builder,
+reader on local PostgreSQL), `slates-acceptance.integration.test.ts`
+(§92 end to end), pgTAP `420_recommendation_slates`, worker
+`recommendation-refresh.test.ts`, api `discovery.test.ts`.
+
+## Recommendation explanations (CQ-REC-007)
+
+Doc 19 §2.2 makes explainability mandatory: every significant
+recommendation must answer why it was shown, which criteria matched,
+which did not, and what remains uncertain. §58 fixes the order —
+deterministic explanation first, Q's wording second, and the explanation
+still works when Q does not.
+
+- **Contract** (§57). `RecommendationExplanation { summary,
+matchedFactors, mismatchedFactors, uncertainties,
+generatedFromRankingVersion }`, plus `slateId`, `companyId`, `rank` and
+  `source` (DETERMINISTIC | Q_SYNTHESIZED). Each `ExplanationFactor` is a
+  dimension (STAGE, GEOGRAPHY, TAXONOMY, SEMANTIC, CHEQUE), an outcome
+  (MATCH, PARTIAL, MISMATCH, UNKNOWN, NOT_APPLICABLE), a bounded plain
+  English label, and the ranker's own reason code as the audit link back.
+- **A replay, not a second opinion.** The service loads the slate item,
+  fetches the feature snapshot **by the id the item stored**, refuses if
+  that snapshot's fingerprint has moved, looks the ranking config up by
+  the **slate's** recorded version, and runs REC-005's own
+  `scoreSnapshot`. The factors are therefore the ones that produced the
+  ordering, and there is no second scoring implementation to drift. A
+  slate built under a config this build no longer carries is refused
+  rather than explained with today's weights (§55, §189).
+- **Three buckets, kept apart** (§92). Missing evidence is an uncertainty,
+  never a mismatch, and the label distinguishes "this company has not
+  stated its stage" from "your mandate does not name one" — different
+  facts, neither a shortcoming. The hard eligibility gate is omitted
+  rather than restated as a merit: every item in a slate passed it.
+- **No arithmetic reaches a reader** (§56). The deterministic summary is
+  composed from the bucket nouns and contains no digit at all, so "87%
+  match" is unreachable by construction; the internal score, weights,
+  contributions and similarity stay in the store.
+- **Q's layer** (§59). `createRecommendationNarrator` (q-specialists) is
+  the first consumer of `FIT_EXPLANATION_V1`, the q-core prompt that has
+  been ACTIVE and hash-pinned since CQ-Q-006 with no caller. It receives
+  the factor labels, the company's own declared one-liner and a neutral
+  line about the investor's criteria — no snapshot, no mandate, no score.
+  Its answer is used only if `groundingFailure` passes it: an invented
+  overall label, any digit or quantity word, a dimension the ranker never
+  scored, or an unknown restated as a match all send the caller back to
+  the deterministic wording. So does an outage, a rate limit, an
+  exhausted route or a refused schema. Discovery holds the port; the
+  narrator is bound above it, and discovery still imports no model
+  gateway and no q-core.
+- **Surface.** `GET /v1/discovery/slates/:slateId/companies/:companyId/explanation`,
+  served by q-api because the natural-language half is Q and the Model
+  Gateway lives there. Neither identifier is authority; all three refusals
+  (not yours or not there, snapshot gone, ranking version unavailable)
+  return one indistinguishable 404.
+- **Known limits (V1).** The explanation is a standalone surface rather
+  than a turn in the Q conversation: `recommendation-guard.ts` still
+  strips recommendation claims from the conversational answer path, and
+  turning that guard into "cites factors the ranker produced" belongs with
+  the conversational integration, not here (§34). Comparisons between two
+  recommendations, and interaction signals, are REC-008/REC-009.
+
+## Synthetic-demo model routing (CQ-REC-007 A)
+
+Doc 15 §62: _"Free" is a cost property. It is not a privacy
+classification._ Free/shared inference may be used aggressively for
+public data, **synthetic data** and **development**, while confidential
+customer information requires an approved provider. The Model Gateway
+could express only the second half — it knows a request's sensitivity and
+a provider's reviewed ceiling, and treats every request as somebody's
+data — so a demo deployment full of invented companies could reach only
+the reviewed provider, and stalled on its free-tier limits.
+
+`ModelDataPosture` (REAL_CUSTOMER | SYNTHETIC_DEMO) is a request field
+orthogonal to sensitivity and never a substitute for it: sensitivity
+stays truthful on the request, the route record and the trace, and
+neither value is ever sent to a provider. Two conditions are required and
+neither is sufficient alone — the request declares the posture, and the
+process holds a `SyntheticDemoRoutingAllowance`. The allowance is an
+operator opt-in (`CQ_SYNTHETIC_DEMO_ROUTING`, off by default) re-checked
+against `CAPITAL_Q_ENV` local/test and a loopback database, refusing
+loudly at startup anywhere the claim cannot hold; migration 20260926 is
+explicit that no permission decision may depend on environment alone, and
+it does not here. No HTTP DTO carries the posture, so a browser cannot
+declare one, and without an allowance a declaration changes nothing.
+
+When both hold, `planRoute` skips the two privacy ceilings and records
+the candidate as `ELIGIBLE_SYNTHETIC_DEMO` rather than `ELIGIBLE`, so a
+route record, a log line and an auditor can tell which rule admitted the
+provider. No `ai_ops` row moves: google stays UNREVIEWED and the Gemini
+ceilings stay PUBLIC, as pgTAP 320 asserts, and no migration was needed.
+Because every task class has exactly one RESTRICTED-class policy row, the
+preference migrations 20260920/20260922 already set — Gemini-lite first
+for dialogue, extraction and synthesis, Groq behind — now applies to demo
+traffic instead of being skipped at the ceiling.
+
+## Not built yet
+
+- Semantic _fit_ as a ranking factor (REC-004/REC-005). Semantic
+  _retrieval_ exists above; its similarity is provenance, not a score.
+- Evidence and freshness as ranking signals.
+- GateQ. Discovery answers "who could you meet"; whether a founder may
+  reach an investor is a different question with its own rules.
+- A closed or blocked relationship state. Network defines only
+  DISCOVERED; when it defines more, `RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY`
+  names them and the policy version moves.
+- Explanations as a turn in the Q conversation. REC-007 serves them on
+  their own path; the conversational guard still strips recommendation
+  claims from the chat answer.
+- Comparing two recommendations ("why is this above that one").
+- A scheduled slate rebuild.
+- A source that can prove a passed company should be offered again: a
+  reset command, or the mandate version a pass was made under (REC-009
+  §12). The seam is typed; the evidence is not there yet.
+- Feature groups beyond eligibility, declared fit and semantic fit: no
+  definition, no value, no zero, until their source infrastructure exists.
+- An event-driven representation refresh worker; today `refreshCompanyRepresentations`
+  is an explicit, idempotent call.
+
+## Recommendation interactions (CQ-REC-008)
+
+`recommendation.interaction_events` records what an investor did with a
+recommendation; `recommendation.interaction_state` is a derived projection
+of it for reads that cannot afford the history. Both are server-only: RLS
+on, no policy, no browser grant, and a founder of a watched company reads
+neither.
+
+Eight types, in two kinds. **Observations** — `IMPRESSION`,
+`WATCH_MILESTONE`, `PROFILE_OPEN`, `ASK_Q` — are reports about what
+somebody saw. **Decisions** — `SAVE`, `UNSAVE`, `PASS` — change durable
+state the person meets again. `INTEREST_OBSERVED` is neither: it is the
+seam for a future canonical Network event, and no client route may write
+it, because Express Interest creates relationship state and CQ-NET-010
+owns it.
+
+Every type carries a strength class (doc 19 §66): `ATTENTION`,
+`CONSIDERATION`, `CONTEXTUAL_DECISION`, `INTENT`. It is a class and never
+a number. Nothing orders it, nothing multiplies it, and REC-005 does not
+read it — `ranking-config.v1` and `recommendation-features.v1` are
+untouched by this packet, so observed behaviour can only reach ranking
+through a governed feature-schema version.
+
+What a caller may say, and what the server decides:
+
+| The client supplies                           | The server resolves                                              |
+| --------------------------------------------- | ---------------------------------------------------------------- |
+| company, surface, the slate it was looking at | the actor's investor organisation                                |
+| a client event id, for idempotency            | the slate item, its rank, the ranker and ranking-config versions |
+| a session id, optionally                      | the company's tenant                                             |
+| a pass reason, optionally                     | the time the interaction was recorded                            |
+
+A client event id grants no authority. It is unique per **actor**, so one
+person's id can never occupy another's identity, and two partial unique
+indexes make a retry harmless even when it invents a fresh one: one
+impression per person, per slate, per company, per session; one milestone
+per playback. The same company in a _new_ slate is a new, legitimate
+impression — that is the difference between deduplicating a retry and
+deleting a fact.
+
+### Impression emission
+
+An item existing in the DOM is not an impression (doc 20 §71). A server
+cannot prove viewport geometry and this one does not pretend to: an
+impression exists because a client deliberately reported one, and the
+contract has no field a virtualised or preloaded row could fill by
+existing.
+
+The rule the feed surface must implement (WEB-020/023 owns it):
+
+```
+report an impression when the item has been
+  at least ~50% visible
+  for at least ~500ms
+```
+
+Tune experimentally. **A preloaded or off-screen item must never report
+one** — that is what turns exposure accounting into noise, and the whole
+point of recording position and ranking version is that a later packet can
+correct for position bias rather than conclude that the top of the list is
+simply better.
+
+### Watch
+
+Milestones only: `STARTED`, `P25`, `P50`, `P75`, `COMPLETED`. There is no
+progress field, because one would invite an event per animation frame.
+`STARTED` means playback began, not that a poster rendered; `COMPLETED`
+comes from playback progress, never from an error or an auto-advance
+(doc 20 §72–§73).
+
+Watching to the end is attention. It is not interest, it does not create a
+relationship, it does not save anything, and it does not widen a declared
+mandate. A founder cannot see who watched, for how long, or when.
+
+### What is deliberately absent
+
+- No `total_views`, `popularity_score` or `save_count` on a company.
+  Exposure must never become a loop where early visibility buys permanent
+  advantage.
+- No question, answer, prompt, transcript or free-text note. An `ASK_Q`
+  row records that Q was asked about a company; the conversation belongs
+  to the Q runtime.
+- No propensity or selection probability. Serving is deterministic today,
+  and recording a probability nobody measured would poison the evaluation
+  it is meant to support. REC-009 owns exploration.
+- No pass reset command. Doc 19 §67 lists "investor resets pass" as a
+  reintroduction trigger; the state keeps `passed_at` so one can be added
+  additively when a surface needs it.
+
+## Organisation-safe recommendation authority (CQ-PERM-ORG-VIEW-001)
+
+A slate belongs to an Investor Organisation. Every member reads the same
+rows, so what goes into it must not depend on which member built it.
+
+The pipeline had exactly one person-scoped read. Eligibility asks the
+disclosure evaluator `permittedToView`, and it asked as whichever human
+the worker's `BuildPrincipalResolver` returned — the mandate's creator,
+or, once they left, the longest-standing active member. Every other
+eligibility port is already organisation-scoped or unscoped: company facts
+and classifications take ids, the mandate is read for the investor
+organisation, relationship standings are between organisations.
+
+So eligibility now takes a **viewpoint**:
+
+| viewpoint               | used by                                       |
+| ----------------------- | --------------------------------------------- |
+| `ACTOR` (the default)   | the slate reader, the interaction action path |
+| `INVESTOR_ORGANISATION` | structured and semantic candidate generation  |
+
+An omitted viewpoint is `ACTOR`: a caller that forgets to say gets the
+narrower, per-person question, never the organisation's. The actor is
+still required under both — it is how the investor organisation and the
+mandate are resolved, and it remains the audit subject. Only the
+disclosure question changes.
+
+Discovery does not know what a principal is. The viewpoint is a Discovery
+word; the infrastructure adapter translates it into the permissions
+module's `actorPrincipal` or `organisationPrincipal`, and an organisation
+viewpoint that resolves to no organisation answers false for every
+company rather than falling back to anyone. Permissions remains the owning
+authority: no permission SQL, and no second framework, lives here.
+
+**What this does and does not change.** No ranking change: REC-005 weights,
+`ranking-config.v1` and `recommendation-features.v1` are untouched, and no
+migration was needed — the organisation principal is expressible in the
+existing `disclosure_policies` recipient model, which already has an
+`ORGANISATION` recipient type. What changes is that a `specifically_shared`
+grant naming one member no longer puts a company in their organisation's
+candidate pool. Nobody was ever over-served — the reader re-evaluates
+REC-001 per actor and withholds — but the pool itself is now the
+organisation's, and rebuilding under a different member yields the same
+one.
+
+### What REC-009 may consume
+
+REC-009 reads exposure and decides what to show next, which turns these
+rows from a record into an input. The boundary, settled here so REC-009
+does not have to rediscover it:
+
+- **Organisation-level exposure is admissible.** `interaction_state` is
+  keyed `(tenant_id, investor_organisation_id, company_id)` and its
+  companies came through an organisation-scoped eligibility evaluation, so
+  "this organisation has been shown this company" is now a statement the
+  whole organisation could have made. Before this packet it was not.
+- **Actor identity stays on the event and never becomes a mandate.**
+  `interaction_events` keeps `actor_user_id`; "member A watched C" must
+  never be read as "organisation O has declared interest in C". Declared
+  mandate and observed behaviour remain separate axes, and only CQ-NET-010
+  creates relationship state.
+- **Strength class is a class.** `ATTENTION`, `CONSIDERATION`,
+  `CONTEXTUAL_DECISION`, `INTENT` are not ordered, summed or multiplied by
+  anything downstream.
+- **Nothing person-private is an input.** A member's own Q context, their
+  personal documents and any `specifically_shared` grant addressed to them
+  are outside the organisation viewpoint by construction, so they cannot
+  enter exposure, diversity or exploration. If REC-009 ever needs one, that
+  is a new packet with a new grant, not a widening of this one.
+- **Exposure is still not popularity.** No global counters exist and none
+  may be added; exposure is per organisation, and early visibility must
+  never buy permanent advantage.
+
+REC-009 was built to this and consumes less of it than it was allowed:
+exposure as a boolean and an instant, and the pass flag. Strength class,
+watch milestones, Ask-Q and Save reach it through no field at all.
+
+## Bounded diversity and exploration (CQ-REC-009)
+
+Doc 19 §81's problem, concretely: a page of twelve companies that are all
+the one thing the investor said they were interested in. REC-009 is the
+stage between REC-005's order and REC-006's persisted slate that fixes
+that without doing damage.
+
+It is a **permutation**, and that is the load-bearing property. It cannot
+introduce a company because there is nowhere inside it for one to come
+from, and it cannot drop one because the output is the input reordered.
+"Exploration can never reintroduce an ineligible company" is therefore not
+a rule anyone has to enforce; it is arithmetic. It also reads no database,
+calls no model, draws no random number and reads no clock — the instant
+recency is measured against arrives as an argument — so `rerank` is a
+synchronous pure function and could not have called a provider even if
+something wanted it to.
+
+- **Identity.** Reranker `BOUNDED_DETERMINISTIC`, implementation
+  `bounded-reranker.v1`, policy `exploration-policy.v1`, status
+  `INITIAL_HEURISTIC_UNCALIBRATED`, context `INVESTOR_DISCOVER` only. It
+  refuses a base order produced by a ranker version it was not written
+  for.
+- **`exploration-policy.v1`** (`EXPLORATION_POLICY_V1`, deep-frozen,
+  validated at construction). Every number lives there; the algorithm
+  holds none, which a test proves by running it under an all-zero policy
+  and getting REC-005's order back untouched.
+
+| Knob                     | v1     | What it means                                                                 |
+| ------------------------ | ------ | ----------------------------------------------------------------------------- |
+| `window`                 | 10     | The page size: concentration is something felt on a page                      |
+| `maxSameClusterInWindow` | 3      | Three of a kind per page, not twelve                                          |
+| `maxScoreDistance`       | 0.15   | The relevance floor: nothing moves past a candidate scored this much higher   |
+| `maxPromotion`           | 20     | A stated cap on rank distance, so movement is bounded and not merely emergent |
+| `recentlySeenWindowMs`   | 24 h   | How recently an impression makes a company "just seen"                        |
+| exploration              | 1 slot | The last position of each window, offered to a company never shown            |
+
+**Two phases, each with its own bound.** First, suppression: a company
+this organisation passed goes behind every unsuppressed candidate, in its
+own order — demoted, never dropped and never banned. Demotion orders the
+slate; it is **not** what keeps a passed company out of a page, because a
+tail is still reachable and a pass recorded after the build is not in the
+build at all. The reader does that, below. Then a bounded greedy
+over the rest: at each position, the best remaining candidate takes it
+unless its cluster already fills the page, or the organisation saw it very
+recently, and some other candidate _within the relevance floor_ fixes
+that. If nothing within the floor does, the best candidate takes the
+position anyway. Doc 19 §82 decided this: relevance is never traded for a
+diversity quota.
+
+**The cluster is the investor's own taxonomy, not the company's.** It is
+the set of `preferredNodeId`s — nodes on the mandate — that REC-002 matched,
+hashed so the key cannot leak a mandate's taxonomy into a log line. Two
+companies share a cluster when they answer the same declared preference,
+which is the granularity the concentration problem is about. A company the
+structured generator did not find has no cluster, and an unknown cluster is
+never capped, never penalised and never counted against anything.
+
+**What it may read, and why that is a shape rather than a rule.**
+`RerankSignals` is three fields — `exposed`, `lastSeenAt`, `passed` — and
+none of them is a number. REC-008's state carries an impression count, a
+save flag, a save time, a last pass reason and a last interaction time;
+the adapter drops all of it. Whether an organisation has seen a company is
+a fact about exposure; _how many times_ is a magnitude, and a magnitude in
+a reordering stage is a popularity signal however carefully it is named.
+Save is absent for the same reason and one more: it is an investor's own
+bookmark and must never move a company, for them or for anyone else.
+
+**Save and Pass together**, which REC-008 showed can both be true:
+
+| State        | Proactive recommendation      | Saved list |
+| ------------ | ----------------------------- | ---------- |
+| saved        | unchanged — Save never boosts | present    |
+| passed       | suppressed to the tail        | absent     |
+| saved+passed | suppressed to the tail        | present    |
+
+Pass decides what the feed offers; Save decides what the Saved list
+holds. Neither action is deleted and neither overrides the other.
+
+**Where suppression actually happens (CQ-REC-009R).** At read time, beside
+REC-001's guard, in the same batch:
+
+```
+page items → REC-001 re-evaluated now  ─┐
+           → passes read now           ─┴→ withheld, never substituted
+```
+
+Both guards exist for the same reason. A slate is built at most once per
+TTL, so anything that can change in between — a revoked grant, a company
+leaving the marketplace, an investor passing on something — has to be
+checked at serving or it is checked too late. The slate keeps the item, so
+the ordering stays reproducible and the history stays auditable; the page
+simply does not offer it. `suppressedFromProactiveDiscovery` is the single
+rule both the build and the read use, so they cannot disagree — except in
+how they treat an unrecognised reintroduction reason, where the build
+refuses outright and the read fails closed, because a build can stop and
+be retried and a feed page cannot.
+
+**Reintroduction after a pass.** `PASS_REINTRODUCTION_REASONS` names three
+— `EXPLICIT_PASS_RESET`, `MANDATE_VERSION_CHANGED`, `MATERIAL_COMPANY_UPDATE`
+— and `PROVABLE_PASS_REINTRODUCTION_REASONS` is **empty**, because nothing
+in the system can currently prove one: `interaction_state` records that a
+pass happened and when, not the mandate version it was made under, and no
+surface issues a reset. A changed `updated_at` is not a material update; a
+typo fix would resurface everything an investor had dismissed. So a passed
+company stays suppressed, the mechanism is typed and tested, and an
+unrecognised reason is refused rather than ignored.
+
+- **Reason codes.** `DIVERSITY_ADJUSTMENT`, `RECENTLY_SEEN_SUPPRESSION`,
+  `PASS_SUPPRESSION`, `PASS_REINTRODUCED`, `EXPLORATION_SLOT`, reported in
+  one fixed order and stored on the slate item beside REC-005's scoring
+  codes. The two sets are disjoint and separately exported, so a consumer
+  partitions them by membership rather than by parsing a name. They are
+  inputs REC-007 may one day be given, not sentences.
+- **REC-005 is untouched.** `ranking-config.v1`,
+  `recommendation-features.v1` and the weights are unchanged; the reranker
+  cannot import the config or the ranker at all, which the boundary test
+  asserts. A slate item stores REC-009's position and REC-005's score, and
+  the base rank is recoverable exactly from the stored scores under
+  REC-005's own tie-break — which is why no column was added.
+- **No migration.** The policy version rides in the generation fingerprint
+  and the `diagnostics` jsonb, so a policy change rebuilds rather than
+  serving an order nobody would compute again.
+- **Cost.** One batched read per build, whatever the pool size. Two
+  hundred candidates reorder in single-digit milliseconds.
+- **Known limits (V1).** Diversity has one dimension, because taxonomy is
+  the only company-side attribute available downstream — geography and
+  stage are read by REC-001 and not carried past it, and adding a read for
+  them is a change to REC-001's contract rather than a rerank concern. The
+  numbers are hand-set: no outcome data calibrates them, and doc 19 §53
+  leaves them open until it exists. Exploration is a bounded slot rather
+  than a policy with propensity logging; contextual bandits (doc 19 §2450)
+  would need action probabilities this deliberately does not produce.

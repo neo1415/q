@@ -108,6 +108,7 @@ function fakeService(overrides: Partial<InvestorService> = {}) {
     getInvestorOrganisation: notUnderTest,
     getCurrentInvestorOrganisation: notUnderTest,
     updateInvestorOrganisation: notUnderTest,
+    setInvestorVisibility: notUnderTest,
     getMyInvestorRepresentative: notUnderTest,
     upsertMyInvestorRepresentative: notUnderTest,
     createInvestorMandate: (command) => {

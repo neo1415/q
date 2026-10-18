@@ -49,7 +49,8 @@ insert into evidence.document_processing_runs (document_version_id, pipeline_ver
   ('00000000-0000-4000-8000-00000000f001', 'evidence-v1');
 
 -- Shape and invariants ------------------------------------------------------------
-select is((select count(*)::int from evidence.document_versions where sha256 = repeat('a', 64)), 2,
+select is((select count(*)::int from evidence.document_versions where sha256 = repeat('a', 64)
+            and tenant_id in (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('tenant_b'))), 2,
   'the same bytes in two tenants are two version records with separate ownership');
 select is((select visibility_scope || '/' || sensitivity_class from evidence.documents where id = '00000000-0000-4000-8000-00000000d001'),
   'organisation_private/CONFIDENTIAL', 'a document defaults to organisation_private and CONFIDENTIAL');
@@ -142,7 +143,8 @@ select throws_ok(
      values (pg_temp.rls_id('tenant_a'), 'USER_STATEMENT', 'COMPANY', '00000000-0000-4000-8000-0000000000c1', 'organisation_private', 'INTERNAL') $$,
   '42501', null, 'an authenticated browser session cannot write sources');
 select pg_temp.act_as_privileged();
-select is((select count(*)::int from evidence.documents), 2, 'the privileged server role reads every document (physical access, not authorisation)');
+select is((select count(*)::int from evidence.documents
+            where id in ('00000000-0000-4000-8000-00000000d001', '00000000-0000-4000-8000-00000000d002')), 2, 'the privileged server role reads every document (physical access, not authorisation)');
 select is((select count(*)::int from evidence.claim_evidence), 2, 'the privileged server role reads every link');
 
 select * from finish();

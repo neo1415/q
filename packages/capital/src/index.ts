@@ -97,7 +97,36 @@ export {
   createPostgresCapitalObjectiveCreationRequestStore,
   createPostgresCapitalObjectiveHistoryWriter,
   createPostgresCapitalObjectiveQueryPort,
+  createPostgresCapitalObjectiveTimes,
   createPostgresCapitalObjectiveRepository,
 } from "./infrastructure/postgres-repositories.js";
+
+export {
+  CapitalRoundClosedError,
+  CapitalRoundNotFoundError,
+  CapitalRoundRevisionConflictError,
+  CapitalRoundStepRefusedError,
+  CapitalRoundTermsError,
+  createCapitalRoundService,
+  isRoundNotFound,
+  type CapitalRoundDependencies,
+  type CapitalRoundService,
+} from "./application/rounds.js";
+
+export {
+  addDecimal,
+  availableRoundSteps,
+  basisPoints,
+  checkRoundTerms,
+  compareDecimal,
+  isRaising,
+  nextRoundStatus,
+  ownershipEstimate,
+  roundChanges,
+  roundNotices,
+  type NoticeInput,
+  type StepOutcome,
+  type StepRefusal,
+} from "./domain/rounds.js";
 
 export const PACKAGE_NAME = "@capital-q/capital" as const;

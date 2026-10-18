@@ -275,12 +275,37 @@ export function createDocumentQSubjectResolver(
 }
 
 /**
- * A relationship resolves for the company side's tenant — its storage
- * anchor (ADR 0003). The investor side, whose tenant differs, reaches it
- * through disclosure in CQ-Q-004.
+ * The exact parties of a relationship (the permissions context's
+ * RelationshipPartyResolver has this shape; the Context Firewall uses the
+ * same one).
+ */
+export type QRelationshipPartiesPort = {
+  readonly resolve: (relationshipId: string) => Promise<{
+    readonly company: {
+      readonly organisationId: string;
+      readonly tenantId: string;
+    };
+    readonly investor: {
+      readonly organisationId: string;
+      readonly tenantId: string;
+    };
+  } | null>;
+};
+
+/**
+ * A relationship resolves for its two parties and nobody else.
+ *
+ * It is stored in the company side's tenant (ADR 0003). Without a parties
+ * port only that side resolves it. With one, the investor side resolves it
+ * too, by exact membership: the actor's own organisation in its own
+ * tenant is one of the two parties. Resolving selects the relationship; it
+ * reveals nothing. What either side may then read is the firewall's
+ * RELATIONSHIP_CONTEXT, labelled for that side, and the Network context's
+ * per-party fold. Everyone else gets null, the same as a typo.
  */
 export function createRelationshipQSubjectResolver(
   relationships: Pick<RelationshipQueryPort, "getById">,
+  parties?: QRelationshipPartiesPort,
 ): QSubjectResolver {
   return {
     kind: "RELATIONSHIP",
@@ -288,10 +313,26 @@ export function createRelationshipQSubjectResolver(
       if (ref.kind !== "RELATIONSHIP") {
         return null;
       }
-      const relationship = await relationships.getById(
-        RelationshipIdSchema.parse(ref.relationshipId),
+      const id = RelationshipIdSchema.safeParse(ref.relationshipId);
+      if (!id.success) {
+        return null;
+      }
+      const relationship = await relationships.getById(id.data);
+      if (parties === undefined || relationship === null) {
+        return inTenant(actor, ref, relationship, null);
+      }
+      const found = await parties.resolve(id.data);
+      if (found === null || actor.organisationId === undefined) {
+        return null;
+      }
+      const isParty = [found.company, found.investor].some(
+        (party) =>
+          party.organisationId === actor.organisationId &&
+          party.tenantId === actor.tenantId,
       );
-      return inTenant(actor, ref, relationship, null);
+      return isParty
+        ? { ref, tenantId: relationship.tenantId, organisationId: null }
+        : null;
     },
   };
 }

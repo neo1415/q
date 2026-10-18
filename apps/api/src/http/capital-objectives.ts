@@ -7,25 +7,14 @@ import {
 } from "@capital-q/capital";
 import { CompanyIdSchema, type CompanyId } from "@capital-q/companies";
 import {
-  CAPITAL_OBJECTIVE_CLOSE_SUFFIX,
   CAPITAL_OBJECTIVE_CURRENT_SEGMENT,
-  CAPITAL_OBJECTIVE_REPLACE_SUFFIX,
   CAPITAL_OBJECTIVES_SUFFIX,
   CapitalObjectiveDtoSchema,
-  CloseCapitalObjectiveRequestSchema,
   COMPANIES_PATH,
-  CorrelationIdSchema,
-  CreateCapitalObjectiveRequestSchema,
-  IDEMPOTENCY_KEY_HEADER,
-  IdempotencyKeyHeaderSchema,
   ListCapitalObjectivesQuerySchema,
   ListCapitalObjectivesResponseSchema,
   parseContract,
-  ReplaceCapitalObjectiveRequestSchema,
-  UpdateCapitalObjectiveRequestSchema,
-  type CorrelationId,
 } from "@capital-q/contracts";
-import { createCorrelationId } from "@capital-q/observability";
 
 import {
   getActorContext,
@@ -45,10 +34,6 @@ import {
 export type CapitalRoutesDependencies = ActorContextDependencies & {
   readonly capital: CapitalService;
 };
-
-function correlation(): CorrelationId {
-  return CorrelationIdSchema.parse(createCorrelationId());
-}
 
 function companyIdParam(request: FastifyRequest): CompanyId {
   const params = request.params as Record<string, unknown>;
@@ -76,36 +61,6 @@ export function registerCapitalObjectiveRoutes(
   const service = dependencies.capital;
   const base = `${COMPANIES_PATH}/:companyId${CAPITAL_OBJECTIVES_SUFFIX}`;
   const byId = `${base}/:capitalObjectiveId`;
-
-  app.post(base, { onRequest: withContext }, async (request, reply) => {
-    const rawKey = request.headers[IDEMPOTENCY_KEY_HEADER];
-    const idempotencyKey = parseContract(
-      IdempotencyKeyHeaderSchema,
-      typeof rawKey === "string" ? rawKey : undefined,
-      "An Idempotency-Key header is required to create a capital objective.",
-    );
-    const input = parseContract(
-      CreateCapitalObjectiveRequestSchema,
-      request.body,
-      "The capital objective request is not valid.",
-    );
-    const companyId = companyIdParam(request);
-    const objective = await service.createCapitalObjective({
-      actor: getActorContext(request),
-      companyId,
-      input,
-      idempotencyKey,
-      correlationId: correlation(),
-    });
-    void reply
-      .status(201)
-      .header(
-        "Location",
-        `${COMPANIES_PATH}/${companyId}${CAPITAL_OBJECTIVES_SUFFIX}/${objective.id}`,
-      )
-      .header("Cache-Control", "no-store");
-    return CapitalObjectiveDtoSchema.parse(toCapitalObjectiveDto(objective));
-  });
 
   app.get(base, { onRequest: withContext }, async (request, reply) => {
     const query = parseContract(
@@ -150,72 +105,4 @@ export function registerCapitalObjectiveRoutes(
     void reply.header("Cache-Control", "no-store");
     return CapitalObjectiveDtoSchema.parse(toCapitalObjectiveDto(objective));
   });
-
-  app.patch(byId, { onRequest: withContext }, async (request, reply) => {
-    const input = parseContract(
-      UpdateCapitalObjectiveRequestSchema,
-      request.body,
-      "The capital objective update is not valid.",
-    );
-    const objective = await service.updateCapitalObjective({
-      actor: getActorContext(request),
-      companyId: companyIdParam(request),
-      capitalObjectiveId: objectiveIdParam(request),
-      input,
-      correlationId: correlation(),
-    });
-    void reply.header("Cache-Control", "no-store");
-    return CapitalObjectiveDtoSchema.parse(toCapitalObjectiveDto(objective));
-  });
-
-  app.post(
-    `${byId}${CAPITAL_OBJECTIVE_CLOSE_SUFFIX}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const input = parseContract(
-        CloseCapitalObjectiveRequestSchema,
-        request.body,
-        "The close request is not valid.",
-      );
-      const objective = await service.closeCapitalObjective({
-        actor: getActorContext(request),
-        companyId: companyIdParam(request),
-        capitalObjectiveId: objectiveIdParam(request),
-        input,
-        correlationId: correlation(),
-      });
-      void reply.header("Cache-Control", "no-store");
-      return CapitalObjectiveDtoSchema.parse(toCapitalObjectiveDto(objective));
-    },
-  );
-
-  app.post(
-    `${byId}${CAPITAL_OBJECTIVE_REPLACE_SUFFIX}`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const input = parseContract(
-        ReplaceCapitalObjectiveRequestSchema,
-        request.body,
-        "The replace request is not valid.",
-      );
-      const companyId = companyIdParam(request);
-      const { replacement } = await service.replaceCapitalObjective({
-        actor: getActorContext(request),
-        companyId,
-        capitalObjectiveId: objectiveIdParam(request),
-        input,
-        correlationId: correlation(),
-      });
-      void reply
-        .status(201)
-        .header(
-          "Location",
-          `${COMPANIES_PATH}/${companyId}${CAPITAL_OBJECTIVES_SUFFIX}/${replacement.id}`,
-        )
-        .header("Cache-Control", "no-store");
-      return CapitalObjectiveDtoSchema.parse(
-        toCapitalObjectiveDto(replacement),
-      );
-    },
-  );
 }

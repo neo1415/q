@@ -1,0 +1,82 @@
+$ npx playwright test -c tests/recovery/playwright.recovery.config.ts --project permissions --project scenarios --project voice --project promises --project a11y
+(exit 1)
+    [scenarios] › tests/recovery/scenarios/a-navigate.spec.ts:84:5 › from /relationships, "open settings" arrives 
+    [scenarios] › tests/recovery/scenarios/a-navigate.spec.ts:84:5 › from /settings, "open discover" arrives 
+    [scenarios] › tests/recovery/scenarios/a-navigate.spec.ts:84:5 › from /settings, "take me to my documents" arrives 
+    [scenarios] › tests/recovery/scenarios/a-navigate.spec.ts:84:5 › from /settings, "show me relationships" arrives 
+    [scenarios] › tests/recovery/scenarios/a-navigate.spec.ts:84:5 › from /settings, "go to capital" arrives 
+    [scenarios] › tests/recovery/scenarios/a-navigate.spec.ts:84:5 › from /capital, "open discover" arrives 
+    [scenarios] › tests/recovery/scenarios/a-navigate.spec.ts:84:5 › from /capital, "take me to my documents" arrives 
+    [scenarios] › tests/recovery/scenarios/a-navigate.spec.ts:84:5 › from /capital, "show me relationships" arrives 
+    [scenarios] › tests/recovery/scenarios/a-navigate.spec.ts:84:5 › from /capital, "open settings" arrives 
+    [scenarios] › tests/recovery/scenarios/a-navigate.spec.ts:119:1 › Scenario A: Capital, the Readiness tab, scroll to risks, explain the second one 
+    [scenarios] › tests/recovery/scenarios/a-navigate.spec.ts:193:1 › an act on a control the page does not have is reported TARGET_MISSING, never done 
+    [scenarios] › tests/recovery/scenarios/b-investor-compare.spec.ts:27:1 › Scenario B: investors list, open the second, mandate tab, compare 
+    [scenarios] › tests/recovery/scenarios/c-documents.spec.ts:23:1 › Scenario C: open, read, check, download, and delete only after confirming 
+    [scenarios] › tests/recovery/scenarios/c-documents.spec.ts:163:1 › archive is not delete: an archived document can be found again 
+    [scenarios] › tests/recovery/scenarios/d-work-agents.spec.ts:20:1 › Scenario D: a research-and-drafts job runs to an honest state, and asks before anything goes out 
+    [scenarios] › tests/recovery/scenarios/d-work-agents.spec.ts:101:1 › a failed agent shows as FAILED or RECOVERING with a reason, never as done 
+    [scenarios] › tests/recovery/scenarios/e-uninterrupted.spec.ts:22:1 › Scenario E: talk across three pages without the line dropping; interrupt; correct; continue 
+    [scenarios] › tests/recovery/scenarios/f-attention.spec.ts:23:1 › Scenario F: what needs my attention names what is waiting, from the attention report 
+    [scenarios] › tests/recovery/scenarios/f-attention.spec.ts:59:1 › L-01 regression: a model that says 'nothing' cannot hide what the report holds 
+    [scenarios] › tests/recovery/scenarios/g-cross-modal.spec.ts:21:1 › Scenario G: say it, type the follow-up, say the next: one conversation 
+    [scenarios] › tests/recovery/scenarios/g-cross-modal.spec.ts:98:1 › a typed turn while the line is up is heard by the same conversation 
+    [scenarios] › tests/recovery/scenarios/h-failures.spec.ts:23:1 › network loss while sending: a visible failure, then a working retry 
+    [scenarios] › tests/recovery/scenarios/h-failures.spec.ts:53:1 › relay failure (the server action is lost): the person sees it, not an endless 'Thinking' 
+    [scenarios] › tests/recovery/scenarios/h-failures.spec.ts:70:1 › model timeout: the turn fails visibly within the deadline 
+    [scenarios] › tests/recovery/scenarios/h-failures.spec.ts:174:1 › worker restart mid-job: the job resumes instead of staying RUNNING forever (audit D-08) 
+    [scenarios] › tests/recovery/scenarios/h-failures.spec.ts:241:1 › asking Q from a busy page (Work with pending decisions) gets an answer, not a 500 
+    [voice] › tests/recovery/voice/duplex-failures.spec.ts:48:3 › duplex voice failures › lost microphone permission: the line says Q can't hear, and offers to fix it 
+    [voice] › tests/recovery/voice/duplex-failures.spec.ts:64:3 › duplex voice failures › failed transcript: Q asks again instead of going silent (audit B-01) 
+    [voice] › tests/recovery/voice/duplex-failures.spec.ts:96:3 › duplex voice failures › realtime connect timeout: falls back to the standard line and says so 
+    [voice] › tests/recovery/voice/duplex-failures.spec.ts:112:3 › duplex voice failures › relay failure: a heard turn whose relay is lost still ends visibly (audit C-08) 
+    [voice] › tests/recovery/voice/duplex-failures.spec.ts:126:3 › duplex voice failures › playback loss: an answer whose audio never starts is shown as text, and the turn ends 
+    [voice] › tests/recovery/voice/duplex-failures.spec.ts:151:3 › duplex voice failures › network loss: the line rejoins, and an answer in flight is not lost (audit C-04) 
+    [voice] › tests/recovery/voice/standard-line.spec.ts:41:1 › the voice failure notice is announced (a live region) 
+    [voice] › tests/recovery/voice/standard-line.spec.ts:68:3 › standard voice line › audio flows, a spoken turn is answered by Q 
+    [voice] › tests/recovery/voice/standard-line.spec.ts:91:3 › standard voice line › a dropped line reconnects, and says so if it cannot 
+    [voice] › tests/recovery/voice/standard-line.spec.ts:112:3 › standard voice line › a vendor error mid-turn ends the turn visibly 
+    [permissions] › tests/recovery/permissions/approvals.spec.ts:150:1 › a model cannot approve on its own initiative when the person only asked a question 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.01 Conversationally interviews every business › Q.01 step 4 UI 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.01 Conversationally interviews every business › Q.01 step 5 text 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.01 Conversationally interviews every business › Q.01 step 6 voice 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.01 Conversationally interviews every business › Q.01 step 10 integration 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.01 Conversationally interviews every business › Q.01 step 12 measurement 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.03 Reveals what could stop the raise › Q.03 step 4 UI 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.03 Reveals what could stop the raise › Q.03 step 5 text 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.03 Reveals what could stop the raise › Q.03 step 6 voice 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.03 Reveals what could stop the raise › Q.03 step 10 integration 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.03 Reveals what could stop the raise › Q.03 step 12 measurement 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.04 Turns weaknesses into an action plan › Q.04 step 5 text 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.04 Turns weaknesses into an action plan › Q.04 step 6 voice 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.04 Turns weaknesses into an action plan › Q.04 step 10 integration 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.04 Turns weaknesses into an action plan › Q.04 step 12 measurement 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.02 Learns how each investor thinks › Q.02 step 5 text 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.02 Learns how each investor thinks › Q.02 step 6 voice 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.02 Learns how each investor thinks › Q.02 step 10 integration 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.02 Learns how each investor thinks › Q.02 step 12 measurement 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.05 Finds the right investors (for founders) › Q.05 step 5 text 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.05 Finds the right investors (for founders) › Q.05 step 6 voice 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.05 Finds the right investors (for founders) › Q.05 step 10 integration 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.05 Finds the right investors (for founders) › Q.05 step 12 measurement 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.06 Finds the right opportunities (for investors) › Q.06 step 5 text 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.06 Finds the right opportunities (for investors) › Q.06 step 6 voice 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.06 Finds the right opportunities (for investors) › Q.06 step 7 persistence 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.06 Finds the right opportunities (for investors) › Q.06 step 9 failure 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.06 Finds the right opportunities (for investors) › Q.06 step 10 integration 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.06 Finds the right opportunities (for investors) › Q.06 step 12 measurement 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.07 Lets investors interview the opportunity › Q.07 step 5 text 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.07 Lets investors interview the opportunity › Q.07 step 6 voice 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.07 Lets investors interview the opportunity › Q.07 step 10 integration 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.07 Lets investors interview the opportunity › Q.07 step 12 measurement 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.08 Understands every business the same way › Q.08 step 2 data 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.08 Understands every business the same way › Q.08 step 4 UI 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.08 Understands every business the same way › Q.08 step 5 text 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.08 Understands every business the same way › Q.08 step 6 voice 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.08 Understands every business the same way › Q.08 step 10 integration 
+    [promises] › tests/recovery/support/promise.ts:95:5 › Q.08 Understands every business the same way › Q.08 step 12 measurement 
+    [a11y] › tests/recovery/a11y/axe.spec.ts:25:3 › /investors as founder.ledgerfold: no serious or critical WCAG violations 
+    [a11y] › tests/recovery/a11y/axe.spec.ts:25:3 › /settings as investor.savanna-seed: no serious or critical WCAG violations 
+  93 passed (1.5h)
+
+

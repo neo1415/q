@@ -174,7 +174,12 @@ async function main(): Promise<number> {
         }
         if (secrets.groq !== undefined) {
           providers.push(
-            createGroqModelProvider({ apiKey: secrets.groq.reveal() }),
+            createGroqModelProvider({
+              apiKey: secrets.groq.reveal(),
+              additionalApiKeys: secrets.groqKeys
+                .slice(1)
+                .map((key) => key.reveal()),
+            }),
           );
         }
         if (providers.length === 0) {

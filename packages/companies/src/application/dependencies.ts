@@ -7,6 +7,7 @@ import type { AuthorizationService } from "@capital-q/security";
 import type {
   CompanyCreationRequestStore,
   CompanyRepository,
+  VerificationClaimsPort,
 } from "./ports.js";
 import type {
   CompanyMemberRepository,
@@ -26,6 +27,8 @@ export type CompanyServiceDependencies = {
   readonly organisations: OrganisationQueryPort;
   readonly outbox: OutboxWriter;
   readonly audit: MaterialActionAuditWriter;
+  /** The Verification seam marketplace readiness reads. Defaults to "unavailable". */
+  readonly verification: VerificationClaimsPort;
   readonly repositories: {
     readonly companies: CompanyRepository;
     readonly creationRequests: CompanyCreationRequestStore;

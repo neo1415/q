@@ -1,23 +1,49 @@
 import {
+  AppendOnboardingInterviewTurnsResponseSchema,
+  GetOnboardingCoverageResponseSchema,
+  ONBOARDING_COVERAGE_SEGMENT,
   IDEMPOTENCY_KEY_HEADER,
+  ListOnboardingInterviewTurnsResponseSchema,
+  ONBOARDING_TURNS_SEGMENT,
+  type AppendOnboardingInterviewTurnsRequest,
+  ONBOARDING_ANSWER_SEGMENT,
+  ONBOARDING_SAY_SEGMENT,
+  SayOnboardingResponseSchema,
+  type SayOnboardingRequest,
+  ONBOARDING_DISMISS_SEGMENT,
+  ONBOARDING_QUESTIONS_SEGMENT,
   ONBOARDING_BACK_SEGMENT,
   ONBOARDING_COMPLETE_SEGMENT,
   ONBOARDING_CURRENT_SEGMENT,
   ONBOARDING_PATH,
   ONBOARDING_RESOLVE_SEGMENT,
+  ONBOARDING_RESPONSES_BATCH_SEGMENT,
   ONBOARDING_RESPONSES_SEGMENT,
+  ONBOARDING_REVISIONS_SEGMENT,
   ONBOARDING_SESSIONS_SEGMENT,
   ONBOARDING_SKIP_SEGMENT,
+  ONBOARDING_WITHDRAW_SEGMENT,
   ONBOARDING_STEPS_SEGMENT,
   ONBOARDING_SUGGESTIONS_SEGMENT,
   OnboardingSessionViewSchema,
+  SubmitOnboardingResponsesResultSchema,
+  ONBOARDING_NUDGE_SEGMENT,
+  ONBOARDING_NUDGE_BRIEFING_SEGMENT,
+  ONBOARDING_NUDGE_CHOICE_SEGMENT,
+  OnboardingBriefingNudgeResponseSchema,
+  OnboardingNudgeChoiceResponseSchema,
+  type OnboardingNudgeChoiceValue,
+  type AnswerOnboardingQuestionRequest,
   type CompleteOnboardingSessionRequest,
+  type DismissOnboardingQuestionRequest,
   type OnboardingJourneyType,
   type OnboardingBackRequest,
   type ResolveOnboardingSuggestionRequest,
   type SkipOnboardingStepRequest,
+  type WithdrawOnboardingResponseRequest,
   type StartOnboardingSessionRequest,
   type SubmitOnboardingResponseRequest,
+  type SubmitOnboardingResponsesRequest,
 } from "@capital-q/contracts";
 
 import { call, type ApiSession } from "./request.js";
@@ -82,6 +108,41 @@ export function submitOnboardingResponse(
   );
 }
 
+/**
+ * `POST /v1/onboarding/sessions/:sessionId/responses/batch` — several
+ * answers committed in one transaction; each answer's outcome in order.
+ */
+export function submitOnboardingResponses(
+  session: ApiSession,
+  sessionId: string,
+  request: SubmitOnboardingResponsesRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_RESPONSES_BATCH_SEGMENT}`,
+    SubmitOnboardingResponsesResultSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/** `POST /v1/onboarding/sessions/:sessionId/revisions` — revise a completed answer (ADR 0024). */
+export function reviseOnboardingResponse(
+  session: ApiSession,
+  sessionId: string,
+  request: SubmitOnboardingResponseRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_REVISIONS_SEGMENT}`,
+    OnboardingSessionViewSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
 /** `POST /v1/onboarding/sessions/:sessionId/steps/:stepKey/skip` */
 export function skipOnboardingStep(
   session: ApiSession,
@@ -94,6 +155,23 @@ export function skipOnboardingStep(
     session,
     "POST",
     `${byId(sessionId)}${ONBOARDING_STEPS_SEGMENT}/${encodeURIComponent(stepKey)}${ONBOARDING_SKIP_SEGMENT}`,
+    OnboardingSessionViewSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/** `POST /v1/onboarding/sessions/:sessionId/steps/:stepKey/withdraw` */
+export function withdrawOnboardingResponse(
+  session: ApiSession,
+  sessionId: string,
+  stepKey: string,
+  request: WithdrawOnboardingResponseRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_STEPS_SEGMENT}/${encodeURIComponent(stepKey)}${ONBOARDING_WITHDRAW_SEGMENT}`,
     OnboardingSessionViewSchema,
     { body: request, ...idempotent(idempotencyKey) },
   );
@@ -143,5 +221,151 @@ export function resolveOnboardingSuggestion(
     `${byId(sessionId)}${ONBOARDING_SUGGESTIONS_SEGMENT}/${encodeURIComponent(suggestionId)}${ONBOARDING_RESOLVE_SEGMENT}`,
     OnboardingSessionViewSchema,
     { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/** `POST /v1/onboarding/sessions/:sessionId/questions/:questionId/answer` (CQ-PRE-REC-001) */
+export function answerOnboardingQuestion(
+  session: ApiSession,
+  sessionId: string,
+  questionId: string,
+  request: AnswerOnboardingQuestionRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_QUESTIONS_SEGMENT}/${encodeURIComponent(questionId)}${ONBOARDING_ANSWER_SEGMENT}`,
+    OnboardingSessionViewSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/** `POST /v1/onboarding/sessions/:sessionId/questions/:questionId/dismiss` */
+export function dismissOnboardingQuestion(
+  session: ApiSession,
+  sessionId: string,
+  questionId: string,
+  request: DismissOnboardingQuestionRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_QUESTIONS_SEGMENT}/${encodeURIComponent(questionId)}${ONBOARDING_DISMISS_SEGMENT}`,
+    OnboardingSessionViewSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/** `POST /v1/onboarding/sessions/:sessionId/say` — the conversational interview (CQ-PRE-REC-001). */
+export function sayToOnboarding(
+  session: ApiSession,
+  sessionId: string,
+  request: SayOnboardingRequest,
+  idempotencyKey: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_SAY_SEGMENT}`,
+    SayOnboardingResponseSchema,
+    { body: request, ...idempotent(idempotencyKey) },
+  );
+}
+
+/**
+ * `GET /v1/onboarding/sessions/:sessionId/turns?limit=` -- the newest turns
+ * of the interview thread, oldest first (CQ-QX-006). A display record for
+ * redrawing the conversation; the session view stays the only evidence of
+ * what was recorded.
+ */
+export function listOnboardingInterviewTurns(
+  session: ApiSession,
+  sessionId: string,
+  limit?: number,
+) {
+  const query = limit === undefined ? "" : `?limit=${String(limit)}`;
+  return call(
+    session,
+    "GET",
+    `${byId(sessionId)}${ONBOARDING_TURNS_SEGMENT}${query}`,
+    ListOnboardingInterviewTurnsResponseSchema,
+  );
+}
+
+/**
+ * `POST /v1/onboarding/sessions/:sessionId/turns` -- append one exchange.
+ * Idempotent by `request.turnRef`: a retry writes nothing (`written: false`).
+ */
+export function appendOnboardingInterviewTurns(
+  session: ApiSession,
+  sessionId: string,
+  request: AppendOnboardingInterviewTurnsRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${byId(sessionId)}${ONBOARDING_TURNS_SEGMENT}`,
+    AppendOnboardingInterviewTurnsResponseSchema,
+    { body: request },
+  );
+}
+
+const nudge = `${ONBOARDING_PATH}${ONBOARDING_NUDGE_SEGMENT}`;
+
+/**
+ * `GET /v1/onboarding/nudge/briefing` -- whether a Home setup reminder is
+ * due now. Changes nothing, so a render or prefetch never uses it up.
+ */
+export function peekBriefingOnboardingNudge(session: ApiSession) {
+  return call(
+    session,
+    "GET",
+    `${nudge}${ONBOARDING_NUDGE_BRIEFING_SEGMENT}`,
+    OnboardingBriefingNudgeResponseSchema,
+  );
+}
+
+/**
+ * `POST /v1/onboarding/nudge/briefing` -- today's setup reminder for Home,
+ * if one is due (recorded as given) or was already given there today.
+ */
+export function claimBriefingOnboardingNudge(session: ApiSession) {
+  return call(
+    session,
+    "POST",
+    `${nudge}${ONBOARDING_NUDGE_BRIEFING_SEGMENT}`,
+    OnboardingBriefingNudgeResponseSchema,
+    { body: {} },
+  );
+}
+
+/** `POST /v1/onboarding/nudge/choice` -- "remind me later" / "stop reminding me". */
+export function chooseOnboardingNudge(
+  session: ApiSession,
+  choice: OnboardingNudgeChoiceValue,
+) {
+  return call(
+    session,
+    "POST",
+    `${nudge}${ONBOARDING_NUDGE_CHOICE_SEGMENT}`,
+    OnboardingNudgeChoiceResponseSchema,
+    { body: { choice } },
+  );
+}
+
+/**
+ * `GET /v1/onboarding/sessions/:sessionId/coverage` -- the canonical
+ * coverage of the caller's own session (lane ob1): per field, what is
+ * known, offered, saved, missing, contradictory, inapplicable, evidence-
+ * needed or deferrable, and what to cover next. The same picture Q reads.
+ */
+export function getOnboardingCoverage(session: ApiSession, sessionId: string) {
+  return call(
+    session,
+    "GET",
+    `${byId(sessionId)}${ONBOARDING_COVERAGE_SEGMENT}`,
+    GetOnboardingCoverageResponseSchema,
   );
 }

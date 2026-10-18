@@ -116,6 +116,10 @@ function fakeRuntime(overrides: Partial<Runtime> = {}) {
     ),
     getCurrentSession: record("getCurrentSession", () => Promise.resolve(VIEW)),
     getSession: record("getSession", () => Promise.resolve(VIEW)),
+    reviseResponse: record("reviseResponse", () => Promise.resolve(VIEW)),
+    submitResponses: record("submitResponses", () =>
+      Promise.resolve({ view: VIEW, results: [] }),
+    ),
     submitResponse: record("submitResponse", () =>
       Promise.resolve({
         ...VIEW,
@@ -126,9 +130,33 @@ function fakeRuntime(overrides: Partial<Runtime> = {}) {
       }),
     ),
     skipStep: record("skipStep", () => Promise.resolve(VIEW)),
+    withdrawResponse: record("withdrawResponse", () => Promise.resolve(VIEW)),
     goBack: record("goBack", () => Promise.resolve(VIEW)),
     completeSession: record("completeSession", () => Promise.resolve(VIEW)),
     resolveSuggestion: record("resolveSuggestion", () => Promise.resolve(VIEW)),
+    answerInterviewQuestion: record("answerInterviewQuestion", () =>
+      Promise.resolve(VIEW),
+    ),
+    dismissInterviewQuestion: record("dismissInterviewQuestion", () =>
+      Promise.resolve(VIEW),
+    ),
+    say: record("say", () =>
+      Promise.resolve({
+        view: VIEW,
+        understood: { kind: "UNCLEAR" as const, stepKey: "intent" },
+      }),
+    ),
+    appendInterviewTurns: record("appendInterviewTurns", () =>
+      Promise.resolve({ written: true }),
+    ),
+    listInterviewTurns: record("listInterviewTurns", () => Promise.resolve([])),
+    listFollowUps: record("listFollowUps", () => Promise.resolve([])),
+    answerFollowUp: record("answerFollowUp", () =>
+      Promise.resolve("ANSWERED" as const),
+    ),
+    dismissFollowUp: record("dismissFollowUp", () =>
+      Promise.resolve("DISMISSED" as const),
+    ),
     ...overrides,
   };
   return { runtime, calls };
@@ -313,6 +341,36 @@ describe("/v1/onboarding/sessions", () => {
     expect(calls).toEqual([]);
   });
 
+  it("a person with no organisation yet answers through the generated route, as themselves (ADR 0040)", async () => {
+    const { runtime, calls } = fakeRuntime();
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: "CONTEXT_REQUIRED",
+      runtime,
+    });
+    const submit = await app.inject({
+      method: "POST",
+      url: `/v1/onboarding/sessions/${SESSION_ID}/responses`,
+      headers: KEY,
+      payload: {
+        stepKey: "intent",
+        response: {
+          value: { type: "SINGLE_SELECT", optionKey: "raising_now" },
+        },
+        expectedSessionVersion: 1,
+      },
+    });
+    expect(submit.statusCode).toBe(200);
+    expect(calls.at(-1)).toMatchObject({
+      method: "submitResponse",
+      input: {
+        actor: { userId: USER_ID, context: null },
+        sessionId: SESSION_ID,
+        idempotencyKey: KEY["idempotency-key"],
+      },
+    });
+  });
+
   it("submit, skip, back, complete and suggestion resolution adapt the contracts and return the safe view", async () => {
     const { runtime, calls } = fakeRuntime();
     const app = buildApp({ principal: PRINCIPAL, runtime });
@@ -341,6 +399,29 @@ describe("/v1/onboarding/sessions", () => {
       response: { value: { type: "SINGLE_SELECT", optionKey: "raising_now" } },
       expectedSessionVersion: 1,
       idempotencyKey: KEY["idempotency-key"],
+    });
+
+    // ADR 0024: a completed answer, revised with the same body and key.
+    const revise = await app.inject({
+      method: "POST",
+      url: `/v1/onboarding/sessions/${SESSION_ID}/revisions`,
+      headers: KEY,
+      payload: {
+        stepKey: "intent",
+        response: {
+          value: { type: "SINGLE_SELECT", optionKey: "raising_now" },
+        },
+        expectedSessionVersion: 1,
+      },
+    });
+    expect(revise.statusCode).toBe(200);
+    expect(calls.at(-1)).toMatchObject({
+      method: "reviseResponse",
+      input: {
+        sessionId: SESSION_ID,
+        stepKey: "intent",
+        idempotencyKey: KEY["idempotency-key"],
+      },
     });
 
     const skip = await app.inject({

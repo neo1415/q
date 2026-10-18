@@ -9,6 +9,7 @@ import { InlineNotice } from "@capital-q/ui/states";
 import type { FounderSuggestionView } from "../models/presentation";
 
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * F3. Two lists, and the difference between them is the whole point.
@@ -32,6 +33,7 @@ export function ReviewStep({
   busy,
   actions,
 }: StepProps<"review">) {
+  const t = useT();
   const [problem, setProblem] = useState<string | null>(null);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -49,7 +51,7 @@ export function ReviewStep({
       resolution,
     });
     if (!recorded) {
-      setProblem("Capital Q couldn't record that just now. Please try again.");
+      setProblem("Capital Q couldn't record that just now. Try again.");
     }
   }
 
@@ -60,7 +62,7 @@ export function ReviewStep({
       {step.suggestions.length > 0 ? (
         <section className="flex flex-col gap-3" aria-labelledby="q-read">
           <h2 id="q-read" className="cq-label text-(--cq-text-secondary)">
-            What Q read in your documents
+            {t("What Q read in your documents")}
           </h2>
           <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
             {step.suggestions.map((suggestion) => (
@@ -88,7 +90,7 @@ export function ReviewStep({
                     disabled={busy}
                     onClick={() => void decide(suggestion, "ACCEPT")}
                   >
-                    That&apos;s right
+                    {t("That's right")}
                     <span className="sr-only"> — {suggestion.label}</span>
                   </Button>
                   <Button
@@ -98,7 +100,7 @@ export function ReviewStep({
                     disabled={busy}
                     onClick={() => void actions.openStep(suggestion.stepId)}
                   >
-                    Change
+                    {t("Change")}
                     <span className="sr-only"> {suggestion.label}</span>
                   </Button>
                   <Button
@@ -108,7 +110,7 @@ export function ReviewStep({
                     disabled={busy}
                     onClick={() => void decide(suggestion, "REJECT")}
                   >
-                    No thanks
+                    {t("No thanks")}
                     <span className="sr-only"> — {suggestion.label}</span>
                   </Button>
                 </div>
@@ -134,7 +136,7 @@ export function ReviewStep({
               <dd className="cq-body text-(--cq-text-primary)">
                 {item.value ?? (
                   <span className="text-(--cq-text-secondary)">
-                    Not added yet
+                    {t("Not added yet")}
                   </span>
                 )}
               </dd>
@@ -146,7 +148,7 @@ export function ReviewStep({
               disabled={busy}
               onClick={() => void actions.openStep(item.editStepId)}
             >
-              Change
+              {t("Change")}
               <span className="sr-only"> {item.label}</span>
             </Button>
           </div>
@@ -156,11 +158,13 @@ export function ReviewStep({
           className="flex items-start justify-between gap-4 py-3"
         >
           <div className="flex min-w-0 flex-col gap-1">
-            <dt className="cq-caption text-(--cq-text-tertiary)">Categories</dt>
+            <dt className="cq-caption text-(--cq-text-tertiary)">
+              {t("Categories")}
+            </dt>
             <dd className="cq-body text-(--cq-text-primary)">
               {step.categories.length === 0 ? (
                 <span className="text-(--cq-text-secondary)">
-                  None chosen yet
+                  {t("None chosen yet")}
                 </span>
               ) : (
                 step.categories.join(", ")
@@ -174,7 +178,8 @@ export function ReviewStep({
             disabled={busy}
             onClick={() => void actions.openStep("categories")}
           >
-            Change<span className="sr-only"> categories</span>
+            {t("Change")}
+            <span className="sr-only"> {t("categories")}</span>
           </Button>
         </div>
         <div
@@ -183,12 +188,12 @@ export function ReviewStep({
         >
           <div className="flex min-w-0 flex-col gap-1">
             <dt className="cq-caption text-(--cq-text-tertiary)">
-              Materials you have
+              {t("Materials you have")}
             </dt>
             <dd className="cq-body text-(--cq-text-primary)">
               {step.materials === undefined || step.materials.length === 0 ? (
                 <span className="text-(--cq-text-secondary)">
-                  None declared yet
+                  {t("None added yet")}
                 </span>
               ) : (
                 step.materials.join(", ")
@@ -202,11 +207,13 @@ export function ReviewStep({
             disabled={busy}
             onClick={() => void actions.openStep("materials")}
           >
-            Change<span className="sr-only"> materials</span>
+            {t("Change")}
+            <span className="sr-only"> {t("materials")}</span>
           </Button>
         </div>
       </dl>
       <ContextIndicator
+        translate={t}
         scope="organisation_private"
         detail="Entered by you. Q hasn't reviewed it, and investors can't see it."
       />

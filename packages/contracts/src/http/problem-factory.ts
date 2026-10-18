@@ -109,6 +109,29 @@ export const PROBLEM_DEFINITIONS: Readonly<
     "Something went wrong.",
     500,
   ),
+  // ADMIN block (ADR 0033)
+  STEP_UP_REQUIRED: define(
+    "step-up-required",
+    "Confirm it's you to continue.",
+    403,
+  ),
+  ACCOUNT_SUSPENDED: define(
+    "account-suspended",
+    "This account is suspended.",
+    403,
+  ),
+  // end ADMIN block
+  // BILLING block (ADR 0034): the account's plan does not include this, or
+  // its limit is used. 402 so clients can tell it from a permission refusal.
+  ENTITLEMENT_REQUIRED: define(
+    "entitlement-required",
+    "Your plan does not include this right now.",
+    402,
+  ),
+  // end BILLING block
+  // BILLING-2 block (ADR 0036)
+  NOT_IMPLEMENTED: define("not-implemented", "This isn't available yet.", 501),
+  // end BILLING-2 block
 };
 
 export type CreateProblemInput = {

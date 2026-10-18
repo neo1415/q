@@ -1,29 +1,22 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
-  CompleteDocumentUploadSessionRequestSchema,
-  CorrelationIdSchema,
-  CreateDocumentUploadSessionRequestSchema,
+  DOCUMENT_FILE_SEGMENT,
+  DOCUMENT_PAGE_MAX,
   DOCUMENT_UPLOAD_SESSIONS_PATH,
   DOCUMENTS_PATH,
-  IDEMPOTENCY_KEY_HEADER,
-  IdempotencyKeyHeaderSchema,
-  parseContract,
+  DocumentFileLinkSchema,
   UtcTimestampSchema,
+  parseContract,
   UuidSchema,
-  type CorrelationId,
-  type DirectUploadTarget,
 } from "@capital-q/contracts";
 import {
   DocumentIdSchema,
   toDocumentDto,
   toDocumentUploadSessionDto,
-  type DirectUploadAuthorization,
   type DocumentId,
-  type DocumentUploadSession,
   type DocumentWithVersion,
   type EvidenceService,
 } from "@capital-q/evidence";
-import { createCorrelationId } from "@capital-q/observability";
 
 import {
   getActorContext,
@@ -46,14 +39,48 @@ import {
 
 export type DocumentRoutesDependencies = ActorContextDependencies & {
   readonly evidence: EvidenceService;
-  readonly uploads: {
-    readonly maxBytes: number;
-    readonly allowedMimeTypes: readonly string[];
-  };
+  /**
+   * P3: a short-lived read of the owner's own current file, once the
+   * route has authorised the owner (getDocumentWithVersion). The object's
+   * own checks (active, version belongs, scan state) stay in Evidence.
+   * Absent without storage: the route answers not found.
+   */
+  readonly fileLink?:
+    | ((document: {
+        readonly tenantId: string;
+        readonly documentId: string;
+        readonly versionId: string;
+      }) => Promise<{
+        readonly url: string;
+        readonly expiresAt: string;
+        readonly scanned: boolean;
+      }>)
+    | undefined;
 };
 
-function correlation(): CorrelationId {
-  return CorrelationIdSchema.parse(createCorrelationId());
+/** P3: an opaque keyset cursor, (updatedAt, id); never an offset. */
+function encodeCursor(updatedAt: string, id: string): string {
+  return Buffer.from(JSON.stringify({ u: updatedAt, i: id })).toString(
+    "base64url",
+  );
+}
+function decodeCursor(raw: unknown) {
+  if (typeof raw !== "string" || raw.length === 0 || raw.length > 200) {
+    return undefined;
+  }
+  try {
+    const value: unknown = JSON.parse(
+      Buffer.from(raw, "base64url").toString("utf8"),
+    );
+    if (typeof value !== "object" || value === null) return undefined;
+    const u = UtcTimestampSchema.safeParse((value as { u?: unknown }).u);
+    const i = UuidSchema.safeParse((value as { i?: unknown }).i);
+    return u.success && i.success
+      ? { updatedAt: u.data, id: i.data }
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function uploadSessionIdParam(request: FastifyRequest): string {
@@ -74,37 +101,8 @@ function documentIdParam(request: FastifyRequest): DocumentId {
   );
 }
 
-function idempotencyKey(request: FastifyRequest, purpose: string): string {
-  const raw = request.headers[IDEMPOTENCY_KEY_HEADER];
-  return parseContract(
-    IdempotencyKeyHeaderSchema,
-    typeof raw === "string" ? raw : undefined,
-    `An Idempotency-Key header is required to ${purpose}.`,
-  );
-}
-
 function documentPayload(entry: DocumentWithVersion) {
   return toDocumentDto(entry.document, entry.currentVersion);
-}
-
-function uploadTarget(
-  authorization: DirectUploadAuthorization,
-  session: DocumentUploadSession,
-  limits: DocumentRoutesDependencies["uploads"],
-): DirectUploadTarget {
-  return {
-    method: authorization.method,
-    url: authorization.url,
-    headers: authorization.headers,
-    // Capital Q stops accepting the upload first; the provider's own token
-    // may outlive that, and finalization after it fails closed.
-    expiresAt: session.expiresAt,
-    providerExpiresAt: UtcTimestampSchema.parse(
-      authorization.providerExpiresAt,
-    ),
-    maxBytes: limits.maxBytes,
-    allowedMimeTypes: [...limits.allowedMimeTypes],
-  };
 }
 
 export function registerDocumentRoutes(
@@ -115,95 +113,8 @@ export function registerDocumentRoutes(
   const service = dependencies.evidence;
   const sessionById = `${DOCUMENT_UPLOAD_SESSIONS_PATH}/:uploadSessionId`;
 
-  app.post(
-    DOCUMENT_UPLOAD_SESSIONS_PATH,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      const key = idempotencyKey(request, "start a document upload");
-      const input = parseContract(
-        CreateDocumentUploadSessionRequestSchema,
-        request.body,
-        "The upload request is not valid.",
-      );
-
-      const result = await service.createDocumentUploadSession({
-        actor,
-        input,
-        idempotencyKey: key,
-        correlationId: correlation(),
-      });
-
-      return reply
-        .code(201)
-        .header("Cache-Control", "no-store")
-        .header(
-          "Location",
-          `${DOCUMENT_UPLOAD_SESSIONS_PATH}/${result.session.id}`,
-        )
-        .send({
-          uploadSession: toDocumentUploadSessionDto(result.session),
-          document: toDocumentDto(result.document, null),
-          upload:
-            result.upload === undefined
-              ? null
-              : uploadTarget(
-                  result.upload,
-                  result.session,
-                  dependencies.uploads,
-                ),
-        });
-    },
-  );
-
-  app.post(
-    `${sessionById}/complete`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      const key = idempotencyKey(request, "complete a document upload");
-      const input = parseContract(
-        CompleteDocumentUploadSessionRequestSchema,
-        request.body ?? {},
-        "The upload completion request is not valid.",
-      );
-
-      const result = await service.completeDocumentUploadSession({
-        actor,
-        uploadSessionId: uploadSessionIdParam(request),
-        input,
-        idempotencyKey: key,
-        correlationId: correlation(),
-      });
-
-      return reply.header("Cache-Control", "no-store").send({
-        uploadSession: toDocumentUploadSessionDto(result.session),
-        document: toDocumentDto(result.document, result.version),
-      });
-    },
-  );
-
-  app.post(
-    `${sessionById}/cancel`,
-    { onRequest: withContext },
-    async (request, reply) => {
-      const actor = getActorContext(request);
-      const session = await service.cancelDocumentUploadSession({
-        actor,
-        uploadSessionId: uploadSessionIdParam(request),
-        correlationId: correlation(),
-      });
-      const document = await service.getDocumentWithVersion({
-        actor,
-        documentId: session.documentId,
-      });
-      return reply.header("Cache-Control", "no-store").send({
-        uploadSession: toDocumentUploadSessionDto(session),
-        document: documentPayload(document),
-      });
-    },
-  );
-
+  // Starting, completing and cancelling an upload are generated from the
+  // action registry (ADR 0040, http/app-actions.ts).
   app.get(sessionById, { onRequest: withContext }, async (request, reply) => {
     const actor = getActorContext(request);
     const session = await service.getDocumentUploadSession({
@@ -236,13 +147,75 @@ export function registerDocumentRoutes(
             )
           : undefined;
 
+      // P3: `limit` asks for one page of active documents, newest change
+      // first, with a cursor; without it the whole list, as before.
+      const rawLimit = Number(query["limit"]);
+      const limit =
+        query["limit"] === undefined || !Number.isInteger(rawLimit)
+          ? undefined
+          : Math.min(Math.max(rawLimit, 1), DOCUMENT_PAGE_MAX);
+      const after = decodeCursor(query["cursor"]);
       const documents = await service.listDocumentsWithVersions({
         actor,
         ...(companyId === undefined ? {} : { companyId }),
+        ...(limit === undefined
+          ? {}
+          : {
+              page: {
+                // One more than asked tells whether another page exists.
+                limit: limit + 1,
+                ...(after === undefined ? {} : { after }),
+              },
+            }),
+      });
+      const page = limit === undefined ? documents : documents.slice(0, limit);
+      const last = page.at(-1);
+      return reply.header("Cache-Control", "no-store").send({
+        documents: page.map(documentPayload),
+        ...(limit !== undefined &&
+        documents.length > limit &&
+        last !== undefined
+          ? {
+              nextCursor: encodeCursor(
+                new Date(last.document.updatedAt).toISOString(),
+                last.document.id,
+              ),
+            }
+          : {}),
+      });
+    },
+  );
+
+  app.get(
+    `${DOCUMENTS_PATH}/:documentId${DOCUMENT_FILE_SEGMENT}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      // Their own document first: anything else is not found.
+      const entry = await service.getDocumentWithVersion({
+        actor,
+        documentId: documentIdParam(request),
+      });
+      if (
+        dependencies.fileLink === undefined ||
+        entry.currentVersion === null ||
+        entry.document.status !== "ACTIVE"
+      ) {
+        return reply.code(404).send({
+          type: "about:blank",
+          title: "Not found",
+          status: 404,
+          detail: "That file isn't available.",
+        });
+      }
+      const link = await dependencies.fileLink({
+        tenantId: entry.document.tenantId,
+        documentId: entry.document.id,
+        versionId: entry.currentVersion.id,
       });
       return reply
         .header("Cache-Control", "no-store")
-        .send({ documents: documents.map(documentPayload) });
+        .send(DocumentFileLinkSchema.parse(link));
     },
   );
 

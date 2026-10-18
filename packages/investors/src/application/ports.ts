@@ -1,5 +1,6 @@
 import type {
   InvestorDeploymentState,
+  InvestorInboundPreference,
   InvestorType,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
@@ -37,6 +38,8 @@ export type NewInvestorOrganisation = {
   readonly deploymentState: InvestorDeploymentState | null;
 };
 
+import type { InvestorVisibilityChoice } from "../domain/network-projection.js";
+
 export type InvestorProfileChanges = {
   readonly investorType?: InvestorType | undefined;
   readonly displayName?: string | undefined;
@@ -44,6 +47,7 @@ export type InvestorProfileChanges = {
   readonly hqCountry?: string | null | undefined;
   readonly publicDescription?: string | null | undefined;
   readonly deploymentState?: InvestorDeploymentState | null | undefined;
+  readonly inboundPreference?: InvestorInboundPreference | null | undefined;
 };
 
 export type InvestorOrganisationRepository = {
@@ -75,6 +79,21 @@ export type InvestorOrganisationRepository = {
     tx: TransactionContext,
     organisationId: OrganisationId,
   ) => Promise<void>;
+  /**
+   * Sets who may see the declared profile, only when the stored version
+   * equals `expectedVersion`, incrementing it. Returns null when no row
+   * matched. The only column this touches is marketplace_visibility.
+   */
+  readonly updateVisibility: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: TenantId;
+      readonly organisationId: OrganisationId;
+      readonly investorOrganisationId: InvestorOrganisationId;
+      readonly expectedVersion: number;
+      readonly visibility: InvestorVisibilityChoice;
+    },
+  ) => Promise<InvestorOrganisation | null>;
   /**
    * Applies `changes` only when the stored version equals `expectedVersion`,
    * incrementing it. Returns null when no row matched.

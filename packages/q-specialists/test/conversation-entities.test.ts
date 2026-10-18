@@ -1,0 +1,989 @@
+import { randomUUID } from "node:crypto";
+
+import { describe, expect, it } from "vitest";
+
+import {
+  PermittedContextPlanSchema,
+  Q_CONTEXT_FIREWALL_POLICY_VERSION,
+  type QPageManifest,
+  type QResultBlock,
+} from "@capital-q/contracts";
+import type { QTurnReader, QTurnReading } from "@capital-q/model-gateway/q";
+import type {
+  QAnswerRequest,
+  QConversationMessage,
+  QRuntimeRepositories,
+} from "@capital-q/q-runtime";
+import { ActorContextSchema } from "@capital-q/security";
+
+import { createSpecialistQAnswer } from "../src/answer.js";
+import {
+  focusFromHistory,
+  hereFromManifest,
+  listsFromHistory,
+  listsFromManifest,
+  referenceAskOf,
+  resolutionNote,
+  resolveReference,
+  type ConversationEntity,
+} from "../src/conversation-entities.js";
+import { controlReferenceOf } from "../src/conversation-entities.js";
+
+/**
+ * RECOVERY-2026-10 B6 (Scenarios A, B, G): what the person points at --
+ * "the second one", "not that investor, the second one", "compare those
+ * two", "go back to what we were discussing", "book a meeting with him" --
+ * is bound by code to records on their page, in Q's lists, or in the
+ * conversation's focus, which lives on the durable messages (so voice and
+ * text, and any q-api instance, see the same thing).
+ */
+
+const TENANT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const USER = "a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1";
+
+// Discover, investors tab: four funds in screen order.
+const HALYARD = "11111111-1111-4111-8111-000000000001";
+const SAVANNA = "11111111-1111-4111-8111-000000000002";
+const CLEARWATER = "11111111-1111-4111-8111-000000000003";
+const LEDGERFOLD = "11111111-1111-4111-8111-000000000004";
+// Companies Q listed.
+const AJOPOT = "22222222-2222-4222-8222-000000000001";
+const TENSORGATE = "22222222-2222-4222-8222-000000000002";
+const KORA = "22222222-2222-4222-8222-000000000003";
+
+/** The investors list on Discover, in screen order. */
+function investorList(
+  ids: readonly string[],
+): QPageManifest["sections"][number] {
+  return {
+    id: "investors",
+    kind: "INVESTOR_LIST",
+    refs: ids.map((id) => ({ kind: "INVESTOR_ORGANISATION" as const, id })),
+    total: ids.length,
+  };
+}
+
+const INVESTORS_PAGE: QPageManifest = {
+  v: 2,
+  seq: 7,
+  tab: "find",
+  inView: ["investors"],
+  sections: [investorList([HALYARD, SAVANNA, CLEARWATER, LEDGERFOLD])],
+  dialogs: [],
+};
+
+const companyCards: QResultBlock = {
+  kind: "ANSWER_CARDS",
+  title: "Closest to your mandate",
+  cards: [
+    ["Ajopot", AJOPOT],
+    ["Tensorgate", TENSORGATE],
+    ["Kora", KORA],
+  ].map(([name, id]) => ({
+    name: name ?? "",
+    subject: { kind: "COMPANY", companyId: id ?? "" },
+    facts: [],
+  })),
+} as unknown as QResultBlock;
+
+const opened = (page: "COMPANY" | "INVESTOR", id: string): QResultBlock => ({
+  kind: "UI_INTENT",
+  intent: { kind: "OPEN_RECORD_PAGE", page, id },
+});
+
+function message(
+  role: "USER" | "Q",
+  content: string,
+  blocks?: readonly QResultBlock[],
+): QConversationMessage {
+  return {
+    id: randomUUID(),
+    tenantId: TENANT,
+    conversationId: "c",
+    runId: randomUUID(),
+    role,
+    content,
+    contentType: "TEXT",
+    createdAt: new Date().toISOString(),
+    ...(blocks === undefined ? {} : { blocks }),
+  } as unknown as QConversationMessage;
+}
+
+const resolve = (
+  said: string,
+  history: readonly QConversationMessage[],
+  manifest?: QPageManifest,
+) => {
+  const ask = referenceAskOf(said);
+  if (ask === null) return null;
+  const latestQ = [...history].reverse().find((one) => one.role === "Q");
+  return resolveReference(ask, {
+    page: listsFromManifest(manifest),
+    answers: listsFromHistory(history),
+    answerIsNewest: (latestQ?.blocks ?? []).some(
+      (block) => block.kind === "ANSWER_CARDS",
+    ),
+    focus: focusFromHistory(history),
+    here: hereFromManifest(manifest),
+  });
+};
+
+const one = (result: ReturnType<typeof resolve>): ConversationEntity | null =>
+  result?.kind === "ONE" ? result.entity : null;
+
+describe("reading what the words point at", () => {
+  it.each([
+    ["explain the second one", { kind: "ORDINAL", position: 2 }],
+    ["open the third investor", { kind: "ORDINAL", position: 3 }],
+    ["show me the last one", { kind: "ORDINAL", position: -1 }],
+    [
+      "not that investor, the second one",
+      { kind: "ORDINAL", position: 2, correction: true },
+    ],
+    ["compare those two", { kind: "PAIR" }],
+    ["can you compare them for me", { kind: "PAIR" }],
+    ["go back to what we were discussing", { kind: "BACK" }],
+    ["book a meeting with him", { kind: "COUNTERPART" }],
+    ["send her a message", null],
+  ])("%j", (said, expected) => {
+    const ask = referenceAskOf(said);
+    if (expected === null) {
+      // "send her a message" names no verb+pronoun pair we bind; the
+      // reader still reads it.
+      expect(ask?.kind ?? null).not.toBe("ORDINAL");
+      return;
+    }
+    expect(ask).toEqual(expect.objectContaining(expected));
+  });
+
+  it("reads the kind named with a correction", () => {
+    expect(referenceAskOf("not that investor, the second one")).toEqual({
+      kind: "ORDINAL",
+      position: 2,
+      entityKind: "INVESTOR_ORGANISATION",
+      correction: true,
+    });
+  });
+
+  it("leaves ordinary questions alone", () => {
+    for (const said of [
+      "what's our runway?",
+      "who is the president of Nigeria?",
+      "hi Q",
+    ]) {
+      expect(referenceAskOf(said)).toBeNull();
+    }
+  });
+});
+
+describe("binding a reference to a record", () => {
+  it("'the second one' on the investors page is the second fund on screen", () => {
+    expect(one(resolve("explain the second one", [], INVESTORS_PAGE))).toEqual({
+      kind: "INVESTOR_ORGANISATION",
+      id: SAVANNA,
+      name: null,
+    });
+  });
+
+  it("'the second one' right after Q listed companies is Q's second card", () => {
+    const history = [
+      message("USER", "top three companies for my mandate"),
+      message("Q", "Here are the closest three.", [companyCards]),
+    ];
+    expect(
+      one(resolve("tell me about the second one", history, INVESTORS_PAGE)),
+    ).toEqual({ kind: "COMPANY", id: TENSORGATE, name: "Tensorgate" });
+  });
+
+  it("'not that investor, the second one' skips the investor just opened", () => {
+    // Q opened the second fund already; the correction means the next.
+    const history = [
+      message("USER", "open the second investor"),
+      message("Q", "Opening it.", [opened("INVESTOR", SAVANNA)]),
+    ];
+    const result = resolve("not that investor, the second one", history, {
+      ...INVESTORS_PAGE,
+      // The page now shows the list with the opened one first.
+      sections: [investorList([SAVANNA, CLEARWATER, HALYARD])],
+    });
+    expect(one(result)?.id).toBe(CLEARWATER);
+  });
+
+  it("'compare those two' is the two most recently discussed of one kind", () => {
+    const history = [
+      message("Q", "Opening it.", [opened("INVESTOR", HALYARD)]),
+      message("USER", "and the next"),
+      message("Q", "Opening it.", [opened("INVESTOR", CLEARWATER)]),
+    ];
+    const result = resolve("compare those two", history, INVESTORS_PAGE);
+    expect(result?.kind).toBe("PAIR");
+    expect(
+      result?.kind === "PAIR" ? result.entities.map((e) => e.id) : [],
+    ).toEqual([CLEARWATER, HALYARD]);
+  });
+
+  it("'compare those two' with nothing discussed is the first two on the list", () => {
+    const result = resolve("compare those two", [], INVESTORS_PAGE);
+    expect(
+      result?.kind === "PAIR" ? result.entities.map((e) => e.id) : [],
+    ).toEqual([HALYARD, SAVANNA]);
+  });
+
+  it("'go back to what we were discussing' is the topic before the current one", () => {
+    const history = [
+      message("Q", "Ajopot's raise is…", [opened("COMPANY", AJOPOT)]),
+      message("USER", "what about Halyard"),
+      message("Q", "Halyard invests…", [opened("INVESTOR", HALYARD)]),
+    ];
+    expect(
+      one(resolve("go back to what we were discussing", history))?.id,
+    ).toBe(AJOPOT);
+  });
+
+  it("'book a meeting with him' is the counterpart in focus", () => {
+    const history = [
+      message("Q", "Halyard invests at seed…", [opened("INVESTOR", HALYARD)]),
+    ];
+    expect(one(resolve("book a meeting with him", history))).toEqual({
+      kind: "INVESTOR_ORGANISATION",
+      id: HALYARD,
+      name: null,
+    });
+  });
+
+  it("binds nothing when nothing was shown or discussed", () => {
+    expect(resolve("explain the second one", [])).toBeNull();
+    expect(resolve("compare those two", [])).toBeNull();
+    expect(resolve("go back to what we were discussing", [])).toBeNull();
+  });
+
+  it("writes Capital Q's note with ids", () => {
+    const ask = referenceAskOf("explain the second one");
+    expect(ask).not.toBeNull();
+    const result = resolve("explain the second one", [], INVESTORS_PAGE);
+    expect(result).not.toBeNull();
+    if (ask === null || result === null) return;
+    expect(resolutionNote(ask, result)).toBe(
+      `RESOLVED: number 2 = (investor ${SAVANNA}).`,
+    );
+  });
+});
+
+// --- through the answer seam --------------------------------------------------
+
+const actor = ActorContextSchema.parse({
+  userId: USER,
+  tenantId: TENANT,
+  organisationId: "a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0",
+  membershipId: "a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2",
+  actorType: "HUMAN",
+});
+
+function request(manifest?: QPageManifest): QAnswerRequest {
+  const runId = randomUUID();
+  return {
+    runId: runId as QAnswerRequest["runId"],
+    tenantId: TENANT as QAnswerRequest["tenantId"],
+    actorUserId: USER as QAnswerRequest["actorUserId"],
+    actor,
+    correlationId: "cor_test",
+    capability: "ANSWER",
+    subjects: [],
+    retrieval: { kind: "NOT_CONFIGURED" },
+    plan: PermittedContextPlanSchema.parse({
+      contractVersion: 1,
+      policyVersion: Q_CONTEXT_FIREWALL_POLICY_VERSION,
+      planId: randomUUID(),
+      fingerprint: "0".repeat(64),
+      runId,
+      tenantId: TENANT,
+      actor: { userId: USER, organisationId: actor.organisationId },
+      purpose: { capability: "ANSWER", taskClass: "GENERAL_QUESTION" },
+      subjects: [],
+      scopes: [],
+      denied: [],
+      maxSensitivity: "CONFIDENTIAL",
+      allowedLayers: [],
+      combinationConstraints: [],
+      evaluatedAt: new Date().toISOString(),
+      revalidateAfter: new Date(Date.now() + 60_000).toISOString(),
+      revalidateOnResume: true,
+      ...(manifest === undefined
+        ? {}
+        : { screen: { route: "DISCOVER", manifest } }),
+    }),
+  };
+}
+
+const QUESTION: QTurnReading = {
+  kind: "QUESTION_TO_Q",
+  confidence: "HIGH",
+  transcript: "CLEAR",
+  question: null,
+  aboutNamedOther: false,
+  tool: null,
+} as unknown as QTurnReading;
+
+function seam(
+  earlier: readonly QConversationMessage[] = [],
+  reading: QTurnReading = QUESTION,
+) {
+  const lines: QConversationMessage[] = [...earlier];
+  const notes: (string | undefined)[] = [];
+  const delegatedWith: QAnswerRequest[] = [];
+  const shownControls: unknown[] = [];
+  const turns: QTurnReader = {
+    read: (input) => {
+      const last = input.recentTurns.at(-1);
+      notes.push(
+        last?.text.startsWith("[Q context]") === true ? last.text : undefined,
+      );
+      shownControls.push(input.screenControls);
+      return Promise.resolve(reading);
+    },
+  };
+  const answer = createSpecialistQAnswer({
+    specialist: {
+      id: "company-intelligence",
+      version: "v1",
+      supports: () => false,
+      investigate: () => Promise.reject(new Error("not used")),
+    },
+    delegate: {
+      answer: (asked) => {
+        delegatedWith.push(asked);
+        return Promise.resolve({
+          kind: "ANSWERED",
+          messageId: "m",
+          modelPolicyVersion: "p",
+          promptBundleVersion: "b",
+        });
+      },
+    },
+    repositories: {
+      messages: {
+        listRecentForConversationOfRun: () => Promise.resolve([...lines]),
+        insert: (_tx: unknown, input: Omit<QConversationMessage, "id">) => {
+          const row = {
+            ...input,
+            id: randomUUID(),
+            contentType: "TEXT",
+            createdAt: new Date().toISOString(),
+          } as unknown as QConversationMessage;
+          lines.push(row);
+          return Promise.resolve(row);
+        },
+      },
+      runs: { allocateEventSequence: () => Promise.resolve(1) },
+      runEvents: {
+        append: (_tx: unknown, input: unknown) => Promise.resolve(input),
+      },
+    } as unknown as QRuntimeRepositories,
+    sql: {} as never,
+    transactions: { run: (work) => work({} as never) },
+    turns,
+    offeredTools: () => Promise.resolve(["open_page"]),
+  });
+  const say = async (said: string, manifest?: QPageManifest) => {
+    lines.push(message("USER", said));
+    await answer.answer(request(manifest));
+    return lines.at(-1);
+  };
+  return { say, notes, delegatedWith, lines, shownControls };
+}
+
+describe("references through the answer seam (Scenarios A, B, G)", () => {
+  it("'open the second one' on the investors page opens that fund, by code", async () => {
+    const run = seam();
+    const last = await run.say("open the second one", INVESTORS_PAGE);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(last?.blocks).toEqual([opened("INVESTOR", SAVANNA)]);
+  });
+
+  it("'not that investor, the second one' opens the next fund, not the one just opened", async () => {
+    const run = seam([
+      message("USER", "open the first one"),
+      message("Q", "Opening it.", [opened("INVESTOR", HALYARD)]),
+    ]);
+    const page: QPageManifest = {
+      ...INVESTORS_PAGE,
+      sections: [investorList([HALYARD, SAVANNA, CLEARWATER])],
+    };
+    const last = await run.say("not that investor, the second one", page);
+    expect(last?.blocks).toEqual([opened("INVESTOR", SAVANNA)]);
+  });
+
+  it("'explain the second one' is answered by Q, told which record it is", async () => {
+    const run = seam();
+    await run.say("explain the second one", INVESTORS_PAGE);
+    expect(run.delegatedWith).toHaveLength(1);
+    expect(run.delegatedWith[0]?.references).toBe(
+      `RESOLVED: number 2 = (investor ${SAVANNA}).`,
+    );
+    // The reader is told too, ahead of the rest of its note.
+    expect(run.notes.at(-1)).toMatch(/^\[Q context\] RESOLVED: number 2/u);
+  });
+
+  it("'compare those two' after Q listed companies tells Q the pair, by name and id", async () => {
+    const run = seam([
+      message("USER", "top three companies for my mandate"),
+      message("Q", "Here are the closest three.", [companyCards]),
+    ]);
+    await run.say("compare those two");
+    expect(run.delegatedWith[0]?.references).toBe(
+      `RESOLVED: the two to compare = "Ajopot" (company ${AJOPOT}) and "Tensorgate" (company ${TENSORGATE}).`,
+    );
+  });
+
+  it("'go back to what we were discussing' carries across voice and text: the focus is on the messages", async () => {
+    // Earlier turns could have been spoken or typed; only the durable
+    // messages are read, so a new seam (another instance) binds the same.
+    const earlier = [
+      message("Q", "Ajopot's raise is…", [opened("COMPANY", AJOPOT)]),
+      message("Q", "Halyard invests…", [opened("INVESTOR", HALYARD)]),
+    ];
+    const run = seam(earlier);
+    await run.say("go back to what we were discussing");
+    expect(run.delegatedWith[0]?.references).toBe(
+      `RESOLVED: what was being discussed before = (company ${AJOPOT}).`,
+    );
+  });
+
+  it("a turn that points at nothing carries no reference", async () => {
+    const run = seam();
+    await run.say("what's our runway?");
+    expect(run.delegatedWith[0]?.references).toBeUndefined();
+  });
+});
+
+// --- the page's own controls (C's request; Scenarios A and B) ---------------
+
+/** Capital, readiness view: tabs, sections and a list registered by C. */
+const CAPITAL_PAGE: QPageManifest = {
+  v: 2,
+  seq: 11,
+  inView: [],
+  sections: [],
+  dialogs: [],
+  controls: [
+    { id: "tab.overview", kind: "TAB", state: "SELECTED" },
+    { id: "tab.readiness", kind: "TAB" },
+    { id: "tab.due-diligence", kind: "TAB" },
+    { id: "section.risks", kind: "SECTION" },
+    { id: "list.risks", kind: "LIST", count: 5 },
+  ],
+};
+
+describe("binding words to the page's controls", () => {
+  const controls = CAPITAL_PAGE.controls;
+
+  it.each([
+    [
+      "open the readiness tab",
+      "RESOLVED: the readiness tab = control tab.readiness on their screen (operate_screen SELECT_TAB target tab.readiness).",
+    ],
+    [
+      "go to the due diligence tab",
+      "RESOLVED: the due diligence tab = control tab.due-diligence on their screen (operate_screen SELECT_TAB target tab.due-diligence).",
+    ],
+    [
+      "scroll to the risks section",
+      "RESOLVED: the risks section = control section.risks on their screen (operate_screen SCROLL_TO target section.risks).",
+    ],
+    [
+      "explain the second one",
+      "RESOLVED: number 2 = item 2 of list.risks on their screen (operate_screen SELECT_ITEM target list.risks index 2).",
+    ],
+    [
+      "open the last one",
+      "RESOLVED: number 5 = item 5 of list.risks on their screen (operate_screen SELECT_ITEM target list.risks index 5).",
+    ],
+  ])("%j", (said, note) => {
+    expect(controlReferenceOf(said, controls)).toBe(note);
+  });
+
+  it("binds nothing the page does not have", () => {
+    expect(controlReferenceOf("open the mandate tab", controls)).toBeNull();
+    expect(controlReferenceOf("explain the ninth one", controls)).toBeNull();
+    expect(controlReferenceOf("open the readiness tab", [])).toBeNull();
+  });
+
+  it("tells the reader and the answer which control 'the second one' is", async () => {
+    const run = seam();
+    await run.say("explain the second one", CAPITAL_PAGE);
+    expect(run.delegatedWith[0]?.references).toBe(
+      "RESOLVED: number 2 = item 2 of list.risks on their screen (operate_screen SELECT_ITEM target list.risks index 2).",
+    );
+    expect(run.notes.at(-1)).toMatch(
+      /^\[Q context\] RESOLVED: number 2 = item 2 of list\.risks/u,
+    );
+  });
+
+  it("works 'open the readiness tab' on this page by code, not by navigating away", async () => {
+    const run = seam();
+    const last = await run.say("open the readiness tab", CAPITAL_PAGE);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(last?.content).toBe("Opening the readiness tab.");
+    expect(last?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: {
+          kind: "UI_ACT",
+          actId: expect.stringMatching(/^uia_[a-f0-9]{24}$/u) as string,
+          act: "SELECT_TAB",
+          target: "tab.readiness",
+        },
+      },
+    ]);
+  });
+
+  it("'open the second one' on a registered list opens that item", async () => {
+    const run = seam();
+    const last = await run.say("open the second one", CAPITAL_PAGE);
+    expect(last?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: expect.objectContaining({
+          kind: "UI_ACT",
+          act: "SELECT_ITEM",
+          target: "list.risks",
+          index: 2,
+        }) as unknown,
+      },
+    ]);
+  });
+
+  it("a tab this page does not have is left to the page table and the answer", async () => {
+    const run = seam();
+    const last = await run.say("open the mandate tab", CAPITAL_PAGE);
+    expect(
+      (last?.blocks ?? []).some(
+        (block) => block.kind === "UI_INTENT" && block.intent.kind === "UI_ACT",
+      ),
+    ).toBe(false);
+  });
+});
+
+// --- owner 2026-10-17: a tab chosen by the reader, by meaning -------------
+
+/** A company profile: its tabs, each with its own visible name. */
+const PROFILE_PAGE: QPageManifest = {
+  v: 2,
+  seq: 4,
+  inView: [],
+  sections: [],
+  dialogs: [],
+  controls: [
+    { id: "tab.overview", kind: "TAB", state: "SELECTED", label: "Overview" },
+    { id: "tab.dataroom", kind: "TAB", label: "Data room" },
+    { id: "tab.deck", kind: "TAB", label: "Pitch deck" },
+    { id: "list.risks", kind: "LIST", count: 3 },
+  ],
+};
+
+const chose = (control: string | null): QTurnReading => ({
+  ...QUESTION,
+  kind: "TOOL_REQUEST",
+  control,
+});
+
+describe("TURN_READER v55: the tab the reader chose, worked by code", () => {
+  it.each([
+    // Garbled speech no word rule reads (live 2026-10-17 09:16).
+    [
+      "Mm .Scroll- show me their, their data room",
+      "tab.dataroom",
+      "Opening Data room.",
+    ],
+    // Another language: nothing here matches words.
+    ["ouvre la salle de données", "tab.dataroom", "Opening Data room."],
+    ["déjame ver su presentación", "tab.deck", "Opening Pitch deck."],
+  ])(
+    "%j selects %s on this page, with no further model call",
+    async (said, id, line) => {
+      const run = seam([], chose(id));
+      const last = await run.say(said, PROFILE_PAGE);
+      expect(run.delegatedWith).toHaveLength(0);
+      expect(last?.content).toBe(line);
+      expect(last?.blocks).toEqual([
+        {
+          kind: "UI_INTENT",
+          intent: {
+            kind: "UI_ACT",
+            actId: expect.stringMatching(/^uia_[a-f0-9]{24}$/u) as string,
+            act: "SELECT_TAB",
+            target: id,
+          },
+        },
+      ]);
+      // The reader was given the page's own controls, names included.
+      expect(run.shownControls.at(-1)).toEqual(PROFILE_PAGE.controls);
+    },
+  );
+
+  it("an id the page did not list, or a list, is never acted on", async () => {
+    for (const id of ["tab.team", "list.risks"]) {
+      const run = seam([], chose(id));
+      const last = await run.say("zeig mir das Team", PROFILE_PAGE);
+      expect(run.delegatedWith).toHaveLength(1);
+      expect(
+        (last?.blocks ?? []).some(
+          (block) =>
+            block.kind === "UI_INTENT" && block.intent.kind === "UI_ACT",
+        ),
+      ).toBe(false);
+    }
+  });
+
+  // Production AT, run 5553724c: on Basketari's profile with the Data room
+  // open, "now the pitch deck" was read as making a deck ("Which company
+  // should the deck be about?") and nothing moved. With the page's tabs
+  // in the reading, its Pitch deck tab is selected, and no deck is made.
+  it("'now the pitch deck' with the Data room open selects the Pitch deck tab, never makes a deck", async () => {
+    const page: QPageManifest = {
+      ...PROFILE_PAGE,
+      controls: [
+        { id: "tab.overview", kind: "TAB", label: "Overview" },
+        {
+          id: "tab.dataroom",
+          kind: "TAB",
+          state: "SELECTED",
+          label: "Data room",
+        },
+        { id: "tab.deck", kind: "TAB", label: "Pitch deck" },
+      ],
+    };
+    const run = seam([], chose("tab.deck"));
+    const last = await run.say("now the pitch deck", page);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(last?.content).toBe("Opening Pitch deck.");
+    expect(last?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: expect.objectContaining({
+          kind: "UI_ACT",
+          act: "SELECT_TAB",
+          target: "tab.deck",
+        }) as unknown,
+      },
+    ]);
+    expect(run.shownControls.at(-1)).toEqual(page.controls);
+  });
+
+  // Production AT: "open the data room" missed the fast lane and ran a full
+  // Q run (1.6 s). With the page's tabs in the reading it is SELECT_TAB.
+  it("'open the data room' on the profile is SELECT_TAB on its Data room tab", async () => {
+    const run = seam([], chose("tab.dataroom"));
+    const last = await run.say("open the data room", PROFILE_PAGE);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(last?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: expect.objectContaining({
+          act: "SELECT_TAB",
+          target: "tab.dataroom",
+        }) as unknown,
+      },
+    ]);
+  });
+
+  it("no control chosen: answered as before", async () => {
+    const run = seam([], chose(null));
+    await run.say("what's in their data room?", PROFILE_PAGE);
+    expect(run.delegatedWith).toHaveLength(1);
+  });
+});
+
+describe("the catalog's cards (K1: 'show me three fintech companies')", () => {
+  // The block the DISCOVER_COMPANIES fast path writes: side by side, no fit.
+  const catalogCards: QResultBlock = {
+    kind: "ANSWER_CARDS",
+    shape: "SIDE_BY_SIDE",
+    title: "Fintech companies",
+    followUps: [],
+    cards: [
+      ["Ajopot", AJOPOT],
+      ["Kora", KORA],
+      ["Tensorgate", TENSORGATE],
+    ].map(([name, id], at) => ({
+      key: id ?? "",
+      name: name ?? "",
+      line: "Fintech · seed · Nigeria",
+      about: null,
+      hue: at + 1,
+      fit: null,
+      reasons: ["Declared on Capital Q: Fintech · seed · Nigeria."],
+      measures: [],
+      view: null,
+      said: `${name ?? ""}.`,
+      sourceCount: 0,
+      subject: { kind: "COMPANY", companyId: id ?? "" },
+    })),
+  };
+
+  it("'open the second' is the second company listed", () => {
+    const history = [
+      message("USER", "Show me three fintech companies"),
+      message("Q", "Here are three fintech companies on Capital Q.", [
+        catalogCards,
+      ]),
+    ];
+    expect(one(resolve("open the second", history))).toMatchObject({
+      kind: "COMPANY",
+      id: KORA,
+    });
+  });
+});
+
+describe("pipeline commands use the registered controls without a model", () => {
+  const page: QPageManifest = {
+    ...CAPITAL_PAGE,
+    controls: [
+      { id: "filter.pipeline-sort", kind: "FILTER" },
+      { id: "filter.pipeline-search", kind: "FILTER" },
+      { id: "filter.pipeline-state", kind: "FILTER" },
+    ],
+  };
+  it.each([
+    ["Sort this pipeline by name A–Z.", "filter.pipeline-sort", "name"],
+    ["Sort the pipeline by name Z-A", "filter.pipeline-sort", "name-desc"],
+    [
+      "Sort the pipeline by latest state change",
+      "filter.pipeline-sort",
+      "recent",
+    ],
+    [
+      'Search this pipeline for "Maji Loop"',
+      "filter.pipeline-search",
+      "Maji Loop",
+    ],
+    ["Clear the pipeline search", "filter.pipeline-search", ""],
+    ["Filter this pipeline to connected", "filter.pipeline-state", "CONNECTED"],
+  ])("%s", async (text, target, value) => {
+    const run = seam();
+    const answer = await run.say(text, page);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(answer?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: expect.objectContaining({
+          kind: "UI_ACT",
+          act: "FILTER",
+          target,
+          value,
+        }) as unknown,
+      },
+    ]);
+  });
+  it.each([
+    "Should we sort this pipeline by name A-Z?",
+    "Sort this pipeline by revenue",
+    "Filter this pipeline to approved",
+    `Search this pipeline for ${"x".repeat(121)}`,
+  ])("does not invent an operation for %s", async (text) => {
+    const run = seam();
+    const answer = await run.say(text, page);
+    expect(
+      (answer?.blocks ?? []).some(
+        (b) => b.kind === "UI_INTENT" && b.intent.kind === "UI_ACT",
+      ),
+    ).toBe(false);
+  });
+  it("does not operate a stale or absent pipeline control", async () => {
+    const run = seam();
+    const answer = await run.say(
+      "Sort this pipeline by name A–Z.",
+      CAPITAL_PAGE,
+    );
+    expect(
+      (answer?.blocks ?? []).some(
+        (b) => b.kind === "UI_INTENT" && b.intent.kind === "UI_ACT",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("opening an exact pipeline relationship uses its native link", () => {
+  it.each(["COMPANY", "INVESTOR_ORGANISATION"] as const)(
+    "uses the visible %s pipeline rather than page aliases or old cards",
+    async (kind) => {
+      const page: QPageManifest = {
+        ...CAPITAL_PAGE,
+        sections: [
+          {
+            id: "pipeline",
+            kind: "RELATIONSHIP_LIST",
+            refs: [
+              { kind, id: AJOPOT },
+              { kind, id: KORA },
+            ],
+            total: 2,
+          },
+        ],
+        controls: [{ id: "list.pipeline", kind: "LIST", count: 2 }],
+      };
+      const run = seam([message("Q", "Older companies", [companyCards])]);
+      const answer = await run.say(
+        "Open the first relationship in this pipeline.",
+        page,
+      );
+      expect(run.delegatedWith).toHaveLength(0);
+      expect(answer?.blocks).toEqual([
+        {
+          kind: "UI_INTENT",
+          intent: expect.objectContaining({
+            kind: "UI_ACT",
+            act: "SELECT_ITEM",
+            target: "list.pipeline",
+            index: 1,
+          }) as unknown,
+        },
+      ]);
+    },
+  );
+  it("does not treat a question about the first relationship as navigation", async () => {
+    const page: QPageManifest = {
+      ...CAPITAL_PAGE,
+      controls: [{ id: "list.pipeline", kind: "LIST", count: 2 }],
+    };
+    const run = seam();
+    const answer = await run.say(
+      "Explain the first relationship in this pipeline",
+      page,
+    );
+    expect(
+      (answer?.blocks ?? []).some(
+        (b) => b.kind === "UI_INTENT" && b.intent.kind === "UI_ACT",
+      ),
+    ).toBe(false);
+  });
+});
+
+/**
+ * Lane W (2026-10-15): "this one" and "the second one" prefer what the
+ * person is looking at -- the records visible now, the pitch playing.
+ */
+describe("what they are looking at (lane W)", () => {
+  const co = (n: number) =>
+    `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+  const page = (extra: Partial<QPageManifest> = {}): QPageManifest => ({
+    v: 2,
+    seq: 1,
+    inView: ["list"],
+    dialogs: [],
+    sections: [
+      {
+        id: "list",
+        kind: "COMPANY_LIST",
+        refs: [1, 2, 3, 4, 5].map((n) => ({ kind: "COMPANY", id: co(n) })),
+        total: 5,
+        visible: [4, 5].map((n) => ({ kind: "COMPANY", id: co(n) })),
+      },
+    ],
+    ...extra,
+  });
+
+  it("reads 'this one' and 'the one I'm looking at'", () => {
+    expect(referenceAskOf("is this one a fit?")).toEqual({
+      kind: "THIS",
+      entityKind: null,
+    });
+    expect(referenceAskOf("tell me about this investor")).toEqual({
+      kind: "THIS",
+      entityKind: "INVESTOR_ORGANISATION",
+    });
+    expect(referenceAskOf("who made this pitch?")).toEqual({
+      kind: "THIS",
+      entityKind: "COMPANY",
+    });
+    // An ordinal still wins.
+    expect(referenceAskOf("this one, the second")?.kind).toBe("ORDINAL");
+  });
+
+  it("counts 'the second one' through what is visible first", () => {
+    expect(one(resolve("open the second one", [], page()))?.id).toBe(co(5));
+    // An older web sends no visible refs: the whole list, as before.
+    const older = page();
+    const [section] = older.sections;
+    if (section === undefined) throw new Error("fixture");
+    const { visible: _visible, ...rest } = section;
+    expect(
+      one(resolve("open the second one", [], { ...older, sections: [rest] }))
+        ?.id,
+    ).toBe(co(2));
+  });
+
+  it("binds 'this one' to the window, then focus, then the pitch, then what is visible", () => {
+    expect(one(resolve("is this one a fit?", [], page()))?.id).toBe(co(4));
+    const playing = page({
+      media: { kind: "PITCH", companyId: co(9), state: "PLAYING" },
+    });
+    expect(one(resolve("who made this pitch?", [], playing))?.id).toBe(co(9));
+    const focused = page({
+      ...playing,
+      focus: { kind: "COMPANY", id: co(7) },
+    });
+    expect(one(resolve("is this one a fit?", [], focused))?.id).toBe(co(7));
+    // Nothing on the page: no binding, the turn is read as before.
+    expect(
+      resolve("is this one a fit?", [], {
+        ...page(),
+        inView: [],
+      }),
+    ).toBeNull();
+  });
+});
+
+/**
+ * Lane S 2026-10-15 (audit 10-14 21:55: "Open the first relationship in
+ * this pipeline." answered "Understood."): an ordinal over the page's list
+ * resolves in the manifest's list order, the in-view list first, and a
+ * relationship opens the relationship page.
+ */
+describe("ordinals over the pipeline on screen (lane S)", () => {
+  const PIPELINE: QPageManifest = {
+    v: 2,
+    seq: 3,
+    inView: ["pipeline"],
+    sections: [
+      {
+        id: "pipeline",
+        kind: "RELATIONSHIP_LIST",
+        refs: [AJOPOT, TENSORGATE, KORA].map((id) => ({
+          kind: "COMPANY" as const,
+          id,
+        })),
+        total: 3,
+      },
+    ],
+    dialogs: [],
+  };
+  const relationship = (id: string): QResultBlock => ({
+    kind: "UI_INTENT",
+    intent: { kind: "OPEN_RECORD_PAGE", page: "RELATIONSHIP_COMPANY", id },
+  });
+
+  it.each([
+    ["Open the first relationship in this pipeline.", AJOPOT],
+    ["open the second relationship", TENSORGATE],
+    ["open the last deal in the pipeline", KORA],
+  ])("%s", async (said, id) => {
+    const run = seam();
+    const last = await run.say(said, PIPELINE);
+    expect(run.delegatedWith).toHaveLength(0);
+    expect(last?.blocks).toEqual([relationship(id)]);
+  });
+
+  it("'open the second one' there opens the second company in list order", async () => {
+    const run = seam();
+    const last = await run.say("open the second one", PIPELINE);
+    expect(last?.blocks).toEqual([opened("COMPANY", TENSORGATE)]);
+  });
+
+  it("'explain the second one' is bound to the second in list order for Q", async () => {
+    const run = seam();
+    await run.say("explain the second one", PIPELINE);
+    expect(run.delegatedWith).toHaveLength(1);
+    expect(run.delegatedWith[0]?.references).toContain(TENSORGATE);
+  });
+});

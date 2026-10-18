@@ -4,6 +4,7 @@ import {
   CreateInvestorOrganisationRequestSchema,
   CreateOrganisationRequestSchema,
   InvestorDeploymentStateSchema,
+  InvestorInboundPreferenceSchema,
   InvestorTypeSchema,
   UpdateInvestorMandateRequestSchema,
   UpdateInvestorOrganisationRequestSchema,
@@ -47,6 +48,10 @@ import {
   type ActorContext,
   type OrganisationId,
 } from "@capital-q/security";
+import {
+  investorMayReuseWorkspace,
+  readInvestorWorkspaceFacts,
+} from "./workspace.js";
 import { TaxonomyNodeIdSchema } from "@capital-q/taxonomy";
 
 import {
@@ -95,11 +100,40 @@ function invalid(path: string, code: string, message: string): never {
   throw new ContractValidationError(message, [{ path, code, message }]);
 }
 
+/** "Gambling", "Gambling and Tobacco", "Gambling, Tobacco and Weapons". */
+function joinNames(names: readonly string[]): string {
+  if (names.length <= 1) {
+    return names[0] ?? "";
+  }
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+}
+
+/**
+ * Lookups repeated by every answer of one request (live AJ 2026-10-16: an
+ * investor's first answers took 1.4-4.7 s in one batch, each answer
+ * resolving the same context and listing the same mandates again). The
+ * memo is the onboarding runtime's, made for that one request and dropped
+ * with it: nothing crosses requests or people. Only successful reads are
+ * kept; every write still runs the Investor domain's own capability,
+ * version and validation checks.
+ */
+type RequestMemo = Map<string, unknown> | undefined;
+
+function remembered<T>(memo: RequestMemo, key: string): T | undefined {
+  return memo?.get(key) as T | undefined;
+}
+
+function remember(memo: RequestMemo, key: string, value: unknown): void {
+  memo?.set(key, value);
+}
+
 /** Resolve the actor context for `organisationId` from the verified principal. */
 export async function resolveInvestorContext(
   services: InvestorDomainServices,
   actor: OnboardingActor,
   organisationId: OrganisationId,
+  /** This request's memo; repeated answers reuse the resolution. */
+  memo?: RequestMemo,
 ): Promise<ActorContext> {
   if (actor.context?.organisationId === organisationId) {
     return actor.context;
@@ -107,6 +141,9 @@ export async function resolveInvestorContext(
   if (actor.principal === undefined) {
     throw new OnboardingContextRequiredError();
   }
+  const key = `context|${actor.userId}|${organisationId}`;
+  const known = remembered<ActorContext>(memo, key);
+  if (known !== undefined) return known;
   const resolution = await resolveHumanActorContext(services.resolver, {
     principal: actor.principal,
     selection: { organisationId },
@@ -114,6 +151,7 @@ export async function resolveInvestorContext(
   if (resolution.status !== "RESOLVED") {
     throw new OnboardingContextRequiredError();
   }
+  remember(memo, key, resolution.context);
   return resolution.context;
 }
 
@@ -122,6 +160,7 @@ export async function boundInvestor(
   services: InvestorDomainServices,
   actor: OnboardingActor,
   session: OnboardingSession,
+  memo?: RequestMemo,
 ): Promise<BoundInvestor> {
   if (
     session.subject === null ||
@@ -135,6 +174,7 @@ export async function boundInvestor(
       services,
       actor,
       session.organisationId,
+      memo,
     ),
     investorOrganisationId: InvestorOrganisationIdSchema.parse(
       session.subject.subjectId,
@@ -154,6 +194,88 @@ export function selectedMandateId(values: ResponseValues): InvestorMandateId {
     );
   }
   return parsed.data;
+}
+
+/** The idempotency key of the first draft this session creates; one per session. */
+function firstMandateKey(session: OnboardingSession): string {
+  return `onboarding:${session.id}:mandate`;
+}
+
+/**
+ * The mandate an answer is about.
+ *
+ * The I1 choice when the investor has made one. Before that, the investor's
+ * only open mandate — and when they have none yet, the first draft, created
+ * exactly as the deployment-status step creates it (same idempotency key,
+ * never activated). Only an investor with several open mandates has to say
+ * which one first; "Most investors have one" is the journey's own premise.
+ *
+ * Refusing every I2+ answer until I1 was answered lost what people say up
+ * front: "we write pre-seed and seed cheques of 100 to 250k" was read
+ * correctly, refused as `mandate_context_required`, and asked again later
+ * (CQ-ACCEPT-001, investor walkthrough).
+ */
+export async function mandateInScope(
+  services: InvestorDomainServices,
+  bound: BoundInvestor,
+  values: ResponseValues,
+  create?: {
+    readonly session: OnboardingSession;
+    readonly correlationId: CorrelationId;
+    readonly requestMemo?: RequestMemo;
+  },
+): Promise<InvestorMandateId> {
+  const chosen = InvestorMandateIdSchema.safeParse(
+    resourceIds(values, INVESTOR_STEPS.mandateContext)?.[0],
+  );
+  if (chosen.success) {
+    return chosen.data;
+  }
+  // The investor's one open mandate, once per request (each answer of a
+  // batch asked again). Only an existing mandate is kept, never one this
+  // request is still creating.
+  const key = `mandate|${bound.investorOrganisationId}`;
+  const known = remembered<InvestorMandateId>(create?.requestMemo, key);
+  if (known !== undefined) return known;
+  const page = await services.investors.listInvestorMandates({
+    actor: bound.context,
+    investorOrganisationId: bound.investorOrganisationId,
+    limit: 50,
+  });
+  const open = page.items.filter((m) => m.status !== "CLOSED");
+  const only = open.length === 1 ? open[0] : undefined;
+  if (only !== undefined) {
+    remember(create?.requestMemo, key, only.id);
+    return only.id;
+  }
+  if (open.length === 0 && create !== undefined) {
+    const created = await createFirstMandate(services, bound, create);
+    return created;
+  }
+  return selectedMandateId(values);
+}
+
+async function createFirstMandate(
+  services: InvestorDomainServices,
+  bound: BoundInvestor,
+  input: {
+    readonly session: OnboardingSession;
+    readonly correlationId: CorrelationId;
+  },
+): Promise<InvestorMandateId> {
+  // A first DRAFT to define; never activated here.
+  const mandate = await services.investors.createInvestorMandate({
+    actor: bound.context,
+    investorOrganisationId: bound.investorOrganisationId,
+    input: parseContract(
+      CreateInvestorMandateRequestSchema,
+      { name: "Primary mandate" },
+      "The mandate is not valid.",
+    ),
+    idempotencyKey: firstMandateKey(input.session),
+    correlationId: input.correlationId,
+  });
+  return mandate.id;
 }
 
 // ---------------------------------------------------------------------------
@@ -323,19 +445,32 @@ export async function taxonomyPreferencesFromResponses(
     string,
     { strength: MandatePreferenceClass; vocabularies: readonly string[] }
   >();
+  const conflicting = new Set<string>();
   for (const source of TAXONOMY_SOURCES) {
     const strength = source.strength(values);
     for (const id of resourceIds(values, source.stepKey) ?? []) {
       const existing = wanted.get(id);
       if (existing !== undefined && existing.strength !== strength) {
-        invalid(
-          "value.resourceIds",
-          "conflicting_preference",
-          "A category cannot be both a preference and an exclusion.",
-        );
+        conflicting.add(id);
       }
       wanted.set(id, { strength, vocabularies: source.vocabularies });
     }
+  }
+  if (conflicting.size > 0) {
+    // Named, so the person knows which category to move (CQ-PRE-REC-001 §41).
+    const named = await services.taxonomy.findNodesByIds(
+      [...conflicting].map((id) => TaxonomyNodeIdSchema.parse(id)),
+    );
+    const labels = [...conflicting].map(
+      (id) =>
+        named.find((node) => String(node.id) === id)?.displayName ??
+        "A category",
+    );
+    invalid(
+      "value.resourceIds",
+      "conflicting_preference",
+      `${joinNames(labels)} ${labels.length === 1 ? "is" : "are"} both a preference and an exclusion. Keep ${labels.length === 1 ? "it" : "each"} in one place.`,
+    );
   }
   if (wanted.size === 0) {
     return [];
@@ -468,10 +603,17 @@ export function exclusionConstraints(
   );
   const overlap = avoid.filter((code) => hard.includes(code));
   if (overlap.length > 0) {
+    // The error names the criterion, so the person can move it rather
+    // than hunt for it (CQ-PRE-REC-001 §41).
+    const labels = overlap.map(
+      (code) =>
+        RED_FLAG_OPTIONS.find((option) => option.optionKey === code)?.label ??
+        code,
+    );
     invalid(
       "value.optionKeys",
       "conflicting_exclusion",
-      "A red flag is either something to avoid or something never to show, not both.",
+      `${joinNames(labels)} ${labels.length === 1 ? "is" : "are"} listed both as something to avoid and as something never to show. Keep ${labels.length === 1 ? "it" : "each"} in one list.`,
     );
   }
   const constraints: MandateConstraintInput[] = [];
@@ -574,13 +716,13 @@ function mergeConstraints(
 async function updateMandate(
   services: InvestorDomainServices,
   bound: BoundInvestor,
-  mandateId: InvestorMandateId,
+  mandate: InvestorMandate,
   patch: (
     mandate: InvestorMandate,
   ) => Omit<UpdateInvestorMandateRequest, "expectedVersion">,
   correlationId: CorrelationId,
 ): Promise<InvestorMandate> {
-  const mandate = await currentMandate(services, bound, mandateId);
+  const mandateId = mandate.id;
   const input = parseContract(
     UpdateInvestorMandateRequestSchema,
     { expectedVersion: mandate.version, ...patch(mandate) },
@@ -618,7 +760,12 @@ async function bootstrapInvestor(
 
   if (session.subject !== null) {
     // Revising the name after binding renames the same investor organisation.
-    const bound = await boundInvestor(services, actor, session);
+    const bound = await boundInvestor(
+      services,
+      actor,
+      session,
+      context.requestMemo,
+    );
     const investor = await services.investors.getInvestorOrganisation({
       actor: bound.context,
       investorOrganisationId: bound.investorOrganisationId,
@@ -645,11 +792,25 @@ async function bootstrapInvestor(
     return;
   }
 
+  // Owner directive 2026-10-16: the active organisation is reused only when
+  // it is a firm's workspace (`investorMayReuseWorkspace`); a founder who
+  // also invests gets their own investing workspace beside the company.
+  const reusable =
+    actor.context?.organisationId !== undefined &&
+    investorMayReuseWorkspace(
+      (await readInvestorWorkspaceFacts(context.tx.sql, actor.context)) ?? {
+        organisationType: "company",
+        holdsCompany: true,
+      },
+    )
+      ? actor.context
+      : null;
+
   let actorContext: ActorContext;
-  if (actor.context?.organisationId !== undefined) {
+  if (reusable !== null) {
     // An existing member acts in their explicit active context. Nobody joins
     // an organisation by typing its name.
-    actorContext = actor.context;
+    actorContext = reusable;
   } else {
     if (actor.principal === undefined) {
       throw new OnboardingContextRequiredError();
@@ -740,17 +901,31 @@ async function withMandate(
     | Omit<UpdateInvestorMandateRequest, "expectedVersion">
     | Promise<Omit<UpdateInvestorMandateRequest, "expectedVersion">>,
 ): Promise<void> {
-  const bound = await boundInvestor(services, context.actor, context.session);
-  const mandateId = selectedMandateId(values);
-  const mandate = await currentMandate(services, bound, mandateId);
+  const bound = await boundInvestor(
+    services,
+    context.actor,
+    context.session,
+    context.requestMemo,
+  );
+  const mandateId = await mandateInScope(services, bound, values, context);
+  // The mandate as this request's own last update left it (live AM: each
+  // of an investor's first answers read it again, ~270 ms an answer). The
+  // runtime drops the memo whenever an answer is refused, so a rolled-back
+  // update is never reused; the domain still locks the mandate and checks
+  // this version on every write.
+  const stateKey = `mandate-state|${mandateId}`;
+  const mandate =
+    remembered<InvestorMandate>(context.requestMemo, stateKey) ??
+    (await currentMandate(services, bound, mandateId));
   const resolved = await patch(mandate);
-  await updateMandate(
+  const updated = await updateMandate(
     services,
     bound,
-    mandateId,
+    mandate,
     () => resolved,
     context.correlationId,
   );
+  remember(context.requestMemo, stateKey, updated);
 }
 
 export function createInvestorWriteTargets(
@@ -772,6 +947,7 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
       await services.investors.upsertMyInvestorRepresentative({
         actor: bound.context,
@@ -794,6 +970,7 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
       const state = InvestorDeploymentStateSchema.safeParse(
         singleSelect(values, INVESTOR_STEPS.deploymentStatus)?.toUpperCase(),
@@ -826,6 +1003,7 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
       const page = await services.investors.listInvestorMandates({
         actor: bound.context,
@@ -836,18 +1014,7 @@ export function createInvestorWriteTargets(
       if (open.length > 0) {
         return;
       }
-      // A first DRAFT to define; never activated here.
-      await services.investors.createInvestorMandate({
-        actor: bound.context,
-        investorOrganisationId: bound.investorOrganisationId,
-        input: parseContract(
-          CreateInvestorMandateRequestSchema,
-          { name: "Primary mandate" },
-          "The mandate is not valid.",
-        ),
-        idempotencyKey: `onboarding:${context.session.id}:mandate`,
-        correlationId: context.correlationId,
-      });
+      await createFirstMandate(services, bound, context);
     },
 
     [INVESTOR_WRITE_TARGETS.mandateSelect]: async (
@@ -859,6 +1026,7 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
       const mandateId = selectedMandateId(values);
       let mandate: InvestorMandate;
@@ -883,20 +1051,48 @@ export function createInvestorWriteTargets(
       }
     },
 
-    [INVESTOR_WRITE_TARGETS.stageCheque]: (services, context, values) =>
-      withMandate(services, context, values, (mandate) => {
-        const patch = stageChequePatch(values);
-        return {
+    [INVESTOR_WRITE_TARGETS.stageCheque]: (services, context, values) => {
+      const update = (
+        servicesNow: InvestorDomainServices,
+        contextNow: OnboardingWriteContext,
+      ) =>
+        withMandate(servicesNow, contextNow, values, (mandate) => {
+          const patch = stageChequePatch(values);
+          return {
+            minStageCode: patch.minStageCode,
+            maxStageCode: patch.maxStageCode,
+            chequeRange: patch.chequeRange,
+            constraints: mergeConstraints(
+              mandate,
+              ["stage", "investment_role"],
+              patch.constraints,
+            ),
+          };
+        });
+      if (context.defer === undefined) return update(services, context);
+      // In a batch the stage and cheque answers (up to six, each the same
+      // mandate update) become one update at its end (live AM: ~270 ms an
+      // answer). This answer's own values are checked now, so a bad one
+      // is refused as itself; the deferred update reads every answer, and
+      // if the domain refuses it the runtime replays the batch answer by
+      // answer.
+      const patch = stageChequePatch(values);
+      parseContract(
+        UpdateInvestorMandateRequestSchema,
+        {
+          expectedVersion: 1,
           minStageCode: patch.minStageCode,
           maxStageCode: patch.maxStageCode,
           chequeRange: patch.chequeRange,
-          constraints: mergeConstraints(
-            mandate,
-            ["stage", "investment_role"],
-            patch.constraints,
-          ),
-        };
-      }),
+          constraints: patch.constraints,
+        },
+        "The mandate details are not valid.",
+      );
+      context.defer(INVESTOR_WRITE_TARGETS.stageCheque, (tx) =>
+        update(servicesFor(tx), { ...context, tx }),
+      );
+      return Promise.resolve();
+    },
 
     [INVESTOR_WRITE_TARGETS.taxonomy]: (services, context, values) =>
       withMandate(services, context, values, async () => ({
@@ -947,6 +1143,7 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
       const wanted = portfolioNames(text(values, INVESTOR_STEPS.portfolio));
       const current = await services.investors.listInvestorPortfolioReferences({
@@ -1003,8 +1200,38 @@ export function createInvestorWriteTargets(
         services,
         context.actor,
         context.session,
+        context.requestMemo,
       );
-      const mandateId = selectedMandateId(values);
+      // ADR 0023: how founders may reach this organisation becomes the
+      // organisation's own setting when the investor confirms. The I10 step
+      // predates the column and its published definition is hash-locked, so
+      // the confirmation (which always follows it) records it. Unanswered
+      // stays unset: not stated is never consent.
+      const inbound = InvestorInboundPreferenceSchema.safeParse(
+        singleSelect(values, INVESTOR_STEPS.inboundPreference)?.toUpperCase(),
+      );
+      if (inbound.success) {
+        const investor = await services.investors.getInvestorOrganisation({
+          actor: bound.context,
+          investorOrganisationId: bound.investorOrganisationId,
+        });
+        if (investor.inboundPreference !== inbound.data) {
+          await services.investors.updateInvestorOrganisation({
+            actor: bound.context,
+            investorOrganisationId: bound.investorOrganisationId,
+            input: parseContract(
+              UpdateInvestorOrganisationRequestSchema,
+              {
+                expectedVersion: investor.version,
+                inboundPreference: inbound.data,
+              },
+              "The inbound preference is not valid.",
+            ),
+            correlationId: context.correlationId,
+          });
+        }
+      }
+      const mandateId = await mandateInScope(services, bound, values);
       const mandate = await currentMandate(services, bound, mandateId);
       if (mandate.status !== "DRAFT") {
         return;
@@ -1033,5 +1260,20 @@ export function createInvestorWriteTargets(
         responseValues(context.currentResponses, response),
       );
     },
+    // Every handler recomputes its target from the whole set of current
+    // answers, so re-running it without the withdrawn one is exact
+    // (CQ-QX-008). Confirmation targets are never withdrawn: their steps
+    // are required, and the runtime refuses those first.
+    ...(targetKey === INVESTOR_WRITE_TARGETS.confirm
+      ? {}
+      : {
+          withdraw: async (context: OnboardingWriteContext) => {
+            await handler(
+              servicesFor(context.tx),
+              context,
+              responseValues(context.currentResponses),
+            );
+          },
+        }),
   }));
 }

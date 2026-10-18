@@ -1,0 +1,185 @@
+{
+  "marker": "fictional-world-enrich.v1",
+  "companies": {
+    "ledgerfold": {
+      "name": "Ledgerfold",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "ledgerfold-overview.txt": "f8dfcff2-3b8a-4fb5-9966-19dc147a36f0",
+        "ledgerfold-financial-summary.txt": "40900fb6-82a1-43f5-9bf5-910166d31240",
+        "ledgerfold-product-brief.txt": "11eaa9b4-9eb4-4921-88d1-79dcf989e65c",
+        "deck": "cf7644e0-232f-49b3-ac4d-26b2a01c5e1a"
+      }
+    },
+    "tarmacly": {
+      "name": "Tarmacly",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "tarmacly-overview.txt": "bd4c33a6-b9af-48ef-aa52-a40cf461fe79",
+        "tarmacly-financial-summary.txt": "59d4c9d0-d439-46d1-b27e-deed38adcc41",
+        "tarmacly-product-brief.txt": "d71f6fa0-4d05-4d93-8f94-caa179854e67",
+        "deck": "7a858525-9101-43fd-82bd-6f4fcbeb18a2"
+      }
+    },
+    "yamfield-agro": {
+      "name": "Yamfield Agro",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "yamfield-agro-overview.txt": "ec643336-bfbf-464a-b3c6-858a689ecb60",
+        "yamfield-agro-financial-summary.txt": "7a994e17-96e7-40b3-80b7-ce0160ea89b3",
+        "yamfield-agro-product-brief.txt": "9fea87bd-1c15-43c8-82ef-c8a20ed6f224",
+        "deck": "558fc4f8-0269-4d3f-9853-38c20b5a98c9"
+      }
+    },
+    "clinicrest": {
+      "name": "Clinicrest",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "clinicrest-overview.txt": "91c7625c-c124-454a-91f5-b71d0a99ca73",
+        "clinicrest-financial-summary.txt": "d8ad4fa8-2310-447e-9248-44c8a9c8909c",
+        "clinicrest-product-brief.txt": "2c6b7563-add3-4e0b-8380-6636efeb26b8",
+        "deck": "4b536c77-2190-4586-b4fe-cbfa632393eb"
+      }
+    },
+    "marketlight-grids": {
+      "name": "Marketlight Grids",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "marketlight-grids-overview.txt": "b07604a9-c912-43dd-8410-78d2e42b3cf2",
+        "marketlight-grids-financial-summary.txt": "61cd1b37-ca5d-4a87-a3de-2ab8f3c8cc88",
+        "marketlight-grids-product-brief.txt": "e3bfe69b-3a6b-4f84-b91e-e7938aac9a86",
+        "deck": "ba6bedb2-1b74-4224-9e40-59afe26c94a5"
+      }
+    },
+    "tallyloom": {
+      "name": "Tallyloom",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "tallyloom-overview.txt": "261283f9-1cfb-47d4-b466-57aa3c9f2cc7",
+        "tallyloom-financial-summary.txt": "7f53b42b-468f-4a67-9338-9ca8c1a42c64",
+        "tallyloom-product-brief.txt": "b4b09136-2c25-4dd4-8b77-3a0a13bdfb45",
+        "deck": "1411f344-8a1b-4337-a2b4-e7c7b18415dc"
+      }
+    },
+    "ajopot": {
+      "name": "Ajopot",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "ajopot-overview.txt": "42f6e840-fcf5-43d9-8c27-3f19e097a5da",
+        "ajopot-financial-summary.txt": "f2437ed5-50fd-4dd3-8a6b-24a107e331d8",
+        "ajopot-product-brief.txt": "0db0efaa-6b5a-4fa9-b27f-5c63cdf96ba6",
+        "deck": "26b91f77-ec0b-4918-9a08-6bced55ed8ba"
+      }
+    },
+    "maji-loop": {
+      "name": "Maji Loop",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "maji-loop-overview.txt": "2f8449f3-9fb1-4f92-a2df-c5e658cf6f2e",
+        "maji-loop-financial-summary.txt": "4f6d4301-a7ce-4a24-813a-7905187e4594",
+        "maji-loop-product-brief.txt": "0683438e-5463-477f-b15e-db692534b777",
+        "deck": "a0a6b52f-0384-46f6-9947-3798eb666371"
+      }
+    },
+    "nsuo-labs": {
+      "name": "Nsuo Labs",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "nsuo-labs-overview.txt": "0f05ba4b-10c8-4b6f-a3b4-54b85a5eb618",
+        "nsuo-labs-financial-summary.txt": "6c8b0538-7d70-4210-8e49-e9c710356c36",
+        "nsuo-labs-product-brief.txt": "50288bef-9035-4f5e-a0a5-7d66a956466b",
+        "deck": "9f1a9380-ffd0-4012-849c-28b24b7fb20d"
+      }
+    },
+    "brightkloof-energy": {
+      "name": "Brightkloof Energy",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "brightkloof-energy-overview.txt": "52a42cce-c237-497c-a2bb-7b7f2032837d",
+        "brightkloof-energy-financial-summary.txt": "649e060b-0c6e-4761-890d-a7898ea6af09",
+        "brightkloof-energy-product-brief.txt": "e9e84f70-6f8d-4233-8469-b694a4a251c9",
+        "deck": "39a3737e-4923-4e1c-a586-48de524549fb"
+      }
+    },
+    "souqsheet": {
+      "name": "Souqsheet",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "souqsheet-overview.txt": "2196316d-f877-4cf4-b243-8f5f6b06e085",
+        "souqsheet-financial-summary.txt": "37bce7d2-7fa7-41e6-bd3c-0deb110ce8d7",
+        "souqsheet-product-brief.txt": "65301c24-af59-4cbc-8c14-7fd063a3e334",
+        "deck": "4297051b-906d-4268-aa3d-19db097bdbd0"
+      }
+    },
+    "kazikit": {
+      "name": "Kazikit",
+      "steps": {
+        "team": true,
+        "documents": true,
+        "deck": true,
+        "q": true
+      },
+      "documentIds": {
+        "kazikit-overview.txt": "2d103580-468f-4b4e-82b5-76ea41fbdb48",
+        "kazikit-financial-summary.txt": "9a142523-c192-4e1b-b88f-d0440f5d706a",
+        "kazikit-product-brief.txt": "5763aa61-2422-4cfa-9aa8-adcdb419d31a",
+        "deck": "e2cd98be-6e88-4d80-be22-1f1eab73b4ea"
+      }
+    }
+  }
+}

@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import { cx } from "@capital-q/ui";
 
+import { QControl } from "@/features/q/control/q-control";
+
 /**
  * Page framing: 16 px mobile edge padding growing with the viewport, content
  * width capped at the content layout width. Pages that need full-bleed media
@@ -76,25 +78,32 @@ export function PageSection({
   readonly className?: string | undefined;
 }) {
   const headingId = `${id}-heading`;
+  // RECOVERY-2026-10 (C1): every page section is one Q can bring into view
+  // by name ("section.<id>"), through the same element a reader scrolls to.
   return (
-    <section
-      id={id}
-      aria-labelledby={headingId}
-      className={cx("scroll-mt-4", className)}
-    >
-      <div
-        className={cx("flex flex-col gap-1", titleHidden ? "sr-only" : "pb-3")}
+    <QControl id={`section.${id}`} kind="SECTION">
+      <section
+        id={id}
+        aria-labelledby={headingId}
+        className={cx("scroll-mt-4", className)}
       >
-        <h2 id={headingId} className="cq-title-md text-(--cq-text-primary)">
-          {title}
-        </h2>
-        {description !== undefined ? (
-          <p className="cq-body-sm max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
-            {description}
-          </p>
-        ) : null}
-      </div>
-      {children}
-    </section>
+        <div
+          className={cx(
+            "flex flex-col gap-1",
+            titleHidden ? "sr-only" : "pb-3",
+          )}
+        >
+          <h2 id={headingId} className="cq-title-md text-(--cq-text-primary)">
+            {title}
+          </h2>
+          {description !== undefined ? (
+            <p className="cq-body-sm max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
+              {description}
+            </p>
+          ) : null}
+        </div>
+        {children}
+      </section>
+    </QControl>
   );
 }

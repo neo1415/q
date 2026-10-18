@@ -327,6 +327,9 @@ describe("@capital-q/network against local PostgreSQL", () => {
     expect(completed).toBe(true);
   }
 
+  // Counts are scoped to this world's company tenant: since CQ-NET-010 a
+  // person can create a relationship from the product, so the shared local
+  // database is not guaranteed to hold none.
   const count = async (query: Promise<{ count: number }[]>) =>
     (await query)[0]?.count;
 
@@ -415,11 +418,28 @@ describe("@capital-q/network against local PostgreSQL", () => {
           companyId: companyA,
           investorOrganisationId: investorA,
         });
-        // Nothing beyond the relationship: no interest, match, meeting or deal tables exist.
+        // Nothing beyond the relationship, Express Interest's own record
+        // (CQ-NET-010), the company's answer and match (CQ-NET-011) and
+        // commitments (Spec 6.6.14, migration 20261029090000; an outcome
+        // both sides confirm, not a parallel deal record), the investor's
+        // pass and its reference reasons (20261118090000) and diligence
+        // requests and fulfilments (20261119090000; what is shared stays a
+        // disclosure policy): no meeting or deal tables exist.
         const tables = await tx.sql<{ n: string }[]>`
           select table_name as n from information_schema.tables
-           where table_schema = 'network' and table_name not in ('relationships', 'relationship_events')`;
+           where table_schema = 'network'
+             and table_name not in ('relationships', 'relationship_events', 'interests', 'interest_requests',
+                                    'interest_responses', 'interest_response_requests', 'matches',
+                                    'commitments', 'relationship_pass_reasons', 'relationship_passes',
+                                    'diligence_requests', 'diligence_fulfilments',
+                                    'diligence_document_views', 'diligence_document_summaries')`;
         expect(tables).toEqual([]);
+        // Ensuring a relationship expresses no interest.
+        expect(
+          await count(
+            tx.sql`select count(*)::int as count from network.interests where relationship_id = ${relationship.id}`,
+          ),
+        ).toBe(0);
       },
     );
   });
@@ -478,6 +498,7 @@ describe("@capital-q/network against local PostgreSQL", () => {
         tx,
         service,
         investorRep,
+        tenantC,
         companyA,
         companyB,
         investorA,
@@ -529,7 +550,7 @@ describe("@capital-q/network against local PostgreSQL", () => {
         ).rejects.toBeInstanceOf(RelationshipPartyNotFoundError);
         expect(
           await count(
-            tx.sql`select count(*)::int as count from network.relationships`,
+            tx.sql`select count(*)::int as count from network.relationships where tenant_id = ${tenantC}`,
           ),
         ).toBe(3);
       },
@@ -579,7 +600,7 @@ describe("@capital-q/network against local PostgreSQL", () => {
         expect(again.created).toBe(false);
         expect(
           await count(
-            tx.sql`select count(*)::int as count from network.relationships`,
+            tx.sql`select count(*)::int as count from network.relationships where tenant_id = ${tenantC}`,
           ),
         ).toBe(1);
       },
@@ -756,7 +777,7 @@ describe("@capital-q/network against local PostgreSQL", () => {
 
   it("rolls back the relationship, its history, audit and idempotent state when the created event cannot be enqueued", async () => {
     await withWorld(
-      async ({ tx, service, investorRep, companyA, investorA }) => {
+      async ({ tx, service, investorRep, tenantC, companyA, investorA }) => {
         const correlationId = CORRELATION();
         await expect(
           service.ensureRelationship({
@@ -770,12 +791,12 @@ describe("@capital-q/network against local PostgreSQL", () => {
         ).rejects.toThrow("outbox unavailable");
         expect(
           await count(
-            tx.sql`select count(*)::int as count from network.relationships`,
+            tx.sql`select count(*)::int as count from network.relationships where tenant_id = ${tenantC}`,
           ),
         ).toBe(0);
         expect(
           await count(
-            tx.sql`select count(*)::int as count from network.relationship_events`,
+            tx.sql`select count(*)::int as count from network.relationship_events where tenant_id = ${tenantC}`,
           ),
         ).toBe(0);
         expect(

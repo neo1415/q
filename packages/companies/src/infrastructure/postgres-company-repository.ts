@@ -26,6 +26,9 @@ import {
   type CompanyCreationRecord,
   type CompanyCreationRequestStore,
   type CompanyProfileChanges,
+  type CompanyInvestmentProfile,
+  type CompanyMarketplaceFacts,
+  type CompanyMarketplaceQueryPort,
   type CompanyProfileFacts,
   type CompanyQueryPort,
   type CompanyRepository,
@@ -33,6 +36,8 @@ import {
   type CompanySearchPage,
   type CompanySearchQuery,
 } from "../application/ports.js";
+import { parseCompanySearch } from "../domain/company-search.js";
+import { companySearchJoins } from "./company-search-sql.js";
 
 /**
  * PostgreSQL adapter for the company ports. Parameterised SQL on the
@@ -182,6 +187,16 @@ export function createPostgresCompanyRepository(): CompanyRepository {
       return rows.length === 0 ? null : toCompany(rows[0]);
     },
 
+    lockByOrganisation: async (tx, tenantId, organisationId) => {
+      const rows = await tx.sql`
+        ${companySelect(tx.sql)}
+         where c.tenant_id = ${tenantId}
+           and c.organisation_id = ${organisationId}
+         order by c.id
+           for update`;
+      return rows.map(toCompany);
+    },
+
     updateProfile: async (tx, input) => {
       const columns = toColumnChanges(input.changes);
       // founded_date must be cast from text; every other column is text.
@@ -217,6 +232,44 @@ export function createPostgresCompanyRepository(): CompanyRepository {
                  and c.organisation_id = ${input.organisationId}
                  and c.version = ${input.expectedVersion}
               returning c.id`;
+      if (updated.length === 0) {
+        return null;
+      }
+      const rows = await tx.sql`
+        ${companySelect(tx.sql)}
+         where c.id = ${input.companyId} and c.tenant_id = ${input.tenantId}`;
+      return toCompany(rows[0]);
+    },
+
+    updateVisibility: async (tx, input) => {
+      const updated = await tx.sql`
+        update core.companies c
+           set marketplace_visibility = ${input.visibility},
+               version = c.version + 1
+         where c.id = ${input.companyId}
+           and c.tenant_id = ${input.tenantId}
+           and c.organisation_id = ${input.organisationId}
+           and c.version = ${input.expectedVersion}
+        returning c.id`;
+      if (updated.length === 0) {
+        return null;
+      }
+      const rows = await tx.sql`
+        ${companySelect(tx.sql)}
+         where c.id = ${input.companyId} and c.tenant_id = ${input.tenantId}`;
+      return toCompany(rows[0]);
+    },
+
+    updateReadiness: async (tx, input) => {
+      const updated = await tx.sql`
+        update core.companies c
+           set marketplace_readiness_state = ${input.readinessState},
+               version = c.version + 1
+         where c.id = ${input.companyId}
+           and c.tenant_id = ${input.tenantId}
+           and c.organisation_id = ${input.organisationId}
+           and c.version = ${input.expectedVersion}
+        returning c.id`;
       if (updated.length === 0) {
         return null;
       }
@@ -320,6 +373,136 @@ function toProfileFacts(row: unknown): CompanyProfileFacts {
   };
 }
 
+const MarketplaceRowSchema = CompanyRowSchema.pick({
+  id: true,
+  tenant_id: true,
+  organisation_id: true,
+  company_status: true,
+  marketplace_visibility: true,
+  marketplace_readiness_state: true,
+  current_stage_code: true,
+  headquarters_country: true,
+});
+
+const InvestmentProfileRowSchema = MarketplaceRowSchema.extend(
+  CompanyRowSchema.pick({
+    canonical_name: true,
+    short_description: true,
+    version: true,
+  }).shape,
+);
+
+function toInvestmentProfile(row: unknown): CompanyInvestmentProfile {
+  const p = InvestmentProfileRowSchema.parse(row);
+  return {
+    ...toMarketplaceFacts(p),
+    canonicalName: p.canonical_name,
+    shortDescription: p.short_description,
+    version: p.version,
+  };
+}
+
+/** Bounded so eligibility over a candidate set stays one statement. */
+const MARKETPLACE_FACTS_BATCH_MAX = 500;
+/** A retrieval dimension is a bounded, id-ordered slice, never a scan. */
+const DISCOVERABLE_LIST_MAX = 500;
+
+function toMarketplaceFacts(row: unknown): CompanyMarketplaceFacts {
+  const p = MarketplaceRowSchema.parse(row);
+  return {
+    id: p.id,
+    tenantId: p.tenant_id,
+    organisationId: p.organisation_id,
+    companyStatus: p.company_status,
+    marketplaceVisibility: p.marketplace_visibility,
+    marketplaceReadinessState: p.marketplace_readiness_state,
+    currentStageCode: p.current_stage_code,
+    headquartersCountry: p.headquarters_country,
+  };
+}
+
+export function createPostgresCompanyMarketplaceQueryPort(options: {
+  readonly sql: DatabaseExecutor;
+}): CompanyMarketplaceQueryPort {
+  const { sql } = options;
+  return {
+    findCanonicalMarketplaceFacts: async (companyIds) => {
+      if (companyIds.length === 0) {
+        return [];
+      }
+      if (companyIds.length > MARKETPLACE_FACTS_BATCH_MAX) {
+        throw new RangeError(
+          `marketplace facts batch exceeds ${String(MARKETPLACE_FACTS_BATCH_MAX)} companies`,
+        );
+      }
+      // Deliberately no tenant predicate: discovery candidates are
+      // cross-tenant (ADR-001 network_visible). Disclosure decides each one.
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.company_status,
+               c.marketplace_visibility, c.marketplace_readiness_state,
+               c.current_stage_code, c.headquarters_country
+          from core.companies c
+         where c.id = any(${[...companyIds]}::uuid[])
+         order by c.id`;
+      return rows.map(toMarketplaceFacts);
+    },
+    listDiscoverableCompanies: async (input) => {
+      const stages = input.stageCodes;
+      const countries = input.headquartersCountries;
+      if (
+        (stages === null || stages.length === 0) &&
+        (countries === null || countries.length === 0)
+      ) {
+        // No dimension asked: nothing to list. A platform scan is not a query.
+        return [];
+      }
+      const limit = Math.max(1, Math.min(DISCOVERABLE_LIST_MAX, input.limit));
+      // companies_marketplace_stage_idx serves (visibility, stage); the
+      // country predicate walks the same visibility slice.
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.company_status,
+               c.marketplace_visibility, c.marketplace_readiness_state,
+               c.current_stage_code, c.headquarters_country
+          from core.companies c
+         where c.company_status = 'active'
+           and c.marketplace_visibility = any(${[...DISCOVERABLE_VISIBILITIES]}::text[])
+           and (${stages === null || stages.length === 0}::boolean
+                or c.current_stage_code = any(${[...(stages ?? [])]}::text[]))
+           and (${countries === null || countries.length === 0}::boolean
+                or c.headquarters_country = any(${[...(countries ?? [])]}::text[]))
+         order by c.id
+         limit ${limit}`;
+      return rows.map(toMarketplaceFacts);
+    },
+    listDiscoverableInvestmentProfiles: async (input) => {
+      const ids = input.companyIds;
+      if (ids !== null && ids.length === 0) return [];
+      if (ids !== null && ids.length > MARKETPLACE_FACTS_BATCH_MAX) {
+        throw new RangeError(
+          `investment profile batch exceeds ${String(MARKETPLACE_FACTS_BATCH_MAX)} companies`,
+        );
+      }
+      const limit = Math.max(1, Math.min(DISCOVERABLE_LIST_MAX, input.limit));
+      // The visibility predicate is the projection's boundary: a company
+      // that is not discoverable has no investment profile here, whether
+      // or not its id was asked for. Only the columns an investor already
+      // sees on the Discover slate are selected.
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.company_status,
+               c.marketplace_visibility, c.marketplace_readiness_state,
+               c.current_stage_code, c.headquarters_country,
+               c.canonical_name, c.short_description, c.version
+          from core.companies c
+         where c.company_status = 'active'
+           and c.marketplace_visibility = any(${[...DISCOVERABLE_VISIBILITIES]}::text[])
+           and (${ids === null}::boolean or c.id = any(${[...(ids ?? [])]}::uuid[]))
+         order by c.id
+         limit ${limit}`;
+      return rows.map(toInvestmentProfile);
+    },
+  };
+}
+
 const SearchRowSchema = CompanyRowSchema.pick({
   id: true,
   tenant_id: true,
@@ -331,14 +514,25 @@ const SearchRowSchema = CompanyRowSchema.pick({
   marketplace_visibility: true,
 });
 
+const SearchScoreSchema = z.object({ score: z.coerce.number().int().min(0) });
+
+// `s` (the match score) is present only on a text search's cursor, which
+// pages by (score desc, name, id); a filter-only search pages by (name, id).
 const SearchCursorSchema = z
-  .object({ n: z.string().min(1).max(200), id: CompanyIdSchema })
+  .object({
+    n: z.string().min(1).max(200),
+    id: CompanyIdSchema,
+    s: z.number().int().min(0).max(10_000).optional(),
+  })
   .strict();
 
-function encodeSearchCursor(name: string, id: string): string {
-  return Buffer.from(JSON.stringify({ n: name, id }), "utf8").toString(
-    "base64url",
-  );
+function encodeSearchCursor(name: string, id: string, score?: number): string {
+  return Buffer.from(
+    JSON.stringify(
+      score === undefined ? { n: name, id } : { n: name, id, s: score },
+    ),
+    "utf8",
+  ).toString("base64url");
 }
 
 function decodeSearchCursor(
@@ -358,12 +552,6 @@ function decodeSearchCursor(
     throw new CompanySearchCursorError();
   }
   return parsed.data;
-}
-
-/** A LIKE pattern from untrusted text: wildcards in the text are literal. */
-function likePattern(text: string): string {
-  const escaped = text.replace(/[\\%_]/g, (ch) => `\\${ch}`);
-  return `%${escaped}%`;
 }
 
 /** Candidate classifications for network discovery (ADR-001). Never merged with each other. */
@@ -408,6 +596,24 @@ export function createPostgresCompanyQueryPort(options: {
          where c.id = ${companyId}`;
       return rows.length === 0 ? null : toIdentity(rows[0]);
     },
+    findCanonicalCompanies: async (companyIds) => {
+      if (companyIds.length === 0) return [];
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.company_status
+          from core.companies c
+         where c.id = any(${[...companyIds]}::uuid[])`;
+      return rows.map(toIdentity);
+    },
+    findOrganisationCompany: async (tenantId, organisationId) => {
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.company_status
+          from core.companies c
+         where c.tenant_id = ${tenantId}
+           and c.organisation_id = ${organisationId}
+         order by c.id
+         limit 2`;
+      return rows.length === 1 ? toIdentity(rows[0]) : null;
+    },
     findCanonicalCompanyVisibility: async (companyId) => {
       const rows = await sql`
         select c.id, c.tenant_id, c.organisation_id, c.marketplace_visibility
@@ -429,6 +635,28 @@ export function createPostgresCompanyQueryPort(options: {
         marketplaceVisibility: parsed.marketplace_visibility,
       };
     },
+    findCanonicalCompanyVisibilities: async (companyIds) => {
+      if (companyIds.length === 0) return [];
+      const rows = await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.marketplace_visibility
+          from core.companies c
+         where c.id = any(${[...companyIds]}::uuid[])`;
+      const pick = CompanyRowSchema.pick({
+        id: true,
+        tenant_id: true,
+        organisation_id: true,
+        marketplace_visibility: true,
+      });
+      return rows.map((row) => {
+        const parsed = pick.parse(row);
+        return {
+          id: parsed.id,
+          tenantId: parsed.tenant_id,
+          organisationId: parsed.organisation_id,
+          marketplaceVisibility: parsed.marketplace_visibility,
+        };
+      });
+    },
     findCanonicalCompanyProfile: async (companyId) => {
       const rows = await sql`
         select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.legal_name,
@@ -447,31 +675,63 @@ export function createPostgresCompanyQueryPort(options: {
         Math.min(query.limit, COMPANY_SEARCH_LIMIT_MAX),
       );
       const text = query.text?.trim().slice(0, COMPANY_SEARCH_TEXT_MAX_LENGTH);
-      const pattern =
-        text === undefined || text.length === 0 ? null : likePattern(text);
+      const parsed =
+        text === undefined || text.length === 0
+          ? null
+          : parseCompanySearch(text);
       const after =
         query.cursor === undefined ? null : decodeSearchCursor(query.cursor);
+      const textGiven = text !== undefined && text.length > 0;
+      // A cursor from the other kind of search is not one this one issued.
+      if (after !== null && (after.s !== undefined) !== textGiven) {
+        throw new CompanySearchCursorError();
+      }
+      // Text with no letters or digits cannot name anything.
+      if (textGiven && parsed === null) {
+        return { items: [], nextCursor: null };
+      }
       const viewerOrganisation = query.viewer.organisationId ?? null;
-      // Discoverable classification OR the viewer's own organisation; active
-      // companies only. Keyset on (canonical_name, id), one row past the
-      // page to learn whether another exists.
-      const rows = await sql`
-        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.current_stage_code,
-               c.headquarters_country, c.short_description, c.marketplace_visibility
-          from core.companies c
-         where c.company_status = 'active'
+      const visible = sql`c.company_status = 'active'
            and (c.marketplace_visibility = any(${[...DISCOVERABLE_VISIBILITIES]}::text[])
                 or (${viewerOrganisation}::uuid is not null
                     and c.tenant_id = ${query.viewer.tenantId}
                     and c.organisation_id = ${viewerOrganisation}::uuid))
-           and (${pattern}::text is null or c.canonical_name ilike ${pattern}::text escape '\\')
            and (${query.stageCode ?? null}::text is null or c.current_stage_code = ${query.stageCode ?? null}::text)
            and (${query.headquartersCountry ?? null}::text is null
-                or c.headquarters_country = ${query.headquartersCountry ?? null}::text)
+                or c.headquarters_country = ${query.headquartersCountry ?? null}::text)`;
+      // Discoverable classification OR the viewer's own organisation; active
+      // companies only; one row past the page tells whether another exists.
+      // With text (P13), every candidate is scored -- exact name, website,
+      // sound-alike, prefix, contains, close misspelling ("young field agro"
+      // for Yamfield Agro, founder report 2026-09-30), or a described match
+      // on place, stage and sector words -- best first, keyset on
+      // (score desc, name, id). Without text, keyset on (name, id).
+      const rows =
+        parsed === null
+          ? await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.current_stage_code,
+               c.headquarters_country, c.short_description, c.marketplace_visibility
+          from core.companies c
+         where ${visible}
            and (${after?.n ?? null}::text is null
                 or (c.canonical_name, c.id) > (${after?.n ?? null}::text, ${after?.id ?? null}::uuid))
          order by c.canonical_name, c.id
+         limit ${limit + 1}`
+          : await sql`
+        select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.current_stage_code,
+               c.headquarters_country, c.short_description, c.marketplace_visibility,
+               s.score
+          from core.companies c
+          ${companySearchJoins(sql, parsed)}
+         where ${visible}
+           and s.score > 0
+           and (${after?.s ?? null}::int is null
+                or s.score < ${after?.s ?? null}::int
+                or (s.score = ${after?.s ?? null}::int
+                    and (c.canonical_name, c.id) > (${after?.n ?? null}::text, ${after?.id ?? null}::uuid)))
+         order by s.score desc, c.canonical_name, c.id
          limit ${limit + 1}`;
+      const scoreOf = (row: unknown) => SearchScoreSchema.parse(row).score;
       const page = rows.slice(0, limit).map((row): CompanySearchCandidate => {
         const p = SearchRowSchema.parse(row);
         return {
@@ -494,7 +754,11 @@ export function createPostgresCompanyQueryPort(options: {
         items: page,
         nextCursor:
           rows.length > limit && last !== undefined
-            ? encodeSearchCursor(last.canonicalName, last.id)
+            ? encodeSearchCursor(
+                last.canonicalName,
+                last.id,
+                parsed === null ? undefined : scoreOf(rows[limit - 1]),
+              )
             : null,
       };
     },

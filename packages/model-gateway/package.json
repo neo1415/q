@@ -24,6 +24,34 @@
     "./extraction": {
       "types": "./dist/extraction/claim-proposer.d.ts",
       "default": "./dist/extraction/claim-proposer.js"
+    },
+    "./providers/openai": {
+      "types": "./dist/providers/openai.d.ts",
+      "default": "./dist/providers/openai.js"
+    },
+    "./images": {
+      "types": "./dist/images/index.d.ts",
+      "default": "./dist/images/index.js"
+    },
+    "./images/openai": {
+      "types": "./dist/images/openai.d.ts",
+      "default": "./dist/images/openai.js"
+    },
+    "./images/google": {
+      "types": "./dist/images/google.d.ts",
+      "default": "./dist/images/google.js"
+    },
+    "./images/stock": {
+      "types": "./dist/images/stock.d.ts",
+      "default": "./dist/images/stock.js"
+    },
+    "./realtime": {
+      "types": "./dist/realtime/index.d.ts",
+      "default": "./dist/realtime/index.js"
+    },
+    "./realtime/openai": {
+      "types": "./dist/realtime/openai.d.ts",
+      "default": "./dist/realtime/openai.js"
     }
   },
   "main": "./dist/index.js",
@@ -47,6 +75,7 @@
     "@capital-q/security": "workspace:*",
     "@google/genai": "2.21.0",
     "groq-sdk": "1.6.0",
+    "openai": "7.21.0",
     "zod": "4.5.4"
   },
   "devDependencies": {

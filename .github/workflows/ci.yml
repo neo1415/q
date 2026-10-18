@@ -1,16 +1,28 @@
 name: CI
 
-# Baseline quality gate: a clean runner must reproduce the repository's static
-# checks, deterministic tests and build from the committed dependency graph.
-# Deployment, database, E2E and security scanning are deliberately not here --
-# they arrive with the packets that introduce those capabilities.
+# Quality gate: a clean runner must reproduce the repository's static checks,
+# deterministic tests and build from the committed dependency graph, and the
+# database suite (pgTAP) against every migration.
+#
+# Branches (RECOVERY F2, audit F-D6): production deploys from
+# recovery/2026-09-12 and integration happens on recovery/2026-09-12-8y2j4w
+# and build/rec-*, none of which CI used to run on. With Railway's
+# "Wait for CI" (checkSuites: true in .railway/railway.ts) a deploy waits
+# for these jobs on the commit it is about to ship.
 
 on:
   pull_request:
   push:
     branches:
       - main
+      - "recovery/**"
+      - "build/rec-*"
   workflow_dispatch:
+    inputs:
+      e2e:
+        description: "Also run the Playwright e2e job (needs a seeded local stack)"
+        type: boolean
+        default: false
 
 # Read-only. This job checks out code and runs local tooling; it never writes to
 # the repository, publishes, or deploys. Unspecified permissions default to none.
@@ -23,10 +35,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality:
-    name: quality
+  # The quality gate's checks run as parallel jobs (2026-10-12): the same
+  # commands as one serial job, on clean runners, in about half the wall
+  # clock (lint ~9 min and tests ~14 min no longer queue behind each other).
+  # `quality` below passes only when every one of them passed, so branch
+  # protection and Railway's "Wait for CI" see the same gate as before.
+  static:
+    name: format and lint
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -63,18 +80,257 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Cheapest gates first so obvious failures do not pay for a build.
+      # Cheapest gate first so an obvious failure is reported in a minute.
       - name: Format check
         run: pnpm format:check
 
       - name: Lint
         run: pnpm lint
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # .nvmrc is the single runtime version source, shared with local dev.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # Corepack activates the exact pnpm pinned in package.json#packageManager,
+      # so CI and local development run the same package manager version.
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+          node --version
+          pnpm --version
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      # Fails if package.json and pnpm-lock.yaml have drifted apart.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck
         run: pnpm typecheck
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # .nvmrc is the single runtime version source, shared with local dev.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # Corepack activates the exact pnpm pinned in package.json#packageManager,
+      # so CI and local development run the same package manager version.
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+          node --version
+          pnpm --version
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      # Fails if package.json and pnpm-lock.yaml have drifted apart.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Tests import workspace packages through their built output, which
+      # the serial job got from the typecheck step before it.
+      - name: Build workspace packages
+        run: pnpm exec turbo run build --filter=./packages/* --output-logs=errors-only
 
       - name: Test
-        run: pnpm test
+        # Preserve every assertion; expose test and unhandled-error failures
+        # through native check annotations when log downloads are unavailable.
+        run: pnpm test --reporter=default --reporter=github-actions
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # .nvmrc is the single runtime version source, shared with local dev.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # Corepack activates the exact pnpm pinned in package.json#packageManager,
+      # so CI and local development run the same package manager version.
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+          node --version
+          pnpm --version
+
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      # Fails if package.json and pnpm-lock.yaml have drifted apart.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm build
+  quality:
+    name: quality
+    needs: [static, typecheck, test, build]
+    # Runs after any outcome so a failed check fails the gate, but not for a
+    # run a newer push superseded (cancel-in-progress): that run's commit is
+    # no longer the one to judge, and a red gate there misled (2026-10-12).
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every quality check passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then exit 1; fi
+          done
+
+  # Every migration from empty, then every pgTAP suite (RLS, grants,
+  # append-only guards, schema guard). The local Supabase stack runs in
+  # Docker on the runner; nothing here reaches a hosted project.
+  database:
+    name: database (pgTAP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The pinned Supabase CLI from package.json. Only what pgTAP needs:
+      # Postgres, plus Auth because fixtures create auth.users rows.
+      - name: Start the local database
+        run: >-
+          pnpm exec supabase start
+          -x studio,imgproxy,inbucket,edge-runtime,logflare,vector,storage-api,realtime,postgres-meta,supavisor
+
+      - name: pgTAP
+        run: pnpm exec supabase test db
+
+      - name: GateQ real-repository concurrent correction proof
+        env:
+          CQ_GATEQ_CONCURRENCY_URL: postgres://postgres:postgres@127.0.0.1:54322/cq_gateq_supersession_test
+        run: |
+          pnpm exec turbo run build --filter=@capital-q/gateq-intake... --concurrency=2
+          docker exec supabase_db_capital-q createdb -U postgres -T template0 cq_gateq_supersession_test
+          docker cp supabase supabase_db_capital-q:/tmp/cq-supersession
+          docker exec supabase_db_capital-q psql -X -v ON_ERROR_STOP=1 -U postgres -d cq_gateq_supersession_test -f /tmp/cq-supersession/tests/database/rls/support/gateq-supersession-local-bootstrap.psql
+          node supabase/tests/database/rls/support/gateq-supersession-concurrency.mjs
+
+      - name: Stop the local database
+        if: always()
+        run: pnpm exec supabase stop --no-backup
+
+  # Browser journeys (Playwright, Chromium). Manual only, and documented
+  # rather than proven: it has not yet run on a GitHub runner. playwright.
+  # config.ts starts the built api and web itself (webServer); journeys that
+  # need seeded people (workstream G's scenarios) add their seed step here,
+  # since `pnpm seed:fictional --local-stack` seeds through a running api.
+  # Provider keys are deliberately non-empty disabled values: no live call.
+  e2e:
+    name: e2e (manual)
+    if: github.event_name == 'workflow_dispatch' && inputs.e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      OPENAI_API_KEY: disabled-locally-000000000000
+      GEMINI_API_KEY: disabled-locally-000000000000
+      GROQ_API_KEY: disabled-locally-000000000000
+      ELEVENLABS_API_KEY: disabled-locally-000000000000
+      DEEPGRAM_API_KEY: disabled-locally-000000000000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start the local stack
+        run: pnpm exec supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,postgres-meta,supavisor
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Playwright
+        run: pnpm test:e2e
+
+      - name: Stop the local stack
+        if: always()
+        run: pnpm exec supabase stop --no-backup

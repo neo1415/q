@@ -12,6 +12,7 @@ import {
   type QDeniedScope,
   type QKnowledgeScopeKind,
   type QScopeFilter,
+  type QScreenContext,
   type QSensitivityClass,
   type QSubjectRef,
 } from "@capital-q/contracts";
@@ -173,6 +174,63 @@ function denialForDisclosure(
   }
 }
 
+/** The screen with only the entities some permitted scope is bound to. */
+export function screenWithin(
+  screen: QScreenContext,
+  permitted: readonly QAuthorisedKnowledgeScope[],
+): QScreenContext {
+  const bound = (ref: QSubjectRef) =>
+    permitted.some(
+      (scope) =>
+        scope.subject !== undefined &&
+        JSON.stringify(scope.subject) === JSON.stringify(ref),
+    );
+  const {
+    companyId,
+    investorOrganisationId,
+    documentId,
+    documentPage,
+    timeZone,
+    artifactId,
+    artifactSlide,
+    artifactVersion,
+    manifest,
+  } = screen;
+  return {
+    route: screen.route,
+    // Q room R1: what the whole page shows, as ids and closed kinds only.
+    // It grants nothing: each ref is read through its own read tool under
+    // this plan, as the asker, and a refused one is dropped unread.
+    ...(manifest === undefined ? {} : { manifest }),
+    // The person's own clock, not data about anyone.
+    ...(timeZone === undefined ? {} : { timeZone }),
+    // voiceq-63: the document Q made for them that is open on this tab, as
+    // an id only. It grants nothing: its words are read solely through
+    // read_my_document, which reads it as the asker through the documents'
+    // own service and refuses one that is not theirs.
+    ...(artifactId === undefined
+      ? {}
+      : {
+          artifactId,
+          ...(artifactSlide === undefined ? {} : { artifactSlide }),
+          ...(artifactVersion === undefined ? {} : { artifactVersion }),
+        }),
+    ...(companyId !== undefined && bound({ kind: "COMPANY", companyId })
+      ? { companyId }
+      : {}),
+    ...(investorOrganisationId !== undefined &&
+    bound({ kind: "INVESTOR_ORGANISATION", investorOrganisationId })
+      ? { investorOrganisationId }
+      : {}),
+    ...(documentId !== undefined && bound({ kind: "DOCUMENT", documentId })
+      ? {
+          documentId,
+          ...(documentPage === undefined ? {} : { documentPage }),
+        }
+      : {}),
+  };
+}
+
 function fingerprintOf(
   plan: Omit<PermittedContextPlan, "fingerprint">,
 ): string {
@@ -182,6 +240,8 @@ function fingerprintOf(
     actor: plan.actor,
     purpose: plan.purpose,
     subjects: plan.subjects,
+    viewing: plan.viewing ?? null,
+    screen: plan.screen ?? null,
     scopes: [...plan.scopes].sort((a, b) =>
       `${a.kind}:${JSON.stringify(a.subject ?? null)}`.localeCompare(
         `${b.kind}:${JSON.stringify(b.subject ?? null)}`,
@@ -333,6 +393,34 @@ export function createContextFirewall(
           });
           break;
 
+        case "OWN_PUBLIC_PRESENCE":
+          // Bound to whichever subject the plan named, so the knowledge
+          // read is restricted to that subject and nothing else. A USER
+          // subject has already been resolved to the actor themselves;
+          // the self resolver admits no other person.
+          candidates.push({
+            spec,
+            subject,
+            resource: subject.resource,
+            filter: {
+              ...base,
+              ...(subject.companyId === undefined
+                ? {}
+                : { companyId: subject.companyId }),
+              ...(subject.investorOrganisationId === undefined
+                ? {}
+                : { investorOrganisationId: subject.investorOrganisationId }),
+              ...(subject.ref.kind === "USER"
+                ? { userId: subject.ref.userId }
+                : {}),
+            },
+            labels: undefined,
+          });
+          break;
+
+        // Actor-wide only (actorWide below); never bound to a subject, so a
+        // subject can never widen whose onboarding is read.
+        case "OWN_ONBOARDING":
         case "NETWORK_VISIBLE_DATA":
         case "PUBLIC_EXTERNAL_DATA":
         case "GENERAL_MODEL_KNOWLEDGE":
@@ -351,7 +439,7 @@ export function createContextFirewall(
       subject: null,
       resource: null,
       filter:
-        kind === "OWN_Q_CONVERSATION"
+        kind === "OWN_Q_CONVERSATION" || kind === "OWN_ONBOARDING"
           ? { tenantId: actor.tenantId, userId: actor.userId }
           : { tenantId: actor.tenantId },
       labels: undefined,
@@ -577,9 +665,13 @@ export function createContextFirewall(
     // 3. Subjects, each on its own. One that does not resolve for this
     // actor ends the request: a request about something the actor may not
     // reach gets no plan, and no partial plan can be used to pivot.
+    // Resolved side by side (latency2), judged in request order: the first
+    // subject that does not resolve still decides the denial.
+    const resolutions = await Promise.all(
+      request.subjects.map((ref) => resolveSubject(resolution, actor, ref)),
+    );
     const subjects: ResolvedSubject[] = [];
-    for (const ref of request.subjects) {
-      const resolved = await resolveSubject(resolution, actor, ref);
+    for (const resolved of resolutions) {
       if (!resolved.ok) {
         return { outcome: "DENIED", reason: resolved.reason, denied: [] };
       }
@@ -598,8 +690,12 @@ export function createContextFirewall(
     // 5. Candidates: what this task may need at most.
     const candidates: Candidate[] = [];
     const denied: QDeniedScope[] = [];
-    for (const subject of subjects) {
-      const built = await candidatesFor(actor, request.capability, subject);
+    const builds = await Promise.all(
+      subjects.map((subject) =>
+        candidatesFor(actor, request.capability, subject),
+      ),
+    );
+    for (const built of builds) {
       candidates.push(...built.candidates);
       denied.push(...built.denied);
     }
@@ -704,6 +800,25 @@ export function createContextFirewall(
       },
       purpose: { capability: request.capability, taskClass },
       subjects: [...request.subjects],
+      // R18: the viewed pitch moment rides on the plan only when the
+      // company it belongs to is bound for this actor; the Q API already
+      // authorised the pitch itself with the playback rule.
+      ...(request.viewing !== undefined &&
+      request.viewing !== null &&
+      permitted.some(
+        (scope) =>
+          scope.kind === "COMPANY_PROFILE" &&
+          scope.subject !== undefined &&
+          scope.filter.companyId === request.viewing?.companyId,
+      )
+        ? { viewing: request.viewing }
+        : {}),
+      // R21: the route is the person's own screen, so it always rides; an
+      // entity it names rides only when the firewall bound that entity for
+      // this actor, exactly as a named subject would be.
+      ...(request.screen === undefined || request.screen === null
+        ? {}
+        : { screen: screenWithin(request.screen, permitted) }),
       scopes: permitted,
       denied: denied.slice(0, 64),
       maxSensitivity,
@@ -737,10 +852,35 @@ function resourceTypeFor(
       return "investor_organisation";
     case "RELATIONSHIP_CONTEXT":
       return "relationship";
+    case "OWN_PUBLIC_PRESENCE":
+      return presenceResourceTypeFor(subject);
     case "OWN_Q_CONVERSATION":
+    case "OWN_ONBOARDING":
     case "NETWORK_VISIBLE_DATA":
     case "PUBLIC_EXTERNAL_DATA":
     case "GENERAL_MODEL_KNOWLEDGE":
+      return "q_run";
+  }
+}
+
+/**
+ * One presence row serves three subject kinds, so the resource follows the
+ * subject. Nothing but the owning side can ever hold this scope, so the
+ * resource only has to name the thing the owner owns; a person's own
+ * presence hangs off the run, as their own conversation does, because
+ * there is no resource another party could be granted it on.
+ */
+function presenceResourceTypeFor(subject: ResolvedSubject): string {
+  switch (subject.kind) {
+    case "INVESTOR_ORGANISATION":
+      return "investor_organisation";
+    case "COMPANY":
+    case "CAPITAL_OBJECTIVE":
+    case "DOCUMENT":
+      return "company";
+    case "USER":
+    case "RELATIONSHIP":
+    case "ORGANISATION":
       return "q_run";
   }
 }

@@ -1,6 +1,12 @@
+import { AsyncLocalStorageProviderSingleton } from "@langchain/core/singletons";
 import { Command, isInterrupted } from "@langchain/langgraph";
 
 import { type QRunHandle } from "@capital-q/contracts";
+import {
+  createRoundTripCounter,
+  currentRoundTripCounter,
+  withRoundTripCounter,
+} from "@capital-q/database";
 import { getTracer, type Logger } from "@capital-q/observability";
 import {
   QRunAlreadyStartedError,
@@ -86,6 +92,31 @@ function rootCause(error: unknown, depth = 0): unknown {
   return error;
 }
 
+/**
+ * Finishes a cancellation still pending when an invocation ended, and
+ * returns the invocation's outcome as it now stands. The runtime refuses
+ * every end but CANCELLED once a cancel is requested, so without this a
+ * complete or fail made after the request left the run at
+ * CANCEL_REQUESTED for good. A claim another worker holds is that
+ * worker's to settle.
+ */
+export async function settlePendingCancellation(
+  runtime: {
+    readonly readRun: (
+      ref: QRunRef,
+    ) => Promise<Pick<QRunRecord, "status"> | null>;
+    readonly finishCancellation: (ref: QRunRef) => Promise<unknown>;
+  },
+  ref: QRunRef,
+  outcome: string,
+): Promise<string> {
+  if (outcome === "action_in_progress") return outcome;
+  const current = await runtime.readRun(ref);
+  if (current?.status !== "CANCEL_REQUESTED") return outcome;
+  await runtime.finishCancellation(ref);
+  return "cancelled";
+}
+
 function isTerminal(status: QRunRecord["status"]): boolean {
   return (
     status === "COMPLETED" ||
@@ -107,6 +138,46 @@ function requireSameOrganisationContext(
   if (run.actorOrganisationId !== (actor.organisationId ?? null)) {
     throw new QRunNotFoundError();
   }
+}
+
+/**
+ * Runs a graph invocation outside any LangGraph invocation already in
+ * progress (live 2026-10-01, action 6b04d028). A typed "yes, go ahead" is
+ * itself a Q run: its answer approves the waiting change and resumes that
+ * change's run from inside its own graph's node. LangGraph carries the
+ * running invocation's config in async-local storage, and a nested invoke
+ * inherits it, so the resumed run read the yes-run's task context instead
+ * of its own checkpoint: an empty state, a ZodError, the run FAILED and the
+ * approved action never executed. Each run is its own thread, always.
+ */
+function detached<T>(invoke: () => Promise<T>): Promise<T> {
+  return AsyncLocalStorageProviderSingleton.getInstance().run(
+    undefined,
+    invoke,
+  );
+}
+
+/** The run's database round trips so far, for the returned log line. */
+function roundTripFields(): Record<string, unknown> {
+  const counter = currentRoundTripCounter();
+  if (counter === undefined) return {};
+  const fields: Record<string, unknown> = {
+    dbRoundTrips: counter.count,
+    // R5: where they went, by phase or tool (labels only, never content).
+    dbRoundTripsByPhase: { ...counter.phases },
+  };
+  const before = counter.marks["preparing_analysis"];
+  const at = counter.markedAtMs["preparing_analysis"];
+  if (before !== undefined) fields["dbRoundTripsBeforeAnalysis"] = before;
+  if (at !== undefined) fields["msBeforeAnalysis"] = at;
+  const sites = Object.entries(counter.sites);
+  if (sites.length > 0) {
+    // Local diagnosis (CQ_ROUND_TRIP_TRACE=1): the 200 busiest call sites.
+    fields["dbRoundTripSites"] = Object.fromEntries(
+      sites.sort((a, b) => b[1] - a[1]).slice(0, 200),
+    );
+  }
+  return fields;
 }
 
 export function createLangGraphQOrchestrator(
@@ -132,6 +203,14 @@ export function createLangGraphQOrchestrator(
         thread_id: threadIdForRun(ref.runId),
         checkpoint_ns: Q_CHECKPOINT_NAMESPACE,
       },
+      // SUB-SECOND: checkpoint only when the invocation exits (an end, an
+      // error or an interrupt), not after every node. An interrupt (a
+      // pause, an approval card) is still saved, so a resume reads exactly
+      // what it did before. What is lost is a mid-run checkpoint, and no
+      // path uses one: a run whose process dies mid-flight is closed by the
+      // orphan sweep (G-D24) and asked again, never resumed from the
+      // middle.
+      durability: "exit" as const,
       ...(signal === undefined ? {} : { signal }),
     };
   }
@@ -216,7 +295,11 @@ export function createLangGraphQOrchestrator(
                 await runtime.finishCancellation(ref);
                 outcome = "cancelled";
               } else {
-                await runtime.fail(ref, code);
+                await runtime.fail(
+                  ref,
+                  code,
+                  options.answer.failureNotice?.(ref.runId),
+                );
                 outcome = "answer_failed";
               }
             } else {
@@ -248,6 +331,14 @@ export function createLangGraphQOrchestrator(
           span.setAttribute("q.duration_ms", Date.now() - startedAt);
           span.end();
         }
+        // INC 2026-10-09 (run a7b44b0a): a cancel requested while the run
+        // worked makes the runtime refuse every end but CANCELLED, so the
+        // complete or fail above returned without moving it and the run
+        // sat at CANCEL_REQUESTED for good (there, the newer delegation's
+        // abort surfaced as an AbortError and took the fail path). Whatever
+        // path ended the invocation, a pending cancellation is finished
+        // here. A claim another worker holds is that worker's to settle.
+        outcome = await settlePendingCancellation(runtime, ref, outcome);
         logger?.info(
           {
             qRunId: ref.runId,
@@ -255,6 +346,7 @@ export function createLangGraphQOrchestrator(
             outcome,
             orchestrationVersion: Q_ORCHESTRATION_VERSION,
             durationMs: Date.now() - startedAt,
+            ...roundTripFields(),
           },
           "q orchestration returned",
         );
@@ -309,127 +401,137 @@ export function createLangGraphQOrchestrator(
   }
 
   return {
-    start: async (input: QOrchestrationInput) => {
-      const run = await runtime.loadOwnedRun(
-        input.actor,
-        input.runId,
-        input.correlationId,
-      );
-      if (isTerminal(run.status)) {
-        throw new QRunAlreadyTerminalError(run.status);
-      }
-      if (run.status !== "RECEIVED" || run.orchestrationVersion !== null) {
-        throw new QRunAlreadyStartedError();
-      }
-      requireSameOrganisationContext(run, input.actor);
-      const ref = runRef(run);
-
-      // RECEIVED → PREFLIGHT, stamping the version and the real start time.
-      // Anything but ADVANCED means another starter or a cancellation got
-      // there first; the engine is not touched.
-      const begun = await runtime.begin(ref, Q_ORCHESTRATION_VERSION);
-      if (begun.kind === "CANCEL_REQUESTED") {
-        await runtime.finishCancellation(ref);
-        return handleOf(ref);
-      }
-      if (begun.kind !== "ADVANCED") {
-        if (isTerminal(begun.run.status)) {
-          return toQRunHandle(begun.run);
+    // SUB-SECOND: every query a start or resume makes, on the request
+    // client and the checkpoint pool, is counted; the total and the count
+    // at PREPARING_ANALYSIS are logged when the invocation returns.
+    start: (input: QOrchestrationInput) =>
+      withRoundTripCounter(createRoundTripCounter(input.runId), async () => {
+        const run = await runtime.loadOwnedRun(
+          input.actor,
+          input.runId,
+          input.correlationId,
+        );
+        if (isTerminal(run.status)) {
+          throw new QRunAlreadyTerminalError(run.status);
         }
-        throw new QRunAlreadyStartedError();
-      }
-
-      const initial: QGraphState = {
-        runId: run.id,
-        tenantId: run.tenantId,
-        actorUserId: run.actorUserId,
-        conversationId: run.conversationId,
-        actorOrganisationId: input.actor.organisationId ?? null,
-        actorMembershipId: input.actor.membershipId ?? null,
-        capability: run.capability,
-        subjects: run.subjects,
-        orchestrationVersion: Q_ORCHESTRATION_VERSION,
-        correlationId: run.correlationId,
-        preflight: null,
-        context: null,
-        contextPlan: null,
-        retrieval: null,
-        answer: null,
-        answerFailure: null,
-        modelPolicyVersion: null,
-        promptBundleVersion: null,
-        action: null,
-        actionId: null,
-        approvalId: null,
-        actionFailure: null,
-      };
-      return execute(
-        ref,
-        () => graph.invoke(initial, config(ref, input.signal)),
-        "start",
-      );
-    },
-
-    resume: async (input: QResumeInput) => {
-      const run = await runtime.loadOwnedRun(
-        input.actor,
-        input.runId,
-        input.correlationId,
-      );
-      if (isTerminal(run.status)) {
-        throw new QRunAlreadyTerminalError(run.status);
-      }
-      if (
-        run.status !== "AWAITING_INPUT" &&
-        run.status !== "AWAITING_APPROVAL"
-      ) {
-        throw new QRunNotResumableError(run.status);
-      }
-      // Fail closed on a version this build cannot continue — before the
-      // canonical lifecycle moves and before the engine reads a checkpoint.
-      assertResumableOrchestrationVersion(run.orchestrationVersion);
-      // The organisation context a run was started under does not follow
-      // the person into another organisation: a run is resumed only in the
-      // context that owns it.
-      requireSameOrganisationContext(run, input.actor);
-      const ref = runRef(run);
-
-      // AWAITING_INPUT → PLANNING, or AWAITING_APPROVAL → ACTION_EXECUTION.
-      // Two concurrent resumes serialise on the row lock; the second finds
-      // the run already moved and is refused rather than driving the
-      // engine a second time. Moving to ACTION_EXECUTION is a lifecycle
-      // fact, not authority: the gate the resumed node calls re-verifies
-      // the approval before anything executes.
-      const resumed =
-        run.status === "AWAITING_APPROVAL"
-          ? await runtime.resumeFromApproval(ref)
-          : await runtime.resumeFromPause(ref);
-      if (resumed.kind !== "ADVANCED") {
-        if (isTerminal(resumed.run.status)) {
-          throw new QRunAlreadyTerminalError(resumed.run.status);
+        if (run.status !== "RECEIVED" || run.orchestrationVersion !== null) {
+          throw new QRunAlreadyStartedError();
         }
-        throw new QRunNotResumableError(resumed.run.status);
-      }
+        requireSameOrganisationContext(run, input.actor);
+        const ref = runRef(run);
 
-      return execute(
-        ref,
-        () =>
-          graph.invoke(
-            // The actor's organisation context is taken from THIS authorised
-            // request, never from the checkpoint: whatever the engine
-            // remembers, the firewall re-plans on behalf of who is here now.
-            new Command({
-              resume: { kind: "Q_ORCHESTRATION_RESUME" },
-              update: {
-                actorOrganisationId: input.actor.organisationId ?? null,
-                actorMembershipId: input.actor.membershipId ?? null,
-              },
-            }),
-            config(ref, input.signal),
-          ),
-        "resume",
-      );
-    },
+        // RECEIVED → PREFLIGHT, stamping the version and the real start time.
+        // Anything but ADVANCED means another starter or a cancellation got
+        // there first; the engine is not touched.
+        const begun = await runtime.begin(ref, Q_ORCHESTRATION_VERSION);
+        if (begun.kind === "CANCEL_REQUESTED") {
+          await runtime.finishCancellation(ref);
+          return handleOf(ref);
+        }
+        if (begun.kind !== "ADVANCED") {
+          if (isTerminal(begun.run.status)) {
+            return toQRunHandle(begun.run);
+          }
+          throw new QRunAlreadyStartedError();
+        }
+
+        const initial: QGraphState = {
+          runId: run.id,
+          tenantId: run.tenantId,
+          actorUserId: run.actorUserId,
+          conversationId: run.conversationId,
+          actorOrganisationId: input.actor.organisationId ?? null,
+          actorMembershipId: input.actor.membershipId ?? null,
+          capability: run.capability,
+          subjects: run.subjects,
+          viewing: run.viewing ?? null,
+          screen: run.screen ?? null,
+          orchestrationVersion: Q_ORCHESTRATION_VERSION,
+          correlationId: run.correlationId,
+          preflight: null,
+          context: null,
+          contextPlan: null,
+          retrieval: null,
+          answer: null,
+          answerFailure: null,
+          modelPolicyVersion: null,
+          promptBundleVersion: null,
+          action: null,
+          actionId: null,
+          approvalId: null,
+          actionFailure: null,
+        };
+        return execute(
+          ref,
+          () =>
+            detached(() => graph.invoke(initial, config(ref, input.signal))),
+          "start",
+        );
+      }),
+
+    resume: (input: QResumeInput) =>
+      withRoundTripCounter(createRoundTripCounter(input.runId), async () => {
+        const run = await runtime.loadOwnedRun(
+          input.actor,
+          input.runId,
+          input.correlationId,
+        );
+        if (isTerminal(run.status)) {
+          throw new QRunAlreadyTerminalError(run.status);
+        }
+        if (
+          run.status !== "AWAITING_INPUT" &&
+          run.status !== "AWAITING_APPROVAL"
+        ) {
+          throw new QRunNotResumableError(run.status);
+        }
+        // Fail closed on a version this build cannot continue — before the
+        // canonical lifecycle moves and before the engine reads a checkpoint.
+        assertResumableOrchestrationVersion(run.orchestrationVersion);
+        // The organisation context a run was started under does not follow
+        // the person into another organisation: a run is resumed only in the
+        // context that owns it.
+        requireSameOrganisationContext(run, input.actor);
+        const ref = runRef(run);
+
+        // AWAITING_INPUT → PLANNING, or AWAITING_APPROVAL → ACTION_EXECUTION.
+        // Two concurrent resumes serialise on the row lock; the second finds
+        // the run already moved and is refused rather than driving the
+        // engine a second time. Moving to ACTION_EXECUTION is a lifecycle
+        // fact, not authority: the gate the resumed node calls re-verifies
+        // the approval before anything executes.
+        const resumed =
+          run.status === "AWAITING_APPROVAL"
+            ? await runtime.resumeFromApproval(ref)
+            : await runtime.resumeFromPause(ref);
+        if (resumed.kind !== "ADVANCED") {
+          if (isTerminal(resumed.run.status)) {
+            throw new QRunAlreadyTerminalError(resumed.run.status);
+          }
+          throw new QRunNotResumableError(resumed.run.status);
+        }
+
+        return execute(
+          ref,
+          () =>
+            detached(() =>
+              graph.invoke(
+                // The actor's organisation context is taken from THIS authorised
+                // request, never from the checkpoint: whatever the engine
+                // remembers, the firewall re-plans on behalf of who is here now.
+                new Command({
+                  resume: { kind: "Q_ORCHESTRATION_RESUME" },
+                  update: {
+                    actorOrganisationId: input.actor.organisationId ?? null,
+                    actorMembershipId: input.actor.membershipId ?? null,
+                  },
+                }),
+                config(ref, input.signal),
+              ),
+            ),
+          "resume",
+        );
+      }),
 
     cancel: async (input: QCancelInput) => {
       // The canonical lifecycle is the authority. A running engine sees the

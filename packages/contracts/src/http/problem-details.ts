@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { CorrelationIdSchema, RequestIdSchema } from "../common/ids.js";
 import { ValidationIssueSchema } from "../common/validation.js";
+import { EntitlementProblemExtensionSchema } from "./billing.js";
 import { ErrorCodeSchema, KnownErrorCodeSchema } from "./error-codes.js";
 
 /**
@@ -43,6 +44,11 @@ const problemBase = {
 
   /** Present only on validation failures; not an empty array on unrelated problems. */
   errors: z.array(ValidationIssueSchema).optional(),
+
+  // BILLING block (ADR 0034): present only on ENTITLEMENT_REQUIRED -- the
+  // caller's own plan, counts and where to see the plans.
+  entitlement: EntitlementProblemExtensionSchema.optional(),
+  // end BILLING block
 };
 
 /**

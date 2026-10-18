@@ -29,7 +29,8 @@ export const QSystemVariablesSchema = z
     operatingMode: QOperatingModeSchema,
     communicationProfile: QCommunicationProfileSchema,
     communicationGuidance: z.string().max(4_000),
-    environmentNotes: z.string().max(2_000),
+    // 2,600 since 2026-09-17 (ADR 0011): see schemas/common.ts.
+    environmentNotes: z.string().max(9_000),
   })
   .strict();
 export type QSystemVariables = z.infer<typeof QSystemVariablesSchema>;
@@ -64,7 +65,8 @@ ENVIRONMENT
 export const Q_SYSTEM_V1: PromptDefinition<QSystemVariables, never> = {
   id: "Q_SYSTEM",
   version: 1,
-  status: "ACTIVE",
+  // Deprecated by v2 (Q's own personality, autopilot P3 2026-10-06).
+  status: "DEPRECATED",
   kind: "CHARTER",
   owner: "q-core",
   changeDescription:

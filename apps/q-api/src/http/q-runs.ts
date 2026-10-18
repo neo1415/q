@@ -1,3 +1,4 @@
+import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   AppendQRunMessageRequestSchema,
@@ -30,8 +31,10 @@ import {
 import {
   getActorContext,
   requireActorContextHook,
+  requireActorContextOrPersonalHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
+import type { QRoomFeed } from "../room/feed.js";
 
 /**
  * `/v1/q/runs` — the Q run lifecycle at the HTTP boundary (doc 22 §66-68,
@@ -51,6 +54,8 @@ import {
 
 export type QRunRoutesDependencies = ActorContextDependencies & {
   readonly qRuntime: QRuntimeService;
+  /** When present, a person with no organisation yet may still ask Q under a personal context. */
+  readonly identity?: ApplicationIdentityLookup | undefined;
   /**
    * Orchestration behind a composition boundary. When present and
    * `autostart` is on, a newly created run is handed to the orchestrator
@@ -61,6 +66,12 @@ export type QRunRoutesDependencies = ActorContextDependencies & {
   readonly orchestration?:
     | { readonly orchestrator: QOrchestrator; readonly autostart: boolean }
     | undefined;
+  /**
+   * voice-cards: a typed run's answer is published to the person's Q room
+   * too, while they have a reader open (the dock on another page, a voice
+   * line), so every surface renders from the same feed.
+   */
+  readonly room?: Pick<QRoomFeed, "watchRun"> | undefined;
 };
 
 function correlation(): CorrelationId {
@@ -89,7 +100,11 @@ export function registerQRunRoutes(
   app: FastifyInstance,
   dependencies: QRunRoutesDependencies,
 ): void {
-  const withContext = requireActorContextHook(dependencies);
+  const identity = dependencies.identity;
+  const withContext =
+    identity === undefined
+      ? requireActorContextHook(dependencies)
+      : requireActorContextOrPersonalHook({ ...dependencies, identity });
   const service = dependencies.qRuntime;
   const runPath = `${Q_RUNS_PATH}/:runId`;
 
@@ -125,6 +140,15 @@ export function registerQRunRoutes(
             "q orchestration ended with an error",
           );
         });
+    }
+
+    if (result.created) {
+      dependencies.room?.watchRun({
+        actor,
+        runId: result.run.id,
+        conversationId: result.run.conversationId,
+        correlationId,
+      });
     }
 
     // 202: durably accepted, not analysed. A replayed retry gets the same

@@ -154,6 +154,40 @@ ids could invent one), conflicts recorded as two readings plus a settling
 question, ambiguity as its own finding, and bounded proposed questions
 restricted to keys the server already said are unanswered.
 
+## Conversational interview (CQ-PRE-REC-001)
+
+The Q-led workspace asks Founder Definition v2 one step at a time through
+the onboarding runtime's `say` path (see `docs/modules/onboarding.md`).
+Two founder-specific pieces live here:
+
+- `FOUNDER_UTTERANCE_ALIASES` — the plain words a founder uses for the
+  definition's options ("Lagos" → Nigeria, "SAFE", "we lead"). Recognition
+  only; the definition still validates the answer.
+- `structuredValueFor` in `intelligence/suggestions.ts` — the document-first
+  shortcut (§23). A candidate the extraction reads from a deck or from prose
+  is mapped deterministically onto the step's own vocabulary (stage,
+  country, currency, instrument, timeframe, use of funds, counts, the raise
+  amount) so it can be offered as a one-tap suggestion; a reading the
+  vocabulary cannot hold stays in the review list. Suggestions for steps the
+  branching has not yet reached surface when the step becomes eligible, and
+  an accepted one means the step is never asked.
+- The founder reading now runs on three triggers: a processed document, a
+  committed narrative response (description, follow-up) and a recorded
+  utterance from the interview. All three feed the same extraction, the
+  same suggestions and the same persisted questions.
+- The review (F3) and the snapshot (F8) name what F2 gathered under
+  definition v2: the evidence documents by title and kind ("kibo-deck.txt
+  (Pitch deck)"), read by id within the tenant through the founder read
+  services; a v1 session's declared material kinds still read. Nothing about
+  a document's contents crosses into the onboarding context (§43).
+- Verified live (§43, CQ-PRE-REC-001): a fresh founder answered in plain
+  words (an ambiguous stage narrowed to two chips, not guessed), uploaded a
+  deck, saw Q's reading (role, founders, team size, functions) and kept it,
+  was not asked the four questions those answers settled, left after the
+  company review, signed out and back in, was greeted with what was covered
+  and what remained, finished, and asked Home Q about paying clinics and the
+  deck — answered from the same state.
+
 ## Security
 
 - All model access through the Model Gateway. No provider SDK, no HTTP
@@ -192,3 +226,15 @@ the planner and the replan are real and tested; the F3 review screen does not
 yet render Q's suggestions, F7 and F8 are not yet wired to the live session,
 and nothing in production yet triggers the review when a document finishes
 processing.
+
+## Interview cues (CQ-Q-VOICE-001 A)
+
+`FOUNDER_INTERVIEW_CUES` (`definition/interview-cues.ts`) tells the runtime where a
+founder's figures live in a sentence: a figure near "raising", "raise", "round",
+"looking for", "seeking" is the raise amount (F6.target_amount); near "people",
+"employees", "team of" the team size; near "founders" the founder count. A figure
+with none of those words nearby ("$90k MRR") is assigned to no step. Category
+phrases in a description resolve to F1.categories candidates through the taxonomy
+classifier and are proposed as a set to keep or adjust. Document-derived
+suggestions now ignore an option the founder named only after a negation ("past
+pilots").

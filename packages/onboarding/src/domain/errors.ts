@@ -48,6 +48,14 @@ export class OnboardingSuggestionNotFoundError extends Error {
   }
 }
 
+/** Enumeration-safe: a question of another session reads as absent. */
+export class OnboardingInterviewQuestionNotFoundError extends Error {
+  constructor() {
+    super("The requested resource was not found.");
+    this.name = "OnboardingInterviewQuestionNotFoundError";
+  }
+}
+
 export class OnboardingSubjectNotFoundError extends Error {
   constructor() {
     super("The requested resource was not found.");
@@ -82,10 +90,23 @@ export const ONBOARDING_STATE_REASONS = [
   "REQUIRED_STEPS_INCOMPLETE",
   "SUGGESTION_ALREADY_RESOLVED",
   "SUGGESTION_STEP_MISMATCH",
+  "QUESTION_ALREADY_RESOLVED",
   "SUBJECT_ALREADY_BOUND",
   "CONTEXT_ALREADY_BOUND",
   "UNBOUND_START_NOT_ALLOWED",
   "SUBJECT_TYPE_MISMATCH",
+  /** Nothing is on the record for the step, so there is nothing to take back. */
+  "NOTHING_TO_WITHDRAW",
+  /** A target the step writes cannot yet represent the answer's absence. */
+  "STEP_NOT_WITHDRAWABLE",
+  /** Only a completed session's revisable answers can be revised (ADR 0024). */
+  "SESSION_NOT_COMPLETED",
+  "STEP_NOT_REVISABLE",
+  /**
+   * The person already rejected this exact value for this step (lane ob1):
+   * a rejected proposal is discarded for good and never offered again.
+   */
+  "SUGGESTION_REJECTED_BEFORE",
 ] as const;
 export type OnboardingStateReason = (typeof ONBOARDING_STATE_REASONS)[number];
 
@@ -114,6 +135,9 @@ export const ONBOARDING_RUNTIME_FAULTS = [
   "SUBJECT_RESOLVER_MISSING",
   "DEFINITION_STEP_MISSING",
   "DEFINITION_VERSION_MISSING",
+  "QUESTIONS_UNAVAILABLE",
+  "UTTERANCES_UNAVAILABLE",
+  "INTERVIEW_TURNS_UNAVAILABLE",
 ] as const;
 export type OnboardingRuntimeFault = (typeof ONBOARDING_RUNTIME_FAULTS)[number];
 

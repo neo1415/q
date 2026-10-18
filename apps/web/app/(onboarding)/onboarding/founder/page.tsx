@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 
 import { loadWebServerConfig } from "@capital-q/config/web";
 
+import { accountDetails } from "@/auth/account-details";
+import { RegistrationDefaultsProvider } from "@/features/onboarding-kit/registration-defaults";
+import { registrationDefaultsFor } from "@/features/onboarding-kit/registration-defaults-for";
+
 import { FounderOnboardingScreen } from "@/features/founder-onboarding";
 
 export const metadata: Metadata = {
@@ -25,16 +29,38 @@ export default async function FounderOnboardingPage({
 }) {
   const config = loadWebServerConfig();
   const params = await searchParams;
+  const startTalking = params["talk"] === "1";
+  // Arriving from Q (Home's welcome, or a spoken "let's finish my setup"):
+  // Q has already welcomed them, and the screen does not do it twice.
+  const greeted = startTalking || params["from"] === "home";
+  const openReview = params["review"] === "1";
+  // Lane ov's Overview links a gap here ("?talk=1&section=<key>"): Q opens
+  // on that section. A profile-sections key, checked by the API too.
+  const rawSection = params["section"];
+  const focusSection =
+    typeof rawSection === "string" && /^[a-z][a-z_]{0,39}$/.test(rawSection)
+      ? rawSection
+      : undefined;
   const rawSeed = params["fixture"];
   const seed =
     config.founderOnboardingAdapter === "fixture" && typeof rawSeed === "string"
       ? rawSeed
       : undefined;
 
+  // Registration facts as the form's starting values (owner directive
+  // 2026-10-16): the organisation typed at sign-up is not asked again.
+  const defaults = registrationDefaultsFor("founder", await accountDetails());
+
   return (
-    <FounderOnboardingScreen
-      adapter={config.founderOnboardingAdapter}
-      seed={seed}
-    />
+    <RegistrationDefaultsProvider value={defaults}>
+      <FounderOnboardingScreen
+        adapter={config.founderOnboardingAdapter}
+        seed={seed}
+        startTalking={startTalking}
+        greeted={greeted}
+        openReview={openReview}
+        focusSection={focusSection}
+      />
+    </RegistrationDefaultsProvider>
   );
 }

@@ -118,6 +118,19 @@ export type MembershipRepository = {
     userId: UserId,
     organisationId: OrganisationId,
   ) => Promise<MembershipView | null>;
+  /**
+   * Active members of one organisation, oldest membership first.
+   *
+   * Ordered by (joined_at, id) so the answer is the same every time it is
+   * asked of the same rows: a background job that has to act as *some*
+   * member of an organisation must not pick a different one on each run
+   * (CQ-REC-007R D).
+   */
+  readonly listActiveForOrganisation: (
+    executor: DatabaseExecutor,
+    organisationId: OrganisationId,
+    limit: number,
+  ) => Promise<readonly MembershipView[]>;
 };
 
 export type RoleTemplateRepository = {

@@ -2,6 +2,49 @@
 
 Persistent instructions for Claude Code in this repository. Read fully before the first edit of any packet.
 
+## Q Pitch — canonical specification (all agents)
+
+- **Read first:** before starting or modifying Q Pitch, demo identities, scripted tours, navigation, narration or showcase features, read `docs/specs/q-pitch/Q_PITCH_MASTER_BLUEPRINT.md`.
+- **Shared baseline:** its approved experience design, 12-minute investor script, Feature Atlas, wow moments, interruption rules, performance targets and certification requirements are the baseline for Claude, Codex, subagents and every future agent.
+- **No alternatives:** do not invent a different Q Pitch architecture, script, experience or demo account system.
+- **Precedence:** the locked PADL and higher-priority Capital Q specifications still take precedence. Flag conflicts; never silently override.
+- **Changes:** a material change is a proposed revision for product-owner approval. Approved revisions go in the blueprint's changelog.
+- **Status and claims:**
+  - Feature status: `docs/specs/q-pitch/IMPLEMENTATION_STATUS.md`. PLANNED is not certified.
+  - Every demonstration claim must map to `docs/specs/q-pitch/CERTIFICATION_MANIFEST.md`.
+- **Shared handoff:** progress, release evidence, risks and branch ownership stay in `docs/ai-handoff/`.
+- **Parallel lanes:** GateQ and Q Pitch run in parallel lanes with one integration owner. No conflicting changes to shared contracts, authorization, Q orchestration or migrations.
+
+## Current instructions — 2026-10-11 (supersede dated notes below where they conflict)
+
+Cross-model engineering handoff: @docs/ai-handoff/START-HERE.md
+
+- **Shared memory:** Claude Code and Codex share one handoff (`docs/ai-handoff/`; Codex reads root `AGENTS.md`). Read `START-HERE.md`, `STATE.md`, `ACTIVE-TASKS.md` and the latest `HANDOFF-LOG.md` entry first. Update them and commit/push at the end of every substantial session.
+- **Lead:** from 2026-10-11 the engineering lead is Codex Cloud. A Claude session works only on a slice that `ACTIVE-TASKS.md` assigns, in its own worktree.
+- **Superseded:** the $250 budget and pacing rules, the 2026-09-28 deadline, Claude-specific model and cache settings, "packet" discipline, and the hosting line that points at ADR 0001 (Vercel/Render). Hosting is **Railway for all four services** (ADR 0014); web is in europe-west4 on the private network. Branches: integrate on `build/int-rc`; push `recovery/2026-09-12-8y2j4w` for CI; push `recovery/2026-09-12` to deploy. Details: `docs/ai-handoff/LEGACY-RECONCILIATION.md`.
+- **Still binding, unchanged:** every product invariant, the Q architecture, data/tenant/permission rules, contracts, UX rules, Forbidden Shortcuts and ADR-001 vocabulary below.
+
+## Budget — Not a Blank Cheque (founder rule, applies to every session and every agent)
+
+**Claude credits.** The cloud budget is **$250 total**; that total is the only hard ceiling. **Deadline: the whole product done, polished and deployed, with seeded videos, by Monday 2026-09-28 morning.** The founder is unavailable on Sunday. **Never stop or pause work because of a daily figure.** Pacing exists to remove waste, not to idle. Spend where it moves the product toward the Monday definition of done in `docs/handoff/cloud-cost-playbook.md` section 0.
+
+- **Read `docs/handoff/cloud-cost-playbook.md` before spawning any agent.** It is the verified cost model and the settings to use.
+- Keep the prompt cache warm. Cloud env vars are `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` and `CLAUDE_CODE_SUBAGENT_PROMPT_CACHE_TTL=1h`, because builds idle workers past the 5-minute default. Never switch model, enable fast mode, or change MCP/plugins mid-session.
+- Keep context small: every token is re-paid on each tool call.
+  - Tail or grep every build, test and log output.
+  - Navigate with graphify before opening files, and read only the ranges you need.
+  - Grep `docs/handoff/transcripts/`, never read it whole.
+  - The lead runs `/compact` after each merge-and-deploy cycle.
+  - One packet per worker. Resume a worker for the same packet; never duplicate one.
+- The cloud VM has 4 vCPU and 16 GB: at most 2 workers building, testing or running a browser at once, and eslint always alone. Commit and push after every meaningful step (idle VMs are reclaimed).
+- Run `/usage` morning, midday and evening, and log it in `docs/handoff/research/ledger.md`. If the total trends toward $250 before Monday's must-haves are done, cut waste and lower-priority items first; never stop the must-haves.
+- Workers run Opus 5.5 at medium effort, with tight prompts naming the exact files and requirement ids, and reports of 60 lines or fewer. Targeted tests only; full gates just before merging to the deploy branch. No sleep-polling.
+
+**The founder's API credits are off-limits.** OpenAI (a $5 top-up), Gemini, ElevenLabs, Deepgram, Cloudflare Stream, Bright Data and any other provider are paid by the founder.
+
+- Tests, evals and local stacks make **no live provider calls**. Set every provider key to a **non-empty** disabled value such as `disabled-locally-000000000000`. An empty value lets `.env.local` supply the real key.
+- A live call needs a stated reason, the smallest possible size, and the lead's approval, and it is reported with its cost.
+
 ## Product Identity
 
 Capital Q is an AI-native Investment Intelligence Operating System for private capital.
@@ -131,6 +174,8 @@ Capital Q should feel minimal, institutional, professional, consumer-grade easy 
 
 Prohibited AI-slop visuals: glowing brains or shields, robot heads, neural particles, floating hexagons, circuit lines, purple-blue AI gradients, holographic dashboards, fake terminals, agent-swarm visualisations, Sparkles as the Q icon, gradient headings, three-feature-card hero sections, `backdrop-blur` everywhere, cards around everything, badge spam, uppercase tracking-widest eyebrows.
 
+Founder amendments: `docs/adr/0017-founder-design-amendments.md` and `docs/design/ux-direction-2026-09.md` supersede the conflicting rules above (glow on Q only, Q Dock, Stage + Board, visible theme switcher); every other prohibition still holds.
+
 ## Engineering Rules
 
 - TypeScript strict. No casual `any`, no double assertions, no non-null assertions used to silence a real bug. `unknown` before validation.
@@ -169,6 +214,24 @@ pnpm build
 `pnpm check` runs all five. Run `pnpm test:e2e` (Playwright, Chromium) only when browser behaviour changes or the packet requires it. Later packets add database/RLS tests, security tests and Q evals — run what the risk warrants, not every heavy suite for a trivial edit.
 
 Deterministic tests (Vitest) and probabilistic AI evals are separate systems. Do not ask an LLM to judge an invariant that code can assert. Sensitive functionality needs negative tests. Flaky tests are defects — never normalise retry-until-green, and never weaken an assertion to get green.
+
+## Git Continuity
+
+A completed implementation packet is not complete until its verified commit is also present on the configured remote. Work that exists only on one machine is unfinished work.
+
+For every completed packet or hotfix:
+
+1. review the diff;
+2. run the required checks;
+3. commit;
+4. push the current implementation branch;
+5. fetch and verify the remote branch;
+6. confirm local HEAD equals the remote branch HEAD;
+7. report both SHAs in the postflight.
+
+Never leave multiple completed packets only on a local machine. If the push fails, report the packet as `IMPLEMENTED BUT REMOTE BACKUP BLOCKED` and do not silently continue through later packets.
+
+Never force-push, reset or rebase shared history without explicit human approval. Never add secrets to Git.
 
 ## Forbidden Shortcuts
 

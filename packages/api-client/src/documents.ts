@@ -1,12 +1,22 @@
+import { z } from "zod";
+
 import {
+  DOCUMENT_ARCHIVE_SEGMENT,
+  DOCUMENT_FILE_SEGMENT,
+  DocumentFileLinkSchema,
+  type ArchiveDocumentRequest,
+  type RenameDocumentRequest,
   CreateDocumentUploadSessionResponseSchema,
   DOCUMENT_UPLOAD_SESSIONS_PATH,
+  DOCUMENT_DOWNLOAD_AUDIENCE_SEGMENT,
   DOCUMENTS_PATH,
+  DocumentDownloadAudienceDtoSchema,
   DocumentListResponseSchema,
   DocumentResponseSchema,
   DocumentUploadSessionResponseSchema,
   IDEMPOTENCY_KEY_HEADER,
   type CompleteDocumentUploadSessionRequest,
+  type SetDocumentDownloadAudienceRequest,
   type CreateDocumentUploadSessionRequest,
 } from "@capital-q/contracts";
 
@@ -109,16 +119,100 @@ export function getDocument(session: ApiSession, documentId: string) {
  */
 export function listDocuments(
   session: ApiSession,
-  filter: { readonly companyId?: string | undefined } = {},
+  filter: {
+    readonly companyId?: string | undefined;
+    /** P3: one page of active documents, newest change first. */
+    readonly limit?: number | undefined;
+    readonly cursor?: string | undefined;
+  } = {},
 ) {
-  const query =
-    filter.companyId === undefined
-      ? ""
-      : `?companyId=${encodeURIComponent(filter.companyId)}`;
+  const query = new URLSearchParams();
+  if (filter.companyId !== undefined) query.set("companyId", filter.companyId);
+  if (filter.limit !== undefined) query.set("limit", String(filter.limit));
+  if (filter.cursor !== undefined) query.set("cursor", filter.cursor);
+  const suffix = query.size === 0 ? "" : `?${query.toString()}`;
   return call(
     session,
     "GET",
-    `${DOCUMENTS_PATH}${query}`,
+    `${DOCUMENTS_PATH}${suffix}`,
     DocumentListResponseSchema,
+  );
+}
+
+const ManagedDocumentSchema = z
+  .object({
+    documentId: z.string(),
+    title: z.string(),
+    status: z.enum(["ACTIVE", "ARCHIVED"]),
+    version: z.number().int(),
+  })
+  .strict();
+
+/** P3 `PATCH /v1/documents/:id` — rename one of their own documents. */
+export function renameDocument(
+  session: ApiSession,
+  documentId: string,
+  request: RenameDocumentRequest,
+  /** One key per intent: the same on a retry, so it runs once. */
+  idempotencyKey?: string,
+) {
+  return call(
+    session,
+    "PATCH",
+    `${DOCUMENTS_PATH}/${encodeURIComponent(documentId)}`,
+    ManagedDocumentSchema,
+    { body: request, headers: intentHeaders(idempotencyKey) },
+  );
+}
+
+/** P3 `POST /v1/documents/:id/archive` — delete it, or bring it back. */
+export function archiveDocument(
+  session: ApiSession,
+  documentId: string,
+  request: ArchiveDocumentRequest,
+  /** One key per intent: the same on a retry, so it runs once. */
+  idempotencyKey?: string,
+) {
+  return call(
+    session,
+    "POST",
+    `${DOCUMENTS_PATH}/${encodeURIComponent(documentId)}${DOCUMENT_ARCHIVE_SEGMENT}`,
+    ManagedDocumentSchema,
+    { body: request, headers: intentHeaders(idempotencyKey) },
+  );
+}
+
+function intentHeaders(
+  key: string | undefined,
+): Readonly<Record<string, string>> | undefined {
+  return key === undefined ? undefined : { [IDEMPOTENCY_KEY_HEADER]: key };
+}
+
+/** P3 `GET /v1/documents/:id/file` — a short-lived link to their own file. */
+export function getDocumentFile(session: ApiSession, documentId: string) {
+  return call(
+    session,
+    "GET",
+    `${DOCUMENTS_PATH}/${encodeURIComponent(documentId)}${DOCUMENT_FILE_SEGMENT}`,
+    DocumentFileLinkSchema,
+  );
+}
+
+/**
+ * `POST /v1/documents/:id/download-audience` — who may download a pitch
+ * deck (ADR 0041): only the organisation, or investors who can find the
+ * company. The version the screen saw; a stale one is refused.
+ */
+export function setDocumentDownloadAudience(
+  session: ApiSession,
+  documentId: string,
+  request: SetDocumentDownloadAudienceRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${DOCUMENTS_PATH}/${encodeURIComponent(documentId)}${DOCUMENT_DOWNLOAD_AUDIENCE_SEGMENT}`,
+    DocumentDownloadAudienceDtoSchema,
+    { body: request },
   );
 }

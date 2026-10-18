@@ -102,7 +102,19 @@ describe("per-service isolation", () => {
     // Q's secret area has a defined home for provider credentials (CQ-Q-005),
     // and holds none by default.
     expect(qApi.secrets).toEqual({
-      modelProviders: { google: undefined, groq: undefined },
+      modelProviders: {
+        syntheticDemoRouting: false,
+        syntheticDemoAttested: false,
+        syntheticDemoProjectRef: undefined,
+        google: undefined,
+        groq: undefined,
+        googleKeys: [],
+        groqKeys: [],
+      },
+      // The research provider (CQ-Q-RESEARCH-001) has the same defined home.
+      researchProviders: { tavily: undefined, brightData: undefined },
+      // And the speech provider (CQ-Q-VOICE-001 C).
+      speechProviders: { elevenLabs: undefined, deepgram: undefined },
     });
     const workers = parseWorkerConfig(EMPTY_ENV);
     expect(workers.public).toEqual({});
@@ -111,14 +123,49 @@ describe("per-service isolation", () => {
     // credentials q-api has — and holds none by default either.
     expect(workers.secrets).toEqual({
       supabaseSecretKey: undefined,
-      modelProviders: { google: undefined, groq: undefined },
+      modelProviders: {
+        syntheticDemoRouting: false,
+        syntheticDemoAttested: false,
+        syntheticDemoProjectRef: undefined,
+        google: undefined,
+        groq: undefined,
+        googleKeys: [],
+        groqKeys: [],
+      },
     });
     // The API carries the document upload limit as public operational value
     // and the storage credential as a secret that is absent unless configured.
     const api = parseApiConfig(EMPTY_ENV);
-    expect(Object.keys(api.public)).toEqual(["documentUploadMaxBytes"]);
+    expect(Object.keys(api.public).sort()).toEqual([
+      "documentUploadMaxBytes",
+      "modelProviders",
+      "qApiBaseUrl",
+      "serveUnscannedDocuments",
+      "videoProviders",
+    ]);
     expect(api.public.documentUploadMaxBytes).toBe(26214400);
     expect(api.secrets.supabaseSecretKey).toBeUndefined();
+    // The GateQ interview's inference credentials (CQ-GATE-002): absent
+    // unless configured, and the public area carries only whether each
+    // adapter exists -- never what it holds.
+    expect(api.public.modelProviders).toEqual({
+      syntheticDemoRouting: false,
+      google: "unconfigured",
+      googleKeys: 0,
+      groq: "unconfigured",
+      groqKeys: 0,
+      openai: "unconfigured",
+      testProvider: undefined,
+    });
+    expect(api.secrets.modelProviders).toEqual({
+      syntheticDemoRouting: false,
+      syntheticDemoAttested: false,
+      syntheticDemoProjectRef: undefined,
+      google: undefined,
+      googleKeys: [],
+      groq: undefined,
+      groqKeys: [],
+    });
     // The web app's public area holds exactly the two browser-safe Supabase
     // values and nothing secret.
     const web = parseWebServerConfig(WEB_ENV);
@@ -271,5 +318,38 @@ describe("configuration errors are safe to log", () => {
     }
 
     expect(JSON.stringify(error)).not.toContain(SYNTHETIC_SECRET);
+  });
+});
+
+/** ADR 0042 (founder decision 2026-10-03): the interim malware policy. */
+describe("CQ_MALWARE_POLICY", () => {
+  const hosted = { CAPITAL_Q_ENV: "production", NODE_ENV: "production" };
+
+  it("defaults to REQUIRE_CLEAN, and the API serves CLEAN files only", () => {
+    expect(parseWorkerConfig(hosted).documents.malwarePolicy).toBe(
+      "REQUIRE_CLEAN",
+    );
+    expect(parseApiConfig(hosted).public.serveUnscannedDocuments).toBe(false);
+  });
+
+  it("allows ALLOW_UNSCANNED_WITH_WARNING in a hosted environment only when set explicitly", () => {
+    const env = {
+      ...hosted,
+      CQ_MALWARE_POLICY: "ALLOW_UNSCANNED_WITH_WARNING",
+    };
+    expect(parseWorkerConfig(env).documents.malwarePolicy).toBe(
+      "ALLOW_UNSCANNED_WITH_WARNING",
+    );
+    expect(parseApiConfig(env).public.serveUnscannedDocuments).toBe(true);
+  });
+
+  it("still refuses ALLOW_UNSCANNED outside a local environment", () => {
+    expect(() =>
+      parseWorkerConfig({ ...hosted, CQ_MALWARE_POLICY: "ALLOW_UNSCANNED" }),
+    ).toThrow(ConfigurationError);
+    expect(
+      parseApiConfig({ ...hosted, CQ_MALWARE_POLICY: "ALLOW_UNSCANNED" }).public
+        .serveUnscannedDocuments,
+    ).toBe(false);
   });
 });

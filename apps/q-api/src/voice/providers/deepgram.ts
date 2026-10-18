@@ -1,0 +1,300 @@
+import type { QVoiceChoice } from "@capital-q/contracts";
+import {
+  languageChannels,
+  type VoiceListenPlan,
+} from "@capital-q/q-core/language";
+
+import { ASR_KEYWORDS } from "../vocabulary.js";
+import type { ElevenLabsSpeechRelay } from "./elevenlabs-speak.js";
+
+/**
+ * Deepgram Voice Agent as the speech transport (CQ-Q-VOICE-001 rework).
+ *
+ * The browser opens the agent websocket with a short-lived token this
+ * server mints; the agent settings this server composes point every
+ * "think" call back at this server's own endpoint, under a per-session
+ * secret, so Q stays the brain. The provider never sees the person's
+ * Capital Q token, and the person never sees the Deepgram API key.
+ */
+
+const GRANT_URL = "https://api.deepgram.com/v1/auth/grant";
+const TOKEN_TTL_SECONDS = 60;
+
+/** Aura-2 voices: a warm professional female default and a steady male alternative. */
+const SPEAK_MODELS: Readonly<Record<QVoiceChoice, string>> = {
+  FEMALE: "aura-2-thalia-en",
+  MALE: "aura-2-orion-en",
+};
+
+/**
+ * The ElevenLabs model the agent is told it is talking to (QX-004 SPEAK
+ * rework).
+ *
+ * This is a declaration to Deepgram, not a choice of voice. The agent's
+ * speak endpoint is this server's relay, and the relay decides which
+ * model renders the audio (`Q_VOICE_TTS_MODEL`, CQ-VOICE-010). The value
+ * stays one Deepgram is known to accept, so switching the relay's model
+ * never depends on what the agent's settings validator allows.
+ */
+const ELEVENLABS_MODEL_ID = "eleven_turbo_v2_5";
+
+export type DeepgramAgentSettings = {
+  readonly agent: Record<string, unknown>;
+  readonly audio: {
+    readonly input: {
+      readonly encoding: "linear16";
+      readonly sample_rate: number;
+    };
+    readonly output: {
+      readonly encoding: "linear16";
+      readonly sample_rate: number;
+      readonly container: "none";
+    };
+  };
+};
+
+export type DeepgramVoiceProvider = {
+  readonly name: "deepgram";
+  readonly voices: readonly QVoiceChoice[];
+  /**
+   * Where Q's voice actually comes from, when it is not Deepgram's own
+   * (QX-004 SPEAK rework). Carried on the transport rather than composed
+   * separately because the settings that name the relay and the relay
+   * that answers them have to agree, and one object is what makes that
+   * impossible to get wrong.
+   */
+  readonly speakRelay: ElevenLabsSpeechRelay | undefined;
+  /** One short-lived browser token for one connection. Never the API key. */
+  readonly mintToken: () => Promise<string>;
+  /** The agent settings for one session; the think endpoint carries the session's secret. */
+  readonly settingsFor: (input: {
+    readonly voice: QVoiceChoice;
+    readonly greeting: string | undefined;
+    readonly thinkToken: string;
+    /**
+     * Names this person is likely to say that the recogniser has never
+     * heard: their organisation, their own name. "NEM Salvage" came back
+     * as "name salvage" until the recogniser was told the word existed.
+     */
+    readonly terms?: readonly string[] | undefined;
+    /**
+     * The person's device language. English (or none) keeps the English
+     * recogniser, tuned for its end-of-turn behaviour; any other language
+     * hears and speaks multilingually, so Q follows the language the
+     * person actually speaks in (the answer itself already follows their
+     * words).
+     */
+    readonly locale?: string | undefined;
+  }) => DeepgramAgentSettings;
+};
+
+export type DeepgramVoiceProviderOptions = {
+  readonly apiKey: string;
+  /** This server's public origin, as the provider reaches it. */
+  readonly publicUrl: string;
+  /** The think route's path on this server. */
+  readonly thinkPath: string;
+  /**
+   * Q's voice (QX-004 SPEAK rework). Present means ElevenLabs: the agent
+   * is told to fetch the audio of each sentence from `path` on this
+   * server, and `relay` is what answers there. Absent means the agent
+   * speaks in its own Aura-2 voice, which is what happens when no
+   * ElevenLabs key is configured.
+   */
+  readonly speak?:
+    | { readonly path: string; readonly relay: ElevenLabsSpeechRelay }
+    | undefined;
+  readonly fetch?: typeof fetch | undefined;
+};
+
+/** What Deepgram's orchestrator is told; Q's real instructions live on this server. */
+const THINK_PROMPT =
+  "You are Q. Every reply is composed by Capital Q's own server; relay it exactly as given.";
+
+export class DeepgramTokenError extends Error {
+  readonly status: number;
+  constructor(status: number) {
+    super("The speech provider refused to issue a session token.");
+    this.name = "DeepgramTokenError";
+    this.status = status;
+  }
+}
+
+/**
+ * How the standard line listens for a locale: the Deepgram model each
+ * language is documented for (q-core's capability table: Flux English,
+ * Flux Multilingual's ten languages, otherwise Nova-3 with the person's
+ * region when Nova-3 names it). A language none of them lists falls back
+ * to Flux Multilingual, which hears English: the route refuses a line for
+ * a language the person CHOSE that cannot be heard, so this fallback only
+ * meets a device hint. docs/ai-handoff/LANGUAGES-2026-10-16.md.
+ */
+export function recogniserFor(locale: string | undefined): VoiceListenPlan {
+  if (locale === undefined) return { model: "flux-general-en" };
+  return languageChannels(locale).listen ?? { model: "flux-general-multi" };
+}
+
+/** Whether a device language is anything but English. */
+export function speaksBeyondEnglish(locale: string | undefined): boolean {
+  if (locale === undefined) return false;
+  const language = locale.split("-")[0]?.toLowerCase() ?? "";
+  return language.length > 0 && language !== "en";
+}
+
+export function createDeepgramVoiceProvider(
+  options: DeepgramVoiceProviderOptions,
+): DeepgramVoiceProvider {
+  const doFetch = options.fetch ?? fetch;
+  const publicUrl = options.publicUrl.replace(/\/$/, "");
+  const thinkUrl = `${publicUrl}${options.thinkPath}/chat/completions`;
+  const speak = options.speak;
+
+  /**
+   * Where the agent gets Q's voice from.
+   *
+   * With a relay path this is Deepgram's bring-your-own-TTS pointed at
+   * *this server*, not at ElevenLabs. These settings are composed here but
+   * sent by the browser, so the vendor key that would normally sit in
+   * `endpoint.headers` would be public to the person; the session's own
+   * secret goes there instead and the ElevenLabs key never leaves the
+   * server. Without a relay path the agent speaks in Aura-2 as before.
+   */
+  const speakFor = (
+    voice: QVoiceChoice,
+    thinkToken: string,
+    multilingual: boolean,
+    languageCode: string | null,
+  ): Record<string, unknown> =>
+    speak === undefined
+      ? { provider: { type: "deepgram", model: SPEAK_MODELS[voice] } }
+      : {
+          provider: {
+            type: "eleven_labs",
+            model_id: ELEVENLABS_MODEL_ID,
+            // Maps to ElevenLabs' language_code: the person's language
+            // when ElevenLabs lists it, so the voice does not guess from a
+            // line that mixes it with English.
+            language: languageCode ?? (multilingual ? "multi" : "en"),
+          },
+          endpoint: {
+            // No voice in the URL: the relay reads the session's voice
+            // from its binding, so a relayed call cannot ask to be spoken
+            // in a voice the session was not issued for.
+            url: `${publicUrl}${speak.path}`,
+            headers: { authorization: `Bearer ${thinkToken}` },
+          },
+        };
+
+  return {
+    name: "deepgram",
+    voices: ["FEMALE", "MALE"],
+    speakRelay: speak?.relay,
+    mintToken: async () => {
+      const response = await doFetch(GRANT_URL, {
+        method: "POST",
+        headers: {
+          authorization: `Token ${options.apiKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ ttl_seconds: TOKEN_TTL_SECONDS }),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) {
+        throw new DeepgramTokenError(response.status);
+      }
+      const body = (await response.json()) as { access_token?: unknown };
+      if (
+        typeof body.access_token !== "string" ||
+        body.access_token.length === 0
+      ) {
+        throw new DeepgramTokenError(response.status);
+      }
+      return body.access_token;
+    },
+    settingsFor: ({ voice, greeting, thinkToken, terms, locale }) => {
+      const multilingual = speaksBeyondEnglish(locale);
+      const recogniser = recogniserFor(locale);
+      const speakCode =
+        locale === undefined
+          ? null
+          : (languageChannels(locale).speak?.languageCode ?? null);
+      const keyterms = [
+        ...new Set([
+          ...(terms ?? [])
+            .map((term) => term.trim())
+            .filter((term) => term.length >= 2 && term.length <= 60),
+          ...ASR_KEYWORDS,
+        ]),
+      ].slice(0, 100);
+      return {
+        agent: {
+          ...(multilingual ? {} : { language: "en" }),
+          ...(greeting === undefined ? {} : { greeting }),
+          listen: {
+            provider:
+              recogniser.model === "nova-3"
+                ? {
+                    // A language Flux does not hear (Arabic, Korean, Urdu...):
+                    // Nova-3 in it, which also carries the English terms
+                    // people mix in. Keyterms stay: names are what a
+                    // recogniser cannot know. Flux's end-of-turn fields do
+                    // not apply to Nova.
+                    type: "deepgram",
+                    version: "v1",
+                    model: "nova-3",
+                    language: recogniser.language,
+                    keyterms,
+                  }
+                : {
+                    type: "deepgram",
+                    version: "v2",
+                    model: recogniser.model,
+                    keyterms,
+                    // When a person has finished. The threshold is how sure the
+                    // turn model must be; the timeout is how long it waits for
+                    // that certainty before ending the turn anyway.
+                    //
+                    // It was 0.8 with the provider's default timeout of five
+                    // seconds. A short utterance — "what's up?" — rarely reaches
+                    // 0.8 on its own, so the turn ended only when the timeout did,
+                    // and five seconds of silence sat in front of every reply
+                    // before Q had even begun. The provider's own default is 0.7;
+                    // three seconds is the longest a person reads as "listening"
+                    // rather than "not working".
+                    //
+                    // Then 0.7 split people thinking aloud into a turn per pause
+                    // (live, 2026-09-25: twelve fragments of one thought). Measured
+                    // on the same audio streamed to Flux in real time, 3 runs each
+                    // (design/voice-comparison/flux-end-of-turn.md): 0.85 with a
+                    // four-second ceiling kept a trailing-off thought whole that
+                    // 0.7 and 0.8 split, and split a three-clause sentence in two
+                    // rather than three, for about 0.4 s more on a finished
+                    // sentence (end of speech to end of turn 0.9 s -> 1.3 s). 0.9
+                    // split no less and cost another 0.4 s. What the recogniser
+                    // still ends open is held by the turn (turn.ts, unfinished).
+                    eot_threshold: 0.85,
+                    eot_timeout_ms: 4_000,
+                  },
+          },
+          think: {
+            provider: { type: "open_ai", model: "capital-q" },
+            endpoint: {
+              url: thinkUrl,
+              headers: { authorization: `Bearer ${thinkToken}` },
+            },
+            prompt: THINK_PROMPT,
+          },
+          speak: speakFor(voice, thinkToken, multilingual, speakCode),
+        },
+        audio: {
+          input: { encoding: "linear16", sample_rate: 16_000 },
+          output: {
+            encoding: "linear16",
+            sample_rate: 24_000,
+            container: "none",
+          },
+        },
+      };
+    },
+  };
+}

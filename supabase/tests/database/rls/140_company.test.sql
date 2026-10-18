@@ -92,7 +92,10 @@ select throws_ok($$ select * from core.companies $$, '42501', null, 'service_rol
 -- Privileged server role: EXPECTED DB BEHAVIOR; APPLICATION AUTHORIZATION
 -- (company.view / company.edit) IS STILL REQUIRED.
 select pg_temp.act_as_privileged();
-select is((select count(*)::int from core.companies), 2, 'privileged: server role sees both companies (expected; not business authorization)');
+-- Counted over this file's fixtures: the shared local database may hold
+-- other suites' rows, and the claim is cross-tenant visibility.
+select is((select count(*)::int from core.companies
+            where id in ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000c2')), 2, 'privileged: server role sees both companies (expected; not business authorization)');
 
 select * from finish();
 

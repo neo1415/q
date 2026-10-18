@@ -83,6 +83,25 @@ export const InvestorOrganisationUpdatedEvent = defineEvent({
     "The investor organisation profile or deployment state changed; consumers re-read the fields they need.",
 });
 
+export const InvestorVisibilityChangedEvent = defineEvent({
+  name: "core.investor_organisation.visibility_changed",
+  version: 1,
+  owner: INVESTOR_EVENT_OWNER,
+  producer: INVESTOR_EVENT_PRODUCER,
+  consumers: ["@capital-q/discovery", "@capital-q/q"],
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      investorOrganisationId: UuidSchema,
+      version: z.number().int().min(1),
+      visibility: z.enum(["organisation_private", "network_visible"]),
+    })
+    .strict(),
+  description:
+    "An editor changed who may see the declared investor profile; discovery re-reads eligibility.",
+});
+
 export const InvestorRepresentativeCreatedEvent = defineEvent({
   name: "core.investor_representative.created",
   version: 1,
@@ -163,6 +182,7 @@ export const InvestorPortfolioReferenceRemovedEvent = defineEvent({
 export const INVESTOR_EVENTS: readonly EventDefinition[] = [
   InvestorOrganisationCreatedEvent,
   InvestorOrganisationUpdatedEvent,
+  InvestorVisibilityChangedEvent,
   InvestorRepresentativeCreatedEvent,
   InvestorRepresentativeUpdatedEvent,
   InvestorPortfolioReferenceAddedEvent,
@@ -248,6 +268,29 @@ export function investorOrganisationUpdatedEvent(
       investorOrganisationId: input.investorOrganisationId,
       version: input.version,
       changedFields: [...input.changedFields],
+    },
+  );
+}
+
+export function investorVisibilityChangedEvent(
+  input: Context & {
+    readonly investorOrganisationId: string;
+    readonly version: number;
+    readonly visibility: "organisation_private" | "network_visible";
+  },
+) {
+  return envelope(
+    InvestorVisibilityChangedEvent,
+    input,
+    {
+      type: "investor_organisation",
+      id: input.investorOrganisationId,
+      version: input.version,
+    },
+    {
+      investorOrganisationId: input.investorOrganisationId,
+      version: input.version,
+      visibility: input.visibility,
     },
   );
 }

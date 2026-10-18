@@ -1,5 +1,6 @@
 import type { ServerResponse } from "node:http";
 
+import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   CorrelationIdSchema,
@@ -26,6 +27,7 @@ import type { QRunStreamService } from "@capital-q/q-runtime";
 import {
   getActorContext,
   requireActorContextHook,
+  requireActorContextOrPersonalHook,
   type ActorContextDependencies,
 } from "../security/actor-context.js";
 import { formatSseComment, formatSseFrame, formatSseRetry } from "./sse.js";
@@ -80,6 +82,8 @@ const DEFAULT_STREAM_OPTIONS: ResolvedQEventStreamOptions = {
 
 export type QEventRoutesDependencies = ActorContextDependencies & {
   readonly qStream: QRunStreamService;
+  /** When present, a person with no organisation yet may follow their own runs under a personal context. */
+  readonly identity?: ApplicationIdentityLookup | undefined;
   readonly options?: QEventStreamOptions | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -137,7 +141,11 @@ export function registerQEventRoutes(
   app: FastifyInstance,
   dependencies: QEventRoutesDependencies,
 ): QEventStreamRegistry {
-  const withContext = requireActorContextHook(dependencies);
+  const identity = dependencies.identity;
+  const withContext =
+    identity === undefined
+      ? requireActorContextHook(dependencies)
+      : requireActorContextOrPersonalHook({ ...dependencies, identity });
   const { qStream, logger } = dependencies;
   const given = dependencies.options ?? {};
   const options: ResolvedQEventStreamOptions = {

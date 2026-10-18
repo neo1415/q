@@ -1,0 +1,526 @@
+import { describe, expect, it } from "vitest";
+
+import { EMAIL_SOURCE_STRINGS } from "@capital-q/email";
+import { createDailySpendCap } from "@capital-q/model-gateway";
+import { languageInfo } from "@capital-q/q-core/language";
+import {
+  checkUiTranslation,
+  UI_TEXT_CATALOG_VERSION,
+  UI_TEXT_HAND_GAPS,
+  UI_TEXT_SOURCE,
+} from "@capital-q/q-core/ui-text";
+
+import {
+  ANSWER_WORDS_VERSION,
+  createLineTranslator,
+  createPostgresUiTextStore,
+  createUiTextService,
+  parseUiTranslationDailyCapUsd,
+  type UiTextRow,
+  type UiTextStore,
+  type UiTextTranslator,
+} from "../src/composition/ui-text.js";
+
+/**
+ * A stand-in translation: the English with its words upper-cased (never
+ * the English left as it was, which the check now refuses), placeholders
+ * kept exactly.
+ */
+function marked(tag: string, text: string): string {
+  return `[${tag}] ${text.replace(/\{[^}]*\}|[a-z]+/gu, (m) =>
+    m.startsWith("{") ? m : m.toUpperCase(),
+  )}`;
+}
+/**
+ * Any-language interface (owner 2026-10-16): the English catalogue is
+ * machine-translated once per language, cached, shared, checked and
+ * capped. No live calls: the translator here is a stand-in.
+ */
+function memoryStore() {
+  const rows = new Map<string, UiTextRow>();
+  let reads = 0;
+  const store: UiTextStore = {
+    read: (language, version) => {
+      reads += 1;
+      const accepted = new Map<string, string>();
+      const settled = new Set<string>();
+      for (const [key, row] of rows) {
+        if (!key.startsWith(`${language}|${version}|`)) continue;
+        settled.add(row.source);
+        if (row.status === "ACCEPTED") accepted.set(row.source, row.text);
+      }
+      return Promise.resolve({ accepted, settled });
+    },
+    write: (language, version, written) => {
+      for (const row of written) {
+        const key = `${language}|${version}|${row.source}`;
+        if (!rows.has(key)) rows.set(key, row);
+      }
+      return Promise.resolve();
+    },
+  };
+  return { store, rows, reads: () => reads };
+}
+
+/** "Settings" -> marked("fr", "Settings"), keeping every placeholder; one item broken on purpose. */
+function fakeTranslator(options: { costUsd?: number; breakOne?: string } = {}) {
+  const calls: { language: string; size: number; tenantId: string }[] = [];
+  const translate: UiTextTranslator = (language, batch, attribution) => {
+    calls.push({
+      language: language.tag,
+      size: batch.length,
+      tenantId: attribution.tenantId,
+    });
+    return Promise.resolve({
+      ok: true,
+      modelCode: "fake-model",
+      costUsd: options.costUsd ?? 0.001,
+      result: {
+        items: batch.map((text, i) => ({
+          i,
+          t:
+            text === options.breakOne
+              ? text.replace(/\{[A-Za-z0-9]+\}/u, "")
+              : marked(language.tag, text),
+        })),
+      },
+    });
+  };
+  return { translate, calls };
+}
+
+const capOf = (capUsd: number) =>
+  createDailySpendCap({ capUsd, readSpentSinceUsd: () => Promise.resolve(0) });
+
+const actor = {
+  tenantId: "00000000-0000-4000-8000-0000000000a1",
+  userId: "00000000-0000-4000-8000-0000000000b1",
+};
+
+const SOURCE = [
+  "Settings",
+  "Discover",
+  "Waiting on {name}.",
+  "USD {n} raised",
+  "Ask Q",
+];
+
+describe("checking a machine translation", () => {
+  it("keeps every placeholder and refuses one that breaks or invents one", () => {
+    expect(
+      checkUiTranslation("Waiting on {name}.", "En attente de {name}."),
+    ).toEqual({ ok: true });
+    expect(
+      checkUiTranslation("Waiting on {name}.", "En attente de {nom}."),
+    ).toEqual({
+      ok: false,
+      reason: "PLACEHOLDERS",
+    });
+    expect(
+      checkUiTranslation("Waiting on {name}.", "En attente."),
+    ).toMatchObject({ reason: "PLACEHOLDERS" });
+    expect(checkUiTranslation("{n} of {n2}", "{n} sur {n2} {n}")).toMatchObject(
+      { reason: "PLACEHOLDERS" },
+    );
+  });
+
+  it("never loses figures, currency codes or product names", () => {
+    expect(checkUiTranslation("Raise USD 2.5m", "Lever 3 M USD")).toMatchObject(
+      { reason: "FIGURES" },
+    );
+    expect(
+      checkUiTranslation("Raise USD 2.5m", "Lever 2.5m dollars"),
+    ).toMatchObject({ reason: "CURRENCY_CODES" });
+    expect(checkUiTranslation("Raise USD 2.5m", "Lever 2.5m USD")).toEqual({
+      ok: true,
+    });
+    expect(checkUiTranslation("Ask Q", "Demander à Kyu")).toMatchObject({
+      reason: "PRODUCT_NAMES",
+    });
+    expect(checkUiTranslation("Open GateQ", "Ouvrir la porte")).toMatchObject({
+      reason: "PRODUCT_NAMES",
+    });
+    expect(checkUiTranslation("Ask Q", "اسأل Q")).toEqual({ ok: true });
+    expect(checkUiTranslation("Settings", "  ")).toMatchObject({
+      reason: "EMPTY",
+    });
+  });
+});
+
+describe("the ui-text service", () => {
+  it("shows English first, translates in the background, then serves from the cache", async () => {
+    const memory = memoryStore();
+    const fake = fakeTranslator();
+    const service = createUiTextService({
+      store: memory.store,
+      translate: fake.translate,
+      cap: capOf(2),
+      source: SOURCE,
+      handGaps: {},
+    });
+    const first = await service.catalog("fr", actor);
+    expect(first).toMatchObject({
+      language: "fr",
+      complete: false,
+      settled: 0,
+      total: 5,
+      entries: {},
+    });
+    await service.idle();
+    const second = await service.catalog("fr", actor);
+    expect(second).toMatchObject({
+      complete: true,
+      settled: 5,
+      version: UI_TEXT_CATALOG_VERSION,
+    });
+    expect(second?.entries["Settings"]).toBe(marked("fr", "Settings"));
+    expect(second?.entries["Waiting on {name}."]).toBe(
+      marked("fr", "Waiting on {name}."),
+    );
+    // Once complete, nothing more is asked of the model.
+    await service.catalog("fr", actor);
+    await service.idle();
+    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls[0]?.tenantId).toBe(actor.tenantId);
+  });
+
+  it("asks once however many people open the language at the same time", async () => {
+    const memory = memoryStore();
+    const fake = fakeTranslator();
+    const service = createUiTextService({
+      store: memory.store,
+      translate: fake.translate,
+      cap: capOf(2),
+      source: SOURCE,
+      handGaps: {},
+    });
+    await Promise.all([
+      service.catalog("sw", actor),
+      service.catalog("sw", actor),
+      service.catalog("sw", actor),
+    ]);
+    await service.idle();
+    expect(fake.calls.filter((call) => call.language === "sw")).toHaveLength(1);
+  });
+
+  it("refuses a translation that breaks a placeholder, keeps English for it and never pays for it again", async () => {
+    const memory = memoryStore();
+    const fake = fakeTranslator({ breakOne: "Waiting on {name}." });
+    const service = createUiTextService({
+      store: memory.store,
+      translate: fake.translate,
+      cap: capOf(2),
+      source: SOURCE,
+      handGaps: {},
+    });
+    await service.catalog("ja", actor);
+    await service.idle();
+    const after = await service.catalog("ja", actor);
+    expect(after?.complete).toBe(true);
+    expect(after?.entries["Waiting on {name}."]).toBeUndefined();
+    expect(
+      memory.rows.get(`ja|${UI_TEXT_CATALOG_VERSION}|Waiting on {name}.`),
+    ).toMatchObject({
+      status: "REJECTED",
+      reason: "PLACEHOLDERS",
+    });
+    await service.idle();
+    expect(fake.calls).toHaveLength(1);
+  });
+
+  it("stops at the day's budget and says so; English stays", async () => {
+    const memory = memoryStore();
+    const fake = fakeTranslator({ costUsd: 1.5 });
+    const source = Array.from({ length: 200 }, (_, i) => `String ${i}`);
+    const service = createUiTextService({
+      store: memory.store,
+      translate: fake.translate,
+      cap: capOf(2),
+      source,
+      handGaps: {},
+      concurrency: 1,
+    });
+    await service.catalog("de", actor);
+    await service.idle();
+    // 1.5 + 1.5 reaches the USD 2 cap: the third batch is never asked.
+    expect(fake.calls).toHaveLength(2);
+    const after = await service.catalog("de", actor);
+    expect(after).toMatchObject({ complete: false, paused: "DAILY_BUDGET" });
+    expect(after?.settled).toBe(120);
+    await service.idle();
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it("machine-fills only what a hand catalogue lacks; English needs nothing", async () => {
+    const memory = memoryStore();
+    const fake = fakeTranslator();
+    const service = createUiTextService({
+      store: memory.store,
+      translate: fake.translate,
+      cap: capOf(2),
+      source: SOURCE,
+      handGaps: { ar: ["Ask Q"] },
+    });
+    await service.catalog("ar-AE", actor);
+    await service.catalog("en-GB", actor);
+    await service.idle();
+    expect(fake.calls).toEqual([
+      { language: "ar-AE", size: 1, tenantId: actor.tenantId },
+    ]);
+    expect(await service.catalog("en", actor)).toMatchObject({
+      complete: true,
+      total: 0,
+    });
+  });
+
+  it("refuses a language it cannot offer, and translates nothing for it", async () => {
+    const memory = memoryStore();
+    const fake = fakeTranslator();
+    const service = createUiTextService({
+      store: memory.store,
+      translate: fake.translate,
+      cap: capOf(2),
+      source: SOURCE,
+      handGaps: {},
+    });
+    expect(await service.catalog("tlh", actor)).toBeNull();
+    expect(await service.catalog("not a tag", actor)).toBeNull();
+    expect(fake.calls).toEqual([]);
+  });
+
+  it("pauses honestly when no model can translate, and retries later", async () => {
+    const memory = memoryStore();
+    let t = 0;
+    let calls = 0;
+    const service = createUiTextService({
+      store: memory.store,
+      translate: () => {
+        calls += 1;
+        return Promise.resolve({ ok: false, reason: "UNAVAILABLE" });
+      },
+      cap: capOf(2),
+      source: SOURCE,
+      handGaps: {},
+      now: () => t,
+      retryAfterMs: 1_000,
+    });
+    await service.catalog("es", actor);
+    await service.idle();
+    expect(await service.catalog("es", actor)).toMatchObject({
+      paused: "UNAVAILABLE",
+      complete: false,
+    });
+    await service.idle();
+    expect(calls).toBe(1);
+    t = 5_000;
+    await service.catalog("es", actor);
+    await service.idle();
+    expect(calls).toBe(2);
+  });
+});
+
+describe("the shipped catalogue and cap", () => {
+  it("translates only the source catalogue; Arabic's hand catalogue covers it", () => {
+    expect(UI_TEXT_SOURCE.length).toBeGreaterThan(3_000);
+    expect(new Set(UI_TEXT_SOURCE).size).toBe(UI_TEXT_SOURCE.length);
+    expect(UI_TEXT_HAND_GAPS["ar"]).toEqual([]);
+    // Emails go out in any language from the same cache.
+    const source = new Set(UI_TEXT_SOURCE);
+    expect(
+      EMAIL_SOURCE_STRINGS.filter((english) => !source.has(english)),
+    ).toEqual([]);
+    expect(languageInfo("ar")?.direction).toBe("rtl");
+  });
+
+  it("defaults the daily cap to USD 2 and refuses a malformed one", () => {
+    expect(parseUiTranslationDailyCapUsd({})).toBe(2);
+    expect(
+      parseUiTranslationDailyCapUsd({ CQ_UI_TRANSLATION_DAILY_CAP_USD: "0.5" }),
+    ).toBe(0.5);
+    expect(() =>
+      parseUiTranslationDailyCapUsd({ CQ_UI_TRANSLATION_DAILY_CAP_USD: "two" }),
+    ).toThrow();
+    expect(() =>
+      parseUiTranslationDailyCapUsd({ CQ_UI_TRANSLATION_DAILY_CAP_USD: "500" }),
+    ).toThrow();
+  });
+});
+
+describe("translateLines (Q's code-written lines, lane ml)", () => {
+  const LINES = ["{v1} needs your answer by {v2}.", "Here's what's waiting."];
+
+  it("translates skeletons once, keeps placeholders, caches under its own version", async () => {
+    const memory = memoryStore();
+    const fake = fakeTranslator();
+    const translateLines = createLineTranslator({
+      store: memory.store,
+      translate: fake.translate,
+      cap: capOf(2),
+    });
+    const first = await translateLines("fr", LINES, actor);
+    expect(first.get("{v1} needs your answer by {v2}.")).toBe(
+      marked("fr", "{v1} needs your answer by {v2}."),
+    );
+    expect(
+      memory.rows.has(`fr|${ANSWER_WORDS_VERSION}|Here's what's waiting.`),
+    ).toBe(true);
+    expect(
+      memory.rows.has(`fr|${UI_TEXT_CATALOG_VERSION}|Here's what's waiting.`),
+    ).toBe(false);
+    await translateLines("fr", LINES, actor);
+    expect(fake.calls).toHaveLength(1);
+    // A new process reads the store, and asks nothing.
+    const again = createLineTranslator({
+      store: memory.store,
+      translate: fake.translate,
+      cap: capOf(2),
+    });
+    expect((await again("fr", LINES, actor)).size).toBe(2);
+    expect(fake.calls).toHaveLength(1);
+  });
+
+  it("returns nothing for English or an unofferable language, without a call", async () => {
+    const fake = fakeTranslator();
+    const translateLines = createLineTranslator({
+      store: memoryStore().store,
+      translate: fake.translate,
+      cap: capOf(2),
+    });
+    expect((await translateLines("en-GB", LINES, actor)).size).toBe(0);
+    expect((await translateLines("tlh", LINES, actor)).size).toBe(0);
+    expect(fake.calls).toEqual([]);
+  });
+
+  it("leaves out a line whose translation broke a placeholder, and waits no longer than it may", async () => {
+    const memory = memoryStore();
+    const broken = fakeTranslator({
+      breakOne: "{v1} needs your answer by {v2}.",
+    });
+    const translateLines = createLineTranslator({
+      store: memory.store,
+      translate: broken.translate,
+      cap: capOf(2),
+    });
+    const out = await translateLines("sw", LINES, actor);
+    expect(out.has("{v1} needs your answer by {v2}.")).toBe(false);
+    expect(out.get("Here's what's waiting.")).toBe(
+      marked("sw", "Here's what's waiting."),
+    );
+    const slow = createLineTranslator({
+      store: memoryStore().store,
+      translate: () => new Promise(() => undefined),
+      cap: capOf(2),
+      waitMs: 20,
+    });
+    expect((await slow("de", LINES, actor)).size).toBe(0);
+  });
+
+  it("stops at the shared daily cap", async () => {
+    const fake = fakeTranslator();
+    const translateLines = createLineTranslator({
+      store: memoryStore().store,
+      translate: fake.translate,
+      cap: capOf(0),
+    });
+    expect((await translateLines("es", LINES, actor)).size).toBe(0);
+    expect(fake.calls).toEqual([]);
+  });
+});
+
+describe("English left in a translation is refused (live AL 2026-10-16)", () => {
+  const fr = { primary: "fr", script: "Latn" };
+  const ar = { primary: "ar", script: "Arab" };
+
+  it("refuses a French line that keeps the English opening or a run of it", () => {
+    expect(
+      checkUiTranslation(
+        "Picking up where we left off.",
+        "Picking là où nous nous étions arrêtés.",
+        fr,
+      ),
+    ).toMatchObject({ ok: false, reason: "UNTRANSLATED" });
+    expect(
+      checkUiTranslation(
+        "Picking up where we left off.",
+        "Reprenons où nous en étions, left off.",
+        fr,
+      ),
+    ).toMatchObject({ ok: false, reason: "UNTRANSLATED" });
+    expect(
+      checkUiTranslation(
+        "Picking up where we left off.",
+        "Reprenons là où nous nous étions arrêtés.",
+        fr,
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it("keeps names, acronyms and product names in any script", () => {
+    expect(
+      checkUiTranslation(
+        "Your SAFE with Capital Q is saved.",
+        "تم حفظ SAFE الخاص بك مع Capital Q.",
+        ar,
+      ),
+    ).toEqual({ ok: true });
+    expect(
+      checkUiTranslation(
+        "Here is one investor who could fit: {v1}.",
+        "هذا investor قد يناسب: {v1}.",
+        ar,
+      ),
+    ).toMatchObject({ ok: false, reason: "UNTRANSLATED" });
+  });
+
+  it("a cached translation that now fails is not served, and the fresh one replaces exactly it", async () => {
+    const queries: string[] = [];
+    const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+      const text = strings.join("?");
+      queries.push(`${text} ${JSON.stringify(values)}`);
+      if (text.includes("select source_text")) {
+        return Promise.resolve([
+          {
+            source_text: "Picking up where we left off.",
+            status: "ACCEPTED",
+            translated_text: "Picking là où nous nous étions arrêtés.",
+          },
+          {
+            source_text: "Settings",
+            status: "ACCEPTED",
+            translated_text: "Paramètres",
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    }) as unknown as Parameters<typeof createPostgresUiTextStore>[0];
+    const store = createPostgresUiTextStore(sql);
+    const read = await store.read("fr", "answer-words.v2");
+    expect(read.accepted.has("Picking up where we left off.")).toBe(false);
+    expect(read.settled.has("Picking up where we left off.")).toBe(false);
+    expect(read.accepted.get("Settings")).toBe("Paramètres");
+    await store.write("fr", "answer-words.v2", [
+      {
+        source: "Picking up where we left off.",
+        status: "ACCEPTED",
+        text: "Reprenons là où nous nous étions arrêtés.",
+        modelCode: "m",
+      },
+    ]);
+    const update = queries.find((q) =>
+      q.includes("update q_runtime.ui_translations"),
+    );
+    expect(update).toBeDefined();
+    expect(update).toContain("Picking là où nous nous étions arrêtés.");
+    // A second write of the same line is insert-only again.
+    queries.length = 0;
+    await store.write("fr", "answer-words.v2", [
+      {
+        source: "Picking up where we left off.",
+        status: "ACCEPTED",
+        text: "Reprenons là où nous nous étions arrêtés.",
+        modelCode: "m",
+      },
+    ]);
+    expect(queries.some((q) => q.includes("update "))).toBe(false);
+  });
+});

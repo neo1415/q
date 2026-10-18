@@ -1,9 +1,71 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 
+import { redirect } from "next/navigation";
+
 import { HomeScreen } from "@/features/home/home-screen";
+import { PendingInvitations } from "@/features/team/pending-invitations";
+import { onboardingPath, resolveOnboardingState } from "@/features/q/context";
 
 export const metadata: Metadata = { title: "Home" };
 
-export default function HomePage() {
-  return <HomeScreen />;
+/**
+ * Home is one person's Q, never a cached page.
+ *
+ * Without this it is statically rendered, and a client component reading
+ * the URL suspends during a static render and falls back to null. The
+ * effect was precise and baffling: `/home` worked, `/home?c=<id>` showed
+ * the page furniture and no Q at all.
+ */
+export const dynamic = "force-dynamic";
+
+export default async function HomePage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  /**
+   * Which conversation is open, read on the server (QX-003A).
+   *
+   * It used to be read in the browser with `useSearchParams`, and that
+   * was the whole of the history bug. The hook hydrated correctly — the
+   * action returned the turns, the merge worked, the projection produced
+   * them — and then the panel remounted as the parameter resolved, so
+   * the instance holding the restored conversation was thrown away and
+   * the one on screen had never fetched anything. Two instances, and the
+   * wrong one won.
+   *
+   * The page already renders per request and already has the parameter.
+   * Passing it down means the panel is mounted once, with the answer.
+   */
+  // Owner 2026-10-16 (supersedes 2026-09-30): an unfinished setup no longer
+  // holds Home; the app is usable and the setup is offered back here, at
+  // most once a day. Only somebody who has not started goes to the welcome.
+  const state = await resolveOnboardingState();
+  if (state.kind === "NEW") {
+    const welcome = onboardingPath(state);
+    if (welcome !== null) redirect(welcome);
+  }
+  const params = await searchParams;
+  const raw = params["c"];
+  const conversationId = typeof raw === "string" && raw.length > 0 ? raw : null;
+  return (
+    <>
+      {/* F2: an invitation to their verified email, where they land.
+          Streamed: its read never holds Q's page (perf lane 2026-10-16). */}
+      <Suspense fallback={null}>
+        <PendingInvitations />
+      </Suspense>
+      <HomeScreen
+        conversationId={conversationId}
+        fresh={params["new"] === "1"}
+        openBoard={params["board"] === "1"}
+        ask={
+          typeof params["ask"] === "string" && params["ask"].length <= 300
+            ? params["ask"]
+            : undefined
+        }
+      />
+    </>
+  );
 }

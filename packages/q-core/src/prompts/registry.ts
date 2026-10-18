@@ -1,4 +1,18 @@
 import {
+  INSTRUCTION_PLAN_V1,
+  INSTRUCTION_PLAN_V2,
+  INSTRUCTION_PLAN_V3,
+  INSTRUCTION_PLAN_V4,
+  INSTRUCTION_PLAN_V5,
+  INSTRUCTION_PLAN_V6,
+  INSTRUCTION_PLAN_V7,
+  INSTRUCTION_PLAN_V8,
+  INSTRUCTION_PLAN_V9,
+  INSTRUCTION_THREAD_READER_V1,
+  INSTRUCTION_THREAD_READER_V2,
+  INSTRUCTION_THREAD_READER_V3,
+} from "./tasks/instructions.v1.js";
+import {
   promptContentHash,
   promptVersionId,
   templateVariables,
@@ -6,15 +20,244 @@ import {
   type PromptId,
   type PromptVersionId,
 } from "./definition.js";
+import { Q_SYSTEM_VOICE_V1 } from "./charter/q-system-voice.v1.js";
+import { Q_SYSTEM_VOICE_V2 } from "./charter/q-system-voice.v2.js";
+import { Q_SYSTEM_VOICE_V3 } from "./charter/q-system-voice.v3.js";
 import { Q_SYSTEM_V1 } from "./charter/q-system.v1.js";
+import { Q_SYSTEM_V2 } from "./charter/q-system.v2.js";
 import { CLAIM_EXTRACTION_V1 } from "./tasks/claim-extraction.v1.js";
 import { COMPANY_ANALYST_V1 } from "./tasks/company-analyst.v1.js";
 import { COMPANY_ANALYST_V2 } from "./tasks/company-analyst.v2.js";
+import { COMPANY_ANALYST_V3 } from "./tasks/company-analyst.v3.js";
+import { COMPANY_ANALYST_V4 } from "./tasks/company-analyst.v4.js";
+import { COMPANY_ANALYST_V5 } from "./tasks/company-analyst.v5.js";
+import { COMPANY_ANALYST_V6 } from "./tasks/company-analyst.v6.js";
+import { COMPANY_ANALYST_V7 } from "./tasks/company-analyst.v7.js";
+import { COMPANY_ANALYST_V8 } from "./tasks/company-analyst.v8.js";
+import { COMPANY_ANALYST_V9 } from "./tasks/company-analyst.v9.js";
+import { COMPANY_ANALYST_V10 } from "./tasks/company-analyst.v10.js";
+import { COMPANY_ANALYST_V11 } from "./tasks/company-analyst.v11.js";
+import { COMPANY_ANALYST_V12 } from "./tasks/company-analyst.v12.js";
+import { COMPANY_ANALYST_V13 } from "./tasks/company-analyst.v13.js";
+import { COMPANY_ANALYST_V14 } from "./tasks/company-analyst.v14.js";
+import { COMPANY_ANALYST_V15 } from "./tasks/company-analyst.v15.js";
+import { COMPANY_ANALYST_V16 } from "./tasks/company-analyst.v16.js";
+import { COMPANY_ANALYST_V17 } from "./tasks/company-analyst.v17.js";
+import { COMPANY_ANALYST_V18 } from "./tasks/company-analyst.v18.js";
+import { COMPANY_ANALYST_V19 } from "./tasks/company-analyst.v19.js";
+import { COMPANY_ANALYST_V20 } from "./tasks/company-analyst.v20.js";
+import { COMPANY_ANALYST_V21 } from "./tasks/company-analyst.v21.js";
+import { COMPANY_ANALYST_V22 } from "./tasks/company-analyst.v22.js";
+import { COMPANY_ANALYST_V23 } from "./tasks/company-analyst.v23.js";
+import { COMPANY_ANALYST_V24 } from "./tasks/company-analyst.v24.js";
+import { COMPANY_ANALYST_V25 } from "./tasks/company-analyst.v25.js";
+import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
+import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
+import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
+import { DECISION_READER_V1 } from "./tasks/decision-reader.v1.js";
+import { DECISION_READER_V2 } from "./tasks/decision-reader.v2.js";
+import {
+  MEETING_OUTCOME_READER_V1,
+  ONBOARDING_MOVE_READER_V1,
+  PREFERENCE_POLARITY_V1,
+  UTTERANCE_CHECK_V1,
+} from "./tasks/words-readers.v1.js";
+import { TURN_READER_V1 } from "./tasks/turn-reader.v1.js";
+import { TURN_READER_V2 } from "./tasks/turn-reader.v2.js";
+import { TURN_READER_V3 } from "./tasks/turn-reader.v3.js";
+import { TURN_READER_V4 } from "./tasks/turn-reader.v4.js";
+import { TURN_READER_V5 } from "./tasks/turn-reader.v5.js";
+import { TURN_READER_V6 } from "./tasks/turn-reader.v6.js";
+import { TURN_READER_V7 } from "./tasks/turn-reader.v7.js";
+import { TURN_READER_V8 } from "./tasks/turn-reader.v8.js";
+import { TURN_READER_V9 } from "./tasks/turn-reader.v9.js";
+import { TURN_READER_V10 } from "./tasks/turn-reader.v10.js";
+import { TURN_READER_V11 } from "./tasks/turn-reader.v11.js";
+import { TURN_READER_V12 } from "./tasks/turn-reader.v12.js";
+import { TURN_READER_V13 } from "./tasks/turn-reader.v13.js";
+import { TURN_READER_V14 } from "./tasks/turn-reader.v14.js";
+import { TURN_READER_V15 } from "./tasks/turn-reader.v15.js";
+import { TURN_READER_V16 } from "./tasks/turn-reader.v16.js";
+import { TURN_READER_V17 } from "./tasks/turn-reader.v17.js";
+import { TURN_READER_V18 } from "./tasks/turn-reader.v18.js";
+import { TURN_READER_V19 } from "./tasks/turn-reader.v19.js";
+// DOCS block.
+import { TURN_READER_V20 } from "./tasks/turn-reader.v20.js";
+import { TURN_READER_V21 } from "./tasks/turn-reader.v21.js";
+// QA block: hand-over intent.
+import { TURN_READER_V22 } from "./tasks/turn-reader.v22.js";
+import { TURN_READER_V23 } from "./tasks/turn-reader.v23.js";
+import { TURN_READER_V24 } from "./tasks/turn-reader.v24.js";
+import { TURN_READER_V25 } from "./tasks/turn-reader.v25.js";
+import { TURN_READER_V26 } from "./tasks/turn-reader.v26.js";
+import { TURN_READER_V27 } from "./tasks/turn-reader.v27.js";
+import { TURN_READER_V28 } from "./tasks/turn-reader.v28.js";
+import { TURN_READER_V29 } from "./tasks/turn-reader.v29.js";
+import { TURN_READER_V30 } from "./tasks/turn-reader.v30.js";
+import { TURN_READER_V31 } from "./tasks/turn-reader.v31.js";
+import { TURN_READER_V32 } from "./tasks/turn-reader.v32.js";
+import { TURN_READER_V33 } from "./tasks/turn-reader.v33.js";
+import { TURN_READER_V34 } from "./tasks/turn-reader.v34.js";
+import { TURN_READER_V35 } from "./tasks/turn-reader.v35.js";
+import { TURN_READER_V36 } from "./tasks/turn-reader.v36.js";
+import { TURN_READER_V37 } from "./tasks/turn-reader.v37.js";
+import { TURN_READER_V38 } from "./tasks/turn-reader.v38.js";
+import { TURN_READER_V39 } from "./tasks/turn-reader.v39.js";
+import { TURN_READER_V40 } from "./tasks/turn-reader.v40.js";
+import { TURN_READER_V41 } from "./tasks/turn-reader.v41.js";
+import { TURN_READER_V42 } from "./tasks/turn-reader.v42.js";
+import { TURN_READER_V43 } from "./tasks/turn-reader.v43.js";
+import { TURN_READER_V44 } from "./tasks/turn-reader.v44.js";
+import { TURN_READER_V45 } from "./tasks/turn-reader.v45.js";
+import { TURN_READER_V46 } from "./tasks/turn-reader.v46.js";
+import { TURN_READER_V47 } from "./tasks/turn-reader.v47.js";
+import { TURN_READER_V48 } from "./tasks/turn-reader.v48.js";
+import { TURN_READER_V49 } from "./tasks/turn-reader.v49.js";
+import { TURN_READER_V50 } from "./tasks/turn-reader.v50.js";
+import { TURN_READER_V51 } from "./tasks/turn-reader.v51.js";
+import { TURN_READER_V52 } from "./tasks/turn-reader.v52.js";
+import { TURN_READER_V53 } from "./tasks/turn-reader.v53.js";
+import { TURN_READER_V54 } from "./tasks/turn-reader.v54.js";
+import { TURN_READER_V55 } from "./tasks/turn-reader.v55.js";
+import { TURN_READER_V56 } from "./tasks/turn-reader.v56.js";
+import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
+import { MEMORY_EXTRACTOR_V2 } from "./tasks/memory-extractor.v2.js";
+import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
+import { MEETING_NOTES_V2 } from "./tasks/meeting-notes.v2.js";
+import { MEETING_NOTES_V3 } from "./tasks/meeting-notes.v3.js";
+import { ERRAND_REPLY_V1 } from "./tasks/errand-reply.v1.js";
+import {
+  DRAFT_REDRAFT_V1,
+  DRAFT_REDRAFT_V2,
+  DRAFT_REDRAFT_V3,
+  DRAFT_REVIEW_V1,
+  DRAFT_REVIEW_V2,
+  DRAFT_REVIEW_V3,
+  JOB_PLAN_V1,
+  JOB_PLAN_V2,
+  JOB_PLAN_V3,
+  JOB_PLAN_V4,
+  JOB_PLAN_V5,
+  JOB_PLAN_V6,
+  JOB_PLAN_V7,
+  SUBSTANCE_CRITIQUE_V1,
+  DILIGENCE_QUESTIONS_V1,
+  DILIGENCE_QUESTIONS_V2,
+  DILIGENCE_QUESTIONS_SHORTEN_V1,
+  REPLY_READER_V1,
+} from "./tasks/workforce.v1.js";
+import { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./tasks/diligence-document-summary.v1.js";
+import { DECK_EXTRACTION_V1 } from "./tasks/deck-extraction.v1.js";
+import { PITCH_SECTION_EXTRACTION_V1 } from "./tasks/pitch-section-extraction.v1.js";
+import { SPOKEN_REPLY_V1 } from "./tasks/spoken-reply.v1.js";
+import { SMALL_TALK_V1 } from "./tasks/small-talk.v1.js";
+import { CONVERSATION_RECALL_V1 } from "./tasks/conversation-recall.v1.js";
+import { TURN_SKIM_V1 } from "./tasks/turn-skim.v1.js";
+import { TURN_SKIM_V2 } from "./tasks/turn-skim.v2.js";
+import { TURN_SKIM_V3 } from "./tasks/turn-skim.v3.js";
+import { TURN_SKIM_V4 } from "./tasks/turn-skim.v4.js";
+import { TURN_SKIM_V5 } from "./tasks/turn-skim.v5.js";
+import { PERSON_BRIEF_READER_V1 } from "./tasks/person-brief-reader.v1.js";
+import { BRIEFING_COMMAND_V1 } from "./tasks/briefing-command.v1.js";
+// AUTO block (ADR 0030)
+import {
+  WORK_CONVERSE_V1,
+  WORK_CONVERSE_V2,
+  WORK_INTERVIEW_REPORT_V1,
+  WORK_INTERVIEW_TURN_V1,
+  WORK_SHORTLIST_V1,
+  WORK_STAND_IN_REPLY_V1,
+  WORK_STAND_IN_REPLY_V2,
+  WORK_SLOT_READER_V1,
+} from "./tasks/q-work.v1.js";
+import { INVESTOR_PERSONA_V1 } from "./tasks/investor-persona.v1.js";
+import { INVESTOR_TWIN_TURN_V1 } from "./tasks/investor-twin-turn.v1.js";
+import { REHEARSAL_SCORE_V1 } from "./tasks/rehearsal-score.v1.js";
+import { INVESTOR_PERSONA_V2 } from "./tasks/investor-persona.v2.js";
+import { INVESTOR_TWIN_TURN_V2 } from "./tasks/investor-twin-turn.v2.js";
+import { REHEARSAL_SCORE_V2 } from "./tasks/rehearsal-score.v2.js";
+import { INVESTOR_TWIN_TURN_V3 } from "./tasks/investor-twin-turn.v3.js";
+import { INVESTOR_TWIN_TURN_V4 } from "./tasks/investor-twin-turn.v4.js";
+import { INVESTOR_PERSONA_V3 } from "./tasks/investor-persona.v3.js";
+import { INVESTOR_PERSONA_V4 } from "./tasks/investor-persona.v4.js";
+import { INVESTOR_PERSONA_V5 } from "./tasks/investor-persona.v5.js";
+import { INVESTOR_PERSONA_V6 } from "./tasks/investor-persona.v6.js";
+import { INVESTOR_TWIN_TURN_V5 } from "./tasks/investor-twin-turn.v5.js";
+import { INVESTOR_TWIN_TURN_V6 } from "./tasks/investor-twin-turn.v6.js";
+import { INVESTOR_TWIN_TURN_V7 } from "./tasks/investor-twin-turn.v7.js";
+import { INVESTOR_TWIN_TURN_V8 } from "./tasks/investor-twin-turn.v8.js";
+import { INVESTOR_TWIN_TURN_V9 } from "./tasks/investor-twin-turn.v9.js";
+import { INVESTOR_TWIN_TURN_V10 } from "./tasks/investor-twin-turn.v10.js";
+import { MEETING_HOST_TURN_V1 } from "./tasks/meeting-host-turn.v1.js";
+import { MEETING_HOST_TURN_V2 } from "./tasks/meeting-host-turn.v2.js";
+import { MEETING_HOST_TURN_V3 } from "./tasks/meeting-host-turn.v3.js";
+import { MEETING_HOST_TURN_V4 } from "./tasks/meeting-host-turn.v4.js";
+import { MEETING_HOST_TURN_V5 } from "./tasks/meeting-host-turn.v5.js";
+import { MEETING_SCREEN_NOTE_V1 } from "./tasks/meeting-screen-note.v1.js";
+import { MEETING_CAMERA_NOTE_V1 } from "./tasks/meeting-camera-note.v1.js";
+import { REHEARSAL_SCORE_V3 } from "./tasks/rehearsal-score.v3.js";
+import { REHEARSAL_SCORE_V4 } from "./tasks/rehearsal-score.v4.js";
+import { REHEARSAL_SCORE_V5 } from "./tasks/rehearsal-score.v5.js";
+import { FOUNDER_RESEARCH_READER_V1 } from "./tasks/founder-research-reader.v1.js";
+import { PROFILE_GAP_READER_V1 } from "./tasks/profile-gap-reader.v1.js";
+import { APP_ACTION_ARGUMENTS_V1 } from "./tasks/app-action-arguments.v1.js";
+import { APP_ACTION_ROUTER_V1 } from "./tasks/app-action-router.v1.js";
+// DOCS block.
+import { DOCUMENT_POLISH_V1 } from "./tasks/document-polish.v1.js";
+import { DOCUMENT_POLISH_V2 } from "./tasks/document-polish.v2.js";
+import { DOCUMENT_CRITIQUE_V1 } from "./tasks/document-critique.v1.js";
 import { FIT_EXPLANATION_V1 } from "./tasks/fit-explanation.v1.js";
+import { FIT_Q_VIEW_V1 } from "./tasks/fit-q-view.v1.js";
+import { FIT_Q_VIEW_V2 } from "./tasks/fit-q-view.v2.js";
+import { FIT_Q_VIEW_V3 } from "./tasks/fit-q-view.v3.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./tasks/founder-onboarding-extraction.v1.js";
 import { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./tasks/founder-onboarding-extraction.v2.js";
+import { GATEQ_DOSSIER_SYNTHESIS_V1 } from "./tasks/gateq-dossier-synthesis.v1.js";
+import { GATEQ_INTERVIEWER_V1 } from "./tasks/gateq-interviewer.v1.js";
+import { GATEQ_INTERVIEWER_V2 } from "./tasks/gateq-interviewer.v2.js";
+import { GATEQ_INTERVIEWER_V3 } from "./tasks/gateq-interviewer.v3.js";
+import { INTERVIEW_CONDUCTOR_V1 } from "./tasks/interview-conductor.v1.js";
+import { INTERVIEW_CONDUCTOR_V2 } from "./tasks/interview-conductor.v2.js";
+import { INTERVIEW_CONDUCTOR_V3 } from "./tasks/interview-conductor.v3.js";
+import { INTERVIEW_CONDUCTOR_V4 } from "./tasks/interview-conductor.v4.js";
+import { INTERVIEW_CONDUCTOR_V5 } from "./tasks/interview-conductor.v5.js";
+import { INTERVIEW_CONDUCTOR_V6 } from "./tasks/interview-conductor.v6.js";
+import { INTERVIEW_CONDUCTOR_V7 } from "./tasks/interview-conductor.v7.js";
+import { INTERVIEW_CONDUCTOR_V8 } from "./tasks/interview-conductor.v8.js";
+import { INTERVIEW_CONDUCTOR_V9 } from "./tasks/interview-conductor.v9.js";
+import { INTERVIEW_CONDUCTOR_V10 } from "./tasks/interview-conductor.v10.js";
+import { INTERVIEW_AGENT_V1 } from "./tasks/interview-agent.v1.js";
+import { INTERVIEW_AGENT_V2 } from "./tasks/interview-agent.v2.js";
+import { INTERVIEW_AGENT_V3 } from "./tasks/interview-agent.v3.js";
+import { INTERVIEW_AGENT_V4 } from "./tasks/interview-agent.v4.js";
+import { INTERVIEW_AGENT_V5 } from "./tasks/interview-agent.v5.js";
+import { INTERVIEW_AGENT_V6 } from "./tasks/interview-agent.v6.js";
+import { INTERVIEW_AGENT_V7 } from "./tasks/interview-agent.v7.js";
+import { INTERVIEW_AGENT_V8 } from "./tasks/interview-agent.v8.js";
+import { INTERVIEW_AGENT_V9 } from "./tasks/interview-agent.v9.js";
+import { INTERVIEW_AGENT_V10 } from "./tasks/interview-agent.v10.js";
+import { INTERVIEW_AGENT_V11 } from "./tasks/interview-agent.v11.js";
+import { INTERVIEW_AGENT_V12 } from "./tasks/interview-agent.v12.js";
+import { INTERVIEW_AGENT_V13 } from "./tasks/interview-agent.v13.js";
+import { INTERVIEW_AGENT_V14 } from "./tasks/interview-agent.v14.js";
+import { INTERVIEW_AGENT_V15 } from "./tasks/interview-agent.v15.js";
+import { INTERVIEW_AGENT_V16 } from "./tasks/interview-agent.v16.js";
+import { INVESTOR_RESEARCH_READER_V1 } from "./tasks/investor-research-reader.v1.js";
+import { DELEGATION_READER_V1 } from "./tasks/delegation-reader.v1.js";
+import { DELEGATION_READER_V2 } from "./tasks/delegation-reader.v2.js";
+import { DELEGATION_READER_V3 } from "./tasks/delegation-reader.v3.js";
+import { DELEGATION_READER_V4 } from "./tasks/delegation-reader.v4.js";
+import { DELEGATION_READER_V5 } from "./tasks/delegation-reader.v5.js";
+import { INTERVIEW_CONDUCTOR_V11 } from "./tasks/interview-conductor.v11.js";
+import { PRESENCE_READER_V1 } from "./tasks/presence-reader.v1.js";
+// DAILY block
+import { DAILY_Q_TAKE_V1 } from "./tasks/daily-q-take.v1.js";
+import { DAILY_STORY_WRITER_V1 } from "./tasks/daily-story-writer.v1.js";
+import { WELCOME_CONDUCTOR_V1 } from "./tasks/welcome-conductor.v1.js";
+import { WELCOME_CONDUCTOR_V2 } from "./tasks/welcome-conductor.v2.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./tasks/investor-mandate-synthesis.v1.js";
 import { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./tasks/investor-mandate-synthesis.v2.js";
+import { INVESTOR_MANDATE_SYNTHESIS_V3 } from "./tasks/investor-mandate-synthesis.v3.js";
 
 /**
  * The Prompt Registry (CQ-Q-006 §16-§21): source-controlled, immutable
@@ -129,14 +372,249 @@ export function createPromptRegistry(
 export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
   [
     Q_SYSTEM_V1,
+    Q_SYSTEM_V2,
+    Q_SYSTEM_VOICE_V1,
+    Q_SYSTEM_VOICE_V2,
+    Q_SYSTEM_VOICE_V3,
     FOUNDER_ONBOARDING_EXTRACTION_V1,
     FOUNDER_ONBOARDING_EXTRACTION_V2,
+    INTERVIEW_CONDUCTOR_V1,
+    INTERVIEW_CONDUCTOR_V2,
+    INTERVIEW_CONDUCTOR_V3,
+    INTERVIEW_CONDUCTOR_V4,
+    INTERVIEW_CONDUCTOR_V5,
+    INTERVIEW_CONDUCTOR_V6,
+    INTERVIEW_CONDUCTOR_V7,
+    INTERVIEW_CONDUCTOR_V8,
+    INTERVIEW_CONDUCTOR_V9,
+    INTERVIEW_CONDUCTOR_V10,
+    INTERVIEW_CONDUCTOR_V11,
+    INTERVIEW_AGENT_V1,
+    INTERVIEW_AGENT_V2,
+    INTERVIEW_AGENT_V3,
+    INTERVIEW_AGENT_V4,
+    INTERVIEW_AGENT_V5,
+    INTERVIEW_AGENT_V6,
+    INTERVIEW_AGENT_V7,
+    INTERVIEW_AGENT_V8,
+    INTERVIEW_AGENT_V9,
+    INTERVIEW_AGENT_V10,
+    INTERVIEW_AGENT_V11,
+    INTERVIEW_AGENT_V12,
+    INTERVIEW_AGENT_V13,
+    INTERVIEW_AGENT_V14,
+    INTERVIEW_AGENT_V15,
+    INTERVIEW_AGENT_V16,
+    DELEGATION_READER_V1,
+    DELEGATION_READER_V2,
+    DELEGATION_READER_V3,
+    DELEGATION_READER_V4,
+    DELEGATION_READER_V5,
+    WELCOME_CONDUCTOR_V1,
+    WELCOME_CONDUCTOR_V2,
     CLAIM_EXTRACTION_V1,
     INVESTOR_MANDATE_SYNTHESIS_V1,
     INVESTOR_MANDATE_SYNTHESIS_V2,
+    INVESTOR_MANDATE_SYNTHESIS_V3,
     COMPANY_ANALYST_V1,
     COMPANY_ANALYST_V2,
+    COMPANY_ANALYST_V3,
+    COMPANY_ANALYST_V4,
+    COMPANY_ANALYST_V5,
+    COMPANY_ANALYST_V6,
+    COMPANY_ANALYST_V7,
+    COMPANY_ANALYST_V8,
+    COMPANY_ANALYST_V9,
+    COMPANY_ANALYST_V10,
+    COMPANY_ANALYST_V11,
+    COMPANY_ANALYST_V12,
+    COMPANY_ANALYST_V13,
+    COMPANY_ANALYST_V14,
+    COMPANY_ANALYST_V15,
+    COMPANY_ANALYST_V16,
+    COMPANY_ANALYST_V17,
+    COMPANY_ANALYST_V18,
+    COMPANY_ANALYST_V19,
+    COMPANY_ANALYST_V20,
+    COMPANY_ANALYST_V21,
+    { ...COMPANY_ANALYST_V22, status: "DEPRECATED" },
+    { ...COMPANY_ANALYST_V23, status: "DEPRECATED" },
+    { ...COMPANY_ANALYST_V24, status: "DEPRECATED" },
+    COMPANY_ANALYST_V25,
+    ARTIFACT_REVISION_V1,
+    ARTIFACT_REVISION_V2,
+    ARTIFACT_REVISION_V3,
     FIT_EXPLANATION_V1,
+    FIT_Q_VIEW_V1,
+    FIT_Q_VIEW_V2,
+    FIT_Q_VIEW_V3,
+    PRESENCE_READER_V1,
+    INVESTOR_RESEARCH_READER_V1,
+    DECISION_READER_V1,
+    DECISION_READER_V2,
+    TURN_READER_V1,
+    TURN_READER_V2,
+    TURN_READER_V3,
+    TURN_READER_V4,
+    TURN_READER_V5,
+    TURN_READER_V6,
+    TURN_READER_V7,
+    TURN_READER_V8,
+    TURN_READER_V9,
+    TURN_READER_V10,
+    TURN_READER_V11,
+    TURN_READER_V12,
+    TURN_READER_V13,
+    TURN_READER_V14,
+    TURN_READER_V15,
+    TURN_READER_V16,
+    TURN_READER_V17,
+    TURN_READER_V18,
+    TURN_READER_V19,
+    TURN_READER_V20,
+    TURN_READER_V21,
+    TURN_READER_V22,
+    TURN_READER_V23,
+    TURN_READER_V24,
+    TURN_READER_V25,
+    TURN_READER_V26,
+    TURN_READER_V27,
+    TURN_READER_V28,
+    TURN_READER_V29,
+    TURN_READER_V30,
+    TURN_READER_V31,
+    TURN_READER_V32,
+    TURN_READER_V33,
+    TURN_READER_V34,
+    TURN_READER_V35,
+    TURN_READER_V36,
+    TURN_READER_V37,
+    TURN_READER_V38,
+    TURN_READER_V39,
+    TURN_READER_V40,
+    TURN_READER_V41,
+    TURN_READER_V42,
+    TURN_READER_V43,
+    TURN_READER_V44,
+    TURN_READER_V45,
+    TURN_READER_V46,
+    TURN_READER_V47,
+    TURN_READER_V48,
+    TURN_READER_V49,
+    TURN_READER_V50,
+    TURN_READER_V51,
+    TURN_READER_V52,
+    TURN_READER_V53,
+    TURN_READER_V54,
+    TURN_READER_V55,
+    TURN_READER_V56,
+    MEMORY_EXTRACTOR_V1,
+    MEMORY_EXTRACTOR_V2,
+    MEETING_NOTES_V1,
+    MEETING_NOTES_V2,
+    MEETING_NOTES_V3,
+    ERRAND_REPLY_V1,
+    DRAFT_REVIEW_V1,
+    DRAFT_REVIEW_V2,
+    DRAFT_REVIEW_V3,
+    DRAFT_REDRAFT_V1,
+    DRAFT_REDRAFT_V2,
+    DRAFT_REDRAFT_V3,
+    REPLY_READER_V1,
+    JOB_PLAN_V1,
+    JOB_PLAN_V2,
+    JOB_PLAN_V3,
+    JOB_PLAN_V4,
+    JOB_PLAN_V5,
+    JOB_PLAN_V6,
+    JOB_PLAN_V7,
+    SUBSTANCE_CRITIQUE_V1,
+    DILIGENCE_QUESTIONS_V1,
+    DILIGENCE_QUESTIONS_V2,
+    DILIGENCE_QUESTIONS_SHORTEN_V1,
+    ONBOARDING_MOVE_READER_V1,
+    PREFERENCE_POLARITY_V1,
+    MEETING_OUTCOME_READER_V1,
+    UTTERANCE_CHECK_V1,
+    INVESTOR_PERSONA_V1,
+    INVESTOR_TWIN_TURN_V1,
+    REHEARSAL_SCORE_V1,
+    INVESTOR_PERSONA_V2,
+    INVESTOR_TWIN_TURN_V2,
+    REHEARSAL_SCORE_V2,
+    INVESTOR_TWIN_TURN_V3,
+    INVESTOR_TWIN_TURN_V4,
+    INVESTOR_PERSONA_V3,
+    INVESTOR_PERSONA_V4,
+    INVESTOR_PERSONA_V5,
+    INVESTOR_PERSONA_V6,
+    INVESTOR_TWIN_TURN_V5,
+    INVESTOR_TWIN_TURN_V6,
+    INVESTOR_TWIN_TURN_V7,
+    INVESTOR_TWIN_TURN_V8,
+    INVESTOR_TWIN_TURN_V9,
+    INVESTOR_TWIN_TURN_V10,
+    MEETING_HOST_TURN_V1,
+    MEETING_HOST_TURN_V2,
+    MEETING_HOST_TURN_V3,
+    MEETING_HOST_TURN_V4,
+    MEETING_HOST_TURN_V5,
+    MEETING_SCREEN_NOTE_V1,
+    MEETING_CAMERA_NOTE_V1,
+    REHEARSAL_SCORE_V3,
+    REHEARSAL_SCORE_V4,
+    REHEARSAL_SCORE_V5,
+    FOUNDER_RESEARCH_READER_V1,
+    PROFILE_GAP_READER_V1,
+    APP_ACTION_ARGUMENTS_V1,
+    APP_ACTION_ROUTER_V1,
+    // DOCS block.
+    DOCUMENT_POLISH_V1,
+    DOCUMENT_POLISH_V2,
+    DOCUMENT_CRITIQUE_V1,
+    { ...GATEQ_INTERVIEWER_V1, status: "DEPRECATED" },
+    { ...GATEQ_INTERVIEWER_V2, status: "DEPRECATED" },
+    GATEQ_INTERVIEWER_V3,
+    // AUTO block (ADR 0030)
+    WORK_SHORTLIST_V1,
+    WORK_CONVERSE_V1,
+    WORK_CONVERSE_V2,
+    WORK_INTERVIEW_TURN_V1,
+    WORK_INTERVIEW_REPORT_V1,
+    WORK_STAND_IN_REPLY_V1,
+    WORK_STAND_IN_REPLY_V2,
+    WORK_SLOT_READER_V1,
+    // ADR 0043: standing instructions.
+    INSTRUCTION_PLAN_V1,
+    INSTRUCTION_PLAN_V2,
+    INSTRUCTION_PLAN_V3,
+    INSTRUCTION_PLAN_V4,
+    INSTRUCTION_PLAN_V5,
+    INSTRUCTION_PLAN_V6,
+    INSTRUCTION_PLAN_V7,
+    INSTRUCTION_PLAN_V8,
+    INSTRUCTION_PLAN_V9,
+    INSTRUCTION_THREAD_READER_V1,
+    INSTRUCTION_THREAD_READER_V2,
+    INSTRUCTION_THREAD_READER_V3,
+    // DAILY block
+    DAILY_STORY_WRITER_V1,
+    DAILY_Q_TAKE_V1,
+    DILIGENCE_DOCUMENT_SUMMARY_V1,
+    // PROFILE block (overnight A5)
+    DECK_EXTRACTION_V1,
+    PITCH_SECTION_EXTRACTION_V1,
+    SPOKEN_REPLY_V1,
+    SMALL_TALK_V1,
+    CONVERSATION_RECALL_V1,
+    TURN_SKIM_V1,
+    TURN_SKIM_V2,
+    TURN_SKIM_V3,
+    TURN_SKIM_V4,
+    TURN_SKIM_V5,
+    PERSON_BRIEF_READER_V1,
+    BRIEFING_COMMAND_V1,
+    GATEQ_DOSSIER_SYNTHESIS_V1,
   ];
 
 /** The production registry: the source-controlled definitions above. */

@@ -10,6 +10,11 @@ import {
   type CompanyService,
 } from "@capital-q/companies";
 import { parseApiConfig } from "@capital-q/config/api";
+import type { MarketplaceReadinessAssessment } from "@capital-q/contracts";
+import type {
+  DiscoverablePitchSet,
+  DiscoverablePitchQueryPort,
+} from "@capital-q/media";
 import {
   AuthorizationDeniedError,
   AuthUserIdSchema,
@@ -22,6 +27,7 @@ import {
 } from "@capital-q/security";
 
 import { createApp, type ApiSecurityDependencies } from "../src/app.js";
+import type { CompanyNetworkViewPort } from "../src/http/companies.js";
 
 /**
  * HTTP adaptation of the company service: context hook (CONTEXT_REQUIRED
@@ -74,10 +80,57 @@ const COMPANY_A: Company = {
 
 const notUnderTest = () => Promise.reject(new Error("not under test"));
 
+const READINESS: MarketplaceReadinessAssessment = {
+  companyId: COMPANY,
+  policyVersion: "marketplace-readiness.v1",
+  state: "requirements_outstanding",
+  verificationAvailable: false,
+  requirements: [
+    {
+      requirement: "COMPANY_ACTIVE",
+      outcome: "SATISFIED",
+      description: "Active.",
+    },
+    {
+      requirement: "MINIMUM_COMPANY_PROFILE",
+      outcome: "OUTSTANDING",
+      description: "Profile incomplete.",
+    },
+    {
+      requirement: "DISCOVERY_VISIBILITY_CONFIRMED",
+      outcome: "OUTSTANDING",
+      description: "Not visible.",
+    },
+    {
+      requirement: "FOUNDER_IDENTITY_VERIFIED",
+      outcome: "OUTSTANDING",
+      description: "Not available.",
+    },
+    {
+      requirement: "ORGANISATION_VERIFIED",
+      outcome: "OUTSTANDING",
+      description: "Not available.",
+    },
+    {
+      requirement: "REQUIRED_DOCUMENTATION",
+      outcome: "NOT_APPLICABLE",
+      description: "None required.",
+    },
+  ],
+  assessedAt: "2026-09-18T09:00:00.000Z",
+};
+
 function fakeService(overrides: Partial<CompanyService> = {}) {
-  const calls: { create: unknown[]; update: unknown[] } = {
+  const calls: {
+    create: unknown[];
+    update: unknown[];
+    visibility: unknown[];
+    assess: unknown[];
+  } = {
     create: [],
     update: [],
+    visibility: [],
+    assess: [],
   };
   const service: CompanyService = {
     createCompany: (command) => {
@@ -89,6 +142,21 @@ function fakeService(overrides: Partial<CompanyService> = {}) {
       calls.update.push(command);
       return Promise.resolve({ ...COMPANY_A, version: 2 });
     },
+    setCompanyVisibility: (command) => {
+      calls.visibility?.push(command);
+      return Promise.resolve({
+        ...COMPANY_A,
+        marketplaceVisibility: command.input.visibility,
+        version: 2,
+      });
+    },
+    getMarketplaceReadiness: () => Promise.resolve(READINESS),
+    assessMarketplaceReadiness: (command) => {
+      calls.assess.push(command);
+      return Promise.resolve(READINESS);
+    },
+    // A worker-only operation (CQ-VERIFY-002); no route reaches it.
+    reconcileMarketplaceReadinessAsSystem: notUnderTest,
     // Founder / team operations are covered by company-team.test.ts.
     getMyCompanyMembership: notUnderTest,
     upsertMyCompanyMembership: notUnderTest,
@@ -105,6 +173,9 @@ function buildApp(options: {
   readonly principal: AuthenticatedPrincipal | null;
   readonly context?: ActorContext | undefined;
   readonly service: CompanyService;
+  readonly pitches?: DiscoverablePitchQueryPort | undefined;
+  readonly networkView?: CompanyNetworkViewPort | undefined;
+  readonly watchesAsInvestor?: boolean | undefined;
 }): FastifyInstance {
   const security: ApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(options.principal) },
@@ -120,8 +191,145 @@ function buildApp(options: {
   };
   return createApp(parseApiConfig({ NODE_ENV: "test" }), security, {
     companies: options.service,
+    ...(options.pitches === undefined
+      ? {}
+      : { companyPitches: options.pitches }),
+    ...(options.networkView === undefined
+      ? {}
+      : { companyNetworkView: options.networkView }),
+    ...(options.watchesAsInvestor === undefined
+      ? {}
+      : {
+          watchesAsInvestor: () =>
+            Promise.resolve(options.watchesAsInvestor === true),
+        }),
   }).app;
 }
+
+describe("GET /v1/companies/:id/network-preview for another organisation (CQ-ACCEPT-001)", () => {
+  const notMine = () => Promise.reject(new CompanyNotFoundError());
+
+  it("serves the projection when disclosure says the company is network-visible", async () => {
+    const { service } = fakeService({ getCompany: notMine });
+    const asked: string[] = [];
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service,
+      networkView: {
+        findNetworkVisible: (_actor, companyId) => {
+          asked.push(companyId);
+          return Promise.resolve({
+            ...COMPANY_A,
+            marketplaceVisibility: "network_visible",
+          });
+        },
+      },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(
+      response.json<{ canonicalName: string; networkVisible: boolean }>(),
+    ).toMatchObject({ canonicalName: "Acme", networkVisible: true });
+    expect(asked).toEqual([COMPANY_A.id]);
+    await app.close();
+  });
+
+  it("classifies only the projection's declared fields, and carries nothing else the port returned (CQ-WEB-024)", async () => {
+    const { service } = fakeService({ getCompany: notMine });
+    const secret = "founder-private-8d1c";
+    // A port that returned more than it should: extra private fields must
+    // still never reach the wire, because the route reads the projection's
+    // field list, not the row.
+    const leaky = {
+      ...COMPANY_A,
+      currentStageCode: "seed",
+      headquartersCountry: "NG",
+      marketplaceVisibility: "network_visible" as const,
+      marketplaceReadinessState: "requirements_outstanding",
+      logoStorageKey: `private/${secret}`,
+      professionalSummary: secret,
+      teamSize: 9,
+    };
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service,
+      networkView: { findNetworkVisible: () => Promise.resolve(leaky) },
+    });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.body).not.toContain(secret);
+    expect(response.body).not.toContain("readiness");
+    expect(response.body).not.toContain("teamSize");
+
+    const body = response.json<{
+      facts: {
+        key: string;
+        statements: {
+          value: string;
+          truthClass: string;
+          evidenceStatus: string;
+          lifecycleStatus: string;
+          source: string;
+        }[];
+      }[];
+    }>();
+    expect(body.facts.map((fact) => fact.key)).toEqual([
+      "currentStageCode",
+      "headquartersCountry",
+      "headquartersCity",
+      "foundedDate",
+      "legalName",
+      "websiteUrl",
+    ]);
+    expect(body.facts[0]?.statements).toEqual([
+      {
+        value: "seed",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+        lifecycleStatus: "CURRENT",
+        source: "COMPANY_PROFILE",
+      },
+    ]);
+    // Not declared is unknown: no statement, never an empty or zero value.
+    expect(body.facts.find((fact) => fact.key === "foundedDate")).toEqual({
+      key: "foundedDate",
+      statements: [],
+    });
+    await app.close();
+  });
+
+  it("stays not-found when disclosure refuses, and without the port", async () => {
+    const { service } = fakeService({ getCompany: notMine });
+    const refused = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service,
+      networkView: { findNetworkVisible: () => Promise.resolve(null) },
+    });
+    const denied = await refused.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+    });
+    expect(denied.statusCode).toBe(404);
+    await refused.close();
+
+    const bare = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const absent = await bare.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+    });
+    expect(absent.statusCode).toBe(404);
+    await bare.close();
+  });
+});
 
 describe("POST /v1/companies", () => {
   it("is 401 without a session and calls nothing", async () => {
@@ -149,7 +357,7 @@ describe("POST /v1/companies", () => {
     });
     expect(response.statusCode).toBe(400);
     expect(response.json<{ code: string; detail: string }>().detail).toMatch(
-      /organisation context/,
+      /organisation/,
     );
     expect(calls.create).toHaveLength(0);
     await app.close();
@@ -363,5 +571,315 @@ describe("GET/PATCH /v1/companies/:companyId", () => {
     });
     expect(response.statusCode).toBe(422);
     await app.close();
+  });
+});
+
+describe("company visibility (CQ-PRE-REC-001 §31-§35)", () => {
+  it("records the founder's choice through the service and returns the company", async () => {
+    const { service, calls } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/companies/${COMPANY_A.id}/visibility`,
+      payload: { visibility: "network_visible", expectedVersion: 1 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(
+      response.json<{ marketplaceVisibility: string }>().marketplaceVisibility,
+    ).toBe("network_visible");
+    expect(calls.visibility).toHaveLength(1);
+    await app.close();
+  });
+
+  it("refuses a visibility the product does not offer before the service is called", async () => {
+    const { service, calls } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/companies/${COMPANY_A.id}/visibility`,
+      payload: { visibility: "public_external", expectedVersion: 1 },
+    });
+    expect(response.statusCode).toBe(422);
+    expect(calls.visibility).toHaveLength(0);
+    await app.close();
+  });
+
+  it("previews exactly the network projection, with no readiness, slug or visibility columns", async () => {
+    const { service } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<Record<string, unknown>>();
+    expect(Object.keys(body).sort()).toEqual(
+      [
+        "canonicalName",
+        "companyId",
+        "companyStatus",
+        "currentStageCode",
+        // The declared fields above, classified (CQ-WEB-024) — no new data.
+        "facts",
+        "foundedDate",
+        "headquartersCity",
+        "headquartersCountry",
+        "legalName",
+        "networkVisible",
+        "pitch",
+        "primaryDescription",
+        "shortDescription",
+        "websiteUrl",
+      ].sort(),
+    );
+    expect(body["networkVisible"]).toBe(false);
+    expect(body["pitch"]).toBeNull();
+    await app.close();
+  });
+});
+
+describe("marketplace readiness (CQ-MKT-001)", () => {
+  it("reads the policy's assessment and returns it unchanged", async () => {
+    const { service, calls } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/marketplace-readiness`,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(
+      response.json<{ state: string; policyVersion: string }>(),
+    ).toMatchObject({
+      state: "requirements_outstanding",
+      policyVersion: "marketplace-readiness.v1",
+    });
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(calls.assess).toHaveLength(0);
+    await app.close();
+  });
+
+  it("asks the service for a reconciliation with the actor and company only; a body naming a state is ignored", async () => {
+    const { service, calls } = fakeService();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "POST",
+      url: `/v1/companies/${COMPANY_A.id}/marketplace-readiness/assess`,
+      payload: {
+        state: "marketplace_ready",
+        desiredState: "marketplace_ready",
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(calls.assess).toHaveLength(1);
+    expect(Object.keys(calls.assess[0] as object).sort()).toEqual([
+      "actor",
+      "companyId",
+      "correlationId",
+    ]);
+    expect(calls.assess[0]).toMatchObject({
+      actor: CONTEXT,
+      companyId: COMPANY,
+    });
+    await app.close();
+  });
+
+  it("requires a session and an organisation context, and maps a denied capability to 403", async () => {
+    const anonymous = buildApp({
+      principal: null,
+      service: fakeService().service,
+    });
+    expect(
+      (
+        await anonymous.inject({
+          method: "POST",
+          url: `/v1/companies/${COMPANY_A.id}/marketplace-readiness/assess`,
+        })
+      ).statusCode,
+    ).toBe(401);
+    await anonymous.close();
+
+    const denied = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service: fakeService({
+        assessMarketplaceReadiness: () =>
+          Promise.reject(new AuthorizationDeniedError("NO_MATCHING_GRANT")),
+      }).service,
+    });
+    expect(
+      (
+        await denied.inject({
+          method: "POST",
+          url: `/v1/companies/${COMPANY_A.id}/marketplace-readiness/assess`,
+        })
+      ).statusCode,
+    ).toBe(403);
+    await denied.close();
+  });
+});
+
+// CQ-MEDIA-012: a company's reads carry the pitch investors can play, from
+// the same media port the feed uses. The port is a double; what is proven
+// is that it is asked for exactly this company, that the contract's four
+// fields and nothing else reach the wire, and that absence is null.
+describe("the company's publishable pitch (CQ-MEDIA-012)", () => {
+  const MEDIA_ASSET = "f0000000-0000-4000-8000-000000000001";
+  const SUMMARY = {
+    mediaAssetId: MEDIA_ASSET,
+    aspectRatio: "9:16",
+    durationSeconds: 87,
+    captionState: "NOT_REQUESTED",
+    title: null,
+    downloadAllowed: false,
+  };
+
+  function fakePitches(present: boolean): {
+    readonly port: DiscoverablePitchQueryPort;
+    readonly calls: string[][];
+  } {
+    const calls: string[][] = [];
+    const port: DiscoverablePitchQueryPort = {
+      findDiscoverablePitches: (companyIds) => {
+        calls.push([...companyIds]);
+        const answer = new Map<string, DiscoverablePitchSet>();
+        if (present) {
+          answer.set(COMPANY_A.id, {
+            mediaAssetId: MEDIA_ASSET as DiscoverablePitchSet["mediaAssetId"],
+            companyId: COMPANY_A.id,
+            aspectRatio: "9:16",
+            durationSeconds: 87,
+            captionState: "NOT_REQUESTED",
+            title: null,
+            audience: "INVESTORS",
+            downloadable: false,
+            more: [],
+          });
+        }
+        return Promise.resolve(answer);
+      },
+    };
+    return { port, calls };
+  }
+
+  it("joins the summary onto the company read and the network preview", async () => {
+    const { service } = fakeService();
+    const { port, calls } = fakePitches(true);
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service,
+      pitches: port,
+    });
+    const company = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}`,
+    });
+    expect(company.statusCode).toBe(200);
+    expect(company.json<{ pitch: unknown }>().pitch).toEqual(SUMMARY);
+
+    const preview = await app.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json<{ pitch: unknown }>().pitch).toEqual(SUMMARY);
+    expect(calls).toEqual([[COMPANY_A.id], [COMPANY_A.id]]);
+    await app.close();
+  });
+
+  it("offers another organisation's viewer only what they may play: every video to an investor, NETWORK videos to anyone else (ADR 0021)", async () => {
+    const { service } = fakeService({
+      getCompany: () => Promise.reject(new CompanyNotFoundError()),
+    });
+    const video = (n: number, audience: "INVESTORS" | "NETWORK") => ({
+      mediaAssetId:
+        `f0000000-0000-4000-8000-00000000000${String(n)}` as DiscoverablePitchSet["mediaAssetId"],
+      companyId: COMPANY_A.id,
+      aspectRatio: "9:16",
+      durationSeconds: 30,
+      captionState: "NOT_REQUESTED" as const,
+      title: `Video ${String(n)}`,
+      audience,
+      downloadable: false,
+    });
+    const port: DiscoverablePitchQueryPort = {
+      findDiscoverablePitches: () =>
+        Promise.resolve(
+          new Map([
+            [
+              COMPANY_A.id,
+              {
+                ...video(1, "INVESTORS"),
+                more: [video(2, "NETWORK"), video(3, "INVESTORS")],
+              },
+            ],
+          ]),
+        ),
+    };
+    const networkView: CompanyNetworkViewPort = {
+      findNetworkVisible: () =>
+        Promise.resolve({
+          ...COMPANY_A,
+          organisationId:
+            "b0000000-0000-4000-8000-0000000000ff" as (typeof COMPANY_A)["organisationId"],
+          marketplaceVisibility: "network_visible",
+        }),
+    };
+    const ids = async (watchesAsInvestor: boolean) => {
+      const app = buildApp({
+        principal: PRINCIPAL,
+        context: CONTEXT,
+        service,
+        pitches: port,
+        networkView,
+        watchesAsInvestor,
+      });
+      const body = (
+        await app.inject({
+          method: "GET",
+          url: `/v1/companies/${COMPANY_A.id}/network-preview`,
+        })
+      ).json<{
+        pitch: { mediaAssetId: string } | null;
+        morePitches?: { mediaAssetId: string }[];
+      }>();
+      await app.close();
+      return [body.pitch, ...(body.morePitches ?? [])].map((p) =>
+        p?.mediaAssetId.slice(-1),
+      );
+    };
+    expect(await ids(true)).toEqual(["1", "2", "3"]);
+    expect(await ids(false)).toEqual(["2"]);
+  });
+
+  it("is null when nothing is publishable, and null when no port is composed", async () => {
+    const { service } = fakeService();
+    const { port, calls } = fakePitches(false);
+    const withPort = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service,
+      pitches: port,
+    });
+    const none = await withPort.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}`,
+    });
+    expect(none.json<{ pitch: unknown }>().pitch).toBeNull();
+    expect(calls).toEqual([[COMPANY_A.id]]);
+    await withPort.close();
+
+    const without = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      service,
+    });
+    const plain = await without.inject({
+      method: "GET",
+      url: `/v1/companies/${COMPANY_A.id}`,
+    });
+    expect(plain.statusCode).toBe(200);
+    expect(plain.json<{ pitch: unknown }>().pitch).toBeNull();
+    await without.close();
   });
 });

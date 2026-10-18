@@ -128,14 +128,23 @@ export function createDocumentProcessingPipeline(
     const { documentVersionId } = job.data;
 
     // The pipeline version comes from this worker's configuration; a job
-    // asking for a different one is not honoured silently.
+    // asking for a different one is not honoured silently. Nor is it a
+    // decision: during a deploy the old and new workers overlap, and a job
+    // the new version enqueued can reach the old worker first (live
+    // 2026-10-03: three re-driven v2 jobs dead-lettered by the v1 worker
+    // within a second). It goes back on the queue for the worker of its
+    // version; the attempt limit still dead-letters a job no worker runs.
     if (job.data.pipelineVersion !== pipelineVersion) {
       logger.warn(
-        { msgId: message.msgId, requested: job.data.pipelineVersion },
-        "process job names another pipeline version",
+        {
+          msgId: message.msgId,
+          requested: job.data.pipelineVersion,
+          running: pipelineVersion,
+        },
+        "process job names another pipeline version; left for its worker",
       );
       observe("PIPELINE_VERSION_MISMATCH", startedAt);
-      return { kind: "PERMANENT", errorCode: "PIPELINE_VERSION_MISMATCH" };
+      return { kind: "RETRY", errorCode: "PIPELINE_VERSION_MISMATCH" };
     }
 
     const target = await evidence.resolveProcessingTarget(documentVersionId);
@@ -182,7 +191,7 @@ export function createDocumentProcessingPipeline(
       status: "FAILED" | "BLOCKED",
       errorCode: string,
       textExtractionStatus: "FAILED" | "UNSUPPORTED",
-      malwareScanStatus?: "BLOCKED" | "ERROR",
+      malwareScanStatus?: "BLOCKED" | "ERROR" | "CLEAN" | "NOT_SCANNED",
     ): Promise<void> => {
       await evidence.advanceVersionProcessingState({
         tenantId,
@@ -268,6 +277,24 @@ export function createDocumentProcessingPipeline(
     if (decision.kind === "RETRY") {
       observe(decision.errorCode, startedAt);
       return { kind: "RETRY", errorCode: decision.errorCode };
+    }
+
+    // A voice note (R34) has no text for the extractor: it is stored and
+    // scanned, never parsed. A real scanner's clean verdict is still the
+    // version's truth; without one it stays unscanned.
+    if (version.mimeType.startsWith("audio/")) {
+      await fail(
+        "FAILED",
+        "NOT_A_TEXT_DOCUMENT",
+        "UNSUPPORTED",
+        decision.scanned
+          ? "CLEAN"
+          : decision.recordNotScanned === true
+            ? "NOT_SCANNED"
+            : undefined,
+      );
+      observe("AUDIO_STORED", startedAt);
+      return { kind: "DONE" };
     }
 
     // --- Isolated extraction ----------------------------------------------
@@ -404,6 +431,7 @@ export function createDocumentProcessingPipeline(
       correlationId,
       causationId: CausationIdSchema.parse(`cau_${job.id}`),
       scannedClean: decision.scanned,
+      ...(decision.recordNotScanned === true ? { notScanned: true } : {}),
       provenance: {
         extractorVersion: result.output.metadata.parserVersion,
         ...(chunking?.chunkingVersion === undefined
@@ -420,6 +448,8 @@ export function createDocumentProcessingPipeline(
           truncated: result.output.metadata.truncated === true,
           parseDurationMs: result.durationMs,
           scanned: decision.scanned,
+          // The policy this run was made under (ADR 0042).
+          malwarePolicy: options.malwarePolicy,
           ...(chunking === undefined
             ? {}
             : {

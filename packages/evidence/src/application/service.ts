@@ -20,8 +20,12 @@ import {
   createListDocumentsWithVersions,
   createListDocumentVersions,
   createRegisterDocumentVersion,
+  createChangeDocument,
+  createSetDocumentDownloadAudience,
 } from "./document-use-cases.js";
 import {
+  createBackfillDocumentPages,
+  createReadOwnDocumentText,
   createFindDocumentExtraction,
   createRecordDocumentExtraction,
 } from "./extraction-use-cases.js";
@@ -58,6 +62,10 @@ export type EvidenceService = {
   readonly getEvidenceSource: ReturnType<typeof createGetEvidenceSource>;
   readonly listEvidenceSources: ReturnType<typeof createListEvidenceSources>;
   readonly createDocument: ReturnType<typeof createCreateDocument>;
+  readonly changeDocument: ReturnType<typeof createChangeDocument>;
+  readonly setDocumentDownloadAudience: ReturnType<
+    typeof createSetDocumentDownloadAudience
+  >;
   readonly registerDocumentVersion: ReturnType<
     typeof createRegisterDocumentVersion
   >;
@@ -138,6 +146,9 @@ export function createEvidenceService(
     listEvidenceSources: createListEvidenceSources(dependencies),
     createDocument: createCreateDocument(dependencies),
     registerDocumentVersion: createRegisterDocumentVersion(dependencies),
+    setDocumentDownloadAudience:
+      createSetDocumentDownloadAudience(dependencies),
+    changeDocument: createChangeDocument(dependencies),
     getDocument: createGetDocument(dependencies),
     listDocuments: createListDocuments(dependencies),
     listDocumentVersions: createListDocumentVersions(dependencies),
@@ -203,6 +214,12 @@ export type DocumentProcessingService = {
   readonly findDocumentExtraction: ReturnType<
     typeof createFindDocumentExtraction
   >;
+  /** Q room W3: pages for extractions recorded before pages existed. */
+  readonly backfillDocumentPages: ReturnType<
+    typeof createBackfillDocumentPages
+  >;
+  /** ob2: an organisation's own unpaged document as text, from its artifact. */
+  readonly readOwnDocumentText: ReturnType<typeof createReadOwnDocumentText>;
 };
 
 export type DocumentProcessingServiceOptions = Omit<
@@ -228,5 +245,7 @@ export function createDocumentProcessingService(
     completeDocumentProcessing: createCompleteDocumentProcessing(dependencies),
     recordDocumentExtraction: createRecordDocumentExtraction(dependencies),
     findDocumentExtraction: createFindDocumentExtraction(dependencies),
+    backfillDocumentPages: createBackfillDocumentPages(dependencies),
+    readOwnDocumentText: createReadOwnDocumentText(dependencies),
   };
 }

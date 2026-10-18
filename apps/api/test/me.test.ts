@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 
 import { parseApiConfig } from "@capital-q/config/api";
-import { MeResponseSchema } from "@capital-q/contracts";
+import { MeResponseSchema, PersonProfileDtoSchema } from "@capital-q/contracts";
 import {
+  effectivePersonChanges,
+  PersonProfileNotFoundError,
+  PersonProfileVersionConflictError,
+  type PersonProfile,
+  type PersonProfileStore,
   AuthUserIdSchema,
   MembershipIdSchema,
   OrganisationIdSchema,
@@ -210,6 +215,228 @@ describe("GET /v1/me", () => {
     const body = MeResponseSchema.parse(response.json());
     expect(body.user.id).toBe(USER_A);
     expect(body.context).toEqual({ status: "CONTEXT_REQUIRED" });
+    await app.close();
+  });
+});
+
+/**
+ * The person's own editable profile (BIZ-002). An in-memory double of the
+ * one person-profile store, with the store's rules: optimistic version,
+ * idempotent replay, active profiles only. The rules themselves are proven
+ * against the database in @capital-q/security; this proves the route never
+ * lets a caller reach anyone's profile but their own.
+ */
+function peopleDouble() {
+  const USER_B = UserIdSchema.parse("b0000000-0000-4000-8000-000000000002");
+  const rows = new Map<string, PersonProfile>([
+    [
+      USER_A,
+      {
+        userId: USER_A,
+        displayName: "Person A",
+        headline: null,
+        version: 1,
+        updatedAt: "2026-09-25T09:00:00.000Z",
+      },
+    ],
+    [
+      USER_B,
+      {
+        userId: USER_B,
+        displayName: "Person B",
+        headline: "Partner",
+        version: 1,
+        updatedAt: "2026-09-25T09:00:00.000Z",
+      },
+    ],
+  ]);
+  const people: PersonProfileStore = {
+    read: (userId) => Promise.resolve(rows.get(userId) ?? null),
+    update: ({ userId, expectedVersion, changes }) => {
+      const current = rows.get(userId);
+      if (current === undefined) {
+        return Promise.reject(new PersonProfileNotFoundError());
+      }
+      const effective = effectivePersonChanges(current, changes);
+      if (Object.keys(effective).length === 0) return Promise.resolve(current);
+      if (current.version !== expectedVersion) {
+        return Promise.reject(
+          new PersonProfileVersionConflictError(current.version),
+        );
+      }
+      const next: PersonProfile = {
+        ...current,
+        ...(effective.displayName === undefined
+          ? {}
+          : { displayName: effective.displayName }),
+        ...(effective.headline === undefined
+          ? {}
+          : { headline: effective.headline }),
+        version: current.version + 1,
+      };
+      rows.set(userId, next);
+      return Promise.resolve(next);
+    },
+  };
+  return { people, rows, USER_B };
+}
+
+describe("GET/PATCH /v1/me/profile (BIZ-002)", () => {
+  function profileApp(people: PersonProfileStore) {
+    return buildApp({
+      authenticator: authenticator(PRINCIPAL_A),
+      resolver: noMembership,
+      identities: identityA,
+      people,
+    });
+  }
+
+  it("is 401 without a session and never reaches the store", async () => {
+    const { people } = peopleDouble();
+    const app = buildApp({
+      authenticator: authenticator(null),
+      resolver: noMembership,
+      identities: identityA,
+      people,
+    });
+    const read = await app.inject({ method: "GET", url: "/v1/me/profile" });
+    const write = await app.inject({
+      method: "PATCH",
+      url: "/v1/me/profile",
+      payload: { expectedVersion: 1, headline: "x" },
+    });
+    expect(read.statusCode).toBe(401);
+    expect(write.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("reads the session's own profile, needing no organisation", async () => {
+    const { people } = peopleDouble();
+    const app = profileApp(people);
+    const response = await app.inject({ method: "GET", url: "/v1/me/profile" });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(PersonProfileDtoSchema.parse(response.json())).toEqual({
+      userId: USER_A,
+      displayName: "Person A",
+      headline: null,
+      version: 1,
+      updatedAt: "2026-09-25T09:00:00.000Z",
+    });
+    await app.close();
+  });
+
+  it("edits the session's own profile at the version read, and only theirs", async () => {
+    const { people, rows, USER_B } = peopleDouble();
+    const app = profileApp(people);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/me/profile",
+      payload: { expectedVersion: 1, headline: "Founder, Kivu Freight" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(PersonProfileDtoSchema.parse(response.json())).toMatchObject({
+      headline: "Founder, Kivu Freight",
+      version: 2,
+    });
+    // The other person is untouched.
+    expect(rows.get(USER_B)).toMatchObject({ headline: "Partner", version: 1 });
+    await app.close();
+  });
+
+  it("refuses a user id, or any field outside the contract, in the body", async () => {
+    const { people, rows, USER_B } = peopleDouble();
+    const app = profileApp(people);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/me/profile",
+      payload: { expectedVersion: 1, userId: USER_B, headline: "Hijacked" },
+    });
+    expect(response.statusCode).toBe(422);
+    expect(rows.get(USER_B)?.headline).toBe("Partner");
+    expect(rows.get(USER_A)?.version).toBe(1);
+    await app.close();
+  });
+
+  it("answers a stale version with VERSION_CONFLICT and keeps the newer value", async () => {
+    const { people, rows } = peopleDouble();
+    const app = profileApp(people);
+    await app.inject({
+      method: "PATCH",
+      url: "/v1/me/profile",
+      payload: { expectedVersion: 1, headline: "Angel investor" },
+    });
+    const stale = await app.inject({
+      method: "PATCH",
+      url: "/v1/me/profile",
+      payload: { expectedVersion: 1, headline: "Something else" },
+    });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json<{ code: string }>().code).toBe("VERSION_CONFLICT");
+    expect(rows.get(USER_A)).toMatchObject({
+      headline: "Angel investor",
+      version: 2,
+    });
+    await app.close();
+  });
+
+  it("treats a retried request as idempotent: same answer, no second version", async () => {
+    const { people } = peopleDouble();
+    const app = profileApp(people);
+    const request = {
+      method: "PATCH" as const,
+      url: "/v1/me/profile",
+      payload: { expectedVersion: 1, displayName: "Ada" },
+    };
+    const first = await app.inject(request);
+    const retry = await app.inject(request);
+    expect(first.statusCode).toBe(200);
+    expect(retry.statusCode).toBe(200);
+    expect(retry.json<{ version: number }>().version).toBe(2);
+    await app.close();
+  });
+
+  it("validates bounds: an empty name and an overlong headline are refused", async () => {
+    const { people } = peopleDouble();
+    const app = profileApp(people);
+    for (const payload of [
+      { expectedVersion: 1, displayName: "   " },
+      { expectedVersion: 1, headline: "x".repeat(161) },
+      { expectedVersion: 1 },
+    ]) {
+      const response = await app.inject({
+        method: "PATCH",
+        url: "/v1/me/profile",
+        payload,
+      });
+      expect(response.statusCode).toBe(422);
+    }
+    await app.close();
+  });
+
+  it("is 403 for a session with no application identity", async () => {
+    const { people } = peopleDouble();
+    const app = buildApp({
+      authenticator: authenticator(PRINCIPAL_A),
+      resolver: noMembership,
+      identities: noIdentity,
+      people,
+    });
+    const response = await app.inject({ method: "GET", url: "/v1/me/profile" });
+    expect(response.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("keeps PATCH /v1/me working through the same store", async () => {
+    const { people, rows } = peopleDouble();
+    const app = profileApp(people);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/v1/me",
+      payload: { displayName: "Ada" },
+    });
+    expect(response.statusCode).toBe(204);
+    expect(rows.get(USER_A)).toMatchObject({ displayName: "Ada", version: 2 });
     await app.close();
   });
 });

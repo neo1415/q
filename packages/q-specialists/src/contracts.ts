@@ -5,6 +5,7 @@ import type {
   QInternalFinding,
   QRunId,
   QSubjectRef,
+  QVisibleStage,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
@@ -43,6 +44,20 @@ export type QSpecialistProbe = {
    * instruction about what it is permitted to do.
    */
   readonly question: string;
+  /**
+   * How Q's turn reader read the message (a model reading, ADR 0011/0016),
+   * when a reader is composed: `null` when it could not read this turn.
+   * A specialist decides whether a question is its kind from this, never
+   * from patterns over the person's words.
+   */
+  readonly reading?: QSpecialistTurnReading | null | undefined;
+};
+
+/** The parts of the turn reader's reading a specialist routes on. */
+export type QSpecialistTurnReading = {
+  readonly kind: string;
+  readonly questionKind: string | null;
+  readonly aboutNamedOther: boolean;
 };
 
 /**
@@ -58,6 +73,19 @@ export type QSpecialistExecutionContext = {
   readonly plan: PermittedContextPlan;
   /** Cooperative cancellation, propagated to reads and to the model call (§101). */
   readonly signal?: AbortSignal | undefined;
+  /**
+   * Approved progress only (CQ-Q-RESEARCH-001 §31): a specialist may say
+   * which visible stage it is in, never what it is sending or reading.
+   * Best effort; a failure to show progress never fails the investigation.
+   */
+  readonly showStage?: ((stage: QVisibleStage) => Promise<void>) | undefined;
+  /**
+   * S3 (lane S): one whole sentence of the answer as the model writes it,
+   * already through the specialist's own citation rewriting. The caller
+   * applies the answer's guards before anyone sees it; the stored message
+   * remains the durable form. Never called with the last sentence.
+   */
+  readonly onAnswerSentence?: ((sentence: string) => void) | undefined;
 };
 
 /**

@@ -1,0 +1,605 @@
+import { z } from "zod";
+
+import { UuidSchema } from "../common/ids.js";
+import { UtcTimestampSchema } from "../common/time.js";
+
+/**
+ * Rehearsals (C12 Investor Twin, generalised by REHEARSE, founder direction
+ * 2026-10-01): a person rehearses a meeting with someone they are connected
+ * to -- a founder with an investor, an investor with a company -- played by
+ * Q from a persona built only from what the rehearsing person may see.
+ * Their own practice: read and written by them only, never shown to the
+ * other side, never evidence.
+ */
+
+export const Q_REHEARSALS_PATH = "/v1/q/rehearsals" as const;
+export const Q_REHEARSAL_PARTNERS_PATH = "/v1/q/rehearsals/partners" as const;
+export const Q_REHEARSAL_PERSONA_PATH =
+  "/v1/q/rehearsals/persona/:counterpartKind/:counterpartId" as const;
+export const Q_REHEARSAL_MEETING_PATH =
+  "/v1/q/rehearsals/meetings/:meetingId" as const;
+export const Q_INVESTOR_REHEARSALS_PATH =
+  "/v1/q/investors/:investorOrganisationId/rehearsals" as const;
+export const Q_REHEARSAL_PATH = "/v1/q/rehearsals/:rehearsalId" as const;
+export const Q_REHEARSAL_TURNS_PATH =
+  "/v1/q/rehearsals/:rehearsalId/turns" as const;
+export const Q_REHEARSAL_FINISH_PATH =
+  "/v1/q/rehearsals/:rehearsalId/finish" as const;
+export const Q_REHEARSAL_SCREEN_PATH =
+  "/v1/q/rehearsals/:rehearsalId/screen" as const;
+
+export const REHEARSAL_COUNTERPART_KINDS = [
+  "INVESTOR_ORGANISATION",
+  "COMPANY",
+  // A researched person outside Capital Q: no account, no relationship.
+  // Q plays a labelled simulation built from public sources only.
+  "EXTERNAL_PERSON",
+] as const;
+export const RehearsalCounterpartKindSchema = z.enum(
+  REHEARSAL_COUNTERPART_KINDS,
+);
+export type RehearsalCounterpartKind = z.infer<
+  typeof RehearsalCounterpartKindSchema
+>;
+
+/** Shown wherever a simulation of a researched external person appears. */
+export const EXTERNAL_REHEARSAL_LABEL =
+  "AI rehearsal informed by public sources";
+export const EXTERNAL_REHEARSAL_DISCLAIMER =
+  "This is an AI rehearsal informed by public sources. It is not the real person and does not predict what they would say.";
+
+const enc = encodeURIComponent;
+export const qInvestorRehearsalsPath = (investorOrganisationId: string) =>
+  Q_INVESTOR_REHEARSALS_PATH.replace(
+    ":investorOrganisationId",
+    enc(investorOrganisationId),
+  );
+export const qRehearsalPath = (rehearsalId: string) =>
+  Q_REHEARSAL_PATH.replace(":rehearsalId", enc(rehearsalId));
+export const qRehearsalTurnsPath = (rehearsalId: string) =>
+  Q_REHEARSAL_TURNS_PATH.replace(":rehearsalId", enc(rehearsalId));
+export const qRehearsalFinishPath = (rehearsalId: string) =>
+  Q_REHEARSAL_FINISH_PATH.replace(":rehearsalId", enc(rehearsalId));
+export const qRehearsalScreenPath = (rehearsalId: string) =>
+  Q_REHEARSAL_SCREEN_PATH.replace(":rehearsalId", enc(rehearsalId));
+export const qRehearsalPersonaPath = (
+  kind: RehearsalCounterpartKind,
+  counterpartId: string,
+) =>
+  Q_REHEARSAL_PERSONA_PATH.replace(":counterpartKind", enc(kind)).replace(
+    ":counterpartId",
+    enc(counterpartId),
+  );
+export const qRehearsalMeetingPath = (meetingId: string) =>
+  Q_REHEARSAL_MEETING_PATH.replace(":meetingId", enc(meetingId));
+
+/**
+ * The browser's own cue on the voice line that the person raised their
+ * hand. A fixed token the browser sends, never the person's words; the
+ * rehearsal turn takes it out before anything reads the transcript.
+ */
+export const REHEARSAL_HAND_RAISED_SIGNAL = "[hand-raised]" as const;
+/**
+ * The browser's own cue that the person has said nothing for a while, so
+ * the played person can react to the silence. Never the person's words.
+ */
+export const REHEARSAL_SILENCE_SIGNAL = "[silence]" as const;
+
+/** How hard the person asks to be pushed. */
+export const REHEARSAL_DIFFICULTIES = ["GENTLE", "REALISTIC", "TOUGH"] as const;
+export const RehearsalDifficultySchema = z.enum(REHEARSAL_DIFFICULTIES);
+export type RehearsalDifficulty = z.infer<typeof RehearsalDifficultySchema>;
+
+export const RehearsalCounterpartSchema = z
+  .object({
+    kind: RehearsalCounterpartKindSchema,
+    id: UuidSchema,
+  })
+  .strict();
+
+export const StartRehearsalRequestSchema = z
+  .object({
+    /** Legacy (C12): a founder's rehearsal with an investor organisation. */
+    investorOrganisationId: UuidSchema.optional(),
+    counterpart: RehearsalCounterpartSchema.optional(),
+    /** The booked call this rehearsal is for; checked to be theirs. */
+    meetingId: UuidSchema.optional(),
+    /** The voice the other person speaks with. */
+    voice: z.enum(["FEMALE", "MALE"]).optional(),
+    difficulty: RehearsalDifficultySchema.optional(),
+    /** Kept for C12 callers; the meeting now runs to a natural close. */
+    length: z.number().int().min(3).max(20).optional(),
+  })
+  .strict()
+  .refine(
+    (body) =>
+      (body.investorOrganisationId === undefined) !==
+      (body.counterpart === undefined),
+    { message: "name exactly one counterpart" },
+  );
+export type StartRehearsalRequest = z.infer<typeof StartRehearsalRequestSchema>;
+
+export const RehearsalTurnRequestSchema = z.union([
+  z.object({ text: z.string().trim().min(1).max(4_000) }).strict(),
+  z.object({ cue: z.literal("HAND_RAISED") }).strict(),
+]);
+export type RehearsalTurnRequest = z.infer<typeof RehearsalTurnRequestSchema>;
+
+/**
+ * One frame of the screen the person chose to share, or of their camera
+ * when they opted in to Q seeing them; never stored.
+ */
+export const REHEARSAL_SCREEN_MAX_CHARS = 480_000;
+export const REHEARSAL_FRAME_KINDS = ["SCREEN", "CAMERA"] as const;
+export const RehearsalScreenRequestSchema = z
+  .object({
+    kind: z.enum(REHEARSAL_FRAME_KINDS).default("SCREEN"),
+    /** Absent: forget the frame held of this kind (they stopped sharing). */
+    image: z
+      .string()
+      .max(REHEARSAL_SCREEN_MAX_CHARS)
+      .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/)
+      .optional(),
+  })
+  .strict();
+export type RehearsalScreenRequest = z.infer<
+  typeof RehearsalScreenRequestSchema
+>;
+
+export const REHEARSAL_MOODS = [
+  "WARM",
+  "NEUTRAL",
+  "SKEPTICAL",
+  "IMPATIENT",
+  "ANNOYED",
+  "ENTHUSIASTIC",
+  "COLD",
+  "INDIFFERENT",
+  "ANGRY",
+  "SAD",
+  "AUTHORITATIVE",
+  "MEEK",
+  "SARCASTIC",
+  "AMUSED",
+  "HAPPY",
+  "DISAPPOINTED",
+] as const;
+export const REHEARSAL_OUTCOMES = [
+  "INDECISIVE",
+  "STRONG_LATER",
+  "ADJOURNED",
+  "DEAL_AGREED",
+  "DECLINED",
+  "LEFT_EARLY",
+  /** The person rehearsing ended it themselves (20261128090000). */
+  "FOUNDER_ENDED",
+] as const;
+export const RehearsalOutcomeSchema = z.enum(REHEARSAL_OUTCOMES);
+export type RehearsalOutcome = z.infer<typeof RehearsalOutcomeSchema>;
+
+export const QRehearsalTurnDtoSchema = z
+  .object({
+    /** THEM: the person Q plays. YOU: the person rehearsing. */
+    from: z.enum(["THEM", "YOU"]),
+    text: z.string().max(4_000),
+    at: UtcTimestampSchema,
+    mood: z.enum(REHEARSAL_MOODS).nullable(),
+    /** A frame of their shared screen was in view for this line. */
+    sawScreen: z.boolean(),
+    /** How loud the played person said it, and any sound before it. */
+    intensity: z.enum(["SOFT", "NORMAL", "RAISED"]).optional(),
+    reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH", "CRY"]).nullable().optional(),
+  })
+  .strict();
+export type QRehearsalTurnDto = z.infer<typeof QRehearsalTurnDtoSchema>;
+
+const RatingSchema = z.enum(["STRONG", "SOLID", "NEEDS_WORK"]);
+
+export const REHEARSAL_DIMENSION_NAMES = [
+  "CLARITY",
+  "EVIDENCE",
+  "HANDLING_PUSHBACK",
+  "FIT_TO_THIS_PERSON",
+  "THE_ASK",
+  "QUESTION_QUALITY",
+  "RAPPORT",
+  "NEXT_STEPS",
+  "DILIGENCE",
+  "CONTROL",
+  "FAIRNESS",
+  "DECISION_CLARITY",
+  "PROFESSIONALISM",
+] as const;
+
+/**
+ * Post-call evaluation of a rehearsal with a researched external person:
+ * the areas a real meeting tests, what was covered, what to improve, and
+ * the public sources it was informed by (the only ones ever cited).
+ */
+export const EXTERNAL_EVALUATION_AREA_NAMES = [
+  "PITCH_CLARITY",
+  "FINANCIALS",
+  "BUSINESS_MODEL",
+  "MARKET_KNOWLEDGE",
+  "DEFENSIBILITY",
+  "ANSWER_QUALITY",
+  "OBJECTION_HANDLING",
+] as const;
+export const ExternalEvaluationBasisSchema = z
+  .object({
+    label: z.string().max(100),
+    disclaimer: z.string().max(300),
+    sources: z
+      .array(
+        z
+          .object({
+            label: z.string().max(200),
+            url: z.string().url().max(2048),
+          })
+          .strict(),
+      )
+      .max(12),
+    areas: z
+      .array(
+        z
+          .object({
+            area: z.enum(EXTERNAL_EVALUATION_AREA_NAMES),
+            covered: z.boolean(),
+            rating: z.string().max(40).nullable(),
+            note: z.string().max(300),
+            youSaid: z.string().max(200).nullable(),
+          })
+          .strict(),
+      )
+      .max(7),
+    beforeTheRealMeeting: z.array(z.string().max(300)).max(8),
+    /** The rehearsal mode (which entity's directions were used). */
+    scenario: z.string().max(60).optional(),
+    /** This mode's own scoring focus: covered or not, with what they said. */
+    modeFocus: z
+      .array(
+        z
+          .object({
+            key: z.string().max(60),
+            label: z.string().max(100),
+            covered: z.boolean(),
+            youSaid: z.string().max(200).nullable(),
+          })
+          .strict(),
+      )
+      .max(8)
+      .optional(),
+  })
+  .strict();
+export type ExternalEvaluationBasisDto = z.infer<
+  typeof ExternalEvaluationBasisSchema
+>;
+
+/**
+ * How a researched external entity is labelled and shown on the rehearsal
+ * screen. `imageUrl` is only ever our own stored asset (portrait or logo
+ * permitted for use); absent, the screen shows a monogram. Quotes are
+ * public SOURCE quotes shown beside the rehearsal, never spoken by Q as
+ * the entity's words.
+ */
+export const ExternalSimulationDtoSchema = z
+  .object({
+    /** The chip: "Research-informed simulation". */
+    label: z.string().max(100),
+    /** "Research-informed simulation of X's public priorities" / "AI simulation: ... (not a real employee)". */
+    title: z.string().max(300).optional(),
+    disclaimer: z.string().max(400),
+    entityKind: z
+      .enum(["PERSON", "ORGANIZATION", "GOVERNMENT_AGENCY"])
+      .optional(),
+    imageUrl: z.string().url().max(2048).nullable().optional(),
+    imageAttribution: z.string().max(200).nullable().optional(),
+    /** R5: the canonical unclaimed investor organisation this simulation plays, if any. */
+    investorOrganisationId: z.string().uuid().nullable().optional(),
+    /** R5: the one distinct habit of this simulated counterpart, in words. */
+    quirk: z.string().max(240).nullable().optional(),
+    headline: z.string().max(200).nullable().optional(),
+    description: z.string().max(240).nullable().optional(),
+    quotes: z
+      .array(
+        z
+          .object({
+            quote: z.string().max(300),
+            sourceLabel: z.string().max(200),
+            sourceUrl: z.string().url().max(2048),
+          })
+          .strict(),
+      )
+      .max(3)
+      .optional(),
+    sources: z
+      .array(
+        z
+          .object({
+            label: z.string().max(200),
+            url: z.string().url().max(2048),
+          })
+          .strict(),
+      )
+      .max(12)
+      .optional(),
+  })
+  .strict();
+export type ExternalSimulationDto = z.infer<typeof ExternalSimulationDtoSchema>;
+
+export const QRehearsalReviewDtoSchema = z
+  .object({
+    overall: z.string().max(600),
+    /** 0-100, computed by code from the ratings (never a model's number). */
+    score: z.number().int().min(0).max(100).nullable(),
+    dimensions: z
+      .array(
+        z
+          .object({
+            name: z.enum(REHEARSAL_DIMENSION_NAMES),
+            rating: RatingSchema,
+            note: z.string().max(300),
+          })
+          .strict(),
+      )
+      .max(5),
+    wentRight: z
+      .array(
+        z
+          .object({ moment: z.string().max(300), why: z.string().max(300) })
+          .strict(),
+      )
+      .max(5),
+    wentWrong: z
+      .array(
+        z
+          .object({
+            moment: z.string().max(300),
+            why: z.string().max(300),
+            better: z.string().max(500),
+          })
+          .strict(),
+      )
+      .max(6),
+    tips: z.array(z.string().max(300)).max(6),
+    /**
+     * How they came across on camera, when they let Q see them: written by
+     * code from presence readings kept as text during the rehearsal.
+     */
+    presence: z
+      .array(
+        z
+          .object({
+            observation: z.string().max(300),
+            tip: z.string().max(300),
+          })
+          .strict(),
+      )
+      .max(4)
+      .optional(),
+    /**
+     * P5: what Q saw on their shared screen and its private coaching note
+     * on it (a slide's gap, a number to source), kept as text during the
+     * rehearsal; never the frames.
+     */
+    slides: z
+      .array(
+        z
+          .object({
+            shows: z.string().max(300),
+            take: z.string().max(300),
+          })
+          .strict(),
+      )
+      .max(8)
+      .optional(),
+    /**
+     * Written by code from the transcript while Q could not write the
+     * review; Q fills in the real one shortly. No ratings, no score.
+     */
+    provisional: z.boolean().optional(),
+    /** Only for a researched external person: see ExternalEvaluationBasisSchema. */
+    externalBasis: ExternalEvaluationBasisSchema.optional(),
+  })
+  .strict();
+export type QRehearsalReviewDto = z.infer<typeof QRehearsalReviewDtoSchema>;
+
+export const PERSONA_SOURCE_KINDS = [
+  "PROFILE",
+  "MESSAGES",
+  "CALLS",
+  "PUBLIC_WEB",
+  "PUBLIC_KNOWLEDGE",
+  "PITCH_TRANSCRIPT",
+  "DECK",
+  "OWN_COMPANY",
+] as const;
+export type PersonaSourceKind = (typeof PERSONA_SOURCE_KINDS)[number];
+
+export const QPersonaSourceDtoSchema = z
+  .object({
+    kind: z.enum(PERSONA_SOURCE_KINDS),
+    label: z.string().max(200),
+    /** A public https URL for a web source; null otherwise. */
+    url: z.string().url().max(2048).nullable(),
+  })
+  .strict();
+export type QPersonaSourceDto = z.infer<typeof QPersonaSourceDtoSchema>;
+
+export const QRehearsalCounterpartDtoSchema = z
+  .object({
+    kind: RehearsalCounterpartKindSchema,
+    id: UuidSchema,
+    name: z.string().min(1).max(200),
+  })
+  .strict();
+export type QRehearsalCounterpartDto = z.infer<
+  typeof QRehearsalCounterpartDtoSchema
+>;
+
+export const QRehearsalPersonaDtoSchema = z
+  .object({
+    counterpart: QRehearsalCounterpartDtoSchema,
+    summary: z.string().max(600),
+    style: z.string().max(400),
+    priorities: z.array(z.string().max(200)).max(6),
+    grounding: z.enum(["THIN", "SOME", "RICH"]),
+    /**
+     * Who holds the leverage in this meeting, by code from the roles (a
+     * founder pitching is the weaker party) and how forward Q reads this
+     * person to be. Q's reading, not a fact about them.
+     */
+    stance: z
+      .object({
+        leads: z.enum(["THEM", "YOU"]),
+        forwardness: z.enum(["RESERVED", "TYPICAL", "FORWARD"]),
+        why: z.string().max(300).nullable(),
+      })
+      .strict(),
+    /** Traits the reading rests on, each with where it came from. */
+    traits: z
+      .array(
+        z
+          .object({
+            trait: z.string().max(200),
+            source: z.enum(["PROFILE", "MESSAGES", "CALLS", "PUBLIC", "PITCH"]),
+          })
+          .strict(),
+      )
+      .max(8),
+    sources: z.array(QPersonaSourceDtoSchema).max(24),
+    /** Present for a researched external entity: how to label and show it. */
+    simulation: ExternalSimulationDtoSchema.optional(),
+    refreshedAt: UtcTimestampSchema,
+  })
+  .strict();
+export type QRehearsalPersonaDto = z.infer<typeof QRehearsalPersonaDtoSchema>;
+
+export const QRehearsalDtoSchema = z
+  .object({
+    id: UuidSchema,
+    counterpart: QRehearsalCounterpartDtoSchema,
+    userRole: z.enum(["FOUNDER", "INVESTOR"]),
+    status: z.enum(["ACTIVE", "FINISHED"]),
+    outcome: RehearsalOutcomeSchema.nullable(),
+    meetingId: UuidSchema.nullable(),
+    voice: z.enum(["FEMALE", "MALE"]),
+    difficulty: RehearsalDifficultySchema,
+    /**
+     * Counted by code from the transcript: their share of the words, their
+     * longest answer, how many exchanges, how long. Never a model's number.
+     */
+    metrics: z
+      .object({
+        yourShareOfWords: z.number().int().min(0).max(100),
+        longestAnswerWords: z.number().int().min(0),
+        exchanges: z.number().int().min(0),
+        minutes: z.number().int().min(0),
+      })
+      .strict(),
+    /** Their previous finished score with the same person, if any. */
+    previousScore: z.number().int().min(0).max(100).nullable(),
+    persona: z
+      .object({
+        summary: z.string().max(600),
+        style: z.string().max(400),
+        priorities: z.array(z.string().max(200)).max(6),
+        grounding: z.enum(["THIN", "SOME", "RICH"]),
+      })
+      .strict(),
+    turns: z.array(QRehearsalTurnDtoSchema).max(160),
+    /** Present for a researched external entity: how to label and show it. */
+    simulation: ExternalSimulationDtoSchema.optional(),
+    review: QRehearsalReviewDtoSchema.nullable(),
+    createdAt: UtcTimestampSchema,
+    endedAt: UtcTimestampSchema.nullable(),
+  })
+  .strict();
+export type QRehearsalDto = z.infer<typeof QRehearsalDtoSchema>;
+
+export const QRehearsalSummaryDtoSchema = z
+  .object({
+    id: UuidSchema,
+    counterpart: QRehearsalCounterpartDtoSchema,
+    status: z.enum(["ACTIVE", "FINISHED"]),
+    outcome: RehearsalOutcomeSchema.nullable(),
+    score: z.number().int().min(0).max(100).nullable(),
+    exchanges: z.number().int().min(0),
+    createdAt: UtcTimestampSchema,
+  })
+  .strict();
+export type QRehearsalSummaryDto = z.infer<typeof QRehearsalSummaryDtoSchema>;
+
+export const QRehearsalListDtoSchema = z
+  .object({ rehearsals: z.array(QRehearsalSummaryDtoSchema).max(50) })
+  .strict();
+export type QRehearsalListDto = z.infer<typeof QRehearsalListDtoSchema>;
+
+export const QRehearsalPartnersDtoSchema = z
+  .object({
+    role: z.enum(["FOUNDER", "INVESTOR"]).nullable(),
+    upcoming: z
+      .array(
+        z
+          .object({
+            meetingId: UuidSchema,
+            startsAt: UtcTimestampSchema,
+            purpose: z.string().max(300),
+            counterpart: QRehearsalCounterpartDtoSchema,
+          })
+          .strict(),
+      )
+      .max(20),
+    people: z
+      .array(
+        z
+          .object({
+            counterpart: QRehearsalCounterpartDtoSchema,
+            relationshipId: UuidSchema,
+            state: z.string().max(40),
+            lastRehearsal: z
+              .object({
+                id: UuidSchema,
+                at: UtcTimestampSchema,
+                score: z.number().int().min(0).max(100).nullable(),
+                outcome: RehearsalOutcomeSchema.nullable(),
+              })
+              .strict()
+              .nullable(),
+          })
+          .strict(),
+      )
+      .max(200),
+    // Demo rehearsal access: prepared public entities this person may
+    // rehearse with as labelled research-informed simulations, no
+    // connection needed. Not relationships. Absent = none.
+    researched: z
+      .array(
+        z
+          .object({
+            externalPersonId: UuidSchema,
+            // Set when a canonical unclaimed investor stands in for it.
+            investorOrganisationId: UuidSchema.nullable(),
+            name: z.string().min(1).max(200),
+            entityKind: z.enum(["PERSON", "ORGANIZATION", "GOVERNMENT_AGENCY"]),
+            // The role Q plays, e.g. "Invest Qatar investment-promotion
+            // officer"; null when the entity is a person.
+            roleLine: z.string().max(200).nullable(),
+          })
+          .strict(),
+      )
+      .max(20)
+      .optional(),
+  })
+  .strict();
+export type QRehearsalPartnersDto = z.infer<typeof QRehearsalPartnersDtoSchema>;
+
+export const QRehearsalMeetingDtoSchema = z
+  .object({ counterpart: QRehearsalCounterpartDtoSchema })
+  .strict();
+export type QRehearsalMeetingDto = z.infer<typeof QRehearsalMeetingDtoSchema>;
+
+/** The label every rehearsal surface shows (founder privacy direction). */
+export function rehearsalSimulationLabel(name: string): string {
+  return `AI rehearsal of ${name}, based on public and shared information`;
+}

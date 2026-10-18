@@ -1,0 +1,5 @@
+{
+  // Fast check of the recovery suite alone; the root tsconfig also covers it.
+  "extends": "../../tsconfig.json",
+  "include": ["./**/*.ts"]
+}

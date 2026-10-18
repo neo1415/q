@@ -5,6 +5,8 @@ import { z } from "zod";
 import {
   defineEvent,
   EventIdSchema,
+  MarketplaceReadinessStateValueSchema,
+  MarketplaceVisibilitySchema,
   UtcTimestampSchema,
   UuidSchema,
   type CapitalQEvent,
@@ -63,9 +65,50 @@ export const CompanyUpdatedEvent = defineEvent({
     "The canonical company profile changed; consumers re-read the fields they need.",
 });
 
+export const CompanyVisibilityChangedEvent = defineEvent({
+  name: "core.company.visibility_changed",
+  version: 1,
+  owner: COMPANY_EVENT_OWNER,
+  producer: COMPANY_EVENT_PRODUCER,
+  consumers: ["@capital-q/onboarding", "@capital-q/evidence", "@capital-q/q"],
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      companyId: UuidSchema,
+      version: z.number().int().min(1),
+      visibility: MarketplaceVisibilitySchema,
+    })
+    .strict(),
+  description:
+    "An editor of the company chose who may see its declared profile. Consumers re-read the row; nothing here is a disclosure grant.",
+});
+
+export const CompanyMarketplaceReadinessChangedEvent = defineEvent({
+  name: "core.company.marketplace_readiness_changed",
+  version: 1,
+  owner: COMPANY_EVENT_OWNER,
+  producer: COMPANY_EVENT_PRODUCER,
+  consumers: ["@capital-q/discovery", "@capital-q/onboarding", "@capital-q/q"],
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      companyId: UuidSchema,
+      version: z.number().int().min(1),
+      readinessState: MarketplaceReadinessStateValueSchema,
+      policyVersion: z.string().regex(/^marketplace-readiness\.v\d+$/),
+    })
+    .strict(),
+  description:
+    "The readiness policy moved the company's marketplace readiness state. Consumers re-read the row; this is not a visibility grant and not a quality signal.",
+});
+
 export const COMPANY_PROFILE_EVENTS: readonly EventDefinition[] = [
   CompanyCreatedEvent,
   CompanyUpdatedEvent,
+  CompanyVisibilityChangedEvent,
+  CompanyMarketplaceReadinessChangedEvent,
 ];
 
 type EnvelopeInput = {
@@ -73,7 +116,8 @@ type EnvelopeInput = {
   readonly organisationId: string;
   readonly companyId: string;
   readonly version: number;
-  readonly actorUserId: string;
+  /** Absent when Capital Q itself acted (a SYSTEM reconciliation). */
+  readonly actorUserId?: string | undefined;
   readonly correlationId: CorrelationId;
 };
 
@@ -93,7 +137,10 @@ function envelope<TData>(
     eventVersion: definition.version,
     tenantId: input.tenantId,
     organisationId: input.organisationId,
-    actor: { type: "HUMAN", id: input.actorUserId },
+    actor:
+      input.actorUserId === undefined
+        ? { type: "SYSTEM" }
+        : { type: "HUMAN", id: input.actorUserId },
     correlationId: input.correlationId,
     aggregate: { type: "company", id: input.companyId, version: input.version },
     data,
@@ -141,3 +188,33 @@ export const COMPANY_EVENTS: readonly EventDefinition[] = [
   ...COMPANY_PROFILE_EVENTS,
   ...TEAM_EVENTS,
 ];
+
+export function companyVisibilityChangedEvent(
+  input: EnvelopeInput & {
+    readonly visibility: z.infer<typeof MarketplaceVisibilitySchema>;
+  },
+): CapitalQEvent<z.infer<typeof CompanyVisibilityChangedEvent.dataSchema>> {
+  return envelope(CompanyVisibilityChangedEvent, input, {
+    companyId: input.companyId,
+    version: input.version,
+    visibility: input.visibility,
+  });
+}
+
+export function companyMarketplaceReadinessChangedEvent(
+  input: EnvelopeInput & {
+    readonly readinessState: z.infer<
+      typeof MarketplaceReadinessStateValueSchema
+    >;
+    readonly policyVersion: string;
+  },
+): CapitalQEvent<
+  z.infer<typeof CompanyMarketplaceReadinessChangedEvent.dataSchema>
+> {
+  return envelope(CompanyMarketplaceReadinessChangedEvent, input, {
+    companyId: input.companyId,
+    version: input.version,
+    readinessState: input.readinessState,
+    policyVersion: input.policyVersion,
+  });
+}

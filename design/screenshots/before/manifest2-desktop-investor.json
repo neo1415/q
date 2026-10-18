@@ -1,0 +1,79 @@
+[
+  {
+    "page": "investor-i3-geography",
+    "viewport": "desktop",
+    "file": "investor-i3-geography-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Where do you invest?"
+  },
+  {
+    "page": "investor-i3-geography",
+    "viewport": "desktop",
+    "file": "investor-i3-geography-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Where do you invest?"
+  },
+  {
+    "page": "investor-i3-sectors",
+    "viewport": "desktop",
+    "file": "investor-i3-sectors-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Which sectors and product areas?"
+  },
+  {
+    "page": "investor-i3-sectors",
+    "viewport": "desktop",
+    "file": "investor-i3-sectors-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Which sectors and product areas?"
+  },
+  {
+    "page": "home-investor",
+    "viewport": "desktop",
+    "file": "home-investor-desktop.png",
+    "url": "http://127.0.0.1:3000/home",
+    "note": "Home with investor context"
+  },
+  {
+    "page": "home-investor-q-working",
+    "viewport": "desktop",
+    "file": "home-investor-q-working-desktop.png",
+    "url": "http://127.0.0.1:3000/home?c=b24c0156-a828-408f-b30e-531f8469a0ea",
+    "note": "Q working"
+  },
+  {
+    "page": "home-investor-q-answer",
+    "viewport": "desktop",
+    "file": "home-investor-q-answer-desktop.png",
+    "url": "http://127.0.0.1:3000/home?c=b24c0156-a828-408f-b30e-531f8469a0ea",
+    "note": "Q answer for a investor"
+  },
+  {
+    "page": "discover-investor",
+    "viewport": "desktop",
+    "file": "discover-investor-desktop.png",
+    "url": "http://127.0.0.1:3000/discover",
+    "note": ""
+  },
+  {
+    "page": "company-visibility-investor",
+    "viewport": "desktop",
+    "file": "company-visibility-investor-desktop.png",
+    "url": "http://127.0.0.1:3000/company/visibility",
+    "note": ""
+  },
+  {
+    "page": "capital-investor",
+    "viewport": "desktop",
+    "file": "capital-investor-desktop.png",
+    "url": "http://127.0.0.1:3000/capital",
+    "note": ""
+  },
+  {
+    "page": "profile-investor",
+    "viewport": "desktop",
+    "file": "profile-investor-desktop.png",
+    "url": "http://127.0.0.1:3000/profile",
+    "note": ""
+  }
+]

@@ -33,6 +33,13 @@ insert into permissions.capabilities (code, description) values
   ('investor.mandate.create',  'Create a declared mandate for the investor organisation.'),
   ('investor.mandate.view',    'Read the investor organisation''s declared mandates.'),
   ('investor.mandate.edit',    'Edit, activate and close the investor organisation''s declared mandates.'),
+  ('investor.interest.express', 'Express the investor organisation''s interest in a company, telling its founders the organisation would like to explore it.'),
+  ('company.interest.view',    'See which investor organisations have expressed interest in the company, and how the company answered.'),
+  ('company.interest.respond', 'Accept or decline an investor organisation''s interest in the company on the company''s behalf.'),
+  ('company.connection.request', 'Send an investor organisation a Connection Request on the company''s behalf, where the investor allows founders to reach them.'),
+  ('investor.connection.view',   'See the Connection Requests founders sent the investor organisation, and how it answered.'),
+  ('investor.connection.respond', 'Accept or decline a founder''s Connection Request on the investor organisation''s behalf.'),
+  ('handle.manage',            'Claim or change the organisation''s public handle and publish its Q Card (a public representation of the organisation).'),
   ('capital_objective.create', 'Create the company''s capital objective.'),
   ('capital_objective.view',   'Read the company''s capital objectives and their history.'),
   ('capital_objective.edit',   'Recalibrate the company''s active capital objective.'),
@@ -51,7 +58,10 @@ insert into permissions.capabilities (code, description) values
   ('evidence.record',          'Register sources, record claims and evidence items, and link evidence to claims.'),
   ('media.create',             'Create or replace pitch media owned by the active organisation.'),
   ('media.view',               'Read pitch media metadata for the active organisation''s resources.'),
-  ('media.manage',             'Delete pitch media and manage its lifecycle for the active organisation.')
+  ('media.manage',             'Delete pitch media and manage its lifecycle for the active organisation.'),
+  ('verification.request',     'Ask Capital Q to verify a founder''s identity and the organisation, for the active organisation''s company.'),
+  ('verification.view',        'Read the verification standings of the active organisation and its members.'),
+  ('verification.decide',      'Decide a verification claim on Capital Q''s behalf. Operator only; granted to no organisation role.')
 on conflict (code) do update
   set description = excluded.description;
 
@@ -100,6 +110,19 @@ select r.id, c.id, 'ALLOW'
       ('organisation_admin',  'investor.mandate.view'),
       ('organisation_admin',  'investor.mandate.edit'),
       ('organisation_member', 'investor.mandate.view'),
+      ('organisation_admin',  'investor.interest.express'),
+      ('organisation_member', 'investor.interest.express'),
+      ('organisation_admin',  'company.interest.view'),
+      ('organisation_admin',  'company.interest.respond'),
+      ('organisation_member', 'company.interest.view'),
+      ('organisation_member', 'company.interest.respond'),
+      ('organisation_admin',  'company.connection.request'),
+      ('organisation_member', 'company.connection.request'),
+      ('organisation_admin',  'investor.connection.view'),
+      ('organisation_member', 'investor.connection.view'),
+      ('organisation_admin',  'investor.connection.respond'),
+      ('organisation_member', 'investor.connection.respond'),
+      ('organisation_admin',  'handle.manage'),
       ('organisation_admin',  'capital_objective.create'),
       ('organisation_admin',  'capital_objective.view'),
       ('organisation_admin',  'capital_objective.edit'),
@@ -122,6 +145,10 @@ select r.id, c.id, 'ALLOW'
       ('organisation_admin',  'media.view'),
       ('organisation_admin',  'media.manage'),
       ('organisation_member', 'media.create'),
-      ('organisation_member', 'media.view')
+      ('organisation_member', 'media.view'),
+      ('organisation_admin',  'verification.request'),
+      ('organisation_admin',  'verification.view'),
+      ('organisation_member', 'verification.request'),
+      ('organisation_member', 'verification.view')
     )
 on conflict (role_id, capability_id) do nothing;

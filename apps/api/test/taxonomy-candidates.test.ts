@@ -89,14 +89,27 @@ function fakeFinder() {
 function buildApp(options: {
   readonly principal: AuthenticatedPrincipal | null;
   readonly finder: TaxonomyCandidateFinder;
+  /** No organisation yet (a new investor mid-way through their first answer). */
+  readonly noOrganisation?: { readonly hasIdentity: boolean };
 }): FastifyInstance {
   const security: ApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(options.principal) },
     resolver: {
       resolveHumanContext: () =>
-        Promise.resolve({ status: "RESOLVED", context: CONTEXT }),
+        Promise.resolve(
+          options.noOrganisation === undefined
+            ? { status: "RESOLVED", context: CONTEXT }
+            : { status: "CONTEXT_REQUIRED" },
+        ),
     },
-    identities: { lookup: () => Promise.resolve(null) },
+    identities: {
+      lookup: () =>
+        Promise.resolve(
+          options.noOrganisation?.hasIdentity === true
+            ? ({ userId: CONTEXT.userId } as never)
+            : null,
+        ),
+    },
   };
   const query = {
     listVocabularies: notUnderTest,
@@ -110,6 +123,56 @@ const post = (app: FastifyInstance, payload: string | object) =>
   app.inject({ method: "POST", url: "/v1/taxonomy/candidates", payload });
 
 describe("POST /v1/taxonomy/candidates", () => {
+  it("serves a signed-in person with no organisation yet (live AM: 400 for a new investor)", async () => {
+    const app = buildApp({
+      principal: PRINCIPAL,
+      finder: fakeFinder().finder,
+      noOrganisation: { hasIdentity: true },
+    });
+    const response = await post(app, { text: "payments rails" });
+    expect(response.statusCode).toBe(200);
+  });
+
+  it("on that path, only the shared vocabulary is read: no tenant or organisation reaches the finder, and no other taxonomy route opens", async () => {
+    const { finder, calls } = fakeFinder();
+    const app = buildApp({
+      principal: PRINCIPAL,
+      finder,
+      noOrganisation: { hasIdentity: true },
+    });
+    const response = await post(app, {
+      text: "payments rails",
+      vocabularyCodes: ["product_category"],
+    });
+    expect(response.statusCode).toBe(200);
+    // The finder is given the phrase and vocabularies only: nothing that
+    // could select organisation-scoped or custom rows.
+    for (const call of calls) {
+      for (const key of Object.keys(call)) {
+        expect(["text", "vocabularyCodes", "strategy", "limit"]).toContain(key);
+      }
+    }
+    // Organisation-scoped taxonomy (company or mandate assignments) has no
+    // route here; nothing new is reachable without an organisation.
+    for (const url of [
+      "/v1/taxonomy/assignments",
+      "/v1/taxonomy/mandate-preferences",
+    ]) {
+      const other = await app.inject({ method: "GET", url });
+      expect(other.statusCode).toBe(404);
+    }
+  });
+
+  it("still refuses a principal with no application identity", async () => {
+    const app = buildApp({
+      principal: PRINCIPAL,
+      finder: fakeFinder().finder,
+      noOrganisation: { hasIdentity: false },
+    });
+    const response = await post(app, { text: "payments rails" });
+    expect(response.statusCode).toBe(403);
+  });
+
   it("requires an authenticated context", async () => {
     const app = buildApp({ principal: null, finder: fakeFinder().finder });
     const response = await post(app, { text: "payments rails" });
@@ -137,7 +200,7 @@ describe("POST /v1/taxonomy/candidates", () => {
     expect(body.classifier).toEqual({
       provider: "capital_q",
       model: "deterministic_lexical",
-      version: "taxonomy-lexical-v1",
+      version: "taxonomy-lexical-v3",
     });
     expect(calls).toEqual([
       {

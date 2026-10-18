@@ -10,16 +10,33 @@
 :root {
   color-scheme: light;
 
+  /*
+   * Type families (founder directive 2026-09-28, item 16): body UI uses the
+   * platform's own professional sans -- the stack LinkedIn uses -- so text
+   * renders in the reader's native face with no font download.
+   */
+  --cq-font-ui:
+    -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --cq-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  /*
+   * The Q Daily's newspaper voice (DAILY): a system serif for the masthead
+   * and headlines only. No download; body text stays in the UI face.
+   */
+  --cq-font-editorial: Georgia, "Times New Roman", Times, serif;
+
   /* Surfaces: canvas → section → surface → raised overlay. */
   --cq-canvas: oklch(0.985 0.004 92);
   --cq-surface: oklch(0.995 0.002 92);
   --cq-surface-raised: oklch(1 0 0);
   --cq-surface-subtle: oklch(0.965 0.005 92);
   --cq-surface-strong: oklch(0.925 0.007 92);
+  /* Below the canvas: a person's own message, a well an answer sits in. */
+  --cq-surface-sunken: oklch(0.955 0.005 92);
 
   --cq-text-primary: oklch(0.19 0.012 258);
   --cq-text-secondary: oklch(0.43 0.012 258);
-  --cq-text-tertiary: oklch(0.57 0.01 258);
+  --cq-text-tertiary: oklch(0.53 0.01 258);
   --cq-text-inverse: oklch(0.98 0.004 92);
 
   --cq-border-subtle: oklch(0.91 0.006 258);
@@ -27,40 +44,80 @@
   --cq-border-strong: oklch(0.71 0.012 258);
 
   /* One accent: primary action, active navigation, selection, Q. */
-  --cq-accent: oklch(0.57 0.18 258);
-  --cq-accent-hover: oklch(0.52 0.18 258);
+  --cq-accent: oklch(0.53 0.18 258);
+  --cq-accent-hover: oklch(0.48 0.18 258);
   --cq-accent-soft: oklch(0.94 0.035 258);
 
   /* Semantic states. Never "green = good company"; meaning is always labelled. */
-  --cq-positive: oklch(0.55 0.13 151);
+  --cq-positive: oklch(0.5 0.13 151);
   --cq-positive-soft: oklch(0.95 0.035 151);
-  --cq-warning: oklch(0.67 0.14 78);
+  --cq-warning: oklch(0.53 0.12 70);
   --cq-warning-soft: oklch(0.96 0.045 78);
   --cq-danger: oklch(0.56 0.2 27);
   --cq-danger-soft: oklch(0.95 0.04 27);
   --cq-info: var(--cq-accent);
 
+  /*
+   * The verified metal (founder, 2026-10-11): rich gold for the one badge
+   * that means Capital Q verified the record. Highlight, light, mid and
+   * deep are the gradient's stops; edge is the rim; ink is the text and
+   * icon, >= 4.5:1 on every stop; gloss and depth are the controlled
+   * specular top and the resting shadow. Used by .cq-verified-badge only.
+   */
+  --cq-gold-highlight: oklch(0.93 0.09 92);
+  --cq-gold-light: oklch(0.86 0.13 90);
+  --cq-gold-mid: oklch(0.78 0.14 85);
+  --cq-gold-deep: oklch(0.67 0.13 80);
+  --cq-gold-edge: oklch(0.5 0.1 75);
+  --cq-gold-ink: oklch(0.2 0.05 75);
+  --cq-gold-gloss: oklch(1 0 0 / 0.5);
+  --cq-gold-depth: oklch(0.35 0.08 75 / 0.32);
+
   --cq-focus-ring: var(--cq-accent);
   --cq-overlay: oklch(0.19 0.012 258 / 0.42);
-  --cq-shadow-overlay: 0 12px 32px -8px oklch(0.19 0.012 258 / 0.28);
-  --cq-shadow-xs: 0 1px 2px oklch(0.19 0.012 258 / 0.06);
 
-  /* Radius (doc 18 §25). Pills are for chips and statuses only. */
-  --cq-radius-xs: 4px;
-  --cq-radius-sm: 6px;
-  --cq-radius-md: 10px;
-  --cq-radius-lg: 14px;
-  --cq-radius-xl: 18px;
-  --cq-radius-full: 999px;
+  /*
+   * Shadows communicate elevation only (doc 18 §27): xs for a resting
+   * composer or dossier, sm for a popover/menu, overlay for sheets and
+   * dialogs. Ordinary panels and cards take a border and no shadow.
+   */
+  --cq-shadow-xs: 0 1px 2px oklch(0.19 0.012 258 / 0.06);
+  --cq-shadow-sm:
+    0 1px 2px oklch(0.19 0.012 258 / 0.06),
+    0 4px 12px -4px oklch(0.19 0.012 258 / 0.1);
+  --cq-shadow-overlay: 0 12px 32px -8px oklch(0.19 0.012 258 / 0.28);
+
+  /*
+   * Radius (owner 2026-10-16: "remove curves ... from the entire app ...
+   * straight like LinkedIn"; amends doc 18 §25). Every surface, control,
+   * chip and pill is square. Only a shape whose meaning is a circle (an
+   * avatar, a status dot, a switch and its knob, a radio, Q's aperture)
+   * uses --cq-radius-circle (or Tailwind's rounded-full).
+   */
+  --cq-radius-xs: 0;
+  --cq-radius-sm: 0;
+  --cq-radius-md: 0;
+  --cq-radius-lg: 0;
+  --cq-radius-xl: 0;
+  --cq-radius-full: 0;
+  --cq-radius-circle: 9999px;
 
   /* Semantic z-layers. Never a bare number in a component. */
   --cq-z-base: 0;
   --cq-z-sticky: 10;
   --cq-z-navigation: 20;
+  /* Q's floating presence and its edge light (ADR 0017 C7): above the
+     navigation, below every popover, sheet and dialog. */
+  --cq-z-presence: 25;
   --cq-z-popover: 30;
   --cq-z-sheet: 40;
   --cq-z-modal: 50;
+  /* A menu opened from inside a modal (a viewer's Download): portalled to
+     the body like every popover, so it must clear the modal it came from. */
+  --cq-z-modal-popover: 55;
   --cq-z-toast: 60;
+  /* The cold-start splash covers everything while it plays, then is gone. */
+  --cq-z-splash: 70;
 
   /* Layout widths (doc 18 §22). */
   --cq-layout-full: 1440px;
@@ -68,6 +125,8 @@
   --cq-layout-content: 1040px;
   --cq-layout-reading: 760px;
   --cq-layout-narrow: 600px;
+  /* Page edge padding (doc 18 §§23–24): 16 mobile, 24 tablet, 32 desktop. */
+  --cq-page-gutter: 16px;
 
   /* Application shell metrics; the shell reserves this space for real. */
   --cq-header-height: 52px;
@@ -78,11 +137,75 @@
   --cq-safe-left: env(safe-area-inset-left, 0px);
   --cq-safe-right: env(safe-area-inset-right, 0px);
 
-  /* Motion: ordinary interactions complete in 90–280 ms. */
-  --cq-motion-fast: 120ms;
-  --cq-motion-base: 180ms;
-  --cq-motion-slow: 260ms;
-  --cq-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  /*
+   * Motion (doc 18 §§118–121). Ordinary interactions complete within
+   * 90–280 ms; only spatial moves (a sheet, a drawer) take 360 ms, and
+   * nothing in the core application exceeds 400 ms. Amplitude stays small:
+   * 2–4 px for control feedback, 8–16 px for content arriving.
+   */
+  --cq-motion-instant: 90ms;
+  --cq-motion-fast: 140ms;
+  --cq-motion-base: 200ms;
+  --cq-motion-emphasis: 280ms;
+  --cq-motion-slow: 360ms;
+  --cq-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --cq-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /*
+   * Q's voice stage: one night in either theme (CQ-Q-VOICE-001). The stage
+   * is a calm inverted field, never a glow: Q's presence is the mark, its
+   * state label and a waveform, and these tokens are all the stage reads.
+   */
+  --cq-stage-canvas: oklch(0.17 0.02 262);
+  /* The Q Card (founder design 2026-09-28): a card with a thin lit edge
+     and one soft arc of light. Light theme: paper card, blue edge. */
+  --cq-qcard-surface: oklch(0.985 0.006 258);
+  --cq-qcard-text: oklch(0.2 0.03 262);
+  --cq-qcard-muted: oklch(0.48 0.025 262);
+  --cq-qcard-edge: oklch(0.6 0.16 255);
+  --cq-qcard-glow: oklch(0.6 0.16 255 / 0.16);
+  --cq-qcard-arc: oklch(0.62 0.16 255 / 0.1);
+  /* The shell's dot grid (2026-10-15): ink at a whisper, below text contrast. */
+  --cq-texture-dot: oklch(0.42 0.03 258 / 0.07);
+  --cq-stage-surface: oklch(1 0 0 / 0.06);
+  --cq-stage-surface-strong: oklch(1 0 0 / 0.12);
+  --cq-stage-border: oklch(1 0 0 / 0.14);
+  --cq-stage-text: oklch(0.98 0.004 92);
+  --cq-stage-text-muted: oklch(1 0 0 / 0.62);
+  --cq-stage-accent: oklch(0.76 0.14 258);
+
+  /*
+   * The Q Aperture's light (ADR 0017 F2). One hue family -- the accent hue
+   * and a warm near-white core -- and on Q only: nothing else in the
+   * product glows. Light theme draws ink and light on paper (--cq-q-ink: 1:
+   * a deeper stroke, a tight bloom); dark and the stage draw additive light.
+   * --cq-q-light and --cq-q-ember hold >= 3:1 against every surface the
+   * aperture sits on (WCAG 1.4.11; asserted in apps/web/test).
+   */
+  --cq-q-light: oklch(0.5 0.2 258);
+  --cq-q-core: oklch(0.99 0.012 85);
+  --cq-q-bloom: oklch(0.62 0.19 258 / 0.34);
+  --cq-q-ember: oklch(0.5 0.035 258);
+  /* The focus sweep's highlight: the deeper stroke on paper, the core in light. */
+  --cq-q-sweep: var(--cq-q-light);
+  --cq-q-ink: 1;
+  /* The same light on the stage, which is one night in either theme. */
+  --cq-stage-q-light: oklch(0.8 0.13 258);
+  --cq-stage-q-core: oklch(0.985 0.014 85);
+  --cq-stage-q-bloom: oklch(0.7 0.17 258 / 0.48);
+  --cq-stage-q-ember: oklch(0.63 0.035 258);
+}
+
+@media (min-width: 640px) {
+  :root {
+    --cq-page-gutter: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --cq-page-gutter: 32px;
+  }
 }
 
 /* Dark: structurally viable now; appearance controls arrive later. */
@@ -94,14 +217,22 @@
     --cq-surface-raised: oklch(0.22 0.011 258);
     --cq-surface-subtle: oklch(0.24 0.01 258);
     --cq-surface-strong: oklch(0.3 0.01 258);
+    --cq-surface-sunken: oklch(0.14 0.01 258);
     --cq-text-primary: oklch(0.95 0.005 92);
     --cq-text-secondary: oklch(0.75 0.008 258);
-    --cq-text-tertiary: oklch(0.61 0.008 258);
+    --cq-text-tertiary: oklch(0.63 0.008 258);
     --cq-text-inverse: oklch(0.17 0.01 258);
     --cq-border-subtle: oklch(0.28 0.01 258);
     --cq-border: oklch(0.34 0.011 258);
     --cq-border-strong: oklch(0.47 0.012 258);
     --cq-accent: oklch(0.72 0.15 258);
+    --cq-qcard-surface: oklch(0.19 0.045 262);
+    --cq-qcard-text: oklch(0.97 0.01 262);
+    --cq-qcard-muted: oklch(0.74 0.03 262);
+    --cq-qcard-edge: oklch(0.68 0.16 255);
+    --cq-qcard-glow: oklch(0.68 0.16 255 / 0.22);
+    --cq-qcard-arc: oklch(0.7 0.16 255 / 0.2);
+    --cq-texture-dot: oklch(0.86 0.02 258 / 0.055);
     --cq-accent-hover: oklch(0.76 0.14 258);
     --cq-accent-soft: oklch(0.27 0.06 258);
     --cq-positive: oklch(0.72 0.12 151);
@@ -110,8 +241,26 @@
     --cq-warning-soft: oklch(0.3 0.06 78);
     --cq-danger: oklch(0.7 0.16 27);
     --cq-danger-soft: oklch(0.28 0.06 27);
+    --cq-gold-highlight: oklch(0.9 0.1 92);
+    --cq-gold-light: oklch(0.83 0.13 90);
+    --cq-gold-mid: oklch(0.75 0.14 85);
+    --cq-gold-deep: oklch(0.64 0.13 80);
+    --cq-gold-edge: oklch(0.82 0.11 88);
+    --cq-gold-ink: oklch(0.18 0.04 75);
+    --cq-gold-gloss: oklch(1 0 0 / 0.38);
+    --cq-gold-depth: oklch(0 0 0 / 0.55);
     --cq-overlay: oklch(0.1 0.01 258 / 0.6);
+    --cq-shadow-xs: 0 1px 2px oklch(0.05 0.01 258 / 0.4);
+    --cq-shadow-sm:
+      0 1px 2px oklch(0.05 0.01 258 / 0.4),
+      0 4px 12px -4px oklch(0.05 0.01 258 / 0.5);
     --cq-shadow-overlay: 0 12px 32px -8px oklch(0.05 0.01 258 / 0.7);
+    --cq-q-light: oklch(0.8 0.13 258);
+    --cq-q-core: oklch(0.985 0.014 85);
+    --cq-q-bloom: oklch(0.7 0.17 258 / 0.48);
+    --cq-q-ember: oklch(0.63 0.035 258);
+    --cq-q-sweep: var(--cq-q-core);
+    --cq-q-ink: 0;
   }
 }
 
@@ -122,14 +271,22 @@
   --cq-surface-raised: oklch(0.22 0.011 258);
   --cq-surface-subtle: oklch(0.24 0.01 258);
   --cq-surface-strong: oklch(0.3 0.01 258);
+  --cq-surface-sunken: oklch(0.14 0.01 258);
   --cq-text-primary: oklch(0.95 0.005 92);
   --cq-text-secondary: oklch(0.75 0.008 258);
-  --cq-text-tertiary: oklch(0.61 0.008 258);
+  --cq-text-tertiary: oklch(0.63 0.008 258);
   --cq-text-inverse: oklch(0.17 0.01 258);
   --cq-border-subtle: oklch(0.28 0.01 258);
   --cq-border: oklch(0.34 0.011 258);
   --cq-border-strong: oklch(0.47 0.012 258);
   --cq-accent: oklch(0.72 0.15 258);
+  --cq-qcard-surface: oklch(0.19 0.045 262);
+  --cq-qcard-text: oklch(0.97 0.01 262);
+  --cq-qcard-muted: oklch(0.74 0.03 262);
+  --cq-qcard-edge: oklch(0.68 0.16 255);
+  --cq-qcard-glow: oklch(0.68 0.16 255 / 0.22);
+  --cq-qcard-arc: oklch(0.7 0.16 255 / 0.2);
+  --cq-texture-dot: oklch(0.86 0.02 258 / 0.055);
   --cq-accent-hover: oklch(0.76 0.14 258);
   --cq-accent-soft: oklch(0.27 0.06 258);
   --cq-positive: oklch(0.72 0.12 151);
@@ -138,8 +295,26 @@
   --cq-warning-soft: oklch(0.3 0.06 78);
   --cq-danger: oklch(0.7 0.16 27);
   --cq-danger-soft: oklch(0.28 0.06 27);
+  --cq-gold-highlight: oklch(0.9 0.1 92);
+  --cq-gold-light: oklch(0.83 0.13 90);
+  --cq-gold-mid: oklch(0.75 0.14 85);
+  --cq-gold-deep: oklch(0.64 0.13 80);
+  --cq-gold-edge: oklch(0.82 0.11 88);
+  --cq-gold-ink: oklch(0.18 0.04 75);
+  --cq-gold-gloss: oklch(1 0 0 / 0.38);
+  --cq-gold-depth: oklch(0 0 0 / 0.55);
   --cq-overlay: oklch(0.1 0.01 258 / 0.6);
+  --cq-shadow-xs: 0 1px 2px oklch(0.05 0.01 258 / 0.4);
+  --cq-shadow-sm:
+    0 1px 2px oklch(0.05 0.01 258 / 0.4),
+    0 4px 12px -4px oklch(0.05 0.01 258 / 0.5);
   --cq-shadow-overlay: 0 12px 32px -8px oklch(0.05 0.01 258 / 0.7);
+  --cq-q-light: oklch(0.8 0.13 258);
+  --cq-q-core: oklch(0.985 0.014 85);
+  --cq-q-bloom: oklch(0.7 0.17 258 / 0.48);
+  --cq-q-ember: oklch(0.63 0.035 258);
+  --cq-q-sweep: var(--cq-q-core);
+  --cq-q-ink: 0;
 }
 
 @layer base {
@@ -190,6 +365,12 @@
     line-height: 1.3;
     font-weight: 600;
   }
+  /* An item title inside a list or panel: a company in Discover, a fact group. */
+  .cq-title-sm {
+    font-size: 17px;
+    line-height: 1.35;
+    font-weight: 600;
+  }
   .cq-body-lg {
     font-size: 17px;
     line-height: 1.55;
@@ -215,6 +396,62 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /*
+   * Q prose and evidence reading (doc 18 §§19, 102): an open, document-like
+   * measure of ~62–78 characters. Never a chat bubble, never stretched
+   * across the workspace.
+   */
+  .cq-prose {
+    max-width: 70ch;
+    line-height: 1.6;
+  }
+  .cq-prose > * + * {
+    margin-top: 0.75em;
+  }
+  .cq-prose strong {
+    font-weight: 600;
+  }
+
+  /*
+   * The dossier panel (doc 18 §§26–29): one bordered surface for a discrete
+   * object -- a company, a mandate, an approval, a snapshot -- with rows
+   * divided by hairlines rather than nested cards. No shadow at rest.
+   */
+  .cq-panel {
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-lg);
+    background-color: var(--cq-surface);
+  }
+  .cq-panel-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid var(--cq-border-subtle);
+  }
+  .cq-panel-body {
+    padding: 16px 20px;
+  }
+  .cq-panel-rows > * + * {
+    border-top: 1px solid var(--cq-border-subtle);
+  }
+
+  /*
+   * A quiet status line: provenance, freshness, scope, or what Q is doing.
+   * Caption size, tertiary colour, an icon or the Q mark for meaning. It
+   * never carries an alert tone; a state that needs attention is a notice.
+   */
+  .cq-status-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 20px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--cq-text-tertiary);
+  }
+
   @media (min-width: 768px) {
     .cq-display {
       font-size: 40px;
@@ -228,9 +465,31 @@
     .cq-title-md {
       font-size: 21px;
     }
+    .cq-title-sm {
+      font-size: 18px;
+    }
     .cq-body {
       font-size: 15px;
     }
+  }
+
+  /*
+   * Content arriving (doc 18 §121): 8–16 px rise, opacity, one emphasis
+   * beat. For a step, an answer block, a panel that was not there before.
+   * Stilled by the global reduced-motion rule.
+   */
+  @keyframes cq-arrive {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .cq-arrive {
+    animation: cq-arrive var(--cq-motion-emphasis) var(--cq-ease) both;
   }
 
   /* Q working rhythm: three dots, opacity only, static under reduced motion. */

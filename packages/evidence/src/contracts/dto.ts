@@ -47,6 +47,7 @@ export function toDocumentDto(
     status: document.status,
     visibilityScope: document.visibilityScope,
     sensitivityClass: document.sensitivityClass,
+    downloadAudience: document.downloadAudience,
     currentVersion:
       currentVersion === null ? null : toDocumentVersionDto(currentVersion),
     createdAt: document.createdAt,

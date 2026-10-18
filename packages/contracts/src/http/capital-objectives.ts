@@ -93,6 +93,27 @@ export type CapitalTarget = z.infer<typeof CapitalTargetSchema>;
 
 const UseOfFundsSchema = z.string().trim().min(1).max(USE_OF_FUNDS_MAX_LENGTH);
 
+/**
+ * F5: what a raise's valuation is. CAP is a SAFE's or a note's cap;
+ * PRE_MONEY / POST_MONEY a priced round's. Reference values, never inferred.
+ */
+export const RAISE_VALUATION_KINDS = [
+  "CAP",
+  "PRE_MONEY",
+  "POST_MONEY",
+] as const;
+export const RaiseValuationKindSchema = z.enum(RAISE_VALUATION_KINDS);
+export type RaiseValuationKind = z.infer<typeof RaiseValuationKindSchema>;
+
+/** F5: a valuation in the raise's own currency; exact, never zero. */
+export const RaiseValuationSchema = z
+  .object({
+    kind: RaiseValuationKindSchema,
+    amount: PositiveDecimalStringSchema,
+  })
+  .strict();
+export type RaiseValuation = z.infer<typeof RaiseValuationSchema>;
+
 export const CreateCapitalObjectiveRequestSchema = z
   .object({
     objectiveType: CapitalObjectiveTypeSchema.optional(),
@@ -101,6 +122,10 @@ export const CreateCapitalObjectiveRequestSchema = z
     instrumentCode: InstrumentCodeSchema.optional(),
     targetCloseDate: LocalDateSchema.optional(),
     useOfFundsSummary: UseOfFundsSchema.optional(),
+    /** F5: in the target's currency. */
+    valuation: RaiseValuationSchema.optional(),
+    /** F5: the smallest cheque taken, in the target's currency. */
+    minimumCheque: PositiveDecimalStringSchema.optional(),
   })
   .strict();
 export type CreateCapitalObjectiveRequest = z.infer<
@@ -114,6 +139,8 @@ export const CAPITAL_OBJECTIVE_EDITABLE_FIELDS = [
   "instrumentCode",
   "targetCloseDate",
   "useOfFundsSummary",
+  "valuation",
+  "minimumCheque",
 ] as const;
 export type CapitalObjectiveEditableField =
   (typeof CAPITAL_OBJECTIVE_EDITABLE_FIELDS)[number];
@@ -126,6 +153,8 @@ export const UpdateCapitalObjectiveRequestSchema = z
     instrumentCode: InstrumentCodeSchema.nullable().optional(),
     targetCloseDate: LocalDateSchema.nullable().optional(),
     useOfFundsSummary: UseOfFundsSchema.nullable().optional(),
+    valuation: RaiseValuationSchema.nullable().optional(),
+    minimumCheque: PositiveDecimalStringSchema.nullable().optional(),
   })
   .strict()
   .refine(
@@ -176,6 +205,9 @@ export const CapitalObjectiveDtoSchema = z.object({
   instrumentCode: z.string().nullable(),
   targetCloseDate: LocalDateSchema.nullable(),
   useOfFundsSummary: z.string().nullable(),
+  /** F5: absent from older readers' fixtures; null when unstated. */
+  valuation: RaiseValuationSchema.nullable().optional(),
+  minimumCheque: z.string().nullable().optional(),
   startedAt: UtcTimestampSchema,
   closedAt: UtcTimestampSchema.nullable(),
   version: ResourceVersionSchema,

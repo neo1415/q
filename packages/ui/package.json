@@ -54,6 +54,10 @@
       "types": "./dist/components/menu.d.ts",
       "default": "./dist/components/menu.js"
     },
+    "./context-menu": {
+      "types": "./dist/components/context-menu.d.ts",
+      "default": "./dist/components/context-menu.js"
+    },
     "./popover": {
       "types": "./dist/components/popover.d.ts",
       "default": "./dist/components/popover.js"
@@ -129,6 +133,10 @@
     "./intelligence-snapshot": {
       "types": "./dist/patterns/intelligence-snapshot.d.ts",
       "default": "./dist/patterns/intelligence-snapshot.js"
+    },
+    "./ui-text": {
+      "types": "./dist/primitives/ui-text.d.ts",
+      "default": "./dist/primitives/ui-text.js"
     }
   },
   "main": "./dist/index.js",

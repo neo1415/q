@@ -1,0 +1,125 @@
+import type { FastifyInstance } from "fastify";
+
+import {
+  INVITATION_PREVIEW_PATH,
+  INVITATION_TOKEN_HEADER,
+  InvitationPreviewDtoSchema,
+  InvitationTokenSchema,
+  MY_INVITATIONS_PATH,
+  MY_ORGANISATIONS_PATH,
+  MyInvitationsDtoSchema,
+  MyOrganisationsDtoSchema,
+  TEAM_PATH,
+  TeamDtoSchema,
+} from "@capital-q/contracts";
+import type { TeamService } from "@capital-q/organisations";
+import { photoLookup } from "@capital-q/public-identity";
+
+import {
+  getActorContext,
+  requireActorContextHook,
+} from "../security/actor-context.js";
+import {
+  getOnboardingActor,
+  requireOnboardingActorHook,
+  type OnboardingActorDependencies,
+} from "../security/onboarding-actor.js";
+import type { NamedPhotos } from "./named-photos.js";
+
+/**
+ * G1/G2: the team's reads. Every change is a declared app action
+ * (`team.*`, generated in app-actions.ts); these are the pages' reads.
+ *
+ * - GET /v1/team: the caller's ACTIVE organisation as a team, resolved on
+ *   the server. Another organisation is never named by the client.
+ * - GET /v1/me/organisations: the switcher's list, for a person who may be
+ *   mid-onboarding (no context yet), so it runs under the onboarding actor.
+ * - GET /v1/invitations/preview: what an invitation link invites to, for
+ *   whoever holds the link (signed in or not: a new user sees it before
+ *   creating their account). The token travels in a header so it never
+ *   lands in a URL the API logs; an unknown or malformed token is the one
+ *   404, never a hint about which part was wrong.
+ * - GET /v1/me/invitations: pending invitations to the caller's VERIFIED
+ *   sign-in email, read on the server (the client names no address), so
+ *   an invitee need not find the email to accept or decline.
+ */
+export type TeamRoutesDependencies = OnboardingActorDependencies & {
+  readonly team: Pick<
+    TeamService,
+    "team" | "myOrganisations" | "myInvitations" | "previewInvitation"
+  >;
+  /**
+   * P14: teammates' photos. A teammate's name is already on this response
+   * (the caller's own team), so their photo goes with it (the named-image
+   * rule). Absent: initials.
+   */
+  readonly namedPhotos?: NamedPhotos | undefined;
+};
+
+export function registerTeamRoutes(
+  app: FastifyInstance,
+  dependencies: TeamRoutesDependencies,
+): void {
+  const withContext = requireActorContextHook(dependencies);
+  const withPerson = requireOnboardingActorHook(dependencies);
+  const { team } = dependencies;
+
+  app.get(TEAM_PATH, { onRequest: withContext }, async (request, reply) => {
+    const out = await team.team(getActorContext(request));
+    if (!out.ok) {
+      reply.callNotFound();
+      return undefined;
+    }
+    void reply.header("Cache-Control", "no-store");
+    const photoOf = await photoLookup(
+      dependencies.namedPhotos,
+      out.value.members.map((member) => ({
+        subjectType: "PERSON" as const,
+        subjectId: member.userId,
+      })),
+    );
+    return TeamDtoSchema.parse({
+      ...out.value,
+      members: out.value.members.map((member) => ({
+        ...member,
+        avatarUrl: photoOf({ subjectType: "PERSON", subjectId: member.userId }),
+      })),
+    });
+  });
+
+  app.get(
+    MY_ORGANISATIONS_PATH,
+    { onRequest: withPerson },
+    async (request, reply) => {
+      const mine = await team.myOrganisations(
+        getOnboardingActor(request).userId,
+      );
+      void reply.header("Cache-Control", "no-store");
+      return MyOrganisationsDtoSchema.parse(mine);
+    },
+  );
+
+  app.get(
+    MY_INVITATIONS_PATH,
+    { onRequest: withPerson },
+    async (request, reply) => {
+      const mine = await team.myInvitations(getOnboardingActor(request).userId);
+      void reply.header("Cache-Control", "no-store");
+      return MyInvitationsDtoSchema.parse(mine);
+    },
+  );
+
+  app.get(INVITATION_PREVIEW_PATH, async (request, reply) => {
+    const raw = request.headers[INVITATION_TOKEN_HEADER];
+    const token = InvitationTokenSchema.safeParse(
+      typeof raw === "string" ? raw : undefined,
+    );
+    const out = token.success ? await team.previewInvitation(token.data) : null;
+    if (out === null || !out.ok) {
+      reply.callNotFound();
+      return undefined;
+    }
+    void reply.header("Cache-Control", "no-store");
+    return InvitationPreviewDtoSchema.parse(out.value);
+  });
+}

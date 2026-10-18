@@ -1429,3 +1429,2308 @@ CQ-C5-R2B           PARTIAL    Founder production integration. The founder
 | A queue message naming a tenant it does not own                            | The tenant is validated at the queue boundary before it names anything                                   | document-processing handler   |
 | A processing failure reported as a successful read                         | A file's state comes from the version's own processing status; "Read" only after extraction completed    | F2 live run                   |
 | A vendor approved for confidential work treated as approved for everything | CONFIDENTIAL routes only to the reviewed provider; RESTRICTED is refused before any provider is called   | gateway-postgres; answer-seam |
+
+## Threat coverage (doc 16) — CQ-PRE-REC-001 rows (Checkpoints A-B)
+
+| Threat                                                                  | Control                                                                                                                                            | Proof                                              |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| A model turning an investor's firm wording into a hard exclusion        | A reading only ever proposes an EXCLUSION_CONFIRMATION question; the hard-exclusion step is written by the investor's explicit answer alone        | mandate-review-service; I11 live run               |
+| A model proposal treated as an answer                                   | Every proposal is a suggestion validated against the pinned step on creation and again on acceptance; nothing said becomes canonical by being said | onboarding integration (say); founder-onboarding-q |
+| A typed sentence guessed into an option                                 | Interpretation is deterministic (labels, journey aliases, figures); anything else is READING or UNCLEAR, never a guess                             | interpretation.test.ts                             |
+| A short option code read as a word ("in" → India)                       | Option keys under four characters are never matched as names                                                                                       | interpretation.test.ts                             |
+| Interview progress living in the browser, a graph process or a provider | The workspace is a reading of the session; utterances, suggestions, questions and step states are runtime rows                                     | conversation.test.ts; refresh/logout live runs     |
+| An utterance's words travelling on the event bus                        | `onboarding.utterance.recorded` carries identifiers only; the reader re-reads the row                                                              | onboarding integration (say)                       |
+| A founder's deck reaching a provider that may not hold it               | Evidence is admitted up to CONFIDENTIAL; a HIGHLY_CONFIDENTIAL document is outside every plan, and the gateway ceiling still decides               | firewall integration; policy.test.ts               |
+| A run stuck "working" forever after a Q API restart                     | Non-terminal runs are closed RUN_EXPIRED at startup; the durable terminal event reaches a reconnecting client                                      | orphaned-runs.ts; live restart                     |
+| A raw internal error shown to a person with no organisation             | The missing-context error's default message is written for the person; the API still refuses                                                       | companies.test.ts; Home live run                   |
+| A duplicate persistence path for conversational answers                 | `say` delegates to submitResponse and skipStep; a chip says its label through the same path                                                        | use-cases.ts; drive-say live run                   |
+
+## Threat coverage (doc 16) — CQ-PRE-REC-001 rows (Checkpoint C)
+
+| Threat                                                                    | Control                                                                                                                         | Proof                                          |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| A company becoming visible because onboarding finished                    | Visibility changes only through `setCompanyVisibility`, an explicit editor action with `company.edit`                           | companies integration; visibility live run     |
+| A founder's preview built from private data and a rendering filter        | The preview is `projectCompanyForNetwork`, the same function Q's company tool serves an investor; it reads declared fields only | companies integration; companies API tests     |
+| A visibility the product does not offer (public, relationship) set by API | The request contract admits only the two founder choices; the use case refuses anything else                                    | companies API tests                            |
+| An investor learning that a private company exists                        | The disclosure layer answers NOT_AVAILABLE for a private company, and Q says it does not know it, whatever the name             | investor lookup live run                       |
+| A model returning its answer as a pseudo tool call, failing the run       | The first tool round is a gathering step with its own note; a refused round falls back to the structured call                   | q-answer-tools tests; investor lookup live run |
+
+## Threat coverage (doc 16) — CQ-PRE-REC-001 rows (Checkpoint D)
+
+| Threat                                                                         | Control                                                                                                                                                                                                                                                                                                                               | Proof                                                                                                                                 |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| A mandate chosen for the investor by position when several are open            | Only exactly one open mandate is answered on the investor's behalf; the runtime's `say` answers a reference step from its server context only, by name or by assent when there is one candidate; nothing is invented without candidates                                                                                               | onboarding interpretation tests; conversation tests; fresh investor live run                                                          |
+| The same criterion held as both AVOID and HARD_EXCLUSION                       | Ticking a flag in one list moves it out of the other; the client plan and `exclusionConstraints` refuse a remaining overlap and name the flag; a sector excluded at I7 is removed from the I3 preference lists in the same save, and vice versa; `taxonomyPreferencesFromResponses` still refuses a node in both buckets and names it | investor journey tests; investor definition tests; fresh investor live run (Gambling moved; Logistics & Mobility HARD_EXCLUSION only) |
+| A sector list that reads "leaving this empty means anywhere"                   | The hint is part of the group's presentation; only geography carries it                                                                                                                                                                                                                                                               | fresh investor live run                                                                                                               |
+| A hard exclusion created by anything other than the investor's explicit answer | Unchanged: the I7 write target is the only writer; readings propose questions                                                                                                                                                                                                                                                         | investor definition tests                                                                                                             |
+
+## Threat coverage (doc 16) — CQ-PRE-REC-001 rows (Checkpoint E)
+
+| Threat                                                                                                                | Control                                                                                                                                                                                                      | Proof                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| A negated or nested mention read as the answer ("beyond pilots" → pilots; "co-invest alongside a lead" → lead)        | Deterministic interpretation drops a mention after a negation marker and a phrase that only occurs inside another matched option's phrase; a rich sentence with nothing placeable goes to Q as an utterance  | onboarding interpretation tests; founder and investor live runs                                 |
+| Part of what the person said dropped because an option matched                                                        | A rich sentence that names an option is placed and also recorded as an utterance under a derived idempotency key; the event carries identifiers only                                                         | onboarding integration test (say scenario, outbox scoped to the session); investor live run     |
+| An ambiguity asked with a question that misdescribes it (exclusion wording on a cheque range)                         | `ambiguityQuestion` builds TYPICAL_OR_LIMIT and IMPRECISE_VALUE questions from the dimension and quote; the model's wording is kept only for SCOPE_OR_EXCLUSION or a specific question                       | ambiguity-question tests                                                                        |
+| The review or snapshot saying no materials while a deck is on file                                                    | Founder facts read F2's evidence documents by id within the tenant (title and kind only); v1 material kinds still read                                                                                       | founder step-context build; founder live run (Q answered from the deck)                         |
+| A confirmation chip's own label not accepted by the interview                                                         | Confirmation steps accept their confirm and decline labels as well as assent                                                                                                                                 | onboarding interpretation tests; founder live run ("Save my raise")                             |
+| A document's contents crossing into onboarding context                                                                | Only `title` and `documentType` are projected; reading stays in the worker                                                                                                                                   | founder step-context code review                                                                |
+| A part-finished setup with no way back from Home once the organisation exists                                         | Home resolves the unfinished journey server-side and offers "Continue setup"; nothing is created or changed by showing it                                                                                    | founder and investor mobile E2Es (Save & leave → Home → Continue setup); dev-founder live check |
+| Stale E2E expectations masking the current product (form-first, v1 materials, single-mandate chooser, inert composer) | Specs updated to the shipped behaviour: one tap to the form after each navigation, definition v2 headings and materials, auto-selected single mandate, move semantics for red flags, the composer reaching Q | Playwright run recorded in the postflight                                                       |
+| An eval expecting a ceiling the catalogue no longer has                                                               | QROUTE-001 v2 sends a HIGHLY_CONFIDENTIAL request (Groq's reviewed ceiling is CONFIDENTIAL); the routing grader is unchanged                                                                                 | q:eval:ci PASS, no baseline regression                                                          |
+
+## Security acceptance — CQ-PRE-REC-001 (Checkpoints A–E)
+
+- No secret in any commit: `.env.local` untouched and unstaged; diffs scanned for provider keys and the hosted project ref before each commit.
+- Hard exclusions: written only by the investor's explicit I7 answer (form or EXCLUSION_CONFIRMATION chip); `Q_PROPOSED` never creates one; verified live in both investor runs and in the database (`is_hard_exclusion` rows).
+- The model decides no tenant, authority, canonical identity, verification, marketplace eligibility or disclosure: suggestions are validated against the pinned definition on creation and acceptance; ambiguity questions are asked, never resolved by the model.
+- Tenant scoping: the founder read services resolve documents with `findInTenant` under the bound actor's tenant; company visibility changes only through `setCompanyVisibility` with `company.edit`.
+- No duplicate truth store: utterances are transient reading input (status PENDING → READ), never a value; responses remain the only answers; mandate constraints and taxonomy preferences remain canonical.
+- Events carry identifiers only (asserted for `onboarding.utterance.recorded`).
+
+## Postflight — CQ-PRE-REC-001 (2026-09-14)
+
+Verdict: **PRE-VOICE PASS — Q-LED ONBOARDING AND LOST PRODUCT STATE RESTORED**
+
+| Check                                                               | Result                                                                                                                                                   |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Format (`prettier --check` on every changed file)                   | PASS                                                                                                                                                     |
+| Lint (`eslint . --max-warnings=0`)                                  | PASS                                                                                                                                                     |
+| Typecheck (turbo packages + root `tsc` over tests)                  | PASS after two api test fixtures were repaired                                                                                                           |
+| Unit (`pnpm test`)                                                  | 138 files, 2179 tests PASS (one vitest fork-worker start timeout under load, not a test failure)                                                         |
+| Integration (`pnpm test:integration`, fresh database)               | 44 files: 40 pass first run; media (3), q-knowledge (1) and q-evals (1) failed on unscoped assertions and a stale eval ceiling — hardened, then all pass |
+| RLS (`db:reset` → `test:rls` on the empty schema → `dev:bootstrap`) | 29 files, 841 tests PASS                                                                                                                                 |
+| Build (`turbo run build`)                                           | 37 tasks PASS                                                                                                                                            |
+| `q:eval:lint`                                                       | PASS (29 cases, 15 graders)                                                                                                                              |
+| `q:eval:ci`                                                         | exit 0, no baseline regression; QROUTE-001 v2 as recorded above                                                                                          |
+| E2E (Playwright, built api and web, local Supabase)                 | 35 passed, 0 failed (final full run)                                                                                                                     |
+| Live (§42)                                                          | fresh investor completed onboarding with no Skip; mandate ACTIVE; database state as recorded in Checkpoint D                                             |
+| Live (§43)                                                          | fresh founder, chat-first, deck read and confirmed, leave/return resume, Home Q answers from the same state                                              |
+| Live (§44)                                                          | fresh investor, one-sentence mandate placed and read, explicit exclusion confirmation, leave/return, mandate ACTIVE, Home Q answers from the mandate     |
+
+Out of scope by instruction and untouched: ElevenLabs, Tavily, any
+recommendation work (REC-001/002, ranker, slates, feed, GateQ). Known
+follow-ups, none blocking: the Discover empty state still says "Set up your
+mandate" to an investor with an active mandate (REC surface); the mandate
+answer exposes stage codes and omits geography; the founder reader does not
+propose taxonomy categories from an utterance (the form suggests them);
+"Welcome back" also greets a person returning from the form within one
+sitting; a six-word answer is treated as rich and read as well as placed.
+
+## Threat coverage (doc 16) — CQ-Q-RESEARCH-001 rows
+
+| Threat                                                                                         | Control                                                                                                                                                                                                                            | Proven by                                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Founder-private material (deck text, figures, customer names) leaving Capital Q in a search    | The outbound query is composed from an allow-list — the person's own words (figures dropped), the subject's authorised public identity, neutral connectives; the model's argument adds nothing                                     | `q-research/test/egress.test.ts`, `q-tools/test/research-tools.test.ts` (marker `CQ_PRIVATE_DO_NOT_EGRESS_94731` never reaches the provider, a log or an error) |
+| An investor's private constraints or another organisation's name used as a search subject      | Investor identity leads a query only for a self-referential question; markers dropped; own display name only                                                                                                                       | `egress.test.ts`, `egress-identity.test.ts`, `research-tools.test.ts` (`CQ_INVESTOR_PRIVATE_DO_NOT_EGRESS_55120`)                                               |
+| A private, unknown or cross-tenant company named to a provider                                 | Subject identity is decided by `company.view` (owner) or disclosure NETWORK_VISIBLE/PUBLIC (others); a private company with no website has no identity and nothing is sent; unknown and undisclosed companies are one denial       | `research-tools.test.ts` (C, H); live investor run against a private company: no leak, no research of its name                                                  |
+| A page instructing the model (prompt injection through retrieved text)                         | Excerpts are cleaned, bounded, scanned (a risk count travels as data), rendered inside the untrusted fence; the specialist offers no tools; the seam offers one round, so a page can never cause a call                            | `q-specialists/test/company-research.test.ts`, `model-gateway/test/q-answer-research.test.ts` (D/E), `q-research/test/research-service.test.ts`                 |
+| SSRF: extract of localhost, private ranges, link-local, cloud metadata, file:/javascript: URLs | `judgePublicUrl` refuses with a reason; extract reads only URLs a search in the same run surfaced                                                                                                                                  | `url-safety.test.ts`, `research-tools.test.ts` (I)                                                                                                              |
+| A search result treated as fact, or raising Capital Q's confidence                             | Sources are `PUBLIC_EXTERNAL_DATA` facts with truth class UNKNOWN and evidence status SELF_REPORTED (own site) / NO_EVIDENCE; findings citing them are bounded; `informationConfidence` unchanged                                  | `company-research.test.ts` ("does not let public pages raise Capital Q's confidence")                                                                           |
+| Research writing canonical company or investor state, or a hard exclusion                      | Every tool is READ_ONLY / SAFE_READ; persistence is only `PUBLIC_WEB` evidence through the Evidence owner (owner only) and a USER_CLAIM knowledge candidate through the Write Gate; no domain service is reachable from q-research | `research-tools.test.ts` (F/G), `boundaries.test.ts`, database inspection (no company row changed by a run)                                                     |
+| A model inventing a statement "the person said"                                                | The quote must occur verbatim in the person's message or nothing is recorded; key, statement and date validated                                                                                                                    | `q-knowledge/test/statement-recorder.test.ts`, `company-research.test.ts`, `q-answer-research.test.ts`                                                          |
+| The provider key reaching the browser, a log, Postgres or a prompt                             | `TAVILY_API_KEY` is q-api-only, wrapped as a `ProviderCredential`, absent from web configuration, reported by presence; provider request ids never leave the adapter                                                               | `config/test/research-providers.test.ts` (J), `tavily-adapter.test.ts`, live smoke assertion                                                                    |
+| Provider failure leaking status codes, endpoints or stacks to a person                         | Typed failure classes; Q receives `PROVIDER_UNAVAILABLE` with one plain sentence                                                                                                                                                   | `tavily-adapter.test.ts`, `research-tools.test.ts`, `company-research.test.ts`                                                                                  |
+| Unbounded cost or a runaway loop                                                               | ≤ 2 searches, ≤ 5 results, one extract of ≤ 5, 2,000-character excerpts, one research read per investigation, one deterministic seam call; metrics carry counts only                                                               | `research-service.test.ts`, `q-answer-research.test.ts`                                                                                                         |
+
+## Security acceptance — CQ-Q-RESEARCH-001
+
+- Tavily is used through `@tavily/core` search and extract only, in one adapter file; the eslint boundary (`@tavily/*`) and a boundary test keep it and the research package out of apps/web, q-core, contracts, the domains, onboarding, q-firewall and q-runtime.
+- `.env.local` untouched, unstaged and ignored; the change set was scanned for provider-key patterns before commit (only a synthetic test key appears). Configuration logs report `tavily: configured` and never a value.
+- No new table, no migration. Public sources are `evidence.sources` rows of type `PUBLIC_WEB` (provider, URL, title, retrieval time, publication time only when dated, SECONDARY_EXTERNAL, organisation_private, INTERNAL, metadata `{ domain, researchRunId }`) with one excerpt item each, deduplicated by URL and excerpt hash; verified in the database after the live founder run (3 rows, 1 item each).
+- A person's clarification is a `USER_STATEMENT` source + item and a `USER_CLAIM` knowledge object (SELF_REPORTED, LOW, ACTIVE, founder_private, CONFIDENTIAL); verified in `q_knowledge.objects` (`operations.geography`) and retrieved by a new conversation. No canonical company field changed.
+- The model never chooses to reach outside Capital Q: the specialist calls the research port deterministically from the person's words; the conversational seam calls it once when the question asks for public information and the gathering round did not.
+- The DB `run_events.visible_stage` CHECK constraint does not admit the new `SEARCHING_PUBLIC_SOURCES` stage; widening it is a migration deliberately not created (migration rule). Research is shown as `CHECKING_EVIDENCE` until it lands; the contract value and web label are in place.
+
+## Postflight — CQ-Q-RESEARCH-001 (2026-09-14)
+
+Verdict: **Q-RESEARCH PASS — Q CAN RESEARCH, COMPARE, CLARIFY AND PERSIST PUBLIC-WEB INTELLIGENCE**
+
+| Check                                                                   | Result                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Preflight (`git status`, `git fetch`, HEAD == @{u})                     | PASS (clean tree at 490afd8, local == remote)                                                                                                                                                                                                                                                                             |
+| TAVILY_API_KEY in root `.env.local`                                     | PRESENT (never printed, logged, committed or sent to the browser)                                                                                                                                                                                                                                                         |
+| Format (`prettier --check` on every changed file)                       | PASS                                                                                                                                                                                                                                                                                                                      |
+| Lint (`eslint . --max-warnings=0`)                                      | PASS                                                                                                                                                                                                                                                                                                                      |
+| Typecheck (turbo packages + root `tsc` over tests)                      | PASS (70 tasks; two test typings repaired)                                                                                                                                                                                                                                                                                |
+| Unit (`pnpm test`)                                                      | 152 files, 2301 tests PASS (one config expectation updated for the new research-provider secret home)                                                                                                                                                                                                                     |
+| Integration (targeted)                                                  | q-tools, q-knowledge (knowledge, q-knowledge), q-api (runs, events), q-evals company intelligence: 69 of 70 PASS; the one failure asserts `q_runtime.runs` is empty, which holds only on a fresh database — the shared local database held the 16 runs of this packet's live acceptance (environmental, not a regression) |
+| Build (`turbo run build`)                                               | 38 tasks PASS                                                                                                                                                                                                                                                                                                             |
+| Dependency audit (`pnpm audit --prod`, new SDK `@tavily/core@0.7.11`)   | No known vulnerabilities                                                                                                                                                                                                                                                                                                  |
+| Secret scan of the change set                                           | Only the synthetic test key `tvly-synthetic-…`                                                                                                                                                                                                                                                                            |
+| Live Tavily smoke (§37, `pnpm test:live-model packages/q-research/…`)   | 1 search, 1 extract, 2 sources (ng.linkedin.com, developer.ice.com); no key in output                                                                                                                                                                                                                                     |
+| Live §38 (founder, real Tavily invocation)                              | Home Q: "What does the public web currently say about which countries Kobo360 operates in?" → 1 search, 1 extract, 3 sources persisted, stage shown, sources cited in the answer                                                                                                                                          |
+| Live §39 (internal vs public comparison)                                | Q: Wikipedia and Y Combinator list seven countries; "Capital Q's internal record only cites Nigeria and Ghana"; public footprint broader than the record                                                                                                                                                                  |
+| Live §40 HARD (mismatch → clarification → persisted → new conversation) | Founder: "Kenya was only a pilot and ended last year…" → "Noted as your statement …" → `USER_STATEMENT` + `operations.geography` USER_CLAIM in the database → new tab, new conversation, "What is the status of Kenya?" → "The Kenya pilot has ended; Kobo360 currently operates only in Nigeria and Ghana."              |
+| Live investor (network-visible company)                                 | dev-investor on Home: research executed (3 sources, 0 persisted), founder-private description never shown; the two-call conversational path hit Groq free-tier TPM limits twice before succeeding with two sources                                                                                                        |
+| Live investor (private company)                                         | "no records or facts about Kobo360" — nothing founder-private, nothing searched under the company's name                                                                                                                                                                                                                  |
+| Migration                                                               | None created; the `run_events` stage constraint widening is reported, not written                                                                                                                                                                                                                                         |
+
+Fixture: the dev founder's company was given the public identity of a real, well-documented logistics company (name, website, headquarters) through the product's own PATCH and visibility endpoints for the live runs, and restored afterwards; the knowledge object recorded during §40 remains in the local database as the acceptance record.
+
+Out of scope by instruction and untouched: ElevenLabs/voice, GateQ, recommendations, Tavily Research/Crawl/Map, connectors. Known follow-ups, none blocking: widen the `run_events.visible_stage` CHECK constraint so `SEARCHING_PUBLIC_SOURCES` can be shown; the conversational path does not yet rewrite "(source S1)" labels into title/domain/date/link (the specialist path does); research about a non-owned company is transient until the Evidence owner admits it; the specialist still passes no earlier turns to the model; Groq's free-tier tokens-per-minute cap makes the two-call conversational research path fragile in quick succession (the seam requests two sources for that reason).
+
+## Checkpoint R — CQ-Q-VOICE-001 R: close research integration handoff (2026-09-14)
+
+| Item                          | What changed                                                                                                                                                                                                                                                                                                                                                                                                                 | Proven by                                                                                                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R1 · stage persistence        | Migration `20260917090000_q_runtime_visible_stage_public_sources.sql` drops and re-adds `run_events_visible_stage_check` with every earlier value plus `SEARCHING_PUBLIC_SOURCES`; the column stays a bounded vocabulary. The interim `CHECKING_EVIDENCE` fallback in the two research tools and the specialist is gone. Rollback would require rewriting rows carrying the new stage before narrowing the constraint again. | migration applied locally; RLS suite; a live research run persisting the stage and the web label "Searching public sources"                      |
+| R2 · brittle integration test | `q-runs.integration.test.ts` "refuses privilege-bearing fields" now counts runs for the caller's real tenant and the tenant the payload claimed, not the whole table.                                                                                                                                                                                                                                                        | 2/2 pass against a database holding 16 unrelated valid runs                                                                                      |
+| R3 · one source presentation  | q-core `presentPublicSource` / `describePublicSource` / `citePublicSources`; Company Intelligence re-exports it; the conversational seam collects the run's public sources from tool outcomes and rewrites label references before the recommendation guard. Public fields only.                                                                                                                                             | `q-core/test/source-presentation.test.ts`, `model-gateway/test/q-answer-research.test.ts` (R3), `q-specialists/test/cite-public-sources.test.ts` |
+| R4 · no duplicate research    | The research service remembers a successful outcome per tenant, run and composed query; the seam already skips its deterministic call when the model researched.                                                                                                                                                                                                                                                             | `q-research/test/research-reuse.test.ts`, `q-answer-research.test.ts`                                                                            |
+| R5 · investor persistence     | Deferred to CQ-PRE-REC-FINAL: research about a network-visible company owned by another organisation stays transient; no ownership, RLS or subject rule was bent.                                                                                                                                                                                                                                                            | postflight                                                                                                                                       |
+
+## Checkpoint A — CQ-Q-VOICE-001 A: natural language → canonical meaning (2026-09-14)
+
+| Item                                               | What changed                                                                                                                                                                                                                                                                                                                                            | Proven by                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Negation, contrast, scope (§7)                     | `packages/onboarding/src/domain/negation.ts`: clause-scoped markers ("not", "never", "don't", "isn't really", "unlike", "except", …); the one option resolver (`resolution/options.ts`) matches affirmative text only; founder document suggestions apply the same rule                                                                                 | `negation.test.ts` (the four packet sentences), `interpretation.test.ts` unchanged                                                                                                                                                                                                           |
+| One utterance, many answers (§8-§9)                | `resolution/cross-step.ts` reads every unanswered step: unambiguous selects → suggestions retained until eligible; several fits → AMBIGUITY question with real options; cued figures and figure pairs → range suggestions; exclusion mentions → EXCLUSION_CONFIRMATION questions. Journeys declare `FOUNDER_INTERVIEW_CUES` / `INVESTOR_INTERVIEW_CUES` | `cross-step.test.ts` (founder and investor packet sentences), integration "one sentence answers many questions"                                                                                                                                                                              |
+| Canonical categories (§5, §10-§11, §19)            | `resolution/taxonomy-phrases.ts`: affirmed n-grams → `OnboardingTaxonomyResolver` (the taxonomy classifier, composed in apps/api) → exact or clear lexical leader proposed as a set; close candidates → a choice among real nodes; no invented ids                                                                                                      | live: "We make AI software for freight forwarders and logistics companies… We're not fintech." → suggestion {Logistics & Mobility, Enterprise Software}; "We're an infrastructure platform." → question {Data Infrastructure, Developer API, Payment Infrastructure}; fintech never proposed |
+| Ambiguity persisted (§10)                          | The asked step's AMBIGUOUS reading is recorded as an interview question with the matching options                                                                                                                                                                                                                                                       | integration suite; live run                                                                                                                                                                                                                                                                  |
+| Corrections (§14)                                  | `resolution/correction.ts`: the words after "no, that's wrong / actually / what I meant" re-read against the last answered step and superseded through the normal response history; `CORRECTED` understanding                                                                                                                                           | `correction.test.ts`, integration case (two rows for intent, current = exploring)                                                                                                                                                                                                            |
+| Contract                                           | `OnboardingUnderstandingSchema`: `CORRECTED` member; `proposed` count on ANSWERED / AMBIGUOUS / READING / UNCLEAR; web acknowledgement says "I also picked up N other things"                                                                                                                                                                           | contracts build, web unit tests                                                                                                                                                                                                                                                              |
+| Model-assisted choice among candidates (§5 rung 6) | Not built: the deterministic rungs plus a clarification question met the acceptance sentences; a bounded index-choice task remains a follow-up if live use shows ambiguity the classifier cannot settle                                                                                                                                                 | —                                                                                                                                                                                                                                                                                            |
+
+Environment note: an unrelated project's Next.js dev server (songscribe) was also
+bound to port 3001 and intermittently answered Capital Q API requests during the
+live smoke; it was stopped so the API could be exercised reliably.
+
+## Checkpoint B — CQ-Q-VOICE-001 B: remove robotic onboarding interactions (2026-09-15)
+
+| Item                                | What changed                                                                                                                                                                                                                                         | Proven by                                                                                            |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| One active question (§16)           | The "I still need" card became a small "N things left to settle · Review remaining gaps" entry; the live prompt is the only question on screen                                                                                                       | E2E: no "Answer" button anywhere in the workspace                                                    |
+| No "Answer" gate (§17-§18)          | Chips carry the value they stand for; `OnboardingClient.submitValue` → runtime `submit`; single select and confirmation submit on one tap; multi select toggles + "Done" (exclusive option submits at once); "I don't know" and "Skip" one click     | `promptFor` tests; E2E founder F0/F1/F2/F3 and investor I0                                           |
+| Category UX (§19)                   | Taxonomy steps render Q's pending proposal as selected chips ("I think these are the closest fits"), Keep these / adjust (ACCEPT or EDIT of the suggestion), and a real taxonomy search; founder presentation now carries labels for suggested nodes | E2E: "Logistics & Mobility" pre-selected after the description, "Supply Chain" added by search, kept |
+| Gaps answered in place (§16, §21)   | Each pending question offers its own options, else the definition's options, else a figure/text input, else the form; `JourneyVocabulary.stepType/optionsFor` from the pinned definitions                                                            | `stillNeeded`/`gapValue` tests                                                                       |
+| Text + options simultaneously (§20) | Composer always enabled (only while a request is in flight is it not), placeholder says "Or say it in your own words" on select steps                                                                                                                | E2E types on text steps, taps on select steps                                                        |
+| Tangents (§23)                      | Questions and request-shaped sentences go to Q over the event stream (`/api/q-stream`), stage labels shown, one continuing Q conversation per interview, bridge line then the live question                                                          | `looksLikeQuestionForQ` tests; manual check against q-api                                            |
+| Resume / pause (§24-§25)            | `resumeIntent` / `pauseIntent`; pause acknowledges persistence, never completes                                                                                                                                                                      | tests with the packet phrases; E2E "Let's stop here." / "Where were we?"                             |
+| Welcome back (§26)                  | Time-gated on `session.lastActivityAt` (30 min); never from browser memory                                                                                                                                                                           | tests at the boundary; E2E: form-and-back and reload show no greeting                                |
+| Form mode (§22)                     | "Review as form" / "Use the form" unchanged; same session both ways                                                                                                                                                                                  | E2E: form shows "Your founding team" after the thread reached F4                                     |
+
+| Proposals retired on answer (§21) | Runtime `commitResponse` expires the other pending suggestions for a step once the person has answered it (the one being accepted or corrected is resolved as before), so an older proposal never lingers as an offer to overwrite the answer | onboarding unit + integration suites; live: after "Keep these" the older category proposal no longer reappears |
+| Short text is the answer | `interpretUtterance` on a `short_text` step takes any line under six words as the value; a figure inside a name ("E2E Rail 2024") no longer makes it a narrative to be read | interpretation unit tests; E2E company and firm names typed into the composer |
+
+## Checkpoint C — CQ-Q-VOICE-001 C: ElevenLabs Speech Engine (2026-09-15)
+
+| Item                                         | What changed                                                                                                                                                                                                                                                                                                              | Proven by                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Architecture (§28-§29)                       | ElevenLabs is the Speech Engine (mic transport, STT, turn detection, interruption, TTS); Q stays in the Q API. [ADR 0010](../adr/0010-realtime-voice-through-a-speech-engine.md); module doc `docs/modules/q-voice.md`                                                                                                    | —                                                                              |
+| Secrets and ids (§30-§31)                    | `packages/config/src/speech-providers.ts`: `ELEVENLABS_API_KEY` as `ProviderCredential` (server-only, redacted), `ELEVENLABS_SPEECH_ENGINE_ID` / `_MALE`; q-api config `voice` + `secrets.speechProviders`; `pnpm voice:setup` creates/updates the two Speech Engine resources and records ids in gitignored `.env.local` | config status logs presence only; `q-voice.test.ts` asserts no key in any body |
+| Provider adapter (§33)                       | `RealtimeVoiceProvider` port (`voice/provider.ts`); ElevenLabs adapter in `voice/providers/`; eslint Rule H refuses `@elevenlabs/*` outside the two adapter directories                                                                                                                                                   | lint                                                                           |
+| Token endpoint + binding (§31, §34, §85-§86) | `POST /v1/q/voice/sessions` issues an ephemeral credential and binds the provider conversation id to the server-resolved actor and thread before returning; per-person and total bounds; a stranger presenting the id is closed                                                                                           | `q-voice.test.ts`                                                              |
+| WebSocket auth (§32)                         | `/v1/q/voice/ws` attached to the Q API's HTTP server through `speechEngine.attach`, which verifies the provider JWT on every upgrade; `disableAuth` is not exposed by the adapter                                                                                                                                         | code review; adapter has no such option                                        |
+| Same Q thread (§35-§36)                      | A spoken interview answer → the application API's `say` under the person's own bearer; a spoken question → `createRun` with `modality: "VOICE"` in the bound conversation, spoken as the run stream arrives; no voice tables                                                                                              | `voice-turn.test.ts`                                                           |
+| Interruption (§37-§38)                       | The provider aborts the turn signal on barge-in; the run is cancelled via `cancelRun`; sentence chunking (`speech.ts`) means at most one sentence is lost and nothing stale is spoken                                                                                                                                     | `voice-turn.test.ts` interruption case; `voice-speech.test.ts`                 |
+| Streaming (§40)                              | Deltas are re-chunked by sentence and handed to `sendResponse` as an async iterable; a completed message without deltas is spoken whole (bounded)                                                                                                                                                                         | `voice-turn.test.ts` streaming case                                            |
+| Shared interview moves                       | `@capital-q/onboarding/interview`: `looksLikeQuestionForQ`, `resumeIntent`, `pauseIntent`, `thinkingIntent` — one implementation for the typed thread and the spoken one                                                                                                                                                  | `interview-moves.test.ts`; web tests unchanged                                 |
+| Live tunnel (0A)                             | `ngrok version` 3.39.9 (MSIX) present; `ngrok config check`, `ngrok http 3002` and the user/machine `NGROK_AUTHTOKEN` all report no credential on this machine, so the tunnel could not be started and the Speech Engine resources were not created here                                                                  | ERR_NGROK_4018; see Known limitations                                          |
+
+## Checkpoint D — CQ-Q-VOICE-001 D: voice interview UX (2026-09-15)
+
+| Item                                   | What changed                                                                                                                                                                                                                                                                                                                             | Proven by                                                                                                |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Entry and layout (§43-§45)             | "Talk with Q" beside the review controls of the Q-led workspace; while voice is active a calm panel sits above the thread (presence, state label, mute / end voice / Female-Male / volume) and the thread, contextual controls, progress and composer stay exactly where they were — voice adds nothing that would make it a different Q | web typecheck/lint; screenshots deferred to the live smoke (tunnel)                                      |
+| Presence and states (§46-§47)          | `features/voice/q-presence.tsx`: the Q mark (doc 18 §33 — no orb) in a ring that eases with the session's own input/output level; public labels only (Ready, Connecting, Listening, Thinking, Speaking, Voice paused); breathing in opacity while thinking; still under `prefers-reduced-motion`                                         | `VOICE_STATE_LABELS`; global reduced-motion rule                                                         |
+| Live transcript (§48)                  | The provider's final user and Q lines join the thread as turns; after each of Q's lines the session is re-read so chips and progress follow. Partial transcripts are not bolted on with a second STT (the SDK reports final lines)                                                                                                       | code                                                                                                     |
+| Controls (§49-§51)                     | Mute, End voice, voice picker (Female default / Male), volume; switching voice restarts only the provider session — the interview and the Q conversation stay where they were on the server                                                                                                                                              | `use-voice-interview.ts`                                                                                 |
+| Voice tuning (§52)                     | Recorded in `dev/voice-setup.ts` and `docs/modules/q-voice.md`; Sarah (female) default, Daniel (male) alternative                                                                                                                                                                                                                        | —                                                                                                        |
+| Fillers and acknowledgements (§53-§54) | `withFiller`: one "Let me check that." only when the first words take longer than 2.5 s; "Let me look at public sources." once when a run reaches the research stage; spoken acknowledgements are "Noted." + the next question, never "Great!"                                                                                           | `voice-speech.test.ts` (quick answer → no filler; slow → one), `voice-turn.test.ts` (research line once) |
+| Patience (§55)                         | "Let me think" / "give me a second" → "Of course, take your time."; the Speech Engine is configured `turnEagerness: patient`, 10 s turn timeout                                                                                                                                                                                          | `interview-moves.test.ts`                                                                                |
+| Options during voice (§59-§61)         | A tapped option, "Done" on a set, "Skip", typed text and "Keep these" go through the spoken thread (`sendUserMessage`) so the server runs the same `say` / ACCEPT the typed path runs and Q continues aloud; an adjusted category set is committed over HTTP and Q is asked to continue                                                  | `voice-turn.test.ts` (spoken "keep these" → ACCEPT)                                                      |
+| Research in voice (§64-§65)            | The research stage is spoken as its approved label; long material is never read aloud (`bounded`, 1,200 chars)                                                                                                                                                                                                                           | `voice-speech.test.ts`                                                                                   |
+| ElevenLabs UI components               | The registry (`ui.elevenlabs.io/r/orb.json`) is behind a browser security checkpoint from this machine and doc 18 §33 rules out an orb; the presence is hand-written on the Q mark                                                                                                                                                       | CLI dry-run log                                                                                          |
+
+## Checkpoints E/F — CQ-Q-VOICE-001: one interview across modalities; live acceptance (2026-09-15)
+
+What the same-interview property rests on, and how much of it this machine could prove.
+
+| Journey (§67-§81)                                                         | How it is the same interview                                                                                                                                   | Proven here                                                                                                                                                 |
+| ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Voice → text (§67)                                                        | A spoken answer reaches `say` on the same onboarding session; the typed thread reads the session back and continues from `currentStep`                         | `voice-turn.test.ts` (say under the bound token, next question spoken); `onboarding-conversation.desktop.spec.ts` (typed continuation from persisted state) |
+| Text → voice (§68)                                                        | "Talk with Q" binds the credential to the session id and the Q conversation the thread already holds; Q opens with the live question                           | `q-voice.test.ts` (binding carries onboarding + thread); workspace `talkWithQ`                                                                              |
+| Click → voice (§69)                                                       | A tap while voice is active travels the spoken thread and the server runs the same `say`; a tap before voice is the structured `submitValue`                   | workspace routing; `voice-turn.test.ts`                                                                                                                     |
+| Voice → form (§70)                                                        | Form mode reads the same session; nothing lives in the provider session                                                                                        | `onboarding-conversation.desktop.spec.ts` ("Use the form" shows the position the thread reached)                                                            |
+| Tangent / research → interview (§71-§72)                                  | A spoken question is a VOICE run in the bound conversation; the research stage is spoken; the live question returns after                                      | `voice-turn.test.ts` (streaming, research line, bridge back)                                                                                                |
+| Pause → new session (§73-§74)                                             | "Let's stop here." persists nothing new and completes nothing; a new voice session binds to the same Capital Q session — no ElevenLabs memory, no localStorage | `interview-moves.test.ts`; `voice-turn.test.ts` (pause/resume without touching the runtime)                                                                 |
+| Live founder / investor journeys, interrupt, filler, disconnect (§75-§81) | Designed and unit-proven with fake adapters (interruption → `cancelRun`, one filler on a slow turn, plain disconnect notice with typing still available)       | **Not exercised live**: no authenticated ngrok on this machine, so no public WSS, no Speech Engine resource, no microphone session                          |
+
+Security (§82-§86): the credential is bound to the server-resolved actor before it is returned; a stranger presenting the provider conversation id is closed; the body cannot name a tenant (422); the provider key is absent from every response and problem body (`q-voice.test.ts`), from the web configuration (`speech-providers.test.ts`) and — see the postflight — from the production client bundle. Only conversational text reaches the provider (`speech.ts` strips citations, addresses and markup).
+
+Performance (§87-§89): `q.voice.turn.first_speech_ms` (final transcript → first text handed to speech) is recorded per turn as an observability histogram; no live sample exists yet, and none is invented. Memory on this 16 GB machine during the packet: ~1.0 GB free with the dev stack, the browser and the lint run up; the embeddings container (1.8 GiB) is the largest Docker consumer; the voice channel adds no worker or container — it runs inside q-api.
+
+Analytics (§90): voice_started / voice_ended / voice_interrupted / voice_error / q_tool_used equivalents are observability counters (`q.voice.session.issued`, `q.voice.session.started`, `q.voice.session.ended`, `q.voice.turn` by outcome and path, `q.voice.error`) — not domain events, not the outbox, not the run stream.
+
+## Postflight — CQ-Q-VOICE-001 (2026-09-15)
+
+Verdict: **VOICE INTERVIEW FAIL — ngrok is not authenticated on this machine (ERR_NGROK_4018: no ngrok.yml at the default path, no NGROK_AUTHTOKEN in the user or machine environment), so no public WSS tunnel could be opened, the Speech Engine resources were not created, and the live ElevenLabs paths — microphone, STT, Q receiving a spoken turn, TTS, interruption, the founder and investor voice journeys — were not exercised.**
+
+Everything that does not need the tunnel is built, tested, committed and pushed. Status: BLOCKED ON LIVE VERIFICATION, not on code.
+
+| Checkpoint                                 | Commit                                                                   | Local                          | Remote  | Equal                     |
+| ------------------------------------------ | ------------------------------------------------------------------------ | ------------------------------ | ------- | ------------------------- |
+| R — close research integration handoff     | CQ-Q-VOICE-001 R: close research integration handoff                     | e7dc899                        | e7dc899 | yes                       |
+| A — natural language → canonical meaning   | feat(onboarding): natural language → canonical meaning                   | 038cfd1                        | 038cfd1 | yes                       |
+| B — remove robotic onboarding interactions | feat(web): remove robotic onboarding interactions                        | 53dd209                        | 53dd209 | yes                       |
+| C — ElevenLabs Speech Engine channel       | feat(q-api): realtime voice channel through the ElevenLabs Speech Engine | 09ca9f1                        | 09ca9f1 | yes                       |
+| D — voice interview UX                     | feat(web): voice interview UX on the Q-led workspace                     | 2e6f635                        | 2e6f635 | yes                       |
+| E/F — cross-modality proofs, postflight    | docs: CQ-Q-VOICE-001 E/F and postflight                                  | the commit adding this section | same    | yes (verified after push) |
+
+Client bundle proof (§85): the production web build (200 files under `.next/static` and `.next/server/app`) contains zero occurrences of the ELEVENLABS_API_KEY value and zero of its name; the only ElevenLabs mention in static output is the browser SDK chunk itself. E2E on that build: the interview spec passes 3/3 with the "Talk with Q" entry present.
+
+**To unblock the live portion** (in this order, on this machine): `ngrok config add-authtoken <token>` (the MSIX install expects `%LOCALAPPDATA%\ngrok\ngrok.yml`), then `ngrok http 3002`, then `pnpm voice:setup -- --ws-url wss://<ngrok-host>/v1/q/voice/ws`, restart `pnpm dev`, open the founder interview and press "Talk with Q". The bounded manual smoke (§93) then covers mic → STT → Q turn → TTS, interruption, typing during voice, a tapped option during voice, and the two journeys; the `q.voice.turn.first_speech_ms` histogram gives the speech-end → first-text samples.
+
+## Security acceptance — CQ-REC-001 deterministic hard eligibility (2026-09-18)
+
+| Concern                                           | How it is held                                                                                                                                                                                                                       | Proven by                                                                                                    |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Founder-private inputs (memory, chats, documents) | `EligibilityPorts` has no port that can express them; the subtree imports no Q, evidence, media or onboarding package and contains no SQL                                                                                            | `eligibility-boundary.test.ts`; `eligibility-service.test.ts` L/M/N; `eligibility.integration.test.ts` L/M/N |
+| Public-web research bypassing canonical state     | A PUBLIC_WEB `evidence.sources` row is not an input; only a confirmed ACTIVE taxonomy assignment can match a declared exclusion                                                                                                      | service test N; integration test L/M/N                                                                       |
+| Model-derived hard exclusions                     | Only `importance = HARD_EXCLUSION` constraints and `isExclusion` preferences from `user_selected`/`admin_curated` are read; `q_inferred`/`document_extracted`/`integration` rows cannot exclude; MANUAL_ONLY constraints are ignored | policy test I; onboarding invariant unchanged                                                                |
+| Client-provided tenant / organisation / mandate   | Investor organisation resolved from the actor; mandate reads are tenant- and organisation-scoped; a pinned foreign mandate resolves as absent                                                                                        | service test "pinned mandate belonging to another investor"                                                  |
+| Cross-tenant exposure                             | Candidates are cross-tenant by design; every id passes the disclosure evaluator; results carry ids and codes only                                                                                                                    | policy test O; integration test C/O                                                                          |
+| Private reason leakage                            | Reason codes are a closed set naming canonical state or a declared rule; `detail` is a dimension or relationship state, never a declared value                                                                                       | policy tests "reason codes…", "hard exclusion on a dimension…"                                               |
+| AVOID / MUST / cheque as eligibility              | Never evaluated; the cheque criterion is NOT_APPLICABLE in v1                                                                                                                                                                        | policy tests E, J; integration test D/E                                                                      |
+| DRAFT or stale mandate                            | Only ACTIVE is FOUND; a DRAFT/CLOSED pinned mandate yields `MANDATE_NOT_ACTIVE` with no rules read                                                                                                                                   | policy test H; service test H; integration test H                                                            |
+| GateQ / ranking contamination                     | Only `INVESTOR_DISCOVER` is evaluated; other modes throw; no weights, no order, no score in the result                                                                                                                               | service test "only INVESTOR_DISCOVER…"; result schema                                                        |
+| Arbitrary SQL / dynamic tables                    | The Recommendation context issues no SQL; the one new query is `createPostgresCompanyMarketplaceQueryPort` in the Companies context, bounded to 500 ids                                                                              | boundary test; code                                                                                          |
+
+## Postflight — CQ-REC-001 (2026-09-18)
+
+Verdict: **REC-001 PASS — HARD ELIGIBILITY IS DETERMINISTIC, PRIVATE-SAFE AND READY FOR CANDIDATE GENERATION**
+
+| Check                                                                                           | Result                                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Format (`prettier --check .`)                                                                   | PASS on every tracked file; the 244 warnings are all under the untracked, git-ignored `graphify-out/`                                                        |
+| Lint (`eslint . --max-warnings=0`)                                                              | PASS                                                                                                                                                         |
+| Typecheck (`turbo run typecheck` + root `tsc`)                                                  | 76 tasks PASS                                                                                                                                                |
+| Unit (`pnpm test`)                                                                              | 202 files, 2627 tests: 2626 pass; `packages/ui/test/q-composer.test.tsx` hit a vitest fork-worker start timeout under concurrent load and passes alone (5/5) |
+| Integration (`vitest --config vitest.integration.config.ts packages/discovery`, local Supabase) | 9 tests PASS                                                                                                                                                 |
+| Build (`turbo run build`)                                                                       | 41 tasks PASS                                                                                                                                                |
+| `git diff --check`, secret scan of changed files, cycle check                                   | clean; no owning context depends on `@capital-q/discovery`                                                                                                   |
+| Migration                                                                                       | NONE — `marketplace_readiness_state` already exists; only `not_assessed` is written today                                                                    |
+| New external integration / ENV / model calls                                                    | NONE / NONE / ZERO                                                                                                                                           |
+
+Canonical inputs: marketplace state `core.companies.marketplace_readiness_state` via `marketplaceParticipationOf`; visibility `core.companies.marketplace_visibility` plus the disclosure evaluator; ACTIVE mandate via `InvestorMandateQueryPort`; hard exclusions via `investor_mandate_constraints.importance = HARD_EXCLUSION` and `taxonomy.mandate_preferences.is_exclusion`; stage `current_stage_code`; geography `headquarters_country`; cheque: none (NOT_APPLICABLE); relationship `network.relationships.current_state` via `RelationshipQueryPort`.
+
+Golden scenarios A–P: A ELIGIBLE · B INELIGIBLE · C INELIGIBLE · D INELIGIBLE · E ELIGIBLE (not ineligible) · F INELIGIBLE · G UNDETERMINED · H DRAFT exclusion has no effect · I cannot hard-exclude · J ELIGIBLE (not automatically ineligible) · K DISCOVERED passes, unknown state UNDETERMINED, no closed state exists in v1 · L unchanged · M unchanged · N unchanged until a canonical classification · O INELIGIBLE with ids only · P identical.
+
+Known limitations (REC-001 only): every company is `not_assessed`, so nothing is ELIGIBLE until the readiness packet writes `marketplace_ready`; the pre-REC slate is untouched and still gates on visibility alone until REC-002 routes candidates through this service; Network defines only DISCOVERED, so `RELATIONSHIP_STATES_CLOSED_TO_DISCOVERY` is empty; onboarding writes stage as MUST plus a range, so a hard stage gate arises only from an explicitly declared HARD_EXCLUSION constraint; hard exclusions on `red_flag`, `business.attribute`, `founder.business_attribute`, `sector` and `investment_role` are UNDETERMINED for every company until a canonical company field answers them.
+
+Next: CQ-REC-002 — Structured Candidate Generator.
+
+## Security acceptance — CQ-MKT-001 marketplace readiness & activation gate (2026-09-18)
+
+| Concern                                  | How it is held                                                                                                                                                                                     | Proven by                                                                                                      |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Founder self-activation                  | No request, route, field or capability names a state; `assess` is body-less and needs `company.edit` on the exact company; the policy decides                                                      | `marketplace-readiness.test.ts` (denied capability, no state field); API test (body naming a state is ignored) |
+| Investor / cross-tenant activation       | Reads and assessments are tenant- and organisation-scoped; a foreign actor gets the same 404 as a missing company                                                                                  | unit + integration "investor in another tenant"                                                                |
+| Browser-forged verification              | The Verification seam is a server port; production adapter answers unavailable and is not configurable; the synthetic seam refuses non-local environments and non-loopback databases               | `synthetic verification seam guard` tests                                                                      |
+| Q inference / memory / public web / docs | The policy snapshot has no field for them; a founder-private memory row in the real table changes nothing                                                                                          | unit "onboarding completion, a READY pitch, Q memory…"; integration "a memory row changes nothing"             |
+| Evidence ≠ verification                  | `REQUIRED_DOCUMENTATION` is NOT_APPLICABLE in v1; no document state is read; only claim standings from the seam satisfy the verification requirements                                              | policy tests                                                                                                   |
+| network_visible ≠ marketplace_ready      | Visibility is one requirement among six; publishing never makes a company ready; withdrawing reassesses in the same transaction                                                                    | unit "publishing never makes a company ready", "withdrawing visibility…"; integration                          |
+| Readiness never widens disclosure        | The policy reads `marketplace_visibility` and never writes it; the fixture script refuses to flip it                                                                                               | code; `pnpm dev:marketplace-ready` run (exit 1 while private)                                                  |
+| Audit / event hygiene                    | Transitions record policy version, trigger, previous/new state, outstanding requirement ids and the verification source; the event carries ids, version, state and policy version; no descriptions | integration (audit row + outbox row asserted)                                                                  |
+| Synthetic ≠ real                         | `verificationSource = SYNTHETIC_LOCAL_FIXTURE` on every synthetic transition; production writes `VERIFICATION_UNAVAILABLE`                                                                         | unit + integration                                                                                             |
+| REC-001 unchanged                        | Eligibility still consumes `marketplaceParticipationOf`; `requirements_outstanding` is NOT_ELIGIBLE; policy `eligibility.v1` untouched                                                             | `eligibility.integration.test.ts` MKT case; REC-001 suites unchanged                                           |
+
+## Postflight — CQ-MKT-001 (2026-09-18)
+
+Verdict: **CQ-MKT-001 PASS — MARKETPLACE READINESS IS CANONICAL, DETERMINISTIC AND SAFE TO CONSUME FROM RECOMMENDATION**
+
+REC-001 final full gate (stack stopped, nothing else running): `pnpm test` → 203 files, 2632 tests, exit 0. REC-001 is closed.
+
+| Check                                                              | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Format (`prettier --check` on every changed file)                  | PASS                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Lint (`eslint . --max-warnings=0`)                                 | PASS when run alone with `NODE_OPTIONS=--max-old-space-size=8192`; two earlier attempts alongside other gates died on the default Node heap (exit 134), not on a finding                                                                                                                                                                                                                                                                                                                                                                       |
+| Typecheck (`turbo run typecheck` + root `tsc`)                     | PASS (one implicit-any in a new test fixed on the way)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Unit (`pnpm test`, final run)                                      | 204 files, 2655 tests, exit 0. Two earlier runs: one real failure (REC-001's two-state vocabulary assertion, updated to three), one SSE timing test in `apps/q-api/test/q-events.test.ts` that failed once under load and passes alone (18/18) and in the final run                                                                                                                                                                                                                                                                            |
+| Integration, this packet (local Supabase)                          | companies readiness 5/5, discovery eligibility 10/10 (incl. the readiness proof), API routes 39/39                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Integration, full suite (`pnpm test:integration`, shared local DB) | 47 files: 37 pass, 1 skipped, 9 fail (16 tests) — none in companies, discovery, contracts, api-client or apps/api. Causes: stale expectations against the current repo (analyst prompt v3 vs v4, four vs five catalogue models, groq vs google routing per the local provider decision) and unscoped row counts over a local DB carrying dev-bootstrap data (taxonomy, capital, investor-onboarding, embeddings) plus one outbox test that counts the two pre-existing `Q.action.prepared` rows and the readiness event the fixture run queued |
+| Build (`turbo run build`)                                          | 41 tasks PASS                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `git diff --check`, secret scan, cycle check                       | clean                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Migration / new service / API key / ENV / billing                  | NONE / NONE / NONE / NONE / NONE                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+
+Existing state reused: `core.companies.marketplace_readiness_state` (bounded text); vocabulary `not_assessed` → `requirements_outstanding` ⇄ `marketplace_ready`. Policy `marketplace-readiness.v1`: COMPANY_ACTIVE, MINIMUM_COMPANY_PROFILE, DISCOVERY_VISIBILITY_CONFIRMED, FOUNDER_IDENTITY_VERIFIED, ORGANISATION_VERIFIED, REQUIRED_DOCUMENTATION (NOT_APPLICABLE).
+
+Verification: no bounded context exists (doc 13 §24 `evidence.verification_claims` unbuilt; `core.investor_organisations.verification_state` is presentation only). Founder identity and organisation sources are the `VerificationClaimsPort`, production adapter `createUnavailableVerificationClaimsPort`. Manual/admin verification: NOT IMPLEMENTED (no such role or capability exists; none invented). External provider: NONE.
+
+**Can a production company become marketplace-ready legitimately today? NO.** Missing capability: a Verification bounded context that records claim-specific founder identity and organisation identity verification (claims table, provider or reviewed workflow, expiry and revocation) and exposes it through a query port that replaces the unavailable adapter. The screen says so in plain English; nothing calls a company verified.
+
+Dev/test: synthetic ready fixture YES (`@capital-q/companies/dev`, `pnpm dev:marketplace-ready`); local/test-only protection PASS (environment and loopback guards, source label on audit). The dev founder's company is currently `requirements_outstanding` because its visibility is still private; the script will not choose visibility for them.
+
+Next: CQ-REC-002 — Structured Candidate Generator.
+
+## Baseline normalisation — CQ-REC-002 pre-flight (2026-09-18)
+
+Local Supabase reset (`pnpm db:reset`), no bootstrap, full `pnpm test:integration`: 47 files, 436 pass, 5 skipped, 10 fail. Every unscoped-count failure of the MKT-001 run vanished with the reset. Of the ten, three were test defects fixed in `a78f87a` (runs created in one transaction share `now()`; five catalogue models since the dialogue-fallback migration; analyst prompt v4 since ADR 0012), and one more in `eb04a08` (outbox rows asserted by index without `ORDER BY id`). The remaining eight — gateway routing and ceiling, orchestrator public-run and tools scenarios, four company-intelligence evals and the `PROVIDER_MISROUTING` gate — all trace to `20260921090000_demo_google_provider_posture.sql`, which raises Gemini to `ENTERPRISE_CONTRACT` for demo traffic while those tests and eval cases still script the reviewed posture (Gemini PUBLIC-only, Groq answering INTERNAL). Realigning them means re-scripting Q provider fixtures or reverting the posture, which is Q/gateway work, and was not done inside a Recommendation packet. One further failure, `permissions/disclosure.integration.test.ts` "a failed outbox write rolls back the grant", appears only in the full run: `created_at` is the container's `now()` and `revoked_at` the host clock, so a few milliseconds of skew trips `revocation_after_creation`. It passes alone.
+
+## Security acceptance — CQ-REC-002 structured candidate generator (2026-09-18)
+
+| Concern                              | How it is held                                                                                                                                                                   | Proven by                                                                       |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| ACTIVE mandate only                  | Same `InvestorMandatePort` as REC-001; NONE and AMBIGUOUS return `NO_ACTIVE_MANDATE`; a pinned DRAFT is refused; no newest-by-date fallback                                      | `candidates.test.ts` L; `candidates.integration.test.ts` L/M/T                  |
+| One AND filter                       | Dimensions retrieve independently and are unioned; an empty intent for one dimension is no hits from it, never a veto                                                            | `candidates.test.ts` A–G, F, G                                                  |
+| AVOID / HARD_EXCLUSION / Q_PROPOSED  | Positive intent is MUST/STRONG/NICE only, from `user_selected`/`admin_curated` taxonomy sources; exclusions are REC-001's; AVOID retrieves nothing and removes nothing           | `candidates.test.ts` intent test, H; integration AvoidOnly/Excluded             |
+| Private companies in retrieval       | Companies port lists only active, network_visible/public_external rows; taxonomy hits are intersected with that projection before entering the pool; REC-001 still gates each id | integration Private never listed, never output; K/Q unit                        |
+| Founder-private material             | Retrieval ports return ids, codes and node ids; no port for memory, conversations, documents, research; boundary guard covers `src/candidates` and the adapter                   | boundary test; N/O unit and integration with `REC002_PRIVATE_FOUNDER_CONTEXT_…` |
+| Cheque                               | Typed seam reporting `NOT_COMPUTABLE`; no capital objective read; "max cheque ≥ total round" cannot be expressed                                                                 | unit D; diagnostics `chequeSignal`                                              |
+| No score / rank / model / randomness | Provenance carries reasons and node ids only; order is canonical id; boundary guard forbids provider tokens                                                                      | provenance test; S/T                                                            |
+| Eligibility authority                | REC-001's service in one batch; INELIGIBLE never emitted; UNDETERMINED counted, not promoted                                                                                     | I/J and UNDETERMINED tests; integration                                         |
+
+## Postflight — CQ-REC-002 (2026-09-18)
+
+Verdict: **REC-002 FAIL — the full `pnpm test:integration` gate does not exit 0 on the clean local baseline: eight Q/gateway tests contradicted by the approved demo-posture migration and one clock-skew race in permissions remain. Every REC-002 gate is green; the implementation is complete in the working tree and deliberately not committed until the baseline is green.**
+
+| Check                                                | Result                                                                                                                       |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Format / lint (touched packages, `--max-warnings=0`) | PASS                                                                                                                         |
+| `pnpm typecheck`                                     | PASS                                                                                                                         |
+| `pnpm test`                                          | 205 files, 2671 tests, exit 0                                                                                                |
+| `pnpm build`                                         | 41 tasks PASS                                                                                                                |
+| Discovery integration (candidates + eligibility)     | 13/13 PASS                                                                                                                   |
+| `pnpm test:integration` (clean local DB)             | 48 files: 41 pass, 1 skipped, 6 fail (11 tests) — none in discovery, companies, taxonomy or apps; see Baseline normalisation |
+| `git diff --check`, secret scan, cycle check         | clean; nothing depends on `@capital-q/discovery` but q-tools                                                                 |
+| Migration / external service / ENV / model calls     | NONE / NONE / NONE / ZERO                                                                                                    |
+
+Live local acceptance (real adapters, clean local Postgres, one ACTIVE mandate: seed · NG · fintech · West Africa; ten synthetic companies): raw hits STAGE 4, GEOGRAPHY 6 (5 country + 1 region), TAXONOMY 3, CHEQUE 0 = 13; deduplicated 8; eligible 5; ineligible 3 (hard-excluded, not marketplace-ready, unknown-stage company that cannot be marketplace-ready); undetermined 0; 135 ms. Rankable candidates and provenance: AllThree `GEOGRAPHY_OVERLAP, STAGE_OVERLAP, TAXONOMY_DESCENDANT_OVERLAP` (fintech → payments); GeographyOnly `GEOGRAPHY_OVERLAP`; TaxonomyOnly `TAXONOMY_OVERLAP`; StageOnly `STAGE_OVERLAP`; RegionOnly `GEOGRAPHY_REGION_OVERLAP` (west_africa). Query count per run: one per asked dimension (2), one hierarchy expansion per preference node (2), one node probe, one discoverable-facts intersection, one eligibility batch.
+
+Next: realign the eight Q/gateway tests with the approved provider posture (or run the suite with the demo posture reverted), fix the two-clock revocation race in permissions, re-run the gate, then commit REC-002 and begin CQ-REC-003.
+
+## Checkpoint — CQ-REC-002 gate-pending (2026-09-18)
+
+`65dcb052084d03e5826f810424419fa69929129d` "CQ-REC-002 checkpoint: structured candidates implemented, integration gate pending", pushed and verified equal to `origin/recovery/2026-09-12`. It is a remote backup of the implementation, explicitly not a PASS; it stays in history as gate-pending and was not amended, squashed or force-pushed.
+
+## Baseline reconciliation — CQ-REC-002R (2026-09-18)
+
+**Provider-policy root cause, classification C.** `20260921090000_demo_google_provider_posture.sql` relabelled the free Gemini tier `ENTERPRISE_CONTRACT` and `20260919` raised its model ceilings to `CONFIDENTIAL`, both "for demo traffic". The gateway derives a provider's justified ceiling from its privacy class (`providerJustifiedCeiling`), so the relabel cleared confidential customer material for an unreviewed free tier in every environment the migration reaches, hosted included. That contradicts doc 13 §57.2 and doc 15 §62 ("free is a cost property; confidential customer information requires an approved provider/endpoint"), and config's `DEPLOYMENT_ENVIRONMENTS` is documented as not a security boundary, so no environment-scoped eligibility can express the intent. The authorisation trail was a vault operator decision and a runbook note; no ADR or PADL amendment. The policy is corrected forward by `20260926090000_restore_reviewed_google_posture.sql` (google → `UNREVIEWED`, Gemini ceilings → `PUBLIC`, demo-posture metadata retained with `demo_posture=false`); the applied migrations are untouched. `20260920` (Gemini preferred for dialogue, synthesis and extraction) is kept: it is privacy-neutral and carries the demo intent wherever Gemini is eligible, which is PUBLIC work. A reviewed paid tier is the route to a higher ceiling, never a data relabel.
+
+**Provider privacy invariant held.** No hard eval or fixture moved a CONFIDENTIAL/HIGHLY_CONFIDENTIAL expectation onto Gemini; `QROUTE-001`/`QROUTE-002` and `PROVIDER_MISROUTING` are unchanged and pass under the restored posture. Demo eligibility is inferred from nothing (not email, host, filename or prompt wording). `provider-posture-matrix.test.ts` (fake providers only) asserts per sensitivity which provider may answer and which is never called: PUBLIC → unreviewed allowed; NETWORK_VISIBLE/INTERNAL → refused `SENSITIVITY_EXCEEDS_CEILING` before any call; CONFIDENTIAL → reviewed zero-retention only and an outage there does not broaden; HIGHLY_CONFIDENTIAL/RESTRICTED → `POLICY_INELIGIBLE`, zero calls; missing adapter → `PROVIDER_UNCONFIGURED`; rate limit falls back within policy; identical route across repeats. No new provider, account, key, billing or OAuth; zero live calls.
+
+**Fixture realignments, each with its basis.** Gateway `gateway-postgres.integration.test.ts` and orchestrator `answer-seam.integration.test.ts`: at PUBLIC, `normal_dialogue.v1` prefers `gemini-3.5-flash-lite` (`20260920`), so the public run is answered by the fake under the google code and the fallback under groq is asserted untouched; INTERNAL/CONFIDENTIAL stay on Groq; two rows added (NETWORK_VISIBLE classification → Groq with Gemini refused; HIGHLY_CONFIDENTIAL → `POLICY_INELIGIBLE`, ledger unchanged) and the usage ledger expects four executions. Orchestrator tools round: roles include the tools-first SYSTEM note (`1e1c4e1`, 2026-09-16). Company-intelligence evals QCI-001/002/006/007/017: prompts rephrased into the specialist's approved analysis-verb scope (`readAboutCompany`, 2026-09-16); expectations unchanged. pgTAP `320_ai_ops`: five model ids and six price snapshots since the qwen row (`20260918`, same provider class and ceiling basis); the google/Gemini privacy assertions there passed unchanged on the reset database.
+
+**Permissions two-clock race.** `created_at` was PostgreSQL's `now()` while expiry validation and `revoked_at` came from the injected `DisclosureClock`, so host/DB skew tripped `revocation_after_creation` under load. The grant now stamps `created_at` from the instant it validated expiry against (`NewDisclosurePolicy.createdAt`), the repository writes it, and status evaluation reads the same clock; the DB constraints remain as defence in depth. No sleeps, no tolerances, no client-supplied timestamp. `clock-determinism.test.ts` fixes the instants: revocation at the boundary is REVOKED and not before; expiry at the boundary is EXPIRED with no grace; host ahead or behind changes nothing; an expiry not after the grant instant is refused.
+
+Commits: `b426b51e105fbe5f826af0431891fe55f09eb4fb` (provider policy baseline reconciliation), `236e360ced49c4171b2a6234ffd88b6875e5b4cb` (permissions clock determinism), each pushed immediately and verified equal to `origin/recovery/2026-09-12`.
+
+## Postflight — CQ-REC-002R closeout of CQ-REC-002 (2026-09-18)
+
+Verdict: **REC-002 PASS — STRUCTURED CANDIDATE GENERATION IS HIGH-RECALL, PROVENANCE-AWARE AND ELIGIBILITY-GATED**
+
+All gates ran sequentially on a reset local database (`pnpm db:reset`) with no Capital Q service running.
+
+| Check                                                         | Result                                                                                                                |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test:rls`                                               | 30 files, 856 tests, PASS (320_ai_ops 33/33)                                                                          |
+| `pnpm test:integration`                                       | 48 files: 47 pass, 1 skipped (Storage credentials); 449 pass, 5 skipped, 0 fail; exit 0                               |
+| `pnpm format:check`                                           | tracked files PASS; the only warnings are the untracked `graphify-out/` (exit 1 from those alone)                     |
+| `pnpm lint` (`NODE_OPTIONS=--max-old-space-size=8192`, alone) | exit 0, `--max-warnings=0`                                                                                            |
+| `pnpm typecheck`                                              | 76 tasks + root tsc, exit 0                                                                                           |
+| `pnpm test`                                                   | 207 files, 2685 tests, exit 0                                                                                         |
+| `pnpm build`                                                  | 41 tasks, exit 0                                                                                                      |
+| `pnpm db:lint`                                                | no schema errors                                                                                                      |
+| `pnpm q:eval:lint` / `pnpm q:eval:ci`                         | dataset lint PASS (29 cases, 15 graders); CI_CORE release gate PASS, 28 PASS / 1 WARN, no new hard failures, no spend |
+| `git diff --check`, secret scan, package cycle check          | clean; 41 workspace packages, 0 cycles; discovery consumed by q-tools, api, q-api only                                |
+| REC-002 regression                                            | discovery integration 13/13; discovery unit 72/72                                                                     |
+| Migration / external service / ENV / model calls              | one forward corrective migration (data only) / NONE / NONE / ZERO                                                     |
+
+Live candidate run (real adapters, reset local Postgres, same fixture world as the REC-002 postflight): raw STAGE 4, GEOGRAPHY 6, TAXONOMY 3, CHEQUE 0 = 13; deduplicated 8; eligible 5; ineligible 3; undetermined 0; 149 ms in the full run and 172 ms alone, against the 135 ms baseline — same counts and provenance (AllThree, GeographyOnly, TaxonomyOnly, StageOnly, RegionOnly), timing within local noise, no generator tuning.
+
+Git: `65dcb05` (gate-pending checkpoint, preserved) → `b426b51` → `236e360` → this closeout commit; each pushed on creation; HEAD equals `origin/recovery/2026-09-12` after each push.
+
+Known limitations: the hosted Supabase project still carries the demo posture until `20260925*` and `20260926` are pushed (`pnpm db:push`); the Storage integration tests need credentials and remain skipped; the cheque dimension stays `NOT_COMPUTABLE` pending a disclosure-safe raise projection.
+
+Next: CQ-REC-003 — STOP.
+
+## Security acceptance — CQ-REC-003 semantic candidate generator (2026-09-18)
+
+| Concern                                                         | How it is held                                                                                                                                                                                                                                                                | Proven by                                                                                  |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Company representation is investor-visible only                 | `CompanyInvestmentProfile` (Companies port) returns canonical name, short description, stage, headquarters and row version of active network_visible/public_external companies; ACTIVE canonical taxonomy from the Taxonomy port; the builder's input type has no other field | `representation.test.ts`; boundary guard over `src/semantic`, `src/hybrid`, both adapters  |
+| Founder-private, document, conversation, raw public-web markers | No port to memory, conversations, documents, evidence or research; markers inserted in all four stores leave hash, vectors, logs and output unchanged                                                                                                                         | `semantic.test.ts` H; `semantic.integration.test.ts` H (real tables)                       |
+| Investor representation private                                 | Built from the investor's own mandate through the tenant/organisation-scoped repository read; stored in `recommendation.mandate_representations` under the investor's tenant; server-only; never joined into a founder projection                                             | integration J/K (tenant on every row); pgTAP 400 (founder cannot read even an id)          |
+| Stale vector vs current privacy/readiness                       | `nearestCompanies` joins `core.companies` current status + visibility; REC-001 then decides readiness, disclosure, exclusions                                                                                                                                                 | unit G (goes private → drops, vector remains); integration I/G; plan review                |
+| Hard exclusion / AVOID                                          | Never encoded in a vector; exclusions removed by REC-001 after retrieval; AVOID absent from the mandate text                                                                                                                                                                  | unit F; integration (BetHaul retrieved, ineligible)                                        |
+| No client vector authority                                      | No API; query type has no vector/score/model field; result schema is strict and rejects a `vector` field; store rows are written by refresh/generate only; browser principals have no grant                                                                                   | unit "no client-supplied vector"; pgTAP 400 exposure block; schema guard                   |
+| Local provider only                                             | `SemanticEmbedder` is the existing `EmbeddingService`; `MANDATE_MATCHING` registered in q-embeddings; runtime down → typed `UNAVAILABLE`, structured pool untouched                                                                                                           | unit M (refresh and generate); hybrid M; boundary guard (no gateway/research/voice import) |
+| Determinism                                                     | Same snapshot → same text/hash; same text → same vector (reused); same vectors → same result and order                                                                                                                                                                        | representation tests; unit L; live acceptance repeated run                                 |
+
+## Postflight — CQ-REC-003 (2026-09-18)
+
+Verdict: **REC-003 PASS — SEMANTIC CANDIDATE GENERATION SUPPLEMENTS STRUCTURED RETRIEVAL WITHOUT LEAKING PRIVATE CONTEXT**
+
+Files: `packages/discovery/src/semantic/{contracts,representation,ports,service}.ts`, `src/hybrid/{contracts,merge,service}.ts`, `src/infrastructure/{postgres-semantic-store,domain-port-semantic-sources}.ts`, index exports, `@capital-q/q-embeddings` dependency; Companies `listDiscoverableInvestmentProfiles`; q-embeddings `MANDATE_MATCHING` instruction (`capital-q-mandate-matching-v1`); migration `20260927090000_recommendation_semantic_representations.sql`; pgTAP `400_recommendation_semantic`; schema guard + `db:types` schema list + regenerated types (383 additive lines); tests `representation`, `semantic`, `hybrid`, `semantic.integration`, boundary guard; docs `discovery.md`, `q-embeddings.md`.
+
+Architecture: bounded context Discovery/Recommendation; generator `SEMANTIC_MANDATE` / `semantic-mandate.v1`; `company-investment-representation.v1`; `investor-mandate-representation.v1`; provider `local-tei` (`Qwen/Qwen3-Embedding-0.6B`, revision 97b0c614…, 1024 dims, L2 unit); document instruction `none-v1`, query instruction `capital-q-mandate-matching-v1`; metric cosine (`<=>`), similarity `1 - distance` in [-1, 1]; top-K 200 (`SEMANTIC_TOP_K` = the structured dimension budget); hybrid pool `hybrid-candidate-pool.v1`.
+
+Q preservation (`git diff --name-only`): Q interviewer/orchestration NO · Q prompts/personality NO · Tavily/research NO · ElevenLabs/voice NO · small-talk NO · model provider policy NO · Gemini/Groq routing NO. The one Q-side file touched is the q-embeddings contract, additively (a second query task).
+
+External setup: new account NONE · API key NONE · billing NONE · Groq/Gemini/Tavily/ElevenLabs calls ZERO.
+
+| Check                                              | Result                                                                                                     |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `pnpm db:reset` / `pnpm db:lint` / `pnpm db:types` | PASS / no schema errors / additive                                                                         |
+| `pnpm test:rls`                                    | 31 files, 890 tests, PASS (400_recommendation_semantic 34/34; schema guard with `recommendation`)          |
+| `pnpm test:integration`                            | 49 files: 48 pass, 1 skipped (Storage); 455 pass, 5 skipped, 0 fail; exit 0 — includes the live Qwen block |
+| `pnpm format:check`                                | tracked files PASS (untracked `graphify-out/` is the only noise)                                           |
+| `pnpm lint` (8 GB heap, alone)                     | exit 0                                                                                                     |
+| `pnpm typecheck`                                   | 76 tasks + root tsc, exit 0 (after one readonly-fixture fix in `semantic.test.ts`)                         |
+| `pnpm test`                                        | 210 files, 2722 tests, exit 0                                                                              |
+| `pnpm build`                                       | 41 tasks, exit 0                                                                                           |
+| `pnpm q:eval:lint` / `pnpm q:eval:ci`              | PASS / release gate PASS, no new hard failures, no spend                                                   |
+| `git diff --check`, cycles, secret scan            | clean; 41 packages, 0 cycles; no secret patterns                                                           |
+| REC-002 regression                                 | live run unchanged: 13 raw / 8 deduped / 5 eligible / 3 ineligible / 0 undetermined                        |
+
+Live local acceptance (real adapters, real `recommendation` store, local PostgreSQL, Qwen3-Embedding-0.6B through the local TEI runtime; one ACTIVE mandate "Africa enterprise logistics" with a DRAFT that must not matter; seven synthetic companies: obvious match, phrasing-different match, structured-only, hard-excluded similar, not-ready similar, private similar, unrelated): representations considered 6 / built 6 / embedded 6, second refresh reused 6 and embedded 0 (refresh 4.8 s cold); semantic top-K 4 → raw 4, REC-001 rejected 2, eligible 2, undetermined 0, query vector reused, 61 ms; structured raw 9 / eligible 2; merged pool 3 = 1 both (KoboLogistics: GEOGRAPHY_OVERLAP, STAGE_OVERLAP, TAXONOMY_OVERLAP + similarity 0.734) + 1 semantic-only (Haulr 0.542) + 1 structured-only (Bakehouse); repeated run identical. Sanity ordering over all six discoverable companies: KoboLogistics 0.734 > Haulr 0.542 > BerlinRobotics 0.334 > Bakehouse 0.327 — close and adjacent matches well above the unrelated ones; the unrelated pair is close together, which is expected for a four-line profile and is not a quality claim.
+
+Query plan (`explain`, 1024-d, six vectors): sequential scan under the `(configuration_version, instruction_version)` prefilter, hash-joined to representations and `core.companies` with the visibility predicate applied before the sort, `Limit` on top. No approximate index at this volume, by the same rule the q_knowledge store follows.
+
+Known follow-ups: DEMO_PROVIDER_ROUTING_FOLLOWUP OPEN (synthetic/demo-safe Q traffic should later be permitted to use the preferred cheap/free provider without globally reclassifying that provider for real confidential customer data; not fixed here). Business model, customer type, raise and traction lines await canonical, discovery-safe fields. Representation refresh is an explicit call; a worker on company/classification events belongs to a later packet. The hosted Supabase project still needs `20260925*`, `20260926` and now `20260927` pushed.
+
+Next: CQ-REC-004 — Recommendation Feature Registry. STOP.
+
+## Security acceptance — CQ-REC-004 recommendation feature registry + privacy firewall (2026-09-18)
+
+| Concern                                   | How it is held                                                                                                                                                                                                                                                       | Proven by                                                                                                                    |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Context allowlist as code                 | Every V1 definition names `INVESTOR_DISCOVER` only; `registry.featuresFor(mode)` / `require(id, mode)` and the service throw `FeatureContextNotAllowedError` before any read for any other mode                                                                      | `features.test.ts` R; integration R (no row written)                                                                         |
+| Founder-private firewall (DMR-023)        | Typed projections tagged with their source class; definitions accept named classes only; unaccepted class → `SOURCE_NOT_AUTHORISED` + scope-violation metric; private classes are not in the vocabulary; boundary guard holds `src/features` to the eligibility list | unit S, L/M/N/O; integration L/M/N/O with markers in q_knowledge, q_runtime, evidence, taxonomy (q_inferred); boundary guard |
+| Investor-private stays internal (DMR-024) | Mandate narrative never read by a feature; mandate-derived values CONFIDENTIAL; snapshot inherits highest class; store server-only; founder actor has no investor organisation                                                                                       | unit U/§63; integration L/M/N/O; pgTAP 410 exposure block                                                                    |
+| Missingness first-class                   | MISSING / NOT_APPLICABLE with bounded reasons; no zero; cheque always `CHEQUE_NOT_COMPUTABLE`; structured-only → `SEMANTIC_NOT_RETRIEVED`                                                                                                                            | unit C/H/J/K, E, region; integration acceptance                                                                              |
+| Eligibility is a gate, not a score        | `eligibility.hard_gate` is a boolean reference; non-ELIGIBLE, foreign-mandate or foreign-investor candidates throw `CandidateNotRankableError`                                                                                                                       | unit T; integration acceptance                                                                                               |
+| No weights, no score, no UI, no provider  | No numeric combination anywhere; semantic similarity reused from REC-003 provenance; no embedding/gateway dependency (boundary guard, W)                                                                                                                             | unit W; integration providerCalls=0                                                                                          |
+| Determinism and reproducibility           | Registry order; fingerprint over schema, definitions, context, mandate/version, company projection version, taxonomy version, candidate provenance, eligibility, values — never computedAt/id; identical fingerprint reused, changed one supersedes                  | unit V; integration P/Q (SUPERSEDED → CURRENT history)                                                                       |
+| Storage                                   | `recommendation.feature_snapshots`: validated bounded jsonb, immutable, one CURRENT per key, cascades, RLS on, no policy, no browser grant                                                                                                                           | pgTAP `410_recommendation_features` (22), schema guard                                                                       |
+
+## Postflight — CQ-REC-004 (2026-09-18)
+
+Verdict: **REC-004 PASS — RECOMMENDATION FEATURES ARE VERSIONED, CONTEXT-ALLOWLISTED, MISSINGNESS-SAFE AND FOUNDER-PRIVATE DATA CANNOT ENTER INVESTOR RANKING**
+
+Files: `packages/discovery/src/features/{contracts,policy,ports,service}.ts`, `src/infrastructure/{postgres-feature-snapshot-store,domain-port-feature-sources}.ts`, index exports; migration `20260928090000_recommendation_feature_snapshots.sql`; pgTAP `410_recommendation_features`; schema guard row; regenerated types (78 additive lines); pgTAP 400 table count; boundary guard; tests `features.test.ts`, `features.integration.test.ts`; docs `discovery.md`.
+
+Architecture: bounded context Discovery/Recommendation; registry `RECOMMENDATION_FEATURES` (frozen, validated at load); schema `recommendation-features.v1`; `createFeatureService().computeForCandidates`; `RecommendationFeatureSnapshot`; store `recommendation.feature_snapshots`.
+
+Registered V1 features (all `INVESTOR_DISCOVER` only, all `PRESERVE_MISSING`): `eligibility.hard_gate` v1 boolean ELIGIBILITY_RESULT INTERNAL (gate reference, never weighted) · `declared_fit.stage` v1 category MATCH/NO_MATCH DECLARED_MANDATE+CANONICAL_COMPANY_STATE CONFIDENTIAL · `declared_fit.geography` v1 category COUNTRY_MATCH/REGION_MATCH/NO_MATCH + CANONICAL_TAXONOMY + TAXONOMY_REFERENCE_HIERARCHY CONFIDENTIAL · `declared_fit.taxonomy` v1 category EXACT_OVERLAP/DESCENDANT_OVERLAP/NO_OVERLAP CONFIDENTIAL · `declared_fit.cheque` v1 number [0,1] CONFIDENTIAL, always MISSING (`CHEQUE_NOT_COMPUTABLE`) · `semantic_fit.mandate_similarity` v1 number [-1,1] SEMANTIC_CANDIDATE_PROVENANCE CONFIDENTIAL, reused from REC-003. Deferred with no value and no zero: company state, evidence/confidence, portfolio, behaviour (REC-008), relationship, freshness, exploration (REC-009), exposure (REC-008).
+
+Q preservation (`git diff --name-only`): interviewer NO · prompts NO · small-talk NO · Tavily NO · voice NO · provider policy / routing NO. External setup: account/key/ENV/billing/provider NONE; Qwen, Gemini, Groq, Tavily, ElevenLabs calls ZERO.
+
+| Check                                                | Result                                                                                                                    |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm db:reset` / `pnpm db:lint`                     | PASS / no schema errors                                                                                                   |
+| `pnpm db:types`                                      | regenerated; the only diff against HEAD is the additive `feature_snapshots` block (`db:types:check` clean once committed) |
+| `pnpm test:rls`                                      | 32 files, 912 tests; one stale count in pgTAP 400 (four → five recommendation tables) corrected, then PASS                |
+| `pnpm test:integration`                              | 50 files: 49 pass, 1 skipped (Storage); 459 pass, 5 skipped, 0 fail                                                       |
+| `pnpm format:check` (tracked) / `lint` / `typecheck` | PASS / exit 0 / 76 tasks + root tsc                                                                                       |
+| `pnpm test` / `pnpm build`                           | 211 files, 2747 tests / 41 tasks                                                                                          |
+| `pnpm q:eval:lint` / `q:eval:ci`                     | PASS / release gate PASS, no new hard failures                                                                            |
+| `git diff --check`, cycles, secret scan              | clean; 41 packages, 0 cycles; none                                                                                        |
+| REC-001/002/003 regression                           | live runs unchanged (13/8/5/3/0; semantic 4/2/2/0)                                                                        |
+
+Live local acceptance (real adapters, real hybrid pool from REC-002 + REC-003, real store, reset local PostgreSQL): 3 candidates (KoboLogistics structured + semantic; Haulr semantic-only; Bakehouse structured-only) → 18 feature values, 14 PRESENT, 4 MISSING (three cheque `CHEQUE_NOT_COMPUTABLE`, one `SEMANTIC_NOT_RETRIEVED` for the structured-only candidate), 0 NOT_APPLICABLE, 0 scope violations, 6 statements for the run (mandate, taxonomy versions, projection batch, hierarchy expansion, current-snapshot read, insert), compute 29 ms, persist 20 ms, provider calls 0. Founder-private churn markers in Q memory, a conversation, a private document and raw research plus a Q-proposed classification left values, provenance, fingerprints and rows byte-identical (all reused); an ACTIVE stage change superseded with NO_MATCH under mandate version 2; a DRAFT change reused; FOUNDER_DISCOVER refused with nothing written.
+
+Known follow-ups: DEMO_PROVIDER_ROUTING_FOLLOWUP OPEN; HOSTED_MIGRATIONS_PENDING YES (`20260925*`, `20260926`, `20260927`, `20260928`). Event-driven snapshot invalidation and rebuild belong to REC-006; behaviour and exposure features to REC-008.
+
+Next: CQ-REC-005 — Deterministic Ranker. STOP.
+
+## Defect fix — eligibility.v2 / structured-mandate.v2: declared company classifications only (2026-09-18)
+
+Found during CQ-REC-005 testing; present since CQ-REC-001 (and partly CQ-REC-002). `classifications.listActive` returned every ACTIVE `taxonomy.entity_assignments` row regardless of `assignment_source`, and `taxonomyCriterion` compared declared mandate exclusions against all of them: a `q_inferred` (or `document_extracted` / `integration`) row on a node the investor hard-excluded made the company INELIGIBLE — a Q inference silently altering investor-facing discoverability, against ADR 0006 point 5 ("a candidate never becomes canonical on its own") and the Context Firewall invariant. REC-002 taxonomy/region retrieval matched any provenance too. REC-004 features and the REC-005 ranker already read declared sources only.
+
+Decision: a versioned policy change, not a silent patch. `ELIGIBILITY_POLICY_VERSION` `eligibility.v1` → `eligibility.v2`: `CompanyClassification` carries `source`; the pure policy keeps only `DECLARED_TAXONOMY_SOURCES` (`user_selected`, `admin_curated`) for both the excluded-node match and the "vocabulary answered" test, so a company whose only classifications in an excluded vocabulary are undeclared is UNKNOWN (`COMPANY_TAXONOMY_UNKNOWN`, UNDETERMINED) — never PASS, never FAIL. `STRUCTURED_GENERATOR_VERSION` `structured-mandate.v1` → `structured-mandate.v2` (its own rule: a retrieval-rule change bumps it): `TaxonomyAssignmentRepository.listCurrentByNodes` gains an optional `assignmentSources` filter applied inside the SQL, so undeclared rows cannot consume the bound. The literals flow through the eligibility, candidates, semantic, hybrid, features and ranking contracts via the constants; no migration (the snapshot column checks only `name.vN`), and CURRENT v1 feature snapshots supersede on next compute because the fingerprint includes both versions.
+
+Files: `packages/discovery/src/eligibility/{contracts,policy,ports}.ts`, `src/candidates/contracts.ts`, `src/infrastructure/domain-port-{eligibility,candidate}-sources.ts`; `packages/taxonomy/src/application/ports.ts`, `src/infrastructure/postgres-assignment-repository.ts` (additive optional parameter; its only caller is discovery); tests `eligibility-policy` (v2 goldens: `q_inferred`/`document_extracted`/`integration` on the excluded node → UNKNOWN/UNDETERMINED; `user_selected`/`admin_curated` → FAIL/INELIGIBLE; undeclared elsewhere in the vocabulary → UNKNOWN not PASS; declared elsewhere + Q inference on the node → PASS; confirmation flips UNDETERMINED → INELIGIBLE), `eligibility.integration` (same on real tables), `candidates.integration` (q_inferred excluded node keeps the company; q_inferred region no longer retrieves it — verified to fail with the SQL filter removed), version literals in `candidates`, `eligibility-service`, `features`, `hybrid`, `semantic`; `docs/modules/discovery.md`. pgTAP `410` keeps `eligibility.v1` as opaque fixture strings (RLS only). Q behaviour, prompts, providers, voice: untouched.
+
+| Check                                                      | Result                                                                                                                  |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `vitest` discovery + taxonomy (unit)                       | 12 files, 213 pass                                                                                                      |
+| `test:integration` discovery + taxonomy (local PostgreSQL) | 8 files, 48 pass                                                                                                        |
+| `pnpm format:check`                                        | tracked files PASS; failures only in untracked `graphify-out/` and `.claude/worktrees/`                                 |
+| `pnpm lint`                                                | exit 0 with `--ignore-pattern ".claude/**"` (a nested agent worktree duplicates tsconfig roots and fails the plain run) |
+| `pnpm typecheck` / `pnpm test` / `pnpm build`              | 76 tasks / 212 files, 2791 tests / 41 tasks                                                                             |
+
+Gates ran on a working tree that also held the uncommitted CQ-REC-005 ranker (whose `ranking.test.ts` literal was bumped in place and is not part of this commit).
+
+## Postflight — CQ-REC-005 deterministic V1 ranker (2026-09-19)
+
+Verdict: **REC-005 PASS — V1 RANKING IS DETERMINISTIC, VERSIONED, FEATURE-GOVERNED AND REPRODUCIBLE**
+
+Sequencing: verified in isolation against CQ-REC-004 and preserved as the non-PASS checkpoint `e0745531dcc9d9735aff0e546c23364e467a50a0` on `scratch/rec005-v1-checkpoint`; the eligibility.v2 / structured-mandate.v2 fix (`d0893d4`) landed first; the checkpoint was applied onto it with `cherry-pick -n` and reconciled against the landed semantics.
+
+Reconciliation, not string replacement: the ranker source held no version literals (it reads the constants). The gap the v2 bump exposed was real: a snapshot computed under `eligibility.v1` or `structured-mandate.v1` is self-consistent, so its fingerprint could not reveal it was stale. The ranker now refuses it (`ELIGIBILITY_POLICY_MISMATCH`, `CANDIDATE_VERSION_MISMATCH`), with a unit test on a re-fingerprinted v1-era snapshot. Test fixtures bind to `ELIGIBILITY_POLICY_VERSION`, `STRUCTURED_GENERATOR_VERSION` and `SEMANTIC_GENERATOR_VERSION` instead of literals. The integration privacy test restores the `q_inferred` classification on the hard-excluded node that had to be dropped under v1; under v2 it changes no score, factor, reason or position.
+
+Architecture: ranker `DETERMINISTIC` / `deterministic-ranker.v1`; config `ranking-config.v1` (`INITIAL_HEURISTIC_UNCALIBRATED`); required feature schema `recommendation-features.v1`; required upstream `eligibility.v2`, `structured-mandate.v2`, `semantic-mandate.v1`; context `INVESTOR_DISCOVER`; migration NONE.
+
+ranking-config.v1: `declared_fit.stage` v1 weight 1 (MATCH 1, NO_MATCH 0) · `declared_fit.geography` v1 weight 1 (COUNTRY_MATCH 1, REGION_MATCH 0.75, NO_MATCH 0) · `declared_fit.taxonomy` v1 weight 1 (EXACT_OVERLAP 1, DESCENDANT_OVERLAP 0.75, NO_OVERLAP 0) · `semantic_fit.mandate_similarity` v1 weight 1 ((s + 1) / 2, clamped [0, 1]). Inactive: `eligibility.hard_gate` GATE_ONLY, `declared_fit.cheque` NOT_COMPUTABLE. MISSING / NOT_APPLICABLE excluded from the denominator. `minimumFit` null. Tie-break score desc, company id asc; unscored after, by company id. Precision 12. Exploration / diversity NONE.
+
+| Check                                                       | Result                                                                                 |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `pnpm db:reset` / `db:lint` / `db:types` / `db:types:check` | PASS / no schema errors / regenerated / clean                                          |
+| `pnpm test:rls`                                             | 32 files, 912 tests, PASS                                                              |
+| `pnpm test:integration`                                     | 51 files: 50 pass, 1 skipped (Storage); 465 pass, 5 skipped, 0 fail                    |
+| `pnpm format:check` / `pnpm lint`                           | tracked PASS / exit 0 (both exclude `graphify-out/` and the `.claude/` agent worktree) |
+| `pnpm typecheck` / `pnpm test` / `pnpm build`               | 76 tasks + root / 212 files, 2792 tests / 41 tasks                                     |
+| `pnpm q:eval:lint` / `q:eval:ci`                            | PASS / release gate PASS, no new hard failures                                         |
+| `git diff --check`, cycles, secret scan                     | clean; 41 packages, 0 cycles; none                                                     |
+| REC-001/002/003/004 regression                              | live runs unchanged (13/8/5/3/0; semantic; features 18 values, 6 statements)           |
+
+Live ranking (reset local DB, full pipeline): #1 KoboLogistics 0.9778 (4 present) · #2 Bakehouse 0.6667 (3 present, semantic missing) · #3 LagosFreight 0.4744 · #4 PetPal 0.3333 (semantic missing) · #5 Haulr 0.2429 (semantic-only candidate; declared fit known and mismatched). Ranker DB queries 0, provider calls 0, rank 3.7 ms; 200 synthetic candidates ranked with no I/O (12–98 ms across runs).
+
+Q preservation: interviewer, prompts, small-talk, Tavily, voice, provider policy and routing unchanged. Known follow-ups: DEMO_PROVIDER_ROUTING_FOLLOWUP OPEN; HOSTED_MIGRATIONS_PENDING YES (20260925–20260928).
+
+Next: CQ-REC-006 — Slate Persistence / Background Worker. STOP.
+
+## Postflight — CQ-REC-006 persisted recommendation slates + background refresh (2026-09-19)
+
+Verdict: **REC-006 PASS — RECOMMENDATION SLATES ARE PRECOMPUTED, DURABLE, VERSION-REPRODUCIBLE, SAFELY INVALIDATED AND CURSOR-SERVABLE**
+
+Checkpoints, each pushed and verified `HEAD == origin/recovery/2026-09-12` before the next began: A `29f7837ab73ead7ccf6a67c70277929ebbf6047f` (foundation), B `105b73789b150a7e684536b8ba41ca6189fa6b33` (builder + shared pipeline), C `39bbaeb7b2316a74c032d0bfd55fcb80f7446993` (refresh worker), D `1eef635dda4597caa5ab0e22b55d6ad8aaf8426e` (cursor read path), E this commit (acceptance, docs, gates). Starting SHA `d0e5d17fedc6f7018732174f0da297ba76507033`.
+
+Files: migration `supabase/migrations/20260929090000_recommendation_slates.sql`; pgTAP `420_recommendation_slates` (40), `130_schema_guard` (+3 INTERNAL_SERVER_ONLY rows), `400` (table count 8); `packages/database/src/generated/database.types.ts`; `packages/discovery/src/slates/{contracts,ports,builder,refresh,reader}.ts`, `src/jobs/index.ts`, `src/infrastructure/{postgres-slate-repository,postgres-refresh-queue,recommendation-pipeline}.ts`, company card port in `postgres-discovery-repository.ts`, `StoredFeatureSnapshotRef.companyTenantId`, `DISCOVERABLE_VISIBILITIES` exported; `apps/workers/src/recommendations/{build-principal,refresh-handler}.ts`, domain-event bridge, `main.ts` (pipeline over the q-api disclosure composition and the local embedding runtime; refresh runner), manifest (+discovery, +q-embeddings, security → dependency); `apps/api/src/http/discovery.ts` (companies from the persisted slate), `app.ts` (`discovery: { discovery, slates }`), `problem-handler.ts` (`SlateCursorRejectedError` → 400 INVALID_REQUEST), `main.ts` (read pipeline + pgmq sender); `packages/contracts/src/http/discovery.ts` (`slateId`, `reasonCodes`, notes `RECOMMENDATIONS_REFRESHING` / `SLATE_RESTARTED`); `apps/web` note labels for the two notes (typecheck reconciliation only; no feed rebuild); `packages/investors/test/mandate-service.integration.test.ts` (the "no slate table exists" proxy became the real invariant: activation writes no slate row); `docs/modules/discovery.md`.
+
+Behaviour: one CURRENT and one BUILDING slate per (investor organisation, ACTIVE mandate, context) by partial unique index; build-then-publish in one transaction that supersedes the previous CURRENT under row locks; items immutable and insertable only while BUILDING, referencing the exact ranked feature snapshot (RESTRICT) and the company (RESTRICT); generation fingerprint = sha256 over key + every version + ranked snapshot fingerprints (no time, id or count), unchanged → no-op; degraded semantic run → structured-only slate with null semantic version; failure after the claim → FAILED row, served slate untouched; concurrent build stands down. Events → directives → lifecycle-only invalidation (`VISIBILITY_CHANGED`, `MARKETPLACE_DISABLED`, `MANDATE_HARD_CHANGED`, `MANDATE_CLOSED`, `SECURITY_RESTRICTION`) + coalesced refresh requests (one row per key, monotonic sequence, HIGH never lowered, reopen on mid-build change) + one bounded pgmq job per real change. Worker consumer claims → builds as the mandate creator's active membership → completes / retries / dead-letters under bounded codes. Reader: servable = CURRENT or SUPERSEDED inside expiry; page after the cursor's rank; REC-001 re-run per page for the requester, withheld never replaced; opaque `(slate, rank)` cursor rejected alike when forged, stale or another investor's; restart with `SLATE_RESTARTED`; no slate → `RECOMMENDATIONS_REFRESHING` + refresh request; empty slate valid. Nothing internal on the wire.
+
+Contracts / events / jobs: job `recommendation.slate.refresh` v1 (owner `@capital-q/discovery`, handler `@capital-q/workers`, CONFIDENTIAL, identifiers + reason + priority + sequence, retry 5 / vt 180 s / exponential 10→600 s, dead letter) on queues `recommendation-refresh` / `recommendation-refresh-dead`; no new event; consumers of `core.investor_mandate.{activated,updated,closed}`, `core.company.{updated,visibility_changed,marketplace_readiness_changed}`, `taxonomy.entity_assignments.changed`, `permissions.disclosure.{granted,revoked}`, `network.relationship.created`. DTO additive: `slateId`, `reasonCodes`, two notes. Policy `slate-policy.v1` (TTL 24 h, page 10/20, pool 200, top-K 200). No new provider, service, account, key or env.
+
+Migration impact: `20260929090000` adds `recommendation.slates`, `slate_items`, `refresh_requests`, two pgmq queues, three triggers; RLS on, no policy; applied locally by `db:reset`; HOSTED_MIGRATIONS_PENDING now 20260925–20260929.
+
+| Check                                                         | Result                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm db:reset` / `db:lint` / `db:types` / `db:types:check`   | PASS / no schema errors / regenerated / clean                                                                                                                                                                                                                |
+| `pnpm test:rls`                                               | 33 files, 952 tests, PASS                                                                                                                                                                                                                                    |
+| `pnpm test:integration`                                       | 53 files: 52 pass, 1 skipped (Storage); 473 pass, 5 skipped, 0 fail (after the investors proxy-assertion reconciliation)                                                                                                                                     |
+| `pnpm format:check` / `pnpm lint`                             | PASS (excluding untracked `graphify-out/` and the `.claude/` agent worktree) / exit 0 with `--ignore-pattern ".claude/**"`                                                                                                                                   |
+| `pnpm typecheck` / `pnpm test` / `pnpm build`                 | 76 tasks + root / 215 files, 2818 tests / 41 tasks                                                                                                                                                                                                           |
+| `pnpm q:eval:lint` / `q:eval:ci`                              | PASS (29 cases, 15 graders) / release gate PASS, no new hard failures                                                                                                                                                                                        |
+| `git diff --check`, cycles, secret scan                       | clean; 41 packages, 0 cycles, no package → app dependency; no secret patterns in the 46 changed files                                                                                                                                                        |
+| Live acceptance §92 (`slates-acceptance.integration.test.ts`) | cold feed → REFRESHING + message; activation → HIGH job on `recommendation-refresh`; claim → build (3 items) → pages by cursor; company withdrawn → INVALIDATED + HIGH; mid-scroll `SLATE_RESTARTED`; rebuild (2 items) served; history CURRENT, INVALIDATED |
+| Live reader cost                                              | first page of 2: 30 executor calls (4 per-tenant/per-pair REC-001 reads); one eligibility batch per page                                                                                                                                                     |
+| Demo stack (`pnpm demo:detached -- --local`)                  | worker runtime started; consumers `domain-events`, `recommendation-refresh` (batch 2), `documents` polling; no errors                                                                                                                                        |
+
+Security/privacy: slates, items and refresh requests are server-only (RLS on, no policy; pgTAP proves anonymous and members cannot read); the builder reads only REC-001..REC-005 outputs — Q memory, conversations, documents, private sources and Q inferences change no fingerprint and reach no row (`REC006_PRIVATE_FOUNDER_DATA_MUST_NOT_CHANGE_SLATE`, proved on the live pipeline); the cursor is never authority; internal score, snapshot, provenance and missingness codes never leave the store; the job carries identifiers only.
+
+Known limitations: founder side (`/v1/discovery/investors`) still on the deterministic visibility slate; build principal is the mandate creator's membership (organisation-level disclosure principal is a permissions follow-up), so a company disclosed only to another member joins the slate at read time for that member but not in the stored ordering; REC-001 ports read per company tenant and per relationship pair (batching across tenants/pairs is a REC-001 port follow-up); no scheduled rebuild — expiry is served as REFRESHING and the next page requests one; newly discoverable companies join via the bounded fan-out (500) or at expiry. Q behaviour, prompts, small-talk, Tavily, ElevenLabs, provider policy: untouched. DEMO_PROVIDER_ROUTING_FOLLOWUP OPEN.
+
+Next: CQ-REC-007 — Explanations. STOP.
+
+## Postflight — CQ-REC-007 recommendation explanations + synthetic-demo Gemini routing (2026-09-20)
+
+Verdict: **REC-007 PASS — RECOMMENDATION EXPLANATIONS ARE DETERMINISTICALLY GROUNDED, Q-NATURALIZED, PRIVATE-SAFE, AND SYNTHETIC DEMO TRAFFIC CAN USE GEMINI WITHOUT WEAKENING REAL-CUSTOMER PROVIDER POLICY**
+
+Checkpoints, each pushed and verified `HEAD == origin/recovery/2026-09-12` before the next began: A `413d8c01e7eee9c24a7e9cd0a9f1b940a77c1681` (synthetic-demo routing), B `ad3a3f0f62e11f9bc03121811ab08bf6b4bea4ba` (deterministic explanations), C `b85b7d99ca8179092f4909d1ce4e28229a0e585f` (Q synthesis + grounding), D `7f5bf0caa21e0773b9fcd9e0095d102db415867d` (the endpoint), E this commit. Starting SHA `000777fee5500d794e537e60bfbe3907067a05bc`.
+
+**DEMO_PROVIDER_ROUTING_FOLLOWUP: CLOSED.** Doc 15 §62 is the rule, and the gateway could express only half of it: _"Free" is a cost property. It is not a privacy classification. Free/shared inference may be used aggressively for public data, synthetic data, development... Confidential customer information requires an approved provider._ The gateway knows a request's sensitivity and a provider's reviewed ceiling and treats every request as somebody's data, so a demo deployment of invented companies could reach only the reviewed provider and stalled on its free tier. Migration 20260926 had already named the seam when it reverted the demo posture: the Gemini preference "takes effect exactly where Gemini is eligible — PUBLIC work, synthetic development data, and any request a reviewed paid tier later justifies."
+
+`ModelDataPosture` (REAL_CUSTOMER | SYNTHETIC_DEMO) is a defaulted field on the internal gateway request, orthogonal to sensitivity and never a substitute: the declared sensitivity stays on the request, the route record and the trace, and neither value is sent to a provider. Attested SYNTHETIC_DEMO material skips the two privacy ceilings in `planRoute` and is recorded as `ELIGIBLE_SYNTHETIC_DEMO`, not `ELIGIBLE`. Four conditions are required and none decides alone: an operator opt-in (`CQ_SYNTHETIC_DEMO_ROUTING`, default off), `CAPITAL_Q_ENV` local/test, a loopback database, and a per-request declaration from server code. `createSyntheticDemoRoutingAllowance` refuses loudly at startup anywhere the claim cannot hold, so it cannot be switched on in a hosted deployment. No HTTP DTO carries the posture. **No `ai_ops` row changed** (google UNREVIEWED, Gemini ceilings PUBLIC, as pgTAP 320 asserts) and **no migration was added** — `db:types:check` clean on a reset database confirms it. New account / key / billing / OAuth: NONE.
+
+Explanations are a replay, not a second opinion (doc 19 §57–§58, §189): the item's own feature snapshot fetched by stored id, refused if its fingerprint moved, scored by REC-005's own `scoreSnapshot` under the ranking config the SLATE recorded; a slate naming a config this build no longer carries is refused rather than explained with today's weights. Three buckets stay apart — missing evidence is an uncertainty whose label distinguishes "this company has not stated its stage" from "your mandate does not name one", the hard gate is omitted rather than restated as a merit, and the deterministic summary contains no digit at all, so §56's "87% match" is unreachable by construction.
+
+Q phrases but never changes. `createRecommendationNarrator` is the first consumer of q-core's `FIT_EXPLANATION_V1` (ACTIVE and hash-pinned since CQ-Q-006, previously unused). It receives bounded factor labels, the company's declared one-liner and a neutral line about the investor's criteria — no snapshot, no mandate, no score, no similarity. Its answer is used only if `groundingFailure` passes it: an invented overall label, any digit or quantity word, a dimension the ranker never scored, or an unknown restated as a match all fall back to the deterministic wording, as do an outage, a rate limit, an exhausted route, a refused schema and an unrenderable prompt.
+
+Files: `packages/contracts` (`ModelDataPosture`, `dataPosture`, `ELIGIBLE_SYNTHETIC_DEMO`, explanation DTO + path); `packages/model-gateway` (`policy/synthetic-demo.ts`, conditional ceilings in `planRoute`, posture on trace and served log, `dataPosture` on the Q answer seam, exports); `packages/config` (`CQ_SYNTHETIC_DEMO_ROUTING`, status); `packages/discovery` (`explanations/{contracts,policy,service}.ts`, narrator port, `findItem`, `readFeatureSnapshotById` + shared row parser, boundary guard); `packages/q-specialists` (`recommendation/narrator.ts`, `groundingFailure`); `apps/q-api` (route, app module, composition, attestation); `apps/workers` (attestation); `scripts/demo-routing-smoke.mjs`; `.env.example`; `docs/modules/discovery.md`.
+
+| Check                                                 | Result                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm db:reset` / `db:lint` / `db:types:check`        | PASS / no schema errors / clean (no migration in this packet)                                                                                                                                                                                                                                                                                                                                                              |
+| `pnpm test:rls`                                       | 33 files, 952 tests, PASS                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `pnpm test:integration`                               | 53 files: 52 pass, 1 skipped (Storage); 473 pass, 5 skipped, 0 fail                                                                                                                                                                                                                                                                                                                                                        |
+| `pnpm format:check` / `pnpm lint`                     | PASS (excluding untracked `graphify-out/` and the `.claude/` agent worktree) / exit 0                                                                                                                                                                                                                                                                                                                                      |
+| `pnpm typecheck` / `pnpm test` / `pnpm build`         | 76 tasks / 221 files, 2863 tests / 41 tasks                                                                                                                                                                                                                                                                                                                                                                                |
+| `pnpm q:eval:lint` / `q:eval:ci`                      | PASS (29 cases, 15 graders) / release gate PASS, no new hard failures, no regression                                                                                                                                                                                                                                                                                                                                       |
+| `git diff --check`, cycles, secret scan               | clean; 41 packages, 0 cycles, no package → app dependency; no secret patterns in the changed files                                                                                                                                                                                                                                                                                                                         |
+| Provider matrix (`synthetic-demo-routing.test.ts`)    | 12 rows, §14 A–K: real PUBLIC/CONFIDENTIAL/HIGHLY_CONFIDENTIAL/RESTRICTED unchanged; posture admits the preferred provider; the same payload as real customer material refused it; a declaration without an attestation inert; the attestation refuses production and hosted databases; fallback on rate limit; no raw provider error; deterministic; omission means REAL_CUSTOMER                                         |
+| Live routing smoke (`scripts/demo-routing-smoke.mjs`) | SYNTHETIC_DEMO → google/gemini-3.5-flash-lite, admitted ELIGIBLE_SYNTHETIC_DEMO, 1435 ms, no fallback. REAL_CUSTOMER, identical words and declared sensitivity → groq/openai/gpt-oss-120b, admitted ELIGIBLE, 1406 ms. Also observed live: with the developer .env.local naming the hosted pooler the allowance REFUSED to exist (database host must be loopback), even with the operator flag set and CAPITAL_Q_ENV=local |
+
+Security/privacy: real CONFIDENTIAL, HIGHLY_CONFIDENTIAL and RESTRICTED customer traffic routes exactly as before — Gemini Free gains no ordinary production approval anywhere. A browser cannot declare the posture (no DTO carries it) and a forged declaration without an attestation changes no route. Explanations expose the declared card, bounded labels and the ranker's own reason codes; the internal score, weights, contributions, similarity and feature snapshot never reach the wire; all three refusals return one indistinguishable 404.
+
+Known limitations: `QEXPL-*` Q eval cases were NOT added — the grounding and privacy properties are covered by deterministic unit tests (9 explanation, 9 narrator/grounding, 4 route, 12 provider matrix) instead; adding them needs a new ROUTING scenario in the eval runner and a new entry in the closed 11-value hard-invariant enum, which is a wider change than this packet warrants. The conversational "why" still passes through `recommendation-guard.ts`, which strips recommendation claims from the chat answer path; REC-007 serves explanations on their own surface and §34 scopes it to the first "why". Comparing two recommendations is not built. The investor description sent to the model is a neutral line rather than their mandate wording. Q interviewer, prompts, small-talk, Tavily, voice, memory and provider policy: untouched.
+
+Next: CQ-REC-008 — Recommendation Interaction Events. STOP.
+
+## Audit — CQ-REC-007R D: the REC-006 build principal (2026-09-20)
+
+REC-006 C gave background slate builds a principal: the mandate's creator,
+provided they still held an active membership. The audit asked whether that
+is correct, a small defect, or a permissions-contract question too large for
+the recommendation context. It is two findings, one of each of the last two.
+
+**Verified first, because both findings depend on it.** The read path does
+re-evaluate. `createSlateReadPipeline` runs REC-001 for the _actual_
+requesting actor on every page, keeps only `ELIGIBLE` companies and leaves a
+shorter page rather than substituting — `packages/discovery/src/slates/reader.ts`,
+"the read-time guard: REC-001 for this actor, now, in one batch". So whatever
+the build principal could see, a reader is never served a company they
+themselves may not see. **No leak, and no finding of one.**
+
+### Finding 1 — classification B, FIXED IN THIS CHECKPOINT
+
+One person was a single point of failure for their whole organisation. When
+the mandate creator's membership ended, `resolve` returned null, and
+`refresh-handler.ts` treats that as `PERMANENT` with `NO_BUILD_PRINCIPAL` —
+a dead letter, not a retry. That mandate's slate then never rebuilt again,
+going stale and expiring, while other active members of the same
+organisation sat there perfectly able to build it. People leave
+organisations; this is not hypothetical, and it is silent.
+
+Fixed: the creator is still preferred — the slate has been built through
+their view all along and changing principal can change what it contains —
+and failing that the longest-standing active member is used.
+`MembershipRepository.listActiveForOrganisation` orders by `(joined_at, id)`,
+so the same rows always give the same answer and a rebuild does not depend
+on who happens to turn up. Null is now returned only when the organisation
+has no active member at all, which is the one case where there is genuinely
+nobody to build as. `chooseBuildMembership` states the rule on its own and is
+unit-tested without a database.
+
+### Finding 2 — classification C, blocking packet CQ-PERM-ORG-VIEW-001
+
+A slate is keyed by `(tenant, investor organisation, mandate, mode)` and is
+therefore an organisation-shared artefact. It is assembled through one
+person's eyes, and one person's eyes are not the organisation's:
+`permissions.disclosure_policies.recipient_type` admits `USER` and
+`MEMBERSHIP`, so a `specifically_shared` grant can name an individual, and
+one member's view can be strictly wider than another's.
+
+The consequence is not a leak — the read-time guard settles that — but it is
+not nothing:
+
+- a slate can hold items most of the organisation will never be shown, so
+  those slots are spent and every other member gets a shorter page;
+- which member built it can change what it contains, so a slate is not
+  reproducible from its key alone, which doc 19 §189 asks of ranking;
+- Finding 1's fallback makes this visible rather than causing it: the
+  principal can now change when a membership ends.
+
+"What is an organisation's view of a shared artefact?" cannot be answered
+inside the recommendation context — it is a disclosure-evaluation question
+about whether an organisation-scoped evaluation exists at all, distinct from
+the union or the intersection of its members' views. It is therefore its own
+packet.
+
+```
+CQ-PERM-ORG-VIEW-001   BLOCKED (blocks Wave 7)
+```
+
+Scope: define an organisation-scoped disclosure evaluation in
+`@capital-q/permissions`, decide explicitly whether an organisation-shared
+artefact is built on the intersection of its members' views (nobody sees a
+slot they cannot use) or on an organisation-only evaluation that ignores
+person-scoped grants entirely; record which principal or evaluation produced
+each slate so its contents are attributable; and make REC-006's builder use
+it. Deadline boundary: **before Wave 7**, because Wave 7 adds interaction
+events over slate items, and an event recording that somebody acted on an
+item most of their organisation cannot see would put the ambiguity into the
+append-only record where it cannot be corrected. Safe to defer until then
+because no cross-member exposure exists today: the read path already
+withholds per actor, and the only present cost is wasted slots and short
+pages.
+
+## Known-debt sweep — CQ-REC-007R E: REC-001 through REC-007 (2026-09-20)
+
+Every item carries an owner packet, a deadline boundary, and the reason it
+is safe to defer until that boundary. Nothing is recorded as "later".
+
+Classes: **1** before CQ-REC-008 · **2** before Wave 7 · **3** before an
+external demo · **4** before real customer data · **5** deliberately post-V1.
+
+### Closed by this packet
+
+| Item                                                         | Origin  | Closed by                                                                                                                      |
+| ------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| No Q-eval coverage of recommendation explanations            | REC-007 | 007R A — ten QEXPL cases, RECOMMENDATION suite ACTIVE                                                                          |
+| Eval cases inherited dead providers from earlier cases       | Q-010   | 007R A — provider health reset per case                                                                                        |
+| Conversational guard unreconciled with the factor model      | Q-023   | 007R B — factor-aware guard, `recommendation.explanation` tool                                                                 |
+| A person could not ask Q "why am I seeing this?"             | REC-007 | 007R B                                                                                                                         |
+| One departed member stopped an organisation's slate for good | REC-006 | 007R D                                                                                                                         |
+| `demo.log` could say nothing at all about a dead stack       | —       | 007R C — `pnpm demo:status`                                                                                                    |
+| `node --watch` restart storm: q-api never reached READY      | —       | 007R C — watchers scoped to `src` and `packages`                                                                               |
+| Stale agent worktree broke `pnpm lint` entirely              | —       | 007R E — worktree removed (clean, and its HEAD was already an ancestor of this branch); `pnpm lint` exits 0 with no workaround |
+
+### Open
+
+| #   | Item                                                                                                                                                                                                                                       | Class | Owner packet                     | Deadline boundary                                       | Why it is safe until then                                                                                                                                                                                                                                                                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- | -------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | The full unit suite is not reliably green in one pass: `apps/q-api/test/q-events.test.ts:598` (several SSE connections) fails only under parallel load, and two files intermittently time out starting a vitest worker. Each passes alone. | **1** | CQ-TEST-FLAKE-001                | Before REC-008                                          | A gate that is sometimes red for its own reasons cannot tell you whether the next packet broke something, so this must be settled before another packet leans on it. Nothing is wrong with the product: every file passes when run on its own, and the failures are contention, not assertions.                                                              |
+| 2   | An organisation-shared slate is assembled through one member's eyes; `specifically_shared` grants can name a USER or MEMBERSHIP.                                                                                                           | **2** | CQ-PERM-ORG-VIEW-001             | Before Wave 7                                           | Audited in 007R D. No cross-member exposure: the read path re-evaluates REC-001 per actor and withholds. The present cost is spent slots and short pages. Wave 7 is the boundary because it writes interaction events over slate items, and an append-only record of somebody acting on an item their organisation cannot see is not correctable afterwards. |
+| 3   | `Q_COMPANY_INTELLIGENCE` is ACTIVE in `Q_EVAL_SUITE_STATUS` with no dataset case; it is covered by an integration test instead, so the eval roll-up reports a suite with zero results.                                                     | **2** | CQ-Q-EVAL-SUITE-HONESTY-001      | Before Wave 7                                           | Found in 007R A. The capability is genuinely tested, just not by a case, so the suite is honest about the product and dishonest only about itself. It matters before Wave 7 adds further suites and the roll-up becomes the thing people read.                                                                                                               |
+| 4   | Migrations `20260925090000` through `20260929090000` are applied locally and not on the hosted Supabase project.                                                                                                                           | **3** | Human-instructed `pnpm db:push`  | Before anything is demonstrated from the hosted project | The demo stack runs entirely against the local stack (`pnpm demo --local`), and the hosted deployment is separately blocked on Render. This packet does not push them, by instruction; they are listed here so they cannot quietly disappear.                                                                                                                |
+| 5   | Nothing rebuilds a slate on a schedule. A slate that expires is rebuilt by the next read, which returns an empty page noted `RECOMMENDATIONS_REFRESHING`.                                                                                  | **3** | CQ-REC-REFRESH-SCHED-001         | Before an external demo                                 | Correct, and self-healing: the read requests the build and the following read serves it. It is a first-impression problem, not a correctness one — somebody opening Discover after a quiet night sees an empty page once.                                                                                                                                    |
+| 6   | Reader cost: a first page of two items took 30 executor calls (four per-tenant/per-pair REC-001 reads, one eligibility batch per page), measured in REC-006.                                                                               | **3** | CQ-REC-READ-COST-001             | Before an external demo                                 | Bounded and correct, and the per-page eligibility batch is the thing that makes the read path safe, so it is not removable. It scales with page size rather than slate size, and doc 20's INP budget is the reason to measure it under a real page before showing it to anybody.                                                                             |
+| 7   | `CQ_SYNTHETIC_DEMO_ROUTING` is off in the running demo, so Q work routes to the reviewed provider and is subject to its free-tier limits — the cost problem REC-007 exists to solve.                                                       | **3** | This packet's acceptance         | Before an external demo                                 | Off is the safe default and the correct one everywhere else; it is a one-variable change on a local stack, exercised in this packet's own acceptance run.                                                                                                                                                                                                    |
+| 8   | No dedicated "why am I seeing this?" affordance in the web UI; the HTTP endpoint and the Q tool both exist and nothing in `apps/web` calls the endpoint.                                                                                   | **5** | CQ-WEB-EXPLAIN-001               | Post-V1                                                 | 007R B made the question answerable where people actually ask it — in conversation with Q — so the demo story works without a button. A dedicated surface is a refinement, not a gap.                                                                                                                                                                        |
+| 9   | The investor description given to the narrator is a neutral line rather than the investor's own mandate wording.                                                                                                                           | **5** | CQ-REC-EXPLAIN-VOICE-001         | Post-V1                                                 | Deliberate. The mandate is `investor_private`; sending its wording to a model to make an explanation read better would trade a privacy boundary for prose.                                                                                                                                                                                                   |
+| 10  | Cheque compatibility is always MISSING with `CHEQUE_NOT_COMPUTABLE`.                                                                                                                                                                       | **5** | CQ-CAP-DISCLOSURE-PROJECTION-001 | Post-V1                                                 | Deliberate and documented in the feature contract: the capital objective is organisation-internal and no disclosure-safe projection of it exists. Unknown stays unknown — the feature is absent, never zero, and never read from a private objective.                                                                                                        |
+| 11  | Comparing two recommendations against each other is not built.                                                                                                                                                                             | **5** | CQ-REC-COMPARE-001               | Post-V1                                                 | Never in scope for V1; explaining one recommendation is the V1 claim, and it is met.                                                                                                                                                                                                                                                                         |
+| 12  | The verification bounded context is unimplemented, so `EXTERNALLY_VERIFIED` and `PLATFORM_VERIFIED` are reachable values that nothing produces.                                                                                            | **5** | CQ-VERIF-001                     | Post-V1                                                 | Honest degradation: evidence stays at the status it earned and no code claims otherwise. ADR-001 keeps `verification_claims` a separate workflow precisely so its absence lowers confidence rather than corrupting the three axes.                                                                                                                           |
+| 13  | Local branch `scratch/rec005-v1-checkpoint` is not merged into `recovery/2026-09-12` and exists only on this machine.                                                                                                                      | **5** | — (housekeeping)                 | Post-V1                                                 | Left deliberately untouched: it is unmerged work and deleting somebody's branch is not an agent's call. Recorded so it is not mistaken for dead weight.                                                                                                                                                                                                      |
+
+### Two notes that are not debt in this repository
+
+`pnpm format:check` exits 1 on a clean checkout. All 295 remaining warnings
+are under `graphify-out/`, which is untracked, gitignored and generated by a
+local agent tool rather than by this project. Every tracked file passes. It
+is not fixed by a `.prettierignore` entry here because that would put a
+local tool's footprint into the repository.
+
+`pnpm lint` now exits 0 with no workaround. It previously failed with 66,629
+errors because the stale agent worktree under `.claude/worktrees/` presented
+a second candidate tsconfig root to typescript-eslint. The worktree was
+clean and its HEAD was already an ancestor of this branch, so removing it
+was safe; the branch `claude/pensive-yonath-873730` is left in place, which
+keeps those commits reachable.
+
+## Acceptance — CQ-REC-007R (2026-09-20)
+
+Local environment reset, `CQ_SYNTHETIC_DEMO_ROUTING=true` set in
+`.env.local` (the operator opt-in; the allowance still checked the
+environment and that the database was loopback), stack restarted, and the
+key journey run twice from a clean database with fresh synthetic
+identities. No row was written by hand and no table was touched.
+
+`pnpm demo:journey` (`scripts/recommendation-journey-smoke.mjs`) drives it
+through public paths only: sign-in, the onboarding runtime, the company
+visibility endpoint, the discovery feed and the explanation endpoint. The
+one non-public step is `dev:marketplace-ready`, the documented local
+fixture whose only synthetic part is the verification seam, which records
+itself as `SYNTHETIC_LOCAL_FIXTURE`.
+
+| Run | Company    | Investor organisation | Slate      | Result |
+| --- | ---------- | --------------------- | ---------- | ------ |
+| 1   | `0d6511ae` | `7b45209e`            | `2c291a3c` | PASSED |
+| 2   | `4e7afd70` | `592b3e42`            | `ecf9c67e` | PASSED |
+
+Each run: founder completed onboarding (21 answered, 2 skipped) and chose
+to be discoverable, readiness moved `requirements_outstanding ->
+marketplace_ready`, the investor completed onboarding (23 answered, 8
+skipped), a slate was built and served, and the investor was told why --
+1 matched, 0 not matched, 3 unknown, from
+`deterministic-ranker.v1/ranking-config.v1`, with no digit, percentage or
+score anywhere in the reader-facing text.
+
+**Which provider carried it.** The narration for the explanation:
+
+```
+service q-api  taskClass NORMAL_DIALOGUE  provider google
+model gemini-3.5-flash-lite  dataPosture SYNTHETIC_DEMO
+attempts 1  fallbackUsed false  1930 ms
+```
+
+That is doc 15 section 62 in the live demo path rather than in a fixture:
+attested synthetic material carried by the free tier, with Gemini's
+reviewed PUBLIC ceiling untouched.
+
+**Provider failure, measured in three stages** rather than asserted.
+
+1. `GEMINI_API_KEY` invalidated, stack restarted. The explanation still
+   arrived, `source: Q_SYNTHESIZED`, served by `groq/openai/gpt-oss-120b`
+   with `attempts 2, fallbackUsed true` and the posture intact. Falling
+   back to the reviewed provider never broadens exposure.
+2. `GROQ_API_KEY` and `GROQ_API_KEY_2` invalidated as well, stack
+   restarted. `HTTP 200`, `source: DETERMINISTIC`, the same 1/0/3 factors
+   and the same ranking version, and a readable summary: _"Stage matches
+   what your mandate names. Geography, sector and what the business does
+   are not established from the information used to rank."_ The service
+   logged `failureClass: AUTHENTICATION` and no provider error text. Doc
+   19 section 58: if Q is unavailable, the explanation still works.
+3. Keys restored from a backup taken before the test, stack restarted,
+   `pnpm demo:status` READY with synthetic-demo routing ON.
+
+| Gate                    | Result                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `pnpm format:check`     | every tracked file passes; 295 warnings, all under untracked `graphify-out/` |
+| `pnpm lint`             | exit 0, unmodified, for the first time in this packet                        |
+| `pnpm typecheck`        | 76 tasks, exit 0                                                             |
+| `pnpm test`             | 225 files, 2893 tests, exit 0, green in one pass                             |
+| `pnpm build`            | 41 tasks, exit 0                                                             |
+| `pnpm test:rls`         | 33 files, 952 tests, PASS                                                    |
+| `pnpm test:integration` | 52 passed / 1 skipped, 473 passed / 5 skipped                                |
+| `pnpm q:eval:lint`      | PASS, 39 cases, 16 graders                                                   |
+| `pnpm q:eval:ci`        | exit 0, no failures, no regression against the re-recorded baseline          |
+| `pnpm demo:status`      | READY, four components, routing reported                                     |
+
+Observed and added to the debt table rather than changed here: the
+workers' `STRUCTURED_EXTRACTION` work still runs as `REAL_CUSTOMER` on
+groq. The posture is per request, and `apps/workers` builds the allowance
+but declares the posture on no request, so founder extraction is still
+subject to the reviewed provider's free-tier limits. REC-007 scoped the
+posture to the Q answer path and the narrator; extending it is a decision
+about which worker material is genuinely invented, not a wiring omission.
+
+| #   | Item                                                                                                                                      | Class | Owner packet              | Deadline boundary       | Why it is safe until then                                                                                                                                                                                                                                           |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 14  | The workers' extraction path never declares a data posture, so it routes as REAL_CUSTOMER and remains subject to Groq's free-tier limits. | **3** | CQ-REC-WORKER-POSTURE-001 | Before an external demo | Correct, not broken: an undeclared posture means "somebody's data", which is the safe default. It costs demo throughput on the founder document path, not correctness, and the decision it needs is which worker material a server can honestly attest is invented. |
+
+## Entry gates — CQ-REC-008 (2026-09-20)
+
+Three gates ran before any REC-008 feature code.
+
+### 0A — the REC-005 scratch artefacts: CLOSED
+
+`origin/scratch/rec005-v1-checkpoint` was already gone; the local branch
+remained at `e0745531dcc9d9735aff0e546c23364e467a50a0`, and its worktree had
+been removed in REC-007R E.
+
+It was inspected rather than assumed. `e074553` is not an ancestor of
+`recovery/2026-09-12` and carries one commit the branch did not share, so
+its CONTENT was diffed against current HEAD for every path it touched.
+`packages/discovery/src/ranking/config.ts` is byte-identical. Across the
+whole of `src`, exactly one line exists on the scratch branch and not on
+recovery — `import type { RecommendationContext }`, an import the current
+ranker no longer needs. The only test assertions unique to it pin
+`structured-mandate.v1` and `eligibility.v1`, both superseded by v2. Fully
+represented, so the local branch was deleted and `git fetch --prune` run;
+`git branch -vv` and `git branch -r` show it gone. `recovery/2026-09-12`
+untouched.
+
+### 0B — full unit-suite reliability: CLOSED
+
+REC-007R E recorded a class-1 item: the suite had passed in its final run
+but had not been reliably green in one pass. Three sequential runs from the
+same clean tree, demo stack stopped, nothing else running:
+
+| Run | Files | Tests | Exit | Duration |
+| --- | ----- | ----- | ---- | -------- |
+| 1   | 225   | 2893  | 0    | 167s     |
+| 2   | 225   | 2893  | 0    | 132s     |
+| 3   | 225   | 2893  | 0    | 150s     |
+
+Not reproducible, and no code was changed to chase it. The single observed
+occurrence was two vitest worker start-up timeouts — `Failed to start forks
+worker`, `Timeout waiting for worker to respond` — on
+`packages/ui/test/choice-and-money.test.tsx` during REC-007R B, while the
+demo stack was running alongside the suite and the dev watchers were still
+scoped to every loaded file. Both conditions are gone: REC-007R C scoped the
+watchers, and the project's own convention is to run gates with the stack
+stopped. No assertion was weakened, no timeout raised, no test retried or
+skipped.
+
+**UNIT_GATE_RELIABILITY: CLOSED** — non-reproducible over 3/3 under the
+documented condition.
+
+### 0C — synthetic-demo posture for extraction workers: CLOSED
+
+REC-007 gave the gateway an attestation and the Q answer path a posture, and
+left every other request declaring nothing. Nothing is REAL_CUSTOMER, so a
+demo full of invented founders was still pushing document extraction through
+the reviewed provider and its free tier — the cost problem REC-007 existed
+to solve, surviving in the path that does the most model work.
+
+Diagnosed rather than guessed. The request is built in
+`packages/founder-onboarding/src/intelligence/extraction.ts` and
+`packages/investor-onboarding/src/intelligence/synthesis.ts`, both of which
+declare `sensitivity: CONFIDENTIAL` and no posture; the worker's composition
+root built the allowance and passed it to the gateway, where it sat inert
+because a posture is per request. Two further sites were in the same state
+and are fixed with it: q-api's memory learner and presence reader.
+
+The posture comes from the composition root and nowhere else. It is the same
+REC-007 attestation — an operator opt-in, `CAPITAL_Q_ENV` local or test, a
+loopback database — and no second policy was introduced. Nothing about an
+individual job decides it, because nothing about an individual job could be
+trusted to: the request type these seams accept has no field for it, and a
+forged field on a caller's request is not read.
+
+Ten tests. Six route through the real gateway against a catalogue mutated so
+the unreviewed provider is PREFERRED for `STRUCTURED_EXTRACTION` — because
+the seeded `structured_extraction.v1` is, listing `gemini-3.5-flash-lite`
+ahead of the Groq models, and a fixture that quietly preferred the reviewed
+provider would have passed whatever the posture did. Four cover the seam:
+the posture is declared when the root supplies it, omitted when it does not,
+and unchanged by anything on the caller's request.
+
+Live, on the demo stack with the operator flag on:
+
+```
+service workers  taskClass STRUCTURED_EXTRACTION  provider google
+model gemini-3.5-flash-lite  routingPolicy structured_extraction.v1
+dataPosture SYNTHETIC_DEMO  attempts 1  fallbackUsed false  2805 ms
+```
+
+Before this change the same work logged `provider groq, dataPosture
+REAL_CUSTOMER`. The declared sensitivity is CONFIDENTIAL in both, and no
+`ai_ops` row, migration or ceiling moved. The posture reaches no migration
+and no repository write — it exists on the gateway request, its span and its
+served log, and nowhere in canonical Company or Investor truth.
+
+Debt item 14 from REC-007R E is therefore **CLOSED**.
+
+## Debt review — CQ-REC-008 E (2026-09-30)
+
+### Closed by this packet
+
+**Item 1, class 1 — the unit gate.** Entry gate 0B ran the full suite three
+times sequentially from a clean tree with the demo stack stopped: 3/3 exit
+0, 225 files, 2893 tests each. Not reproducible, and no code was changed to
+chase it. `CQ-TEST-FLAKE-001` is **CLOSED** as non-reproducible, with the
+one observed occurrence explained: vitest worker start-up timeouts while
+the demo stack ran alongside the suite and the dev watchers were still
+scoped to every loaded file, both of which REC-007R C removed.
+
+**Item 14, class 3 — worker extraction posture.** Closed by entry gate 0C.
+Worker `STRUCTURED_EXTRACTION` now declares `SYNTHETIC_DEMO` where the
+deployment holds the attestation, proven live at
+`provider google, model gemini-3.5-flash-lite, attempts 1, no fallback`.
+
+### CQ-PERM-ORG-VIEW-001 — status, and a correction to its recorded reason
+
+**Status: OPEN. Boundary unchanged: MUST COMPLETE BEFORE WAVE 7.**
+
+The reason recorded in REC-007R D needs correcting rather than repeating.
+It said Wave 7 was the boundary "because Wave 7 adds interaction events
+over slate items, and an append-only record of somebody acting on an item
+their organisation cannot see is not correctable afterwards." REC-008 has
+now added exactly those events, so that sentence has to be re-examined
+instead of carried forward unchanged.
+
+What REC-008 actually records makes the risk _smaller_, not larger. Every
+interaction row carries `actor_user_id` as well as
+`investor_organisation_id`, so an event is never "organisation Y engaged
+with company Z" — it is "person X, of organisation Y, acted on Z at rank N
+of slate S". A later reader that needs to know whether the rest of Y could
+see Z can ask, because the actor is on the row. The ambiguity the note
+feared would be uncorrectable is, in fact, recorded.
+
+What has NOT changed is the underlying question, and the boundary still
+holds for a different and better-stated reason: **REC-009 consumes these
+events.** Exploration and diversity will read exposure and decide what to
+show next, and at that point "this organisation has seen this company"
+becomes an input rather than a record. An input computed from a slate
+assembled through one member's wider view would personalise a whole
+organisation's feed on evidence most of it never had. That is the thing
+that must not ship, and it ships in Wave 7.
+
+No cross-member exposure exists today: the read path re-evaluates REC-001
+per actor and withholds, and REC-008's own action path runs the same
+evaluation before recording anything. The present cost remains spent slots
+and short pages.
+
+### Everything else
+
+Items 3–13 from the REC-007R sweep are unchanged, and none moved class.
+For the record: item 4 (hosted migrations) now reads **20260925–20260930**,
+because REC-008 adds `20260930090000_recommendation_interactions.sql`.
+It is applied locally by `db:reset` and has NOT been pushed to the hosted
+project; this packet does not run `db:push`.
+
+## Acceptance — CQ-REC-008 (2026-09-30)
+
+`pnpm demo:journey` now carries the interaction sequence, so the acceptance
+is a command rather than a description. Fresh database, stack restarted,
+fresh synthetic identities, every step through a public HTTP path.
+
+```
+ok  both services answered as themselves
+ok  founder completed onboarding, company discoverable and marketplace-ready
+ok  investor completed onboarding
+ok  a slate was built and served            slate 99914903-b7c8-496d-a806-481cd5f05308
+ok  the investor was told why               1 matched, 0 not, 3 unknown
+ok  exposure and attention recorded         4 of 4
+ok  a retry is recognised rather than counted twice   first false, retry true
+ok  no client route can create Interest     HTTP 422
+ok  the investor saved a company            HTTP 200
+ok  a pass is recorded, and leaves the save alone     saved true, passed true
+ok  still saved after the feed is read again
+ok  the saved list is identities only       ["companyIds"]
+```
+
+The history it left, read back from the database:
+
+| Interaction                 | Strength class      | From a slate | Position |
+| --------------------------- | ------------------- | ------------ | -------- |
+| IMPRESSION                  | ATTENTION           | yes          | 1        |
+| WATCH_MILESTONE (COMPLETED) | ATTENTION           | yes          | 1        |
+| ASK_Q                       | CONSIDERATION       | yes          | 1        |
+| PROFILE_OPEN                | ATTENTION           | yes          | 1        |
+| PROFILE_OPEN                | ATTENTION           | yes          | 1        |
+| SAVE                        | CONSIDERATION       | yes          | 1        |
+| PASS (TIMING)               | CONTEXTUAL_DECISION | yes          | 1        |
+
+Seven rows for eight requests: the retried `PROFILE_OPEN` is one row, and
+the API told the client so. `impression_count` is 1, which is the number of
+impressions that happened rather than the number of times one was reported.
+
+What did NOT happen, asserted against the database after the run:
+
+| Claim                                           | Result                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| Watching to the end created interest            | `INTEREST_OBSERVED` rows: **0**                              |
+| An interaction created relationship state       | `network.relationship_events`: **0**                         |
+| Observed behaviour rewrote the declared mandate | mandate still `ACTIVE`; no interaction path writes one       |
+| Ranking changed                                 | slates still `deterministic-ranker.v1` / `ranking-config.v1` |
+| Private text was persisted                      | events with non-empty metadata: **0**                        |
+| Exposure became popularity                      | popularity columns on `core.companies`: **0**                |
+
+Save and pass are both true on the same company, which is the sharper test
+of the two being independent flags: passing something does not un-save it,
+and neither is a judgement about the company. The two-company case --
+passing one leaves the other alone -- is proven in the interaction
+integration and service suites, where a second company costs nothing to
+seed; the live fixture has one discoverable company because a second
+founder needs its account's active organisation to follow the company its
+journey creates, which is an onboarding concern rather than this packet's.
+
+One thing the acceptance found and the fixture now works around: running
+`dev:marketplace-ready` LOADS `packages/companies/dist`, and on Windows
+`node --watch` treats a read of a watched file as a change, so the api
+restarts underneath the journey. Answering once is therefore not the same
+as being up, and both the journey and the acceptance script now wait for
+three consecutive healthy answers before trusting the stack. It is the
+same spurious-watch behaviour REC-007R C diagnosed for `node_modules`,
+surviving in `packages/*/dist`, and it is recorded below rather than fixed
+here.
+
+### New debt from this packet
+
+| #   | Item                                                                                                                                                                                                                                         | Class | Owner packet           | Deadline boundary       | Why it is safe until then                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ---------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 15  | `node --watch` restarts the dev services when a watched file under `packages/*/dist` is merely READ, not written. Any script that loads a package's dist -- `dev:marketplace-ready` does -- restarts the api underneath whatever is running. | **3** | CQ-DEV-WATCH-SCOPE-001 | Before an external demo | Development only: the built services (`pnpm start`) watch nothing, so nothing a customer touches is affected. It costs a restart mid-fixture, which the journey and the acceptance script now wait out by requiring three consecutive healthy answers. REC-007R C removed the same behaviour for `node_modules`; narrowing the watch to source rather than `dist` would remove the rest, at the cost of not restarting on a package rebuild. |
+
+### Gates — CQ-REC-008
+
+| Gate                                           | Result                                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------------------------- |
+| `pnpm db:reset` / `db:lint` / `db:types:check` | PASS / no schema errors / clean (types regenerated and committed in A)        |
+| `pnpm test:rls`                                | 34 files, 982 tests, PASS (was 33 / 952)                                      |
+| `pnpm test:integration`                        | 54 files: 53 pass, 1 skipped; 484 pass, 5 skipped (was 53 / 473)              |
+| `pnpm format:check`                            | every tracked file passes; the 295 warnings are untracked `graphify-out/`     |
+| `pnpm lint`                                    | exit 0, unmodified                                                            |
+| `pnpm typecheck`                               | 76 tasks, exit 0                                                              |
+| `pnpm test`                                    | 231 files, 2948 tests, exit 0, green in one pass (was 225 / 2893)             |
+| `pnpm build`                                   | exit 0                                                                        |
+| `pnpm q:eval:lint` / `q:eval:ci`               | PASS, 39 cases / 16 graders / exit 0, no regression, nothing added or changed |
+| Cycles / dependency direction                  | 42 workspace packages; no package depends on an app                           |
+| Secret scan / `git diff --check`               | clean on every changed file                                                   |
+| `pnpm demo:status`                             | READY, four components, synthetic-demo routing ON                             |
+
+Migration impact: `20260930090000_recommendation_interactions.sql` adds
+`recommendation.interaction_events` and `interaction_state`, one trigger,
+two partial unique indexes, four ordinary indexes; RLS on, no policy, no
+grant. Applied locally by `db:reset`. **HOSTED_MIGRATIONS_PENDING is now
+20260925–20260930**; this packet did not run `db:push`.
+
+Next: CQ-REC-009 — Diversity / Exploration. Not started.
+
+## CQ-PERM-ORG-VIEW-001 — organisation-safe recommendation authority (2026-09-20)
+
+Starting SHA `8ac5141`. No migration, no schema change, no product behaviour
+change.
+
+### What the defect actually was
+
+Traced rather than assumed, because the recorded note could have been
+either a live leak or a structural one. Every port hard eligibility reads
+from is already organisation-scoped or unscoped: company facts and
+classifications take ids, the mandate is read for the investor
+organisation, relationship standings are between organisations. **Exactly
+one read was person-scoped** — `DiscoverabilityPort.permittedToView`,
+which asks the disclosure evaluator "may this principal view this
+company", and it asked as whichever human `BuildPrincipalResolver`
+returned.
+
+The honest finding, which changes how this packet should be read: the
+person-specific grant **could not change slate membership today**. REC-001
+requires both halves — a `network_visible`/`public_external` classification
+_and_ `permittedToView` — and a company classified below that is excluded
+by the classification half whatever any grant says. A `specifically_shared`
+grant on an already network-visible company is the only shape that would
+have differed, and nothing in the product issues one. So this is
+**preventive structural hardening**, not the closing of an exploitable
+leak. It still had to be closed before REC-009, because REC-009 turns slate
+membership into an input rather than a record.
+
+Answers to §4, for the record:
+
+| Question                                                         | Answer                                                                                                |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| A. What principal builds an organisation slate?                  | A human member — the mandate's creator, else the longest-standing active member (REC-007R Finding 1). |
+| B. What if the creator's membership is disabled?                 | The build continues under another active member. Only an organisation with no active member fails.    |
+| C. Can A's person-specific grant affect a slate B consumes?      | Structurally yes before this packet; not observably, because the classification half blocks it.       |
+| D. Can A's interactions influence organisation state B receives? | Interaction rows carry `actor_user_id`; nothing in REC-008 aggregates them into organisation policy.  |
+| E. Did an organisation-level disclosure principal already exist? | No. `DisclosurePrincipal` was ANONYMOUS \| ACTOR.                                                     |
+
+### What was built
+
+`@capital-q/permissions` gained a third principal, `ORGANISATION`, carrying
+a tenant and an organisation id and nothing else. It is **not a privilege
+level**: it answers strictly less than any member of the same organisation.
+`personal_private` can never match it; `specifically_shared` reaches it only
+through a grant naming the `ORGANISATION` itself, so a share addressed to a
+`USER` or a `MEMBERSHIP` returns `WRONG_RECIPIENT`; `organisation_private`,
+`founder_private` and `investor_private` match on `ownerOrganisationId`
+alone, never `ownerUserId`; `relationship_shared` answers identically either
+way, because relationship parties are organisations already.
+
+There is deliberately no membership list in the evaluation. "Can any member
+see it" is the union of everyone's access, which is the thing being
+avoided; "can every member see it" would let one colleague's absence change
+what the institution knows.
+
+Discovery consumes it through a typed viewpoint and never learns what a
+principal is. `EvaluateEligibilityQuery.viewpoint` is `ACTOR` (the default)
+or `INVESTOR_ORGANISATION`; the infrastructure adapter translates it into
+`actorPrincipal` or `organisationPrincipal`, and an organisation viewpoint
+that resolves to no organisation answers false for every company rather
+than falling back to anyone. Structured and semantic candidate generation
+pass `INVESTOR_ORGANISATION`; the slate reader and the interaction action
+path keep `ACTOR`, because withholding per person and acting on a company
+are that person's own business.
+
+No fake service user, no service membership, no permission SQL in
+Discovery, no second framework. Execution authority and disclosure
+authority are now separate things: the worker still resolves a human actor
+for audit and attribution, and that actor no longer decides what may be
+seen.
+
+### Security tests (§12)
+
+| #    | Proven by                                                                                                                                                                                                                           |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `apps/workers/test/build-principal.test.ts` (creator inactive → another member builds) plus `organisation-view.test.ts` "same answer from a different member".                                                                      |
+| 2    | `organisation-view.test.ts` — asked as member A the private company is eligible; asked as the organisation it is not.                                                                                                               |
+| 3    | Q-private material is `personal_private` or the member's own conversation; `evaluator.test.ts` "never sees a Person's own material, even its own member's".                                                                         |
+| 4    | `evaluator.test.ts` — a share addressed to a USER or a MEMBERSHIP is not inherited; the organisation answers `WRONG_RECIPIENT`.                                                                                                     |
+| 5, 6 | Unchanged and re-run: REC-008 keeps `actor_user_id` on every row and no path aggregates it into declared policy.                                                                                                                    |
+| 7    | The reader re-evaluates REC-001 per actor and withholds; REC-008's action path does the same before recording.                                                                                                                      |
+| 8    | `evaluator.test.ts` "another tenant's private material stays denied"; the viewpoint's tenant is the actor's resolved tenant.                                                                                                        |
+| 9,10 | `evaluator.test.ts` sweep: the organisation answers no more than its widest member for any scope. `organisation-view.test.ts` — an actor outside the organisation resolves to no investor subject and the evaluator is never asked. |
+| 11   | Full unit and integration suites, green.                                                                                                                                                                                            |
+
+The sweep matters more than any single case: it asserts the property
+rather than an example. So does the mutation check — reverting the
+viewpoint translation in `eligibility/service.ts` fails three of the six
+new discovery tests, so they are not vacuous. The pre-existing fake at
+`eligibility-service.test.ts` ignored its first argument and would have
+passed either way; it is now named `_viewpoint` and says why it is blind.
+
+### REC-009 seam (§13)
+
+Written into `docs/modules/discovery.md`. In short: organisation-level
+exposure from `interaction_state` is admissible **because** its companies
+now came through an organisation-scoped evaluation — before this packet it
+was not; actor identity stays on the event and never becomes a declared
+mandate; strength class stays a class; nothing person-private can be an
+input, by construction rather than by rule; and exposure is still not
+popularity.
+
+### Gates — CQ-PERM-ORG-VIEW-001
+
+| Gate                             | Result                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------ |
+| Targeted: permissions, discovery | 21 files, 306 tests, PASS                                                            |
+| Targeted: REC-006 worker paths   | `build-principal` + `recommendation-refresh`, 2 files, 11 tests, PASS                |
+| `pnpm typecheck`                 | 76 tasks, exit 0                                                                     |
+| `pnpm format:check`              | every tracked file passes; the 297 warnings are untracked `graphify-out/`            |
+| `pnpm lint`                      | exit 0                                                                               |
+| `pnpm test`                      | 232 files, 2963 tests, exit 0 (was 231 / 2948)                                       |
+| `pnpm build`                     | 41 tasks, exit 0                                                                     |
+| `pnpm test:integration`          | 54 files: 53 pass, 1 skipped; 484 pass, 5 skipped — unchanged                        |
+| `pnpm q:eval:lint` / `q:eval:ci` | PASS, 39 cases / 16 graders; exit 0, no regression, nothing added                    |
+| Dependency direction             | 37 workspace packages; none depends on an app; permissions does not import discovery |
+| Secret scan / `git diff --check` | clean on every changed file                                                          |
+
+DB gates were not run: no migration, no schema change, and `db:types:check`
+has nothing to regenerate. Hosted migrations remain **20260925–20260930**
+and `db:push` was not run.
+
+**One honest note on the unit gate.** The first `pnpm test` run reported
+2948 passing tests and 4 errors: `vitest-pool` failed to start forks
+workers for four jsdom component files (`packages/ui/q-composer`,
+`packages/ui/choice-and-money`, `apps/web/mobile-navigation`,
+`apps/web/network-status`) — none of them touched by this packet. Run
+directly they pass in 9.5s, 4 files / 15 tests. The cause is vitest's
+`START_TIMEOUT`, a hard-coded 60s constant in `cli-api` with no config
+knob: on a saturated machine, forking a jsdom worker can exceed it. The
+second run was green in one pass at half the wall-clock (144s against
+292s). No test was retried and no assertion was weakened — the four files
+never ran at all the first time. This is the same signature entry gate 0B
+saw once and closed as non-reproducible, so **CQ-TEST-FLAKE-001 is
+reopened, class 3**, with a concrete cause and a concrete lever: capping
+`poolOptions.forks.maxForks` in the root vitest config. That is a
+repository-wide testing decision and does not belong in a permissions
+packet.
+
+### Debt
+
+| #   | Item                                                                                                                                     | Class | Owner packet      | Deadline boundary  | Why it is safe until then                                                                                                                                                                       |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----- | ----------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 16  | `vitest-pool` can exceed its hard-coded 60s worker `START_TIMEOUT` when many jsdom workers fork at once, reporting files that never ran. | **3** | CQ-TEST-FLAKE-001 | Before CI is wired | Local only and visible: the run reports errors rather than passing quietly, and the affected files pass deterministically when run. Capping `maxForks` would remove it at some wall-clock cost. |
+
+Item 2 of the REC-007R sweep — "an organisation-shared slate is assembled
+through one member's eyes" — is **CLOSED** by this packet. Items 3–13 are
+unchanged. Item 15 (`node --watch` on `packages/*/dist`) is unchanged.
+
+Next: CQ-REC-009 — Diversity / Exploration. Not started.
+
+## CQ-TEST-FLAKE-001 — CLOSED (2026-09-20)
+
+Reopened by CQ-PERM-ORG-VIEW-001 with a concrete cause. Closed here with a
+concrete fix.
+
+A non-watch run defaults to `availableParallelism() - 1` workers, so an
+8-core Windows host forks seven at once, each booting the runner and — for
+the `.tsx` suites — jsdom. Waiting for a worker to report "started" has a
+hard-coded 60s budget (`START_TIMEOUT` in Vitest's `cli-api`; no option
+exposes it), and on a busy machine with a few GB free that budget was
+missed. The run then reported unhandled errors for files that never ran,
+which reads like a test failure and is not one.
+
+`vitest.config.ts` now sets `maxWorkers` to half the host's parallelism,
+floored at two — four here, which is also the count Vitest itself picks
+for watch mode, where it expects to share the machine. No serial
+execution, no longer timeouts, no retries, no weakened assertions.
+
+**A correction worth recording.** The first attempt set
+`poolOptions.forks.maxForks`, which Vitest 4 accepts, warns about and then
+ignores. The two green runs that followed it proved only that the machine
+was idle, and the deprecation line was in both logs unread. `165bc52`
+claimed the closure; `2d1331e` corrected the option and deferred the
+proof. The lesson is the cheap one: a config key that is merely accepted
+is not a key that works, and a warning in a log that was skimmed for the
+summary line is a warning that was not read.
+
+Proved after REC-009 landed, on the same host, back to back:
+
+| Run | Files | Tests | Exit | Startup timeouts | Duration |
+| --- | ----- | ----- | ---- | ---------------- | -------- |
+| 1   | 234   | 3006  | 0    | 0                | 136.5s   |
+| 2   | 234   | 3006  | 0    | 0                | 146.5s   |
+
+For comparison, unbounded on this host: 292s with four start-up failures,
+then 144s clean. Bounding costs nothing measurable, because less
+contention is also less thrashing.
+
+## CQ-PERM-ORG-VIEW-001 — CLOSED
+
+Recorded above; nothing in REC-009 reopened it. REC-009 consumes
+`interaction_state`, which is keyed by investor organisation, through a
+port that carries no user and no membership.
+
+## CQ-REC-009 — bounded diversity and exploration (2026-09-20)
+
+Starting SHA `fea92d6`. No migration, no schema change, no ranking change.
+
+### The stage
+
+Between REC-005's order and REC-006's persisted slate. It is a
+**permutation** of the ranked list, and that is the load-bearing property:
+exploration cannot introduce an ineligible company because there is
+nowhere inside the stage for a company to come from, and suppression
+cannot drop one because the output is the input reordered. Doc 19's rule
+that safety outranks diversity is therefore arithmetic rather than a rule
+anyone has to enforce.
+
+It reads no database, calls no model, draws no random number and reads no
+clock — the instant recency is measured against arrives as an argument —
+so `rerank` is a **synchronous** pure function and could not have reached a
+provider even if something wanted it to. Doc 19 §190 asks for a seed only
+where randomness exists; none does, so there is nothing to persist in
+order to reproduce an order.
+
+|                      |                                                                            |
+| -------------------- | -------------------------------------------------------------------------- |
+| Reranker             | `BOUNDED_DETERMINISTIC` / `bounded-reranker.v1`                            |
+| Policy               | `exploration-policy.v1`, `INITIAL_HEURISTIC_UNCALIBRATED`                  |
+| Context              | `INVESTOR_DISCOVER` only; refuses a base order from another ranker version |
+| Window / cluster cap | 10 / 3                                                                     |
+| Relevance floor      | 0.15 of REC-005's internal score                                           |
+| Movement cap         | 20 ranks                                                                   |
+| Recently seen        | 24 h                                                                       |
+| Exploration          | 1 slot per window, to a company never shown                                |
+
+Two phases, each with its own stated bound. First suppression: a passed
+company goes behind every unsuppressed candidate, in its own order,
+demoted and never banned. Then a bounded greedy: the best remaining
+candidate takes each position unless its cluster already fills the page or
+the organisation saw it very recently, and some other candidate _within
+the relevance floor_ fixes that. If nothing within the floor does, the
+best candidate takes the position anyway.
+
+### What it may read, and why that is a shape
+
+`RerankSignals` is three fields — `exposed`, `lastSeenAt`, `passed` — and
+none of them is a number. REC-008's state carries an impression count, a
+save flag, a save time, a last pass reason and a last interaction time;
+`createInteractionRerankSignals` drops all of it. Whether an organisation
+has seen a company is a fact about exposure; _how many times_ is a
+magnitude, and a magnitude in a reordering stage is a popularity signal
+however carefully it is named. Save is absent for that reason and one
+more: it is an investor's own bookmark and must never move a company, for
+them or for anyone else.
+
+The one company-side attribute is the cluster, and it is really the
+investor's: the set of `preferredNodeId`s — nodes on their own mandate —
+that REC-002 matched, hashed so the key cannot leak a taxonomy into a log
+line. A company the structured generator did not find has **no** cluster,
+never a bad one, and an unknown cluster is never capped, never penalised
+and never counted against anything.
+
+### Pass, Save, and the two together
+
+| State        | Proactive recommendation      | Saved list |
+| ------------ | ----------------------------- | ---------- |
+| saved        | unchanged — Save never boosts | present    |
+| passed       | suppressed to the tail        | absent     |
+| saved+passed | suppressed to the tail        | present    |
+
+`PASS_REINTRODUCTION_REASONS` names three; `PROVABLE_PASS_REINTRODUCTION_REASONS`
+is **empty**, because nothing can currently prove one. `interaction_state`
+records that a pass happened and when, not the mandate version it was made
+under, and no surface issues a reset. A changed `updated_at` is not a
+material update — a typo fix would resurface everything an investor had
+dismissed — so a passed company stays suppressed, the mechanism stays
+typed and tested, and an unrecognised reason is refused rather than
+ignored.
+
+### No migration, and why none was needed
+
+A slate item stores REC-009's position and REC-005's score. The base rank
+is recoverable **exactly** from the stored scores under REC-005's own
+tie-break (score descending, then canonical company id), which a test
+asserts, so no `base_rank` column exists. Reason codes went into the
+existing `reason_codes` array — a `text[]` with only a length check — with
+the two code sets disjoint and separately exported so a consumer
+partitions them by membership. The policy version rides in the generation
+fingerprint and in the `diagnostics` jsonb, so a policy change rebuilds
+rather than serving an order nobody would compute again. Hosted migrations
+remain **20260925–20260930**; `db:push` was not run.
+
+### Targeted tests
+
+`rerank.test.ts` (29) proves the reordering: determinism over five
+repetitions, the permutation property, the score carried untouched, the
+base rank recoverable, the relevance floor refusing and permitting the
+same swap on one changed number, the movement bound, unknown clusters
+never capped, cold start not penalised, forty-seven impressions and one
+being the same fact, recency as a nudge and not a ban, one exploration
+slot per window and none when the unexposed candidate is below the floor,
+pass suppression and its typed reintroduction, Save changing nothing, and
+an all-zero policy returning REC-005's order — which is how "the algorithm
+holds no constant of its own" is checked rather than asserted.
+
+`rerank-service.test.ts` (10) proves the seam: the cluster derives only
+from the investor's own matched mandate nodes and is opaque, the signals
+port is asked exactly once for exactly this organisation, another
+organisation's rows change nothing, one read per build at 200 candidates,
+and the adapter dropping the count and the save flag.
+
+Four new cases in `eligibility-boundary.test.ts` hold it structurally: no
+private import, no SQL, no model, no import of the ranking config or the
+ranker, and no field on `RerankSignals` that could hold a magnitude.
+
+`slates.test.ts` now builds through the **real** rerank service rather
+than a stub, so a future change that moved items would surface in REC-006's
+own goldens.
+
+### Performance
+
+200 candidates: single-digit milliseconds, asserted under 30ms with two
+orders of magnitude of headroom. One batched read per build regardless of
+pool size, so there is no N+1 to find.
+
+### Gates — CQ-REC-009
+
+| Gate                                | Result                                                                                                     |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `pnpm test` ×2 (entry gate + final) | 234 files, 3006 tests, exit 0 both times, no startup timeouts (was 232 / 2963)                             |
+| `pnpm typecheck`                    | 76 tasks, exit 0                                                                                           |
+| `pnpm format:check`                 | every tracked file passes; the warnings are untracked `graphify-out/`                                      |
+| `pnpm lint`                         | exit 0                                                                                                     |
+| `pnpm build`                        | 41 tasks, exit 0                                                                                           |
+| `pnpm test:integration`             | 53 pass + 1 skipped; 484 pass + 5 skipped — unchanged                                                      |
+| `pnpm q:eval:lint` / `q:eval:ci`    | PASS, 39 cases / 16 graders; no regression, nothing added                                                  |
+| Dependency direction                | no package depends on an app; the rerank subtree imports one workspace package, `@capital-q/observability` |
+| Secret scan / `git diff --check`    | clean                                                                                                      |
+| `pnpm demo:status`                  | READY, four components, synthetic-demo routing ON                                                          |
+
+DB gates were not run: no migration, no schema change, no RLS change.
+
+### Known limits (V1)
+
+- **One diversity dimension.** Taxonomy is the only company-side attribute
+  available downstream. `headquartersCountry` and `currentStageCode` are
+  read by REC-001 and not carried past it, so geography and stage would
+  need a change to REC-001's contract rather than a rerank one — a
+  deliberate deferral, not an oversight.
+- **Hand-set numbers.** No outcome data calibrates the window, the cap,
+  the floor or the recency horizon; doc 19 §53 leaves them open until it
+  exists, and the policy says so in its status.
+- **A semantic-only candidate escapes the cluster cap**, because it has no
+  matched mandate nodes and unknown must not become a penalty.
+- **No propensity logging.** Exploration is a deterministic slot, not a
+  probabilistic policy, so there are no action probabilities — which doc 19
+  §2450 notes a contextual bandit would later require.
+
+### Debt
+
+Item 16 (`vitest-pool` start-up timeouts) is **CLOSED** by the concurrency
+bound above. Item 15, `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarting
+the dev services when a file under `packages/*/dist` is merely read —
+remains **OPEN**, class 3, and **must be fixed before an external GateQ
+demo**. REC-009 does not touch that system and does not close it.
+
+Next: CQ-GATE-001 — GateQ Core. Not started.
+
+## CQ-REC-009R — pass suppression semantics closeout (2026-09-20)
+
+Starting SHA `d04f3c7`. No migration, no schema change.
+
+### What was actually wrong
+
+REC-009's postflight said "Pass suppresses to the tail — demoted, never
+dropped", and treated that as suppression. Tracing the serving path says
+it is not:
+
+| Question                                                | Answer                                                                                                                                                          |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A. Is a passed company retained in the persisted slate? | **Yes** — REC-009 demotes it to the tail and `insertItems` writes it.                                                                                           |
+| B. Can the reader eventually return it?                 | **Yes.** `pageItems` walks ranks in order and the only read-time guard was REC-001, which knows nothing about interactions. Paging to the tail served it again. |
+| C. Was there already a read-time filter?                | **No.** `PASS_SUPPRESSION` is absent from `PUBLIC_REASON_CODES`, so the code was stripped from the response — the item was not.                                 |
+| D. Is the historical slate/item retained?               | **Yes**, and it must stay so: items are immutable and insert-only.                                                                                              |
+
+There is a second, sharper problem that tail demotion could never have
+fixed: a slate is built at most once per TTL, so a pass recorded _after_ a
+build is not in that build at all. Ordering at build time cannot express a
+decision made later.
+
+### The correction
+
+Suppression moved to where REC-001's guard already is — read time, in the
+same batch:
+
+```
+page items → REC-001 re-evaluated now  ─┐
+           → passes read now           ─┴→ withheld, never substituted
+```
+
+The slate keeps the item, so the ordering stays reproducible and the
+history stays auditable; the page does not offer it. Nothing is deleted,
+nothing is marked bad, no mandate is mutated and no global exclusion is
+created. REC-009's tail demotion stays, because it is still the right
+_ordering_ — it keeps the slate a complete permutation and puts suppressed
+items where they cost the fewest slots — it is simply no longer mistaken
+for suppression.
+
+`suppressedFromProactiveDiscovery` is the one rule, used by the build and
+the read so they cannot disagree. They differ in exactly one place, on
+purpose: an unrecognised reintroduction reason makes the build refuse
+outright and the read fail closed. A build can stop and be retried; a feed
+page cannot, and a 500 is a worse answer than one missing company.
+
+`ProactiveSuppressionPort` carries the mandate id and version, which is
+what `MANDATE_VERSION_CHANGED` would one day compare against. Nothing
+implements the reintroduction port, so every passed company stays
+suppressed — the honest V1 answer, unchanged from REC-009.
+
+### Tests
+
+Seven new reader cases: paging all the way to the end never returns the
+passed company; the slate still lists it at the rank it was built with;
+the page is shorter rather than substituted; a reset that clears the pass
+and a reset supplied as a reason both restore serving; a mandate change or
+a company edit reintroduce nothing because nothing can prove either; an
+unrecognised reason suppresses instead of erroring the page; and the
+suppression query is asked only about this page, for this organisation.
+Removing the filter fails four of them.
+
+One interaction-service case: a company that was saved and then passed
+stays in Saved.
+
+One end-to-end integration case against the local database: the investor
+passes, the next page drops the company, the slate row and the `PASS`
+event are both still there, and after a save the company is in the saved
+list and still not in the feed.
+
+### Gates — CQ-REC-009R
+
+| Gate                                                | Result                                         |
+| --------------------------------------------------- | ---------------------------------------------- |
+| `pnpm typecheck`                                    | exit 0                                         |
+| `pnpm lint`                                         | exit 0                                         |
+| `pnpm format:check`                                 | every tracked file passes                      |
+| `pnpm test`                                         | 234 files, 3014 tests, exit 0 (was 234 / 3006) |
+| `pnpm build`                                        | exit 0                                         |
+| `pnpm test:integration`                             | 53 pass + 1 skipped; 484 pass + 5 skipped      |
+| `pnpm q:eval:lint` / `q:eval:ci`                    | PASS, 39 cases / 16 graders, no regression     |
+| Dependency direction / secrets / `git diff --check` | clean                                          |
+| `pnpm demo:status`                                  | READY, four components                         |
+
+DB gates not run: no migration, no schema change, no RLS change.
+
+**One gate needed a second run, and why.** The first `pnpm test:integration`
+reported all 484 tests passing but exited 1 on two unhandled rejections —
+`Cannot use a pool after calling end on the pool` — from
+`apps/q-api/test/q-events.integration.test.ts`, an SSE suite unrelated to
+this packet. Run alone it passes 9/9 cleanly in 27s. The variable was the
+demo stack: this was the first integration run with it up, and with it
+stopped the gate is exit 0 with no errors. The underlying shape is a real
+latent defect — a stream test that leaves a request pending across pool
+shutdown is a race whenever the machine is loaded — recorded below rather
+than fixed inside a pass-suppression closeout.
+
+### Debt
+
+| #   | Item                                                                                                                                                                                                                                                              | Class | Owner packet             | Deadline boundary  | Why it is safe until then                                                                                                                                                                                            |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 17  | `apps/q-api/test/q-events.integration.test.ts` can leave a query pending when the pool closes, producing unhandled rejections that fail the integration gate while every test passes. Reproducible only under load — here, with the demo stack running alongside. | **3** | CQ-TEST-SSE-TEARDOWN-001 | Before CI is wired | Test-harness teardown only; no product path opens a stream across a pool shutdown. It fails loudly rather than passing quietly, and the gate is green with the stack stopped, which is the documented way to run it. |
+
+`CQ-DEV-WATCH-SCOPE-001` remains **OPEN** and still must be fixed before an
+external GateQ demo.
+
+Next: CQ-GATE-001 — GateQ Core. Not started.
+
+## CQ-GATE-001 — GateQ Core (2026-09-21)
+
+Starting SHA `61b2a28`. New `gateq` schema, one additive migration, no
+change to any existing table.
+
+### Architecture
+
+`@capital-q/gateq` owns gateways, their versions and their criteria, and
+nothing else. Its entire workspace dependency set is `audit`, `contracts`,
+`database`, `observability`, `security` — no Companies, no Investors, no
+Taxonomy, no Discovery, no Q. A test asserts that, which is also how
+"changing the investor mandate cannot rewrite a published gateway" is
+proved: there is no path.
+
+|                        |                                                          |
+| ---------------------- | -------------------------------------------------------- |
+| Engine                 | `gateq-qualification.v1`                                 |
+| Gateway modes          | `CLOSED`, `QUALIFIED`, `OPEN`                            |
+| Qualification outcomes | `QUALIFIED`, `NOT_QUALIFIED`, `INSUFFICIENT_INFORMATION` |
+| Access decisions       | `MAY_APPLY`, `MAY_NOT_APPLY`, `NEEDS_INFORMATION`        |
+| Version lifecycle      | `DRAFT` → `PUBLISHED` → `SUPERSEDED` / `ARCHIVED`        |
+
+Three concepts kept apart deliberately. The mode is the door; the outcome
+is the fit; the access decision follows from both. A company can be a
+perfect fit at a closed door, and an OPEN gateway admits one that is not
+qualified — which is why collapsing any two of them would be wrong.
+
+The engine is one pure function: no database, no model, no random number,
+no clock. It computes **no score**. A weighted threshold here would be a
+second ranker with none of REC-005's governance or calibration, and doc 19
+§53 leaves scoring open until outcome data exists.
+
+### Supported criteria
+
+| Dimension                                                                          | Status          | Source                                                                                                                                                                                              |
+| ---------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Taxonomy (industry, business model, technology, customer type, impact, regulatory) | **SUPPORTED**   | canonical node ids with ancestor matching                                                                                                                                                           |
+| Geography                                                                          | **SUPPORTED**   | `core.companies.headquarters_country`                                                                                                                                                               |
+| Stage                                                                              | **SUPPORTED**   | `core.companies.current_stage_code`                                                                                                                                                                 |
+| Business model                                                                     | **SUPPORTED**   | it is a taxonomy vocabulary, not a separate axis                                                                                                                                                    |
+| Raise size                                                                         | **SUPPORTED**   | the open capital objective's target                                                                                                                                                                 |
+| Cheque compatibility                                                               | **SUPPORTED**   | gateway-configured cheque range against the same target                                                                                                                                             |
+| Hard exclusions                                                                    | **SUPPORTED**   | `EXCLUDED_TAXONOMY`, proof required                                                                                                                                                                 |
+| Revenue                                                                            | **UNSUPPORTED** | no canonical revenue exists; financials are document-derived evidence with their own truth class and disclosure scope, and reading one here would make an unverified extraction into inbound policy |
+| Traction                                                                           | **UNSUPPORTED** | no canonical measure; every candidate signal is narrative, Q inference or observed platform behaviour, none of which is declared company truth                                                      |
+| Readiness / InvestIQ                                                               | **UNSUPPORTED** | `marketplace_readiness_state` is a lifecycle state, not an assessment, and no governed InvestIQ projection exists; readiness is also a separate axis from fit                                       |
+
+The three unsupported dimensions are **absent from the criterion union**
+rather than present and permanently UNKNOWN, each carrying its reason in
+`UNSUPPORTED_CRITERION_DIMENSIONS`. A gateway therefore cannot publish a
+policy Capital Q could never answer, and "no unsupported criterion
+silently becomes a pass or a fail" is true by construction. The database
+check constraint refuses the types too.
+
+**Cheque compatibility is now real.** REC-001 recorded this
+`NOT_COMPUTABLE` and wrote down the correct rule it could not use: the
+investor's _minimum_ cheque fitting inside the company's round, never the
+maximum covering it, which would reject every syndicated raise. GateQ is
+the other direction — the company is applying and its raise is part of
+what it brings — so both sides are authoritative here. A different
+currency is UNKNOWN: an exchange rate is a number nobody in this system is
+authorised to choose, and a converted amount would be indistinguishable
+from a declared one.
+
+### Unknown is never a mismatch
+
+The invariant most of the goldens are about. Missing taxonomy, country,
+stage or raise each produce UNKNOWN with its own reason code, never
+NO_MATCH and never zero. A required UNKNOWN yields
+`INSUFFICIENT_INFORMATION` and `NEEDS_INFORMATION` — a question with a next
+step, which GATE-002's interview will ask — while a required NO_MATCH
+refuses. An exclusion needs proof: an unclassified company is never
+excluded, because an inferred exclusion is indistinguishable from a
+rejection nobody decided.
+
+### Versioning and authority
+
+A version is a row, not an overwritten column. Publishing is an explicit
+act with its own capability, an author and a time; editing a draft cannot
+move the public door; and a stored qualification result names the exact
+version that produced it. Two invariants belong to the database rather
+than the code: `gateway_versions_one_published_idx` allows one published
+version per gateway, and a trigger makes a published version immutable
+except for its own lifecycle — its criteria too, because somebody was
+already judged against them.
+
+Authority is read from the gateway's owning organisation, never from a
+request body and never from who created it. `organisation_admin` holds
+create, view, edit and publish; `organisation_member` holds view only.
+The creator is provenance: they may leave, and their colleagues carry on.
+
+### Public projection
+
+One anonymous route, `GET /v1/gateq/public/{publicId}`, and the
+projection is a **whitelist built from named parts** rather than a
+redaction — a redaction is a list of things somebody remembered to delete,
+and the failure mode is silent. It carries the gateway's own public
+wording, its mode, and the _kinds_ of thing it asks about with the
+investor's own labels. Never a node id, a country list, a member, a
+mandate, a draft or an internal identifier.
+
+The public id is 128 bits of randomness in Crockford base32 with a `gq_`
+prefix. Enumeration safety is the requirement: a sequential id or a
+name-derived slug would let anyone walk the list of investors accepting
+applications. A CLOSED gateway is visible and says it is closed (§20); a
+404 would tell a founder the link was wrong rather than that the door was
+shut.
+
+**One thing the tests found.** A malformed public id was answering 422,
+which tells a caller their guess was the wrong _shape_ — the first thing
+somebody enumerating would want to know. Unknown, unpublished, disabled
+and malformed are now one 404, and a malformed id never reaches the
+service.
+
+### Migration
+
+`20261001090000_gateq_core.sql`: schema `gateq`, three tables, two
+triggers, four capabilities and their role grants. RLS on all three, **no
+policy, no browser grant** — which sectors an investor will look at is
+commercially sensitive, and the public sees one controlled projection
+through the API rather than a table. `db:types` now includes the `gateq`
+schema.
+
+**HOSTED_MIGRATIONS_PENDING is now 20260925–20261001**; this packet did
+not run `db:push`.
+
+### Gates — CQ-GATE-001
+
+| Gate                                           | Result                                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `pnpm db:reset` / `db:lint` / `db:types:check` | exit 0 / no findings / clean                                                                   |
+| `pnpm test:rls`                                | 35 files, 1010 tests, PASS (was 34 / 982)                                                      |
+| `pnpm test:integration`                        | 53 pass + 1 skipped; 484 pass + 5 skipped — unchanged                                          |
+| `pnpm format:check`                            | every tracked file passes                                                                      |
+| `pnpm lint`                                    | exit 0                                                                                         |
+| `pnpm typecheck`                               | exit 0                                                                                         |
+| `pnpm test`                                    | 237 files, 3070 tests, exit 0 (was 234 / 3014)                                                 |
+| `pnpm build`                                   | exit 0                                                                                         |
+| `pnpm q:eval:lint` / `q:eval:ci`               | PASS, 39 cases / 16 graders, no regression                                                     |
+| Dependency direction                           | no package depends on an app; gateq imports five infrastructure packages and no domain context |
+| Secret scan / `git diff --check`               | clean                                                                                          |
+| `pnpm demo:status`                             | READY, four components                                                                         |
+
+### Performance
+
+A representative V1 policy — seven criteria across all six types, against
+a company with three classifications — qualifies in **5 microseconds**,
+measured over 20 000 runs. No N+1: the engine takes one bounded projection,
+and the projection is assembled from a fixed number of reads plus one
+ancestor lookup per distinct assigned node, which is a handful per company
+and does not grow with anything else.
+
+### Providers
+
+No model, no provider, no new service, account, API key, OAuth or billing,
+and no new environment variable. Qualification is arithmetic over declared
+data.
+
+### Known limits (V1)
+
+- Three dimensions the Product Specification names are not configurable,
+  with the reasons above. Adding one is a criterion-type version bump, not
+  a widening of this one.
+- The public route has no rate limit of its own beyond the app's. Opaque
+  128-bit ids make enumeration impractical rather than impossible; a
+  dedicated limit belongs with the public application surface in
+  GATE-DEMO-001.
+- Geography is the company's declared headquarters country rather than the
+  `geography` taxonomy vocabulary, because mapping countries onto nodes
+  would be a mapping nobody has authored. It is the same field REC-001
+  uses.
+- No gateway UI. GATE-002 and GATE-003 own the applicant and investor
+  surfaces.
+
+### Open debt, unchanged by this packet
+
+| Item                                                                                                                                                            | Class | Boundary                                    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------- |
+| `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarts dev services when a file under `packages/*/dist` is merely read                                              | 3     | **before an external or public GateQ demo** |
+| `CQ-TEST-SSE-TEARDOWN-001` — the q-api SSE integration test can leave a query pending across pool shutdown, failing the gate under load while every test passes | 3     | **no later than the pre-Wave-7 closure**    |
+
+Neither blocks GateQ Core and neither is resolved here.
+
+Next: CQ-GATE-002 — Application / Guest Session / Intake + Adaptive Q
+Interview. Not started.
+
+## CQ-GATE-002 / CQ-GATE-002R — the GateQ applicant surface (2026-09-21)
+
+GATE-002 shipped its foundations and stopped short of the surface a
+stranger touches; GATE-002R finished that and was told explicitly not to
+redesign what already passed. What follows covers both.
+
+A person with no Capital Q account opens an application at a published
+gateway, is interviewed by Q, closes the tab, comes back two days later,
+and submits. No account, no Supabase user, no membership, no synthetic
+actor anywhere in the path.
+
+### What holds it together
+
+| Separation                              | Where it is enforced                                                |
+| --------------------------------------- | ------------------------------------------------------------------- |
+| guest session ≠ membership ≠ capability | a bearer credential naming one application; no actor is ever built  |
+| applicant said it ≠ verified fact       | provenance per fact; APPLICANT_PROVIDED is not evidence             |
+| model proposal ≠ recorded fact          | a closed dimension contract validates every proposal before a write |
+| model sentence ≠ qualification          | GATE-001 recomputes after the turn's facts are recorded             |
+| criterion label ≠ criterion config      | the private configuration never enters a prompt                     |
+| unknown ≠ zero                          | UNKNOWN is a recorded value with its own provenance                 |
+| application ≠ canonical Company         | a separate subject kind; no Company is created                      |
+| draft ≠ submitted                       | submission is the disclosure boundary and is immutable after        |
+
+The policy an application is judged under is frozen at creation. An
+investor who tightens their criteria on Tuesday does not retroactively
+reject the founder who started on Monday.
+
+### The public routes
+
+Four anonymous routes under `/v1/gateq/apply`, with no context hook. No
+request schema anywhere has a field for a tenant, an investor
+organisation, a gateway version, a company id or a qualification outcome:
+a field a browser fills is a field a browser can forge.
+
+Every refusal is the same 404. Forged, expired, revoked and
+valid-but-somebody-else's credentials are one answer; so are an unknown,
+unpublished, closed and malformed gateway id. An endpoint that tells them
+apart answers questions nobody asked.
+
+A retry is the same turn. The session remembers the last client turn id
+and the reply it produced, so a double-tapped send on a flaky connection
+returns what the applicant already saw rather than paying for a second
+model call and recording the same sentence twice.
+
+### What the live model found
+
+The QGATE suite was run against a real provider, and it showed three
+things a scripted model never would:
+
+1. Asked which countries the investor accepts, Q answered "any company
+   headquartered in an African country is eligible". Nothing private
+   leaked — the configuration is not in the prompt — but it invented an
+   eligibility rule and told a founder to act on it. A false rule is worse
+   than a refusal: it invites the wrong people and turns the right ones
+   away.
+2. On that same turn it recorded a country the applicant never gave,
+   because it read a question as an answer.
+3. The opening turn — an empty utterance — was read as an answer and
+   replied to with "Which country are you based in?", which is a form
+   introducing itself.
+
+All three were prompt failures and all three are fixed. After the fix the
+same live cases read like a person: "We work with Meridian Seed Partners,
+who run seed cheques into African fintech and read every application
+themselves. Can you tell me a bit about what you are building?"
+
+The suite also exposed a lying diagnostic: a proposal discarded because
+the turn was small talk was not counted as rejected, so a log said
+"rejected: 0" for a turn where a model tried to write a fact during
+sabotage.
+
+### Gates — CQ-GATE-002R (demo stack stopped, database reset)
+
+| Gate                             | Result                                                                  |
+| -------------------------------- | ----------------------------------------------------------------------- |
+| `pnpm db:reset` / `db:lint`      | 20261003090000 applied / no schema errors                               |
+| `pnpm db:types:check`            | clean after regeneration (two new session columns)                      |
+| `pnpm test:rls`                  | 36 files, 1035 tests, PASS (was 35 / 1010)                              |
+| `pnpm test:integration`          | 53 pass + 1 skipped; 484 pass + 5 skipped, exit 0                       |
+| `pnpm format:check`              | every tracked file passes (295 offenders are untracked `graphify-out/`) |
+| `pnpm lint`                      | exit 0                                                                  |
+| `pnpm typecheck`                 | 80/80                                                                   |
+| `pnpm test`                      | 240 files, 3123 tests, exit 0 (was 237 / 3070)                          |
+| `pnpm build`                     | 43/43                                                                   |
+| `pnpm q:eval:lint`               | PASS, 57 cases / 18 graders (was 39 / 16)                               |
+| `pnpm q:eval:ci`                 | release gate PASS, exit 0, no regression                                |
+| QGATE profile                    | 18/18, exit 0, 6 flagged for human review                               |
+| LIVE_MODEL, GateQ cases          | run against a real provider; findings above                             |
+| Dependency direction             | no package depends on an app                                            |
+| Secret scan / `git diff --check` | clean                                                                   |
+| `pnpm demo:status`               | READY, four components (`--local`; see below)                           |
+
+### Providers
+
+The API now composes a model gateway, because the applicant interview is a
+conversation. No new provider, account, API key or billing: it reuses the
+same `GEMINI_API_KEY` / `GROQ_API_KEY` the workers and q-api already read.
+With no provider configured the applicant surface does not register at
+all — a closed front door rather than a broken one.
+
+### Known limits
+
+- **The guest document path is not implemented.** Evidence's
+  `createDocument` requires an `ActorContext` with an active organisation
+  and a capability check, and `ownedSubject()` matches the subject against
+  that organisation. An applicant has neither, and minting a synthetic
+  user to satisfy it would break the invariant that no fake Supabase user
+  is ever created. Closing it needs an Evidence-owned decision about guest
+  authority — a guest principal in its authority model, or a trusted
+  non-actor creation entry point — with the draft-privacy consequences
+  that follow. Reported rather than worked around.
+- A live turn said "I read your application and I am genuinely glad you
+  sent it" — a claim about a past action Q cannot make. No grader catches
+  it mechanically; the case is human-review and it is recorded here rather
+  than quietly passed.
+- Live eligibility in QGATE is deliberately narrow. A case asserting which
+  dimensions one ambiguous sentence yields, or which intent label a model
+  puts on it, is an exact property of the validator against a scripted
+  model and merely a reading against a real one. Those stay deterministic.
+- The applicant routes carry the contract's own size and shape bounds and
+  the app's limits; a dedicated per-credential rate limit is still open.
+- Hosted migrations pending: **20260925 through 20261003**. `db:push` was
+  not run, per the packet.
+- The demo stack needed `pnpm demo --local`: the checked-in environment
+  points `SUPABASE_URL` and `DATABASE_URL` at the hosted project while
+  `apps/web/.env.local` still points at the local one, and the launcher
+  refuses a split configuration. Pre-existing, unrelated to this packet.
+- Circular-import scan reports five, all pre-existing barrel
+  self-references in other packages' built `.d.ts` output. None introduced
+  here.
+
+### Open debt, unchanged by this packet
+
+| Item                                                                                                                                                            | Class | Boundary                                    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------- |
+| `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarts dev services when a file under `packages/*/dist` is merely read                                              | 3     | **before an external or public GateQ demo** |
+| `CQ-TEST-SSE-TEARDOWN-001` — the q-api SSE integration test can leave a query pending across pool shutdown, failing the gate under load while every test passes | 3     | **no later than the pre-Wave-7 closure**    |
+
+### Commits
+
+| Checkpoint | SHA       | What                                               |
+| ---------- | --------- | -------------------------------------------------- |
+| A          | `dcc242d` | secure resumable guest applications                |
+| B          | `41f603e` | the model-led interview brain (partial)            |
+| C          | `8673997` | the public application API                         |
+| D          | `0039e78` | the QGATE suite, and the live findings it produced |
+| E          | `c587506` | regenerated database types; gates closed           |
+
+Next: CQ-GATE-003 — the investor's view of inbound applications. Not
+started. The guest document path above must be resolved first or
+explicitly deferred.
+
+## CQ-GATE-002S — guest evidence, public abuse and epistemic wording (2026-09-21)
+
+Three completed-scope defects were left by GATE-002R. Two are closed here.
+The third is reported rather than improvised, and it is the one that
+blocks GATE-003.
+
+### Per-credential limits — CLOSED
+
+The applicant surface is the only anonymous write path in the product and
+a conversational one: every turn spends somebody else's model budget.
+GATE-002R bounded the shape of a request and not how often it arrives.
+
+Allowances are per session and per operation. A founder hammering their
+own session exhausts their own turn budget and nobody else's — there is
+deliberately no global counter a single script could trip for everybody —
+and spending every turn does not spend the submit allowance, or a long
+conversation could not be finished.
+
+Writing it exposed a defect in the first version of this very change:
+charging before verifying meant a forged credential could fill the bucket
+table and learn a 429, which tells an attacker the endpoint counted them.
+A credential earns a quota by being real. Verification comes first, the
+key is the server-issued session id rather than anything derived from the
+secret, and a forgery gets the same 404 every forgery has always got.
+
+A spent allowance is the one guest refusal that is not a 404. Telling an
+honest founder their application had vanished, when only their turn
+budget ran out, would be a lie that costs them the application.
+
+In process, on purpose: no Redis, no new service, no new credential. Each
+API instance holds its own counters — weaker than a shared limiter, far
+stronger than none. A distributed one is a real thing to want and is not
+this packet.
+
+### Grounded source claims — CLOSED
+
+A live provider told an applicant "I read your application and I am
+genuinely glad you sent it" on a turn where nothing of the kind had been
+supplied. Nothing leaked and nothing was mis-recorded; it simply was not
+true, and an applicant believes a claim about what was read.
+
+A prompt rule alone could not fix it, because the model had no way to tell
+what it was handed from what it was not. It is now told, as a fact derived
+from the turn's own input rather than declared beside it: what the gateway
+published, whether an application record was loaded, how much the
+applicant has said, how many values came from documents of theirs that
+were actually read, and that nothing came from the public web. It may
+claim to have read only what is on that list.
+
+Graded on provenance, not vocabulary. The same sentence passes when the
+deck was given to the turn and fails when it was not, because banning the
+words would be worse than the defect: Q should say it went through the
+deck when it went through the deck.
+
+Against a live provider:
+
+|                         |                                                                                                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| before                  | "I read your application and I am genuinely glad you sent it."                                                                                               |
+| after, nothing supplied | "I haven't seen any documents from you yet. Could you resend them?"                                                                                          |
+| after, deck supplied    | "I just landed here with the three details from your docs: KoboLogistics in Nigeria, raising two million dollars. I haven't gone through anything else yet." |
+
+QGATE-019's FAIL path is proved in a grader test rather than in the
+dataset. Against a scripted model the reply is whatever the script says,
+so scripting the false claim would have proved the grader reads strings
+and nothing about Q; the eval case is the regression guard against a real
+model, and the grader test is the guard on the guard.
+
+### Guest Evidence — OPEN, and it blocks GATE-003
+
+`evidence.documents` requires `owner_organisation_id` and
+`created_by_user_id`, both `NOT NULL` with foreign keys to
+`identity.tenant_organisations` and `identity.user_profiles`.
+`evidence.document_versions` requires `uploaded_by_user_id` the same way,
+inside an immutability trigger. A GateQ guest has no user profile and no
+organisation, so there is no value those three columns can take that the
+packet's own constraints permit — a synthetic user, a synthetic person or
+a synthetic membership is exactly what is forbidden.
+
+Making them optional is not a subject-registry addition. It is a change to
+the ownership and attribution model of every document row: 116 references
+across 19 Evidence files, plus the storage-key derivation, the audit actor
+and the document domain event payload. Draft privacy currently hangs off
+`owner_organisation_id` and `visibility_scope`, so it moves with them.
+
+Widening `subject_type` to include `GATEQ_APPLICATION` is the easy half
+and has a precedent — `20260924090000_presence_subjects.sql` did exactly
+that for `PERSON` and `INVESTOR_ORGANISATION`. It is also not the blocker.
+
+The two real options, both Evidence's to choose:
+
+1. a guest principal in Evidence's own authority model, with the three
+   identity columns becoming optional under a check constraint that
+   requires either a member actor or a bound application; or
+2. a trusted non-actor creation entry point beside
+   `DocumentProcessingService`, owning the same attribution question.
+
+Neither is a small change and neither should be improvised inside a
+closeout packet.
+
+### Gates — CQ-GATE-002S (demo stack stopped)
+
+| Gate                             | Result                                            |
+| -------------------------------- | ------------------------------------------------- |
+| `pnpm lint`                      | exit 0                                            |
+| `pnpm typecheck`                 | 80/80                                             |
+| `pnpm test`                      | 242 files, 3138 tests, exit 0 (was 240 / 3123)    |
+| `pnpm build`                     | 43/43                                             |
+| `pnpm q:eval:lint`               | PASS, 59 cases / 19 graders (was 57 / 18)         |
+| `pnpm q:eval:ci`                 | release gate PASS, exit 0                         |
+| QGATE profile                    | 20/20, exit 0 (was 18/18)                         |
+| LIVE_MODEL, grounding cases      | run against a real provider; transcript above     |
+| `pnpm test:integration`          | 53 pass + 1 skipped; 484 pass + 5 skipped, exit 0 |
+| Dependency direction             | no package depends on an app                      |
+| Secret scan / `git diff --check` | clean                                             |
+| `pnpm demo:status`               | READY, four components (`--local`)                |
+
+No migration and no RLS change, so the database gates were not re-run;
+the GATE-002R baseline stands.
+
+### Resources
+
+No new service, account, API key, OAuth, billing or environment variable.
+
+### Open debt
+
+| Item                                                                                                                                                            | Class | Boundary                                    |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------- |
+| `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarts dev services when a file under `packages/*/dist` is merely read                                              | 3     | **before an external or public GateQ demo** |
+| `CQ-TEST-SSE-TEARDOWN-001` — the q-api SSE integration test can leave a query pending across pool shutdown, failing the gate under load while every test passes | 3     | **no later than the pre-Wave-7 closure**    |
+| `CQ-GATE-EVIDENCE-GUEST-001` — a GateQ applicant cannot use the Evidence pipeline; Evidence's document identity requires a user profile and an organisation     | 2     | **before GATE-003**                         |
+
+GATE-002 completed-scope debt: **`CQ-GATE-EVIDENCE-GUEST-001` only.** The
+rate limit and the epistemic wording are closed.
+
+### Commits
+
+| SHA       | What                                                             |
+| --------- | ---------------------------------------------------------------- |
+| `ba82f7d` | per-credential limits, grounded source claims, the blocker named |
+
+Next: QX-001 — Q-Centric Home / Surface. GATE-003 remains blocked on the
+Evidence authority decision above.
+
+## QX-001 — Home as a unified Q surface (2026-09-21)
+
+The first packet of the Q Experience Completion Wave. Home was a page
+heading, a boxed chat and three dashboard sections; it is now Q.
+
+### What changed
+
+The conversation occupies the screen and the composer is what your eye
+lands on. Everything else has to earn its place underneath, and what earns
+it is a setup left part-way, the control over who can see you, and — for
+somebody Capital Q knows nothing about yet — which side of the table they
+are on. No counter reading zero, no empty activity feed, no "0 matches".
+
+**One input.** Typing, talking and attaching sit on the same row of the
+same composer. The attach control runs the same three-step Evidence
+upload onboarding already uses — ask permission, bytes straight from the
+browser into private storage, server verifies what landed — and appears
+only for a founder with a company, because that is the only subject
+Evidence can own a document against today. An investor sees no control
+rather than one that refuses.
+
+**Voice is a mode, not a product.** Entering and leaving the voice stage
+keeps the conversation id, the turns and the context; Q does not restart
+because the display changed. Proved live below.
+
+**Deep chat stays separate.** One deliberate Chats control on Home opens
+the same conversations and the same runs. There is no second chat
+implementation and the transcript does not dominate Home.
+
+### Structured results
+
+A reusable card shell now renders the object blocks of an answer with
+typed actions: `COMPANY_REFERENCE`, `INVESTOR_REFERENCE`, `COMPARISON`,
+`CLARIFICATION_REQUEST`, `ACTION_PROPOSAL`, `UI_INTENT`. Prose, findings,
+uncertainties and the source count stay prose and lists — a rounded
+rectangle is for an object with an action, not a paragraph with a border.
+
+Two honest limits, both reported rather than papered over:
+
+- **The runtime attaches no result blocks at all today.** `toQMessage`
+  builds text-only messages, so nothing currently renders. That is the
+  correct amount of nothing; the shell lights up the day a specialist
+  attaches its first block, with no further change here.
+- **No UI intent has a surface to point at.** There is no company detail
+  page and no comparison view, so an intent with no route is ignored
+  rather than shipped as a link to a 404 — the same rule the spoken
+  destination map already follows.
+
+QX-003 extends this shell for generated artifacts rather than inventing a
+second card language beside it.
+
+### An invariant the tests caught
+
+Carrying blocks through verbatim re-introduced evidence identifiers into
+the browser's model of a conversation. A reference is only identifiers,
+and whether somebody may see the document behind one is disclosure's
+decision at render time. Evidence stays a count, `SHOW_EVIDENCE` is
+dropped with it, and `apps/web/test/q-result-blocks.test.ts` pins both.
+
+### Persona choice
+
+A radio group, not two links dressed as cards. Arrow keys move within it,
+the selected card says "selected" in words as well as by its outline, and
+the button names the role it will continue as. Selection and navigation
+are separate because reading both options before committing is the point
+of showing them together. Canonical Founder and Investor semantics are
+unchanged and no third persona was invented.
+
+### Live UX smoke (local stack, synthetic accounts)
+
+|                                          |                                                                                                                      |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| A · founder types, answers, voice, back  | PASS — conversation `9be65d4a` unchanged across the voice stage and back; turns preserved                            |
+| B · Chats → reopen → second message      | PASS — two answers in the same conversation                                                                          |
+| C · investor Home, "What is my mandate?" | PASS — answered from authorised investor context: no mandate is configured, rather than an invented one              |
+| D · structured result card               | **NOT OBSERVED** — the runtime emits no blocks, so there was nothing to render. Shell and projection are unit-tested |
+| E · 375px                                | PASS — no horizontal overflow; composer, attach, mic and send all reachable                                          |
+
+Q's answers were honest about having nothing on record in both A and C,
+which is the behaviour the product depends on and the reason neither was
+dressed up.
+
+The microphone is blocked in the test browser. The failure showed as one
+plain sentence with a Dismiss and Home intact underneath — no provider
+name, no stack, no enum — which is the error behaviour §17 asks for.
+
+### Verification
+
+| Gate                                        | Result                      |
+| ------------------------------------------- | --------------------------- |
+| web + ui tests                              | 16 files, 204 tests, exit 0 |
+| `@capital-q/web` typecheck                  | exit 0                      |
+| `@capital-q/web` build                      | exit 0                      |
+| eslint, web + ui                            | exit 0                      |
+| `git diff --check` / secret scan / boundary | clean                       |
+| `pnpm demo:status`                          | READY, four components      |
+
+No new provider, account, API key, environment variable or migration. No
+model call was added to render Home: the page reads server-resolved
+context and nothing else.
+
+### Deferred, as scoped
+
+QX-002 research-assisted onboarding · QX-003 artifact persistence and
+viewer · QX-004 deck and document generation · GateQ investor dashboard ·
+media feed.
+
+### Open debt, carried
+
+| Item                                                                                                               | Class | Boundary                                    |
+| ------------------------------------------------------------------------------------------------------------------ | ----- | ------------------------------------------- |
+| `CQ-GATE-EVIDENCE-GUEST-001` — a GateQ applicant cannot use the Evidence pipeline                                  | 2     | **before GATE-003**                         |
+| `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarts dev services when a file under `packages/*/dist` is merely read | 3     | **before an external or public GateQ demo** |
+| `CQ-TEST-SSE-TEARDOWN-001` — the q-api SSE integration test can leave a query pending across pool shutdown         | 3     | **no later than the pre-Wave-7 closure**    |
+
+None is closed by this packet.
+
+### Commits
+
+| SHA       | What                                                                          |
+| --------- | ----------------------------------------------------------------------------- |
+| `ffcf1a3` | Home as a Q-first surface, one composer, the result-card shell, persona cards |
+
+Next: QX-002 — Research-Assisted Onboarding.
+
+## QX-002/003 — PARTIAL: first-run Q and real structured results (2026-09-21)
+
+Two of four checkpoints. A and C are done and pushed; B and D were not
+started. The packet's own time guard says to stop at a coherent boundary
+rather than run a six-hour session, and this is that boundary.
+
+### A — first run is a voice-led, option-driven Q introduction · DONE
+
+Arrival was a dark screen, a "Tap to begin" that immediately demanded the
+microphone, and — if you got through it — a conversation with no visible
+options.
+
+**Reading Q never needs a microphone.** The introduction is text from the
+moment the page loads. Talking is a two-way session and genuinely needs
+the microphone, so it sits beside Start as an offer rather than in front
+of it as a gate.
+
+**Q does not start interrogating anybody.** Nothing is asked until Start
+is pressed. An introduction that is immediately a question is not an
+introduction.
+
+**The choice is visible.** After Start, Q asks whether you are here to
+raise capital or invest it, and both answers are on screen as the same
+persona cards Home uses — one component, so the question Q asks and the
+cards you click cannot drift into two vocabularies. Answering in your own
+words is still one control away. A returning founder or investor skips
+all of it; the page already redirects them to Home.
+
+Nothing here decides identity: a card navigates to that onboarding path
+and the canonical role is established there under the person's own
+authority.
+
+Actual first words: _"Hi Dev Member, I'm Q. I'll help you understand where
+you are, prepare what you need, and move through the capital process
+without making you repeat yourself."_
+
+**Limit, stated rather than implied.** Capital Q has no standalone speech
+endpoint, so Q's voice is the two-way session. "Hear Q without a
+microphone" is not buildable without adding one, and this packet adds no
+provider. What is guaranteed is the weaker, honest thing: the microphone
+is never required to read Q's introduction or to finish onboarding.
+
+### C — real structured results, end to end · DONE
+
+This closes QX-001's remaining caveat. The renderer existed and nothing
+rendered, because the runtime's messages were text-only.
+
+The structure was already there — the analyst schema has said since it was
+written that "the rest is structure the runtime can check and later
+surface as result blocks" — and nothing surfaced it. Findings, gaps,
+contradictions and clarifying questions were produced on every run and
+dropped. They now travel as blocks on the durable `q.message.completed`
+event.
+
+Two seams, not one: the conversational gateway and the Company
+Intelligence specialist each persist their own answer, and patching only
+the first would have meant one answer carrying a different shape
+depending on which brain produced it.
+
+What the projection will not do:
+
+- invent anything — a run with no findings produces no finding blocks;
+- reference a subject the model named rather than one the server
+  authorised the run against;
+- read an unrecognised label as a stronger one — an unreadable claim is a
+  `USER_CLAIM` with `SELF_REPORTED` evidence, never a fact;
+- carry an evidence identifier, which remains disclosure's decision at
+  render time (the QX-001 finding stands).
+
+Uncertainty says which kind it is: missing evidence becomes
+`INSUFFICIENT_EVIDENCE`, a contradiction becomes `CONFLICTING_EVIDENCE`.
+
+Live, founder Home, "Review my company.": one `COMPANY_REFERENCE` card
+reading "Company / Ask Q about it" with a working action, and the finding
+rendered as _"Fact · Canonical name: Northstar Logistics (dev) · Moderate
+confidence"_.
+
+**Limit:** the message store is plain text by design — its own comment
+warns that an unbounded column there is where a provider's whole response
+object would end up — so blocks live on the run event. They survive a
+reconnect and a replay; reopening an old conversation from history shows
+its text without its cards until a bounded, migrated column exists.
+Logged below.
+
+### B — research-assisted onboarding · NOT STARTED
+
+Surveyed, not built. The ground is better than expected and none of it
+needs a new provider:
+
+- `@capital-q/q-research` already owns a provider-neutral research port
+  with a Tavily adapter, outbound egress control over what words may
+  leave, public-URL safety, bounded instruction-scanned excerpts, and
+  deterministic comparison notes against a subject's recorded identity;
+- `@capital-q/q-presence` already owns the order in which the public web
+  is read _at arrival_, the excerpts handed to a model, and the
+  understandings proposed through the Knowledge Write Gate;
+- `PUBLIC_WEB` is already a source type in Evidence with provenance.
+
+What is missing is the wiring: neither onboarding package references
+research today, so nothing fires when a name and an organisation become
+known, and nothing suppresses a later question because a candidate was
+already confirmed. That is an integration across both onboarding flows
+plus the no-repeat semantics, and it is the whole of B.
+
+### D — Q artifact foundation · NOT STARTED
+
+Not surveyed beyond confirming no artifact domain exists. D is a new
+bounded context with persistence, versioning, RLS, an API surface, a
+result-block type, a web card, a viewer and an edit path. C was taken
+first because D's artifact card is a result block and would not have
+rendered without it.
+
+### Verification
+
+| Gate                                                  | Result                      |
+| ----------------------------------------------------- | --------------------------- |
+| web tests                                             | 13 files, 185 tests, exit 0 |
+| model-gateway tests                                   | 18 files, 143 tests, exit 0 |
+| affected packages (model-gateway, q-specialists, web) | 37 files, 415 tests, exit 0 |
+| typecheck, web + model-gateway + q-specialists        | exit 0                      |
+| eslint, the same three                                | exit 0                      |
+| `git diff --check` / secret scan                      | clean                       |
+| `pnpm demo:status`                                    | READY, four components      |
+
+No new provider, account, API key, environment variable or migration. No
+combined final confidence pass was run, because two of the four
+checkpoints did not happen — it belongs with the packet that finishes
+them.
+
+### Open debt
+
+| Item                                                                                                                                  | Class | Boundary                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------- |
+| `CQ-GATE-EVIDENCE-GUEST-001` — a GateQ applicant cannot use the Evidence pipeline                                                     | 2     | **before GATE-003**                         |
+| `CQ-DEV-WATCH-SCOPE-001` — `node --watch` restarts dev services when a file under `packages/*/dist` is merely read                    | 3     | **before an external or public GateQ demo** |
+| `CQ-TEST-SSE-TEARDOWN-001` — the q-api SSE integration test can leave a query pending across pool shutdown                            | 3     | **no later than the pre-Wave-7 closure**    |
+| `CQ-Q-BLOCKS-HISTORY-001` — result blocks live on the run event, so a conversation reopened from history shows text without its cards | 3     | **with the packet that persists them**      |
+
+### Commits
+
+| SHA       | What                                                      |
+| --------- | --------------------------------------------------------- |
+| `827a5b1` | QX-002A — first run is a voice-led Q introduction         |
+| `207543d` | QX-002C — real structured results from runtime to browser |
+
+Next: QX-002B (research-assisted onboarding) and QX-003 (artifacts)
+remain outstanding, then QX-004 — Pitch Deck Studio.

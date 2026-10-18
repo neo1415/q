@@ -299,7 +299,7 @@ function ownerEnvelope(seeded: Seed): RetrievalPermissionEnvelope {
   return {
     planId: randomUUID(),
     planFingerprint: "0".repeat(64),
-    policyVersion: "context-firewall-v1",
+    policyVersion: "context-firewall-v2",
     tenantId: seeded.tenantId,
     actorUserId: randomUUID(),
     organisationId: randomUUID(),

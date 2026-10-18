@@ -2,10 +2,21 @@
 
 import { useState, type FormEvent } from "react";
 
+import { Button } from "@capital-q/ui/button";
 import { Input } from "@capital-q/ui/input";
 import { Select } from "@capital-q/ui/select";
 
+import { useRegistrationDefaults } from "../../onboarding-kit/registration-defaults";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
+
+/** "https://www.acme.com/" read as "acme.com". */
+function displayHost(url: string): string {
+  return url
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/\/$/, "");
+}
 
 /** Name first; website optional; country from a native picker. */
 export function CompanyBasicsStep({
@@ -14,7 +25,13 @@ export function CompanyBasicsStep({
   busy,
   actions,
 }: StepProps<"company_basics">) {
-  const [name, setName] = useState(step.response?.name ?? "");
+  const t = useT();
+  // A saved answer wins; otherwise what they typed at sign-up, which they
+  // confirm by continuing (owner directive 2026-10-16: never re-asked).
+  const registered = useRegistrationDefaults().organisationName;
+  const fromRegistration =
+    step.response?.name === undefined && registered !== null;
+  const [name, setName] = useState(step.response?.name ?? registered ?? "");
   const [website, setWebsite] = useState(step.response?.website ?? "");
   const [countryCode, setCountryCode] = useState(
     step.response?.countryCode ?? "",
@@ -41,7 +58,12 @@ export function CompanyBasicsStep({
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
       <Input
         id="company-name"
-        label="Company name"
+        label={t("Company name")}
+        description={
+          fromRegistration && name === registered
+            ? "From your sign-up. Change it if the company is called something else."
+            : undefined
+        }
         autoComplete="organization"
         autoFocus
         value={name}
@@ -54,8 +76,8 @@ export function CompanyBasicsStep({
       />
       <Input
         id="company-website"
-        label="Website"
-        description="Optional. Q can read a website later to fill gaps."
+        label={t("Website")}
+        description={t("Optional. Q can read a website later to fill gaps.")}
         type="text"
         inputMode="url"
         autoComplete="url"
@@ -64,11 +86,33 @@ export function CompanyBasicsStep({
         disabled={busy}
         onChange={(event) => setWebsite(event.target.value)}
       />
+      {step.suggestedWebsite !== undefined && website.trim().length === 0 ? (
+        // What Q's research found, offered in place: one tap fills it,
+        // and nothing is recorded until they continue.
+        <div
+          className="flex flex-wrap items-center gap-2"
+          data-suggested-website
+        >
+          <span className="cq-body-sm text-(--cq-text-secondary)">
+            Q found {displayHost(step.suggestedWebsite)}. Is that yours?
+          </span>
+          <Button
+            variant="secondary"
+            size="compact"
+            disabled={busy}
+            onClick={() => {
+              setWebsite(step.suggestedWebsite ?? "");
+            }}
+          >
+            {t("Use it")}
+          </Button>
+        </div>
+      ) : null}
       <Select
         id="company-country"
-        label="Where is the company based?"
-        description="Optional for now."
-        placeholder="Choose a country"
+        label={t("Where is the company based?")}
+        description={t("Optional for now.")}
+        placeholder={t("Choose a country")}
         options={step.countries}
         value={countryCode}
         disabled={busy}

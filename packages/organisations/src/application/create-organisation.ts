@@ -31,6 +31,11 @@ import type { OrganisationServiceDependencies } from "./dependencies.js";
 
 /** The seeded template the creator is assigned. Looked up by code, never by id. */
 export const INITIAL_ADMIN_ROLE_CODE = "organisation_admin" as const;
+/**
+ * G1: the creator is also the first owner (one person alone is their own
+ * organisation, and every organisation keeps at least one owner).
+ */
+export const INITIAL_OWNER_ROLE_CODE = "organisation_owner" as const;
 
 const ORGANISATION_CREATED = AuditActionTypeSchema.parse(
   "organisation.created",
@@ -58,7 +63,7 @@ export type CreateOrganisationCommand = {
  * One transaction:
  *
  *   Person resolved -> idempotency lock and lookup -> tenant -> organisation
- *   -> tenant link -> active membership -> organisation_admin assignment
+ *   -> tenant link -> active membership -> organisation_admin + owner
  *   -> active context -> audit -> events -> idempotency record -> COMMIT
  *
  * Any failure rolls back everything. A retry with the same key and the same
@@ -125,6 +130,15 @@ export function createCreateOrganisation(
           `role template ${INITIAL_ADMIN_ROLE_CODE}`,
         );
       }
+      const ownerRoleId = await roleTemplates.findActiveRoleIdByCode(
+        tx,
+        INITIAL_OWNER_ROLE_CODE,
+      );
+      if (ownerRoleId === null) {
+        throw new OrganisationReferenceDataError(
+          `role template ${INITIAL_OWNER_ROLE_CODE}`,
+        );
+      }
 
       // Separate identifiers for tenant and organisation, always. V1 pairs
       // them one-to-one; nothing here encodes equality.
@@ -149,6 +163,7 @@ export function createCreateOrganisation(
         userId,
       });
       await memberships.assignRole(tx, membership.id, adminRoleId);
+      await memberships.assignRole(tx, membership.id, ownerRoleId);
       await memberships.setActiveContext(tx, userId, membership.id);
 
       await audit.record(tx, {
@@ -200,7 +215,7 @@ export function createCreateOrganisation(
       return {
         organisation,
         membership,
-        roleCodes: [INITIAL_ADMIN_ROLE_CODE],
+        roleCodes: [INITIAL_ADMIN_ROLE_CODE, INITIAL_OWNER_ROLE_CODE],
         isActiveContext: true,
       };
     });

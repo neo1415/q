@@ -1,20 +1,86 @@
 import {
+  ListQArtifactsResponseSchema,
+  QArtifactDetailSchema,
+  Q_ARTIFACTS_PATH,
+  Q_ARTIFACT_VERSIONS_SUFFIX,
   AppendQRunMessageResponseSchema,
   CreateQRunResponseSchema,
+  CreateQVoiceSessionResponseSchema,
+  QVoiceTurnStateSchema,
+  qVoiceTurnPath,
+  qVoiceScreenPath,
+  qVoiceDuplexEndPath,
+  qVoiceDuplexNarrationPath,
+  qVoiceDuplexRejoinPath,
+  qVoiceDuplexToolPath,
+  qVoiceDuplexHeardPath,
+  qVoiceDuplexSaidPath,
+  QVoiceDuplexHeardResultSchema,
+  type QVoiceDuplexHeard,
+  type QVoiceDuplexSaid,
+  qVoiceDuplexUsagePath,
+  QVoiceDuplexNarrationResultSchema,
+  QVoiceDuplexRejoinResultSchema,
+  QVoiceDuplexToolResultSchema,
+  QVoiceDuplexUsageResultSchema,
+  type QVoiceDuplexEnd,
+  type QVoiceDuplexNarrationRequest,
+  type QVoiceDuplexRejoin,
+  type QVoiceDuplexToolCall,
+  type QVoiceDuplexUsageReport,
+  type QVoiceScreenUpdate,
+  Q_VOICE_SESSIONS_PATH,
   IDEMPOTENCY_KEY_HEADER,
   Q_APPROVAL_APPROVE_SUFFIX,
   Q_APPROVAL_REJECT_SUFFIX,
   Q_APPROVALS_PATH,
+  Q_CONVERSATION_ARCHIVE_SUFFIX,
+  Q_CONVERSATION_MESSAGE_HIDE_SUFFIX,
+  Q_CONVERSATIONS_PATH,
   Q_RUN_CANCEL_SUFFIX,
   Q_RUN_MESSAGES_SUFFIX,
   Q_RUNS_PATH,
+  ListQConversationsResponseSchema,
+  QConversationDetailSchema,
   QApprovalViewSchema,
+  QPendingApprovalListSchema,
   QRunSummarySchema,
   type AppendQRunMessageRequest,
   type CreateQRunRequest,
+  type CreateQVoiceSessionRequest,
   type RejectQApprovalRequest,
+  ProfileFindingsResponseSchema,
+  Q_PROFILE_FINDINGS_PATH,
+  type ProfileFindingsQuery,
+  // DOCS block.
+  Q_ANSWER_EXPORTS_PATH,
+  Q_BRAND_KIT_CONFIRM_SUFFIX,
+  Q_BRAND_KIT_PATH,
+  Q_BRAND_KIT_SUGGEST_SUFFIX,
+  QBrandKitSchema,
+  QBrandKitStateSchema,
+  type ConfirmQBrandKitRequest,
+  type CreateQAnswerExportRequest,
+  type SetQBrandKitRequest,
+  FillQArtifactPlaceholderResponseSchema,
+  QDocumentPipelineProgressSchema,
+  Q_ARTIFACT_PLACEHOLDERS_SUFFIX,
+  Q_ARTIFACT_PROGRESS_SUFFIX,
+  type FillQArtifactPlaceholderRequest,
+  Q_ROOM_PATH,
+  QRoomReadSchema,
+  type QRoomRead,
+  Q_UI_ACT_RECEIPTS_PATH,
+  Q_FAST_NAVIGATION_PATH,
+  QFastNavigationResponseSchema,
+  type QFastNavigationRequest,
+  type QFastNavigationResponse,
+  QUiActReceiptsResponseSchema,
+  type QUiActReceiptsRequest,
+  type QUiActReceiptsResponse,
 } from "@capital-q/contracts";
 
+import { readProblemResponse } from "./problem.js";
 import { call, type ApiSession } from "./request.js";
 
 /**
@@ -94,6 +160,11 @@ const approvalPath = (approvalId: string) =>
  * the action's own status, never assumed.
  */
 
+/** `GET /v1/q/approvals` — the approvals still waiting on the caller (R35). */
+export function listPendingQApprovals(session: ApiSession) {
+  return call(session, "GET", Q_APPROVALS_PATH, QPendingApprovalListSchema);
+}
+
 /** `GET /v1/q/approvals/:approvalId` — the approval as its requested approver may read it. */
 export function getQApproval(session: ApiSession, approvalId: string) {
   return call(session, "GET", approvalPath(approvalId), QApprovalViewSchema);
@@ -123,4 +194,488 @@ export function rejectQApproval(
     QApprovalViewSchema,
     { body: input },
   );
+}
+
+/**
+ * `POST /v1/q/voice/sessions` (CQ-Q-VOICE-001 C) — an ephemeral, scoped
+ * credential for one microphone session, bound on the server to the actor
+ * and the thread the person is in. It grants audio transport and nothing
+ * in Capital Q; the provider API key never leaves the Q API.
+ */
+/** What Q is asking after its latest spoken turn (owner only). */
+/**
+ * The line's sealed session (from the create response), presented so any
+ * instance of the Q API still knows the line after a deploy or restart.
+ */
+const voiceSessionHeader = (sessionToken: string | undefined) =>
+  sessionToken === undefined ? {} : { "x-q-voice-session": sessionToken };
+
+export function getQVoiceTurnState(
+  session: ApiSession,
+  voiceSessionId: string,
+  sessionToken?: string,
+) {
+  return call(
+    session,
+    "GET",
+    qVoiceTurnPath(voiceSessionId),
+    QVoiceTurnStateSchema,
+    { headers: voiceSessionHeader(sessionToken) },
+  );
+}
+
+/** Where the person is now, while the line is open (R21; owner only). 204. */
+export async function setQVoiceScreen(
+  session: ApiSession,
+  voiceSessionId: string,
+  screen: QVoiceScreenUpdate,
+  sessionToken?: string,
+): Promise<void> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/, "")}${qVoiceScreenPath(voiceSessionId)}`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+        ...voiceSessionHeader(sessionToken),
+      },
+      body: JSON.stringify(screen),
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await readProblemResponse(response);
+  }
+}
+
+export function createQVoiceSession(
+  session: ApiSession,
+  input: CreateQVoiceSessionRequest,
+) {
+  return call(
+    session,
+    "POST",
+    Q_VOICE_SESSIONS_PATH,
+    CreateQVoiceSessionResponseSchema,
+    { body: input },
+  );
+}
+
+/** DUPLEX: one function call the duplex model proposed, for the server to run. */
+export function relayQVoiceDuplexTool(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexToolCall,
+) {
+  return call(
+    session,
+    "POST",
+    qVoiceDuplexToolPath(voiceSessionId),
+    QVoiceDuplexToolResultSchema,
+    { body: input },
+  );
+}
+
+/**
+ * VOICE-BRAIN: one finished turn of the person's; the server decides who
+ * answers it and, for a substantive one, returns Q's answer.
+ */
+export function sendQVoiceDuplexHeard(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexHeard,
+) {
+  return call(
+    session,
+    "POST",
+    qVoiceDuplexHeardPath(voiceSessionId),
+    QVoiceDuplexHeardResultSchema,
+    { body: input },
+  );
+}
+
+/** VOICE-BRAIN: what the voice said in one response, for the transcript. */
+export async function sendQVoiceDuplexSaid(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexSaid,
+): Promise<void> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/, "")}${qVoiceDuplexSaidPath(voiceSessionId)}`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify(input),
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await readProblemResponse(response);
+  }
+}
+
+/** DUPLEX: one response's usage, for the spend cap. */
+export function reportQVoiceDuplexUsage(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexUsageReport,
+) {
+  return call(
+    session,
+    "POST",
+    qVoiceDuplexUsagePath(voiceSessionId),
+    QVoiceDuplexUsageResultSchema,
+    { body: input },
+  );
+}
+
+/** DUPLEX: a fresh realtime call for the same line after a drop (I1). */
+export function rejoinQVoiceDuplex(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexRejoin,
+) {
+  return call(
+    session,
+    "POST",
+    qVoiceDuplexRejoinPath(voiceSessionId),
+    QVoiceDuplexRejoinResultSchema,
+    { body: input },
+  );
+}
+
+/**
+ * voice-cards: the person's Q room feed -- every run's answer, whichever
+ * path made it -- after `after` (a long poll unless `wait` is false).
+ */
+export function readQRoom(
+  session: ApiSession,
+  input: {
+    readonly after: number;
+    readonly epoch?: string | undefined;
+    readonly wait: boolean;
+  },
+): Promise<QRoomRead> {
+  const query = new URLSearchParams({
+    after: String(input.after),
+    wait: input.wait ? "1" : "0",
+    ...(input.epoch === undefined ? {} : { epoch: input.epoch }),
+  });
+  return call(
+    session,
+    "GET",
+    `${Q_ROOM_PATH}?${query.toString()}`,
+    QRoomReadSchema,
+  );
+}
+
+/**
+ * RECOVERY-2026-10 (workstream C): what came of Q's UI acts on the
+ * person's screen, so the next turn knows DONE from TARGET_MISSING.
+ */
+export function reportQUiActs(
+  session: ApiSession,
+  input: QUiActReceiptsRequest,
+): Promise<QUiActReceiptsResponse> {
+  return call(
+    session,
+    "POST",
+    Q_UI_ACT_RECEIPTS_PATH,
+    QUiActReceiptsResponseSchema,
+    { body: input },
+  );
+}
+
+/**
+ * RECOVERY-2026-10 (workstream C): where a finished sentence goes, read by
+ * code as the person, for the screen to move before Q has answered.
+ */
+export function resolveQNavigation(
+  session: ApiSession,
+  input: QFastNavigationRequest,
+): Promise<QFastNavigationResponse> {
+  return call(
+    session,
+    "POST",
+    Q_FAST_NAVIGATION_PATH,
+    QFastNavigationResponseSchema,
+    { body: input },
+  );
+}
+
+/** ADR 0062: the silence ladder's beats while ask_q works (long poll). */
+export function pollQVoiceDuplexNarration(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexNarrationRequest,
+) {
+  return call(
+    session,
+    "POST",
+    qVoiceDuplexNarrationPath(voiceSessionId),
+    QVoiceDuplexNarrationResultSchema,
+    { body: input },
+  );
+}
+
+/** DUPLEX: the line ended. */
+export async function endQVoiceDuplex(
+  session: ApiSession,
+  voiceSessionId: string,
+  input: QVoiceDuplexEnd,
+): Promise<void> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/, "")}${qVoiceDuplexEndPath(voiceSessionId)}`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify(input),
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await readProblemResponse(response);
+  }
+}
+
+const conversationPath = (conversationId: string) =>
+  `${Q_CONVERSATIONS_PATH}/${encodeURIComponent(conversationId)}`;
+
+/**
+ * A person's conversations with Q (ADR 0012). Owner-only on the server;
+ * a conversation that is not theirs is not found.
+ */
+
+/** `GET /v1/q/conversations?limit=&before=` — newest activity first. */
+export function listQConversations(
+  session: ApiSession,
+  page: { readonly limit?: number; readonly before?: string } = {},
+) {
+  const query = new URLSearchParams();
+  if (page.limit !== undefined) query.set("limit", String(page.limit));
+  if (page.before !== undefined) query.set("before", page.before);
+  const suffix = query.size === 0 ? "" : `?${query.toString()}`;
+  return call(
+    session,
+    "GET",
+    `${Q_CONVERSATIONS_PATH}${suffix}`,
+    ListQConversationsResponseSchema,
+  );
+}
+
+/** `GET /v1/q/conversations/:conversationId` — the recent turns and the latest run. */
+export function getQConversation(session: ApiSession, conversationId: string) {
+  return call(
+    session,
+    "GET",
+    conversationPath(conversationId),
+    QConversationDetailSchema,
+  );
+}
+
+/** `POST /v1/q/conversations/:conversationId/archive` — idempotent; 204. */
+/** Keep one of the owner's lines out of what Q reads back; never deleted. */
+export async function hideQConversationMessage(
+  session: ApiSession,
+  conversationId: string,
+  messageId: string,
+): Promise<void> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/, "")}${conversationPath(conversationId)}/messages/${encodeURIComponent(messageId)}${Q_CONVERSATION_MESSAGE_HIDE_SUFFIX}`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+      },
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await readProblemResponse(response);
+  }
+}
+
+export async function archiveQConversation(
+  session: ApiSession,
+  conversationId: string,
+): Promise<void> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/, "")}${conversationPath(conversationId)}${Q_CONVERSATION_ARCHIVE_SUFFIX}`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+      },
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) {
+    throw await readProblemResponse(response);
+  }
+}
+
+const artifactPath = (artifactId: string) =>
+  `${Q_ARTIFACTS_PATH}/${encodeURIComponent(artifactId)}`;
+
+/**
+ * What Q composed (QX-003E). Owner-only on the server: an artifact that
+ * is not this person's is not found, and knowing its id changes nothing.
+ */
+
+/** `GET /v1/q/artifacts?limit=&before=&subjectId=` — newest first. */
+export function listQArtifacts(
+  session: ApiSession,
+  page: {
+    readonly limit?: number;
+    readonly before?: string;
+    readonly subjectId?: string;
+  } = {},
+) {
+  const query = new URLSearchParams();
+  if (page.limit !== undefined) query.set("limit", String(page.limit));
+  if (page.before !== undefined) query.set("before", page.before);
+  if (page.subjectId !== undefined) query.set("subjectId", page.subjectId);
+  const suffix = query.size === 0 ? "" : `?${query.toString()}`;
+  return call(
+    session,
+    "GET",
+    `${Q_ARTIFACTS_PATH}${suffix}`,
+    ListQArtifactsResponseSchema,
+  );
+}
+
+/** `GET /v1/q/artifacts/:artifactId` — the current version and the history. */
+export function getQArtifact(session: ApiSession, artifactId: string) {
+  return call(session, "GET", artifactPath(artifactId), QArtifactDetailSchema);
+}
+
+/**
+ * `GET /v1/q/artifacts/:artifactId/progress` — Q room W5: where a document
+ * Q is making has got to (their organisation's job only).
+ */
+export function getQArtifactProgress(session: ApiSession, artifactId: string) {
+  return call(
+    session,
+    "GET",
+    `${artifactPath(artifactId)}${Q_ARTIFACT_PROGRESS_SUFFIX}`,
+    QDocumentPipelineProgressSchema,
+  );
+}
+
+/**
+ * `POST /v1/q/artifacts/:artifactId/placeholders` — Q room W5: their own
+ * uploaded picture on a slide's placeholder, as a new version of the
+ * version they were looking at (idempotent: the same slide of the same
+ * version replays).
+ */
+export function fillQArtifactPlaceholder(
+  session: ApiSession,
+  artifactId: string,
+  input: FillQArtifactPlaceholderRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${artifactPath(artifactId)}${Q_ARTIFACT_PLACEHOLDERS_SUFFIX}`,
+    FillQArtifactPlaceholderResponseSchema,
+    { body: input },
+  );
+}
+
+/** `GET /v1/q/artifacts/:artifactId/versions/:version` — one earlier version. */
+export function getQArtifactVersion(
+  session: ApiSession,
+  artifactId: string,
+  version: number,
+) {
+  return call(
+    session,
+    "GET",
+    `${artifactPath(artifactId)}${Q_ARTIFACT_VERSIONS_SUFFIX}/${String(version)}`,
+    QArtifactDetailSchema,
+  );
+}
+
+/**
+ * `GET /v1/q/profile-findings` -- what Q found on the public web about the
+ * caller's own profile subject (BIZ-002). A Q API session.
+ */
+export function getProfileFindings(
+  session: ApiSession,
+  query: ProfileFindingsQuery,
+) {
+  const params = new URLSearchParams({
+    subjectType: query.subjectType,
+    subjectId: query.subjectId,
+  });
+  return call(
+    session,
+    "GET",
+    `${Q_PROFILE_FINDINGS_PATH}?${params.toString()}`,
+    ProfileFindingsResponseSchema,
+  );
+}
+
+// --- DOCS block: brand kit and answer exports ------------------------------
+
+/** `GET /v1/q/brand-kit` — what applies and what waits for a yes. */
+export function getQBrandKit(session: ApiSession) {
+  return call(session, "GET", Q_BRAND_KIT_PATH, QBrandKitStateSchema);
+}
+
+/** `POST /v1/q/brand-kit` — the person's own values, confirmed as given. */
+export function setQBrandKit(session: ApiSession, body: SetQBrandKitRequest) {
+  return call(session, "POST", Q_BRAND_KIT_PATH, QBrandKitSchema, { body });
+}
+
+/** `POST /v1/q/brand-kit/suggest` — Q reads their website; applies nothing. */
+export function suggestQBrandKit(session: ApiSession) {
+  return call(
+    session,
+    "POST",
+    `${Q_BRAND_KIT_PATH}${Q_BRAND_KIT_SUGGEST_SUFFIX}`,
+    QBrandKitSchema,
+    { body: {} },
+  );
+}
+
+/** `POST /v1/q/brand-kit/confirm` — confirm or decline exactly one suggestion. */
+export function confirmQBrandKit(
+  session: ApiSession,
+  body: ConfirmQBrandKitRequest,
+) {
+  return call(
+    session,
+    "POST",
+    `${Q_BRAND_KIT_PATH}${Q_BRAND_KIT_CONFIRM_SUFFIX}`,
+    QBrandKitSchema,
+    { body },
+  );
+}
+
+/** `POST /v1/q/answer-exports` — one Q answer filed as a PDF document. */
+export function createQAnswerExport(
+  session: ApiSession,
+  body: CreateQAnswerExportRequest,
+) {
+  return call(session, "POST", Q_ANSWER_EXPORTS_PATH, QArtifactDetailSchema, {
+    body,
+  });
 }

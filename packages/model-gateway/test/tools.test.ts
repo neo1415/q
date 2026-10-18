@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import type { ModelMessage, ModelToolDefinition } from "@capital-q/contracts";
 
@@ -8,7 +9,6 @@ import {
   createModelGateway,
   createModelProviderRegistry,
   createStaticModelCatalog,
-  ModelGatewayError,
   requiredCapabilitiesFor,
 } from "../src/index.js";
 import {
@@ -141,16 +141,31 @@ describe("gateway with tools", () => {
     expect(result.providerCode).toBe("beta");
   });
 
-  it("rejects tools with STRUCTURED output as an invalid request", async () => {
-    const { gateway } = build([{ kind: "TEXT", text: "x" }]);
-    await expect(
-      gateway.execute(
-        request({
-          tools: [TOOL],
-          output: { kind: "STRUCTURED", schemaName: "X", jsonSchema: {} },
-        }),
-      ),
-    ).rejects.toBeInstanceOf(ModelGatewayError);
+  it("with STRUCTURED output, returns tool calls when proposed and the validated answer when not", async () => {
+    const schema = z.object({ answer: z.string() }).strict();
+    const structured = {
+      tools: [TOOL],
+      output: { kind: "STRUCTURED" as const, schemaName: "X", jsonSchema: {} },
+    };
+    const calling = build([
+      {
+        kind: "TOOL_CALLS",
+        calls: [{ callId: "c1", name: TOOL.name, arguments: {} }],
+      },
+    ]);
+    const proposed = await calling.gateway.execute(request(structured), {
+      schema,
+    });
+    expect(proposed.output.kind).toBe("TOOL_CALLS");
+
+    const answering = build([{ kind: "JSON", value: { answer: "done" } }]);
+    const answered = await answering.gateway.execute(request(structured), {
+      schema,
+    });
+    expect(answered.output).toEqual({
+      kind: "STRUCTURED",
+      value: { answer: "done" },
+    });
   });
 
   it("accepts assistant tool-call turns and tool-result turns in the conversation", async () => {
@@ -187,6 +202,52 @@ describe("Gemini projection", () => {
       "minLength",
     );
     expect(toolsForGemini([])).toEqual([]);
+  });
+
+  // Live 2026-10-01: the seam's "do it, don't say it" round appends the
+  // model's reply and a trusted SYSTEM note. Lifted into the instruction,
+  // the note left the contents ending on the model's turn; flash-lite
+  // answered 400 and flash hung to its 45 s deadline.
+  it("says a later system note where it was added, so the contents end on a user turn", () => {
+    const { systemInstruction, contents } = toContents([
+      { role: "SYSTEM", content: "charter" },
+      { role: "USER", content: "task" },
+      { role: "SYSTEM", content: "capabilities" },
+      { role: "ASSISTANT", content: '{"answer":"I will look it up."}' },
+      { role: "SYSTEM", content: "Do it, don't say it." },
+    ]);
+    expect(systemInstruction).toBe("charter");
+    expect(contents.map((c) => c.role)).toEqual(["user", "model", "user"]);
+    expect(contents[0]?.parts).toEqual([
+      { text: "task" },
+      { text: "[Capital Q note] capabilities" },
+    ]);
+    expect(contents.at(-1)?.parts).toEqual([
+      { text: "[Capital Q note] Do it, don't say it." },
+    ]);
+  });
+
+  it("never mixes a note into a turn of function responses", () => {
+    const { contents } = toContents([
+      { role: "SYSTEM", content: "charter" },
+      { role: "USER", content: "task" },
+      {
+        role: "ASSISTANT",
+        content: "",
+        toolCalls: [{ callId: "abc", name: "get_company", arguments: {} }],
+      },
+      { role: "TOOL", callId: "abc", name: "get_company", content: "{}" },
+      { role: "SYSTEM", content: "sources changed" },
+    ]);
+    expect(contents.map((c) => c.role)).toEqual([
+      "user",
+      "model",
+      "user",
+      "user",
+    ]);
+    expect(contents.at(-1)?.parts).toEqual([
+      { text: "[Capital Q note] sources changed" },
+    ]);
   });
 
   it("maps tool turns to function calls and merged function responses, echoing only real ids", () => {

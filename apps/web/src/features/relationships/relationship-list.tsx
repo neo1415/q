@@ -1,0 +1,177 @@
+import Link from "next/link";
+
+import type { RelationshipSummaryDto } from "@capital-q/contracts";
+import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
+
+import { EntityAvatar } from "@/features/entity/entity-avatar";
+
+import {
+  formatRelationshipDate,
+  NEXT_STEP_WORDS,
+  relationshipHref,
+  relationshipsNeedingYou,
+  STATE_WORDS,
+} from "./relationship-words";
+import { serverTNow } from "@/features/i18n/server-now";
+
+/**
+ * A side's relationships, as hairline rows (CQ-WEB-030; doc 17 §83;
+ * spec §13 "/capital: objective + relationship timeline list").
+ *
+ * One row per counterpart: who, where it stands in words, since when,
+ * and what is next. No card around each row, no badge, no colour carrying
+ * meaning, no count. The row opens the relationship's own page.
+ */
+export function RelationshipList({
+  items,
+  emptySentence,
+  unread,
+}: {
+  readonly items: readonly RelationshipSummaryDto[];
+  readonly emptySentence: string;
+  /** R34: unread chat messages per relationship id. */
+  readonly unread?: ReadonlyMap<string, number> | undefined;
+}) {
+  const t = serverTNow();
+
+  if (items.length === 0) {
+    return (
+      <p
+        className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)"
+        data-state="empty"
+      >
+        {t(emptySentence)}
+      </p>
+    );
+  }
+  return (
+    <ul
+      aria-label={t("Relationships")}
+      className="cq-panel-rows flex max-w-(--cq-layout-reading) flex-col"
+    >
+      {items.map((item) => (
+        <li
+          key={item.relationshipId}
+          data-relationship-id={item.relationshipId}
+        >
+          <RelationshipRow
+            item={item}
+            unread={unread?.get(item.relationshipId) ?? 0}
+          />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function RelationshipRow({
+  item,
+  unread,
+}: {
+  readonly item: RelationshipSummaryDto;
+  readonly unread: number;
+}) {
+  const t = serverTNow();
+
+  return (
+    <Link
+      href={relationshipHref(item)}
+      className="flex min-h-11 items-center gap-3 py-3 outline-offset-2 hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+    >
+      {item.counterpart.kind === "COMPANY" ? (
+        <EntityAvatar
+          kind="company"
+          name={item.counterpart.name}
+          companyId={item.counterpart.id}
+          src={item.counterpart.photoUrl}
+          size="sm"
+          decorative
+        />
+      ) : (
+        // The list names them, so it carries their logo (the name's scope).
+        <EntityAvatar
+          kind="investor"
+          name={item.counterpart.name}
+          investorOrganisationId={item.counterpart.id}
+          src={item.counterpart.photoUrl ?? undefined}
+          size="sm"
+          decorative
+        />
+      )}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="cq-body text-(--cq-text-primary)">
+          {item.counterpart.name}
+        </span>
+        <span className="cq-caption text-(--cq-text-secondary)">
+          {t(STATE_WORDS[item.state])}
+          <span className="cq-numeric">
+            {" "}
+            {t("since")} {t(formatRelationshipDate(item.stateSince))}
+          </span>
+        </span>
+        <span className="cq-caption text-(--cq-text-tertiary)">
+          {t("Next:")} {t(NEXT_STEP_WORDS[item.nextStep])}
+        </span>
+      </span>
+      {unread > 0 ? (
+        // Said in words, not by colour alone.
+        <span
+          className="cq-caption cq-numeric shrink-0 bg-(--cq-accent-soft) px-2 py-0.5 text-(--cq-text-primary)"
+          data-unread={unread}
+        >
+          {unread === 1
+            ? "1 new message"
+            : t(`${unread > 99 ? "99+" : unread} new messages`)}
+        </span>
+      ) : null}
+      <ChevronRight
+        size={ICON_SIZE.compact}
+        aria-hidden="true"
+        className="shrink-0 text-(--cq-text-tertiary)"
+      />
+    </Link>
+  );
+}
+
+/**
+ * The relationships waiting on the person, ready to drop into the Q
+ * page's "Now / Needs you" column (spec §7.1; UXA's Board). Renders
+ * nothing when nothing needs them -- an empty "Needs you" is not an item.
+ * Pass the items from `listInvestorRelationships` or
+ * `listCompanyRelationships`; this component filters them.
+ */
+export function RelationshipNeedsYou({
+  items,
+}: {
+  readonly items: readonly RelationshipSummaryDto[];
+}) {
+  const t = serverTNow();
+
+  const needing = relationshipsNeedingYou(items);
+  if (needing.length === 0) return null;
+  return (
+    <ul
+      aria-label={t("Relationships needing you")}
+      className="flex flex-col gap-1"
+    >
+      {needing.map((item) => (
+        <li key={item.relationshipId} data-needs-you={item.nextStep}>
+          <Link
+            href={relationshipHref(item)}
+            className="flex min-h-11 flex-col justify-center gap-0.5 px-2 py-2 hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          >
+            <span className="cq-body-sm text-(--cq-text-primary)">
+              {item.nextStep === "ANSWER_INTEREST"
+                ? t(`Answer ${item.counterpart.name}'s interest`)
+                : t(`Arrange a first meeting with ${item.counterpart.name}`)}
+            </span>
+            <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
+              {t(STATE_WORDS[item.state])} {t("since")}{" "}
+              {t(formatRelationshipDate(item.stateSince))}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}

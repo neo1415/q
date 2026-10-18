@@ -1,24 +1,44 @@
+import type { ActorContext } from "@capital-q/security";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   ApproveQApprovalRequestSchema,
   CorrelationIdSchema,
+  EmailDraftDtoSchema,
+  Q_APPROVAL_EMAIL_DRAFT_SUFFIX,
+  ReviseEmailDraftRequestSchema,
   parseContract,
   Q_APPROVAL_APPROVE_SUFFIX,
   Q_APPROVAL_REJECT_SUFFIX,
   Q_APPROVALS_PATH,
+  Q_CONTRACT_VERSION,
   QApprovalIdSchema,
   QApprovalViewSchema,
+  QPendingApprovalListSchema,
   RejectQApprovalRequestSchema,
   type CorrelationId,
   type QApprovalId,
+  type QSubjectRef,
 } from "@capital-q/contracts";
 import {
   createCorrelationId,
   withObservabilityContext,
 } from "@capital-q/observability";
-import type { QActionService } from "@capital-q/q-actions";
+import {
+  QApprovalNotFoundError,
+  type QActionService,
+} from "@capital-q/q-actions";
+import {
+  photoLookup,
+  type NamedImageReader,
+  type NamedImageSubject,
+} from "@capital-q/public-identity";
 import type { QOrchestrator } from "@capital-q/q-runtime";
 
+import type { ApprovedContinuation } from "../composition/approved-continuation.js";
+import {
+  EMAIL_SEND,
+  EmailSendPayloadSchema,
+} from "../composition/email-action.js";
 import {
   getActorContext,
   requireActorContextHook,
@@ -49,7 +69,61 @@ export type QApprovalRoutesDependencies = ActorContextDependencies & {
   readonly qActions: QActionService;
   /** Resumes the run after an approval; absent means an approved action waits for a worker. */
   readonly orchestrator?: QOrchestrator | undefined;
+  /**
+   * Resume, or execute through the gate when the run cannot resume
+   * (approved-continuation.ts). Preferred over `orchestrator` when set.
+   */
+  readonly continueApproved?: ApprovedContinuation | undefined;
+  /** Pictures of who an approval names. Absent: none are carried. */
+  readonly namedPhotos?: Pick<NamedImageReader, "photos"> | undefined;
+  /**
+   * Founder brief J3: the person's decision on an action Q prepared, for
+   * the agents' learning. After the decision is durable, detached: it
+   * never changes or delays the decision itself.
+   */
+  readonly onDecision?:
+    | ((
+        actor: ActorContext,
+        decision: {
+          readonly qActionId: string;
+          readonly kind: "APPROVED" | "REJECTED" | "EDITED";
+          readonly editedBody?: string | undefined;
+          readonly note?: string | undefined;
+        },
+      ) => Promise<void>)
+    | undefined;
 };
+
+/**
+ * The person or organisation an action is aimed at: its first such
+ * target. The approver may open the approval, which names its targets, so
+ * the picture shows with them (founder decision 2026-10-04).
+ */
+export function namedTarget(
+  targets: readonly QSubjectRef[] | undefined,
+): NamedImageSubject | null {
+  for (const target of targets ?? []) {
+    switch (target.kind) {
+      case "COMPANY":
+        return { subjectType: "COMPANY", subjectId: target.companyId };
+      case "INVESTOR_ORGANISATION":
+        return {
+          subjectType: "INVESTOR_ORGANISATION",
+          subjectId: target.investorOrganisationId,
+        };
+      case "USER":
+        return { subjectType: "PERSON", subjectId: target.userId };
+      // A relationship, objective, document or organisation has no
+      // picture of its own; the next target may.
+      case "RELATIONSHIP":
+      case "CAPITAL_OBJECTIVE":
+      case "DOCUMENT":
+      case "ORGANISATION":
+        break;
+    }
+  }
+  return null;
+}
 
 function correlation(): CorrelationId {
   return CorrelationIdSchema.parse(createCorrelationId());
@@ -71,6 +145,50 @@ export function registerQApprovalRoutes(
   const withContext = requireActorContextHook(dependencies);
   const service = dependencies.qActions;
   const approvalPath = `${Q_APPROVALS_PATH}/:approvalId`;
+
+  /*
+    What is still waiting on the caller (R35): their own pending approvals,
+    for Q's briefing. The engine applies the single read's predicate, so
+    the list never names an approval the caller could not open.
+  */
+  app.get(
+    Q_APPROVALS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const rows = await service.listPendingApprovals({
+        actor: getActorContext(request),
+      });
+      const named = rows.map((row) => namedTarget(row.targets));
+      const photo = await photoLookup(
+        dependencies.namedPhotos,
+        named.filter((subject) => subject !== null),
+      );
+      return reply.header("Cache-Control", "no-store").send(
+        QPendingApprovalListSchema.parse({
+          contractVersion: Q_CONTRACT_VERSION,
+          // `actionType` is the engine's own (Q room W4b's like-request
+          // check); the strict public contract refused it, and every
+          // caller with a waiting card got a 500 (Zino, 7 Oct).
+          items: rows.map(
+            ({ targets: _targets, actionType: _type, ...row }, index) => {
+              const subject = named[index] ?? null;
+              return {
+                ...row,
+                named:
+                  subject === null
+                    ? null
+                    : {
+                        kind: subject.subjectType,
+                        id: subject.subjectId,
+                        photoUrl: photo(subject),
+                      },
+              };
+            },
+          ),
+        }),
+      );
+    },
+  );
 
   app.get(approvalPath, { onRequest: withContext }, async (request, reply) => {
     const view = await service.getApproval({
@@ -98,11 +216,39 @@ export function registerQApprovalRoutes(
         actor,
         approvalId: approvalIdParam(request),
         correlationId,
+        via: { channel: "CARD" },
       });
+      if (result.decided) {
+        void dependencies
+          .onDecision?.(actor, {
+            qActionId: result.action.id,
+            kind: "APPROVED",
+          })
+          .catch(() => undefined);
+      }
 
       // The decision is durable; execution is the run's continuation,
       // re-verified by the gate. A retried approve does not resume twice.
-      if (result.decided && dependencies.orchestrator !== undefined) {
+      // A repeated tap on an action still waiting to run (its first
+      // continuation was lost) continues it again; the gate's claim makes
+      // that safe.
+      const continueApproved = dependencies.continueApproved;
+      if (
+        continueApproved !== undefined &&
+        (result.decided || result.action.status === "APPROVED")
+      ) {
+        void continueApproved({
+          actor,
+          runId: result.action.runId,
+          actionId: result.action.id,
+          correlationId,
+        }).catch((error: unknown) => {
+          request.log.error(
+            { err: error, qRunId: result.action.runId, correlationId },
+            "approved action did not continue after approval",
+          );
+        });
+      } else if (result.decided && dependencies.orchestrator !== undefined) {
         const orchestrator = dependencies.orchestrator;
         void orchestrator
           .resume({ actor, runId: result.action.runId, correlationId })
@@ -137,6 +283,73 @@ export function registerQApprovalRoutes(
         correlationId: correlation(),
         reason: input.reason,
       });
+      void dependencies
+        .onDecision?.(getActorContext(request), {
+          qActionId: result.action.id,
+          kind: "REJECTED",
+          note: input.reason ?? undefined,
+        })
+        .catch(() => undefined);
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(QApprovalViewSchema.parse(result.view));
+    },
+  );
+
+  // The email draft behind an `email.send` approval (BIZ-007): read by its
+  // approver, and edited by them. An edit is a revision: the old approval
+  // is void and a new one is requested for exactly the new words; the
+  // recipient and the relationship cannot change here.
+  const emailDraft = async (request: FastifyRequest) => {
+    const read = await service.readProposal({
+      actor: getActorContext(request),
+      approvalId: approvalIdParam(request),
+      correlationId: correlation(),
+    });
+    const payload = EmailSendPayloadSchema.safeParse(read.payload);
+    if (read.actionType !== EMAIL_SEND || !payload.success) {
+      throw new QApprovalNotFoundError();
+    }
+    return { view: read.view, payload: payload.data };
+  };
+
+  app.get(
+    `${approvalPath}${Q_APPROVAL_EMAIL_DRAFT_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const { view, payload } = await emailDraft(request);
+      return reply.header("Cache-Control", "no-store").send(
+        EmailDraftDtoSchema.parse({
+          approvalId: view.approvalId,
+          ...payload,
+        }),
+      );
+    },
+  );
+
+  app.post(
+    `${approvalPath}${Q_APPROVAL_EMAIL_DRAFT_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const input = parseContract(
+        ReviseEmailDraftRequestSchema,
+        request.body ?? {},
+        "The edited email is not valid.",
+      );
+      const { payload } = await emailDraft(request);
+      const result = await service.revise({
+        actor: getActorContext(request),
+        approvalId: approvalIdParam(request),
+        correlationId: correlation(),
+        payload: { ...payload, subject: input.subject, body: input.body },
+      });
+      void dependencies
+        .onDecision?.(getActorContext(request), {
+          qActionId: result.action.id,
+          kind: "EDITED",
+          editedBody: input.body,
+        })
+        .catch(() => undefined);
       return reply
         .header("Cache-Control", "no-store")
         .send(QApprovalViewSchema.parse(result.view));

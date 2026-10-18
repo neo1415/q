@@ -37,12 +37,28 @@ export type DisclosureResourceResolver = {
   readonly resolve: (
     resourceId: string,
   ) => Promise<DisclosureResourceDescriptor | null>;
+  /**
+   * S2: many resources of this kind in one read. Each descriptor names its
+   * own resource; an id that does not resolve is simply absent.
+   */
+  readonly resolveMany?:
+    | ((
+        resourceIds: readonly string[],
+      ) => Promise<readonly DisclosureResourceDescriptor[]>)
+    | undefined;
 };
 
 export type DisclosureResourceResolverRegistry = {
   readonly resolve: (
     resource: DisclosureResourceRef,
   ) => Promise<DisclosureResourceDescriptor | null>;
+  /**
+   * S2: `resolve` for many resources; one read per resource kind that can
+   * batch. The result is keyed `type:id`; an unresolved resource is absent.
+   */
+  readonly resolveMany: (
+    resources: readonly DisclosureResourceRef[],
+  ) => Promise<Map<string, DisclosureResourceDescriptor>>;
   readonly has: (resourceType: string) => boolean;
   readonly types: () => readonly DisclosureResourceType[];
 };
@@ -68,6 +84,14 @@ export type NewDisclosurePolicy = {
   readonly accessLevel: DisclosureAccessLevel;
   readonly expiresAt: UtcTimestamp | null;
   readonly createdByUserId: UserId;
+  /**
+   * From the injected DisclosureClock — the same clock that validates
+   * expiry on grant, stamps revocation and evaluates status. A policy row
+   * never mixes an application instant with the database's own `now()`,
+   * so `revoked_at >= created_at` and `expires_at > created_at` hold
+   * whatever the skew between the host and PostgreSQL.
+   */
+  readonly createdAt: UtcTimestamp;
 };
 
 /**
@@ -107,6 +131,20 @@ export type DisclosurePolicyRepository = {
     executor: DatabaseExecutor,
     resources: readonly DisclosureResourceRef[],
   ) => Promise<readonly DisclosurePolicy[]>;
+  /**
+   * Unrevoked policies of one resource type granted to one recipient (a
+   * relationship's diligence shares). Optional: adapters without it list
+   * nothing.
+   */
+  readonly findUnrevokedForRecipient?:
+    | ((
+        executor: DatabaseExecutor,
+        query: {
+          readonly resourceType: DisclosureResourceRef["type"];
+          readonly recipient: DisclosureRecipient;
+        },
+      ) => Promise<readonly DisclosurePolicy[]>)
+    | undefined;
   /** Every policy of one resource, including revoked history, for inspection. */
   readonly findAllForResource: (
     executor: DatabaseExecutor,

@@ -1,0 +1,360 @@
+import type { OnboardingSessionView } from "@capital-q/contracts";
+import { createCorrelationId, type Logger } from "@capital-q/observability";
+import type { PresenceService } from "@capital-q/q-presence";
+import type { ActorContext } from "@capital-q/security";
+
+/**
+ * When Capital Q first knows enough to look somebody up.
+ *
+ * The moment, not a schedule: a name alone is a bad query (every third
+ * person shares one), so a presence build waits until the setup has both a
+ * name and something that disambiguates it — a company name, a website.
+ * From then on the presence service itself decides whether a read is due,
+ * and this only asks.
+ *
+ * Every call here is detached and best effort. It runs while a person is
+ * mid-sentence with Q; it must never delay a turn and must never be able
+ * to fail one, so nothing awaits it and nothing it throws escapes.
+ */
+
+const FOUNDER_COMPANY_NAME = "F1.company_name";
+const FOUNDER_WEBSITE = "F1.website";
+const INVESTOR_ORGANISATION_NAME = "I0.organisation_name";
+
+/**
+ * Which step names the subject, for the subject this session is about.
+ *
+ * A session binds to a company or to an investor organisation, and the two
+ * journeys ask for that name on different steps. Only the founder's step
+ * was ever read, so an investor's organisation was never looked up at all:
+ * the name was sitting in the session (and in their registration) and the
+ * one branch that could have used it tested for a step the investor
+ * journey does not have.
+ */
+function subjectNameStepFor(subjectType: "COMPANY" | "INVESTOR_ORGANISATION"): {
+  readonly nameStep: string;
+  readonly websiteStep: string | null;
+} {
+  return subjectType === "COMPANY"
+    ? { nameStep: FOUNDER_COMPANY_NAME, websiteStep: FOUNDER_WEBSITE }
+    : { nameStep: INVESTOR_ORGANISATION_NAME, websiteStep: null };
+}
+
+function firstText(
+  view: OnboardingSessionView,
+  stepKey: string,
+): string | null {
+  const response = view.responses.find((r) => r.stepKey === stepKey);
+  if (response === undefined) return null;
+  const value: unknown = response.value;
+  if (typeof value === "string") return value.trim() || null;
+  if (value !== null && typeof value === "object" && "text" in value) {
+    const text: unknown = value.text;
+    return typeof text === "string" ? text.trim() || null : null;
+  }
+  return null;
+}
+
+/**
+ * What the person is called, for the one query that is about them.
+ *
+ * A name alone is a bad query and a person's name is the worst of them:
+ * the presence build drops every page that does not name the subject, so
+ * without something to disambiguate, a common name reads as nothing found.
+ * The company they have just named is that something.
+ */
+export type PersonNameLookup = {
+  readonly displayNameFor: (
+    actor: ActorContext,
+  ) => Promise<string | null> | string | null;
+};
+
+/**
+ * What was found about the person, on its way back to them.
+ *
+ * Looking somebody up at arrival is only worth doing if Q can then say so:
+ * here is what is public under your name, have I got the right person?
+ * Without this the research happened in silence and the person had no idea
+ * Q had done anything at all.
+ *
+ * Their own understandings, going back to them. Nobody else's ever reaches
+ * this, because a build only runs for a subject the actor already owns.
+ */
+export type PresenceFound = {
+  /**
+   * Whose presence this is. Absent means the person (older callers): a
+   * company's findings carry "COMPANY" and become a website question.
+   */
+  readonly subjectType?: "PERSON" | "COMPANY" | undefined;
+  readonly name: string;
+  readonly statements: readonly string[];
+  readonly domains: readonly string[];
+};
+
+/** Where Q offers what a company's own website says about it, for the profile (ADR 0011). */
+export type ProfileSuggestionSink = {
+  readonly offer: (suggestion: {
+    readonly actorUserId: string;
+    readonly tenantId: string;
+    readonly companyId: string;
+    readonly updates: readonly {
+      readonly field: "shortDescription";
+      readonly value: string;
+      readonly quote: string;
+    }[];
+  }) => void;
+};
+
+/** The one profile fact the offer depends on: whether a short description exists. */
+export type ProfileShortDescriptionLookup = {
+  readonly shortDescriptionOf: (companyId: string) => Promise<string | null>;
+};
+
+export type PresenceTriggerDependencies = {
+  readonly presence: PresenceService;
+  /** Absent means companies only; a person is simply not looked up. */
+  readonly people?: PersonNameLookup | undefined;
+  /** Absent means Q never offers a website's description into the profile. */
+  readonly profileSuggestions?: ProfileSuggestionSink | undefined;
+  readonly profiles?: ProfileShortDescriptionLookup | undefined;
+  /** Told what was found about the person, so Q can check it is them. */
+  readonly onPersonFound?: ((found: PresenceFound) => void) | undefined;
+  /**
+   * True when the acting person is a fictional synthetic demo account (auth
+   * app_metadata `synthetic` and `fictional_demo`), the same rule as the
+   * workers' typed-onboarding guard. An invented subject has no public
+   * presence: the open web can only return real namesakes, and every search
+   * is a paid provider call. Absent: every subject is researched, as before.
+   * A failed read keeps the old behaviour.
+   */
+  readonly isFictionalAccount?:
+    ((userId: string) => Promise<boolean>) | undefined;
+  readonly logger?: Logger | undefined;
+};
+
+export type PresenceTrigger = {
+  /**
+   * The setup moved on. If it now names a subject well enough to search
+   * for, and a read is due, start one in the background.
+   */
+  readonly afterInterviewTurn: (
+    actor: ActorContext,
+    view: OnboardingSessionView,
+    /** Told what was found about the person, so Q can check it is them. */
+    onFound?: (found: PresenceFound) => void,
+    /** What the person told Capital Q before the interview began. */
+    hints?: { readonly organisationName?: string | null | undefined },
+  ) => void;
+};
+
+export function createPresenceTrigger(
+  dependencies: PresenceTriggerDependencies,
+): PresenceTrigger {
+  const { presence, people, onPersonFound, isFictionalAccount, logger } =
+    dependencies;
+
+  /** One build, detached, never able to delay or fail a turn. */
+  const start = (
+    actor: ActorContext,
+    subjectType: "COMPANY" | "INVESTOR_ORGANISATION" | "PERSON",
+    subjectId: string,
+    identity: {
+      readonly name: string;
+      readonly websiteUrl: string | null;
+      readonly profileUrl: string | null;
+      readonly qualifier: string | null;
+    },
+    report: ((found: PresenceFound) => void) | undefined,
+  ): void => {
+    void (async () => {
+      try {
+        if (
+          isFictionalAccount !== undefined &&
+          (await isFictionalAccount(actor.userId).catch(() => false))
+        ) {
+          logger?.info(
+            { subjectType },
+            "presence research skipped: fictional synthetic account",
+          );
+          return;
+        }
+        const outcome = await presence.build({
+          actor,
+          subject: { subjectType, subjectId },
+          identity,
+          correlationId: createCorrelationId(),
+        });
+        // Counts and a status. Never a statement, a query or a page.
+        logger?.info(
+          {
+            status: outcome.status,
+            subjectType,
+            ...(outcome.status === "SKIPPED" ? { reason: outcome.reason } : {}),
+            searchedByNameOnly: identity.websiteUrl === null,
+          },
+          "public presence build finished",
+        );
+        if (
+          subjectType !== "INVESTOR_ORGANISATION" &&
+          outcome.status === "COMPLETED" &&
+          (outcome.understandings.length > 0 || outcome.domains.length > 0) &&
+          report !== undefined
+        ) {
+          // What was found goes back to the person as a question (the
+          // onboarding conductor's queue), never straight onto the record.
+          report({
+            subjectType,
+            name: identity.name,
+            statements: outcome.understandings.map((u) => u.statement),
+            domains: outcome.domains,
+          });
+        }
+        /**
+         * The company's own website said what it does; the profile says
+         * nothing. Q offers the sentence into the profile through the
+         * same proposal and approval as a change the person asked for:
+         * it is a suggestion until they say yes (ADR 0011).
+         */
+        if (
+          subjectType === "COMPANY" &&
+          outcome.status === "COMPLETED" &&
+          dependencies.profileSuggestions !== undefined &&
+          dependencies.profiles !== undefined
+        ) {
+          const said = outcome.understandings.find(
+            (u) =>
+              (u.key === "presence.what_they_do" ||
+                u.key === "presence.self_description") &&
+              u.statement.trim().length >= 20,
+          );
+          if (said !== undefined) {
+            const current =
+              await dependencies.profiles.shortDescriptionOf(subjectId);
+            if (current === null || current.trim().length === 0) {
+              dependencies.profileSuggestions.offer({
+                actorUserId: actor.userId,
+                tenantId: actor.tenantId,
+                companyId: subjectId,
+                updates: [
+                  {
+                    field: "shortDescription",
+                    value: said.statement.trim().slice(0, 280),
+                    quote: `their public website (${outcome.domains[0] ?? "the web"})`,
+                  },
+                ],
+              });
+              logger?.info(
+                { subjectType, domains: outcome.domains.length },
+                "a website's description was offered for the profile",
+              );
+            }
+          }
+        }
+      } catch (error: unknown) {
+        logger?.warn(
+          { err: error, subjectType },
+          "public presence build threw",
+        );
+      }
+    })();
+  };
+
+  /**
+   * One read per subject per process. The interview calls this after
+   * every turn; the presence service has its own memory of what it read,
+   * but a build it is still running must not be asked for again on the
+   * next sentence.
+   */
+  const started = new Set<string>();
+  const once = (subjectType: string, subjectId: string): boolean => {
+    const key = `${subjectType}:${subjectId}`;
+    if (started.has(key)) return false;
+    started.add(key);
+    return true;
+  };
+
+  return {
+    afterInterviewTurn: (actor, view, onFound, hints) => {
+      // Evidence is recorded for a subject the actor's active organisation
+      // owns, so an actor with none yet (the first turns of a setup, before
+      // the organisation exists) can only fail every page (live 2026-10-01:
+      // EvidenceSubjectNotFoundError on all 13 pages, and the build was
+      // marked started, so it never ran again). Wait for a turn that has one.
+      if (actor.organisationId === undefined) return;
+      const subject = view.session.subject;
+      const steps = subject === null ? null : subjectNameStepFor(subject.type);
+      const interviewName =
+        steps === null ? null : firstText(view, steps.nameStep);
+      const website =
+        steps === null || steps.websiteStep === null
+          ? null
+          : firstText(view, steps.websiteStep);
+      // What tells one person of that name from another: the organisation
+      // they named in the interview, or failing that the one they typed at
+      // sign-up. Public either way.
+      const qualifier =
+        interviewName !== null && interviewName.length >= 2
+          ? interviewName
+          : (hints?.organisationName ?? "").trim() || null;
+
+      if (
+        subject !== null &&
+        interviewName !== null &&
+        interviewName.length >= 2 &&
+        once(subject.type, subject.id)
+      ) {
+        // By name even without a website (founder report 2026-10-05: the
+        // company read was skipped for want of one, and nothing was said).
+        start(
+          actor,
+          subject.type,
+          subject.id,
+          {
+            name: interviewName,
+            websiteUrl: website,
+            profileUrl: null,
+            qualifier: null,
+          },
+          // Only a company's own site becomes a question, and only while
+          // the website step is still open.
+          subject.type === "COMPANY" && website === null ? onFound : undefined,
+        );
+      }
+
+      /**
+       * And the person themselves, which is the whole point of doing this
+       * at arrival: what they have published, what they say they do, what
+       * they are known for. Their own row, never anybody else's; the
+       * presence service refuses a subject the actor does not own.
+       *
+       * This does not wait for a company record to exist. Live, a new
+       * founder went through a whole interview and was never looked up,
+       * because the company row is created late in the setup and the
+       * lookup was tied to it. A name and a qualifier are enough.
+       * Their company's website is not theirs and is not passed.
+       */
+      if (people === undefined || qualifier === null) return;
+      if (!once("PERSON", actor.userId)) return;
+      void (async () => {
+        try {
+          const personName = await people.displayNameFor(actor);
+          if (personName === null || personName.trim().length < 2) return;
+          start(
+            actor,
+            "PERSON",
+            actor.userId,
+            {
+              name: personName.trim(),
+              websiteUrl: null,
+              profileUrl: null,
+              qualifier,
+            },
+            onFound ?? onPersonFound,
+          );
+        } catch (error: unknown) {
+          logger?.warn({ err: error }, "could not read a name to look up");
+        }
+      })();
+    },
+  };
+}

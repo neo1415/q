@@ -380,7 +380,10 @@ describe("Approval flow through the Q orchestrator against local PostgreSQL", ()
   }
 
   /** A fresh orchestrator with its own checkpoint store — a "process". */
-  function orchestrator(world: World): QOrchestrator {
+  function orchestrator(
+    world: World,
+    answer: QAnswerPort = answeringPort,
+  ): QOrchestrator {
     const store = createPostgresQCheckpointStore({
       connectionString: TEST_DATABASE_URL,
     });
@@ -398,7 +401,7 @@ describe("Approval flow through the Q orchestrator against local PostgreSQL", ()
       checkpoints: store,
       firewall: world.firewall,
       retrieval: createUnconfiguredQRetrieval(),
-      answer: answeringPort,
+      answer,
       actions: createQActionPort({
         service: world.actions,
         proposer: proposer(world),
@@ -555,6 +558,68 @@ describe("Approval flow through the Q orchestrator against local PostgreSQL", ()
       expect(JSON.stringify(outbox)).not.toContain(PAYLOAD_MARKER);
       expect(world.logLines.join("\n")).not.toContain(PAYLOAD_MARKER);
       expect(await checkpointText(run.id)).not.toContain(PAYLOAD_MARKER);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("a run approved by a typed yes in ANOTHER run resumes as itself and executes once (live 2026-10-01, 6b04d028)", async () => {
+    // Live: "yes, go ahead" is itself a Q run; its answer approved the
+    // waiting change and resumed that change's run from inside its own
+    // graph invocation. The resumed graph read an empty state (runId,
+    // tenantId, ... undefined), the run failed INTERNAL_ERROR and the
+    // approved action never executed.
+    const world = await commitWorld();
+    try {
+      const waiting = await createRun(world);
+      const first = orchestrator(world);
+      await first.start({
+        actor: world.founder.actor,
+        runId: waiting.id,
+        correlationId: CORRELATION(),
+      });
+      const required = (await events(waiting.id)).find(
+        (e) => e.event_type === "q.approval.required",
+      );
+      const approvalId = required?.payload["approvalId"] as string;
+
+      let resumedStatus: string | null = null;
+      const typedYes: QAnswerPort = {
+        answer: async () => {
+          await world.actions.approve({
+            actor: world.founder.actor,
+            approvalId: approvalId as never,
+            correlationId: CORRELATION(),
+          });
+          const handle = await first.resume({
+            actor: world.founder.actor,
+            runId: waiting.id,
+            correlationId: CORRELATION(),
+          });
+          resumedStatus = handle.status;
+          return {
+            kind: "ANSWERED",
+            messageId: randomUUID(),
+            modelPolicyVersion: "test-policy",
+            promptBundleVersion: "test-bundle",
+          };
+        },
+      };
+      const yes = await createRun(world);
+      const second = orchestrator(world, typedYes);
+      await second.start({
+        actor: world.founder.actor,
+        runId: yes.id,
+        correlationId: CORRELATION(),
+      });
+
+      expect(resumedStatus).toBe("COMPLETED");
+      expect(await runRow(waiting.id)).toMatchObject({
+        status: "COMPLETED",
+        failure_code: null,
+      });
+      expect(world.executor.executions()).toBe(1);
+      expect((await actionRow(waiting.id))?.status).toBe("EXECUTED");
     } finally {
       await cleanup(world);
     }

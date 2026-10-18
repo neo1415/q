@@ -49,6 +49,8 @@ pnpm dev
 
 `pnpm dev` starts every app. Individual apps run with `pnpm --filter @capital-q/api dev`.
 
+Local configuration lives in two gitignored files, both described in `.env.example`: the repository-root `.env.local` (server-only values for `api`, `q-api` and `workers`, preloaded by their `dev` scripts through `scripts/dev-env.mjs`) and `apps/web/.env.local` (the `NEXT_PUBLIC_*` values and web settings, read by Next.js itself). Deployed processes never read either file.
+
 `api` and `q-api` expose `/health/live` and `/health/ready`. `workers` is a private workload with no public endpoint.
 
 ### Authentication (local)

@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import {
@@ -118,6 +118,42 @@ function sandboxEnvironment(): NodeJS.ProcessEnv {
   return environment;
 }
 
+/**
+ * Module-loading flags the parent was started with, and nothing else.
+ *
+ * In development the services run their TypeScript sources through a
+ * preload that resolves the sources' `./x.js` imports; a child started
+ * without it cannot load `child.ts` and crashes before parsing a byte. In
+ * production the entry is compiled `child.js`, execArgv carries no such
+ * flag, and this is empty. The child's environment is still the scrubbed
+ * one: the preload refuses to load any file under NODE_ENV=production,
+ * which is what the sandbox sets.
+ */
+function inheritedLoaderArguments(): readonly string[] {
+  const args: string[] = [];
+  const execArgv = process.execArgv;
+  // The parent resolved a relative specifier against its own working
+  // directory; the child runs in a temporary workspace, so the same text
+  // would resolve to nothing. It is handed over as an absolute file URL.
+  const absolute = (specifier: string): string =>
+    specifier.includes("://") || specifier.startsWith("node:")
+      ? specifier
+      : pathToFileURL(resolve(process.cwd(), specifier)).href;
+  for (let index = 0; index < execArgv.length; index += 1) {
+    const argument = execArgv[index] ?? "";
+    if (argument.startsWith("--import=")) {
+      args.push(`--import=${absolute(argument.slice("--import=".length))}`);
+    } else if (argument === "--import") {
+      const next = execArgv[index + 1];
+      if (next !== undefined) {
+        args.push(argument, absolute(next));
+        index += 1;
+      }
+    }
+  }
+  return args;
+}
+
 export function createParserSandbox(
   options: ParserSandboxOptions,
 ): ParserSandbox {
@@ -148,6 +184,7 @@ export function createParserSandbox(
           process.execPath,
           [
             `--max-old-space-size=${options.maxOldSpaceMb}`,
+            ...inheritedLoaderArguments(),
             entryPath,
             workspace,
           ],

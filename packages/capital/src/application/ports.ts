@@ -5,6 +5,7 @@ import type {
   CapitalObjectiveType,
   CapitalTarget,
   LocalDate,
+  RaiseValuation,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 import type { TenantId, UserId } from "@capital-q/security";
@@ -35,6 +36,8 @@ export type NewCapitalObjective = {
   readonly instrumentCode: string | null;
   readonly targetCloseDate: LocalDate | null;
   readonly useOfFundsSummary: string | null;
+  readonly valuation: RaiseValuation | null;
+  readonly minimumCheque: string | null;
   readonly createdByUserId: UserId;
 };
 
@@ -44,6 +47,8 @@ export type CapitalObjectiveChanges = {
   readonly instrumentCode?: string | null | undefined;
   readonly targetCloseDate?: LocalDate | null | undefined;
   readonly useOfFundsSummary?: string | null | undefined;
+  readonly valuation?: RaiseValuation | null | undefined;
+  readonly minimumCheque?: string | null | undefined;
 };
 
 export type CapitalObjectiveRepository = {

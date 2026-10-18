@@ -6,12 +6,17 @@ import type {
 import {
   COUNTRY_OTHER_OPTION,
   CURRENCY_OPTIONS,
-  FOUNDER_DEFINITION_V2,
+  FOUNDER_DEFINITION_CURRENT,
   FOUNDER_DEFINITION_V2_VERSION,
+  FOUNDER_DEFINITION_V4_VERSION,
+  FOUNDER_FINANCIAL_STEPS,
+  FOUNDER_PROFILE_SECTION_STEPS,
+  FOUNDER_PROFILE_SECTIONS,
   FOUNDER_STEPS,
   FounderRaiseContextSchema,
   FounderReviewContextSchema,
   FounderSnapshotContextSchema,
+  instrumentLabel,
   RAISING_ACTIVE_OPTIONS,
   type FounderSnapshotContext,
 } from "@capital-q/founder-onboarding/definition";
@@ -23,6 +28,7 @@ import {
   type Submission,
 } from "../../onboarding-kit/runtime-port";
 import type { SnapshotSection } from "@capital-q/ui/intelligence-snapshot";
+import { formatAmountForDisplay } from "@capital-q/ui/money-input";
 
 import type {
   FounderOnboardingSessionView,
@@ -65,7 +71,15 @@ export type GroupId =
   | "traction"
   | "capital_objective"
   | "follow_up"
-  | "snapshot";
+  | "snapshot"
+  /** A founder profile section of its own (definition v6, phase F9). */
+  | `profile:${string}`
+  /**
+   * A step this build has no screen for (a later definition): drawn as a
+   * question and a text field, never a reason to refuse the whole setup
+   * (live 2026-10-16: v6 took founder setup down on the web).
+   */
+  | `step:${string}`;
 
 export type Group = {
   readonly id: GroupId;
@@ -79,6 +93,7 @@ export type Group = {
 export { SubmissionPlanError, type Submission };
 
 const S = FOUNDER_STEPS;
+const F = FOUNDER_FINANCIAL_STEPS;
 
 const SNAPSHOT_GROUP: Group = {
   id: "snapshot",
@@ -156,7 +171,22 @@ export const GROUPS: readonly Group[] = [
     kind: "traction",
     section: "business",
     title: "Business and traction",
-    stepKeys: [S.signal, S.pilots, S.revenueStatus, S.customers, S.growth],
+    // v4 adds the optional financials block after the traction questions;
+    // in a v2/v3 session those steps are never eligible, so never shown.
+    stepKeys: [
+      S.signal,
+      S.pilots,
+      S.revenueStatus,
+      S.customers,
+      S.growth,
+      F.currency,
+      F.monthlyRevenue,
+      F.revenueTrend,
+      F.grossMargin,
+      F.monthlyBurn,
+      F.cash,
+      F.runway,
+    ],
   },
   {
     id: "capital_objective",
@@ -170,9 +200,23 @@ export const GROUPS: readonly Group[] = [
       S.instrument,
       S.timeframe,
       S.useOfFunds,
+      F.minCheque,
       S.raiseConfirm,
     ],
   },
+  // Founder v6: one optional text section per profile section (F9).
+  ...FOUNDER_PROFILE_SECTION_STEPS.map(
+    (step): Group => ({
+      id: `profile:${step.stepKey}`,
+      kind: "narrative",
+      section: "business",
+      title:
+        FOUNDER_PROFILE_SECTIONS.find((section) =>
+          section.stepKeys.includes(step.stepKey),
+        )?.title ?? step.configuration.prompt,
+      stepKeys: [step.stepKey],
+    }),
+  ),
   {
     id: "follow_up",
     kind: "narrative",
@@ -197,15 +241,18 @@ const GROUP_BY_ID = new Map(GROUPS.map((group) => [group.id, group]));
 const STEP_CONFIG = new Map(
   // v2 is the published journey. Every step v2 did not replace carries v1's
   // configuration verbatim, so reading from v2 changes nothing but F2.
-  FOUNDER_DEFINITION_V2.steps.map((step) => [step.stepKey, step]),
+  FOUNDER_DEFINITION_CURRENT.steps.map((step) => [step.stepKey, step]),
 );
 
 export function groupOf(stepKey: string): Group | undefined {
-  return GROUP_BY_STEP.get(stepKey);
+  return GROUP_BY_STEP.get(stepKey) ?? fallbackGroup(stepKey);
 }
 
 export function groupById(id: string): Group | undefined {
-  return GROUP_BY_ID.get(id as GroupId);
+  return (
+    GROUP_BY_ID.get(id as GroupId) ??
+    (id.startsWith("step:") ? fallbackGroup(id.slice(5)) : undefined)
+  );
 }
 
 function config(stepKey: string) {
@@ -214,6 +261,17 @@ function config(stepKey: string) {
     throw new Error(`unknown founder step ${stepKey}`);
   }
   return step;
+}
+
+/** A step this build does not know: its question and a text field. */
+function fallbackGroup(stepKey: string): Group {
+  return {
+    id: `step:${stepKey}`,
+    kind: "narrative",
+    section: "review",
+    title: STEP_CONFIG.get(stepKey)?.configuration.prompt ?? "One more question",
+    stepKeys: [stepKey],
+  };
 }
 
 export function optionsOf(stepKey: string): readonly ChoiceOption[] {
@@ -279,14 +337,22 @@ function renderValue(
   }
 }
 
-export function describeSuggestion(
-  suggestion: {
-    readonly id: string;
-    readonly stepKey: string;
-    readonly suggestedValue: OnboardingResponseValue;
-    readonly confidence: string | null;
-  },
-): FounderSuggestionView | null {
+/** Q's pending website suggestion, as a step field, when there is one. */
+function suggestedWebsiteOf(suggestions: readonly FounderSuggestionView[]): {
+  readonly suggestedWebsite?: string;
+} {
+  const found = suggestions.find(
+    (suggestion) => suggestion.stepKey === S.website,
+  );
+  return found === undefined ? {} : { suggestedWebsite: found.value };
+}
+
+export function describeSuggestion(suggestion: {
+  readonly id: string;
+  readonly stepKey: string;
+  readonly suggestedValue: OnboardingResponseValue;
+  readonly confidence: string | null;
+}): FounderSuggestionView | null {
   const group = GROUPS.find((candidate) =>
     candidate.stepKeys.includes(suggestion.stepKey),
   );
@@ -306,6 +372,7 @@ export function describeSuggestion(
     // nothing safe to show yet; provenance stays on the server (§12).
     source: undefined,
     confidence: suggestion.confidence ?? undefined,
+    stepKey: suggestion.stepKey,
   };
 }
 
@@ -330,10 +397,18 @@ export function runtimeState(view: OnboardingSessionView): RuntimeState {
 }
 
 export function isSupportedVersion(view: OnboardingSessionView): boolean {
-  // v2 only. A session pinned to v1 still runs v1's journey on the server;
-  // this screen would render its F2 as an upload it never collected, so it
-  // says plainly that it cannot render rather than misrepresenting it (§82).
-  return view.session.definitionVersion === FOUNDER_DEFINITION_V2_VERSION;
+  // Decided by what the session asks, not by a list of version numbers:
+  // v2 onward, as long as every step on its path is one this screen draws.
+  // A session pinned to v1 still runs v1's journey on the server; this
+  // screen would render its F2 as an upload it never collected, so it says
+  // plainly that it cannot render rather than misrepresenting it (§82).
+  // Live 2026-10-01 (v3) and again 2026-10-15 (v4, published 2026-10-07):
+  // a hard-coded version list refused every new founder until it was edited.
+  // A later version that only adds options (v5: Gulf countries) renders as
+  // is; one that adds a step this build does not know is refused honestly.
+  // A step this build has no screen for is drawn as a question and a text
+  // field (fallbackGroup): it never refuses the setup (live 2026-10-16).
+  return view.session.definitionVersion >= FOUNDER_DEFINITION_V2_VERSION;
 }
 
 function single(state: RuntimeState, key: string): string | undefined {
@@ -362,7 +437,7 @@ function refs(state: RuntimeState, key: string): string[] | undefined {
 /** The screen the session is on: by current step, or the snapshot once complete. */
 export function currentGroup(view: OnboardingSessionView): Group {
   const key = view.session.currentStepKey;
-  const group = key === null ? undefined : GROUP_BY_STEP.get(key);
+  const group = key === null ? undefined : groupOf(key);
   return group ?? SNAPSHOT_GROUP;
 }
 
@@ -407,6 +482,12 @@ function skippedGroup(group: Group, state: RuntimeState): boolean {
 export type PresentationExtras = {
   /** Labels for taxonomy node ids the founder already selected. */
   readonly selectedTaxonomy?: readonly TaxonomyCandidateView[] | undefined;
+  /**
+   * Labels for every taxonomy id a pending suggestion or a recorded answer
+   * mentions, whichever screen is current, so the Q-led interview shows
+   * categories as words and never as ids (CQ-Q-VOICE-001 B §19).
+   */
+  readonly suggestedTaxonomy?: readonly TaxonomyCandidateView[] | undefined;
   /**
    * The documents this company has, with their REAL processing state
    * (CQ-Q-021 §14, §16). Read from the Evidence API on every load, so a
@@ -465,7 +546,10 @@ export function toPresentation(
   const state = runtimeState(view);
   const current = currentGroup(view);
   const complete = view.session.status !== "ACTIVE";
-  const steps: StepSummary[] = GROUPS.flatMap((group) => {
+  const unknown = view.progress.eligibleSteps
+    .filter((step) => !GROUP_BY_STEP.has(step.stepKey))
+    .map((step) => fallbackGroup(step.stepKey));
+  const steps: StepSummary[] = [...GROUPS, ...unknown].flatMap((group) => {
     const status = groupStatus(group, state, current);
     return status === null
       ? []
@@ -485,6 +569,7 @@ export function toPresentation(
     sections: [...SECTIONS],
     steps,
     currentStepId: current.id,
+    questions: view.pendingQuestions ?? [],
     step: complete
       ? undefined
       : buildStep(current, state, {
@@ -496,6 +581,12 @@ export function toPresentation(
             : {}),
         }),
     source,
+    labels: Object.fromEntries(
+      [
+        ...(extras.suggestedTaxonomy ?? []),
+        ...(extras.selectedTaxonomy ?? []),
+      ].map((node) => [node.nodeId, node.label]),
+    ),
   };
 }
 
@@ -515,6 +606,38 @@ function base<TKind extends StepKind>(
     help: configuration.supportingText,
     optional: !required,
     skipped: skippedGroup(group, state),
+  };
+}
+
+/**
+ * A profile section, or a step this build has no screen for: its question
+ * and a text field. The runtime takes their words for any question
+ * (always-save), so nothing here depends on knowing the step's type.
+ */
+function ownWordsStep(group: Group, state: RuntimeState): StepView {
+  const key = group.stepKeys[0];
+  const known = STEP_CONFIG.get(key);
+  const live =
+    state.view.currentStep?.stepKey === key ? state.view.currentStep : null;
+  const eligible = state.view.progress.eligibleSteps.find(
+    (step) => step.stepKey === key,
+  );
+  const value = text(state, key);
+  return {
+    id: group.id,
+    kind: "narrative",
+    section: group.section,
+    title: group.title,
+    prompt: known?.configuration.prompt ?? live?.prompt ?? group.title,
+    help: known?.configuration.supportingText,
+    optional: !(known?.required ?? eligible?.required ?? false),
+    skipped: skippedGroup(group, state),
+    maxLength:
+      known?.configuration.stepType === "long_text"
+        ? known.configuration.maxLength
+        : 2000,
+    voiceEnabled: false,
+    response: value === undefined ? undefined : { kind: "narrative", text: value },
   };
 }
 
@@ -542,6 +665,9 @@ function buildStep(
       return {
         ...base(group, "company_basics", state),
         countries: optionsOf(S.country),
+        ...(website === undefined
+          ? suggestedWebsiteOf(extras.suggestions ?? [])
+          : {}),
         response:
           name === undefined
             ? undefined
@@ -569,6 +695,15 @@ function buildStep(
           ? {
               privacyNote:
                 "Private to you. Investors never see this and it changes nothing about your company profile.",
+              // What Q still wants to ask, from the session itself. Every
+              // question names a real step; the screen that owns that step
+              // is where a plain answer goes.
+              questions: (state.view.pendingQuestions ?? []).map(
+                (question) => ({
+                  ...question,
+                  editStepId: GROUP_BY_STEP.get(question.stepKey)?.id,
+                }),
+              ),
             }
           : {}),
         response:
@@ -649,6 +784,8 @@ function buildStep(
       return buildCapitalObjective(group, state, context);
     case "snapshot":
       return buildSnapshot(group, state, context, extras.companyId);
+    default:
+      return ownWordsStep(group, state);
   }
 }
 
@@ -758,9 +895,14 @@ function buildCapitalObjective(
   const instrument = single(state, S.instrument);
   const timeframe = single(state, S.timeframe);
   const useOfFunds = multi(state, S.useOfFunds);
+  const minCheque = range(state, F.minCheque);
   return {
     ...base(group, "capital_objective", state),
-    help: "The raise is its own object, separate from the company profile. You can recalibrate it any time.",
+    // Introduced in v4 and kept by every later version (a floor, not a list).
+    asksMinCheque:
+      state.eligible.has(F.minCheque) ||
+      state.view.session.definitionVersion >= FOUNDER_DEFINITION_V4_VERSION,
+    help: "Your raise is kept separate from your company profile. You can change it any time.",
     raisingOptions: optionsOf(S.raising),
     instrumentOptions: optionsOf(S.instrument),
     timeframeOptions: optionsOf(S.timeframe),
@@ -788,6 +930,7 @@ function buildCapitalObjective(
             ...(instrument === undefined ? {} : { instrument }),
             ...(timeframe === undefined ? {} : { timeframe }),
             ...(useOfFunds === undefined ? {} : { useOfFunds }),
+            ...(minCheque === undefined ? {} : { minCheque }),
           },
   };
 }
@@ -797,7 +940,7 @@ const MISSING_COPY: Readonly<Record<string, string>> = {
   categories: "Confirm the categories investors would find you under.",
   stage: "Set the company's stage.",
   materials:
-    "Note which materials you have; uploads arrive in a later release.",
+    "Add a deck or a memo so Q can read it; a founder without one is not turned away.",
   founder_count: "Complete the founding team facts.",
   team_size: "Add today's team size.",
   capital_objective: "Define your raise when you're ready.",
@@ -932,12 +1075,19 @@ function snapshotSections(snapshot: FounderSnapshotContext): SnapshotSection[] {
       items:
         raise.status === "active"
           ? [
-              ...item("target", `Raising ${raise.currency} ${raise.amount}`),
+              // Display grouping only; the stored amount stays the exact string.
+              ...item(
+                "target",
+                `Raising ${raise.currency} ${formatAmountForDisplay(raise.amount)}`,
+              ),
               ...item(
                 "instrument",
                 raise.instrumentCode === null
                   ? undefined
-                  : `Instrument: ${raise.instrumentCode}`,
+                  : `Instrument: ${
+                      instrumentLabel(raise.instrumentCode) ??
+                      raise.instrumentCode.replace(/_/g, " ")
+                    }`,
               ),
               ...item("use", raise.useOfFundsSummary ?? undefined),
             ]
@@ -948,7 +1098,7 @@ function snapshotSections(snapshot: FounderSnapshotContext): SnapshotSection[] {
       title: "Materials you have",
       items:
         snapshot.materials === null || snapshot.materials.length === 0
-          ? item("none", "None declared yet")
+          ? item("none", "None added yet")
           : snapshot.materials.map((m) => ({
               id: m.key,
               text: m.label,
@@ -1098,6 +1248,10 @@ export function planSubmissions(
         selectOrSkip(S.instrument, response.instrument),
         selectOrSkip(S.timeframe, response.timeframe),
         multiOrSkip(S.useOfFunds, response.useOfFunds),
+        // Not eligible in a v2/v3 session: the executor passes over it.
+        response.minCheque === undefined
+          ? skip(F.minCheque)
+          : submit(F.minCheque, { type: "RANGE", value: response.minCheque }),
         submit(S.raiseConfirm, { type: "CONFIRMATION", confirmed: true }),
       ];
     }

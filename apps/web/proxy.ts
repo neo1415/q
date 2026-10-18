@@ -13,11 +13,39 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // Exactly the root: who sees the landing (src/auth/landing-route.ts).
+    "/",
     "/home/:path*",
+    "/welcome/:path*",
     "/discover/:path*",
     "/capital/:path*",
+    "/company/:path*",
+    "/pitch/:path*",
+    "/investors/:path*",
+    "/find/:path*",
+    "/search/:path*",
+    "/explore/:path*",
+    "/verification/:path*",
     "/profile/:path*",
     "/onboarding/:path*",
+    "/relationships/:path*",
+    "/crm/:path*",
+    "/q-pitch/:path*",
+    "/settings/:path*",
+    // G1/G2: an invitation's link.
+    "/join/:path*",
+    // AUTO (ADR 0030): Q's work.
+    "/work/:path*",
+    // DAILY: The Q Daily reader.
+    "/daily/:path*",
+    "/gateway/:path*",
+    "/gateq/:path*",
+    "/rehearsals/:path*",
+    "/results/:path*",
+    "/reviews/:path*",
+    "/documents/:path*",
+    "/admin/:path*",
+    "/paused/:path*",
     "/auth/:path*",
   ],
 };

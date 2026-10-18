@@ -30,6 +30,7 @@ import { createPostgresActorContextResolver } from "@capital-q/security/postgres
 import { ONBOARDING_EVENTS } from "../src/events/index.js";
 import {
   createCompanyOnboardingSubjectResolver,
+  createOnboardingQRecommendations,
   createOnboardingService,
   OnboardingDefinitionConflictError,
   OnboardingDefinitionInvalidError,
@@ -42,6 +43,10 @@ import {
   type OnboardingService,
   type OnboardingSessionId,
   type OnboardingWriteTargetHandler,
+  type InterviewCues,
+  type OnboardingTaxonomyResolver,
+  type OnboardingRuntimeDependencies,
+  type UtteranceMove,
 } from "../src/index.js";
 import {
   SYNTHETIC_FOUNDER_MANIFEST,
@@ -101,6 +106,9 @@ type World = {
   readonly companyC: string;
   readonly build: (options?: {
     readonly writeTargets?: readonly OnboardingWriteTargetHandler[];
+    readonly interviewCues?: InterviewCues;
+    readonly taxonomy?: OnboardingTaxonomyResolver;
+    readonly moveReader?: OnboardingRuntimeDependencies["moveReader"];
   }) => OnboardingService;
 };
 
@@ -256,12 +264,18 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
     const build = (
       options: {
         readonly writeTargets?: readonly OnboardingWriteTargetHandler[];
+        readonly interviewCues?: InterviewCues;
+        readonly taxonomy?: OnboardingTaxonomyResolver;
+        readonly moveReader?: OnboardingRuntimeDependencies["moveReader"];
       } = {},
     ) =>
       createOnboardingService({
         sql: tx.sql,
         transactions: nestedTransactions(tx),
         outbox: createOutboxWriter({ registry }),
+        interviewCues: options.interviewCues,
+        taxonomy: options.taxonomy,
+        moveReader: options.moveReader,
         subjectResolvers: [
           createCompanyOnboardingSubjectResolver(
             createPostgresCompanyQueryPort({ sql: tx.sql }),
@@ -549,17 +563,36 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
       await expect(
         submit(world, adminA, id, "intent", select("maybe"), 1),
       ).rejects.toBeInstanceOf(ContractValidationError);
+      // Their own words for a choice are kept, like "Other" with text
+      // (owner 2026-10-16, always save); that opens no branch.
+      const own = await submit(world, adminA, id, "intent", text("raising"), 1);
+      expect(own.responses.find((r) => r.stepKey === "intent")?.value).toEqual({
+        type: "TEXT",
+        text: "raising",
+      });
+      const current = own.session.version;
+      // Out of path and unknown steps are still refused, whatever is sent.
       await expect(
-        submit(world, adminA, id, "intent", text("raising"), 1),
-      ).rejects.toBeInstanceOf(ContractValidationError);
-      await expect(
-        submit(world, adminA, id, "raise_amount", range("5"), 1),
+        submit(world, adminA, id, "raise_amount", range("5"), current),
       ).rejects.toMatchObject({ reason: "STEP_NOT_ELIGIBLE" });
       await expect(
-        submit(world, adminA, id, "ghost", select("x"), 1),
+        submit(
+          world,
+          adminA,
+          id,
+          "raise_amount",
+          text("five million"),
+          current,
+        ),
       ).rejects.toMatchObject({ reason: "STEP_NOT_ELIGIBLE" });
       await expect(
-        submit(world, adminA, id, "intent", select("raising_now"), 2),
+        submit(world, adminA, id, "ghost", select("x"), current),
+      ).rejects.toMatchObject({ reason: "STEP_NOT_ELIGIBLE" });
+      await expect(
+        submit(world, adminA, id, "ghost", text("anything"), current),
+      ).rejects.toMatchObject({ reason: "STEP_NOT_ELIGIBLE" });
+      await expect(
+        submit(world, adminA, id, "intent", select("raising_now"), 1),
       ).rejects.toBeInstanceOf(OnboardingSessionVersionConflictError);
     });
   });
@@ -663,6 +696,229 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
       ).toBe(1);
       // The old raise answer still exists but is invisible to progress.
       expect(v.progress.eligibleStepCount).toBe(6);
+    });
+  });
+
+  it("the conversational interview places what a person says through the same paths, or records it for Q (CQ-PRE-REC-001 §16-§21)", async () => {
+    await withWorld(async (world) => {
+      const { adminA } = world;
+      // edc28e38 (founder brief J7, "no fixed phrase lists"): conversational
+      // moves are read by meaning through the Model Gateway
+      // (ONBOARDING_MOVE_READER), injected as `moveReader`. Tests make no
+      // model calls, so this stand-in returns what that reader returns for
+      // these replies; the reader's own prompt is covered in
+      // packages/model-gateway/test/words-readers.test.ts. Everything the
+      // reader does not mark as a move must still be placed or read as before.
+      const readings = new Map<string, UtteranceMove>([
+        ["Why do you need this?", "WHY"],
+        ["come back to this later", "SKIP"],
+      ]);
+      const service = world.build({
+        moveReader: ({ utterance }) =>
+          Promise.resolve(readings.get(utterance) ?? "NONE"),
+      });
+      const { view } = await start(world, adminA);
+      const id = view.session.id;
+
+      // With no reader (or a failing one) a move is never guessed from
+      // fixed phrases: nothing is written and nothing is skipped.
+      const unread = await world.service.runtime.say({
+        actor: adminA,
+        sessionId: id as OnboardingSessionId,
+        text: "come back to this later",
+        expectedSessionVersion: 1,
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      expect(unread.understood.kind).not.toBe("SKIP");
+      expect(unread.view.session.version).toBe(1);
+      expect(unread.view.session.currentStepKey).toBe("intent");
+
+      const say = (text: string, version: number, key = randomUUID()) =>
+        service.runtime.say({
+          actor: adminA,
+          sessionId: id as OnboardingSessionId,
+          text,
+          expectedSessionVersion: version,
+          idempotencyKey: key,
+          correlationId: CORRELATION(),
+        });
+
+      // A move the interview owns: nothing is written.
+      const why = await say("Why do you need this?", 1);
+      expect(why.understood.kind).toBe("WHY");
+      expect(why.view.session.version).toBe(1);
+
+      // A required step cannot be talked past.
+      const later = await say("come back to this later", 1);
+      expect(later.understood).toMatchObject({
+        kind: "REQUIRED",
+        stepKey: "intent",
+      });
+
+      // An option named in plain words is the answer, through submitResponse.
+      const answered = await say("just exploring, really", 1);
+      expect(answered.understood).toEqual({
+        kind: "ANSWERED",
+        stepKey: "intent",
+        summary: "Just exploring",
+      });
+      expect(answered.view.session.version).toBe(2);
+      expect(answered.view.session.currentStepKey).toBe("sectors");
+
+      // Prose no rule can place is recorded for Q's reading, not guessed.
+      const reading = await say(
+        "We build underwriting tools for regional banks and some clinics use us too",
+        2,
+      );
+      expect(reading.understood.kind).toBe("READING");
+      // Recorded once, announced once, and the session itself unchanged.
+      expect(reading.view.session.version).toBe(2);
+      const utterances = await world.tx.sql`
+        select status, step_key from onboarding.utterances where session_id = ${id}`;
+      expect(utterances).toEqual([{ status: "PENDING", step_key: "sectors" }]);
+      expect(
+        await count(world.tx.sql`
+          select count(*)::int as count from events.outbox
+           where event_type = 'onboarding.utterance.recorded'
+             and payload->'data'->>'sessionId' = ${id}`),
+      ).toBe(1);
+      // The outbox carries identifiers only, never the words.
+      const [payload] = await world.tx.sql`
+        select payload::text as body from events.outbox
+         where event_type = 'onboarding.utterance.recorded'
+             and payload->'data'->>'sessionId' = ${id}`;
+      expect(String(payload?.["body"])).not.toContain("underwriting");
+
+      // The same key replays the same reading without a second row.
+      const key = randomUUID();
+      const first = await say(
+        "Also we have a waitlist of three hundred",
+        2,
+        key,
+      );
+      const replay = await say(
+        "Also we have a waitlist of three hundred",
+        2,
+        key,
+      );
+      expect(first.understood.kind).toBe("READING");
+      expect(replay.understood.kind).toBe("READING");
+      expect(
+        await count(world.tx.sql`
+          select count(*)::int as count from onboarding.utterances where session_id = ${id}`),
+      ).toBe(2);
+
+      // A rich sentence that names an option is placed AND read: the option
+      // lands through submitResponse and the sentence is recorded for Q (§44).
+      const rich = await say(
+        "Mostly fintech, and we write cheques of about two million dollars",
+        2,
+      );
+      expect(rich.understood).toMatchObject({
+        kind: "ANSWERED",
+        stepKey: "sectors",
+        summary: "Fintech",
+      });
+      expect(
+        rich.understood.kind === "ANSWERED" && rich.understood.utteranceId,
+      ).toBeTruthy();
+      expect(rich.view.session.version).toBe(3);
+      expect(
+        await count(world.tx.sql`
+          select count(*)::int as count from onboarding.utterances where session_id = ${id}`),
+      ).toBe(3);
+      expect(
+        await count(world.tx.sql`
+          select count(*)::int as count from events.outbox
+           where event_type = 'onboarding.utterance.recorded'
+             and payload->'data'->>'sessionId' = ${id}`),
+      ).toBe(3);
+    });
+  });
+
+  it("one sentence answers many questions: the asked step is placed, the others become proposals, and a correction supersedes (CQ-Q-VOICE-001 A §8-§9, §14)", async () => {
+    await withWorld(async (world) => {
+      const { adminA } = world;
+      const service = world.build({
+        interviewCues: {
+          raise_amount: { kind: "FIGURE", cues: ["raise", "raising"] },
+        },
+      });
+      const { view } = await start(world, adminA);
+      const id = view.session.id;
+      const say = (text: string, version: number) =>
+        service.runtime.say({
+          actor: adminA,
+          sessionId: id as OnboardingSessionId,
+          text,
+          expectedSessionVersion: version,
+          idempotencyKey: randomUUID(),
+          correlationId: CORRELATION(),
+        });
+
+      // Q asked about intent; the sentence also names sectors and a raise.
+      const first = await say(
+        "We're raising now — mostly fintech and health — and looking to raise about $2m",
+        1,
+      );
+      expect(first.understood).toMatchObject({
+        kind: "ANSWERED",
+        stepKey: "intent",
+        summary: "I'm raising now",
+        proposed: 2,
+      });
+      const proposals = first.view.pendingSuggestions.map((s) => ({
+        stepKey: s.stepKey,
+        value: s.suggestedValue,
+      }));
+      expect(proposals).toContainEqual({
+        stepKey: "sectors",
+        value: { type: "MULTI_SELECT", optionKeys: ["fintech", "health"] },
+      });
+      expect(proposals).toContainEqual({
+        stepKey: "raise_amount",
+        value: { type: "RANGE", value: "2000000" },
+      });
+      // Proposals are offers: nothing was written to the steps themselves.
+      expect(
+        first.view.responses.filter((r) => r.stepKey !== "intent"),
+      ).toEqual([]);
+
+      // A correction right after the answer re-reads the words against the
+      // step just answered and supersedes it through the normal response
+      // history.
+      const corrected = await say(
+        "Actually, I meant just exploring",
+        first.view.session.version,
+      );
+      expect(corrected.understood).toMatchObject({
+        kind: "CORRECTED",
+        stepKey: "intent",
+        summary: "Just exploring",
+      });
+      const intent = corrected.view.responses.find(
+        (r) => r.stepKey === "intent",
+      );
+      expect(intent?.value).toEqual({
+        type: "SINGLE_SELECT",
+        optionKey: "exploring",
+      });
+
+      // The same sectors sentence again proposes nothing twice.
+      const again = await say(
+        "Mostly fintech and health, and looking to raise about $2m",
+        corrected.view.session.version,
+      );
+      expect(
+        again.view.pendingSuggestions.filter((s) => s.stepKey === "sectors")
+          .length,
+      ).toBeLessThanOrEqual(1);
+      expect(
+        await count(world.tx.sql`
+          select count(*)::int as count from onboarding.responses
+           where session_id = ${id} and step_key = 'intent'`),
+      ).toBe(2);
     });
   });
 
@@ -1053,6 +1309,283 @@ describe("@capital-q/onboarding against local PostgreSQL", () => {
   // -------------------------------------------------------------------------
   // Suggestions
   // -------------------------------------------------------------------------
+
+  it("several answers commit in one transaction: order-independent, refusals reported, one idempotency record (lane ob1 latency)", async () => {
+    await withWorld(async (world) => {
+      const { service, adminA } = world;
+      const { view } = await start(world, adminA);
+      const id = view.session.id as OnboardingSessionId;
+      const key = randomUUID();
+      const batch = {
+        actor: adminA,
+        sessionId: id,
+        // The amount is only on the path once the intent is in: said
+        // first, it lands on the second pass.
+        responses: [
+          { stepKey: "raise_amount", response: range("5000000") },
+          { stepKey: "intent", response: select("raising_now") },
+          { stepKey: "ghost", response: select("x") },
+        ],
+        expectedSessionVersion: 1,
+        idempotencyKey: key,
+        correlationId: CORRELATION(),
+      };
+      const out = await service.runtime.submitResponses(batch);
+      expect(out.results.map((r) => r.outcome)).toEqual([
+        "COMMITTED",
+        "COMMITTED",
+        "REFUSED",
+      ]);
+      const refusedItem = out.results[2];
+      expect(
+        refusedItem?.outcome === "REFUSED" ? refusedItem.refusal.detail : null,
+      ).toContain("STEP_NOT_ELIGIBLE");
+      expect(out.view.responses.map((r) => r.stepKey).sort()).toEqual([
+        "intent",
+        "raise_amount",
+      ]);
+      expect(out.view.session.version).toBe(3);
+      // The same request again is a replay, not two more commits.
+      const again = await service.runtime.submitResponses(batch);
+      expect(again.view.session.version).toBe(3);
+      // The same key on a different request is a conflict.
+      await expect(
+        service.runtime.submitResponses({
+          ...batch,
+          responses: [{ stepKey: "intent", response: select("exploring") }],
+        }),
+      ).rejects.toBeInstanceOf(OnboardingMutationConflictError);
+    });
+  });
+
+  it("a deferred canonical update runs once per batch; refused, the batch replays answer by answer (owner 2026-10-17)", async () => {
+    await withWorld(async (world) => {
+      const { adminA, build } = world;
+      const runs: string[] = [];
+      let refuseDeferred = false;
+      const coalescing = build({
+        writeTargets: [
+          {
+            targetKey: TEST_WRITE_TARGET,
+            apply: (context, response) => {
+              if (context.defer === undefined) {
+                runs.push(`now:${response.stepKey}`);
+                return Promise.resolve();
+              }
+              context.defer(TEST_WRITE_TARGET, () => {
+                runs.push("deferred");
+                if (refuseDeferred) {
+                  return Promise.reject(
+                    new ContractValidationError("refused together", [
+                      { path: "value", code: "x", message: "refused" },
+                    ]),
+                  );
+                }
+                return Promise.resolve();
+              });
+              return Promise.resolve();
+            },
+          },
+        ],
+      });
+      const { view } = await coalescing.runtime.startSession({
+        actor: adminA,
+        journeyType: "external_investor_conversion",
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      const id = view.session.id as OnboardingSessionId;
+      const out = await coalescing.runtime.submitResponses({
+        actor: adminA,
+        sessionId: id,
+        // "name" is the step that writes the canonical target here.
+        responses: [
+          { stepKey: "intent", response: select("raising_now") },
+          { stepKey: "name", response: text("Alpha Rails") },
+        ],
+        expectedSessionVersion: 1,
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      expect(out.results.map((r) => r.outcome)).toEqual([
+        "COMMITTED",
+        "COMMITTED",
+      ]);
+      // Handed to the batch's end and run there once; never written as
+      // the answer committed.
+      expect(runs).toEqual(["deferred"]);
+
+      runs.length = 0;
+      refuseDeferred = true;
+      const again = await coalescing.runtime.submitResponses({
+        actor: adminA,
+        sessionId: id,
+        responses: [{ stepKey: "name", response: text("Beta Rails") }],
+        expectedSessionVersion: out.view.session.version,
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      // Refused together: replayed answer by answer, each writing as it
+      // commits, and each reporting its own outcome.
+      expect(runs).toEqual(["deferred", "now:name"]);
+      expect(again.results.map((r) => r.outcome)).toEqual(["COMMITTED"]);
+    });
+  });
+
+  it("a rejected proposal is discarded for good: never offered again, by Q or a document re-read (lane ob1)", async () => {
+    await withWorld(async (world) => {
+      const { tx, service, adminA } = world;
+      const { view } = await start(world, adminA);
+      const id = view.session.id as OnboardingSessionId;
+      await submit(world, adminA, id, "intent", select("exploring"), 1);
+      const recommendations = createOnboardingQRecommendations({
+        transactions: nestedTransactions(tx),
+      });
+      const found = await recommendations.recommend({
+        userId: adminA.userId,
+        sessionId: id,
+        stepKey: "sectors",
+        value: { type: "MULTI_SELECT", optionKeys: ["health"] },
+        rationale: "Found on a public page.",
+        runId: null,
+        sources: [
+          { sourceType: "PUBLIC_WEB", url: "https://example.test/about" },
+        ],
+      });
+      const v = await service.runtime.getSession({
+        actor: adminA,
+        sessionId: id,
+      });
+      await service.runtime.resolveSuggestion({
+        actor: adminA,
+        sessionId: id,
+        suggestionId: found.id,
+        resolution: "REJECT",
+        expectedSessionVersion: v.session.version,
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      await expect(
+        recommendations.recommend({
+          userId: adminA.userId,
+          sessionId: id,
+          stepKey: "sectors",
+          value: { type: "MULTI_SELECT", optionKeys: ["health"] },
+          rationale: "Found it again.",
+          runId: null,
+        }),
+      ).rejects.toMatchObject({ reason: "SUGGESTION_REJECTED_BEFORE" });
+      await expect(
+        service.internal.createSuggestion({
+          sessionId: id,
+          stepKey: "sectors",
+          targetField: "sectors",
+          suggestedValue: { type: "MULTI_SELECT", optionKeys: ["health"] },
+        }),
+      ).rejects.toMatchObject({ reason: "SUGGESTION_REJECTED_BEFORE" });
+      // A different value is still offerable.
+      await expect(
+        recommendations.recommend({
+          userId: adminA.userId,
+          sessionId: id,
+          stepKey: "sectors",
+          value: { type: "MULTI_SELECT", optionKeys: ["fintech"] },
+          rationale: "Payments fit.",
+          runId: null,
+        }),
+      ).resolves.toMatchObject({ stepKey: "sectors" });
+    });
+  });
+
+  it("Q's recommendations survive a restart and an approval writes exactly the recommended payload (CQ-QX-008 P0-2)", async () => {
+    await withWorld(async (world) => {
+      const { tx, service, adminA, adminC } = world;
+      const { view } = await start(world, adminA);
+      const id = view.session.id as OnboardingSessionId;
+      await submit(world, adminA, id, "intent", select("exploring"), 1);
+      const transactions = nestedTransactions(tx);
+      const first = await createOnboardingQRecommendations({
+        transactions,
+      }).recommend({
+        userId: adminA.userId,
+        sessionId: id,
+        stepKey: "sectors",
+        value: { type: "MULTI_SELECT", optionKeys: ["health"] },
+        rationale: "Health fits what you described.",
+        runId: null,
+      });
+      // A new port is a restart: the recommendation is still there, bound
+      // to the same payload.
+      const restarted = createOnboardingQRecommendations({ transactions });
+      const second = await restarted.recommend({
+        userId: adminA.userId,
+        sessionId: id,
+        stepKey: "sectors",
+        value: { type: "MULTI_SELECT", optionKeys: ["fintech"] },
+        rationale: "Payments fit better.",
+        runId: null,
+      });
+      const pending = await createOnboardingQRecommendations({
+        transactions,
+      }).pending({ userId: adminA.userId, sessionId: id });
+      expect(pending).toEqual([
+        {
+          id: second.id,
+          stepKey: "sectors",
+          value: { type: "MULTI_SELECT", optionKeys: ["fintech"] },
+          rationale: "Payments fit better.",
+          // No public source was cited for this recommendation.
+          sources: [],
+          payloadSha256: second.payloadSha256,
+        },
+      ]);
+      expect(second.payloadSha256).not.toBe(first.payloadSha256);
+      const [superseded] = await tx.sql<{ status: string }[]>`
+        select status from onboarding.suggestions where id = ${first.id}`;
+      expect(superseded?.status).toBe("EXPIRED");
+
+      // Someone else can neither see nor make one on this session.
+      await expect(
+        restarted.pending({ userId: adminC.userId, sessionId: id }),
+      ).rejects.toBeInstanceOf(OnboardingSessionNotFoundError);
+      await expect(
+        restarted.recommend({
+          userId: adminC.userId,
+          sessionId: id,
+          stepKey: "sectors",
+          value: { type: "MULTI_SELECT", optionKeys: ["fintech"] },
+          rationale: "x",
+          runId: null,
+        }),
+      ).rejects.toBeInstanceOf(OnboardingSessionNotFoundError);
+
+      // Approval: the stored payload, exactly, becomes the answer.
+      const v = await service.runtime.getSession({
+        actor: adminA,
+        sessionId: id,
+      });
+      await service.runtime.resolveSuggestion({
+        actor: adminA,
+        sessionId: id,
+        suggestionId: second.id,
+        resolution: "ACCEPT",
+        expectedSessionVersion: v.session.version,
+        idempotencyKey: randomUUID(),
+        correlationId: CORRELATION(),
+      });
+      const [answer] = await tx.sql<
+        { source_modality: string; response_jsonb: unknown }[]
+      >`select source_modality, response_jsonb from onboarding.responses
+         where session_id = ${id} and step_key = 'sectors' and superseded_by_response_id is null`;
+      expect(answer).toEqual({
+        source_modality: "SUGGESTION_ACCEPT",
+        response_jsonb: { type: "MULTI_SELECT", optionKeys: ["fintech"] },
+      });
+      expect(
+        await restarted.pending({ userId: adminA.userId, sessionId: id }),
+      ).toEqual([]);
+    });
+  });
 
   it("suggestions are proposals: accept, edit, reject, expire, never twice (§117-121, §225-228, §236)", async () => {
     await withWorld(async (world) => {

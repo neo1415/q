@@ -1,0 +1,332 @@
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+  onRequestHookHandler,
+} from "fastify";
+
+import {
+  parseContract,
+  Q_VOICE_LIVE_TRIAL_SPENT,
+  type QLanguagePreference,
+} from "@capital-q/contracts";
+import { effectiveLocale } from "@capital-q/q-core";
+
+import { getActorContext } from "../../security/actor-context.js";
+import type { VoiceSessionBinding } from "../bindings.js";
+import { createAvailabilityCache } from "./availability-cache.js";
+import type { LiveBroker } from "./broker.js";
+import {
+  LiveDelegationRequestSchema,
+  LiveDelegationResultSchema,
+  LiveEndSchema,
+  LiveOpenRequestSchema,
+  LiveOpenResultSchema,
+  LiveTranscriptReportSchema,
+  LiveTranscriptResultSchema,
+  LiveUsageReportSchema,
+  LiveUsageResultSchema,
+  LiveAvailabilitySchema,
+  Q_VOICE_LIVE_AVAILABLE_PATH,
+  Q_VOICE_LIVE_CANCEL_PATH,
+  Q_VOICE_LIVE_DELEGATIONS_PATH,
+  Q_VOICE_LIVE_END_PATH,
+  Q_VOICE_LIVE_TRANSCRIPT_PATH,
+  Q_VOICE_LIVE_PREVIEW_PATH,
+  Q_VOICE_LIVE_SESSIONS_PATH,
+  Q_VOICE_LIVE_USAGE_PATH,
+} from "./contracts.js";
+
+/**
+ * The GPT-Live line's routes (workstream V). Normal protected requests:
+ * the actor comes from the hook, never the body. A line (or a voice
+ * session) that is not this person's is the same 404 as one that does not
+ * exist. The SDP exchange happens here so the provider key never reaches
+ * the browser.
+ */
+
+const problem = (reply: FastifyReply, status: number, detail: string) =>
+  reply.code(status).send({
+    type: "about:blank",
+    title: status === 404 ? "Not found" : "Unavailable",
+    status,
+    detail,
+  });
+
+export function registerLiveVoiceRoutes(
+  app: FastifyInstance,
+  dependencies: {
+    readonly broker: LiveBroker;
+    readonly withContext: onRequestHookHandler;
+    /** The voice session this person was issued, by id (or null). */
+    readonly binding: (
+      request: FastifyRequest,
+      voiceSessionId: string,
+    ) => Promise<VoiceSessionBinding | null>;
+    /** A fresh binding for a call not attached to a standard session. */
+    readonly issue: (
+      request: FastifyRequest,
+      voice: "FEMALE" | "MALE",
+    ) => VoiceSessionBinding;
+    /** The issued binding is now in use: keep it past the connect window. */
+    readonly connect: (binding: VoiceSessionBinding) => void;
+    /**
+     * Who may open a live line (LiveConfig.allowedUsers): null means anyone
+     * signed in (a local deployment).
+     */
+    readonly allowedUsers: ReadonlySet<string> | null;
+    /**
+     * Names this person is likely to say (their records, their
+     * counterparts), for the voice to recognise and pronounce. A failed
+     * read costs the line its names, never the line.
+     */
+    readonly names?:
+      ((request: FastifyRequest) => Promise<readonly string[]>) | undefined;
+    /**
+     * Multilingual Q: the language this person chose for Q, which wins over
+     * the device's locale. A failed read keeps the device's.
+     */
+    readonly languageOf?:
+      ((request: FastifyRequest) => Promise<QLanguagePreference>) | undefined;
+    /** Developer preview gate (LiveConfig.preview). */
+    readonly preview: {
+      readonly enabled: boolean;
+      readonly providers: () => Readonly<Record<string, boolean>>;
+    };
+  },
+): void {
+  const { broker, withContext } = dependencies;
+  // Off a local deployment only the named people may see the preview;
+  // everyone else is told there is no such thing.
+  const allowed = (request: FastifyRequest): boolean =>
+    dependencies.allowedUsers === null ||
+    dependencies.allowedUsers.has(
+      getActorContext(request).userId.toLowerCase(),
+    );
+  // A paid line: the named people, and the trial's people (whose line the
+  // broker limits to their allowance of active speech).
+  const mayOpen = (request: FastifyRequest): boolean =>
+    allowed(request) || broker.isTrialUser(getActorContext(request).userId);
+  const params = (request: FastifyRequest) =>
+    request.params as { voiceSessionId?: string; delegationId?: string };
+
+  app.post(
+    Q_VOICE_LIVE_SESSIONS_PATH,
+    { onRequest: withContext, bodyLimit: 256 * 1024 },
+    async (request, reply) => {
+      const body = parseContract(
+        LiveOpenRequestSchema,
+        request.body ?? {},
+        "That is not a live voice offer.",
+      );
+      if (!mayOpen(request))
+        return problem(reply, 404, "No such voice session.");
+      const actor = getActorContext(request);
+      const binding =
+        body.voiceSessionId === undefined
+          ? dependencies.issue(request, body.voice ?? "FEMALE")
+          : await dependencies.binding(request, body.voiceSessionId);
+      if (
+        binding === null ||
+        binding.actor.userId !== actor.userId ||
+        binding.actor.tenantId !== actor.tenantId
+      ) {
+        return problem(reply, 404, "No such voice session.");
+      }
+      const opened = await broker.open({
+        binding,
+        sdp: body.sdp,
+        briefingOpening: body.briefingOpening,
+        firstName: body.firstName,
+        role: body.role,
+        locale: effectiveLocale(
+          await (
+            dependencies.languageOf?.(request) ?? Promise.resolve(null)
+          ).catch(() => null),
+          body.locale,
+        ),
+        names: await (
+          dependencies.names?.(request) ?? Promise.resolve([])
+        ).catch(() => []),
+      });
+      if (opened.kind === "REFUSED") {
+        request.log.info({ reason: opened.reason }, "live voice refused");
+        // The browser carries on with the standard line on any refusal.
+        // 429 when the provider is out of quota, or the person's trial is
+        // used up: the browser then skips every OpenAI line and opens the
+        // standard voice (the trial's code lets it say why).
+        if (opened.reason === "TRIAL_SPENT") {
+          return reply.code(429).send({
+            type: "about:blank",
+            title: "Unavailable",
+            status: 429,
+            detail: "Live voice unavailable: TRIAL_SPENT.",
+            code: Q_VOICE_LIVE_TRIAL_SPENT,
+          });
+        }
+        return problem(
+          reply,
+          opened.reason === "PROVIDER_QUOTA" ? 429 : 503,
+          `Live voice unavailable: ${opened.reason}.`,
+        );
+      }
+      dependencies.connect(binding);
+      return reply
+        .code(201)
+        .header("Cache-Control", "no-store")
+        .send(LiveOpenResultSchema.parse(opened.result));
+    },
+  );
+
+  app.post(
+    Q_VOICE_LIVE_DELEGATIONS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const delegation = parseContract(
+        LiveDelegationRequestSchema,
+        request.body ?? {},
+        "That is not a delegation.",
+      );
+      // Letting go of the request never cancels the run: interrupting the
+      // voice is not "cancel" (OpenAI live-delegation guide). Cancel is
+      // its own route, confirmed.
+      const result = await broker.delegate({
+        actor: getActorContext(request),
+        voiceSessionId: params(request).voiceSessionId ?? "",
+        delegation,
+      });
+      if (result === null) return problem(reply, 404, "No such voice line.");
+      return reply
+        .code(200)
+        .header("Cache-Control", "no-store")
+        .send(LiveDelegationResultSchema.parse(result));
+    },
+  );
+
+  app.post(
+    Q_VOICE_LIVE_CANCEL_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const { voiceSessionId = "", delegationId = "" } = params(request);
+      const cancelled = await broker.cancel({
+        actor: getActorContext(request),
+        voiceSessionId,
+        delegationId,
+      });
+      if (cancelled === null) return problem(reply, 404, "No such voice line.");
+      return reply
+        .code(200)
+        .header("Cache-Control", "no-store")
+        .send({ cancelled });
+    },
+  );
+
+  app.post(
+    Q_VOICE_LIVE_USAGE_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const report = parseContract(
+        LiveUsageReportSchema,
+        request.body ?? {},
+        "That usage report is not valid.",
+      );
+      const result = await broker.usage({
+        actor: getActorContext(request),
+        voiceSessionId: params(request).voiceSessionId ?? "",
+        report,
+      });
+      if (result === null) return problem(reply, 404, "No such voice line.");
+      return reply
+        .code(200)
+        .header("Cache-Control", "no-store")
+        .send(LiveUsageResultSchema.parse(result));
+    },
+  );
+
+  app.post(
+    Q_VOICE_LIVE_TRANSCRIPT_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const report = parseContract(
+        LiveTranscriptReportSchema,
+        request.body ?? {},
+        "That transcript report is not valid.",
+      );
+      const recorded = await broker.transcript({
+        actor: getActorContext(request),
+        voiceSessionId: params(request).voiceSessionId ?? "",
+        report,
+      });
+      if (recorded === null) return problem(reply, 404, "No such voice line.");
+      return reply
+        .code(200)
+        .header("Cache-Control", "no-store")
+        .send(LiveTranscriptResultSchema.parse({ recorded }));
+    },
+  );
+
+  app.post(
+    Q_VOICE_LIVE_END_PATH,
+    { onRequest: withContext },
+    (request, reply) => {
+      const body = parseContract(
+        LiveEndSchema,
+        request.body ?? {},
+        "That is not a reason to end.",
+      );
+      broker.end({
+        actor: getActorContext(request),
+        voiceSessionId: params(request).voiceSessionId ?? "",
+        reason: body.reason,
+      });
+      // Ending a line that already ended is not an error.
+      return reply.code(204).send();
+    },
+  );
+
+  // Whether this person's voice starts on GPT-Live: the web asks before it
+  // opens any voice line (founder 2026-10-09: GPT-Live is the voice of the
+  // app for the people it is switched on for).
+  // Answered from memory for a token seen in the last few minutes (no
+  // Auth server call, no database read): availability-cache.ts.
+  const availability = createAvailabilityCache();
+  app.get(
+    Q_VOICE_LIVE_AVAILABLE_PATH,
+    { onRequest: availability.hook(withContext) },
+    async (request, reply) => {
+      let available = broker.enabled && mayOpen(request);
+      // A spent, held or unreadable trial is unavailable. Its LIVE-only
+      // binding never authorises an unmetered fallback.
+      if (available && broker.isTrialUser(getActorContext(request).userId)) {
+        const trial = await broker
+          .trialFor(getActorContext(request))
+          .catch(() => null);
+        available = trial !== null && trial.remainingSeconds > 0;
+      }
+      // Trial balances and account claims change during a call; cache only
+      // ordinary configured access, never a trial's mutable availability.
+      if (!broker.isTrialUser(getActorContext(request).userId))
+        availability.remember(request, available);
+      return reply
+        .code(200)
+        .header("Cache-Control", "no-store")
+        .send(LiveAvailabilitySchema.parse({ available }));
+    },
+  );
+
+  // Developer-only: which voice lines this local deployment can compare.
+  // Not registered at all outside the gate, so production has no route.
+  if (dependencies.preview.enabled) {
+    app.get(
+      Q_VOICE_LIVE_PREVIEW_PATH,
+      { onRequest: withContext },
+      (request, reply) =>
+        allowed(request)
+          ? reply
+              .code(200)
+              .header("Cache-Control", "no-store")
+              .send({ providers: dependencies.preview.providers() })
+          : problem(reply, 404, "Not found."),
+    );
+  }
+}

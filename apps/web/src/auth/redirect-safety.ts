@@ -9,7 +9,7 @@
  * useful to tell the user about it.
  */
 
-export const DEFAULT_RETURN_PATH = "/home";
+export const DEFAULT_RETURN_PATH = "/welcome";
 
 const MAX_LENGTH = 2048;
 

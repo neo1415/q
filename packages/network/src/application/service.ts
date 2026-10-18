@@ -1,22 +1,87 @@
+import type { ActorContext } from "@capital-q/security";
+
+import {
+  createRelationshipPipelineQuery,
+  type RelationshipPipelineQueryService,
+} from "./relationship-pipeline-query.js";
+import {
+  createRelationshipViewService,
+  type RelationshipViewService,
+} from "./relationship-views.js";
+import {
+  createRelationshipNoteService,
+  type RelationshipNoteService,
+} from "./relationship-notes.js";
+
+import type { Interest } from "../contracts/index.js";
 import {
   createRelationshipEventRegistry,
   RELATIONSHIP_EVENT_DEFINITIONS,
 } from "../domain/event-registry.js";
 import {
+  createPostgresInterestRepository,
+  createPostgresInterestRequestStore,
+  createPostgresInterestResponseRepository,
+  createPostgresInterestResponseRequestStore,
+} from "../infrastructure/postgres-interest-repositories.js";
+import {
+  createListRelationshipsForCompany,
+  createListRelationshipsForInvestor,
+  createRelationshipById,
+  createRelationshipForCompany,
+  createRelationshipForInvestor,
+  type RelationshipListing,
+  type RelationshipPartyView,
+  type RelationshipStatus,
+} from "./relationship-status.js";
+import {
+  createRelationshipBrief,
+  createRelationshipBriefs,
+} from "./relationship-brief.js";
+import {
+  createListIncomingInterest,
+  createMayRespondToInterest,
+  createRespondToInterest,
+  type IncomingInterest,
+  type RespondToInterestCommand,
+  type RespondToInterestResult,
+} from "./respond-to-interest.js";
+import {
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
 } from "../infrastructure/postgres-repositories.js";
 import {
+  createExpressInterest,
+  createGetOwnInterest,
+  createMayExpressInterest,
+  type ExpressInterestCommand,
+  type ExpressInterestDependencies,
+  type ExpressInterestResult,
+} from "./express-interest.js";
+import {
   createRelationshipEventAppender,
   type RelationshipEventAppender,
 } from "./append-event.js";
+import {
+  createGetConnectionStatus,
+  createListConnectionRequests,
+  createRequestConnection,
+  createRespondToConnectionRequest,
+  type ConnectionRequestDependencies,
+} from "./connection-requests.js";
 import type { NetworkServiceDependencies } from "./dependencies.js";
 import {
   createEnsureRelationship,
   type EnsuredRelationship,
   type EnsureRelationshipCommand,
 } from "./ensure-relationship.js";
-import type { RelationshipQueryPort } from "./ports.js";
+import type {
+  InterestRepository,
+  InterestRequestStore,
+  InterestResponseRepository,
+  InterestResponseRequestStore,
+  RelationshipQueryPort,
+} from "./ports.js";
 
 /**
  * The Network application service consumed by later owning workflows
@@ -66,6 +131,12 @@ export function createNetworkService(
           companyId,
           investorOrganisationId,
         ),
+      findManyByInvestor: (investorOrganisationId, companyIds) =>
+        repositories.relationships.findByInvestorAndCompanies(
+          sql,
+          investorOrganisationId,
+          companyIds,
+        ),
       listEvents: (relationshipId, page = {}) =>
         repositories.events.listByRelationship(sql, relationshipId, {
           afterSequence: page.afterSequence,
@@ -74,5 +145,171 @@ export function createNetworkService(
       getEventById: (relationshipEventId) =>
         repositories.events.findById(sql, relationshipEventId),
     },
+  };
+}
+
+/** Express Interest and the investor's own status read (CQ-NET-010). */
+export type InterestService = {
+  /** CRM pipeline over its read model (slice 3b); absent: the bounded path. */
+  readonly relationshipPipeline?: RelationshipPipelineQueryService | undefined;
+  /** CRM saved views over the same party-scoped pipeline (2026-10-15). */
+  readonly relationshipViews?: RelationshipViewService | undefined;
+  /** CRM private notes on a relationship record (S3, 2026-10-15). */
+  readonly relationshipNotes?: RelationshipNoteService | undefined;
+  readonly expressInterest: (
+    command: ExpressInterestCommand,
+  ) => Promise<ExpressInterestResult>;
+  readonly getOwnInterest: (query: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+  }) => Promise<Interest | null>;
+  /** The command's authorisation only; writes nothing. */
+  readonly mayExpressInterest: (query: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+  }) => Promise<boolean>;
+  /** The company's inbox (CQ-NET-011). */
+  readonly listIncomingInterest: (query: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+  }) => Promise<readonly IncomingInterest[]>;
+  /** Accept or decline, as the company (CQ-NET-011). */
+  readonly respondToInterest: (
+    command: RespondToInterestCommand,
+  ) => Promise<RespondToInterestResult>;
+  /** The answer's authorisation only; writes nothing. */
+  readonly mayRespondToInterest: (query: {
+    readonly actor: ActorContext;
+    readonly interestId: string;
+  }) => Promise<boolean>;
+  /** "Where are we with this company?", for an investor (CQ-NET-012). */
+  readonly relationshipForInvestor: (query: {
+    readonly actor: ActorContext;
+    readonly companyId: string;
+  }) => Promise<RelationshipStatus | null>;
+  /** "Where are we with this investor?", for a company (CQ-NET-012). */
+  readonly relationshipForCompany: (query: {
+    readonly actor: ActorContext;
+    readonly investorOrganisationId: string;
+  }) => Promise<RelationshipStatus | null>;
+  /** One relationship by id, as the asking party sees it; null for a non-party. */
+  readonly relationshipById: (query: {
+    readonly actor: ActorContext;
+    readonly relationshipId: string;
+  }) => Promise<RelationshipPartyView | null>;
+  /**
+   * The Relationship Brief (R1): the asking party's whole standing with
+   * the counterparty, other contexts' facts read through `sources` as the
+   * actor. Null for a non-party or nothing this side may see.
+   */
+  readonly relationshipBrief: ReturnType<typeof createRelationshipBrief>;
+  /**
+   * Every brief on one page of the viewer's own list, from batched reads
+   * (R1). Optional so narrow fakes need not carry it.
+   */
+  readonly relationshipBriefs?:
+    ReturnType<typeof createRelationshipBriefs> | undefined;
+  /** An investor organisation's own relationships (CQ-WEB-030). */
+  readonly listRelationshipsForInvestor: (query: {
+    readonly actor: ActorContext;
+    readonly scanLimit?: number;
+  }) => Promise<readonly RelationshipListing[]>;
+  /** A company's own relationships it can see anything of (CQ-WEB-030). */
+  readonly listRelationshipsForCompany: (query: {
+    readonly actor: ActorContext;
+    readonly scanLimit?: number;
+    readonly companyId: string;
+  }) => Promise<readonly RelationshipListing[]>;
+};
+
+export type InterestServiceOptions = NetworkServiceOptions &
+  Pick<
+    ExpressInterestDependencies,
+    "authorization" | "investorSubject" | "companyVisibility"
+  > & {
+    readonly interests?: InterestRepository | undefined;
+    readonly interestRequests?: InterestRequestStore | undefined;
+    readonly interestResponses?: InterestResponseRepository | undefined;
+    readonly interestResponseRequests?:
+      InterestResponseRequestStore | undefined;
+  };
+
+function interestDependencies(
+  options: InterestServiceOptions,
+): ExpressInterestDependencies {
+  return {
+    ...options,
+    registry:
+      options.registry ??
+      createRelationshipEventRegistry(RELATIONSHIP_EVENT_DEFINITIONS),
+    repositories: options.repositories ?? {
+      relationships: createPostgresRelationshipRepository(),
+      events: createPostgresRelationshipEventRepository(),
+    },
+    interests: options.interests ?? createPostgresInterestRepository(),
+    interestRequests:
+      options.interestRequests ?? createPostgresInterestRequestStore(),
+    interestResponses:
+      options.interestResponses ?? createPostgresInterestResponseRepository(),
+    interestResponseRequests:
+      options.interestResponseRequests ??
+      createPostgresInterestResponseRequestStore(),
+  };
+}
+
+export function createInterestService(
+  options: InterestServiceOptions,
+): InterestService {
+  const dependencies = interestDependencies(options);
+  return {
+    relationshipViews: createRelationshipViewService(dependencies),
+    relationshipNotes: createRelationshipNoteService(dependencies),
+    relationshipPipeline: createRelationshipPipelineQuery(dependencies),
+    expressInterest: createExpressInterest(dependencies),
+    getOwnInterest: createGetOwnInterest(dependencies),
+    mayExpressInterest: createMayExpressInterest(dependencies),
+    listIncomingInterest: createListIncomingInterest(dependencies),
+    respondToInterest: createRespondToInterest(dependencies),
+    mayRespondToInterest: createMayRespondToInterest(dependencies),
+    relationshipForInvestor: createRelationshipForInvestor(dependencies),
+    relationshipForCompany: createRelationshipForCompany(dependencies),
+    relationshipById: createRelationshipById(dependencies),
+    relationshipBrief: createRelationshipBrief(dependencies),
+    relationshipBriefs: createRelationshipBriefs(dependencies),
+    listRelationshipsForInvestor:
+      createListRelationshipsForInvestor(dependencies),
+    listRelationshipsForCompany:
+      createListRelationshipsForCompany(dependencies),
+  };
+}
+
+/** A founder's Connection Requests and the investor's answers (ADR 0023). */
+export type ConnectionService = {
+  readonly requestConnection: ReturnType<typeof createRequestConnection>;
+  readonly connectionStatus: ReturnType<typeof createGetConnectionStatus>;
+  readonly listConnectionRequests: ReturnType<
+    typeof createListConnectionRequests
+  >;
+  readonly respondToConnectionRequest: ReturnType<
+    typeof createRespondToConnectionRequest
+  >;
+};
+
+export type ConnectionServiceOptions = InterestServiceOptions &
+  Pick<ConnectionRequestDependencies, "founderSubject" | "investorReach">;
+
+export function createConnectionService(
+  options: ConnectionServiceOptions,
+): ConnectionService {
+  const dependencies: ConnectionRequestDependencies = {
+    ...interestDependencies(options),
+    founderSubject: options.founderSubject,
+    investorReach: options.investorReach,
+  };
+  return {
+    requestConnection: createRequestConnection(dependencies),
+    connectionStatus: createGetConnectionStatus(dependencies),
+    listConnectionRequests: createListConnectionRequests(dependencies),
+    respondToConnectionRequest: createRespondToConnectionRequest(dependencies),
   };
 }

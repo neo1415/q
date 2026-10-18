@@ -4,7 +4,7 @@
     "business_model": 1,
     "company_stage": 1,
     "customer_type": 1,
-    "geography": 1,
+    "geography": 2,
     "impact_theme": 1,
     "industry": 1,
     "product_category": 1,
@@ -484,8 +484,8 @@
         "industry/payment_infrastructure",
         "geography/north_africa",
         "geography/south_africa",
-        "geography/southern_africa",
-        "industry/edtech"
+        "geography/central_africa",
+        "geography/southern_africa"
       ],
       "abstained": false,
       "top1Hit": null,

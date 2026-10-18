@@ -15,7 +15,7 @@ import {
   ProcessingRunStatusSchema,
   ProcessingStatusSchema,
   TextExtractionStatusSchema,
-  type Document,
+  type ProcessingDocument,
   type DocumentProcessingRun,
   type DocumentVersion,
 } from "../contracts/index.js";
@@ -228,7 +228,7 @@ export function createAdvanceVersionProcessingState(
  */
 export type ProcessingTarget = {
   readonly version: DocumentVersion;
-  readonly document: Document;
+  readonly document: ProcessingDocument;
 };
 
 export function createResolveProcessingTarget(
@@ -246,11 +246,10 @@ export function createResolveProcessingTarget(
     if (version === null) {
       return null;
     }
-    const document = await repositories.documents.findInTenant(
-      sql,
-      version.tenantId,
-      version.documentId,
-    );
+    const document = await (
+      repositories.documents.findForProcessing ??
+      repositories.documents.findInTenant
+    )(sql, version.tenantId, version.documentId);
     return document === null ? null : { version, document };
   };
 }
@@ -265,6 +264,11 @@ export const CompleteDocumentProcessingInputSchema = z
     causationId: CausationIdSchema.optional(),
     /** True only when a scanner actually returned a clean verdict. */
     scannedClean: z.boolean(),
+    /**
+     * ADR 0042: no scanner ran, under the interim policy; the version is
+     * recorded NOT_SCANNED. Ignored when scannedClean is true.
+     */
+    notScanned: z.boolean().optional(),
     provenance: z
       .object({
         extractorVersion: z.string().min(1).max(64).optional(),
@@ -337,18 +341,19 @@ export function createCompleteDocumentProcessing(
             // document keeps the state it already had.
             ...(parsed.scannedClean
               ? ({ malwareScanStatus: "CLEAN" } as const)
-              : {}),
+              : parsed.notScanned === true
+                ? ({ malwareScanStatus: "NOT_SCANNED" } as const)
+                : {}),
           },
         },
       );
       if (version === null) {
         throw new DocumentVersionNotFoundError();
       }
-      const document = await repositories.documents.findInTenant(
-        tx.sql,
-        tenantId,
-        version.documentId,
-      );
+      const document = await (
+        repositories.documents.findForProcessing ??
+        repositories.documents.findInTenant
+      )(tx.sql, tenantId, version.documentId);
       if (document === null) {
         throw new DocumentNotFoundError();
       }
@@ -361,6 +366,9 @@ export function createCompleteDocumentProcessing(
           ? {}
           : { provenance: parsed.provenance }),
       });
+      // Application-private readiness must not enter the organisation event
+      // consumers (onboarding reviews, rankings or general Q knowledge).
+      if (document.ownerOrganisationId === null) return { emitted: false };
       await outbox.enqueue(
         tx,
         documentReadyEvent(

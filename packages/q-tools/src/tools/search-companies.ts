@@ -5,7 +5,6 @@ import {
   CompanySearchCursorError,
 } from "@capital-q/companies";
 import { UuidSchema } from "@capital-q/contracts";
-import { actorPrincipal } from "@capital-q/permissions";
 
 import {
   allow,
@@ -16,6 +15,7 @@ import {
 } from "../definition.js";
 import { actorWideScope } from "../plan.js";
 import type { QToolPorts } from "../ports.js";
+import { networkVisibleCompanies } from "./network-companies.js";
 
 /**
  * SEARCH_COMPANIES — `company.search` v1 (doc 12 §28.1 `searchCompanies`;
@@ -24,14 +24,15 @@ import type { QToolPorts } from "../ports.js";
  * Bounded discovery over companies classified network_visible or
  * public_external (ADR-001: two distinct scopes, both discoverable to an
  * authenticated participant), under the plan's actor-wide
- * NETWORK_VISIBLE_DATA scope. Filters are exact structured fields plus a
- * case-insensitive name substring; results are keyset-paged and every
+ * NETWORK_VISIBLE_DATA scope. Filters are exact structured fields plus the
+ * text, which the Companies context reads and ranks deterministically (P13:
+ * exact, sound-alike, prefix, misspelling, or described place/stage/sector
+ * words over declared profile facts); results are keyset-paged and every
  * candidate is re-checked through the Permissions bounded context before
  * it is returned — classification selects candidates, disclosure decides.
  * The actor's own organisation-private companies are not search results:
- * they are subjects of their own conversations. No ranking, no score, no
- * semantic retrieval (CQ-RAG), no taxonomy filter yet (no companies-by-node
- * query exists in the Taxonomy context).
+ * they are subjects of their own conversations. The match score never
+ * leaves the repository; no semantic retrieval (CQ-RAG).
  */
 
 export const SEARCH_COMPANIES = "company.search" as const;
@@ -47,7 +48,9 @@ export const SearchCompaniesInputSchema = z
       .min(1)
       .max(COMPANY_SEARCH_TEXT_MAX_LENGTH)
       .optional()
-      .describe("Case-insensitive substring of the company name."),
+      .describe(
+        "A company name as heard (partial or misspelt is fine), its website, or a few words of place, stage and sector, e.g. Nigerian fintech seed. Best matches first.",
+      ),
     stageCode: z
       .string()
       .trim()
@@ -103,7 +106,7 @@ export function createSearchCompaniesTool(
     status: "ACTIVE",
     providerName: "search_companies",
     description:
-      "Searches companies visible across the Capital Q network by name substring, stage code and headquarters country, returning up to 20 per page with a cursor. Call it to find candidate companies; then use get_company for a profile. Results are declared profiles, not assessments.",
+      "Searches companies visible across the Capital Q network by name (partial, misspelt or sound-alike), website, or described place, stage and sector words, plus exact stage code and headquarters country filters; best matches first, up to 20 per page with a cursor. Call it to find a company the person names or describes; then use get_company for a profile. Results are declared profiles, not assessments, and not recommendations: being visible is not being in anyone's feed, so never use these results to say what an investor should look at — that comes only from discovery_slate.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],
@@ -119,7 +122,10 @@ export function createSearchCompaniesTool(
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
     owner: "q-tools",
-    visibleStage: "COMPARING_OPPORTUNITIES",
+    // A lookup by name is reviewing company records, not comparing
+    // opportunities: live, "I'm comparing the opportunities now" was said
+    // while Q looked a company up for a deck (directive I).
+    visibleStage: "REVIEWING_COMPANY",
     input: SearchCompaniesInputSchema,
     output: SearchCompaniesOutputSchema,
     authorize: (_input, context) => {
@@ -131,13 +137,10 @@ export function createSearchCompaniesTool(
       );
     },
     execute: async (input, context) => {
-      let page;
+      let found: Awaited<ReturnType<typeof networkVisibleCompanies>>;
       try {
-        page = await ports.companies.searchCompanies({
-          viewer: {
-            tenantId: context.actor.tenantId,
-            organisationId: undefined,
-          },
+        // Classification chose the candidates; disclosure decides each one.
+        found = await networkVisibleCompanies(ports, context.actor, {
           text: input.query,
           stageCode: input.stageCode,
           headquartersCountry: input.headquartersCountry?.toUpperCase(),
@@ -152,35 +155,15 @@ export function createSearchCompaniesTool(
         }
         throw error;
       }
-      // Classification chose the candidates; disclosure decides each one.
-      const decisions =
-        page.items.length === 0
-          ? []
-          : await ports.disclosure.evaluateMany(
-              page.items.map((item) => ({
-                principal: actorPrincipal(context.actor),
-                resource: { type: "company" as const, id: item.id },
-                requestedAccess: "view" as const,
-              })),
-            );
-      const items = page.items.filter((_item, index) => {
-        const decision = decisions[index];
-        return (
-          decision !== undefined &&
-          decision.outcome === "ALLOW" &&
-          (decision.reasonCode === "NETWORK_VISIBLE" ||
-            decision.reasonCode === "PUBLIC_EXTERNAL")
-        );
-      });
       return {
-        items: items.map((item) => ({
+        items: found.items.map((item) => ({
           companyId: item.id,
           canonicalName: item.canonicalName,
           currentStageCode: item.currentStageCode,
           headquartersCountry: item.headquartersCountry,
           shortDescription: item.shortDescription,
         })),
-        nextCursor: page.nextCursor,
+        nextCursor: found.nextCursor,
         truthClass: "USER_CLAIM",
       };
     },

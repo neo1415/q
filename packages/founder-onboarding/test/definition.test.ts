@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { ContractValidationError } from "@capital-q/contracts";
+
 import {
   hashOnboardingRequest,
   referencedStepKeys,
@@ -17,6 +19,7 @@ import {
   FOUNDER_DEFINITION_V1,
   FOUNDER_STEP_CONTEXTS,
   FOUNDER_STEPS,
+  FOUNDER_FINANCIAL_WRITE_TARGET,
   FOUNDER_WRITE_TARGETS,
   normaliseWebsite,
   onboardingDefinitionIds,
@@ -83,8 +86,12 @@ describe("Founder Definition v1", () => {
     const providers = new Set(
       createFounderStepContextProviders(noDomain).map((p) => p.key),
     );
+    // v4 adds the financials block's target alongside the v1 set.
     expect([...handlers].sort()).toEqual(
-      Object.values(FOUNDER_WRITE_TARGETS).sort(),
+      [
+        ...Object.values(FOUNDER_WRITE_TARGETS),
+        FOUNDER_FINANCIAL_WRITE_TARGET,
+      ].sort(),
     );
     expect([...providers].sort()).toEqual(
       Object.values(FOUNDER_STEP_CONTEXTS).sort(),
@@ -246,11 +253,29 @@ describe("Founder canonical mappings", () => {
 
   it("normalises a bare domain into an https URL and keeps explicit schemes", () => {
     expect(normaliseWebsite("example.com")).toBe("https://example.com");
+    expect(normaliseWebsite("Https://zinoaviation.com")).toBe(
+      "https://zinoaviation.com",
+    );
     expect(normaliseWebsite("http://example.com/x")).toBe(
       "http://example.com/x",
     );
+    // The scheme is kept (http stays http) but stored lower-case, which
+    // RFC 3986 makes the canonical form; the rest is kept as typed.
     expect(normaliseWebsite("  HTTPS://Example.com ")).toBe(
-      "HTTPS://Example.com",
+      "https://Example.com",
+    );
+  });
+
+  it("refuses words that are not a public host (CQ-ACCEPT-001)", () => {
+    // "we're still on instagram" once became https://instagram on the
+    // canonical record.
+    for (const said of ["instagram", "no website yet", "https://intranet"]) {
+      expect(() => normaliseWebsite(said), said).toThrow(
+        ContractValidationError,
+      );
+    }
+    expect(normaliseWebsite("instagram.com/lumenhealth")).toBe(
+      "https://instagram.com/lumenhealth",
     );
   });
 

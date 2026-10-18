@@ -43,6 +43,11 @@ export type VideoProviderCapabilities = {
 // Upload
 // ---------------------------------------------------------------------------
 
+/** A SHA-256 hex digest. Hashes only ever cross this boundary, never keys. */
+export const ReservationKeySchema = z
+  .string()
+  .regex(/^[0-9a-f]{64}$/, "expected a reservation digest");
+
 /**
  * The server's instruction to reserve an upload. Every constraint is chosen
  * here, not by the browser: a client that could set its own duration
@@ -61,6 +66,19 @@ export const CreateVideoUploadSessionSchema = z
     requireSignedPlayback: z.boolean(),
     /** Restricts where the upload target may be used from, when supported. */
     allowedOrigin: z.string().url().optional(),
+    /**
+     * The file's exact size, when the creator's client can resume. Its
+     * presence asks for a RESUMABLE target: a resumable protocol fixes the
+     * length up front so an interrupted transfer knows where it stands.
+     * Absent means the one-shot DIRECT target.
+     */
+    uploadLengthBytes: z.number().int().min(1).optional(),
+    /**
+     * A server-derived digest (never the client's raw key) that the provider
+     * keeps with the asset, so a retried reservation can be recognised as
+     * the same request and answered with the same target.
+     */
+    reservationKey: ReservationKeySchema.optional(),
   })
   .strict();
 export type CreateVideoUploadSession = z.infer<
@@ -72,9 +90,9 @@ export const UploadModeSchema = z.enum(UPLOAD_MODES);
 export type UploadMode = z.infer<typeof UploadModeSchema>;
 
 /**
- * A one-time target the creator's browser uploads to directly. It is handed
- * over once and never persisted: it authorises a transfer, and a transfer is
- * not a permission to do anything else.
+ * A target the creator's browser uploads to directly. It is handed over and
+ * never persisted by Capital Q: it authorises a transfer into one asset,
+ * and a transfer is not a permission to do anything else.
  */
 export const VideoUploadSessionSchema = z
   .object({
@@ -82,9 +100,32 @@ export const VideoUploadSessionSchema = z
     uploadMode: UploadModeSchema,
     uploadUrl: z.string().url(),
     expiresAt: z.string().optional(),
+    /**
+     * RESUMABLE only: the size each transfer request should carry. A
+     * provider fact (its minimum and alignment), so it travels with the
+     * target rather than being known by the browser.
+     */
+    chunkSizeBytes: z.number().int().min(1).optional(),
   })
   .strict();
 export type VideoUploadSession = z.infer<typeof VideoUploadSessionSchema>;
+
+/**
+ * "Is the resumable target this request reserved still open?" Answered from
+ * the provider's own record: the asset must carry our media asset id and
+ * the same reservation key, and still be waiting for bytes. Anything else
+ * is null — a retry does not get a target it did not reserve.
+ */
+export const ResumeVideoUploadSessionSchema = z
+  .object({
+    mediaAssetId: MediaAssetIdSchema,
+    providerAssetId: ProviderAssetIdSchema,
+    reservationKey: ReservationKeySchema,
+  })
+  .strict();
+export type ResumeVideoUploadSession = z.infer<
+  typeof ResumeVideoUploadSessionSchema
+>;
 
 // ---------------------------------------------------------------------------
 // Asset status
@@ -145,10 +186,51 @@ export const PlaybackAuthorizationSchema = z
     /** Opaque provider grant, if the provider issues one. */
     token: z.string().min(1).optional(),
     playbackUrl: z.string().url(),
+    /** The poster frame, under the same grant, when the provider serves one. */
+    posterUrl: z.string().url().optional(),
     expiresAt: z.string(),
   })
   .strict();
 export type PlaybackAuthorization = z.infer<typeof PlaybackAuthorizationSchema>;
+
+/**
+ * Permission to save one pitch as a file (ADR 0047). Reaching this point
+ * means Capital Q has already decided this viewer may watch it AND that its
+ * owner allows downloads; the provider only turns that into a short-lived
+ * link that the browser fetches from the CDN directly.
+ */
+export const DownloadAuthorizationRequestSchema = z
+  .object({
+    mediaAssetId: MediaAssetIdSchema,
+    providerAssetId: ProviderAssetIdSchema,
+    accessMode: PlaybackPolicySchema,
+    ttlSeconds: z.number().int().min(30).max(3_600),
+    /** The saved file's name, already reduced to safe characters. */
+    fileName: z.string().regex(/^[A-Za-z0-9._-]{1,80}$/u),
+  })
+  .strict();
+export type DownloadAuthorizationRequest = z.infer<
+  typeof DownloadAuthorizationRequestSchema
+>;
+
+/**
+ * READY: a link to the file, valid until `expiresAt`. PREPARING: the
+ * provider is still making the file (first request for this pitch).
+ * The link is a short-lived secret, like a playback token: never logged,
+ * stored, or put in an event or audit record.
+ */
+export type DownloadAuthorization =
+  | {
+      readonly status: "READY";
+      readonly mediaAssetId: MediaAssetId;
+      readonly downloadUrl: string;
+      readonly expiresAt: string;
+    }
+  | {
+      readonly status: "PREPARING";
+      readonly mediaAssetId: MediaAssetId;
+      readonly percentComplete: number | null;
+    };
 
 // ---------------------------------------------------------------------------
 // The port
@@ -160,13 +242,53 @@ export type VideoProvider = {
   readonly createUploadSession: (
     input: CreateVideoUploadSession,
   ) => Promise<VideoUploadSession>;
+  /** The same open RESUMABLE target again, or null. Never a new one. */
+  readonly resumeUploadSession: (
+    input: ResumeVideoUploadSession,
+  ) => Promise<VideoUploadSession | null>;
   readonly getAsset: (providerAssetId: string) => Promise<VideoAssetStatus>;
   readonly createPlaybackAuthorization: (
     input: PlaybackAuthorizationRequest,
   ) => Promise<PlaybackAuthorization>;
+  /**
+   * ADR 0047: a short-lived link to the pitch as a file. Idempotent: asking
+   * again while the file is being made answers PREPARING. Absent when the
+   * provider cannot serve downloads.
+   */
+  readonly createDownloadAuthorization?:
+    | ((input: DownloadAuthorizationRequest) => Promise<DownloadAuthorization>)
+    | undefined;
   /** Idempotent: deleting an asset the provider no longer has is success. */
   readonly deleteAsset: (providerAssetId: string) => Promise<void>;
+  /**
+   * Ask the provider to generate captions for a READY asset in one
+   * language (R18). Idempotent: asking again for a language it already
+   * has, or is making, answers its current state. Present only when
+   * `capabilities.captions` is true.
+   */
+  readonly requestGeneratedCaptions?:
+    | ((
+        providerAssetId: string,
+        language: string,
+      ) => Promise<GeneratedCaptionsStatus>)
+    | undefined;
+  /** The generated captions in one language, with the WebVTT once READY. */
+  readonly getGeneratedCaptions?:
+    | ((
+        providerAssetId: string,
+        language: string,
+      ) => Promise<GeneratedCaptions>)
+    | undefined;
 };
+
+/**
+ * Generated captions, as the provider reports them. NONE: never asked for
+ * in that language. Nothing here is a transcript until it is READY.
+ */
+export type GeneratedCaptionsStatus = "NONE" | "PENDING" | "READY" | "FAILED";
+export type GeneratedCaptions =
+  | { readonly status: "NONE" | "PENDING" | "FAILED" }
+  | { readonly status: "READY"; readonly vtt: string };
 
 /** Re-exported so an adapter needs one import for the whole boundary. */
 export type { MediaAssetId, MediaPurpose, MediaStatus, PlaybackPolicy };

@@ -43,6 +43,37 @@ import type { RunnerLogger } from "../outbox-runner.js";
 
 const PROCESS_TRIGGER_EVENT = "evidence.document.version_created";
 const READY_EVENT = "evidence.document.ready";
+/** An investor's narrative answer → Q's reading of the mandate (CQ-PRE-REC-001 §6). */
+const RESPONSE_COMMITTED_EVENT = "onboarding.response.committed";
+const MEDIA_STATUS_CHANGED_EVENT = "media.asset.status_changed";
+/** Lane ov stored a pitch reading: its sections become founder proposals. */
+const PITCH_SECTIONS_READ_EVENT = "media.pitch_sections.read";
+/**
+ * A free-text turn of the conversational interview that no deterministic
+ * rule could place (CQ-PRE-REC-001 §20): the journey's own reading turns it
+ * into suggestions and questions the person then confirms.
+ */
+const UTTERANCE_RECORDED_EVENT = "onboarding.utterance.recorded";
+
+type UtteranceRecordedData = {
+  readonly sessionId: string;
+  readonly utteranceId: string;
+  readonly journeyType: string;
+  readonly stepKey: string | null;
+};
+
+/** A journey reading of one committed response (a narrative step). */
+type ResponseReader = (event: {
+  readonly sessionId: string;
+  readonly stepKey: string;
+  readonly responseId: string;
+}) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
+
+/** A journey reading of one free-text turn (CQ-PRE-REC-001 §20). */
+type UtteranceReader = (event: {
+  readonly sessionId: string;
+  readonly utteranceId: string;
+}) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
 
 const ProcessDocumentJobSchema = createJobSchema(ProcessDocumentJob.dataSchema);
 
@@ -61,10 +92,129 @@ export type DocumentProcessingHandlerOptions = {
           readonly tenantId: TenantId;
           readonly documentId: string;
           readonly documentVersionId: string;
+        }) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
+        readonly onResponseCommitted: ResponseReader;
+        readonly onUtterance: UtteranceReader;
+        readonly onPitchSectionsRead?:
+          | ((event: {
+              readonly tenantId: TenantId;
+              readonly companyId: string;
+              readonly readingId: string;
+            }) => Promise<{ readonly kind: string }>)
+          | undefined;
+      }
+    | undefined;
+  /**
+   * The investor mandate reading, when this deployment composes one. Runs
+   * off the onboarding runtime's own response event; the session, tenant
+   * and narrative are all re-read from the database, never from the
+   * message.
+   */
+  readonly mandateReview?:
+    | {
+        readonly onResponseCommitted: (event: {
+          readonly sessionId: string;
+          readonly stepKey: string;
+          readonly responseId: string;
+        }) => Promise<{ readonly kind: string; readonly blocked?: unknown }>;
+        readonly onUtterance: UtteranceReader;
+        /** Lane ob1: an investor's own fund deck or thesis, read into proposals. */
+        readonly onDocumentReady?:
+          | ((event: {
+              readonly tenantId: TenantId;
+              readonly documentId: string;
+              readonly documentVersionId: string;
+            }) => Promise<{
+              readonly kind: string;
+              readonly blocked?: unknown;
+            }>)
+          | undefined;
+      }
+    | undefined;
+  /**
+   * Q.01: the deterministic check of a founder's stated figures against
+   * their own confirmed deck. No model; it only ever records questions.
+   */
+  readonly founderFinancialCheck?:
+    | {
+        readonly onResponseCommitted: (event: {
+          readonly sessionId: string;
+          readonly stepKey: string;
+          readonly responseId: string;
+        }) => Promise<{ readonly kind: string; readonly asked: number }>;
+      }
+    | undefined;
+  /**
+   * Public presence research (CQ-C2), when this deployment can reach the
+   * public web. Fire-and-forget: called, never awaited, on every committed
+   * response regardless of whether the founder or mandate reading above
+   * also handled it. Absent means no research provider is configured and a
+   * typed session behaves exactly as it did before this packet.
+   */
+  readonly presenceResearch?:
+    | {
+        readonly onResponseCommitted: (event: {
+          readonly sessionId: string;
+          readonly stepKey: string;
+          readonly responseId: string;
+        }) => void;
+      }
+    | undefined;
+  /**
+   * Persisted recommendation slates (CQ-REC-006): every domain event is
+   * offered to the invalidation service, which decides whether it names a
+   * slate at all. Identifiers only; the slates and their keys are read
+   * from the database, never from the message.
+   */
+  readonly recommendations?:
+    | {
+        readonly onEvent: (event: CapitalQEvent<unknown>) => Promise<{
+          readonly invalidated: number;
+          readonly enqueued: number;
+        }>;
+      }
+    | undefined;
+  /**
+   * Automated moderation (CQ-MEDIA-013): Capital Q's integrity decision,
+   * applied when a pitch becomes READY. Identifiers only; the asset and
+   * its technical facts are re-read under a row lock, never trusted from
+   * the message, and the decision is idempotent under redelivery.
+   */
+  readonly mediaModeration?:
+    | {
+        readonly onReady: (event: {
+          readonly tenantId: TenantId;
+          readonly mediaAssetId: string;
+          readonly correlationId: string | undefined;
         }) => Promise<{ readonly kind: string }>;
       }
     | undefined;
   readonly logger: RunnerLogger;
+};
+
+type MediaStatusChangedData = {
+  readonly mediaAssetId: string;
+  readonly status: string;
+};
+
+/**
+ * A reading the model could not produce because no provider could take the
+ * call right now (a rate limit, an outage) is worth another attempt on the
+ * queue's own backoff; the review is idempotent, so a retry adds nothing
+ * twice. Every other outcome — including "no eligible provider", which
+ * will not change by waiting — is final.
+ */
+function transientlyBlocked(outcome: {
+  readonly kind: string;
+  readonly blocked?: unknown;
+}): boolean {
+  return outcome.kind === "PREPARED" && outcome.blocked === "MODEL_UNAVAILABLE";
+}
+
+type ResponseCommittedData = {
+  readonly sessionId: string;
+  readonly stepKey: string;
+  readonly responseId: string;
 };
 
 type VersionCreatedData = {
@@ -85,7 +235,17 @@ type DocumentReadyData = {
 export function createDomainEventHandler(
   options: DocumentProcessingHandlerOptions,
 ): (message: QueueMessage) => Promise<MessageOutcome> {
-  const { registry, queues, founderReview, logger } = options;
+  const {
+    registry,
+    queues,
+    founderReview,
+    founderFinancialCheck,
+    mandateReview,
+    presenceResearch,
+    recommendations,
+    mediaModeration,
+    logger,
+  } = options;
 
   return async (message) => {
     const parsed = registry.parse(message.message);
@@ -100,6 +260,187 @@ export function createDomainEventHandler(
     }
 
     const event: CapitalQEvent<unknown> = parsed.message;
+    if (recommendations !== undefined) {
+      // Lifecycle and queue writes only, idempotent under redelivery: an
+      // invalidated slate stays invalidated and a pending request coalesces.
+      try {
+        await recommendations.onEvent(event);
+      } catch (error: unknown) {
+        logger.warn(
+          { err: error, msgId: message.msgId, eventId: event.id },
+          "recommendation slate refresh failed; retrying",
+        );
+        return { kind: "RETRY", errorCode: "RECOMMENDATION_REFRESH_FAILED" };
+      }
+    }
+    if (event.type === PITCH_SECTIONS_READ_EVENT) {
+      const read = event.data as {
+        readonly ownerType?: unknown;
+        readonly ownerId?: unknown;
+        readonly readingId?: unknown;
+      };
+      const tenantId = TenantIdSchema.safeParse(event.tenantId);
+      const propose = founderReview?.onPitchSectionsRead;
+      if (
+        propose === undefined ||
+        !tenantId.success ||
+        read.ownerType !== "COMPANY" ||
+        typeof read.ownerId !== "string" ||
+        typeof read.readingId !== "string"
+      ) {
+        return { kind: "ARCHIVE" };
+      }
+      try {
+        const outcome = await propose({
+          tenantId: tenantId.data,
+          companyId: read.ownerId,
+          readingId: read.readingId,
+        });
+        logger.info(
+          { msgId: message.msgId, eventId: event.id, outcome: outcome.kind },
+          "pitch sections proposed to founder onboarding",
+        );
+        return { kind: "ARCHIVE" };
+      } catch (error: unknown) {
+        logger.warn(
+          { err: error, msgId: message.msgId, eventId: event.id },
+          "pitch section proposals failed; retrying",
+        );
+        return { kind: "RETRY", errorCode: "PITCH_SECTION_PROPOSALS_FAILED" };
+      }
+    }
+    if (event.type === MEDIA_STATUS_CHANGED_EVENT) {
+      const changed = event.data as MediaStatusChangedData;
+      if (mediaModeration === undefined || changed.status !== "READY") {
+        return { kind: "ARCHIVE" };
+      }
+      const tenantId = TenantIdSchema.safeParse(event.tenantId);
+      if (!tenantId.success) {
+        return { kind: "ARCHIVE" };
+      }
+      try {
+        const outcome = await mediaModeration.onReady({
+          tenantId: tenantId.data,
+          mediaAssetId: changed.mediaAssetId,
+          correlationId: event.correlationId,
+        });
+        logger.info(
+          { msgId: message.msgId, eventId: event.id, outcome: outcome.kind },
+          "pitch moderation applied",
+        );
+        return { kind: "ARCHIVE" };
+      } catch (error: unknown) {
+        logger.warn(
+          { err: error, msgId: message.msgId, eventId: event.id },
+          "pitch moderation failed; retrying",
+        );
+        return { kind: "RETRY", errorCode: "MEDIA_MODERATION_FAILED" };
+      }
+    }
+    if (event.type === RESPONSE_COMMITTED_EVENT) {
+      const committed = event.data as ResponseCommittedData;
+      // Fire-and-forget, deliberately not part of the try/catch below: a
+      // research run that fails, times out or finds nothing must never
+      // turn this message into a retry, and it never blocks the founder or
+      // mandate reading that follows it.
+      presenceResearch?.onResponseCommitted({
+        sessionId: committed.sessionId,
+        stepKey: committed.stepKey,
+        responseId: committed.responseId,
+      });
+      // Each journey's reading decides for itself whether the step is one
+      // of its narrative steps; a session belongs to exactly one of them.
+      const readers = [
+        ...(founderFinancialCheck === undefined
+          ? []
+          : [
+              {
+                name: "founder financial check",
+                reader: founderFinancialCheck,
+              },
+            ]),
+        ...(mandateReview === undefined
+          ? []
+          : [{ name: "investor mandate reading", reader: mandateReview }]),
+        ...(founderReview === undefined
+          ? []
+          : [{ name: "founder narrative reading", reader: founderReview }]),
+      ];
+      for (const { name, reader } of readers) {
+        try {
+          const outcome = await reader.onResponseCommitted({
+            sessionId: committed.sessionId,
+            stepKey: committed.stepKey,
+            responseId: committed.responseId,
+          });
+          if (transientlyBlocked(outcome)) {
+            return {
+              kind: "RETRY",
+              errorCode: "NARRATIVE_READING_MODEL_UNAVAILABLE",
+            };
+          }
+          if (outcome.kind !== "SKIPPED") {
+            logger.info(
+              {
+                msgId: message.msgId,
+                eventId: event.id,
+                sessionId: committed.sessionId,
+                outcome: outcome.kind,
+              },
+              `${name} handled`,
+            );
+          }
+        } catch (error: unknown) {
+          logger.warn(
+            { err: error, msgId: message.msgId, eventId: event.id },
+            `${name} failed; retrying`,
+          );
+          return { kind: "RETRY", errorCode: "NARRATIVE_READING_FAILED" };
+        }
+      }
+      return { kind: "ARCHIVE" };
+    }
+    if (event.type === UTTERANCE_RECORDED_EVENT) {
+      const said = event.data as UtteranceRecordedData;
+      const reader =
+        said.journeyType === "founder"
+          ? founderReview
+          : said.journeyType === "investor"
+            ? mandateReview
+            : undefined;
+      if (reader === undefined) {
+        return { kind: "ARCHIVE" };
+      }
+      try {
+        const outcome = await reader.onUtterance({
+          sessionId: said.sessionId,
+          utteranceId: said.utteranceId,
+        });
+        if (transientlyBlocked(outcome)) {
+          return {
+            kind: "RETRY",
+            errorCode: "UTTERANCE_READING_MODEL_UNAVAILABLE",
+          };
+        }
+        logger.info(
+          {
+            msgId: message.msgId,
+            eventId: event.id,
+            sessionId: said.sessionId,
+            journeyType: said.journeyType,
+            outcome: outcome.kind,
+          },
+          "conversational interview turn read",
+        );
+      } catch (error: unknown) {
+        logger.warn(
+          { err: error, msgId: message.msgId, eventId: event.id },
+          "conversational interview turn reading failed; retrying",
+        );
+        return { kind: "RETRY", errorCode: "UTTERANCE_READING_FAILED" };
+      }
+      return { kind: "ARCHIVE" };
+    }
     if (event.type !== PROCESS_TRIGGER_EVENT && event.type !== READY_EVENT) {
       return { kind: "ARCHIVE" };
     }
@@ -112,24 +453,51 @@ export function createDomainEventHandler(
     }
 
     if (event.type === READY_EVENT) {
-      if (founderReview === undefined) {
+      const investorRead = mandateReview?.onDocumentReady;
+      if (founderReview === undefined && investorRead === undefined) {
         return { kind: "ARCHIVE" };
       }
       const ready = event.data as DocumentReadyData;
       try {
-        const outcome = await founderReview.onDocumentReady({
+        const ref = {
           // A queue message is untrusted input: the tenant is validated
           // here, at the boundary, before it names anything.
           tenantId: TenantIdSchema.parse(event.tenantId),
           documentId: ready.documentId,
           documentVersionId: ready.documentVersionId,
-        });
+        };
+        // Each reading skips a document that is not its own (a company's
+        // deck vs an investor's fund deck), so both may be offered it.
+        const outcome =
+          founderReview === undefined
+            ? { kind: "SKIPPED" }
+            : await founderReview.onDocumentReady(ref);
+        const investorOutcome =
+          investorRead === undefined
+            ? { kind: "SKIPPED" }
+            : await investorRead(ref);
+        if (transientlyBlocked(investorOutcome)) {
+          return {
+            kind: "RETRY",
+            errorCode: "MANDATE_REVIEW_MODEL_UNAVAILABLE",
+          };
+        }
+        if (transientlyBlocked(outcome)) {
+          return {
+            kind: "RETRY",
+            errorCode: "FOUNDER_REVIEW_MODEL_UNAVAILABLE",
+          };
+        }
         logger.info(
           {
             msgId: message.msgId,
             eventId: event.id,
             documentVersionId: ready.documentVersionId,
             outcome: outcome.kind,
+            investorOutcome: investorOutcome.kind,
+            ...("reason" in investorOutcome
+              ? { investorReason: investorOutcome.reason }
+              : {}),
           },
           "founder onboarding review handled",
         );

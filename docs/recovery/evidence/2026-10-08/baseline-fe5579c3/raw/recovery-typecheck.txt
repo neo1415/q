@@ -1,0 +1,4 @@
+$ npx tsc --noEmit -p tests/recovery/tsconfig.json
+(exit 0)
+
+

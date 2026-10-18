@@ -1,0 +1,603 @@
+import {
+  UNICORN_POTENTIAL_CAVEAT,
+  FIT_BAND_LABELS,
+  FIT_CONFIDENCE_LABELS,
+  FIT_OUTCOME_LABELS,
+  FIT_PARAMETER_LABELS,
+  FIT_COMPARISON_MAX,
+  FIT_PARAMETERS,
+  fitScoreOutOf10,
+  FitComparisonDtoSchema,
+  INVESTABILITY_BAND_LABELS,
+  investabilityLine,
+  notAssessedInvestability,
+  SCORE_CONFIDENCE_LABELS,
+  suitabilityFromFit,
+  suitabilityLine,
+  type CompanyScoresDto,
+  type InvestabilityDto,
+  type UnicornPotentialDto,
+  type FitCandidateSource,
+  type FitComparisonDto,
+  type FitOutcome,
+  type FitParameter,
+  type FitProfileDto,
+} from "@capital-q/contracts";
+import type { Logger } from "@capital-q/observability";
+import type { ActorContext } from "@capital-q/security";
+
+import type { EligibilityReasonCode } from "../eligibility/contracts.js";
+import type { EligibilityService } from "../eligibility/service.js";
+import type { FitEvidenceLine } from "./stated.js";
+import type { RecommendationFeatureSnapshot } from "../features/contracts.js";
+
+import { FIT_CONFIG_CURRENT, type FitConfig } from "./config.js";
+import {
+  assessFit,
+  compareAssessments,
+  notApplicableObservation,
+  type FitAssessment,
+} from "./model.js";
+import { compareFitOrder, fitOrderScore } from "./order.js";
+import { observeFit, type DeclaredFitFacts } from "./observe.js";
+
+/**
+ * Fit with your mandate, for one investor (B1-B3; ADR 0052).
+ *
+ * Off the swipe path by construction: Discover's feed route never calls
+ * this. Profiles are a read-time projection over the feature snapshots
+ * the slate builder already persisted plus declared facts, through a pure
+ * model — one indexed read per company and no model call — so a card or
+ * a profile reads it cheaply when it is opened.
+ *
+ * Authorisation, before anything is read (Context Firewall):
+ *  1. the actor's own investor organisation, or nothing;
+ *  2. eligibility for VIEW, under the actor's own viewpoint: a company the
+ *     actor may not see is simply absent (no difference between "private"
+ *     and "does not exist"); a declared hard rule becomes OUTSIDE_MANDATE,
+ *     named, never weighted;
+ *  3. only then are inputs read, for admitted companies only.
+ * Top N ranks only the actor's own candidates (their relationships, the
+ * requests sent to them, their feed), never the network.
+ */
+
+export type FitCandidate = {
+  readonly companyId: string;
+  readonly source: FitCandidateSource;
+};
+
+export type FitCompanyInputs = {
+  readonly snapshot: RecommendationFeatureSnapshot | null;
+  readonly declared: DeclaredFitFacts;
+  readonly name: string;
+  /** "Seed · Clean energy · Nairobi", or null. */
+  readonly line: string | null;
+  /** What the company does, in its own one line, where this reader may see it. */
+  readonly about?: string | null | undefined;
+  /** The current raise, only where disclosure lets this reader see it. */
+  readonly raise?:
+    { readonly amount: string; readonly currency: string } | null | undefined;
+  /** What the company stated where this reader may see it; never scored. */
+  readonly evidence?: readonly FitEvidenceLine[] | undefined;
+  /** That evidence came through a grant: models read it only as CONFIDENTIAL. */
+  readonly evidenceConfidential?: boolean | undefined;
+};
+
+export type FitInputSource = {
+  /**
+   * Inputs for companies eligibility already admitted for THIS actor.
+   * Must return only what the actor may see; absent means no inputs.
+   */
+  readonly read: (query: {
+    readonly actor: ActorContext;
+    readonly investorOrganisationId: string;
+    readonly mandateId: string;
+    readonly companyIds: readonly string[];
+  }) => Promise<ReadonlyMap<string, FitCompanyInputs>>;
+};
+
+export type FitServiceDependencies = {
+  /** Visible canonical names for company assessments before mandate setup. */
+  readonly companyIdentities?:
+    | ((
+        ids: readonly string[],
+      ) => Promise<ReadonlyMap<string, { readonly name: string }>>)
+    | undefined;
+  readonly investorSubject: {
+    readonly investorOrganisationFor: (
+      actor: ActorContext,
+    ) => Promise<{ readonly investorOrganisationId: string } | null>;
+  };
+  readonly eligibility: Pick<EligibilityService, "evaluate">;
+  readonly inputs: FitInputSource;
+  /** The actor's own candidates: relationships, requests to them, their feed. */
+  readonly candidates: (
+    actor: ActorContext,
+  ) => Promise<readonly FitCandidate[]>;
+  /**
+   * F5 (2026-10-08): of these companies, the unclaimed public profiles: a
+   * real company shared with the network (network_visible / public_external)
+   * that nobody has joined yet. PADL marketplace activation keeps them out
+   * of Discover (readiness `not_assessed`), but an investor who finds one
+   * through search may read its fit, computed from its public facts only
+   * (it holds no founder-private material). Absent: none are.
+   */
+  readonly unclaimedPublic?:
+    | ((companyIds: readonly string[]) => Promise<ReadonlySet<string>>)
+    | undefined;
+  /**
+   * 2026-10-16: each admitted company's Investability (InvestIQ, from the
+   * investor-eligible projection), read only after eligibility admitted
+   * it. Absent: every company reads NOT_ASSESSED.
+   */
+  readonly investability?:
+    | ((
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, InvestabilityDto>>)
+    | undefined;
+  /** Premium read, reauthorized for this actor after company eligibility. */
+  readonly unicornPotential?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, UnicornPotentialDto>>)
+    | undefined;
+  /** The method label a NOT_ASSESSED company is shown under. */
+  readonly investabilityMethodVersion?: string | undefined;
+  readonly config?: FitConfig | undefined;
+  readonly clock?: (() => Date) | undefined;
+  readonly logger?: Logger | undefined;
+};
+
+/** F5: how the fit line names an unclaimed public profile. */
+export const UNCLAIMED_PUBLIC_PROFILE_LABEL = "Unclaimed public profile";
+
+export type FitProfileItem = {
+  readonly assessment: FitAssessment;
+  readonly name: string;
+  readonly line: string | null;
+  readonly about?: string | null | undefined;
+  readonly raise?:
+    { readonly amount: string; readonly currency: string } | null | undefined;
+  /** For Q's view: what the company stated where this reader may see it. */
+  readonly evidence?: readonly FitEvidenceLine[] | undefined;
+  readonly evidenceConfidential?: boolean | undefined;
+  /** Investability and Suitability: two scores, never blended. */
+  readonly scores?: CompanyScoresDto | undefined;
+};
+
+export type FitProfilesResult =
+  | { readonly kind: "OK"; readonly items: readonly FitProfileItem[] }
+  | { readonly kind: "NOT_INVESTOR" }
+  | { readonly kind: "NO_MANDATE" };
+
+export type FitTopResult =
+  | { readonly kind: "OK"; readonly comparison: FitComparisonDto }
+  | { readonly kind: "NOT_INVESTOR" }
+  | { readonly kind: "NO_MANDATE" };
+
+export type FitService = {
+  readonly profiles: (
+    actor: ActorContext,
+    companyIds: readonly string[],
+  ) => Promise<FitProfilesResult>;
+  readonly top: (actor: ActorContext, limit: number) => Promise<FitTopResult>;
+  /**
+   * Q.10: the companies the investor picked (2-4, from Saved), side by
+   * side on the same fit as the top three. Each is re-checked for VIEW
+   * eligibility first; one they may not see is absent, never named.
+   */
+  readonly compare: (
+    actor: ActorContext,
+    companyIds: readonly string[],
+  ) => Promise<FitTopResult>;
+};
+
+/** The reader may not see the company at all: it is absent, not "poor". */
+const NOT_VISIBLE: ReadonlySet<EligibilityReasonCode> = new Set([
+  "COMPANY_NOT_ACTIVE",
+  "COMPANY_NOT_MARKETPLACE_ELIGIBLE",
+  "COMPANY_IS_INVESTORS_OWN",
+  "COMPANY_NOT_DISCOVERABLE_BY_INVESTOR",
+]);
+const NO_MANDATE: ReadonlySet<EligibilityReasonCode> = new Set([
+  "NO_ACTIVE_MANDATE",
+  "ACTIVE_MANDATE_AMBIGUOUS",
+  "MANDATE_NOT_ACTIVE",
+]);
+
+export const FIT_TOP_CANDIDATES_MAX = 200;
+
+export function createFitService(
+  dependencies: FitServiceDependencies,
+): FitService {
+  const config = dependencies.config ?? FIT_CONFIG_CURRENT;
+  const clock = dependencies.clock ?? (() => new Date());
+
+  const withScores = async (
+    actor: ActorContext,
+    items: readonly FitProfileItem[],
+  ): Promise<Extract<FitProfilesResult, { kind: "OK" }>> => {
+    const investability =
+      dependencies.investability === undefined || items.length === 0
+        ? new Map<string, InvestabilityDto>()
+        : await dependencies
+            .investability(items.map((i) => i.assessment.profile.companyId))
+            .catch(() => new Map<string, InvestabilityDto>());
+    const unicornPotential =
+      dependencies.unicornPotential === undefined || items.length === 0
+        ? new Map<string, UnicornPotentialDto>()
+        : await dependencies.unicornPotential(
+            actor,
+            items.map((i) => i.assessment.profile.companyId),
+          );
+    const method = dependencies.investabilityMethodVersion ?? "investiq/v1";
+    return {
+      kind: "OK",
+      items: items.map((item) => {
+        const companyId = item.assessment.profile.companyId;
+        return {
+          ...item,
+          scores: {
+            companyId,
+            investability:
+              investability.get(companyId) ?? notAssessedInvestability(method),
+            suitability: suitabilityFromFit(item.assessment.profile),
+            ...(unicornPotential.get(companyId) === undefined
+              ? {}
+              : { unicornPotential: unicornPotential.get(companyId) }),
+          },
+        };
+      }),
+    };
+  };
+
+  const profiles = async (
+    actor: ActorContext,
+    companyIds: readonly string[],
+  ): Promise<FitProfilesResult> => {
+    const subject =
+      await dependencies.investorSubject.investorOrganisationFor(actor);
+    if (subject === null) return { kind: "NOT_INVESTOR" };
+    const ids = [...new Set(companyIds)];
+    if (ids.length === 0) return { kind: "OK", items: [] };
+
+    const evaluation = await dependencies.eligibility.evaluate({
+      actor,
+      purpose: "VIEW",
+      viewpoint: "ACTOR",
+      companyIds: ids,
+    });
+    // F5: only marketplace participation stood in the way, and the company
+    // is an unclaimed public profile: its fit is readable from public facts.
+    const onlyNotReady = evaluation.results
+      .filter(
+        (r) =>
+          r.reasonCodes.includes("COMPANY_NOT_MARKETPLACE_ELIGIBLE") &&
+          r.reasonCodes.every(
+            (code) =>
+              code === "COMPANY_NOT_MARKETPLACE_ELIGIBLE" ||
+              !NOT_VISIBLE.has(code),
+          ),
+      )
+      .map((r) => r.companyId);
+    const unclaimed =
+      onlyNotReady.length === 0 || dependencies.unclaimedPublic === undefined
+        ? new Set<string>()
+        : await dependencies
+            .unclaimedPublic(onlyNotReady)
+            .catch(() => new Set<string>());
+    const admitted = evaluation.results.filter(
+      (r) =>
+        unclaimed.has(r.companyId) ||
+        !r.reasonCodes.some((code) => NOT_VISIBLE.has(code)),
+    );
+    const mandateId = admitted.find((r) => r.mandateId !== null)?.mandateId;
+    const noMandate =
+      admitted.length > 0 &&
+      admitted.every(
+        (r) =>
+          r.mandateId === null || r.reasonCodes.some((c) => NO_MANDATE.has(c)),
+      );
+    if (noMandate || mandateId === undefined || mandateId === null) {
+      if (admitted.length === 0) return { kind: "OK", items: [] };
+      if (dependencies.companyIdentities === undefined)
+        return { kind: "NO_MANDATE" };
+      const names = await dependencies.companyIdentities(
+        admitted.map((r) => r.companyId),
+      );
+      const computedAt = clock().toISOString();
+      // A company assessment does not require an investor mandate. Suitability
+      // stays unknown with no preferences; no synthetic mandate or fit is made.
+      return withScores(
+        actor,
+        admitted.flatMap(({ companyId }) => {
+          const identity = names.get(companyId);
+          if (identity === undefined) return [];
+          const observations = Object.fromEntries(
+            FIT_PARAMETERS.map((parameter) => [
+              parameter,
+              notApplicableObservation(),
+            ]),
+          ) as Record<
+            FitParameter,
+            ReturnType<typeof notApplicableObservation>
+          >;
+          return [
+            {
+              assessment: assessFit(
+                { companyId, observations, hardRule: null },
+                config,
+                computedAt,
+              ),
+              name: identity.name,
+              line: null,
+            },
+          ];
+        }),
+      );
+    }
+
+    const inputs = await dependencies.inputs.read({
+      actor,
+      investorOrganisationId: subject.investorOrganisationId,
+      mandateId,
+      companyIds: admitted.map((r) => r.companyId),
+    });
+    const now = clock();
+    const computedAt = now.toISOString();
+    const items: FitProfileItem[] = [];
+    for (const result of admitted) {
+      const input = inputs.get(result.companyId);
+      if (input === undefined) continue;
+      const isUnclaimed = unclaimed.has(result.companyId);
+      const observed = observeFit({
+        companyId: result.companyId,
+        snapshot: input.snapshot,
+        declared: input.declared,
+        // Not being in Discover is not a declared rule of this investor.
+        eligibilityReasons: isUnclaimed
+          ? result.reasonCodes.filter(
+              (code) => code !== "COMPANY_NOT_MARKETPLACE_ELIGIBLE",
+            )
+          : result.reasonCodes,
+        config,
+        now,
+      });
+      items.push({
+        assessment: assessFit(observed, config, computedAt),
+        name: input.name,
+        line: isUnclaimed
+          ? [input.line, UNCLAIMED_PUBLIC_PROFILE_LABEL]
+              .filter((part): part is string => part !== null && part !== "")
+              .join(" · ")
+          : input.line,
+        about: input.about ?? null,
+        raise: input.raise ?? null,
+        evidence: input.evidence ?? [],
+        evidenceConfidential: input.evidenceConfidential ?? false,
+      });
+    }
+    // Request order, as eligibility returned it. Scores are read only for
+    // the companies eligibility admitted for this reader.
+    return withScores(actor, items);
+  };
+
+  return {
+    profiles,
+    compare: async (actor, companyIds) => {
+      const ids = [...new Set(companyIds)].slice(0, FIT_COMPARISON_MAX);
+      const result = await profiles(actor, ids);
+      if (result.kind !== "OK") return result;
+      const sources = new Map<string, ReadonlySet<FitCandidateSource>>(
+        result.items.map((item) => [
+          item.assessment.profile.companyId,
+          new Set<FitCandidateSource>(["SAVED"]),
+        ]),
+      );
+      return {
+        kind: "OK",
+        comparison: buildFitComparison({
+          items: result.items,
+          sources,
+          limit: ids.length,
+          config,
+          computedAt: clock().toISOString(),
+          keepAll: true,
+        }),
+      };
+    },
+    top: async (actor, limit) => {
+      const listed = await dependencies.candidates(actor);
+      const sources = new Map<string, Set<FitCandidateSource>>();
+      for (const c of listed.slice(0, FIT_TOP_CANDIDATES_MAX)) {
+        const set = sources.get(c.companyId) ?? new Set();
+        set.add(c.source);
+        sources.set(c.companyId, set);
+      }
+      const result = await profiles(actor, [...sources.keys()]);
+      if (result.kind !== "OK") return result;
+      return {
+        kind: "OK",
+        comparison: buildFitComparison({
+          items: result.items,
+          sources,
+          limit,
+          config,
+          computedAt: clock().toISOString(),
+        }),
+      };
+    },
+  };
+}
+
+const OUTCOME_RANK: Readonly<Record<FitOutcome, number>> = {
+  STRONG: 3,
+  PARTIAL: 2,
+  MISMATCH: 1,
+  UNKNOWN: 0,
+};
+
+/**
+ * Top N, side by side. Q does not choose: this orders by the config's
+ * tie-break, leaves out what a declared rule excludes and what is too
+ * unknown to band, and marks a row's best only where one entry is
+ * strictly better than every other (never on unknown).
+ */
+export function buildFitComparison(input: {
+  readonly items: readonly FitProfileItem[];
+  readonly sources: ReadonlyMap<string, ReadonlySet<FitCandidateSource>>;
+  readonly limit: number;
+  readonly config: FitConfig;
+  readonly computedAt: string;
+  /**
+   * Q.10: the investor picked these, so none is left out for being outside
+   * the mandate or thin; each still shows its band in words.
+   */
+  readonly keepAll?: boolean | undefined;
+}): FitComparisonDto {
+  const outside = input.items.filter(
+    (i) => i.assessment.profile.band === "OUTSIDE_MANDATE",
+  ).length;
+  const thin = input.items.filter(
+    (i) => i.assessment.profile.band === "NOT_ENOUGH_INFORMATION",
+  ).length;
+  const ranked = input.items
+    .filter(
+      (i) =>
+        input.keepAll === true ||
+        (i.assessment.profile.band !== "OUTSIDE_MANDATE" &&
+          i.assessment.profile.band !== "NOT_ENOUGH_INFORMATION"),
+    )
+    // The same comparator as the Discover feed (fit-order.v1): a higher
+    // score out of 10 is never listed below a lower one.
+    // No base rank here, so the config's company-id fallback keeps the
+    // order total and stable.
+    .sort(
+      (a, b) =>
+        compareFitOrder(
+          { assessment: a.assessment, score: fitOrderScore(a.assessment) },
+          { assessment: b.assessment, score: fitOrderScore(b.assessment) },
+        ) || compareAssessments(a.assessment, b.assessment),
+    )
+    .slice(0, input.limit);
+
+  const bestOn = (index: number): FitParameter[] =>
+    ranked.length < 2
+      ? []
+      : FIT_PARAMETERS.filter((parameter) => {
+          const rank = (i: number) => {
+            const r = ranked[i]?.assessment.profile.parameters.find(
+              (p) => p.parameter === parameter,
+            );
+            return r === undefined || !r.applicable
+              ? 0
+              : OUTCOME_RANK[r.outcome];
+          };
+          const mine = rank(index);
+          return (
+            mine > OUTCOME_RANK.MISMATCH &&
+            ranked.every((_r, j) => j === index || rank(j) < mine)
+          );
+        });
+
+  return FitComparisonDtoSchema.parse({
+    configVersion: input.config.version,
+    configLabel: input.config.label,
+    parameters: [...FIT_PARAMETERS],
+    entries: ranked.map((item, index) => ({
+      position: index + 1,
+      companyId: item.assessment.profile.companyId,
+      name: item.name,
+      line: item.line,
+      about: item.about ?? null,
+      raise: item.raise ?? null,
+      sources: [
+        ...(input.sources.get(item.assessment.profile.companyId) ?? ["FEED"]),
+      ].sort(),
+      profile: item.assessment.profile,
+      ...(item.scores === undefined ? {} : { scores: item.scores }),
+      bestOn: bestOn(index),
+    })),
+    considered: input.items.length,
+    leftOut:
+      input.keepAll === true
+        ? { outsideMandate: 0, notEnoughInformation: 0 }
+        : { outsideMandate: outside, notEnoughInformation: thin },
+    computedAt: input.computedAt,
+  });
+}
+
+/** One profile, as plain text (Q's fallback where cards are not rendered). */
+/**
+ * The two scores as one plain line, each with its coverage and confidence;
+ * computed by code, repeated by Q, never blended.
+ */
+export function companyScoresText(scores: CompanyScoresDto): string {
+  const inv = scores.investability;
+  const invWords =
+    inv.status === "SCORED" && inv.band !== null && inv.confidence !== null
+      ? `${investabilityLine(inv)} (${INVESTABILITY_BAND_LABELS[inv.band]}, ${SCORE_CONFIDENCE_LABELS[inv.confidence].toLowerCase()})`
+      : investabilityLine(inv);
+  const suit =
+    scores.suitability === null ? null : suitabilityLine(scores.suitability);
+  const potential = scores.unicornPotential;
+  const unicorn =
+    potential === undefined
+      ? null
+      : `Unicorn Potential: ${potential.overallScore === null ? "insufficient evidence, no score" : `${potential.overallScore}/100`}; evidence coverage ${Math.round(potential.coverage * 100)}%; ${potential.confidence.toLowerCase()} confidence; method ${potential.methodVersion}. ${UNICORN_POTENTIAL_CAVEAT}`;
+  return (
+    [invWords, suit, unicorn].filter((part) => part !== null).join(". ") + "."
+  );
+}
+
+export function fitProfileText(
+  name: string,
+  profile: FitProfileDto,
+  options: {
+    readonly summaryOnly?: boolean;
+    readonly scores?: CompanyScoresDto | undefined;
+  } = {},
+): string {
+  // ADR 0059: the score out of 10 beside the words, computed here from the
+  // rows below (never by a model); none when too little is known.
+  const score = fitScoreOutOf10(profile);
+  const head = `${name}: ${score === null ? "" : `${score}/10 · `}${FIT_BAND_LABELS[profile.band]}, ${FIT_CONFIDENCE_LABELS[profile.confidence].toLowerCase()}.${options.scores === undefined ? "" : ` ${companyScoresText(options.scores)}`}`;
+  if (options.summaryOnly === true) return head;
+  const rows = profile.parameters.map(
+    (p) =>
+      `- ${FIT_PARAMETER_LABELS[p.parameter]}: ${p.applicable ? FIT_OUTCOME_LABELS[p.outcome] : "No preference"}. ${p.reason}`,
+  );
+  return [head, ...rows].join("\n");
+}
+
+/** The comparison as plain text, best first. */
+export function fitComparisonText(
+  comparison: FitComparisonDto,
+  options: { readonly summaryOnly?: boolean } = {},
+): string {
+  if (comparison.entries.length === 0) {
+    return `None of the ${comparison.considered} companies you can compare has enough known to rank yet.`;
+  }
+  // The compact tool fallback accompanies complete typed profiles. Repeat
+  // only their code-derived scores here, not each band/confidence/reason.
+  // Unknown scores remain words; full prose and every profile stay intact.
+  if (options.summaryOnly === true) {
+    const scores = comparison.entries.map((entry) => {
+      const score = fitScoreOutOf10(entry.profile);
+      return `${entry.position}. ${entry.name}: ${score === null ? FIT_BAND_LABELS[entry.profile.band] : `${score}/10`}${entry.scores === undefined ? "" : ` · ${companyScoresText(entry.scores)}`}`;
+    });
+    return [
+      ...scores,
+      `Mandate fit, rules ${comparison.configLabel}. Unknown never counts against a company.`,
+    ].join("\n");
+  }
+  const parts = comparison.entries.map(
+    (e) =>
+      `${e.position}. ${fitProfileText(e.name, e.profile, { ...options, scores: e.scores })}`,
+  );
+  return [
+    ...parts,
+    `Ranked by fit with your mandate only (fit rules version ${comparison.configLabel}). Unknown never counts against a company.`,
+  ].join("\n\n");
+}

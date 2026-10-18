@@ -10,13 +10,18 @@ test.describe("desktop application shell", () => {
     const sidebar = page.getByRole("complementary");
     await expect(sidebar).toBeVisible();
     const nav = sidebar.getByRole("navigation", { name: "Primary" });
-    await expect(nav.getByRole("link")).toHaveCount(3);
-    await expect(nav.getByRole("link", { name: "Home" })).toHaveAttribute(
+    await expect(nav.getByRole("link")).toHaveCount(4);
+    // The Q page's entry is labelled "Q" (ADR 0017; route still /home).
+    await expect(nav.getByRole("link", { name: "Q" })).toHaveAttribute(
       "aria-current",
       "page",
     );
     await expect(sidebar.getByRole("link", { name: "Profile" })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Ask Q" })).toBeVisible();
+    // No separate "Ask Q" entry: the Q page is Q (R24).
+    await expect(sidebar.getByRole("link", { name: "Ask Q" })).toHaveCount(0);
+    // On the Q page the sidebar starts as a rail; it expands on request.
+    const toggle = sidebar.getByRole("button", { name: "Expand sidebar" });
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
 
     // Exactly one Primary navigation is exposed: the mobile one is display:none.
     await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(
@@ -27,6 +32,10 @@ test.describe("desktop application shell", () => {
 
     await nav.getByRole("link", { name: "Discover" }).click();
     await expect(page).toHaveURL(/\/discover$/);
+    // Elsewhere it starts open.
+    await expect(
+      sidebar.getByRole("button", { name: "Collapse sidebar" }),
+    ).toHaveAttribute("aria-expanded", "true");
     await expect(nav.getByRole("link", { name: "Discover" })).toHaveAttribute(
       "aria-current",
       "page",
@@ -35,6 +44,13 @@ test.describe("desktop application shell", () => {
     await nav.getByRole("link", { name: "Capital" }).click();
     await expect(
       page.getByRole("heading", { name: "Capital", level: 1 }),
+    ).toBeVisible();
+
+    // CRM (the relationship workspace) is top-level (R27; 2026-10-15).
+    await nav.getByRole("link", { name: "CRM" }).click();
+    await expect(page).toHaveURL(/\/relationships$/);
+    await expect(
+      page.getByRole("heading", { name: "Relationships", level: 1 }),
     ).toBeVisible();
 
     await sidebar.getByRole("link", { name: "Profile" }).click();

@@ -109,6 +109,27 @@ export type CreateInvestorOrganisationRequest = z.infer<
   typeof CreateInvestorOrganisationRequestSchema
 >;
 
+/**
+ * How an investor wants unsolicited founder contact handled.
+ *   CLOSED     no unsolicited inbound
+ *   QUALIFIED  founders may request contact once later GateQ criteria are met
+ *   OPEN       broader inbound accepted
+ * Captured during onboarding as the investor's confirmed preference; GateQ
+ * (CQ-GATE-001) promotes it into canonical inbound policy using this same
+ * vocabulary. It is not a discovery mode and not an active screen.
+ */
+export const INVESTOR_INBOUND_PREFERENCES = [
+  "CLOSED",
+  "QUALIFIED",
+  "OPEN",
+] as const;
+export const InvestorInboundPreferenceSchema = z.enum(
+  INVESTOR_INBOUND_PREFERENCES,
+);
+export type InvestorInboundPreference = z.infer<
+  typeof InvestorInboundPreferenceSchema
+>;
+
 /** The fields an editor may change. Verification state is not among them. */
 export const INVESTOR_EDITABLE_FIELDS = [
   "investorType",
@@ -117,6 +138,7 @@ export const INVESTOR_EDITABLE_FIELDS = [
   "hqCountry",
   "publicDescription",
   "deploymentState",
+  "inboundPreference",
 ] as const;
 
 export type InvestorEditableField = (typeof INVESTOR_EDITABLE_FIELDS)[number];
@@ -131,6 +153,8 @@ export const UpdateInvestorOrganisationRequestSchema = z
     publicDescription: PublicDescriptionSchema.nullable().optional(),
     /** `null` returns the answer to unknown; it does not mean paused. */
     deploymentState: InvestorDeploymentStateSchema.nullable().optional(),
+    /** `null` returns it to not stated: not reachable. */
+    inboundPreference: InvestorInboundPreferenceSchema.nullable().optional(),
   })
   .strict()
   .refine(
@@ -147,6 +171,61 @@ export type UpdateInvestorOrganisationRequest = z.infer<
  * The organisation-internal investor profile. Verification state is
  * reported read-only; tenant, organisation and membership stay internal.
  */
+/**
+ * Who may see the declared investor profile. The same two states a founder
+ * chooses for a company, for the same reasons (doc 19 §44): private to the
+ * organisation, or visible to authenticated Capital Q participants.
+ */
+export const INVESTOR_VISIBILITY_SEGMENT = "/visibility" as const;
+export const INVESTOR_NETWORK_PREVIEW_SEGMENT = "/network-preview" as const;
+
+export const InvestorVisibilityChoiceSchema = z.enum([
+  "organisation_private",
+  "network_visible",
+]);
+export type InvestorVisibilityChoice = z.infer<
+  typeof InvestorVisibilityChoiceSchema
+>;
+
+export const SetInvestorVisibilityRequestSchema = z
+  .object({
+    visibility: InvestorVisibilityChoiceSchema,
+    expectedVersion: ResourceVersionSchema,
+  })
+  .strict();
+export type SetInvestorVisibilityRequest = z.infer<
+  typeof SetInvestorVisibilityRequestSchema
+>;
+
+/**
+ * What a founder across the network sees of an investor: the declared
+ * profile and nothing else. No mandate, no portfolio, no observed
+ * behaviour, no browsing history, no GateQ state and no score — doc 19
+ * §204.9 forbids private investor behaviour reaching a founder through
+ * discovery, and this shape has nowhere to put it.
+ */
+export const InvestorNetworkPreviewSchema = z
+  .object({
+    investorOrganisationId: UuidSchema,
+    displayName: z.string(),
+    investorType: InvestorTypeSchema,
+    websiteUrl: z.string().nullable(),
+    hqCountry: z.string().nullable(),
+    publicDescription: z.string().nullable(),
+    deploymentState: InvestorDeploymentStateSchema.nullable(),
+    /** True when founders across the network can currently reach this profile. */
+    networkVisible: z.boolean(),
+    /**
+     * How founders may reach them (ADR 0023); null is not stated. Optional
+     * so a preview from an older API still parses.
+     */
+    inboundPreference: InvestorInboundPreferenceSchema.nullable().optional(),
+  })
+  .strict();
+export type InvestorNetworkPreview = z.infer<
+  typeof InvestorNetworkPreviewSchema
+>;
+
 export const InvestorOrganisationDtoSchema = z.object({
   id: UuidSchema,
   investorType: InvestorTypeSchema,
@@ -155,7 +234,14 @@ export const InvestorOrganisationDtoSchema = z.object({
   hqCountry: z.string().nullable(),
   publicDescription: z.string().nullable(),
   deploymentState: InvestorDeploymentStateSchema.nullable(),
+  /**
+   * How founders may reach them (ADR 0023); null is not stated. Defaults
+   * so a response from an older API still parses as not stated.
+   */
+  inboundPreference: InvestorInboundPreferenceSchema.nullable().default(null),
   verificationState: InvestorVerificationStateSchema,
+  /** Who may see this profile. Changed only through the visibility route. */
+  visibility: InvestorVisibilityChoiceSchema,
   version: ResourceVersionSchema,
   createdAt: UtcTimestampSchema,
   updatedAt: UtcTimestampSchema,
@@ -242,27 +328,6 @@ export type InvestorPortfolioReferenceDto = z.infer<
 // ---------------------------------------------------------------------------
 // Inbound preference seam (CQ-ONB-003 I10; canonical policy arrives with CQ-GATE-001)
 // ---------------------------------------------------------------------------
-
-/**
- * How an investor wants unsolicited founder contact handled.
- *   CLOSED     no unsolicited inbound
- *   QUALIFIED  founders may request contact once later GateQ criteria are met
- *   OPEN       broader inbound accepted
- * Captured during onboarding as the investor's confirmed preference; GateQ
- * (CQ-GATE-001) promotes it into canonical inbound policy using this same
- * vocabulary. It is not a discovery mode and not an active screen.
- */
-export const INVESTOR_INBOUND_PREFERENCES = [
-  "CLOSED",
-  "QUALIFIED",
-  "OPEN",
-] as const;
-export const InvestorInboundPreferenceSchema = z.enum(
-  INVESTOR_INBOUND_PREFERENCES,
-);
-export type InvestorInboundPreference = z.infer<
-  typeof InvestorInboundPreferenceSchema
->;
 
 export const INVESTORS_PATH = "/v1/investors" as const;
 /** The investor organisation attached to the caller's active organisation. */

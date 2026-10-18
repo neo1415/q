@@ -40,8 +40,12 @@ export const LOCAL_TEI_PROVIDER_CODE = "local-tei" as const;
 const PROVIDER = LOCAL_TEI_PROVIDER_CODE;
 
 export type LocalTeiProviderOptions = {
-  /** Private-network origin, e.g. `http://127.0.0.1:8080`. */
-  readonly baseUrl: string;
+  /**
+   * Private-network origin, e.g. `http://127.0.0.1:8080`. Undefined when the deployment has not said where the runtime lives
+   * (`Q_EMBEDDING_BASE_URL` outside local). Every call is then UNAVAILABLE
+   * without a request: never a guessed loopback address.
+   */
+  readonly baseUrl: string | undefined;
   readonly configuration: EmbeddingConfiguration;
   readonly timeoutMs: number;
   /** Injectable for tests; defaults to the platform fetch. */
@@ -89,7 +93,8 @@ export function createLocalTeiEmbeddingProvider(
   const { configuration } = options;
   const doFetch = options.fetch ?? globalThis.fetch;
   const now = options.now ?? (() => Date.now());
-  const origin = options.baseUrl.replace(/\/+$/, "");
+  const origin =
+    options.baseUrl === undefined ? null : options.baseUrl.replace(/\/+$/, "");
 
   const fail = (
     message: string,
@@ -117,6 +122,9 @@ export function createLocalTeiEmbeddingProvider(
     init: RequestInit,
     context: EmbeddingExecutionContext,
   ): Promise<{ readonly status: number; readonly body: unknown }> {
+    if (origin === null) {
+      return fail("the embedding runtime is not configured", "UNAVAILABLE");
+    }
     const timeoutMs = context.timeoutMs ?? options.timeoutMs;
     const timeout = new AbortController();
     const timer = setTimeout(() => {
@@ -350,9 +358,11 @@ export function createLocalTeiEmbeddingProvider(
           runtimeVersion: null,
           latencyMs: now() - startedAt,
           detail:
-            failure === "TIMEOUT"
-              ? "the embedding runtime did not answer in time"
-              : "the embedding runtime is not reachable",
+            origin === null
+              ? "the embedding runtime is not configured"
+              : failure === "TIMEOUT"
+                ? "the embedding runtime did not answer in time"
+                : "the embedding runtime is not reachable",
         };
       }
       const latencyMs = now() - startedAt;

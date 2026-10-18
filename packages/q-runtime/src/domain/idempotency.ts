@@ -26,7 +26,17 @@ export function hashRunIdempotencyKey(key: string): string {
 }
 
 export function hashCreateQRunRequest(input: CreateQRunRequest): string {
-  return sha256Hex(canonicalJsonStringify(input));
+  // Where the question was asked from (the screen, the pitch moment, the
+  // surface's opening words) is context, not the request: a question asked
+  // again under the same key after a reload carries none of it, and it is
+  // still the same question (CQ-QX-007 H1).
+  const {
+    screen: _screen,
+    viewing: _viewing,
+    opening: _opening,
+    ...asked
+  } = input;
+  return sha256Hex(canonicalJsonStringify(asked));
 }
 
 export function hashMessageIdempotencyKey(key: string): string {

@@ -116,7 +116,11 @@ export const Q_PUBLIC_FAILURE_MESSAGES: Readonly<
   ACTION_EXPIRED:
     "The prepared action is no longer available. Ask Q to prepare it again if you still need it.",
   CANCELLED: "This request was cancelled.",
-  EXPIRED: "This request expired before it could finish. Please try again.",
+  // Not a deadline: a run is only ever marked expired by the sweep that
+  // runs when Q starts, over runs that were still going when it last
+  // stopped. Saying "expired" implied a clock the person had run out of,
+  // and there is none. What is true is that it never finished.
+  EXPIRED: "That one didn't finish. Ask again and I'll start it fresh.",
   Q_FAILED: "Q couldn't complete this request. Please try again.",
 };
 
@@ -132,6 +136,18 @@ export const QPublicFailureSchema = z
     runId: QRunIdSchema.optional(),
     /** So support can find the private diagnostic without the client seeing it. */
     requestId: RequestIdSchema.optional(),
+    /**
+     * Q's own sentence for this failure in this conversation (CQ-QX-005):
+     * a subsystem notice the conversation core composes from its fixed
+     * lines, so a person hears which capability is down and what Q will do
+     * instead, and never the same line twice running. A surface shows it
+     * instead of `message` when present. Never exception or vendor text.
+     */
+    notice: z
+      .string()
+      .min(1)
+      .max(Q_PUBLIC_FAILURE_MESSAGE_MAX_LENGTH)
+      .optional(),
   })
   .strict();
 
@@ -175,6 +191,8 @@ const PUBLIC_PROJECTION: Readonly<
 export type QPublicFailureRefs = {
   readonly runId?: string | undefined;
   readonly requestId?: string | undefined;
+  /** A conversation-core subsystem notice; see `QPublicFailureSchema.notice`. */
+  readonly notice?: string | undefined;
 };
 
 /** The internal failure, or anything that at least names its diagnostic code. */
@@ -202,5 +220,6 @@ export function toPublicQFailure(
     retryable: projection.retryable,
     ...(refs.runId === undefined ? {} : { runId: refs.runId }),
     ...(refs.requestId === undefined ? {} : { requestId: refs.requestId }),
+    ...(refs.notice === undefined ? {} : { notice: refs.notice }),
   });
 }

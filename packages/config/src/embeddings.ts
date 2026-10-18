@@ -20,7 +20,13 @@ import { ConfigurationError } from "./errors.js";
  * quiet addition here.
  */
 
-export const EMBEDDING_PROVIDERS = ["local-tei"] as const;
+/**
+ * `openai` (Q.02, 2026-10-07): the hosted adapter, because the TEI runtime
+ * does not fit the hosting plan. It reuses the reviewed OpenAI model-provider
+ * key the composition root already holds (OPENAI_API_KEY); this file still
+ * holds no secret. Selecting it is an explicit operator choice.
+ */
+export const EMBEDDING_PROVIDERS = ["local-tei", "openai"] as const;
 export type EmbeddingProviderSetting = (typeof EMBEDDING_PROVIDERS)[number];
 
 export const EMBEDDING_ENV_NAMES = [
@@ -30,7 +36,8 @@ export const EMBEDDING_ENV_NAMES = [
   "Q_EMBEDDING_MAX_BATCH_ITEMS",
 ] as const;
 
-const DEFAULT_BASE_URL = "http://127.0.0.1:8080";
+/** The laptop runtime. A default only when CAPITAL_Q_ENV is local. */
+const LOCAL_BASE_URL = "http://127.0.0.1:8080";
 
 function boundedInt(defaultValue: number, min: number, max: number) {
   const expectation = `expected an integer between ${String(min)} and ${String(max)}`;
@@ -60,6 +67,10 @@ export function isPrivateEmbeddingHost(host: string): boolean {
   if (name === "localhost" || name === "::1" || name === "0.0.0.0") return true;
   if (PRIVATE_IPV4.test(name)) return true;
   if (name.startsWith("fd") || name.startsWith("fc")) return true;
+  // `.internal` is reserved by ICANN for private use and never delegated in
+  // public DNS; Railway's private network (`<service>.railway.internal`) is
+  // one such zone, and it is how a hosted runtime is reached.
+  if (name.endsWith(".internal")) return true;
   // A single-label name is a container or service on an internal network;
   // anything with a dot resolves through public DNS.
   return !name.includes(".") && name.length > 0;
@@ -68,10 +79,18 @@ export function isPrivateEmbeddingHost(host: string): boolean {
 const embeddingEnvSchema = z.object({
   ...runtimeEnvShape,
   Q_EMBEDDING_PROVIDER: z.enum(EMBEDDING_PROVIDERS).default("local-tei"),
-  Q_EMBEDDING_BASE_URL: z
-    .string()
-    .url("expected an http(s) URL for the embedding runtime")
-    .default(DEFAULT_BASE_URL),
+  Q_EMBEDDING_BASE_URL: z.preprocess(
+    (value) =>
+      typeof value !== "string" ||
+      value.trim() === "" ||
+      value.trim().startsWith("disabled-")
+        ? undefined
+        : value.trim(),
+    z
+      .string()
+      .url("expected an http(s) URL for the embedding runtime")
+      .optional(),
+  ),
   // Long enough for a cold CPU model to answer, short enough that a stuck
   // runtime does not hold a worker open.
   Q_EMBEDDING_TIMEOUT_MS: boundedInt(60_000, 1_000, 300_000),
@@ -81,14 +100,47 @@ const embeddingEnvSchema = z.object({
 export type EmbeddingConfig = {
   readonly runtime: RuntimeConfig;
   readonly provider: EmbeddingProviderSetting;
-  readonly baseUrl: string;
+  /**
+   * Undefined outside `local` when `Q_EMBEDDING_BASE_URL` is unset: the
+   * runtime is then unavailable (semantic retrieval degrades to lexical),
+   * never silently pointed at a loopback address nothing listens on.
+   */
+  readonly baseUrl: string | undefined;
+  /** Names still needed. Never a value. */
+  readonly missing: readonly string[];
   readonly timeoutMs: number;
   readonly maxBatchItems: number;
 };
 
 export function parseEmbeddingConfig(env: EnvironmentInput): EmbeddingConfig {
   const parsed = parseConfig("embeddings", embeddingEnvSchema, env);
-  const url = new URL(parsed.Q_EMBEDDING_BASE_URL);
+  const runtime = toRuntimeConfig(parsed);
+  if (parsed.Q_EMBEDDING_PROVIDER === "openai") {
+    // Hosted: no runtime address. The key is checked by the composition
+    // root, which reports it missing by name.
+    return {
+      runtime,
+      provider: "openai",
+      baseUrl: undefined,
+      missing: [],
+      timeoutMs: parsed.Q_EMBEDDING_TIMEOUT_MS,
+      maxBatchItems: parsed.Q_EMBEDDING_MAX_BATCH_ITEMS,
+    };
+  }
+  const baseUrl =
+    parsed.Q_EMBEDDING_BASE_URL ??
+    (runtime.deploymentEnvironment === "local" ? LOCAL_BASE_URL : undefined);
+  if (baseUrl === undefined) {
+    return {
+      runtime,
+      provider: parsed.Q_EMBEDDING_PROVIDER,
+      baseUrl: undefined,
+      missing: ["Q_EMBEDDING_BASE_URL"],
+      timeoutMs: parsed.Q_EMBEDDING_TIMEOUT_MS,
+      maxBatchItems: parsed.Q_EMBEDDING_MAX_BATCH_ITEMS,
+    };
+  }
+  const url = new URL(baseUrl);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new ConfigurationError("embeddings", [
       {
@@ -107,9 +159,10 @@ export function parseEmbeddingConfig(env: EnvironmentInput): EmbeddingConfig {
     ]);
   }
   return {
-    runtime: toRuntimeConfig(parsed),
+    runtime,
     provider: parsed.Q_EMBEDDING_PROVIDER,
-    baseUrl: parsed.Q_EMBEDDING_BASE_URL,
+    baseUrl,
+    missing: [],
     timeoutMs: parsed.Q_EMBEDDING_TIMEOUT_MS,
     maxBatchItems: parsed.Q_EMBEDDING_MAX_BATCH_ITEMS,
   };

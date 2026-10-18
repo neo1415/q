@@ -23,6 +23,7 @@ import type {
   QActionRecord,
   QActionRepositories,
   QApprovalRecord,
+  QPendingApprovalRow,
 } from "../ports.js";
 
 /**
@@ -122,6 +123,19 @@ const ApprovalRow = z.object({
   version: z.number().int().min(1),
 });
 
+const PendingRow = z.object({
+  id: QApprovalIdSchema,
+  run_id: QRunIdSchema,
+  conversation_id: z.string().uuid().nullable(),
+  summary: z.string().min(1),
+  requested_at: Timestamp,
+  expires_at: Timestamp,
+  // A stored target the contract no longer reads is no target, never a
+  // failed list.
+  target_refs: z.unknown(),
+  action_type: QActionTypeSchema,
+});
+
 function toApproval(row: unknown): QApprovalRecord {
   const r = ApprovalRow.parse(row);
   return {
@@ -143,6 +157,11 @@ function toApproval(row: unknown): QApprovalRecord {
     version: r.version,
   };
 }
+
+const AwaitingRow = z.object({
+  action_id: QActionProposalIdSchema,
+  approval_id: QApprovalIdSchema,
+});
 
 function selectAction(executor: DatabaseExecutor) {
   return executor`
@@ -187,6 +206,20 @@ export function createPostgresQActionRepositories(): QActionRepositories {
     return rows.length === 0 ? null : toApproval(rows[0]);
   };
 
+  /**
+   * Only cards for these exact targets (voiceq-63: each candidate is read
+   * back with two queries, inside the propose transaction; unfiltered, a
+   * person with many waiting cards paid for all of them before a new card
+   * appeared). jsonb equality: the same refs, whatever their key order.
+   */
+  const sameTargets = (
+    executor: DatabaseExecutor,
+    targets: readonly unknown[] | undefined,
+  ) =>
+    targets === undefined
+      ? executor``
+      : executor`and a.target_refs = ${JSON.stringify(targets)}::text::jsonb`;
+
   return {
     actions: {
       insert: async (tx, input) => {
@@ -213,6 +246,85 @@ export function createPostgresQActionRepositories(): QActionRepositories {
            where a.id = ${actionId} and a.tenant_id = ${tenantId}
            for update`;
         return rows.length === 0 ? null : toAction(rows[0]);
+      },
+      listAwaitingForProposer: async (executor, input) => {
+        const rows = await executor`
+          select a.id as action_id, p.id as approval_id
+            from q_runtime.actions a
+            join q_runtime.approvals p
+              on p.action_id = a.id and p.tenant_id = a.tenant_id
+           where a.tenant_id = ${input.tenantId}
+             and a.proposed_by_user_id = ${input.userId}
+             and a.organisation_id = ${input.organisationId}
+             and a.action_type = ${input.actionType}
+             and a.action_version = ${input.actionVersion}
+             and a.status = 'AWAITING_APPROVAL'
+             ${sameTargets(executor, input.targets)}
+             and p.requested_from_user_id = ${input.userId}
+             and p.status = 'PENDING'
+             and p.expires_at > ${input.now.toISOString()}::text::timestamptz
+           order by p.requested_at desc, p.id desc
+           limit 20`;
+        const found: {
+          readonly action: QActionRecord;
+          readonly approval: QApprovalRecord;
+        }[] = [];
+        for (const row of rows) {
+          const ids = AwaitingRow.parse(row);
+          const action = await findAction(
+            executor,
+            input.tenantId,
+            ids.action_id,
+          );
+          const approval = await findApproval(
+            executor,
+            input.tenantId,
+            ids.approval_id,
+          );
+          if (action !== null && approval !== null) {
+            found.push({ action, approval });
+          }
+        }
+        return found;
+      },
+      listExecutedForProposer: async (executor, input) => {
+        const rows = await executor`
+          select a.id as action_id, p.id as approval_id
+            from q_runtime.actions a
+            join q_runtime.approvals p
+              on p.action_id = a.id and p.tenant_id = a.tenant_id
+           where a.tenant_id = ${input.tenantId}
+             and a.proposed_by_user_id = ${input.userId}
+             and a.organisation_id = ${input.organisationId}
+             and a.action_type = ${input.actionType}
+             and a.action_version = ${input.actionVersion}
+             and a.status = 'EXECUTED'
+             ${sameTargets(executor, input.targets)}
+             and p.status = 'APPROVED'
+             and a.executed_at >= ${input.since.toISOString()}::text::timestamptz
+           order by a.executed_at desc, a.id desc
+           limit 20`;
+        const found: {
+          readonly action: QActionRecord;
+          readonly approval: QApprovalRecord;
+        }[] = [];
+        for (const row of rows) {
+          const ids = AwaitingRow.parse(row);
+          const action = await findAction(
+            executor,
+            input.tenantId,
+            ids.action_id,
+          );
+          const approval = await findApproval(
+            executor,
+            input.tenantId,
+            ids.approval_id,
+          );
+          if (action !== null && approval !== null) {
+            found.push({ action, approval });
+          }
+        }
+        return found;
       },
       listForRun: async (executor, tenantId, runId) => {
         const rows = await executor`
@@ -281,6 +393,52 @@ export function createPostgresQActionRepositories(): QActionRepositories {
           tenantId: r.tenant_id,
           requestedFromUserId: r.requested_from_user_id,
         };
+      },
+      listLapsed: async (executor, input) => {
+        const rows = await executor<{ tenant_id: string; id: string }[]>`
+          select p.tenant_id, p.id
+            from q_runtime.approvals p
+           where p.status = 'PENDING'
+             and p.expires_at <= ${input.now.toISOString()}::text::timestamptz
+           order by p.expires_at, p.id
+           limit ${input.limit}`;
+        return rows.map((row) => ({
+          tenantId: TenantIdSchema.parse(row.tenant_id),
+          approvalId: QApprovalIdSchema.parse(row.id),
+        }));
+      },
+      listPendingForApprover: async (executor, input) => {
+        const rows = await executor`
+          select p.id, a.run_id, r.conversation_id, a.summary,
+                 p.requested_at, p.expires_at, a.target_refs, a.action_type
+            from q_runtime.approvals p
+            join q_runtime.actions a
+              on a.id = p.action_id and a.tenant_id = p.tenant_id
+            join q_runtime.runs r
+              on r.id = a.run_id and r.tenant_id = a.tenant_id
+           where p.tenant_id = ${input.tenantId}
+             and p.requested_from_user_id = ${input.userId}
+             and a.organisation_id = ${input.organisationId}
+             and p.status = 'PENDING'
+             -- Only a card its run still waits on can be decided (live
+             -- 2026-10-16: a cancelled run's card was listed as waiting).
+             and r.status = 'AWAITING_APPROVAL'
+             and p.expires_at > ${input.now.toISOString()}::text::timestamptz
+           order by p.requested_at desc, p.id desc
+           limit ${input.limit}`;
+        return rows.map((row): QPendingApprovalRow => {
+          const r = PendingRow.parse(row);
+          return {
+            approvalId: r.id,
+            runId: r.run_id,
+            conversationId: r.conversation_id,
+            summary: r.summary,
+            requestedAt: r.requested_at,
+            expiresAt: r.expires_at,
+            targets: QSubjectRefsSchema.safeParse(r.target_refs).data ?? [],
+            actionType: r.action_type,
+          };
+        });
       },
       listForAction: async (executor, tenantId, actionId) => {
         const rows = await executor`

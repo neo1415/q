@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* global process, console, URL */
 /**
  * Local embedding health and smoke (CQ-RAG-002 §49).
  *

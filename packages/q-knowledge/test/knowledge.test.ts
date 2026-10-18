@@ -325,7 +325,7 @@ describe("read authorisation is projected from the plan", () => {
   const plan = (scopes: unknown[]): PermittedContextPlan =>
     ({
       contractVersion: 1,
-      policyVersion: "context-firewall-v1",
+      policyVersion: "context-firewall-v2",
       planId: "77777777-7777-4777-8777-777777777777",
       fingerprint: "a".repeat(64),
       runId: "66666666-6666-4666-8666-666666666666",

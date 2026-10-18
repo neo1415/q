@@ -21,6 +21,7 @@ export {
   INVESTOR_PHASES,
   INVESTOR_STEP_CONTEXTS,
   INVESTOR_STEPS,
+  INVESTOR_REVISABLE_STEPS,
   INVESTOR_TYPE_OPTIONS,
   INVESTOR_WRITE_TARGETS,
   PERSONAL_INVESTING_WORKSPACE,
@@ -43,3 +44,10 @@ export {
   type InvestorMandatesContext,
   type InvestorReviewContext,
 } from "./contexts.js";
+
+export { INVESTOR_UTTERANCE_ALIASES } from "./utterance-aliases.js";
+export {
+  INVESTOR_COVERAGE_PROFILE,
+  INVESTOR_DOCUMENT_FIELDS,
+  INVESTOR_UPLOAD_DOCUMENT_TYPES,
+} from "./coverage.js";

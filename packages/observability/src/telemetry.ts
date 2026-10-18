@@ -13,13 +13,56 @@ const DEFAULT_SCOPE = "@capital-q/observability";
  * (TEO-050). This module owns the API surface so domain code never imports
  * OpenTelemetry directly and no backend is baked in.
  *
- * IMPORTANT — nothing is exported anywhere yet. Without a registered SDK the
- * OpenTelemetry API returns no-op tracers and meters: spans are created and
- * discarded. That is the intended state for this packet. The SDK, OTLP exporter
- * and collector arrive with the operations packets, at which point this API
- * begins producing real telemetry with no change to calling code.
+ * Export is OFF by default: without a registered SDK the OpenTelemetry API
+ * returns no-op tracers and meters. RECOVERY F8 (audit F-D7) adds an opt-in:
+ * with `CQ_TELEMETRY_EXPORT=otlp` and `OTEL_EXPORTER_OTLP_ENDPOINT` set, the
+ * runtime's `start()` registers the OTLP/HTTP trace exporter, if the SDK
+ * packages are installed. They are not dependencies yet (a lead decision:
+ * `@opentelemetry/sdk-node`, `@opentelemetry/exporter-trace-otlp-http`), so
+ * today the opt-in reports UNAVAILABLE once on stderr and changes nothing.
+ * No backend is chosen here and none is paid for.
  */
 export const TELEMETRY_EXPORT_ENABLED = false;
+
+export type TelemetryExportStatus = "OFF" | "ON" | "UNAVAILABLE";
+
+/** The SDK, as far as this module needs it. */
+export type TelemetrySdk = {
+  start(): void | Promise<void>;
+  shutdown(): Promise<void>;
+};
+
+export type TelemetrySdkLoader = () => Promise<TelemetrySdk>;
+
+/** Whether this process was asked to export (env only; never a default). */
+export function telemetryExportRequested(
+  env: Readonly<Record<string, string | undefined>>,
+): boolean {
+  return (
+    env["CQ_TELEMETRY_EXPORT"]?.trim().toLowerCase() === "otlp" &&
+    (env["OTEL_EXPORTER_OTLP_ENDPOINT"]?.trim() ?? "") !== ""
+  );
+}
+
+/**
+ * Loads the SDK by name at runtime. The specifiers are variables on
+ * purpose: the packages are optional, and a missing one must be a status,
+ * not a build error or a crash.
+ */
+const loadOtlpSdk: TelemetrySdkLoader = async () => {
+  const sdkName = "@opentelemetry/sdk-node";
+  const exporterName = "@opentelemetry/exporter-trace-otlp-http";
+  const sdkModule = (await import(sdkName)) as {
+    NodeSDK: new (options: { traceExporter: unknown }) => TelemetrySdk;
+  };
+  const exporterModule = (await import(exporterName)) as {
+    OTLPTraceExporter: new () => unknown;
+  };
+  // The exporter reads OTEL_EXPORTER_OTLP_ENDPOINT and _HEADERS itself.
+  return new sdkModule.NodeSDK({
+    traceExporter: new exporterModule.OTLPTraceExporter(),
+  });
+};
 
 export function getTracer(
   name: string = DEFAULT_SCOPE,
@@ -53,26 +96,61 @@ export function getActiveTraceContext():
 }
 
 /**
- * Lifecycle contract for the observability subsystem.
- *
- * `start` is currently a no-op and `shutdown` has nothing to flush. The
- * contract exists now so that adding an exporter later — which does need
- * startup and a flush on termination — does not require touching every
- * deployable's composition root.
+ * Lifecycle contract for the observability subsystem. Every deployable
+ * already calls `start` at boot and `shutdown` on termination, so turning
+ * export on needs no composition change.
  */
 export type ObservabilityRuntime = {
   start(): Promise<void>;
   shutdown(): Promise<void>;
+  /** After `start`: whether spans are being exported. */
+  exportStatus(): TelemetryExportStatus;
 };
 
-export function createTelemetryRuntime(): ObservabilityRuntime {
+export function createTelemetryRuntime(
+  options: {
+    readonly env?: Readonly<Record<string, string | undefined>> | undefined;
+    readonly load?: TelemetrySdkLoader | undefined;
+    readonly report?: ((line: string) => void) | undefined;
+  } = {},
+): ObservabilityRuntime {
+  const env = options.env ?? process.env;
+  const report =
+    options.report ??
+    ((line: string) => {
+      process.stderr.write(`${line}\n`);
+    });
+  let sdk: TelemetrySdk | undefined;
+  let status: TelemetryExportStatus = "OFF";
   return {
-    start(): Promise<void> {
-      return Promise.resolve();
+    async start(): Promise<void> {
+      if (!telemetryExportRequested(env)) return;
+      try {
+        sdk = await (options.load ?? loadOtlpSdk)();
+        await sdk.start();
+        status = "ON";
+      } catch {
+        // Telemetry never stops a service from starting. One line, no
+        // endpoint or header values.
+        sdk = undefined;
+        status = "UNAVAILABLE";
+        report(
+          JSON.stringify({
+            level: "warn",
+            msg: "telemetry export requested but the OpenTelemetry SDK is not available; continuing without export",
+          }),
+        );
+      }
     },
-    shutdown(): Promise<void> {
-      return Promise.resolve();
+    async shutdown(): Promise<void> {
+      if (sdk === undefined) return;
+      try {
+        await sdk.shutdown();
+      } catch {
+        // A failed final flush is not a failed shutdown.
+      }
     },
+    exportStatus: () => status,
   };
 }
 

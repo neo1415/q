@@ -73,9 +73,23 @@ export const KnowledgeKeySchema = z
   .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/)
   .max(128);
 
+/**
+ * What an understanding can be about (doc 14 §2.2). A company, the person
+ * themselves, or an investor organisation — the same three the Evidence
+ * context resolves, because an understanding must rest on evidence about
+ * the same subject and the gate checks that they match.
+ */
+export const KNOWLEDGE_SUBJECT_TYPES = [
+  "COMPANY",
+  "PERSON",
+  "INVESTOR_ORGANISATION",
+] as const;
+export const KnowledgeSubjectTypeSchema = z.enum(KNOWLEDGE_SUBJECT_TYPES);
+export type KnowledgeSubjectType = z.infer<typeof KnowledgeSubjectTypeSchema>;
+
 export const KnowledgeSubjectRefSchema = z
   .object({
-    subjectType: z.literal("COMPANY"),
+    subjectType: KnowledgeSubjectTypeSchema,
     subjectId: z.string().uuid(),
   })
   .strict();

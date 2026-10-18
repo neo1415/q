@@ -3,10 +3,12 @@
 import { useState, type FormEvent } from "react";
 
 import { ChoiceList, MultiChoiceList } from "@capital-q/ui/choice-list";
+import { Input } from "@capital-q/ui/input";
 import { MoneyInput, type MoneyValue } from "@capital-q/ui/money-input";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 const RAISING = new Set(["active", "preparing"]);
 
@@ -22,6 +24,7 @@ export function CapitalObjectiveStep({
   busy,
   actions,
 }: StepProps<"capital_objective">) {
+  const t = useT();
   const saved = step.response;
   const [raisingStatus, setRaisingStatus] = useState<string | undefined>(
     saved?.raisingStatus,
@@ -41,6 +44,7 @@ export function CapitalObjectiveStep({
   const [useOfFunds, setUseOfFunds] = useState<readonly string[]>(
     saved?.useOfFunds ?? [],
   );
+  const [minCheque, setMinCheque] = useState<string>(saved?.minCheque ?? "");
   const [error, setError] = useState<string | undefined>(undefined);
   const [amountError, setAmountError] = useState<string | undefined>(undefined);
 
@@ -67,6 +71,8 @@ export function CapitalObjectiveStep({
       ...(instrument !== undefined ? { instrument } : {}),
       ...(timeframe !== undefined ? { timeframe } : {}),
       ...(useOfFunds.length > 0 ? { useOfFunds: [...useOfFunds] } : {}),
+      // Empty means any size is welcome: the step is skipped, never 0.
+      ...(step.asksMinCheque && /[1-9]/.test(minCheque) ? { minCheque } : {}),
     });
   }
 
@@ -95,16 +101,18 @@ export function CapitalObjectiveStep({
       {raising ? (
         <>
           {step.existingObjective !== undefined ? (
-            <InlineNotice tone="info" title="Recalibrating your raise">
-              Your current objective is {step.existingObjective.currency}{" "}
+            <InlineNotice tone="info" title={t("Updating your raise")}>
+              Your current raise is {step.existingObjective.currency}{" "}
               {step.existingObjective.amount}. Saving updates it; it never
               creates a second one.
             </InlineNotice>
           ) : null}
           <MoneyInput
             id="raise-amount"
-            label="Target amount"
-            description="An exact figure. A range is fine; enter the midpoint."
+            label={t("Target amount")}
+            description={t(
+              "An exact figure. A range is fine; enter the midpoint.",
+            )}
             value={amount}
             currencies={step.currencies}
             disabled={busy}
@@ -118,7 +126,7 @@ export function CapitalObjectiveStep({
             id="raise-instrument"
             name="instrument"
             legend="Instrument"
-            description="Optional."
+            description={t("Optional.")}
             options={step.instrumentOptions}
             value={instrument}
             disabled={busy}
@@ -128,7 +136,7 @@ export function CapitalObjectiveStep({
             id="raise-timeframe"
             name="timeframe"
             legend="Target close"
-            description="Optional."
+            description={t("Optional.")}
             options={step.timeframeOptions}
             value={timeframe}
             disabled={busy}
@@ -138,12 +146,27 @@ export function CapitalObjectiveStep({
             id="raise-use"
             name="useOfFunds"
             legend="Main use of funds"
-            description="Optional. Choose any that apply."
+            description={t("Optional. Choose any that apply.")}
             options={step.useOfFundsOptions}
             values={useOfFunds}
             disabled={busy}
             onChange={setUseOfFunds}
           />
+          {step.asksMinCheque ? (
+            <Input
+              id="raise-min-cheque"
+              label={`Smallest cheque you would take (${amount.currency})`}
+              description={t("Optional. Leave empty if any size is welcome.")}
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={minCheque}
+              disabled={busy}
+              onChange={(event) =>
+                setMinCheque(event.target.value.replace(/[^0-9]/g, ""))
+              }
+            />
+          ) : null}
         </>
       ) : null}
     </form>

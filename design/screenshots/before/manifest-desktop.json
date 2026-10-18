@@ -1,0 +1,198 @@
+[
+  {
+    "page": "root",
+    "viewport": "desktop",
+    "file": "root-desktop.png",
+    "url": "http://127.0.0.1:3000/auth/sign-in?next=%2Fhome",
+    "note": "landing / redirect target when signed out"
+  },
+  {
+    "page": "auth-sign-up",
+    "viewport": "desktop",
+    "file": "auth-sign-up-desktop.png",
+    "url": "http://127.0.0.1:3000/auth/sign-up",
+    "note": ""
+  },
+  {
+    "page": "auth-sign-in",
+    "viewport": "desktop",
+    "file": "auth-sign-in-desktop.png",
+    "url": "http://127.0.0.1:3000/auth/sign-in",
+    "note": ""
+  },
+  {
+    "page": "auth-sign-in-error",
+    "viewport": "desktop",
+    "file": "auth-sign-in-error-desktop.png",
+    "url": "http://127.0.0.1:3000/auth/sign-in",
+    "note": "wrong credentials"
+  },
+  {
+    "page": "auth-forgot-password",
+    "viewport": "desktop",
+    "file": "auth-forgot-password-desktop.png",
+    "url": "http://127.0.0.1:3000/auth/forgot-password",
+    "note": ""
+  },
+  {
+    "page": "auth-check-email",
+    "viewport": "desktop",
+    "file": "auth-check-email-desktop.png",
+    "url": "http://127.0.0.1:3000/auth/check-email",
+    "note": ""
+  },
+  {
+    "page": "auth-update-password",
+    "viewport": "desktop",
+    "file": "auth-update-password-desktop.png",
+    "url": "http://127.0.0.1:3000/auth/sign-in",
+    "note": "reached without a recovery session"
+  },
+  {
+    "page": "home-signed-out-redirect",
+    "viewport": "desktop",
+    "file": "home-signed-out-redirect-desktop.png",
+    "url": "http://127.0.0.1:3000/auth/sign-in?next=%2Fhome",
+    "note": "signed-out visit to /home"
+  },
+  {
+    "page": "after-sign-in-landing",
+    "viewport": "desktop",
+    "file": "after-sign-in-landing-desktop.png",
+    "url": "http://127.0.0.1:3000/welcome",
+    "note": "where sign-in lands a fresh person"
+  },
+  {
+    "page": "welcome",
+    "viewport": "desktop",
+    "file": "welcome-desktop.png",
+    "url": "http://127.0.0.1:3000/welcome?again=1",
+    "note": "arrival: Q introduces itself"
+  },
+  {
+    "page": "welcome-started",
+    "viewport": "desktop",
+    "file": "welcome-started-desktop.png",
+    "url": "http://127.0.0.1:3000/welcome?again=1",
+    "note": "after Start: the role choice"
+  },
+  {
+    "page": "home-fresh",
+    "viewport": "desktop",
+    "file": "home-fresh-desktop.png",
+    "url": "http://127.0.0.1:3000/home",
+    "note": "Home with no organisation context"
+  },
+  {
+    "page": "home-q-working",
+    "viewport": "desktop",
+    "file": "home-q-working-desktop.png",
+    "url": "http://127.0.0.1:3000/home?c=85faeccd-e47f-41bb-b70c-c989a33fc877",
+    "note": "Q working state right after a question"
+  },
+  {
+    "page": "home-q-answer",
+    "viewport": "desktop",
+    "file": "home-q-answer-desktop.png",
+    "url": "http://127.0.0.1:3000/home?c=85faeccd-e47f-41bb-b70c-c989a33fc877",
+    "note": "Q answer on Home"
+  },
+  {
+    "page": "discover-fresh",
+    "viewport": "desktop",
+    "file": "discover-fresh-desktop.png",
+    "url": "http://127.0.0.1:3000/discover",
+    "note": "Discover with no context"
+  },
+  {
+    "page": "capital-empty",
+    "viewport": "desktop",
+    "file": "capital-empty-desktop.png",
+    "url": "http://127.0.0.1:3000/capital",
+    "note": "Capital empty state"
+  },
+  {
+    "page": "profile-fresh",
+    "viewport": "desktop",
+    "file": "profile-fresh-desktop.png",
+    "url": "http://127.0.0.1:3000/profile",
+    "note": ""
+  },
+  {
+    "page": "company-visibility-fresh",
+    "viewport": "desktop",
+    "file": "company-visibility-fresh-desktop.png",
+    "url": "http://127.0.0.1:3000/company/visibility",
+    "note": "visibility with no company"
+  },
+  {
+    "page": "onboarding-founder-conversation",
+    "viewport": "desktop",
+    "file": "onboarding-founder-conversation-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Q-led founder onboarding, conversation first"
+  },
+  {
+    "page": "onboarding-founder-f0-form",
+    "viewport": "desktop",
+    "file": "onboarding-founder-f0-form-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "founder F0 structured form"
+  },
+  {
+    "page": "onboarding-investor-conversation",
+    "viewport": "desktop",
+    "file": "onboarding-investor-conversation-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Q-led investor onboarding, conversation first"
+  },
+  {
+    "page": "onboarding-investor-i0-form",
+    "viewport": "desktop",
+    "file": "onboarding-investor-i0-form-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "investor I0 structured form"
+  },
+  {
+    "page": "onboarding-founder-conversation-working",
+    "viewport": "desktop",
+    "file": "onboarding-founder-conversation-working-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Q working in onboarding"
+  },
+  {
+    "page": "onboarding-founder-conversation-reply",
+    "viewport": "desktop",
+    "file": "onboarding-founder-conversation-reply-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Q reply in onboarding conversation"
+  },
+  {
+    "page": "home-fresh-dark",
+    "viewport": "desktop",
+    "file": "home-fresh-dark-desktop.png",
+    "url": "http://127.0.0.1:3000/home",
+    "note": "dark scheme"
+  },
+  {
+    "page": "profile-dark",
+    "viewport": "desktop",
+    "file": "profile-dark-desktop.png",
+    "url": "http://127.0.0.1:3000/profile",
+    "note": "dark scheme"
+  },
+  {
+    "page": "founder-failure",
+    "viewport": "desktop",
+    "file": "founder-failure-desktop.png",
+    "url": "chrome-error://chromewebdata/",
+    "note": "Error: page.goto: net::ERR_NETWORK_IO_SUSPENDED at http://127.0.0.1:3000/onboarding/founder\nCall log:\n\u001b[2m  - navigating"
+  },
+  {
+    "page": "investor-failure",
+    "viewport": "desktop",
+    "file": "investor-failure-desktop.png",
+    "url": "http://127.0.0.1:3000/auth/sign-in",
+    "note": "TimeoutError: page.waitForURL: Timeout 45000ms exceeded.\n=========================== logs ===========================\nwa"
+  }
+]

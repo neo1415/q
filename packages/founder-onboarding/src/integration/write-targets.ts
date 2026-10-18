@@ -57,10 +57,20 @@ import {
   type ResponseValues,
 } from "@capital-q/onboarding";
 import {
+  createFinancialKnowledgePort,
+  financialClaimFor,
+  type FinancialKnowledgePort,
+} from "./financial-claims.js";
+import { FOUNDER_FINANCIAL_WRITE_TARGET } from "../definition/founder-v4.js";
+import {
   createFounderDomainServices,
   type FounderDomainDependencies,
   type FounderDomainServices,
 } from "./services.js";
+import {
+  founderMayReuseWorkspace,
+  readFounderWorkspaceFacts,
+} from "./workspace.js";
 
 /**
  * Founder write-target handlers. Each maps one semantic target onto the
@@ -79,6 +89,9 @@ export type FounderWriteTargetOptions = FounderDomainDependencies & {
   /** Test seam: compose the domains differently on the transaction. */
   readonly services?:
     ((tx: TransactionContext) => FounderDomainServices) | undefined;
+  /** Q.01: where a financial answer is recorded; the Write Gate by default. */
+  readonly financialKnowledge?:
+    ((tx: TransactionContext) => FinancialKnowledgePort) | undefined;
 };
 
 export type BoundCompany = {
@@ -141,10 +154,39 @@ function invalid(path: string, code: string, message: string): never {
   throw new ContractValidationError(message, [{ path, code, message }]);
 }
 
-/** "example.com" is what founders type; the canonical field is an http(s) URL. */
+/**
+ * "example.com" is what founders type; the canonical field is an http(s)
+ * URL of a public host.
+ *
+ * A host with no dot is not a website anybody can visit. "we're still on
+ * instagram" became `https://instagram` on the canonical company record,
+ * which investors would then see as the company's website
+ * (CQ-ACCEPT-001). It is refused, the same way any other invalid value is,
+ * so the step stays open and Q says it did not go in.
+ */
 export function normaliseWebsite(raw: string): string {
   const trimmed = raw.trim();
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  // The scheme is stored lower-case: a typed or spoken "Https://" showed
+  // as "Https://site.com" wherever the scheme is trimmed for display.
+  const url = /^https?:\/\//i.test(trimmed)
+    ? trimmed.replace(/^https?:\/\//i, (scheme) => scheme.toLowerCase())
+    : `https://${trimmed}`;
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    invalid("value.text", "website_invalid", "That isn't a web address.");
+  }
+  const labels = host.split(".");
+  const tld = labels.at(-1) ?? "";
+  if (
+    labels.length < 2 ||
+    labels.some((l) => l.length === 0) ||
+    tld.length < 2
+  ) {
+    invalid("value.text", "website_invalid", "That isn't a web address.");
+  }
+  return url;
 }
 
 async function updateCompanyIfChanged(
@@ -181,6 +223,46 @@ async function updateCompanyIfChanged(
 // company.bootstrap (F1.company_name)
 // ---------------------------------------------------------------------------
 
+/**
+ * F3 (2026-10-08): how a company name compares: lower case, legal suffixes
+ * (Ltd, Limited, Inc, LLC, PLC, Corp) dropped, letters and digits only. "Bumpa
+ * Ltd." and "bumpa" are the same company name.
+ */
+export function companyNameKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/gu, "")
+    .replace(/\b(ltd|limited|inc|llc|plc|corp)\b\.?/gu, "")
+    .replace(/[^a-z0-9]/gu, "");
+}
+
+/**
+ * The name of an existing active canonical company with the same name key,
+ * that the network may see (network_visible / public_external, ADR-001) and
+ * that is not in the founder's own organisation. A private company is never
+ * matched, so this cannot reveal one.
+ */
+export async function existingCanonicalCompany(
+  sql: TransactionContext["sql"],
+  name: string,
+  ownOrganisationId: string | null,
+): Promise<string | null> {
+  const key = companyNameKey(name);
+  if (key.length < 2) return null;
+  const rows = await sql<{ canonical_name: string }[]>`
+    select c.canonical_name
+      from core.companies c
+     where c.company_status = 'active'
+       and c.marketplace_visibility in ('network_visible', 'public_external')
+       and (${ownOrganisationId}::uuid is null or c.organisation_id <> ${ownOrganisationId}::uuid)
+       and regexp_replace(
+             regexp_replace(lower(c.canonical_name), '\\m(ltd|limited|inc|llc|plc|corp)\\M\\.?', '', 'g'),
+             '[^a-z0-9]', '', 'g') = ${key}
+     limit 1`;
+  return rows[0]?.canonical_name ?? null;
+}
+
 async function bootstrapCompany(
   services: FounderDomainServices,
   context: OnboardingWriteContext,
@@ -199,17 +281,50 @@ async function bootstrapCompany(
     return;
   }
 
+  // Owner directive 2026-10-16: the active organisation is this company's
+  // workspace only when it is a company workspace this person may found a
+  // company in (`founderMayReuseWorkspace`). A firm's workspace, or a team
+  // somebody else founded, is left as it is and the founder gets their own.
+  const reusable =
+    actor.context?.organisationId !== undefined &&
+    founderMayReuseWorkspace(
+      (await readFounderWorkspaceFacts(context.tx.sql, actor.context)) ?? {
+        organisationType: "unknown",
+        isOwner: false,
+        holdsCompany: true,
+      },
+    )
+      ? actor.context
+      : null;
+
+  // F3 (2026-10-08): one canonical company per real company. A founder
+  // naming a company already on Capital Q (one the network may see, outside
+  // their own organisation) claims it instead of creating a second record.
+  const existing = await existingCanonicalCompany(
+    context.tx.sql,
+    name,
+    reusable?.organisationId ?? null,
+  );
+  if (existing !== null) {
+    invalid(
+      "value.text",
+      "company_already_on_capital_q",
+      `${existing} is already on Capital Q. If it's yours, claim it from GateQ → Find my startup (/gateq?tab=claim&q=${encodeURIComponent(existing)}) instead of creating it again. If yours is a different company, add what sets its name apart.`,
+    );
+  }
+
   let actorContext: ActorContext;
-  if (actor.context?.organisationId !== undefined) {
+  if (reusable !== null) {
     // An existing member creates the company in their active organisation;
     // the company service decides whether they may.
-    actorContext = actor.context;
+    actorContext = reusable;
   } else {
     if (actor.principal === undefined) {
       throw new OnboardingContextRequiredError();
     }
-    // First workspace: the organisation service creates tenant, organisation
-    // and the founder's admin membership, then activates the context.
+    // Their own workspace (the first, or one beside a firm or a team they
+    // joined): the organisation service creates tenant, organisation and the
+    // founder's owner membership, then activates the context.
     const membership = await services.organisations.createOrganisation({
       principal: actor.principal,
       input: parseContract(
@@ -258,9 +373,43 @@ async function bootstrapCompany(
 // company.basics (F1.website / country / stage / description)
 // ---------------------------------------------------------------------------
 
+/**
+ * A country named in the person's words, as its ISO code: "Uzbekistan"
+ * outside the short list is still a country (founder direction
+ * 2026-09-30: an answer outside the options is kept, never lost to
+ * "Somewhere else"). A validator's normalisation over the platform's own
+ * region names (ADR 0011 §4); null when the words name no country.
+ */
+export function countryCodeOf(words: string | null): string | null {
+  if (words === null) return null;
+  const wanted = words.trim().toLowerCase();
+  if (wanted.length === 0) return null;
+  const names = new Intl.DisplayNames(["en"], { type: "region" });
+  for (let a = 65; a <= 90; a += 1) {
+    for (let b = 65; b <= 90; b += 1) {
+      const code = String.fromCharCode(a, b);
+      let name: string | undefined;
+      try {
+        name = names.of(code);
+      } catch {
+        continue;
+      }
+      if (
+        name !== undefined &&
+        name !== code &&
+        name.toLowerCase() === wanted
+      ) {
+        return code;
+      }
+    }
+  }
+  return null;
+}
+
 function companyBasicsChanges(
   stepKey: string,
   values: ResponseValues,
+  note: string | null = null,
 ): Record<string, string | null> {
   switch (stepKey) {
     case FOUNDER_STEPS.website: {
@@ -271,9 +420,11 @@ function companyBasicsChanges(
       const code = singleSelect(values, stepKey);
       return {
         headquartersCountry:
-          code === null || code === COUNTRY_OTHER_OPTION
+          code === null
             ? null
-            : code.toUpperCase(),
+            : code === COUNTRY_OTHER_OPTION
+              ? countryCodeOf(note)
+              : code.toUpperCase(),
       };
     }
     case FOUNDER_STEPS.stage: {
@@ -483,6 +634,9 @@ export function createFounderWriteTargets(
   const servicesFor =
     options.services ??
     ((tx: TransactionContext) => createFounderDomainServices(tx, options));
+  const financialFor =
+    options.financialKnowledge ??
+    ((tx: TransactionContext) => createFinancialKnowledgePort(tx, options));
 
   return [
     {
@@ -511,6 +665,7 @@ export function createFounderWriteTargets(
           companyBasicsChanges(
             response.stepKey,
             responseValues(context.currentResponses, response),
+            response.note,
           ),
           context.correlationId,
         );
@@ -557,8 +712,13 @@ export function createFounderWriteTargets(
             UpsertMyCompanyMembershipRequestSchema,
             {
               relationshipType: "team_member",
+              // A role outside the options is their own title, in their
+              // words ("Founder"), not "Something else".
               businessTitle:
-                role === null ? null : (FOUNDER_ROLE_TITLES[role] ?? null),
+                role === null
+                  ? null
+                  : (FOUNDER_ROLE_TITLES[role] ??
+                    (response.note?.trim().slice(0, 80) || null)),
               isFounder: true,
             },
             "The role is not valid.",
@@ -622,6 +782,40 @@ export function createFounderWriteTargets(
           return;
         }
         await saveCapitalObjective(servicesFor(context.tx), context, values);
+      },
+    },
+    {
+      // Q.01 financials: the founder's own figure, as their own claim,
+      // through the Knowledge Write Gate (founder_private). A skipped step
+      // or a figure with no currency records nothing: unknown stays unknown.
+      targetKey: FOUNDER_FINANCIAL_WRITE_TARGET,
+      apply: async (context, response) => {
+        const claim = financialClaimFor(
+          response.stepKey,
+          responseValues(context.currentResponses, response),
+        );
+        if (claim === null) {
+          return;
+        }
+        const bound = await boundCompany(
+          servicesFor(context.tx),
+          context.actor,
+          context.session,
+        );
+        const result = await financialFor(context.tx).record({
+          actor: bound.context,
+          companyId: bound.companyId,
+          claim,
+          sessionId: context.session.id,
+          correlationId: context.correlationId,
+        });
+        if (result !== null && result.outcome === "REJECTED") {
+          invalid(
+            "value",
+            "financial_claim_refused",
+            "That figure could not be recorded. Try again in a moment.",
+          );
+        }
       },
     },
   ];

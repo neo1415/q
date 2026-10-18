@@ -1,3 +1,4 @@
+import type { QNavigateDestination } from "@capital-q/contracts";
 import type {
   CorrelationId,
   ModelToolDefinition,
@@ -13,7 +14,10 @@ import type {
   QRunHandle,
   QRunId,
   QSensitivityClass,
+  QPageManifest,
+  QScreenContext,
   QSubjectRef,
+  QViewingMoment,
   QToolClassification,
   QToolName,
   QVisibleStage,
@@ -93,6 +97,10 @@ export type ContextFirewallRequest = {
   readonly capability: QCapability;
   readonly subjects: readonly QSubjectRef[];
   readonly requestedLabels?: readonly QContextLabel[] | undefined;
+  /** R18: the run's authorised viewing moment; the plan carries it only if the company is bound. */
+  readonly viewing?: QViewingMoment | null | undefined;
+  /** R21: the run's screen; the plan keeps the route and only bound entities. */
+  readonly screen?: QScreenContext | null | undefined;
 };
 
 export type ContextFirewallDecision =
@@ -158,7 +166,50 @@ export function createUnconfiguredQRetrieval(): QRetrievalPort {
  * provider whose data policy is unsuitable. Until then the only
  * implementation reports that no model execution is configured.
  */
+/**
+ * One step of a requested series of questions (R35). Structurally the
+ * conversation core's `QuestionSequenceStep`, restated here so the
+ * runtime does not depend on the core.
+ */
+export type QQuestionSequenceStep =
+  | {
+      readonly kind: "ASK" | "REASK";
+      readonly topic: string;
+      readonly number: number;
+      readonly total: number;
+    }
+  | {
+      readonly kind: "FINISHED";
+      readonly topic: string;
+      readonly total: number;
+    }
+  | { readonly kind: "STOPPED"; readonly topic: string };
+
+/**
+ * One result Q already fetched in this conversation (owner live
+ * 2026-10-17; q_runtime.conversation_tool_results): a successful read-only
+ * tool result an earlier run of the same owner received, after that tool's
+ * authorize step and output validation. Read back only for the owner, at
+ * or below the current run's sensitivity ceiling, newest first. Context
+ * for follow-ups, never authority: a tool still reads anything new.
+ */
+export type QConversationFetch = {
+  /** The run (turn) that fetched it. */
+  readonly runId: string;
+  readonly toolName: string;
+  readonly arguments: unknown;
+  readonly result: unknown;
+  readonly sensitivity: QSensitivityClass;
+  readonly fetchedAt: string;
+};
+
 export type QAnswerRequest = QOrchestrationSubjectContext & {
+  /**
+   * What earlier runs of this conversation fetched (QConversationFetch),
+   * read once per turn by the answer seam. Absent: none kept, or the
+   * store is not composed.
+   */
+  readonly fetchedInConversation?: readonly QConversationFetch[] | undefined;
   /**
    * The server-resolved actor the run belongs to, re-validated by the
    * engine on every (re)start. Tools authorise against it (CQ-Q-007); it
@@ -170,6 +221,213 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   readonly plan: PermittedContextPlan;
   /** Cooperative cancellation: the engine's signal, propagated to the model call. */
   readonly signal?: AbortSignal | undefined;
+  /**
+   * Whether this turn may go to the public web (CQ-QX-005), decided from
+   * the conversation core's reading of the turn before the answer runs.
+   * EXPLICIT: they asked for something real or current. ONLY_IF_EMPTY:
+   * about their own records — authorised context first, the web only if
+   * that came back empty, announced as a change of source. NEVER: every
+   * other turn. A promise, so that reading the turn runs alongside the
+   * context the answer assembles anyway; the answer path awaits it only
+   * where research is decided. Absent means no reading was made, and the
+   * answer path forces no research of its own.
+   */
+  readonly research?: Promise<QResearchDirective> | undefined;
+  /**
+   * The turn could not be read, even on a second try (the reader's model
+   * was unavailable). No document, screen change or record change can be
+   * started on this turn, and the answer must say so plainly rather than
+   * answer as if nothing had been asked (B1, 2026-09-25).
+   */
+  readonly turnUnread?: boolean | undefined;
+  /**
+   * The person asked for this answer as a document (a Q_REPORT, founder
+   * live 2026-09-28 #1): the answer is the document's text, and Capital Q
+   * files it with a PDF once it is written. Decided from the turn's
+   * reading, never by the answer's model.
+   */
+  readonly writingDocument?: boolean | undefined;
+  /**
+   * A series of questions the person asked Q to put to them, and what
+   * this turn must do about it (R35): decided by the conversation core
+   * from the turn's reading, never by the answer's model. Absent: no
+   * series is in hand.
+   */
+  readonly questionSequence?: QQuestionSequenceStep | undefined;
+  /**
+   * What this run can do beyond the tools the model is offered, built by
+   * code from what is composed (CQ-QX-008): the screens Capital Q opens,
+   * the documents it prepares, whether a visibility change can be
+   * prepared. The answer tells the model; it never guesses.
+   */
+  readonly capabilities?: QCapabilityManifest | undefined;
+  /**
+   * What the conversation core read this turn as (ANSWER, TOOL_REQUEST,
+   * ...). Absent when it was not read. A statement about their company is
+   * recorded only from a turn that states something (live 2026-10-02:
+   * "I'm giving you full permission…" was echoed as a noted statement).
+   */
+  readonly turnKind?: string | undefined;
+  /**
+   * What kind of question the reader read it as (ADVICE, THEIR_OWN_RECORDS,
+   * ...), when it is one. "What should I do next?" is ADVICE: their own
+   * readiness leads that answer (QA 2026-10-03, run 2cba241a).
+   */
+  readonly questionKind?: string | undefined;
+  /** The turn reader named someone other than the conversation's subject. */
+  readonly aboutNamedOther?: boolean | undefined;
+  /**
+   * K8: the reader read a question about something prepared for this turn
+   * (their mandate, the record on screen, Q's work for them). The router
+   * answers it from that context without a tool round when it is there.
+   */
+  readonly preparedSubject?:
+    "MANDATE" | "ON_SCREEN_RECORD" | "Q_WORK" | "OWN_COMPANY" | undefined;
+  /**
+   * K1: a DISCOVER_COMPANIES request as the reader read it ("three
+   * fintech companies in Nigeria"). Answered from the catalog by code, fit
+   * only when asked for; never the analyst, never the public web.
+   */
+  readonly discoverCompanies?:
+    | {
+        /** Their question in its words, for the answer's heading. */
+        readonly text: string;
+        readonly sectors: readonly string[];
+        readonly countries: readonly string[];
+        readonly stages: readonly string[];
+        readonly count: number | null;
+        readonly ranking: "NONE" | "FIT" | "TOP";
+        readonly mandateRelevant: boolean;
+        readonly previous: boolean;
+      }
+    | undefined;
+  /**
+   * W2: a PERSON_SEARCH request as the first read understood it: one named
+   * person, company or government body to identify from public sources,
+   * with only the clues the person gave. Answered by code as an identity
+   * card from the lookup tool; never the analyst describing someone.
+   */
+  readonly personSearch?:
+    | {
+        readonly name: string;
+        readonly entityKind: "PERSON" | "ORGANIZATION" | "GOVERNMENT_AGENCY";
+        readonly city: string | null;
+        readonly country: string | null;
+        readonly organization: string | null;
+        readonly role: string | null;
+        readonly freshSearch: boolean;
+      }
+    | undefined;
+  /**
+   * D1: investors of a region or kind, no name given ("top three Arab
+   * investors that may be interested in this"), as the first read
+   * understood it. Region words are as the member said them; code maps
+   * them to countries. Answered by code with candidate cards.
+   */
+  readonly discoverInvestors?:
+    | {
+        readonly regions: readonly string[];
+        readonly sector: string | null;
+        readonly stage: string | null;
+        readonly count: number | null;
+        readonly aboutMyCompany: boolean;
+      }
+    | undefined;
+  /**
+   * A FIT question as the reader read it (live 2026-10-09): their question
+   * in its words -- the earlier ask when this turn only pressed on it
+   * ("still waiting") -- and how many companies it asks for, null when
+   * no number. Answered from the computed fit, never the public web.
+   */
+  readonly fitQuestion?:
+    | {
+        readonly text: string;
+        readonly count: number | null;
+        /** The reader read it as about the companies Q just showed. */
+        readonly previous?: boolean | undefined;
+        /**
+         * TURN_READER v56: they want companies other than those Q already
+         * showed in this conversation ("three new ones", "who else
+         * fits?"); the ranking leaves those out. Absent is false.
+         */
+        readonly excludeShown?: boolean | undefined;
+      }
+    | undefined;
+  /**
+   * Lines code composed to open this answer (readiness for "what should I
+   * do next?"), said before the model's own words. Absent: none.
+   */
+  readonly leadLines?: string | undefined;
+  /**
+   * RECOVERY-2026-10 B6: what the turn's words point at ("the second one",
+   * "compare those two", "him"), bound by code to records the person
+   * already saw (their page, Q's lists, the conversation's focus), as one
+   * trusted note with ids. Never the person's words; grants nothing.
+   */
+  readonly references?: string | undefined;
+  /**
+   * The declared action the reader read them as asking for, by its name
+   * (TURN_READER v30, ADR 0040), offered here or not. Absent: none named.
+   */
+  readonly askedAction?: string | undefined;
+  /** What the turn is about, for the tool offer (QToolFocus). */
+  readonly toolFocus?: QToolFocus | undefined;
+  /**
+   * This answer was started before its turn was read (voice speculation,
+   * latency2). Until `decided` settles true nothing it produces may leave
+   * the answer: live text is held, nothing is stored, and only READ_ONLY
+   * tools run. Settled false, it is dropped unsaid and unstored. Absent:
+   * an ordinary answer.
+   */
+  readonly speculation?: QAnswerSpeculation | undefined;
+  /**
+   * The turn was spoken and its answer is said aloud (the utterance came
+   * from a voice line). The answer is shaped for the ear: short, answer
+   * first, lists on screen (natural conversation, 2026-10-07). Absent:
+   * a typed turn.
+   */
+  readonly spoken?: boolean | undefined;
+};
+
+export type QAnswerSpeculation = {
+  /** True: adopted as the turn's answer. False: cancelled. */
+  readonly decided: Promise<boolean>;
+};
+
+/** A speculative answer reached a side effect and was then cancelled. */
+export class QSpeculationCancelledError extends Error {
+  constructor() {
+    super("speculative answer cancelled");
+    this.name = "QSpeculationCancelledError";
+  }
+}
+
+export type QCapabilityManifest = {
+  readonly navigate: readonly QNavigateDestination[];
+  readonly documents: readonly string[];
+  readonly visibilityChange: boolean;
+  /**
+   * R33: what only the person can do, on a screen (an OAuth consent, a
+   * password, a file from their device): Q offers the screen by name.
+   */
+  readonly offers?:
+    | readonly {
+        readonly does: string;
+        readonly destination: QNavigateDestination;
+      }[]
+    | undefined;
+};
+
+export type QResearchDirective = {
+  /** OFFERED: the model holds the research tools; nothing is forced. */
+  readonly mode: "EXPLICIT" | "ONLY_IF_EMPTY" | "OFFERED" | "NEVER";
+  readonly announceSourceChange: boolean;
+  /**
+   * A question to Q with research up: a platform lookup the world can also
+   * answer (prospective investors) that came back empty or thin may fall
+   * back to public sources.
+   */
+  readonly fallback?: boolean | undefined;
 };
 
 export type QAnswerOutcome =
@@ -177,7 +435,12 @@ export type QAnswerOutcome =
   | {
       /** The Q message the gateway produced, and the routing policy it ran under. */
       readonly kind: "ANSWERED";
-      readonly messageId: string;
+      /**
+       * Null when Q deliberately says nothing: a turn it could not make out,
+       * right after it already asked them to say it again. The run still
+       * completes; a voice keeps listening.
+       */
+      readonly messageId: string | null;
       readonly modelPolicyVersion: string;
       /** The prompt bundle that produced the answer (CQ-Q-006). */
       readonly promptBundleVersion: string;
@@ -194,6 +457,48 @@ export type QAnswerOutcome =
 
 export type QAnswerPort = {
   readonly answer: (request: QAnswerRequest) => Promise<QAnswerOutcome>;
+  /**
+   * Q's own sentence for a run whose answer FAILED, from the conversation
+   * core's failure ledger (CQ-QX-005): named by the subsystem that failed,
+   * and undefined when the ledger says the person has already been told.
+   * A port, not graph state: checkpoints hold coded outcomes, never prose.
+   * Read once; the port forgets it.
+   */
+  readonly failureNotice?: (runId: string) => string | undefined;
+  /**
+   * Start the turn's read-only preparation (conversation, context, tools,
+   * the person's own facts) while the caller is still reading the turn;
+   * the answer that follows for the same run takes it up. Optional and
+   * best effort: an answer never depends on it having been called.
+   */
+  readonly warm?: (request: QAnswerRequest) => void;
+  /**
+   * Start reading the person's latest turn as soon as PREFLIGHT has passed
+   * (ADR 0035), beside the Context Firewall. Its input is only their own
+   * message and their own recent turns in this run's conversation; it is
+   * a reading, never an answer, and nothing is said or done from it until
+   * the answer for the same run takes it up. Optional and best effort.
+   */
+  readonly preread?: (input: QPrereadInput) => void;
+  /**
+   * The run was refused (or ended) before its answer: an early reading is
+   * dropped unused.
+   */
+  readonly discard?: (runId: string) => void;
+};
+
+export type QPrereadInput = {
+  readonly runId: QRunId;
+  readonly tenantId: TenantId;
+  readonly actor: ActorContext;
+  readonly correlationId: string;
+  readonly signal?: AbortSignal | undefined;
+  /**
+   * Owner 2026-10-17 (TURN_READER v55): the page's own registered controls
+   * (ids, kinds, states, a tab's visible name), exactly what the firewall
+   * passes on in the plan's screen, so the early reading can choose one.
+   */
+  readonly screenControls?: QPageManifest["controls"] | undefined;
 };
 
 export function createUnconfiguredQAnswer(): QAnswerPort {
@@ -218,6 +523,53 @@ export type QToolExecutionContext = {
   readonly capability: QCapability;
   readonly plan: PermittedContextPlan;
   readonly signal?: AbortSignal | undefined;
+  /**
+   * The person's latest message in this run, verbatim (CQ-Q-RESEARCH-001
+   * §9). A tool that sends anything outside Capital Q composes its request
+   * from these words and from authorised public identity — never from a
+   * model's argument as given. Absent when a caller has no conversation.
+   */
+  readonly conversation?:
+    | {
+        readonly latestUserText: string;
+        /**
+         * The person's own earlier messages, most recent last (at most a
+         * few): their words too, for a look-up that refers back ("look
+         * her up"). Never Q's words.
+         */
+        readonly earlierUserText?: readonly string[] | undefined;
+      }
+    | undefined;
+  /**
+   * What this turn is about, from its reading (lead 2026-10-02): the tool
+   * offer narrows to the core, these capability areas and these tools.
+   * Absent or empty: the purpose's list, ranked and bounded as before.
+   */
+  readonly focus?: QToolFocus | undefined;
+};
+
+/**
+ * The parts of the app a turn is about (capability areas, e.g.
+ * "Relationships") and the tools it named (provider names). Decided by
+ * code from the turn's reading, never by the answer's model.
+ */
+export type QToolFocus = {
+  readonly areas: readonly string[];
+  readonly tools: readonly string[];
+  /**
+   * A request to act that named no tool (lead 2026-10-03, run d396af2f):
+   * the purpose's tools are all kept, and the areas only add the declared
+   * app actions in them. Absent: the areas narrow the purpose's tools.
+   */
+  readonly widen?: boolean | undefined;
+  /**
+   * A question to Q (tool budget 2026-10-12): only READ_ONLY tools, the
+   * browser's own actions and what the turn named are offered; every
+   * change-making tool, core or not, stays one `use_capability` call
+   * away. Narrows the offer (cost) only: what may execute is decided
+   * without the focus, exactly as before.
+   */
+  readonly readsOnly?: boolean | undefined;
 };
 
 /**
@@ -279,6 +631,15 @@ export type QToolPort = {
   readonly offer: (
     context: QToolExecutionContext,
   ) => Promise<readonly QOfferedTool[]>;
+  /**
+   * Everything relevant to this purpose, actor and plan, before a turn's
+   * focus narrows it (lead 2026-10-02): what the turn reader is told Capital
+   * Q can do, so an action not offered to the answer is still named and
+   * reached. Absent: the offer is the list.
+   */
+  readonly available?:
+    | ((context: QToolExecutionContext) => Promise<readonly QOfferedTool[]>)
+    | undefined;
   /** Validate → authorise → execute → validate output. Never throws for a bad proposal. */
   readonly execute: (
     proposal: QToolProposal,

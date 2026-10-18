@@ -406,7 +406,9 @@ describe("@capital-q/companies founder / team against local PostgreSQL", () => {
       ]);
 
       // End the period (a later lifecycle operation); a new self-link opens a
-      // new period and the old one stays.
+      // new period and the old one stays. Both rows start inside this one
+      // transaction (same started_at), so the ended period sorts first by
+      // ended_at -- ordering by started_at alone was a coin toss under load.
       await tx.sql`update core.company_members set is_current = false, ended_at = clock_timestamp() where id = ${first.id}`;
       await expect(
         service.getMyCompanyMembership({ actor, companyId: companyA as never }),
@@ -421,7 +423,7 @@ describe("@capital-q/companies founder / team against local PostgreSQL", () => {
       expect(rejoined.version).toBe(1);
       const rows = await tx.sql<
         { id: string; is_current: boolean }[]
-      >`select id, is_current from core.company_members where company_id = ${companyA} and user_id = ${actor.userId} order by started_at`;
+      >`select id, is_current from core.company_members where company_id = ${companyA} and user_id = ${actor.userId} order by started_at, ended_at nulls last`;
       expect(rows.map((r) => r.is_current)).toEqual([false, true]);
     });
   });

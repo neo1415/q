@@ -3,16 +3,28 @@ import {
   COMPANIES_PATH,
   COMPANY_PITCH_SUFFIX,
   CorrelationIdSchema,
-  CreateCompanyPitchRequestSchema,
+  createProblemDetails,
+  MEDIA_CAPTIONS_VTT_SUFFIX,
+  MEDIA_DOWNLOAD_SUFFIX,
+  MEDIA_PLAYBACK_SUFFIX,
+  MEDIA_TRANSCRIPT_SUFFIX,
+  MEDIA_SYNC_SUFFIX,
   parseContract,
+  PitchDownloadDtoSchema,
+  PitchTranscriptDtoSchema,
+  PlaybackAuthorizationDtoSchema,
+  PROBLEM_CONTENT_TYPE,
+  SyncMediaAssetRequestSchema,
+  SyncMediaAssetResponseSchema,
   UuidSchema,
   type CorrelationId,
   type MediaAssetDto,
+  type ProblemDetails,
 } from "@capital-q/contracts";
 import {
-  DEFAULT_PITCH_DURATION_POLICY,
   MediaAssetIdSchema,
-  PREFERRED_PITCH_ASPECT_RATIO,
+  MediaProviderError,
+  MediaProviderNotConfiguredError,
   toMediaAssetDto,
   type MediaAsset,
   type MediaAssetId,
@@ -69,58 +81,77 @@ function payload(asset: MediaAsset): MediaAssetDto {
   return toMediaAssetDto(asset);
 }
 
-/** Product guidance, served from one place so no client hardcodes it. */
-const GUIDANCE = {
-  targetMinSeconds: DEFAULT_PITCH_DURATION_POLICY.targetMinSeconds,
-  targetMaxSeconds: DEFAULT_PITCH_DURATION_POLICY.targetMaxSeconds,
-  hardMaxSeconds: DEFAULT_PITCH_DURATION_POLICY.hardMaxSeconds,
-  preferredAspectRatio: PREFERRED_PITCH_ASPECT_RATIO,
-} as const;
+/**
+ * What a caller is told when the video provider is the reason (CQ-MEDIA-010).
+ *
+ * Not configured is said plainly, with the variable names an operator must
+ * set, because a founder staring at a dead upload button deserves a cause
+ * and the names disclose nothing. A provider that answered badly is a
+ * closed door with no vendor, host, status or reason code on it: those
+ * stay in the server log. Anything else is not this function's to decide.
+ */
+export function mediaProviderProblem(
+  error: unknown,
+  requestId: string,
+): ProblemDetails | null {
+  if (error instanceof MediaProviderNotConfiguredError) {
+    return createProblemDetails({
+      code: "PROVIDER_UNAVAILABLE",
+      requestId,
+      detail: `${error.code}: ${error.message}`,
+    });
+  }
+  if (error instanceof MediaProviderError) {
+    return createProblemDetails({
+      code:
+        error.failure === "RATE_LIMITED"
+          ? "RATE_LIMITED"
+          : "PROVIDER_UNAVAILABLE",
+      requestId,
+      detail: "The video provider could not complete that. Try again shortly.",
+    });
+  }
+  return null;
+}
+
+/** How long the caption track waits for a just-finished provider step. */
+const CAPTIONS_SYNC_WAIT_MS = 3_000;
 
 export function registerMediaRoutes(
+  app: FastifyInstance,
+  dependencies: MediaRoutesDependencies,
+): void {
+  // Provider failures are translated here, in the one scope that can
+  // raise them; every other error keeps the application's handler.
+  const parentErrorHandler = app.errorHandler;
+  void app.register((scope, _options, done) => {
+    scope.setErrorHandler((error, request, reply) => {
+      const problem = mediaProviderProblem(error, request.id);
+      if (problem === null) {
+        parentErrorHandler(error, request, reply);
+        return;
+      }
+      request.log.warn(
+        { err: error, requestId: request.id },
+        "video provider refused or failed",
+      );
+      void reply
+        .status(problem.status)
+        .type(PROBLEM_CONTENT_TYPE)
+        .send(problem);
+    });
+    registerPitchRoutes(scope, dependencies);
+    done();
+  });
+}
+
+function registerPitchRoutes(
   app: FastifyInstance,
   dependencies: MediaRoutesDependencies,
 ): void {
   const withContext = requireActorContextHook(dependencies);
   const service = dependencies.media;
   const pitch = `${COMPANIES_PATH}/:companyId${COMPANY_PITCH_SUFFIX}`;
-
-  app.post(pitch, { onRequest: withContext }, async (request, reply) => {
-    const actor = getActorContext(request);
-    const input = parseContract(
-      CreateCompanyPitchRequestSchema,
-      request.body ?? {},
-      "The pitch request is not valid.",
-    );
-
-    const result = await service.createCompanyPitch({
-      actor,
-      companyId: companyIdParam(request),
-      input: {
-        ...(input.replacesMediaAssetId === undefined
-          ? {}
-          : {
-              replacesMediaAssetId: MediaAssetIdSchema.parse(
-                input.replacesMediaAssetId,
-              ),
-            }),
-      },
-      correlationId: correlation(),
-    });
-
-    return reply
-      .code(201)
-      .header("Cache-Control", "no-store")
-      .header(
-        "Location",
-        `${COMPANIES_PATH}/${result.asset.ownerId}${COMPANY_PITCH_SUFFIX}`,
-      )
-      .send({
-        pitch: payload(result.asset),
-        replacedMediaAssetId: result.replaced?.id ?? null,
-        guidance: GUIDANCE,
-      });
-  });
 
   app.get(pitch, { onRequest: withContext }, async (request, reply) => {
     const actor = getActorContext(request);
@@ -148,15 +179,29 @@ export function registerMediaRoutes(
     },
   );
 
-  // Removing a pitch is consequential: it changes what the company presents
-  // and what later projections may show, so it needs its own capability and
-  // is audited. The row is not erased; the history stays interpretable.
-  app.delete(
-    `${pitch}/:mediaAssetId`,
+  // Making a pitch, its upload, cancel, removal and playback policy are
+  // generated from the action registry (ADR 0040, http/app-actions.ts),
+  // with the video provider's failures mapped as here.
+
+  // The direct upload flow (CQ-MEDIA-011). POSTs on one asset, each
+  // answering with a contract DTO that carries no provider identifier: the
+  // one-time upload target and the minted playback URL are the only
+  // provider-shaped things a client ever sees, and both are the server's
+  // to issue.
+
+  // Sync. Idempotent: the same answer however often it is asked, and the
+  // lifecycle refuses any move the provider's answer cannot justify.
+  app.post(
+    `${pitch}/:mediaAssetId${MEDIA_SYNC_SUFFIX}`,
     { onRequest: withContext },
     async (request, reply) => {
       const actor = getActorContext(request);
-      const asset = await service.deleteCompanyPitch({
+      parseContract(
+        SyncMediaAssetRequestSchema,
+        request.body ?? {},
+        "The sync request is not valid.",
+      );
+      const asset = await service.syncMediaAsset({
         actor,
         companyId: companyIdParam(request),
         mediaAssetId: mediaAssetIdParam(request),
@@ -164,7 +209,152 @@ export function registerMediaRoutes(
       });
       return reply
         .header("Cache-Control", "no-store")
-        .send({ pitch: payload(asset) });
+        .send(SyncMediaAssetResponseSchema.parse({ pitch: payload(asset) }));
+    },
+  );
+
+  // The owner's name for one video and who may watch it (ADR 0021/0022).
+  // Widening the audience is a disclosure decision: `media.manage`,
+  // versioned, audited, like the playback policy.
+  // The pitch's title and who can watch it are declared once in the app's
+  // action registry (ADR 0040) and their route is generated from it
+  // (http/app-actions.ts), as Q's tool is.
+
+  // Playback. Per viewer, short-lived, decided here every time. A provider
+  // UID is not access control, which is why it is not in the answer.
+  app.post(
+    `${pitch}/:mediaAssetId${MEDIA_PLAYBACK_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const grant = await service.authorisePlayback({
+        actor,
+        companyId: companyIdParam(request),
+        mediaAssetId: mediaAssetIdParam(request),
+      });
+      return reply.header("Cache-Control", "no-store").send(
+        PlaybackAuthorizationDtoSchema.parse({
+          mediaAssetId: grant.asset.id,
+          playbackUrl: grant.authorization.playbackUrl,
+          posterUrl: grant.authorization.posterUrl ?? null,
+          expiresAt: grant.authorization.expiresAt,
+        }),
+      );
+    },
+  );
+
+  // ADR 0047: a short-lived link to the pitch as a file. The playback
+  // rule, then the owner's download permission, decided here on every
+  // request; every refusal is the same not-found as playback's. The link
+  // is the CDN's: the browser fetches the bytes from it, never from us.
+  app.get(
+    `${pitch}/:mediaAssetId${MEDIA_DOWNLOAD_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const answer = await service.authoriseDownload({
+        actor,
+        companyId: companyIdParam(request),
+        mediaAssetId: mediaAssetIdParam(request),
+      });
+      return reply
+        .header("Cache-Control", "no-store")
+        .send(PitchDownloadDtoSchema.parse(answer));
+    },
+  );
+
+  /**
+   * The pitch's transcript (R18), under exactly the playback rule. A pitch
+   * that is READY but has no transcript yet gets one step of sync started
+   * in the background -- after the answer, never holding the request -- so
+   * pitches that were READY before transcripts existed catch up when first
+   * watched. The answer is always what is stored now.
+   */
+  const transcriptOf = async (
+    request: FastifyRequest,
+    options: { readonly waitMs?: number } = {},
+  ) => {
+    const read = () =>
+      service.getPitchTranscript({
+        actor: getActorContext(request),
+        companyId: companyIdParam(request),
+        mediaAssetId: mediaAssetIdParam(request),
+      });
+    const view = await read();
+    if (view.status === "AVAILABLE") return view;
+    const sync = service
+      .syncPitchTranscript({
+        tenantId: view.tenantId,
+        mediaAssetId: view.mediaAssetId,
+      })
+      .catch((error: unknown) => {
+        request.log.warn(
+          { err: error, mediaAssetId: view.mediaAssetId },
+          "pitch transcript sync did not complete",
+        );
+        return null;
+      });
+    // The player's caption track may wait a moment: captions the provider
+    // finished since the last sweep are stored and served on this read
+    // rather than the next. Bounded, so a slow provider costs the track a
+    // few seconds at most and never the video.
+    const waitMs = options.waitMs ?? 0;
+    if (waitMs <= 0) return view;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const outcome = await Promise.race([
+      sync,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => {
+          resolve(null);
+        }, waitMs);
+      }),
+    ]);
+    clearTimeout(timer);
+    return outcome === "AVAILABLE" ? read() : view;
+  };
+
+  app.get(
+    `${pitch}/:mediaAssetId${MEDIA_TRANSCRIPT_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const view = await transcriptOf(request);
+      return reply.header("Cache-Control", "private, no-store").send(
+        PitchTranscriptDtoSchema.parse({
+          mediaAssetId: view.mediaAssetId,
+          status: view.status,
+          language: view.status === "AVAILABLE" ? view.language : null,
+          source: view.status === "AVAILABLE" ? "PROVIDER_GENERATED" : null,
+          cues: view.status === "AVAILABLE" ? view.cues : [],
+        }),
+      );
+    },
+  );
+
+  // The same transcript as WebVTT for the player's <track>. Not available
+  // yet is a 404: a track with no captions is simply absent.
+  app.get(
+    `${pitch}/:mediaAssetId${MEDIA_CAPTIONS_VTT_SUFFIX}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const view = await transcriptOf(request, {
+        waitMs: CAPTIONS_SYNC_WAIT_MS,
+      });
+      if (view.status !== "AVAILABLE") {
+        return reply
+          .status(404)
+          .header("Cache-Control", "private, no-store")
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(
+            createProblemDetails({
+              code: "RESOURCE_NOT_FOUND",
+              requestId: request.id,
+            }),
+          );
+      }
+      return reply
+        .header("Cache-Control", "private, no-store")
+        .type("text/vtt; charset=utf-8")
+        .send(view.vtt);
     },
   );
 }

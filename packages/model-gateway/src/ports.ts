@@ -13,6 +13,7 @@ import type {
   ModelToolCall,
   ModelToolDefinition,
   ModelUsage,
+  ModelUsagePurpose,
   TenantModelPolicy,
 } from "@capital-q/contracts";
 
@@ -39,6 +40,13 @@ export type ModelProviderRequest = {
   readonly maxOutputTokens: number;
   readonly temperature: number | undefined;
   readonly reasoning: ModelReasoningLevel;
+  /**
+   * An opaque routing hint for the vendor's prompt cache, set by the gateway
+   * only for a model the catalogue marks as caching prompts. It is a hash —
+   * never a raw tenant, user or content value — and an adapter whose vendor
+   * has no such hint ignores it.
+   */
+  readonly cacheKey?: string | undefined;
 };
 
 export type ModelExecutionContext = {
@@ -47,6 +55,23 @@ export type ModelExecutionContext = {
   readonly attemptTimeoutMs: number;
   readonly attempt: number;
   readonly correlationId: string;
+  /**
+   * Called with each new piece of text as the model writes it, when the
+   * caller wants the answer as it is written rather than after it.
+   *
+   * An adapter that cannot stream ignores this and is still correct: the
+   * result it returns is the same either way, and a caller that receives
+   * no fragment simply has nothing to show early. That is why this is a
+   * field on the context rather than a second method on the port — a
+   * provider is not a different kind of provider for streaming, and a
+   * gateway that had to branch on it would have two of everything.
+   *
+   * The fragments are raw model text in order, and together they are
+   * exactly the `text` on the result. Nothing is de-duplicated for the
+   * caller and nothing is guaranteed about where a fragment ends: a word,
+   * even a character, may be split across two.
+   */
+  readonly onTextDelta?: ((text: string) => void) | undefined;
 };
 
 /**
@@ -130,6 +155,8 @@ export type ModelUsageEntry = {
   readonly success: boolean;
   readonly errorCode: ModelFailureClass | undefined;
   readonly correlationId: string | undefined;
+  /** What it was for (usage view); absent from older callers: OTHER. */
+  readonly purpose?: ModelUsagePurpose | undefined;
 };
 
 export type ModelUsageRepository = {
@@ -156,13 +183,39 @@ export const noTenantModelPolicy: TenantModelPolicyPort = {
 export type ProviderHealthState = "HEALTHY" | "TEMPORARILY_FAILING";
 
 export type ProviderHealthPort = {
-  readonly state: (code: ModelProviderCode, at: Date) => ProviderHealthState;
+  /**
+   * Whether this provider's MODEL should be skipped for the moment.
+   *
+   * Keyed by both, because a model being overloaded says nothing about
+   * a sibling on the same account. Hosted, 2026-09-22:
+   * `gemini-3.5-flash-lite` answered 503, the whole of `google` was taken
+   * out, and `gemini-3.8-flash` — which was eligible and quite possibly
+   * well — went with it. The interview had no route left at all.
+   */
+  readonly state: (
+    code: ModelProviderCode,
+    model: ModelCode,
+    at: Date,
+  ) => ProviderHealthState;
   readonly recordFailure: (
     code: ModelProviderCode,
+    model: ModelCode,
     failureClass: ModelFailureClass,
     at: Date,
+    /**
+     * How long the attempt actually ran. A timeout is only evidence about
+     * a provider when the caller waited long enough for it to be — see
+     * `createProcessLocalProviderHealth`.
+     */
+    elapsedMs?: number,
+    /** The provider account cannot serve until a person acts (credit, quota). */
+    accountExhausted?: boolean,
   ) => void;
-  readonly recordSuccess: (code: ModelProviderCode, at: Date) => void;
+  readonly recordSuccess: (
+    code: ModelProviderCode,
+    model: ModelCode,
+    at: Date,
+  ) => void;
 };
 
 export type ModelClock = { readonly now: () => Date };

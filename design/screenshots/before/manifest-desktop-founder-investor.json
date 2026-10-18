@@ -1,0 +1,107 @@
+[
+  {
+    "page": "founder-f0-intent",
+    "viewport": "desktop",
+    "file": "founder-f0-intent-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": ""
+  },
+  {
+    "page": "founder-f1-company",
+    "viewport": "desktop",
+    "file": "founder-f1-company-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": ""
+  },
+  {
+    "page": "founder-f1-stage",
+    "viewport": "desktop",
+    "file": "founder-f1-stage-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": ""
+  },
+  {
+    "page": "founder-f1-description",
+    "viewport": "desktop",
+    "file": "founder-f1-description-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": ""
+  },
+  {
+    "page": "founder-f1-categories",
+    "viewport": "desktop",
+    "file": "founder-f1-categories-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Q-suggested taxonomy"
+  },
+  {
+    "page": "founder-f2-materials",
+    "viewport": "desktop",
+    "file": "founder-f2-materials-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "document upload step"
+  },
+  {
+    "page": "founder-f3-review",
+    "viewport": "desktop",
+    "file": "founder-f3-review-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": ""
+  },
+  {
+    "page": "founder-f4-team",
+    "viewport": "desktop",
+    "file": "founder-f4-team-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": ""
+  },
+  {
+    "page": "founder-f5-traction",
+    "viewport": "desktop",
+    "file": "founder-f5-traction-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": ""
+  },
+  {
+    "page": "founder-f6-capital-objective",
+    "viewport": "desktop",
+    "file": "founder-f6-capital-objective-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": ""
+  },
+  {
+    "page": "founder-f7-follow-up",
+    "viewport": "desktop",
+    "file": "founder-f7-follow-up-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": ""
+  },
+  {
+    "page": "founder-f8-snapshot",
+    "viewport": "desktop",
+    "file": "founder-f8-snapshot-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "first-value snapshot"
+  },
+  {
+    "page": "founder-failure",
+    "viewport": "desktop",
+    "file": "founder-failure-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "TimeoutError: page.waitForURL: Timeout 30000ms exceeded.\n=========================== logs ===========================\nwa"
+  },
+  {
+    "page": "investor-i0-role",
+    "viewport": "desktop",
+    "file": "investor-i0-role-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": ""
+  },
+  {
+    "page": "investor-failure",
+    "viewport": "desktop",
+    "file": "investor-failure-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "TimeoutError: locator.waitFor: Timeout 45000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Are"
+  }
+]

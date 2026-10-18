@@ -275,7 +275,10 @@ describe("@capital-q/organisations against local PostgreSQL", () => {
         expect(organisation.organisationType).toBe("company");
         expect(view.membership.userId).toBe(a.userId);
         expect(view.membership.status).toBe("active");
-        expect(view.roleCodes).toEqual(["organisation_admin"]);
+        expect(view.roleCodes).toEqual([
+          "organisation_admin",
+          "organisation_owner",
+        ]);
         expect(view.isActiveContext).toBe(true);
 
         const { sql } = tx;
@@ -304,8 +307,13 @@ describe("@capital-q/organisations against local PostgreSQL", () => {
         expect(memberships[0]?.invited_by_user_id).toBeNull();
         const roles = await sql<{ code: string }[]>`
         select r.code from identity.membership_roles mr join permissions.roles r on r.id = mr.role_id
-         where mr.membership_id = ${view.membership.id}`;
-        expect(roles.map((r) => r.code)).toEqual(["organisation_admin"]);
+         where mr.membership_id = ${view.membership.id} order by r.code`;
+        // ADR 0057 (e2dd5c3b, G1): the creator is the first owner, held as
+        // organisation_admin + organisation_owner; still the exact set.
+        expect(roles.map((r) => r.code)).toEqual([
+          "organisation_admin",
+          "organisation_owner",
+        ]);
         const [context] = await sql<
           { membership_id: string }[]
         >`select membership_id from identity.user_active_contexts where user_id = ${a.userId}`;

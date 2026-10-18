@@ -1,0 +1,478 @@
+"use server";
+
+import { headers } from "next/headers";
+import { z } from "zod";
+
+import {
+  ApiProblemError,
+  applicationTurn,
+  openApplicationInterview,
+  saveApplicationContact,
+  confirmAccountApplicationContact,
+  confirmApplicationContact,
+  getApplicationTranscript,
+  getApplicationCoverage,
+  getApplicationVideo,
+  startApplicationVideo,
+  endApplicationVideo,
+  resumeApplication,
+  saveApplicationAnswers,
+  startApplication,
+  submitApplication,
+} from "@capital-q/api-client";
+import type {
+  ApplicationSummaryDto,
+  GateqVideoStateDto,
+} from "@capital-q/contracts";
+import {
+  GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
+  ApplicationAnswersRequestSchema,
+  ApplicationContactRequestSchema,
+  ApplicationContactConfirmRequestSchema,
+  GATEQ_TURN_MAX_CHARS,
+} from "@capital-q/contracts";
+import { apiSession } from "@/features/q/context";
+import { loadWebServerConfig } from "@capital-q/config/web";
+import { effectiveLocale } from "@capital-q/q-core";
+import { resolveQStanding } from "@/features/q/context";
+
+/**
+ * Starts per visitor, on this instance (P7). The API caps starts per
+ * gateway; this keeps one visitor on someone's website from spending that
+ * ceiling for everyone. The address comes from the platform's own
+ * forwarding header (Vercel sets it; a client cannot), and is only ever a
+ * map key in memory: never logged, stored or sent on.
+ */
+const VISITOR_STARTS = new Map<string, { count: number; resetAt: number }>();
+const VISITOR_START_LIMIT = 8;
+const VISITOR_WINDOW_MS = 10 * 60_000;
+
+async function visitorMayStart(): Promise<boolean> {
+  const forwarded = (await headers()).get("x-forwarded-for") ?? "";
+  const visitor = forwarded.split(",")[0]?.trim() ?? "";
+  if (visitor === "") return true;
+  const now = Date.now();
+  if (VISITOR_STARTS.size > 10_000) {
+    for (const [key, bucket] of VISITOR_STARTS) {
+      if (bucket.resetAt <= now) VISITOR_STARTS.delete(key);
+    }
+  }
+  const bucket = VISITOR_STARTS.get(visitor);
+  if (bucket === undefined || bucket.resetAt <= now) {
+    VISITOR_STARTS.set(visitor, { count: 1, resetAt: now + VISITOR_WINDOW_MS });
+    return true;
+  }
+  bucket.count += 1;
+  return bucket.count <= VISITOR_START_LIMIT;
+}
+
+/**
+ * A founder applying through a gateway (CQ-GATE-002), often inside an
+ * investor's own website. Anonymous: the only credential is the
+ * application's own session token, which the API issued and which the
+ * browser holds for this application alone.
+ */
+export type ApplyResult =
+  | {
+      readonly ok: true;
+      readonly sessionToken: string;
+      readonly reply: string | null;
+      readonly application: ApplicationSummaryDto;
+    }
+  | {
+      readonly ok: false;
+      readonly message: string;
+      /** A spent allowance: wait, nothing is lost (P7 rate-limited state). */
+      readonly rateLimited?: boolean;
+      readonly contactNotConfirmed?: boolean;
+    };
+
+const PublicId = z.string().regex(/^[A-Za-z0-9_-]{4,64}$/);
+const Token = z.string().min(16).max(128);
+const Key = z
+  .string()
+  .min(8)
+  .max(128)
+  .regex(/^[A-Za-z0-9:_-]+$/);
+
+const RATE_LIMITED = {
+  ok: false,
+  rateLimited: true,
+  message:
+    "That's a lot in a short time. Give it a few minutes, then carry on.",
+} as const;
+
+function failure(error: unknown): ApplyResult {
+  if (error instanceof ApiProblemError && error.status === 429) {
+    return RATE_LIMITED;
+  }
+  return {
+    ok: false,
+    message:
+      error instanceof ApiProblemError &&
+      error.status < 500 &&
+      error.problem?.detail !== undefined
+        ? error.problem.detail
+        : "Couldn't reach Capital Q just now. Please try again.",
+  };
+}
+
+function base(): string | null {
+  return loadWebServerConfig().apiBaseUrl ?? null;
+}
+
+export async function startApplicationAction(
+  publicId: string,
+): Promise<ApplyResult> {
+  const id = PublicId.safeParse(publicId);
+  const url = base();
+  if (!id.success || url === null) return { ok: false, message: "Not found." };
+  if (!(await visitorMayStart())) return RATE_LIMITED;
+  try {
+    const started = await startApplication(url, id.data);
+    return {
+      ok: true,
+      sessionToken: started.sessionToken,
+      reply: started.reply,
+      application: started.application,
+    };
+  } catch (error: unknown) {
+    return failure(error);
+  }
+}
+
+export async function applicationTurnAction(
+  sessionToken: string,
+  message: string,
+  clientTurnId: string,
+): Promise<ApplyResult> {
+  const token = Token.safeParse(sessionToken);
+  const key = Key.safeParse(clientTurnId);
+  const text = message.trim().slice(0, GATEQ_TURN_MAX_CHARS);
+  const url = base();
+  if (!token.success || !key.success || text === "" || url === null) {
+    return { ok: false, message: "Please try again." };
+  }
+  try {
+    const turned = await applicationTurn(url, token.data, {
+      message: text,
+      clientTurnId: key.data,
+    });
+    return {
+      ok: true,
+      sessionToken: token.data,
+      reply: turned.reply,
+      application: turned.application,
+    };
+  } catch (error: unknown) {
+    return failure(error);
+  }
+}
+
+export async function submitApplicationAction(
+  sessionToken: string,
+  clientRequestId: string,
+): Promise<ApplyResult> {
+  const token = Token.safeParse(sessionToken);
+  const key = Key.safeParse(clientRequestId);
+  const url = base();
+  if (!token.success || !key.success || url === null) {
+    return { ok: false, message: "Please try again." };
+  }
+  try {
+    const submitted = await submitApplication(url, token.data, key.data);
+    return {
+      ok: true,
+      sessionToken: token.data,
+      reply: null,
+      application: submitted.application,
+    };
+  } catch (error: unknown) {
+    if (
+      // The server's code is RESOURCE_CONFLICT; matching a code it never
+      // sends left this branch dead. The exact detail tells the two
+      // same-screen refusals apart (the other, not-ready, reads as is).
+      error instanceof ApiProblemError &&
+      error.status === 409 &&
+      error.problem?.detail === GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL
+    )
+      return {
+        ok: false,
+        contactNotConfirmed: true,
+        message: "Confirm your contact email before submitting.",
+      };
+    return failure(error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// F1: the GateQ form. The same anonymous, credential-scoped surface; no model.
+// ---------------------------------------------------------------------------
+
+export type FormResult =
+  | {
+      readonly ok: true;
+      readonly sessionToken: string;
+      readonly application: ApplicationSummaryDto;
+    }
+  | {
+      readonly ok: false;
+      readonly message: string;
+      readonly rateLimited?: boolean;
+    };
+
+function formFailure(
+  error: unknown,
+): Extract<FormResult, { readonly ok: false }> {
+  const failed = failure(error);
+  return failed.ok
+    ? { ok: false, message: "Please try again." }
+    : {
+        ok: false,
+        message: failed.message,
+        ...(failed.rateLimited === true ? { rateLimited: true } : {}),
+      };
+}
+
+export async function startFormAction(publicId: string): Promise<FormResult> {
+  const id = PublicId.safeParse(publicId);
+  const url = base();
+  if (!id.success || url === null) return { ok: false, message: "Not found." };
+  if (!(await visitorMayStart())) return RATE_LIMITED;
+  try {
+    const started = await startApplication(url, id.data, "form");
+    return {
+      ok: true,
+      sessionToken: started.sessionToken,
+      application: started.application,
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+
+export async function saveAnswersAction(
+  sessionToken: string,
+  answers: unknown,
+): Promise<FormResult> {
+  const token = Token.safeParse(sessionToken);
+  // Validated here too: the API is the authority, but a malformed answer
+  // should never leave the web tier.
+  const parsed = ApplicationAnswersRequestSchema.safeParse(answers);
+  const url = base();
+  if (!token.success || !parsed.success || url === null) {
+    return { ok: false, message: "Please check your answers and try again." };
+  }
+  try {
+    const saved = await saveApplicationAnswers(url, token.data, parsed.data);
+    return {
+      ok: true,
+      sessionToken: token.data,
+      application: saved.application,
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+
+export async function contactAction(sessionToken: string, input: unknown) {
+  const token = Token.safeParse(sessionToken);
+  const parsed = ApplicationContactRequestSchema.safeParse(input);
+  const url = base();
+  if (!token.success || !parsed.success || url === null)
+    return {
+      ok: false as const,
+      message: "Please check your contact details.",
+    };
+  try {
+    const account = await apiSession();
+    return {
+      ok: true as const,
+      ...(account === null
+        ? await saveApplicationContact(url, token.data, parsed.data)
+        : await confirmAccountApplicationContact(account, {
+            ...parsed.data,
+            sessionToken: token.data,
+          })),
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+export async function confirmContactAction(sessionToken: string, code: string) {
+  const token = Token.safeParse(sessionToken);
+  const parsed = ApplicationContactConfirmRequestSchema.safeParse({ code });
+  const url = base();
+  if (!token.success || !parsed.success || url === null)
+    return {
+      ok: false as const,
+      message: "Enter the six-digit code from your email.",
+    };
+  try {
+    return {
+      ok: true as const,
+      ...(await confirmApplicationContact(url, token.data, parsed.data.code)),
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+export async function interviewProgressAction(sessionToken: string) {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return {
+      ok: false as const,
+      message: "Couldn't restore your application.",
+    };
+  try {
+    const [application, transcript, coverage] = await Promise.all([
+      resumeApplication(url, token.data),
+      getApplicationTranscript(url, token.data),
+      getApplicationCoverage(url, token.data),
+    ]);
+    return { ok: true as const, application, transcript, coverage };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+
+export async function saveContactAction(
+  sessionToken: string,
+  contact: unknown,
+) {
+  const token = Token.safeParse(sessionToken);
+  const parsed = ApplicationContactRequestSchema.safeParse(contact);
+  const url = base();
+  if (!token.success || !parsed.success || url === null)
+    return {
+      ok: false as const,
+      message: "Please check your contact details.",
+    };
+  try {
+    return {
+      ok: true as const,
+      ...(await saveApplicationContact(url, token.data, parsed.data)),
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+export async function transcriptAction(sessionToken: string) {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false as const, message: "Please try again." };
+  try {
+    return {
+      ok: true as const,
+      turns: (await getApplicationTranscript(url, token.data)).turns,
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+export async function openInterviewAction(sessionToken: string) {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false as const, message: "Please try again." };
+  try {
+    return {
+      ok: true as const,
+      turns: (await openApplicationInterview(url, token.data)).turns,
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+export async function coverageAction(sessionToken: string) {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false as const, message: "Please try again." };
+  try {
+    return {
+      ok: true as const,
+      coverage: await getApplicationCoverage(url, token.data),
+    };
+  } catch (error: unknown) {
+    return formFailure(error);
+  }
+}
+
+/**
+ * C3: the GateQ video interview, by the applicant's own credential. Every
+ * failure is a plain message; typing always remains the interview.
+ */
+export type VideoResult =
+  | { readonly ok: true; readonly state: GateqVideoStateDto }
+  | { readonly ok: false; readonly message: string };
+
+const videoFailure = (error: unknown): VideoResult => {
+  const failed = failure(error);
+  return {
+    ok: false,
+    message: failed.ok
+      ? "Video isn't available right now. You can continue by typing."
+      : failed.message,
+  };
+};
+
+export async function videoStateAction(
+  sessionToken: string,
+): Promise<VideoResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false, message: "Please try again." };
+  try {
+    return { ok: true, state: await getApplicationVideo(url, token.data) };
+  } catch (error: unknown) {
+    return videoFailure(error);
+  }
+}
+
+export async function startVideoAction(
+  sessionToken: string,
+  deviceLanguage?: string,
+): Promise<VideoResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false, message: "Please try again." };
+  // Lane ml: the room's language. A signed-in applicant's saved choice wins
+  // over the device's; the API validates the tag again.
+  const standing = await resolveQStanding().catch(() => null);
+  const locale = effectiveLocale(standing?.language, deviceLanguage);
+  try {
+    return {
+      ok: true,
+      state: await startApplicationVideo(url, token.data, locale),
+    };
+  } catch (error: unknown) {
+    return videoFailure(error);
+  }
+}
+
+export async function endVideoAction(
+  sessionToken: string,
+  continueByTyping: boolean,
+): Promise<VideoResult> {
+  const token = Token.safeParse(sessionToken);
+  const url = base();
+  if (!token.success || url === null)
+    return { ok: false, message: "Please try again." };
+  try {
+    return {
+      ok: true,
+      state: await endApplicationVideo(
+        url,
+        token.data,
+        continueByTyping === true,
+      ),
+    };
+  } catch (error: unknown) {
+    return videoFailure(error);
+  }
+}

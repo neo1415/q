@@ -21,10 +21,15 @@ export class AuthenticationRequiredError extends Error {
 /**
  * Authenticated, but no organisation context was selected and none could be
  * established. The caller must choose one; the server will not choose for them.
+ *
+ * The default message is written for the person who reads it: it travels as
+ * the problem `detail` to Home, where someone with no organisation yet asks
+ * Q something and must learn what to do next, not which header was missing
+ * (CQ-PRE-REC-001 §8: no raw internal error).
  */
 export class ActorContextRequiredError extends Error {
   constructor(
-    message = "Select an organisation context before performing this operation.",
+    message = "You're not working inside an organisation yet. Set up as a founder or an investor, or choose an organisation, and Q can get started.",
   ) {
     super(message);
     this.name = "ActorContextRequiredError";

@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   createProblemDetails,
+  GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
+  GATEQ_SUBMIT_NOT_READY_DETAIL,
   PROBLEM_CONTENT_TYPE,
   problemFromUnknownError,
   type ProblemDetails,
@@ -11,6 +13,11 @@ import {
   CapitalObjectiveLifecycleError,
   CapitalObjectiveNotFoundError,
   CapitalObjectiveVersionConflictError,
+  CapitalRoundClosedError,
+  CapitalRoundNotFoundError,
+  CapitalRoundRevisionConflictError,
+  CapitalRoundStepRefusedError,
+  CapitalRoundTermsError,
 } from "@capital-q/capital";
 import {
   CompanyCreationConflictError,
@@ -33,13 +40,54 @@ import {
   InvestorRepresentativeNotFoundError,
   InvestorVersionConflictError,
 } from "@capital-q/investors";
+import {
+  ChatAttachmentUnavailableError,
+  ChatBlockedError,
+  ChatIdempotencyConflictError,
+  ChatNotConnectedError,
+  ChatReportReasonError,
+  ChatNotFoundError,
+} from "@capital-q/communication";
+import {
+  ConnectionNotAcceptedError,
+  ConnectionNotPermittedError,
+  InterestAlreadyAnsweredError,
+  RelationshipAlreadyConnectedError,
+  InterestCompanyNotFoundError,
+  InterestIdempotencyConflictError,
+  InterestNotFoundError,
+  RelationshipPipelineLimitError,
+  RelationshipPipelineQueryError,
+  RelationshipViewLimitError,
+  RelationshipNoteSupersededError,
+  InterestNotPermittedError,
+} from "@capital-q/network";
+import {
+  DisclosurePolicyNotFoundError,
+  DisclosureResourceNotFoundError,
+} from "@capital-q/permissions";
 import type { Logger } from "@capital-q/observability";
+import {
+  HandleUnavailableError,
+  ProfileImageRejectedError,
+  ProfileImageStorageUnavailableError,
+  ProfileImageUploadNotFoundError,
+  QCardFieldNotAllowedError,
+  QCardNotFoundError,
+  QCardSubjectNotFoundError,
+  QCardVersionConflictError,
+} from "@capital-q/public-identity";
 import {
   OrganisationCreationConflictError,
   OrganisationNotFoundError,
   OrganisationVersionConflictError,
 } from "@capital-q/organisations";
 import type { DocumentUploadFailureCode } from "@capital-q/contracts";
+import {
+  UnicornPotentialDiscoverDeniedError,
+  SlateCursorRejectedError,
+} from "@capital-q/discovery";
+import { IntakeRefusedError } from "@capital-q/gateq-intake";
 import {
   ClaimNotFoundError,
   ClaimRevisionConflictError,
@@ -59,6 +107,7 @@ import {
 import {
   MediaAssetConflictError,
   MediaAssetNotFoundError,
+  MediaIdempotencyConflictError,
   MediaOwnerNotFoundError,
   MediaReplacementConflictError,
   MediaRuleError,
@@ -70,6 +119,8 @@ import {
   AuthenticationRequiredError,
   AuthorizationDeniedError,
   AuthorizationRequirementError,
+  PersonProfileNotFoundError,
+  PersonProfileVersionConflictError,
 } from "@capital-q/security";
 import {
   OnboardingContextRequiredError,
@@ -81,6 +132,7 @@ import {
   OnboardingSessionVersionConflictError,
   OnboardingSubjectNotFoundError,
   OnboardingSuggestionNotFoundError,
+  OnboardingInterviewQuestionNotFoundError,
 } from "@capital-q/onboarding";
 import {
   TaxonomyClassificationCandidateDecidedError,
@@ -93,6 +145,12 @@ import {
   TaxonomySubjectNotFoundError,
   TaxonomyVocabularyNotFoundError,
 } from "@capital-q/taxonomy";
+
+import {
+  QAccountPausedError,
+  QInterviewUnavailableError,
+} from "../q/interview-client.js";
+import { AccountSuspendedError } from "../security/suspension.js";
 
 /**
  * Fastify wiring for the Capital Q problem contract.
@@ -184,7 +242,18 @@ function toProblem(
     return createProblemDetails({ code: "AUTHENTICATION_REQUIRED", requestId });
   }
 
-  if (error instanceof ActorContextDeniedError) {
+  // ADMIN block (ADR 0033): an operator suspended this account.
+  if (error instanceof AccountSuspendedError) {
+    return createProblemDetails({ code: "ACCOUNT_SUSPENDED", requestId });
+  }
+  // end ADMIN block
+
+  // A profile that vanished between read and write is the same answer as
+  // one that never existed: no access, nothing about why.
+  if (
+    error instanceof ActorContextDeniedError ||
+    error instanceof PersonProfileNotFoundError
+  ) {
     return createProblemDetails({
       code: "PERMISSION_DENIED",
       requestId,
@@ -193,6 +262,62 @@ function toProblem(
   }
 
   if (error instanceof ActorContextRequiredError) {
+    return createProblemDetails({
+      code: "INVALID_REQUEST",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // A cursor is a position this server issued for this actor, never
+  // authority: anything else is a bad request, with no hint of whose
+  // slate it might have been (CQ-REC-006).
+  // A GateQ guest that has spent its allowance (CQ-GATE-002S §8). Every
+  // other intake refusal is already a 404 at the route, so this is the
+  // only one that arrives here. The response names no credential, no
+  // application and no quota: an honest applicant needs to know to wait,
+  // and a script must learn nothing about where the edges are.
+  if (
+    error instanceof IntakeRefusedError &&
+    error.refusal === "TOO_MANY_REQUESTS"
+  ) {
+    return createProblemDetails({ code: "RATE_LIMITED", requestId });
+  }
+  // GateQ slice 1: Submit before the contact's email is confirmed. The
+  // applicant fixes it on the same screen; nothing else is said.
+  if (
+    error instanceof IntakeRefusedError &&
+    error.refusal === "CONTACT_NOT_CONFIRMED"
+  ) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: GATEQ_SUBMIT_CONTACT_NOT_CONFIRMED_DETAIL,
+    });
+  }
+  // Submit with a required answer still missing. Only the submit route lets
+  // this refusal through (every other route keeps it a 404), and only after
+  // the credential verified: the applicant answers and submits again.
+  if (
+    error instanceof IntakeRefusedError &&
+    error.refusal === "NOT_READY_TO_SUBMIT"
+  ) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: GATEQ_SUBMIT_NOT_READY_DETAIL,
+    });
+  }
+
+  if (error instanceof UnicornPotentialDiscoverDeniedError) {
+    return createProblemDetails({
+      code: "PERMISSION_DENIED",
+      requestId,
+      detail: "Premium Unicorn Potential access is required for this filter.",
+    });
+  }
+
+  if (error instanceof SlateCursorRejectedError) {
     return createProblemDetails({
       code: "INVALID_REQUEST",
       requestId,
@@ -247,6 +372,7 @@ function toProblem(
     error instanceof InvestorMandateNotFoundError ||
     error instanceof InvestorPortfolioReferenceNotFoundError ||
     error instanceof CapitalObjectiveNotFoundError ||
+    error instanceof CapitalRoundNotFoundError ||
     error instanceof TaxonomyVocabularyNotFoundError ||
     error instanceof TaxonomyNodeNotFoundError ||
     error instanceof TaxonomySubjectNotFoundError ||
@@ -254,6 +380,7 @@ function toProblem(
     error instanceof TaxonomyClassificationCandidateNotFoundError ||
     error instanceof OnboardingSessionNotFoundError ||
     error instanceof OnboardingSuggestionNotFoundError ||
+    error instanceof OnboardingInterviewQuestionNotFoundError ||
     error instanceof OnboardingSubjectNotFoundError ||
     error instanceof OnboardingDefinitionUnavailableError ||
     error instanceof EvidenceSourceNotFoundError ||
@@ -264,9 +391,155 @@ function toProblem(
     error instanceof DocumentVersionNotFoundError ||
     error instanceof DocumentUploadSessionNotFoundError ||
     error instanceof MediaAssetNotFoundError ||
-    error instanceof MediaOwnerNotFoundError
+    error instanceof MediaOwnerNotFoundError ||
+    // Absent and not-visible are one answer (CQ-NET-010).
+    error instanceof InterestCompanyNotFoundError ||
+    // Absent, withdrawn and another company's are one answer (CQ-NET-011).
+    error instanceof InterestNotFoundError ||
+    // A share that is not on this company's own objects (CQ-BIZ-003).
+    error instanceof DisclosurePolicyNotFoundError ||
+    error instanceof DisclosureResourceNotFoundError ||
+    // Absent, another tenant's and another organisation's (BIZ-004).
+    error instanceof QCardSubjectNotFoundError ||
+    error instanceof QCardNotFoundError ||
+    error instanceof ProfileImageUploadNotFoundError ||
+    // Not a party, no such thread or message: one answer (R34).
+    error instanceof ChatNotFoundError
   ) {
     return createProblemDetails({ code: "RESOURCE_NOT_FOUND", requestId });
+  }
+
+  // ADR 0023: the investor's own declared choice, or the caller's role.
+  // Neither says anything private about anyone.
+  if (error instanceof ConnectionNotAcceptedError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof ConnectionNotPermittedError) {
+    return createProblemDetails({
+      code: "PERMISSION_DENIED",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // Describes the caller, never a company: safe to say plainly.
+  if (
+    error instanceof RelationshipPipelineLimitError ||
+    error instanceof RelationshipPipelineQueryError ||
+    error instanceof RelationshipViewLimitError
+  ) {
+    return createProblemDetails({
+      code: "INVALID_REQUEST",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof InterestNotPermittedError) {
+    return createProblemDetails({
+      code: "PERMISSION_DENIED",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // R34: about the caller's own thread or document; safe to say plainly.
+  if (error instanceof ChatNotConnectedError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  // R34 safety: the same sentence to both sides; never who blocked.
+  if (error instanceof ChatBlockedError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof ChatReportReasonError) {
+    return createProblemDetails({
+      code: "VALIDATION_FAILED",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof ChatAttachmentUnavailableError) {
+    return createProblemDetails({
+      code: "VALIDATION_FAILED",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof ChatIdempotencyConflictError) {
+    return createProblemDetails({ code: "IDEMPOTENCY_CONFLICT", requestId });
+  }
+
+  if (error instanceof InterestIdempotencyConflictError) {
+    return createProblemDetails({ code: "IDEMPOTENCY_CONFLICT", requestId });
+  }
+  // About the caller's own note: safe to say plainly.
+  if (error instanceof RelationshipNoteSupersededError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  // An answer is never overwritten; saying so is safe to the one party
+  // allowed to answer.
+  // Handles and the Q Card (BIZ-004). A refused handle says why in words a
+  // person can act on; held and retired handles read the same as taken.
+  if (error instanceof HandleUnavailableError) {
+    return createProblemDetails({
+      code:
+        error.reason === "SHAPE" ? "VALIDATION_FAILED" : "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof QCardFieldNotAllowedError) {
+    return createProblemDetails({
+      code: "VALIDATION_FAILED",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof QCardVersionConflictError) {
+    return createProblemDetails({ code: "VERSION_CONFLICT", requestId });
+  }
+  // Profile images: a refused image says why in words a person can act on.
+  if (error instanceof ProfileImageRejectedError) {
+    return createProblemDetails({
+      code: error.reason === "TOO_MANY" ? "RATE_LIMITED" : "VALIDATION_FAILED",
+      requestId,
+      detail: error.message,
+    });
+  }
+  if (error instanceof ProfileImageStorageUnavailableError) {
+    return createProblemDetails({ code: "PROVIDER_UNAVAILABLE", requestId });
+  }
+
+  if (error instanceof RelationshipAlreadyConnectedError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
+  }
+
+  if (error instanceof InterestAlreadyAnsweredError) {
+    return createProblemDetails({
+      code: "RESOURCE_CONFLICT",
+      requestId,
+      detail: error.message,
+    });
   }
 
   // A refused upload. The category is machine-readable so a client can say
@@ -309,6 +582,10 @@ function toProblem(
     return createProblemDetails({ code: "VERSION_CONFLICT", requestId });
   }
 
+  if (error instanceof MediaIdempotencyConflictError) {
+    return createProblemDetails({ code: "IDEMPOTENCY_CONFLICT", requestId });
+  }
+
   // Someone else changed the media asset first, or the pitch being replaced
   // is no longer the current one. Refused rather than resolved: two callers
   // must never both believe they set the company's pitch.
@@ -340,6 +617,23 @@ function toProblem(
   // rather than open, and no provider detail is echoed.
   if (error instanceof DocumentStorageUnavailableError) {
     return createProblemDetails({ code: "PROVIDER_UNAVAILABLE", requestId });
+  }
+
+  // The one Q interviewer is unreachable (QX-004 core gate: one Q). The
+  // conversational interview closes rather than falling back to the
+  // template engine it replaced; the person can still tap through the
+  // step. No provider, host or status detail is echoed.
+  if (error instanceof QInterviewUnavailableError) {
+    return createProblemDetails({ code: "PROVIDER_UNAVAILABLE", requestId });
+  }
+
+  // Founder direction 2026-09-30: a paused account is told so plainly.
+  if (error instanceof QAccountPausedError) {
+    return createProblemDetails({
+      code: "PERMISSION_DENIED",
+      requestId,
+      detail: error.message,
+    });
   }
 
   if (error instanceof EvidenceRuleError) {
@@ -432,7 +726,9 @@ function toProblem(
     error instanceof CompanyVersionConflictError ||
     error instanceof TeamVersionConflictError ||
     error instanceof InvestorVersionConflictError ||
-    error instanceof CapitalObjectiveVersionConflictError
+    error instanceof CapitalObjectiveVersionConflictError ||
+    error instanceof CapitalRoundRevisionConflictError ||
+    error instanceof PersonProfileVersionConflictError
   ) {
     return createProblemDetails({
       code: "VERSION_CONFLICT",
@@ -463,7 +759,10 @@ function toProblem(
     error instanceof InvestorOrganisationExistsError ||
     error instanceof InvestorMandateLifecycleError ||
     error instanceof ActiveCapitalObjectiveExistsError ||
-    error instanceof CapitalObjectiveLifecycleError
+    error instanceof CapitalObjectiveLifecycleError ||
+    error instanceof CapitalRoundClosedError ||
+    error instanceof CapitalRoundStepRefusedError ||
+    error instanceof CapitalRoundTermsError
   ) {
     return createProblemDetails({
       code: "RESOURCE_CONFLICT",

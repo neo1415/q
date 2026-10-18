@@ -73,6 +73,7 @@ export {
   OnboardingSessionVersionConflictError,
   OnboardingSubjectNotFoundError,
   OnboardingSuggestionNotFoundError,
+  OnboardingInterviewQuestionNotFoundError,
   type OnboardingRuntimeFault,
   type OnboardingStateReason,
 } from "./domain/errors.js";
@@ -108,6 +109,12 @@ export {
 export type {
   NewOnboardingSession,
   NewOnboardingSuggestion,
+  NewOnboardingInterviewQuestion,
+  NewOnboardingUtterance,
+  NewOnboardingInterviewTurn,
+  OnboardingInterviewTurnRepository,
+  OnboardingInterviewQuestionRepository,
+  OnboardingUtteranceRepository,
   OnboardingDefinitionRepository,
   OnboardingIdempotencyRepository,
   OnboardingResponseRepository,
@@ -142,6 +149,8 @@ export {
   toSessionView,
   toStepView,
   toSuggestionView,
+  toQuestionView,
+  pendingQuestionViews,
   type OnboardingSessionAggregate,
 } from "./application/view.js";
 export {
@@ -155,19 +164,59 @@ export {
   type OnboardingRuntimeDependencies,
   type OnboardingUseCases,
   type ResolveOnboardingSuggestionCommand,
+  type RecordOnboardingQuestionsCommand,
+  type AnswerOnboardingQuestionCommand,
+  type DismissOnboardingQuestionCommand,
   type SessionScopedQuery,
   type SkipOnboardingStepCommand,
+  type WithdrawOnboardingResponseCommand,
   type StartOnboardingSessionCommand,
   type StartOnboardingSessionResult,
+  type SayOnboardingCommand,
+  type SayOnboardingOutcome,
+  type AppendOnboardingInterviewTurnsCommand,
+  type AppendOnboardingInterviewTurnsResult,
+  type ListOnboardingInterviewTurnsQuery,
+  type ReviseOnboardingResponseCommand,
   type SubmitOnboardingResponseCommand,
 } from "./application/use-cases.js";
+export {
+  followUpQuickAnswers,
+  followUpResponse,
+  followUpTyped,
+  type FollowUpAnswer,
+  type FollowUpQuickAnswer,
+  type FollowUpTyped,
+  type OnboardingFollowUp,
+} from "./application/follow-ups.js";
 export { getOnboardingMetrics } from "./application/metrics.js";
+export {
+  answeredLine,
+  createOwnOnboardingSummaryReader,
+  settleOwnCompletion,
+  type OwnOnboardingCompletion,
+  type OwnOnboardingSummary,
+  type OwnOnboardingSummaryReader,
+} from "./application/own-summary.js";
 export {
   createOnboardingService,
   type OnboardingService,
   type OnboardingServiceOptions,
 } from "./application/service.js";
 export { createPostgresOnboardingDefinitionRepository } from "./infrastructure/postgres-definition-repository.js";
+export { createPostgresOnboardingInterviewQuestionRepository } from "./infrastructure/postgres-question-repository.js";
+export { createPostgresOnboardingUtteranceRepository } from "./infrastructure/postgres-utterance-repository.js";
+export { createPostgresOnboardingInterviewTurnRepository } from "./infrastructure/postgres-interview-turn-repository.js";
+export {
+  interpretUtterance,
+  isRichUtterance,
+  type UtteranceMove,
+  parseFigure,
+  referenceCandidatesOf,
+  type ReferenceCandidate,
+  type OnboardingUtteranceAliases,
+  type StepInterpretation,
+} from "./domain/interpretation.js";
 export {
   createPostgresOnboardingIdempotencyRepository,
   createPostgresOnboardingResponseRepository,
@@ -177,3 +226,126 @@ export {
 } from "./infrastructure/postgres-session-repository.js";
 
 export const PACKAGE_NAME = "@capital-q/onboarding" as const;
+export {
+  affirmativeText,
+  affirmedMention,
+  clausesOf,
+  NEGATION_MARKERS,
+  negatedMention,
+} from "./domain/negation.js";
+export { mentions, normalise, wordsOf } from "./domain/text.js";
+export {
+  matchedOptions,
+  matchOptions,
+  mentionedOptions,
+  type OptionAliases,
+  type OptionMatch,
+} from "./domain/resolution/options.js";
+export {
+  CROSS_STEP_MAX_READINGS,
+  parseFigurePair,
+  resolveAcrossSteps,
+  type CrossStepInput,
+  type CrossStepReading,
+  type InterviewCues,
+  type InterviewStepCue,
+} from "./domain/resolution/cross-step.js";
+export {
+  aggregateTaxonomyCandidates,
+  TAXONOMY_PHRASE_MAX,
+  TAXONOMY_STRONG_CONFIDENCE,
+  TAXONOMY_WEAK_CONFIDENCE,
+  taxonomyPhrases,
+  type AggregatedTaxonomyCandidates,
+  type TaxonomyPhraseCandidate,
+} from "./domain/resolution/taxonomy-phrases.js";
+export {
+  correctionIntent,
+  type CorrectionIntent,
+} from "./domain/resolution/correction.js";
+export type { OnboardingTaxonomyResolver } from "./application/ports.js";
+
+export {
+  createOnboardingQRecommendations,
+  payloadSha256,
+  Q_RECOMMENDATION_PUBLIC_SOURCE_TYPES,
+  Q_RECOMMENDATION_SOURCE,
+  type OnboardingQRecommendations,
+  type QRecommendation,
+  type QRecommendationPublicSourceType,
+} from "./application/q-recommendations.js";
+export {
+  decideOnboardingNudge,
+  EMPTY_NUDGE_STATE,
+  minutesLeft,
+  nudgeStreak,
+  ONBOARDING_NUDGE_POLICY,
+  ONBOARDING_NUDGE_SURFACES,
+  recordNudgeChoice,
+  recordNudgeShown,
+  type OnboardingNudgeChoice,
+  type OnboardingNudgeDecision,
+  type OnboardingNudgePolicyConfig,
+  type OnboardingNudgeProgress,
+  type OnboardingNudgeQuiet,
+  type OnboardingNudgeState,
+  type OnboardingNudgeSurface,
+} from "./domain/nudge-policy.js";
+export {
+  createOnboardingNudges,
+  nudgeJourney,
+  type OnboardingNudge,
+  type OnboardingNudgeRequest,
+  type OnboardingNudges,
+  type OnboardingNudgeStateRepository,
+} from "./application/nudges.js";
+export { createPostgresOnboardingNudgeStateRepository } from "./infrastructure/postgres-nudge-state-repository.js";
+export {
+  branchDependencies,
+  deriveOnboardingCoverage,
+  displayOnboardingValue,
+  knownFactsFromRegistration,
+  proposalSource,
+  selectNextFields,
+  type DeriveOnboardingCoverageInput,
+  type OnboardingCoverageCheck,
+  type OnboardingCoverageFieldProfile,
+  type OnboardingCoverageProfile,
+  type OnboardingKnownFact,
+  type OnboardingRegistrationFacts,
+} from "./application/coverage.js";
+export {
+  confirmationItemKey,
+  ENGLISH_ONBOARDING_COPY,
+  groupConfirmation,
+  ONBOARDING_COPY_CATALOGS,
+  onboardingCopyFor,
+  type OnboardingCopyCatalog,
+} from "./application/confirmation.js";
+export { ARABIC_ONBOARDING_COPY } from "./application/confirmation-ar.js";
+export {
+  drainPendingWrites,
+  failureCode,
+  isTransientOnboardingFailure,
+  pendingReplayKey,
+  sameResponseValue,
+  type DrainPorts,
+  type DrainResult,
+  type PendingWrite,
+  type PendingWriteOrigin,
+  type PendingWriteRepository,
+  type ReplayFailure,
+} from "./application/pending-writes.js";
+export { createPostgresPendingWriteRepository } from "./infrastructure/postgres-pending-write-repository.js";
+export {
+  classifyOnboardingUpload,
+  ONBOARDING_READABLE_DOCUMENT_TYPES,
+  onboardingDocumentTreatment,
+  type OnboardingDocumentTreatment,
+} from "./application/documents.js";
+export {
+  createOwnOnboardingTranscriptReader,
+  type OwnOnboardingTranscriptReader,
+  type OwnTranscriptLine,
+  type OwnTranscriptSession,
+} from "./application/own-transcript.js";

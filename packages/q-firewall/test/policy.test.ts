@@ -24,6 +24,7 @@ import {
   sensitivityCeiling,
   type SubjectRelation,
 } from "../src/index.js";
+import { screenWithin } from "../src/firewall.js";
 
 /**
  * The pure policies, exhaustively. No database, no ports: these are the
@@ -33,6 +34,50 @@ import {
 
 const COMPANY = "11111111-1111-4111-8111-111111111111";
 const TENANT = "22222222-2222-4222-8222-222222222222";
+
+describe("viewer references within the permitted screen", () => {
+  it("retains artifact positions without adding any scope", () => {
+    const screen = {
+      route: "DOCUMENTS" as const,
+      artifactId: COMPANY,
+      artifactSlide: 2,
+      artifactVersion: 1,
+    };
+    expect(screenWithin(screen, [])).toEqual(screen);
+  });
+
+  it("drops positions without their parent reference", () => {
+    expect(
+      screenWithin(
+        {
+          route: "DOCUMENTS",
+          artifactSlide: 2,
+          artifactVersion: 1,
+          documentPage: 3,
+        },
+        [],
+      ),
+    ).toEqual({ route: "DOCUMENTS" });
+  });
+
+  it("retains an uploaded document page only under its own permitted subject", () => {
+    const screen = {
+      route: "DOCUMENTS" as const,
+      documentId: COMPANY,
+      documentPage: 3,
+    };
+    expect(screenWithin(screen, [scope("COMPANY_PROFILE")])).toEqual({
+      route: "DOCUMENTS",
+    });
+    expect(
+      screenWithin(screen, [
+        scope("EVIDENCE_DOCUMENTS", {
+          subject: { kind: "DOCUMENT", documentId: COMPANY },
+        }),
+      ]),
+    ).toEqual(screen);
+  });
+});
 
 function scope(
   kind: QAuthorisedKnowledgeScope["kind"],
@@ -61,7 +106,7 @@ function scope(
 
 describe("policy version", () => {
   it("is explicit and stable", () => {
-    expect(CONTEXT_FIREWALL_POLICY_VERSION).toBe("context-firewall-v1");
+    expect(CONTEXT_FIREWALL_POLICY_VERSION).toBe("context-firewall-v2");
     expect(CONTEXT_FIREWALL_POLICY_VERSION).not.toMatch(/latest/i);
   });
 });
@@ -108,6 +153,11 @@ describe("scope catalogue", () => {
     expect(SCOPE_CATALOGUE.COMPANY_CAPITAL_OBJECTIVE.ownerSensitivity).toBe(
       "CONFIDENTIAL",
     );
+    // Evidence is admitted up to CONFIDENTIAL: a HIGHLY_CONFIDENTIAL document
+    // is outside every plan rather than inside one no provider may receive.
+    expect(SCOPE_CATALOGUE.EVIDENCE_DOCUMENTS.ownerSensitivity).toBe(
+      "CONFIDENTIAL",
+    );
   });
 });
 
@@ -149,11 +199,99 @@ describe("purpose policy", () => {
     );
   });
 
-  it("gives a plain answer the minimum: profile and capital objective, no financials or documents", () => {
+  it("keeps a question about a company a company question when the actor's own investor organisation rides along (CQ-QX-007)", () => {
+    // An investor asking from a company page: their own firm is context.
+    expect(
+      deriveTaskClass("ANSWER", [
+        { kind: "COMPANY", relation: "NETWORK" },
+        { kind: "INVESTOR_ORGANISATION", relation: "OWNER" },
+      ]),
+    ).toBe("COUNTERPARTY_COMPANY_QUESTION");
+    expect(
+      deriveTaskClass("INVESTIGATE", [
+        { kind: "INVESTOR_ORGANISATION", relation: "OWNER" },
+        { kind: "COMPANY", relation: "COUNTERPARTY" },
+      ]),
+    ).toBe("COUNTERPARTY_COMPANY_QUESTION");
+    // Only the actor's OWN organisation is set aside: somebody else's
+    // investor organisation beside a company is still an investor question.
+    expect(
+      deriveTaskClass("ANSWER", [
+        { kind: "COMPANY", relation: "NETWORK" },
+        { kind: "INVESTOR_ORGANISATION", relation: "NETWORK" },
+      ]),
+    ).toBe("INVESTOR_QUESTION");
+    // Their own firm on its own is still a question about their firm.
+    expect(
+      deriveTaskClass("ANSWER", [
+        { kind: "INVESTOR_ORGANISATION", relation: "OWNER" },
+      ]),
+    ).toBe("INVESTOR_QUESTION");
+    // A founder asking about an investor never becomes a company question.
+    expect(
+      deriveTaskClass("ANSWER", [
+        { kind: "INVESTOR_ORGANISATION", relation: "NETWORK" },
+      ]),
+    ).toBe("INVESTOR_QUESTION");
+    // Relationships and comparisons keep their own classes.
+    expect(
+      deriveTaskClass("ANSWER", [
+        { kind: "COMPANY", relation: "NETWORK" },
+        { kind: "INVESTOR_ORGANISATION", relation: "OWNER" },
+        { kind: "RELATIONSHIP", relation: "COUNTERPARTY" },
+      ]),
+    ).toBe("RELATIONSHIP_QUESTION");
+    expect(
+      deriveTaskClass("COMPARE", [
+        { kind: "COMPANY", relation: "NETWORK" },
+        { kind: "INVESTOR_ORGANISATION", relation: "OWNER" },
+      ]),
+    ).toBe("COMPARISON");
+  });
+
+  it("lets a person reach what Capital Q understands of their own public footprint", () => {
+    // The presence build researches a person, drops every page that does
+    // not name them, and writes through the Write Gate. Without a scope
+    // that authorises reading it back, all of that was performed and then
+    // discarded, and Q answered "I have nothing about you".
+    //
+    // A USER subject is only ever oneself: the self resolver admits no
+    // other person, and this row is never shared (sharedVia is null), so
+    // widening the read does not widen disclosure.
+    expect(candidateScopeKinds("ANSWER", "USER")).toEqual([
+      "OWN_Q_CONVERSATION",
+      "OWN_PUBLIC_PRESENCE",
+    ]);
+    // Classifying a sentence never needs to know who somebody is.
+    expect(candidateScopeKinds("CLASSIFY", "USER")).toEqual([
+      "OWN_Q_CONVERSATION",
+    ]);
+    expect(candidateScopeKinds("ANSWER", "INVESTOR_ORGANISATION")).toContain(
+      "OWN_PUBLIC_PRESENCE",
+    );
+
+    const spec = SCOPE_CATALOGUE["OWN_PUBLIC_PRESENCE"];
+    // Owner side only, forever: nothing grants somebody else's reading of
+    // a person to a counterparty, and no label here is network or public.
+    expect(spec.sharedVia).toBeNull();
+    expect(spec.defaultLabel).toBe("organisation_private");
+    expect(spec.ownerSensitivity).not.toBe("PUBLIC");
+    expect(spec.sharedSensitivity).not.toBe("NETWORK_VISIBLE");
+  });
+
+  it("gives a plain answer the minimum: profile, capital objective and own evidence, no financials", () => {
     expect(candidateScopeKinds("ANSWER", "COMPANY")).toEqual([
       "COMPANY_PROFILE",
       "COMPANY_CAPITAL_OBJECTIVE",
+      "EVIDENCE_DOCUMENTS",
+      // What Capital Q understands of the company's own public footprint.
+      // It is the company's own material, read from the open web, so a
+      // plain answer may use it; nothing here shares it with anyone else.
+      "OWN_PUBLIC_PRESENCE",
     ]);
+    expect(candidateScopeKinds("ANSWER", "COMPANY")).not.toContain(
+      "COMPANY_PRIVATE_FINANCIALS",
+    );
     expect(candidateScopeKinds("INVESTIGATE", "COMPANY")).toContain(
       "COMPANY_PRIVATE_FINANCIALS",
     );
@@ -184,6 +322,28 @@ describe("purpose policy", () => {
       for (const scopeKind of actorWideScopeKinds(capability)) {
         expect(Q_KNOWLEDGE_SCOPE_KINDS).toContain(scopeKind);
       }
+    }
+  });
+
+  it("lets a person reach their own onboarding, and nobody else's (CQ-QX-007)", () => {
+    // Home Q told an onboarded investor it could not say who they were.
+    // Their own setup is actor-wide, filtered to their own user id, never
+    // shared and never network or public.
+    expect(actorWideScopeKinds("ANSWER")).toContain("OWN_ONBOARDING");
+    expect(actorWideScopeKinds("CLASSIFY")).not.toContain("OWN_ONBOARDING");
+    const spec = SCOPE_CATALOGUE["OWN_ONBOARDING"];
+    expect(spec.bound).toBe(false);
+    expect(spec.sharedVia).toBeNull();
+    expect(spec.defaultLabel).toBe("personal_private");
+    for (const kind of [
+      "COMPANY",
+      "INVESTOR_ORGANISATION",
+      "RELATIONSHIP",
+      "USER",
+    ] as const) {
+      expect(candidateScopeKinds("ANSWER", kind)).not.toContain(
+        "OWN_ONBOARDING",
+      );
     }
   });
 

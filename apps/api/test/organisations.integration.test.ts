@@ -163,7 +163,12 @@ describe("/v1/organisations through the real API composition", () => {
         membership: { roleCodes: string[]; isActiveContext: boolean };
       }>();
       const organisationId = summary.organisation.id;
-      expect(summary.membership.roleCodes).toEqual(["organisation_admin"]);
+      // ADR 0057 (e2dd5c3b, G1): the creator is the first owner, held as
+      // organisation_admin + organisation_owner; still the exact set.
+      expect([...summary.membership.roleCodes].sort()).toEqual([
+        "organisation_admin",
+        "organisation_owner",
+      ]);
       expect(summary.membership.isActiveContext).toBe(true);
 
       // Retry with the same key: same organisation, nothing new.

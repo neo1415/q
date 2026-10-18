@@ -21,7 +21,13 @@ export {
 
 export const PACKAGE_NAME = "@capital-q/api-client" as const;
 
-export { fetchMe, type FetchMeInput } from "./me.js";
+export {
+  fetchMe,
+  getMyProfile,
+  updateMe,
+  updateMyProfile,
+  type FetchMeInput,
+} from "./me.js";
 
 export {
   activateOrganisation,
@@ -32,7 +38,18 @@ export {
   type ApiSession,
 } from "./organisations.js";
 
-export { createCompany, getCompany, updateCompany } from "./companies.js";
+export {
+  assessMarketplaceReadiness,
+  createCompany,
+  getCompany,
+  downloadCompanyDeck,
+  getCompanyNetworkPreview,
+  getCompanyProfile,
+  getCompanyProfilePhoto,
+  getMarketplaceReadiness,
+  setCompanyVisibility,
+  updateCompany,
+} from "./companies.js";
 
 export {
   getCompanyTeamFacts,
@@ -46,6 +63,8 @@ export {
 export {
   createInvestorOrganisation,
   getCurrentInvestorOrganisation,
+  getInvestorNetworkPreview,
+  setInvestorVisibility,
   getInvestorOrganisation,
   getMyInvestorRepresentative,
   updateInvestorOrganisation,
@@ -79,14 +98,26 @@ export {
 } from "./taxonomy.js";
 
 export {
+  answerOnboardingQuestion,
+  appendOnboardingInterviewTurns,
+  chooseOnboardingNudge,
+  claimBriefingOnboardingNudge,
+  peekBriefingOnboardingNudge,
+  listOnboardingInterviewTurns,
+  getOnboardingCoverage,
+  sayToOnboarding,
   completeOnboardingSession,
+  dismissOnboardingQuestion,
   getCurrentOnboardingSession,
   getOnboardingSession,
   goBackInOnboarding,
   resolveOnboardingSuggestion,
   skipOnboardingStep,
+  withdrawOnboardingResponse,
   startOnboardingSession,
+  reviseOnboardingResponse,
   submitOnboardingResponse,
+  submitOnboardingResponses,
 } from "./onboarding.js";
 
 export {
@@ -96,21 +127,62 @@ export {
   getDocument,
   getDocumentUploadSession,
   listDocuments,
+  setDocumentDownloadAudience,
+  archiveDocument,
+  getDocumentFile,
+  renameDocument,
 } from "./documents.js";
 
 export {
+  authorisePitchDownload,
+  authorisePitchPlayback,
+  cancelPitchUpload,
   createPitchMediaAsset,
+  createPitchUploadSession,
   deletePitchMediaAsset,
   getCompanyPitch,
   listCompanyMedia,
+  setPitchDetails,
+  setPitchPlaybackPolicy,
+  syncPitch,
 } from "./media.js";
 
 export {
   appendQRunMessage,
   approveQApproval,
+  archiveQConversation,
+  hideQConversationMessage,
   cancelQRun,
   createQRun,
+  getQConversation,
+  getQArtifact,
+  getQArtifactProgress,
+  fillQArtifactPlaceholder,
+  getQArtifactVersion,
+  getProfileFindings,
+  listQArtifacts,
+  // DOCS block.
+  confirmQBrandKit,
+  createQAnswerExport,
+  getQBrandKit,
+  setQBrandKit,
+  suggestQBrandKit,
+  listQConversations,
+  createQVoiceSession,
+  getQVoiceTurnState,
+  setQVoiceScreen,
+  relayQVoiceDuplexTool,
+  sendQVoiceDuplexHeard,
+  sendQVoiceDuplexSaid,
+  reportQVoiceDuplexUsage,
+  pollQVoiceDuplexNarration,
+  readQRoom,
+  reportQUiActs,
+  resolveQNavigation,
+  rejoinQVoiceDuplex,
+  endQVoiceDuplex,
   getQApproval,
+  listPendingQApprovals,
   getQRun,
   rejectQApproval,
 } from "./q.js";
@@ -133,3 +205,335 @@ export {
   type QStreamState,
 } from "./q-stream-reducer.js";
 export { createSseParser, type SseMessage, type SseParser } from "./sse.js";
+
+export {
+  discoverCompanies,
+  discoverInvestors,
+  getDiscoveredInvestor,
+  getDiscoveredInvestorPhoto,
+  listNetworkPitches,
+  getRecommendationExplanation,
+  listSavedCompanies,
+  listYourCompanies,
+  listPassedCompanies,
+  unpassCompany,
+  passCompany,
+  saveCompany,
+  unsaveCompany,
+} from "./discovery.js";
+
+export {
+  answerConnectionRequest,
+  answerInterest,
+  getConnectionStatus,
+  listConnectionRequests,
+  requestConnection,
+  expressInterest,
+  getOwnInterest,
+  getRelationshipBrief,
+  getRelationshipGateqApplications,
+  listRelationshipBriefs,
+  getRelationshipWithCompany,
+  getRelationshipWithInvestor,
+  listCompanyRelationships,
+  listIncomingInterest,
+  listInvestorRelationships,
+  queryRelationshipPipeline,
+} from "./network.js";
+
+export {
+  getCompanyVerification,
+  requestCompanyVerification,
+} from "./verification.js";
+export {
+  getAudiencePreview,
+  getVisibilityState,
+  revokeVisibilityShare,
+  shareRaiseWithNetwork,
+  shareWithRelationship,
+} from "./visibility.js";
+
+export {
+  completeProfileImageUpload,
+  createProfileImageUpload,
+  getProfileImages,
+  removeProfileImage,
+} from "./profile-images.js";
+export {
+  claimHandle,
+  getPublicHandle,
+  getQCard,
+  resolveCardCode,
+  updateQCard,
+} from "./q-cards.js";
+export {
+  disconnectGoogle,
+  getEmailDraft,
+  getGoogleConnection,
+  getInboundEmailAddress,
+  rotateInboundEmailAddress,
+  listRelationshipMail,
+  reviseEmailDraft,
+  startGoogleConnect,
+} from "./integrations.js";
+export {
+  blockChat,
+  reportChat,
+  unblockChat,
+  getChatAttachment,
+  getChatThread,
+  getChatUnread,
+  markChatRead,
+  sendChatMessage,
+  unsendChatMessage,
+} from "./chat.js";
+export {
+  cancelMeeting,
+  createReminder,
+  dismissReminder,
+  findMeetingSlots,
+  getMeetingBrief,
+  listNotifications,
+  listRelationshipMeetings,
+  listReminders,
+  markNotificationsRead,
+  scheduleMeeting,
+  joinMeetingCall,
+} from "./schedule.js";
+
+export {
+  forgetQMemory,
+  getQPreferenceLearning,
+  listQMemory,
+  setQPreferenceLearning,
+} from "./memory.js";
+export {
+  bringMeetingAssistant,
+  dismissMeetingAssistant,
+  getMeetingAssistant,
+} from "./meeting-assistant.js";
+export { listRelationshipErrands, stopErrand } from "./errands.js";
+export {
+  adoptCommitment,
+  disputeCommitment,
+  confirmCommitment,
+  getCompanyFundraising,
+  getRelationshipCommitments,
+  stateCommitment,
+  withdrawCommitment,
+} from "./commitments.js";
+export {
+  closeCapitalRound,
+  confirmCommitmentAmount,
+  confirmCommitmentReceived,
+  getCapitalLedger,
+  getMyCommitments,
+  markCommitmentSent,
+  openCapitalRound,
+  getCapitalRoundHistory,
+  recordCapitalRoundStep,
+  reviseCapitalRound,
+} from "./capital-rounds.js";
+export {
+  getRelationshipPass,
+  listPassReasons,
+  passRelationship,
+  pauseRelationship,
+  recordMeetingOutcome,
+  resumeRelationship,
+} from "./outcomes.js";
+export {
+  applicationTurn,
+  openApplicationInterview,
+  saveAccountApplicationContact,
+  saveApplicationContact,
+  confirmAccountApplicationContact,
+  confirmApplicationContact,
+  getApplicationTranscript,
+  getApplicationCoverage,
+  getApplicationVideo,
+  startApplicationVideo,
+  endApplicationVideo,
+  resumeApplication,
+  createGateway,
+  draftGatewayVersion,
+  extractGatewayPolicy,
+  getGatewayPolicy,
+  getPublicGateway,
+  listGatewayApplications,
+  listGateways,
+  publishGatewayVersion,
+  saveApplicationAnswers,
+  shareApplicationMaterials,
+  startApplication,
+  submitApplication,
+} from "./gateq.js";
+export {
+  getAdminAttribution,
+  getAdminDisputes,
+  getAdminOverview,
+  getAdminPaused,
+  reinstatePausedAccount,
+} from "./admin.js";
+// REHEARSE block
+export {
+  endRehearsalVideo,
+  getRehearsalInterviewers,
+  getRehearsalVideo,
+  startRehearsalVideo,
+  finishRehearsal,
+  getRehearsal,
+  getRehearsalMeeting,
+  getRehearsalPartners,
+  getRehearsalPersona,
+  listInvestorRehearsals,
+  listRehearsals,
+  sayInRehearsal,
+  sendRehearsalScreen,
+  startRehearsal,
+} from "./rehearsals.js";
+// end REHEARSE block
+export {
+  getQStanding,
+  getUiText,
+  localiseWords,
+  setQLanguage,
+  setQPersonality,
+} from "./standing.js";
+// AUTO block: Q's delegated work, Web Push, notification settings.
+export {
+  answerQWork,
+  getNotificationSettings,
+  getPushKey,
+  getQWork,
+  getQWorkReport,
+  getQWorkReportPdf,
+  getMyUsage,
+  listQWork,
+  saveNotificationSettings,
+  setQPresence,
+  stopQWork,
+  listQWorkSuggestions,
+  getQWorkSince,
+  listQWorkDone,
+  dismissQWorkSuggestion,
+  setQWorkPaused,
+  stopWorkforceJob,
+  setQWorkDelegation,
+  subscribePush,
+  unsubscribePush,
+  listWorkforceJobs,
+  getWorkforceJob,
+  retryWorkforceDraft,
+  readBriefingCommand,
+  getWorkforceOverview,
+} from "./work.js";
+// end AUTO block
+
+// ADMIN block
+export * from "./admin-console.js";
+export * from "./results.js";
+// end ADMIN block
+
+// DAILY block
+export {
+  getQDaily,
+  getQDailyEdition,
+  getQDailyPreferences,
+  requestQDailyEdition,
+  setQDailyPreferences,
+} from "./daily.js";
+// BILLING block (ADR 0034)
+export {
+  accrueAdminFees,
+  assignAdminBillingPlan,
+  entitlementOf,
+  exportAdminFeeLedger,
+  getAdminBillingAccount,
+  getAdminUsage,
+  getAdminFeeLedger,
+  getMyPlan,
+  getPlanCatalogue,
+  openBillingPortal,
+  setAdminBillingOverride,
+  setAdminFeeRate,
+  startPlanCheckout,
+} from "./billing.js";
+// end BILLING block
+
+// P5 block: brand theming
+export {
+  getAdminBrandTheme,
+  getBrandTheme,
+  setAdminBrandTheme,
+} from "./brand-theme.js";
+// end P5 block
+
+// ADMIN-3 block
+export * from "./reviews-kyb.js";
+// end ADMIN-3 block
+export {
+  diligenceDownload,
+  fulfilDiligenceRequest,
+  uploadAndFulfilDiligenceRequest,
+  getDiligence,
+  requestDiligenceDocument,
+  revokeDiligenceShare,
+  shareDiligenceDocument,
+} from "./diligence.js";
+// ETIQUETTE block (ADR 0050): how Q conducts business.
+export {
+  activateAdminEtiquetteGuide,
+  getAdminEtiquetteGuide,
+  getMyEtiquetteGuide,
+  recordAdminEtiquetteGuide,
+  removeMyEtiquetteGuide,
+  saveMyEtiquetteGuide,
+} from "./etiquette.js";
+export * from "./fit.js";
+// PROFILE block (overnight A1-A8)
+export {
+  confirmDeckReading,
+  decideDataRoomRequest,
+  readDeckAgain,
+  reviewDeckSection,
+  getCompanyDataRoom,
+  getCompanyDeck,
+  getCompanyFounder,
+  openCompanyDeck,
+  openDataRoomDocument,
+  requestDataRoomAccess,
+  setDataRoomLevel,
+  setDataRoomOutline,
+} from "./profile-material.js";
+
+export { exploreRelated, exploreSearch, exploreSlate } from "./explore.js";
+// G1/G2 block: teams.
+export * from "./team.js";
+export * from "./gateq-inbox.js";
+export * from "./company-claims.js";
+export * from "./readiness.js";
+// Investor promises (2026-10-07): Q.07, Q.05, Q.10, Q.02.
+export * from "./investor-promises.js";
+// Founder documents (2026-10-08): requests inbox, access editor, answers.
+export * from "./founder-documents.js";
+// Deal close (2026-10-08).
+export {
+  closeDeal,
+  generateRelationshipReport,
+  getRelationshipDeal,
+  markDealSigned,
+  recordDealTerms,
+  tickDealChecklist,
+} from "./deal-close.js";
+// CRM saved views (2026-10-15).
+export {
+  deleteRelationshipView,
+  listRelationshipViews,
+  saveRelationshipView,
+} from "./relationship-views.js";
+// CRM private notes (S3, 2026-10-15).
+export {
+  addRelationshipNote,
+  listRelationshipNotes,
+} from "./relationship-notes.js";

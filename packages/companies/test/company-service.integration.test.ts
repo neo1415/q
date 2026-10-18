@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createPostgresMaterialActionAuditWriter } from "@capital-q/audit";
 import { parseDatabaseConfig } from "@capital-q/config/database";
 import {
+  COMPANY_NETWORK_FACT_KEYS,
   createEventRegistry,
   type CorrelationId,
   type CreateCompanyRequest,
@@ -37,6 +38,8 @@ import {
   CompanyVersionConflictError,
   createCompanyService,
   createPostgresCompanyQueryPort,
+  declaredFactsForNetwork,
+  projectCompanyForNetwork,
   type CompanyService,
 } from "../src/index.js";
 import { COMPANY_EVENTS } from "../src/events/index.js";
@@ -319,19 +322,35 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         version: 1,
       });
 
-      // Nothing beyond the company: no members, no capital objective, no
-      // evidence tables exist to be written.
+      // The exact core schema the migrations create (identity, handles and
+      // review tables included): an unexpected table fails this, as does a
+      // missing one. The company write above touches only `companies`.
+      // Later migrations added six RLS-enabled core tables: founder_person_facts
+      // and founder_background_entries (a112dd84, deck extractions),
+      // company_claim_requests (10ba5ed0, Find my startup F4),
+      // capital_round_events (c2aaec60, P8 round lifecycle) and the
+      // company_readiness_* pair (d79060cb, readiness rules v1).
       const tables = await sql<{ table_name: string }[]>`
         select table_name from information_schema.tables where table_schema = 'core' order by 1`;
       expect(tables.map((t) => t.table_name)).toEqual([
         "capital_objective_creation_requests",
         "capital_objective_events",
         "capital_objectives",
+        "capital_round_events",
+        "capital_rounds",
         "companies",
+        "company_claim_requests",
         "company_creation_requests",
         "company_members",
+        "company_readiness_action_events",
+        "company_readiness_assessments",
         "company_team_facts",
+        "founder_background_entries",
+        "founder_person_facts",
         "founder_profiles",
+        "handles",
+        "human_reviews",
+        "identity_submissions",
         "investor_creation_requests",
         "investor_mandate_constraints",
         "investor_mandate_creation_requests",
@@ -339,6 +358,11 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         "investor_organisations",
         "investor_portfolio_references",
         "investor_representatives",
+        "kyb_submissions",
+        "profile_images",
+        "reserved_handles",
+        "shareable_identities",
+        "shareable_identity_scans",
       ]);
       const [related] = await sql<
         { members: number; profiles: number; facts: number }[]
@@ -612,6 +636,23 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         version: 2,
       });
 
+      // A replay of the change that already landed (a retried request with
+      // the version it was sent with) is idempotent: the requested state
+      // holds, so it succeeds without a new version, event or audit row
+      // (BIZ-002). Only a stale request that would change something is a
+      // conflict.
+      const replayCorrelation = CORRELATION();
+      const replay = await service.updateCompany({
+        actor: adminA,
+        companyId: a.id,
+        input: { expectedVersion: 1, shortDescription: "Rail intelligence." },
+        correlationId: replayCorrelation,
+      });
+      expect(replay.version).toBe(2);
+      const replayEvents = await tx.sql`
+        select 1 from events.outbox where payload ->> 'correlationId' = ${replayCorrelation}`;
+      expect(replayEvents).toHaveLength(0);
+
       // Cross-tenant: A's admin on B's company.
       await expect(
         service.updateCompany({
@@ -638,6 +679,179 @@ describe("@capital-q/companies against local PostgreSQL", () => {
         marketplace_visibility: "organisation_private",
         marketplace_readiness_state: "not_assessed",
       });
+    });
+  });
+
+  it("an editor publishes the declared profile to the network and takes it back; a member cannot; the projection reads only declared fields (CQ-PRE-REC-001 §31-§35)", async () => {
+    await withWorld(async ({ tx, service, adminA, memberA, adminB }) => {
+      const a = await service.createCompany({
+        actor: adminA,
+        input: request("Visible A"),
+        idempotencyKey: "vis-a",
+        correlationId: CORRELATION(),
+      });
+      expect(a.marketplaceVisibility).toBe("organisation_private");
+
+      // Finishing anything never publishes: only this call does.
+      const publishCorrelation = CORRELATION();
+      const published = await service.setCompanyVisibility({
+        actor: adminA,
+        companyId: a.id,
+        input: { visibility: "network_visible", expectedVersion: 1 },
+        correlationId: publishCorrelation,
+      });
+      expect(published.marketplaceVisibility).toBe("network_visible");
+      expect(published.version).toBe(2);
+      const audits = await tx.sql`
+        select action_type from audit.material_actions
+         where correlation_id = ${publishCorrelation.slice(4)}::uuid
+           and action_type = 'company.visibility_changed'`;
+      expect(audits).toHaveLength(1);
+      const events = await tx.sql`
+        select payload from events.outbox
+         where event_type = 'core.company.visibility_changed'
+           and payload -> 'data' ->> 'companyId' = ${a.id}`;
+      expect(events).toHaveLength(1);
+
+      // Choosing the same visibility again changes nothing.
+      const same = await service.setCompanyVisibility({
+        actor: adminA,
+        companyId: a.id,
+        input: { visibility: "network_visible", expectedVersion: 2 },
+        correlationId: CORRELATION(),
+      });
+      expect(same.version).toBe(2);
+
+      // The projection an investor gets is the declared profile only.
+      const projection = projectCompanyForNetwork(published);
+      expect(Object.keys(projection).sort()).toEqual(
+        [
+          "canonicalName",
+          "companyId",
+          "companyStatus",
+          "currentStageCode",
+          "foundedDate",
+          "headquartersCity",
+          "headquartersCountry",
+          "legalName",
+          "primaryDescription",
+          "shortDescription",
+          "websiteUrl",
+        ].sort(),
+      );
+      expect(JSON.stringify(projection)).not.toContain("marketplace");
+      expect(JSON.stringify(projection)).not.toContain("readiness");
+
+      // An ordinary member may read but not publish.
+      await expect(
+        service.setCompanyVisibility({
+          actor: memberA,
+          companyId: a.id,
+          input: { visibility: "organisation_private", expectedVersion: 2 },
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(AuthorizationDeniedError);
+
+      // A stale writer conflicts; a foreign organisation learns nothing.
+      await expect(
+        service.setCompanyVisibility({
+          actor: adminA,
+          companyId: a.id,
+          input: { visibility: "organisation_private", expectedVersion: 1 },
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(CompanyVersionConflictError);
+      await expect(
+        service.setCompanyVisibility({
+          actor: adminB,
+          companyId: a.id,
+          input: { visibility: "organisation_private", expectedVersion: 2 },
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(CompanyNotFoundError);
+
+      // And back to private, intentionally.
+      const withdrawn = await service.setCompanyVisibility({
+        actor: adminA,
+        companyId: a.id,
+        input: { visibility: "organisation_private", expectedVersion: 2 },
+        correlationId: CORRELATION(),
+      });
+      expect(withdrawn.marketplaceVisibility).toBe("organisation_private");
+      expect(withdrawn.version).toBe(3);
+    });
+  });
+
+  it("the investor's facts carry nothing founder-private, and a private verified claim never upgrades them (CQ-WEB-024)", async () => {
+    await withWorld(async ({ tx, service, adminA, tenantA }) => {
+      const marker = `founder-private-${randomUUID()}`;
+      const a = await service.createCompany({
+        actor: adminA,
+        input: request("Facts A", {
+          currentStageCode: "seed",
+          headquartersCountry: "NG",
+        }),
+        idempotencyKey: "facts-a",
+        correlationId: CORRELATION(),
+      });
+      await service.setCompanyVisibility({
+        actor: adminA,
+        companyId: a.id,
+        input: { visibility: "network_visible", expectedVersion: 1 },
+        correlationId: CORRELATION(),
+      });
+
+      // Private material about the same company: a founder-private profile,
+      // organisation-only team facts, and a founder-private claim that says
+      // something different about the stage and claims to be verified.
+      await tx.sql`insert into core.founder_profiles (tenant_id, user_id, primary_company_id, professional_summary)
+        values (${tenantA}, ${adminA.userId}, ${a.id}, ${marker})`;
+      await tx.sql`insert into core.company_team_facts (tenant_id, company_id, founder_count, team_size)
+        values (${tenantA}, ${a.id}, 2, 9)`;
+      const claimId = randomUUID();
+      const revisionId = randomUUID();
+      await tx.sql`insert into evidence.claims (id, tenant_id, subject_type, subject_id, claim_type, claim_key,
+          statement, asserted_by_type, asserted_by_id, asserted_at, truth_class, evidence_status,
+          lifecycle_status, visibility_scope, sensitivity_class, current_revision_id)
+        values (${claimId}, ${tenantA}, 'COMPANY', ${a.id}, 'company.stage', 'company.stage',
+          ${`series_b ${marker}`}, 'USER', ${adminA.userId}, now(), 'VERIFIED', 'PLATFORM_VERIFIED',
+          'CURRENT', 'founder_private', 'CONFIDENTIAL', ${revisionId})`;
+      await tx.sql`insert into evidence.claim_revisions (id, tenant_id, claim_id, revision_number, statement,
+          truth_class, evidence_status, lifecycle_status, changed_by_type, changed_by_id)
+        values (${revisionId}, ${tenantA}, ${claimId}, 1, ${`series_b ${marker}`}, 'VERIFIED',
+          'PLATFORM_VERIFIED', 'CURRENT', 'USER', ${adminA.userId})`;
+
+      // The read an investor's network view makes, then the projection.
+      const profile = await createPostgresCompanyQueryPort({
+        sql: tx.sql,
+      }).findCanonicalCompanyProfile(a.id);
+      expect(profile).not.toBeNull();
+      if (profile === null) return;
+      const facts = declaredFactsForNetwork(projectCompanyForNetwork(profile));
+      const wire = JSON.stringify(facts);
+
+      expect(wire).not.toContain(marker);
+      expect(wire).not.toContain("series_b");
+      expect(wire).not.toMatch(/VERIFIED|PLATFORM|DOCUMENT/);
+      expect(facts.map((fact) => fact.key)).toEqual([
+        ...COMPANY_NETWORK_FACT_KEYS,
+      ]);
+      // What the company declared, and only as its own claim.
+      expect(
+        facts.find((fact) => fact.key === "currentStageCode")?.statements,
+      ).toEqual([
+        {
+          value: "seed",
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+          lifecycleStatus: "CURRENT",
+          source: "COMPANY_PROFILE",
+        },
+      ]);
+      // Never declared: unknown, with no statement standing in for it.
+      expect(
+        facts.find((fact) => fact.key === "foundedDate")?.statements,
+      ).toEqual([]);
     });
   });
 

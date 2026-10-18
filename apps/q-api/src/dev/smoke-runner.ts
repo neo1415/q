@@ -479,7 +479,12 @@ export async function withSmokeWorld(
     }
     if (secrets.groq !== undefined && options.provider !== "google") {
       providers.push(
-        createGroqModelProvider({ apiKey: secrets.groq.reveal() }),
+        createGroqModelProvider({
+          apiKey: secrets.groq.reveal(),
+          additionalApiKeys: secrets.groqKeys
+            .slice(1)
+            .map((key) => key.reveal()),
+        }),
       );
     }
     const tenantPolicy: TenantModelPolicy | undefined =

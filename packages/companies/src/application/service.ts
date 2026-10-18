@@ -1,3 +1,5 @@
+import type { MarketplaceReadinessAssessment } from "@capital-q/contracts";
+
 import type { Company } from "../contracts/index.js";
 import type {
   CompanyMember,
@@ -8,6 +10,16 @@ import {
   createPostgresCompanyCreationRequestStore,
   createPostgresCompanyRepository,
 } from "../infrastructure/postgres-company-repository.js";
+import { createUnavailableVerificationClaimsPort } from "../infrastructure/unavailable-verification-claims.js";
+import {
+  createAssessMarketplaceReadiness,
+  createGetMarketplaceReadiness,
+  createReconcileMarketplaceReadinessAsSystem,
+  type AssessMarketplaceReadinessCommand,
+  type GetMarketplaceReadinessQuery,
+  type ReconcileMarketplaceReadinessAsSystemCommand,
+  type SystemReadinessOutcome,
+} from "./marketplace-readiness.js";
 import {
   createPostgresCompanyMemberRepository,
   createPostgresCompanyTeamFactsRepository,
@@ -37,6 +49,10 @@ import {
   createUpdateCompany,
   type UpdateCompanyCommand,
 } from "./update-company.js";
+import {
+  createSetCompanyVisibility,
+  type SetCompanyVisibilityCommand,
+} from "./set-company-visibility.js";
 
 /**
  * The company application service: the one entry point HTTP (and later
@@ -46,6 +62,26 @@ export type CompanyService = {
   readonly createCompany: (command: CreateCompanyCommand) => Promise<Company>;
   readonly getCompany: (query: GetCompanyQuery) => Promise<Company>;
   readonly updateCompany: (command: UpdateCompanyCommand) => Promise<Company>;
+  /** Who may see the declared profile (CQ-PRE-REC-001 §31-§35). */
+  readonly setCompanyVisibility: (
+    command: SetCompanyVisibilityCommand,
+  ) => Promise<Company>;
+  /** Marketplace readiness as the policy sees it now; reads nothing but canonical state. */
+  readonly getMarketplaceReadiness: (
+    query: GetMarketplaceReadinessQuery,
+  ) => Promise<MarketplaceReadinessAssessment>;
+  /** Reconcile the stored readiness state with the policy (CQ-MKT-001). */
+  readonly assessMarketplaceReadiness: (
+    command: AssessMarketplaceReadinessCommand,
+  ) => Promise<MarketplaceReadinessAssessment>;
+  /**
+   * Trusted server operation (CQ-VERIFY-002): Capital Q reconciles an
+   * organisation's companies after a verification decision. Composed by
+   * the worker only; no route calls it.
+   */
+  readonly reconcileMarketplaceReadinessAsSystem: (
+    command: ReconcileMarketplaceReadinessAsSystemCommand,
+  ) => Promise<readonly SystemReadinessOutcome[]>;
   readonly getMyCompanyMembership: (
     query: GetMyCompanyMembershipQuery,
   ) => Promise<CompanyMember>;
@@ -68,10 +104,17 @@ export type CompanyService = {
 
 export type CompanyServiceOptions = Omit<
   CompanyServiceDependencies,
-  "repositories"
+  "repositories" | "verification"
 > & {
   readonly repositories?:
     CompanyServiceDependencies["repositories"] | undefined;
+  /**
+   * Omitted in every application: the production seam answers
+   * "unavailable" until a Verification context exists. Supplied only by
+   * tests and the local synthetic fixture.
+   */
+  readonly verification?:
+    CompanyServiceDependencies["verification"] | undefined;
 };
 
 export function createCompanyService(
@@ -79,6 +122,8 @@ export function createCompanyService(
 ): CompanyService {
   const dependencies: CompanyServiceDependencies = {
     ...options,
+    verification:
+      options.verification ?? createUnavailableVerificationClaimsPort(),
     repositories: options.repositories ?? {
       companies: createPostgresCompanyRepository(),
       creationRequests: createPostgresCompanyCreationRequestStore(),
@@ -92,6 +137,11 @@ export function createCompanyService(
     createCompany: createCreateCompany(dependencies),
     getCompany: createGetCompany(dependencies),
     updateCompany: createUpdateCompany(dependencies),
+    setCompanyVisibility: createSetCompanyVisibility(dependencies),
+    getMarketplaceReadiness: createGetMarketplaceReadiness(dependencies),
+    assessMarketplaceReadiness: createAssessMarketplaceReadiness(dependencies),
+    reconcileMarketplaceReadinessAsSystem:
+      createReconcileMarketplaceReadinessAsSystem(dependencies),
     getMyCompanyMembership: createGetMyCompanyMembership(dependencies),
     upsertMyCompanyMembership: createUpsertMyCompanyMembership(dependencies),
     getMyFounderProfile: createGetMyFounderProfile(dependencies),

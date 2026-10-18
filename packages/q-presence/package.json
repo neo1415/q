@@ -1,0 +1,35 @@
+{
+  "name": "@capital-q/q-presence",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Capital Q public presence: what the public web already says about a subject, read once at arrival and refreshed on a schedule. Owns the parallel read, the bounded excerpts it hands a model, the understandings it proposes through the Knowledge Write Gate, and the log of when it last ran. Owns no store of its own, no truth, no ranking feature and no personality score.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

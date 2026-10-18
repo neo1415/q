@@ -19,6 +19,7 @@ import {
   toOfferedTool,
   type QToolRecord,
   type QToolRegistry,
+  Q_TURN_TOOLS_MAX,
 } from "./registry.js";
 
 /**
@@ -80,7 +81,10 @@ function argumentIssues(issues: readonly { path: PropertyKey[] }[]): string {
       ),
     ),
   ].slice(0, 8);
-  return `Arguments are invalid at: ${paths.join(", ")}.`;
+  // Said to the model, which speaks to the person: never ask them for an
+  // id or relay this (live 2026-10-02: "I need Tallyloom's company record
+  // ID"). Ids come from the run's own tools.
+  return `Arguments are invalid at: ${paths.join(", ")}. Do not ask the person for an id or mention this error: find the id with list_my_relationships or a search tool and try again, or tell them plainly what you could not do and the next step you can take.`;
 }
 
 export function createQToolExecutor(
@@ -117,6 +121,18 @@ export function createQToolExecutor(
         failureCode: outcome.failureCode,
         sensitivity: outcome.sensitivity,
         latencyMs: outcome.latencyMs,
+        // Which argument fields a reader got wrong (paths only, never
+        // values): voiceq-63, a reader's propose_meeting arguments failed
+        // and cost a second model call before the card, with no trace of why.
+        ...(outcome.failureCode === "INVALID_ARGUMENTS" &&
+        outcome.result.ok === false
+          ? {
+              invalidAt:
+                /invalid at: ([^.]*)\./u.exec(
+                  outcome.result.error.safeMessage,
+                )?.[1] ?? null,
+            }
+          : {}),
       },
       "q tool call finished",
     );
@@ -203,10 +219,33 @@ export function createQToolExecutor(
               ),
             );
           }
-          const authorization = await definition.authorize(
-            parsed.data,
-            context,
-          );
+          // An authorize step that throws (its port down, a timeout) is
+          // closed, as a typed failure for this one call: it used to
+          // escape the executor and end the whole turn (harden harness,
+          // 2026-10-01: get_company, get_capital_objective,
+          // propose_handle_claim). Nothing is granted on a failure.
+          let authorization: Awaited<ReturnType<typeof definition.authorize>>;
+          try {
+            authorization = await definition.authorize(parsed.data, context);
+          } catch (error: unknown) {
+            logger?.error(
+              { err: error, qRunId: context.runId, tool: definition.id },
+              "q tool authorization threw",
+            );
+            return finish(
+              context,
+              failed(
+                proposal,
+                record,
+                "FAILED",
+                isAborted(context.signal) ? "CANCELLED" : "TOOL_INTERNAL_ERROR",
+                isAborted(context.signal)
+                  ? "The request was cancelled."
+                  : "The tool could not complete.",
+                elapsed(),
+              ),
+            );
+          }
           if (authorization.outcome === "DENY") {
             return finish(
               context,
@@ -341,8 +380,31 @@ export function createQToolExecutor(
   }
 
   return {
-    offer: (context) =>
-      Promise.resolve(registry.eligible(context).map(toOfferedTool)),
+    offer: (context) => {
+      const ranked = registry.ranked(context);
+      // The bound is applied by the registry (core first, then priority);
+      // what it cut is logged so a crowded purpose is seen, not silent.
+      if (ranked.length > Q_TURN_TOOLS_MAX) {
+        logger?.warn(
+          {
+            qRunId: context.runId,
+            purpose: context.plan.purpose.taskClass,
+            eligible: ranked.length,
+            dropped: ranked
+              .slice(Q_TURN_TOOLS_MAX)
+              .map((record) => record.definition.providerName),
+          },
+          "more tools relevant than one model request carries",
+        );
+      }
+      return Promise.resolve(registry.eligible(context).map(toOfferedTool));
+    },
+    // The reader's list: every tool this purpose and plan allow, unfocused,
+    // up to what one request can carry, exactly as the offer was before.
+    // Declared app actions follow on any purpose: the reader may name one,
+    // and a named one executes (lead 2026-10-03).
+    available: (context) =>
+      Promise.resolve(registry.available(context).map(toOfferedTool)),
     execute,
   };
 }

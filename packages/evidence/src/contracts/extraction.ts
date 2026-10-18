@@ -257,7 +257,7 @@ export type ExtractedDocument = z.infer<typeof ExtractedDocumentSchema>;
 export type DocumentExtraction = {
   readonly id: DocumentExtractionId;
   readonly tenantId: TenantId;
-  readonly ownerOrganisationId: OrganisationId;
+  readonly ownerOrganisationId: OrganisationId | null;
   readonly documentId: DocumentId;
   readonly documentVersionId: DocumentVersionId;
   readonly processingRunId: DocumentProcessingRunId;

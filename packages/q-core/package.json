@@ -8,6 +8,22 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./speech": {
+      "types": "./dist/speech/public.d.ts",
+      "default": "./dist/speech/public.js"
+    },
+    "./language": {
+      "types": "./dist/language/public.d.ts",
+      "default": "./dist/language/public.js"
+    },
+    "./ui-text": {
+      "types": "./dist/ui-text/public.d.ts",
+      "default": "./dist/ui-text/public.js"
+    },
+    "./names": {
+      "types": "./dist/names/public.d.ts",
+      "default": "./dist/names/public.js"
     }
   },
   "main": "./dist/index.js",

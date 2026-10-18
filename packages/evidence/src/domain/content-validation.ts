@@ -46,7 +46,20 @@ const MAGIC = {
   gzip: [0x1f, 0x8b],
   compoundFile: [0xd0, 0xcf, 0x11, 0xe0], // legacy .doc/.xls/.ppt
   classFile: [0xca, 0xfe, 0xba, 0xbe],
+  // EBML header: the Matroska/WebM container (R34 voice notes).
+  ebml: [0x1a, 0x45, 0xdf, 0xa3],
 } as const;
+
+/** ISO base media (MP4/M4A): a `ftyp` box at byte 4. */
+function isIsoBaseMedia(head: Uint8Array): boolean {
+  return (
+    head.length >= 12 &&
+    head[4] === 0x66 &&
+    head[5] === 0x74 &&
+    head[6] === 0x79 &&
+    head[7] === 0x70
+  );
+}
 
 function startsWith(bytes: Uint8Array, magic: readonly number[]): boolean {
   if (bytes.length < magic.length) return false;
@@ -257,6 +270,8 @@ export async function detectDocumentContent(input: {
   if (startsWith(head, MAGIC.pdf)) return { ok: true, kind: "pdf" };
   if (startsWith(head, MAGIC.png)) return { ok: true, kind: "png" };
   if (startsWith(head, MAGIC.jpeg)) return { ok: true, kind: "jpeg" };
+  if (startsWith(head, MAGIC.ebml)) return { ok: true, kind: "webm_audio" };
+  if (isIsoBaseMedia(head)) return { ok: true, kind: "mp4_audio" };
 
   if (startsWith(head, MAGIC.elf) || startsWith(head, MAGIC.mz)) {
     return { ok: false, failureCode: "ACTIVE_CONTENT_TYPE_NOT_ALLOWED" };

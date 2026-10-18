@@ -14,6 +14,7 @@ import {
   OrganisationIdSchema,
   TenantIdSchema,
   UserIdSchema,
+  type TenantId,
 } from "@capital-q/security";
 
 import { createPostgresDocumentExtractionRepository } from "./postgres-extraction-repository.js";
@@ -38,10 +39,13 @@ import {
   ClaimRevisionIdSchema,
   DocumentIdSchema,
   DocumentProcessingRunIdSchema,
+  DocumentDownloadAudienceSchema,
   DocumentStatusSchema,
   DocumentTypeSchema,
   DocumentVersionIdSchema,
   EvidenceItemIdSchema,
+  type DocumentId,
+  type DocumentVersionId,
   EvidenceLocatorSchema,
   EvidenceSourceIdSchema,
   EvidenceSourceTypeSchema,
@@ -190,6 +194,7 @@ const DocumentRow = z.object({
   title: z.string(),
   visibility_scope: DisclosureScopeSchema,
   sensitivity_class: MessageSensitivitySchema,
+  download_audience: DocumentDownloadAudienceSchema,
   current_version_id: DocumentVersionIdSchema.nullable(),
   status: DocumentStatusSchema,
   created_by_user_id: UserIdSchema,
@@ -209,6 +214,7 @@ function toDocument(row: unknown): Document {
     title: r.title,
     visibilityScope: r.visibility_scope,
     sensitivityClass: r.sensitivity_class,
+    downloadAudience: r.download_audience,
     currentVersionId: r.current_version_id,
     status: r.status,
     createdByUserId: r.created_by_user_id,
@@ -221,8 +227,9 @@ function toDocument(row: unknown): Document {
 function selectDocuments(executor: DatabaseExecutor) {
   return executor`
     select d.id, d.tenant_id, d.company_id, d.owner_organisation_id, d.document_type, d.title,
-           d.visibility_scope, d.sensitivity_class, d.current_version_id, d.status,
-           d.created_by_user_id, d.created_at, d.updated_at, d.version
+           d.visibility_scope, d.sensitivity_class, d.download_audience,
+           d.current_version_id, d.status,
+           d.created_by_user_id, d.created_at, d.updated_at, d.version, d.owner_kind, d.gateq_application_id, d.gateq_session_id
       from evidence.documents d`;
 }
 
@@ -265,8 +272,42 @@ export function createPostgresDocumentRepository(): DocumentRepository {
     findById,
     findInTenant: async (executor, tenantId, documentId) => {
       const rows = await executor`
-        ${selectDocuments(executor)} where d.id = ${documentId} and d.tenant_id = ${tenantId}`;
+        ${selectDocuments(executor)} where d.id = ${documentId} and d.tenant_id = ${tenantId} and d.owner_kind = 'ORGANISATION'`;
       return rows.length === 0 ? null : toDocument(rows[0]);
+    },
+    findForProcessing: async (executor, tenantId, documentId) => {
+      const rows =
+        await executor`${selectDocuments(executor)} where d.id = ${documentId} and d.tenant_id = ${tenantId} and d.custody_cleanup_started_at is null`;
+      if (rows.length === 0) return null;
+      const custody = z
+        .object({ owner_kind: z.enum(["ORGANISATION", "GATEQ_APPLICATION"]) })
+        .parse(rows[0]);
+      if (custody.owner_kind === "ORGANISATION") return toDocument(rows[0]);
+      const r = DocumentRow.extend({
+        owner_organisation_id: z.null(),
+        created_by_user_id: z.null(),
+        gateq_application_id: z.string().uuid(),
+        gateq_session_id: z.string().uuid(),
+      }).parse(rows[0]);
+      return {
+        id: r.id,
+        tenantId: r.tenant_id,
+        companyId: r.company_id,
+        ownerOrganisationId: null,
+        createdByUserId: null,
+        applicationId: r.gateq_application_id,
+        applicationSessionId: r.gateq_session_id,
+        documentType: r.document_type,
+        title: r.title,
+        visibilityScope: r.visibility_scope,
+        sensitivityClass: r.sensitivity_class,
+        downloadAudience: r.download_audience,
+        currentVersionId: r.current_version_id,
+        status: r.status,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+        version: r.version,
+      };
     },
     lockById: async (tx, tenantId, ownerOrganisationId, documentId) => {
       const rows = await tx.sql`
@@ -278,6 +319,26 @@ export function createPostgresDocumentRepository(): DocumentRepository {
       return rows.length === 0 ? null : toDocument(rows[0]);
     },
     listByOwner: async (executor, tenantId, ownerOrganisationId, filter) => {
+      if (filter.page !== undefined) {
+        // Keyset, never offset (CLAUDE.md): the list changes under the reader.
+        const after = filter.page.after;
+        const rows = await executor`
+          ${selectDocuments(executor)}
+           where d.tenant_id = ${tenantId}
+             and d.owner_organisation_id = ${ownerOrganisationId}
+             and d.status = 'ACTIVE'
+             ${filter.companyId === undefined ? executor`` : executor`and d.company_id = ${filter.companyId}`}
+             ${
+               after === undefined
+                 ? executor``
+                 : executor`and (date_trunc('milliseconds', d.updated_at), d.id) < (${after.updatedAt}::timestamptz, ${after.id}::uuid)`
+             }
+           -- Milliseconds, as the cursor carries them (an ISO timestamp):
+           -- ordering and comparing at one precision never skips a row.
+           order by date_trunc('milliseconds', d.updated_at) desc, d.id desc
+           limit ${filter.page.limit}`;
+        return rows.map(toDocument);
+      }
       const rows =
         filter.companyId === undefined
           ? await executor`
@@ -310,6 +371,15 @@ export function createPostgresDocumentRepository(): DocumentRepository {
         update evidence.documents d
            set title = coalesce(${changes.title ?? null}, d.title),
                document_type = coalesce(${changes.documentType ?? null}, d.document_type),
+               -- ADR 0041: a deck reclassified as anything else stops being
+               -- shared, rather than the update failing on the constraint.
+               -- A deleted (archived) deck stops being downloadable by
+               -- investors at once; restoring it does not reopen it.
+               download_audience = case
+                 when coalesce(${changes.documentType ?? null}, d.document_type) = 'PITCH_DECK'
+                  and coalesce(${changes.status ?? null}, d.status) = 'ACTIVE'
+                   then d.download_audience
+                 else 'ORGANISATION' end,
                sensitivity_class = coalesce(${changes.sensitivityClass ?? null}, d.sensitivity_class),
                status = coalesce(${changes.status ?? null}, d.status),
                version = d.version + 1
@@ -319,6 +389,73 @@ export function createPostgresDocumentRepository(): DocumentRepository {
         returning d.id`;
       return rows.length === 1;
     },
+    setDownloadAudience: async (tx, input) => {
+      const rows = await tx.sql`
+        update evidence.documents d
+           set download_audience = ${input.audience},
+               version = d.version + 1
+         where d.id = ${input.documentId}
+           and d.tenant_id = ${input.tenantId}
+           and d.version = ${input.expectedVersion}
+        returning d.id`;
+      return rows.length === 1;
+    },
+  };
+}
+
+/**
+ * The deck a company opened to investors (ADR 0041), if any: the newest
+ * ACTIVE PITCH_DECK with audience INVESTORS whose current version a real
+ * scanner found clean. Identity only; whether the reader is an investor
+ * the company is viewable to is the caller's decision, made first.
+ */
+export async function findInvestorAudienceDeck(
+  executor: DatabaseExecutor,
+  tenantId: TenantId,
+  companyId: string,
+  /**
+   * ADR 0042: also a NOT_SCANNED version, under the founder's interim
+   * policy. The same audience either way; only the scan state widens.
+   */
+  serveUnscanned = false,
+): Promise<{
+  readonly documentId: DocumentId;
+  readonly documentVersionId: DocumentVersionId;
+  readonly title: string;
+  readonly updatedAt: string;
+  /** False when the version was never scanned (NOT_SCANNED). */
+  readonly scanned: boolean;
+} | null> {
+  const rows = await executor`
+    select d.id, d.current_version_id, d.title, d.updated_at, v.malware_scan_status
+      from evidence.documents d
+      join evidence.document_versions v
+        on v.id = d.current_version_id and v.document_id = d.id
+     where d.tenant_id = ${tenantId}
+       and d.company_id = ${companyId}
+       and d.document_type = 'PITCH_DECK'
+       and d.download_audience = 'INVESTORS'
+       and d.status = 'ACTIVE'
+       and (v.malware_scan_status = 'CLEAN'
+            or (${serveUnscanned}::boolean and v.malware_scan_status = 'NOT_SCANNED'))
+     order by d.updated_at desc, d.id desc
+     limit 1`;
+  if (rows.length === 0) return null;
+  const row = z
+    .object({
+      id: DocumentIdSchema,
+      current_version_id: DocumentVersionIdSchema,
+      title: z.string(),
+      updated_at: Timestamp,
+      malware_scan_status: z.string(),
+    })
+    .parse(rows[0]);
+  return {
+    documentId: row.id,
+    documentVersionId: row.current_version_id,
+    title: row.title,
+    updatedAt: row.updated_at,
+    scanned: row.malware_scan_status === "CLEAN",
   };
 }
 
@@ -337,7 +474,7 @@ const VersionRow = z.object({
   mime_type: z.string(),
   size_bytes: z.union([z.number(), z.string()]).transform(Number),
   sha256: z.string(),
-  uploaded_by_user_id: UserIdSchema,
+  uploaded_by_user_id: UserIdSchema.nullable(),
   uploaded_at: Timestamp,
   supersedes_version_id: DocumentVersionIdSchema.nullable(),
   processing_status: ProcessingStatusSchema,
@@ -416,7 +553,12 @@ export function createPostgresDocumentVersionRepository(): DocumentVersionReposi
          order by v.version_number desc`;
       return rows.map(toVersion);
     },
-    listCurrentByOwner: async (executor, tenantId, ownerOrganisationId) => {
+    listCurrentByOwner: async (
+      executor,
+      tenantId,
+      ownerOrganisationId,
+      documentIds,
+    ) => {
       const rows = await executor`
         select v.id, v.tenant_id, v.document_id, v.version_number, v.storage_bucket, v.storage_key,
                v.original_filename, v.mime_type, v.size_bytes, v.sha256, v.uploaded_by_user_id,
@@ -428,7 +570,8 @@ export function createPostgresDocumentVersionRepository(): DocumentVersionReposi
            and d.tenant_id = v.tenant_id
            and d.current_version_id = v.id
          where v.tenant_id = ${tenantId}
-           and d.owner_organisation_id = ${ownerOrganisationId}`;
+           and d.owner_organisation_id = ${ownerOrganisationId}
+           ${documentIds === undefined ? executor`` : executor`and d.id = any(${[...documentIds]}::uuid[])`}`;
       return rows.map(toVersion);
     },
     findBySha256: async (executor, tenantId, ownerOrganisationId, sha256) => {

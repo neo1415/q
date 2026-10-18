@@ -109,6 +109,50 @@ export function createPostgresTaxonomyAssignmentRepository(): TaxonomyAssignment
          order by v.code, n.canonical_code`;
       return rows.map(toAssignment);
     },
+    listCurrentForSubjects: async (executor, subjectType, subjects) => {
+      if (subjects.length === 0) return [];
+      // A repeated pair would repeat its rows.
+      const pairs = [
+        ...new Map(
+          subjects.map((s) => [`${s.tenantId}:${s.subjectId}`, s] as const),
+        ).values(),
+      ];
+      const tenants = pairs.map((s) => s.tenantId);
+      const ids = pairs.map((s) => s.subjectId);
+      const rows = await executor`
+        ${assignmentSelect(executor)}
+          join unnest(${tenants}::uuid[], ${ids}::uuid[]) as wanted (tenant_id, entity_id)
+            on a.tenant_id = wanted.tenant_id and a.entity_id = wanted.entity_id
+         where a.entity_type = ${subjectType}
+           and a.status = 'ACTIVE'
+           and a.valid_to is null
+         order by a.entity_id, v.code, n.canonical_code`;
+      return rows.map(toAssignment);
+    },
+    listCurrentByNodes: async (
+      executor,
+      subjectType,
+      nodeIds,
+      limit,
+      assignmentSources,
+    ) => {
+      if (nodeIds.length === 0 || assignmentSources?.length === 0) {
+        return [];
+      }
+      const sources =
+        assignmentSources === undefined ? null : [...assignmentSources];
+      // entity_assignments_node_idx (node_id, status) serves the probe.
+      const rows = await executor`
+        ${assignmentSelect(executor)}
+         where a.entity_type = ${subjectType}
+           and a.node_id = any(${[...nodeIds]}::uuid[])
+           and (${sources}::text[] is null or a.assignment_source = any(${sources}::text[]))
+           and a.status = 'ACTIVE'
+           and a.valid_to is null
+         order by a.entity_id, a.node_id
+         limit ${Math.max(1, Math.min(2000, limit))}`;
+      return rows.map(toAssignment);
+    },
     listHistory: async (executor, tenantId, subject) => {
       const rows = await executor`
         ${assignmentSelect(executor)}

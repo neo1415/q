@@ -6,6 +6,7 @@ import { MarketplaceVisibilitySchema } from "../http/companies.js";
 import { MessageSensitivitySchema } from "../messaging/sensitivity.js";
 import { QCapabilitySchema } from "./capability.js";
 import { QRunIdSchema } from "./ids.js";
+import { QScreenContextSchema, QViewingMomentSchema } from "./request.js";
 import { QSubjectRefSchema, QSubjectRefsSchema } from "./subject.js";
 
 /**
@@ -30,7 +31,7 @@ import { QSubjectRefSchema, QSubjectRefsSchema } from "./subject.js";
  */
 
 /** The deterministic policy generation that produced a plan. Never "latest". */
-export const Q_CONTEXT_FIREWALL_POLICY_VERSION = "context-firewall-v1" as const;
+export const Q_CONTEXT_FIREWALL_POLICY_VERSION = "context-firewall-v2" as const;
 
 /** Context labels: exactly ADR-001's disclosure scopes. No alias vocabulary. */
 export const QContextLabelSchema = MarketplaceVisibilitySchema;
@@ -88,6 +89,26 @@ export const Q_KNOWLEDGE_SCOPE_KINDS = [
   "EVIDENCE_DOCUMENTS",
   /** The actor's own Q conversation (personal_private). */
   "OWN_Q_CONVERSATION",
+  /**
+   * The actor's own onboarding: who they said they are (name, role), which
+   * steps are answered, which are left and where they are now. Owner only,
+   * personal_private, never shared — it is what they told Capital Q while
+   * setting up, and Home Q needs it to know the person it is talking to
+   * (CQ-QX-007).
+   */
+  "OWN_ONBOARDING",
+  /**
+   * What Capital Q understands about a subject from that subject's own
+   * public footprint: their site, their profile, what they publish.
+   *
+   * Owner side only. It exists because a presence build researches a
+   * person, a company or an investor organisation, drops every page that
+   * does not name them, registers the evidence and writes through the
+   * Write Gate — and without a scope that authorises reading it back, all
+   * of that was performed and then discarded. The material is public; the
+   * reading of it is the subject's own and is never shared by this row.
+   */
+  "OWN_PUBLIC_PRESENCE",
   /** Anything classified network_visible across Capital Q. */
   "NETWORK_VISIBLE_DATA",
   /** Anything classified public_external. */
@@ -281,6 +302,21 @@ export const PermittedContextPlanSchema = z
       })
       .strict(),
     subjects: QSubjectRefsSchema,
+    /**
+     * R18: the pitch moment the person was viewing, present only when the
+     * Q API authorised it for them (the pitch playback rule plus the
+     * company's visibility) and the firewall bound the company. What makes
+     * get_pitch_moment eligible; absent otherwise.
+     */
+    viewing: QViewingMomentSchema.optional(),
+    /**
+     * R21: the screen the person asked from. The route always (it is their
+     * own screen, not data about anyone); each entity id only when the
+     * firewall bound that entity for this actor, dropped otherwise. What
+     * lets Q say "you're on your profile" truthfully. Absent when the
+     * client sent none.
+     */
+    screen: QScreenContextSchema.optional(),
     scopes: z.array(QAuthorisedKnowledgeScopeSchema).max(Q_PLAN_SCOPES_MAX),
     denied: z.array(QDeniedScopeSchema).max(Q_PLAN_DENIED_MAX),
     /** The strongest sensitivity of any permitted scope: what derived output inherits. */

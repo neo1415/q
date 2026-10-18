@@ -499,7 +499,7 @@ describe("@capital-q/capital against local PostgreSQL", () => {
 
   it("rolls back objective, history, audit, event and idempotency record when the event cannot be enqueued", async () => {
     await withWorld(
-      async ({ tx, service, resolve, adminA, companyA }) => {
+      async ({ tx, service, resolve, adminA, companyA, tenantA }) => {
         const correlationId = CORRELATION();
         await expect(
           service.createCapitalObjective({
@@ -517,7 +517,9 @@ describe("@capital-q/capital against local PostgreSQL", () => {
         ]) {
           expect(
             await count(
-              tx.sql`select count(*)::int as count from ${tx.sql(table)}`,
+              // This world's tenant only: the shared local database can hold
+              // other suites' rows, which are not this rollback's business.
+              tx.sql`select count(*)::int as count from ${tx.sql(table)} where tenant_id = ${tenantA}::uuid`,
             ),
             table,
           ).toBe(0);

@@ -52,6 +52,10 @@ export const Q_TOOL_FAILURE_CODES = [
   "INVALID_TOOL_OUTPUT",
   /** The bounded result limit was exceeded. */
   "RESULT_TOO_LARGE",
+  // BILLING block (ADR 0034): the account's plan does not cover this now;
+  // the safe message names their own plan, counts and the plan page.
+  "ENTITLEMENT_REQUIRED",
+  // end BILLING block
 ] as const;
 export type QToolFailureCode = (typeof Q_TOOL_FAILURE_CODES)[number];
 
@@ -89,6 +93,22 @@ export type QToolDefinition<I, O, G> = {
   readonly requiredCapabilities: readonly Capability[];
   /** Task classes (the firewall's derived purpose) the tool may be offered for. */
   readonly supportedPurposes: readonly QTaskClass[];
+  /**
+   * The always-on core (R33): the app's own controls a person may ask for
+   * mid-anything -- navigation, the client actions, approving, declining
+   * and listing what waits for them. Offered for every purpose (the scope
+   * kinds and the tool's authorize step still apply) and kept first when
+   * a run is over the model's tool bound. Absent: false.
+   */
+  readonly core?: boolean | undefined;
+  /**
+   * A declared app action (ADR 0040; lead 2026-10-03): when the turn names
+   * it (the focus's tools) it is offered and may execute on any purpose
+   * whose plan holds its scope kinds, and the reader is told it is
+   * available; `supportedPurposes` then shapes only the unfocused offer.
+   * Its authorize step still decides. Absent: false.
+   */
+  readonly eligibleWhenNamed?: boolean | undefined;
   /** Offered only when the plan holds at least one of these scope kinds; empty = always. */
   readonly requiredScopeKinds: readonly QKnowledgeScopeKind[];
   readonly approval: "NONE";

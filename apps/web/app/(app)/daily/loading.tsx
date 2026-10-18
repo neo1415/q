@@ -1,0 +1,40 @@
+import { serverT } from "@/features/i18n/server";
+/**
+ * The Q Daily while it loads: the newspaper's own shape (masthead, lead,
+ * two columns), quiet and still under reduced motion.
+ */
+export default async function Loading() {
+  const t = await serverT();
+
+  return (
+    <div
+      className="mx-auto flex w-full max-w-(--cq-layout-content) flex-col gap-8 px-4 py-6 motion-safe:animate-pulse"
+      aria-busy="true"
+      aria-label={t("Loading The Q Daily")}
+      data-daily-loading
+    >
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-12 w-64 bg-(--cq-surface-strong)" />
+        <div className="h-4 w-full max-w-xl bg-(--cq-surface-subtle)" />
+      </div>
+      <div className="grid gap-5 md:grid-cols-[3fr_2fr]">
+        <div className="flex flex-col gap-3">
+          <div className="h-9 w-full bg-(--cq-surface-strong)" />
+          <div className="h-9 w-4/5 bg-(--cq-surface-strong)" />
+          <div className="h-4 w-full bg-(--cq-surface-subtle)" />
+          <div className="h-4 w-11/12 bg-(--cq-surface-subtle)" />
+        </div>
+        <div className="aspect-[16/9] w-full bg-(--cq-surface-subtle)" />
+      </div>
+      <div className="grid gap-8 md:grid-cols-2">
+        {[0, 1].map((column) => (
+          <div key={column} className="flex flex-col gap-3">
+            <div className="h-6 w-3/4 bg-(--cq-surface-strong)" />
+            <div className="h-4 w-full bg-(--cq-surface-subtle)" />
+            <div className="h-4 w-5/6 bg-(--cq-surface-subtle)" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

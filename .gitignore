@@ -4,6 +4,8 @@ node_modules/
 
 # Build output
 dist/
+# A symlink named dist (a worktree pointing at another checkout) is not a directory.
+dist
 .next/
 out/
 *.tsbuildinfo
@@ -56,3 +58,17 @@ models/
 .cache/huggingface/
 *.safetensors
 *.onnx
+
+# Local demo launcher output
+demo.log
+# One service at a time on a spare port, for local acceptance when another
+# project holds the usual one (scripts/run-detached.ps1). Same reason
+# demo.log is ignored: it is this machine's output, not the repository's.
+api-local.log
+q-api-local.log
+web-local.log
+web-prod.log
+detached.log
+.demo-stopped
+# `next dev` output when the web app runs against the hosted backend
+web.log

@@ -1,6 +1,8 @@
 import type { SecurityEventWriter } from "@capital-q/audit";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
+import type { QViewingMoment } from "@capital-q/contracts";
+import type { ActorContext } from "@capital-q/security";
 
 import type { QSubjectResolverRegistry } from "../domain/subjects.js";
 import type { QRuntimeRepositories } from "./ports.js";
@@ -26,4 +28,32 @@ export type QRuntimeDependencies = {
   readonly securityEvents?: SecurityEventWriter | undefined;
   /** Identifiers and coded outcomes only; never a message body. */
   readonly logger?: Logger | undefined;
+  /**
+   * The canonical investor organisation of the actor's own organisation,
+   * when it is one (CQ-QX-007). Server-side, from the actor's membership,
+   * never from the request. Absent: no run gains a subject it did not ask
+   * for, which is the behaviour before fit questions were answerable.
+   */
+  readonly ownInvestorOrganisation?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
+  /**
+   * R18: may this actor be viewing this pitch moment -- the pitch playback
+   * rule plus the company's visibility, answered by the media context.
+   * Absent: no run carries a viewing moment, whatever the client sent.
+   */
+  readonly viewing?:
+    | {
+        readonly authorise: (
+          actor: ActorContext,
+          viewing: QViewingMoment,
+        ) => Promise<boolean>;
+      }
+    | undefined;
+  /**
+   * The actor's own company, from their membership, on the server: what
+   * "my company" means on a turn that names none (CQ-QX-008). Absent: no
+   * run gains it.
+   */
+  readonly ownCompany?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
 };

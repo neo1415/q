@@ -38,7 +38,7 @@ export function createInvestorOnboardingClient(input: {
       );
     case "none":
       return createUnavailableClient(
-        "Investor setup isn't available on this build yet.",
+        "Investor setup isn't available right now. Try again later.",
       );
   }
 }

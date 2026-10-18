@@ -473,7 +473,11 @@ describe("QCIU-010 · coverage is a vocabulary, never a percentage", () => {
 describe("QCIU-011 · canonical state is assembled before documents", () => {
   it("labels facts in hierarchy order, canonical first", () => {
     const assembled = assembleCompanyContext({
-      plan: { subjects: [], maxSensitivity: "INTERNAL" } as never,
+      plan: {
+        subjects: [],
+        maxSensitivity: "INTERNAL",
+        purpose: { capability: "ANSWER", taskClass: "OWN_COMPANY_QUESTION" },
+      } as never,
       canonicalFacts: [
         fact({ scope: "CAPITAL_OBJECTIVE", statement: "Raising 2m USD." }),
       ],

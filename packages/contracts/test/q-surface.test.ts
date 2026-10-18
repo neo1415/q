@@ -89,6 +89,35 @@ const completedRun = {
       rows: [{ label: "Stage", values: ["Seed", "Series A"] }],
     },
     {
+      kind: "COMPARISON_CARDS",
+      title: null,
+      items: [
+        { name: "A", subtitle: null, points: ["Seed"] },
+        { name: "B", subtitle: null, points: ["Not known"] },
+      ],
+    },
+    {
+      kind: "ANSWER_CARDS",
+      shape: "RESEARCH",
+      title: "Research Y Combinator",
+      cards: [
+        {
+          key: "what-it-is",
+          name: "What it is",
+          line: null,
+          hue: 1,
+          fit: null,
+          reasons: ["An accelerator"],
+          measures: [],
+          view: null,
+          said: null,
+          sourceCount: 4,
+          subject: null,
+        },
+      ],
+      followUps: [],
+    },
+    {
       kind: "EVIDENCE",
       evidenceRefs: [{ kind: "DOCUMENT", documentId: UUID, page: 3 }],
     },
@@ -128,7 +157,86 @@ const completedRun = {
         createdAt: NOW,
       },
     },
+    {
+      kind: "ARTIFACT_REFERENCE",
+      artifactId: UUID_2,
+      type: "INVESTMENT_BRIEF",
+      status: "READY",
+      title: "Investment brief",
+    },
     { kind: "UI_INTENT", intent: { kind: "OPEN_COMPANY", companyId: UUID } },
+    // RECOVERY E4: the visual blocks are part of the public run too.
+    {
+      kind: "TABLE",
+      title: "Side by side",
+      columns: [{ label: "Apex Capital", subject: null }],
+      rows: [{ label: "Based in", cells: ["GB"] }],
+    },
+    {
+      kind: "CHART",
+      chart: "BAR",
+      title: "Monthly revenue",
+      unit: "a month",
+      currency: "USD",
+      series: [
+        {
+          label: "Revenue",
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "DOCUMENT_SUPPORTED",
+          source: "From the bank statements they uploaded.",
+          points: [
+            { label: "Aug", value: 1200 },
+            { label: "Sep", value: 1800 },
+          ],
+        },
+      ],
+    },
+    {
+      kind: "MAP",
+      title: "Where they're based",
+      basis: "Head-office country, as each investor publishes it.",
+      places: [
+        { label: "Apex Capital", countryCode: "GB", subject: null, note: null },
+      ],
+    },
+    {
+      kind: "ATTENTION",
+      report: {
+        items: [
+          {
+            key: "approval:1",
+            source: "APPROVAL",
+            title: "One change waits for your yes",
+            note: "Send the follow-up to Apex Capital",
+            since: "2026-10-08T09:00:00.000Z",
+            decidable: true,
+          },
+        ],
+        activity: null,
+        unread: ["UNANSWERED_MESSAGE"],
+        readAt: "2026-10-08T09:05:00.000Z",
+      },
+    },
+    {
+      kind: "TIMELINE",
+      title: "Your relationship",
+      events: [
+        {
+          at: "2026-09-12",
+          label: "Interest expressed",
+          note: null,
+          subject: null,
+        },
+      ],
+    },
+    {
+      kind: "PUBLIC_SOURCE",
+      url: "https://news.example.com/2026/09/northstar",
+      domain: "news.example.com",
+      title: "Northstar expands to Kenya",
+      publishedOn: "2026-09-02",
+      retrievedOn: "2026-09-27",
+    },
   ],
   createdAt: NOW,
   startedAt: NOW,
@@ -253,6 +361,10 @@ describe("type-level guarantees", () => {
           return block.investorOrganisationId;
         case "COMPARISON":
           return String(block.rows.length);
+        case "COMPARISON_CARDS":
+          return String(block.items.length);
+        case "ANSWER_CARDS":
+          return String(block.cards.length);
         case "EVIDENCE":
           return String(block.evidenceRefs.length);
         case "FINDING":
@@ -263,8 +375,19 @@ describe("type-level guarantees", () => {
           return block.question;
         case "ACTION_PROPOSAL":
           return block.proposal.proposalId;
+        case "ARTIFACT_REFERENCE":
+          return block.artifactId;
         case "UI_INTENT":
           return block.intent.kind;
+        case "PUBLIC_SOURCE":
+          return block.url;
+        case "TABLE":
+        case "CHART":
+        case "MAP":
+        case "TIMELINE":
+          return block.title;
+        case "ATTENTION":
+          return block.report.readAt;
         default: {
           const unreachable: never = block;
           return unreachable;
@@ -290,5 +413,40 @@ describe("type-level guarantees", () => {
 
     expect(company.kind).toBe("COMPANY");
     expect(wrong.kind).toBe("COMPANY");
+  });
+});
+
+describe("PUBLIC_SOURCE block (R23, R38)", () => {
+  const source = {
+    kind: "PUBLIC_SOURCE",
+    url: "https://news.example.com/2026/09/northstar",
+    domain: "news.example.com",
+    title: "Northstar expands to Kenya",
+    publishedOn: "2026-09-02",
+    retrievedOn: "2026-09-27",
+  } as const;
+
+  it("carries a public page's fields and nothing else", () => {
+    expect(QResultBlockSchema.safeParse(source).success).toBe(true);
+    expect(
+      QResultBlockSchema.safeParse({ ...source, publishedOn: null }).success,
+    ).toBe(true);
+    expect(
+      QResultBlockSchema.safeParse({ ...source, evidenceSourceId: "x" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("is only ever an http(s) page with day-precision dates", () => {
+    expect(
+      QResultBlockSchema.safeParse({ ...source, url: "javascript:alert(1)" })
+        .success,
+    ).toBe(false);
+    expect(
+      QResultBlockSchema.safeParse({
+        ...source,
+        retrievedOn: "2026-09-27T10:00:00Z",
+      }).success,
+    ).toBe(false);
   });
 });

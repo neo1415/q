@@ -89,14 +89,17 @@ export function createUpdateInvestorOrganisation(
       if (current === null) {
         throw new InvestorOrganisationNotFoundError();
       }
-      if (current.version !== command.input.expectedVersion) {
-        throw new InvestorVersionConflictError(current.version);
-      }
-
       const changes = effectiveChanges(current, command.input);
       const changedFields = Object.keys(changes) as InvestorEditableField[];
+      // Nothing differs: a no-op, or a replay of a change that already
+      // landed. The requested state holds, so the retry succeeds without a
+      // new version, event or audit row (BIZ-002: edits are idempotent).
+      // A stale request that would change something is still refused.
       if (changedFields.length === 0) {
         return current;
+      }
+      if (current.version !== command.input.expectedVersion) {
+        throw new InvestorVersionConflictError(current.version);
       }
 
       const updated = await repositories.investors.updateProfile(tx, {

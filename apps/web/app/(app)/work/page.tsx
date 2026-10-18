@@ -1,0 +1,149 @@
+import type { Metadata } from "next";
+import { Suspense } from "react";
+
+import { Skeleton } from "@capital-q/ui/states";
+
+import { PageContainer } from "@/components/app-shell/page-container";
+import { resolveOwnContext } from "@/features/q/context";
+import { WorkHeader, workSideOf } from "@/features/work/work-header";
+import {
+  pendingQApprovalsAction,
+  readQApprovalAction,
+} from "@/features/q/actions";
+import { listWorkAction } from "@/features/work/work-actions";
+import {
+  listDoneAction,
+  listSuggestionsAction,
+} from "@/features/work/work-page-actions";
+import { QSection } from "@/features/q/q-section";
+import { WorkPage } from "@/features/work/work-page";
+import { loadWorkforceAction } from "@/features/work/workforce-actions";
+import { serverT } from "@/features/i18n/server";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await serverT();
+  return { title: t("Work") };
+}
+
+/** Waiting cards read in full with the page; the rest load when opened. */
+const VIEWS_READ_AHEAD = 10;
+
+/**
+ * Work, Q's work page (WORK-58): give Q a task, what Q suggests from the
+ * person's own account, what needs their yes, what runs, what is done.
+ *
+ * Every list is read on the server, in parallel, and streamed in; the
+ * header never waits on them (design-48: a client action queued behind
+ * the shell's own left the page on its skeleton).
+ */
+/** voice-cards: `/work?view=team` opens that tab (Q's "open the Team tab"). */
+const WORK_VIEWS = ["needs", "progress", "done", "team", "cost"] as const;
+type WorkViewParam = (typeof WORK_VIEWS)[number];
+
+function workViewOf(
+  raw: string | string[] | undefined,
+): WorkViewParam | undefined {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return WORK_VIEWS.find((view) => view === value);
+}
+
+/**
+ * The Work page is one decision scroll (needs, in progress, done) plus the
+ * Team map and Cost; a deep link to an older tab name lands on the scroll.
+ */
+function pageViewOf(
+  view: WorkViewParam | undefined,
+): "work" | "team" | "cost" | undefined {
+  if (view === undefined) return undefined;
+  return view === "team" || view === "cost" ? view : "work";
+}
+
+async function WorkLists({
+  view,
+}: {
+  readonly view?: WorkViewParam | undefined;
+}) {
+  const t = await serverT();
+
+  const [suggestions, approvals, work, done, workforce] = await Promise.all([
+    listSuggestionsAction().catch(() => null),
+    pendingQApprovalsAction().catch(() => null),
+    listWorkAction().catch(() => null),
+    listDoneAction().catch(() => null),
+    loadWorkforceAction().catch(() => null),
+  ]);
+  const items = work?.ok === true ? work.value : [];
+  const waiting = approvals?.ok === true ? approvals.value : null;
+  // Work around decisions (2026-10-08): the first cards are read in full
+  // here, so each decision shows its exact message without a second tap.
+  const read = await Promise.all(
+    (waiting ?? [])
+      .slice(0, VIEWS_READ_AHEAD)
+      .map((approval) =>
+        readQApprovalAction(approval.approvalId).catch(() => null),
+      ),
+  );
+  const views = Object.fromEntries(
+    read.flatMap((result) =>
+      result?.ok === true ? [[result.value.approvalId, result.value]] : [],
+    ),
+  );
+  return (
+    <>
+      {/* Q room R1: Q's work and what waits for them, by id, for Q. */}
+      <QSection
+        id="work"
+        kind="WORK_LIST"
+        refs={items.slice(0, 12).map((item) => ({
+          kind: "Q_WORK" as const,
+          id: item.id,
+        }))}
+        total={items.length}
+        label={t(`${String(items.length)} work items`)}
+      />
+      {waiting === null ? null : (
+        <QSection
+          id="approvals"
+          kind="APPROVAL_LIST"
+          refs={waiting.slice(0, 12).map((approval) => ({
+            kind: "APPROVAL" as const,
+            id: approval.approvalId,
+          }))}
+          total={waiting.length}
+          label={t("what needs you")}
+        />
+      )}
+      <WorkPage
+        key={view ?? "default"}
+        initialView={pageViewOf(view)}
+        suggestions={suggestions?.ok === true ? suggestions.value : null}
+        approvals={approvals?.ok === true ? approvals.value : null}
+        views={views}
+        work={work?.ok === true ? work.value : null}
+        done={done?.ok === true ? done.value : null}
+        workforce={workforce}
+      />
+    </>
+  );
+}
+
+export default async function WorkRoute({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{ readonly view?: string | string[] }>;
+}) {
+  // Remembers the person's language for the header below (serverTNow).
+  await serverT();
+
+  const view = workViewOf((await searchParams).view);
+  // The shell already read this for the request; React's cache shares it.
+  const context = await resolveOwnContext().catch(() => null);
+  return (
+    <PageContainer>
+      <WorkHeader view="tasks" side={workSideOf(context)} />
+      <Suspense fallback={<Skeleton lines={6} />}>
+        <WorkLists view={view} />
+      </Suspense>
+    </PageContainer>
+  );
+}

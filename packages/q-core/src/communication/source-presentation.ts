@@ -1,0 +1,227 @@
+/**
+ * The one human-safe presentation of a public-web source (CQ-Q-VOICE-001
+ * R3). Company Intelligence, the conversational seam and, later, voice all
+ * project a source through this and nothing else, so a person never sees or
+ * hears a provider label, an evidence id, a tenant, a storage locator or a
+ * raw payload — only a title, a domain, a defensible date, the public link
+ * and a short provenance phrase.
+ */
+
+/** The minimum a research result carries per source. Public fields only. */
+export type PublicSourceLike = {
+  readonly index: number;
+  readonly url: string;
+  readonly domain: string;
+  readonly title: string | null;
+  readonly publishedAt: string | null;
+  readonly retrievedAt: string;
+};
+
+export type PublicSourcePresentation = {
+  readonly index: number;
+  /** The page title, or the domain when the page had none. */
+  readonly title: string;
+  readonly domain: string;
+  /** ISO date (YYYY-MM-DD) when the provider dated the page; otherwise null. */
+  readonly publishedOn: string | null;
+  readonly retrievedOn: string;
+  readonly url: string;
+  /** "published 2026-09-02" or "retrieved 2026-09-14": the only defensible date. */
+  readonly dateLabel: string;
+  /** Short provenance for a person: "Public web source · en.wikipedia.org · published 2026-09-02". */
+  readonly provenance: string;
+  /** What voice may say for it: the title, never the URL. */
+  readonly spoken: string;
+};
+
+const TITLE_MAX = 120;
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * YYYY-MM-DD, or null when the value is not a date. Providers send dates
+ * as "Oct 3, 2026" or "2 days ago" as well as ISO; slicing the first ten
+ * characters gave "Oct 3, 202", which failed the block contract and lost
+ * the whole answer (live 2026-10-10).
+ */
+function dayOrNull(value: string): string | null {
+  const head = value.trim().slice(0, 10);
+  if (ISO_DAY.test(head)) return head;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return null;
+  const iso = new Date(parsed).toISOString().slice(0, 10);
+  return ISO_DAY.test(iso) ? iso : null;
+}
+
+function day(value: string): string {
+  return dayOrNull(value) ?? new Date().toISOString().slice(0, 10);
+}
+
+function cleanTitle(title: string | null, domain: string): string {
+  const trimmed = (title ?? "").replace(/\s+/g, " ").trim();
+  if (trimmed.length === 0) {
+    return domain;
+  }
+  return trimmed.length > TITLE_MAX
+    ? `${trimmed.slice(0, TITLE_MAX - 1).trimEnd()}…`
+    : trimmed;
+}
+
+export function presentPublicSource(
+  source: PublicSourceLike,
+): PublicSourcePresentation {
+  const title = cleanTitle(source.title, source.domain);
+  const publishedOn =
+    source.publishedAt === null ? null : dayOrNull(source.publishedAt);
+  const retrievedOn = day(source.retrievedAt);
+  const dateLabel =
+    publishedOn === null
+      ? `retrieved ${retrievedOn}`
+      : `published ${publishedOn}`;
+  return {
+    index: source.index,
+    title,
+    domain: source.domain,
+    publishedOn,
+    retrievedOn,
+    url: source.url,
+    dateLabel,
+    provenance: `Public web source · ${source.domain} · ${dateLabel}`,
+    spoken: title === source.domain ? `a page on ${source.domain}` : title,
+  };
+}
+
+/** One line a person can read and follow: title (domain, date, link). */
+export function describePublicSource(source: PublicSourceLike): string {
+  const p = presentPublicSource(source);
+  return `${p.title} (${p.domain}, ${p.dateLabel}, ${p.url})`;
+}
+
+/**
+ * A model that was told to cite a public source by title, domain and date
+ * still tends to write "(source S1)". The label is Capital Q's, positional
+ * and meaningless to a person, so it is rewritten deterministically into
+ * the presentation it stands for. Nothing else in the text changes; an
+ * index that names no source is left alone.
+ */
+export function citePublicSources(
+  text: string,
+  sources: readonly PublicSourceLike[],
+): string {
+  if (sources.length === 0) {
+    return text;
+  }
+  const byIndex = new Map(sources.map((source) => [source.index, source]));
+  return text.replace(
+    /\(?\b(?:public web )?source\s+S(\d{1,2})\b\)?|\bS(\d{1,2})\b(?=[\s.,;:)])/gi,
+    (match, a: string | undefined, b: string | undefined) => {
+      const source = byIndex.get(Number(a ?? b));
+      if (source === undefined) {
+        return match;
+      }
+      const wrapped = match.startsWith("(") && match.endsWith(")");
+      const cited = describePublicSource(source);
+      return wrapped ? `(${cited})` : cited;
+    },
+  );
+}
+
+/**
+ * The conversational answer's form (R23, R38): the answer comes first and
+ * the public pages it rests on travel beside it as structured sources,
+ * behind the Sources disclosure. A "(source S1)" the model still writes is
+ * removed rather than expanded into a title, domain, date and link in the
+ * middle of a sentence; an index that names no source is left alone, so
+ * nothing the person or a document said is touched.
+ */
+export function withoutPublicSourceLabels(
+  text: string,
+  sources: readonly PublicSourceLike[],
+): string {
+  if (sources.length === 0) {
+    return text;
+  }
+  const known = new Set(sources.map((source) => source.index));
+  return text.replace(
+    /[ \t]*\(?\b(?:public web )?source\s+S(\d{1,2})\b\)?|[ \t]*\bS(\d{1,2})\b(?=[\s.,;:)])/gi,
+    (match, a: string | undefined, b: string | undefined) =>
+      known.has(Number(a ?? b)) ? "" : match,
+  );
+}
+
+/**
+ * What a client shows behind Sources for one public page: the same
+ * presentation as everywhere else, in the result-block's fields.
+ */
+export function publicSourceBlockFields(source: PublicSourceLike): {
+  readonly url: string;
+  readonly domain: string;
+  readonly title: string;
+  readonly publishedOn: string | null;
+  readonly retrievedOn: string;
+} {
+  const p = presentPublicSource(source);
+  return {
+    url: p.url,
+    domain: p.domain,
+    title: p.title,
+    publishedOn: p.publishedOn,
+    retrievedOn: p.retrievedOn,
+  };
+}
+
+/** The part of an authorised fact a citation needs. */
+export type CitableFact = {
+  readonly ref?: string | undefined;
+  readonly source?: string | undefined;
+};
+
+function escapeForPattern(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Capital Q's own fact labels never reach a person (CQ-QX-005, H3b).
+ *
+ * Authorised facts are shown to the model under per-render labels — F1,
+ * F2 — so its findings can cite them. A small model also writes them into
+ * its prose ("GMV was $412k (F3)"), and a label is machinery: it means
+ * nothing to the person and is not a source. Only the labels issued for
+ * THIS render are rewritten — into the fact's coarse source description
+ * where it has one ("your one-pager"), otherwise removed — so nothing the
+ * person or a document said is touched.
+ */
+export function citeAuthorisedFacts(
+  text: string,
+  facts: readonly CitableFact[],
+): string {
+  const byRef = new Map<string, CitableFact>();
+  for (const fact of facts) {
+    if (fact.ref !== undefined) byRef.set(fact.ref, fact);
+  }
+  if (byRef.size === 0) return text;
+  const refs = [...byRef.keys()]
+    .sort((a, b) => b.length - a.length)
+    .map(escapeForPattern)
+    .join("|");
+  const sourcesIn = (matched: string): string[] => {
+    const found = [...matched.matchAll(new RegExp(`\\b(${refs})\\b`, "g"))]
+      .map((m) => byRef.get(m[1] ?? "")?.source)
+      .filter((source): source is string => source !== undefined);
+    return [...new Set(found)];
+  };
+  const grouped = new RegExp(
+    `\\s*[\\[(]\\s*(?:facts?\\s+)?(?:${refs})(?:\\s*(?:,|;|&|and)\\s*(?:${refs}))*\\s*[\\])]`,
+    "g",
+  );
+  const bare = new RegExp(`\\b(?:facts?\\s+)?(?:${refs})\\b`, "g");
+  return text
+    .replace(grouped, (matched) => {
+      const sources = sourcesIn(matched);
+      return sources.length === 0 ? "" : ` (${sources.join("; ")})`;
+    })
+    .replace(bare, (matched) => sourcesIn(matched)[0] ?? "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+([.,;:!?])/g, "$1")
+    .trim();
+}

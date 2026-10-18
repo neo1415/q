@@ -1,8 +1,13 @@
+import type { InterviewCues } from "../domain/resolution/cross-step.js";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { OutboxWriter } from "@capital-q/eventing";
 import type { Logger } from "@capital-q/observability";
 
 import { createPostgresOnboardingDefinitionRepository } from "../infrastructure/postgres-definition-repository.js";
+import { createPostgresOnboardingInterviewQuestionRepository } from "../infrastructure/postgres-question-repository.js";
+import { createPostgresOnboardingInterviewTurnRepository } from "../infrastructure/postgres-interview-turn-repository.js";
+import { createPostgresOnboardingUtteranceRepository } from "../infrastructure/postgres-utterance-repository.js";
+import type { OnboardingUtteranceAliases } from "../domain/interpretation.js";
 import {
   createPostgresOnboardingIdempotencyRepository,
   createPostgresOnboardingResponseRepository,
@@ -13,13 +18,17 @@ import {
 import type {
   OnboardingDefinitionRepository,
   OnboardingIdempotencyRepository,
+  OnboardingInterviewQuestionRepository,
+  OnboardingInterviewTurnRepository,
   OnboardingResponseRepository,
   OnboardingSessionRepository,
-  OnboardingStepStateRepository,
   OnboardingStepContextProvider,
+  OnboardingStepStateRepository,
   OnboardingSubjectResolver,
   OnboardingSuggestionRepository,
+  OnboardingUtteranceRepository,
   OnboardingWriteTargetHandler,
+  OnboardingTaxonomyResolver,
 } from "./ports.js";
 import {
   createOnboardingDefinitionPublisher,
@@ -31,6 +40,7 @@ import {
   createOnboardingWriteTargetRegistry,
 } from "./registry.js";
 import {
+  type OnboardingRuntimeDependencies,
   createOnboardingUseCases,
   type OnboardingUseCases,
 } from "./use-cases.js";
@@ -49,14 +59,28 @@ export type OnboardingService = {
     | "getCurrentSession"
     | "getSession"
     | "submitResponse"
+    | "submitResponses"
+    | "reviseResponse"
     | "skipStep"
+    | "withdrawResponse"
     | "goBack"
     | "completeSession"
     | "resolveSuggestion"
+    | "answerInterviewQuestion"
+    | "dismissInterviewQuestion"
+    | "listFollowUps"
+    | "answerFollowUp"
+    | "dismissFollowUp"
+    | "say"
+    | "appendInterviewTurns"
+    | "listInterviewTurns"
   >;
   readonly internal: Pick<
     OnboardingUseCases,
-    "bindSessionContext" | "createSuggestion" | "expireSuggestion"
+    | "bindSessionContext"
+    | "createSuggestion"
+    | "expireSuggestion"
+    | "recordInterviewQuestions"
   >;
   readonly publisher: OnboardingDefinitionPublisher;
 };
@@ -78,9 +102,26 @@ export type OnboardingServiceOptions = {
         readonly stepStates?: OnboardingStepStateRepository | undefined;
         readonly responses?: OnboardingResponseRepository | undefined;
         readonly suggestions?: OnboardingSuggestionRepository | undefined;
+        readonly questions?: OnboardingInterviewQuestionRepository | undefined;
+        readonly utterances?: OnboardingUtteranceRepository | undefined;
+        readonly interviewTurns?: OnboardingInterviewTurnRepository | undefined;
         readonly idempotency?: OnboardingIdempotencyRepository | undefined;
       }
     | undefined;
+  /**
+   * Plain-language names journeys accept for their options in the
+   * conversational interview (CQ-PRE-REC-001 §19): step key → option key →
+   * phrases. Recognition only; the definition still validates the answer.
+   */
+  readonly utteranceAliases?: OnboardingUtteranceAliases | undefined;
+  /** Founder brief J7: a short reply's move, read by meaning. */
+  readonly moveReader?: OnboardingRuntimeDependencies["moveReader"];
+  /** Figures and exclusions a journey declares for the interview (CQ-Q-VOICE-001 A). */
+  readonly interviewCues?: InterviewCues | undefined;
+  /** Capital Q's taxonomy classifier for category phrases (CQ-Q-VOICE-001 A). */
+  readonly taxonomy?: OnboardingTaxonomyResolver | undefined;
+  /** ADR 0024: per journey, the answers a completed session may revise. */
+  readonly revisableSteps?: OnboardingRuntimeDependencies["revisableSteps"];
   /** Safe structured logging only; never response content. */
   readonly logger?: Logger | undefined;
 };
@@ -108,6 +149,20 @@ export function createOnboardingService(
     suggestions:
       options.repositories?.suggestions ??
       createPostgresOnboardingSuggestionRepository(),
+    questions:
+      options.repositories?.questions ??
+      createPostgresOnboardingInterviewQuestionRepository(),
+    utterances:
+      options.repositories?.utterances ??
+      createPostgresOnboardingUtteranceRepository(),
+    interviewTurns:
+      options.repositories?.interviewTurns ??
+      createPostgresOnboardingInterviewTurnRepository(),
+    utteranceAliases: options.utteranceAliases,
+    moveReader: options.moveReader,
+    interviewCues: options.interviewCues,
+    taxonomy: options.taxonomy,
+    revisableSteps: options.revisableSteps,
     idempotency:
       options.repositories?.idempotency ??
       createPostgresOnboardingIdempotencyRepository(),
@@ -128,15 +183,27 @@ export function createOnboardingService(
       getCurrentSession: useCases.getCurrentSession,
       getSession: useCases.getSession,
       submitResponse: useCases.submitResponse,
+      submitResponses: useCases.submitResponses,
+      reviseResponse: useCases.reviseResponse,
       skipStep: useCases.skipStep,
+      withdrawResponse: useCases.withdrawResponse,
       goBack: useCases.goBack,
       completeSession: useCases.completeSession,
       resolveSuggestion: useCases.resolveSuggestion,
+      answerInterviewQuestion: useCases.answerInterviewQuestion,
+      dismissInterviewQuestion: useCases.dismissInterviewQuestion,
+      listFollowUps: useCases.listFollowUps,
+      answerFollowUp: useCases.answerFollowUp,
+      dismissFollowUp: useCases.dismissFollowUp,
+      say: useCases.say,
+      appendInterviewTurns: useCases.appendInterviewTurns,
+      listInterviewTurns: useCases.listInterviewTurns,
     },
     internal: {
       bindSessionContext: useCases.bindSessionContext,
       createSuggestion: useCases.createSuggestion,
       expireSuggestion: useCases.expireSuggestion,
+      recordInterviewQuestions: useCases.recordInterviewQuestions,
     },
     publisher: createOnboardingDefinitionPublisher({
       transactions: options.transactions,

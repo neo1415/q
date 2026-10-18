@@ -1,6 +1,7 @@
 import type { QEvalDataset, QEvalProfile } from "../contracts/index.js";
 import {
   Q_EVAL_ADVERSARIAL_DATASET,
+  Q_EVAL_GATEQ_DATASET,
   Q_EVAL_GOLDEN_DATASET,
   Q_EVAL_REGRESSION_DATASET,
 } from "../datasets/index.js";
@@ -43,6 +44,7 @@ export const Q_EVAL_PROFILE_DEFINITIONS: Readonly<
       Q_EVAL_REGRESSION_DATASET,
       Q_EVAL_ADVERSARIAL_DATASET,
       Q_EVAL_GOLDEN_DATASET,
+      Q_EVAL_GATEQ_DATASET,
     ],
     skipCaseIds: [],
   },
@@ -56,7 +58,17 @@ export const Q_EVAL_PROFILE_DEFINITIONS: Readonly<
       Q_EVAL_REGRESSION_DATASET,
       Q_EVAL_ADVERSARIAL_DATASET,
       Q_EVAL_GOLDEN_DATASET,
+      Q_EVAL_GATEQ_DATASET,
     ],
+    skipCaseIds: [],
+  },
+  QGATE: {
+    profile: "QGATE",
+    implemented: true,
+    providerMode: "FAKE",
+    description:
+      "The GateQ applicant interview: does it behave like a person, and does it stay inside its authority. Scripted model, no spend, no database.",
+    datasets: [Q_EVAL_GATEQ_DATASET],
     skipCaseIds: [],
   },
   STAGING_FULL: {

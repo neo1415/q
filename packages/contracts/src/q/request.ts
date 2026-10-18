@@ -6,7 +6,9 @@ import {
   QLocaleSchema,
   QRequestContextSchema,
 } from "./context.js";
+import { UuidSchema } from "../common/ids.js";
 import { QConversationIdSchema, QRunIdSchema } from "./ids.js";
+import { QPageManifestSchema } from "./screen-manifest.js";
 import { QSubjectRefsSchema } from "./subject.js";
 import { QContractVersionSchema } from "./version.js";
 
@@ -18,6 +20,9 @@ import { QContractVersionSchema } from "./version.js";
  */
 export const Q_MESSAGE_TEXT_MAX_LENGTH = 8000;
 
+/** A surface's opening words: a greeting and a short briefing, never a page. */
+export const Q_OPENING_MAX_LENGTH = 1200;
+
 export const QUserMessageInputSchema = z
   .object({
     text: z.string().trim().min(1).max(Q_MESSAGE_TEXT_MAX_LENGTH),
@@ -25,6 +30,110 @@ export const QUserMessageInputSchema = z
   .strict();
 
 export type QUserMessageInput = z.infer<typeof QUserMessageInputSchema>;
+
+/**
+ * What the person is watching as they ask (R18: Q watches the video with
+ * us): a pitch and the playback position. A request, never authority --
+ * the Q API authorises the asset for the asker with the pitch playback
+ * rule and the company's visibility before anything enters the run's
+ * context, and drops it silently when refused, exactly as if absent.
+ */
+export const QViewingMomentSchema = z
+  .object({
+    kind: z.literal("PITCH_PLAYBACK"),
+    companyId: UuidSchema,
+    mediaAssetId: UuidSchema,
+    positionSeconds: z.number().int().min(0).max(7200),
+  })
+  .strict();
+export type QViewingMoment = z.infer<typeof QViewingMomentSchema>;
+
+/**
+ * The screens a person can be on when they ask (R21). A closed list the
+ * web maps its routes onto; OTHER for anything else. Not pixels.
+ */
+export const Q_SCREEN_ROUTES = [
+  "HOME",
+  "DISCOVER",
+  "CAPITAL",
+  "PROFILE",
+  "COMPANY_VISIBILITY",
+  "COMPANY_INTEREST",
+  "COMPANY",
+  "PITCH",
+  "RELATIONSHIPS",
+  "RELATIONSHIP_COMPANY",
+  "RELATIONSHIP_INVESTOR",
+  "VERIFICATION",
+  "ONBOARDING",
+  // The Q Daily (founder live 2026-10-01): "summarize everything here" on
+  // the Daily was answered from older conversation text.
+  "DAILY",
+  // voiceq-63: their documents, and Q's work page ("Needs you").
+  "DOCUMENTS",
+  "WORK",
+  "OTHER",
+] as const;
+export const QScreenRouteSchema = z.enum(Q_SCREEN_ROUTES);
+export type QScreenRoute = z.infer<typeof QScreenRouteSchema>;
+
+/**
+ * What is on the person's screen as they ask (R21): the screen, and the
+ * canonical entities it shows -- a company, an investor organisation, an
+ * open Q document. The pitch and playback position travel as `viewing`
+ * (R18), not here. A request, never authority: each entity is resolved
+ * for the asker through its owning context exactly like a named subject,
+ * and one that does not resolve is dropped silently, as if absent.
+ */
+export const QScreenContextSchema = z
+  .object({
+    route: QScreenRouteSchema,
+    companyId: UuidSchema.optional(),
+    investorOrganisationId: UuidSchema.optional(),
+    documentId: UuidSchema.optional(),
+    /**
+     * Q room W3 (R3): the page of documentId open in the Q room's viewer
+     * (1-based), so "this page" and "read it to me" mean that page. A
+     * position, never authority.
+     */
+    documentPage: z.number().int().min(1).max(10_000).optional(),
+    /**
+     * voiceq-63: a document Q prepared for them, open in a viewer on this
+     * Capital Q tab (founder, live 2026-10-04: Q opened the prep PDF and
+     * could not read what it showed). An id, never authority: its words
+     * are read only through read_my_document, which reads it as the asker
+     * through the documents' own service and refuses anything not theirs.
+     */
+    artifactId: UuidSchema.optional(),
+    /**
+     * Q room W5 (R8): the slide of artifactId open in the Q room's deck
+     * surface (1-based) and the version it shows, so "this slide" means
+     * that slide and an edit applies to the version on screen. A
+     * position, never authority.
+     */
+    artifactSlide: z.number().int().min(1).max(24).optional(),
+    artifactVersion: z.number().int().min(1).max(10_000).optional(),
+    /**
+     * The device's IANA time zone as the person asks (live test 2026-09-28
+     * #2): "tomorrow at 2 PM" is resolved by code in this zone, never in
+     * UTC by accident. A request like the rest: a zone the runtime does not
+     * know is ignored, and it grants nothing.
+     */
+    timeZone: z
+      .string()
+      .regex(/^[A-Za-z]+(\/[A-Za-z0-9_+-]+){0,2}$/)
+      .max(64)
+      .optional(),
+    /**
+     * Q room R1: what the whole page shows (sections, tab, filters, open
+     * dialogs), as ids and closed kinds only. Read back on the server
+     * through each record's own service, as the asker; a ref that does not
+     * resolve for them is dropped silently. It grants nothing.
+     */
+    manifest: QPageManifestSchema.optional(),
+  })
+  .strict();
+export type QScreenContext = z.infer<typeof QScreenContextSchema>;
 
 /**
  * PUBLIC. The body a client sends to start a Q run (doc 22 §67).
@@ -52,6 +161,20 @@ export const CreateQRunRequestSchema = z
     modality: QClientModalitySchema,
     locale: QLocaleSchema.optional(),
     conversationId: QConversationIdSchema.optional(),
+    /** R18: asked while watching a pitch; authorised server-side or dropped. */
+    viewing: QViewingMomentSchema.optional(),
+    /** R21: what is on screen; each entity resolved for the asker or dropped. */
+    screen: QScreenContextSchema.optional(),
+    /**
+     * What Q's surface said to the person before this first question (the
+     * welcome or briefing on Home: "There are companies in your feed…").
+     * Kept as Q's opening line of a NEW conversation, so a follow-up such
+     * as "what are these companies?" has what it refers to. Ignored when
+     * the run continues a conversation. It is what this person's own
+     * screen showed them, read as conversation (data, never instruction),
+     * and it grants nothing.
+     */
+    opening: z.string().trim().min(1).max(Q_OPENING_MAX_LENGTH).optional(),
   })
   .strict();
 

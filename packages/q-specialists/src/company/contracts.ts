@@ -31,8 +31,23 @@ import type {
 export type CompanyIntelligenceFocus =
   CompanyIntelligenceDimension | "CHANGES" | "RISKS" | "STRENGTHS" | "GAPS";
 
+/**
+ * A company Capital Q holds no record of, named by the person, that Q is
+ * asked to work on from what the public web says about it (CQ-QACT-002).
+ * No identifier: there is no canonical entity to point at, and inventing
+ * one would be a second, quieter record. Everything known about it in an
+ * investigation comes from public sources, as unverified data.
+ */
+export type PublicCompanySubject = {
+  readonly kind: "PUBLIC_COMPANY";
+  readonly name: string;
+};
+
 export type CompanyIntelligenceRequest = {
-  readonly company: Extract<QSubjectRef, { kind: "COMPANY" }>;
+  /** Trusted preparation reads only canonical records and governed knowledge; no paid calls or writes. */
+  readonly preparationMode?: "EVIDENCE_ONLY" | undefined;
+  readonly company:
+    Extract<QSubjectRef, { kind: "COMPANY" }> | PublicCompanySubject;
   /** The person's message, verbatim. DATA, never an instruction. */
   readonly question: string;
   /**
@@ -47,6 +62,30 @@ export type CompanyIntelligenceRequest = {
    * later period reaches the answer (§65, §81).
    */
   readonly asOf?: Date | undefined;
+  /**
+   * A document Q already prepared in this conversation, when there is
+   * one. Its title goes in front of the model so that "make the summary
+   * shorter" can be read as a request to change it (QX-003F).
+   */
+  readonly openDocument?: OpenDocument | undefined;
+  /**
+   * Whether this turn asked for public, current or external information,
+   * as the conversation core decided from its reading of the turn
+   * (CQ-QX-005). Only then is the public web read. Absent means no.
+   */
+  readonly publicResearch?: boolean | undefined;
+  /**
+   * The conversation so far, oldest first, without this message. DATA.
+   *
+   * The specialist answered each turn as if it were the first: a founder
+   * corrected August GMV from 412k to 380k, and the very next answer
+   * quoted 412k again, because the model was never shown the correction
+   * (CQ-QX-007 H3a). What the person said earlier in THIS conversation is
+   * part of what the answer must honour.
+   */
+  readonly conversation?:
+    | readonly { readonly role: "USER" | "Q"; readonly content: string }[]
+    | undefined;
 };
 
 /** One dimension's evidential standing. No percentage, ever (§40). */
@@ -86,8 +125,33 @@ export type CompanyContradictionFinding = {
   readonly evidenceRefs: readonly QEvidenceRef[];
 };
 
+/**
+ * A document Q already prepared in this conversation.
+ *
+ * Supplied by the answer seam from the person's own recent turns. The
+ * specialist puts the title in front of the model so a request to change
+ * it can be read as one; it is a fact about the conversation, never a
+ * grant and never something a model may name for itself.
+ */
+export type OpenDocument = {
+  readonly title: string;
+};
+
 export type CompanyIntelligenceResult = {
-  readonly companyId: string;
+  /** Null when the company is not on Capital Q (a PUBLIC_COMPANY subject). */
+  readonly companyId: string | null;
+  /**
+   * The company's canonical name as the authorised read returned it, when
+   * it did. A document titled "your company — investor deck" is a
+   * document nobody would send.
+   */
+  readonly companyName?: string | null | undefined;
+  /**
+   * The company's own description from its canonical profile, when it has
+   * one. What a document about the company opens with (CQ-QX-007): the
+   * record, never the reply Q wrote in the conversation.
+   */
+  readonly canonicalDescription?: string | null | undefined;
   readonly specialistVersion: string;
   /** The information state the findings describe. */
   readonly asOf: UtcTimestamp;
@@ -118,6 +182,42 @@ export type CompanyIntelligenceResult = {
    * contribution to it, not a message and not a persona (§11, §56).
    */
   readonly synthesis: string | null;
+  /**
+   * The public-web read made for this question, when the person asked for
+   * public information (CQ-Q-RESEARCH-001). Counts and status only.
+   */
+  readonly research: {
+    readonly status:
+      "OK" | "NO_PUBLIC_IDENTITY" | "PROVIDER_UNAVAILABLE" | "NOT_OFFERED";
+    readonly sourceCount: number;
+    readonly comparisonCount: number;
+  } | null;
+  /**
+   * Statements the person made about their own company in this message,
+   * verified against their words and recorded as their claims through the
+   * Knowledge Write Gate (§20-§21). The quoted words, for the answer to
+   * acknowledge. Empty when nothing was recorded.
+   */
+  readonly recordedStatements: readonly string[];
+  /**
+   * What the person asked Q to prepare or change in this message, read
+   * into the analyst's closed schema (ADR 0011, ADR 0013).
+   *
+   * A reading, never an act. The specialist composes and does not write;
+   * the answer seam checks the quote against the message, takes the
+   * subject from the run's own plan and asks the artifact application
+   * service to persist. Null when they asked for no such thing.
+   */
+  readonly artifactRequest: {
+    readonly kind: "PREPARE" | "REVISE";
+    readonly artifactType:
+      "INVESTMENT_BRIEF" | "PITCH_DECK" | "ONE_PAGER" | "MEMO";
+    readonly instruction: string;
+    /** How they said it should look, when they said. Null is the common case. */
+    readonly visualDirection:
+      "MINIMAL_INSTITUTIONAL" | "DARK_TECHNICAL" | "WARM_GROWTH" | null;
+    readonly quote: string;
+  } | null;
   /** Safe operational record for traces, evals and the developer smoke. */
   readonly telemetry: CompanyIntelligenceTelemetry;
 };
@@ -126,6 +226,13 @@ export type CompanyFinding = QSpecialistFinding & {
   readonly dimension: CompanyIntelligenceDimension;
   /** DETERMINISTIC: computed from institutional state. MODEL: written, then validated. */
   readonly derivation: "DETERMINISTIC" | "MODEL";
+  /**
+   * Where the facts this finding rests on came from, as the person reads
+   * it ("kivu-one-pager.pdf, page 1", "what you told me on 24 September
+   * 2026"). Resolved from the citations that held, never from anything
+   * the model wrote about its sources (CQ-QX-007 F1).
+   */
+  readonly sources?: readonly string[] | undefined;
 };
 
 /**
@@ -157,4 +264,9 @@ export type CompanyIntelligenceTelemetry = {
   /** Model findings dropped because a claim or a citation did not hold (§61). */
   readonly rejectedFindingCount: number;
   readonly rejectedCitationCount: number;
+  /** Public-web research reads asked of the Tool Registry (0 or 1). */
+  readonly researchCalls: number;
+  readonly publicSourceCount: number;
+  /** The person's statements recorded through the Knowledge Write Gate. */
+  readonly statementsRecorded: number;
 };

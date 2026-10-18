@@ -271,6 +271,20 @@ export function validateModelFindings(
       }
     }
 
+    // What the person may be told this rests on: the named sources of the
+    // facts it actually cites. A fact whose source may not be named (an
+    // undisclosable document) supports the finding and is never named.
+    const sources = [
+      ...new Set(
+        cited.flatMap((fact) =>
+          typeof fact.presentedSource === "string" &&
+          fact.presentedSource.length > 0
+            ? [fact.presentedSource]
+            : [],
+        ),
+      ),
+    ];
+
     const dimension: CompanyIntelligenceDimension = proposed.dimension;
     accepted.push({
       findingId: input.findingId(accepted.length),
@@ -283,6 +297,7 @@ export function validateModelFindings(
       evidenceStatus: boundedEvidenceStatus(cited),
       confidence: boundedConfidence(proposed.confidence, cited),
       evidenceRefs,
+      ...(sources.length === 0 ? {} : { sources }),
       subjects: [...input.subjects],
       sensitivity: input.sensitivity,
       visibilityScope: input.visibilityScope,

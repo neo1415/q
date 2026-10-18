@@ -276,6 +276,26 @@ describe("privacy", () => {
     expect(usage.entries.every((e) => e.providerId === IDS.alpha)).toBe(true);
   });
 
+  it("records what each call was for: declared, an instruction's correlation id, a Q run, else OTHER", async () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [{ purpose: "REHEARSAL" }, "REHEARSAL"],
+      [{ correlationId: "cor_instr_abc_1234" }, "INSTRUCTION"],
+      [{ qRunId: "11111111-2222-4333-8444-555555555555" }, "CONVERSATION"],
+      [{}, "OTHER"],
+    ];
+    for (const [extra, purpose] of cases) {
+      const { gateway, usage } = build();
+      const base = request();
+      const { qRunId: _unused, ...withoutRun } = base.attribution;
+      void _unused;
+      await gateway.execute({
+        ...base,
+        attribution: { ...withoutRun, ...extra },
+      });
+      expect(usage.entries.at(-1)?.purpose).toBe(purpose);
+    }
+  });
+
   it("refuses a RESTRICTED request outright: no ceiling admits it", async () => {
     const { gateway, alpha, beta } = build();
     const error = await failure(
@@ -342,7 +362,7 @@ describe("reliability", () => {
     expect(result.output).toEqual({ kind: "TEXT", text: "beta says hello" });
   });
 
-  it("retries a rate limit once with backoff, honouring retry-after, then succeeds", async () => {
+  it("moves to the next eligible model on a rate limit instead of sleeping on the first (a per-minute quota is spent for the minute)", async () => {
     const waits: number[] = [];
     const { gateway } = build({
       alpha: [
@@ -357,14 +377,20 @@ describe("reliability", () => {
       },
     });
     const result = await gateway.execute(request());
-    expect(result.providerCode).toBe("alpha");
-    expect(result.attempts).toHaveLength(2);
-    expect(result.fallbackUsed).toBe(false);
-    expect(waits).toEqual([1_500]);
+    expect(result.providerCode).toBe("beta");
+    expect(result.attempts.map((attempt) => attempt.outcome)).toEqual([
+      "RATE_LIMIT",
+      "SUCCESS",
+    ]);
+    expect(result.fallbackUsed).toBe(true);
+    expect(waits).toEqual([]);
   });
 
-  it("bounds a hung provider by the attempt timeout, retries, then falls back", async () => {
-    const { gateway } = build({
+  // CQ-VOICE-010: a timed-out model was asked a second time before the
+  // waiting fallback. That second wait was the 24-second turn in the
+  // hosted ledger.
+  it("bounds a hung provider by the attempt timeout and moves to the waiting model rather than waiting on it twice", async () => {
+    const { gateway, alpha } = build({
       alpha: [{ kind: "HANG" }, { kind: "HANG" }],
     });
     const result = await gateway.execute(
@@ -378,12 +404,69 @@ describe("reliability", () => {
       }),
     );
     expect(result.providerCode).toBe("beta");
+    expect(alpha.calls).toHaveLength(1);
     expect(result.attempts.map((a) => a.outcome)).toEqual([
-      "TIMEOUT",
       "TIMEOUT",
       "SUCCESS",
     ]);
   }, 10_000);
+
+  it("still retries a timed-out model when it is the only one there is", async () => {
+    const alpha = createFakeModelProvider({
+      code: "alpha",
+      script: [{ kind: "HANG" }, { kind: "TEXT", text: "alpha, second time" }],
+    });
+    const { gateway } = build({ providers: [alpha] });
+    const result = await gateway.execute(
+      request({
+        budget: {
+          maxAttempts: 3,
+          maxEstimatedCostUsd: 0.5,
+          maxOutputTokens: 256,
+          attemptTimeoutMs: 1_000,
+        },
+      }),
+    );
+    expect(result.attempts.map((a) => a.outcome)).toEqual([
+      "TIMEOUT",
+      "SUCCESS",
+    ]);
+  }, 10_000);
+
+  it("holds the first model to the caller's shorter patience when another waits behind it", async () => {
+    const { gateway, alpha } = build({ alpha: [{ kind: "HANG" }] });
+    const started = Date.now();
+    const result = await gateway.execute(
+      request({
+        budget: {
+          maxAttempts: 4,
+          maxEstimatedCostUsd: 0.5,
+          maxOutputTokens: 256,
+          attemptTimeoutMs: 8_000,
+        },
+      }),
+      { firstAttemptTimeoutMs: 80 },
+    );
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(result.providerCode).toBe("beta");
+    expect(alpha.calls).toHaveLength(1);
+    expect(result.attempts.map((a) => a.outcome)).toEqual([
+      "TIMEOUT",
+      "SUCCESS",
+    ]);
+  }, 10_000);
+
+  it("gives the last model standing its whole attempt budget, whatever the caller's first patience", async () => {
+    const alpha = createFakeModelProvider({
+      code: "alpha",
+      script: [{ kind: "TEXT", text: "slow but sure", delayMs: 150 }],
+    });
+    const { gateway } = build({ providers: [alpha] });
+    const result = await gateway.execute(request(), {
+      firstAttemptTimeoutMs: 20,
+    });
+    expect(result.attempts.map((a) => a.outcome)).toEqual(["SUCCESS"]);
+  });
 
   it("does not retry an authentication failure on the same provider but may fall back", async () => {
     const { gateway, alpha } = build({
@@ -593,6 +676,36 @@ describe("structured output", () => {
       kind: "STRUCTURED",
       value: { category: "investment_software", confidence: "high" },
     });
+  });
+
+  it("treats an answer cut off at the ceiling as room, not competence, and gives the next attempt the model's own maximum", async () => {
+    // Seen in production: a long answer stopped at exactly maxOutputTokens,
+    // so the JSON never closed, the parse failed, and every later attempt
+    // repeated it at the same ceiling until the budget ran out and the
+    // person was told the review could not be completed.
+    const { gateway, beta } = build({
+      beta: [
+        {
+          kind: "TEXT",
+          text: '{"category":"investment_softw',
+          finish: "MAX_OUTPUT_TOKENS",
+        },
+        {
+          kind: "JSON",
+          value: { category: "investment_software", confidence: "high" },
+        },
+      ],
+    });
+    const result = await gateway.execute(structured(), { schema: Category });
+    expect(result.output).toEqual({
+      kind: "STRUCTURED",
+      value: { category: "investment_software", confidence: "high" },
+    });
+    expect(beta.calls).toHaveLength(2);
+    // The first asks for the task's usual allowance; the second asks
+    // beta-cheap for everything it will write.
+    expect(beta.calls[0]?.request.maxOutputTokens).toBe(256);
+    expect(beta.calls[1]?.request.maxOutputTokens).toBe(1_024);
   });
 
   it("classifies invalid JSON and schema mismatches as INVALID_MODEL_OUTPUT, retries once, then falls back", async () => {

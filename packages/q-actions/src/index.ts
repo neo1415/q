@@ -52,6 +52,7 @@ export {
   type QApprovalDecision,
   type QApprovalPolicy,
   type QApprovalRecord,
+  type QPendingApprovalRow,
   type QApprovalRepository,
 } from "./ports.js";
 export {
@@ -91,18 +92,40 @@ export {
   projectedApprovalStatus,
   toApprovalView,
   type DecideQApprovalCommand,
+  Q_DECISION_CHANNELS,
+  type QDecisionChannel,
+  type QDecisionVia,
   type DecideQApprovalResult,
   type ProposeQActionCommand,
   type ProposeQActionResult,
   type QActionService,
   type QActionServiceDependencies,
+  type QApprovalProposalRead,
   type QApprovalQuery,
+  type ReviseQApprovalCommand,
+  type ReviseQApprovalResult,
 } from "./application/service.js";
 export {
   createQActionPort,
   noQActionProposer,
+  type QActionProposal,
   type QActionProposer,
+  type QActionRefusal,
+  type QWaitingLines,
+  waitingLine,
 } from "./application/port.js";
+export {
+  createQActionNarrator,
+  failedLine,
+  noQActionNarrator,
+  proposalBlocks,
+  alreadyWaitingLine,
+  proposedLine,
+  replacesLine,
+  refusedLine,
+  type QActionNarrator,
+  type QRunRef,
+} from "./application/narrator.js";
 export { createPostgresQActionRepositories } from "./infrastructure/postgres-repositories.js";
 
 export const PACKAGE_NAME = "@capital-q/q-actions" as const;

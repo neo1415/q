@@ -16,6 +16,7 @@ import { FormNotice } from "./form-notice";
 import { AuthDivider, GoogleSignIn } from "./google-sign-in";
 import { PasswordField } from "./password-field";
 import { SubmitButton } from "./submit-button";
+import { useT } from "@/features/i18n/language";
 
 export type SignInNotice = {
   readonly tone: NoticeTone;
@@ -41,6 +42,7 @@ export function SignInForm({
   /** Whether the Auth server actually offers Google. Resolved on the server. */
   readonly googleEnabled?: boolean | undefined;
 }) {
+  const t = useT();
   const [mode, setMode] = useState<"password" | "link">("password");
   const [passwordState, passwordAction] = useActionState(
     signInWithPasswordAction,
@@ -58,7 +60,7 @@ export function SignInForm({
 
   return (
     <div className="flex flex-col gap-8">
-      <AuthHeading title="Sign in" />
+      <AuthHeading title={t("Sign in")} />
 
       {notice !== undefined ? (
         <FormNotice tone={notice.tone}>{notice.message}</FormNotice>
@@ -77,13 +79,13 @@ export function SignInForm({
           <EmailField />
           <PasswordField
             id="password"
-            label="Password"
+            label={t("Password")}
             autoComplete="current-password"
           />
           {passwordState.status === "error" ? (
             <FormNotice tone="danger">{passwordState.message}</FormNotice>
           ) : null}
-          <SubmitButton pendingLabel="Signing in…">Continue</SubmitButton>
+          <SubmitButton pendingLabel="Signing in…">{t("Sign in")}</SubmitButton>
         </form>
       ) : (
         <form action={linkAction} className="flex flex-col gap-5">
@@ -93,21 +95,24 @@ export function SignInForm({
             <FormNotice tone="danger">{linkState.message}</FormNotice>
           ) : null}
           <SubmitButton pendingLabel="Sending…">
-            Email me a sign-in link
+            {t("Email me a sign-in link")}
           </SubmitButton>
         </form>
       )}
 
       <div className="flex flex-col items-start gap-1 cq-body-sm">
         {mode === "password" ? (
-          <Link href="/auth/forgot-password" className={linkClassName()}>
-            Forgot password?
+          <Link
+            href="/auth/forgot-password"
+            className={linkClassName("inline-flex min-h-11 items-center")}
+          >
+            {t("Forgot password?")}
           </Link>
         ) : null}
         <Button
           variant="quiet"
-          size="regular"
-          className="-ml-4"
+          size="compact"
+          className="-ms-3"
           onClick={() => {
             setMode((current) =>
               current === "password" ? "link" : "password",
@@ -121,7 +126,7 @@ export function SignInForm({
         <p className="text-(--cq-text-secondary)">
           New to Capital Q?{" "}
           <Link href={signUpHref} className={linkClassName()}>
-            Create account
+            {t("Create account")}
           </Link>
         </p>
       </div>

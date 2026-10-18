@@ -211,6 +211,22 @@ export const DEFAULT_PITCH_DURATION_POLICY: MediaDurationPolicy = {
 /** Guidance only. A landscape pitch is a pitch. */
 export const PREFERRED_PITCH_ASPECT_RATIO = "9:16" as const;
 
+/**
+ * Who beyond its owner may watch a publishable video (ADR 0021): the
+ * investors the company is discoverable to, or also every signed-in
+ * founder on Capital Q. Reference codes; INVESTORS is the default and no
+ * one's disclosure widens without the owner choosing NETWORK.
+ */
+export const PITCH_AUDIENCES = ["INVESTORS", "NETWORK"] as const;
+export const PitchAudienceSchema = z.enum(PITCH_AUDIENCES);
+export type PitchAudience = z.infer<typeof PitchAudienceSchema>;
+
+/** The owner's name for a video. */
+export const PITCH_TITLE_MAX = 120;
+
+/** Live videos one company may have at once; a bound, not a target. */
+export const LIVE_PITCHES_MAX = 30;
+
 // ---------------------------------------------------------------------------
 // The record
 // ---------------------------------------------------------------------------
@@ -236,6 +252,15 @@ export type MediaAsset = {
   readonly captionState: CaptionState;
   readonly transcriptState: TranscriptState;
   readonly moderationStatus: ModerationStatus;
+  /** The owner's name for the video; display text, never a company fact. */
+  readonly title: string | null;
+  /** Who beyond the owner may watch it once publishable (ADR 0021). */
+  readonly audience: PitchAudience;
+  /**
+   * Whether viewers the playback rule admits may also save a copy (ADR
+   * 0047). False unless the owner turned it on (doc 20 §219).
+   */
+  readonly downloadable: boolean;
   /** Lineage: the asset this one replaced. Replacement never overwrites. */
   readonly replacesMediaAssetId: MediaAssetId | null;
   /** Set when a successor replaced this asset. Superseded is not deleted. */
@@ -257,6 +282,8 @@ export type NewMediaAsset = {
   readonly playbackPolicy: PlaybackPolicy;
   readonly createdByUserId: UserId;
   readonly replacesMediaAssetId?: MediaAssetId | undefined;
+  readonly title?: string | null | undefined;
+  readonly audience?: PitchAudience | undefined;
 };
 
 /**
@@ -275,6 +302,12 @@ export type MediaAssetDto = {
   readonly captionState: CaptionState;
   readonly transcriptState: TranscriptState;
   readonly moderationStatus: ModerationStatus;
+  readonly title: string | null;
+  readonly audience: PitchAudience;
+  /** ADR 0047: investors who may watch it may also save a copy. */
+  readonly downloadable: boolean;
+  /** False once another video replaced it, or it was deleted. */
+  readonly live: boolean;
   readonly replacesMediaAssetId: string | null;
   readonly createdAt: string;
   readonly readyAt: string | null;
@@ -292,6 +325,10 @@ export function toMediaAssetDto(asset: MediaAsset): MediaAssetDto {
     captionState: asset.captionState,
     transcriptState: asset.transcriptState,
     moderationStatus: asset.moderationStatus,
+    title: asset.title,
+    audience: asset.audience,
+    downloadable: asset.downloadable,
+    live: asset.deletedAt === null && asset.supersededAt === null,
     replacesMediaAssetId: asset.replacesMediaAssetId,
     createdAt: asset.createdAt,
     readyAt: asset.readyAt,
@@ -347,3 +384,90 @@ export function isPitchPlayable(pitch: CompanyPitch): boolean {
     pitch.playbackPolicy !== "PRIVATE"
   );
 }
+
+/**
+ * What a feed item may carry about a company's pitch (CQ-MEDIA-012; doc 20
+ * §77). Exactly the fields a player needs to lay out a slot before it asks
+ * for playback, and nothing that grants playback: no provider identifier,
+ * no URL, no poster reference, no status — a pitch is either here, and
+ * therefore publishable, or absent.
+ */
+export type DiscoverablePitch = {
+  readonly mediaAssetId: MediaAssetId;
+  readonly companyId: string;
+  readonly aspectRatio: string | null;
+  readonly durationSeconds: number | null;
+  readonly captionState: CaptionState;
+  readonly title: string | null;
+  readonly audience: PitchAudience;
+  /** ADR 0047: the owner lets viewers save a copy. */
+  readonly downloadable: boolean;
+};
+
+/**
+ * A company's publishable videos for a feed item (ADR 0022): the newest
+ * leads, the rest follow newest first. Ranking stays per company; the
+ * videos are how the company tells its story, never extra lottery tickets.
+ */
+export type DiscoverablePitchSet = DiscoverablePitch & {
+  readonly more: readonly DiscoverablePitch[];
+};
+
+/**
+ * The publishable view of one asset, or null. The single rule for "may
+ * this pitch appear on a feed item": a live founder pitch, READY,
+ * moderation ALLOWED, policy not PRIVATE. The batched read applies the
+ * same predicate in SQL; this is the one place it is written down in code,
+ * and the SQL is checked against it.
+ */
+export function toDiscoverablePitch(
+  asset: MediaAsset,
+): DiscoverablePitch | null {
+  if (
+    asset.ownerType !== "COMPANY" ||
+    asset.purpose !== "FOUNDER_PITCH" ||
+    asset.deletedAt !== null ||
+    asset.supersededAt !== null ||
+    !isPitchPlayable(toCompanyPitch(asset))
+  ) {
+    return null;
+  }
+  return {
+    mediaAssetId: asset.id,
+    companyId: asset.ownerId,
+    aspectRatio: asset.aspectRatio,
+    durationSeconds: asset.durationSeconds,
+    captionState: asset.captionState,
+    title: asset.title,
+    audience: asset.audience,
+    downloadable: asset.downloadable,
+  };
+}
+
+/**
+ * A publishable video as a feed item or profile carries it (the HTTP
+ * PitchSummaryDto): layout facts and the owner's title, nothing that
+ * grants playback.
+ */
+export function pitchSummary(pitch: DiscoverablePitch): {
+  readonly mediaAssetId: string;
+  readonly aspectRatio: string | null;
+  readonly durationSeconds: number | null;
+  readonly captionState: CaptionState;
+  readonly title: string | null;
+  readonly downloadAllowed: boolean;
+} {
+  return {
+    mediaAssetId: pitch.mediaAssetId,
+    aspectRatio: pitch.aspectRatio,
+    durationSeconds: pitch.durationSeconds,
+    captionState: pitch.captionState,
+    title: pitch.title,
+    // Whether the menu offers Download. A hint for the menu only: the
+    // download endpoint decides again on every request.
+    downloadAllowed: pitch.downloadable,
+  };
+}
+
+/** Companies per batched pitch lookup. A feed page is 5–10; this is a bound, not a target. */
+export const DISCOVERABLE_PITCH_BATCH_MAX = 200;

@@ -1,0 +1,214 @@
+import type {
+  QClientActionIntent,
+  QNavigateDestination,
+} from "@capital-q/contracts";
+
+import { asksForMove } from "@capital-q/q-core/speech";
+
+import type { QTurn } from "./conversation";
+import { wireNow } from "./wire";
+
+/** What Q draws where the person is: the answer is the object itself. */
+const DRAWN_IN_PLACE: ReadonlySet<string> = new Set([
+  "MAP",
+  "CHART",
+  "TABLE",
+  "TIMELINE",
+]);
+
+/** Intents that take the person off the page they are on. */
+const MOVES: ReadonlySet<string> = new Set([
+  "NAVIGATE",
+  "OPEN_COMPANY",
+  "OPEN_RECORD_PAGE",
+  "OPEN_SETTINGS",
+  "OPEN_SETUP",
+]);
+
+/**
+ * Which navigation a typed conversation should follow now (CQ-QACT-001).
+ *
+ * Q's answer to "take me to Discover" carries a NAVIGATE intent; the
+ * screen follows it exactly as it follows a spoken one, through the same
+ * route map. Only an answer that arrived while this screen was open is
+ * followed: a conversation reopened from history, or a refresh, shows the
+ * old answer and its link but never moves the person on its own.
+ *
+ * `seen` is every Q turn already on screen when the conversation opened,
+ * plus every one this function has already considered. It is updated in
+ * place, so each answer is followed at most once.
+ */
+export function navigationToFollow(
+  turns: readonly QTurn[],
+  seen: Set<string>,
+): QNavigateDestination | null {
+  return followOfTurns(turns, seen).navigate;
+}
+
+/**
+ * The navigation and the client actions (R20/R33: theme, reload, their
+ * website) a typed conversation should follow now, under the same rule:
+ * only answers that arrived while this screen was open, each at most once.
+ */
+export function followOfTurns(
+  turns: readonly QTurn[],
+  seen: Set<string>,
+): {
+  readonly navigate: QNavigateDestination | null;
+  readonly actions: readonly QClientActionIntent[];
+} {
+  let navigate: QNavigateDestination | null = null;
+  const actions: QClientActionIntent[] = [];
+  // W7: nothing is followed, or marked followed, before the wire's
+  // contracts are in; the caller looks again once they are (useWire).
+  const schema = wireNow()?.QClientActionIntentSchema;
+  if (schema === undefined) return { navigate, actions };
+  let asked: string | null = null;
+  for (const turn of turns) {
+    if (turn.kind === "PERSON") {
+      asked = turn.text;
+      continue;
+    }
+    if (turn.kind !== "Q" || turn.streaming || seen.has(turn.id)) continue;
+    seen.add(turn.id);
+    // Owner 2026-10-15: a map Q drew is never replaced, the moment it lands,
+    // by a page the person did not ask for (the server drops such a move
+    // too; this is the screen's own second check).
+    const keepsDrawing =
+      turn.blocks.some((block) => DRAWN_IN_PLACE.has(block.kind)) &&
+      (asked === null || !asksForMove(asked));
+    for (const block of turn.blocks) {
+      if (block.kind !== "UI_INTENT") continue;
+      if (keepsDrawing && MOVES.has(block.intent.kind)) continue;
+      if (block.intent.kind === "NAVIGATE") {
+        // The latest one wins: two in one render is a conversation that
+        // moved on, and the person should land where it ended.
+        navigate = block.intent.destination;
+        continue;
+      }
+      const action = schema.safeParse(block.intent);
+      if (action.success) actions.push(action.data);
+    }
+  }
+  // R3: nothing is expected here. Only the surface that makes the move
+  // asks for it (requestMove), and asks before it performs the actions, so
+  // an answer that moves AND works the new page ("open Capital, readiness
+  // tab") has its UI acts wait for that page. Registering a move here that
+  // another surface was meant to make is what left a spoken move reported
+  // FAILED with nothing ever pushed (hosted 2026-10-09).
+  return { navigate, actions };
+}
+
+/**
+ * What this surface follows of the thread's answers. While a voice line is
+ * open, a spoken answer's moves are the voice board's to make, after Q has
+ * said them (they are only marked seen here). An answer to a question this
+ * surface sent by typing is still followed here: the board never carries
+ * it (2026-10-09 stack run, n-founder-strings: "Okay, let me do a quick
+ * rehearsal with these people" was typed while /home's voice line was
+ * open, and its NAVIGATE to Rehearsals was marked seen and never made).
+ */
+export function followOfThread(
+  turns: readonly QTurn[],
+  seen: Set<string>,
+  voice: {
+    readonly active: boolean;
+    /** Runs this tab followed live on the stream (default: all noted). */
+    readonly liveRuns?: ReadonlySet<string> | undefined;
+    /** Runs started in this tab from typed questions (default: all noted). */
+    readonly typedRuns?: ReadonlySet<string> | undefined;
+  },
+): ReturnType<typeof followOfTurns> {
+  // G2 gate (cd52c0ea): an answer from a run this page never started or
+  // followed live never moves the person, however it reaches the thread
+  // after open -- the room feed hands in the last 45 s of answers when a
+  // line starts, and after the typed matrix /home re-asked six earlier
+  // moves (all SUPERSEDED, a "couldn't open" notice, no page change).
+  // Keyed on runs, not clocks: a laptop clock minutes off must not decide.
+  const typedRuns = voice.typedRuns ?? TYPED_RUNS;
+  const liveRuns = voice.liveRuns ?? LIVE_RUNS;
+  for (const turn of turns) {
+    if (
+      turn.kind === "Q" &&
+      turn.runId !== undefined &&
+      !typedRuns.has(turn.runId) &&
+      !liveRuns.has(turn.runId)
+    ) {
+      seen.add(turn.id);
+    }
+  }
+  if (!voice.active) return followOfTurns(turns, seen);
+  const typed = followOfTurns(
+    turns.filter(
+      (turn) =>
+        turn.kind !== "Q" ||
+        (turn.runId !== undefined && typedRuns.has(turn.runId)),
+    ),
+    seen,
+  );
+  // The spoken ones: seen, so they are never made here later either.
+  followOfTurns(turns, seen);
+  return typed;
+}
+
+/**
+ * The Q turns already there when a conversation opens, so never followed.
+ * With nothing asked in this tab lately (`since` null) that is every one.
+ * Otherwise (RECOVERY-2026-10 G-D16) an answer recorded after the question
+ * is the person's fresh one and is followed. An answer still streaming has
+ * no recorded time: it is fresh only when its run is one this tab started
+ * (G2 follow-up: an older run still streaming in the conversation Home
+ * opened was treated as fresh, and its move bounced /home away).
+ */
+export function seenAtOpen(
+  turns: readonly QTurn[],
+  since: number | null,
+  ownRuns: ReadonlySet<string> = TYPED_RUNS,
+): Set<string> {
+  const seen = new Set<string>();
+  for (const turn of turns) {
+    if (turn.kind !== "Q") continue;
+    // A run this tab started is fresh whatever the clocks say (a laptop
+    // clock minutes off must not swallow G-D16's move); only a turn with
+    // no run falls back to comparing times.
+    const fresh =
+      since !== null &&
+      (turn.runId !== undefined
+        ? ownRuns.has(turn.runId)
+        : turn.at !== undefined &&
+          Date.parse(turn.at) >= since - FRESH_SKEW_MS);
+    if (!fresh) seen.add(turn.id);
+  }
+  return seen;
+}
+
+/** Clock skew between the browser's "asked" and the server's record. */
+const FRESH_SKEW_MS = 3_000;
+
+/**
+ * The runs this tab started from typed questions. Module state, so it
+ * outlives the surface that asked (2026-10-09 rerun: the Q page's surface
+ * was set up again as the voice line dropped and came back, and a set held
+ * by the old one was gone when the answer landed). Bounded.
+ */
+const TYPED_RUNS = new Set<string>();
+const TYPED_RUNS_MAX = 50;
+
+/** Runs this tab followed on the stream after it opened (bounded). */
+const LIVE_RUNS = new Set<string>();
+
+export function noteLiveRun(runId: string): void {
+  LIVE_RUNS.add(runId);
+  if (LIVE_RUNS.size > TYPED_RUNS_MAX) {
+    const oldest = LIVE_RUNS.values().next().value;
+    if (oldest !== undefined) LIVE_RUNS.delete(oldest);
+  }
+}
+
+export function noteTypedRun(runId: string): void {
+  TYPED_RUNS.add(runId);
+  if (TYPED_RUNS.size > TYPED_RUNS_MAX) {
+    const oldest = TYPED_RUNS.values().next().value;
+    if (oldest !== undefined) TYPED_RUNS.delete(oldest);
+  }
+}

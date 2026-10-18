@@ -76,4 +76,13 @@ export {
   type ModelProviderSecrets,
 } from "./model-providers.js";
 
+export {
+  VIDEO_PROVIDER_ENV_NAMES,
+  toVideoProviderSecrets,
+  videoProviderConfigStatus,
+  type CloudflareStreamSecrets,
+  type VideoProviderConfigStatus,
+  type VideoProviderSecrets,
+} from "./video-providers.js";
+
 export const CONFIG_SCHEMA_VERSION = 1;

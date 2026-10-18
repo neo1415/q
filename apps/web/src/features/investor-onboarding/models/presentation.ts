@@ -9,6 +9,7 @@ import type { CurrencyOption } from "@capital-q/ui/money-input";
 
 import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
 import type {
+  QuestionView,
   SessionPresentation,
   StepBase,
 } from "../../onboarding-kit/session";
@@ -128,6 +129,11 @@ export type StepView =
       readonly strengthOptions: readonly ChoiceOption[];
       readonly allowAvoid: boolean;
       readonly maxItems: number;
+      /** What the search control is called, in this group's words (§39/§40). */
+      readonly searchLabel: string;
+      readonly searchPlaceholder: string;
+      /** What an empty list means here; only geography means "anywhere". */
+      readonly emptyHint: string;
       /** Labels for already-selected ids, so a revisit can render them. */
       readonly selected: readonly TaxonomyCandidateView[];
       readonly avoidSelected: readonly TaxonomyCandidateView[];
@@ -153,17 +159,38 @@ export type StepView =
   | (Base<"red_flags"> & {
       readonly options: readonly ChoiceOption[];
       readonly sectorExclusionSelected: readonly TaxonomyCandidateView[];
+      /** Sectors currently held as preferences (I3); excluding one moves it here. */
+      readonly preferredSectors: readonly TaxonomyCandidateView[];
       readonly response?:
         Extract<StepResponse, { kind: "red_flags" }> | undefined;
     })
   | (Base<"mandate_review"> & {
       readonly review: InvestorReviewContext | undefined;
+      /** What Q read from the narrative, as pending proposals with labels (CQ-PRE-REC-001). */
+      readonly reading: readonly QReadingItem[];
+      /** What Q still needs the investor to settle, most material first. */
+      readonly questions: readonly AskedQuestionView[];
       readonly response?: undefined;
     })
   | (Base<"handoff"> & {
       readonly handoff: InvestorHandoffContext | undefined;
       readonly response?: undefined;
     });
+
+/** One pending suggestion rendered in words the investor was offered. */
+export type QReadingItem = {
+  readonly id: string;
+  readonly stepId: string;
+  readonly label: string;
+  readonly value: string;
+  /** What the person should know about it, e.g. names not matched (ob2). */
+  readonly note?: string | undefined;
+};
+
+/** A persisted question with the screen that answers it. */
+export type AskedQuestionView = QuestionView & {
+  readonly editStepId: string | undefined;
+};
 
 export type StepViewOfKind<TKind extends StepKind> = Extract<
   StepView,

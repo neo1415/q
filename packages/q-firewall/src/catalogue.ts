@@ -161,8 +161,18 @@ export const SCOPE_CATALOGUE: Readonly<Record<QKnowledgeScopeKind, ScopeSpec>> =
       kind: "EVIDENCE_DOCUMENTS",
       bound: true,
       defaultLabel: "founder_private",
-      ownerSensitivity: "HIGHLY_CONFIDENTIAL",
-      sharedSensitivity: "HIGHLY_CONFIDENTIAL",
+      // Evidence classifies each document on its own (docs/modules/evidence.md:
+      // CONFIDENTIAL by default; financial models, management accounts and
+      // FINANCIAL material HIGHLY_CONFIDENTIAL). This scope admits evidence
+      // up to CONFIDENTIAL: the retrieval envelope applies the ceiling per
+      // chunk, so a HIGHLY_CONFIDENTIAL document is outside every plan and
+      // never reaches a model provider, which no privacy class may receive
+      // it anyway (model-gateway eligibility). A plan that reasons over a
+      // deck is therefore declared CONFIDENTIAL, which is what the deck is,
+      // rather than at the class of material it was never allowed to read
+      // (CQ-PRE-REC-001 §11: an uploaded deck is reusable from Home Q).
+      ownerSensitivity: "CONFIDENTIAL",
+      sharedSensitivity: "CONFIDENTIAL",
       layer: "EVIDENCE_DOCUMENTS",
       factCategories: [],
       ownerCapability: capability("document.view"),
@@ -181,6 +191,41 @@ export const SCOPE_CATALOGUE: Readonly<Record<QKnowledgeScopeKind, ScopeSpec>> =
       ownerCapability: null,
       sharedVia: null,
       isEvidence: false,
+    },
+    OWN_ONBOARDING: {
+      kind: "OWN_ONBOARDING",
+      bound: false,
+      // The person's own setup answers: theirs, and never anybody else's.
+      defaultLabel: "personal_private",
+      ownerSensitivity: "CONFIDENTIAL",
+      sharedSensitivity: "CONFIDENTIAL",
+      layer: "STRUCTURED_STATE",
+      factCategories: ["PERSONAL_CONTEXT"],
+      ownerCapability: null,
+      sharedVia: null,
+      isEvidence: false,
+    },
+    OWN_PUBLIC_PRESENCE: {
+      kind: "OWN_PUBLIC_PRESENCE",
+      bound: true,
+      // The label the presence build writes at: material read from the
+      // open web, held as the subject's own organisation's understanding.
+      defaultLabel: "organisation_private",
+      ownerSensitivity: "INTERNAL",
+      // Unreachable while sharedVia is null, and kept honest anyway: a
+      // reading of somebody's public footprint is not public data.
+      sharedSensitivity: "INTERNAL",
+      layer: "KNOWLEDGE_OBJECTS",
+      // A person's presence is personal context; a company's is identity.
+      // The union is declared because one row serves all three subjects.
+      factCategories: ["PERSONAL_CONTEXT", "COMPANY_IDENTITY"],
+      // Reading back what Capital Q understands about oneself needs no
+      // capability beyond being that side; the relation decides it.
+      ownerCapability: null,
+      // No disclosure resource grants another party someone's presence.
+      // If that is ever wanted it is a product decision with its own row.
+      sharedVia: null,
+      isEvidence: true,
     },
     NETWORK_VISIBLE_DATA: {
       kind: "NETWORK_VISIBLE_DATA",

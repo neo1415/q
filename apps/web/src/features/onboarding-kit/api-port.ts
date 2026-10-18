@@ -1,7 +1,10 @@
 import type { OnboardingJourneyType } from "@capital-q/contracts";
 
 import {
+  onboardingAnswerQuestionAction,
   onboardingCandidatesAction,
+  onboardingDismissQuestionAction,
+  onboardingSayAction,
   onboardingCompleteAction,
   onboardingCurrentAction,
   onboardingDescribeNodesAction,
@@ -39,7 +42,7 @@ async function through<T>(call: Promise<ActionResult<T>>): Promise<T> {
     // A failed server-action round trip (offline, deploy in progress).
     throw new OnboardingClientError(
       "NETWORK",
-      "Couldn't reach Capital Q. Please try again.",
+      "Couldn't reach Capital Q. Try again.",
     );
   }
   return unwrap(result);
@@ -64,6 +67,11 @@ export function createApiRuntimePort(input: {
     skip: (request) => through(onboardingSkipAction(request)),
     resolveSuggestion: (request) =>
       through(onboardingResolveSuggestionAction(request)),
+    answerQuestion: (request) =>
+      through(onboardingAnswerQuestionAction(request)),
+    dismissQuestion: (request) =>
+      through(onboardingDismissQuestionAction(request)),
+    say: (request) => through(onboardingSayAction(request)),
 
     /**
      * The real Evidence upload, in the three steps the API actually has
@@ -93,7 +101,7 @@ export function createApiRuntimePort(input: {
         // rather than completed over nothing.
         return {
           ok: false,
-          message: "We couldn't upload that file. Please try again.",
+          message: "We couldn't upload that file. Try again.",
         };
       }
       const completed = await materialUploadCompleteAction(

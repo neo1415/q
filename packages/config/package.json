@@ -29,6 +29,26 @@
       "types": "./dist/database.d.ts",
       "default": "./dist/database.js"
     },
+    "./google-workspace": {
+      "types": "./dist/google-workspace.d.ts",
+      "default": "./dist/google-workspace.js"
+    },
+    "./app-email": {
+      "types": "./dist/app-email.d.ts",
+      "default": "./dist/app-email.js"
+    },
+    "./inbound-email": {
+      "types": "./dist/inbound-email.d.ts",
+      "default": "./dist/inbound-email.js"
+    },
+    "./web-push": {
+      "types": "./dist/web-push.d.ts",
+      "default": "./dist/web-push.js"
+    },
+    "./speech-providers": {
+      "types": "./dist/speech-providers.d.ts",
+      "default": "./dist/speech-providers.js"
+    },
     "./supabase-auth": {
       "types": "./dist/supabase-auth.d.ts",
       "default": "./dist/supabase-auth.js"
@@ -37,9 +57,17 @@
       "types": "./dist/embeddings.d.ts",
       "default": "./dist/embeddings.js"
     },
+    "./research-providers": {
+      "types": "./dist/research-providers.d.ts",
+      "default": "./dist/research-providers.js"
+    },
     "./model-providers": {
       "types": "./dist/model-providers.d.ts",
       "default": "./dist/model-providers.js"
+    },
+    "./video-providers": {
+      "types": "./dist/video-providers.d.ts",
+      "default": "./dist/video-providers.js"
     }
   },
   "main": "./dist/index.js",

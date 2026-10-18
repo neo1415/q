@@ -112,6 +112,7 @@ function response(
     responseType: value.type,
     value,
     rawText: value.type === "TEXT" ? value.text : null,
+    note: null,
     sourceModality: value.type === "TEXT" ? "TYPED_TEXT" : "SELECTION",
     createdAt: "2026-09-04T00:00:00.000Z",
     supersededByResponseId: null,
@@ -482,7 +483,19 @@ describe("response validation per step type (§40, §96-99, §210)", () => {
       sourceModality: "SELECTION",
     });
     invalid("intent", { value: { type: "SINGLE_SELECT", optionKey: "nope" } });
-    invalid("intent", { value: { type: "TEXT", text: "raising" } });
+    // Their own words are an answer too, like "Other" on a form (owner
+    // 2026-10-16): kept verbatim as TEXT, never refused.
+    expect(
+      validateOnboardingResponse(defStep("intent"), {
+        value: { type: "TEXT", text: "raising, sort of" },
+      }),
+    ).toMatchObject({
+      responseType: "TEXT",
+      rawText: "raising, sort of",
+      sourceModality: "TYPED_TEXT",
+    });
+    invalid("intent", { value: { type: "TEXT", text: "x".repeat(501) } });
+    invalid("intent", { value: { type: "CONFIRMATION", confirmed: true } });
     invalid("intent", {
       value: { type: "SINGLE_SELECT", optionKey: "raising_now", extra: 1 },
     });
@@ -643,11 +656,12 @@ describe("contracts, idempotency, events and projection (§123, §125, §128, §
     ).toBe(hashOnboardingRequest({ a: [2, { d: 1 }], b: 1 }));
   });
 
-  it("registers five runtime events whose payloads carry identifiers only", () => {
+  it("registers six runtime events whose payloads carry identifiers only", () => {
     const registry = createEventRegistry([...ONBOARDING_EVENTS]);
     expect(
       ONBOARDING_EVENTS.map((e) => `${e.name}@${e.version}:${e.sensitivity}`),
     ).toEqual([
+      "onboarding.utterance.recorded@1:CONFIDENTIAL",
       "onboarding.session.started@1:CONFIDENTIAL",
       "onboarding.response.committed@1:CONFIDENTIAL",
       "onboarding.step.skipped@1:CONFIDENTIAL",
@@ -692,6 +706,7 @@ describe("contracts, idempotency, events and projection (§123, §125, §128, §
       ]),
       currentResponses: responses,
       pendingSuggestions: [],
+      pendingQuestions: [],
       path: computeActivePath(definition.steps, responses),
     });
     expect(OnboardingSessionViewSchema.safeParse(view).success).toBe(true);

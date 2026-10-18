@@ -65,7 +65,9 @@ const RANK: Readonly<Record<PlannedQuestion["reason"], number>> = {
 
 /** The neutral fallback wording when the model proposed nothing for a key. */
 function defaultQuestion(key: FounderFactKey): string {
-  return `Capital Q does not yet have ${key.replace(/_/g, " ")} for this company. What is it, if you know?`;
+  const label = key.replace(/_/g, " ");
+  const pronoun = key.endsWith("s") ? "them" : "it";
+  return `We don't have the company's ${label} yet. Could you add ${pronoun}, if you know?`;
 }
 
 export function planFollowUpQuestions(

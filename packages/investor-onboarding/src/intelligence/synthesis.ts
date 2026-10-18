@@ -9,6 +9,7 @@ import {
   type MandateDimension,
   type PromptRegistry,
 } from "@capital-q/q-core";
+import type { ModelDataPosture } from "@capital-q/contracts";
 import type { TenantId, UserId } from "@capital-q/security";
 
 import type {
@@ -63,12 +64,14 @@ export type MandateSynthesisGateway = {
     request: {
       readonly taskClass: "STRUCTURED_EXTRACTION";
       readonly sensitivity: string;
+      readonly dataPosture?: ModelDataPosture | undefined;
       readonly budget: unknown;
       readonly messages: unknown;
       readonly output: unknown;
       readonly attribution: {
         readonly tenantId: string;
         readonly userId: string;
+        readonly correlationId: string;
       };
     },
     options: {
@@ -103,6 +106,16 @@ export type MandateSynthesisDependencies = {
    * one, and a refusal is honoured rather than worked around (§37, §73).
    */
   readonly sensitivity?: string | undefined;
+  /**
+   * What KIND of material this composition handles (doc 15 section 62).
+   * Set by a composition root that holds a synthetic-demo attestation;
+   * omitted means REAL_CUSTOMER, which is what every deployment serving a
+   * real person gets. It is orthogonal to `sensitivity`: the declared
+   * sensitivity still travels with the request, and nothing here widens a
+   * provider's reviewed ceiling for a customer's data.
+   */
+  readonly dataPosture?: ModelDataPosture | undefined;
+
   readonly budget?: unknown;
   readonly logger?: Logger | undefined;
 };
@@ -125,6 +138,8 @@ export type MandateSynthesisRequest = {
   readonly observedBehaviour: readonly string[];
   /** The session revision this runs against, so a stale result is refusable (§49). */
   readonly revision: number;
+  /** The unit of work, carried through to the model call's attribution. */
+  readonly correlationId: string;
   readonly signal?: AbortSignal | undefined;
 };
 
@@ -242,12 +257,16 @@ export function createMandateSynthesis(
             {
               taskClass: "STRUCTURED_EXTRACTION",
               sensitivity: dependencies.sensitivity ?? "CONFIDENTIAL",
+              ...(dependencies.dataPosture === undefined
+                ? {}
+                : { dataPosture: dependencies.dataPosture }),
               budget: dependencies.budget,
               messages: [...rendered.messages],
               output: rendered.output,
               attribution: {
                 tenantId: request.tenantId,
                 userId: request.userId,
+                correlationId: request.correlationId,
               },
             },
             {

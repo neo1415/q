@@ -29,6 +29,7 @@ import {
 import type { StepStatus, StepSummary } from "../../onboarding-kit/session";
 import type {
   InvestorOnboardingSessionView,
+  QReadingItem,
   SectionId,
   StepKind,
   StepResponse,
@@ -327,10 +328,39 @@ export type PresentationExtras = {
   /** Small vocabularies listed for pick-lists, by vocabulary code. */
   readonly nodeLists?:
     Readonly<Record<string, readonly TaxonomyCandidateView[]>> | undefined;
+  /** Labels for taxonomy ids that pending suggestions propose (the I11 reading). */
+  readonly suggestedTaxonomy?: readonly TaxonomyCandidateView[] | undefined;
 };
 
 /** What the runtime client fetches for the current screen before presenting it. */
 export async function enrich(
+  view: OnboardingSessionView,
+  group: JourneyGroup,
+  port: RuntimePort,
+): Promise<PresentationExtras> {
+  // Labels for every taxonomy id a pending suggestion proposes, whichever
+  // screen is current: the Q-led interview shows what was picked up as
+  // words, never as ids (CQ-PRE-REC-001 §21).
+  const taxonomyIds = (value: OnboardingResponseValue): readonly string[] =>
+    value.type === "RESOURCE_REFERENCE" && value.resourceType === "TAXONOMY_NODE"
+      ? value.resourceIds
+      : [];
+  const suggestedIds = [
+    ...new Set([
+      ...view.pendingSuggestions.flatMap((suggestion) =>
+        taxonomyIds(suggestion.suggestedValue),
+      ),
+      // Answered picks too, so "Review what Q knows" reads as words.
+      ...view.responses.flatMap((response) => taxonomyIds(response.value)),
+    ]),
+  ];
+  const suggestedTaxonomy =
+    suggestedIds.length === 0 ? [] : await port.describeNodes(suggestedIds);
+  const extras = await enrichGroup(view, group, port);
+  return { ...extras, suggestedTaxonomy };
+}
+
+async function enrichGroup(
   view: OnboardingSessionView,
   group: JourneyGroup,
   port: RuntimePort,
@@ -352,7 +382,13 @@ export async function enrich(
       return { selectedTaxonomy };
     case "red_flags":
       await describe(S.sectorExclusions);
+      // Named so the screen can say a sector is being moved, not duplicated.
+      await describe(S.sectors);
+      await describe(S.sectorsAvoid);
       return { selectedTaxonomy };
+    case "review":
+      // Suggested taxonomy labels are fetched for every group above.
+      return {};
     case "attributes": {
       const [businessModels, customerTypes] = await Promise.all([
         port.listNodes(BUSINESS_MODEL_VOCABULARIES[0]),
@@ -398,9 +434,96 @@ export function toPresentation(
     sections: [...SECTIONS],
     steps,
     currentStepId: current.id,
+    questions: view.pendingQuestions ?? [],
     step: complete ? undefined : buildStep(current, state, extras),
     source,
+    labels: Object.fromEntries(
+      (extras.suggestedTaxonomy ?? []).map((node) => [node.nodeId, node.label]),
+    ),
   };
+}
+
+/** The group a runtime step belongs to, for "change this" navigation. */
+const GROUP_BY_STEP_KEY: ReadonlyMap<string, Group> = new Map(
+  [...GROUPS, HANDOFF_GROUP].flatMap((group) =>
+    group.stepKeys.map((key) => [key, group] as const),
+  ),
+);
+
+/** The screen that owns a runtime step, for direct editing (CQ-PRE-REC-001 §30). */
+export function groupOf(stepKey: string): Group | undefined {
+  return GROUP_BY_STEP_KEY.get(stepKey);
+}
+
+/**
+ * A pending suggestion as the words the investor was offered. Option keys
+ * become labels from the published definition; taxonomy ids become labels
+ * the port described. A value nothing can render is dropped rather than
+ * shown as JSON.
+ */
+function readingItems(
+  view: OnboardingSessionView,
+  described: readonly TaxonomyCandidateView[],
+): QReadingItem[] {
+  const labelByNode = new Map(
+    described.map((node) => [node.nodeId, node.label]),
+  );
+  return view.pendingSuggestions.flatMap((suggestion) => {
+    const group = GROUP_BY_STEP_KEY.get(suggestion.stepKey);
+    if (group === undefined) {
+      return [];
+    }
+    const value = suggestion.suggestedValue;
+    let rendered: string | null = null;
+    switch (value.type) {
+      case "SINGLE_SELECT":
+        rendered =
+          optionsOf(suggestion.stepKey).find(
+            (o) => o.value === value.optionKey,
+          )?.label ?? null;
+        break;
+      case "MULTI_SELECT": {
+        const options = optionsOf(suggestion.stepKey);
+        const labels = value.optionKeys.flatMap((key) => {
+          const label = options.find((o) => o.value === key)?.label;
+          return label === undefined ? [] : [label];
+        });
+        rendered = labels.length === 0 ? null : labels.join(", ");
+        break;
+      }
+      case "RANGE":
+        rendered = value.value;
+        break;
+      case "RESOURCE_REFERENCE": {
+        const labels = value.resourceIds.flatMap((id) => {
+          const label = labelByNode.get(id);
+          return label === undefined ? [] : [label];
+        });
+        rendered = labels.length === 0 ? null : labels.join(", ");
+        break;
+      }
+      case "TEXT":
+        rendered = value.text;
+        break;
+      case "CONFIRMATION":
+        rendered = null;
+    }
+    if (rendered === null) {
+      return [];
+    }
+    const stepLabel = config(suggestion.stepKey).configuration.prompt;
+    return [
+      {
+        id: suggestion.id,
+        stepId: group.id,
+        label: stepLabel,
+        value: rendered,
+        ...(suggestion.rationale === null
+          ? {}
+          : { note: suggestion.rationale }),
+      },
+    ];
+  });
 }
 
 function base<TKind extends StepKind>(
@@ -538,6 +661,9 @@ function buildStep(
         strengthOptions: STRENGTH_OPTIONS(),
         allowAvoid: false,
         maxItems: 20,
+        searchLabel: "Search countries or regions",
+        searchPlaceholder: "Search countries or regions…",
+        emptyHint: "Nothing chosen yet. Leaving this empty means anywhere.",
         selected: selected(S.geography),
         avoidSelected: [],
         response:
@@ -560,6 +686,10 @@ function buildStep(
         strengthOptions: STRENGTH_OPTIONS(),
         allowAvoid: true,
         maxItems: 20,
+        searchLabel: "Search sectors or product areas",
+        searchPlaceholder: "Search sectors or product areas…",
+        emptyHint:
+          "Nothing chosen yet. Add the sectors and product areas you invest in; several is normal.",
         selected: selected(S.sectors),
         avoidSelected: selected(S.sectorsAvoid),
         response:
@@ -589,7 +719,7 @@ function buildStep(
       return {
         ...base(group, "attributes", state),
         prompt: "Business attributes",
-        help: "Each dimension is recorded separately; nothing is collapsed into one category.",
+        help: "Answer what matters to you. Each one is kept separately.",
         businessModelOptions:
           extras.nodeLists?.[BUSINESS_MODEL_VOCABULARIES[0]] ?? [],
         customerTypeOptions:
@@ -661,6 +791,7 @@ function buildStep(
         help: "Two different things: what you'd rather not see, and what must never be shown.",
         options: optionsOf(S.avoid),
         sectorExclusionSelected: selected(S.sectorExclusions),
+        preferredSectors: [...selected(S.sectors), ...selected(S.sectorsAvoid)],
         response:
           avoid === undefined &&
           hard === undefined &&
@@ -680,6 +811,11 @@ function buildStep(
         ...base(group, "mandate_review", state),
         primaryActionLabel: "Looks right",
         review: parsed.success ? parsed.data : undefined,
+        reading: readingItems(state.view, extras.suggestedTaxonomy ?? []),
+        questions: (state.view.pendingQuestions ?? []).map((question) => ({
+          ...question,
+          editStepId: GROUP_BY_STEP_KEY.get(question.stepKey)?.id,
+        })),
         response: undefined,
       };
     }
@@ -703,6 +839,19 @@ const submit = (
   stepKey: string,
   value: OnboardingResponseValue,
 ): Submission => ({ stepKey, action: "submit", value });
+
+/** Names the flags in both lists, so the person can move them (§41). */
+export function redFlagConflictMessage(codes: readonly string[]): string {
+  const options = optionsOf(S.avoid);
+  const names = codes.map(
+    (code) => options.find((option) => option.value === code)?.label ?? code,
+  );
+  const joined =
+    names.length <= 1
+      ? (names[0] ?? "")
+      : `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
+  return `${joined} ${names.length === 1 ? "is" : "are"} listed both as something to avoid and as something never to show. Keep ${names.length === 1 ? "it" : "each"} in one list.`;
+}
 const skip = (stepKey: string): Submission => ({ stepKey, action: "skip" });
 const leave = (stepKey: string): Submission => ({ stepKey, action: "leave" });
 const selectOrSkip = (stepKey: string, optionKey: string | undefined) =>
@@ -736,9 +885,49 @@ const strengthFor = (
   strength: string | undefined,
 ) => (!hasItems ? leave(stepKey) : selectOrSkip(stepKey, strength));
 
+/**
+ * The submissions that keep one category in one place (CQ-PRE-REC-001 §41):
+ * a sector newly named as a preference leaves the exclusions, and one newly
+ * excluded leaves the preferences. Only steps that already hold the category
+ * are touched, and they are written before the screen's own answers.
+ */
+function movedBetweenBuckets(
+  view: OnboardingSessionView | undefined,
+  moving: readonly string[],
+  from: readonly { stepKey: string; strengthStepKey?: string }[],
+): readonly Submission[] {
+  if (view === undefined || moving.length === 0) {
+    return [];
+  }
+  const state = runtimeState(view);
+  const out: Submission[] = [];
+  for (const source of from) {
+    const held = refs(state, source.stepKey);
+    if (held === undefined) {
+      continue;
+    }
+    const kept = held.filter((id) => !moving.includes(id));
+    if (kept.length === held.length) {
+      continue;
+    }
+    out.push(nodesOrSkip(source.stepKey, kept));
+    if (source.strengthStepKey !== undefined) {
+      out.push(
+        strengthFor(
+          source.strengthStepKey,
+          kept.length > 0,
+          single(state, source.strengthStepKey),
+        ),
+      );
+    }
+  }
+  return out;
+}
+
 export function planSubmissions(
   group: JourneyGroup,
   response: StepResponse,
+  view?: OnboardingSessionView,
 ): readonly Submission[] {
   if (response.kind !== group.kind) {
     throw new SubmissionPlanError(
@@ -801,6 +990,11 @@ export function planSubmissions(
             ),
           ]
         : [
+            ...movedBetweenBuckets(
+              view,
+              [...response.nodeIds, ...(response.avoidNodeIds ?? [])],
+              [{ stepKey: S.sectorExclusions }],
+            ),
             nodesOrSkip(S.sectors, response.nodeIds),
             strengthFor(
               S.sectorStrength,
@@ -841,11 +1035,13 @@ export function planSubmissions(
         response.hard.includes(code),
       );
       if (overlap.length > 0) {
-        throw new SubmissionPlanError(
-          "A red flag is either something to avoid or something never to show, not both.",
-        );
+        throw new SubmissionPlanError(redFlagConflictMessage(overlap));
       }
       return [
+        ...movedBetweenBuckets(view, response.sectorExclusionIds, [
+          { stepKey: S.sectors, strengthStepKey: S.sectorStrength },
+          { stepKey: S.sectorsAvoid },
+        ]),
         multiOrSkip(S.avoid, response.avoid),
         multiOrSkip(S.hardExclusions, response.hard),
         nodesOrSkip(S.sectorExclusions, response.sectorExclusionIds),

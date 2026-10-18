@@ -25,6 +25,9 @@ export const DETECTED_CONTENT_KINDS = [
   "text",
   "png",
   "jpeg",
+  // R34 voice notes: the two containers browsers record into.
+  "webm_audio",
+  "mp4_audio",
 ] as const;
 export type DetectedContentKind = (typeof DETECTED_CONTENT_KINDS)[number];
 
@@ -66,6 +69,10 @@ export const ADMISSIBLE_DOCUMENT_TYPES: readonly AdmissibleDocumentType[] = [
   { mimeType: "text/plain", extensions: [".txt"], kinds: ["text"] },
   { mimeType: "image/png", extensions: [".png"], kinds: ["png"] },
   { mimeType: "image/jpeg", extensions: [".jpg", ".jpeg"], kinds: ["jpeg"] },
+  // R34 voice notes. Audio is stored and scanned like any file, never
+  // parsed: there is no text in it for the extractor to read.
+  { mimeType: "audio/webm", extensions: [".webm"], kinds: ["webm_audio"] },
+  { mimeType: "audio/mp4", extensions: [".m4a"], kinds: ["mp4_audio"] },
 ];
 
 export const ADMISSIBLE_MIME_TYPES: readonly string[] =

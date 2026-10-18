@@ -1,0 +1,49 @@
+{
+  "name": "@capital-q/integrations",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Capital Q integrations bounded context (BIZ-007): a person's connected Google mailbox (OAuth with PKCE, AES-256-GCM encrypted refresh token, disconnect/revoke), the EmailProvider port with its Gmail adapter, approved sends on the canonical relationship and reply tracking by Gmail history (Pub/Sub push verified by Google OIDC, plus polling). Provider calls only through injected HTTP; no provider SDK.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "default": "./dist/events.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/email": "workspace:*",
+    "@capital-q/network": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "nodemailer": "7.0.13",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@capital-q/config": "workspace:*",
+    "@capital-q/eventing": "workspace:*",
+    "@types/node": "^24.13.3",
+    "@types/nodemailer": "8.0.2",
+    "typescript": "5.9.3"
+  }
+}

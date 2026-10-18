@@ -1,6 +1,13 @@
 import { createPostgresQRuntimeRepositories } from "../infrastructure/postgres-q-runtime-repositories.js";
 import { createAppendQRunMessage } from "./append-message.js";
+import { createRecordSpokenExchange } from "./spoken-exchange.js";
 import { createCancelQRun } from "./cancel-run.js";
+import {
+  createArchiveQConversation,
+  createHideQConversationMessage,
+  createGetQConversation,
+  createListQConversations,
+} from "./conversations.js";
 import { createCreateQRun } from "./create-run.js";
 import type { QRuntimeDependencies } from "./dependencies.js";
 import { createGetQRun } from "./get-run.js";
@@ -19,6 +26,16 @@ export type QRuntimeService = {
   readonly getRun: ReturnType<typeof createGetQRun>;
   readonly appendMessage: ReturnType<typeof createAppendQRunMessage>;
   readonly cancelRun: ReturnType<typeof createCancelQRun>;
+  /** The owner's conversations (ADR 0012). */
+  readonly listConversations: ReturnType<typeof createListQConversations>;
+  readonly getConversation: ReturnType<typeof createGetQConversation>;
+  readonly archiveConversation: ReturnType<typeof createArchiveQConversation>;
+  /** The owner keeps one of their lines out of what Q reads back. */
+  readonly hideConversationMessage: ReturnType<
+    typeof createHideQConversationMessage
+  >;
+  /** VOICE-BRAIN: what the voice said without Q, into the conversation. */
+  readonly recordSpokenExchange: ReturnType<typeof createRecordSpokenExchange>;
 };
 
 export type QRuntimeServiceOptions = Omit<
@@ -40,5 +57,10 @@ export function createQRuntimeService(
     getRun: createGetQRun(dependencies),
     appendMessage: createAppendQRunMessage(dependencies),
     cancelRun: createCancelQRun(dependencies),
+    listConversations: createListQConversations(dependencies),
+    getConversation: createGetQConversation(dependencies),
+    archiveConversation: createArchiveQConversation(dependencies),
+    hideConversationMessage: createHideQConversationMessage(dependencies),
+    recordSpokenExchange: createRecordSpokenExchange(dependencies),
   };
 }

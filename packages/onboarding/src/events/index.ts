@@ -130,7 +130,30 @@ export const OnboardingSuggestionResolvedEvent = defineEvent({
     "A suggestion was accepted, edited, rejected or expired. Carries no suggested or edited content.",
 });
 
+export const OnboardingUtteranceRecordedEvent = defineEvent({
+  name: "onboarding.utterance.recorded",
+  version: 1,
+  owner: ONBOARDING_EVENT_OWNER,
+  producer: ONBOARDING_EVENT_PRODUCER,
+  consumers: CONSUMERS,
+  sensitivity: "CONFIDENTIAL",
+  replaySafety: "REPLAY_SAFE",
+  tenancy: "PLATFORM",
+  dataSchema: z
+    .object({
+      sessionId: UuidSchema,
+      utteranceId: UuidSchema,
+      journeyType: OnboardingJourneyTypeSchema,
+      stepKey: OnboardingStepKeySchema.nullable(),
+      sessionVersion,
+    })
+    .strict(),
+  description:
+    "A person said something in the conversational interview that no deterministic rule could place on a step. Carries identifiers only; the reader re-reads the text.",
+});
+
 export const ONBOARDING_EVENTS: readonly EventDefinition[] = [
+  OnboardingUtteranceRecordedEvent,
   OnboardingSessionStartedEvent,
   OnboardingResponseCommittedEvent,
   OnboardingStepSkippedEvent,
@@ -220,4 +243,18 @@ export const suggestionResolvedEvent = (
     suggestionId: input.suggestionId,
     stepKey: input.stepKey,
     resolution: input.resolution,
+  });
+
+export const utteranceRecordedEvent = (
+  input: Envelope & {
+    readonly utteranceId: string;
+    readonly stepKey: string | null;
+  },
+) =>
+  envelope(OnboardingUtteranceRecordedEvent, input, {
+    sessionId: input.session.id,
+    utteranceId: input.utteranceId,
+    journeyType: input.session.journeyType,
+    stepKey: input.stepKey,
+    sessionVersion: input.session.version,
   });

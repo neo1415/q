@@ -1,7 +1,8 @@
-import type {
-  CorrelationId,
-  DisclosureScope,
-  RelationshipSourceType,
+import {
+  isMatchedRelationshipState,
+  type CorrelationId,
+  type DisclosureScope,
+  type RelationshipSourceType,
 } from "@capital-q/contracts";
 import type { TransactionContext } from "@capital-q/database";
 
@@ -11,6 +12,7 @@ import type {
   RelationshipId,
 } from "../contracts/index.js";
 import { RelationshipNotFoundError } from "../domain/errors.js";
+import { projectRelationshipState } from "../domain/state-projector.js";
 import type { NetworkServiceDependencies } from "./dependencies.js";
 
 /**
@@ -87,4 +89,32 @@ export function createRelationshipEventAppender(
       });
     },
   };
+}
+
+/**
+ * Whether the pair's own history already holds the match (relationship-
+ * state.v2's matched states), folded inside the caller's transaction under
+ * the pair lock, so a new interest or Connection Request is never recorded
+ * on a relationship that is already connected.
+ */
+export async function isAlreadyMatched(
+  tx: TransactionContext,
+  repositories: Pick<NetworkServiceDependencies["repositories"], "events">,
+  relationshipId: RelationshipId,
+): Promise<boolean> {
+  const history: RelationshipEvent[] = [];
+  let afterSequence = 0;
+  for (;;) {
+    const page = await repositories.events.listByRelationship(
+      tx.sql,
+      relationshipId,
+      { afterSequence, limit: 500 },
+    );
+    history.push(...page);
+    const last = page.at(-1);
+    if (page.length < 500 || last === undefined) break;
+    afterSequence = last.sequence;
+  }
+  const state = projectRelationshipState(history)?.state;
+  return state !== undefined && isMatchedRelationshipState(state);
 }

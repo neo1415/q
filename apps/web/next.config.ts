@@ -8,27 +8,107 @@ import type { NextConfig } from "next";
  */
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Microphone stays reservable for Capital Q's own voice capability later;
-  // camera and location are not product features.
+  // Microphone: Q's voice. Camera: the rehearsal room's self-view, which
+  // stays in the browser (REHEARSE; live 2026-10-01 the camera button was
+  // refused by this header). Display capture is not listed, so it keeps
+  // its default of self (the rehearsal's screen share). Location is not a
+  // product feature. The video rehearsal's room (ADR 0066) is the one
+  // other origin delegated camera, microphone and screen share, and only
+  // inside its iframe: the provider's private room host, nothing wider.
   {
     key: "Permissions-Policy",
-    value: "camera=(), geolocation=(), microphone=(self)",
+    value:
+      'camera=(self "https://tavus.daily.co"), display-capture=(self "https://tavus.daily.co"), geolocation=(), microphone=(self "https://tavus.daily.co")',
   },
 ];
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    // P9: the sidebar prefetches a whole page on hover. A hover-prefetched
+    // page is reused for 30 seconds, not the default five minutes, so a
+    // click long after a hover never shows an inbox that old.
+    staleTimes: { static: 30 },
+  },
+  // `/@handle` is the Q Card's public address (BIZ-004). An `@` segment is
+  // a parallel-route slot in the App Router, so the page lives at
+  // `/u/[handle]` and the public address is a rewrite onto it. The vCard
+  // rule comes first so `.vcf` is never read as part of a handle.
+  rewrites() {
+    return Promise.resolve([
+      { source: "/@:handle([a-z0-9-]+).vcf", destination: "/u/:handle/vcard" },
+      // The card to save or send (founder design 2026-09-28).
+      {
+        source: "/@:handle([a-z0-9-]+).png",
+        destination: "/u/:handle/card.png",
+      },
+      {
+        source: "/@:handle([a-z0-9-]+).pdf",
+        destination: "/u/:handle/card.pdf",
+      },
+      { source: "/@:handle([A-Za-z0-9-]+)", destination: "/u/:handle" },
+    ]);
+  },
+  // Q's page lives at /home, where every `/home?c=` link already points.
+  // /q is its short address; the query string (a conversation id) is
+  // carried across. Temporary, so the canonical route can still move.
+  redirects() {
+    return Promise.resolve([
+      { source: "/q", destination: "/home", permanent: false },
+    ]);
+  },
   headers() {
     return Promise.resolve([
       { source: "/(.*)", headers: securityHeaders },
+      // Nothing is framed by another site except the GateQ embed below.
+      {
+        source: "/((?!g/[^/]+/embed$).*)",
+        headers: [{ key: "X-Frame-Options", value: "DENY" }],
+      },
+      {
+        // GateQ embed (spec §1): the one page another site may frame.
+        source: "/g/:publicId/embed",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors *" },
+          { key: "Cache-Control", value: "no-store" },
+        ],
+      },
+      {
+        // P7: the one-line launcher any website loads. Short-lived cache so
+        // a fix reaches every embed within minutes; served as script, never
+        // sniffed.
+        source: "/gateq.js",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=300, stale-while-revalidate=3600",
+          },
+          {
+            key: "Content-Type",
+            value: "application/javascript; charset=utf-8",
+          },
+          { key: "Cross-Origin-Resource-Policy", value: "cross-origin" },
+        ],
+      },
       {
         // Authentication responses are never shared-cacheable: a callback that
         // sets session cookies, or a sign-in page rendered with a notice,
         // must not be served to anyone else by a CDN or proxy.
         source: "/auth/:path*",
         headers: [{ key: "Cache-Control", value: "no-store" }],
+      },
+      {
+        // P9: PWA icons change only with a deploy that renames nothing, so
+        // a day of freshness plus background revalidation keeps repeat
+        // visits on a bad network from re-asking for them.
+        source: "/icons/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
+        ],
       },
       {
         // The service worker must never be cached indefinitely, or an old

@@ -8,11 +8,14 @@ import {
   AuthenticationRequiredError,
   ORGANISATION_CONTEXT_HEADER,
   parseOrganisationSelector,
+  personalActorContext,
   requireHumanActorContext,
+  resolveHumanActorContext,
   type ActorContext,
   type ActorContextResolver,
   type AuthenticatedPrincipal,
 } from "@capital-q/security";
+import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 import { withObservabilityContext } from "@capital-q/observability";
 
 /**
@@ -122,6 +125,81 @@ export function requireActorContextHook(
           ...(context.tenantId === undefined
             ? {}
             : { tenantId: context.tenantId }),
+          ...(context.organisationId === undefined
+            ? {}
+            : { organisationId: context.organisationId }),
+        },
+        () => {
+          done();
+        },
+      );
+    })().catch((error: unknown) => {
+      done(error instanceof Error ? error : new Error("actor context failed"));
+    });
+  };
+}
+
+/**
+ * The same hook, for the few routes a person may use before they belong to
+ * an organisation: the arrival conversation and Q's open thread. An
+ * authenticated person with an active profile and no organisation context
+ * gets a personal context (`personalActorContext`): no organisation, no
+ * membership, no subject, attributed to the well-known personal tenant. A
+ * person with an organisation resolves exactly as everywhere else, and a
+ * request that names an organisation still gets that one or nothing.
+ */
+export function requireActorContextOrPersonalHook(
+  dependencies: ActorContextDependencies & {
+    readonly identity: ApplicationIdentityLookup;
+  },
+): onRequestHookHandler {
+  return function actorContextOrPersonalHook(
+    request: FastifyRequest,
+    _reply: FastifyReply,
+    done: (error?: Error) => void,
+  ): void {
+    void (async () => {
+      const principal = await dependencies.authenticator.authenticate(request);
+      if (principal === null) {
+        throw new AuthenticationRequiredError();
+      }
+      const rawSelector = request.headers[ORGANISATION_CONTEXT_HEADER];
+      const selector = parseOrganisationSelector(
+        typeof rawSelector === "string" ? rawSelector : undefined,
+      );
+      if (!selector.ok) {
+        throw new ActorContextRequiredError(
+          "The requested organisation context identifier is not valid.",
+        );
+      }
+      const resolution = await resolveHumanActorContext(dependencies.resolver, {
+        principal,
+        selection: selector.selection,
+      });
+      let context: ActorContext;
+      if (resolution.status === "RESOLVED") {
+        context = resolution.context;
+      } else if (
+        resolution.status === "CONTEXT_REQUIRED" &&
+        selector.selection?.organisationId === undefined
+      ) {
+        const identity = await dependencies.identity.lookup(principal);
+        if (identity === null) {
+          throw new ActorContextRequiredError();
+        }
+        context = personalActorContext(identity.userId);
+      } else {
+        // Everything else fails exactly as the strict hook does.
+        context = await requireHumanActorContext(dependencies.resolver, {
+          principal,
+          selection: selector.selection,
+        });
+      }
+      request.actorContext = context;
+      withObservabilityContext(
+        {
+          requestId: request.id,
+          tenantId: context.tenantId,
           ...(context.organisationId === undefined
             ? {}
             : { organisationId: context.organisationId }),

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   CompanyIdSchema,
+  projectCompanyForNetwork,
   type CompanyProfileFacts,
 } from "@capital-q/companies";
 import {
@@ -175,22 +176,14 @@ export function createGetCompanyTool(ports: QToolPorts): AnyQToolDefinition {
           : "NETWORK_VISIBLE";
       return allow(sensitivity, { profile, relation: "SHARED" });
     },
+    // The same projection the founder previews as "what investors will
+    // see" (CQ-PRE-REC-001 §33): one field list, shared with the companies
+    // context, so the preview and the answer cannot drift apart.
     execute: (_input, _context, grant) =>
       Promise.resolve({
-        companyId: grant.profile.id,
-        canonicalName: grant.profile.canonicalName,
-        legalName: grant.profile.legalName,
-        websiteUrl: grant.profile.websiteUrl,
-        foundedDate: grant.profile.foundedDate,
-        headquartersCountry: grant.profile.headquartersCountry,
-        headquartersCity: grant.profile.headquartersCity,
-        currentStageCode: grant.profile.currentStageCode,
-        shortDescription: grant.profile.shortDescription,
-        primaryDescription:
-          grant.profile.primaryDescription === null
-            ? null
-            : grant.profile.primaryDescription.slice(0, DESCRIPTION_MAX),
-        companyStatus: grant.profile.companyStatus,
+        ...projectCompanyForNetwork(grant.profile, {
+          descriptionMax: DESCRIPTION_MAX,
+        }),
         relationToYou: grant.relation,
         truthClass: "USER_CLAIM",
       }),

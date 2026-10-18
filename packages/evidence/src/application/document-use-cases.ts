@@ -10,6 +10,7 @@ import {
 import { CompanyIdSchema } from "@capital-q/companies";
 import {
   MessageSensitivitySchema,
+  UtcTimestampSchema,
   UuidSchema,
   type CorrelationId,
   type MessageSensitivity,
@@ -22,6 +23,7 @@ import {
   DocumentTitleSchema,
   DocumentTypeSchema,
   DocumentVersionIdSchema,
+  type DocumentDownloadAudience,
   type DocumentType,
   MimeTypeSchema,
   OriginalFilenameSchema,
@@ -45,6 +47,8 @@ import {
 } from "../domain/sensitivity.js";
 import {
   documentCreatedEvent,
+  documentDetailsChangedEvent,
+  documentDownloadAudienceChangedEvent,
   documentVersionCreatedEvent,
 } from "../events/index.js";
 import {
@@ -70,6 +74,10 @@ const RESOURCE_DOCUMENT = AuditResourceTypeSchema.parse("document");
 const ACTION = {
   created: AuditActionTypeSchema.parse("document.created"),
   versionRegistered: AuditActionTypeSchema.parse("document.version_registered"),
+  downloadAudienceChanged: AuditActionTypeSchema.parse(
+    "document.download_audience_changed",
+  ),
+  detailsChanged: AuditActionTypeSchema.parse("document.details_changed"),
 };
 
 /** Doc 15 §27 V1 formats. Broader acceptance is a security decision, not a default. */
@@ -82,6 +90,9 @@ export const DOCUMENT_MIME_ALLOWLIST = [
   "text/plain",
   "image/png",
   "image/jpeg",
+  // R34 voice notes (stored and scanned, never parsed).
+  "audio/webm",
+  "audio/mp4",
 ] as const;
 
 /** Upper bound on a registered version; the platform storage limit is 50 MiB. */
@@ -497,6 +508,14 @@ export function createGetDocument(dependencies: EvidenceServiceDependencies) {
 export type ListDocumentsQuery = {
   readonly actor: ActorContext;
   readonly companyId?: string | undefined;
+  /** One page of active documents, newest change first (keyset). */
+  readonly page?:
+    | {
+        readonly limit: number;
+        readonly after?:
+          { readonly updatedAt: string; readonly id: string } | undefined;
+      }
+    | undefined;
 };
 
 export function createListDocuments(dependencies: EvidenceServiceDependencies) {
@@ -521,6 +540,23 @@ export function createListDocuments(dependencies: EvidenceServiceDependencies) {
           query.companyId === undefined
             ? undefined
             : UuidSchema.parse(query.companyId),
+        ...(query.page === undefined
+          ? {}
+          : {
+              page: {
+                limit: Math.min(Math.max(query.page.limit, 1), 100),
+                ...(query.page.after === undefined
+                  ? {}
+                  : {
+                      after: {
+                        updatedAt: UtcTimestampSchema.parse(
+                          query.page.after.updatedAt,
+                        ),
+                        id: UuidSchema.parse(query.page.after.id),
+                      },
+                    }),
+              },
+            }),
       },
     );
   };
@@ -615,6 +651,10 @@ export function createListDocumentsWithVersions(
         dependencies.sql,
         query.actor.tenantId,
         activeOrganisation(query.actor),
+        // A page reads only its own documents' versions.
+        query.page === undefined
+          ? undefined
+          : documents.map((document) => document.id),
       );
     const byId = new Map(versions.map((version) => [version.id, version]));
     return documents.map((document) => ({
@@ -624,5 +664,253 @@ export function createListDocumentsWithVersions(
           ? null
           : (byId.get(document.currentVersionId) ?? null),
     }));
+  };
+}
+
+export type SetDocumentDownloadAudienceCommand = {
+  readonly actor: ActorContext;
+  readonly documentId: DocumentId;
+  readonly audience: DocumentDownloadAudience;
+  readonly expectedVersion: number;
+  readonly correlationId: CorrelationId;
+};
+
+/**
+ * Who may download a pitch deck (ADR 0041; founder decision 2026-10-02):
+ * its organisation only, or also investors the company is viewable to.
+ * The owner's own document, the profile-edit level capability
+ * (document.manage, as media.manage is for the pitch), the version the
+ * founder saw, and one audit entry and one event per change. Only a
+ * PITCH_DECK can be opened; the database enforces it too. Setting the
+ * value it already has changes nothing and records nothing.
+ */
+export function createSetDocumentDownloadAudience(
+  dependencies: EvidenceServiceDependencies,
+) {
+  const { transactions, repositories, audit, outbox } = dependencies;
+  return async (
+    command: SetDocumentDownloadAudienceCommand,
+  ): Promise<Document> => {
+    const { actor } = command;
+    const organisationId = activeOrganisation(actor);
+    const documentId = DocumentIdSchema.parse(command.documentId);
+    const visible = await repositories.documents.findById(
+      dependencies.sql,
+      actor.tenantId,
+      organisationId,
+      documentId,
+    );
+    if (visible === null) {
+      throw new DocumentNotFoundError();
+    }
+    await dependencies.authorization.requireCapability({
+      actor,
+      capability: DOCUMENT_MANAGE,
+      resource: documentScope(actor, organisationId, visible.id),
+    });
+    if (
+      command.audience === "INVESTORS" &&
+      visible.documentType !== "PITCH_DECK"
+    ) {
+      throw new EvidenceRuleError(
+        "only a pitch deck can be shared with investors",
+      );
+    }
+    return transactions.run(async (tx) => {
+      const document = await repositories.documents.lockById(
+        tx,
+        actor.tenantId,
+        organisationId,
+        documentId,
+      );
+      if (document === null) {
+        throw new DocumentNotFoundError();
+      }
+      if (document.version !== command.expectedVersion) {
+        throw new DocumentVersionConflictError();
+      }
+      if (document.downloadAudience === command.audience) {
+        return document;
+      }
+      const updated = await repositories.documents.setDownloadAudience(tx, {
+        tenantId: actor.tenantId,
+        documentId,
+        expectedVersion: document.version,
+        audience: command.audience,
+      });
+      if (!updated) {
+        throw new DocumentVersionConflictError();
+      }
+      await audit.record(tx, {
+        ...auditActorFromContext(actor),
+        auditEventId: createAuditEventId(),
+        actionType: ACTION.downloadAudienceChanged,
+        resourceType: RESOURCE_DOCUMENT,
+        resourceId: document.id,
+        occurredAt: occurredNow(),
+        outcome: "SUCCEEDED",
+        metadata: {
+          from: document.downloadAudience,
+          to: command.audience,
+          companyId: document.companyId,
+        },
+        correlationId: command.correlationId,
+      });
+      await outbox.enqueue(
+        tx,
+        documentDownloadAudienceChangedEvent(
+          { actor, organisationId, correlationId: command.correlationId },
+          {
+            documentId: document.id,
+            ownerOrganisationId: document.ownerOrganisationId,
+            companyId: document.companyId,
+            downloadAudience: command.audience,
+            documentVersion: document.version + 1,
+          },
+        ),
+      );
+      const after = await repositories.documents.findById(
+        tx.sql,
+        actor.tenantId,
+        organisationId,
+        documentId,
+      );
+      if (after === null) {
+        throw new DocumentNotFoundError();
+      }
+      return after;
+    });
+  };
+}
+
+export type DocumentChange =
+  | { readonly kind: "RENAME"; readonly title: string }
+  | { readonly kind: "ARCHIVE" }
+  | { readonly kind: "RESTORE" };
+
+export type ChangeDocumentCommand = {
+  readonly actor: ActorContext;
+  readonly documentId: DocumentId;
+  readonly change: DocumentChange;
+  /** The version the screen saw; absent acts on the current one (Q). */
+  readonly expectedVersion?: number | undefined;
+  readonly correlationId: CorrelationId;
+};
+
+/**
+ * Rename, delete (archive) or restore one of the organisation's own
+ * documents (P3 documents page). Deleting is the existing soft archive, so
+ * it can be undone; a deleted pitch deck stops being downloadable by
+ * investors at once. The file and its versions are never touched. The same
+ * capability as the download choice (document.manage), one audit entry and
+ * one event per change; asking for what is already so changes nothing.
+ */
+export function createChangeDocument(
+  dependencies: EvidenceServiceDependencies,
+) {
+  const { transactions, repositories, audit, outbox } = dependencies;
+  return async (command: ChangeDocumentCommand): Promise<Document> => {
+    const { actor, change } = command;
+    const organisationId = activeOrganisation(actor);
+    const documentId = DocumentIdSchema.parse(command.documentId);
+    const title =
+      change.kind === "RENAME" ? change.title.trim().slice(0, 200) : null;
+    if (change.kind === "RENAME" && (title === null || title.length === 0)) {
+      throw new EvidenceRuleError("a document needs a name");
+    }
+    const visible = await repositories.documents.findById(
+      dependencies.sql,
+      actor.tenantId,
+      organisationId,
+      documentId,
+    );
+    if (visible === null) {
+      throw new DocumentNotFoundError();
+    }
+    await dependencies.authorization.requireCapability({
+      actor,
+      capability: DOCUMENT_MANAGE,
+      resource: documentScope(actor, organisationId, visible.id),
+    });
+    return transactions.run(async (tx) => {
+      const document = await repositories.documents.lockById(
+        tx,
+        actor.tenantId,
+        organisationId,
+        documentId,
+      );
+      if (document === null) {
+        throw new DocumentNotFoundError();
+      }
+      if (
+        command.expectedVersion !== undefined &&
+        document.version !== command.expectedVersion
+      ) {
+        throw new DocumentVersionConflictError();
+      }
+      const status =
+        change.kind === "ARCHIVE"
+          ? ("ARCHIVED" as const)
+          : change.kind === "RESTORE"
+            ? ("ACTIVE" as const)
+            : undefined;
+      const unchanged =
+        (title !== null && title === document.title) ||
+        (status !== undefined && status === document.status);
+      if (unchanged) return document;
+      const updated = await repositories.documents.updateDetails(tx, {
+        tenantId: actor.tenantId,
+        documentId,
+        expectedVersion: document.version,
+        changes: {
+          ...(title === null ? {} : { title }),
+          ...(status === undefined ? {} : { status }),
+        },
+      });
+      if (!updated) {
+        throw new DocumentVersionConflictError();
+      }
+      await audit.record(tx, {
+        ...auditActorFromContext(actor),
+        auditEventId: createAuditEventId(),
+        actionType: ACTION.detailsChanged,
+        resourceType: RESOURCE_DOCUMENT,
+        resourceId: document.id,
+        occurredAt: occurredNow(),
+        outcome: "SUCCEEDED",
+        // The kind of change and the states, never the old or new title.
+        metadata: {
+          change: change.kind,
+          fromStatus: document.status,
+          toStatus: status ?? document.status,
+          companyId: document.companyId,
+        },
+        correlationId: command.correlationId,
+      });
+      await outbox.enqueue(
+        tx,
+        documentDetailsChangedEvent(
+          { actor, organisationId, correlationId: command.correlationId },
+          {
+            documentId: document.id,
+            ownerOrganisationId: document.ownerOrganisationId,
+            companyId: document.companyId,
+            change: change.kind,
+            status: status ?? document.status,
+            documentVersion: document.version + 1,
+          },
+        ),
+      );
+      const after = await repositories.documents.findById(
+        tx.sql,
+        actor.tenantId,
+        organisationId,
+        documentId,
+      );
+      if (after === null) {
+        throw new DocumentNotFoundError();
+      }
+      return after;
+    });
   };
 }

@@ -31,7 +31,11 @@ import {
   createMediaOwnerResolverRegistry,
   createMediaService,
   createPostgresCompanyPitchQueryPort,
+  createPostgresDiscoverablePitchQueryPort,
+  createPostgresNetworkPitchQueryPort,
+  MediaAssetConflictError,
   MediaAssetNotFoundError,
+  MediaIdempotencyConflictError,
   MediaOwnerNotFoundError,
   MediaReplacementConflictError,
   MediaRuleError,
@@ -249,10 +253,14 @@ describe("@capital-q/media against local PostgreSQL", () => {
     expect(completed).toBe(true);
   }
 
-  const outboxTypes = async (tx: TransactionContext) => {
-    const rows = await tx.sql<
-      { event_type: string }[]
-    >`select event_type from events.outbox order by id`;
+  // Scoped to this world's tenants: the local database is shared, and media
+  // events other work committed there are not this test's to count.
+  const outboxTypes = async (world: World) => {
+    const rows = await world.tx.sql<{ event_type: string }[]>`
+      select event_type from events.outbox
+       where event_type like 'media.%'
+         and tenant_id in (${world.tenantA}, ${world.tenantB})
+       order by id`;
     return rows.map((row) => row.event_type);
   };
 
@@ -279,26 +287,181 @@ describe("@capital-q/media against local PostgreSQL", () => {
       expect(asset.ownerId).toBe(world.companyA);
       expect(replaced).toBeNull();
 
-      expect(await outboxTypes(world.tx)).toEqual(["media.asset.created"]);
+      expect(await outboxTypes(world)).toEqual(["media.asset.created"]);
     });
   });
 
-  it("keeps one current pitch and refuses a silent second one", async () => {
+  it("adds a second live video beside the first; the profile leads with the newest (ADR 0022)", async () => {
     await withWorld(async (world) => {
-      await world.service.createCompanyPitch({
+      const first = await world.service.createCompanyPitch({
         actor: world.adminA,
         companyId: world.companyA,
         input: {},
         correlationId: CORRELATION(),
       });
-      await expect(
-        world.service.createCompanyPitch({
+      const second = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+      // Neither replaced the other: both are live, nothing superseded.
+      expect(second.replaced).toBeNull();
+      expect(second.asset.replacesMediaAssetId).toBeNull();
+      const live = (
+        await world.service.listCompanyMedia({
           actor: world.adminA,
           companyId: world.companyA,
-          input: {},
+        })
+      ).filter((a) => a.supersededAt === null && a.deletedAt === null);
+      expect(live.map((a) => a.id).sort()).toEqual(
+        [first.asset.id, second.asset.id].sort(),
+      );
+      const current = await world.service.getCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+      });
+      expect(current?.id).toBe(second.asset.id);
+      expect(await outboxTypes(world)).toEqual([
+        "media.asset.created",
+        "media.asset.created",
+      ]);
+    });
+  });
+
+  it("names a video and opens it to the network only for someone who may manage it, audited (ADR 0021)", async () => {
+    await withWorld(async (world) => {
+      const { asset } = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+      expect(asset.audience).toBe("INVESTORS");
+      expect(asset.title).toBeNull();
+      await expect(
+        world.service.setPitchDetails({
+          actor: world.memberA,
+          companyId: world.companyA,
+          mediaAssetId: asset.id,
+          details: { title: "Demo", audience: "NETWORK" },
+          expectedVersion: asset.version,
           correlationId: CORRELATION(),
         }),
-      ).rejects.toBeInstanceOf(MediaReplacementConflictError);
+      ).rejects.toThrow();
+      await expect(
+        world.service.setPitchDetails({
+          actor: world.adminB,
+          companyId: world.companyA,
+          mediaAssetId: asset.id,
+          details: { title: "Demo", audience: "NETWORK" },
+          expectedVersion: asset.version,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toThrow();
+      const updated = await world.service.setPitchDetails({
+        actor: world.adminA,
+        companyId: world.companyA,
+        mediaAssetId: asset.id,
+        details: { title: "  Product demo  ", audience: "NETWORK" },
+        expectedVersion: asset.version,
+        correlationId: CORRELATION(),
+      });
+      expect(updated.title).toBe("Product demo");
+      expect(updated.audience).toBe("NETWORK");
+      // A stale screen does not decide.
+      await expect(
+        world.service.setPitchDetails({
+          actor: world.adminA,
+          companyId: world.companyA,
+          mediaAssetId: asset.id,
+          details: { title: "", audience: "INVESTORS" },
+          expectedVersion: asset.version,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(MediaAssetConflictError);
+      const cleared = await world.service.setPitchDetails({
+        actor: world.adminA,
+        companyId: world.companyA,
+        mediaAssetId: asset.id,
+        details: { title: "", audience: "INVESTORS" },
+        expectedVersion: updated.version,
+        correlationId: CORRELATION(),
+      });
+      expect(cleared.title).toBeNull();
+      // A replacement keeps the owner's name and audience.
+      const renamed = await world.service.setPitchDetails({
+        actor: world.adminA,
+        companyId: world.companyA,
+        mediaAssetId: asset.id,
+        details: { title: "Pitch v2", audience: "NETWORK" },
+        expectedVersion: cleared.version,
+        correlationId: CORRELATION(),
+      });
+      const successor = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: { replacesMediaAssetId: renamed.id },
+        correlationId: CORRELATION(),
+      });
+      expect(successor.asset.title).toBe("Pitch v2");
+      expect(successor.asset.audience).toBe("NETWORK");
+      const audited = await world.tx.sql<{ n: number }[]>`
+        select count(*)::int as n from audit.material_actions
+         where resource_id = ${asset.id}
+           and action_type = 'media.asset.details_set'`;
+      expect(audited[0]?.n).toBe(3);
+    });
+  });
+
+  it("sets who can watch as ONE choice: audience and playback change together, audited, with the policy event (live 2026-10-02)", async () => {
+    await withWorld(async (world) => {
+      const { asset } = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+      expect(asset.playbackPolicy).toBe("PRIVATE");
+      const everyone = await world.service.setPitchDetails({
+        actor: world.adminA,
+        companyId: world.companyA,
+        mediaAssetId: asset.id,
+        details: {
+          title: null,
+          audience: "NETWORK",
+          playbackPolicy: "AUTHORISED",
+        },
+        expectedVersion: asset.version,
+        correlationId: CORRELATION(),
+      });
+      expect(everyone.audience).toBe("NETWORK");
+      expect(everyone.playbackPolicy).toBe("AUTHORISED");
+      // "Only my organisation": private, the audience kept for next time.
+      const mine = await world.service.setPitchDetails({
+        actor: world.adminA,
+        companyId: world.companyA,
+        mediaAssetId: asset.id,
+        details: {
+          title: null,
+          audience: "NETWORK",
+          playbackPolicy: "PRIVATE",
+        },
+        expectedVersion: everyone.version,
+        correlationId: CORRELATION(),
+      });
+      expect(mine.playbackPolicy).toBe("PRIVATE");
+      expect(mine.audience).toBe("NETWORK");
+      const policies = await world.tx.sql<{ n: number }[]>`
+        select count(*)::int as n from audit.material_actions
+         where resource_id = ${asset.id}
+           and action_type = 'media.asset.playback_policy_set'`;
+      expect(policies[0]?.n).toBe(2);
+      const events = await world.tx.sql<{ n: number }[]>`
+        select count(*)::int as n from events.outbox
+         where event_type = 'media.asset.playback_policy_changed'
+           and payload::text like ${"%" + asset.id + "%"}`;
+      expect(events[0]?.n).toBe(2);
     });
   });
 
@@ -333,10 +496,68 @@ describe("@capital-q/media against local PostgreSQL", () => {
         companyId: world.companyA,
       });
       expect(current?.id).toBe(second.asset.id);
-      expect(await outboxTypes(world.tx)).toEqual([
+      expect(await outboxTypes(world)).toEqual([
         "media.asset.created",
         "media.asset.replaced",
       ]);
+    });
+  });
+
+  it("answers a retried replacement with the same asset and refuses a reused key (VID)", async () => {
+    await withWorld(async (world) => {
+      const first = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: {},
+        idempotencyKey: `vid-create-${randomUUID()}`,
+        correlationId: CORRELATION(),
+      });
+      const key = `vid-replace-${randomUUID()}`;
+      const replace = () =>
+        world.service.createCompanyPitch({
+          actor: world.adminA,
+          companyId: world.companyA,
+          input: { replacesMediaAssetId: first.asset.id },
+          idempotencyKey: key,
+          correlationId: CORRELATION(),
+        });
+      const second = await replace();
+      const retried = await replace();
+      expect(second.replayed).toBe(false);
+      expect(retried.replayed).toBe(true);
+      expect(retried.asset.id).toBe(second.asset.id);
+      expect(retried.replaced?.id).toBe(first.asset.id);
+      expect(await outboxTypes(world)).toEqual([
+        "media.asset.created",
+        "media.asset.replaced",
+      ]);
+
+      // The same key for a different request is refused, not replayed.
+      await expect(
+        world.service.createCompanyPitch({
+          actor: world.adminA,
+          companyId: world.companyA,
+          input: {},
+          idempotencyKey: key,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(MediaIdempotencyConflictError);
+
+      // Another tenant's administrator cannot reach it with the same key.
+      await expect(
+        world.service.createCompanyPitch({
+          actor: world.adminB,
+          companyId: world.companyA,
+          input: { replacesMediaAssetId: first.asset.id },
+          idempotencyKey: key,
+          correlationId: CORRELATION(),
+        }),
+      ).rejects.toBeInstanceOf(MediaOwnerNotFoundError);
+
+      const rows = await world.tx.sql`
+        select count(*)::int as n from media.pitch_requests
+         where media_asset_id in (${first.asset.id}, ${second.asset.id})`;
+      expect(rows[0]?.["n"]).toBe(2);
     });
   });
 
@@ -451,7 +672,7 @@ describe("@capital-q/media against local PostgreSQL", () => {
         companyId: world.companyA,
       });
       expect(history).toHaveLength(1);
-      expect(await outboxTypes(world.tx)).toEqual([
+      expect(await outboxTypes(world)).toEqual([
         "media.asset.created",
         "media.asset.deleted",
       ]);
@@ -691,6 +912,131 @@ describe("@capital-q/media against local PostgreSQL", () => {
     });
   });
 
+  it("applies verified provider reports idempotently, as the platform, through the outbox (CQ-MEDIA-012)", async () => {
+    await withWorld(async (world) => {
+      const uid = `wh${randomUUID().replace(/-/g, "")}`;
+      const { asset } = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+      await world.service.attachProviderAsset({
+        tenantId: world.tenantA,
+        mediaAssetId: asset.id,
+        provider: "CLOUDFLARE_STREAM",
+        providerAssetId: uid,
+      });
+      await world.service.transitionMediaStatus({
+        tenantId: world.tenantA,
+        mediaAssetId: asset.id,
+        status: "UPLOAD_PENDING",
+      });
+      // A pitch in the other tenant that no report names: it must not move.
+      const other = await world.service.createCompanyPitch({
+        actor: world.adminB,
+        companyId: world.companyB,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+
+      const apply = (
+        report: Parameters<
+          MediaService["applyProviderStatusReport"]
+        >[0]["report"],
+      ) =>
+        world.service.applyProviderStatusReport({
+          provider: "CLOUDFLARE_STREAM",
+          report,
+          mediaAssetId: asset.id,
+          correlationId: CORRELATION(),
+        });
+      const ready = {
+        providerAssetId: uid,
+        status: "READY" as const,
+        durationSeconds: 87,
+        width: 1080,
+        height: 1920,
+        thumbnailReference: `${uid}/thumbnails/thumbnail.jpg`,
+      };
+
+      expect(await apply(ready)).toMatchObject({
+        kind: "APPLIED",
+        status: "READY",
+        appliedTransitions: ["UPLOADING", "PROCESSING", "READY"],
+      });
+      // Duplicate, out-of-order, and failure-after-READY deliveries.
+      expect(await apply(ready)).toMatchObject({
+        kind: "UNCHANGED",
+        stale: false,
+      });
+      expect(
+        await apply({ providerAssetId: uid, status: "PROCESSING" }),
+      ).toMatchObject({ kind: "UNCHANGED", stale: true });
+      expect(
+        await apply({
+          providerAssetId: uid,
+          status: "PROCESSING_FAILED",
+          providerErrorCode: "ERR_MALFORMED_VIDEO",
+        }),
+      ).toMatchObject({ kind: "UNCHANGED", status: "READY" });
+      expect(
+        await world.service.applyProviderStatusReport({
+          provider: "CLOUDFLARE_STREAM",
+          report: { ...ready, providerAssetId: `${uid}x` },
+          correlationId: CORRELATION(),
+        }),
+      ).toEqual({ kind: "UNKNOWN_ASSET" });
+
+      const [row] = await world.tx.sql<
+        {
+          status: string;
+          ready_at: Date | null;
+          aspect_ratio: string | null;
+          duration_seconds: number | null;
+        }[]
+      >`select status, ready_at, aspect_ratio, duration_seconds
+          from media.media_assets where id = ${asset.id}`;
+      expect(row).toMatchObject({
+        status: "READY",
+        aspect_ratio: "9:16",
+        duration_seconds: 87,
+      });
+      expect(row?.ready_at).not.toBeNull();
+      const [untouched] = await world.tx.sql<
+        { status: string }[]
+      >`select status from media.media_assets where id = ${other.asset.id}`;
+      expect(untouched?.status).toBe("CREATED");
+
+      // One event per step, once; attributed to the platform; no uid.
+      const events = await world.tx.sql<
+        { payload: { actor: { type: string }; data: { status: string } } }[]
+      >`select payload from events.outbox
+         where event_type = 'media.asset.status_changed'
+           and payload->'aggregate'->>'id' = ${asset.id}
+         order by id`;
+      expect(events.map((e) => e.payload.data.status)).toEqual([
+        "UPLOADING",
+        "PROCESSING",
+        "READY",
+      ]);
+      for (const event of events) {
+        expect(event.payload.actor.type).toBe("SYSTEM");
+      }
+      const audits = await world.tx.sql<
+        { actor_type: string }[]
+      >`select actor_type from audit.material_actions
+         where action_type = 'media.asset.provider_status_applied'
+           and resource_id = ${asset.id}`;
+      expect(audits).toHaveLength(1);
+      expect(audits[0]?.actor_type).toBe("capital_q_system");
+      const outboxRows = await world.tx.sql<
+        { payload: unknown }[]
+      >`select to_jsonb(o.*) as payload from events.outbox o`;
+      expect(JSON.stringify(outboxRows)).not.toContain(uid);
+    });
+  });
+
   it("answers the current-pitch query port without scanning history", async () => {
     await withWorld(async (world) => {
       const port = createPostgresCompanyPitchQueryPort({ sql: world.tx.sql });
@@ -734,7 +1080,304 @@ describe("@capital-q/media against local PostgreSQL", () => {
     });
   });
 
-  it("uses an index for the current-pitch lookup", async () => {
+  // CQ-MEDIA-012: the feed's batched read. One query for many companies
+  // across tenants, and only what is publishable comes back.
+  it("answers the feed's batched pitch read with publishable pitches only, across tenants", async () => {
+    await withWorld(async (world) => {
+      const port = createPostgresDiscoverablePitchQueryPort({
+        sql: world.tx.sql,
+      });
+      expect(
+        (await port.findDiscoverablePitches([world.companyA, world.companyB]))
+          .size,
+      ).toBe(0);
+
+      const LIFECYCLE = [
+        "UPLOAD_PENDING",
+        "UPLOADING",
+        "PROCESSING",
+        "READY",
+      ] as const;
+
+      // Company A: a READY, ALLOWED, AUTHORISED pitch — publishable.
+      const a = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+      await world.service.attachProviderAsset({
+        tenantId: world.tenantA,
+        mediaAssetId: a.asset.id,
+        provider: "CLOUDFLARE_STREAM",
+        providerAssetId: PRIVATE_MARKER,
+      });
+      for (const status of LIFECYCLE) {
+        await world.service.transitionMediaStatus({
+          tenantId: world.tenantA,
+          mediaAssetId: a.asset.id,
+          status,
+        });
+      }
+      await world.service.recordProviderMetadata({
+        tenantId: world.tenantA,
+        mediaAssetId: a.asset.id,
+        metadata: { durationSeconds: 87, aspectRatio: "9:16" },
+      });
+      await world.service.setMediaStates({
+        tenantId: world.tenantA,
+        mediaAssetId: a.asset.id,
+        moderationStatus: "ALLOWED",
+        playbackPolicy: "AUTHORISED",
+      });
+
+      // Company B, in the other tenant: READY but still PRIVATE and
+      // unreviewed — not publishable, so absent.
+      const b = await world.service.createCompanyPitch({
+        actor: world.adminB,
+        companyId: world.companyB,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+      await world.service.attachProviderAsset({
+        tenantId: world.tenantB,
+        mediaAssetId: b.asset.id,
+        provider: "CLOUDFLARE_STREAM",
+        providerAssetId: `${PRIVATE_MARKER}-b`,
+      });
+      for (const status of LIFECYCLE) {
+        await world.service.transitionMediaStatus({
+          tenantId: world.tenantB,
+          mediaAssetId: b.asset.id,
+          status,
+        });
+      }
+
+      const pitches = await port.findDiscoverablePitches([
+        world.companyA,
+        world.companyB,
+        randomUUID(),
+      ]);
+      expect([...pitches.keys()]).toEqual([world.companyA]);
+      expect(pitches.get(world.companyA)).toEqual({
+        mediaAssetId: a.asset.id,
+        companyId: world.companyA,
+        aspectRatio: "9:16",
+        durationSeconds: 87,
+        captionState: "NOT_REQUESTED",
+        title: null,
+        audience: "INVESTORS",
+        downloadable: false,
+        more: [],
+      });
+      expect(JSON.stringify([...pitches.values()])).not.toContain(
+        PRIVATE_MARKER,
+      );
+
+      // Once B is allowed and widened it appears too — cross-tenant, one
+      // query, nothing about either tenant in the ask.
+      await world.service.setMediaStates({
+        tenantId: world.tenantB,
+        mediaAssetId: b.asset.id,
+        moderationStatus: "ALLOWED",
+        playbackPolicy: "AUTHORISED",
+      });
+      expect(
+        [
+          ...(
+            await port.findDiscoverablePitches([world.companyA, world.companyB])
+          ).keys(),
+        ].sort(),
+      ).toEqual([world.companyA, world.companyB].sort());
+
+      // A second publishable video of A leads the item; the first follows.
+      const a2 = await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: {},
+        correlationId: CORRELATION(),
+      });
+      await world.service.attachProviderAsset({
+        tenantId: world.tenantA,
+        mediaAssetId: a2.asset.id,
+        provider: "CLOUDFLARE_STREAM",
+        providerAssetId: `${PRIVATE_MARKER}-a2`,
+      });
+      for (const status of LIFECYCLE) {
+        await world.service.transitionMediaStatus({
+          tenantId: world.tenantA,
+          mediaAssetId: a2.asset.id,
+          status,
+        });
+      }
+      await world.service.setMediaStates({
+        tenantId: world.tenantA,
+        mediaAssetId: a2.asset.id,
+        moderationStatus: "ALLOWED",
+        playbackPolicy: "AUTHORISED",
+      });
+      const both = (await port.findDiscoverablePitches([world.companyA])).get(
+        world.companyA,
+      );
+      expect(both?.mediaAssetId).toBe(a2.asset.id);
+      expect(both?.more.map((p) => p.mediaAssetId)).toEqual([a.asset.id]);
+      // Deleting the newer one leaves the older leading again.
+      await world.service.deleteCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        mediaAssetId: a2.asset.id,
+        correlationId: CORRELATION(),
+      });
+
+      // Replacing A's pitch supersedes it: the CREATED successor is not
+      // publishable, so A drops out rather than showing a stale pitch.
+      await world.service.createCompanyPitch({
+        actor: world.adminA,
+        companyId: world.companyA,
+        input: { replacesMediaAssetId: a.asset.id },
+        correlationId: CORRELATION(),
+      });
+      expect(
+        (await port.findDiscoverablePitches([world.companyA])).has(
+          world.companyA,
+        ),
+      ).toBe(false);
+
+      await expect(
+        port.findDiscoverablePitches(
+          Array.from({ length: 201 }, () => randomUUID()),
+        ),
+      ).rejects.toBeInstanceOf(RangeError);
+    });
+  });
+
+  it("lists only live, publishable videos opened to the network, newest first, without the viewer's own, page by page (ADR 0021)", async () => {
+    await withWorld(async (world) => {
+      const publish = async (
+        admin: ActorContext,
+        tenantId: string,
+        companyId: string,
+        audience: "INVESTORS" | "NETWORK",
+      ) => {
+        const { asset } = await world.service.createCompanyPitch({
+          actor: admin,
+          companyId,
+          input: {},
+          correlationId: CORRELATION(),
+        });
+        await world.service.attachProviderAsset({
+          tenantId,
+          mediaAssetId: asset.id,
+          provider: "CLOUDFLARE_STREAM",
+          providerAssetId: `${PRIVATE_MARKER}-${asset.id}`,
+        });
+        for (const status of [
+          "UPLOAD_PENDING",
+          "UPLOADING",
+          "PROCESSING",
+          "READY",
+        ] as const) {
+          await world.service.transitionMediaStatus({
+            tenantId,
+            mediaAssetId: asset.id,
+            status,
+          });
+        }
+        const allowed = await world.service.setMediaStates({
+          tenantId,
+          mediaAssetId: asset.id,
+          moderationStatus: "ALLOWED",
+          playbackPolicy: "AUTHORISED",
+        });
+        return audience === "INVESTORS"
+          ? allowed
+          : world.service.setPitchDetails({
+              actor: admin,
+              companyId,
+              mediaAssetId: asset.id,
+              details: { title: null, audience },
+              expectedVersion: allowed.version,
+              correlationId: CORRELATION(),
+            });
+      };
+      const aNetwork = await publish(
+        world.adminA,
+        world.tenantA,
+        world.companyA,
+        "NETWORK",
+      );
+      await publish(world.adminA, world.tenantA, world.companyA, "INVESTORS");
+      const b1 = await publish(
+        world.adminB,
+        world.tenantB,
+        world.companyB,
+        "NETWORK",
+      );
+      const b2 = await publish(
+        world.adminB,
+        world.tenantB,
+        world.companyB,
+        "NETWORK",
+      );
+      const port = createPostgresNetworkPitchQueryPort({ sql: world.tx.sql });
+      const ours: readonly string[] = [aNetwork.id, b1.id, b2.id];
+      const mine = (ids: readonly string[]) =>
+        ids.filter((id) => ours.includes(id));
+
+      const all = await port.findNetworkPitches({
+        excludeOwnerOrganisationId: null,
+        before: null,
+        limit: 50,
+      });
+      expect(mine(all.map((p) => p.mediaAssetId))).toEqual([
+        b2.id,
+        b1.id,
+        aNetwork.id,
+      ]);
+      expect(JSON.stringify(all)).not.toContain(PRIVATE_MARKER);
+
+      // A's own organisation does not see its videos as "the network".
+      const forA = await port.findNetworkPitches({
+        excludeOwnerOrganisationId: world.adminA.organisationId ?? null,
+        before: null,
+        limit: 50,
+      });
+      expect(forA.some((p) => p.companyId === world.companyA)).toBe(false);
+
+      // Keyset paging: strictly older than the cursor.
+      const first = all.find((p) => p.mediaAssetId === b2.id);
+      const older = await port.findNetworkPitches({
+        excludeOwnerOrganisationId: null,
+        before:
+          first === undefined
+            ? null
+            : { createdAt: first.createdAt, mediaAssetId: first.mediaAssetId },
+        limit: 50,
+      });
+      expect(mine(older.map((p) => p.mediaAssetId))).toEqual([
+        b1.id,
+        aNetwork.id,
+      ]);
+
+      // Back to investors only: gone from the network at once.
+      await world.service.setPitchDetails({
+        actor: world.adminB,
+        companyId: world.companyB,
+        mediaAssetId: b2.id,
+        details: { title: null, audience: "INVESTORS" },
+        expectedVersion: b2.version,
+        correlationId: CORRELATION(),
+      });
+      const after = await port.findNetworkPitches({
+        excludeOwnerOrganisationId: null,
+        before: null,
+        limit: 50,
+      });
+      expect(after.some((p) => p.mediaAssetId === b2.id)).toBe(false);
+    });
+  });
+
+  it("uses an index for the live-videos lookup", async () => {
     await withWorld(async (world) => {
       const first = await world.service.createCompanyPitch({
         actor: world.adminA,
@@ -764,8 +1407,8 @@ describe("@capital-q/media against local PostgreSQL", () => {
            and m.deleted_at is null
            and m.superseded_at is null`;
       const text = plan.map((row) => row["QUERY PLAN"]).join("\n");
-      // A company's pitch history is never scanned to find the current one.
-      expect(text).toContain("media_assets_current_pitch_idx");
+      // A company's pitch history is never scanned to find its live videos.
+      expect(text).toContain("media_assets_live_pitches_idx");
     });
   });
 });

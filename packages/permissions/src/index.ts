@@ -27,6 +27,7 @@
 export {
   accessLevelSatisfies,
   actorPrincipal,
+  organisationPrincipal,
   ANONYMOUS_PRINCIPAL,
   DISCLOSURE_ACCESS_LEVELS,
   DISCLOSURE_POLICY_STATUSES,
@@ -104,6 +105,8 @@ export type {
 export { createDisclosureResourceResolverRegistry } from "./application/resolver-registry.js";
 export {
   createCapitalObjectiveDisclosureResolver,
+  createDocumentDisclosureResolver,
+  type DocumentDisclosurePort,
   createCompanyDisclosureResolver,
   createDefaultDisclosureResolvers,
   createFounderProfileDisclosureResolver,
@@ -158,3 +161,61 @@ export {
 export { createPostgresDisclosurePolicyRepository } from "./infrastructure/postgres-disclosure-policy-repository.js";
 
 export const PACKAGE_NAME = "@capital-q/permissions" as const;
+export {
+  createVisibilityCentre,
+  type VisibilityCentre,
+  type VisibilityCentrePorts,
+} from "./application/visibility-centre.js";
+export {
+  createDiligenceService,
+  questionsByRequest,
+  type DiligenceDocument,
+  type DiligenceRequestQuestion,
+  type DiligenceDocumentPort,
+  type DiligenceOutcome,
+  type DiligenceRefusal,
+  type DiligenceService,
+  type DiligenceView,
+} from "./application/diligence.js";
+export {
+  activeGrants,
+  checklistFor,
+  createDataRoomService,
+  fileKind,
+  lockedOutline,
+  projectForInvestor,
+  stageRank,
+  type DataRoomChecklistEntry,
+  type DataRoomCompany,
+  type DataRoomDocument,
+  type DataRoomOutcome,
+  type DataRoomRefusal,
+  type DataRoomRequestRecord,
+  type DataRoomService,
+  type DataRoomStore,
+  type RelationshipConnection,
+} from "./application/data-room.js";
+export {
+  accessHistory,
+  createFounderRequestsService,
+  inboxCounts,
+  questionSets,
+  sortInbox,
+  toQuestion,
+  type FounderRequestsDependencies,
+  type FounderRequestsNotice,
+  type FounderRequestsOutcome,
+  type FounderRequestsRefusal,
+  type FounderRequestsService,
+} from "./application/founder-requests.js";
+export {
+  createCompanyDeckService,
+  type CompanyDeckReading,
+  type CompanyDeckRecord,
+  type CompanyDeckRefusal,
+  type CompanyDeckService,
+  type CompanyDeckStore,
+  type DeckSectionReview,
+  reviewedDeckSections,
+} from "./application/company-deck.js";
+export { createPostgresProfileMaterialPorts } from "./infrastructure/postgres-profile-material-ports.js";

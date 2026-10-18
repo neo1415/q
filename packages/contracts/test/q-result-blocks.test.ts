@@ -74,8 +74,45 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
       { label: "Runway", values: ["14 months", ""] },
     ],
   },
+  COMPARISON_CARDS: {
+    kind: "COMPARISON_CARDS",
+    title: null,
+    items: [
+      { name: "Ledgerfold", subtitle: "Seed", points: ["USD 40k MRR"] },
+      { name: "Kivu Freight", subtitle: null, points: ["Not known"] },
+    ],
+  },
+  ANSWER_CARDS: {
+    kind: "ANSWER_CARDS",
+    shape: "RANKED",
+    title: "Top three for your mandate",
+    cards: [
+      {
+        key: "ledgerfold",
+        name: "Ledgerfold",
+        line: "Treasury software",
+        hue: 1,
+        fit: { score: 8.6, measured: 3, of: 4 },
+        reasons: ["Seed round in range"],
+        measures: [{ label: "Stage", level: "STRONG", value: "Seed" }],
+        view: null,
+        said: null,
+        sourceCount: 2,
+        subject: null,
+      },
+    ],
+    followUps: [],
+  },
   EVIDENCE: { kind: "EVIDENCE", evidenceRefs: [evidenceRef] },
   FINDING: { kind: "FINDING", finding: publicFinding },
+  PUBLIC_SOURCE: {
+    kind: "PUBLIC_SOURCE",
+    url: "https://zino.example/about",
+    domain: "zino.example",
+    title: "About Zino Aviation",
+    publishedOn: null,
+    retrievedOn: "2026-09-27",
+  },
   UNCERTAINTY: {
     kind: "UNCERTAINTY",
     statement: "I could not establish current monthly burn.",
@@ -88,9 +125,89 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
     options: ["Apex Robotics", "Apex Health"],
   },
   ACTION_PROPOSAL: { kind: "ACTION_PROPOSAL", proposal },
+  ARTIFACT_REFERENCE: {
+    kind: "ARTIFACT_REFERENCE",
+    artifactId: UUID_2,
+    type: "INVESTMENT_BRIEF",
+    status: "READY",
+    title: "Investment brief",
+  },
   UI_INTENT: {
     kind: "UI_INTENT",
     intent: { kind: "OPEN_COMPANY", companyId: UUID },
+  },
+  // RECOVERY E4: visual blocks, from validated data only.
+  TABLE: {
+    kind: "TABLE",
+    title: "Side by side",
+    columns: [
+      { label: "Apex Capital", subject: null },
+      { label: "Northwind", subject: null },
+    ],
+    rows: [{ label: "Based in", cells: ["GB", ""] }],
+  },
+  CHART: {
+    kind: "CHART",
+    chart: "BAR",
+    title: "Monthly revenue",
+    unit: "a month",
+    currency: "USD",
+    series: [
+      {
+        label: "Revenue",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "DOCUMENT_SUPPORTED",
+        source: "From the bank statements they uploaded.",
+        points: [
+          { label: "Aug", value: 1200 },
+          { label: "Sep", value: 1800 },
+        ],
+      },
+    ],
+  },
+  MAP: {
+    kind: "MAP",
+    title: "Where they're based",
+    basis: "Head-office country, as each investor publishes it.",
+    places: [
+      { label: "Apex Capital", countryCode: "GB", subject: null, note: null },
+    ],
+  },
+  ATTENTION: {
+    kind: "ATTENTION",
+    report: {
+      items: [
+        {
+          key: "approval:1",
+          source: "APPROVAL",
+          title: "One change waits for your yes",
+          note: "Send the follow-up to Apex Capital",
+          since: "2026-10-08T09:00:00.000Z",
+          decidable: true,
+        },
+      ],
+      activity: null,
+      unread: ["UNANSWERED_MESSAGE"],
+      readAt: "2026-10-08T09:05:00.000Z",
+    },
+  },
+  TIMELINE: {
+    kind: "TIMELINE",
+    title: "Your relationship",
+    events: [
+      {
+        at: "2026-09-12",
+        label: "Interest expressed",
+        note: null,
+        subject: null,
+      },
+      {
+        at: "2026-10-03",
+        label: "Meeting booked",
+        note: null,
+        subject: null,
+      },
+    ],
   },
 };
 
@@ -159,6 +276,24 @@ describe("QResultBlock", () => {
     ).toBe(false);
   });
 
+  it("keeps comparison cards to two to four items with no score field", () => {
+    const card = { name: "A", subtitle: null, points: ["b"] };
+    expect(
+      QResultBlockSchema.safeParse({
+        kind: "COMPARISON_CARDS",
+        title: null,
+        items: [card],
+      }).success,
+    ).toBe(false);
+    expect(
+      QResultBlockSchema.safeParse({
+        kind: "COMPARISON_CARDS",
+        title: null,
+        items: [card, { ...card, score: 9 }],
+      }).success,
+    ).toBe(false);
+  });
+
   it("refuses an uncertainty block that claims high confidence", () => {
     expect(
       QResultBlockSchema.safeParse({
@@ -188,6 +323,38 @@ describe("QUiIntent", () => {
       section: "FINANCIALS",
     },
     SHOW_EVIDENCE: { kind: "SHOW_EVIDENCE", evidenceRefs: [evidenceRef] },
+    NAVIGATE: { kind: "NAVIGATE", destination: "DISCOVER" },
+    SET_THEME: { kind: "SET_THEME", theme: "light" },
+    RELOAD_PAGE: { kind: "RELOAD_PAGE" },
+    OPEN_WEBSITE: { kind: "OPEN_WEBSITE", url: "https://zino.example" },
+    SET_Q_MOTION: { kind: "SET_Q_MOTION", motion: "calm" },
+    SET_VOICE: { kind: "SET_VOICE", voice: "FEMALE" },
+    SET_LANGUAGE: { kind: "SET_LANGUAGE", language: "ar" },
+    SIGN_OUT: { kind: "SIGN_OUT" },
+    OPEN_RECORD_PAGE: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: UUID },
+    OPEN_SETUP: { kind: "OPEN_SETUP", journey: "investor" },
+    OPEN_SETTINGS: { kind: "OPEN_SETTINGS", section: "notifications" },
+    SHOW_IN_Q_ROOM: {
+      kind: "SHOW_IN_Q_ROOM",
+      object: "DATA_ROOM",
+      id: "00000000-0000-4000-8000-000000000001",
+      title: "Ledgerline",
+    },
+    SHOW_CALENDAR_CONNECT: {
+      kind: "SHOW_CALENDAR_CONNECT",
+      reason: "NOT_CONNECTED",
+      counterpartName: "Clearwater Pay",
+      timeZone: "Europe/London",
+      suggested: [
+        {
+          startsAt: "2026-10-13T09:00:00.000Z",
+          endsAt: "2026-10-13T09:30:00.000Z",
+          local: "Tue 13 Oct, 10:00",
+        },
+      ],
+    },
+    DOCUMENT_ACT: { kind: "DOCUMENT_ACT", act: "GO_TO_PAGE", page: 3 },
+    CARDS: { kind: "CARDS", action: "HIDE_CATEGORY", category: "CONNECTION" },
   };
 
   it("parses every supported intent", () => {
@@ -199,6 +366,37 @@ describe("QUiIntent", () => {
     }
   });
 
+  it("a cards intent names what it needs, and nothing else", () => {
+    const parse = (intent: unknown) =>
+      QUiIntentSchema.safeParse(intent).success;
+    expect(parse({ kind: "CARDS", action: "HIDE_ALL" })).toBe(true);
+    expect(
+      parse({ kind: "CARDS", action: "RESTORE_ONE", name: "TensorGate" }),
+    ).toBe(true);
+    expect(parse({ kind: "CARDS", action: "HIDE_CATEGORY" })).toBe(false);
+    expect(parse({ kind: "CARDS", action: "HIDE_ONE" })).toBe(false);
+    expect(parse({ kind: "CARDS", action: "DELETE_ALL" })).toBe(false);
+    expect(parse({ kind: "CARDS", action: "HIDE_ALL", id: "x" })).toBe(false);
+  });
+
+  it("a document act to a page names the page", () => {
+    expect(
+      QUiIntentSchema.safeParse({ kind: "DOCUMENT_ACT", act: "GO_TO_PAGE" })
+        .success,
+    ).toBe(false);
+    expect(
+      QUiIntentSchema.safeParse({ kind: "DOCUMENT_ACT", act: "NEXT_PAGE" })
+        .success,
+    ).toBe(true);
+    expect(
+      QUiIntentSchema.safeParse({
+        kind: "DOCUMENT_ACT",
+        act: "GO_TO_PAGE",
+        page: 0,
+      }).success,
+    ).toBe(false);
+  });
+
   it("has no intent that could run code or reach an arbitrary destination", () => {
     for (const intent of [
       { kind: "OPEN_URL", url: "https://evil.example" },
@@ -207,6 +405,9 @@ describe("QUiIntent", () => {
       { kind: "SET_RAW_HTML", html: "<b>x</b>" },
       { kind: "CALL_API", path: "/v1/companies" },
       { kind: "NAVIGATE", href: "/anything" },
+      { kind: "NAVIGATE", destination: "/admin" },
+      { kind: "NAVIGATE", destination: "FORM" },
+      { kind: "NAVIGATE", destination: "DISCOVER", href: "/x" },
     ]) {
       expect(QUiIntentSchema.safeParse(intent).success).toBe(false);
     }

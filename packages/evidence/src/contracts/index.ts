@@ -72,7 +72,12 @@ export type EvidenceItemId = z.infer<typeof EvidenceItemIdSchema>;
  * typed query port are listed; a subject id is resolved through the
  * registry before anything is written and never through dynamic SQL.
  */
-export const EVIDENCE_SUBJECT_TYPES = ["COMPANY"] as const;
+export const EVIDENCE_SUBJECT_TYPES = [
+  "COMPANY",
+  /** A person on Capital Q, as themselves. Their own organisation owns it. */
+  "PERSON",
+  "INVESTOR_ORGANISATION",
+] as const;
 export const EvidenceSubjectTypeSchema = z.enum(EVIDENCE_SUBJECT_TYPES);
 export type EvidenceSubjectType = z.infer<typeof EvidenceSubjectTypeSchema>;
 
@@ -116,12 +121,33 @@ export const DOCUMENT_TYPES = [
   "CUSTOMER",
   "OPERATIONAL",
   "OTHER",
+  // An investor firm's own materials (2026-10-16); mirrors the HTTP contract.
+  "FUND_DECK",
+  "INVESTMENT_THESIS",
+  "LP_LETTER",
 ] as const;
 export const DocumentTypeSchema = z.enum(DOCUMENT_TYPES);
 export type DocumentType = z.infer<typeof DocumentTypeSchema>;
 
 export const DOCUMENT_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export const DocumentStatusSchema = z.enum(DOCUMENT_STATUSES);
+
+/**
+ * Who may download a document's file (ADR 0041). ORGANISATION is the
+ * owner only and the default; INVESTORS also admits every investor for
+ * whom the company is viewable (the pitch rule). Only a PITCH_DECK may be
+ * INVESTORS. Never widens `visibilityScope` or anything derived from it.
+ */
+export const DOCUMENT_DOWNLOAD_AUDIENCES = [
+  "ORGANISATION",
+  "INVESTORS",
+] as const;
+export const DocumentDownloadAudienceSchema = z.enum(
+  DOCUMENT_DOWNLOAD_AUDIENCES,
+);
+export type DocumentDownloadAudience = z.infer<
+  typeof DocumentDownloadAudienceSchema
+>;
 export type DocumentStatus = z.infer<typeof DocumentStatusSchema>;
 
 /** Version-level pipeline state. CQ-EVD-002/003 drive the transitions. */
@@ -140,6 +166,13 @@ export const MALWARE_SCAN_STATUSES = [
   "CLEAN",
   "BLOCKED",
   "ERROR",
+  /**
+   * ADR 0042: processed with no scanner attached, under the founder's
+   * interim policy. Never clean; downloadable only to the audiences that
+   * already have access, with a visible "not virus-scanned" note, and only
+   * while that policy is set. A real scanner later scans every one.
+   */
+  "NOT_SCANNED",
 ] as const;
 export const MalwareScanStatusSchema = z.enum(MALWARE_SCAN_STATUSES);
 export type MalwareScanStatus = z.infer<typeof MalwareScanStatusSchema>;
@@ -399,6 +432,8 @@ export type Document = {
   readonly title: string;
   readonly visibilityScope: DisclosureScope;
   readonly sensitivityClass: MessageSensitivity;
+  /** ADR 0041: who may download the file. */
+  readonly downloadAudience: DocumentDownloadAudience;
   readonly currentVersionId: DocumentVersionId | null;
   readonly status: DocumentStatus;
   readonly createdByUserId: UserId;
@@ -407,6 +442,18 @@ export type Document = {
   /** Optimistic concurrency on the logical document, not on its bytes. */
   readonly version: number;
 };
+
+/** Trusted pipeline only: application custody is never an organisation resource. */
+export type ApplicationOwnedDocument = Omit<
+  Document,
+  "ownerOrganisationId" | "createdByUserId"
+> & {
+  readonly ownerOrganisationId: null;
+  readonly createdByUserId: null;
+  readonly applicationId: string;
+  readonly applicationSessionId: string;
+};
+export type ProcessingDocument = Document | ApplicationOwnedDocument;
 
 export type DocumentVersion = {
   readonly id: DocumentVersionId;
@@ -419,7 +466,7 @@ export type DocumentVersion = {
   readonly mimeType: string;
   readonly sizeBytes: number;
   readonly sha256: string;
-  readonly uploadedByUserId: UserId;
+  readonly uploadedByUserId: UserId | null;
   readonly uploadedAt: UtcTimestamp;
   readonly supersedesVersionId: DocumentVersionId | null;
   readonly processingStatus: ProcessingStatus;

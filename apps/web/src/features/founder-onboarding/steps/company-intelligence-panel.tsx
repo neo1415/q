@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { QStateIndicator } from "@capital-q/ui/q-state";
+import { QMark } from "@capital-q/ui/q-mark";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import {
@@ -11,6 +11,7 @@ import {
   workingLabel,
 } from "@/features/q/conversation";
 import { useQConversation } from "@/features/q/use-q-conversation";
+import { useT } from "@/features/i18n/language";
 
 /**
  * F8's first Company Intelligence, through the ordinary Q boundary
@@ -34,6 +35,7 @@ export function CompanyIntelligencePanel({
   readonly companyId: string;
   readonly companyName: string;
 }) {
+  const t = useT();
   const q = useQConversation({ companyId });
   const asked = useRef(false);
   const { ask } = q;
@@ -52,29 +54,48 @@ export function CompanyIntelligencePanel({
   const answer = turns.filter((turn) => turn.kind === "Q").at(-1);
 
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="q-first-reading">
-      <h2 id="q-first-reading" className="cq-label text-(--cq-text-secondary)">
-        What Q makes of it so far
+    <section className="flex flex-col gap-3" aria-labelledby="q-first-reading">
+      <h2 id="q-first-reading" className="cq-title-md text-(--cq-text-primary)">
+        {t("What Q makes of it so far")}
       </h2>
 
+      {/*
+        While Q reads, one status line says so; the reading itself arrives
+        as open prose at reading measure, not in a box (doc 18 §§19, 102).
+      */}
       {q.working ? (
-        <QStateIndicator state="WORKING" detail={workingLabel(q.state)} />
-      ) : null}
-
-      {answer !== undefined ? (
-        <p className="cq-body max-w-(--cq-layout-narrow) whitespace-pre-wrap text-(--cq-text-primary)">
-          {answer.text}
+        <p
+          role="status"
+          className="cq-status-line"
+          data-q-first-reading-working
+        >
+          <QMark size="sm" state="WORKING" />
+          {workingLabel(q.state)}
+          <span aria-hidden="true" className="inline-flex gap-0.5">
+            <span className="cq-working-dot">·</span>
+            <span className="cq-working-dot">·</span>
+            <span className="cq-working-dot">·</span>
+          </span>
         </p>
       ) : null}
 
+      {answer !== undefined ? (
+        <div
+          className="cq-prose cq-body cq-arrive whitespace-pre-wrap text-(--cq-text-primary)"
+          data-q-first-reading-answer
+        >
+          {answer.text}
+        </div>
+      ) : null}
+
       {q.state.failure !== null ? (
-        <InlineNotice tone="info" title="Q couldn't finish that reading">
+        <InlineNotice tone="info" title={t("Q couldn't finish that reading")}>
           {failureMessage(q.state.failure)}
         </InlineNotice>
       ) : null}
 
       {q.notice !== null ? (
-        <InlineNotice tone="info" title="Q couldn't finish that reading">
+        <InlineNotice tone="info" title={t("Q couldn't finish that reading")}>
           {q.notice}
         </InlineNotice>
       ) : null}
@@ -84,9 +105,10 @@ export function CompanyIntelligencePanel({
         on what the founder supplied, and none of it has been checked against
         anything (§20).
       */}
-      <p className="cq-caption text-(--cq-text-tertiary)">
-        Based on what you&apos;ve told Capital Q and the material you shared.
-        Nothing here has been independently verified.
+      <p className="cq-status-line">
+        {t(
+          "Based on what you've told Capital Q and the material you shared. Nothing here has been independently verified.",
+        )}
       </p>
       {/* The company this reading is about; never rendered, never guessed. */}
       <span hidden data-company-id={companyId} />

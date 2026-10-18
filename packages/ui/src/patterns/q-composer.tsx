@@ -6,15 +6,17 @@ import {
   useState,
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 
 import { IconButton } from "../components/button.js";
 import { InlineNotice } from "../components/states.js";
-import { ArrowUp, ICON_SIZE } from "../icons/index.js";
+import { ArrowUp, ICON_SIZE, Mic, Plus } from "../icons/index.js";
 import { cx } from "../primitives/class-names.js";
 import type { ContextScope } from "../tokens/index.js";
 import { ContextIndicator } from "./context-indicator.js";
 import { QMark } from "./q-mark.js";
+import { useUiText } from "../primitives/ui-text.js";
 
 /**
  * The Q composer: Q identity, a labelled growing input, a submit affordance
@@ -22,8 +24,14 @@ import { QMark } from "./q-mark.js";
  *
  * It is an entry point, not an intelligence. When no `onSubmit` is wired the
  * composer says plainly that nothing was sent; it never fabricates an
- * answer, a stage or a "thinking" animation. Voice is omitted until a real
- * capability exists -- a dead microphone is worse than none.
+ * answer, a stage or a "thinking" animation. The microphone appears only
+ * when a surface wires `onVoice` to a real capability: a dead microphone
+ * is worse than none, and the same is true of the attach control.
+ *
+ * Typing, talking and attaching are one surface rather than three
+ * (QX-001 §5). Each is a way of saying something to Q in the same
+ * conversation, so they sit on the same row and none of them starts a
+ * separate history.
  */
 
 export const Q_COMPOSER_PLACEHOLDER =
@@ -38,6 +46,42 @@ export type QComposerProps = {
   readonly disabled?: boolean | undefined;
   readonly autoFocus?: boolean | undefined;
   readonly className?: string | undefined;
+  /** What the input is waiting for on this surface; the general cue by default. */
+  readonly placeholder?: string | undefined;
+  /** Talk with Q instead: present only where voice is wired. */
+  readonly onVoice?: (() => void) | undefined;
+  readonly voiceLabel?: string | undefined;
+  /**
+   * Attach a file to this conversation: present only where a surface can
+   * actually accept one. On Home that means a founder with a company, and
+   * nobody else sees the control rather than seeing one that refuses.
+   */
+  readonly onAttach?: ((file: File) => void | Promise<void>) | undefined;
+  readonly attachLabel?: string | undefined;
+  /** What is attached or attaching, in the surface's own words. */
+  readonly attachments?: readonly string[] | undefined;
+  readonly attachAccept?: string | undefined;
+  /**
+   * A question to start from, which the person can edit or clear. Only
+   * ever a draft: nothing is sent until they send it.
+   */
+  readonly initialValue?: string | undefined;
+  /**
+   * False where the surface already shows the scope elsewhere (the Q
+   * page's top line): the field carries the words, not a chip.
+   */
+  readonly showContext?: boolean | undefined;
+  /**
+   * Controls that belong to the field while something is live (Mute and
+   * End during a voice session), set at its leading edge.
+   */
+  readonly actions?: ReactNode | undefined;
+  /**
+   * Icon controls set in the field's own icon row, before Send (Mute and
+   * End during a voice session: owner 2026-10-18, full-size buttons made
+   * the box look cluttered on a phone).
+   */
+  readonly iconActions?: ReactNode | undefined;
 };
 
 export function QComposer({
@@ -48,18 +92,32 @@ export function QComposer({
   disabled = false,
   autoFocus = false,
   className,
+  placeholder = Q_COMPOSER_PLACEHOLDER,
+  onVoice,
+  voiceLabel = "Talk with Q",
+  onAttach,
+  attachLabel = "Attach a document",
+  attachments = [],
+  attachAccept,
+  initialValue = "",
+  showContext = true,
+  actions,
+  iconActions,
 }: QComposerProps) {
+  const t = useUiText();
   const generatedId = useId();
   const inputId = id ?? `q-composer-${generatedId}`;
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initialValue);
   const [notice, setNotice] = useState<"unavailable" | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const trimmed = value.trim();
   const canSubmit = trimmed.length > 0 && !disabled && !submitting;
 
-  // JS fallback for browsers without `field-sizing: content`.
+  // JS fallback for browsers without `field-sizing: content`; the class's
+  // max-height caps it, and past the cap the field scrolls.
   function resize(element: HTMLTextAreaElement) {
     element.style.height = "auto";
     element.style.height = `${String(element.scrollHeight)}px`;
@@ -109,15 +167,20 @@ export function QComposer({
       onSubmit={handleSubmit}
       aria-labelledby={`${inputId}-title`}
       className={cx(
-        "flex flex-col gap-3 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) p-3 shadow-(--cq-shadow-xs) transition-colors duration-(--cq-motion-fast) focus-within:border-(--cq-border-strong)",
+        "flex flex-col gap-2 border border-(--cq-border) bg-(--cq-surface-raised) px-2 py-1 shadow-(--cq-shadow-xs) transition-colors duration-(--cq-motion-fast) focus-within:border-(--cq-border-strong)",
         className,
       )}
     >
-      <div className="flex items-start gap-3">
-        <QMark size="md" state={submitting ? "WORKING" : "IDLE"} />
+      {/* One line: the mark, the field, and its controls. The field grows
+          with what is typed up to a cap, then scrolls inside itself, so the
+          composer never pushes a conversation off a phone's screen. */}
+      <div className="flex items-end gap-1" data-q-composer-row>
+        <div className="flex h-11 flex-none items-center ps-1">
+          <QMark size="sm" state={submitting ? "WORKING" : "IDLE"} />
+        </div>
         <div className="flex min-w-0 flex-1 flex-col">
           <label id={`${inputId}-title`} htmlFor={inputId} className="sr-only">
-            Ask Q
+            {t("Ask Q")}
           </label>
           <textarea
             ref={textareaRef}
@@ -127,7 +190,7 @@ export function QComposer({
             value={value}
             autoFocus={autoFocus}
             disabled={disabled}
-            placeholder={Q_COMPOSER_PLACEHOLDER}
+            placeholder={t(placeholder)}
             enterKeyHint="send"
             autoComplete="off"
             onChange={(event) => {
@@ -138,31 +201,113 @@ export function QComposer({
               }
             }}
             onKeyDown={handleKeyDown}
-            className="cq-body min-h-8 w-full resize-none bg-transparent py-1 text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) [field-sizing:content] disabled:opacity-50"
+            className="cq-body max-h-40 min-h-11 w-full resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) [field-sizing:content] disabled:opacity-50"
+            data-q-composer-input
           />
         </div>
+        <div className="flex flex-none items-center gap-1">
+          {iconActions}
+          {onAttach !== undefined ? (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden="true"
+                {...(attachAccept === undefined
+                  ? {}
+                  : { accept: attachAccept })}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  // The input is cleared either way, so choosing the same
+                  // file twice still fires.
+                  event.target.value = "";
+                  if (file !== undefined) {
+                    void onAttach(file);
+                  }
+                }}
+              />
+              <IconButton
+                type="button"
+                variant="quiet"
+                aria-label={attachLabel}
+                title={attachLabel}
+                disabled={disabled}
+                onClick={() => fileRef.current?.click()}
+                data-q-attach
+              >
+                <Plus
+                  aria-hidden="true"
+                  size={ICON_SIZE.prominent}
+                  strokeWidth={2}
+                />
+              </IconButton>
+            </>
+          ) : null}
+          {onVoice !== undefined ? (
+            <IconButton
+              type="button"
+              variant="quiet"
+              aria-label={t(voiceLabel)}
+              title={t(voiceLabel)}
+              disabled={disabled}
+              onClick={onVoice}
+              data-q-talk
+            >
+              <Mic
+                aria-hidden="true"
+                size={ICON_SIZE.prominent}
+                strokeWidth={2}
+              />
+            </IconButton>
+          ) : null}
+          <IconButton
+            type="submit"
+            variant="primary"
+            aria-label={t("Send to Q")}
+            disabled={!canSubmit}
+          >
+            <ArrowUp
+              aria-hidden="true"
+              size={ICON_SIZE.prominent}
+              strokeWidth={2}
+            />
+          </IconButton>
+        </div>
       </div>
-      <div className="flex items-center justify-between gap-3">
-        <ContextIndicator scope={contextScope} detail={contextDetail} />
-        <IconButton
-          type="submit"
-          variant="primary"
-          aria-label="Send to Q"
-          disabled={!canSubmit}
+      {showContext || actions !== undefined ? (
+        <div className="flex min-w-0 items-center gap-1 pb-1">
+          {showContext ? (
+            <ContextIndicator scope={contextScope} detail={contextDetail} />
+          ) : null}
+          {actions}
+        </div>
+      ) : null}
+      {attachments.length > 0 ? (
+        <ul
+          aria-label={t("Attached")}
+          className="flex flex-wrap gap-2"
+          data-q-attachments
         >
-          <ArrowUp
-            aria-hidden="true"
-            size={ICON_SIZE.prominent}
-            strokeWidth={2}
-          />
-        </IconButton>
-      </div>
+          {attachments.map((attachment) => (
+            <li
+              key={attachment}
+              className="cq-caption bg-(--cq-surface-sunken) px-2 py-1 text-(--cq-text-secondary)"
+            >
+              {attachment}
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {notice === "unavailable" ? (
         <InlineNotice
           tone="info"
-          title="Q isn't connected on this surface yet."
+          title={t("Q isn't connected on this surface yet.")}
         >
-          Nothing was sent. Your question is still here when Q is available.
+          {t(
+            "Nothing was sent. Your question is still here when Q is available.",
+          )}
         </InlineNotice>
       ) : null}
     </form>

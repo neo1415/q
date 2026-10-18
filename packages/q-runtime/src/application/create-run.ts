@@ -1,9 +1,11 @@
 import {
   CreateQRunRequestSchema,
+  Q_SUBJECTS_MAX,
   QConversationIdSchema,
   type CorrelationId,
   type CreateQRunRequest,
   type QSubjectRef,
+  type QViewingMoment,
 } from "@capital-q/contracts";
 import type { ActorContext } from "@capital-q/security";
 
@@ -38,6 +40,13 @@ export type CreateQRunCommand = {
   readonly input: CreateQRunRequest;
   readonly idempotencyKey: string;
   readonly correlationId: CorrelationId;
+  /**
+   * Server-internal, never from a client body: the spoken utterance the
+   * person's words are a form of, named by the voice channel. A newer
+   * message of the same utterance supersedes this one when the
+   * conversation is read (`domain/utterances.ts`).
+   */
+  readonly utteranceRef?: string | undefined;
 };
 
 export type CreateQRunResult = {
@@ -65,6 +74,73 @@ export type CreateQRunResult = {
  * until an orchestrator exists to pick it up; the response says exactly
  * that. There is no model, no retrieval, no tool and no answer.
  */
+/**
+ * The actor's own context on every turn (CQ-QX-007, generalised in
+ * CQ-QX-008).
+ *
+ * A founder asking for "a PDF describing my company" from Home Q was asked
+ * "which company?": the turn named no subject, so no company was in the
+ * run and nothing said whose company "my company" is. An investor asking
+ * whether a company fits what they invest in was told their thesis was
+ * unknown for the same reason. Their own company and their own investor
+ * organisation are added here, on the server, from their membership — a
+ * subject a client declares is input, never proof — and only after each
+ * resolves in their tenant as belonging to their own organisation. What
+ * either may contribute is still decided per run by the Context Firewall.
+ *
+ * Their company is added when the turn is about no company (a question
+ * about somebody else's keeps that one alone); their investor
+ * organisation whenever the turn names no investor or relationship.
+ */
+async function withOwnContext(
+  dependencies: QRuntimeDependencies,
+  actor: ActorContext,
+  refs: readonly QSubjectRef[],
+): Promise<readonly QSubjectRef[]> {
+  if (actor.organisationId === undefined) return refs;
+  let out = refs;
+  const own = async (ref: QSubjectRef): Promise<QSubjectRef | null> => {
+    if (!dependencies.subjects.supports(ref.kind)) return null;
+    const resolved = await dependencies.subjects.resolve(actor, ref);
+    return resolved !== null &&
+      resolved.tenantId === actor.tenantId &&
+      resolved.organisationId === actor.organisationId
+      ? ref
+      : null;
+  };
+  if (
+    dependencies.ownCompany !== undefined &&
+    out.length < Q_SUBJECTS_MAX &&
+    !out.some((ref) => ref.kind === "COMPANY") &&
+    !out.some((ref) => ref.kind === "RELATIONSHIP")
+  ) {
+    const companyId = await dependencies.ownCompany(actor);
+    const ref =
+      companyId === null ? null : await own({ kind: "COMPANY", companyId });
+    if (ref !== null) out = [...out, ref];
+  }
+  if (
+    dependencies.ownInvestorOrganisation !== undefined &&
+    out.length < Q_SUBJECTS_MAX &&
+    !out.some(
+      (ref) =>
+        ref.kind === "INVESTOR_ORGANISATION" || ref.kind === "RELATIONSHIP",
+    )
+  ) {
+    const investorOrganisationId =
+      await dependencies.ownInvestorOrganisation(actor);
+    const ref =
+      investorOrganisationId === null
+        ? null
+        : await own({
+            kind: "INVESTOR_ORGANISATION",
+            investorOrganisationId,
+          });
+    if (ref !== null) out = [...out, ref];
+  }
+  return out;
+}
+
 export function createCreateQRun(dependencies: QRuntimeDependencies) {
   const { transactions, repositories, subjects } = dependencies;
 
@@ -99,8 +175,8 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
     // Every subject must resolve in the actor's tenant through its owning
     // context's port. Unsupported kinds and unresolvable subjects both stop
     // the request before anything is written.
-    const refs: readonly QSubjectRef[] = input.subjects ?? [];
-    for (const ref of refs) {
+    const requested: readonly QSubjectRef[] = input.subjects ?? [];
+    for (const ref of requested) {
       if (!subjects.supports(ref.kind)) {
         throw new QSubjectUnsupportedError(ref.kind);
       }
@@ -109,6 +185,89 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         throw new QSubjectNotFoundError();
       }
     }
+
+    /**
+     * A conversation stays about what it was about until somebody changes
+     * the subject.
+     *
+     * A voice turn is a run of its own and carries no subject, so every
+     * turn arrived with an empty list: Q named a company and, asked to say
+     * more about it, replied that no company had been named. Carrying the
+     * conversation's own subjects forward is what a person means by "it".
+     *
+     * Inherited subjects are re-resolved here like any other, and a
+     * subject that no longer resolves for this actor is simply dropped
+     * rather than refused: a share can be revoked between two sentences,
+     * and that ends the subject, it does not fail the question. Recording
+     * a subject therefore grants nothing — authority is decided per run,
+     * by the firewall, after this.
+     */
+    let refs: readonly QSubjectRef[] = requested;
+    if (requested.length === 0 && existing !== null) {
+      const carried: QSubjectRef[] = [];
+      for (const ref of existing.subjects) {
+        if (!subjects.supports(ref.kind)) {
+          continue;
+        }
+        const resolved = await subjects.resolve(actor, ref);
+        if (resolved !== null) {
+          carried.push(ref);
+        }
+      }
+      refs = carried;
+    }
+
+    // R18: what the person was viewing is a request, never authority. It
+    // is kept only when the media context says this actor may play this
+    // pitch now and the company resolves for them as a subject; otherwise
+    // it is dropped silently, exactly as if it had not been sent.
+    let viewing: QViewingMoment | null = null;
+    if (input.viewing !== undefined && dependencies.viewing !== undefined) {
+      const allowed = await dependencies.viewing
+        .authorise(actor, input.viewing)
+        .catch(() => false);
+      const company: QSubjectRef = {
+        kind: "COMPANY",
+        companyId: input.viewing.companyId,
+      };
+      const named = refs.some(
+        (ref) =>
+          ref.kind === "COMPANY" && ref.companyId === input.viewing?.companyId,
+      );
+      if (
+        allowed &&
+        (named ||
+          (refs.length < Q_SUBJECTS_MAX &&
+            (await subjects.resolve(actor, company)) !== null))
+      ) {
+        viewing = input.viewing;
+        if (!named) refs = [...refs, company];
+      }
+    }
+
+    // R21: what is on the person's screen is a request, never authority.
+    // Each entity it shows is resolved for this actor through its owning
+    // context, exactly like a named subject, and joins this run's subjects
+    // only then; one that does not resolve is dropped silently. It is
+    // this turn's context, so it is not written to the conversation's
+    // subjects and does not carry forward.
+    const beforeScreen = refs;
+    refs = await withScreenEntities(subjects, actor, refs, input.screen);
+    const onScreen = refs.slice(beforeScreen.length);
+    // The run keeps which screen it was asked from (the route), and only
+    // the entities that are this run's subjects now: one that did not
+    // resolve is not written down anywhere.
+    const screen =
+      input.screen === undefined ? null : screenKept(input.screen, refs);
+    const keptByConversation = (all: readonly QSubjectRef[]) =>
+      all.filter((ref) => !onScreen.includes(ref));
+    // "This company" is the one on screen, not one the conversation carried
+    // from an earlier page (run 5, 16 Oct: asked while a profile was still
+    // loading, Q answered about the feed's last card). Only over carried
+    // subjects: subjects the person named this turn keep their order.
+    if (requested.length === 0) refs = screenCompanyFirst(refs, input.screen);
+
+    refs = await withOwnContext(dependencies, actor, refs);
 
     const keyHash = hashRunIdempotencyKey(command.idempotencyKey);
     const requestHash = hashCreateQRunRequest(input);
@@ -134,8 +293,19 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
           tenantId: actor.tenantId,
           userId: actor.userId,
           organisationId,
-          subjects: refs,
+          subjects: keptByConversation(refs),
         }));
+
+      // A turn that names a subject changes what the conversation is
+      // about, so the next turn inherits the new one rather than the old.
+      if (existing !== null && requested.length > 0) {
+        await repositories.conversations.setSubjects(
+          tx,
+          actor.tenantId,
+          conversation.id,
+          keptByConversation(refs),
+        );
+      }
 
       const run = await repositories.runs.insert(tx, {
         tenantId: actor.tenantId,
@@ -146,8 +316,22 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         capability: input.capability,
         consequenceClass: consequenceClassFor(input.capability),
         subjects: refs,
+        viewing,
+        screen,
         correlationId: command.correlationId,
       });
+
+      // What the surface said before this first question, as Q's opening
+      // line, so the conversation holds what a follow-up refers to.
+      if (existing === null && input.opening !== undefined) {
+        await repositories.messages.insert(tx, {
+          tenantId: actor.tenantId,
+          conversationId: conversation.id,
+          runId: run.id,
+          role: "Q",
+          content: input.opening,
+        });
+      }
 
       const message = await repositories.messages.insert(tx, {
         tenantId: actor.tenantId,
@@ -155,6 +339,9 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         runId: run.id,
         role: "USER",
         content: input.message.text,
+        ...(command.utteranceRef === undefined
+          ? {}
+          : { utteranceRef: command.utteranceRef }),
       });
 
       await appendRunEvent(repositories, tx, run, {
@@ -209,12 +396,16 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
           actor.userId,
           run.conversationId,
         );
-        const [message] = await repositories.messages.listForRun(
-          tx.sql,
-          actor.tenantId,
-          run.id,
-          1,
-        );
+        // The person's question; a surface's opening line, when the run
+        // was given one, is recorded before it.
+        const message = (
+          await repositories.messages.listForRun(
+            tx.sql,
+            actor.tenantId,
+            run.id,
+            2,
+          )
+        ).find((recorded) => recorded.role === "USER");
         if (conversation === null || message === undefined) {
           throw new QRunCreationConflictError();
         }
@@ -222,4 +413,151 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
       }
     });
   };
+}
+
+/**
+ * The most a run's screen may hold (q_runtime.runs `runs_screen_check`,
+ * 20261220210000). Past it the manifest is left out, never the turn.
+ */
+export const RUN_SCREEN_MAX_CHARS = 32_768;
+
+/**
+ * The screen as the run records it: the route, and only entities in `refs`.
+ * A manifest that would take it past the column's bound is dropped (G-D8:
+ * busy pages failed the insert and every turn from them answered 500).
+ */
+function screenKept(
+  screen: NonNullable<CreateQRunRequest["screen"]>,
+  refs: readonly QSubjectRef[],
+): NonNullable<CreateQRunRequest["screen"]> {
+  const kept = screenWithManifest(screen, refs);
+  if (
+    kept.manifest !== undefined &&
+    JSON.stringify(kept).length > RUN_SCREEN_MAX_CHARS
+  ) {
+    const { manifest: _dropped, ...rest } = kept;
+    return rest;
+  }
+  return kept;
+}
+
+function screenWithManifest(
+  screen: NonNullable<CreateQRunRequest["screen"]>,
+  refs: readonly QSubjectRef[],
+): NonNullable<CreateQRunRequest["screen"]> {
+  const has = (ref: QSubjectRef) =>
+    refs.some((known) => JSON.stringify(known) === JSON.stringify(ref));
+  const {
+    companyId,
+    investorOrganisationId,
+    documentId,
+    documentPage,
+    artifactId,
+    artifactSlide,
+    artifactVersion,
+    timeZone,
+    manifest,
+  } = screen;
+  return {
+    route: screen.route,
+    // The person's own clock: not an entity, nothing to resolve.
+    ...(timeZone === undefined ? {} : { timeZone }),
+    // Q room R1: the page's manifest, ids and closed kinds only. Kept as
+    // asked; every ref is read back as the asker before the model sees
+    // anything, and one that does not resolve is dropped there.
+    ...(manifest === undefined ? {} : { manifest }),
+    // An artifact is a viewer reference, not a document/entity subject.
+    // Its content and any edit still require the owning service's actor read.
+    // Keep it even when no conversation card exists (workforce documents).
+    ...(artifactId === undefined
+      ? {}
+      : {
+          artifactId,
+          ...(artifactSlide === undefined ? {} : { artifactSlide }),
+          ...(artifactVersion === undefined ? {} : { artifactVersion }),
+        }),
+    ...(companyId !== undefined && has({ kind: "COMPANY", companyId })
+      ? { companyId }
+      : {}),
+    ...(investorOrganisationId !== undefined &&
+    has({ kind: "INVESTOR_ORGANISATION", investorOrganisationId })
+      ? { investorOrganisationId }
+      : {}),
+    ...(documentId !== undefined && has({ kind: "DOCUMENT", documentId })
+      ? {
+          documentId,
+          ...(documentPage === undefined ? {} : { documentPage }),
+        }
+      : {}),
+  };
+}
+
+/** The screen's entities as subjects, each resolved for the actor or dropped. */
+/**
+ * The company the screen names moved ahead of the subjects a conversation
+ * carried, when the screen names exactly one: its `companyId`, with no
+ * other company declared in focus. Several or none: unchanged, so the run
+ * asks rather than guesses. Only a company already among the run's
+ * subjects can move, and a screen company joins them only when it resolves
+ * for this actor (withScreenEntities), so one the person may not see is
+ * never chosen.
+ */
+export function screenCompanyFirst(
+  refs: readonly QSubjectRef[],
+  screen: CreateQRunRequest["screen"],
+): readonly QSubjectRef[] {
+  const named = screen?.companyId;
+  if (named === undefined) return refs;
+  const focus = screen?.manifest?.focus;
+  if (focus !== undefined && focus.kind === "COMPANY" && focus.id !== named) {
+    return refs;
+  }
+  const at = refs.findIndex(
+    (ref) => ref.kind === "COMPANY" && ref.companyId === named,
+  );
+  if (at <= 0) return refs;
+  const first = refs[at];
+  if (first === undefined) return refs;
+  return [first, ...refs.slice(0, at), ...refs.slice(at + 1)];
+}
+
+async function withScreenEntities(
+  subjects: QRuntimeDependencies["subjects"],
+  actor: ActorContext,
+  refs: readonly QSubjectRef[],
+  screen: CreateQRunRequest["screen"],
+): Promise<readonly QSubjectRef[]> {
+  if (screen === undefined) return refs;
+  const shown: QSubjectRef[] = [
+    ...(screen.companyId === undefined
+      ? []
+      : [{ kind: "COMPANY" as const, companyId: screen.companyId }]),
+    ...(screen.investorOrganisationId === undefined
+      ? []
+      : [
+          {
+            kind: "INVESTOR_ORGANISATION" as const,
+            investorOrganisationId: screen.investorOrganisationId,
+          },
+        ]),
+    ...(screen.documentId === undefined
+      ? []
+      : [{ kind: "DOCUMENT" as const, documentId: screen.documentId }]),
+  ];
+  let out = refs;
+  for (const ref of shown) {
+    const already = out.some(
+      (known) => JSON.stringify(known) === JSON.stringify(ref),
+    );
+    if (
+      already ||
+      out.length >= Q_SUBJECTS_MAX ||
+      !subjects.supports(ref.kind)
+    ) {
+      continue;
+    }
+    const resolved = await subjects.resolve(actor, ref).catch(() => null);
+    if (resolved !== null) out = [...out, ref];
+  }
+  return out;
 }

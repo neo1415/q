@@ -1,0 +1,79 @@
+[
+  {
+    "page": "founder-unknown-0",
+    "viewport": "desktop",
+    "file": "founder-unknown-0-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": ""
+  },
+  {
+    "page": "home-founder",
+    "viewport": "desktop",
+    "file": "home-founder-desktop.png",
+    "url": "http://127.0.0.1:3000/home",
+    "note": "Home with founder context"
+  },
+  {
+    "page": "home-founder-q-working",
+    "viewport": "desktop",
+    "file": "home-founder-q-working-desktop.png",
+    "url": "http://127.0.0.1:3000/home?c=412fbf2a-07e7-470a-9956-31b7d9ba485f",
+    "note": "Q working"
+  },
+  {
+    "page": "home-founder-q-answer",
+    "viewport": "desktop",
+    "file": "home-founder-q-answer-desktop.png",
+    "url": "http://127.0.0.1:3000/home?c=412fbf2a-07e7-470a-9956-31b7d9ba485f",
+    "note": "Q answer for a founder"
+  },
+  {
+    "page": "discover-founder",
+    "viewport": "desktop",
+    "file": "discover-founder-desktop.png",
+    "url": "http://127.0.0.1:3000/discover",
+    "note": ""
+  },
+  {
+    "page": "company-visibility-founder",
+    "viewport": "desktop",
+    "file": "company-visibility-founder-desktop.png",
+    "url": "http://127.0.0.1:3000/company/visibility",
+    "note": ""
+  },
+  {
+    "page": "capital-founder",
+    "viewport": "desktop",
+    "file": "capital-founder-desktop.png",
+    "url": "http://127.0.0.1:3000/capital",
+    "note": ""
+  },
+  {
+    "page": "profile-founder",
+    "viewport": "desktop",
+    "file": "profile-founder-desktop.png",
+    "url": "http://127.0.0.1:3000/profile",
+    "note": ""
+  },
+  {
+    "page": "investor-i0-role",
+    "viewport": "desktop",
+    "file": "investor-i0-role-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "How do you invest?"
+  },
+  {
+    "page": "investor-i0-role",
+    "viewport": "desktop",
+    "file": "investor-i0-role-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "How do you invest?"
+  },
+  {
+    "page": "investor-failure",
+    "viewport": "desktop",
+    "file": "investor-failure-desktop.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "TimeoutError: locator.check: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('radio', { name: 'Venture"
+  }
+]

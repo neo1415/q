@@ -112,6 +112,9 @@ function fakeEngine(overrides: Partial<QActionService> = {}) {
   const calls: Calls = { getApproval: [], approve: [], reject: [], resume: [] };
   const service: QActionService = {
     propose: () => Promise.reject(new Error("not used")),
+    revise: () => Promise.reject(new Error("not used")),
+    readProposal: () => Promise.reject(new Error("not used")),
+    currentRevision: (_tenantId, _runId, actionId) => Promise.resolve(actionId),
     getApproval: (query) => {
       calls.getApproval.push(query);
       return Promise.resolve(VIEW);
@@ -126,6 +129,22 @@ function fakeEngine(overrides: Partial<QActionService> = {}) {
     },
     executeApproved: () => Promise.reject(new Error("not used")),
     findApprovalForAction: () => Promise.resolve(null),
+    listPendingApprovals: (query) => {
+      calls.getApproval.push(query);
+      return Promise.resolve([
+        {
+          approvalId: APPROVAL_ID as never,
+          runId: VIEW.runId,
+          conversationId: null,
+          summary: "Make your company visible to investors",
+          requestedAt: VIEW.requestedAt,
+          expiresAt: VIEW.expiresAt,
+          // The repository's own row carries it (Q room W4b); the public
+          // list must not: it 500ed every caller with a card (7 Oct).
+          actionType: "app.chat.message.send" as never,
+        },
+      ]);
+    },
     ...overrides,
   };
   const orchestrator: QOrchestrator = {
@@ -173,6 +192,105 @@ function buildApp(options: {
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+describe("GET /v1/q/approvals (R35)", () => {
+  it("refuses an unauthenticated caller before touching the engine", async () => {
+    const { service, calls } = fakeEngine();
+    const app = buildApp({ principal: null, service });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/q/approvals",
+    });
+    expect(response.statusCode).toBe(401);
+    expect(calls.getApproval).toHaveLength(0);
+    await app.close();
+  });
+
+  it("lists what waits on the resolved actor, and only for that actor", async () => {
+    const { service, calls } = fakeEngine();
+    const app = buildApp({ principal: PRINCIPAL, context: CONTEXT, service });
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/q/approvals",
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    const body = response.json<{ items: { approvalId: string }[] }>();
+    expect(body.items.map((item) => item.approvalId)).toEqual([APPROVAL_ID]);
+    expect((calls.getApproval[0] as { actor: ActorContext }).actor).toEqual(
+      CONTEXT,
+    );
+    await app.close();
+  });
+
+  it("names the action's person or organisation with their picture, signed in one batch", async () => {
+    const LOGO = "https://storage.test/object/sign/cq-profile-images/l?t=1";
+    const PERSON_ID = "b1000000-0000-4000-8000-000000000009";
+    const asked: unknown[] = [];
+    const row = {
+      approvalId: APPROVAL_ID as never,
+      runId: VIEW.runId,
+      conversationId: null,
+      summary: "Send the deck",
+      requestedAt: VIEW.requestedAt,
+      expiresAt: VIEW.expiresAt,
+    };
+    const { service } = fakeEngine({
+      listPendingApprovals: () =>
+        Promise.resolve([
+          {
+            ...row,
+            targets: [
+              { kind: "DOCUMENT", documentId: COMPANY_ID },
+              { kind: "COMPANY", companyId: COMPANY_ID },
+            ],
+          },
+          { ...row, targets: [{ kind: "USER", userId: PERSON_ID }] },
+          { ...row, targets: [] },
+        ] as never),
+    });
+    const app = createApp(
+      parseQApiConfig({ NODE_ENV: "test" }),
+      {
+        authenticator: { authenticate: () => Promise.resolve(PRINCIPAL) },
+        resolver: {
+          resolveHumanContext: () =>
+            Promise.resolve({ status: "RESOLVED", context: CONTEXT }),
+        },
+      },
+      {
+        qActions: service,
+        namedPhotos: {
+          photos: (subjects) => {
+            asked.push(subjects);
+            // Only the company has a picture; the person has none.
+            return Promise.resolve(new Map([[`COMPANY:${COMPANY_ID}`, LOGO]]));
+          },
+        },
+      },
+    ).app;
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/q/approvals",
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ items: Record<string, unknown>[] }>();
+    expect(body.items.map((item) => item["named"])).toEqual([
+      { kind: "COMPANY", id: COMPANY_ID, photoUrl: LOGO },
+      { kind: "PERSON", id: PERSON_ID, photoUrl: null },
+      null,
+    ]);
+    // The targets themselves never leave in the list.
+    expect(body.items.every((item) => !("targets" in item))).toBe(true);
+    expect(asked).toEqual([
+      [
+        { subjectType: "COMPANY", subjectId: COMPANY_ID },
+        { subjectType: "PERSON", subjectId: PERSON_ID },
+      ],
+    ]);
+    await app.close();
+  });
+});
 
 describe("GET /v1/q/approvals/:approvalId", () => {
   it("refuses an unauthenticated caller before touching the engine", async () => {

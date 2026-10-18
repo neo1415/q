@@ -1,5 +1,6 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -14,6 +15,12 @@ import {
 } from "./auth-errors";
 import type { AuthFormState } from "./form-state";
 import { DEFAULT_RETURN_PATH, resolveSafeReturnPath } from "./redirect-safety";
+import {
+  INTENDED_JOURNEY_KEY,
+  isInvitationReturn,
+  RegistrationJourneySchema,
+  WORKSPACE_CHOSEN_COOKIE,
+} from "./registration";
 import { getSessionUser } from "./session";
 import { createServerSupabaseClient } from "./supabase-server";
 
@@ -126,25 +133,81 @@ export async function signUpWithPasswordAction(
 ): Promise<AuthFormState> {
   const next = resolveSafeReturnPath(field(formData, "next"));
   const input = z
-    .object({ email: EmailSchema, password: PasswordSchema })
+    .object({
+      email: EmailSchema,
+      password: PasswordSchema,
+      /**
+       * What to call them, and what they are here about.
+       *
+       * Both are asked here rather than left to the conversation because
+       * they are the two things Q needs before it can be any use: a name
+       * to greet somebody by, and an organisation to tell them apart from
+       * everybody else with that name when it goes looking for them.
+       *
+       * The organisation is optional. Somebody who has not decided what
+       * theirs is called, or who is here to invest under their own name,
+       * should not be stopped at the door.
+       */
+      fullName: z.string().trim().min(1).max(80),
+      organisationName: z.string().trim().max(120).optional(),
+      /**
+       * Raising or investing (owner directive 2026-10-16): the journey this
+       * account starts in. Required, except for somebody following an
+       * invitation, whose organisation and role the invitation already
+       * names. It initialises a journey; it never classifies the person.
+       */
+      journey: RegistrationJourneySchema.optional(),
+    })
     .safeParse({
       email: field(formData, "email"),
       password: field(formData, "password"),
+      fullName: field(formData, "fullName"),
+      organisationName: field(formData, "organisationName") || undefined,
+      journey: field(formData, "journey") || undefined,
     });
 
   if (!input.success) {
     return {
       status: "error",
-      message: "Enter a valid email and a password of at least 8 characters.",
+      message:
+        "Enter your name, a valid email, and a password of at least 8 characters.",
     };
   }
+  const invited = isInvitationReturn(next);
+  if (!invited && input.data.journey === undefined) {
+    return {
+      status: "error",
+      message: "Choose whether you are raising capital or investing it.",
+    };
+  }
+  // An invitation decides the organisation; a journey chosen alongside one
+  // is ignored rather than carried, so the invitee is never steered into
+  // setting up a second company next to the one they were invited into.
+  const journey = invited ? undefined : input.data.journey;
 
   const { auth } = loadWebServerConfig();
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase.auth.signUp({
     email: input.data.email,
     password: input.data.password,
-    options: { emailRedirectTo: callbackUrl(auth.appOrigin, next) },
+    options: {
+      emailRedirectTo: callbackUrl(auth.appOrigin, next),
+      /**
+       * Carried on the account because it is the only thing that survives
+       * a confirmation email and a return trip. It is NOT where the name
+       * ends up: the database trigger reads nothing a person supplied, on
+       * purpose, so this is copied into the profile by the first
+       * authenticated page load, through the ordinary API, under their own
+       * session.
+       */
+      data: {
+        display_name: input.data.fullName,
+        ...(input.data.organisationName === undefined || invited
+          ? {}
+          : { organisation_name: input.data.organisationName }),
+        ...(journey === undefined ? {} : { [INTENDED_JOURNEY_KEY]: journey }),
+      },
+    },
   });
 
   if (error !== null) {
@@ -266,6 +329,8 @@ export async function signOutAction(): Promise<void> {
   // their own sessions; ending those is a security-settings feature, not
   // a sign-out button.
   await supabase.auth.signOut({ scope: "local" });
+  // The next sign-in chooses its workspace afresh.
+  (await cookies()).delete(WORKSPACE_CHOSEN_COOKIE);
 
   redirect("/auth/sign-in?notice=signed-out");
 }

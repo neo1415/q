@@ -357,7 +357,8 @@ describe("@capital-q/taxonomy against local PostgreSQL", () => {
         business_model: 1,
         company_stage: 1,
         customer_type: 1,
-        geography: 1,
+        // 20261008100000 grew geography to v2 (more of Africa).
+        geography: 2,
         impact_theme: 1,
         industry: 1,
         product_category: 1,
@@ -530,7 +531,7 @@ describe("@capital-q/taxonomy against local PostgreSQL", () => {
         removedCount: 0,
       });
       const events = await tx.sql<{ payload: { data: unknown } }[]>`
-        select payload from events.outbox where payload ->> 'correlationId' = ${correlationId} and event_type = 'taxonomy.entity_assignments.changed'`;
+        select payload from events.outbox where payload ->> 'correlationId' = ${correlationId} and event_type = 'taxonomy.entity_assignments.changed' order by id`;
       expect(events).toHaveLength(5);
       expect(events[1]?.payload.data).toEqual({
         subjectType: "COMPANY",

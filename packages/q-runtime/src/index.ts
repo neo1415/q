@@ -34,6 +34,7 @@ export {
   type NewQRunEvent,
   type QConversation,
   type QConversationContextType,
+  type QConversationDigest,
   type QConversationMessage,
   type QRunEventRecord,
   type QRunRecord,
@@ -70,6 +71,16 @@ export {
   hashRunIdempotencyKey,
 } from "./domain/idempotency.js";
 export {
+  UTTERANCE_REF_PATTERN,
+  withoutSupersededUtterances,
+} from "./domain/utterances.js";
+export {
+  closestByName,
+  comparable,
+  distance,
+  nameSkeleton,
+} from "./domain/names.js";
+export {
   createCapitalObjectiveQSubjectResolver,
   createCompanyQSubjectResolver,
   createDocumentQSubjectResolver,
@@ -78,6 +89,7 @@ export {
   createQSubjectResolverRegistry,
   createRelationshipQSubjectResolver,
   createSelfUserQSubjectResolver,
+  type QRelationshipPartiesPort,
   type QSubjectResolver,
   type QSubjectResolverRegistry,
   type QSubjectViewPort,
@@ -88,15 +100,18 @@ export type { QRuntimeDependencies } from "./application/dependencies.js";
 export type {
   QConversationMessageRepository,
   QConversationRepository,
+  QConversationSearch,
   QMessageCreationRequestStore,
   QRunCreationRequestStore,
   QRunEventRepository,
+  QRunMoveChain,
   QRunRepository,
   QRunTransition,
   QRuntimeRepositories,
 } from "./application/ports.js";
 export {
   appendRunEvent,
+  appendRunEventAtomic,
   type QRunEventInput,
 } from "./application/run-events.js";
 export type {
@@ -104,6 +119,15 @@ export type {
   CreateQRunResult,
 } from "./application/create-run.js";
 export type { GetQRunQuery, GetQRunResult } from "./application/get-run.js";
+export {
+  conversationTitle,
+  toQConversationSummary,
+  type ArchiveQConversationCommand,
+  type GetQConversationQuery,
+  type GetQConversationResult,
+  type ListQConversationsQuery,
+  type ListQConversationsResult,
+} from "./application/conversations.js";
 export type {
   AppendQRunMessageCommand,
   AppendQRunMessageResult,
@@ -124,12 +148,19 @@ export {
   createUnconfiguredQRetrieval,
   createUnconfiguredQTools,
   neverPause,
+  QSpeculationCancelledError,
+  type QAnswerSpeculation,
   type ContextFirewallDecision,
   type ContextFirewallPort,
   type ContextFirewallRequest,
   type QAnswerOutcome,
   type QAnswerPort,
+  type QPrereadInput,
   type QAnswerRequest,
+  type QConversationFetch,
+  type QCapabilityManifest,
+  type QResearchDirective,
+  type QQuestionSequenceStep,
   type QCancelInput,
   type QOrchestrationInput,
   type QOrchestrationSubjectContext,
@@ -148,6 +179,7 @@ export {
   type QToolCallOutcome,
   type QToolCallStatusOutcome,
   type QToolExecutionContext,
+  type QToolFocus,
   type QToolPort,
   type QToolProposal,
   type QToolResult,
@@ -165,9 +197,13 @@ export {
   QRunNotResumableError,
 } from "./domain/orchestration-errors.js";
 
-export { createPostgresQRuntimeRepositories } from "./infrastructure/postgres-q-runtime-repositories.js";
+export {
+  boundConversationSearch,
+  createPostgresQRuntimeRepositories,
+} from "./infrastructure/postgres-q-runtime-repositories.js";
 export { createPostgresQRunEventNotifier } from "./infrastructure/postgres-run-event-notifier.js";
 export {
+  coalesceDeltas,
   createInProcessQLiveDeltaBus,
   createInProcessQRunEventNotifier,
   createQRunStreamService,
@@ -190,3 +226,23 @@ export {
 } from "./application/stream.js";
 
 export const PACKAGE_NAME = "@capital-q/q-runtime" as const;
+export {
+  createOrphanedRunSweep,
+  ORPHAN_ENGINE_WINDOW_MS,
+  type OrphanedRunSweepDependencies,
+  type OrphanedRunSweepResult,
+} from "./application/orphaned-runs.js";
+export {
+  createRunEngineHeartbeat,
+  ENGINE_HEARTBEAT_INTERVAL_MS,
+  type RunEngineHeartbeat,
+} from "./application/engine-heartbeat.js";
+// ETIQUETTE block (ADR 0050): a person's own business etiquette guide.
+export {
+  createPostgresEtiquetteGuideStore,
+  type EtiquetteGuideOwner,
+  type PersonalEtiquetteGuide,
+  type PersonalEtiquetteGuideStore,
+  type PersonalEtiquetteSourceKind,
+  type SavePersonalEtiquetteGuide,
+} from "./infrastructure/postgres-etiquette-guides.js";

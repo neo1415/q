@@ -1,0 +1,547 @@
+"use client";
+
+import type {
+  EvidenceStatus,
+  LifecycleStatus,
+  ProfileFinding,
+  ProfileFindingKey,
+  TruthClass,
+  VerificationStandingDto,
+} from "@capital-q/contracts";
+import Link from "next/link";
+
+import { buttonClassName } from "@capital-q/ui/button";
+import {
+  ICON_SIZE,
+  Search,
+  Shield,
+  ShieldCheck,
+  UserRound,
+} from "@capital-q/ui/icons";
+import { Skeleton } from "@capital-q/ui/states";
+
+import { useGlobalQ } from "@/components/app-shell/global-q";
+import { requestVerificationFromProfileAction } from "@/features/verification/verification-actions";
+import { SourcesDisclosure } from "@/components/sources-disclosure";
+import { formatDay } from "@/components/date-format";
+import { useT } from "@/features/i18n/language";
+
+/**
+ * What else is known about a profile, beside what the person declared
+ * (BIZ-002; ADR-001 D2): what Q found on the public web, and what Capital
+ * Q has verified. Three things kept apart and never merged -- a finding is
+ * never shown as the profile's value, and a verification is claim-specific,
+ * never a general "verified" tick.
+ *
+ * Every axis is said in words. Lifecycle is mentioned only when it is not
+ * CURRENT. No number stands for confidence. A finding becomes part of the
+ * profile only when the person confirms it, which here means asking Q, who
+ * prepares the change for their approval (the same write path as Edit).
+ */
+
+const FINDING_LABELS: Readonly<Record<ProfileFindingKey, string>> = {
+  "presence.self_description": "How it describes itself",
+  "presence.what_they_do": "What it does",
+  "presence.location": "Where it is",
+  "presence.milestone": "A milestone",
+};
+
+export const TRUTH_WORDS: Readonly<Record<TruthClass, string>> = {
+  VERIFIED: "Verified",
+  USER_CLAIM: "Your statement",
+  ESTIMATE: "An estimate",
+  Q_INFERENCE: "Q's reading",
+  UNKNOWN: "Unknown",
+};
+
+export const EVIDENCE_WORDS: Readonly<Record<EvidenceStatus, string>> = {
+  NO_EVIDENCE: "no evidence yet",
+  SELF_REPORTED: "self-reported",
+  DOCUMENT_SUPPORTED: "supported by a document",
+  MULTI_SOURCE_SUPPORTED: "supported by more than one source",
+  EXTERNALLY_VERIFIED: "verified externally",
+  PLATFORM_VERIFIED: "verified by Capital Q",
+};
+
+export const LIFECYCLE_WORDS: Readonly<Record<LifecycleStatus, string>> = {
+  CURRENT: "Current",
+  HISTORICAL: "Historical",
+  SUPERSEDED: "Superseded",
+  DISPUTED: "Disputed",
+  CONTRADICTORY: "Contradicted",
+  STALE: "May be out of date",
+};
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function dayOf(iso: string | null): string | null {
+  if (iso === null) return null;
+  const day = formatDay(iso);
+  return day === iso ? null : day;
+}
+
+/**
+ * The draft Q opens with for one finding: the person's to edit or send.
+ * It restates only what this page shows, and asks Q to check before
+ * anything is changed -- confirming is the person's decision.
+ */
+export function findingQuestion(
+  subjectLabel: string,
+  finding: ProfileFinding,
+): string {
+  const source = finding.sources[0];
+  const where = source === undefined ? "" : ` on ${hostOf(source.url)}`;
+  return `You found${where} about ${subjectLabel}: "${finding.statement}". Is that right, and should any of it go on my profile?`;
+}
+
+export type FindingsState =
+  | { readonly status: "READ"; readonly findings: readonly ProfileFinding[] }
+  | { readonly status: "LOADING" }
+  | { readonly status: "UNAVAILABLE" };
+
+export function ProfileFindings({
+  subjectLabel,
+  state,
+  hasWebsite = false,
+  bare = false,
+}: {
+  /** How the subject is named in a question to Q ("Kivu Freight", "me"). */
+  readonly subjectLabel: string;
+  readonly state: FindingsState;
+  /**
+   * Whether a website is on record. The empty state must not ask for
+   * what is already there (R30 #18).
+   */
+  readonly hasWebsite?: boolean | undefined;
+  /** Inside the Signals card, which already heads and explains it. */
+  readonly bare?: boolean | undefined;
+}) {
+  const t = useT();
+  const { askNow } = useGlobalQ();
+  const headingId = `found-${subjectLabel.replace(/\W+/g, "-").toLowerCase()}`;
+  return (
+    <section
+      aria-labelledby={bare ? undefined : headingId}
+      aria-label={bare ? `What Q found about ${subjectLabel}` : undefined}
+      data-profile-findings
+    >
+      {bare ? null : (
+        <>
+          <h3 id={headingId} className="cq-label text-(--cq-text-primary)">
+            {t("What Q found")}
+          </h3>
+          <p className="cq-caption pt-1 text-(--cq-text-secondary)">
+            {t(
+              "Q's reading of public pages. Not on your profile until you confirm it.",
+            )}
+          </p>
+        </>
+      )}
+      {state.status === "LOADING" ? (
+        <p
+          className="cq-body-sm pt-3 text-(--cq-text-secondary)"
+          aria-busy="true"
+        >
+          {t("Reading what Q found…")}
+        </p>
+      ) : state.status === "UNAVAILABLE" ? (
+        <p className="cq-body-sm pt-3 text-(--cq-text-secondary)">
+          {t("Couldn't be read just now.")}
+        </p>
+      ) : state.findings.length === 0 ? (
+        <p className="cq-body-sm pt-3 text-(--cq-text-secondary)">
+          {hasWebsite
+            ? "Nothing found yet. Your name and website are on record; ask Q to look and what it finds shows here."
+            : "Nothing found yet. Q looks once it knows your name and website."}
+        </p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
+          {state.findings.map((finding) => (
+            <li
+              key={finding.id}
+              data-finding={finding.key}
+              className="flex flex-col gap-1.5 py-3"
+            >
+              <p className="cq-caption text-(--cq-text-secondary)">
+                {t(FINDING_LABELS[finding.key])}
+              </p>
+              <p className="cq-body-sm text-(--cq-text-primary)">
+                {finding.statement}
+              </p>
+              <SourcesDisclosure count={finding.sources.length}>
+                <p className="cq-caption text-(--cq-text-tertiary)">
+                  {TRUTH_WORDS[finding.truthClass]} ·{" "}
+                  {t(EVIDENCE_WORDS[finding.evidenceStatus])}
+                  {finding.lifecycleStatus === "CURRENT"
+                    ? ""
+                    : ` · ${LIFECYCLE_WORDS[finding.lifecycleStatus]}`}
+                </p>
+                {finding.sources.length === 0 ? null : (
+                  <ul className="flex flex-col gap-0.5">
+                    {finding.sources.map((source) => (
+                      <li key={source.url} className="cq-caption">
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow"
+                          className="text-(--cq-text-secondary) underline decoration-(--cq-border-strong) underline-offset-4 hover:text-(--cq-text-primary)"
+                        >
+                          {source.title ?? hostOf(source.url)}
+                        </a>
+                        {dayOf(source.retrievedAt) === null ? null : (
+                          <span className="text-(--cq-text-tertiary)">
+                            {" "}
+                            · read {dayOf(source.retrievedAt)}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </SourcesDisclosure>
+              <div>
+                <button
+                  type="button"
+                  className={buttonClassName("quiet", "regular", "-ms-4")}
+                  onClick={() => askNow(findingQuestion(subjectLabel, finding))}
+                  aria-label={`Ask Q about: ${FINDING_LABELS[finding.key].toLowerCase()}`}
+                >
+                  {t("Ask Q about this")}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+const CLAIM_WORDS: Readonly<
+  Record<VerificationStandingDto["claimType"], string>
+> = {
+  FOUNDER_IDENTITY: "Founder identity",
+  INVESTOR_IDENTITY: "Investor identity",
+  ORGANISATION: "Organisation",
+  DOMAIN_CONTROL: "Website ownership",
+};
+
+/**
+ * ADMIN-4 (founder feedback 2026-10-02): each line says its real state,
+ * so the card never reads as verified when nothing is.
+ */
+function standingLine(standing: VerificationStandingDto): string {
+  switch (standing.status) {
+    case "NOT_REQUESTED":
+      return "Not requested";
+    case "PENDING":
+      return "Requested — with Capital Q";
+    case "VERIFIED":
+      return standing.verifiedAt === null
+        ? "Verified"
+        : `Verified on ${new Date(standing.verifiedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+    case "EXPIRED":
+      return "Expired — ask again";
+    case "REVOKED":
+      return standing.declineReason === null ||
+        standing.declineReason === undefined
+        ? "Declined"
+        : `Declined: ${standing.declineReason}`;
+  }
+}
+
+export type VerificationState =
+  | {
+      readonly status: "READ";
+      readonly standings: readonly VerificationStandingDto[];
+    }
+  | { readonly status: "UNAVAILABLE" }
+  | { readonly status: "NONE" };
+
+/** One subject Q may have read about: the organisation, or the person. */
+export type SignalsSubject = {
+  readonly label: string;
+  /** How the group is headed when there are two ("Your company", "You"). */
+  readonly heading: string;
+  readonly hasWebsite: boolean;
+  readonly findings: FindingsState;
+};
+
+/**
+ * The profile's right rail (founder design 2026-09-28): one card, two
+ * parts. What Q found on public pages (never the profile's value until the
+ * person confirms it), and what Capital Q verified claim by claim. Q itself
+ * is always one tap away in the dock, so the rail carries no "ask Q" box. Every button opens something real: Q, already
+ * answering the question (one tap runs it, C8), or the verification page for a company.
+ */
+export function SignalsAndVerification({
+  subjects,
+  verification,
+  verificationHref,
+  verificationCompanyId = null,
+  verificationRequestKey = null,
+}: {
+  readonly subjects: readonly SignalsSubject[];
+  /** A company's standings; null for an organisation without that workflow. */
+  readonly verification: VerificationState | null;
+  /** Where verification is asked for; null when this side has no page for it. */
+  readonly verificationHref: string | null;
+  /** The company the inline request is for (ADMIN-4); null: no inline request. */
+  readonly verificationCompanyId?: string | null | undefined;
+  /** Minted by the server render, so a double press is the same request. */
+  readonly verificationRequestKey?: string | null | undefined;
+}) {
+  const t = useT();
+  const { askNow } = useGlobalQ();
+  const primary = subjects[0];
+  const loading = subjects.some((s) => s.findings.status === "LOADING");
+  const read = subjects.flatMap((subject) =>
+    subject.findings.status === "READ" && subject.findings.findings.length > 0
+      ? [subject]
+      : [],
+  );
+  const unavailable =
+    !loading &&
+    read.length === 0 &&
+    subjects.some((s) => s.findings.status === "UNAVAILABLE");
+  const lookDraft =
+    primary === undefined
+      ? "Look for public information about me."
+      : `Look for public information about ${primary.label} and tell me what you find.`;
+
+  return (
+    <section
+      aria-labelledby="signals-heading"
+      className="flex flex-col gap-4 border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
+      data-profile-signals
+    >
+      <h2
+        id="signals-heading"
+        className="cq-title-sm flex items-center gap-2 text-(--cq-text-primary)"
+      >
+        <Shield size={ICON_SIZE.regular} aria-hidden="true" />
+        {t("Signals & verification")}
+      </h2>
+
+      <SignalsPart
+        icon={<Search size={ICON_SIZE.compact} aria-hidden="true" />}
+        title={t("What Q found")}
+        data="findings"
+      >
+        {loading ? (
+          <div aria-busy="true" className="flex flex-col gap-2">
+            <Skeleton lines={2} />
+          </div>
+        ) : read.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {read.map((subject) => (
+              <div key={subject.heading} className="flex flex-col gap-1">
+                {subjects.length > 1 ? (
+                  <p className="cq-caption text-(--cq-text-tertiary)">
+                    {subject.heading}
+                  </p>
+                ) : null}
+                <ProfileFindings
+                  subjectLabel={subject.label}
+                  state={subject.findings}
+                  hasWebsite={subject.hasWebsite}
+                  bare
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <InnerEmpty
+            icon={<UserRound size={ICON_SIZE.regular} aria-hidden="true" />}
+            title={
+              unavailable ? "Couldn't be read just now" : "Nothing found yet"
+            }
+            hint={
+              unavailable
+                ? "Try again in a moment."
+                : primary?.hasWebsite === true
+                  ? "Nothing public about you yet."
+                  : "Add your website so Q can look."
+            }
+          />
+        )}
+        <button
+          type="button"
+          className={buttonClassName("quiet", "compact", "-ms-2 self-start")}
+          onClick={() => askNow(lookDraft)}
+          data-signals-look
+        >
+          {t("Ask Q to look")}
+        </button>
+      </SignalsPart>
+
+      <SignalsPart
+        icon={
+          <ShieldCheck
+            size={ICON_SIZE.compact}
+            aria-hidden="true"
+            className="text-(--cq-text-secondary)"
+          />
+        }
+        title={t("Verification")}
+        data="verified"
+      >
+        {verification !== null && verification.status === "READ" ? (
+          <dl className="flex flex-col divide-y divide-(--cq-border-subtle)">
+            {verification.standings.map((standing) => (
+              <div
+                key={standing.claimType}
+                data-claim={standing.claimType}
+                data-status={standing.status}
+                className="flex flex-col gap-0.5 py-2"
+              >
+                <dt className="cq-caption text-(--cq-text-secondary)">
+                  {t(CLAIM_WORDS[standing.claimType])}
+                </dt>
+                <dd className="cq-body-sm text-(--cq-text-primary)">
+                  {standingLine(standing)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <InnerEmpty
+            icon={<ShieldCheck size={ICON_SIZE.regular} aria-hidden="true" />}
+            title={
+              verification?.status === "UNAVAILABLE"
+                ? "Couldn't be read just now"
+                : "Nothing verified yet"
+            }
+            hint={
+              verificationHref === null ? (
+                "Nothing checked yet."
+              ) : (
+                <>
+                  <Link
+                    href={verificationHref}
+                    className="text-(--cq-text-primary) underline underline-offset-4"
+                  >
+                    {t("Add claims")}
+                  </Link>{" "}
+                  to have them checked.
+                </>
+              )
+            }
+          />
+        )}
+        {verificationCompanyId !== null &&
+        verificationRequestKey !== null &&
+        verification !== null &&
+        verification.status === "READ" &&
+        verification.standings.some(
+          (standing) =>
+            standing.status === "NOT_REQUESTED" ||
+            standing.status === "EXPIRED",
+        ) ? (
+          <form action={requestVerificationFromProfileAction}>
+            <input
+              type="hidden"
+              name="companyId"
+              value={verificationCompanyId}
+            />
+            <input
+              type="hidden"
+              name="requestKey"
+              value={verificationRequestKey}
+            />
+            <button
+              type="submit"
+              className={buttonClassName("secondary", "compact", "self-start")}
+              data-request-verification
+            >
+              {t("Request verification")}
+            </button>
+          </form>
+        ) : null}
+        {verificationHref === null ? (
+          <button
+            type="button"
+            className={buttonClassName("quiet", "compact", "-ms-2 self-start")}
+            onClick={() =>
+              askNow(
+                "How does verification work on Capital Q, and what can be verified for my organisation?",
+              )
+            }
+          >
+            {t("How verification works")}
+          </button>
+        ) : (
+          <Link
+            href={verificationHref}
+            className={buttonClassName("quiet", "compact", "-ms-2 self-start")}
+          >
+            {t("How verification works")}
+          </Link>
+        )}
+      </SignalsPart>
+    </section>
+  );
+}
+
+function SignalsPart({
+  icon,
+  title,
+  description,
+  data,
+  children,
+}: {
+  readonly icon: React.ReactNode;
+  readonly title: string;
+  readonly description?: string | undefined;
+  readonly data: string;
+  readonly children: React.ReactNode;
+}) {
+  const id = `signals-${data}`;
+  return (
+    <section
+      aria-labelledby={id}
+      className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-3"
+      data-signals-part={data}
+    >
+      <div className="flex flex-col gap-1">
+        <h3
+          id={id}
+          className="cq-label flex items-center gap-2 text-(--cq-text-primary)"
+        >
+          {icon}
+          {title}
+        </h3>
+        {description === undefined ? null : (
+          <p className="cq-caption text-(--cq-text-secondary)">{description}</p>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function InnerEmpty({
+  icon,
+  title,
+  hint,
+}: {
+  readonly icon: React.ReactNode;
+  readonly title: string;
+  readonly hint: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-3">
+      <span className="mt-0.5 text-(--cq-text-tertiary)">{icon}</span>
+      <div className="flex flex-col gap-0.5">
+        <p className="cq-body-sm text-(--cq-text-primary)">{title}</p>
+        <p className="cq-caption text-(--cq-text-secondary)">{hint}</p>
+      </div>
+    </div>
+  );
+}

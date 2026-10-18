@@ -223,6 +223,8 @@ export function describeQStage(stage: QVisibleStage | null): string | null {
       return "Reviewing the company";
     case "CHECKING_EVIDENCE":
       return "Checking the evidence";
+    case "SEARCHING_PUBLIC_SOURCES":
+      return "Looking into it";
     case "REVIEWING_INVESTOR_CRITERIA":
       return "Reviewing investor criteria";
     case "COMPARING_OPPORTUNITIES":
@@ -231,6 +233,16 @@ export function describeQStage(stage: QVisibleStage | null): string | null {
       return "Reviewing the relationship";
     case "PREPARING_ANALYSIS":
       return "Preparing the analysis";
+    case "PREPARING_DOCUMENT":
+      return "Writing your document. This takes a moment.";
+    case "REVISING_DOCUMENT":
+      return "Making your changes to the document. One moment.";
+    case "DESIGNING_DOCUMENT":
+      return "Laying out each page";
+    case "FINDING_DOCUMENT_IMAGES":
+      return "Finding pictures and drawing your charts";
+    case "CHECKING_DOCUMENT":
+      return "Checking every page";
     case "WAITING_FOR_REPLY":
       return "Q needs a little more information before continuing.";
     case "WAITING_FOR_APPROVAL":

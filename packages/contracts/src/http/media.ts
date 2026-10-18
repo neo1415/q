@@ -62,10 +62,23 @@ export const DERIVED_TEXT_STATES = [
 export const DerivedTextStateSchema = z.enum(DERIVED_TEXT_STATES);
 
 /**
+ * Who beyond its owner may watch a publishable video (ADR 0021):
+ * INVESTORS (the investors the company is discoverable to) or NETWORK
+ * (also every signed-in founder on Capital Q). INVESTORS by default.
+ */
+export const PITCH_AUDIENCES = ["INVESTORS", "NETWORK"] as const;
+export const PitchAudienceSchema = z.enum(PITCH_AUDIENCES);
+export type PitchAudience = z.infer<typeof PitchAudienceSchema>;
+export const PITCH_TITLE_MAX = 120;
+/** Live videos one company may have at once (ADR 0022). */
+export const LIVE_PITCHES_MAX = 30;
+
+/**
  * The create request. Strict and nearly empty on purpose: everything that
  * matters — tenant, owner, provider, status, readiness, moderation, playback
  * policy — is decided by the server. The only thing a client may say is
- * which pitch it believes it is replacing.
+ * which live video it is replacing; without one, the upload is another
+ * video beside the company's others (ADR 0022).
  */
 export const CreateCompanyPitchRequestSchema = z
   .object({
@@ -87,6 +100,16 @@ export const MediaAssetDtoSchema = z
     captionState: DerivedTextStateSchema,
     transcriptState: DerivedTextStateSchema,
     moderationStatus: ModerationStatusSchema,
+    /** The owner's name for the video; null when they gave none. */
+    title: z.string().max(PITCH_TITLE_MAX).nullable(),
+    audience: PitchAudienceSchema,
+    /**
+     * ADR 0047: investors who may watch it may also save a copy. False
+     * unless the owner turned it on (doc 20 §219); absent from older APIs.
+     */
+    downloadable: z.boolean().default(false),
+    /** False once replaced by a re-upload, or deleted. */
+    live: z.boolean(),
     replacesMediaAssetId: UuidSchema.nullable(),
     createdAt: UtcTimestampSchema,
     readyAt: UtcTimestampSchema.nullable(),
@@ -132,3 +155,289 @@ export const CreateCompanyPitchResponseSchema = z
 export type CreateCompanyPitchResponse = z.infer<
   typeof CreateCompanyPitchResponseSchema
 >;
+
+/*
+ * Upload, sync and playback (CQ-MEDIA-010/011). These are the routes the
+ * header above said would come later. Each is scoped to one asset under
+ * the company's pitch path: `/pitch/:mediaAssetId` + suffix.
+ *
+ * The provider stays invisible: no route returns a provider identifier,
+ * and playback carries no separate token field — whatever authorises the
+ * viewer is embedded in the URL the server minted for them.
+ */
+
+export const MEDIA_UPLOAD_SESSION_SUFFIX = "/upload-session" as const;
+export const MEDIA_SYNC_SUFFIX = "/sync" as const;
+export const MEDIA_PLAYBACK_SUFFIX = "/playback" as const;
+/**
+ * `GET .../pitch/:mediaAssetId/download` (ADR 0047): a short-lived link to
+ * the pitch as a file, decided per viewer on every request. The browser
+ * fetches the file from the CDN; no byte passes through Capital Q.
+ */
+export const MEDIA_DOWNLOAD_SUFFIX = "/download" as const;
+
+export const UPLOAD_MODES = ["DIRECT", "RESUMABLE"] as const;
+export const UploadModeSchema = z.enum(UPLOAD_MODES);
+
+export const MEDIA_UPLOAD_CANCEL_SUFFIX = "/upload-session/cancel" as const;
+
+/**
+ * `POST .../pitch/:mediaAssetId/upload-session` — the server reserves an
+ * upload target with the provider. The client sends the version it saw so
+ * a stale tab cannot reopen an upload on an asset that moved on.
+ *
+ * `uploadLengthBytes` (CQ-MEDIA-011) is how a client that can resume says
+ * so: the file's exact size. The server then chooses the mode — RESUMABLE
+ * when its provider supports it, DIRECT otherwise — and the answer's
+ * `uploadMode` is what the client must follow. With a length the
+ * `Idempotency-Key` header (IDEMPOTENCY_KEY_HEADER) is required; the same
+ * key and length again, while the target is open, returns the same target
+ * rather than a refusal, which is how a dropped answer or a reload resumes.
+ */
+export const CreateMediaUploadSessionRequestSchema = z
+  .object({
+    expectedVersion: ResourceVersionSchema,
+    uploadLengthBytes: z
+      .number()
+      .int()
+      .min(1)
+      .max(Number.MAX_SAFE_INTEGER)
+      .optional(),
+  })
+  .strict();
+export type CreateMediaUploadSessionRequest = z.infer<
+  typeof CreateMediaUploadSessionRequestSchema
+>;
+
+export const MediaUploadSessionDtoSchema = z
+  .object({
+    mediaAssetId: UuidSchema,
+    uploadMode: UploadModeSchema,
+    /**
+     * The target on the provider's edge: bytes go browser → CDN, never
+     * through the API. DIRECT: one POST of the whole file. RESUMABLE: a tus
+     * 1.0.0 resource the client HEADs for its offset and PATCHes in chunks.
+     */
+    uploadUrl: z.string().url(),
+    expiresAt: UtcTimestampSchema,
+    /** The server's reservation; the client may not exceed it. */
+    maxDurationSeconds: z.number().int().min(1).max(3600),
+    /** RESUMABLE only: the size of each PATCH (the last may be shorter). */
+    chunkSizeBytes: z.number().int().min(1).optional(),
+    pitch: MediaAssetDtoSchema,
+  })
+  .strict();
+export type MediaUploadSessionDto = z.infer<typeof MediaUploadSessionDtoSchema>;
+
+/**
+ * `POST .../pitch/:mediaAssetId/upload-session/cancel` — the founder stops
+ * an unfinished upload. Empty body. The pitch ends UPLOAD_FAILED and the
+ * provider's target is released; repeating it changes nothing.
+ */
+export const CancelMediaUploadRequestSchema = z.object({}).strict();
+export type CancelMediaUploadRequest = z.infer<
+  typeof CancelMediaUploadRequestSchema
+>;
+
+export const CancelMediaUploadResponseSchema = z
+  .object({ pitch: MediaAssetDtoSchema })
+  .strict();
+export type CancelMediaUploadResponse = z.infer<
+  typeof CancelMediaUploadResponseSchema
+>;
+
+/**
+ * `POST .../pitch/:mediaAssetId/sync` — idempotent "look at the provider
+ * and move the lifecycle". Empty body; the answer is the asset as it now is.
+ */
+export const SyncMediaAssetRequestSchema = z.object({}).strict();
+export type SyncMediaAssetRequest = z.infer<typeof SyncMediaAssetRequestSchema>;
+
+export const SyncMediaAssetResponseSchema = z
+  .object({ pitch: MediaAssetDtoSchema })
+  .strict();
+export type SyncMediaAssetResponse = z.infer<
+  typeof SyncMediaAssetResponseSchema
+>;
+
+/**
+ * `POST .../pitch/:mediaAssetId/playback` — per-viewer and short-lived. A
+ * provider UID is not access control (doc 20): the viewer is authorised
+ * here, server-side, every time.
+ */
+export const PlaybackAuthorizationDtoSchema = z
+  .object({
+    mediaAssetId: UuidSchema,
+    playbackUrl: z.string().url(),
+    posterUrl: z.string().url().nullable(),
+    expiresAt: UtcTimestampSchema,
+  })
+  .strict();
+export type PlaybackAuthorizationDto = z.infer<
+  typeof PlaybackAuthorizationDtoSchema
+>;
+
+/**
+ * A company's current pitch as another surface may show it: a feed item,
+ * the founder's own company, the network preview an investor opens. Null
+ * when none is publishable (READY, moderation ALLOWED, policy not
+ * PRIVATE). It carries no provider id and no URL: whoever activates it
+ * asks `/playback`, and is authorised there.
+ */
+export const PitchSummaryDtoSchema = z
+  .object({
+    mediaAssetId: UuidSchema,
+    aspectRatio: z.string().nullable(),
+    durationSeconds: z.number().int().nullable(),
+    captionState: DerivedTextStateSchema,
+    /** The owner's name for the video (ADR 0022); absent from older APIs. */
+    title: z.string().max(PITCH_TITLE_MAX).nullable().optional(),
+    /**
+     * ADR 0047: the owner lets viewers save a copy, so the player's menu
+     * offers Download. A hint for the menu only: the download route decides
+     * again on every request. Absent from older APIs (treated as false).
+     */
+    downloadAllowed: z.boolean().optional(),
+  })
+  .strict();
+export type PitchSummaryDto = z.infer<typeof PitchSummaryDtoSchema>;
+
+/*
+ * The founder's decision (CQ-MEDIA-013). Commercial authority over their
+ * own pitch is theirs: whether investors may be granted playback. Whether
+ * the pitch is allowed on the platform at all is Capital Q's (moderation)
+ * and has no client route.
+ */
+
+export const MEDIA_PLAYBACK_POLICY_SUFFIX = "/playback-policy" as const;
+
+/** What an owner may choose. PUBLIC is deliberately absent: doc 20 §34 is a product decision no packet has made. */
+export const OWNER_PLAYBACK_POLICIES = ["AUTHORISED", "PRIVATE"] as const;
+export const OwnerPlaybackPolicySchema = z.enum(OWNER_PLAYBACK_POLICIES);
+export type OwnerPlaybackPolicy = z.infer<typeof OwnerPlaybackPolicySchema>;
+
+/** `POST .../pitch/:mediaAssetId/playback-policy` — reversible, consequential, versioned. */
+export const SetPitchPlaybackPolicyRequestSchema = z
+  .object({
+    playbackPolicy: OwnerPlaybackPolicySchema,
+    expectedVersion: ResourceVersionSchema,
+  })
+  .strict();
+export type SetPitchPlaybackPolicyRequest = z.infer<
+  typeof SetPitchPlaybackPolicyRequestSchema
+>;
+
+export const SetPitchPlaybackPolicyResponseSchema = z
+  .object({ pitch: MediaAssetDtoSchema })
+  .strict();
+export type SetPitchPlaybackPolicyResponse = z.infer<
+  typeof SetPitchPlaybackPolicyResponseSchema
+>;
+
+/*
+ * The owner's name for one video and who may watch it (ADR 0021/0022).
+ * Widening the audience is a disclosure decision: media.manage, audited,
+ * versioned like the playback policy.
+ */
+export const MEDIA_DETAILS_SUFFIX = "/details" as const;
+
+/** `POST .../pitch/:mediaAssetId/details`. A blank title clears it. */
+export const SetPitchDetailsRequestSchema = z
+  .object({
+    title: z.string().max(PITCH_TITLE_MAX).nullable(),
+    audience: PitchAudienceSchema,
+    /**
+     * Who may play it, set with the audience in the same call (live
+     * 2026-10-02): AUTHORISED for an investor-facing audience, PRIVATE for
+     * "only my organisation". Absent: unchanged.
+     */
+    playbackPolicy: OwnerPlaybackPolicySchema.optional(),
+    /**
+     * ADR 0047: whether investors who may watch it may also save a copy.
+     * Absent: unchanged. Off by default (doc 20 §219).
+     */
+    downloadable: z.boolean().optional(),
+    expectedVersion: ResourceVersionSchema,
+  })
+  .strict();
+export type SetPitchDetailsRequest = z.infer<
+  typeof SetPitchDetailsRequestSchema
+>;
+
+/**
+ * READY: the link, until `expiresAt` (a secret for this viewer: open it,
+ * never store or share it). PREPARING: the file is still being made; ask
+ * again shortly.
+ */
+export const PitchDownloadDtoSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("READY"),
+      mediaAssetId: UuidSchema,
+      downloadUrl: z.string().url(),
+      expiresAt: UtcTimestampSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("PREPARING"),
+      mediaAssetId: UuidSchema,
+      percentComplete: z.number().min(0).max(100).nullable(),
+    })
+    .strict(),
+]);
+export type PitchDownloadDto = z.infer<typeof PitchDownloadDtoSchema>;
+
+export const SetPitchDetailsResponseSchema = z
+  .object({ pitch: MediaAssetDtoSchema })
+  .strict();
+export type SetPitchDetailsResponse = z.infer<
+  typeof SetPitchDetailsResponseSchema
+>;
+
+// ---------------------------------------------------------------------------
+// The pitch's timed transcript (R18: Q watches the video with us)
+// ---------------------------------------------------------------------------
+
+/**
+ * `GET .../pitch/:mediaAssetId/transcript` and `.../captions.vtt`.
+ *
+ * The transcript is part of the pitch: whoever may play it may read it,
+ * authorised by the same rule that mints the playback token, and anyone
+ * else gets the same not-found. Generated by the video provider and
+ * labelled so; never evidence of the company's claims.
+ */
+export const MEDIA_TRANSCRIPT_SUFFIX = "/transcript" as const;
+export const MEDIA_CAPTIONS_VTT_SUFFIX = "/captions.vtt" as const;
+
+export const PitchTranscriptCueSchema = z
+  .object({
+    startMs: z.number().int().min(0).max(86_400_000),
+    endMs: z.number().int().min(0).max(86_400_000),
+    text: z.string().min(1).max(2000),
+  })
+  .strict();
+export type PitchTranscriptCue = z.infer<typeof PitchTranscriptCueSchema>;
+
+/**
+ * AVAILABLE: the cues below. PENDING: asked for, not ready yet. NONE:
+ * there is no transcript for this pitch -- unknown, never "nothing was
+ * said".
+ */
+export const PITCH_TRANSCRIPT_STATUSES = [
+  "AVAILABLE",
+  "PENDING",
+  "NONE",
+] as const;
+export const PitchTranscriptStatusSchema = z.enum(PITCH_TRANSCRIPT_STATUSES);
+
+export const PitchTranscriptDtoSchema = z
+  .object({
+    mediaAssetId: UuidSchema,
+    status: PitchTranscriptStatusSchema,
+    language: z.string().min(2).max(35).nullable(),
+    source: z.literal("PROVIDER_GENERATED").nullable(),
+    cues: z.array(PitchTranscriptCueSchema).max(5000),
+  })
+  .strict();
+export type PitchTranscriptDto = z.infer<typeof PitchTranscriptDtoSchema>;

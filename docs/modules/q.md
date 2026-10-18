@@ -159,6 +159,14 @@ an internal `QToolCallRecord` and a public `QToolProgress` that withholds the
 tool name. Neither carries arguments or results; per-tool Zod schemas are
 CQ-Q-007's, and no client can submit a "tool result".
 
+Controlled public-web research (CQ-Q-RESEARCH-001) reaches Q only through
+this registry: two bounded, provider-mediated tools whose outbound query is
+composed from the person's own words and authorised public identity, whose
+results are unverified data with provenance, and whose sources a founder's Q
+reads about their own company are recorded as that company's evidence. See
+[q-research.md](q-research.md) and ADR 0009. `QToolExecutionContext` carries
+`conversation.latestUserText` for that one purpose.
+
 ## Stream events
 
 `QStreamEvent` is a closed union on `type`: `q.run.started`, `q.stage.changed`,
@@ -240,7 +248,7 @@ Q message      ≠ canonical company truth    Q run event ≠ domain event ≠ a
 run accepted   ≠ analysis completed         message persisted ≠ message understood
 ```
 
-## Schema (`q_runtime`, migration `20260906120000`)
+## Schema (`q_runtime`, migration `20260906120000`; `run_events.visible_stage` widened by `20260917090000`)
 
 Doc 13 §34/§47, one canonical message store, all tables
 `INTERNAL_SERVER_ONLY` (RLS on, no policies, no client grants; guarded by
@@ -687,7 +695,7 @@ against row-derived text.
 
 ## The plan (`PermittedContextPlan`, INTERNAL)
 
-`contractVersion` 1, `policyVersion` `context-firewall-v1`, a fresh `planId`
+`contractVersion` 1, `policyVersion` `context-firewall-v2`, a fresh `planId`
 per evaluation, a `fingerprint` over the policy-relevant content (identical
 inputs → identical fingerprint, so a re-plan can be compared without holding
 the old plan), the run and tenant ids, the actor (user + organisation), the

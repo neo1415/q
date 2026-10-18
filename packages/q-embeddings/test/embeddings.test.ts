@@ -178,8 +178,16 @@ describe("configuration identity", () => {
     ).toBeLessThanOrEqual(4_096);
   });
 
-  it("registers exactly one versioned V1 query instruction, free of policy", () => {
-    expect(EMBEDDING_QUERY_TASKS).toEqual(["EVIDENCE_RETRIEVAL"]);
+  it("registers one versioned query instruction per retrieval task, free of policy", () => {
+    // One task per retrieval flow that exists: evidence retrieval (RAG) and
+    // mandate matching (REC-003). Not a prompt library.
+    expect(EMBEDDING_QUERY_TASKS).toEqual([
+      "EVIDENCE_RETRIEVAL",
+      "MANDATE_MATCHING",
+    ]);
+    const matching = instructionFor("MANDATE_MATCHING");
+    expect(matching.instructionVersion).toBe("capital-q-mandate-matching-v1");
+    expect(matching.instruction.length).toBeLessThan(200);
     const profile = instructionFor("EVIDENCE_RETRIEVAL");
     expect(profile).toBe(EVIDENCE_RETRIEVAL_INSTRUCTION);
     expect(profile.instructionVersion).toBe("capital-q-evidence-retrieval-v1");
@@ -654,5 +662,19 @@ describe("similarity", () => {
 
   it("refuses vectors of different lengths", () => {
     expect(() => cosineSimilarity([1, 0], [1, 0, 0])).toThrow(TypeError);
+  });
+});
+
+describe("an unconfigured runtime (no Q_EMBEDDING_BASE_URL outside local)", () => {
+  it("is UNAVAILABLE on every call without making a request, and says so in health", async () => {
+    const { provider, requests } = teiProvider([], { baseUrl: undefined });
+    await expect(
+      provider.embedQuery({ query: "runway", task: "EVIDENCE_RETRIEVAL" }),
+    ).rejects.toMatchObject({ failureClass: "UNAVAILABLE" });
+    const health = await provider.health();
+    expect(health.state).toBe("UNAVAILABLE");
+    expect(health.detail).toBe("the embedding runtime is not configured");
+    expect(health.endpoint).toBeNull();
+    expect(requests).toHaveLength(0);
   });
 });

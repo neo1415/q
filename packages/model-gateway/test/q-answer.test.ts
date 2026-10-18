@@ -13,7 +13,6 @@ import {
   createPromptRegistry,
   PRIVATE_CHARTER_MARKER,
   PROMPT_DEFINITIONS,
-  Q_SYSTEM_V1,
   SYNTHETIC_COMPANY_FACTS,
   type CompanyAnalystResult,
 } from "@capital-q/q-core";
@@ -109,6 +108,9 @@ function fakeRepositories(userMessage: string) {
   const repositories = {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
+      // The seam reads the conversation, not the run; the fake has one
+      // conversation, so both return the same thing.
+      listRecentForConversationOfRun: () => Promise.resolve([...messages]),
       insert: (
         _tx: unknown,
         input: { role: "USER" | "Q"; content: string },
@@ -174,7 +176,7 @@ function build(options: {
     sleep: () => Promise.resolve(),
     logger,
   });
-  const { repositories, messages } = fakeRepositories(
+  const { repositories, messages, events } = fakeRepositories(
     options.userMessage ?? "What's our current raise target?",
   );
   const seam = createModelGatewayQAnswer({
@@ -210,7 +212,16 @@ function build(options: {
     retrieval: { kind: "NOT_CONFIGURED" },
     plan: planWith(maxSensitivity),
   });
-  return { seam, alpha, beta, messages, logLines, usage, answerRequest };
+  return {
+    seam,
+    alpha,
+    beta,
+    messages,
+    events,
+    logLines,
+    usage,
+    answerRequest,
+  };
 }
 
 const withFacts: QAuthorisedContextPort = {
@@ -235,14 +246,25 @@ describe("Q answer seam over the Prompt Registry", () => {
       return;
     }
     expect(outcome.promptBundleVersion).toBe(
-      "q-system.v1_company-analyst.v2_comm.v1",
+      "q-system.v2_company-analyst.v25_comm.v1",
     );
     expect(outcome.modelPolicyVersion).toBe("normal_dialogue.v1");
     expect(messages.at(-1)?.role).toBe("Q");
     expect(messages.at(-1)?.content).toContain("2,000,000");
 
     const sent = alpha.calls[0]?.request;
-    expect(sent?.messages.map((m) => m.role)).toEqual(["SYSTEM", "USER"]);
+    // The charter, the fenced task, what this run can do (CQ-QX-008), and
+    // which findings channel the conversation shows.
+    expect(sent?.messages.map((m) => m.role)).toEqual([
+      "SYSTEM",
+      "USER",
+      "SYSTEM",
+      "SYSTEM",
+    ]);
+    expect(sent?.messages[3]?.content).toContain("IN THIS CONVERSATION");
+    expect(sent?.messages[2]?.content).toContain(
+      "WHAT YOU CAN DO IN THIS CONVERSATION",
+    );
     expect(sent?.messages[0]?.content).toContain("You are Q");
     expect(sent?.messages[0]?.content).not.toContain("raise target");
     expect(sent?.messages[1]?.content).toContain(
@@ -251,6 +273,28 @@ describe("Q answer seam over the Prompt Registry", () => {
     expect(sent?.messages[1]?.content).toContain("Northwind Sensor Systems");
     expect(sent?.output.kind).toBe("STRUCTURED");
     expect(seam.lastObservation()?.promptCharacters).toBeGreaterThan(5_000);
+  });
+
+  it("PRESENCE: carries the model's gestures, clamped to the reply, on the completion event only", async () => {
+    const { seam, events, answerRequest } = build({
+      context: withFacts,
+      providerOutput: {
+        ...analystResult(),
+        gestures: [
+          { sentence: 7, gesture: "MONEY" },
+          { sentence: 0, gesture: "CLAP" },
+        ],
+      },
+    });
+    const outcome = await seam.answer(answerRequest());
+    expect(outcome.kind).toBe("ANSWERED");
+    const completed = events.find(
+      (event) => event.eventType === "q.message.completed",
+    );
+    const message = (completed?.payload as { message?: { gestures?: unknown } })
+      .message;
+    // One sentence in the reply: both land on it, and the first wins.
+    expect(message?.gestures).toEqual([{ sentence: 0, gesture: "MONEY" }]);
   });
 
   it("declares the plan's sensitivity by default, so a confidential plan finds no public-only provider", async () => {
@@ -271,10 +315,10 @@ describe("Q answer seam over the Prompt Registry", () => {
   it("never lets a charter marker reach the stored message or the logs, whatever the model echoes", async () => {
     const marked = createPromptRegistry(
       PROMPT_DEFINITIONS.map((d) =>
-        d.id === "Q_SYSTEM"
+        d.id === "Q_SYSTEM" && d.status === "ACTIVE"
           ? {
-              ...Q_SYSTEM_V1,
-              template: `${Q_SYSTEM_V1.template}\nINTERNAL TEST MARKER: ${PRIVATE_CHARTER_MARKER}`,
+              ...d,
+              template: `${d.template}\nINTERNAL TEST MARKER: ${PRIVATE_CHARTER_MARKER}`,
             }
           : d,
       ),

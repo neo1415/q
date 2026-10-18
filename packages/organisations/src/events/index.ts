@@ -82,11 +82,58 @@ export const MembershipCreatedEvent = defineEvent({
     "A person became a member of an organisation. Roles are not carried; authority is resolved from policy.",
 });
 
+// G1/G2: a membership ended (left or removed) or changed role. Consumers
+// re-resolve authority; a removed person's running Q work already stops at
+// its next step, because their membership no longer resolves.
+export const MembershipEndedEvent = defineEvent({
+  name: "identity.membership.ended",
+  version: 1,
+  owner: ORGANISATION_EVENT_OWNER,
+  producer: ORGANISATION_EVENT_PRODUCER,
+  consumers: [],
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      membershipId: UuidSchema,
+      organisationId: UuidSchema,
+      userId: UuidSchema,
+      membershipStatus: z.enum(["left", "revoked"]),
+      /** Who picks up their open work (a removal); null when they left. */
+      handedOverToUserId: UuidSchema.nullable(),
+    })
+    .strict(),
+  description:
+    "A person stopped being a member of an organisation, by leaving or being removed.",
+});
+
+export const MembershipRoleChangedEvent = defineEvent({
+  name: "identity.membership.role_changed",
+  version: 1,
+  owner: ORGANISATION_EVENT_OWNER,
+  producer: ORGANISATION_EVENT_PRODUCER,
+  consumers: [],
+  sensitivity: "INTERNAL",
+  replaySafety: "REPLAY_SAFE",
+  dataSchema: z
+    .object({
+      membershipId: UuidSchema,
+      organisationId: UuidSchema,
+      userId: UuidSchema,
+      role: z.enum(["OWNER", "ADMIN", "MEMBER"]),
+    })
+    .strict(),
+  description:
+    "A member's team role changed (Owner, Admin or Member). Authority is re-resolved from policy.",
+});
+
 /** Everything this context publishes. Registered by the API and the worker. */
 export const ORGANISATION_EVENTS: readonly EventDefinition[] = [
   OrganisationCreatedEvent,
   OrganisationUpdatedEvent,
   MembershipCreatedEvent,
+  MembershipEndedEvent,
+  MembershipRoleChangedEvent,
 ];
 
 type EnvelopeInput = {
@@ -180,6 +227,50 @@ export function membershipCreatedEvent(
       organisationId: input.organisationId,
       userId: input.userId,
       membershipStatus: "active",
+    },
+  );
+}
+
+export function membershipEndedEvent(
+  input: EnvelopeInput & {
+    readonly membershipId: string;
+    readonly userId: string;
+    readonly status: "left" | "revoked";
+    readonly handedOverToUserId: string | null;
+  },
+): CapitalQEvent<z.infer<typeof MembershipEndedEvent.dataSchema>> {
+  return envelope(
+    MembershipEndedEvent,
+    input,
+    { type: "membership", id: input.membershipId },
+    {
+      membershipId: input.membershipId,
+      organisationId: input.organisationId,
+      userId: input.userId,
+      membershipStatus: input.status,
+      handedOverToUserId: input.handedOverToUserId,
+    },
+  );
+}
+
+export function membershipRoleChangedEvent(
+  input: EnvelopeInput & {
+    readonly membershipId: string;
+    readonly userId: string;
+    readonly role: string;
+  },
+): CapitalQEvent<z.infer<typeof MembershipRoleChangedEvent.dataSchema>> {
+  const role =
+    input.role === "OWNER" || input.role === "ADMIN" ? input.role : "MEMBER";
+  return envelope(
+    MembershipRoleChangedEvent,
+    input,
+    { type: "membership", id: input.membershipId },
+    {
+      membershipId: input.membershipId,
+      organisationId: input.organisationId,
+      userId: input.userId,
+      role,
     },
   );
 }

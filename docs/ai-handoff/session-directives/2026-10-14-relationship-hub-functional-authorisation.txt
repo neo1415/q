@@ -1,0 +1,572 @@
+# CAPITAL Q — BUILD THE RELATIONSHIP HUB FUNCTIONALITY FIRST
+## Product owner decision: Functional implementation approved; visual redesign deferred
+**14 October 2026**
+
+We are changing the delivery strategy for the Relationship Hub.
+
+The previous design prototype did not adequately reflect Capital Q's existing visual identity, colors, theme system, typography, restrained information hierarchy or expected product quality.
+
+**I am NOT approving that prototype as the production design.**
+
+However, I AM authorizing implementation of the underlying CRM functionality and its integration into the real Capital Q product.
+
+Our strategy is now:
+
+**Real functionality → Working existing-system UI → Complete integration → End-to-end acceptance → Future professional visual redesign.**
+
+The eventual redesign must be able to replace presentation components without rewriting the underlying business logic, Q navigation, data contracts or workflow machinery.
+
+You have broad engineering autonomy to build this properly.
+
+---
+
+## 1. Preserve all existing work
+
+Repository: https://github.com/neo1415/q
+
+Refresh the latest GitHub state before starting.
+
+Latest observed production branch:
+`recovery/2026-09-12` at `62bd144a`.
+
+GateQ PRs #76–#79 have merged, including transactional fact supersession and the cold interview-opening repair. Continue the already established GateQ acceptance work independently.
+
+Relationship Hub design PR #75 remains separate. Do not merge its prototype into the production application.
+
+Use the design research and prototype only as references for required capabilities and interaction scenarios, not as approved visual designs.
+
+### Read governing sources
+
+Read relevant sections of:
+
+- Locked PADL
+- Real Capital Q Product Specification
+- Final System Review
+- MVP/V1 Release Definition
+- Documents 17 and 18: UX and Visual Design
+- Documents 12–15: Q architecture, data, RAG/memory and security
+- Documents 19, 22 and 23: recommendation architecture, integration contracts and repository standards
+- Current ADRs, API contracts and handoff documents
+
+Inspect actual production implementations before coding.
+
+Important existing modules:
+
+- `apps/web/src/features/results/`
+- `apps/web/src/features/relationships/`
+- `apps/web/src/features/gateq/`
+- `apps/web/src/features/capital/`
+- `apps/web/src/features/schedule/`
+- `apps/web/src/features/work/`
+- `apps/web/src/features/q/`
+- `apps/web/src/features/q/control/`
+- `packages/app-actions/`
+- Relevant canonical relationship, meeting, document, Evidence and Q contracts
+
+Reuse existing components, workflows and data wherever possible.
+
+**Do not build another CRM beside Capital Q.**
+
+## 2. Functional architecture — one hub, two perspectives
+
+Build a single integrated relationship-management capability consumed through two different experiences.
+
+### Investor Investment Hub
+
+Integrate:
+
+- Investment opportunities and existing relationships
+- GateQ applications and dossiers
+- Discover-sourced opportunities
+- Investment pipeline and review status
+- Mandate qualification and investment intelligence
+- Meetings, transcripts and action items
+- Documents, versions and evidence
+- Messages and private team notes
+- Due diligence and outstanding requests
+- Q Work agents, jobs, reports and approvals
+- Investment decisions and outcomes
+- Portfolio monitoring where existing source data supports it
+- Reports, exports and management actions
+
+### Founder Fundraising Hub
+
+Integrate:
+
+- Existing and prospective investor relationships
+- Investor mandate and suitability context
+- GateQ applications and submission history
+- Fundraising rounds, targets and commitments
+- Meetings and communications
+- Investor requests and diligence obligations
+- Shared documents and company updates
+- Reminders and follow-up actions
+- Founder-private notes
+- Q Work activity relevant to the founder
+- Fundraising progress and reporting
+
+Keep both views permission-aware and correctly scoped.
+
+No duplicated canonical company, investor organisation or relationship.
+
+A GateQ application is not automatically evidence of investor interest or an authorized canonical relationship. Preserve the existing application-to-relationship rules.
+
+Relationship state must derive from canonical events, not from a new mutable CRM stage field.
+
+Keep Readiness, Quality, Fit, Interest, Relationship State and Outcome distinct.
+
+## 3. Create reusable functional contracts, not design-specific logic
+
+The most important architectural requirement is future redesignability.
+
+Build functionality through existing bounded modules and typed/versioned interfaces.
+
+Provide coherent capabilities for:
+
+- Hub overview reads
+- Relationship and opportunity queries
+- Saved views and filters
+- Sorting and cursor pagination
+- Selected-record context
+- Activity/event aggregation
+- Meeting/transcript access
+- Evidence and document access
+- Authorized exports
+- Action preparation and approvals
+- Q contextual navigation
+- Q Work references
+- Notifications and task summaries
+
+Use existing APIs where possible.
+
+Where a new read model or contract is genuinely needed, define it cleanly with explicit module ownership, authorization, Zod validation, source references and versioning.
+
+Never introduce arbitrary cross-module SQL queries simply because the Hub needs aggregated information.
+
+The frontend should primarily render returned data and invoke typed actions.
+
+Business rules, access checks and canonical state changes belong in the owning backend modules.
+
+### Future redesign requirement
+
+A later engineer should be able to replace the Hub's page layout, tabs, cards, typography and animations without rebuilding:
+
+- Search/filter services
+- Saved views
+- Export logic
+- Relationship operations
+- Q controls
+- Evidence retrieval
+- Transcript handling
+- Approval workflows
+- Work/job integration
+
+Do not embed critical business decisions inside React rendering components.
+
+## 4. Use the EXISTING Capital Q design system
+
+This is a binding instruction.
+
+The previous HTML prototype's styling is not approved.
+
+Build functional production screens using Capital Q's actual:
+
+- Design tokens
+- Light/dark theme implementations
+- Typography and font configuration
+- Color palette
+- Buttons, inputs, dialogs and sheets
+- Spacing and border conventions
+- Navigation shell
+- Existing table/list patterns
+- Q dock and Q presence
+- Responsive breakpoints
+- Accessibility conventions
+
+Inspect `packages/ui/`, existing Capital Q screens and document 18 before rendering any new production interface.
+
+Do not introduce an independent stylesheet with another visual identity.
+
+### Copy and hierarchy
+
+Avoid verbose descriptions, excessive explanatory paragraphs, decorative labels and repeated instructions.
+
+Prioritize:
+
+1. What matters?
+2. Why does it matter?
+3. What is the next available action?
+4. Where can the user inspect details?
+
+Use concise labels and progressively disclose secondary information.
+
+Show important facts upfront; make supporting evidence one or two intuitive interactions away.
+
+Users must still be able to find advanced functionality without asking Q.
+
+### States and transitions
+
+Although the full motion redesign is deferred, define and correctly implement semantic UI states now:
+
+- Initial loading
+- Skeleton/streaming
+- Ready
+- Empty
+- No search results
+- Partial data availability
+- Stale data
+- Unauthorized
+- Action pending
+- Awaiting human approval
+- Completed
+- Failed
+- Retry/recovery
+- Background Q Work running
+- Background Q Work blocked
+- Document uploading
+- Document processing
+- Evidence ready/blocked
+- Export preparing/ready/expired
+
+Transitions between these states must be deterministic and accessible.
+
+Use existing lightweight animation and motion conventions where appropriate. Respect reduced-motion preferences.
+
+Do not add elaborate visual animations or cinematic decoration.
+
+Keep functional transitions, focus management, loading feedback and state ownership independent of their eventual animation design.
+
+## 5. Conventional CRM functionality must actually work
+
+Implement real capabilities rather than decorative buttons.
+
+### Search and filtering
+
+Support appropriate combinations of:
+
+- Company/investor
+- Sector
+- Geography
+- Stage
+- Relationship state
+- Owner/assigned team member
+- Opportunity source
+- Investor qualification
+- Outstanding evidence
+- Pending decisions
+- Upcoming meetings
+- Follow-up dates
+- Last interaction
+- Work status
+
+Use server-authorized filtering and sorting where needed for correctness and scale.
+
+### Views
+
+Provide usable:
+
+- Table view
+- Board view
+- Relevant timeline/activity view
+- Detail view
+
+These must be different presentations of the same canonical records.
+
+Board movement must not silently change relationship state. Any real transition must go through the existing authorized action/event workflow.
+
+Implement saved views, configurable visible columns and persistent user preferences using established patterns.
+
+### Records and history
+
+A company/investor relationship record should aggregate permitted:
+
+- Summary
+- Current status
+- Relevant assessments
+- Latest actions
+- GateQ results
+- Meetings and transcripts
+- Messages
+- Documents and evidence
+- Diligence
+- Q Work
+- Decisions and outcomes
+- Historical events
+
+Use existing record URLs and relationship identity.
+
+### Exports and reporting
+
+Make filtering, downloads and exports functional.
+
+Reuse current PDF/CSV exports and existing report services.
+
+Add XLSX or other structured export only where justified, with correct types and safe encoding.
+
+Exports must reflect the selected authorized scope and filters, not silently export every underlying record.
+
+Protect private notes, undisclosed documents and role-specific information.
+
+Support export progress, failure/retry handling, expiry and audit logging as appropriate.
+
+Do not mark an unavailable export format as functional.
+
+### Collaboration
+
+Reuse existing assignments, notes, reminders, messaging, meeting proposals, diligence requests and human approval mechanisms.
+
+Add missing integrations only when necessary.
+
+Do not recreate them as separate CRM subsystems.
+
+## 6. Q must fully operate the Hub
+
+This is an essential product capability, not a future decorative enhancement.
+
+Use existing Q navigation, action, page manifest, semantic control and receipt infrastructure.
+
+Inspect and extend:
+
+- `fast-navigation.ts`
+- `app-routes.ts`
+- `q-control-runtime.tsx`
+- `registry.ts`
+- `perform.ts`
+- `manifest.ts`
+- Existing Q action, retrieval, permission and navigation lifecycle contracts
+
+Q must genuinely be able to:
+
+- Open the Hub
+- Switch role-appropriate areas
+- Select tabs
+- Search and apply filters
+- Change saved views
+- Open a record
+- Expand sections
+- Scroll to a precise section
+- Open authorized documents
+- Navigate to an evidence page or passage
+- Open meeting transcripts
+- Jump to transcript timestamps
+- Display authorized GateQ results
+- Navigate into Q Work
+- Open an agent report or approval
+- Return to prior context
+- Recover after interrupted navigation
+
+Use stable semantic identities and actual page actions.
+
+Do not build a separate navigation engine for the CRM.
+
+Do not let the model invent DOM selectors or claim actions completed before receiving valid completion receipts.
+
+### Q must understand the current context
+
+The Hub should provide Q with structured, permission-filtered context for:
+
+- Current organization
+- Active role
+- Selected relationship/company/investor
+- Active tab/view
+- Relevant filters
+- Authorized evidence references
+- Recent relationship events
+- Pending actions
+- Current Q Work jobs
+
+Make it possible to ask:
+
+"Q, what's important today?"
+
+"What changed with this company since its GateQ application?"
+
+"Show me the last meeting and the outstanding action items."
+
+"Open the financial statement supporting that claim."
+
+"Which founders have not responded to our diligence requests?"
+
+"What have my agents completed on this opportunity?"
+
+"Compare these companies by mandate fit, evidence and unresolved risks."
+
+Q's answers must come from actual authorized structured data and source-aware retrieval, not fabricated summaries.
+
+### Q speed
+
+Routine navigation, tabs, filters and scroll operations should not wait for a full LLM response.
+
+Reuse fast deterministic controls and prefetching where applicable.
+
+Build a scoped, efficiently refreshed briefing read model so Q can immediately access important current information, then investigate deeper when required.
+
+Q's memory remains contextual, permission-sensitive and derived. It is not the canonical CRM source of truth.
+
+Do not regress fast Q navigation, voice control or other existing functionality.
+
+Benchmark relevant operations against the current Q navigation baseline and report measured results.
+
+## 7. Q Work and agent activity
+
+Q Work must appear as part of the relevant relationship and Hub experience.
+
+Reuse the existing persisted workforce/work runtime, not a new agent system.
+
+Show authorized:
+
+- Active jobs
+- Progress
+- Assigned agent
+- Completed work
+- Source-linked reports
+- Generated artifacts
+- Failures
+- Retry/recovery
+- Pending approvals
+- Consequential actions awaiting human authorization
+
+Every item should link to its real existing work record.
+
+Q must be able to open these items and use permitted outputs in its analysis.
+
+Do not simulate completed jobs in production.
+
+Do not automatically execute actions merely because an agent recommended them.
+
+## 8. Implement in complete vertical slices
+
+Do not launch a large rewrite and leave ten half-finished modules.
+
+Build sequentially, with small independent work when safe.
+
+### Slice H1 — Functional Hub foundation
+
+Deliver:
+
+- Investor/founder role-aware entry points
+- Existing Capital Q visual system
+- Useful real-data overview
+- Existing Results/Relationships/GateQ/Capital links and queries
+- Relevant next actions and status summaries
+- Working Q navigation into and through the new areas
+
+Acceptance: both roles can enter the Hub, see real authorized information, navigate to records, and return without losing Q context.
+
+### Slice H2 — Full pipeline and records
+
+Deliver:
+
+- Real search, filter, sort and pagination
+- Table/board views
+- Saved views
+- Record previews/details
+- Existing relationship actions
+- GateQ dossier entry points
+- Downloads and authorized exports
+- Relevant Q filter/navigation controls
+
+Acceptance: users can manage real opportunities using the Hub without returning to disconnected tools for the basic workflow.
+
+### Slice H3 — Connected intelligence and history
+
+Deliver:
+
+- Consolidated authorized event timeline
+- Meeting and transcript navigation
+- Evidence/document viewer integration
+- GateQ results and intelligence
+- Q contextual summaries/comparisons
+- Exact source navigation
+- Relevant Q Work jobs/artifacts and approvals
+
+Acceptance: Q can navigate a complete multi-step relationship investigation in the actual UI and reference the correct evidence.
+
+### Slice H4 — Reporting, workflows and polish
+
+Deliver:
+
+- Advanced reporting/export integration
+- Remaining supported collaboration controls
+- Better reminders/notifications and follow-ups
+- Error and recovery states
+- Responsive/accessibility completeness
+- Measured navigation and retrieval optimizations
+
+Acceptance: investor and founder workflows work end to end with no simulated production controls.
+
+Q integration is required throughout every slice, not postponed entirely to H3.
+
+## 9. Testing and release
+
+For each slice:
+
+- Define explicit acceptance criteria.
+- State modules, interfaces, migrations and threats.
+- Implement and test.
+- Check module boundaries.
+- Run formatting, lint, strict typecheck and relevant unit/integration tests.
+- Validate permissions and RLS.
+- Test negative cross-tenant and founder/investor privacy cases.
+- Verify filters and downloads against authorized server data.
+- Run genuine browser interaction tests.
+- Confirm Q navigation receipts and failure paths.
+- Verify loading, empty, pending and error states.
+- Check desktop/mobile usability and accessibility.
+- Measure applicable performance.
+- Commit and push.
+- Use protected PR and release workflows.
+
+Do not deploy partially wired CRM controls or claim functionality from mock data.
+
+Use fictional test accounts for realistic acceptance where appropriate.
+
+Preserve the existing investor discovery, Q, GateQ, voice, meetings, documents and relationship behavior.
+
+## 10. Keep GateQ progressing independently
+
+GateQ remains an active separate product lane.
+
+Check the latest release and live acceptance state after PR #79.
+
+Finish the remaining authenticated/guest journey and outstanding Evidence integration work through its own approved branches.
+
+Do not mix GateQ product-repair commits into unrelated Hub feature PRs.
+
+Coordinate any shared Q or relationship contract changes through an explicit integration owner.
+
+Avoid concurrent edits to the same files.
+
+If resource or agent limits become a constraint, prioritize preserving working GateQ functionality and completing one verified Hub vertical slice rather than spreading effort across unfinished tasks.
+
+## 11. What is explicitly NOT authorized
+
+- Merging the rejected visual prototype into production.
+- Copying its CSS, typography, colors or visual structure as the new product standard.
+- Rebuilding canonical companies, investors or relationships.
+- Creating independent CRM memory or a second Q runtime.
+- Changing locked InvestIQ scoring.
+- Treating Q inference as investor policy.
+- Exposing private cross-party intelligence.
+- Inventing demo data as production results.
+- Introducing unnecessary new vendors or paid services.
+- Claiming navigation, exports or agent actions work when they are simulated.
+- Starting a full visual redesign without another owner review.
+
+## 12. Begin work
+
+First perform a focused architecture and reuse audit of the existing Results, Relationships, GateQ, Capital, Work and Q modules.
+
+Identify which functionality already exists and what genuinely needs implementation.
+
+Then immediately begin **Slice H1** using the real Capital Q design system.
+
+Continue GateQ independently.
+
+Do not produce a massive strategy report or spend the session redesigning the product.
+
+You have autonomy to discover missing functions, correct problems and improve the experience, while preserving the source-of-truth architecture.
+
+**Deliver working capabilities now. Leave the visual architecture clean enough for a later premium redesign.**
+
+The goal is a powerful, Q-native investment relationship operating environment whose complexity is hidden through excellent information structure—not through missing functionality.

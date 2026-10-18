@@ -26,9 +26,14 @@ const base = {
 };
 
 describe("model provider configuration", () => {
-  it("names exactly the two V1 variables", () => {
+  it("names the provider variables, rotation keys included", () => {
     expect([...MODEL_PROVIDER_ENV_NAMES]).toEqual([
       "GEMINI_API_KEY",
+      // A second Gemini key, so an exhausted free tier moves Q to the
+      // next one instead of stopping it. Both spellings are accepted
+      // because one was already in use without the underscore.
+      "GEMINI_API_KEY_2",
+      "GEMINI_API_KEY2",
       "GROQ_API_KEY",
     ]);
   });
@@ -36,14 +41,26 @@ describe("model provider configuration", () => {
   it("treats each provider as optional and reports presence by name only", () => {
     const none = parseQApiConfig(base);
     expect(modelProviderConfigStatus(none.secrets.modelProviders)).toEqual({
+      // Synthetic-demo routing is off unless an operator asks for it: a
+      // deployment never starts out believing its data is invented.
+      syntheticDemoRouting: false,
       google: "unconfigured",
+      googleKeys: 0,
       groq: "unconfigured",
+      groqKeys: 0,
+      openai: "unconfigured",
+      testProvider: undefined,
     });
 
     const groqOnly = parseQApiConfig({ ...base, GROQ_API_KEY: GROQ });
     expect(modelProviderConfigStatus(groqOnly.secrets.modelProviders)).toEqual({
+      syntheticDemoRouting: false,
       google: "unconfigured",
+      googleKeys: 0,
       groq: "configured",
+      groqKeys: 1,
+      openai: "unconfigured",
+      testProvider: undefined,
     });
     expect(groqOnly.secrets.modelProviders.google).toBeUndefined();
     expect(groqOnly.secrets.modelProviders.groq?.reveal()).toBe(GROQ);
@@ -79,5 +96,19 @@ describe("model provider configuration", () => {
     } catch (error: unknown) {
       expect(String(error)).not.toContain("   ");
     }
+  });
+
+  it("reads an empty key as not configured, so a launch env can switch a paid provider off", () => {
+    const config = parseQApiConfig({
+      ...base,
+      GEMINI_API_KEY: GEMINI,
+      OPENAI_API_KEY: "",
+      OPEN_AI_API_KEY: "  ",
+    });
+    expect(config.secrets.modelProviders.openai).toBeUndefined();
+    expect(
+      modelProviderConfigStatus(config.secrets.modelProviders).openai,
+    ).toBe("unconfigured");
+    expect(config.secrets.modelProviders.google?.reveal()).toBe(GEMINI);
   });
 });

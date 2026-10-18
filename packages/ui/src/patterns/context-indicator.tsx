@@ -29,6 +29,22 @@ type ScopePresentation = {
   }>;
 };
 
+/**
+ * One word for the compact form: a phone shows no hover title, so an icon
+ * alone left "what is this lock?" unanswered (demo audit 2026-10-03).
+ */
+const SHORT: Record<ContextScope, string> = {
+  personal_private: "Private",
+  organisation_private: "Private",
+  founder_private: "Private",
+  investor_private: "Private",
+  relationship_shared: "Shared",
+  specifically_shared: "Shared",
+  network_visible: "Network",
+  public_external: "Public",
+  unset: "No context",
+};
+
 const presentation: Record<ContextScope, ScopePresentation> = {
   personal_private: { label: "Private to you", Icon: Lock },
   organisation_private: { label: "Private to organisation", Icon: Building2 },
@@ -45,20 +61,53 @@ export type ContextIndicatorProps = {
   readonly scope: ContextScope;
   /** Optional trailing detail, e.g. an organisation name. */
   readonly detail?: string | undefined;
+  /**
+   * Icon only, for chrome that has no room for words (the mobile header):
+   * the same scope, its full label carried as the accessible name and the
+   * hover title rather than shown.
+   */
+  readonly compact?: boolean | undefined;
   readonly className?: string | undefined;
+  /** The reader's language (multilingual Q); English when absent. */
+  readonly translate?: ((english: string) => string) | undefined;
 };
 
 export function ContextIndicator({
   scope,
   detail,
+  compact = false,
   className,
+  translate = (english) => english,
 }: ContextIndicatorProps) {
-  const { label, Icon } = presentation[scope];
+  const { label: english, Icon } = presentation[scope];
+  const label = translate(english);
+  if (compact) {
+    const name = detail === undefined ? label : `${label} · ${detail}`;
+    return (
+      <span
+        data-scope={scope}
+        role="img"
+        aria-label={name}
+        title={name}
+        className={cx(
+          "cq-caption inline-flex h-8 shrink-0 items-center justify-center gap-1 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 font-medium text-(--cq-text-secondary)",
+          className,
+        )}
+      >
+        <Icon
+          aria-hidden="true"
+          size={ICON_SIZE.compact}
+          strokeWidth={ICON_STROKE}
+        />
+        <span aria-hidden="true">{translate(SHORT[scope])}</span>
+      </span>
+    );
+  }
   return (
     <span
       data-scope={scope}
       className={cx(
-        "inline-flex min-h-8 min-w-0 max-w-full shrink items-center gap-1.5 overflow-hidden rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 cq-caption font-medium text-(--cq-text-secondary)",
+        "inline-flex min-h-8 min-w-0 max-w-full shrink items-center gap-1.5 overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 cq-caption font-medium text-(--cq-text-secondary)",
         className,
       )}
     >

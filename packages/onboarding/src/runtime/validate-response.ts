@@ -36,6 +36,24 @@ const RESPONSE_TYPE_FOR_STEP: Record<
   reference_select: "RESOURCE_REFERENCE",
 };
 
+/** Steps whose answer may also be the person's own words ("Other: ..."). */
+const OWN_WORDS_STEP_TYPES: ReadonlySet<OnboardingStepType> = new Set([
+  "single_select",
+  "multi_select",
+  "range",
+  "reference_select",
+]);
+/** The longest own-words answer to a choice, number or category question. */
+export const OWN_WORDS_MAX = 500;
+
+/** Whether a response is the person's own words on a structured step. */
+export function isOwnWordsAnswer(
+  stepType: OnboardingStepType,
+  responseType: OnboardingResponseType,
+): boolean {
+  return responseType === "TEXT" && OWN_WORDS_STEP_TYPES.has(stepType);
+}
+
 const ALLOWED_MODALITIES: Record<
   OnboardingResponseType,
   readonly OnboardingSourceModality[]
@@ -105,7 +123,14 @@ export function validateOnboardingResponse(
   const expected = expectedResponseType(step.stepType);
   const { value } = input;
 
-  if (value.type !== expected) {
+  // Their own words are an answer to any question that asks for a choice,
+  // a number or a category, as ticking "Other" and typing is on a form
+  // (owner 2026-10-16: every fact a person gives is saved). Kept verbatim
+  // as TEXT; nothing structured is inferred from it here.
+  const ownWords =
+    value.type === "TEXT" && OWN_WORDS_STEP_TYPES.has(step.stepType);
+  const responseType: OnboardingResponseType = ownWords ? "TEXT" : expected;
+  if (value.type !== expected && !ownWords) {
     throw new ContractValidationError("The onboarding response is not valid.", [
       issue(
         "value.type",
@@ -222,6 +247,16 @@ export function validateOnboardingResponse(
             ),
           );
         }
+      } else if (ownWords) {
+        if (length < 1 || length > OWN_WORDS_MAX) {
+          issues.push(
+            issue(
+              "value.text",
+              length < 1 ? "too_short" : "too_long",
+              `Between 1 and ${String(OWN_WORDS_MAX)} characters.`,
+            ),
+          );
+        }
       } else if (
         configuration.stepType === "voice_text" &&
         length > configuration.maxLength
@@ -315,13 +350,15 @@ export function validateOnboardingResponse(
     }
   }
 
-  const allowed = ALLOWED_MODALITIES[expected];
+  const allowed = ALLOWED_MODALITIES[responseType];
   const defaultModality =
     step.stepType === "voice_text"
       ? "VOICE_TRANSCRIPT"
-      : step.stepType === "reference_select"
-        ? "SELECTION"
-        : allowed[0];
+      : ownWords
+        ? "TYPED_TEXT"
+        : step.stepType === "reference_select"
+          ? "SELECTION"
+          : allowed[0];
   let sourceModality: OnboardingSourceModality;
   if (options.sourceModality !== undefined) {
     sourceModality = options.sourceModality;
@@ -349,9 +386,11 @@ export function validateOnboardingResponse(
 
   return {
     stepKey: step.stepKey,
-    responseType: expected,
+    responseType,
     value,
     rawText: value.type === "TEXT" ? value.text : null,
+    note: input.note ?? null,
     sourceModality,
+    channel: input.channel ?? null,
   };
 }

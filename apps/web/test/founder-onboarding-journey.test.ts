@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { OnboardingSessionViewSchema } from "@capital-q/contracts";
-import { FOUNDER_STEPS } from "@capital-q/founder-onboarding/definition";
+import {
+  FOUNDER_FINANCIAL_STEPS,
+  FOUNDER_STEPS,
+} from "@capital-q/founder-onboarding/definition";
 
 import { FounderOnboardingClientError } from "../src/features/founder-onboarding/adapters/client";
 import {
@@ -245,7 +248,7 @@ describe("founder journey over the runtime contract", () => {
     expect(snapshot.headline).toBe("Here's what we have so far.");
     const text = JSON.stringify(snapshot);
     expect(text).toContain("NexaRail Technologies");
-    expect(text).toContain("Raising USD 500000");
+    expect(text).toContain("Raising USD 500,000");
     expect(text).toContain("2 founders, 2 full-time");
     expect(text).not.toMatch(/readiness|score|verified|Q inferred|match/i);
     // The founder skipped F2, so material to share is an open gap — stated
@@ -311,7 +314,7 @@ describe("founder journey over the runtime contract", () => {
     });
     // Everything after was already visited: the client jumps forward.
     expect(session.currentStepId).toBe("snapshot");
-    expect(JSON.stringify(session.step)).toContain("Raising USD 3000000");
+    expect(JSON.stringify(session.step)).toContain("Raising USD 3,000,000");
   });
 
   it("revenue-stage companies get the revenue traction variant", async () => {
@@ -411,11 +414,58 @@ describe("founder journey over the runtime contract", () => {
       FOUNDER_STEPS.instrument,
       FOUNDER_STEPS.timeframe,
       FOUNDER_STEPS.useOfFunds,
+      FOUNDER_FINANCIAL_STEPS.minCheque,
       FOUNDER_STEPS.raiseConfirm,
     ]);
   });
 
-  it("refuses a session pinned to a definition version this build cannot present", async () => {
+  it("v4: the smallest cheque is submitted when given and skipped (never 0) when empty", () => {
+    const raise = requireGroup("capital_objective");
+    const plan = (minCheque?: string) =>
+      planSubmissions(raise, {
+        kind: "capital_objective",
+        raisingStatus: "active",
+        targetAmount: { amount: "2000000", currency: "USD" },
+        ...(minCheque === undefined ? {} : { minCheque }),
+      }).find((s) => s.stepKey === FOUNDER_FINANCIAL_STEPS.minCheque);
+    expect(plan("50000")).toMatchObject({
+      action: "submit",
+      value: { type: "RANGE", value: "50000" },
+    });
+    expect(plan()).toMatchObject({ action: "skip" });
+  });
+
+  it("v4: the financials block is asked on the traction screen, each answer or unknown on its own step", () => {
+    const traction = requireGroup("traction");
+    expect(traction.stepKeys).toEqual(
+      expect.arrayContaining(
+        Object.values(FOUNDER_FINANCIAL_STEPS).filter(
+          (key) => key !== FOUNDER_FINANCIAL_STEPS.minCheque,
+        ),
+      ),
+    );
+    const planned = planSubmissions(traction, {
+      kind: "traction",
+      metrics: {
+        [FOUNDER_STEPS.signal]: { value: "waitlist" },
+        [FOUNDER_FINANCIAL_STEPS.cash]: { unknown: true },
+        [FOUNDER_FINANCIAL_STEPS.monthlyBurn]: { value: "40000" },
+      },
+    });
+    const byKey = new Map(planned.map((s) => [s.stepKey, s]));
+    expect(byKey.get(FOUNDER_FINANCIAL_STEPS.cash)).toMatchObject({
+      action: "skip",
+    });
+    expect(byKey.get(FOUNDER_FINANCIAL_STEPS.monthlyBurn)).toMatchObject({
+      action: "submit",
+      value: { type: "RANGE", value: "40000" },
+    });
+    expect(byKey.get(FOUNDER_FINANCIAL_STEPS.runway)).toMatchObject({
+      action: "leave",
+    });
+  });
+
+  it("presents a session whose definition has a step this build has no screen for (live 2026-10-16)", async () => {
     const port = createFixtureRuntimePort({ storage: null, seed: "reset" });
     const unknownVersion: RuntimePort = {
       ...port,
@@ -423,11 +473,65 @@ describe("founder journey over the runtime contract", () => {
         const view = await port.current();
         return view === null
           ? null
-          : { ...view, session: { ...view.session, definitionVersion: 3 } };
+          : // A later version is presentable unless its path holds a step
+            // this build cannot draw.
+            {
+              ...view,
+              session: { ...view.session, definitionVersion: 99 },
+              progress: {
+                ...view.progress,
+                eligibleSteps: [
+                  ...view.progress.eligibleSteps,
+                  {
+                    stepKey: "F9.unknown_question",
+                    phaseKey: "F9",
+                    required: false,
+                    status: "PENDING" as const,
+                  },
+                ],
+              },
+            };
       },
     };
+    // Never refused: the unknown step is drawn as its question and a text
+    // field when the journey reaches it (fallbackGroup).
     await expect(
       createRuntimeFounderClient(unknownVersion, SOURCE).getSession(),
-    ).rejects.toMatchObject({ kind: "UNAVAILABLE" });
+    ).resolves.toMatchObject({ status: "in_progress" });
+  });
+});
+
+describe("the website Q found (founder live 2026-10-05)", () => {
+  it("is offered on the company step while no website is recorded", async () => {
+    const port = createFixtureRuntimePort({ storage: null, seed: "reset" });
+    const founder = createRuntimeFounderClient(port, SOURCE);
+    await founder.getSession();
+    await founder.saveResponse({
+      stepId: "intent",
+      response: { kind: "choice", value: "raising_now" },
+    });
+    const view = await port.current();
+    if (view === null) throw new Error("no session");
+    const suggestion = {
+      id: "s-1",
+      stepId: "company_basics",
+      label: "Your company",
+      value: "https://zinoaviation.com",
+      source: undefined,
+      confidence: undefined,
+      stepKey: FOUNDER_STEPS.website,
+    };
+    const presented = toPresentation(view, SOURCE, {
+      suggestions: [suggestion],
+    });
+    const basics = expectKind(presented.step, "company_basics");
+    expect(basics.suggestedWebsite).toBe("https://zinoaviation.com");
+    // Another step's suggestion is not a website.
+    const other = toPresentation(view, SOURCE, {
+      suggestions: [{ ...suggestion, stepKey: FOUNDER_STEPS.description }],
+    });
+    expect(
+      expectKind(other.step, "company_basics").suggestedWebsite,
+    ).toBeUndefined();
   });
 });

@@ -116,6 +116,9 @@ function emptyResult(
   };
 }
 
+/** A retrieval longer than this is reported step by step, not as a total. */
+const SLOW_RETRIEVAL_MS = 2_000;
+
 export function createAuthorisedRetrievalService(
   dependencies: AuthorisedRetrievalDependencies,
 ): AuthorisedRetrievalService {
@@ -168,6 +171,8 @@ export function createAuthorisedRetrievalService(
     }
   }
 
+  let warnedUnconfigured = false;
+
   async function runSemantic(
     envelope: RetrievalPermissionEnvelope,
     text: string,
@@ -192,12 +197,19 @@ export function createAuthorisedRetrievalService(
     let vector: readonly number[];
     let dimension: number;
     let configurationVersion: string;
+    // A budget of its own, well under the provider's. A query embedding
+    // that takes longer than a person will wait is not worth having: the
+    // lexical half still runs, the answer still comes, and the retrieval
+    // says it was degraded. Without this, one cold or busy embedder held a
+    // retrieval for twelve seconds before any model had been asked
+    // anything, with the sixty-second provider timeout as the only limit.
+    const budget = AbortSignal.timeout(config.queryEmbeddingBudgetMs);
+    const bounded =
+      signal === undefined ? budget : AbortSignal.any([signal, budget]);
     try {
-      const result = await embeddings.embedQuery(
-        text,
-        "EVIDENCE_RETRIEVAL",
-        signal === undefined ? undefined : { signal },
-      );
+      const result = await embeddings.embedQuery(text, "EVIDENCE_RETRIEVAL", {
+        signal: bounded,
+      });
       vector = result.vector;
       dimension = result.dimension;
       configurationVersion = result.configurationVersion;
@@ -205,7 +217,22 @@ export function createAuthorisedRetrievalService(
       // The local runtime is unavailable. There is no fallback: sending a
       // private evidence query to an external embedding API to keep search
       // working would trade a privacy guarantee for an availability one.
-      logger?.error({ err: error }, "query embedding failed");
+      // A runtime that is not configured at all (no Q_EMBEDDING_BASE_URL on
+      // this deployment) is a standing state, not an incident: lexical
+      // retrieval answers, the degradation travels with the result, and it
+      // is logged once rather than as an error on every turn (lead
+      // 2026-10-04, run 13955ca2).
+      const unconfigured =
+        error instanceof Error && /not configured/u.test(error.message);
+      if (!unconfigured) {
+        logger?.error({ err: error }, "query embedding failed");
+      } else if (!warnedUnconfigured) {
+        warnedUnconfigured = true;
+        logger?.warn(
+          { reason: "EMBEDDING_UNAVAILABLE" },
+          "no embedding runtime configured; retrieval is lexical only",
+        );
+      }
       return {
         candidates: [],
         state: "UNAVAILABLE",
@@ -353,19 +380,29 @@ export function createAuthorisedRetrievalService(
       const wantsLexical = requested !== "SEMANTIC_ONLY";
       const wantsSemantic = requested !== "LEXICAL_ONLY";
 
-      const lexicalOutcome = wantsLexical
-        ? await runLexical(envelope, text)
-        : { candidates: [], state: "NOT_ATTEMPTED" as const, ms: null };
-      throwIfCancelled(request.signal);
-      const semanticOutcome = wantsSemantic
-        ? await runSemantic(envelope, text, request.signal)
-        : {
-            candidates: [],
-            state: "NOT_ATTEMPTED" as const,
-            embeddingMs: null,
-            searchMs: null,
-            reason: null,
-          };
+      // Lexical and semantic are parallel components of one hybrid step
+      // (ADR-001), under the one envelope already resolved above: neither
+      // widens what the other may read, and each degrades on its own. Run
+      // concurrently, the step costs the slower half (usually the query
+      // embedding) instead of their sum (2026-10-12).
+      const [lexicalOutcome, semanticOutcome] = await Promise.all([
+        wantsLexical
+          ? runLexical(envelope, text)
+          : Promise.resolve({
+              candidates: [] as readonly LexicalCandidate[],
+              state: "NOT_ATTEMPTED" as const,
+              ms: null,
+            }),
+        wantsSemantic
+          ? runSemantic(envelope, text, request.signal)
+          : Promise.resolve({
+              candidates: [] as readonly SemanticCandidate[],
+              state: "NOT_ATTEMPTED" as const,
+              embeddingMs: null,
+              searchMs: null,
+              reason: null,
+            }),
+      ]);
       throwIfCancelled(request.signal);
 
       const degraded: RetrievalDegradation = {
@@ -469,19 +506,31 @@ export function createAuthorisedRetrievalService(
       // Counts and codes only: no query text, no chunk text, no title, and
       // no count of what was excluded — "3 results were withheld" discloses
       // existence as surely as naming the file would.
-      logger?.debug(
-        {
-          planId: envelope.planId,
-          configVersion: config.configVersion,
-          strategy: executed,
-          lexicalCandidates: lexicalOutcome.candidates.length,
-          semanticCandidates: semanticOutcome.candidates.length,
-          fusedCandidates: fused.length,
-          hits: hits.length,
-          totalMs,
-        },
-        "authorised retrieval completed",
-      );
+      const timings = {
+        planId: envelope.planId,
+        configVersion: config.configVersion,
+        strategy: executed,
+        degraded: degraded.reason,
+        lexicalCandidates: lexicalOutcome.candidates.length,
+        semanticCandidates: semanticOutcome.candidates.length,
+        fusedCandidates: fused.length,
+        hits: hits.length,
+        lexicalMs: lexicalOutcome.ms,
+        queryEmbeddingMs: semanticOutcome.embeddingMs,
+        semanticMs: semanticOutcome.searchMs,
+        fusionMs,
+        expansionMs,
+        totalMs,
+      };
+      // Which step took the time, at a level somebody will see, whenever
+      // a retrieval is slow enough to be felt. A twelve-second retrieval
+      // was once logged as a single total, and nothing said where the
+      // seconds went.
+      if (totalMs >= SLOW_RETRIEVAL_MS) {
+        logger?.warn(timings, "authorised retrieval was slow");
+      } else {
+        logger?.debug(timings, "authorised retrieval completed");
+      }
 
       return {
         configVersion: config.configVersion,

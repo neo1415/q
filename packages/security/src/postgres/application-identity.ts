@@ -28,6 +28,8 @@ export type ApplicationIdentityLookup = {
   readonly lookup: (
     principal: AuthenticatedPrincipal,
   ) => Promise<ApplicationIdentity | null>;
+  // Edits to the person's profile go through the one person-profile store
+  // (person-profile-store.ts, BIZ-002), never through a lookup.
 };
 
 const RowSchema = z.object({

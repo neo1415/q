@@ -10,11 +10,20 @@ import {
   type RetrievalHit,
 } from "@capital-q/q-knowledge";
 import type { QToolExecutionContext, QToolPort } from "@capital-q/q-runtime";
+import {
+  mandateStatement,
+  ownInvestorOrganisationIn,
+  ownProfileFact,
+} from "@capital-q/model-gateway/q";
 
 import type {
   CompanyCanonicalPort,
   CompanyEvidencePort,
   CompanyKnowledgePort,
+  CompanyResearchPort,
+  CompanyResearchRead,
+  PublicWebComparisonNote,
+  PublicWebSource,
 } from "./ports.js";
 
 /**
@@ -46,12 +55,14 @@ export function createToolCanonicalPort(
 ): CompanyCanonicalPort {
   return {
     read: async (context: QToolExecutionContext, companyId: string) => {
-      const offered = await tools.offer(context);
+      // What the run may use, unnarrowed by a turn's focus: code calls these.
+      const offered = await (tools.available ?? tools.offer)(context);
       const names = new Set(offered.map((tool) => tool.definition.name));
       const facts: AuthorisedFact[] = [];
       let toolCalls = 0;
       let available = false;
       let canonicalName: string | null = null;
+      let description: string | null = null;
 
       if (names.has("get_company")) {
         toolCalls += 1;
@@ -101,12 +112,13 @@ export function createToolCanonicalPort(
             evidenceStatus: "SELF_REPORTED",
             source: "Capital Q canonical company record",
           });
-          const description =
+          const described =
             company.primaryDescription ?? company.shortDescription;
-          if (description !== null && description.trim().length > 0) {
+          if (described !== null && described.trim().length > 0) {
+            description = described.trim();
             facts.push({
               scope: "COMPANY_PROFILE",
-              statement: description,
+              statement: described,
               truthClass: "USER_CLAIM",
               evidenceStatus: "SELF_REPORTED",
               source: "Capital Q canonical company record",
@@ -127,6 +139,13 @@ export function createToolCanonicalPort(
         );
         if (outcome.result.ok) {
           const payload = outcome.result.data as {
+            availability?: "CURRENT" | "NONE" | "NOT_SHARED_WITH_YOU";
+            /** R2: the one raise read, as the card and the profile say it. */
+            raise?: {
+              source: "DISCLOSED_OBJECTIVE" | "PITCH_CLAIM" | "NONE";
+              money: { amount: string; currency: string } | null;
+              pitch: { atSeconds: number } | null;
+            };
             objective: {
               objectiveType: string;
               status: string;
@@ -139,6 +158,39 @@ export function createToolCanonicalPort(
           // Null means the company has no current objective. Unknown stays
           // unknown: nothing here turns an absent objective into "not
           // raising", which would be an assertion nobody made.
+          const pitchRaise =
+            payload.raise?.source === "PITCH_CLAIM" &&
+            payload.raise.money !== null
+              ? payload.raise.money
+              : null;
+          if (
+            payload.availability === "NOT_SHARED_WITH_YOU" &&
+            pitchRaise !== null
+          ) {
+            // R2: nothing disclosed, but their own pitch says it -- the
+            // same figure and label the Discover card and the profile show.
+            // The company's claim in a video, never a disclosed or verified
+            // raise, and never the founder-private objective.
+            facts.push({
+              scope: "CAPITAL_OBJECTIVE",
+              statement: `The company has not disclosed a raise to you on Capital Q. In their pitch video they say they are raising ${pitchRaise.amount} ${pitchRaise.currency}${payload.raise?.pitch == null ? "" : ` (at ${String(Math.floor(payload.raise.pitch.atSeconds / 60))}:${String(payload.raise.pitch.atSeconds % 60).padStart(2, "0")})`}: the company's own claim from its pitch, not a disclosed or verified figure.`,
+              truthClass: "USER_CLAIM",
+              evidenceStatus: "SELF_REPORTED",
+              source: "The company's pitch video (its own words)",
+            });
+          } else if (payload.availability === "NOT_SHARED_WITH_YOU") {
+            // Private (or absent) to this person: said as such, so the
+            // answer is "not shared with you", never "unknown" and never
+            // a guess (R35).
+            facts.push({
+              scope: "CAPITAL_OBJECTIVE",
+              statement:
+                "The company has not shared its raise (amount, instrument or terms) with you on Capital Q.",
+              truthClass: "VERIFIED",
+              evidenceStatus: "PLATFORM_VERIFIED",
+              source: "Capital Q disclosure settings",
+            });
+          }
           if (payload.objective !== null) {
             const objective = payload.objective;
             const amount =
@@ -175,14 +227,48 @@ export function createToolCanonicalPort(
         }
       }
 
+      /**
+       * The person's OWN declared mandate, when the run carries their own
+       * investor organisation beside the company (CQ-QX-007 fit). "Is this
+       * one worth my time given what I invest in?" is answered from what
+       * they declared, criterion by criterion, and that is only possible
+       * if the declaration is in front of the model. The tool authorises
+       * against the plan's INVESTOR_MANDATE scope for that organisation,
+       * which the firewall admits only to its owner: a founder's run about
+       * an investor never holds it, and nothing here can widen that.
+       */
+      const ownInvestor = ownInvestorOrganisationIn(context.plan);
+      if (names.has("get_investor_mandate") && ownInvestor !== null) {
+        toolCalls += 1;
+        const outcome = await tools.execute(
+          {
+            callId: "specialist-own-mandate",
+            name: "get_investor_mandate",
+            arguments: { investorOrganisationId: ownInvestor },
+          },
+          context,
+        );
+        if (outcome.result.ok) {
+          // Declared by the investor about themselves; the same fact the
+          // conversational path puts in front of the model.
+          const own = ownProfileFact(outcome.result.data);
+          if (own !== null) {
+            facts.push(own);
+          }
+        }
+      }
+
       logger?.debug(
         { companyId, toolCalls, available },
         "canonical company state read",
       );
-      return { facts, toolCalls, available, canonicalName };
+      return { facts, toolCalls, available, canonicalName, description };
     },
   };
 }
+
+/** Re-exported: the one statement of a declared mandate lives in the gateway's own-profile module. */
+export { mandateStatement };
 
 /** Authorised Q Knowledge reads under the plan's own envelope (§16, §46). */
 export function createKnowledgeCompanyPort(
@@ -274,6 +360,105 @@ export function createRetrievalEvidencePort(
         "company intelligence retrieval",
       );
       return result.hits.slice(0, COMPANY_PASSAGE_LIMIT);
+    },
+  };
+}
+
+/**
+ * Public-web research through the Tool Registry (CQ-Q-RESEARCH-001 §24).
+ *
+ * Called deterministically, like the canonical read: the specialist decides
+ * from the person's words whether to research at all, the registry decides
+ * whether this run may, and the research capability decides what leaves.
+ * The model is never offered the tool and cannot be talked into a search
+ * by text inside a document or a page. A tool that is not offered to this
+ * run is reported as such; nothing is sent.
+ */
+export function createToolResearchPort(
+  tools: QToolPort,
+  logger?: Logger,
+): CompanyResearchPort {
+  return {
+    research: async (context: QToolExecutionContext, input) => {
+      // What the run may use, unnarrowed by a turn's focus: code calls these.
+      const offered = await (tools.available ?? tools.offer)(context);
+      if (
+        !offered.some((tool) => tool.definition.name === "research_public_web")
+      ) {
+        return {
+          status: "NOT_OFFERED",
+          message: null,
+          sources: [],
+          comparison: [],
+          toolCalls: 0,
+        };
+      }
+      const outcome = await tools.execute(
+        {
+          callId: "specialist-research",
+          name: "research_public_web",
+          arguments: {
+            // The person's words, bounded. The tool composes the real query
+            // from these and the authorised identity; private tokens drop.
+            query: input.question.trim().slice(0, 200) || "company",
+            ...(input.companyId === undefined
+              ? {}
+              : { companyId: input.companyId }),
+          },
+        },
+        context,
+      );
+      if (!outcome.result.ok) {
+        // Denied or failed reads are one plain outcome; the reason stays in
+        // the tool's own telemetry.
+        logger?.debug(
+          { qRunId: context.runId, status: outcome.status },
+          "public research not available to this investigation",
+        );
+        return {
+          status: "NOT_OFFERED",
+          message: null,
+          sources: [],
+          comparison: [],
+          toolCalls: 1,
+        };
+      }
+      const data = outcome.result.data as {
+        status: CompanyResearchRead["status"];
+        message: string | null;
+        sources: readonly PublicWebSource[];
+        comparison: readonly PublicWebComparisonNote[];
+      };
+      const read: CompanyResearchRead = {
+        status: data.status,
+        message: data.message,
+        sources: data.sources.map((source) => ({
+          index: source.index,
+          url: source.url,
+          domain: source.domain,
+          title: source.title,
+          publishedAt: source.publishedAt,
+          retrievedAt: source.retrievedAt,
+          temporal: source.temporal,
+          excerpt: source.excerpt,
+          isSubjectWebsite: source.isSubjectWebsite,
+          mentionedCountries: [...source.mentionedCountries],
+          instructionRiskSignals: source.instructionRiskSignals,
+          recordedAsEvidence: source.recordedAsEvidence,
+        })),
+        comparison: data.comparison.map((note) => ({ ...note })),
+        toolCalls: 1,
+      };
+      logger?.debug(
+        {
+          qRunId: context.runId,
+          status: read.status,
+          sources: read.sources.length,
+          comparison: read.comparison.length,
+        },
+        "public research read",
+      );
+      return read;
     },
   };
 }

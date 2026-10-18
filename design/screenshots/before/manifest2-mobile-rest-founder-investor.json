@@ -1,0 +1,107 @@
+[
+  {
+    "page": "capital-empty",
+    "viewport": "mobile",
+    "file": "capital-empty-mobile.png",
+    "url": "http://127.0.0.1:3000/capital",
+    "note": "Capital empty state"
+  },
+  {
+    "page": "profile-fresh",
+    "viewport": "mobile",
+    "file": "profile-fresh-mobile.png",
+    "url": "http://127.0.0.1:3000/profile",
+    "note": ""
+  },
+  {
+    "page": "company-visibility-fresh",
+    "viewport": "mobile",
+    "file": "company-visibility-fresh-mobile.png",
+    "url": "http://127.0.0.1:3000/company/visibility",
+    "note": ""
+  },
+  {
+    "page": "onboarding-founder-conversation",
+    "viewport": "mobile",
+    "file": "onboarding-founder-conversation-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "Q-led founder onboarding"
+  },
+  {
+    "page": "onboarding-founder-f0-form",
+    "viewport": "mobile",
+    "file": "onboarding-founder-f0-form-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": ""
+  },
+  {
+    "page": "onboarding-investor-conversation",
+    "viewport": "mobile",
+    "file": "onboarding-investor-conversation-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": ""
+  },
+  {
+    "page": "onboarding-investor-i0-form",
+    "viewport": "mobile",
+    "file": "onboarding-investor-i0-form-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": ""
+  },
+  {
+    "page": "founder-f0-intent",
+    "viewport": "mobile",
+    "file": "founder-f0-intent-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "What brings you to Capital Q?"
+  },
+  {
+    "page": "founder-f0-intent",
+    "viewport": "mobile",
+    "file": "founder-f0-intent-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "What brings you to Capital Q?"
+  },
+  {
+    "page": "founder-failure",
+    "viewport": "mobile",
+    "file": "founder-failure-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/founder",
+    "note": "TimeoutError: locator.check: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('radio', { name: /I'm rai"
+  },
+  {
+    "page": "investor-i1-deployment",
+    "viewport": "mobile",
+    "file": "investor-i1-deployment-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Are you deploying capital right now?"
+  },
+  {
+    "page": "investor-i1-deployment",
+    "viewport": "mobile",
+    "file": "investor-i1-deployment-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Are you deploying capital right now?"
+  },
+  {
+    "page": "investor-i2-stage-cheque",
+    "viewport": "mobile",
+    "file": "investor-i2-stage-cheque-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Stage and cheque"
+  },
+  {
+    "page": "investor-i2-stage-cheque",
+    "viewport": "mobile",
+    "file": "investor-i2-stage-cheque-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "Stage and cheque"
+  },
+  {
+    "page": "investor-failure",
+    "viewport": "mobile",
+    "file": "investor-failure-mobile.png",
+    "url": "http://127.0.0.1:3000/onboarding/investor",
+    "note": "TimeoutError: locator.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('textbox', { name: 'Minimu"
+  }
+]

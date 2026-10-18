@@ -40,11 +40,18 @@ import type { MaterialFileView, MaterialState } from "./materials";
  */
 
 const UploadInput = z.object({
-  companyId: z.string().uuid(),
+  /** Absent for an organisation's own documents (an investor's profile or mandate). */
+  companyId: z.string().uuid().optional(),
   documentType: DocumentTypeSchema,
   filename: z.string().min(1).max(255),
   mimeType: z.string().min(3).max(129),
   sizeBytes: z.number().int().min(1),
+  /**
+   * Q room W7: one key per dropped file, so a retry after a lost response
+   * gets the same upload session back (Evidence replays it) instead of a
+   * second document. Absent, each call is its own upload.
+   */
+  idempotencyKey: z.string().uuid().optional(),
 });
 
 /** What the browser needs to put the bytes somewhere it is allowed to. */
@@ -64,7 +71,7 @@ async function run<T>(
     return {
       ok: false,
       kind: "REJECTED",
-      message: "Please sign in again to continue.",
+      message: "Your session ended. Sign in again to continue.",
     };
   }
   const config = loadWebServerConfig();
@@ -109,14 +116,16 @@ export async function materialUploadTargetAction(
     const created = await createDocumentUploadSession(
       session,
       {
-        companyId: input.companyId,
+        ...(input.companyId === undefined
+          ? {}
+          : { companyId: input.companyId }),
         documentType: input.documentType,
         title: input.filename.replace(/\.[^.]+$/, "").slice(0, 200),
         filename: input.filename,
         declaredMimeType: input.mimeType,
         declaredSizeBytes: input.sizeBytes,
       },
-      randomUUID(),
+      input.idempotencyKey ?? randomUUID(),
     );
     if (created.upload === null) {
       // The API declined to issue a target. Treated as a refusal, not as a
@@ -140,14 +149,21 @@ export async function materialUploadTargetAction(
 /** Step three: the server verifies what actually landed. */
 export async function materialUploadCompleteAction(
   rawUploadSessionId: string,
+  rawIdempotencyKey?: string,
 ): Promise<ActionResult<{ readonly documentId: string }>> {
   const uploadSessionId = z.string().uuid().parse(rawUploadSessionId);
+  // Q room W7: a retried completion of the same drop carries the same key;
+  // a completed session replays its document either way.
+  const idempotencyKey =
+    rawIdempotencyKey === undefined
+      ? randomUUID()
+      : z.string().uuid().parse(rawIdempotencyKey);
   return run(async (session) => {
     const completed = await completeDocumentUploadSession(
       session,
       uploadSessionId,
       {},
-      randomUUID(),
+      idempotencyKey,
     );
     return { documentId: completed.document.id };
   });
@@ -184,7 +200,10 @@ function stateOf(document: {
     };
   }
   if (version.textExtractionStatus === "COMPLETED") {
-    return { state: "ready", label: "Read" };
+    // ADR 0042: read and shareable, but no scanner has looked at it.
+    return version.malwareScanStatus === "NOT_SCANNED"
+      ? { state: "ready", label: "Read · Not virus-scanned yet" }
+      : { state: "ready", label: "Read" };
   }
   switch (version.processingStatus) {
     case "NOT_STARTED":
@@ -203,6 +222,9 @@ const TYPE_LABELS: Readonly<Record<string, string>> = {
   FINANCIAL_MODEL: "Financial model",
   MANAGEMENT_ACCOUNTS: "Management accounts",
   COMPANY_PROFILE: "Company profile",
+  FUND_DECK: "Fund deck",
+  INVESTMENT_THESIS: "Investment thesis",
+  LP_LETTER: "LP letter",
   OTHER: "Other material",
   UNCLASSIFIED: "Document",
 };
@@ -215,17 +237,24 @@ const TYPE_LABELS: Readonly<Record<string, string>> = {
  * remember wrongly.
  */
 export async function materialListAction(
-  rawCompanyId: string,
+  rawCompanyId?: string,
 ): Promise<ActionResult<readonly MaterialFileView[]>> {
-  const companyId = z.string().uuid().parse(rawCompanyId);
+  const companyId =
+    rawCompanyId === undefined
+      ? undefined
+      : z.string().uuid().parse(rawCompanyId);
   return run(async (session) => {
-    const listed = await listDocuments(session, { companyId });
+    const listed = await listDocuments(
+      session,
+      companyId === undefined ? {} : { companyId },
+    );
     return listed.documents.map((document): MaterialFileView => {
       const { state, label } = stateOf(document);
       return {
         id: document.id,
         filename: document.currentVersion?.originalFilename ?? document.title,
         kindLabel: TYPE_LABELS[document.documentType] ?? "Document",
+        documentType: document.documentType,
         state,
         stateLabel: label,
       };

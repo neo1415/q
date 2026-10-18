@@ -1,8 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import {
   ME_PATH,
+  ME_PROFILE_PATH,
   MeResponseSchema,
+  PersonProfileDtoSchema,
   type MeResponse,
+  type PersonProfileDto,
 } from "@capital-q/contracts";
 import {
   ActorContextDeniedError,
@@ -12,6 +15,9 @@ import {
   parseOrganisationSelector,
   resolveHumanActorContext,
   type ActorContextResolver,
+  type AuthenticatedPrincipal,
+  type PersonProfile,
+  type PersonProfileStore,
 } from "@capital-q/security";
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 
@@ -25,7 +31,24 @@ export type MeRouteDependencies = {
   readonly authenticator: RequestAuthenticator;
   readonly resolver: ActorContextResolver;
   readonly identities: ApplicationIdentityLookup;
+  /**
+   * The person's own editable profile (BIZ-002): the same store Q's
+   * approved `person.profile.update` executes through, so the page and Q
+   * share one write path. Absent: the profile routes are not served and
+   * `PATCH /v1/me` refuses.
+   */
+  readonly people?: PersonProfileStore | undefined;
 };
+
+function toPersonProfileDto(profile: PersonProfile): PersonProfileDto {
+  return PersonProfileDtoSchema.parse({
+    userId: profile.userId,
+    displayName: profile.displayName,
+    headline: profile.headline,
+    version: profile.version,
+    updatedAt: profile.updatedAt,
+  });
+}
 
 /**
  * `GET /v1/me` -- the one place a client learns who the server thinks is
@@ -47,13 +70,50 @@ export function registerMeRoute(
   app: FastifyInstance,
   dependencies: MeRouteDependencies,
 ): void {
+  const authenticated = requireAuthenticationHook({
+    authenticator: dependencies.authenticator,
+  });
+  const people = dependencies.people;
+
+  /**
+   * The acting person's own profile. The user id comes from the verified
+   * session and nowhere else; an absent, suspended or closed profile is
+   * one answer, the same as "no access".
+   */
+  const ownProfile = async (
+    principal: AuthenticatedPrincipal,
+  ): Promise<{
+    readonly store: PersonProfileStore;
+    profile: PersonProfile;
+  }> => {
+    const identity = await dependencies.identities.lookup(principal);
+    const profile =
+      identity === null || people === undefined
+        ? null
+        : await people.read(identity.userId);
+    if (profile === null || people === undefined) {
+      throw new ActorContextDeniedError();
+    }
+    return { store: people, profile };
+  };
+
+  // PATCH /v1/me and /v1/me/profile are generated from the action registry,
+  // person-scoped (ADR 0040, http/app-actions.ts), through the same store.
+  if (people !== undefined) {
+    app.get(
+      ME_PROFILE_PATH,
+      { onRequest: authenticated },
+      async (request, reply) => {
+        const { profile } = await ownProfile(getPrincipal(request));
+        void reply.header("Cache-Control", "no-store");
+        return toPersonProfileDto(profile);
+      },
+    );
+  }
+
   app.get(
     ME_PATH,
-    {
-      onRequest: requireAuthenticationHook({
-        authenticator: dependencies.authenticator,
-      }),
-    },
+    { onRequest: authenticated },
     async (request, reply): Promise<MeResponse> => {
       const principal = getPrincipal(request);
 

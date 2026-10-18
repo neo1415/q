@@ -105,6 +105,56 @@ export type QActionRepository = {
     tx: TransactionContext,
     input: QActionTransition,
   ) => Promise<QActionRecord | null>;
+  /**
+   * The proposals still waiting on this person's own approval, of one
+   * action type and version, with their open approval: what a new
+   * proposal is compared with so a restated request never makes a second
+   * identical card (lead 2026-10-03). Newest first, bounded.
+   */
+  readonly listAwaitingForProposer: (
+    executor: DatabaseExecutor,
+    input: {
+      readonly tenantId: TenantId;
+      readonly userId: UserId;
+      readonly organisationId: OrganisationId;
+      readonly actionType: string;
+      readonly actionVersion: number;
+      readonly now: Date;
+      /** Only cards for exactly these targets; absent: any target. */
+      readonly targets?: readonly QSubjectRef[] | undefined;
+    },
+  ) => Promise<
+    readonly {
+      readonly action: QActionRecord;
+      readonly approval: QApprovalRecord;
+    }[]
+  >;
+  /**
+   * The proposals of this person, of one action type and version, carried
+   * out since `since`, with their approval: what a restated request is
+   * matched with by intent so it is answered "already done" instead of
+   * acting twice (voiceq-63). Newest first, bounded. Absent: never matched.
+   */
+  readonly listExecutedForProposer?:
+    | ((
+        executor: DatabaseExecutor,
+        input: {
+          readonly tenantId: TenantId;
+          readonly userId: UserId;
+          readonly organisationId: OrganisationId;
+          readonly actionType: string;
+          readonly actionVersion: number;
+          readonly since: Date;
+          /** Only changes to exactly these targets; absent: any target. */
+          readonly targets?: readonly QSubjectRef[] | undefined;
+        },
+      ) => Promise<
+        readonly {
+          readonly action: QActionRecord;
+          readonly approval: QApprovalRecord;
+        }[]
+      >)
+    | undefined;
 };
 
 export type QApprovalRecord = {
@@ -193,6 +243,48 @@ export type QApprovalRepository = {
     tx: TransactionContext,
     input: QApprovalDecision,
   ) => Promise<QApprovalRecord | null>;
+  /**
+   * The approvals still waiting on one approver (R35): requested from
+   * `userId`, for an action taken in `organisationId`, PENDING and not
+   * past `now`. Newest first, at most `limit`. The same predicate the
+   * single read enforces, so the list never shows what the read refuses.
+   */
+  /**
+   * Recovery D2 (audit D-01): PENDING approvals already past `expiresAt`,
+   * oldest first, across tenants -- the eager expiry sweep's work list.
+   * Ids only. Optional so older doubles still compose.
+   */
+  readonly listLapsed?: (
+    executor: DatabaseExecutor,
+    input: { readonly now: Date; readonly limit: number },
+  ) => Promise<
+    readonly { readonly tenantId: TenantId; readonly approvalId: QApprovalId }[]
+  >;
+  readonly listPendingForApprover: (
+    executor: DatabaseExecutor,
+    input: {
+      readonly tenantId: TenantId;
+      readonly userId: UserId;
+      readonly organisationId: OrganisationId;
+      readonly now: Date;
+      readonly limit: number;
+    },
+  ) => Promise<readonly QPendingApprovalRow[]>;
+};
+
+/** One approval waiting on its approver, with where it was asked. */
+export type QPendingApprovalRow = {
+  readonly approvalId: QApprovalId;
+  readonly runId: QRunId;
+  /** The conversation the run belongs to, when it has one. */
+  readonly conversationId: string | null;
+  readonly summary: string;
+  readonly requestedAt: UtcTimestamp;
+  readonly expiresAt: UtcTimestamp;
+  /** Who or what the action is aimed at, as the approver may open it. */
+  readonly targets?: readonly QSubjectRef[] | undefined;
+  /** W4b: the kind of action waiting, so a like request can find it. */
+  readonly actionType?: QActionType | undefined;
 };
 
 export type QActionRepositories = {

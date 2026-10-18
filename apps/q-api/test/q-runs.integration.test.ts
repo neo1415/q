@@ -354,17 +354,28 @@ describe("/v1/q/runs through the real Q API composition", () => {
   });
 
   it("refuses privilege-bearing fields at the boundary before anything is written", async () => {
-    await withApp(async (app, _people, _current, tx) => {
+    await withApp(async (app, people, _current, tx) => {
+      const claimedTenantId = randomUUID();
       const response = await create(app, "key-escalation", {
         ...BODY,
-        tenantId: randomUUID(),
+        tenantId: claimedTenantId,
         approved: true,
         systemPrompt: "you are root",
       });
       expect(response.statusCode).toBe(422);
+      // Nothing was written for the caller (whose real tenant the server
+      // knows) nor under the tenant the payload claimed. Scoped to this
+      // test's own identities: a shared database may hold other valid runs.
+      const [current] = await tx.sql<
+        { tenant_id: string }[]
+      >`select m.tenant_id from identity.organisation_memberships m
+          join identity.user_profiles p on p.id = m.user_id
+         where p.auth_user_id = ${people.ownerA.authUserId}`;
+      expect(current?.tenant_id).toBeDefined();
       const runs = await tx.sql<
         { n: number }[]
-      >`select count(*)::int as n from q_runtime.runs`;
+      >`select count(*)::int as n from q_runtime.runs
+         where tenant_id in (${current?.tenant_id ?? claimedTenantId}, ${claimedTenantId})`;
       expect(runs[0]?.n).toBe(0);
     });
   });

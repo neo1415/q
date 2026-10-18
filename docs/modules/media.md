@@ -23,9 +23,11 @@ Capital Q's identifier is the `MediaAssetId`. The provider's identifier is
 replaceable integration metadata: knowing it is never permission to play the
 media, and it is never this record's identity.
 
-No provider is implemented. No Cloudflare API is called, no vendor SDK is
-installed, no provider credential exists, and no video bytes pass through the
-API or PostgreSQL.
+One provider is implemented behind the `VideoProvider` port — Cloudflare
+Stream (CQ-MEDIA-010) — and the direct upload flow runs over it
+(CQ-MEDIA-011); see `media-cloudflare-setup.md` for both. No vendor SDK is
+installed, the credential is revealed once at composition, and no video bytes
+pass through the API or PostgreSQL.
 
 ## Ownership
 

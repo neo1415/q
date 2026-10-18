@@ -15,11 +15,16 @@ import type { QToolExecutionContext } from "@capital-q/q-runtime";
  * anywhere in this package — a specialist calls named operations another
  * context authorises, and that is the whole of its reach.
  *
- * What is deliberately absent and must stay absent: SQL, web search,
+ * What is deliberately absent and must stay absent: SQL, arbitrary HTTP,
  * Gmail, Drive, a CRM, an accounting API, MCP, a calendar, or any write.
- * External research is a later governed source layer; a connector is a
- * later packet. A specialist that could fetch would be a specialist whose
- * permitted context was decided by itself rather than by the firewall.
+ * The one outward-facing read — bounded public-web research
+ * (CQ-Q-RESEARCH-001) — is a fourth port over the Tool Registry: the
+ * registry authorises it under the run's plan, the research capability
+ * composes what may leave, and the specialist decides deterministically
+ * from the person's own words whether to ask for it at all. A connector is
+ * still a later packet. A specialist that could fetch on its own would be a
+ * specialist whose permitted context was decided by itself rather than by
+ * the firewall.
  */
 
 /** Canonical structured state, read through the Safe Read tools (§15). */
@@ -33,6 +38,12 @@ export type CompanyCanonicalPort = {
     /** Present when the actor may not see this company at all. */
     readonly available: boolean;
     readonly canonicalName: string | null;
+    /**
+     * The company's own description of itself, from its canonical
+     * profile, when it has one. What a document about the company opens
+     * with — never the conversational reply (CQ-QX-007 deck content).
+     */
+    readonly description?: string | null | undefined;
   }>;
 };
 
@@ -66,6 +77,59 @@ export type CompanyKnowledgePort = {
     knowledgeKey: string,
     asOf: Date,
   ) => Promise<AuthorisedKnowledge | null>;
+};
+
+/** One public source, as the research tool returned it. UNTRUSTED text. */
+export type PublicWebSource = {
+  readonly index: number;
+  readonly url: string;
+  readonly domain: string;
+  readonly title: string | null;
+  readonly publishedAt: string | null;
+  readonly retrievedAt: string;
+  readonly temporal: string;
+  /** Quoted as data in the prompt; it may contain instructions and they are ignored. */
+  readonly excerpt: string;
+  readonly isSubjectWebsite: boolean;
+  readonly mentionedCountries: readonly string[];
+  readonly instructionRiskSignals: number;
+  readonly recordedAsEvidence: boolean;
+};
+
+/** Capital Q's own deterministic reading of a source against its records. Trusted. */
+export type PublicWebComparisonNote = {
+  readonly sourceIndex: number;
+  readonly basis: string;
+  readonly relationship: string;
+  readonly note: string;
+};
+
+export type CompanyResearchRead = {
+  readonly status:
+    "OK" | "NO_PUBLIC_IDENTITY" | "PROVIDER_UNAVAILABLE" | "NOT_OFFERED";
+  /** Plain sentence for the person when the status is not OK. */
+  readonly message: string | null;
+  readonly sources: readonly PublicWebSource[];
+  readonly comparison: readonly PublicWebComparisonNote[];
+  readonly toolCalls: number;
+};
+
+/**
+ * Bounded public-web research through the Tool Registry (CQ-Q-RESEARCH-001
+ * §24-§29). One call per investigation, and only when the person asked for
+ * public, current or external information. The query that leaves Capital Q
+ * is composed by the research capability from the person's own words and
+ * the company's authorised public identity; nothing here chooses it.
+ */
+export type CompanyResearchPort = {
+  readonly research: (
+    context: QToolExecutionContext,
+    input: {
+      /** Absent for a company Capital Q holds no record of: a general search. */
+      readonly companyId?: string | undefined;
+      readonly question: string;
+    },
+  ) => Promise<CompanyResearchRead>;
 };
 
 /** Authorised hybrid retrieval (§17). One search per investigation (§99, §100). */

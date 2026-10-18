@@ -1,36 +1,19 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { buttonClassName } from "@capital-q/ui/button";
-import { EmptyState } from "@capital-q/ui/states";
-
-import {
-  PageContainer,
-  PageHeader,
-} from "@/components/app-shell/page-container";
-
-export const metadata: Metadata = { title: "Capital" };
+import { capitalTarget } from "@/features/relationships/hub-view";
 
 /**
- * Capital workspace shell: objectives, relationships, meetings, diligence
- * and execution will live here. Until an objective exists, it says so.
+ * `/capital` (owner 2026-10-16: "the stuff in Capital would be like a tab
+ * in CRM"): Capital is the CRM's Capital tab now. This address forwards
+ * there with its tab, round and plan horizon kept, so every saved link,
+ * Q round card and spoken "open Capital" still lands on the same content.
  */
-export default function CapitalPage() {
-  return (
-    <PageContainer>
-      <PageHeader
-        title="Capital"
-        description="Your objective, the relationships behind it, and what happens next, in one working view."
-      />
-      <EmptyState
-        title="No capital objective yet."
-        description="Tell Q what you're raising or deploying. Relationships, meetings and diligence gather around that objective as they happen."
-        action={
-          <Link href="/home#q" className={buttonClassName("secondary")}>
-            Tell Q your objective
-          </Link>
-        }
-      />
-    </PageContainer>
-  );
+export default async function CapitalPage({
+  searchParams,
+}: {
+  readonly searchParams?: Promise<
+    Readonly<Record<string, string | string[] | undefined>>
+  >;
+} = {}) {
+  redirect(capitalTarget((await searchParams) ?? {}));
 }

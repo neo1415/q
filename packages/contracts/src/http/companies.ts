@@ -4,6 +4,12 @@ import { CountryCodeSchema } from "../common/geography.js";
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { ResourceVersionSchema } from "../common/version.js";
+import {
+  EvidenceStatusSchema,
+  LifecycleStatusSchema,
+  TruthClassSchema,
+} from "../evidence/vocabulary.js";
+import { PitchSummaryDtoSchema } from "./media.js";
 
 /**
  * `/v1/companies` -- the canonical Company profile contract.
@@ -46,6 +52,117 @@ export const MarketplaceReadinessStateSchema = z
   .regex(/^[a-z][a-z0-9_]*$/)
   .max(64);
 export const MARKETPLACE_READINESS_NOT_ASSESSED = "not_assessed" as const;
+/**
+ * The one state that means "this company may participate in the investor
+ * marketplace" (PADL #58; Product Specification, Marketplace Readiness).
+ * Only the readiness engine writes it; nothing in this contract does.
+ * Every other value, including states a later packet adds, is read as not
+ * eligible until that packet says otherwise: discovery fails closed.
+ */
+export const MARKETPLACE_READINESS_MARKETPLACE_READY =
+  "marketplace_ready" as const;
+/** Assessed under a readiness policy and found wanting; the assessment says what remains. */
+export const MARKETPLACE_READINESS_REQUIREMENTS_OUTSTANDING =
+  "requirements_outstanding" as const;
+/** The V1 vocabulary. Bounded text in the column; this is the set the policy writes. */
+export const MARKETPLACE_READINESS_STATES = [
+  MARKETPLACE_READINESS_NOT_ASSESSED,
+  MARKETPLACE_READINESS_REQUIREMENTS_OUTSTANDING,
+  MARKETPLACE_READINESS_MARKETPLACE_READY,
+] as const;
+export const MarketplaceReadinessStateValueSchema = z.enum(
+  MARKETPLACE_READINESS_STATES,
+);
+export type MarketplaceReadinessState = z.infer<
+  typeof MarketplaceReadinessStateValueSchema
+>;
+
+/**
+ * Marketplace readiness (PADL #57/#58; Product Specification, "Marketplace
+ * Readiness"; doc 10 F10/F11). A derived assessment over canonical
+ * requirements, never a switch: the founder asks for an assessment, the
+ * policy decides the state. Requirement ids are stable machine values;
+ * `description` is the plain-English sentence a person reads.
+ */
+export const COMPANY_MARKETPLACE_READINESS_SEGMENT =
+  "/marketplace-readiness" as const;
+export const COMPANY_MARKETPLACE_READINESS_ASSESS_SEGMENT =
+  "/marketplace-readiness/assess" as const;
+
+export const MARKETPLACE_READINESS_REQUIREMENTS = [
+  "COMPANY_ACTIVE",
+  "MINIMUM_COMPANY_PROFILE",
+  "DISCOVERY_VISIBILITY_CONFIRMED",
+  "FOUNDER_IDENTITY_VERIFIED",
+  "ORGANISATION_VERIFIED",
+  "REQUIRED_DOCUMENTATION",
+] as const;
+export const MarketplaceReadinessRequirementSchema = z.enum(
+  MARKETPLACE_READINESS_REQUIREMENTS,
+);
+export type MarketplaceReadinessRequirement = z.infer<
+  typeof MarketplaceReadinessRequirementSchema
+>;
+
+export const MARKETPLACE_READINESS_OUTCOMES = [
+  "SATISFIED",
+  "OUTSTANDING",
+  "UNKNOWN",
+  "NOT_APPLICABLE",
+] as const;
+export const MarketplaceReadinessOutcomeSchema = z.enum(
+  MARKETPLACE_READINESS_OUTCOMES,
+);
+export type MarketplaceReadinessOutcome = z.infer<
+  typeof MarketplaceReadinessOutcomeSchema
+>;
+
+export const MarketplaceReadinessRequirementResultSchema = z
+  .object({
+    requirement: MarketplaceReadinessRequirementSchema,
+    outcome: MarketplaceReadinessOutcomeSchema,
+    /** Plain English for the person; never an internal code or private content. */
+    description: z.string().min(1).max(300),
+  })
+  .strict();
+export type MarketplaceReadinessRequirementResult = z.infer<
+  typeof MarketplaceReadinessRequirementResultSchema
+>;
+
+export const MarketplaceReadinessAssessmentSchema = z
+  .object({
+    companyId: UuidSchema,
+    policyVersion: z.string().regex(/^marketplace-readiness\.v\d+$/),
+    state: MarketplaceReadinessStateValueSchema,
+    /**
+     * Whether Capital Q can verify identity and organisation today. False
+     * means the two verification requirements cannot be met by anyone yet,
+     * and the screen must say so rather than imply a step the person can take.
+     */
+    verificationAvailable: z.boolean(),
+    requirements: z
+      .array(MarketplaceReadinessRequirementResultSchema)
+      .length(MARKETPLACE_READINESS_REQUIREMENTS.length),
+    assessedAt: UtcTimestampSchema,
+    /**
+     * What investors' declared rules can place the company by (live
+     * 2026-10-02: a ready company with no sector). Not a readiness
+     * requirement and not about any investor: whether the company itself
+     * has declared a sector, a stage and a country. Absent from older APIs.
+     */
+    discoverability: z
+      .object({
+        sectorDeclared: z.boolean(),
+        stageDeclared: z.boolean(),
+        countryDeclared: z.boolean(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type MarketplaceReadinessAssessment = z.infer<
+  typeof MarketplaceReadinessAssessmentSchema
+>;
 
 export const COMPANY_NAME_MAX_LENGTH = 200;
 export const COMPANY_CITY_MAX_LENGTH = 120;
@@ -162,6 +279,8 @@ export const CompanyDtoSchema = z.object({
   companyStatus: CompanyStatusSchema,
   marketplaceVisibility: MarketplaceVisibilitySchema,
   marketplaceReadinessState: MarketplaceReadinessStateSchema,
+  /** The founder's current publishable pitch; see `PitchSummaryDtoSchema`. */
+  pitch: PitchSummaryDtoSchema.nullable().default(null),
   version: ResourceVersionSchema,
   createdAt: UtcTimestampSchema,
   updatedAt: UtcTimestampSchema,
@@ -170,3 +289,115 @@ export const CompanyDtoSchema = z.object({
 export type CompanyDto = z.infer<typeof CompanyDtoSchema>;
 
 export const COMPANIES_PATH = "/v1/companies" as const;
+
+/**
+ * Who may see the declared company profile (CQ-PRE-REC-001 §31-§35). The
+ * founder chooses between private to the organisation and visible to
+ * investors across the network; nothing else is a profile switch.
+ */
+export const COMPANY_VISIBILITY_SEGMENT = "/visibility" as const;
+export const COMPANY_NETWORK_PREVIEW_SEGMENT = "/network-preview" as const;
+
+export const CompanyVisibilityChoiceSchema = z.enum([
+  "organisation_private",
+  "network_visible",
+]);
+export type CompanyVisibilityChoice = z.infer<
+  typeof CompanyVisibilityChoiceSchema
+>;
+
+export const SetCompanyVisibilityRequestSchema = z
+  .object({
+    visibility: CompanyVisibilityChoiceSchema,
+    expectedVersion: ResourceVersionSchema,
+  })
+  .strict();
+export type SetCompanyVisibilityRequest = z.infer<
+  typeof SetCompanyVisibilityRequestSchema
+>;
+
+/**
+ * The declared fields the investor projection classifies as facts
+ * (CQ-WEB-024). Each names a field of the projection below; nothing
+ * outside the projection can be a fact here.
+ */
+export const COMPANY_NETWORK_FACT_KEYS = [
+  "currentStageCode",
+  "headquartersCountry",
+  "headquartersCity",
+  "foundedDate",
+  "legalName",
+  "websiteUrl",
+] as const;
+export const CompanyNetworkFactKeySchema = z.enum(COMPANY_NETWORK_FACT_KEYS);
+export type CompanyNetworkFactKey = z.infer<typeof CompanyNetworkFactKeySchema>;
+
+/**
+ * One statement of a fact, on ADR-001's three independent axes, with where
+ * it came from. `value` is the machine value (a stage code, a country
+ * code, a date); the reader labels it.
+ */
+export const CompanyNetworkFactStatementSchema = z
+  .object({
+    value: z.string().min(1).max(2048),
+    truthClass: TruthClassSchema,
+    evidenceStatus: EvidenceStatusSchema,
+    lifecycleStatus: LifecycleStatusSchema,
+    /** Provenance. The declared profile is the only source this projection reads. */
+    source: z.enum(["COMPANY_PROFILE"]),
+  })
+  .strict();
+export type CompanyNetworkFactStatement = z.infer<
+  typeof CompanyNetworkFactStatementSchema
+>;
+
+/**
+ * What is known about one fact. No statements means unknown: nothing was
+ * declared, which is never zero and never a negative. More than one means
+ * the statements disagree, and none has been chosen over the others.
+ */
+export const CompanyNetworkFactSchema = z
+  .object({
+    key: CompanyNetworkFactKeySchema,
+    statements: z.array(CompanyNetworkFactStatementSchema).max(4),
+  })
+  .strict();
+export type CompanyNetworkFact = z.infer<typeof CompanyNetworkFactSchema>;
+
+/**
+ * What an investor across the network sees of a company: the same
+ * projection Q's company tool serves, returned to the founder as a preview
+ * (§33). Nothing founder-private can appear here because the projection
+ * only reads these declared fields.
+ */
+export const CompanyNetworkPreviewSchema = z
+  .object({
+    companyId: UuidSchema,
+    canonicalName: z.string(),
+    legalName: z.string().nullable(),
+    websiteUrl: z.string().nullable(),
+    foundedDate: z.string().nullable(),
+    headquartersCountry: z.string().nullable(),
+    headquartersCity: z.string().nullable(),
+    currentStageCode: z.string().nullable(),
+    shortDescription: z.string().nullable(),
+    primaryDescription: z.string().nullable(),
+    companyStatus: CompanyStatusSchema,
+    /** True when investors across the network can currently reach this profile. */
+    networkVisible: z.boolean(),
+    /** The pitch an investor may play here; see `PitchSummaryDtoSchema`. */
+    pitch: PitchSummaryDtoSchema.nullable().default(null),
+    /** The company's other publishable videos, newest first (ADR 0022). */
+    morePitches: z.array(PitchSummaryDtoSchema).max(29).optional(),
+    /**
+     * The declared fields above, classified (CQ-WEB-024): what is known
+     * and how well supported it is. Defaults to empty so a server that
+     * predates it still parses; empty then says nothing, not "unknown".
+     */
+    facts: z
+      .array(CompanyNetworkFactSchema)
+      .max(COMPANY_NETWORK_FACT_KEYS.length)
+      .default([]),
+  })
+  .strict();
+export type CompanyNetworkPreview = z.infer<typeof CompanyNetworkPreviewSchema>;

@@ -1,4 +1,5 @@
 import type {
+  ModelCode,
   ModelFailureClass,
   ModelProviderCode,
 } from "@capital-q/contracts";
@@ -8,11 +9,19 @@ import type { ProviderHealthPort, ProviderHealthState } from "../ports.js";
 /**
  * Minimal, process-local provider health (doc 21 §92; packet §46).
  *
- * A provider that has failed with an availability class three times
- * within a minute is skipped for thirty seconds. That is all: no shared
- * state, no service discovery, no Redis, and — deliberately — no way for
- * this to make a provider eligible. It can only make an eligible provider
- * temporarily un-chosen, and a security decision never reads it.
+ * One provider's ONE MODEL that has failed with an availability class
+ * three times within a minute is skipped for thirty seconds. That is all:
+ * no shared state, no service discovery, no Redis, and — deliberately —
+ * no way for this to make anything eligible. It can only make an eligible
+ * model temporarily un-chosen, and a security decision never reads it.
+ *
+ * Keyed by provider and model together, because a model being overloaded
+ * says nothing about a sibling on the same account. Hosted, 2026-09-22:
+ * `gemini-3.5-flash-lite` answered 503 three times, the whole of `google`
+ * was taken out with it, and `gemini-3.8-flash` — eligible, and quite
+ * possibly well — went too. Every provider was then either rate-limited
+ * or shut off, the interview had no route at all, and the conversation
+ * ended there.
  */
 
 const AVAILABILITY_FAILURES: ReadonlySet<ModelFailureClass> = new Set([
@@ -22,10 +31,43 @@ const AVAILABILITY_FAILURES: ReadonlySet<ModelFailureClass> = new Set([
   "TRANSIENT",
 ]);
 
+/**
+ * How long an attempt must have run before its timeout says anything
+ * about the provider.
+ *
+ * A timeout is two different events wearing one name. One is a provider
+ * that has stopped answering. The other is a caller whose own budget was
+ * shorter than this model's tail, which is news about the caller.
+ *
+ * Hosted, 2026-09-22: a spoken interview turn was given a twelve-second
+ * model budget so that the turn could finish inside the voice route's own
+ * twenty-second deadline. Gemini answers that turn in about a second
+ * almost always and in sixteen occasionally. Three of the slow ones inside
+ * a minute read as three availability failures, the breaker opened, and a
+ * provider that was working perfectly well was taken out of rotation for
+ * every task class — leaving the interview with no eligible route at all
+ * while the only other provider was rate-limited. The conversation ended
+ * there.
+ *
+ * So a timeout counts only when the caller waited at least this long. It
+ * is deliberately below any budget a person is waiting on and above the
+ * budgets that exist because a person is.
+ */
+const TIMEOUT_MEANS_UNHEALTHY_AFTER_MS = 20_000;
+
+/**
+ * A provider whose ACCOUNT cannot serve (credit or quota exhausted) is
+ * skipped, every model on it, for this long after one such answer; then
+ * one attempt probes it again. Live 2026-10-01: OpenAI credit ran out and
+ * every turn first spent two retries on it before falling back.
+ */
+const ACCOUNT_EXHAUSTED_OPEN_MS = 10 * 60_000;
+
 export type ProviderHealthOptions = {
   readonly failureThreshold?: number | undefined;
   readonly windowMs?: number | undefined;
   readonly openForMs?: number | undefined;
+  readonly accountExhaustedOpenForMs?: number | undefined;
 };
 
 export function createProcessLocalProviderHealth(
@@ -34,12 +76,26 @@ export function createProcessLocalProviderHealth(
   const failureThreshold = options.failureThreshold ?? 3;
   const windowMs = options.windowMs ?? 60_000;
   const openForMs = options.openForMs ?? 30_000;
-  const failures = new Map<ModelProviderCode, number[]>();
-  const openUntil = new Map<ModelProviderCode, number>();
+  const failures = new Map<string, number[]>();
+  const openUntil = new Map<string, number>();
+  const accountOpenForMs =
+    options.accountExhaustedOpenForMs ?? ACCOUNT_EXHAUSTED_OPEN_MS;
+  /** Provider-wide: every model on an exhausted account. */
+  const accountOpenUntil = new Map<ModelProviderCode, number>();
+  const keyOf = (code: ModelProviderCode, model: ModelCode): string =>
+    `${code}\u0000${model}`;
 
-  const state = (code: ModelProviderCode, at: Date): ProviderHealthState => {
-    const until = openUntil.get(code);
+  const state = (
+    code: ModelProviderCode,
+    model: ModelCode,
+    at: Date,
+  ): ProviderHealthState => {
+    const until = openUntil.get(keyOf(code, model));
     if (until !== undefined && until > at.getTime()) {
+      return "TEMPORARILY_FAILING";
+    }
+    const accountUntil = accountOpenUntil.get(code);
+    if (accountUntil !== undefined && accountUntil > at.getTime()) {
       return "TEMPORARILY_FAILING";
     }
     return "HEALTHY";
@@ -47,24 +103,39 @@ export function createProcessLocalProviderHealth(
 
   return {
     state,
-    recordFailure: (code, failureClass, at) => {
+    recordFailure: (code, model, failureClass, at, elapsedMs, exhausted) => {
+      if (exhausted === true) {
+        accountOpenUntil.set(code, at.getTime() + accountOpenForMs);
+        return;
+      }
       if (!AVAILABILITY_FAILURES.has(failureClass)) {
         return;
       }
+      // Our own short budget expiring is not the provider's news.
+      if (
+        failureClass === "TIMEOUT" &&
+        elapsedMs !== undefined &&
+        elapsedMs < TIMEOUT_MEANS_UNHEALTHY_AFTER_MS
+      ) {
+        return;
+      }
+      const key = keyOf(code, model);
       const now = at.getTime();
-      const recent = (failures.get(code) ?? []).filter(
+      const recent = (failures.get(key) ?? []).filter(
         (t) => now - t <= windowMs,
       );
       recent.push(now);
-      failures.set(code, recent);
+      failures.set(key, recent);
       if (recent.length >= failureThreshold) {
-        openUntil.set(code, now + openForMs);
-        failures.set(code, []);
+        openUntil.set(key, now + openForMs);
+        failures.set(key, []);
       }
     },
-    recordSuccess: (code) => {
-      failures.delete(code);
-      openUntil.delete(code);
+    recordSuccess: (code, model) => {
+      accountOpenUntil.delete(code);
+      const key = keyOf(code, model);
+      failures.delete(key);
+      openUntil.delete(key);
     },
   };
 }

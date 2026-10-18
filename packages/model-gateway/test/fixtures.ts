@@ -45,7 +45,10 @@ function model(
     modelType: "TEXT_GENERATION",
     status: "ACTIVE",
     contextWindow: 32_000,
-    maxOutputTokens: 4_096,
+    // Room for an analytical answer's budget (RECOVERY B4: 8,192); every
+    // seeded production text model allows far more (gpt-5.6-luna 128k,
+    // gemini-3.5-flash-lite 65k).
+    maxOutputTokens: 16_384,
     supportsTools: false,
     supportsStructuredOutput: true,
     supportsVision: false,

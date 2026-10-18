@@ -1,3 +1,4 @@
+import type { TaxonomyPhraseCandidate } from "../domain/resolution/taxonomy-phrases.js";
 import type {
   OnboardingJourneyType,
   OnboardingSessionStatus,
@@ -19,6 +20,10 @@ import type {
   OnboardingDefinitionId,
   OnboardingDefinitionVersion,
   OnboardingDefinitionVersionId,
+  OnboardingInterviewQuestion,
+  OnboardingInterviewQuestionId,
+  OnboardingInterviewTurnRecord,
+  OnboardingQuestionStatus,
   OnboardingResponse,
   OnboardingResponseId,
   OnboardingSession,
@@ -29,6 +34,9 @@ import type {
   OnboardingSubject,
   OnboardingSuggestion,
   OnboardingSuggestionId,
+  OnboardingUtterance,
+  OnboardingUtteranceId,
+  OnboardingUtteranceStatus,
   PublishedOnboardingDefinition,
   ValidatedOnboardingResponse,
 } from "../contracts/index.js";
@@ -225,6 +233,14 @@ export type OnboardingResponseRepository = {
     previousResponseId: OnboardingResponseId,
     replacementResponseId: OnboardingResponseId,
   ) => Promise<void>;
+  /**
+   * Marks the current response withdrawn, once. Never touches its content
+   * and never deletes it. False when it was not current.
+   */
+  readonly withdraw: (
+    tx: TransactionContext,
+    responseId: OnboardingResponseId,
+  ) => Promise<boolean>;
 };
 
 export type NewOnboardingSuggestion = {
@@ -235,6 +251,7 @@ export type NewOnboardingSuggestion = {
   readonly sourceRefs: readonly OnboardingSourceRef[];
   readonly confidence: string | null;
   readonly modelRunId: string | null;
+  readonly rationale?: string | null | undefined;
 };
 
 export type OnboardingSuggestionRepository = {
@@ -257,6 +274,120 @@ export type OnboardingSuggestionRepository = {
     suggestionId: OnboardingSuggestionId,
     status: Exclude<OnboardingSuggestionStatus, "PENDING">,
   ) => Promise<boolean>;
+  /**
+   * Values the person REJECTED for one step in this session (lane ob1),
+   * so a rejected proposal is never offered again. Optional for adapters
+   * that predate it; absent means nothing is remembered.
+   */
+  readonly listRejectedValues?: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    stepKey: string,
+  ) => Promise<readonly unknown[]>;
+};
+
+export type NewOnboardingInterviewQuestion = Omit<
+  OnboardingInterviewQuestion,
+  "id" | "status" | "createdAt" | "resolvedAt"
+>;
+
+/**
+ * Persisted interview questions (CQ-PRE-REC-001). Creation replaces any
+ * PENDING question for the same fact so a re-planned interview never shows
+ * two questions about one thing; answering and dismissing are terminal.
+ */
+export type OnboardingInterviewQuestionRepository = {
+  readonly listPending: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+  ) => Promise<readonly OnboardingInterviewQuestion[]>;
+  readonly findById: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    questionId: OnboardingInterviewQuestionId,
+  ) => Promise<OnboardingInterviewQuestion | null>;
+  readonly insert: (
+    tx: TransactionContext,
+    input: NewOnboardingInterviewQuestion,
+  ) => Promise<OnboardingInterviewQuestion>;
+  /**
+   * Every question ever recorded for one fact in a session, any status,
+   * newest first: lets a deterministic check see that the person already
+   * settled a disagreement and not ask it again (Q.01).
+   */
+  readonly listForFact?: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    factKey: string,
+  ) => Promise<readonly OnboardingInterviewQuestion[]>;
+  /** PENDING -> SUPERSEDED for the named facts; returns how many changed. */
+  readonly supersedePending: (
+    tx: TransactionContext,
+    sessionId: OnboardingSessionId,
+    factKeys: readonly string[],
+  ) => Promise<number>;
+  /** PENDING -> terminal status; false if it was already resolved. */
+  readonly resolve: (
+    tx: TransactionContext,
+    questionId: OnboardingInterviewQuestionId,
+    status: Exclude<OnboardingQuestionStatus, "PENDING">,
+  ) => Promise<boolean>;
+};
+
+export type NewOnboardingUtterance = Pick<
+  OnboardingUtterance,
+  "sessionId" | "stepKey" | "text"
+>;
+
+/** Free-text turns awaiting Q's reading (CQ-PRE-REC-001 §20). */
+export type OnboardingUtteranceRepository = {
+  readonly insert: (
+    tx: TransactionContext,
+    input: NewOnboardingUtterance,
+  ) => Promise<OnboardingUtterance>;
+  readonly findById: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    utteranceId: OnboardingUtteranceId,
+  ) => Promise<OnboardingUtterance | null>;
+  readonly listPending: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+  ) => Promise<readonly OnboardingUtterance[]>;
+  /** PENDING -> READ or IGNORED; false if it was already read. */
+  readonly markRead: (
+    executor: DatabaseExecutor,
+    utteranceId: OnboardingUtteranceId,
+    status: Exclude<OnboardingUtteranceStatus, "PENDING">,
+  ) => Promise<boolean>;
+};
+
+export type NewOnboardingInterviewTurn = Pick<
+  OnboardingInterviewTurnRecord,
+  "sessionId" | "role" | "text" | "stepKey" | "channel" | "turnRef"
+>;
+
+/** The interview thread (CQ-QX-006): append-only, idempotent per reference and role. */
+export type OnboardingInterviewTurnRepository = {
+  /**
+   * Appends one turn; null when the (session, turnRef, role) already exists,
+   * in which case nothing was written.
+   */
+  readonly append: (
+    tx: TransactionContext,
+    input: NewOnboardingInterviewTurn,
+  ) => Promise<OnboardingInterviewTurnRecord | null>;
+  readonly findByRef: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    turnRef: string,
+  ) => Promise<readonly OnboardingInterviewTurnRecord[]>;
+  /** The newest `limit` turns, oldest first. */
+  readonly listRecent: (
+    executor: DatabaseExecutor,
+    sessionId: OnboardingSessionId,
+    limit: number,
+  ) => Promise<readonly OnboardingInterviewTurnRecord[]>;
 };
 
 /** Hash-only idempotency for session start and session mutations. */
@@ -345,6 +476,24 @@ export type OnboardingWriteContext = {
     readonly organisationId: OrganisationId;
     readonly subject: OnboardingSubject;
   }) => Promise<OnboardingSession>;
+  /**
+   * Reads a handler may reuse for the rest of this request only (one
+   * batch): the same context resolution or open mandate each answer would
+   * otherwise read again. Never shared across requests or people; absent
+   * outside a batch. A handler keeps only successful reads in it.
+   */
+  readonly requestMemo?: Map<string, unknown> | undefined;
+  /**
+   * In a batch only: hand this target's canonical update to the end of the
+   * batch under `key`, where it runs once, after every answer, in this
+   * transaction (several answers to one record, one update). The latest
+   * registration for a key wins; it must recompute from every current
+   * answer. If it is refused, the runtime rolls the batch back and runs it
+   * again without deferral, so each answer reports its own outcome.
+   */
+  readonly defer?:
+    | ((key: string, run: (tx: TransactionContext) => Promise<void>) => void)
+    | undefined;
 };
 
 export type OnboardingStepContextInput = {
@@ -383,6 +532,13 @@ export type OnboardingWriteTargetHandler = {
     context: OnboardingWriteContext,
     response: ValidatedOnboardingResponse,
   ) => Promise<void>;
+  /**
+   * Re-derive the target without the withdrawn step's answer: the context's
+   * current responses no longer hold it. Absent when the target cannot
+   * represent the answer's absence; the step is then not withdrawable.
+   */
+  readonly withdraw?:
+    ((context: OnboardingWriteContext) => Promise<void>) | undefined;
 };
 
 export type OnboardingWriteTargetRegistry = {
@@ -399,3 +555,18 @@ export type OnboardingSubjectResolverRegistry = {
 };
 
 export type { OnboardingSourceModality };
+
+/**
+ * Capital Q's own taxonomy classifier, as the interview needs it
+ * (CQ-Q-VOICE-001 A §5): phrases in, canonical candidates out. Exact label
+ * and alias matches and bounded lexical scoring against the vocabularies a
+ * step allows; never a model naming an id. Absent means category phrases in
+ * a sentence are not resolved synchronously (Q's reading still runs).
+ */
+export type OnboardingTaxonomyResolver = {
+  readonly findCandidates: (input: {
+    readonly text: string;
+    readonly vocabularyCodes: readonly string[];
+    readonly limit: number;
+  }) => Promise<readonly TaxonomyPhraseCandidate[]>;
+};

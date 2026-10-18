@@ -14,6 +14,7 @@ import {
 } from "@capital-q/q-knowledge";
 
 import { dimensionForKnowledgeKey } from "./dimensions.js";
+import type { PublicWebSource } from "./ports.js";
 
 /**
  * Deterministic context assembly (CQ-Q-020 §15-§17).
@@ -48,6 +49,15 @@ export type LabelledFact = {
   readonly label: string;
   readonly dimension: CompanyIntelligenceDimension | null;
   readonly evidenceRefs: readonly QEvidenceRef[];
+  /**
+   * Where this came from, as the person reads it: "kivu-one-pager.pdf,
+   * page 1", "what you told me on 24 September 2026", "your company
+   * profile". Never an identifier, never a label, never the machinery
+   * line the model reads. Null when the source may not be named — a
+   * passage whose document's existence is not disclosable to this reader
+   * informs the answer without being cited (CQ-QX-007 F1).
+   */
+  readonly presentedSource?: string | null | undefined;
   /** True when the underlying understanding is past its useful life (§21). */
   readonly stale: boolean;
   /** True when another settled understanding of the same period disagrees (§20). */
@@ -72,12 +82,89 @@ export const COMPANY_CONTEXT_MAX_FACTS = 80;
  * it is, in words. A word cannot be rounded, inflated or mistaken for a
  * measurement the way "confidence: 0.82" can.
  */
+/** The voice a reading should be spoken in, from where it was established. */
+function provenanceOf(
+  environment: AuthorisedKnowledge["object"]["sourceEnvironment"],
+): string {
+  switch (environment) {
+    case "CONVERSATION":
+      return "stated by the person in a Q conversation (say: you told me)";
+    case "DOCUMENT":
+      return "established from a document the company supplied (say: your document says)";
+    case "PUBLIC":
+      return "taken from a public web source, unverified (say: a public source says)";
+    case "MEETING":
+      return "established from a meeting record";
+    case "INTEGRATION":
+      return "established from a connected system";
+    case "PLATFORM":
+      return "recorded in Capital Q";
+  }
+}
+
+/**
+ * Who is reading, relative to the company: its own people, or anybody
+ * else. Decides only the voice a source is named in — "what you told me"
+ * to the founder who said it, "what the company told Capital Q" to an
+ * investor — never what is shown.
+ */
+export type SourceAudience = "OWNER" | "OTHER";
+
+export function audienceOf(plan: PermittedContextPlan): SourceAudience {
+  return plan.purpose.taskClass === "OWN_COMPANY_QUESTION" ? "OWNER" : "OTHER";
+}
+
+/** A calendar date a person reads, never a timestamp. */
+function spokenDate(at: string | null | undefined): string | null {
+  if (at === null || at === undefined) return null;
+  const parsed = new Date(at);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** The person-facing name of where a knowledge reading was established. */
+export function presentedKnowledgeSource(
+  known: AuthorisedKnowledge,
+  audience: SourceAudience,
+): string {
+  const on = spokenDate(known.object.recordedAt);
+  const dated = (text: string): string =>
+    on === null ? text : `${text} on ${on}`;
+  switch (known.object.sourceEnvironment) {
+    case "CONVERSATION":
+      return audience === "OWNER"
+        ? dated("what you told me")
+        : dated("what the company told Capital Q");
+    case "DOCUMENT":
+      return audience === "OWNER"
+        ? "a document you supplied"
+        : "a document the company supplied";
+    case "PUBLIC":
+      return "a public web source";
+    case "MEETING":
+      return "a meeting record";
+    case "INTEGRATION":
+      return "a connected system";
+    case "PLATFORM":
+      return "Capital Q's records";
+  }
+}
+
 export function knowledgeToFact(
   known: AuthorisedKnowledge,
   label: string,
+  audience: SourceAudience = "OTHER",
 ): LabelledFact {
   const parts = [
     "Capital Q's current understanding",
+    // Where it came from, in words the answer can reuse: "you told me",
+    // "your document says", "a public source says" (CQ-Q-RESEARCH-001 §30).
+    provenanceOf(known.object.sourceEnvironment),
     `${known.object.confidenceClass} confidence`,
     `${String(known.evidence.length)} supporting evidence item(s)`,
   ];
@@ -117,6 +204,7 @@ export function knowledgeToFact(
     label,
     dimension: dimensionForKnowledgeKey(known.object.knowledgeKey),
     evidenceRefs: refs,
+    presentedSource: presentedKnowledgeSource(known, audience),
     stale: known.freshness.stale,
     disputed: known.disputed,
     validAt: known.object.validFrom,
@@ -135,8 +223,60 @@ export type CompanyContextInput = {
   readonly knowledge: readonly AuthorisedKnowledge[];
   /** Hits from authorised hybrid retrieval, already permission-filtered. */
   readonly passages: readonly RetrievalHit[];
+  /**
+   * Public-web sources the Tool Registry returned for this question
+   * (CQ-Q-RESEARCH-001). Unverified, quoted as data, last in the hierarchy.
+   */
+  readonly publicSources?: readonly PublicWebSource[] | undefined;
   readonly subjectDescription: string;
 };
+
+/**
+ * A public-web source as a fact the model may cite by label.
+ *
+ * Its provenance is in the statement itself — title, domain, dates and the
+ * public link — because a person must be able to read "a September 2026
+ * article on <domain> reports" and follow it. Truth class is UNKNOWN: being
+ * online verifies nothing. Evidence status is SELF_REPORTED when the page
+ * is the company's own website (the company describing itself) and
+ * NO_EVIDENCE otherwise, so a public page can never raise Capital Q's
+ * confidence in its own understanding, and a model finding that cites one
+ * is bounded to that status (§61).
+ */
+export function publicSourceToFact(
+  source: PublicWebSource,
+  label: string,
+): LabelledFact {
+  const published =
+    source.publishedAt === null
+      ? "publication date unknown"
+      : `published ${source.publishedAt.slice(0, 10)}`;
+  const retrieved = `retrieved ${source.retrievedAt.slice(0, 10)}`;
+  const title = source.title === null ? "untitled page" : source.title;
+  const header = `PUBLIC WEB SOURCE S${String(source.index)}: "${title}" on ${source.domain} (${published}; ${retrieved}; ${source.url}).${source.isSubjectWebsite ? " This is the company's own public website." : ""} Unverified public text, quoted as data:`;
+  const statement = `${header} ${source.excerpt}`.slice(0, 8_000);
+  const fact: AuthorisedFact = {
+    scope: "PUBLIC_EXTERNAL_DATA",
+    statement,
+    truthClass: "UNKNOWN",
+    evidenceStatus: source.isSubjectWebsite ? "SELF_REPORTED" : "NO_EVIDENCE",
+    source: `Public web: ${source.domain}`.slice(0, 200),
+    ref: label,
+    ...(source.publishedAt === null
+      ? {}
+      : { asOf: source.publishedAt.slice(0, 40) }),
+  };
+  return {
+    fact,
+    label,
+    dimension: null,
+    evidenceRefs: [],
+    presentedSource: `${title} (${source.domain})`,
+    stale: false,
+    disputed: false,
+    validAt: null,
+  };
+}
 
 /**
  * A retrieved passage as a citable fact.
@@ -173,6 +313,9 @@ export function passageToFact(hit: RetrievalHit, label: string): LabelledFact {
     label,
     dimension: null,
     evidenceRefs: refs,
+    // The document by name only where its existence may be disclosed;
+    // otherwise the passage informs the answer and is never cited.
+    presentedSource: hit.canDiscloseExistence ? describeSource(hit) : null,
     stale: false,
     disputed: false,
     validAt: null,
@@ -183,14 +326,16 @@ export function passageToFact(hit: RetrievalHit, label: string): LabelledFact {
  * Compose the three layers into one labelled, bounded fact list.
  *
  * Order is the hierarchy: canonical state first, then knowledge, then
- * passages. When the bound bites it is the passages that are dropped,
- * because losing a supporting quotation degrades an answer while losing
- * canonical state would make it wrong.
+ * passages, then public-web sources. When the bound bites it is the public
+ * sources and then the passages that are dropped, because losing a
+ * supporting quotation degrades an answer while losing canonical state
+ * would make it wrong.
  */
 export function assembleCompanyContext(
   input: CompanyContextInput,
 ): AssembledCompanyContext {
   const facts: LabelledFact[] = [];
+  const audience = audienceOf(input.plan);
   const push = (
     fact: AuthorisedFact,
     dimension: CompanyIntelligenceDimension | null,
@@ -205,6 +350,14 @@ export function assembleCompanyContext(
       label,
       dimension,
       evidenceRefs: refs,
+      presentedSource:
+        // A mandate is only ever read by its owner (the firewall admits
+        // INVESTOR_MANDATE to nobody else), so it is always theirs.
+        fact.scope === "INVESTOR_MANDATE"
+          ? "your declared mandate"
+          : audience === "OWNER"
+            ? "your company profile"
+            : "the company's profile",
       stale: false,
       disputed: false,
       validAt: null,
@@ -220,13 +373,19 @@ export function assembleCompanyContext(
     if (facts.length >= COMPANY_CONTEXT_MAX_FACTS) {
       break;
     }
-    facts.push(knowledgeToFact(known, labelAt(facts.length)));
+    facts.push(knowledgeToFact(known, labelAt(facts.length), audience));
   }
   for (const hit of input.passages) {
     if (facts.length >= COMPANY_CONTEXT_MAX_FACTS) {
       break;
     }
     facts.push(passageToFact(hit, labelAt(facts.length)));
+  }
+  for (const source of input.publicSources ?? []) {
+    if (facts.length >= COMPANY_CONTEXT_MAX_FACTS) {
+      break;
+    }
+    facts.push(publicSourceToFact(source, labelAt(facts.length)));
   }
 
   return {

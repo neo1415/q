@@ -1,7 +1,12 @@
 "use client";
 
+import type { QConduct, QSentenceGesture } from "@capital-q/contracts";
+
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { OnboardingResponseValue } from "@capital-q/contracts";
+import type {
+  OnboardingResponseValue,
+  OnboardingUnderstanding,
+} from "@capital-q/contracts";
 
 import {
   OnboardingClientError,
@@ -25,6 +30,34 @@ import type { SessionPresentation } from "./session";
 
 export type OnboardingPhase = "loading" | "ready" | "unavailable" | "error";
 export type SaveStatus = "idle" | "saving" | "saved" | "failed";
+
+/**
+ * What came back from one turn of the interview (QX-004 core gate: one Q).
+ *
+ * `reply` is Q's own words and is rendered as given; composing a sentence
+ * from the fields beside it is how a second conversation gets built in a
+ * browser, which is the defect this removes. `understood` is what the
+ * deterministic runtime read into the sentence, and is null when the one
+ * interviewer answered.
+ */
+export type OnboardingTurn = {
+  readonly understood: OnboardingUnderstanding | null;
+  readonly reply: string | null;
+  /** Where Q is taking the person, if anywhere; "FORM" hands over to the form. */
+  readonly navigate: string | null;
+  /**
+   * What Q said it would look into, when the turn asked for something
+   * real (CQ-QX-005). The surface carries it to the same Q run a spoken
+   * turn would start, then returns to the interview.
+   */
+  readonly researching: string | null;
+  /** The steps Q's reply asks about; absent when not known. */
+  readonly askingAbout?: readonly string[] | undefined;
+  /** Q's patience after the turn (founder direction 2026-09-30). */
+  readonly conduct?: QConduct | undefined;
+  /** PRESENCE: what Q's particles form for which sentence. */
+  readonly gestures?: readonly QSentenceGesture[] | undefined;
+};
 
 export type OnboardingState<TView> = {
   readonly phase: OnboardingPhase;
@@ -67,6 +100,44 @@ export type OnboardingActions<TResponse> = {
     readonly resolution: "ACCEPT" | "EDIT" | "REJECT";
     readonly response?: OnboardingResponseValue | undefined;
   }) => Promise<boolean>;
+  /**
+   * Answer or set aside one of Q's questions (CQ-PRE-REC-001). Returns
+   * false when this build has no path to record it.
+   */
+  readonly answerQuestion: (input: {
+    readonly questionId: string;
+    readonly stepKey: string;
+    readonly value: OnboardingResponseValue;
+  }) => Promise<boolean>;
+  readonly dismissQuestion: (questionId: string) => Promise<boolean>;
+  /**
+   * A tapped option, as the structured value it stands for
+   * (CQ-Q-VOICE-001 B §17-§18). Returns false when this build has no direct
+   * path to record it.
+   */
+  readonly submitValue: (input: {
+    readonly stepKey: string;
+    readonly value: OnboardingResponseValue;
+  }) => Promise<boolean>;
+  /**
+   * One turn of the conversational interview (CQ-PRE-REC-001 §16-§21),
+   * held by the one Q interviewer (QX-004 core gate: one Q).
+   *
+   * Resolves to Q's own words and to whatever the deterministic runtime
+   * read into the sentence, or to null when this build has no path — never
+   * a fabricated acknowledgement.
+   */
+  readonly say: (
+    text: string,
+    recentTurns: readonly {
+      readonly role: "person" | "q";
+      readonly text: string;
+    }[],
+    /** The founder profile section they came to fill (Overview link). */
+    focus?: string,
+  ) => Promise<OnboardingTurn | null>;
+  /** Re-read the session from the runtime (Q's reading may have landed). */
+  readonly refresh: () => Promise<void>;
   readonly retry: () => Promise<void>;
 };
 
@@ -119,7 +190,9 @@ export function useOnboardingJourney<
           setPhase("unavailable");
         } else {
           setErrorMessage(
-            error instanceof Error ? error.message : "Something went wrong.",
+            error instanceof Error
+              ? error.message
+              : "That didn't work. Try again in a moment.",
           );
           setPhase("error");
         }
@@ -165,7 +238,7 @@ export function useOnboardingJourney<
         const message =
           error instanceof Error
             ? error.message
-            : "Something went wrong. Please try again.";
+            : "That didn't work. Try again in a moment.";
         if (isSave) {
           setSave(conflict ? "idle" : "failed");
         }
@@ -270,6 +343,95 @@ export function useOnboardingJourney<
       }
       await run(() => resolve(input), true);
       return true;
+    },
+    answerQuestion: async (input) => {
+      const answer = requireClient().answerQuestion;
+      if (answer === undefined) {
+        return false;
+      }
+      return run(() => answer(input), true);
+    },
+    dismissQuestion: async (questionId) => {
+      const dismiss = requireClient().dismissQuestion;
+      if (dismiss === undefined) {
+        return false;
+      }
+      return run(() => dismiss({ questionId }), true);
+    },
+    submitValue: async (input) => {
+      const submit = requireClient().submitValue;
+      if (submit === undefined) {
+        return false;
+      }
+      return run(() => submit(input), true);
+    },
+    say: async (text, recentTurns, focus) => {
+      const say = requireClient().say;
+      if (say === undefined) {
+        return null;
+      }
+      let turn: OnboardingTurn | null = null;
+      /**
+       * An opening turn is Q asking itself what to ask (QX-004 core gate:
+       * one Q). Nothing is being saved and nothing of the person's is at
+       * stake, so a Q that cannot answer must not take the screen down
+       * with it: the step's own prompt is a worse question than Q's, and
+       * a great deal better than "Investor setup couldn't load."
+       */
+      if (text.length === 0) {
+        // Busy while Q opens, so the composer is closed until the opening
+        // has settled. Left open, a person who typed straight away had a
+        // second turn in flight against the same session version; the
+        // opening answered last and took the screen, and the typed turn
+        // came back a conflict the screen could not show.
+        setBusy(true);
+        try {
+          const outcome = await say({
+            text,
+            recentTurns,
+            ...(focus === undefined ? {} : { focus }),
+          });
+          setSession(outcome.view);
+          return {
+            understood: outcome.understood,
+            reply: outcome.reply,
+            navigate: outcome.navigate,
+            researching: outcome.researching,
+            askingAbout: outcome.askingAbout,
+            conduct: outcome.conduct,
+            gestures: outcome.gestures,
+          };
+        } catch {
+          return null;
+        } finally {
+          setBusy(false);
+        }
+      }
+      const ok = await run(async () => {
+        const outcome = await say({
+          text,
+          recentTurns,
+          ...(focus === undefined ? {} : { focus }),
+        });
+        turn = {
+          understood: outcome.understood,
+          reply: outcome.reply,
+          navigate: outcome.navigate,
+          researching: outcome.researching,
+          askingAbout: outcome.askingAbout,
+          conduct: outcome.conduct,
+          gestures: outcome.gestures,
+        };
+        return outcome.view;
+      }, true);
+      return ok ? turn : null;
+    },
+    refresh: async () => {
+      const reload = requireClient().reload;
+      if (reload === undefined) {
+        return;
+      }
+      await run(reload, false);
     },
     retry: async () => {
       const operation = lastOperation.current;

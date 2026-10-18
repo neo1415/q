@@ -2,87 +2,237 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+
+import { IntentLink } from "./intent-link";
 
 import { cx } from "@capital-q/ui";
-import { buttonClassName } from "@capital-q/ui/button";
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
-import { ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
-import { QMark } from "@capital-q/ui/q-mark";
+import { ICON_SIZE, ICON_STROKE, PanelLeft } from "@capital-q/ui/icons";
+import { Tooltip } from "@capital-q/ui/tooltip";
+
+import { ThemeMenu } from "@/features/appearance/theme-menu";
+import { SidebarOrganisationSwitcher } from "@/features/team/org-switcher";
+import { SignOutControl } from "@/features/auth";
+import { NotificationCenter } from "@/features/work/notification-center";
+import { useHomeHref } from "@/features/q/active-conversation";
+
+import type { ShellContext } from "./app-shell";
+import { useNotices } from "@/features/work/notice-store";
 
 import {
   isActiveRoute,
+  navigationGroupsFor,
   PRIMARY_NAVIGATION,
-  PROFILE_NAVIGATION,
+  WORK_NAVIGATION,
 } from "./navigation";
+import { useNavGroups } from "./nav-group-state";
+import { NavGroupToggle } from "./nav-group-toggle";
+import { sidebarCollapsed, type SidebarOverride } from "./sidebar-state";
+import { useT } from "@/features/i18n/language";
 
 /**
- * Desktop progressive enhancement of the same information architecture: a
- * compact light sidebar with the three primary areas, an honest organisation
- * context area, a Q shortcut and Profile kept secondary at the bottom.
+ * Desktop progressive enhancement of the same information architecture.
  * Hidden below the desktop breakpoint, where the bottom navigation is
  * canonical.
+ *
+ * Collapsible (R24). On the Q page it starts as a narrow rail of icons, so
+ * Q has the width; elsewhere it starts open. A choice made on one kind of
+ * page holds until the person moves to the other kind. Past chats live
+ * on the Q page's Conversations sheet, not here (founder direction
+ * 2026-09-29): the sidebar is navigation only.
  */
-export function DesktopSidebar() {
+export function DesktopSidebar({
+  context,
+}: {
+  readonly context: ShellContext;
+}) {
   const pathname = usePathname();
+  // Home is the conversation this tab was in, not a new chat each visit.
+  const home = useHomeHref();
+  const [override, setOverride] = useState<SidebarOverride | null>(null);
+  const collapsed = sidebarCollapsed(pathname, override);
+  const onQ = isActiveRoute(pathname, "/home");
+  const setCollapsed = (next: boolean) => {
+    setOverride({ onQ, collapsed: next });
+  };
+
+  const groups = navigationGroupsFor(context.scope, {
+    admin: context.admin,
+    qPitch: context.qPitch,
+  });
+  // What waits on them, from the shell's one notice read (no extra call).
+  const needsYou = useNeedsYouCount();
+  // You and Admin fold away, closed until opened (2026-10-07).
+  const disclosure = useNavGroups(groups, pathname);
+  const t = useT();
 
   return (
-    <aside className="cq-shell-sidebar">
-      <div className="px-5 pt-6 pb-4">
-        <Link
-          href="/home"
-          className="cq-title-md inline-block rounded-xs text-(--cq-text-primary)"
+    <aside
+      className="cq-shell-sidebar"
+      data-collapsed={collapsed ? "" : undefined}
+      data-sidebar
+    >
+      <div
+        className={cx(
+          "flex items-center gap-2 pt-4 pb-3",
+          collapsed ? "flex-col px-2" : "justify-between pe-2 ps-5",
+        )}
+      >
+        {collapsed ? null : (
+          <Link
+            href={home}
+            className="cq-title-md inline-block text-(--cq-text-primary)"
+          >
+            Capital Q
+          </Link>
+        )}
+        <Tooltip
+          content={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          side="right"
         >
-          Capital Q
-        </Link>
+          <button
+            type="button"
+            className="cq-sidebar-icon"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            onClick={() => {
+              setCollapsed(!collapsed);
+            }}
+            data-sidebar-toggle
+          >
+            <PanelLeft
+              aria-hidden="true"
+              size={ICON_SIZE.regular}
+              strokeWidth={ICON_STROKE}
+            />
+          </button>
+        </Tooltip>
       </div>
 
-      <nav aria-label="Primary" className="px-3">
-        <ul className="flex flex-col gap-0.5">
-          {PRIMARY_NAVIGATION.map((item) => (
-            <li key={item.href}>
-              <SidebarLink
-                href={item.href}
-                label={item.label}
-                Icon={item.icon}
-                active={isActiveRoute(pathname, item.href)}
-              />
-            </li>
-          ))}
-        </ul>
+      {/* G2: who they act for, when they have two or more. */}
+      {(context.organisations?.length ?? 0) < 2 ? null : (
+        <div
+          className={collapsed ? "flex justify-center px-2 pb-2" : "px-3 pb-2"}
+        >
+          <SidebarOrganisationSwitcher
+            organisations={context.organisations ?? []}
+            compact={collapsed}
+          />
+        </div>
+      )}
+
+      {/* Scrolls up and down only. Folded, the rail has no side padding
+          and centres its 44 px icons, so a classic scrollbar (Windows,
+          Linux) still leaves them room instead of forcing a sideways bar. */}
+      <nav
+        aria-label={t("Primary")}
+        className={cx(
+          "flex min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto pb-3",
+          collapsed ? "items-center px-0" : "px-3",
+        )}
+        data-sidebar-nav
+      >
+        {groups.map((group) => {
+          const label = group.label;
+          const listId =
+            label === null ? undefined : `cq-sidebar-group-${label}`;
+          const open = label === null || disclosure.isOpen(label);
+          const waiting = group.items.some(
+            (item) => item.href === WORK_NAVIGATION.href,
+          )
+            ? needsYou
+            : 0;
+          return (
+            <div
+              key={label ?? "main"}
+              role={label === null ? undefined : "group"}
+              aria-label={label === null ? undefined : t(label)}
+              className={collapsed ? "flex flex-col items-center" : undefined}
+            >
+              {label === null || listId === undefined ? null : (
+                <NavGroupToggle
+                  label={t(label)}
+                  open={open}
+                  controls={listId}
+                  waiting={waiting}
+                  compact={collapsed}
+                  onToggle={() => {
+                    disclosure.toggle(label);
+                  }}
+                />
+              )}
+              <ul
+                id={listId}
+                hidden={!open}
+                className={cx(
+                  "flex flex-col gap-0.5",
+                  label === null ? null : "cq-nav-group-list",
+                  collapsed ? "items-center" : null,
+                )}
+              >
+                {group.items.map((item) => (
+                  <li key={item.href}>
+                    <SidebarLink
+                      href={item.href === "/home" ? home : item.href}
+                      label={t(item.label)}
+                      Icon={item.icon}
+                      active={isActiveRoute(pathname, item.href)}
+                      compact={collapsed}
+                      count={
+                        item.href === WORK_NAVIGATION.href
+                          ? needsYou
+                          : undefined
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
 
-      <div className="mt-6 flex flex-col gap-3 border-t border-(--cq-border-subtle) px-5 pt-5">
-        <p className="cq-label text-(--cq-text-secondary)">Organisation</p>
-        <ContextIndicator scope="unset" />
-        <p className="cq-caption text-(--cq-text-tertiary)">
-          Your organisation appears here once you belong to one.
-        </p>
-      </div>
-
-      <div className="px-3 pt-6">
-        <Link
-          href="/home#q"
-          className={buttonClassName(
-            "secondary",
-            "regular",
-            "w-full justify-start",
+      {/* The footer never widens the rail: folded, its icons stack in one
+          column; open, where they act sits on its own line above them,
+          rather than squeezed beside three icons. */}
+      <div
+        className="flex flex-col gap-1 overflow-x-hidden border-t border-(--cq-border-subtle) px-2 py-3"
+        data-sidebar-footer
+      >
+        {collapsed ? null : (
+          <div className="min-w-0 px-3 pb-1">
+            {/* Where this person is acting: the scope, out of the input. */}
+            <ContextIndicator
+              translate={t}
+              scope={context.scope}
+              detail={context.label}
+            />
+          </div>
+        )}
+        <div
+          className={cx(
+            "flex gap-1",
+            collapsed ? "flex-col items-center" : "items-center px-1",
           )}
         >
-          <QMark size="sm" />
-          Ask Q
-        </Link>
-      </div>
-
-      <div className="mt-auto border-t border-(--cq-border-subtle) px-3 py-3">
-        <SidebarLink
-          href={PROFILE_NAVIGATION.href}
-          label={PROFILE_NAVIGATION.label}
-          Icon={PROFILE_NAVIGATION.icon}
-          active={isActiveRoute(pathname, PROFILE_NAVIGATION.href)}
-        />
+          {/* The appearance choice, one icon (R24; ADR 0017 F4). */}
+          <ThemeMenu align={collapsed ? "start" : "end"} />
+          {/* AUTO: notices from Q and the push switch, one bell. */}
+          <NotificationCenter />
+          <SignOutControl appearance="icon" />
+        </div>
       </div>
     </aside>
   );
+}
+
+/** Unread notices that wait on the person, for the Work entry's count. */
+function useNeedsYouCount(): number {
+  const notices = useNotices();
+  return (notices.items ?? []).filter(
+    (item) => item.priority === "NEEDS_YOU" && !item.read,
+  ).length;
 }
 
 function SidebarLink({
@@ -90,18 +240,29 @@ function SidebarLink({
   label,
   Icon,
   active,
+  compact,
+  count,
 }: {
   readonly href: string;
   readonly label: string;
   readonly Icon: (typeof PRIMARY_NAVIGATION)[number]["icon"];
   readonly active: boolean;
+  readonly compact: boolean;
+  /** What waits on them there; shown as a number, said in the name. */
+  readonly count?: number | undefined;
 }) {
-  return (
-    <Link
+  const waiting = count !== undefined && count > 0 ? count : null;
+  const name =
+    waiting === null ? label : `${label}, ${String(waiting)} waiting for you`;
+  const link = (
+    <IntentLink
       href={href}
+      // P9: loading shell in view, the whole page on intent.
       aria-current={active ? "page" : undefined}
+      aria-label={compact || waiting !== null ? name : undefined}
       className={cx(
-        "relative flex min-h-10 items-center gap-3 rounded-md px-3 cq-body-sm transition-colors duration-(--cq-motion-fast)",
+        "relative flex min-h-11 items-center cq-body-sm pointer-fine:min-h-9 transition-colors duration-(--cq-motion-fast)",
+        compact ? "w-11 justify-center" : "gap-3 px-3",
         active
           ? "bg-(--cq-accent-soft) font-medium text-(--cq-text-primary)"
           : "text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)",
@@ -110,7 +271,7 @@ function SidebarLink({
       {active ? (
         <span
           aria-hidden="true"
-          className="absolute inset-y-2 left-0 w-0.5 rounded-r-full bg-(--cq-accent)"
+          className="absolute inset-y-2 start-0 w-0.5 bg-(--cq-accent)"
         />
       ) : null}
       <Icon
@@ -118,7 +279,24 @@ function SidebarLink({
         size={ICON_SIZE.regular}
         strokeWidth={ICON_STROKE}
       />
-      <span>{label}</span>
-    </Link>
+      {compact ? null : (
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+      )}
+      {compact || waiting === null ? null : (
+        <span
+          aria-hidden="true"
+          className="cq-caption cq-numeric font-semibold text-(--cq-accent)"
+        >
+          {waiting}
+        </span>
+      )}
+    </IntentLink>
+  );
+  return compact ? (
+    <Tooltip content={label} side="right">
+      {link}
+    </Tooltip>
+  ) : (
+    link
   );
 }

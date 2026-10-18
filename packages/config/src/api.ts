@@ -12,11 +12,25 @@ import {
   type RuntimeConfig,
 } from "./common.js";
 import {
+  modelProviderConfigStatus,
+  modelProviderEnvShape,
+  toModelProviderSecrets,
+  type ModelProviderConfigStatus,
+  type ModelProviderSecrets,
+} from "./model-providers.js";
+import {
   supabaseAuthEnvShape,
   supabaseSecretKeySchema,
   toSupabaseAuthConfig,
   type SupabaseAuthConfig,
 } from "./supabase-auth.js";
+import {
+  toVideoProviderSecrets,
+  videoProviderConfigStatus,
+  videoProviderEnvShape,
+  type VideoProviderConfigStatus,
+  type VideoProviderSecrets,
+} from "./video-providers.js";
 
 /** Local default. Hosting platforms inject PORT. */
 export const API_DEFAULT_PORT = 3001;
@@ -37,12 +51,34 @@ const apiEnvSchema = z.object({
   SUPABASE_SECRET_KEY: supabaseSecretKeySchema.optional(),
   // Adjustable implementation limit, not a locked product decision. Bounded
   // by the 50 MiB ceiling a document version may ever carry.
+  // ADR 0042 (founder decision 2026-10-03): with no scanner attached, files
+  // processed under ALLOW_UNSCANNED_WITH_WARNING are NOT_SCANNED and may be
+  // downloaded by the audiences that already have access, flagged
+  // scanned:false. Any other value (the default) serves CLEAN files only.
+  // Set with the workers' value; never on by default.
+  CQ_MALWARE_POLICY: z
+    .enum(["REQUIRE_CLEAN", "ALLOW_UNSCANNED", "ALLOW_UNSCANNED_WITH_WARNING"])
+    .default("REQUIRE_CLEAN"),
   CQ_DOCUMENT_UPLOAD_MAX_BYTES: z.coerce
     .number()
     .int()
     .min(1024)
     .max(52428800)
     .default(26214400),
+  // Inference credentials (CQ-GATE-002). The API serves the GateQ
+  // applicant interview, which is a model-backed conversation. Optional:
+  // with no provider configured the applicant surface does not register at
+  // all, which is a closed front door rather than a broken one.
+  ...modelProviderEnvShape,
+  // Where the one Q interviewer runs (QX-004 core gate: one Q). The
+  // conversational onboarding turn is delegated to it rather than answered
+  // by a second implementation here. Optional: with no URL the /say route
+  // closes, which is a closed door rather than a quietly worse Q.
+  CQ_Q_API_URL: z.string().url("expected an absolute http(s) URL").optional(),
+  // Pitch video (CQ-MEDIA-010). Optional: without it the Media context
+  // composes an explicit unconfigured provider that refuses every upload
+  // and playback by name, and the rest of the API still serves.
+  ...videoProviderEnvShape,
 });
 
 /**
@@ -52,11 +88,23 @@ const apiEnvSchema = z.object({
 export type ApiSecrets = {
   /** Privileged Supabase key for private document storage. */
   readonly supabaseSecretKey: string | undefined;
+  /** Inference credentials for the GateQ applicant interview. */
+  readonly modelProviders: ModelProviderSecrets;
+  /** Cloudflare Stream credentials for pitch video. */
+  readonly videoProviders: VideoProviderSecrets;
 };
 
 /** Non-secret operational values safe to expose in diagnostics. */
 export type ApiPublicConfig = {
   readonly documentUploadMaxBytes: number;
+  /** ADR 0042: NOT_SCANNED files may be downloaded, flagged. Default false. */
+  readonly serveUnscannedDocuments: boolean;
+  /** Absolute base URL of the Q service, or undefined when not composed. */
+  readonly qApiBaseUrl: string | undefined;
+  /** Which providers are configured. Names and booleans, never keys. */
+  readonly modelProviders: ModelProviderConfigStatus;
+  /** Whether pitch video can be uploaded and played. Names, never keys. */
+  readonly videoProviders: VideoProviderConfigStatus;
 };
 
 export type ApiConfig = {
@@ -72,6 +120,7 @@ export type ApiConfig = {
 export function parseApiConfig(env: EnvironmentInput): ApiConfig {
   const parsed = parseConfig("api", apiEnvSchema, env);
   const runtime = toRuntimeConfig(parsed);
+  const videoProviders = toVideoProviderSecrets(parsed);
 
   return {
     runtime,
@@ -85,8 +134,19 @@ export function parseApiConfig(env: EnvironmentInput): ApiConfig {
             SUPABASE_PUBLISHABLE_KEY: parsed.SUPABASE_PUBLISHABLE_KEY,
           })
         : undefined,
-    public: { documentUploadMaxBytes: parsed.CQ_DOCUMENT_UPLOAD_MAX_BYTES },
-    secrets: { supabaseSecretKey: parsed.SUPABASE_SECRET_KEY },
+    public: {
+      documentUploadMaxBytes: parsed.CQ_DOCUMENT_UPLOAD_MAX_BYTES,
+      serveUnscannedDocuments:
+        parsed.CQ_MALWARE_POLICY === "ALLOW_UNSCANNED_WITH_WARNING",
+      qApiBaseUrl: parsed.CQ_Q_API_URL?.replace(/\/$/, ""),
+      modelProviders: modelProviderConfigStatus(toModelProviderSecrets(parsed)),
+      videoProviders: videoProviderConfigStatus(videoProviders),
+    },
+    secrets: {
+      supabaseSecretKey: parsed.SUPABASE_SECRET_KEY,
+      modelProviders: toModelProviderSecrets(parsed),
+      videoProviders,
+    },
   };
 }
 

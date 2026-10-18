@@ -24,7 +24,9 @@ import {
   type QSubjectRef,
   type QVisibleStage,
   type UtcTimestamp,
+  type QResultBlock,
 } from "@capital-q/contracts";
+import type { QScreenContext, QViewingMoment } from "@capital-q/contracts";
 import type { OrganisationId, TenantId, UserId } from "@capital-q/security";
 
 /**
@@ -62,8 +64,22 @@ export type QConversation = {
   readonly organisationId: OrganisationId | null;
   readonly contextType: QConversationContextType;
   readonly subjects: readonly QSubjectRef[];
+  /** A few words naming it, once the memory extractor has run (ADR 0012). */
+  readonly title: string | null;
+  /** The conversation so far, rolled forward. Model-written working memory: untrusted text. */
+  readonly summary: string | null;
+  /** The newest message the summary covers. */
+  readonly summaryThrough: UtcTimestamp | null;
+  readonly lastMessageAt: UtcTimestamp | null;
   readonly createdAt: UtcTimestamp;
   readonly archivedAt: UtcTimestamp | null;
+};
+
+/** What the memory extractor writes back about a conversation. */
+export type QConversationDigest = {
+  readonly title: string | null;
+  readonly summary: string;
+  readonly summaryThrough: UtcTimestamp;
 };
 
 export type NewQConversation = {
@@ -84,6 +100,16 @@ export type QRunRecord = {
   readonly consequenceClass: QConsequenceClass;
   readonly status: QRunStatus;
   readonly subjects: readonly QSubjectRef[];
+  /**
+   * R18: the pitch moment the person was viewing, only when the Q API
+   * authorised it for them at creation; null (or absent) otherwise.
+   */
+  readonly viewing?: QViewingMoment | null | undefined;
+  /**
+   * R21: the screen the person asked from: the route, and only the
+   * entities that resolved for them at creation; null when none was sent.
+   */
+  readonly screen?: QScreenContext | null | undefined;
   /** NULL until the orchestrator, prompt registry and model policy exist. */
   readonly orchestrationVersion: string | null;
   readonly promptBundleVersion: string | null;
@@ -108,6 +134,10 @@ export type NewQRun = {
   readonly capability: QCapability;
   readonly consequenceClass: QConsequenceClass;
   readonly subjects: readonly QSubjectRef[];
+  /** R18: already authorised for the actor; never a client's word. */
+  readonly viewing?: QViewingMoment | null | undefined;
+  /** R21: the route plus only the on-screen entities that resolved. */
+  readonly screen?: QScreenContext | null | undefined;
   readonly correlationId: CorrelationId;
 };
 
@@ -119,6 +149,24 @@ export type QConversationMessage = {
   readonly role: QMessageRole;
   readonly content: string;
   readonly contentType: "TEXT";
+  /**
+   * The objects Q's answer referred to (CQ-Q-BLOCKS-HISTORY-001).
+   *
+   * Exactly what the browser received live, so reopening a conversation
+   * shows the same cards rather than the prose alone. Parsed through the
+   * public contract on the way in and on the way out: a block that does
+   * not satisfy it is not stored and not served, which is what keeps
+   * internal state, a provider payload and a private evidence reference
+   * out of history by construction rather than by review.
+   */
+  readonly blocks?: readonly QResultBlock[] | undefined;
+  /**
+   * The spoken utterance this person's turn is a form of, when it came by
+   * voice (`domain/utterances.ts`). Stored as the reserved provider message
+   * reference: an opaque id, never a payload. Server-internal; never sent
+   * to a client.
+   */
+  readonly utteranceRef?: string | undefined;
   readonly createdAt: UtcTimestamp;
 };
 
@@ -134,6 +182,10 @@ export type NewQConversationMessage = {
   readonly runId: QRunId;
   readonly role: QMessageRole;
   readonly content: string;
+  /** Q's own turns only; a person's turn is what they typed. */
+  readonly blocks?: readonly QResultBlock[] | undefined;
+  /** A person's spoken turn only: the utterance it is a form of. */
+  readonly utteranceRef?: string | undefined;
 };
 
 export type QRunEventRecord = {
@@ -178,6 +230,78 @@ export function toQRunHandle(run: QRunRecord): QRunHandle {
   });
 }
 
+/**
+ * The blocks a stored answer may hand back to a client
+ * (CQ-Q-BLOCKS-HISTORY-001 §A5).
+ *
+ * An evidence reference is only identifiers, and whether a reader may see
+ * the document behind one is disclosure's decision at render time — never
+ * something a message projection may pre-empt. That rule was already
+ * enforced, but only in the browser's own projection, which meant one
+ * client remembering to filter was the whole of the protection. Making
+ * history durable would have made that the wrong place for it: a row read
+ * by anything else would have carried the identifiers straight out.
+ *
+ * So it is enforced here, where every client reads through. A block that
+ * carries evidence references is dropped and the rest of the answer is
+ * served; the count a reader is entitled to already travels with the
+ * findings.
+ */
+function disclosable(
+  blocks: readonly QResultBlock[] | undefined,
+): readonly QResultBlock[] {
+  if (blocks === undefined) return [];
+  return blocks.filter((block) => {
+    switch (block.kind) {
+      case "EVIDENCE":
+        return false;
+      case "UI_INTENT":
+        // The same references under another name.
+        return block.intent.kind !== "SHOW_EVIDENCE";
+      case "FINDING":
+        // A finding's own references are equally not the browser's to
+        // hold. The projection that produces them already sends an empty
+        // list; a row that somehow holds otherwise is dropped rather
+        // than trimmed, because a half-stripped finding is a finding
+        // somebody stopped checking.
+        return block.finding.evidenceRefs.length === 0;
+      // Prose and objects. None of them carries an evidence identifier,
+      // and each is listed rather than defaulted so that adding a block
+      // kind forces somebody to decide what history may hand back.
+      // ARTIFACT_REFERENCE among them: it names something Q composed and
+      // grants nothing, because knowing an identifier has never been
+      // permission to see what it names. PUBLIC_SOURCE is a public web
+      // page's own public fields (R23), no guarded record.
+      // Answer cards and data blocks too: subject refs (as
+      // COMPANY_REFERENCE), measure levels, a chart's evidence status and
+      // source caption, no evidence identifier. Missing here, history served
+      // them as prose and the cards vanished on reload (INC-1, G-D13).
+      case "TEXT":
+      case "ANSWER_CARDS":
+      case "TABLE":
+      case "CHART":
+      case "MAP":
+      case "TIMELINE":
+      case "ATTENTION": // the person's own attention items, no evidence
+      case "COMPANY_REFERENCE":
+      case "INVESTOR_REFERENCE":
+      case "COMPARISON":
+      case "COMPARISON_CARDS":
+      case "UNCERTAINTY":
+      case "CLARIFICATION_REQUEST":
+      case "ACTION_PROPOSAL":
+      case "ARTIFACT_REFERENCE":
+      case "PUBLIC_SOURCE":
+        return true;
+      default: {
+        // A new kind fails typecheck here instead of silently vanishing.
+        const unhandled: never = block;
+        return unhandled;
+      }
+    }
+  });
+}
+
 export function toQMessage(message: QConversationMessage): QMessage {
   return QMessageSchema.parse(
     message.role === "USER"
@@ -193,6 +317,12 @@ export function toQMessage(message: QConversationMessage): QMessage {
           runId: message.runId,
           role: "Q",
           text: message.content,
+          // Restored from the store, re-validated on read and filtered to
+          // what a reader may actually be handed.
+          ...(() => {
+            const blocks = disclosable(message.blocks);
+            return blocks.length === 0 ? {} : { blocks };
+          })(),
           createdAt: message.createdAt,
         },
   );

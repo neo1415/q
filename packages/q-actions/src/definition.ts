@@ -40,6 +40,11 @@ import type {
  * unregistered type has no executor and no way to acquire one.
  */
 
+export type QActionDescription = {
+  readonly summary: string;
+  readonly preview?: string | undefined;
+};
+
 export type QActionAuthorization =
   | { readonly outcome: "ALLOW" }
   | { readonly outcome: "DENY"; readonly code: string };
@@ -63,6 +68,16 @@ export type ApprovedQAction<P> = {
 };
 
 export type QActionExecutionContext = {
+  /**
+   * The approver, exactly as the gate just verified them: the same person
+   * who approved, in the same tenant and organisation, holding the approve
+   * capability and the action's own permission at this moment. An
+   * executor acts under this authority and no other — rebuilding an actor
+   * from the approval's user id loses the membership that roles hang on,
+   * and live, every approved profile change failed its own permission
+   * check that way (CQ-QACT-001).
+   */
+  readonly approver: ActorContext;
   readonly correlationId: CorrelationId;
   /** 1 for the first claim; a retry under the same approval increments it. */
   readonly attempt: number;
@@ -106,12 +121,68 @@ export type QActionDefinition<P, R> = {
   readonly describe: (
     payload: P,
     targets: readonly QSubjectRef[],
-  ) => { readonly summary: string; readonly preview?: string | undefined };
+  ) => QActionDescription;
+  /**
+   * The same, naming its targets as the proposing person may see them,
+   * read after authorize allowed them; never writes. Absent: `describe`.
+   * A failure falls back to `describe`: a card is never lost to a name.
+   */
+  readonly describeFor?:
+    | ((
+        payload: P,
+        targets: readonly QSubjectRef[],
+        actor: ActorContext,
+      ) => Promise<QActionDescription>)
+    | undefined;
   readonly authorize: (
     payload: P,
     actor: ActorContext,
   ) => Promise<QActionAuthorization>;
   readonly executor: QActionExecutor<P, R>;
+  /**
+   * Whether `next` may replace `previous` as the person's own edit of a
+   * pending proposal (BIZ-007: the words of an email, never its recipient).
+   * Absent: the action cannot be revised in place. A revision is proposed,
+   * authorised and bound afresh; the old approval is void.
+   */
+  readonly revisable?: ((previous: P, next: P) => boolean) | undefined;
+  /**
+   * A setter (lead 2026-10-03): two waiting values for the same target
+   * contradict each other, so a newer card replaces the older one. Absent
+   * or false: an additive action (a message, a request, a reminder), and
+   * several cards for one target coexist.
+   */
+  readonly supersedes?: boolean | undefined;
+  /**
+   * A setter's resource, from its payload (G-D23 follow-up): two waiting
+   * cards replace each other only when this is equal. Required in effect
+   * for a setter that declares no targets -- its default target is the
+   * proposer, which would match every card of theirs; without a key such
+   * a setter never replaces anything.
+   */
+  readonly supersedeKey?: ((payload: P) => string) | undefined;
+  /**
+   * Whether two proposals for the same targets would do the same thing in
+   * the world although their values differ in detail (voiceq-63, live
+   * 2026-10-04: "book a call with Nixo in the next five minutes", said and
+   * restated, gave five starts seconds apart, five cards and two invites).
+   * A match with a waiting card returns that card; a match with one
+   * already carried out returns its result, said as `alreadyDone`. Absent:
+   * only identical content is the same card.
+   */
+  readonly sameIntent?: ((previous: P, next: P) => boolean) | undefined;
+  /**
+   * What Q says when a request matches a change already carried out, from
+   * that change's payload and validated result: "Already booked for Tue
+   * 10:00 — link: …". Absent: "Already done: <summary>."
+   */
+  readonly alreadyDone?: ((payload: P, result: R) => string) | undefined;
+  /**
+   * What Q tells the person once the gate has persisted EXECUTED, from the
+   * approved payload and the executor's validated result — never from a
+   * model. Absent: the approval summary, prefixed "Done".
+   */
+  readonly confirm?: ((payload: P, result: R) => string) | undefined;
 };
 
 /** Erased for the registry; per-definition types stay with the definition. */

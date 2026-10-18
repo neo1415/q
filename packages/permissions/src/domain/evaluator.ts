@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import type { ActorContext } from "@capital-q/security";
-
 import {
   accessLevelSatisfies,
   DisclosureAccessLevelSchema,
@@ -100,21 +98,27 @@ const DENY_PRECEDENCE: readonly DisclosureDenyReason[] = [
   "UNKNOWN_RESOURCE_SCOPE",
 ];
 
-function isParty(actor: ActorContext, parties: RelationshipParties): boolean {
-  if (actor.organisationId === undefined) {
+/** Where a principal stands: the only two fields party membership turns on. */
+type Standing = {
+  readonly tenantId: string;
+  readonly organisationId: string | undefined;
+};
+
+function isParty(standing: Standing, parties: RelationshipParties): boolean {
+  if (standing.organisationId === undefined) {
     return false;
   }
   const { company, investor } = parties;
   return (
-    (actor.organisationId === company.organisationId &&
-      actor.tenantId === company.tenantId) ||
-    (actor.organisationId === investor.organisationId &&
-      actor.tenantId === investor.tenantId)
+    (standing.organisationId === company.organisationId &&
+      standing.tenantId === company.tenantId) ||
+    (standing.organisationId === investor.organisationId &&
+      standing.tenantId === investor.tenantId)
   );
 }
 
 function matchRelationship(
-  actor: ActorContext,
+  standing: Standing,
   relationshipId: string | undefined,
   parties: Readonly<Record<string, RelationshipParties>>,
 ): ScopeMatch {
@@ -125,9 +129,90 @@ function matchRelationship(
   if (resolved === undefined) {
     return { matched: false, reason: "UNRESOLVED_RELATIONSHIP" };
   }
-  return isParty(actor, resolved)
+  return isParty(standing, resolved)
     ? { matched: true, reason: "RELATIONSHIP_PARTY" }
     : { matched: false, reason: "NO_MATCHING_SCOPE" };
+}
+
+/**
+ * What an organisation may see, asked as an organisation
+ * (CQ-PERM-ORG-VIEW-001).
+ *
+ * Strictly narrower than any of its members. Two scopes carry the whole
+ * point: `personal_private` can never match, because a Person's own
+ * material is not the organisation's; and `specifically_shared` matches
+ * only a grant that names the ORGANISATION, because a share addressed to
+ * one member is that member's and does not become institutional knowledge
+ * by being useful.
+ *
+ * There is no membership list here on purpose. Asking "can any member see
+ * it" would be the union of every member's access, which is the thing this
+ * exists to avoid; asking "can every member see it" would make one
+ * colleague's absence change what the organisation knows.
+ */
+function matchOrganisationScope(
+  scope: DisclosureScope,
+  facts: ScopeFacts,
+  principal: { readonly tenantId: string; readonly organisationId: string },
+  parties: Readonly<Record<string, RelationshipParties>>,
+): ScopeMatch {
+  const standing = {
+    tenantId: principal.tenantId,
+    organisationId: principal.organisationId,
+  };
+  switch (scope) {
+    case "public_external":
+      // Handled before this function; listed so the switch stays exhaustive.
+      return { matched: true, reason: "PUBLIC_EXTERNAL" };
+
+    case "network_visible":
+      // An organisation is an authenticated Capital Q context in its own
+      // right; the visibility layer asks nothing more.
+      return { matched: true, reason: "NETWORK_VISIBLE" };
+
+    case "personal_private":
+      // A Person's own material, never the organisation's. No branch here,
+      // deliberately: this is the scope the whole principal exists for.
+      return { matched: false, reason: "NO_MATCHING_SCOPE" };
+
+    case "organisation_private":
+    case "founder_private":
+    case "investor_private":
+      // The owning side, as a side. An owner who is a Person is not the
+      // organisation, so `ownerUserId` is not consulted.
+      return facts.ownerOrganisationId !== undefined &&
+        facts.ownerOrganisationId === principal.organisationId
+        ? { matched: true, reason: "SAME_ORGANISATION" }
+        : { matched: false, reason: "NO_MATCHING_SCOPE" };
+
+    case "relationship_shared":
+      // Relationship parties ARE organisations, so this answers identically
+      // for the organisation and for any of its members.
+      return matchRelationship(standing, facts.relationshipId, parties);
+
+    case "specifically_shared": {
+      const recipient = facts.recipient;
+      if (recipient === null) {
+        return { matched: false, reason: "WRONG_RECIPIENT" };
+      }
+      switch (recipient.type) {
+        case "ORGANISATION":
+          return recipient.id === principal.organisationId
+            ? { matched: true, reason: "EXPLICIT_RECIPIENT" }
+            : { matched: false, reason: "WRONG_RECIPIENT" };
+        case "RELATIONSHIP": {
+          const match = matchRelationship(standing, recipient.id, parties);
+          return match.matched || match.reason === "UNRESOLVED_RELATIONSHIP"
+            ? match
+            : { matched: false, reason: "WRONG_RECIPIENT" };
+        }
+        case "USER":
+        case "MEMBERSHIP":
+          // Addressed to a person. It stays theirs.
+          return { matched: false, reason: "WRONG_RECIPIENT" };
+      }
+    }
+  }
 }
 
 /**
@@ -144,6 +229,9 @@ function matchScope(
   // Deliberately public: the only scope an unauthenticated principal can hold.
   if (scope === "public_external") {
     return { matched: true, reason: "PUBLIC_EXTERNAL" };
+  }
+  if (principal.kind === "ORGANISATION") {
+    return matchOrganisationScope(scope, facts, principal, parties);
   }
   if (principal.kind !== "ACTOR") {
     return { matched: false, reason: "AUTHENTICATION_REQUIRED" };
@@ -183,7 +271,11 @@ function matchScope(
         : { matched: false, reason: "NO_MATCHING_SCOPE" };
 
     case "relationship_shared":
-      return matchRelationship(actor, facts.relationshipId, parties);
+      return matchRelationship(
+        { tenantId: actor.tenantId, organisationId: actor.organisationId },
+        facts.relationshipId,
+        parties,
+      );
 
     case "specifically_shared": {
       const recipient = facts.recipient;
@@ -210,7 +302,11 @@ function matchScope(
             ? { matched: true, reason: "EXPLICIT_RECIPIENT" }
             : { matched: false, reason: "WRONG_RECIPIENT" };
         case "RELATIONSHIP": {
-          const match = matchRelationship(actor, recipient.id, parties);
+          const match = matchRelationship(
+            { tenantId: actor.tenantId, organisationId: actor.organisationId },
+            recipient.id,
+            parties,
+          );
           return match.matched || match.reason === "UNRESOLVED_RELATIONSHIP"
             ? match
             : { matched: false, reason: "WRONG_RECIPIENT" };
@@ -249,6 +345,9 @@ export function evaluateDisclosure(
 
   // Zero ambient authority for non-human principals (§77). Q learns of a
   // resource through a human's resolved envelope later, never by asking.
+  // An ORGANISATION principal is not one of these: it is not an agent that
+  // could ask on its own behalf, and it answers strictly less than any of
+  // its human members (CQ-PERM-ORG-VIEW-001).
   if (
     request.principal.kind === "ACTOR" &&
     request.principal.actor.actorType !== "HUMAN"

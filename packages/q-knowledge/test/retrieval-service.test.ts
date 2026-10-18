@@ -33,7 +33,7 @@ function envelope(
   return {
     planId: "77777777-7777-4777-8777-777777777777",
     planFingerprint: "a".repeat(64),
-    policyVersion: "context-firewall-v1",
+    policyVersion: "context-firewall-v2",
     tenantId: TENANT,
     actorUserId: "22222222-2222-4222-8222-222222222222",
     organisationId: "33333333-3333-4333-8333-333333333333",
@@ -160,6 +160,47 @@ describe("authorised retrieval service", () => {
     expect(result.hits.map((h) => h.chunkId)).toEqual([chunkId(1)]);
   });
 
+  it("an unconfigured runtime is lexical-only, logged once as a warning, never as an error (run 13955ca2)", async () => {
+    const logger = {
+      error: vi.fn(),
+      warn: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+    };
+    const embeddings = {
+      describe: () => {
+        throw new Error("unused");
+      },
+      embedDocuments: () => Promise.reject(new Error("unused")),
+      embedQuery: vi
+        .fn()
+        .mockRejectedValue(
+          new Error("the embedding runtime is not configured"),
+        ),
+      health: () => Promise.reject(new Error("unused")),
+    };
+    const service = createAuthorisedRetrievalService({
+      sql,
+      lexical: {
+        search: () =>
+          Promise.resolve([
+            { chunkId: chunkId(1), rank: 1, lexicalScore: 0.5 },
+          ]),
+      },
+      semantic: noSemantic,
+      hydration: fakeHydration([hydrated(chunkId(1))]),
+      embeddings,
+      logger: logger as never,
+    });
+    for (const query of ["runway", "burn", "payroll"]) {
+      const result = await service.retrieve({ query, envelope: envelope() });
+      expect(result.executedStrategy).toBe("LEXICAL_ONLY");
+      expect(result.hits.map((h) => h.chunkId)).toEqual([chunkId(1)]);
+    }
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+  });
+
   it("never reaches for an external provider when the local one is down", async () => {
     const embeddings = {
       describe: () => {
@@ -188,6 +229,70 @@ describe("authorised retrieval service", () => {
     expect(embeddings.embedQuery).toHaveBeenCalledTimes(1);
     expect(result.degraded.reason).toBe("EMBEDDING_UNAVAILABLE");
     expect(result.executedStrategy).toBe("LEXICAL_ONLY");
+  });
+
+  it("runs the lexical and semantic halves concurrently under the one envelope (2026-10-12)", async () => {
+    // Lexical is held open until the semantic half has already embedded the
+    // query and searched: sequential execution would deadlock this test.
+    let releaseLexical: (() => void) | undefined;
+    const lexicalHeld = new Promise<void>((resolve) => {
+      releaseLexical = resolve;
+    });
+    const order: string[] = [];
+    const lexicalEnvelopes: unknown[] = [];
+    const semanticScopes: unknown[] = [];
+    const service = createAuthorisedRetrievalService({
+      sql,
+      lexical: {
+        search: async (_executor, query) => {
+          order.push("lexical:start");
+          lexicalEnvelopes.push(query.constraints);
+          await lexicalHeld;
+          order.push("lexical:end");
+          return [{ chunkId: chunkId(1), rank: 1 } as never];
+        },
+      },
+      semantic: {
+        search: (_executor, query) => {
+          order.push("semantic:search");
+          semanticScopes.push(query.authorisedScopes);
+          releaseLexical?.();
+          return Promise.resolve([{ chunkId: chunkId(2), rank: 1 } as never]);
+        },
+      },
+      hydration: fakeHydration([hydrated(chunkId(1)), hydrated(chunkId(2))]),
+      embeddings: {
+        embedQuery: () => {
+          order.push("semantic:embed");
+          return Promise.resolve({
+            vector: [0.1],
+            dimension: 1,
+            configurationVersion: "x-v1",
+          });
+        },
+      } as never,
+    });
+    const result = await service.retrieve({
+      query: "market size",
+      envelope: envelope(),
+    });
+    expect(order.indexOf("semantic:search")).toBeLessThan(
+      order.indexOf("lexical:end"),
+    );
+    expect(order[0]).toBe("lexical:start");
+    expect(result.executedStrategy).toBe("HYBRID");
+    expect(result.hits.map((hit) => hit.chunkId).sort()).toEqual(
+      [chunkId(1), chunkId(2)].sort(),
+    );
+    // Both halves read through the same authorised constraints.
+    expect(lexicalEnvelopes).toEqual([envelope().constraints]);
+    expect(semanticScopes).toEqual([
+      envelope().constraints.map((c) => ({
+        subjectIds: c.subjectIds,
+        visibilityScopes: c.visibilityScopes,
+        sensitivityCeiling: c.sensitivityCeiling,
+      })),
+    ]);
   });
 
   it("degrades to semantic when the lexical half fails", async () => {

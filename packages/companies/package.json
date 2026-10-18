@@ -16,6 +16,10 @@
     "./events": {
       "types": "./dist/events/index.d.ts",
       "default": "./dist/events/index.js"
+    },
+    "./dev": {
+      "types": "./dist/dev/synthetic-verification.d.ts",
+      "default": "./dist/dev/synthetic-verification.js"
     }
   },
   "main": "./dist/index.js",
@@ -31,6 +35,7 @@
   },
   "dependencies": {
     "@capital-q/audit": "workspace:*",
+    "@capital-q/config": "workspace:*",
     "@capital-q/contracts": "workspace:*",
     "@capital-q/database": "workspace:*",
     "@capital-q/eventing": "workspace:*",

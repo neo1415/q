@@ -1,0 +1,1208 @@
+import type { InterviewAgent } from "./interview-agent.js";
+import { randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
+import type { ReadableStream as WebReadableStream } from "node:stream/web";
+
+import type { FastifyInstance, FastifyRequest } from "fastify";
+import {
+  createProblemDetails,
+  PROBLEM_CONTENT_TYPE,
+  CreateQSpeechRequestSchema,
+  CreateQVoiceSessionRequestSchema,
+  CreateQVoiceSessionResponseSchema,
+  parseContract,
+  Q_VOICE_SESSIONS_PATH,
+  Q_VOICE_SPEECH_PATH,
+  Q_VOICE_SCREEN_PATH,
+  Q_VOICE_CARD_PATH,
+  QVoiceCardUpdateSchema,
+  Q_VOICE_TURN_PATH,
+  QVoiceScreenUpdateSchema,
+  QVoiceTurnStateSchema,
+  type QLanguagePreference,
+  type QVoiceChoice,
+  type QVoiceDuplexCredential,
+} from "@capital-q/contracts";
+import { effectiveLocale } from "@capital-q/q-core";
+import { languageInfo, voiceLineAvailable } from "@capital-q/q-core/language";
+import { fetchMe } from "@capital-q/api-client";
+import { createCorrelationId, getMeter } from "@capital-q/observability";
+import { AuthenticationRequiredError } from "@capital-q/security";
+import { signupContextFromToken } from "./interview-steps.js";
+import { extractBearerToken } from "@capital-q/security/supabase";
+
+import {
+  getActorContext,
+  requireActorContextHook,
+  requireActorContextOrPersonalHook,
+  type ActorContextDependencies,
+} from "../security/actor-context.js";
+import {
+  VOICE_CONNECT_WINDOW_MS,
+  VoiceSessionLimitError,
+  type VoiceSessionBinding,
+  type VoiceSessionBindings,
+  type VoiceThread,
+} from "./bindings.js";
+import {
+  Q_VOICE_SESSION_TOKEN_HEADER,
+  voiceTokenFingerprint,
+} from "./session-token.js";
+import type { RealtimeVoiceProvider } from "./provider.js";
+import { bounded, speakable } from "./speech.js";
+
+/**
+ * The most the speak relay voices in one request: a whole spoken answer
+ * (`SPOKEN_MAX_CHARS`, 1,200) and a line after it, such as a look-up
+ * offered and the question it returns to. 2,000 is also the most Aura-2,
+ * the last-resort voice, takes in one request.
+ */
+const RELAY_MAX_CHARS = 2_000;
+import type {
+  DeepgramAgentSettings,
+  DeepgramVoiceProvider,
+} from "./providers/deepgram.js";
+import {
+  SpeechSynthesisError,
+  createSpeechThrottle,
+  type SpeechSynthesisPort,
+  type SpeechThrottle,
+} from "./synthesis.js";
+import type { VoiceCardTurns } from "./card-turns.js";
+import type { VoiceTurnBoard } from "./turn-board.js";
+import type { WelcomeHost } from "./welcome.js";
+import {
+  composeReturningOpener,
+  plainOpener,
+  type OpenerFacts,
+} from "./returning-opener.js";
+import type { ActorContext } from "@capital-q/security";
+import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
+import type { DuplexBroker } from "./duplex/broker.js";
+import { registerDuplexVoiceRoutes } from "./duplex/routes.js";
+import type { LiveBroker } from "./live/broker.js";
+import { registerLiveVoiceRoutes } from "./live/routes.js";
+
+/**
+ * `POST /v1/q/voice/sessions` (CQ-Q-VOICE-001 C §31, §34; doc 12 §7.2,
+ * §36.3).
+ *
+ * A normal protected request: the session is verified, the actor and
+ * tenant are resolved on the server, the body is the strict public
+ * contract. Then, before the microphone can open, the provider issues one
+ * ephemeral conversation credential and the server binds that conversation
+ * to this actor and to the thread the body names. What the browser gets
+ * back grants audio transport with the provider and nothing in Capital Q;
+ * the provider API key is never in the response, a log, or the token.
+ *
+ * The person's own bearer token is kept with the binding, in memory, so a
+ * spoken interview answer reaches the application API with exactly the
+ * authority a typed one has. It is never written anywhere else.
+ */
+
+/**
+ * Where the Deepgram Voice Agent fetches Q's voice (QX-004 SPEAK rework).
+ *
+ * Not in `@capital-q/contracts` with the other voice paths on purpose:
+ * this is not part of Capital Q's public API. It is an integration
+ * detail between this service and one speech transport, reachable only
+ * with a per-session secret, and it speaks a vendor's dialect rather
+ * than ours.
+ */
+/** G-D21: the line was replaced by the person's own newer one (409). */
+const VOICE_LINE_REPLACED_PROBLEM = {
+  type: "about:blank",
+  title: "Voice moved",
+  status: 409,
+  detail: "This voice line was replaced by a newer one.",
+} as const;
+
+export const Q_VOICE_SPEAK_RELAY_PATH = "/v1/q/voice/speak" as const;
+
+/** What `CreateQVoiceSessionResponseSchema` allows for an opening line. */
+const FIRST_MESSAGE_MAX = 700;
+
+export type QVoiceRoutesDependencies = ActorContextDependencies & {
+  /**
+   * Multilingual Q: the language this person chose for Q (Settings), which
+   * overrides the device's locale on every voice line. Absent: the device's.
+   */
+  readonly languageOf?:
+    ((actor: ActorContext) => Promise<QLanguagePreference>) | undefined;
+  /** The ElevenLabs transport, when composed. */
+  readonly provider?: RealtimeVoiceProvider | undefined;
+  /** The Deepgram transport, when composed; preferred when both exist. */
+  readonly deepgram?: DeepgramVoiceProvider | undefined;
+  readonly bindings: VoiceSessionBindings;
+  /**
+   * REHEARSE: what the person Q plays says first on a rehearsal line (the
+   * rehearsal's latest line), for the person's own rehearsal only; null
+   * when it is not theirs or has ended.
+   */
+  readonly rehearsals?:
+    | {
+        readonly opening: (
+          actor: ActorContext,
+          rehearsalId: string,
+        ) => Promise<{
+          readonly line: string;
+          readonly name: string;
+          /** Steady per counterpart: picks the persona's own voice. */
+          readonly seed: string;
+        } | null>;
+        /** The persona's voice id for the speak relay, if it has one. */
+        readonly voiceIdFor?:
+          | ((voice: QVoiceChoice, seed: string) => string | undefined)
+          | undefined;
+        /** How the opening line sounds (its mood), on this voice session. */
+        readonly performOpening?:
+          | ((
+              actor: ActorContext,
+              rehearsalId: string,
+              voiceSessionId: string,
+            ) => Promise<void>)
+          | undefined;
+      }
+    | undefined;
+  /**
+   * The interview as a tool-calling Q run (ADR 0016): composes Q's
+   * opening line for an interview session, when present.
+   */
+  readonly interviewAgent?: InterviewAgent | undefined;
+  /** The application API origin, needed for the opening line. */
+  readonly apiBaseUrl?: string | undefined;
+  /** The turn board, for the screen to read what Q is asking. */
+  readonly board?: VoiceTurnBoard | undefined;
+  /** E-03: decision cards on the standard line (shared with think). */
+  readonly cards?: VoiceCardTurns | undefined;
+  /** Q's first minute with a new person. */
+  readonly welcome?: WelcomeHost | undefined;
+  /** One-way synthesis, when composed: Q reads a line, nothing listens. */
+  readonly speech?: SpeechSynthesisPort | undefined;
+  /** How often one person may ask for that; composed here so a test can drive it. */
+  readonly speechThrottle?: SpeechThrottle | undefined;
+  readonly now?: (() => number) | undefined;
+  /**
+   * When present, a person with no organisation yet may still talk with Q
+   * (arrival, the open thread) under a personal context; the interview and
+   * subject-bound threads resolve their organisation as everywhere else.
+   */
+  readonly identity?: ApplicationIdentityLookup | undefined;
+  /** Names this person taught Q to hear (ADR 0012), for the recogniser. */
+  readonly memory?:
+    | { readonly termsFor: (actor: ActorContext) => Promise<readonly string[]> }
+    | undefined;
+  /**
+   * The names on the person's own records — their company (canonical and
+   * legal), their firm, their own name — for the recogniser, so it hears
+   * "Zino Aviation" rather than "Zener Aviation" (founder live
+   * 2026-09-27, #6). Read for the resolved actor's own organisation only.
+   */
+  readonly ownNames?:
+    | { readonly namesFor: (actor: ActorContext) => Promise<readonly string[]> }
+    | undefined;
+  /** What is theirs to deal with now, for a returning person's opener. */
+  readonly openerFacts?:
+    ((actor: ActorContext) => Promise<OpenerFacts>) | undefined;
+  /**
+   * DUPLEX: the full-duplex broker, when composed (CQ_VOICE_REALTIME).
+   * Tried after the standard line is bound; anything short of a minted
+   * line leaves the standard credential exactly as it was.
+   */
+  readonly duplex?: DuplexBroker | undefined;
+  /**
+   * V: the GPT-Live line, when composed (CQ_VOICE_LIVE). Attaches to a
+   * voice session this route issued; never replaces the standard line.
+   */
+  readonly live?:
+    | {
+        readonly broker: LiveBroker;
+        /** Who may open a live line; null: anyone signed in (local). */
+        readonly allowedUsers: ReadonlySet<string> | null;
+        /** The names across their relationships (counterparts). */
+        readonly counterparts?:
+          ((actor: ActorContext) => Promise<readonly string[]>) | undefined;
+        readonly preview: {
+          readonly enabled: boolean;
+          readonly providers: () => Readonly<Record<string, boolean>>;
+        };
+      }
+    | undefined;
+};
+
+export function registerQVoiceRoutes(
+  app: FastifyInstance,
+  dependencies: QVoiceRoutesDependencies,
+): void {
+  const identity = dependencies.identity;
+  const withContext =
+    identity === undefined
+      ? requireActorContextHook(dependencies)
+      : requireActorContextOrPersonalHook({ ...dependencies, identity });
+  const now = dependencies.now ?? Date.now;
+  const meter = getMeter("@capital-q/q-api");
+  const started = meter.createCounter("q.voice.session.issued", {
+    description: "Voice session credentials issued, by voice",
+  });
+  const spokenLines = meter.createCounter("q.voice.speech.synthesised", {
+    description: "One-way spoken lines synthesised, by voice",
+  });
+  const throttle = dependencies.speechThrottle ?? createSpeechThrottle();
+
+  /**
+   * The line this voice session id names: held here, or restored from the
+   * sealed token the browser presents (after a deploy, a restart or on
+   * another replica). The token must name this very session; the caller
+   * still has to be its owner, which each route checks.
+   */
+  const ownLine = async (
+    request: FastifyRequest,
+    voiceSessionId: string,
+  ): Promise<VoiceSessionBinding | null> => {
+    const held = dependencies.bindings.byVoiceSessionId(voiceSessionId);
+    if (held !== null) return held;
+    const presented = request.headers[Q_VOICE_SESSION_TOKEN_HEADER];
+    if (typeof presented !== "string" || presented.length === 0) return null;
+    const restored = await dependencies.bindings.restore(presented);
+    return restored !== null && restored.voiceSessionId === voiceSessionId
+      ? restored
+      : null;
+  };
+
+  // What Q is asking after its latest spoken turn: the owner's own
+  // session only; anyone else sees the same 404 as a session that does
+  // not exist.
+  app.get(
+    Q_VOICE_TURN_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const params = request.params as { voiceSessionId?: string };
+      const id = params.voiceSessionId ?? "";
+      const binding = await ownLine(request, id);
+      if (
+        binding === null &&
+        dependencies.bindings.replaced?.(id, actor.userId) === true
+      ) {
+        // G-D21: their own newer line replaced this one (another tab):
+        // that tab stops rather than reopening and replacing it back.
+        request.log.info({ reason: "REPLACED" }, "voice turn state refused");
+        return reply.code(409).send(VOICE_LINE_REPLACED_PROBLEM);
+      }
+      if (binding === null || binding.actor.userId !== actor.userId) {
+        // The browser reads this as "the line is gone" and reconnects, so
+        // which of the two it was decides whether a reconnect loop is the
+        // server letting sessions go or somebody reading another person's.
+        request.log.warn(
+          {
+            reason: binding === null ? "NO_BINDING" : "NOT_THIS_PERSON",
+            boundCount: dependencies.bindings.size(),
+          },
+          "voice turn state refused",
+        );
+        return reply.code(404).send({
+          type: "about:blank",
+          title: "Not found",
+          status: 404,
+          detail: "No such voice session.",
+        });
+      }
+      const state = dependencies.board?.read(id) ?? {
+        sequence: 0,
+        asking: null,
+        navigate: null,
+        handoff: null,
+        degraded: false,
+      };
+      return reply.code(200).send(QVoiceTurnStateSchema.parse(state));
+    },
+  );
+
+  /**
+   * `POST /v1/q/voice/sessions/:voiceSessionId/screen` — where the person
+   * is now, while the line is open (R21). Spoken turns reach the planner
+   * with the screen exactly as typed ones do. Owner only: another person's
+   * session is not found. What is recorded is only the validated shape;
+   * each turn's run resolves its entities for the asker or drops them.
+   */
+  app.post(
+    Q_VOICE_SCREEN_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const params = request.params as { voiceSessionId?: string };
+      const binding = await ownLine(request, params.voiceSessionId ?? "");
+      if (binding === null || binding.actor.userId !== actor.userId) {
+        return reply.code(404).send({
+          type: "about:blank",
+          title: "Not found",
+          status: 404,
+          detail: "No such voice session.",
+        });
+      }
+      const screen = QVoiceScreenUpdateSchema.safeParse(request.body);
+      if (!screen.success) {
+        return reply.code(400).send({
+          type: "about:blank",
+          title: "Bad request",
+          status: 400,
+          detail: "That is not a screen.",
+        });
+      }
+      const { viewing, ...shown } = screen.data;
+      binding.thread.screen = shown;
+      // R18: the pitch moment on screen, for spoken turns; replaced (or
+      // cleared) by every update, so a moved-on card never lingers.
+      binding.thread.viewing = viewing;
+      return reply.code(204).send();
+    },
+  );
+
+  /**
+   * E-03: the standard line's side of the screen's decision cards: which
+   * card is in focus, and the browser's verdict on a spoken reply (decided
+   * by the card's own code under this person's session). Owner only.
+   */
+  app.post(
+    Q_VOICE_CARD_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const params = request.params as { voiceSessionId?: string };
+      const binding = await ownLine(request, params.voiceSessionId ?? "");
+      const cards = dependencies.cards;
+      if (
+        binding === null ||
+        binding.actor.userId !== actor.userId ||
+        cards === undefined
+      ) {
+        return reply.code(404).send({
+          type: "about:blank",
+          title: "Not found",
+          status: 404,
+          detail: "No such voice session.",
+        });
+      }
+      const update = QVoiceCardUpdateSchema.safeParse(request.body);
+      if (!update.success) {
+        return reply.code(400).send({
+          type: "about:blank",
+          title: "Bad request",
+          status: 400,
+          detail: "That is not a card update.",
+        });
+      }
+      if (update.data.kind === "FOCUS") {
+        cards.setFocus(binding.voiceSessionId, update.data.inFocus);
+      } else {
+        cards.resolve(binding.voiceSessionId, update.data.words, {
+          handled: update.data.handled,
+          outcome: update.data.outcome,
+        });
+      }
+      return reply.code(204).send();
+    },
+  );
+
+  /**
+   * `POST /v1/q/voice/speech` — Q reads one line aloud
+   * (Q-FIRST-RUN-TTS-001).
+   *
+   * A normal protected request that happens to answer with audio. It
+   * opens nothing, binds nothing and records nothing: there is no
+   * session, no thread, no conversation and no microphone anywhere in
+   * this path, which is the entire reason it exists separately from the
+   * voice session above.
+   *
+   * The body is the strict public contract, so the text is bounded before
+   * a provider is addressed, and the allowance is charged against the
+   * server-resolved actor rather than anything the caller chose. What
+   * comes back is bytes and a media type. What never does is the
+   * provider's name, status or complaint.
+   */
+  app.post(
+    Q_VOICE_SPEECH_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const speech = dependencies.speech;
+      if (speech === undefined) {
+        return reply.code(404).send({
+          type: "about:blank",
+          title: "Not Found",
+          status: 404,
+          detail: "Q can't speak right now.",
+        });
+      }
+      const actor = getActorContext(request);
+      const input = parseContract(
+        CreateQSpeechRequestSchema,
+        request.body ?? {},
+        "The speech request is not valid.",
+      );
+      if (!throttle.charge(`${actor.tenantId}:${actor.userId}`)) {
+        return reply.code(429).send({
+          type: "about:blank",
+          title: "Too Many Requests",
+          status: 429,
+          detail: "That is more speech than Q will read out just now.",
+        });
+      }
+      const voice = speech.voices.includes(input.voice)
+        ? input.voice
+        : "FEMALE";
+      try {
+        const spoken = await speech.synthesise({ text: input.text, voice });
+        spokenLines.add(1, { voice });
+        return (
+          reply
+            .code(200)
+            .header("content-type", spoken.mediaType)
+            // Audio of whatever this person asked to hear, under their own
+            // session: never a shared cache's to keep.
+            .header("cache-control", "no-store")
+            .send(Buffer.from(spoken.audio))
+        );
+      } catch (error) {
+        if (error instanceof SpeechSynthesisError) {
+          // Hearing Q is an offer, and a refused offer is not an error a
+          // person has to do anything about. The screen keeps the words.
+          return reply.code(503).send({
+            type: "about:blank",
+            title: "Service Unavailable",
+            status: 503,
+            detail: "Q can't speak right now.",
+          });
+        }
+        throw error;
+      }
+    },
+  );
+
+  /**
+   * `POST /v1/q/voice/speak` — Q's voice, for the Voice Agent
+   * (QX-004 SPEAK rework).
+   *
+   * Not a person's route. The Deepgram Voice Agent calls this for the
+   * audio of each sentence it has been given, in ElevenLabs' own request
+   * dialect, and this asks ElevenLabs under the account key and streams
+   * the bytes straight back. It exists so that the key does not have to
+   * travel to the browser inside the agent settings.
+   *
+   * Authorised exactly as the think endpoint is: the bearer is the
+   * per-session secret minted with the session, and the binding it names
+   * was tied to a person before the microphone opened. The voice comes
+   * from that binding, never from the request.
+   */
+  const speakRelay = dependencies.deepgram?.speakRelay;
+  if (speakRelay !== undefined) {
+    app.post(Q_VOICE_SPEAK_RELAY_PATH, async (request, reply) => {
+      const header = request.headers.authorization;
+      const token =
+        typeof header === "string" && header.startsWith("Bearer ")
+          ? header.slice("Bearer ".length).trim()
+          : "";
+      const restored =
+        token.length === 0 ? null : await dependencies.bindings.restore(token);
+      // Only a token issued as the provider's bearer speaks.
+      const binding = restored?.thinkToken === token ? restored : null;
+      if (binding === null) {
+        request.log.warn(
+          {
+            reason: "NO_BINDING_FOR_TOKEN",
+            boundCount: dependencies.bindings.size(),
+            presented: token.length === 0 ? "" : voiceTokenFingerprint(token),
+          },
+          "voice speak relay refused",
+        );
+        return reply.code(401).send({
+          type: "about:blank",
+          title: "Unauthorized",
+          status: 401,
+          detail: "No voice session for this request.",
+        });
+      }
+      const body = request.body;
+      const text =
+        body !== null &&
+        typeof body === "object" &&
+        typeof (body as { text?: unknown }).text === "string"
+          ? (body as { text: string }).text
+          : "";
+      // Bounded by what Q can say in one turn, not by the one-way speech
+      // route's per-request limit. The agent decides how much text it asks
+      // for at once, and a whole spoken answer (up to SPOKEN_MAX_CHARS) sent
+      // as one request used to be refused here: Q's words on screen, no
+      // sound, and nothing in the log.
+      if (text.trim().length === 0 || text.length > RELAY_MAX_CHARS) {
+        request.log.warn(
+          { reason: "SPEAK_TEXT_OUT_OF_BOUNDS", characters: text.length },
+          "voice speak relay refused",
+        );
+        return reply.code(400).send({
+          type: "about:blank",
+          title: "Bad Request",
+          status: 400,
+          detail: "There is nothing to say.",
+        });
+      }
+      const query = request.query;
+      const outputFormat =
+        query !== null &&
+        typeof query === "object" &&
+        typeof (query as { output_format?: unknown }).output_format === "string"
+          ? (query as { output_format: string }).output_format
+          : undefined;
+
+      /**
+       * The agent hangs up on Q mid-sentence every time the person speaks
+       * over it, which is barge-in working, not a fault. Left unhandled
+       * that arrives here as an unhandled `ERR_STREAM_PREMATURE_CLOSE`,
+       * the connection dies, and the agent reports it to the browser as
+       * INTERNAL_SERVER_ERROR and drops the line (seen live). So the
+       * request going away cancels the vendor call instead: the sentence
+       * nobody is listening to any more is not paid for or waited on.
+       */
+      const gone = new AbortController();
+      // The *response* closing unfinished is the agent dropping the
+      // request. Not the request stream's own close, which fires as soon
+      // as the body has been read and would cancel every sentence before
+      // a byte of it was sent — the same trap the think route documents.
+      reply.raw.on("close", () => {
+        if (!reply.raw.writableFinished) gone.abort();
+      });
+
+      let upstream: Response;
+      try {
+        upstream = await speakRelay.stream({
+          voice: binding.voice,
+          text,
+          outputFormat,
+          signal: gone.signal,
+          // Keys this sentence's delivery cues and timing (CQ-VOICE-010);
+          // from the binding, like the voice, never from the request.
+          session: binding.voiceSessionId,
+          ...(binding.speakerVoiceId === undefined
+            ? {}
+            : { voiceId: binding.speakerVoiceId }),
+        });
+      } catch (error: unknown) {
+        if (gone.signal.aborted) {
+          // Interrupted before the vendor answered. Nobody to tell.
+          return reply;
+        }
+        request.log.warn({ err: error }, "voice speak relay unreachable");
+        return reply.code(502).send({
+          type: "about:blank",
+          title: "Bad Gateway",
+          status: 502,
+          detail: "Q can't speak right now.",
+        });
+      }
+      if (!upstream.ok || upstream.body === null) {
+        // The vendor's status is for this log and nowhere else; the agent
+        // is told only that the audio did not come.
+        request.log.warn(
+          { status: upstream.status },
+          "voice speak relay refused upstream",
+        );
+        return reply.code(502).send({
+          type: "about:blank",
+          title: "Bad Gateway",
+          status: 502,
+          detail: "Q can't speak right now.",
+        });
+      }
+      spokenLines.add(1, { voice: binding.voice });
+      const audio = Readable.fromWeb(
+        upstream.body as WebReadableStream<Uint8Array>,
+      );
+      // A sentence cut off in the middle is the ordinary shape of a
+      // conversation, not something to log as a failure or to let bubble
+      // out of this handler.
+      audio.on("error", (error: NodeJS.ErrnoException) => {
+        if (
+          gone.signal.aborted ||
+          error.code === "ERR_STREAM_PREMATURE_CLOSE"
+        ) {
+          return;
+        }
+        request.log.warn(
+          { err: error },
+          "voice speak relay stream ended early",
+        );
+      });
+      gone.signal.addEventListener("abort", () => audio.destroy(), {
+        once: true,
+      });
+      return (
+        reply
+          .code(200)
+          .header(
+            "content-type",
+            upstream.headers.get("content-type") ?? "application/octet-stream",
+          )
+          // Audio of one sentence in one person's live conversation.
+          .header("cache-control", "no-store")
+          .send(audio)
+      );
+    });
+  }
+
+  app.post(
+    Q_VOICE_SESSIONS_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const requested = parseContract(
+        CreateQVoiceSessionRequestSchema,
+        request.body ?? {},
+        "The voice session request is not valid.",
+      );
+      // Multilingual Q: the language they chose in Settings wins over the
+      // device's, for every line opened below (standard, duplex, GPT-Live,
+      // rehearsal). A failed read keeps the device's: never a refusal.
+      const chosen =
+        dependencies.languageOf === undefined
+          ? null
+          : await dependencies.languageOf(actor).catch(() => null);
+      const input = {
+        ...requested,
+        locale: effectiveLocale(chosen, requested.locale),
+      };
+      const header = request.headers.authorization;
+      const accessToken = extractBearerToken(
+        typeof header === "string" ? header : undefined,
+      );
+      if (accessToken === null) {
+        // The hook already authenticated; a missing bearer here would be a
+        // hook that changed. Fail closed rather than bind without authority.
+        throw new AuthenticationRequiredError();
+      }
+      // G-D21: an old tab's line reopening by itself never takes voice
+      // from a newer one this person opened meanwhile (another tab).
+      const reopens = input.reopens;
+      if (reopens !== undefined) {
+        const own = dependencies.bindings.byVoiceSessionId(reopens);
+        const stillHeld = own?.actor.userId === actor.userId ? 1 : 0;
+        if (
+          dependencies.bindings.replaced?.(reopens, actor.userId) === true ||
+          dependencies.bindings.countFor(actor.userId) > stillHeld
+        ) {
+          request.log.info({ reason: "REPLACED" }, "voice reopen refused");
+          return reply.code(409).send(VOICE_LINE_REPLACED_PROBLEM);
+        }
+      }
+      const deepgram = dependencies.deepgram;
+      const elevenLabs = dependencies.provider;
+      const liveOnly =
+        dependencies.live?.broker.isTrialUser(actor.userId) === true;
+      const transport = deepgram ?? elevenLabs;
+      if (transport === undefined && !liveOnly) {
+        return reply.code(404).send({
+          type: "about:blank",
+          title: "Not Found",
+          status: 404,
+          detail: "Voice isn't available right now.",
+        });
+      }
+      const voice =
+        (transport?.voices.includes(input.voice) ?? liveOnly)
+          ? input.voice
+          : "FEMALE";
+
+      // Any language, honestly: a language the person CHOSE that the
+      // standard line cannot hear or speak (no Deepgram model or no
+      // ElevenLabs voice lists it) is said plainly, never opened as an
+      // English line pretending to listen. Typing still works, in their
+      // language. With nothing chosen the device's language is only a hint.
+      if (
+        !liveOnly &&
+        deepgram !== undefined &&
+        chosen !== null &&
+        chosen !== "AUTO" &&
+        !voiceLineAvailable(chosen)
+      ) {
+        const info = languageInfo(chosen);
+        const name = info?.englishName ?? chosen;
+        request.log.info(
+          { language: chosen, reason: "VOICE_LANGUAGE_UNAVAILABLE" },
+          "voice line refused for its language",
+        );
+        // 422 with a body that says 422 (RFC 9457): live 2026-10-16 the
+        // body said 400 under a 422.
+        const problem = createProblemDetails({
+          code: "VALIDATION_FAILED",
+          requestId: request.id,
+          detail: `Q can't hold a voice conversation in ${name} yet: the speech services Capital Q uses don't support it. Type to Q instead and Q answers in ${name}, or switch to another language for voice.`,
+        });
+        return reply
+          .code(problem.status)
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(problem);
+      }
+
+      // Q opens the interview in its own words: a greeting and the live
+      // question, from the session's state. Composed here so the browser
+      // can hand it to the provider as the first thing Q says.
+      // A thread that is already open is not opened again (resume): no
+      // opening line is composed, none is recorded, and Q greets nobody a
+      // second time. What Q says first, if anything, is the line the
+      // person already has on screen, which the browser hands the provider.
+      const resume = input.resume === true;
+      let firstMessage: string | undefined;
+      const agent = dependencies.interviewAgent;
+      const apiBaseUrl = dependencies.apiBaseUrl;
+      let knownName: string | null = null;
+      // REHEARSE: a rehearsal line opens with the other person's own line.
+      let rehearsalName: string | null = null;
+      let rehearsalSeed: string | null = null;
+      if (input.rehearsal !== undefined) {
+        const opening =
+          dependencies.rehearsals === undefined
+            ? null
+            : await dependencies.rehearsals
+                .opening(actor, input.rehearsal.rehearsalId)
+                .catch(() => null);
+        if (opening === null) {
+          return reply.code(404).send({
+            type: "about:blank",
+            title: "Not Found",
+            status: 404,
+            detail: "This rehearsal isn't available.",
+          });
+        }
+        rehearsalName = opening.name;
+        rehearsalSeed = opening.seed;
+        if (!resume) firstMessage = opening.line;
+      }
+      if (
+        !resume &&
+        apiBaseUrl !== undefined &&
+        input.onboarding === undefined &&
+        input.rehearsal === undefined
+      ) {
+        try {
+          const me = await fetchMe({ baseUrl: apiBaseUrl, accessToken });
+          knownName = me.user.displayName;
+        } catch {
+          // Unknown name is a fine state to open from.
+        }
+      }
+      if (input.rehearsal !== undefined) {
+        // Opened above; nothing else greets on a rehearsal line.
+      } else if (
+        !resume &&
+        input.welcome === true &&
+        dependencies.welcome !== undefined
+      ) {
+        try {
+          const opening = await dependencies.welcome.turn({
+            attribution: {
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              correlationId: createCorrelationId(),
+            },
+            knownName,
+            knownOrganisation: input.organisationHint ?? null,
+            utterance: "",
+            recentTurns: [],
+          });
+          firstMessage = opening.reply;
+        } catch (error: unknown) {
+          request.log.warn({ err: error }, "welcome opening line unavailable");
+        }
+      } else if (
+        // Q leads on a resumed line too (onboarding conductor): the
+        // conductor resumes on the next unanswered step without greeting
+        // again, so the person never has to speak first.
+        input.onboarding !== undefined &&
+        agent !== undefined &&
+        apiBaseUrl !== undefined
+      ) {
+        try {
+          const opening = await agent.turn({
+            actor,
+            session: { baseUrl: apiBaseUrl, accessToken },
+            onboardingSessionId: input.onboarding.sessionId,
+            // The opening line is where sign-up context matters most:
+            // greeting somebody by name and offering the organisation
+            // they registered with, rather than asking cold.
+            signup: signupContextFromToken(accessToken),
+            journeyType: input.onboarding.journeyType,
+            ...(input.onboarding.focus === undefined
+              ? {}
+              : { focus: input.onboarding.focus }),
+            channel: "voice",
+            attribution: {
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              correlationId: createCorrelationId(),
+            },
+            utterance: "",
+            recentTurns: [],
+          });
+          firstMessage = opening.reply;
+        } catch (error: unknown) {
+          request.log.warn({ err: error }, "voice opening line unavailable");
+        }
+      }
+
+      // Q's opening line goes to the speaker like any other, so it gets
+      // the same treatment: a greeting that named a raise target read out
+      // "two zero zero zero zero zero zero zero zero N G N", because every
+      // other spoken path runs through `speakable` and this one did not.
+      if (firstMessage !== undefined) {
+        const spoken = bounded(speakable(firstMessage), FIRST_MESSAGE_MAX);
+        // An opening line that was nothing but markup is no opening line:
+        // fall through to the plain greeting below rather than send the
+        // provider an empty string to say.
+        firstMessage = spoken.length === 0 ? undefined : spoken;
+      }
+
+      // Continuing a conversation already on screen is not an arrival:
+      // "Hi Zino. I'm listening" in the middle of one (founder live
+      // 2026-09-29) read as Q forgetting what was just said. Q greets
+      // only a new conversation.
+      const continuing = input.conversationId !== undefined;
+      if (
+        firstMessage === undefined &&
+        !resume &&
+        !continuing &&
+        input.rehearsal === undefined
+      ) {
+        // Q always speaks first. On the open thread there is no interview
+        // state to open from, so the line is a plain greeting.
+        const first = knownName?.trim().split(/\s+/)[0];
+        const name = first !== undefined && first.length > 0 ? first : null;
+        // Proactive (founder direction 2026-09-29): open with what is
+        // theirs to deal with now, when it can be read quickly; the
+        // plain greeting otherwise.
+        const facts =
+          dependencies.openerFacts === undefined
+            ? null
+            : await Promise.race([
+                dependencies.openerFacts(actor).catch(() => null),
+                new Promise<null>((resolve) =>
+                  setTimeout(() => resolve(null), 1_200),
+                ),
+              ]);
+        // Owner 2026-10-16: the same opener as the web's, never a list.
+        firstMessage =
+          facts !== null
+            ? composeReturningOpener(name, facts, new Date())
+            : plainOpener(name);
+      }
+
+      // Names the person has taught Q to hear, before the recogniser
+      // hears them again. Best effort: no memory is an empty list.
+      let rememberedTerms: readonly string[] = [];
+      if (dependencies.memory !== undefined) {
+        try {
+          rememberedTerms = await dependencies.memory.termsFor(actor);
+        } catch (error: unknown) {
+          request.log.debug({ err: error }, "remembered terms unavailable");
+        }
+      }
+      // Their own records' names, likewise best effort.
+      let ownNames: readonly string[] = [];
+      if (dependencies.ownNames !== undefined) {
+        try {
+          ownNames = await dependencies.ownNames.namesFor(actor);
+        } catch (error: unknown) {
+          request.log.debug({ err: error }, "own record names unavailable");
+        }
+      }
+      const issuedAt = now();
+      const voiceSessionId = randomUUID();
+      const speakerVoiceId =
+        rehearsalSeed === null
+          ? undefined
+          : dependencies.rehearsals?.voiceIdFor?.(voice, rehearsalSeed);
+      if (input.rehearsal !== undefined && !resume) {
+        await dependencies.rehearsals
+          ?.performOpening?.(actor, input.rehearsal.rehearsalId, voiceSessionId)
+          .catch(() => undefined);
+      }
+      const thread: VoiceThread = {
+        conversationId: input.conversationId,
+        subjects: input.subjects,
+        onboarding: input.onboarding,
+        ...(input.screen === undefined ? {} : { screen: input.screen }),
+        welcome: input.welcome === true,
+        ...(input.organisationHint === undefined
+          ? {}
+          : { organisationHint: input.organisationHint }),
+        ...(input.rehearsal === undefined
+          ? {}
+          : { rehearsal: input.rehearsal }),
+        ...(firstMessage === undefined ||
+        input.conversationId !== undefined ||
+        input.onboarding !== undefined ||
+        input.welcome === true ||
+        input.rehearsal !== undefined
+          ? {}
+          : { opening: firstMessage }),
+      };
+      // The binding as resolved here, sealed: any instance restores it from
+      // the token, so a deploy or a restart does not end the line.
+      const sealFor = (providerConversationId: string, thinkBearer: boolean) =>
+        dependencies.bindings.seal({
+          voiceSessionId,
+          providerConversationId,
+          actor,
+          accessToken,
+          voice,
+          thread,
+          issuedAt,
+          ...(speakerVoiceId === undefined ? {} : { speakerVoiceId }),
+          ...(thinkBearer ? { thinkBearer: true } : {}),
+        });
+      let credentials: {
+        readonly token: string;
+        readonly providerConversationId: string;
+        readonly thinkToken?: string | undefined;
+        readonly sessionToken: string;
+        readonly settings?: DeepgramAgentSettings | undefined;
+      };
+      if (liveOnly) {
+        dependencies.bindings.releaseFor(actor.userId);
+        // The real local session identifies its binding; no provider call or
+        // provider token exists for this LIVE-only bootstrap.
+        credentials = {
+          token: "",
+          providerConversationId: voiceSessionId,
+          sessionToken: sealFor(voiceSessionId, false),
+        };
+      } else if (deepgram !== undefined) {
+        // One voice session per person on this transport: a new one
+        // replaces whatever was left open.
+        dependencies.bindings.releaseFor(actor.userId);
+        const providerConversationId = `dg_${voiceSessionId}`;
+        const thinkToken = sealFor(providerConversationId, true);
+        credentials = {
+          token: await deepgram.mintToken(),
+          providerConversationId,
+          thinkToken,
+          sessionToken: thinkToken,
+          settings: deepgram.settingsFor({
+            voice,
+            greeting: firstMessage,
+            thinkToken,
+            ...(input.locale === undefined ? {} : { locale: input.locale }),
+            // The organisation they typed at sign-up: the one name in this
+            // conversation the recogniser could not know.
+            terms: [
+              ...(rehearsalName === null ? [] : [rehearsalName]),
+              ...ownNames,
+              ...(input.organisationHint === undefined
+                ? []
+                : [input.organisationHint]),
+              ...rememberedTerms,
+            ],
+          }),
+        };
+      } else if (elevenLabs !== undefined) {
+        const issued = await elevenLabs.createSession({ voice });
+        credentials = {
+          token: issued.token,
+          providerConversationId: issued.providerConversationId,
+          sessionToken: sealFor(issued.providerConversationId, false),
+        };
+      } else {
+        throw new Error("unreachable: no voice transport");
+      }
+      const binding: VoiceSessionBinding = {
+        voiceSessionId,
+        providerConversationId: credentials.providerConversationId,
+        actor,
+        accessToken,
+        voice,
+        thread,
+        issuedAt,
+        connectBy: issuedAt + VOICE_CONNECT_WINDOW_MS,
+        connectedAt: undefined,
+        ...(credentials.thinkToken === undefined
+          ? {}
+          : { thinkToken: credentials.thinkToken }),
+        ...(speakerVoiceId === undefined ? {} : { speakerVoiceId }),
+        sessionToken: credentials.sessionToken,
+      };
+      const accepted = dependencies.bindings.issue(binding);
+      if (!accepted) {
+        throw new VoiceSessionLimitError();
+      }
+      started.add(1, { voice });
+
+      // DUPLEX: offered on top of the standard line, never instead of it.
+      // Any failure here is silent: the person gets the standard line.
+      let duplex: QVoiceDuplexCredential | undefined;
+      if (
+        !liveOnly &&
+        dependencies.duplex?.enabled === true &&
+        input.duplex !== false &&
+        input.rehearsal === undefined
+      ) {
+        try {
+          const opened = await dependencies.duplex.open({
+            binding,
+            firstMessage,
+            locale: input.locale,
+            vocabulary: [
+              ...ownNames,
+              ...(input.organisationHint === undefined
+                ? []
+                : [input.organisationHint]),
+              ...rememberedTerms,
+            ],
+          });
+          if (opened.kind === "DUPLEX") {
+            duplex = opened.credential;
+            // The line is in use from now: kept past the connect window,
+            // and the standard transport finds it connected on fallback.
+            dependencies.bindings.connect(binding.providerConversationId);
+          }
+        } catch (error: unknown) {
+          request.log.warn({ err: error }, "duplex voice unavailable");
+        }
+      }
+
+      // Identifiers only: never the token, never the bearer.
+      request.log.info(
+        {
+          qVoiceSessionId: voiceSessionId,
+          voice,
+          thread: input.onboarding === undefined ? "conversation" : "interview",
+          resume,
+          duplex: duplex !== undefined,
+        },
+        "voice session issued",
+      );
+      return reply
+        .code(201)
+        .header("Cache-Control", "no-store")
+        .send(
+          CreateQVoiceSessionResponseSchema.parse({
+            voiceSessionId,
+            providerConversationId: liveOnly
+              ? ""
+              : credentials.providerConversationId,
+            token: credentials.token,
+            ...(liveOnly ? { liveOnly: true } : {}),
+            voice,
+            expiresAt: new Date(
+              issuedAt + VOICE_CONNECT_WINDOW_MS,
+            ).toISOString(),
+            ...(firstMessage === undefined ? {} : { firstMessage }),
+            sessionToken: credentials.sessionToken,
+            provider:
+              credentials.settings === undefined ? "elevenlabs" : "deepgram",
+            ...(credentials.settings === undefined
+              ? {}
+              : { deepgram: credentials.settings }),
+            ...(duplex === undefined ? {} : { duplex }),
+          }),
+        );
+    },
+  );
+
+  if (dependencies.live !== undefined) {
+    registerLiveVoiceRoutes(app, {
+      broker: dependencies.live.broker,
+      allowedUsers: dependencies.live.allowedUsers,
+      withContext,
+      binding: ownLine,
+      ...(dependencies.languageOf === undefined
+        ? {}
+        : {
+            languageOf: (request: FastifyRequest) =>
+              dependencies.languageOf?.(getActorContext(request)) ??
+              Promise.resolve("AUTO" as const),
+          }),
+      // V (founder 2026-10-09, "Tensorgate" heard as "Tensorflow"): the
+      // names this person is likely to say, as every speech transport gets
+      // them, plus their counterparts. Each read is optional and bounded.
+      names: async (request) => {
+        const actor = getActorContext(request);
+        const settle = (read: Promise<readonly string[]> | undefined) =>
+          (read ?? Promise.resolve([])).catch(() => [] as readonly string[]);
+        const [own, remembered, counterparts] = await Promise.all([
+          settle(dependencies.ownNames?.namesFor(actor)),
+          settle(dependencies.memory?.termsFor(actor)),
+          settle(dependencies.live?.counterparts?.(actor)),
+        ]);
+        return [...own, ...counterparts, ...remembered];
+      },
+      // A GPT-Live call that is not attached to a standard session gets its
+      // own binding, built exactly as the session route builds one (the
+      // person's own bearer, a sealed token), without a speech provider.
+      issue: (request, voice) => {
+        const actor = getActorContext(request);
+        const header = request.headers.authorization;
+        const accessToken = extractBearerToken(
+          typeof header === "string" ? header : undefined,
+        );
+        if (accessToken === null) throw new AuthenticationRequiredError();
+        const issuedAt = now();
+        const voiceSessionId = randomUUID();
+        const providerConversationId = `live_${voiceSessionId}`;
+        const thread: VoiceThread = {
+          conversationId: undefined,
+          subjects: undefined,
+          onboarding: undefined,
+        };
+        // One voice session per person at a time, as on every transport.
+        dependencies.bindings.releaseFor(actor.userId);
+        const binding: VoiceSessionBinding = {
+          voiceSessionId,
+          providerConversationId,
+          actor,
+          accessToken,
+          voice,
+          thread,
+          issuedAt,
+          connectBy: issuedAt + VOICE_CONNECT_WINDOW_MS,
+          connectedAt: undefined,
+          sessionToken: dependencies.bindings.seal({
+            voiceSessionId,
+            providerConversationId,
+            actor,
+            accessToken,
+            voice,
+            thread,
+            issuedAt,
+          }),
+        };
+        if (!dependencies.bindings.issue(binding)) {
+          throw new VoiceSessionLimitError();
+        }
+        return binding;
+      },
+      // In use from now: kept past the connect window, like a duplex line.
+      connect: (binding) => {
+        dependencies.bindings.connect(binding.providerConversationId);
+      },
+      preview: dependencies.live.preview,
+    });
+  }
+
+  if (dependencies.duplex !== undefined) {
+    registerDuplexVoiceRoutes(app, {
+      broker: dependencies.duplex,
+      withContext,
+      restricted: (actor) =>
+        dependencies.live?.broker.isTrialUser(actor.userId) === true,
+      replaced: (voiceSessionId, userId) =>
+        dependencies.bindings.replaced?.(voiceSessionId, userId) === true,
+      // A11 (C-16): a line this instance does not hold is adopted from the
+      // sealed binding the browser presents; the token alone authorises
+      // nothing (the route's actor must be its owner).
+      restore: async (request) => {
+        const presented = request.headers[Q_VOICE_SESSION_TOKEN_HEADER];
+        if (typeof presented !== "string" || presented.length === 0) {
+          return null;
+        }
+        return dependencies.bindings.restore(presented);
+      },
+    });
+  }
+}

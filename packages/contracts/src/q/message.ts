@@ -3,6 +3,7 @@ import { z } from "zod";
 import { UtcTimestampSchema } from "../common/time.js";
 import { QMessageIdSchema, QRunIdSchema } from "./ids.js";
 import { Q_MESSAGE_TEXT_MAX_LENGTH } from "./request.js";
+import { QSentenceGesturesSchema } from "./presence.js";
 import { QResultBlocksSchema } from "./result-block.js";
 
 /**
@@ -54,6 +55,11 @@ export const QResponseMessageSchema = z
     role: z.literal("Q"),
     text: z.string().min(1).max(Q_RESPONSE_TEXT_MAX_LENGTH).optional(),
     blocks: QResultBlocksSchema.optional(),
+    /**
+     * PRESENCE: what Q's particles form for which sentence (closed set).
+     * Rides the live completion event only; the message store keeps text.
+     */
+    gestures: QSentenceGesturesSchema.optional(),
     createdAt: UtcTimestampSchema,
   })
   .strict()

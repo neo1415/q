@@ -1,0 +1,309 @@
+/**
+ * @capital-q/communication — relationship chat (R34, CQ-COMM-001; ADR 0019).
+ *
+ * Owns: the 1:1 thread on a canonical relationship, its append-only
+ * messages and read cursors. Reaches Network only through its public
+ * contract (party resolution is injected; `message_sent` goes through the
+ * Network appender) and Evidence only through an injected document port.
+ */
+
+export {
+  ChatAttachmentUnavailableError,
+  ChatBlockedError,
+  ChatIdempotencyConflictError,
+  ChatNotConnectedError,
+  ChatNotFoundError,
+  ChatReportReasonError,
+} from "./errors.js";
+// R34 safety: block and report.
+export {
+  createChatSafetyService,
+  type ChatSafetyAuditEntry,
+  type ChatSafetyAuditPort,
+  type ChatSafetyService,
+  type ChatSafetyServiceDependencies,
+} from "./safety.js";
+export type { ChatSafetyAuditHook, ChatSafetyStore } from "./safety-store.js";
+export { createPostgresChatSafetyStore } from "./safety-postgres.js";
+export {
+  createChatService,
+  foldChatRows,
+  type BriefLatestMessage,
+  type ChatDocumentPort,
+  type ChatDownloadPort,
+  type ChatParty,
+  type ChatPartyResolver,
+  type ChatService,
+  type ChatServiceDependencies,
+} from "./service.js";
+export type {
+  AppendChatMessageInput,
+  ChatAttachmentSnapshot,
+  ChatConversation,
+  ChatMessageRow,
+  ChatRowKind,
+  ChatSide,
+  ChatStore,
+} from "./store.js";
+export { createPostgresChatStore, type ChatOutbox } from "./postgres.js";
+export {
+  composeChat,
+  composeChatSafety,
+  composeSchedule,
+  createChatDocuments,
+  createNetworkChatParties,
+  type OwnDocumentLookup,
+} from "./compose.js";
+
+// BIZ-008: meetings, reminders, notifications.
+export {
+  createScheduleService,
+  NOTIFICATIONS_PAGE,
+  googleEventIdFor,
+  JOINED_CALL_CONSENT,
+  JOINED_CALL_MINUTES,
+  type AppEmailPort,
+  type CalendarDirectory,
+  type CalendarStateReader,
+  type MeetingView,
+  type OrganiserCalendar,
+  type ReminderView,
+  type ScheduleOutcome,
+  type ScheduleRefusal,
+  type ScheduleService,
+  type ScheduleServiceDependencies,
+} from "./schedule/service.js";
+export {
+  isKnownTimeZone,
+  proposeSlots,
+  suggestSlotsWithoutCalendar,
+  SLOT_POLICY,
+  type Interval,
+} from "./schedule/slots.js";
+export {
+  composePrepBrief,
+  PREP_BRIEF_COMPOSER_VERSION,
+} from "./schedule/brief.js";
+export type {
+  MeetingActivityWriter,
+  MeetingDirectory,
+  MeetingParticipant,
+  MeetingRecord,
+  NotificationRecord,
+  ReminderRecord,
+  ScheduleStore,
+} from "./schedule/store.js";
+export {
+  createNetworkMeetingActivityWriter,
+  createPostgresMeetingDirectory,
+  createPostgresScheduleStore,
+} from "./schedule/postgres.js";
+// MEET-TIME block (2026-10-09): a meeting time is a proposal the investor
+// accepts; nothing is booked or called confirmed before that.
+export {
+  createProposalService,
+  PROPOSAL_TRANSITIONS,
+  transition as transitionProposal,
+  type ProposalAction,
+  type ProposalBooking,
+  type ProposalEvent,
+  type ProposalOutcome,
+  type ProposalParties,
+  type ProposalRecord,
+  type ProposalRefusal,
+  type ProposalService,
+  type ProposalSide,
+  type ProposalState,
+  type ProposalStore,
+  type TimeOption,
+} from "./schedule/proposal.js";
+export {
+  createMeetingProposalPort,
+  type MeetingProposalPort,
+} from "./schedule/proposal-port.js";
+export {
+  createPostgresProposalParties,
+  createPostgresProposalStore,
+} from "./schedule/proposal-postgres.js";
+export {
+  createMeetingAssistantService,
+  meetingAssistantView,
+  Q_MEETING_BOT_NAME,
+  transcriptText,
+  type MeetingAssistantOutcome,
+  type MeetingAssistantService,
+  type MeetingBotProvider,
+  type MeetingBotHosting,
+  hostedJoin,
+  HOST_JOIN_EARLY_MS,
+  HOST_WAIT_AFTER_START_MS,
+  HOST_MAX_CALL_MS,
+  type MeetingBotState,
+  type MeetingBotEnd,
+  MEETING_BOT_END,
+  BOT_CREATE_MAX_ATTEMPTS,
+  botRetryDelayMs,
+  type MeetingNotes,
+  type MeetingNextStepNote,
+  type MeetingNotesComposer,
+  type MeetingTranscriptLine,
+} from "./meeting-assistant/service.js";
+export {
+  howDidItGo,
+  notesQuestions,
+  proposeMeetingOutcome,
+  type MeetingOutcomeReader,
+  type ProposedMeetingOutcome,
+} from "./meeting-assistant/outcome-proposal.js";
+export {
+  meetingRecapEmail,
+  type MeetingRecap,
+  type MeetingRecapEmail,
+} from "./meeting-assistant/recap-email.js";
+
+// AUTO block: Web Push (VAPID) and notice delivery (ADR 0030).
+export {
+  createWebPushSender,
+  encryptPushPayload,
+  unavailableWebPushSender,
+  vapidAuthorization,
+  type PushMessage,
+  type PushOutcome,
+  type PushSubscriptionKeys,
+  type WebPushSender,
+} from "./push/web-push.js";
+export {
+  createNotificationDelivery,
+  createPushSubscriptionStore,
+  type NotificationDelivery,
+  type NotificationSettings,
+  type PushSubscriptionStore,
+} from "./push/delivery.js";
+// end AUTO block
+// AUTO block: calendar invites without Google (2026-10-02).
+export { meetingIcs, type IcsInvite } from "./schedule/ics.js";
+export {
+  createMeetingMailer,
+  meetingEmail,
+  meetingVersion,
+  type MeetingMailer,
+} from "./schedule/meeting-mail.js";
+// end AUTO block
+export {
+  createChatMessageNotices,
+  createCounterpartNotices,
+  type ChatMessageNotices,
+  type CounterpartNoticeKind,
+  type CounterpartNotices,
+} from "./counterpart-notices.js";
+
+// DOCS block: emails on the shared Capital Q layout.
+export { noticeEmail, reminderEmail } from "./email-templates.js";
+// MEET-HOST block (ADR 0037): Q as a live participant in a booked call.
+export {
+  addressedToQ,
+  asksQToAct,
+  asksQToBreakRules,
+  boundedPolicy,
+  createMeetingHost,
+  DEFAULT_HOST_POLICY,
+  HOST_AT_TIME,
+  HOST_POLICY_BOUNDS,
+  hostProposed,
+  hostCarded,
+  INTERRUPT_GRACE_MS,
+  saysNeverMind,
+  asksQToWait,
+  asksToReschedule,
+  waitMinutesAsked,
+  waitMaxMsFromEnv,
+  type LeaveCause,
+  type HostOutcome,
+  type HostPolicy,
+  DEFAULT_HOST_LIMITS,
+  HOST_LEAVING,
+  HOST_INTRO,
+  HOST_STAYS,
+  HOST_TAKING_LATEST,
+  FRESH_SPEECH_MS,
+  ECHO_WINDOW_MS,
+  HOST_REFUSAL,
+  HOST_UNAVAILABLE,
+  matchParty,
+  onlyCallsQ,
+  HOST_SEES_SCREENS,
+  HOST_SEES_SCREENS_AND_CAMERAS,
+  EARLY_MATCH_MS,
+  sameRequest,
+  type CallParticipant,
+  type HostAction,
+  type HostContext,
+  type HostEvent,
+  type HostLimits,
+  type HostParty,
+  type HostPhase,
+  type HostSide,
+  type MeetingHost,
+  type RosterEntry,
+} from "./meeting-host/host.js";
+export {
+  createScreenWatch,
+  createCameraWatch,
+  DEFAULT_CAMERA_WATCH_LIMITS,
+  DEFAULT_SCREEN_WATCH_LIMITS,
+  type CameraWatch,
+  type CameraWatchLimits,
+  frameFingerprint,
+  type ScreenFrame,
+  type ScreenLook,
+  type ScreenWatch,
+  type ScreenWatchLimits,
+} from "./meeting-host/screen.js";
+export {
+  isCorrection,
+  isHearingCheck,
+  isOpinionAsk,
+  isRememberAsk,
+  isResume,
+  isStayQuiet,
+  isWhereWeAre,
+  routeMeetingTurn,
+  type BrainInput,
+  type BrainRoute,
+} from "./meeting-host/brain.js";
+export {
+  affirms,
+  attributeSpeaker,
+  createMeetingMemory,
+  dueTextOf,
+  readLine,
+  type FollowUp,
+  type MeetingEvent,
+  type MeetingEventKind,
+  type MeetingMemory,
+  type MeetingStance,
+  type SpeakerRef,
+  type WorkingSummary,
+} from "./meeting-host/memory.js";
+export {
+  answerFromSnapshot,
+  audienceOf,
+  buildMeetingSnapshot,
+  factsFor,
+  layersPermittedFor,
+  MEETING_SNAPSHOT_VERSION,
+  renderSnapshot,
+  SNAPSHOT_LAYERS,
+  type Audience,
+  type MeetingContextSnapshot,
+  type PreparedAnswer,
+  type RoomMember,
+  type SnapshotFact,
+  type SnapshotLayer,
+  type SnapshotParticipant,
+  type SnapshotSide,
+  type SnapshotSources,
+  type SnapshotTopic,
+  type SnapshotTruth,
+} from "./meeting-host/snapshot.js";
+// end MEET-HOST block

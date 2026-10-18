@@ -3,6 +3,8 @@ import { z } from "zod";
 import { DecimalStringSchema } from "../common/decimal.js";
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
+import { QConductSchema } from "../q/conduct.js";
+import { QSentenceGesturesSchema } from "../q/presence.js";
 
 /**
  * `/v1/onboarding` -- the generic onboarding runtime (CQ-ONB-001).
@@ -19,14 +21,38 @@ import { UtcTimestampSchema } from "../common/time.js";
 export const ONBOARDING_PATH = "/v1/onboarding";
 export const ONBOARDING_SESSIONS_SEGMENT = "/sessions";
 export const ONBOARDING_RESPONSES_SEGMENT = "/responses";
+/**
+ * `POST /v1/onboarding/sessions/:sessionId/responses/batch` -- several
+ * answers given in one breath, committed in ONE transaction (lane ob1,
+ * 2026-10-16: eleven sequential round trips made a typed turn 6-18 s).
+ * Each answer is validated as a single submission would be; one the
+ * journey refuses is reported with its reason and the rest still commit.
+ * An infrastructure failure commits none. Idempotency-Key required.
+ */
+export const ONBOARDING_RESPONSES_BATCH_SEGMENT = "/responses/batch";
+/** The most answers one batch carries. */
+export const ONBOARDING_RESPONSES_BATCH_MAX = 24;
 export const ONBOARDING_STEPS_SEGMENT = "/steps";
 export const ONBOARDING_SKIP_SEGMENT = "/skip";
+/** Take a step's answer back without replacing it; its history is kept. */
+export const ONBOARDING_WITHDRAW_SEGMENT = "/withdraw";
+/**
+ * `POST /v1/onboarding/sessions/:sessionId/revisions` — change one answer of
+ * a COMPLETED session (ADR 0024), with the same body as a submission. Only
+ * the steps the journey declares revisable; its write targets merge the
+ * new answer into the canonical records. Idempotency-Key required.
+ */
+export const ONBOARDING_REVISIONS_SEGMENT = "/revisions";
 export const ONBOARDING_BACK_SEGMENT = "/back";
 export const ONBOARDING_COMPLETE_SEGMENT = "/complete";
 export const ONBOARDING_SUGGESTIONS_SEGMENT = "/suggestions";
 export const ONBOARDING_RESOLVE_SEGMENT = "/resolve";
 /** `GET /v1/onboarding/sessions/current?journeyType=` -- the caller's latest active session. */
 export const ONBOARDING_CURRENT_SEGMENT = "/current";
+/** `POST /v1/onboarding/sessions/:id/questions/:questionId/answer|dismiss` (CQ-PRE-REC-001). */
+export const ONBOARDING_QUESTIONS_SEGMENT = "/questions";
+export const ONBOARDING_ANSWER_SEGMENT = "/answer";
+export const ONBOARDING_DISMISS_SEGMENT = "/dismiss";
 
 // ---------------------------------------------------------------------------
 // Closed vocabularies
@@ -244,11 +270,32 @@ export type OnboardingResponseValue = z.infer<
   typeof OnboardingResponseValueSchema
 >;
 
+/** The surface an answer was given in. Provenance, never authority. */
+export const ONBOARDING_RESPONSE_CHANNELS = ["FORM", "CONVERSATION"] as const;
+export const OnboardingResponseChannelSchema = z.enum(
+  ONBOARDING_RESPONSE_CHANNELS,
+);
+export type OnboardingResponseChannel = z.infer<
+  typeof OnboardingResponseChannelSchema
+>;
+
 /** What a client submits for a step. Modality is a declaration, not authority. */
 export const OnboardingResponseInputSchema = z
   .object({
     value: OnboardingResponseValueSchema,
     sourceModality: OnboardingClientSourceModalitySchema.optional(),
+    /**
+     * The person's own meaning where the options could not hold it
+     * (CQ-QX-005): prose for people and for Q's reading of them, never a
+     * filter or a mandate value.
+     */
+    note: z.string().trim().min(1).max(500).optional(),
+    /**
+     * Which surface the answer was given in (lane ob1): the form or the
+     * conversation with Q. Provenance for people, never authority; absent
+     * on older clients.
+     */
+    channel: OnboardingResponseChannelSchema.optional(),
   })
   .strict();
 export type OnboardingResponseInput = z.infer<
@@ -286,6 +333,79 @@ export type SubmitOnboardingResponseRequest = z.infer<
   typeof SubmitOnboardingResponseRequestSchema
 >;
 
+/** `POST .../responses/batch`: answers in the order they were given. */
+export const SubmitOnboardingResponsesRequestSchema = z
+  .object({
+    responses: z
+      .array(
+        z
+          .object({
+            stepKey: OnboardingStepKeySchema,
+            response: OnboardingResponseInputSchema,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(ONBOARDING_RESPONSES_BATCH_MAX),
+    expectedSessionVersion: SessionVersionSchema,
+  })
+  .strict();
+export type SubmitOnboardingResponsesRequest = z.infer<
+  typeof SubmitOnboardingResponsesRequestSchema
+>;
+
+/**
+ * Why the journey refused one answer of a batch, in the problem-details
+ * shape a single submission's refusal has (its detail and violations), so a
+ * caller reads both the same way. Never a stack, never another person's data.
+ */
+export const OnboardingBatchRefusalSchema = z
+  .object({
+    detail: z.string().max(400).nullable(),
+    errors: z
+      .array(
+        z
+          .object({
+            path: z.string().max(200),
+            code: z.string().max(120),
+            message: z.string().max(400),
+          })
+          .strict(),
+      )
+      .max(10),
+  })
+  .strict();
+export type OnboardingBatchRefusal = z.infer<
+  typeof OnboardingBatchRefusalSchema
+>;
+
+export const OnboardingBatchItemResultSchema = z.discriminatedUnion("outcome", [
+  z
+    .object({
+      stepKey: OnboardingStepKeySchema,
+      outcome: z.literal("COMMITTED"),
+    })
+    .strict(),
+  z
+    .object({
+      stepKey: OnboardingStepKeySchema,
+      outcome: z.literal("REFUSED"),
+      refusal: OnboardingBatchRefusalSchema,
+    })
+    .strict(),
+]);
+export type OnboardingBatchItemResult = z.infer<
+  typeof OnboardingBatchItemResultSchema
+>;
+
+/** `POST .../steps/:stepKey/withdraw` — the answer is taken back, never deleted. */
+export const WithdrawOnboardingResponseRequestSchema = z
+  .object({ expectedSessionVersion: SessionVersionSchema })
+  .strict();
+export type WithdrawOnboardingResponseRequest = z.infer<
+  typeof WithdrawOnboardingResponseRequestSchema
+>;
+
 export const SkipOnboardingStepRequestSchema = z
   .object({ expectedSessionVersion: SessionVersionSchema })
   .strict();
@@ -319,6 +439,189 @@ export const OnboardingSuggestionResolutionSchema = z.enum(
 );
 export type OnboardingSuggestionResolution = z.infer<
   typeof OnboardingSuggestionResolutionSchema
+>;
+
+/**
+ * Why Q is asking a question (CQ-PRE-REC-001). Ordered by how much a wrong
+ * or missing answer matters; the planner, not the client, decides it.
+ */
+export const ONBOARDING_QUESTION_REASONS = [
+  "CONTRADICTION",
+  "REQUIRED_AND_UNANSWERED",
+  "AMBIGUITY",
+  "MATERIAL_GAP",
+  /** Q read firm wording; only the person can turn it into a hard exclusion. */
+  "EXCLUSION_CONFIRMATION",
+] as const;
+export const OnboardingQuestionReasonSchema = z.enum(
+  ONBOARDING_QUESTION_REASONS,
+);
+export type OnboardingQuestionReason = z.infer<
+  typeof OnboardingQuestionReasonSchema
+>;
+
+/**
+ * Answer a persisted interview question: the response lands on `stepKey`
+ * through the ordinary validated-response path, and the question is then
+ * marked answered. `stepKey` is normally the question's own step; it may be
+ * one of the question's option steps.
+ */
+export const AnswerOnboardingQuestionRequestSchema = z
+  .object({
+    stepKey: OnboardingStepKeySchema,
+    response: OnboardingResponseInputSchema,
+    expectedSessionVersion: SessionVersionSchema,
+  })
+  .strict();
+export type AnswerOnboardingQuestionRequest = z.infer<
+  typeof AnswerOnboardingQuestionRequestSchema
+>;
+
+/** "I don't know" / "come back to this": the question is set aside, nothing is written. */
+export const DismissOnboardingQuestionRequestSchema = z
+  .object({ expectedSessionVersion: SessionVersionSchema })
+  .strict();
+export type DismissOnboardingQuestionRequest = z.infer<
+  typeof DismissOnboardingQuestionRequestSchema
+>;
+
+/**
+ * The conversational interview (CQ-PRE-REC-001 §16-§21). A person says
+ * something to Q about the current step; the runtime places it
+ * deterministically where it can (an option, a figure, a plain answer, a
+ * skip, a question back) and otherwise records it for Q's reading, whose
+ * proposals then arrive as ordinary suggestions and questions.
+ */
+export const ONBOARDING_SAY_SEGMENT = "/say";
+
+export const SayOnboardingRequestSchema = z
+  .object({
+    /**
+     * What the person said.
+     *
+     * Empty opens the interview: Q speaks first, in its own words, for a
+     * screen that has just loaded or been refreshed (QX-004 core gate: one
+     * Q). Nothing is recorded from an empty turn -- there is no sentence
+     * to record -- so this is a question asked, not an answer given.
+     */
+    text: z.string().trim().max(2000),
+    expectedSessionVersion: SessionVersionSchema,
+    /**
+     * A section of the founder profile the person came to fill (lane ov's
+     * Overview links "/onboarding/founder?talk=1&section=<key>"): Q opens on
+     * that section's question. A key of the shared profile-sections config;
+     * unknown keys are ignored. Data, never authority.
+     */
+    focus: z
+      .string()
+      .regex(/^[a-z][a-z_]{0,39}$/)
+      .optional(),
+
+    /**
+     * The exchange so far, oldest first, so a typed turn carries the same
+     * context a spoken one does (QX-004 core gate: one Q). Untrusted --
+     * these are words the conversation produced, never authority over what
+     * was recorded.
+     */
+    recentTurns: z
+      .array(
+        z
+          .object({
+            role: z.enum(["person", "q"]),
+            text: z.string().max(1500),
+          })
+          .strict(),
+      )
+      .max(16)
+      .default([]),
+  })
+  .strict();
+export type SayOnboardingRequest = z.infer<typeof SayOnboardingRequestSchema>;
+
+const Why = z.string().max(500).nullable();
+/** Proposals (suggestions and questions) a sentence produced for other steps. */
+const ProposedCount = z.number().int().min(0).max(48).optional();
+
+/** What the runtime made of what was said. Never a model's opinion of truth. */
+export const OnboardingUnderstandingSchema = z.discriminatedUnion("kind", [
+  /** Placed on the step as a normal validated response. */
+  z
+    .object({
+      kind: z.literal("ANSWERED"),
+      stepKey: OnboardingStepKeySchema,
+      summary: z.string().max(300),
+      /** Set when the sentence said more than the option and Q is reading the rest. */
+      utteranceId: UuidSchema.optional(),
+      /** How many other things the sentence answered, now waiting to be confirmed. */
+      proposed: ProposedCount,
+    })
+    .strict(),
+  /** An earlier answer was corrected and superseded (CQ-Q-VOICE-001 A §14). */
+  z
+    .object({
+      kind: z.literal("CORRECTED"),
+      stepKey: OnboardingStepKeySchema,
+      summary: z.string().max(300),
+      proposed: ProposedCount,
+    })
+    .strict(),
+  /** The optional step was skipped; unknown stays unknown. */
+  z
+    .object({ kind: z.literal("SKIPPED"), stepKey: OnboardingStepKeySchema })
+    .strict(),
+  /** They asked to move on, but the step is needed to complete the journey. */
+  z
+    .object({
+      kind: z.literal("REQUIRED"),
+      stepKey: OnboardingStepKeySchema,
+      why: Why,
+    })
+    .strict(),
+  /** They asked why Q needs this. */
+  z
+    .object({
+      kind: z.literal("WHY"),
+      stepKey: OnboardingStepKeySchema,
+      why: Why,
+    })
+    .strict(),
+  /** They would rather upload something. */
+  z
+    .object({ kind: z.literal("UPLOAD"), stepKey: OnboardingStepKeySchema })
+    .strict(),
+  /** More than one option fits; the person picks. */
+  z
+    .object({
+      kind: z.literal("AMBIGUOUS"),
+      stepKey: OnboardingStepKeySchema,
+      optionKeys: z.array(OnboardingOptionKeySchema).min(2).max(20),
+      proposed: ProposedCount,
+    })
+    .strict(),
+  /** A confirmation step was declined; something needs changing. */
+  z
+    .object({ kind: z.literal("DECLINED"), stepKey: OnboardingStepKeySchema })
+    .strict(),
+  /** Recorded for Q's reading; proposals follow as suggestions and questions. */
+  z
+    .object({
+      kind: z.literal("READING"),
+      stepKey: OnboardingStepKeySchema,
+      utteranceId: UuidSchema,
+      proposed: ProposedCount,
+    })
+    .strict(),
+  /** Nothing could be made of it; the person picks or says more. */
+  z
+    .object({
+      kind: z.literal("UNCLEAR"),
+      stepKey: OnboardingStepKeySchema,
+      proposed: ProposedCount,
+    })
+    .strict(),
+]);
+export type OnboardingUnderstanding = z.infer<
+  typeof OnboardingUnderstandingSchema
 >;
 
 export const ResolveOnboardingSuggestionRequestSchema = z
@@ -425,6 +728,10 @@ export const OnboardingResponseViewSchema = z.object({
   responseType: OnboardingResponseTypeSchema,
   value: OnboardingResponseValueSchema,
   sourceModality: OnboardingSourceModalitySchema,
+  /** See `OnboardingResponseInputSchema.note`. Null when the options held everything. */
+  note: z.string().max(500).nullable().default(null),
+  /** FORM or CONVERSATION; null when the client did not say (older answers). */
+  channel: OnboardingResponseChannelSchema.nullable().default(null),
   createdAt: UtcTimestampSchema,
 });
 export type OnboardingResponseView = z.infer<
@@ -460,9 +767,64 @@ export const OnboardingSuggestionViewSchema = z.object({
   confidence: z.string().nullable(),
   status: OnboardingSuggestionStatusSchema,
   createdAt: UtcTimestampSchema,
+  /**
+   * Where the suggestion came from (QX-004 C): the evidence rows it cites,
+   * by type and id. A candidate from public research carries the page it
+   * was read from; one from the person's own document carries that
+   * document. Empty for a suggestion nothing cites. The domain has always
+   * held this; the wire dropped it, so no screen could say "from where".
+   */
+  sourceRefs: z
+    .array(
+      z
+        .object({
+          sourceType: z.string().max(64),
+          sourceId: z.string().max(200),
+        })
+        .strict(),
+    )
+    .max(20)
+    .default([]),
+  /**
+   * What the person should know about this proposal, in plain words (ob2):
+   * e.g. the names in their list that matched nothing and so are not in
+   * it. Null when there is nothing to add.
+   */
+  rationale: z.string().max(300).nullable().default(null),
 });
 export type OnboardingSuggestionView = z.infer<
   typeof OnboardingSuggestionViewSchema
+>;
+
+/** A server-built quick answer to a question: submitting `value` to `stepKey` answers it. */
+export const OnboardingQuestionOptionViewSchema = z.object({
+  label: z.string().min(1).max(120),
+  stepKey: OnboardingStepKeySchema,
+  value: OnboardingResponseValueSchema,
+});
+export type OnboardingQuestionOptionView = z.infer<
+  typeof OnboardingQuestionOptionViewSchema
+>;
+
+/**
+ * A question Q still wants answered (CQ-PRE-REC-001). Persisted journey
+ * state, never a value: answering submits a normal response to `stepKey`.
+ * `readings` carry the competing figures behind a contradiction so the
+ * person, never Q, chooses between them.
+ */
+export const OnboardingInterviewQuestionViewSchema = z.object({
+  id: UuidSchema,
+  stepKey: OnboardingStepKeySchema,
+  factKey: z.string(),
+  question: z.string(),
+  why: z.string().nullable(),
+  reason: OnboardingQuestionReasonSchema,
+  readings: z.array(z.string()),
+  options: z.array(OnboardingQuestionOptionViewSchema),
+  createdAt: UtcTimestampSchema,
+});
+export type OnboardingInterviewQuestionView = z.infer<
+  typeof OnboardingInterviewQuestionViewSchema
 >;
 
 export const OnboardingPhaseViewSchema = z.object({
@@ -527,7 +889,277 @@ export const OnboardingSessionViewSchema = z.object({
    * trip per step. Only the caller's own answers; never another user's.
    */
   responses: z.array(OnboardingResponseViewSchema),
+  /**
+   * Questions Q still wants answered on the eligible path, most material
+   * first. Absent on a runtime that predates them; empty when there is
+   * nothing left to ask.
+   */
+  pendingQuestions: z.array(OnboardingInterviewQuestionViewSchema).optional(),
   /** Present after a mutation that changed the eligible path. */
   pathChanges: OnboardingPathChangesSchema.optional(),
 });
 export type OnboardingSessionView = z.infer<typeof OnboardingSessionViewSchema>;
+
+/** The conversational interview's reply: the updated view and what was understood. */
+/**
+ * The steps Q's reply actually asks about, in order (CQ-QX-008): what a
+ * screen's choices and a test driver follow — Q, never the journey's step
+ * cursor. Empty when the reply asks nothing.
+ */
+export const OnboardingAskingAboutSchema = z
+  .array(z.string().max(80))
+  .max(6)
+  .default([]);
+
+/** What is waiting on the person's decision after a turn (CQ-QX-008). */
+export const OnboardingTurnPendingSchema = z
+  .object({
+    /** Q's recommendations not yet accepted or declined. */
+    recommendations: z
+      .array(
+        z
+          .object({
+            stepKey: z.string().max(80),
+            value: z.string().max(600),
+            rationale: z.string().max(300).nullable(),
+          })
+          .strict(),
+      )
+      .max(12),
+    /** Values held for the person's yes (legacy interviewer only). */
+    held: z
+      .array(
+        z
+          .object({
+            stepKey: z.string().max(80),
+            value: z.string().max(600),
+          })
+          .strict(),
+      )
+      .max(12),
+  })
+  .strict()
+  .default({ recommendations: [], held: [] });
+
+export const SayOnboardingResponseSchema = z
+  .object({
+    view: OnboardingSessionViewSchema,
+    /**
+     * What the deterministic runtime did with the sentence.
+     *
+     * Null when the one Q interviewer handled the turn: it places answers
+     * through the same validated submit and skip paths, but it does not
+     * produce this reading of them. `view` is then what was recorded, and
+     * `reply` is what Q said about it.
+     */
+    understood: OnboardingUnderstandingSchema.nullable(),
+    /**
+     * Q's own words for this turn (QX-004 core gate: one Q).
+     *
+     * The onboarding screen used to write Q's side of the conversation
+     * itself, composing "Investor type: Angel investor. Noted." from the
+     * fields above and then reading the next step's raw prompt aloud --
+     * "Your firm" -- to a person who had typed their firm at registration
+     * two screens earlier. That was a second conversational implementation
+     * living in the browser, and it was the poorer of the two.
+     *
+     * This carries what the one interviewer actually said, and a surface
+     * shows it as given. The fields above remain what the runtime did, and
+     * they are still the only evidence of it: a surface must not read this
+     * prose to decide what was recorded.
+     *
+     * Null when no interviewer was reachable for this turn.
+     */
+    reply: z.string().max(4000).nullable(),
+    /**
+     * Where Q is taking the person, if anywhere (QX-004 D: one capability,
+     * two modalities). A spoken "open Discover" already navigates; a typed
+     * one reached this seam and was dropped here. Same values as the
+     * interview turn's `navigate`; "FORM" hands over to the form.
+     */
+    navigate: z.string().max(40).nullable(),
+    /**
+     * What Q is looking into for this person, when the turn asked for a
+     * real-world example or public facts (CQ-QX-005). Same value as the
+     * interview turn's `researching`; a typed surface starts the same Q run
+     * a spoken one would. Null when nothing is being researched.
+     */
+    researching: z.string().max(200).nullable().default(null),
+    /** True when Q answered without a model and said so plainly. */
+    degraded: z.boolean(),
+    /**
+     * Forwarded from the interview turn so the screen's answer choices
+     * follow what Q asked, not the step cursor (they can differ).
+     */
+    askingAbout: OnboardingAskingAboutSchema,
+    pending: OnboardingTurnPendingSchema,
+    /** Q's patience after this turn (founder direction 2026-09-30). */
+    conduct: QConductSchema.optional(),
+    /** PRESENCE: what Q's particles form for which sentence of the reply. */
+    gestures: QSentenceGesturesSchema.optional(),
+  })
+  .strict();
+export type SayOnboardingResponse = z.infer<typeof SayOnboardingResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// The interview thread (CQ-QX-006)
+// ---------------------------------------------------------------------------
+
+/**
+ * `GET|POST /v1/onboarding/sessions/:id/turns` -- the conversation as it was
+ * shown, both sides and both modalities, so a reload redraws the thread
+ * instead of dropping it. A display record only: it is never evidence of
+ * what was recorded (the session view is), and nothing reads it to decide.
+ */
+export const ONBOARDING_TURNS_SEGMENT = "/turns";
+export const ONBOARDING_INTERVIEW_TURNS_MAX = 100;
+export const ONBOARDING_INTERVIEW_TURNS_DEFAULT = 50;
+
+export const OnboardingInterviewTurnRoleSchema = z.enum(["PERSON", "Q"]);
+export type OnboardingInterviewTurnRole = z.infer<
+  typeof OnboardingInterviewTurnRoleSchema
+>;
+export const OnboardingInterviewTurnChannelSchema = z.enum(["TEXT", "VOICE"]);
+export type OnboardingInterviewTurnChannel = z.infer<
+  typeof OnboardingInterviewTurnChannelSchema
+>;
+
+export const OnboardingInterviewTurnSchema = z
+  .object({
+    role: OnboardingInterviewTurnRoleSchema,
+    text: z.string().min(1).max(ONBOARDING_TEXT_MAX_LENGTH),
+    channel: OnboardingInterviewTurnChannelSchema,
+    createdAt: UtcTimestampSchema,
+  })
+  .strict();
+export type OnboardingInterviewTurn = z.infer<
+  typeof OnboardingInterviewTurnSchema
+>;
+
+/** `?limit=` -- the newest N turns, returned oldest first. */
+export const ListOnboardingInterviewTurnsQuerySchema = z
+  .object({
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(ONBOARDING_INTERVIEW_TURNS_MAX)
+      .default(ONBOARDING_INTERVIEW_TURNS_DEFAULT),
+  })
+  .strict();
+export type ListOnboardingInterviewTurnsQuery = z.infer<
+  typeof ListOnboardingInterviewTurnsQuerySchema
+>;
+
+export const ListOnboardingInterviewTurnsResponseSchema = z
+  .object({
+    items: z
+      .array(OnboardingInterviewTurnSchema)
+      .max(ONBOARDING_INTERVIEW_TURNS_MAX),
+  })
+  .strict();
+export type ListOnboardingInterviewTurnsResponse = z.infer<
+  typeof ListOnboardingInterviewTurnsResponseSchema
+>;
+
+/**
+ * One exchange, appended after it happened: the person's words and Q's
+ * reply, or either alone. `turnRef` makes a retried append write nothing
+ * (one row per reference and role), so each role appears at most once.
+ */
+export const AppendOnboardingInterviewTurnsRequestSchema = z
+  .object({
+    turnRef: UuidSchema,
+    turns: z
+      .array(
+        z
+          .object({
+            role: OnboardingInterviewTurnRoleSchema,
+            text: z.string().min(1).max(ONBOARDING_TEXT_MAX_LENGTH),
+            stepKey: OnboardingStepKeySchema.optional(),
+            channel: OnboardingInterviewTurnChannelSchema,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(2)
+      .refine(
+        (turns) => new Set(turns.map((t) => t.role)).size === turns.length,
+        "each role appears at most once in one exchange",
+      ),
+  })
+  .strict();
+export type AppendOnboardingInterviewTurnsRequest = z.infer<
+  typeof AppendOnboardingInterviewTurnsRequestSchema
+>;
+
+export const AppendOnboardingInterviewTurnsResponseSchema = z
+  .object({
+    /** False when this exchange reference was already recorded. */
+    written: z.boolean(),
+  })
+  .strict();
+export type AppendOnboardingInterviewTurnsResponse = z.infer<
+  typeof AppendOnboardingInterviewTurnsResponseSchema
+>;
+
+/**
+ * Setup reminders (founder directive 2026-09-27). Whether one is due is
+ * decided on the server by the versioned policy in @capital-q/onboarding;
+ * these are the person's own reminders only, keyed by the authenticated
+ * principal, never by an id in the request.
+ */
+export const ONBOARDING_NUDGE_SEGMENT = "/nudge";
+export const ONBOARDING_NUDGE_BRIEFING_SEGMENT = "/briefing";
+export const ONBOARDING_NUDGE_CHOICE_SEGMENT = "/choice";
+
+export const OnboardingNudgeViewSchema = z
+  .object({
+    policyVersion: z.string().min(1).max(64),
+    journeyType: z.enum(["founder", "investor"]),
+    emphasis: z.enum(["STRONG", "LIGHT"]),
+    requiredCount: z.number().int().min(1),
+    doneCount: z.number().int().min(0),
+    minutesLeft: z.number().int().min(1),
+    remainingTopics: z.array(z.string().min(1).max(80)).max(4),
+    /** The UTC day it was given for, YYYY-MM-DD. */
+    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  })
+  .strict();
+export type OnboardingNudgeView = z.infer<typeof OnboardingNudgeViewSchema>;
+
+/** `POST /v1/onboarding/nudge/briefing` -- today's card for Home, if any. */
+export const OnboardingBriefingNudgeResponseSchema = z
+  .object({ nudge: OnboardingNudgeViewSchema.nullable() })
+  .strict();
+export type OnboardingBriefingNudgeResponse = z.infer<
+  typeof OnboardingBriefingNudgeResponseSchema
+>;
+
+/** `POST /v1/onboarding/nudge/choice` -- "remind me later" / "stop reminding me". */
+export const OnboardingNudgeChoiceSchema = z.enum(["LATER", "STOP"]);
+export type OnboardingNudgeChoiceValue = z.infer<
+  typeof OnboardingNudgeChoiceSchema
+>;
+export const OnboardingNudgeChoiceRequestSchema = z
+  .object({ choice: OnboardingNudgeChoiceSchema })
+  .strict();
+export type OnboardingNudgeChoiceRequest = z.infer<
+  typeof OnboardingNudgeChoiceRequestSchema
+>;
+export const OnboardingNudgeChoiceResponseSchema = z
+  .object({ recorded: OnboardingNudgeChoiceSchema })
+  .strict();
+
+/** The session after the commit, and each answer's outcome in request order. */
+export const SubmitOnboardingResponsesResultSchema = z
+  .object({
+    view: OnboardingSessionViewSchema,
+    results: z
+      .array(OnboardingBatchItemResultSchema)
+      .max(ONBOARDING_RESPONSES_BATCH_MAX),
+  })
+  .strict();
+export type SubmitOnboardingResponsesResult = z.infer<
+  typeof SubmitOnboardingResponsesResultSchema
+>;

@@ -1,0 +1,758 @@
+[
+  {
+    "case": "t1-trailing",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 0,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -2273,
+    "finalAfterSpeechMs": 1477,
+    "pieces": [
+      "This one... you know? So yes.",
+      "See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t1-trailing",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 0,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -2277,
+    "finalAfterSpeechMs": 1519,
+    "pieces": [
+      "This one... you know? So yes.",
+      "See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t1-trailing",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 3392,
+    "finalAfterSpeechMs": 3392,
+    "pieces": [
+      "This one... you know? So yes. See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t1-trailing",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 3143,
+    "finalAfterSpeechMs": 3143,
+    "pieces": [
+      "This one... you know? So yes. See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t1-trailing",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 1,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -1449,
+    "finalAfterSpeechMs": 4611,
+    "pieces": [
+      "This one... you know? So yes.",
+      "See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t1-trailing",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 1,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -1284,
+    "finalAfterSpeechMs": 2645,
+    "pieces": [
+      "This one... you know? So yes.",
+      "See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t1-trailing",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1876,
+    "finalAfterSpeechMs": 1876,
+    "pieces": [
+      "This one... you know? So yes. See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t1-trailing",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 2630,
+    "finalAfterSpeechMs": 2630,
+    "pieces": [
+      "This one... you know? So yes. See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t1-trailing",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 2,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -1757,
+    "finalAfterSpeechMs": 2399,
+    "pieces": [
+      "This one... you know? So yes.",
+      "See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t1-trailing",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 2,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -1192,
+    "finalAfterSpeechMs": 3058,
+    "pieces": [
+      "This one... you know? So yes.",
+      "See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t1-trailing",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 2693,
+    "finalAfterSpeechMs": 2693,
+    "pieces": [
+      "This one... you know? So yes. See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t1-trailing",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 2549,
+    "finalAfterSpeechMs": 2549,
+    "pieces": [
+      "This one... you know? So yes. See, you could tell me who invests in aviation."
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 0,
+    "turns": 3,
+    "firstTurnAfterSpeechMs": -5404,
+    "finalAfterSpeechMs": 1598,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation,",
+      "Which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 0,
+    "turns": 3,
+    "firstTurnAfterSpeechMs": -4840,
+    "finalAfterSpeechMs": 2918,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation,",
+      "Which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 0,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -4839,
+    "finalAfterSpeechMs": 3352,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation, which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 0,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -4474,
+    "finalAfterSpeechMs": 6536,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation, which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 1,
+    "turns": 3,
+    "firstTurnAfterSpeechMs": -4778,
+    "finalAfterSpeechMs": 3353,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation,",
+      "Which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 1,
+    "turns": 3,
+    "firstTurnAfterSpeechMs": -4792,
+    "finalAfterSpeechMs": 3368,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation,",
+      "Which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 1,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -4512,
+    "finalAfterSpeechMs": 3279,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation, which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 1,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -4642,
+    "finalAfterSpeechMs": 3785,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation, which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 2,
+    "turns": 3,
+    "firstTurnAfterSpeechMs": -4779,
+    "finalAfterSpeechMs": 3084,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation,",
+      "Which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 2,
+    "turns": 3,
+    "firstTurnAfterSpeechMs": -4605,
+    "finalAfterSpeechMs": 3245,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation,",
+      "Which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 2,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -4834,
+    "finalAfterSpeechMs": 2643,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation, which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t2-clauses",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 2,
+    "turns": 2,
+    "firstTurnAfterSpeechMs": -4883,
+    "finalAfterSpeechMs": 2724,
+    "pieces": [
+      "I'm asking you that right now.",
+      "Based on what is in aviation, which investors would likely be interested?"
+    ],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 991,
+    "finalAfterSpeechMs": 991,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1152,
+    "finalAfterSpeechMs": 1152,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1294,
+    "finalAfterSpeechMs": 1294,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1671,
+    "finalAfterSpeechMs": 1671,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 897,
+    "finalAfterSpeechMs": 897,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1205,
+    "finalAfterSpeechMs": 1205,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1395,
+    "finalAfterSpeechMs": 1395,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1522,
+    "finalAfterSpeechMs": 1522,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 873,
+    "finalAfterSpeechMs": 873,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1274,
+    "finalAfterSpeechMs": 1274,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1199,
+    "finalAfterSpeechMs": 1199,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t3-complete",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1792,
+    "finalAfterSpeechMs": 1792,
+    "pieces": ["What check size do you usually write?"],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 847,
+    "finalAfterSpeechMs": 847,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1107,
+    "finalAfterSpeechMs": 1107,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1599,
+    "finalAfterSpeechMs": 1599,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1407,
+    "finalAfterSpeechMs": 1407,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 772,
+    "finalAfterSpeechMs": 772,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1054,
+    "finalAfterSpeechMs": 1054,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1193,
+    "finalAfterSpeechMs": 1193,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1761,
+    "finalAfterSpeechMs": 1761,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 883,
+    "finalAfterSpeechMs": 883,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1661,
+    "finalAfterSpeechMs": 1661,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1239,
+    "finalAfterSpeechMs": 1239,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t4-short",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1523,
+    "finalAfterSpeechMs": 1523,
+    "pieces": ["Okay."],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1909,
+    "finalAfterSpeechMs": 1909,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 2043,
+    "finalAfterSpeechMs": 2043,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 2324,
+    "finalAfterSpeechMs": 2324,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 0,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 2401,
+    "finalAfterSpeechMs": 2401,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 1633,
+    "finalAfterSpeechMs": 1633,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 2434,
+    "finalAfterSpeechMs": 2434,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 2155,
+    "finalAfterSpeechMs": 2155,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 1,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 3117,
+    "finalAfterSpeechMs": 3117,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.7,
+    "timeout": 3000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 2200,
+    "finalAfterSpeechMs": 2200,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.8,
+    "timeout": 3000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 2479,
+    "finalAfterSpeechMs": 2479,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.85,
+    "timeout": 4000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 3267,
+    "finalAfterSpeechMs": 3267,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  },
+  {
+    "case": "t5-thinking",
+    "eot": 0.9,
+    "timeout": 5000,
+    "run": 2,
+    "turns": 1,
+    "firstTurnAfterSpeechMs": 2246,
+    "finalAfterSpeechMs": 2246,
+    "pieces": [
+      "We are raising a seed round, and, um, I think the amount is around five hundred thousand."
+    ],
+    "error": null
+  }
+]

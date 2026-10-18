@@ -51,6 +51,7 @@ export {
 
 export {
   bundleVersionOf,
+  COMMUNICATION_GUIDANCE_MAX,
   renderPrompt,
   type PromptBundle,
   type PromptBundleVersion,
@@ -63,13 +64,816 @@ export {
   QSystemVariablesSchema,
   type QSystemVariables,
 } from "./prompts/charter/q-system.v1.js";
+export { Q_SYSTEM_VOICE_V1 } from "./prompts/charter/q-system-voice.v1.js";
+export {
+  Q_SYSTEM_VOICE_V2,
+  VOICE_V2_MANNER,
+} from "./prompts/charter/q-system-voice.v2.js";
+export {
+  Q_SYSTEM_VOICE_V3,
+  VOICE_CALL_SECTION,
+} from "./prompts/charter/q-system-voice.v3.js";
+export { Q_SYSTEM_V2, Q_VOICE_SECTION } from "./prompts/charter/q-system.v2.js";
+export {
+  Q_PERSONALITIES,
+  Q_PERSONALITY_CODES,
+  personalityOf,
+  type QPersonality,
+  type QPersonalityCode,
+} from "./personality.js";
+export * from "./language/public.js";
+export {
+  effectiveLocale,
+  spokenLanguageNote,
+  supportedLanguageOf,
+  writtenLanguageNote,
+} from "./language.js";
+export {
+  hasReadinessLeadCopy,
+  READINESS_LEAD_ARABIC_STEPS,
+  READINESS_STEPS_ARABIC,
+  readinessLeadCopy,
+  type ReadinessLeadCopy,
+} from "./readiness-lead-copy.js";
 export { COMPANY_ANALYST_V1 } from "./prompts/tasks/company-analyst.v1.js";
+export { GATEQ_INTERVIEWER_V1 } from "./prompts/tasks/gateq-interviewer.v1.js";
+export {
+  GATEQ_INTERVIEWER_SCHEMA_NAME,
+  GATEQ_INTERVIEWER_SCHEMA_VERSION,
+  GATEQ_INTERVIEWER_UNTRUSTED,
+  GATEQ_TURN_INTENTS,
+  GateQDimensionSchema,
+  GateQInterviewerResultSchema,
+  GateQInterviewerVariablesSchema,
+  GateQProposedFactSchema,
+  GateQProposedValueSchema,
+  GateQTurnIntentSchema,
+  type GateQInterviewerResult,
+  type GateQInterviewerVariables,
+  type GateQProposedFact,
+  type GateQProposedValue,
+  type GateQTurnIntent,
+} from "./prompts/schemas/gateq-interviewer.js";
+export { INTERVIEW_CONDUCTOR_V1 } from "./prompts/tasks/interview-conductor.v1.js";
+export { INTERVIEW_CONDUCTOR_V2 } from "./prompts/tasks/interview-conductor.v2.js";
+export { INTERVIEW_CONDUCTOR_V3 } from "./prompts/tasks/interview-conductor.v3.js";
+export { INTERVIEW_CONDUCTOR_V4 } from "./prompts/tasks/interview-conductor.v4.js";
+export { INTERVIEW_CONDUCTOR_V5 } from "./prompts/tasks/interview-conductor.v5.js";
+export { INTERVIEW_CONDUCTOR_V6 } from "./prompts/tasks/interview-conductor.v6.js";
+export { INTERVIEW_CONDUCTOR_V7 } from "./prompts/tasks/interview-conductor.v7.js";
+export { INTERVIEW_CONDUCTOR_V8 } from "./prompts/tasks/interview-conductor.v8.js";
+export { INTERVIEW_CONDUCTOR_V9 } from "./prompts/tasks/interview-conductor.v9.js";
+export { INTERVIEW_CONDUCTOR_V10 } from "./prompts/tasks/interview-conductor.v10.js";
+export { INTERVIEW_CONDUCTOR_V11 } from "./prompts/tasks/interview-conductor.v11.js";
+export { INTERVIEW_AGENT_V1 } from "./prompts/tasks/interview-agent.v1.js";
+export { INTERVIEW_AGENT_V2 } from "./prompts/tasks/interview-agent.v2.js";
+export { INTERVIEW_AGENT_V3 } from "./prompts/tasks/interview-agent.v3.js";
+export { INTERVIEW_AGENT_V4 } from "./prompts/tasks/interview-agent.v4.js";
+export { INTERVIEW_AGENT_V5 } from "./prompts/tasks/interview-agent.v5.js";
+export { INTERVIEW_AGENT_V6 } from "./prompts/tasks/interview-agent.v6.js";
+export { INTERVIEW_AGENT_V7 } from "./prompts/tasks/interview-agent.v7.js";
+export { INTERVIEW_AGENT_V8 } from "./prompts/tasks/interview-agent.v8.js";
+export { INTERVIEW_AGENT_V9 } from "./prompts/tasks/interview-agent.v9.js";
+export { INTERVIEW_AGENT_V10 } from "./prompts/tasks/interview-agent.v10.js";
+export { INTERVIEW_AGENT_V11 } from "./prompts/tasks/interview-agent.v11.js";
+export { INTERVIEW_AGENT_V12 } from "./prompts/tasks/interview-agent.v12.js";
+export { INTERVIEW_AGENT_V13 } from "./prompts/tasks/interview-agent.v13.js";
+export { INTERVIEW_AGENT_V14 } from "./prompts/tasks/interview-agent.v14.js";
+export { INTERVIEW_AGENT_V15 } from "./prompts/tasks/interview-agent.v15.js";
+export { INTERVIEW_AGENT_V16 } from "./prompts/tasks/interview-agent.v16.js";
+export { DELEGATION_READER_V1 } from "./prompts/tasks/delegation-reader.v1.js";
+export { DELEGATION_READER_V2 } from "./prompts/tasks/delegation-reader.v2.js";
+export { DELEGATION_READER_V3 } from "./prompts/tasks/delegation-reader.v3.js";
+export { DELEGATION_READER_V4 } from "./prompts/tasks/delegation-reader.v4.js";
+export { DELEGATION_READER_V5 } from "./prompts/tasks/delegation-reader.v5.js";
+export {
+  DELEGATION_READER_SCHEMA_NAME,
+  DELEGATION_READER_SCHEMA_VERSION,
+  DelegationReaderResultSchema,
+  DelegationReaderV2ResultSchema,
+  DelegationReaderV3ResultSchema,
+  type DelegationReaderV3Result,
+  DelegationReaderV2VariablesSchema,
+  DelegationReaderV4VariablesSchema,
+  type DelegationReaderV4Variables,
+  DelegationReaderVariablesSchema,
+  type DelegationReaderResult,
+  type DelegationReaderV2Result,
+  type DelegationReaderV2Variables,
+  type DelegationReaderVariables,
+} from "./prompts/schemas/delegation-reader.js";
+export {
+  INTERVIEW_AGENT_SCHEMA_NAME,
+  INTERVIEW_AGENT_SCHEMA_VERSION,
+  InterviewAgentResultSchema,
+  InterviewAgentV3VariablesSchema,
+  InterviewAgentV5VariablesSchema,
+  InterviewAgentV6VariablesSchema,
+  InterviewAgentV7VariablesSchema,
+  InterviewAgentV9VariablesSchema,
+  InterviewAgentV11ResultSchema,
+  InterviewAgentV16ResultSchema,
+  InterviewAgentV11VariablesSchema,
+  InterviewAgentVariablesSchema,
+  type InterviewAgentResult,
+  type InterviewAgentV11Result,
+  type InterviewAgentV16Result,
+  type InterviewAgentV11Variables,
+  type InterviewAgentV3Variables,
+  type InterviewAgentV5Variables,
+  type InterviewAgentV6Variables,
+  type InterviewAgentV7Variables,
+  type InterviewAgentV9Variables,
+  type InterviewAgentVariables,
+} from "./prompts/schemas/interview-agent.js";
+export { DECISION_READER_V1 } from "./prompts/tasks/decision-reader.v1.js";
+export { DECISION_READER_V2 } from "./prompts/tasks/decision-reader.v2.js";
+// Founder brief J7: people's words read by meaning.
+export {
+  MEETING_OUTCOME_READER_V1,
+  ONBOARDING_MOVE_READER_V1,
+  PREFERENCE_POLARITY_V1,
+  UTTERANCE_CHECK_V1,
+} from "./prompts/tasks/words-readers.v1.js";
+export * from "./prompts/schemas/words-readers.js";
+export { TURN_READER_V1 } from "./prompts/tasks/turn-reader.v1.js";
+export { TURN_READER_V2 } from "./prompts/tasks/turn-reader.v2.js";
+export { TURN_READER_V3 } from "./prompts/tasks/turn-reader.v3.js";
+export { TURN_READER_V4 } from "./prompts/tasks/turn-reader.v4.js";
+export { TURN_READER_V5 } from "./prompts/tasks/turn-reader.v5.js";
+export { TURN_READER_V6 } from "./prompts/tasks/turn-reader.v6.js";
+export { TURN_READER_V7 } from "./prompts/tasks/turn-reader.v7.js";
+export { TURN_READER_V8 } from "./prompts/tasks/turn-reader.v8.js";
+export { TURN_READER_V9 } from "./prompts/tasks/turn-reader.v9.js";
+export { TURN_READER_V10 } from "./prompts/tasks/turn-reader.v10.js";
+export { TURN_READER_V11 } from "./prompts/tasks/turn-reader.v11.js";
+export { TURN_READER_V12 } from "./prompts/tasks/turn-reader.v12.js";
+export { TURN_READER_V13 } from "./prompts/tasks/turn-reader.v13.js";
+export { TURN_READER_V14 } from "./prompts/tasks/turn-reader.v14.js";
+export { TURN_READER_V15 } from "./prompts/tasks/turn-reader.v15.js";
+export {
+  TURN_READER_V16,
+  TURN_READER_V16_RECORDS,
+} from "./prompts/tasks/turn-reader.v16.js";
+export { TURN_READER_V17 } from "./prompts/tasks/turn-reader.v17.js";
+export { TURN_READER_V18 } from "./prompts/tasks/turn-reader.v18.js";
+export { TURN_READER_V19 } from "./prompts/tasks/turn-reader.v19.js";
+export { TURN_READER_V20 } from "./prompts/tasks/turn-reader.v20.js";
+export { TURN_READER_V21 } from "./prompts/tasks/turn-reader.v21.js";
+export {
+  TURN_READER_V22,
+  TURN_READER_V22_HAND_OVER,
+} from "./prompts/tasks/turn-reader.v22.js";
+export {
+  TURN_READER_V23,
+  TURN_READER_V23_HAND_OVER,
+} from "./prompts/tasks/turn-reader.v23.js";
+export {
+  TURN_READER_V24,
+  TURN_READER_V24_ADDRESSED,
+} from "./prompts/tasks/turn-reader.v24.js";
+export {
+  TURN_READER_V25,
+  TURN_READER_V25_END_VOICE,
+} from "./prompts/tasks/turn-reader.v25.js";
+export {
+  TURN_READER_V26,
+  TURN_READER_V26_HAND_OVER,
+} from "./prompts/tasks/turn-reader.v26.js";
+export {
+  TURN_READER_V27,
+  TURN_READER_V27_SAVE_TO_PROFILE,
+} from "./prompts/tasks/turn-reader.v27.js";
+export {
+  TURN_READER_V28,
+  TURN_READER_V28_DIRECT,
+} from "./prompts/tasks/turn-reader.v28.js";
+export {
+  TURN_READER_V29,
+  TURN_READER_V29_DESTINATIONS,
+} from "./prompts/tasks/turn-reader.v29.js";
+export {
+  TURN_READER_V30,
+  TURN_READER_V30_ASKED_ACTION,
+} from "./prompts/tasks/turn-reader.v30.js";
+export {
+  TURN_READER_V31,
+  TURN_READER_V31_APP_ACTION,
+} from "./prompts/tasks/turn-reader.v31.js";
+export {
+  TURN_READER_V32,
+  TURN_READER_V32_ACTIONS,
+} from "./prompts/tasks/turn-reader.v32.js";
+export {
+  TURN_READER_V33,
+  TURN_READER_V33_TAIL,
+} from "./prompts/tasks/turn-reader.v33.js";
+export { TURN_READER_V34 } from "./prompts/tasks/turn-reader.v34.js";
+export { TURN_READER_V35 } from "./prompts/tasks/turn-reader.v35.js";
+export { TURN_READER_V36 } from "./prompts/tasks/turn-reader.v36.js";
+export { TURN_READER_V37 } from "./prompts/tasks/turn-reader.v37.js";
+export {
+  TURN_READER_V38,
+  TURN_READER_V38_DESTINATIONS,
+} from "./prompts/tasks/turn-reader.v38.js";
+export {
+  TURN_READER_V39,
+  TURN_READER_V39_TOOL_REQUEST,
+} from "./prompts/tasks/turn-reader.v39.js";
+export {
+  TURN_READER_V40,
+  TURN_READER_V40_DESTINATIONS,
+  TURN_READER_V40_REFERENCES,
+} from "./prompts/tasks/turn-reader.v40.js";
+export {
+  TURN_READER_V41,
+  TURN_READER_V41_DESTINATIONS,
+} from "./prompts/tasks/turn-reader.v41.js";
+export {
+  TURN_READER_V42,
+  TURN_READER_V42_MESSY_WORDS,
+} from "./prompts/tasks/turn-reader.v42.js";
+export {
+  TURN_READER_V43,
+  V43_PREPARE_HEAD,
+} from "./prompts/tasks/turn-reader.v43.js";
+export {
+  TURN_READER_V44,
+  V44_UNCLEAR,
+} from "./prompts/tasks/turn-reader.v44.js";
+export {
+  TURN_READER_V45,
+  V45_FIT,
+  V45_STILL_WAITING,
+} from "./prompts/tasks/turn-reader.v45.js";
+export {
+  TURN_READER_V46,
+  V46_DISCOVER,
+  V46_DISCOVER_FIELDS,
+} from "./prompts/tasks/turn-reader.v46.js";
+export {
+  TURN_READER_V47,
+  V47_SUBJECT,
+} from "./prompts/tasks/turn-reader.v47.js";
+export {
+  TURN_READER_V48,
+  V48_SUBJECT,
+} from "./prompts/tasks/turn-reader.v48.js";
+export {
+  TURN_READER_V49,
+  V49_TEAM_JOB,
+} from "./prompts/tasks/turn-reader.v49.js";
+export {
+  TURN_READER_SCHEMA_NAME,
+  TURN_READER_SCHEMA_VERSION,
+  TURN_READER_UNTRUSTED,
+  TURN_READER_V2_SCHEMA_VERSION,
+  TURN_READER_V3_SCHEMA_VERSION,
+  TURN_DOCUMENT_TYPES,
+  TURN_TOOL_V3_KINDS,
+  TurnReaderV3ResultSchema,
+  TurnToolV3Schema,
+  TURN_DOCUMENT_TYPES_V5,
+  TURN_READER_V5_SCHEMA_VERSION,
+  TurnReaderV5ResultSchema,
+  TurnReaderV7VariablesSchema,
+  type TurnReaderV7Variables,
+  TURN_READER_V8_SCHEMA_VERSION,
+  TurnReaderV8ResultSchema,
+  TurnToolV8Schema,
+  TurnUnknownScreenSchema,
+  type TurnReaderV8Result,
+  type TurnToolV8,
+  type TurnUnknownScreen,
+  TURN_READER_MORE_DOCUMENTS_MAX,
+  TURN_READER_V9_SCHEMA_VERSION,
+  TurnReaderV9ResultSchema,
+  type TurnReaderV9Result,
+  TURN_READER_V11_SCHEMA_VERSION,
+  TurnReaderV11ResultSchema,
+  type TurnReaderV11Result,
+  TURN_DOCUMENT_TYPES_V14,
+  TURN_READER_V14_SCHEMA_VERSION,
+  TurnReaderV14ResultSchema,
+  TurnReaderV15ResultSchema,
+  TURN_HAND_OVER_KINDS,
+  TURN_READER_V22_SCHEMA_VERSION,
+  TurnHandOverSchema,
+  TurnReaderV22ResultSchema,
+  TURN_READER_V24_SCHEMA_VERSION,
+  TurnReaderV24ResultSchema,
+  TURN_READER_V25_SCHEMA_VERSION,
+  TurnReaderV25ResultSchema,
+  type TurnReaderV25Result,
+  TURN_READER_V27_SCHEMA_VERSION,
+  TurnReaderV27ResultSchema,
+  type TurnReaderV27Result,
+  TURN_READER_V28_SCHEMA_VERSION,
+  TURN_READER_V30_SCHEMA_VERSION,
+  TURN_READER_V31_SCHEMA_VERSION,
+  TurnAppActionSchema,
+  TurnReaderV31ResultSchema,
+  type TurnAppAction,
+  type TurnReaderV31Result,
+  TURN_READER_V40_SCHEMA_VERSION,
+  TURN_REFERENCE_OPEN_KINDS,
+  TurnReaderV40ResultSchema,
+  TurnReferenceSchema,
+  type TurnReaderV40Result,
+  TURN_READER_V44_SCHEMA_VERSION,
+  TurnReaderV44ResultSchema,
+  type TurnReaderV44Result,
+  TURN_READER_V45_SCHEMA_VERSION,
+  TurnReaderV45ResultSchema,
+  type TurnReaderV45Result,
+  TURN_READER_V46_SCHEMA_VERSION,
+  TurnReaderV46ResultSchema,
+  type TurnReaderV46Result,
+  TURN_READER_V47_SCHEMA_VERSION,
+  TurnReaderV47ResultSchema,
+  type TurnReaderV47Result,
+  TURN_READER_V48_SCHEMA_VERSION,
+  TurnReaderV48ResultSchema,
+  type TurnReaderV48Result,
+  TURN_READER_V49_SCHEMA_VERSION,
+  TurnReaderV49ResultSchema,
+  type TurnReaderV49Result,
+  TURN_READER_V52_SCHEMA_VERSION,
+  TurnReaderV52ResultSchema,
+  type TurnReaderV52Result,
+  TURN_READER_V54_SCHEMA_VERSION,
+  TURN_READER_V54_UNTRUSTED,
+  TURN_READER_V55_SCHEMA_VERSION,
+  TURN_READER_V55_UNTRUSTED,
+  TurnReaderV55ResultSchema,
+  TurnReaderV55VariablesSchema,
+  type TurnReaderV55Result,
+  type TurnReaderV55Variables,
+  TURN_READER_V56_SCHEMA_VERSION,
+  TurnQuestionV56Schema,
+  type TurnQuestionV56,
+  TurnReaderV56ResultSchema,
+  type TurnReaderV56Result,
+  TurnFromShownSchema,
+  type TurnFromShown,
+  TurnReaderV54ResultSchema,
+  type TurnReaderV54Result,
+  TurnReaderV54VariablesSchema,
+  type TurnReaderV54Variables,
+  type TurnReference,
+  type TurnReferenceOpenKind,
+  TurnReaderV30ResultSchema,
+  type TurnReaderV30Result,
+  TurnReaderV28ResultSchema,
+  TurnTimeWindowSchema,
+  type TurnReaderV28Result,
+  type TurnTimeWindow,
+  type TurnReaderV24Result,
+  type TurnHandOver,
+  type TurnReaderV22Result,
+  TurnToolV14Schema,
+  type TurnDocumentTypeV14,
+  type TurnReaderV14Result,
+  type TurnReaderV15Result,
+  type TurnToolV14,
+  TurnToolV5Schema,
+  type TurnReaderV5Result,
+  type TurnToolV5,
+  type TurnReaderV3Result,
+  type TurnToolV3,
+  TURN_TOOL_KINDS,
+  TURN_TOOL_VISIBILITIES,
+  TurnReaderResultSchema,
+  TurnReaderV2ResultSchema,
+  TurnReaderVariablesSchema,
+  TurnToolSchema,
+  type TurnReaderResult,
+  type TurnReaderV2Result,
+  type TurnTool,
+  type TurnReaderVariables,
+} from "./prompts/schemas/turn-reader.js";
+export {
+  DECISION_READER_SCHEMA_NAME,
+  DECISION_READER_SCHEMA_VERSION,
+  DECISIONS,
+  DecisionReaderResultSchema,
+  DecisionReaderVariablesSchema,
+  type Decision,
+  type DecisionReaderResult,
+  type DecisionReaderVariables,
+} from "./prompts/schemas/decision-reader.js";
+export { MEMORY_EXTRACTOR_V1 } from "./prompts/tasks/memory-extractor.v1.js";
+export { MEMORY_EXTRACTOR_V2 } from "./prompts/tasks/memory-extractor.v2.js";
+export {
+  MEMORY_EXTRACT_TYPES_V2,
+  MEMORY_EXTRACTOR_V2_SCHEMA_VERSION,
+  MemoryExtractItemV2Schema,
+  MemoryExtractorResultV2Schema,
+  type MemoryExtractItemV2,
+  type MemoryExtractorResultV2,
+  MEMORY_EXTRACT_TYPES,
+  MEMORY_EXTRACTOR_SCHEMA_NAME,
+  MEMORY_EXTRACTOR_SCHEMA_VERSION,
+  MEMORY_KEY_PATTERN,
+  MemoryExtractItemSchema,
+  MemoryExtractorResultSchema,
+  MemoryExtractorVariablesSchema,
+  type MemoryExtractItem,
+  type MemoryExtractType,
+  type MemoryExtractorResult,
+  type MemoryExtractorVariables,
+} from "./prompts/schemas/memory-extractor.js";
+export { MEETING_NOTES_V1 } from "./prompts/tasks/meeting-notes.v1.js";
+export { MEETING_NOTES_V2 } from "./prompts/tasks/meeting-notes.v2.js";
+export { MEETING_NOTES_V3 } from "./prompts/tasks/meeting-notes.v3.js";
+export { ERRAND_REPLY_V1 } from "./prompts/tasks/errand-reply.v1.js";
+export { DILIGENCE_DOCUMENT_SUMMARY_V1 } from "./prompts/tasks/diligence-document-summary.v1.js";
+export { INVESTOR_PERSONA_V1 } from "./prompts/tasks/investor-persona.v1.js";
+export { INVESTOR_TWIN_TURN_V1 } from "./prompts/tasks/investor-twin-turn.v1.js";
+export { REHEARSAL_SCORE_V1 } from "./prompts/tasks/rehearsal-score.v1.js";
+// REHEARSE block (2026-10-01)
+export { INVESTOR_PERSONA_V2 } from "./prompts/tasks/investor-persona.v2.js";
+export { INVESTOR_TWIN_TURN_V2 } from "./prompts/tasks/investor-twin-turn.v2.js";
+export { REHEARSAL_SCORE_V2 } from "./prompts/tasks/rehearsal-score.v2.js";
+export { INVESTOR_TWIN_TURN_V3 } from "./prompts/tasks/investor-twin-turn.v3.js";
+export { INVESTOR_TWIN_TURN_V4 } from "./prompts/tasks/investor-twin-turn.v4.js";
+export { INVESTOR_PERSONA_V3 } from "./prompts/tasks/investor-persona.v3.js";
+export { INVESTOR_PERSONA_V4 } from "./prompts/tasks/investor-persona.v4.js";
+export { INVESTOR_PERSONA_V5 } from "./prompts/tasks/investor-persona.v5.js";
+export {
+  INVESTOR_PERSONA_V6,
+  INVESTOR_PERSONA_V6_CONDUCT,
+} from "./prompts/tasks/investor-persona.v6.js";
+export { INVESTOR_TWIN_TURN_V5 } from "./prompts/tasks/investor-twin-turn.v5.js";
+export { INVESTOR_TWIN_TURN_V6 } from "./prompts/tasks/investor-twin-turn.v6.js";
+export { INVESTOR_TWIN_TURN_V7 } from "./prompts/tasks/investor-twin-turn.v7.js";
+export { INVESTOR_TWIN_TURN_V8 } from "./prompts/tasks/investor-twin-turn.v8.js";
+export { INVESTOR_TWIN_TURN_V9 } from "./prompts/tasks/investor-twin-turn.v9.js";
+export { INVESTOR_TWIN_TURN_V10 } from "./prompts/tasks/investor-twin-turn.v10.js";
+// MEET-HOST block (ADR 0037)
+export { MEETING_HOST_TURN_V1 } from "./prompts/tasks/meeting-host-turn.v1.js";
+export { MEETING_HOST_TURN_V2 } from "./prompts/tasks/meeting-host-turn.v2.js";
+export { MEETING_SCREEN_NOTE_V1 } from "./prompts/tasks/meeting-screen-note.v1.js";
+export { MEETING_HOST_TURN_V3 } from "./prompts/tasks/meeting-host-turn.v3.js";
+export { MEETING_HOST_TURN_V4 } from "./prompts/tasks/meeting-host-turn.v4.js";
+export { MEETING_HOST_TURN_V5 } from "./prompts/tasks/meeting-host-turn.v5.js";
+export { MEETING_CAMERA_NOTE_V1 } from "./prompts/tasks/meeting-camera-note.v1.js";
+export {
+  MEETING_SCREEN_NOTE_SCHEMA_NAME,
+  MEETING_SCREEN_NOTE_SCHEMA_VERSION,
+  MEETING_SCREEN_NOTE_UNTRUSTED,
+  MeetingScreenNoteResultSchema,
+  MeetingScreenNoteVariablesSchema,
+  type MeetingScreenNoteResult,
+  type MeetingScreenNoteVariables,
+} from "./prompts/schemas/meeting-screen-note.js";
+export {
+  MEETING_HOST_SCHEMA_NAME,
+  MEETING_HOST_SCHEMA_VERSION,
+  MEETING_HOST_UNTRUSTED,
+  MeetingHostResultSchema,
+  MeetingHostVariablesSchema,
+  type MeetingHostResult,
+  MEETING_HOST_KINDS,
+  MeetingHostResultV2Schema,
+  type MeetingHostResultV2,
+  type MeetingHostVariables,
+  MEETING_HOST_UNTRUSTED_V3,
+  MeetingHostVariablesV3Schema,
+  type MeetingHostVariablesV3,
+  MEETING_HOST_KINDS_V3,
+  MEETING_HOST_UNTRUSTED_V4,
+  MeetingHostResultV3Schema,
+  type MeetingHostResultV3,
+  MeetingHostVariablesV4Schema,
+  type MeetingHostVariablesV4,
+} from "./prompts/schemas/meeting-host.js";
+// end MEET-HOST block
+export { REHEARSAL_SCORE_V3 } from "./prompts/tasks/rehearsal-score.v3.js";
+export { REHEARSAL_SCORE_V4 } from "./prompts/tasks/rehearsal-score.v4.js";
+export {
+  REHEARSAL_SCORE_V5,
+  REHEARSAL_SCORE_V5_RULE,
+} from "./prompts/tasks/rehearsal-score.v5.js";
+export {
+  REHEARSAL_CONCLUSIONS,
+  REHEARSAL_CUES,
+  REHEARSAL_CUES_V3,
+  REHEARSAL_DIMENSIONS_FOR,
+  REHEARSAL_APPRAISALS_V4,
+  REHEARSAL_LINE_MOODS_V4,
+  RehearsalTurnV4ResultSchema,
+  RehearsalTurnV4VariablesSchema,
+  RehearsalTurnV5VariablesSchema,
+  RehearsalTurnV6VariablesSchema,
+  RehearsalTurnV8VariablesSchema,
+  REHEARSAL_TURN_V8_SCHEMA_VERSION,
+  RehearsalTurnV8ResultSchema,
+  RehearsalScreenNoteSchema,
+  type RehearsalTurnV8Variables,
+  type RehearsalTurnV8Result,
+  type RehearsalScreenNote,
+  RehearsalTurnV5ResultSchema,
+  RehearsalTurnV6ResultSchema,
+  RehearsalTurnV7ResultSchema,
+  type RehearsalTurnV7Result,
+  type RehearsalTurnV6Result,
+  PresenceReadingSchema,
+  type PresenceReading,
+  type RehearsalTurnV6Variables,
+  type RehearsalTurnV5Result,
+  type RehearsalTurnV5Variables,
+  type RehearsalTurnV4Result,
+  type RehearsalTurnV4Variables,
+  RehearsalReviewLenientSchema,
+  normaliseRehearsalReview,
+  type RehearsalReviewLenient,
+  REHEARSAL_DIFFICULTIES,
+  REHEARSAL_LINE_MOODS_V3,
+  RehearsalTurnV3ResultSchema,
+  RehearsalTurnV3VariablesSchema,
+  type RehearsalTurnV3Result,
+  type RehearsalTurnV3Variables,
+  REHEARSAL_DIMENSIONS,
+  REHEARSAL_LINE_MOODS,
+  REHEARSAL_MOVES,
+  RehearsalReviewResultSchema,
+  RehearsalReviewVariablesSchema,
+  RehearsalTurnResultSchema,
+  RehearsalTurnVariablesSchema,
+  type RehearsalReviewResult,
+  type RehearsalReviewVariables,
+  type RehearsalTurnResult,
+  type RehearsalTurnVariables,
+} from "./prompts/schemas/rehearsal.js";
+export {
+  CounterpartPersonaLenientSchema,
+  CounterpartPersonaResultSchema,
+  CounterpartPersonaVariablesSchema,
+  normaliseCounterpartPersona,
+  normaliseCounterpartPersonaV4,
+  CounterpartPersonaStoredSchema,
+  CounterpartPersonaV4LenientSchema,
+  CounterpartPersonaV5VariablesSchema,
+  type CounterpartPersonaV5Variables,
+  PERSONA_FORWARDNESS,
+  PERSONA_TRAIT_SOURCES,
+  PERSONA_PATIENCE,
+  PERSONA_WARMTH,
+  PERSONA_DODGE_TOLERANCE,
+  PERSONA_CEILING,
+  PERSONA_LEAVING,
+  PersonaConductSchema,
+  type PersonaConduct,
+  CounterpartPersonaV6LenientSchema,
+  type CounterpartPersonaV6Lenient,
+  type CounterpartPersonaStored,
+  type CounterpartPersonaV4Lenient,
+  type PersonaForwardness,
+  type CounterpartPersonaLenient,
+  PERSONA_MOODS,
+  type CounterpartPersonaResult,
+  type CounterpartPersonaVariables,
+} from "./prompts/schemas/investor-persona.js";
+// end REHEARSE block
+export { FOUNDER_RESEARCH_READER_V1 } from "./prompts/tasks/founder-research-reader.v1.js";
+export {
+  FOUNDER_RESEARCH_READER_SCHEMA_NAME,
+  FOUNDER_RESEARCH_READER_SCHEMA_VERSION,
+  FOUNDER_RESEARCH_READER_UNTRUSTED,
+  FounderResearchReaderResultSchema,
+  FounderResearchReaderVariablesSchema,
+  type FounderResearchReaderResult,
+  type FounderResearchReaderVariables,
+} from "./prompts/schemas/founder-research-reader.js";
+export {
+  INVESTOR_TWIN_TURN_SCHEMA_NAME,
+  INVESTOR_TWIN_TURN_SCHEMA_VERSION,
+  INVESTOR_TWIN_TURN_UNTRUSTED,
+  InvestorTwinTurnResultSchema,
+  InvestorTwinTurnVariablesSchema,
+  REHEARSAL_RATINGS,
+  REHEARSAL_SCORE_SCHEMA_NAME,
+  REHEARSAL_SCORE_SCHEMA_VERSION,
+  REHEARSAL_SCORE_UNTRUSTED,
+  RehearsalScoreResultSchema,
+  RehearsalScoreVariablesSchema,
+  type InvestorTwinTurnResult,
+  type InvestorTwinTurnVariables,
+  type RehearsalScoreResult,
+  type RehearsalScoreVariables,
+} from "./prompts/schemas/rehearsal.js";
+export {
+  INVESTOR_PERSONA_SCHEMA_NAME,
+  INVESTOR_PERSONA_SCHEMA_VERSION,
+  INVESTOR_PERSONA_UNTRUSTED,
+  InvestorPersonaResultSchema,
+  InvestorPersonaVariablesSchema,
+  type InvestorPersonaResult,
+  type InvestorPersonaVariables,
+} from "./prompts/schemas/investor-persona.js";
+export {
+  ERRAND_REPLY_SCHEMA_NAME,
+  ERRAND_REPLY_SCHEMA_VERSION,
+  ERRAND_REPLY_UNTRUSTED,
+  ErrandReplyResultSchema,
+  ErrandReplyVariablesSchema,
+  type ErrandReplyResult,
+  type ErrandReplyVariables,
+} from "./prompts/schemas/errand-reply.js";
+export {
+  DILIGENCE_DOCUMENT_SUMMARY_SCHEMA_NAME,
+  DILIGENCE_DOCUMENT_SUMMARY_SCHEMA_VERSION,
+  DILIGENCE_DOCUMENT_SUMMARY_UNTRUSTED,
+  DiligenceDocumentSummaryResultSchema,
+  DiligenceDocumentSummaryVariablesSchema,
+  type DiligenceDocumentSummaryResult,
+  type DiligenceDocumentSummaryVariables,
+} from "./prompts/schemas/diligence-document-summary.js";
+export {
+  MEETING_NOTES_SCHEMA_NAME,
+  MEETING_NOTES_SCHEMA_VERSION,
+  MeetingNotesResultSchema,
+  MeetingNotesV2ResultSchema,
+  MeetingNotesV3ResultSchema,
+  MeetingNotesV3VariablesSchema,
+  MeetingNextStepSchema,
+  MEETING_NEXT_STEP_KINDS,
+  MeetingNotesVariablesSchema,
+  type MeetingNextStep,
+  type MeetingNotesResult,
+  type MeetingNotesV2Result,
+  type MeetingNotesV3Result,
+  type MeetingNotesV3Variables,
+  type MeetingNotesVariables,
+} from "./prompts/schemas/meeting-notes.js";
+export { WELCOME_CONDUCTOR_V1 } from "./prompts/tasks/welcome-conductor.v1.js";
+export { WELCOME_CONDUCTOR_V2 } from "./prompts/tasks/welcome-conductor.v2.js";
+export { PRESENCE_READER_V1 } from "./prompts/tasks/presence-reader.v1.js";
+export {
+  PRESENCE_KEY_VALUES,
+  PRESENCE_READER_SCHEMA_NAME,
+  PRESENCE_READER_SCHEMA_VERSION,
+  PRESENCE_READER_UNTRUSTED,
+  PresenceReaderResultSchema,
+  PresenceReaderVariablesSchema,
+  type PresenceReaderResult,
+  type PresenceReaderVariables,
+} from "./prompts/schemas/presence-reader.js";
+export { INVESTOR_RESEARCH_READER_V1 } from "./prompts/tasks/investor-research-reader.v1.js";
+export {
+  INVESTOR_RESEARCH_READER_SCHEMA_NAME,
+  INVESTOR_RESEARCH_READER_SCHEMA_VERSION,
+  INVESTOR_RESEARCH_READER_UNTRUSTED,
+  InvestorResearchReaderResultSchema,
+  InvestorResearchReaderVariablesSchema,
+  type InvestorResearchReaderResult,
+  type InvestorResearchReaderVariables,
+} from "./prompts/schemas/investor-research-reader.js";
+export {
+  WELCOME_CONDUCTOR_SCHEMA_NAME,
+  WELCOME_CONDUCTOR_SCHEMA_VERSION,
+  WELCOME_CONDUCTOR_UNTRUSTED,
+  WelcomeConductorResultSchema,
+  WelcomeConductorVariablesSchema,
+  type WelcomeConductorResult,
+  type WelcomeConductorVariables,
+} from "./prompts/schemas/welcome-conductor.js";
+export {
+  INTERVIEW_CONDUCTOR_SCHEMA_NAME,
+  INTERVIEW_CONDUCTOR_SCHEMA_VERSION,
+  INTERVIEW_CONDUCTOR_V4_SCHEMA_VERSION,
+  INTERVIEW_CONDUCTOR_V5_SCHEMA_VERSION,
+  INTERVIEW_CONDUCTOR_V6_SCHEMA_VERSION,
+  INTERVIEW_CONDUCTOR_V7_SCHEMA_VERSION,
+  INTERVIEW_CONDUCTOR_V8_UNTRUSTED,
+  AnswerClaritySchema,
+  type AnswerClarity,
+  InterviewConductorResultSchema,
+  InterviewConductorV4ResultSchema,
+  InterviewConductorV5ResultSchema,
+  InterviewConductorV6ResultSchema,
+  InterviewConductorV7ResultSchema,
+  type InterviewConductorV7Result,
+  InterviewConductorV8VariablesSchema,
+  type InterviewConductorV6Result,
+  type InterviewConductorV8Variables,
+  InterviewConductorVariablesSchema,
+  InterviewOpenStepSchema,
+  type InterviewConductorResult,
+  type InterviewConductorV3Result,
+  type InterviewConductorV4Result,
+  type InterviewConductorV5Result,
+  type InterviewConductorVariables,
+  type InterviewConductorV3Variables,
+  type InterviewConductorV4Variables,
+  InterviewConductorV3VariablesSchema,
+  InterviewConductorV4VariablesSchema,
+  type InterviewOpenStep,
+  INTERVIEW_DESTINATIONS,
+  InterviewDestinationSchema,
+  type InterviewDestination,
+} from "./prompts/schemas/interview-conductor.js";
 export { COMPANY_ANALYST_V2 } from "./prompts/tasks/company-analyst.v2.js";
+export { COMPANY_ANALYST_V3 } from "./prompts/tasks/company-analyst.v3.js";
+export { COMPANY_ANALYST_V4 } from "./prompts/tasks/company-analyst.v4.js";
+export { COMPANY_ANALYST_V5 } from "./prompts/tasks/company-analyst.v5.js";
+export { COMPANY_ANALYST_V6 } from "./prompts/tasks/company-analyst.v6.js";
+export { COMPANY_ANALYST_V7 } from "./prompts/tasks/company-analyst.v7.js";
+export { COMPANY_ANALYST_V8 } from "./prompts/tasks/company-analyst.v8.js";
+export { COMPANY_ANALYST_V9 } from "./prompts/tasks/company-analyst.v9.js";
+export { COMPANY_ANALYST_V10 } from "./prompts/tasks/company-analyst.v10.js";
+export { COMPANY_ANALYST_V11 } from "./prompts/tasks/company-analyst.v11.js";
+export { COMPANY_ANALYST_V12 } from "./prompts/tasks/company-analyst.v12.js";
+export {
+  COMPANY_ANALYST_V13,
+  COMPANY_ANALYST_V13_FORMAT_SECTION,
+} from "./prompts/tasks/company-analyst.v13.js";
+export { COMPANY_ANALYST_V14 } from "./prompts/tasks/company-analyst.v14.js";
+export { COMPANY_ANALYST_V15 } from "./prompts/tasks/company-analyst.v15.js";
+export {
+  COMPANY_ANALYST_V17,
+  V17_CARDS_LINE,
+} from "./prompts/tasks/company-analyst.v17.js";
+export {
+  COMPANY_ANALYST_V18,
+  V18_ADVICE_LINE,
+  V18_MANDATE_LINE,
+  V18_NO_SCORE,
+} from "./prompts/tasks/company-analyst.v18.js";
+export {
+  COMPANY_ANALYST_V19,
+  V18_DOCUMENT_TYPES,
+  V19_DOCUMENT_TYPES,
+} from "./prompts/tasks/company-analyst.v19.js";
+export {
+  COMPANY_ANALYST_V20,
+  CONVERSATION_SECTION,
+  V19_ANSWER_FORMAT_HEADING,
+} from "./prompts/tasks/company-analyst.v20.js";
+export {
+  COMPANY_ANALYST_V21,
+  V20_CAVEAT_LINE,
+  V21_NO_DISCLAIMER_LINE,
+} from "./prompts/tasks/company-analyst.v21.js";
+export {
+  COMPANY_ANALYST_V22,
+  V22_VISUAL_LINE,
+} from "./prompts/tasks/company-analyst.v22.js";
+export {
+  COMPANY_ANALYST_V16,
+  COMPANY_ANALYST_V16_TURN,
+} from "./prompts/tasks/company-analyst.v16.js";
+export { ARTIFACT_REVISION_V1 } from "./prompts/tasks/artifact-revision.v1.js";
+export { ARTIFACT_REVISION_V2 } from "./prompts/tasks/artifact-revision.v2.js";
+export { ARTIFACT_REVISION_V3 } from "./prompts/tasks/artifact-revision.v3.js";
+export {
+  ARTIFACT_REVISION_BODY_MAX,
+  ARTIFACT_REVISION_SLIDES_MAX,
+  ARTIFACT_REVISION_V2_SCHEMA_VERSION,
+  ARTIFACT_REVISION_V3_SCHEMA_VERSION,
+  ArtifactRevisionV2ResultSchema,
+  ArtifactRevisionV3ResultSchema,
+  type ArtifactRevisionV3Result,
+  type ArtifactRevisionV2Result,
+  ARTIFACT_REVISION_SCHEMA_NAME,
+  ARTIFACT_REVISION_SCHEMA_VERSION,
+  ARTIFACT_REVISION_SECTIONS_MAX,
+  ARTIFACT_REVISION_UNTRUSTED,
+  ArtifactRevisionResultSchema,
+  ArtifactRevisionVariablesSchema,
+  type ArtifactRevisionResult,
+  type ArtifactRevisionVariables,
+} from "./prompts/schemas/artifact-revision.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V1 } from "./prompts/tasks/founder-onboarding-extraction.v1.js";
 export { FOUNDER_ONBOARDING_EXTRACTION_V2 } from "./prompts/tasks/founder-onboarding-extraction.v2.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V1 } from "./prompts/tasks/investor-mandate-synthesis.v1.js";
 export { INVESTOR_MANDATE_SYNTHESIS_V2 } from "./prompts/tasks/investor-mandate-synthesis.v2.js";
+export { INVESTOR_MANDATE_SYNTHESIS_V3 } from "./prompts/tasks/investor-mandate-synthesis.v3.js";
 export { FIT_EXPLANATION_V1 } from "./prompts/tasks/fit-explanation.v1.js";
+export { GATEQ_DOSSIER_SYNTHESIS_V1 } from "./prompts/tasks/gateq-dossier-synthesis.v1.js";
+export {
+  GATEQ_DOSSIER_SYNTHESIS_SCHEMA_NAME,
+  GATEQ_DOSSIER_SYNTHESIS_SCHEMA_VERSION,
+  GateqDossierSynthesisResultSchema,
+  GateqDossierSynthesisVariablesSchema,
+  type GateqDossierSynthesisResult,
+  type GateqDossierSynthesisVariables,
+} from "./prompts/schemas/gateq-dossier-synthesis.js";
+export { FIT_Q_VIEW_V1 } from "./prompts/tasks/fit-q-view.v1.js";
+export { FIT_Q_VIEW_V2 } from "./prompts/tasks/fit-q-view.v2.js";
+export { FIT_Q_VIEW_V3 } from "./prompts/tasks/fit-q-view.v3.js";
+export {
+  FIT_Q_VIEW_SCHEMA_NAME,
+  FIT_Q_VIEW_SCHEMA_VERSION,
+  FIT_Q_VIEW_VERDICTS,
+  FitQViewResultSchema,
+  FitQViewVariablesSchema,
+  FitQViewV3VariablesSchema,
+  type FitQViewResult,
+  type FitQViewVariables,
+  type FitQViewV3Variables,
+} from "./prompts/schemas/fit-q-view.js";
 
 export {
   AuthorisedFactSchema,
@@ -90,6 +894,64 @@ export {
   COMPANY_ANALYST_V2_SCHEMA_VERSION,
   CompanyAnalystResultSchema,
   CompanyAnalystV2ResultSchema,
+  CompanyAnalystV3ResultSchema,
+  COMPANY_ANALYST_V3_SCHEMA_VERSION,
+  type CompanyAnalystV3Result,
+  COMPANY_ANALYST_V4_SCHEMA_VERSION,
+  COMPANY_ANALYST_V4_UNTRUSTED,
+  COMPANY_ANALYST_V5_SCHEMA_VERSION,
+  COMPANY_ANALYST_V6_SCHEMA_VERSION,
+  COMPANY_ANALYST_V8_SCHEMA_VERSION,
+  COMPANY_ANALYST_V5_UNTRUSTED,
+  ARTIFACT_REQUEST_KINDS,
+  ARTIFACT_REQUEST_TYPES,
+  ARTIFACT_VISUAL_DIRECTIONS,
+  ArtifactRequestSchema,
+  ArtifactRequestV2Schema,
+  CompanyAnalystV5ResultSchema,
+  CompanyAnalystV6ResultSchema,
+  CompanyAnalystV8ResultSchema,
+  CompanyAnalystV12ResultSchema,
+  CompanyAnalystV14ResultSchema,
+  CompanyAnalystV15ResultSchema,
+  CompanyAnalystV17ResultSchema,
+  CompanyAnalystV19ResultSchema,
+  CompanyAnalystV22ResultSchema,
+  ANALYST_VISUALS,
+  type CompanyAnalystV22Result,
+  ArtifactRequestV3Schema,
+  ARTIFACT_REQUEST_TYPES_V3,
+  type CompanyAnalystV19Result,
+  type ArtifactRequestV3,
+  COMPANY_ANALYST_V17_SCHEMA_VERSION,
+  ANSWER_CARDS_GUIDANCE,
+  ModelAnswerCardsSchema,
+  type ModelAnswerCards,
+  type CompanyAnalystV17Result,
+  COMPANY_ANALYST_V15_SCHEMA_VERSION,
+  PROPOSAL_STATUS_GUIDANCE,
+  COMPANY_ANALYST_V14_SCHEMA_VERSION,
+  ModelComparisonCardsSchema,
+  type CompanyAnalystV12Result,
+  type CompanyAnalystV14Result,
+  type CompanyAnalystV15Result,
+  type ModelComparisonCards,
+  CompanyAnalystV5VariablesSchema,
+  type ArtifactRequest,
+  type ArtifactRequestV2,
+  type CompanyAnalystV5Result,
+  type CompanyAnalystV6Result,
+  type CompanyAnalystV8Result,
+  type CompanyAnalystV5Variables,
+  CompanyAnalystV4ResultSchema,
+  CompanyAnalystV4VariablesSchema,
+  DisplayNameRequestSchema,
+  NOTHING_REMEMBERED,
+  type CompanyAnalystV4Result,
+  type CompanyAnalystV4Variables,
+  type DisplayNameRequest,
+  ProfileUpdateSchema,
+  type ProfileUpdate,
   CompanyAnalystV2VariablesSchema,
   CompanyAnalystVariablesSchema,
   type CompanyAnalystResult,
@@ -106,6 +968,7 @@ export {
   CompanyIntelligenceFindingSchema,
   CompanyIntelligenceModelOutputSchema,
   CompanyMaterialChangeSchema,
+  readCitationLabels,
   type CompanyEvidenceCoverage,
   type CompanyIntelligenceDimension,
   type CompanyIntelligenceFinding,
@@ -191,7 +1054,75 @@ export {
   RECOMMENDATION_UNAVAILABLE_MESSAGE,
   withoutRecommendationClaims,
   type GuardedAnswer,
+  type RecommendationGrounds,
 } from "./communication/recommendation-guard.js";
+export {
+  createCaveatGuard,
+  inFirstPerson,
+  withOneCaveat,
+  NATURAL_REGISTER_ISSUES,
+  naturalRegisterIssues,
+  SPOKEN_WORDS_MAX,
+  type NaturalRegisterIssue,
+} from "./communication/natural-register.js";
+export {
+  citeAuthorisedFacts,
+  citePublicSources,
+  withoutPublicSourceLabels,
+  publicSourceBlockFields,
+  describePublicSource,
+  type CitableFact,
+  presentPublicSource,
+  type PublicSourceLike,
+  type PublicSourcePresentation,
+} from "./communication/source-presentation.js";
+
+// ETIQUETTE block (ADR 0050): how Q conducts business.
+export {
+  BUILT_IN_ETIQUETTE_DIGEST,
+  BUILT_IN_ETIQUETTE_GUIDE,
+  BUILT_IN_ETIQUETTE_TITLE,
+  BUILT_IN_ETIQUETTE_VERSION,
+} from "./etiquette/default-guide.js";
+export {
+  BUILT_IN_ETIQUETTE,
+  DEFAULT_ETIQUETTE_GUIDES,
+  ETIQUETTE_GUIDE_TEXT_MAX,
+  ETIQUETTE_PERSONAL_EXCERPT_MAX,
+  ETIQUETTE_PLATFORM_EXCERPT_MAX,
+  ETIQUETTE_RENDERING_VERSION,
+  etiquetteExcerpt,
+  etiquetteVersions,
+  houseEtiquetteOf,
+  platformEtiquetteSource,
+  renderEtiquetteGuidance,
+  type ActivePlatformGuideLike,
+  type EtiquetteGuides,
+  type EtiquetteGuideSource,
+  type EtiquettePurpose,
+  type EtiquetteRequest,
+} from "./etiquette/guidance.js";
+export {
+  considerationReason,
+  considerOutreach,
+  ETIQUETTE_PACING,
+  type OutreachConsideration,
+  type OutreachKind,
+  type OutreachMoment,
+} from "./etiquette/pacing.js";
+// Founder 2026-10-07: messages that woo, and code's check of them.
+export {
+  COLD_OPEN,
+  WOO_FEEDBACK,
+  WOO_GUIDANCE,
+  WOO_PROBLEMS,
+  WOO_WORDS_MAX,
+  WOO_WORDS_TARGET,
+  wooProblem,
+  type WooInput,
+  type WooProblem,
+} from "./etiquette/woo.js";
+// end ETIQUETTE block
 
 export {
   COMMUNICATION_FORBIDDEN_TERMS,
@@ -200,6 +1131,33 @@ export {
   DEFAULT_COMMUNICATION_PROFILE,
   renderCommunicationGuidance,
 } from "./communication/guidance.js";
+
+export {
+  isPlainLine,
+  plainLineProblems,
+  type PlainLineProblem,
+} from "./communication/plain-lines.js";
+
+export {
+  isEmptyPromise,
+  stripEmptyPromises,
+  type PromiseStripResult,
+} from "./communication/promises.js";
+
+export {
+  createSentenceCutter,
+  splitSentences,
+  type SentenceCutter,
+} from "./communication/sentences.js";
+
+export { namesSomething } from "./communication/names-something.js";
+
+export {
+  isRecordableKnowledgeKey,
+  recordableNamespacesSentence,
+  RECORDABLE_KNOWLEDGE_NAMESPACES,
+  type RecordableKnowledgeNamespace,
+} from "./communication/knowledge-keys.js";
 
 export {
   PRIVATE_CHARTER_MARKER,
@@ -213,3 +1171,498 @@ export {
 } from "./fixtures/index.js";
 
 export const PACKAGE_NAME = "@capital-q/q-core" as const;
+
+export * from "./conversation/index.js";
+export {
+  deliveryFromCue,
+  PLAIN_DELIVERY,
+  SPEECH_CUES,
+  SPEECH_MAX_SENTENCE_INDEX,
+  SPEECH_PACES,
+  SPEECH_REACTIONS,
+  SpeechCueSchema,
+  SpeechDeliverySchema,
+  type SpeechCue,
+  type SpeechDelivery,
+  type SpeechPace,
+  type SpeechReaction,
+} from "./speech/delivery.js";
+// AUTO block: Q's delegated work prompts (ADR 0030).
+export {
+  WORK_CONVERSE_V1,
+  WORK_CONVERSE_V2,
+  WORK_INTERVIEW_REPORT_V1,
+  WORK_INTERVIEW_TURN_V1,
+  WORK_SHORTLIST_V1,
+  WORK_STAND_IN_REPLY_V1,
+  WORK_STAND_IN_REPLY_V2,
+  WORK_SLOT_READER_V1,
+} from "./prompts/tasks/q-work.v1.js";
+export {
+  WorkConverseResultSchema,
+  WorkInterviewReportResultSchema,
+  WorkInterviewTurnResultSchema,
+  WorkShortlistResultSchema,
+  WorkStandInReplyResultSchema,
+  WorkSlotReaderResultSchema,
+  type WorkSlotReaderResult,
+  type WorkSlotReaderVariables,
+  type WorkConverseResult,
+  type WorkConverseVariables,
+  type WorkInterviewReportResult,
+  type WorkInterviewReportVariables,
+  type WorkInterviewTurnResult,
+  type WorkInterviewTurnVariables,
+  type WorkShortlistResult,
+  type WorkShortlistVariables,
+  type WorkStandInReplyResult,
+  type WorkStandInReplyVariables,
+} from "./prompts/schemas/q-work.js";
+// end AUTO block
+// ADR 0043: standing instructions.
+export {
+  INSTRUCTION_PLAN_V1,
+  INSTRUCTION_PLAN_V2,
+  INSTRUCTION_PLAN_V3,
+  INSTRUCTION_PLAN_V4,
+  INSTRUCTION_PLAN_V5,
+  INSTRUCTION_PLAN_V6,
+  INSTRUCTION_PLAN_V7,
+  INSTRUCTION_PLAN_V8,
+  INSTRUCTION_PLAN_V9,
+  INSTRUCTION_REPLY_GUIDANCE,
+  INSTRUCTION_THREAD_READER_V1,
+  INSTRUCTION_THREAD_READER_V2,
+  INSTRUCTION_THREAD_READER_V3,
+} from "./prompts/tasks/instructions.v1.js";
+export {
+  InstructionThreadFactsSchema,
+  InstructionThreadFactsV2Schema,
+  INSTRUCTION_QUESTION_KINDS,
+  type InstructionQuestionKind,
+  type InstructionThreadFactsV2,
+  type InstructionPlanV4Variables,
+  type InstructionThreadFacts,
+  type InstructionThreadReaderVariables,
+  InstructionPlanResultSchema,
+  InstructionPlanV2ResultSchema,
+  InstructionPlanV3ResultSchema,
+  InstructionPlanV5ResultSchema,
+  INSTRUCTION_MESSAGE_KINDS,
+  INSTRUCTION_MESSAGE_ASKS,
+  type InstructionMessageKind,
+  type InstructionMessageAsk,
+  type InstructionPlanV5Result,
+  INSTRUCTION_PLAN_REQUESTS,
+  INSTRUCTION_CANNOT_NEEDS,
+  ENGINE_ABILITIES,
+  type InstructionPlanResult,
+  type InstructionPlanV2Result,
+  type InstructionPlanV3Result,
+  type InstructionPlanVariables,
+} from "./prompts/schemas/instructions.js";
+
+// DOCS block: the wording pass over a composed deck.
+export { DOCUMENT_POLISH_V1 } from "./prompts/tasks/document-polish.v1.js";
+export { DOCUMENT_POLISH_V2 } from "./prompts/tasks/document-polish.v2.js";
+export {
+  DOCUMENT_POLISH_SCHEMA_NAME,
+  DOCUMENT_POLISH_SCHEMA_VERSION,
+  DOCUMENT_POLISH_V2_BULLETS_MAX,
+  DOCUMENT_POLISH_V2_SCHEMA_VERSION,
+  DOCUMENT_POLISH_V2_TEXT_MAX,
+  DocumentPolishV2ResultSchema,
+  type DocumentPolishV2Result,
+  DOCUMENT_POLISH_UNTRUSTED,
+  DocumentPolishResultSchema,
+  DocumentPolishVariablesSchema,
+  type DocumentPolishResult,
+  type DocumentPolishVariables,
+} from "./prompts/schemas/document-polish.js";
+// Deck wave 8: the vision check of a rendered deck.
+export { DOCUMENT_CRITIQUE_V1 } from "./prompts/tasks/document-critique.v1.js";
+export {
+  DOCUMENT_CRITIQUE_FIX_KINDS,
+  DOCUMENT_CRITIQUE_PAGES_MAX,
+  DOCUMENT_CRITIQUE_SCHEMA_NAME,
+  DOCUMENT_CRITIQUE_SCHEMA_VERSION,
+  DOCUMENT_CRITIQUE_UNTRUSTED,
+  DocumentCritiqueResultSchema,
+  DocumentCritiqueVariablesSchema,
+  type DocumentCritiqueResult,
+  type DocumentCritiqueVariables,
+} from "./prompts/schemas/document-critique.js";
+
+// DAILY block (The Q Daily)
+export { DAILY_STORY_WRITER_V1 } from "./prompts/tasks/daily-story-writer.v1.js";
+export { DAILY_Q_TAKE_V1 } from "./prompts/tasks/daily-q-take.v1.js";
+export {
+  DAILY_Q_TAKE_SCHEMA_NAME,
+  DAILY_Q_TAKE_SCHEMA_VERSION,
+  DAILY_Q_TAKE_UNTRUSTED,
+  DAILY_STORY_WRITER_SCHEMA_NAME,
+  DAILY_STORY_WRITER_SCHEMA_VERSION,
+  DAILY_STORY_WRITER_UNTRUSTED,
+  DailyQTakeResultSchema,
+  DailyQTakeVariablesSchema,
+  DailyStoryWriterResultSchema,
+  DailyStoryWriterVariablesSchema,
+  type DailyQTakeResult,
+  type DailyQTakeVariables,
+  type DailyStoryWriterResult,
+  type DailyStoryWriterVariables,
+} from "./prompts/schemas/daily.js";
+// end DAILY block
+// PRESENCE block
+export {
+  gesturesForReply,
+  ModelSentenceGesturesEnumSchema,
+  ModelSentenceGesturesSchema,
+  PRESENCE_GESTURES_GUIDANCE,
+  sentenceCount,
+  type ModelSentenceGestures,
+} from "./speech/gesture.js";
+// end PRESENCE block
+export { PROFILE_GAP_READER_V1 } from "./prompts/tasks/profile-gap-reader.v1.js";
+export {
+  PROFILE_GAP_READER_SCHEMA_NAME,
+  PROFILE_GAP_READER_SCHEMA_VERSION,
+  ProfileGapReaderResultSchema,
+  ProfileGapReaderVariablesSchema,
+  type ProfileGapReaderResult,
+  type ProfileGapReaderVariables,
+} from "./prompts/schemas/profile-gap-reader.js";
+export { APP_ACTION_ARGUMENTS_V1 } from "./prompts/tasks/app-action-arguments.v1.js";
+export { APP_ACTION_ROUTER_V1 } from "./prompts/tasks/app-action-router.v1.js";
+export {
+  APP_ACTION_ROUTER_SCHEMA_NAME,
+  APP_ACTION_ROUTER_SCHEMA_VERSION,
+  AppActionRouterResultSchema,
+  AppActionRouterVariablesSchema,
+  type AppActionRouterResult,
+  type AppActionRouterVariables,
+} from "./prompts/schemas/app-action-router.js";
+export {
+  APP_ACTION_ARGUMENTS_SCHEMA_NAME,
+  APP_ACTION_ARGUMENTS_SCHEMA_VERSION,
+  AppActionArgumentsResultSchema,
+  AppActionArgumentsVariablesSchema,
+  type AppActionArgumentsResult,
+  type AppActionArgumentsVariables,
+} from "./prompts/schemas/app-action-arguments.js";
+
+// Founder brief J1-J9 (2026-10-06): Q's workforce of agents.
+export {
+  DRAFT_REDRAFT_V1,
+  DRAFT_REDRAFT_V2,
+  DRAFT_REDRAFT_V3,
+  DRAFT_REVIEW_V1,
+  DRAFT_REVIEW_V2,
+  DRAFT_REVIEW_V3,
+  JOB_PLAN_V1,
+  JOB_PLAN_V2,
+  JOB_PLAN_V3,
+  JOB_PLAN_V5,
+  JOB_PLAN_V6,
+  JOB_PLAN_V7,
+  REPLY_READER_V1,
+} from "./prompts/tasks/workforce.v1.js";
+export {
+  DRAFT_CHANNELS,
+  DRAFT_INTEGRITY_RULES,
+  DRAFT_INTEGRITY_RULES_V2,
+  DRAFT_RUBRIC_CRITERIA,
+  DRAFT_STAGES,
+  DraftRedraftResultSchema,
+  DraftReviewResultSchema,
+  DraftReviewResultV2Schema,
+  JobPlanResultSchema,
+  JobPlanResultV2Schema,
+  JobPlanResultV3Schema,
+  JOB_PLAN_V3_SCHEMA_VERSION,
+  JobPlanResultV4Schema,
+  JOB_PLAN_V4_SCHEMA_VERSION,
+  JOB_PLAN_V5_SCHEMA_VERSION,
+  JOB_PLAN_V6_SCHEMA_VERSION,
+  JobPlanResultV6Schema,
+  type JobPlanResultV6,
+  JOB_PLAN_V5_UNTRUSTED,
+  JobPlanResultV5Schema,
+  JobPlanVariablesV5Schema,
+  type JobPlanResultV5,
+  type JobPlanVariablesV5,
+  PlannedNamedCompanyDocumentSchema,
+  SUBSTANCE_CRITIQUE_SCHEMA_NAME,
+  SUBSTANCE_CRITIQUE_SCHEMA_VERSION,
+  SUBSTANCE_CRITIQUE_ISSUE_KINDS,
+  SubstanceCritiqueResultSchema,
+  SubstanceCritiqueVariablesSchema,
+  type SubstanceCritiqueResult,
+  type SubstanceCritiqueVariables,
+  type JobPlanResultV4,
+  DILIGENCE_QUESTIONS_SCHEMA_NAME,
+  DILIGENCE_QUESTIONS_SCHEMA_VERSION,
+  DiligenceQuestionsResultSchema,
+  DiligenceQuestionsVariablesSchema,
+  type DiligenceQuestionsResult,
+  type DiligenceQuestionsVariables,
+  DILIGENCE_QUESTION_DRAFT_MAX_LENGTH,
+  DILIGENCE_QUESTION_SENT_MAX_LENGTH,
+  DILIGENCE_QUESTIONS_SCHEMA_VERSION_V2,
+  DiligenceQuestionsDraftResultSchema,
+  type DiligenceQuestionsDraftResult,
+  DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_NAME,
+  DILIGENCE_QUESTIONS_SHORTEN_SCHEMA_VERSION,
+  DiligenceQuestionsShortenResultSchema,
+  DiligenceQuestionsShortenVariablesSchema,
+  type DiligenceQuestionsShortenResult,
+  type DiligenceQuestionsShortenVariables,
+  JOB_PLAN_V2_SCHEMA_VERSION,
+  PLAN_AGENT_ROLES,
+  PLAN_AGENT_ROLES_V2,
+  REPLY_REQUEST_KINDS,
+  REPLY_STANCES,
+  REPLY_TONES,
+  ReplyReaderResultSchema,
+  stanceDeclines,
+  type DraftChannel,
+  type DraftIntegrityRule,
+  type DraftRedraftResult,
+  type DraftRedraftVariables,
+  type DraftReviewResult,
+  type DraftReviewVariables,
+  type DraftIntegrityRuleV2,
+  type DraftReviewResultV2,
+  type DraftReviewV2Variables,
+  type DraftRubricCriterion,
+  type DraftStage,
+  type JobPlanResult,
+  type JobPlanResultV2,
+  type JobPlanResultV3,
+  type JobPlanVariables,
+  type ReplyReaderResult,
+  type ReplyReaderVariables,
+  type ReplyStance,
+  type ReplyTone,
+} from "./prompts/schemas/workforce.js";
+// PROFILE block (overnight A5): the deck into twelve sections.
+export { DECK_EXTRACTION_V1 } from "./prompts/tasks/deck-extraction.v1.js";
+export { PITCH_SECTION_EXTRACTION_V1 } from "./prompts/tasks/pitch-section-extraction.v1.js";
+export {
+  PITCH_SECTION_EXTRACTION_SCHEMA_NAME,
+  PITCH_SECTION_EXTRACTION_SCHEMA_VERSION,
+  PITCH_SECTION_EXTRACTION_UNTRUSTED,
+  PITCH_SECTION_FACTS_MAX,
+  PITCH_SECTION_SECTIONS_MAX,
+  PITCH_SECTION_TRANSCRIPT_MAX,
+  PitchSectionExtractionResultSchema,
+  PitchSectionExtractionVariablesSchema,
+  PitchSectionFactSchema,
+  type PitchSectionExtractionResult,
+  type PitchSectionExtractionVariables,
+  type PitchSectionFact,
+} from "./prompts/schemas/pitch-section-extraction.js";
+export {
+  SPEAK_FROM_FACTS_V1,
+  SPOKEN_REPLY_V1,
+} from "./prompts/tasks/spoken-reply.v1.js";
+export { BRIEFING_COMMAND_V1 } from "./prompts/tasks/briefing-command.v1.js";
+export { SMALL_TALK_V1 } from "./prompts/tasks/small-talk.v1.js";
+export { CONVERSATION_RECALL_V1 } from "./prompts/tasks/conversation-recall.v1.js";
+export {
+  CONVERSATION_RECALL_SCHEMA_NAME,
+  CONVERSATION_RECALL_SCHEMA_VERSION,
+  CONVERSATION_RECALL_UNTRUSTED,
+  ConversationRecallResultSchema,
+  ConversationRecallVariablesSchema,
+  type ConversationRecallResult,
+  type ConversationRecallVariables,
+} from "./prompts/schemas/conversation-recall.js";
+export { TURN_SKIM_V1 } from "./prompts/tasks/turn-skim.v1.js";
+export { TURN_SKIM_V2 } from "./prompts/tasks/turn-skim.v2.js";
+export { TURN_SKIM_V3 } from "./prompts/tasks/turn-skim.v3.js";
+export { TURN_SKIM_V4 } from "./prompts/tasks/turn-skim.v4.js";
+export { PERSON_BRIEF_READER_V1 } from "./prompts/tasks/person-brief-reader.v1.js";
+export {
+  PERSON_BRIEF_READER_SCHEMA_NAME,
+  PERSON_BRIEF_READER_SCHEMA_VERSION,
+  PERSON_BRIEF_READER_TOPICS,
+  PERSON_BRIEF_READER_UNTRUSTED,
+  PersonBriefReaderResultSchema,
+  PersonBriefReaderVariablesSchema,
+  type PersonBriefReaderResult,
+  type PersonBriefReaderVariables,
+} from "./prompts/schemas/person-brief-reader.js";
+export {
+  TURN_SKIM_KINDS,
+  TURN_SKIM_SCHEMA_NAME,
+  TURN_SKIM_SCHEMA_VERSION,
+  TURN_SKIM_V2_KINDS,
+  TURN_SKIM_V2_SCHEMA_VERSION,
+  SkimPersonSchema,
+  SkimInvestorsSchema,
+  type SkimPerson,
+  type SkimInvestors,
+  TurnSkimResultSchema,
+  TurnSkimVariablesSchema,
+  TurnSkimV3VariablesSchema,
+  ARRIVAL_ASPECTS,
+  type TurnSkimResult,
+  type TurnSkimVariables,
+  type TurnSkimV3Variables,
+} from "./prompts/schemas/turn-skim.js";
+export {
+  SMALL_TALK_SCHEMA_NAME,
+  SMALL_TALK_SCHEMA_VERSION,
+  SMALL_TALK_UNTRUSTED,
+  SmallTalkResultSchema,
+  SmallTalkVariablesSchema,
+  type SmallTalkResult,
+  type SmallTalkVariables,
+} from "./prompts/schemas/small-talk.js";
+export {
+  BRIEFING_COMMAND_SCHEMA_NAME,
+  BRIEFING_COMMAND_SCHEMA_VERSION,
+  BRIEFING_COMMAND_UNTRUSTED,
+  BRIEFING_VERBS,
+  BriefingCommandResultSchema,
+  BriefingCommandVariablesSchema,
+  type BriefingCommandResult,
+  type BriefingCommandVariables,
+  type BriefingVerb,
+} from "./prompts/schemas/briefing-command.js";
+export {
+  SPOKEN_REPLY_SCHEMA_NAME,
+  SPOKEN_REPLY_SCHEMA_VERSION,
+  SPOKEN_REPLY_UNTRUSTED,
+  SpokenReplyResultSchema,
+  SpokenReplyVariablesSchema,
+  type SpokenReplyResult,
+  type SpokenReplyVariables,
+} from "./prompts/schemas/spoken-reply.js";
+export {
+  BANNED_SPOKEN_PHRASES,
+  factsForVoice,
+  requestedCount,
+  shownCardsOf,
+  SPOKEN_FACTS_VERSION,
+  SPOKEN_FACTS_WORDS_MAX,
+  SPOKEN_FIDELITY_ISSUES,
+  naturalPlaceLine,
+  spokenFactsOf,
+  spokenFactsOfAttention,
+  spokenFactsOfAttentionOnScreen,
+  spokenFidelityIssues,
+  spokenList,
+  type SpokenFacts,
+  type SpokenFactsKind,
+  type SpokenFidelityIssue,
+  type SpokenItem,
+} from "./speech/spoken-facts.js";
+export {
+  movePhaseLine,
+  pendingPlaceOf,
+  type MovePhase,
+} from "./speech/move-line.js";
+export {
+  arrivalGreeting,
+  arrivalSeed,
+  cardFactsForVoice,
+  cardLine,
+  gistOf,
+  isTimeZone,
+  localHour,
+  lowdownOf,
+  partOfDay,
+  summaryOfCards,
+  type ActivityCount,
+  type ArrivalActivity,
+  type ArrivalFacts,
+  type DecisionCardFacts,
+  type Lowdown,
+  type PartOfDay,
+} from "./speech/arrival.js";
+export {
+  applyCardEdit,
+  bodyDigest,
+  focusedCard,
+  parseCardCommand,
+  wordsAllowDismiss,
+  wordsAllowSend,
+  remainingAfterFocus,
+  sameShownMessage,
+  sentencesOf,
+  startSequence,
+  stepSequence,
+  type CardCommand,
+  type CardEdit,
+  type CardOutcome,
+  type SequenceCard,
+  type SequenceEffect,
+  type SequenceEvent,
+  type SequenceNote,
+  type SequenceState,
+  type SequenceStep,
+} from "./speech/card-sequence.js";
+export {
+  DECK_EXTRACTION_SCHEMA_NAME,
+  DECK_EXTRACTION_SCHEMA_VERSION,
+  DECK_EXTRACTION_UNTRUSTED,
+  DeckExtractionResultSchema,
+  DeckExtractionVariablesSchema,
+  type DeckExtractionResult,
+  type DeckExtractionVariables,
+} from "./prompts/schemas/deck-extraction.js";
+
+export {
+  WELCOME_STORIES_MAX,
+  dailyFollowUpKind,
+  dailyGistWords,
+  dailyMoreWords,
+  editionDay,
+  quietDayNewsWords,
+  spokenHeadline,
+  storyOrdinal,
+  welcomeStories,
+  type DailyFollowUpKind,
+  type DailyNewsStory,
+} from "./speech/daily-news.js";
+
+export { TURN_READER_V50, V50_FIT } from "./prompts/tasks/turn-reader.v50.js";
+export {
+  TURN_READER_V51,
+  V51_DECISION_WITH_WORK,
+} from "./prompts/tasks/turn-reader.v51.js";
+export {
+  TURN_READER_V52,
+  V52_NEXT_STEPS,
+} from "./prompts/tasks/turn-reader.v52.js";
+export {
+  TURN_READER_V53,
+  V53_Q_PITCH,
+} from "./prompts/tasks/turn-reader.v53.js";
+export {
+  TURN_READER_V54,
+  V54_FROM_SHOWN,
+} from "./prompts/tasks/turn-reader.v54.js";
+export {
+  TURN_READER_V55,
+  V55_SCREEN_CONTROLS,
+} from "./prompts/tasks/turn-reader.v55.js";
+export {
+  TURN_READER_V56,
+  V56_FIT_EXCLUDE_SHOWN,
+} from "./prompts/tasks/turn-reader.v56.js";
+export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
+
+export {
+  COMPANY_ANALYST_V23,
+  V23_ALLOWED_ROOT_KEYS,
+  V23_RESULT_GUIDANCE,
+} from "./prompts/tasks/company-analyst.v23.js";
+
+export { COMPANY_ANALYST_V24 } from "./prompts/tasks/company-analyst.v24.js";
+export {
+  COMPANY_ANALYST_V25,
+  V25_RESULT_GUIDANCE,
+} from "./prompts/tasks/company-analyst.v25.js";

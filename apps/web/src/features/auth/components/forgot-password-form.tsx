@@ -12,8 +12,10 @@ import { AuthHeading } from "./auth-heading";
 import { EmailField } from "./email-field";
 import { FormNotice } from "./form-notice";
 import { SubmitButton } from "./submit-button";
+import { useT } from "@/features/i18n/language";
 
 export function ForgotPasswordForm() {
+  const t = useT();
   const [state, action] = useActionState(
     requestPasswordResetAction,
     INITIAL_AUTH_FORM_STATE,
@@ -22,8 +24,10 @@ export function ForgotPasswordForm() {
   return (
     <div className="flex flex-col gap-8">
       <AuthHeading
-        title="Reset your password"
-        description="Enter your email and we'll send a link to choose a new one."
+        title={t("Reset your password")}
+        description={t(
+          "Enter your email and we'll send a link to choose a new one.",
+        )}
       />
 
       <form action={action} className="flex flex-col gap-5">
@@ -31,12 +35,14 @@ export function ForgotPasswordForm() {
         {state.status === "error" ? (
           <FormNotice tone="danger">{state.message}</FormNotice>
         ) : null}
-        <SubmitButton pendingLabel="Sending…">Send reset link</SubmitButton>
+        <SubmitButton pendingLabel="Sending…">
+          {t("Send reset link")}
+        </SubmitButton>
       </form>
 
       <p className="cq-body-sm text-(--cq-text-secondary)">
         <Link href="/auth/sign-in" className={linkClassName()}>
-          Back to sign in
+          {t("Back to sign in")}
         </Link>
       </p>
     </div>

@@ -40,6 +40,17 @@ export {
   type InvestorWriteTargetOptions,
 } from "./integration/write-targets.js";
 export {
+  createMandateReview,
+  MANDATE_NARRATIVE_STEP_KEYS,
+  MANDATE_REVIEW_SKIP_REASONS,
+  parseMoney,
+  type MandateReview,
+  type MandateReviewResult,
+  type MandateReviewServiceDependencies,
+  type MandateReviewSkipReason,
+  type MandateTaxonomyResolver,
+} from "./integration/mandate-review-service.js";
+export {
   createInvestorStepContextProviders,
   type InvestorStepContextOptions,
 } from "./integration/step-contexts.js";
@@ -62,3 +73,8 @@ export function createInvestorOnboardingIntegration(
 
 export const PACKAGE_NAME = "@capital-q/investor-onboarding" as const;
 export * from "./intelligence/index.js";
+export { INVESTOR_INTERVIEW_CUES } from "./definition/interview-cues.js";
+export {
+  INVESTOR_CONCEPT_FAMILIES,
+  type ConceptFamily,
+} from "./definition/concept-families.js";

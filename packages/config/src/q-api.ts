@@ -17,7 +17,22 @@ import {
   type ModelProviderSecrets,
 } from "./model-providers.js";
 import {
+  researchProviderEnvShape,
+  toResearchProviderSecrets,
+  type ResearchProviderSecrets,
+} from "./research-providers.js";
+import {
+  speechProviderEnvShape,
+  toSpeechEngineIds,
+  toSpeechProviderSecrets,
+  type SpeechEngineIds,
+  type SpeechProviderSecrets,
+  resolveVoiceProvider,
+  type VoiceProviderCode,
+} from "./speech-providers.js";
+import {
   supabaseAuthEnvShape,
+  supabaseSecretKeySchema,
   toSupabaseAuthConfig,
   type SupabaseAuthConfig,
 } from "./supabase-auth.js";
@@ -39,6 +54,50 @@ const qApiEnvSchema = z.object({
   // around an unconfigured provider, and a service with neither still
   // starts — model-capable tasks then fail safely as "unavailable".
   ...modelProviderEnvShape,
+  // Public-web research provider key (CQ-Q-RESEARCH-001). Optional: without
+  // it the research tools are not composed and Q answers from Capital Q alone.
+  ...researchProviderEnvShape,
+  // Realtime speech provider (CQ-Q-VOICE-001 C). Optional: without the key
+  // and a Speech Engine id the voice routes are not registered.
+  ...speechProviderEnvShape,
+  // Where the application API is, so a spoken interview answer reaches the
+  // same onboarding session a typed one does. Optional: without it voice
+  // carries Q conversations only.
+  CQ_API_URL: z.string().url("expected an absolute http(s) URL").optional(),
+  // How Q carries itself in a live conversation (q-core personality registry).
+  Q_PERSONALITY: z.enum(["UPBEAT", "CALM", "DIRECT"]).optional(),
+  // Whether the Speech Engines render inline audio tags ([laughs]); set by
+  // voice:setup alongside the engine ids.
+  Q_VOICE_EXPRESSIVE: z.enum(["true", "false"]).optional(),
+  // The ElevenLabs model that renders Q's voice behind the speak relay
+  // (CQ-VOICE-010). Unset means eleven_v3_conversational, chosen by
+  // listening to design/voice-comparison; turbo stands behind it per
+  // utterance either way. Pinning turbo is the rollback.
+  Q_VOICE_TTS_MODEL: z
+    .enum(["eleven_turbo_v2_5", "eleven_v3_conversational"])
+    .optional(),
+  // Q as an MCP server (doc 12 §34.2): a constrained façade over the tools
+  // the registry offers the authenticated person. Off unless a deployment
+  // says otherwise; nothing about Q's own behaviour depends on it.
+  Q_MCP_SERVER: z.enum(["enabled", "disabled"]).optional(),
+  // DOCS block: generated images for documents. Off unless a deployment
+  // turns them on (they spend provider credit); the secret key is the
+  // storage authority for the private image bucket, server-only.
+  SUPABASE_SECRET_KEY: supabaseSecretKeySchema.optional(),
+  CQ_DOCUMENT_IMAGES: z.enum(["enabled", "disabled"]).optional(),
+  CQ_DOCUMENT_IMAGES_PER_DOCUMENT: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(6)
+    .optional(),
+  CQ_DOCUMENT_IMAGES_PER_DAY: z.coerce.number().int().min(0).max(50).optional(),
+  CQ_DOCUMENT_IMAGES_PLATFORM_PER_DAY: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(500)
+    .optional(),
 });
 
 /**
@@ -48,11 +107,50 @@ const qApiEnvSchema = z.object({
  * configuration surface.
  */
 export type QApiSecrets = {
+  /** DOCS: storage authority for the private document-image bucket. */
+  readonly supabaseSecretKey: string | undefined;
   /** Server-only. Never serialised, logged, or handed to a client or a prompt. */
   readonly modelProviders: ModelProviderSecrets;
+  /** Server-only. Read once by the research adapter at composition. */
+  readonly researchProviders: ResearchProviderSecrets;
+  /** Server-only. Read once by the speech adapter at composition. */
+  readonly speechProviders: SpeechProviderSecrets;
+};
+
+export type QApiVoiceConfig = {
+  /** The Speech Engine resources this environment speaks through; absent means no voice. */
+  readonly speechEngines: SpeechEngineIds | undefined;
+  /** The application API origin for spoken interview turns; absent means Q conversations only. */
+  readonly apiBaseUrl: string | undefined;
+  /** How Q carries itself in a live conversation (q-core personality registry). */
+  readonly personality: "UPBEAT" | "CALM" | "DIRECT";
+  /** Whether the Speech Engines render inline audio tags. */
+  readonly expressive: boolean;
+  /** The ElevenLabs model behind the speak relay and one-way speech. */
+  readonly ttsModel: "eleven_turbo_v2_5" | "eleven_v3_conversational";
+  /** The transport that carries the voice, resolved from keys and preference; absent means no voice. */
+  readonly provider: VoiceProviderCode | undefined;
+  /** This server's public origin as the speech provider reaches it (the tunnel in development). */
+  readonly publicUrl: string | undefined;
 };
 
 export type QApiPublicConfig = Readonly<Record<string, never>>;
+
+/** DOCS: generated images for documents, and their budgets. */
+export type QApiDocumentImagesConfig = {
+  readonly enabled: boolean;
+  /** Per composed or illustrated document (one Q run). */
+  readonly perDocument: number;
+  /** Per organisation per UTC day. */
+  readonly perOrganisationPerDay: number;
+  /** Across Capital Q per UTC day: the founder's credit ceiling. */
+  readonly platformPerDay: number;
+};
+
+export type QApiConnectorsConfig = {
+  /** Whether the MCP server façade is mounted. */
+  readonly mcpServer: boolean;
+};
 
 export type QApiConfig = {
   readonly runtime: RuntimeConfig;
@@ -61,6 +159,9 @@ export type QApiConfig = {
   /** Supabase Auth verification settings; absent means "not configured". */
   readonly supabaseAuth: SupabaseAuthConfig | undefined;
   readonly public: QApiPublicConfig;
+  readonly voice: QApiVoiceConfig;
+  readonly connectors: QApiConnectorsConfig;
+  readonly documentImages: QApiDocumentImagesConfig;
   readonly secrets: QApiSecrets;
 };
 
@@ -81,7 +182,32 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
           })
         : undefined,
     public: {},
-    secrets: { modelProviders: toModelProviderSecrets(parsed) },
+    voice: {
+      speechEngines: toSpeechEngineIds(parsed),
+      apiBaseUrl: parsed.CQ_API_URL?.replace(/\/$/, ""),
+      personality: parsed.Q_PERSONALITY ?? "UPBEAT",
+      expressive: parsed.Q_VOICE_EXPRESSIVE === "true",
+      ttsModel: parsed.Q_VOICE_TTS_MODEL ?? "eleven_v3_conversational",
+      provider: resolveVoiceProvider(
+        toSpeechProviderSecrets(parsed),
+        toSpeechEngineIds(parsed),
+        parsed.Q_VOICE_PROVIDER,
+      ),
+      publicUrl: parsed.Q_API_PUBLIC_URL?.replace(/\/$/, ""),
+    },
+    connectors: { mcpServer: parsed.Q_MCP_SERVER === "enabled" },
+    documentImages: {
+      enabled: parsed.CQ_DOCUMENT_IMAGES === "enabled",
+      perDocument: parsed.CQ_DOCUMENT_IMAGES_PER_DOCUMENT ?? 2,
+      perOrganisationPerDay: parsed.CQ_DOCUMENT_IMAGES_PER_DAY ?? 6,
+      platformPerDay: parsed.CQ_DOCUMENT_IMAGES_PLATFORM_PER_DAY ?? 40,
+    },
+    secrets: {
+      supabaseSecretKey: parsed.SUPABASE_SECRET_KEY,
+      modelProviders: toModelProviderSecrets(parsed),
+      researchProviders: toResearchProviderSecrets(parsed),
+      speechProviders: toSpeechProviderSecrets(parsed),
+    },
   };
 }
 

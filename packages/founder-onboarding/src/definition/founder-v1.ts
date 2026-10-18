@@ -82,6 +82,26 @@ export const FOUNDER_STEPS = {
 } as const;
 export type FounderStepKey = (typeof FOUNDER_STEPS)[keyof typeof FOUNDER_STEPS];
 
+/**
+ * ADR 0024: answers a founder may change after onboarding, from their
+ * profile or through Q. The company's name, website, country, stage and
+ * description are company fields edited on the profile; the raise is the
+ * Capital page's; materials and confirmations are not answers to revise.
+ */
+export const FOUNDER_REVISABLE_STEPS: ReadonlySet<string> = new Set([
+  FOUNDER_STEPS.categories,
+  FOUNDER_STEPS.founderRole,
+  FOUNDER_STEPS.founderCount,
+  FOUNDER_STEPS.fullTime,
+  FOUNDER_STEPS.teamSize,
+  FOUNDER_STEPS.functions,
+  FOUNDER_STEPS.signal,
+  FOUNDER_STEPS.pilots,
+  FOUNDER_STEPS.revenueStatus,
+  FOUNDER_STEPS.customers,
+  FOUNDER_STEPS.growth,
+]);
+
 // ---------------------------------------------------------------------------
 // Bounded option vocabularies. Keys are stable identifiers; labels are copy.
 // ---------------------------------------------------------------------------
@@ -256,6 +276,19 @@ export const INSTRUMENT_CODES: Readonly<Record<string, string | null>> = {
   convertible: "convertible_note",
   unsure: null,
 };
+
+/**
+ * An instrument as a reader says it, from either spelling it is stored in:
+ * the option key ("priced") or the canonical code an objective holds
+ * ("priced_equity"). Undefined for a code the definition does not know.
+ */
+export function instrumentLabel(code: string): string | undefined {
+  const key =
+    Object.entries(INSTRUMENT_CODES).find(
+      ([, canonical]) => canonical === code,
+    )?.[0] ?? code;
+  return INSTRUMENT_OPTIONS.find((option) => option.optionKey === key)?.label;
+}
 
 export const TIMEFRAME_OPTIONS: Option[] = [
   { optionKey: "under_3", label: "Within 3 months" },

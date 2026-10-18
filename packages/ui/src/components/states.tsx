@@ -70,7 +70,7 @@ export function InlineNotice({
       role={tone === "danger" ? "alert" : "status"}
       data-tone={tone}
       className={cx(
-        "flex items-start gap-3 rounded-md border px-3 py-3 text-(--cq-text-primary)",
+        "flex items-start gap-3 border px-3 py-3 text-(--cq-text-primary)",
         frame,
         className,
       )}
@@ -116,17 +116,19 @@ export function EmptyState({
   ...rest
 }: StateBlockProps) {
   return (
+    // An absence is a sentence and, at most, a way forward -- never a dashed
+    // frame drawn around nothing (design/visual-direction.md, "No dashboards").
     <section
       data-state="empty"
       aria-label={title}
       className={cx(
-        "flex flex-col gap-2 rounded-lg border border-dashed border-(--cq-border) text-(--cq-text-primary)",
-        compact ? "px-4 py-5" : "px-5 py-8",
+        "flex max-w-(--cq-layout-reading) flex-col gap-2 text-(--cq-text-primary)",
+        compact ? "py-3" : "py-4",
         className,
       )}
       {...rest}
     >
-      <h3 className={compact ? "cq-body font-medium" : "cq-title-md"}>
+      <h3 className={compact ? "cq-body font-medium" : "cq-title-sm"}>
         {title}
       </h3>
       {description !== undefined ? (
@@ -152,7 +154,7 @@ export function ErrorState({
       role="alert"
       data-state="error"
       className={cx(
-        "flex gap-3 rounded-lg border border-(--cq-border) bg-(--cq-surface) text-(--cq-text-primary)",
+        "flex gap-3 border border-(--cq-border) bg-(--cq-surface) text-(--cq-text-primary)",
         compact ? "px-4 py-4" : "px-5 py-6",
         className,
       )}
@@ -214,7 +216,7 @@ export function Skeleton({
         <div
           key={index}
           className={cx(
-            "h-4 animate-pulse rounded-sm bg-(--cq-surface-strong)",
+            "h-4 animate-pulse bg-(--cq-surface-strong)",
             index === lines - 1 && lines > 1 ? "w-2/3" : "w-full",
           )}
         />
@@ -249,11 +251,11 @@ export function Progress({ label, value, className }: ProgressProps) {
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={clamped}
-        className="h-1 w-full overflow-hidden rounded-full bg-(--cq-surface-strong)"
+        className="h-1 w-full overflow-hidden bg-(--cq-surface-strong)"
       >
         <div
           className={cx(
-            "h-full rounded-full bg-(--cq-accent) transition-[width] duration-(--cq-motion-slow)",
+            "h-full bg-(--cq-accent) transition-[width] duration-(--cq-motion-slow)",
             !determinate && "w-1/3 animate-pulse",
           )}
           style={clamped !== undefined ? { width: `${clamped}%` } : undefined}

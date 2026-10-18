@@ -360,14 +360,29 @@ describe("QFOU-007 · suggestions carry provenance", () => {
     expect(described).not.toContain("11111111");
   });
 
-  it("emits nothing for a step whose vocabulary it does not know", () => {
-    // Guessing a select value would produce a suggestion the runtime
-    // rejects at validation. Better to surface it for review than to emit
-    // something that cannot be stored.
-    expect(isDirectlySuggestable("stage")).toBe(false);
+  it("maps a structured reading onto the step's own vocabulary, and nothing outside it", () => {
+    // CQ-PRE-REC-001 §23: "Seed" is the seed option, deterministically. A
+    // reading the vocabulary cannot hold is not guessed into an option; it
+    // reaches the founder through the review list instead.
+    expect(isDirectlySuggestable("stage")).toBe(true);
     expect(
-      draftSuggestions([candidate({ key: "stage", value: "Seed" })]),
+      draftSuggestions([candidate({ key: "stage", value: "Seed" })]).map(
+        (draft) => draft.suggestedValue,
+      ),
+    ).toEqual([{ type: "SINGLE_SELECT", optionKey: "seed" }]);
+    expect(
+      draftSuggestions([candidate({ key: "stage", value: "Mezzanine" })]),
     ).toEqual([]);
+    expect(
+      draftSuggestions([
+        candidate({ key: "target_amount", value: "USD 3m on a SAFE" }),
+      ]).map((draft) => draft.suggestedValue),
+    ).toEqual([{ type: "RANGE", value: "3000000" }]);
+    expect(
+      draftSuggestions([
+        candidate({ key: "use_of_funds", value: "hiring and US expansion" }),
+      ]).map((draft) => draft.suggestedValue),
+    ).toEqual([{ type: "MULTI_SELECT", optionKeys: ["hiring", "expansion"] }]);
   });
 
   it("suggests each fact once", () => {
@@ -416,30 +431,61 @@ describe("QFOU-009 · a drafted suggestion is a valid answer to its step", () =>
     }
   });
 
-  it("only drafts for steps the published journey answers with plain text", () => {
-    // The class of bug this closes: use_of_funds was listed as free text
-    // while its step is a multi_select over a fixed vocabulary, so every
-    // suggestion Q made for it was refused. Asserting against the published
-    // definition means the set cannot drift from the journey again.
+  it("drafts, for every suggestable fact, the response type its published step takes", () => {
+    // The class of bug this closes: use_of_funds was once listed as free
+    // text while its step is a multi_select over a fixed vocabulary, so
+    // every suggestion Q made for it was refused. Asserting against the
+    // published definition means the mapping cannot drift from the journey.
     const stepTypes = new Map(
       FOUNDER_DEFINITION_V2.steps.map((step) => [
         step.stepKey,
         step.configuration.stepType,
       ]),
     );
-    const textual = new Set(["short_text", "long_text", "url", "company_name"]);
+    const expected: Readonly<Record<string, string>> = {
+      short_text: "TEXT",
+      long_text: "TEXT",
+      single_select: "SINGLE_SELECT",
+      multi_select: "MULTI_SELECT",
+      range: "RANGE",
+    };
+    const sample: Readonly<Partial<Record<FounderFactKey, string>>> = {
+      company_name: "Northstar",
+      website: "https://northstar.example",
+      description: "Workflow software for freight forwarders.",
+      country: "Nigeria",
+      stage: "Seed",
+      founder_role: "CEO",
+      founder_count: "3",
+      full_time: "all full time",
+      team_size: "14",
+      functions: "product and engineering",
+      signal: "pilots",
+      pilots: "4",
+      revenue_status: "recurring and growing",
+      customers: "34",
+      growth: "more than doubled",
+      raising: "yes, actively",
+      currency: "USD",
+      target_amount: "$3m",
+      instrument: "SAFE",
+      timeframe: "within 3 months",
+      use_of_funds: "hiring and sales",
+    };
     for (const key of FOUNDER_REQUIRED_FACTS) {
       if (!isDirectlySuggestable(key)) {
         continue;
       }
       const stepKey = stepForFactKey(key) ?? "";
-      const stepType = stepTypes.get(stepKey);
-      expect(
-        stepType === undefined ? "missing" : stepType,
-        `${key} -> ${stepKey}`,
-      ).toSatisfy((value: unknown) => textual.has(String(value)));
-      const [draft] = draftSuggestions([candidate({ key, value: "x" })]);
-      expect(draft?.suggestedValue).toMatchObject({ type: "TEXT" });
+      const stepType = stepTypes.get(stepKey) ?? "missing";
+      const value = sample[key];
+      expect(value, `no sample for ${key}`).toBeDefined();
+      const [draft] = draftSuggestions([
+        candidate({ key, value: value ?? "" }),
+      ]);
+      expect(draft?.suggestedValue, `${key} -> ${stepKey}`).toMatchObject({
+        type: expected[stepType] ?? "missing",
+      });
     }
   });
 });

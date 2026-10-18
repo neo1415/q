@@ -9,11 +9,18 @@ import type { InvestorOrganisationId } from "@capital-q/investors";
 import type { ActorType, TenantId } from "@capital-q/security";
 
 import type {
+  Interest,
+  InterestParty,
+  InterestDecision,
+  InterestId,
+  InterestResponseId,
+  MatchId,
   Relationship,
   RelationshipEvent,
   RelationshipEventId,
   RelationshipId,
 } from "../contracts/index.js";
+import type { PassStanding } from "../domain/reapproach.js";
 
 /**
  * Application-owned persistence ports. Specific to the relationship spine;
@@ -34,6 +41,16 @@ export type RelationshipRepository = {
     companyId: CompanyId,
     investorOrganisationId: InvestorOrganisationId,
   ) => Promise<Relationship | null>;
+  /**
+   * S2: `findByParties` for one investor organisation against many
+   * companies in one statement (the pair constraint is unique, so at most
+   * one row per company).
+   */
+  readonly findByInvestorAndCompanies: (
+    executor: DatabaseExecutor,
+    investorOrganisationId: InvestorOrganisationId,
+    companyIds: readonly CompanyId[],
+  ) => Promise<readonly Relationship[]>;
   /** Serialises first creation of one pair until commit. */
   readonly lockPair: (
     tx: TransactionContext,
@@ -68,6 +85,37 @@ export type RelationshipRepository = {
     investorOrganisationId: InvestorOrganisationId,
     limit: number,
   ) => Promise<readonly Relationship[]>;
+  /**
+   * The projector's write (CQ-NET-012), and the only writer of
+   * `current_state`. Applied only when the fold reaches further than the
+   * cached one, or equally far under another projector version (a
+   * rebuild): a replayed or out-of-order projection can never move the
+   * cache backwards. True when the row changed.
+   */
+  readonly recordProjection: (
+    executor: DatabaseExecutor,
+    input: {
+      readonly relationshipId: RelationshipId;
+      readonly state: string;
+      readonly stateSince: string;
+      readonly throughSequence: number;
+      readonly version: string;
+    },
+  ) => Promise<boolean>;
+  /** Keyset page of relationship ids, optionally only those whose projection is behind. */
+  readonly listIdsForProjection: (
+    executor: DatabaseExecutor,
+    page: {
+      readonly after: RelationshipId | null;
+      readonly limit: number;
+      readonly onlyBehind: boolean;
+      /**
+       * The current projector version: a cache folded by another version
+       * is behind too, so a rebuild rolls a new version out from history.
+       */
+      readonly version?: string | undefined;
+    },
+  ) => Promise<readonly RelationshipId[]>;
 };
 
 export type NewRelationshipEvent = {
@@ -102,6 +150,148 @@ export type RelationshipEventRepository = {
       readonly limit: number;
     },
   ) => Promise<readonly RelationshipEvent[]>;
+  /**
+   * S5 (lane S): the first `limit` events of each relationship, in order,
+   * in one read. Optional: callers fall back to listByRelationship.
+   */
+  readonly listFirstByRelationships?: (
+    executor: DatabaseExecutor,
+    relationshipIds: readonly RelationshipId[],
+    limit: number,
+  ) => Promise<readonly RelationshipEvent[]>;
+};
+
+/**
+ * Express Interest's own record (CQ-NET-010). Insert-only here: withdrawal
+ * belongs to a later packet, and nothing in this port changes a status.
+ */
+export type InterestRepository = {
+  readonly findById: (
+    executor: DatabaseExecutor,
+    interestId: InterestId,
+  ) => Promise<Interest | null>;
+  /** One party's open interest on this relationship, if any (default: the investor's). */
+  readonly findOpenByRelationship: (
+    executor: DatabaseExecutor,
+    relationshipId: RelationshipId,
+    party?: InterestParty,
+  ) => Promise<Interest | null>;
+  /** Open investor interests addressed to one company, newest first, with their answers. */
+  readonly listByCompany: (
+    executor: DatabaseExecutor,
+    companyId: CompanyId,
+    limit: number,
+  ) => Promise<readonly Interest[]>;
+  /** Open Connection Requests addressed to one investor organisation, newest first (ADR 0023). */
+  readonly listByInvestor: (
+    executor: DatabaseExecutor,
+    investorOrganisationId: InvestorOrganisationId,
+    limit: number,
+  ) => Promise<readonly Interest[]>;
+  readonly insert: (
+    tx: TransactionContext,
+    input: {
+      readonly id: InterestId;
+      readonly tenantId: TenantId;
+      readonly relationshipId: RelationshipId;
+      /** Absent: the investor, as before ADR 0023. */
+      readonly expressedByParty?: InterestParty;
+      readonly expressedByUserId: string;
+      readonly expressedInOrganisationId: string;
+      readonly relationshipEventId: RelationshipEventId;
+    },
+  ) => Promise<Interest>;
+};
+
+/** Hashes only: (person, organisation, key hash) -> the interest the command resolved to. */
+export type InterestRequestStore = {
+  readonly lock: (
+    tx: TransactionContext,
+    userId: string,
+    organisationId: string,
+    idempotencyKeyHash: string,
+  ) => Promise<void>;
+  readonly find: (
+    tx: TransactionContext,
+    userId: string,
+    organisationId: string,
+    idempotencyKeyHash: string,
+  ) => Promise<{
+    readonly requestHash: string;
+    readonly interestId: InterestId;
+  } | null>;
+  readonly record: (
+    tx: TransactionContext,
+    input: {
+      readonly userId: string;
+      readonly organisationId: string;
+      readonly tenantId: TenantId;
+      readonly idempotencyKeyHash: string;
+      readonly requestHash: string;
+      readonly interestId: InterestId;
+    },
+  ) => Promise<void>;
+};
+
+/**
+ * The company's answer (CQ-NET-011). Insert-only: one answer per interest
+ * (the database refuses a second), and a match only for an acceptance.
+ */
+export type InterestResponseRepository = {
+  readonly insert: (
+    tx: TransactionContext,
+    input: {
+      readonly id: InterestResponseId;
+      readonly tenantId: TenantId;
+      readonly relationshipId: RelationshipId;
+      readonly interestId: InterestId;
+      readonly decision: InterestDecision;
+      readonly respondedByUserId: string;
+      readonly respondedInOrganisationId: string;
+      /** Absent: the company, as before ADR 0023. */
+      readonly respondedByParty?: InterestParty;
+      readonly relationshipEventId: RelationshipEventId;
+    },
+  ) => Promise<void>;
+  readonly insertMatch: (
+    tx: TransactionContext,
+    input: {
+      readonly id: MatchId;
+      readonly tenantId: TenantId;
+      readonly relationshipId: RelationshipId;
+      readonly interestResponseId: InterestResponseId;
+    },
+  ) => Promise<void>;
+};
+
+/** Hashes only: (person, organisation, key hash) -> the interest answered. */
+export type InterestResponseRequestStore = {
+  readonly lock: (
+    tx: TransactionContext,
+    userId: string,
+    organisationId: string,
+    idempotencyKeyHash: string,
+  ) => Promise<void>;
+  readonly find: (
+    tx: TransactionContext,
+    userId: string,
+    organisationId: string,
+    idempotencyKeyHash: string,
+  ) => Promise<{
+    readonly requestHash: string;
+    readonly interestId: InterestId;
+  } | null>;
+  readonly record: (
+    tx: TransactionContext,
+    input: {
+      readonly userId: string;
+      readonly organisationId: string;
+      readonly tenantId: TenantId;
+      readonly idempotencyKeyHash: string;
+      readonly requestHash: string;
+      readonly interestResponseId: InterestResponseId;
+    },
+  ) => Promise<void>;
 };
 
 /**
@@ -118,6 +308,16 @@ export type RelationshipQueryPort = {
     companyId: CompanyId,
     investorOrganisationId: InvestorOrganisationId,
   ) => Promise<Relationship | null>;
+  /**
+   * S2: the pair lookup for one investor against many companies, one
+   * read. Optional on the port; callers fall back to `findByParties`.
+   */
+  readonly findManyByInvestor?:
+    | ((
+        investorOrganisationId: InvestorOrganisationId,
+        companyIds: readonly CompanyId[],
+      ) => Promise<readonly Relationship[]>)
+    | undefined;
   readonly listEvents: (
     relationshipId: RelationshipId,
     page?: {
@@ -129,4 +329,12 @@ export type RelationshipQueryPort = {
   readonly getEventById: (
     relationshipEventId: RelationshipEventId,
   ) => Promise<RelationshipEvent | null>;
+  /**
+   * The current pass's time and the mandate it was made under (doc 19
+   * §67), for the re-approach rule; never its reason. Permission-neutral.
+   * Absent: a passed relationship stays closed to discovery.
+   */
+  readonly passStanding?:
+    | ((relationshipId: RelationshipId) => Promise<PassStanding | null>)
+    | undefined;
 };

@@ -28,7 +28,23 @@ export {
   createSavepointTransactionManager,
   createTransactionManager,
 } from "./transaction.js";
-export { checkDatabaseHealth, type DatabaseHealth } from "./health.js";
+export {
+  checkDatabaseHealth,
+  checkDatabaseReadiness,
+  type DatabaseHealth,
+} from "./health.js";
+export { decodeJsonbString, jsonbParam } from "./jsonb.js";
+export {
+  countRoundTrip,
+  createRoundTripCounter,
+  currentRoundTripCounter,
+  markRoundTrips,
+  withRoundTripCounter,
+  withRoundTripPhase,
+  cachedInRun,
+  type RunCacheKey,
+  type RoundTripCounter,
+} from "./round-trips.js";
 export {
   DATABASE_FAILURE_KINDS,
   DatabaseError,

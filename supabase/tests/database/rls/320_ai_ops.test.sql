@@ -19,14 +19,14 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(33);
+select plan(35);
 
 -- Seed is present and shaped as the packet verified it -------------------------------
-select is((select count(*)::int from ai_ops.providers), 2, 'two V1 providers are seeded');
+select is((select count(*)::int from ai_ops.providers), 3, 'three providers are seeded (openai joined in 20261006090000)');
 select results_eq(
   $$ select code from ai_ops.providers order by code $$,
-  $$ values ('google'), ('groq') $$,
-  'the providers are google and groq');
+  $$ values ('google'), ('groq'), ('openai') $$,
+  'the providers are google, groq and openai');
 select is((select privacy_policy_class from ai_ops.providers where code = 'google'), 'UNREVIEWED',
   'google data-use terms are recorded as unreviewed');
 -- CQ-C5-R2A: groq was reviewed on 2026-09-08. The class states what the
@@ -38,8 +38,10 @@ select ok((select supports_zero_retention from ai_ops.providers where code = 'gr
   'groq zero data retention is recorded as enabled for this organisation');
 select results_eq(
   $$ select model_code from ai_ops.models order by model_code $$,
-  $$ values ('gemini-3.5-flash-lite'), ('gemini-3.8-flash'), ('openai/gpt-oss-120b'), ('openai/gpt-oss-20b') $$,
-  'the four verified model ids are seeded, exactly');
+  $$ values ('gemini-2.5-flash-image'), ('gemini-3.1-flash-lite-image'), ('gemini-3.5-flash'), ('gemini-3.5-flash-lite'), ('gemini-3.8-flash'),
+            ('gpt-5.6-luna'), ('gpt-image-1'), ('gpt-live-1'), ('gpt-realtime-mini'),
+            ('openai/gpt-oss-120b'), ('openai/gpt-oss-20b'), ('qwen/qwen3.8-27b') $$,
+  'the twelve model ids are seeded, exactly (gpt-live-1 for the GPT-Live voice line in 20261221090000, priced per second in its metadata so it has no model_prices row; gemini-3.1-flash-lite-image under its own id in 20261220192000, gpt-realtime-mini for full-duplex voice in 20261203090000, image models gemini-2.5-flash-image and gpt-image-1 in 20261113010000, qwen/qwen3.8-27b joined Groq in 20260918, gpt-5.6-luna in 20261006090000, gemini-3.5-flash in 20261008120000)');
 select is((select count(*)::int from ai_ops.models where sensitivity_ceiling in ('HIGHLY_CONFIDENTIAL', 'RESTRICTED')), 0,
   'no model is cleared above CONFIDENTIAL: the strongest material never leaves through a vendor');
 select is(
@@ -55,7 +57,7 @@ select is((select sensitivity_ceiling from ai_ops.models where model_code = 'gem
   'unverified gemini is public-only');
 select is((select sensitivity_ceiling from ai_ops.models where model_code = 'openai/gpt-oss-120b'), 'CONFIDENTIAL',
   'groq carries confidential work under its reviewed zero-retention terms');
-select is((select count(*)::int from ai_ops.model_prices), 5, 'five price snapshots are seeded');
+select is((select count(*)::int from ai_ops.model_prices), 9, 'nine price snapshots are seeded (one per priced model, plus the closed introductory gemini-3.8-flash price; gpt-realtime-mini joined in 20261203090000)');
 select is(
   (select effective_to from ai_ops.model_prices where id = 'a3000000-0000-4000-8000-000000000002'),
   '2027-01-01T00:00:00Z'::timestamptz,
@@ -64,8 +66,8 @@ select is(
   (select input_per_million from ai_ops.model_prices where id = 'a3000000-0000-4000-8000-000000000003'),
   1.50::numeric(12,6),
   'the announced 2027 price is a separate row, not an edit');
-select is((select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE'), 7,
-  'seven active v1 routing policies, one per text task class');
+select is((select count(*)::int from ai_ops.routing_policies where status = 'ACTIVE'), 8,
+  'eight active v1 routing policies, one per text task class (UI_TRANSLATION joined in 20261228150500)');
 select is((select count(*)::int from ai_ops.routing_policies where task_class in ('EMBEDDING', 'REALTIME_VOICE', 'GUARDRAIL')), 0,
   'no policy routes embedding, voice or guardrail to a model');
 
@@ -100,7 +102,19 @@ values
    'a1000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', 'a4000000-0000-4000-8000-000000000001', 1,
    0, 0, 0, 1200, null, 'UNPRICED', false, 'TIMEOUT', null);
 
-select is((select count(*)::int from ai_ops.model_usage), 2, 'success and failure attempts are both recorded');
+-- Counted within the fixture tenants: a shared local database also holds
+-- rows that integration tests wrote, and those are not this suite's.
+select is((select count(*)::int from ai_ops.model_usage
+            where tenant_id in (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('tenant_b'))), 2,
+  'success and failure attempts are both recorded');
+-- 20261126090000: what a call was for, a closed set; older writers read OTHER.
+select is((select count(*)::int from ai_ops.model_usage where purpose = 'OTHER'
+            and tenant_id in (pg_temp.rls_id('tenant_a'), pg_temp.rls_id('tenant_b'))), 2,
+  'a row written without a purpose reads OTHER');
+select throws_ok(
+  $$ insert into ai_ops.model_usage (tenant_id, task_class, provider_id, model_id, attempt, latency_ms, cost_basis, success, purpose)
+     values (pg_temp.rls_id('tenant_a'), 'NORMAL_DIALOGUE', 'a1000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000004', 1, 10, 'UNPRICED', true, 'SHOPPING') $$,
+  '23514', null, 'a purpose outside the closed set is refused');
 select throws_ok(
   $$ insert into ai_ops.model_usage (tenant_id, task_class, provider_id, model_id, attempt, latency_ms, cost_basis, success, error_code)
      values (pg_temp.rls_id('tenant_a'), 'NORMAL_DIALOGUE', 'a1000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000004', 1, 10, 'UNPRICED', true, 'TIMEOUT') $$,

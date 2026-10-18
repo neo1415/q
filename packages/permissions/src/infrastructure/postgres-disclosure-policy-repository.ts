@@ -94,12 +94,14 @@ export function createPostgresDisclosurePolicyRepository(): DisclosurePolicyRepo
         const rows = await tx.sql`
           insert into permissions.disclosure_policies
             (id, tenant_id, owner_organisation_id, owner_user_id, resource_type, resource_id,
-             scope_type, recipient_type, recipient_id, access_level, expires_at, created_by_user_id)
+             scope_type, recipient_type, recipient_id, access_level, expires_at, created_by_user_id,
+             created_at)
           values
             (${policy.id}, ${policy.tenantId}, ${policy.ownerOrganisationId}, ${policy.ownerUserId},
              ${policy.resource.type}, ${policy.resource.id}, ${policy.scopeType},
              ${policy.recipient?.type ?? null}, ${policy.recipient?.id ?? null}, ${policy.accessLevel},
-             ${policy.expiresAt}::text::timestamptz, ${policy.createdByUserId})
+             ${policy.expiresAt}::text::timestamptz, ${policy.createdByUserId},
+             ${policy.createdAt}::text::timestamptz)
           returning id`;
         const inserted = z
           .object({ id: DisclosurePolicyIdSchema })
@@ -153,6 +155,17 @@ export function createPostgresDisclosurePolicyRepository(): DisclosurePolicyRepo
             on wanted.resource_type = p.resource_type and wanted.resource_id = p.resource_id
          where p.revoked_at is null
          order by p.created_at, p.id`;
+      return rows.map(toPolicy);
+    },
+    findUnrevokedForRecipient: async (executor, query) => {
+      const rows = await executor`
+        ${policySelect(executor)}
+         where p.resource_type = ${query.resourceType}
+           and p.recipient_type = ${query.recipient.type}
+           and p.recipient_id = ${query.recipient.id}
+           and p.revoked_at is null
+         order by p.created_at, p.id
+         limit 200`;
       return rows.map(toPolicy);
     },
     findAllForResource: async (executor, resource) => {

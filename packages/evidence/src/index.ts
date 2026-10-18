@@ -42,6 +42,8 @@ export {
 } from "./domain/sensitivity.js";
 export {
   createCompanyEvidenceSubjectResolver,
+  createInvestorEvidenceSubjectResolver,
+  createPersonEvidenceSubjectResolver,
   createEvidenceSubjectResolverRegistry,
   type EvidenceSubjectResolver,
   type EvidenceSubjectResolverRegistry,
@@ -61,6 +63,9 @@ export type {
   EvidenceServiceDependencies,
 } from "./application/dependencies.js";
 export type {
+  DirectDownloadAuthorization,
+  PrivateBatchDownloadAuthorizer,
+  PrivateDocumentDownloadAuthorizer,
   DirectUploadAuthorization,
   PrivateDocumentStorageProvider,
   StoredObjectMetadata,
@@ -178,8 +183,10 @@ export {
   DOCUMENT_MAX_SIZE_BYTES,
   DOCUMENT_MIME_ALLOWLIST,
   RegisterDocumentVersionInputSchema,
+  type ChangeDocumentCommand,
   type CreateDocumentCommand,
   type CreateDocumentInput,
+  type DocumentChange,
   type RegisterDocumentVersionCommand,
   type RegisterDocumentVersionInput,
   type RegisterDocumentVersionResult,
@@ -238,11 +245,79 @@ export {
   RecordDocumentExtractionInputSchema,
   type RecordDocumentExtractionInput,
   type RecordDocumentExtractionResult,
+  type BackfillDocumentPagesResult,
+  type ReadOwnDocumentTextQuery,
 } from "./application/extraction-use-cases.js";
+export {
+  DOCUMENT_PAGE_MAX_CHARS,
+  documentTextFromBlocks,
+  pagesFromBlocks,
+  type DocumentPageText,
+} from "./domain/document-pages.js";
 export {
   scanInstructionRisk,
   type InstructionRiskReport,
 } from "./domain/instruction-risk.js";
-export { createPostgresDocumentExtractionRepository } from "./infrastructure/postgres-extraction-repository.js";
+export {
+  createPostgresDocumentExtractionRepository,
+  createPostgresDocumentPageTextReader,
+} from "./infrastructure/postgres-extraction-repository.js";
 
 export const PACKAGE_NAME = "@capital-q/evidence" as const;
+export {
+  createSharedDocumentDownloads,
+  findActiveDocumentById,
+  SHARED_DOWNLOAD_TTL_SECONDS,
+  type SharedDocumentDownloads,
+} from "./application/shared-download.js";
+export {
+  coachDeck,
+  DECK_RUBRIC_VERSION,
+  MINIMUM_STANDARD_SECTIONS,
+  scoreDeckSection,
+} from "./domain/deck-coaching.js";
+// F26: every figure "the deck says" must be in the deck's own text.
+export {
+  deckFigureIndex,
+  unverifiedFigures,
+  verifyDeckReading,
+  type DeckVerification,
+} from "./domain/deck-verifier.js";
+// Q.07: assumptions to test and the evidence board (investor readers only).
+export {
+  assumptionBoardText,
+  buildAssumptionBoard,
+  withAskedQuestions,
+} from "./domain/assumptions.js";
+export {
+  createPostgresDataRoom,
+  type DataRoomChecklistRow,
+  type DataRoomDocumentRow,
+  type DataRoomRequestRow,
+  type DeckExtractionRow,
+  type PostgresDataRoom,
+} from "./infrastructure/postgres-data-room.js";
+export {
+  createGateQApplicationEvidenceService,
+  GateQApplicationEvidenceScopeSchema,
+  GateQApplicationEvidenceScopeError,
+  GateQApplicationDocumentDisclosedError,
+  gateqApplicationDocumentStatus,
+  type GateQApplicationDocumentStatus,
+  type GateQApplicationEvidenceScope,
+  type GateQApplicationEvidenceDependencies,
+  type GateQApplicationEvidenceItem,
+  type GateQApplicationEvidenceService,
+} from "./application/gateq-application-evidence.js";
+// ADR 0067: the port GateQ intake reads and freezes application documents through.
+export {
+  createGateQApplicationDocumentPort,
+  GateQApplicationDocumentSelectionError,
+  type GateQSelectedApplicationDocument,
+  type GateQFrozenApplicationDocumentObject,
+  type GateQApplicationDocumentPort,
+  type GateQApplicationDocumentRef,
+  type GateQApplicationDocumentFreeze,
+  type GateQReadyApplicationDocument,
+  type GateQFrozenApplicationDocument,
+} from "./application/gateq-application-document-port.js";

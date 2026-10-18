@@ -83,6 +83,8 @@ export function toCompanyDto(company: Company): CompanyDto {
     companyStatus: company.companyStatus,
     marketplaceVisibility: company.marketplaceVisibility,
     marketplaceReadinessState: company.marketplaceReadinessState,
+    // The pitch is Media's to say (CQ-MEDIA-012); the route joins it on.
+    pitch: null,
     version: company.version,
     createdAt: company.createdAt,
     updatedAt: company.updatedAt,

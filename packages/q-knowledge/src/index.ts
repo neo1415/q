@@ -214,3 +214,152 @@ export {
 } from "./infrastructure/postgres-chunk-repositories.js";
 
 export const PACKAGE_NAME = "@capital-q/q-knowledge" as const;
+export {
+  createConversationStatementRecorder,
+  quoteOccursIn,
+  type ConversationStatement,
+  type ConversationStatementRecorder,
+  type RecordStatementCommand,
+  type RecordStatementOutcome,
+  type StatementEvidencePort,
+} from "./q/statement-recorder.js";
+export {
+  answerKnowledgeKey,
+  createInvestorAnswerRecorder,
+  type InvestorAnswerCommand,
+  type InvestorAnswerRecorded,
+  type InvestorAnswerRecorder,
+} from "./q/answer-recorder.js";
+
+export {
+  LIVE_MEMORY_STATUSES,
+  MEMORY_CONTENT_MAX,
+  MEMORY_OWNER_CONTEXT_TYPES,
+  MEMORY_QUOTE_MAX,
+  MEMORY_STATUSES,
+  MEMORY_SUBJECT_TYPES,
+  MEMORY_TYPES,
+  MEMORY_WRITE_MODES,
+  MEMORY_WRITE_REASONS,
+  MemoryCandidateSchema,
+  MemoryItemSchema,
+  MemoryKeySchema,
+  MemoryOwnerContextTypeSchema,
+  MemoryStatusSchema,
+  MemorySubjectRefSchema,
+  MemoryTypeSchema,
+  MemoryWriteModeSchema,
+  type MemoryBundle,
+  type MemoryCandidate,
+  type MemoryConversationDigest,
+  type MemoryRehearsalDigest,
+  type MemoryItem,
+  type MemoryOwner,
+  type MemoryOwnerContextType,
+  type MemoryStatus,
+  type MemorySubjectRef,
+  type MemoryType,
+  type MemoryWriteMode,
+  type MemoryWriteReason,
+  type MemoryWriteResult,
+  SMALL_TALK_RETENTION_DAYS,
+  type SmallTalkThread,
+} from "./memory/contracts.js";
+export {
+  createPostgresMemoryRepository,
+  type MemoryRepository,
+  type NewMemoryItem,
+} from "./memory/postgres-memory-repository.js";
+export {
+  createMemoryService,
+  looksLikeSecret,
+  memoryContentHash,
+  personOwner,
+  smallTalkFollowUp,
+  type ForgetCommand,
+  type MemoryConversationDigestPort,
+  type MemoryRehearsalPort,
+  type MemoryService,
+  type MemoryServiceDependencies,
+  type RecallQuery,
+  type RememberCommand,
+} from "./memory/service.js";
+export {
+  MEMORY_TEXT_MAX,
+  NO_REHEARSALS_LINE,
+  REHEARSALS_LABEL,
+  RELEVANT_LABEL,
+  renderMemoryBundle,
+} from "./memory/render.js";
+export {
+  CONNECTED_LABEL,
+  CONNECTED_MAX,
+  GRAPH_BUDGET_MS,
+  GRAPH_CUES,
+  GRAPH_LIMITS,
+  GRAPH_STALE_DAYS,
+  buildConnectedRecall,
+  connectedRecallWithin,
+  namesCompany,
+  planGraphRecall,
+  renderConnectedRecall,
+  type ConnectedCompany,
+  type ConnectedRecall,
+  type GraphConversation,
+  type GraphCue,
+  type GraphDocument,
+  type GraphFacet,
+  type GraphJob,
+  type GraphMandateFit,
+  type GraphRecallPlan,
+  type GraphReviewIssue,
+  type RecallGraphPort,
+} from "./memory/graph.js";
+export {
+  RECALL_TERMS_MAX,
+  asksAboutRehearsal,
+  recallTermsFrom,
+} from "./memory/recall-terms.js";
+
+export {
+  COMMUNICATION_ASPECTS,
+  communicationPreferenceKey,
+  communicationProfileFromMemory,
+  createLoopMemoryReader,
+  NOTHING_RECALLED,
+  planAdmitsOwnMemory,
+  PREFERENCE_PERSISTENCES,
+  type CommunicationAspect,
+  type LoopMemory,
+  type LoopMemoryReader,
+  type PreferencePersistence,
+} from "./memory/communication.js";
+
+export {
+  createPreferenceNotebook,
+  type PreferenceNote,
+  type PreferenceNoteResult,
+} from "./memory/preference-notebook.js";
+
+export {
+  compactThread,
+  openingOf,
+  THREAD_EXCERPT_MAX_CHARS,
+  THREAD_RECENT_TURNS,
+  THREAD_SUMMARY_MAX_CHARS,
+  type CompactedThread,
+  type CompactThreadOptions,
+  type ThreadTurn,
+} from "./memory/thread.js";
+
+export {
+  createPostgresPreferenceLearningConsent,
+  NOT_NOW_DAYS,
+  PREFERENCE_LEARNING_POLICY_VERSION,
+  preferenceLearningState,
+  type PreferenceLearningChoice,
+  type PreferenceLearningConsent,
+  type PreferenceLearningState,
+  type PreferenceLearningStatus,
+  type PreferenceLearningVia,
+} from "./memory/learning-consent.js";

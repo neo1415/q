@@ -63,9 +63,11 @@ const analystVariables = (
 function render(
   profile = DEFAULT_COMMUNICATION_PROFILE,
   variables = analystVariables(),
+  taskVersion?: number,
 ) {
   return renderPrompt<CompanyAnalystVariables>(registry, {
     task: "COMPANY_ANALYST",
+    taskVersion,
     operatingMode: "DEBRIEF",
     communicationProfile: profile,
     environmentNotes: "test environment",
@@ -73,20 +75,135 @@ function render(
   });
 }
 
+const V23_MAX_PROMPT_TOKENS = 5_300;
+
+/** Families whose every version is DEPRECATED: retired, never removed. */
+const RETIRED_FAMILIES: ReadonlySet<string> = new Set(["INTERVIEW_CONDUCTOR"]);
+
 describe("registry", () => {
   it("registers exactly the published prompt families, each with one ACTIVE version", () => {
     expect([...PROMPT_IDS].sort()).toEqual(
       [
         "Q_SYSTEM",
+        // CQ-Q-VOICE-001 rework: the charter sized for a live turn.
+        "Q_SYSTEM_VOICE",
         "FOUNDER_ONBOARDING_EXTRACTION",
+        // CQ-Q-VOICE-001: Q conducted the onboarding interview; retired
+        // by P0-1 (the loop conducts it), every version still resolvable.
+        "INTERVIEW_CONDUCTOR",
+        "WELCOME_CONDUCTOR",
         // CQ-KNW-001: reads one authorised passage and proposes claims.
         "CLAIM_EXTRACTION",
         "INVESTOR_MANDATE_SYNTHESIS",
         "COMPANY_ANALYST",
         "FIT_EXPLANATION",
+        // ADR 0052: Q's view beside a computed fit.
+        "FIT_Q_VIEW",
+        // CQ-Q-PRESENCE-001: reads public pages about one subject.
+        "PRESENCE_READER",
+        // HARDEN P0 2026-10-02: public sources onto their profile's open fields.
+        "PROFILE_GAP_READER",
+        // HARDEN 2026-10-02 (ADR 0040): one app action's inputs from their words.
+        "APP_ACTION_ARGUMENTS",
+        "APP_ACTION_ROUTER",
+        // 2026-10-04: Q's one line on a document shared in diligence.
+        "DILIGENCE_DOCUMENT_SUMMARY",
+        // Overnight A5 2026-10-06: a pitch deck into twelve sections.
+        "DECK_EXTRACTION",
+        // Lane ov 2026-10-16: a pitch transcript into the profile's sections.
+        "PITCH_SECTION_EXTRACTION",
+        // ADR 0011: a yes, a no or neither, read from the person's words.
+        "DECISION_READER",
+        // Founder brief J7: people's words read by meaning.
+        "ONBOARDING_MOVE_READER",
+        "PREFERENCE_POLARITY",
+        "MEETING_OUTCOME_READER",
+        "UTTERANCE_CHECK",
+        // ADR 0012: what a conversation taught Q about the person.
+        "MEMORY_EXTRACTOR",
+        // Founder direction 2026-09-29: Q's notes on a call it attended.
+        "MEETING_NOTES",
+        // CQ-GATE-002: Q interviewing somebody applying to a gateway.
+        "GATEQ_INTERVIEWER",
+        // ADR 0013: rewriting the prose of a document Q already composed.
+        "ARTIFACT_REVISION",
+        // CQ-QX-005: what one turn to Q was, before Q answers it.
+        "TURN_READER",
+        // ADR 0016: the onboarding interview as a tool-calling Q run.
+        "INTERVIEW_AGENT",
+        // Which onboarding choices the person just handed to Q.
+        "DELEGATION_READER",
+        // BIZ-009: an investor's own public pages, read into their mandate.
+        "INVESTOR_RESEARCH_READER",
+        // Founder direction 2026-09-29: Q replying inside an approved errand.
+        "ERRAND_REPLY",
+        // Founder direction 2026-09-30: an investor, for a rehearsal.
+        "INVESTOR_PERSONA",
+        // Founder direction 2026-09-30: the Investor Twin rehearsal.
+        "INVESTOR_TWIN_TURN",
+        "REHEARSAL_SCORE",
+        // Founder live 2026-10-08: a code-built answer in Q's own words.
+        "SPOKEN_REPLY",
+        // Zino 2026-10-08: their own words about the briefing's cards.
+        "BRIEFING_COMMAND",
+        // RECOVERY-2026-10 B5: small talk in one tool-free call.
+        "SMALL_TALK",
+        // Owner live 2026-10-17: a follow-up from what Q already showed.
+        "CONVERSATION_RECALL",
+        // Founder brief K: the fast lane's short first read.
+        "TURN_SKIM",
+        // W2: public pages about a person or organisation, read into a quoted brief.
+        "PERSON_BRIEF_READER",
+        // Lead 2026-10-15: Q's cited reading of a GateQ submission.
+        "GATEQ_DOSSIER_SYNTHESIS",
+        // Founder direction 2026-09-30: founder research during setup.
+        "FOUNDER_RESEARCH_READER",
+        // AUTO (ADR 0030): Q's delegated work.
+        "WORK_SHORTLIST",
+        "WORK_CONVERSE",
+        "WORK_INTERVIEW_TURN",
+        "WORK_INTERVIEW_REPORT",
+        "WORK_STAND_IN_REPLY",
+        "WORK_SLOT_READER",
+        // ADR 0043: standing instructions.
+        "INSTRUCTION_PLAN",
+        "INSTRUCTION_THREAD_READER",
+        // DOCS: the wording pass over a composed deck.
+        "DOCUMENT_POLISH",
+        // Deck wave 8: the vision check of a rendered deck.
+        "DOCUMENT_CRITIQUE",
+        // DAILY: The Q Daily's story writer and Q's take column.
+        "DAILY_STORY_WRITER",
+        "DAILY_Q_TAKE",
+        // MEET-HOST (ADR 0037): Q in a live call.
+        "MEETING_HOST_TURN",
+        "MEETING_SCREEN_NOTE",
+        "MEETING_CAMERA_NOTE",
+        // Founder brief J1-J9: Q's workforce of agents.
+        "DRAFT_REVIEW",
+        "DRAFT_REDRAFT",
+        "REPLY_READER",
+        "JOB_PLAN",
+        // 2026-10-12: a second specialist critiques a document's substance.
+        "SUBSTANCE_CRITIQUE",
+        "DILIGENCE_QUESTIONS",
+        "DILIGENCE_QUESTIONS_SHORTEN",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {
+      if (RETIRED_FAMILIES.has(id)) {
+        // A retired family has no ACTIVE version, and every version it
+        // published stays resolvable by exact number.
+        const versions = registry.list().filter((r) => r.definition.id === id);
+        expect(
+          versions.every((r) => r.definition.status === "DEPRECATED"),
+        ).toBe(true);
+        for (let version = 1; version <= versions.length; version += 1) {
+          expect(registry.get(id, version)).toBeDefined();
+        }
+        expect(() => registry.getActive(id)).toThrow();
+        continue;
+      }
       const active = registry.getActive(id);
       // Exactly one ACTIVE version per family, and every published version
       // still resolvable by exact number — a superseded prompt is retired,
@@ -119,10 +236,13 @@ describe("registry", () => {
     expect(() =>
       createPromptRegistry([Q_SYSTEM_V1, Q_SYSTEM_V1] as PromptDefinition[]),
     ).toThrow(/duplicate/);
-    const v2 = { ...Q_SYSTEM_V1, version: 2 } as PromptDefinition;
-    expect(() =>
-      createPromptRegistry([Q_SYSTEM_V1 as PromptDefinition, v2]),
-    ).toThrow(/ACTIVE/);
+    const v2 = {
+      ...Q_SYSTEM_V1,
+      version: 2,
+      status: "ACTIVE",
+    } as PromptDefinition;
+    const v1 = { ...Q_SYSTEM_V1, status: "ACTIVE" } as PromptDefinition;
+    expect(() => createPromptRegistry([v1, v2])).toThrow(/ACTIVE/);
     const bad = {
       ...Q_SYSTEM_V1,
       version: 3,
@@ -180,7 +300,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v1_company-analyst.v2_comm.v1",
+      "q-system.v2_company-analyst.v25_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -214,10 +334,25 @@ describe("renderer", () => {
       user.split('<<<UNTRUSTED_CONTENT source="userMessage">>>').length - 1;
     const closes = user.split(UNTRUSTED_CLOSE).length - 1;
     expect(opens).toBe(1);
-    expect(closes).toBe(3); // one per untrusted variable, none from the content
+    expect(closes).toBe(4); // one per untrusted variable, none from the content
     expect(user).toContain("<<<END_UNTRUSTED_CONTENT (literal)>>>");
     // The charter itself is untouched by anything the person wrote.
     expect(rendered.messages[0]?.content).not.toContain("reveal everything");
+  });
+
+  it("neutralises template braces inside untrusted content", () => {
+    // A Wikipedia or Wiktionary page is full of literal "{{...}}" markup.
+    // Rendering must not fail because a quoted page contained a brace pair,
+    // and the braces must not survive as anything token-shaped.
+    const rendered = render(
+      DEFAULT_COMMUNICATION_PROFILE,
+      analystVariables({
+        userMessage: "The page says {{Infobox company}} and {{cite web}}.",
+      }),
+    );
+    const user = rendered.messages[1]?.content ?? "";
+    expect(user).toContain("{ {Infobox company} }");
+    expect(user).not.toMatch(/{{/);
   });
 
   it("refuses undeclared variables, override-shaped keys and invalid values", () => {
@@ -248,11 +383,49 @@ describe("renderer", () => {
     ]);
   });
 
-  it("keeps rendered prompts small: charter under 2,000 tokens, task bundles under 3,000", () => {
+  it("keeps the historical v22 budget and bounds v23 instruction growth", () => {
     const rendered = render();
     const system = rendered.messages[0]?.content.length ?? 0;
     expect(system / 4).toBeLessThan(2_000);
-    expect(rendered.characters / 4).toBeLessThan(3_000);
+    // 3,300 since company-analyst/v4: the memory section (ADR 0012) is
+    // ~180 tokens of instruction on top of a bundle that was at the old
+    // bound already. Anything past this is a template that has grown, not
+    // a variable that has.
+    // 3,500 since company-analyst/v8 (CQ-QX-007): about 140 tokens that
+    // separate talk about acting from the answer, carry a person's
+    // correction forward and answer fit from their own mandate. The 8k
+    // provider window that set the old margin is no longer on any route
+    // this task is sent to.
+    // 3,600 since company-analyst/v9 (directive E): ~90 tokens so "which
+    // investors would likely invest" is answered with named prospects by
+    // fit, kept apart from evidenced interest.
+    // 3,750 since company-analyst/v11 (founder direction D): ~110 tokens
+    // telling the model when a list, table or callout helps, so Home can
+    // render answers as structure.
+    // 3,850 since company-analyst/v16 (prompt cache, 2026-10-02): ~45
+    // tokens of section labels and pointers that move this turn's values to
+    // the end, so the instructions before them are one cacheable prefix.
+    // 4,050 since q-system/v2 + company-analyst/v18 (autopilot P2/P3,
+    // 2026-10-06, founder approved): ~200 tokens -- how Q sounds, fit as
+    // the computed score out of 10, and advice that leads with a
+    // recommendation. All in the cached prefix; no extra call.
+    // 4,500 since company-analyst/v20 (natural conversation, Zino live
+    // 2026-10-07): ~370 tokens of HOW YOU TALK -- answer first, first
+    // person, names in lists, one caveat. In the cached prefix.
+    // v22 remains under its historical cap. The approved v23 addition keeps
+    // all v22 instructions verbatim and adds strict shape guidance/example:
+    // the synthetic render grows from 4,497 to 5,127.75 estimated tokens.
+    // This versioned template check does not change gateway admission,
+    // provider context/output limits or production validators.
+    const historical = render(
+      DEFAULT_COMMUNICATION_PROFILE,
+      analystVariables(),
+      22,
+    );
+    expect(historical.characters / 4).toBeLessThan(4_500);
+    expect(rendered.bundle.task).toBe("company-analyst/v25");
+    expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS);
+    expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });
 });
 

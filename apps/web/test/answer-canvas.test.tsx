@@ -1,0 +1,599 @@
+// @vitest-environment jsdom
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { AnswerCanvas } from "../src/features/q/answer-canvas";
+import {
+  DEMO_COMPARE,
+  DEMO_RESEARCH,
+  demoTop,
+} from "../src/features/q/answer-canvas-fixtures";
+import {
+  answerChipFor,
+  canvasLayout,
+  compareRows,
+  comparesAsTable,
+  focusForSaid,
+  playbackSteps,
+  topicMovedOn,
+} from "../src/features/q/answer-canvas-logic";
+import { boardTimeline, groupByDay } from "../src/features/q/board-timeline";
+import type { QTurn } from "../src/features/q/conversation";
+import { announceQSaid } from "../src/features/q-swarm/q-said";
+import { registerClientRouter } from "../src/features/q/client-actions";
+import { registerNavigationViewer } from "../src/features/q/control/app-routes";
+import {
+  onNavigationPhase,
+  resetNavigationLifecycle,
+} from "../src/features/q/control/navigation-lifecycle";
+import { useAnswerPlayback } from "../src/features/q/use-answer-playback";
+
+/**
+ * Q's answer as cards (C1-C4, C6, C7): the layout for any number of
+ * cards, which card is open while Q talks, closing, the topic moving on
+ * to the Board, the chip on other pages and the Board's timeline.
+ */
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
+const person = (id: string, text: string): QTurn => ({
+  kind: "PERSON",
+  id,
+  text,
+  unconfirmed: false,
+});
+const answer = (
+  id: string,
+  text: string,
+  blocks: Extract<QTurn, { kind: "Q" }>["blocks"] = [],
+): QTurn => ({
+  kind: "Q",
+  id,
+  at: "2026-10-05T21:04:00.000Z",
+  text,
+  streaming: false,
+  sourceCount: 2,
+  publicSources: [],
+  findings: [],
+  uncertainties: [],
+  blocks,
+});
+
+describe("layout for 1, 3, 5 and 10 cards (C1)", () => {
+  it("is a row on a desktop up to five, then the focused card beside a grid", () => {
+    expect([1, 3, 5, 10].map((n) => canvasLayout(n, true).layout)).toEqual([
+      "row",
+      "row",
+      "row",
+      "grid",
+    ]);
+  });
+
+  it("turns the rest into half-width tiles on a phone from four cards", () => {
+    expect([1, 3, 5, 10].map((n) => canvasLayout(n, false).tiles)).toEqual([
+      false,
+      false,
+      true,
+      true,
+    ]);
+  });
+
+  it("shows a comparison with shared measures as one table", () => {
+    expect(comparesAsTable(DEMO_COMPARE)).toBe(true);
+    expect(comparesAsTable(demoTop(3))).toBe(false);
+  });
+
+  // Live 2026-10-13: one company carried a measure the other did not, and
+  // the comparison fell back to two loose cards.
+  it("lays a comparison whose cards' measures differ out as one table, the gap shown as not recorded", () => {
+    const [first, second] = DEMO_COMPARE.cards;
+    if (first === undefined || second === undefined) throw new Error("fixture");
+    const uneven = {
+      ...DEMO_COMPARE,
+      cards: [first, { ...second, measures: second.measures.slice(0, -1) }],
+    };
+    expect(comparesAsTable(uneven)).toBe(true);
+    expect(compareRows(uneven)).toEqual(first.measures.map((m) => m.label));
+    const { container } = render(
+      <AnswerCanvas block={uneven} focus={0} said="" />,
+    );
+    expect(container.querySelectorAll("[data-ac-compare]")).toHaveLength(1);
+    const gaps = container.querySelectorAll("[data-ac-not-recorded]");
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]?.textContent).toBe("Not recorded");
+  });
+});
+
+describe("the card Q is talking about (C2)", () => {
+  const cards = demoTop(3).cards;
+
+  it("is the card the sentence names first, as a whole name", () => {
+    expect(
+      focusForSaid(cards, "Kestrel Heat is close behind Norrland Grid."),
+    ).toBe(1);
+    expect(focusForSaid(cards, "atlas ledger's revenue is a claim")).toBe(2);
+    expect(focusForSaid(cards, "Three stand out.")).toBeNull();
+  });
+
+  it("walks through each card, then the overview, at speaking pace", () => {
+    const steps = playbackSteps(demoTop(3), "Want them side by side?");
+    expect(steps.map((step) => step.focus)).toEqual([0, 1, 2, -1]);
+    expect(steps[0]?.ms).toBeGreaterThanOrEqual(2600);
+  });
+
+  it("follows the timed walk-through, and stops where the person taps", () => {
+    vi.useFakeTimers();
+    const block = demoTop(3);
+    const { result } = renderHook(() =>
+      useAnswerPlayback(block, "a1", "Want them side by side?", false),
+    );
+    expect(result.current.focus).toBe(0);
+    act(() => {
+      vi.advanceTimersByTime(playbackSteps(block, "").at(0)?.ms ?? 0);
+    });
+    expect(result.current.focus).toBe(1);
+    act(() => result.current.choose(2));
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(result.current.focus).toBe(2);
+  });
+
+  it("follows Q's own spoken lines on a live voice line", () => {
+    const block = demoTop(3);
+    const { result } = renderHook(() =>
+      useAnswerPlayback(block, "a1", "Want them side by side?", true),
+    );
+    expect(result.current.focus).toBe(-1);
+    act(() => announceQSaid("Atlas Ledger fits the sector."));
+    expect(result.current.focus).toBe(2);
+    expect(result.current.said).toBe("Atlas Ledger fits the sector.");
+    act(() => announceQSaid("That's the three."));
+    expect(result.current.focus).toBe(2);
+  });
+});
+
+describe("the canvas (C1, C3)", () => {
+  it("offers Open profile on a card with a company behind it, and opens it (R0)", () => {
+    const block = demoTop(2);
+    const companyId = "0a8b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+    const withSubject = {
+      ...block,
+      cards: block.cards.map((card, index) =>
+        index === 0
+          ? { ...card, subject: { kind: "COMPANY" as const, companyId } }
+          : card,
+      ),
+    };
+    const opened: string[] = [];
+    render(
+      <AnswerCanvas
+        block={withSubject}
+        focus={0}
+        said=""
+        onOpenProfile={(card) => {
+          if (card.subject?.kind === "COMPANY") {
+            opened.push(card.subject.companyId);
+          }
+        }}
+      />,
+    );
+    const buttons = document.querySelectorAll("[data-ac-open-profile]");
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0] as Element);
+    expect(opened).toEqual([companyId]);
+  });
+
+  it("K5: a card with a record has an explicit Open that goes through the one lifecycle; a tap still spotlights", () => {
+    const companyId = "0a8b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+    const investorId = "1b9c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e";
+    const block = demoTop(3);
+    const withSubjects = {
+      ...block,
+      cards: block.cards.map((card, index) =>
+        index === 0
+          ? { ...card, subject: { kind: "COMPANY" as const, companyId } }
+          : index === 1
+            ? {
+                ...card,
+                subject: {
+                  kind: "INVESTOR_ORGANISATION" as const,
+                  investorOrganisationId: investorId,
+                },
+              }
+            : card,
+      ),
+    };
+    const pushes: string[] = [];
+    registerClientRouter((path) => pushes.push(path));
+    const phases: string[] = [];
+    const stop = onNavigationPhase((state) => phases.push(state.phase));
+    const onFocus = vi.fn();
+    try {
+      render(
+        <AnswerCanvas
+          block={withSubjects}
+          focus={-1}
+          said=""
+          onFocus={onFocus}
+        />,
+      );
+      const heads = [
+        ...document.querySelectorAll("[data-ac-card] .cq-ac-head-main"),
+      ];
+      // A tap on the card keeps the spotlight; nothing moves.
+      fireEvent.click(heads[0] as Element);
+      expect(onFocus).toHaveBeenCalledWith(0);
+      expect(pushes).toEqual([]);
+      // Open: the company's page, like a record move.
+      const name0 = block.cards[0]?.name ?? "";
+      const name1 = block.cards[1]?.name ?? "";
+      fireEvent.click(screen.getByRole("button", { name: `Open ${name0}` }));
+      expect(pushes).toEqual([`/company/${companyId}`]);
+      expect(phases.slice(0, 3)).toEqual([
+        "REQUESTED",
+        "VALIDATED",
+        "EXECUTING",
+      ]);
+      // An investor's card opens the relationship with them.
+      fireEvent.click(screen.getByRole("button", { name: `Open ${name1}` }));
+      expect(pushes.at(-1)).toBe(`/relationships/investor/${investorId}`);
+      // A card with no record behind it has no Open.
+      expect(document.querySelectorAll("[data-ac-open]")).toHaveLength(2);
+    } finally {
+      stop();
+      registerClientRouter(null);
+      resetNavigationLifecycle();
+    }
+  });
+
+  it("opens the focused card with its reasons, fit in words and measure words", () => {
+    render(
+      <AnswerCanvas block={demoTop(3)} focus={0} said="Norrland fits best." />,
+    );
+    const cards = document.querySelectorAll("[data-ac-card]");
+    expect([...cards].map((card) => card.getAttribute("data-state"))).toEqual([
+      "focus",
+      "rest",
+      "rest",
+    ]);
+    expect(
+      screen.getByRole("img", {
+        name: /Mandate fit 8.6 out of 10, from 5 of 6 measures known/u,
+      }),
+    ).toBeTruthy();
+    expect(screen.getAllByText("Unknown").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Seed round inside your cheque range").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("shows a known mismatch as words and a cross, separate from unknown evidence", () => {
+    const base = demoTop(1);
+    const block = {
+      ...base,
+      cards: base.cards.map((card) => ({
+        ...card,
+        fit: null,
+        measures: [
+          { label: "Sector", level: "MISMATCH" as const, value: null },
+          { label: "Round terms", level: "UNKNOWN" as const, value: null },
+        ],
+      })),
+    };
+    render(<AnswerCanvas block={block} focus={0} said="" />);
+    expect(screen.getAllByText("Does not match").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Unknown").length).toBeGreaterThan(0);
+    expect(
+      document.querySelector('[data-level="MISMATCH"] path'),
+    ).not.toBeNull();
+    expect(
+      document.querySelector('[data-level="UNKNOWN"] circle[stroke-dasharray]'),
+    ).not.toBeNull();
+  });
+
+  it("has an X on every card and one on the whole answer", () => {
+    const onCloseCard = vi.fn();
+    const onCloseAll = vi.fn();
+    render(
+      <AnswerCanvas
+        block={demoTop(3)}
+        focus={0}
+        said="Three stand out."
+        onCloseCard={onCloseCard}
+        onCloseAll={onCloseAll}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Close Kestrel Heat" }));
+    expect(onCloseCard).toHaveBeenCalledWith("kestrel");
+    fireEvent.click(screen.getByRole("button", { name: "Close this answer" }));
+    expect(onCloseAll).toHaveBeenCalledOnce();
+  });
+
+  it("drops a dismissed card from the layout", () => {
+    render(
+      <AnswerCanvas
+        block={demoTop(5)}
+        focus={0}
+        dismissed={new Set(["morrow"])}
+      />,
+    );
+    expect(
+      document.querySelector("[data-ac-cards]")?.getAttribute("data-n"),
+    ).toBe("4");
+    expect(document.querySelector('[data-ac-card="morrow"]')).toBeNull();
+  });
+
+  it("shows research with no score, and follow-ups only on the overview", () => {
+    const onFollowUp = vi.fn();
+    const { rerender } = render(
+      <AnswerCanvas block={DEMO_RESEARCH} focus={0} onFollowUp={onFollowUp} />,
+    );
+    expect(screen.queryByText("fit, out of 10")).toBeNull();
+    expect(document.querySelector("[data-ac-followups]")).toBeNull();
+    rerender(
+      <AnswerCanvas block={DEMO_RESEARCH} focus={-1} onFollowUp={onFollowUp} />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Which YC companies fit my mandate?",
+      }),
+    );
+    expect(onFollowUp).toHaveBeenCalledWith(
+      "Which YC companies fit my mandate?",
+    );
+  });
+});
+
+describe("the topic moves on (C4)", () => {
+  const cards = [{ ...demoTop(3), kind: "ANSWER_CARDS" as const }];
+  it("keeps the cards for a follow-up that names one of them", () => {
+    const turns = [
+      person("p1", "Top three"),
+      answer("a1", "Three stand out.", cards),
+      person("p2", "Why is Atlas third?"),
+      answer("a2", "Atlas Ledger's revenue is only a claim."),
+    ];
+    expect(topicMovedOn(turns, "a1")).toBe(false);
+  });
+
+  it("sends them to the Board when the next answer is about something else", () => {
+    const turns = [
+      person("p1", "Top three"),
+      answer("a1", "Three stand out.", cards),
+      person("p2", "What's on tomorrow?"),
+      answer("a2", "Two meetings tomorrow."),
+    ];
+    expect(topicMovedOn(turns, "a1")).toBe(true);
+  });
+
+  it("replaces them when a new answer brings cards of its own", () => {
+    const turns = [
+      answer("a1", "Three stand out.", cards),
+      answer("a2", "Here is the research.", [DEMO_RESEARCH]),
+    ];
+    expect(topicMovedOn(turns, "a1")).toBe(true);
+  });
+});
+
+describe("the chip on other pages (C6)", () => {
+  const turns = [answer("a1", "Three stand out.", [demoTop(3)])];
+  it("names a new answer, its companies and colours", () => {
+    expect(answerChipFor(turns, new Set(), new Set())).toEqual({
+      answerId: "a1",
+      heading: "Top three ready",
+      names: "Norrland, Kestrel, Atlas",
+      hues: [1, 2, 3],
+    });
+  });
+  it("is not shown for an answer already there, or dismissed", () => {
+    expect(answerChipFor(turns, new Set(["a1"]), new Set())).toBeNull();
+    expect(answerChipFor(turns, new Set(), new Set(["a1"]))).toBeNull();
+  });
+});
+
+describe("the Board's timeline (C7)", () => {
+  it("keeps what Q showed, newest first, with minis and folded sources", () => {
+    const turns = [
+      person("p1", "Research Y Combinator"),
+      answer("a1", "Y Combinator invests early. It runs batches.", [
+        DEMO_RESEARCH,
+      ]),
+      person("p2", "hello"),
+      answer("a2", "Hi."),
+      person("p3", "Top three"),
+      answer("a3", "Three stand out. Norrland leads.", [demoTop(3)]),
+    ];
+    const entries = boardTimeline(turns);
+    expect(entries.map((entry) => entry.id)).toEqual(["a3", "a1"]);
+    expect(entries[0]?.kind).toBe("Ranked answer, 3 results");
+    expect(entries[0]?.minis[0]).toEqual({
+      name: "Norrland Grid",
+      hue: 1,
+      score: "8.6",
+    });
+    expect(entries[1]?.kind).toBe("Research, 3 parts");
+    expect(entries[0]?.sources[0]?.title).toBe("2 records on Capital Q");
+    expect(groupByDay(entries, new Date("2026-10-05T23:00:00Z"))[0]?.day).toBe(
+      "Today",
+    );
+  });
+});
+
+describe("W4: an identity card of a researched person", () => {
+  const externalPersonId = "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d";
+  const profileUrl = "https://qa.linkedin.com/in/shadi-qishta-282453a";
+  const block = (() => {
+    const base = demoTop(1);
+    return {
+      ...base,
+      cards: base.cards.map((card) => ({
+        ...card,
+        name: "Shadi Qishta",
+        subject: null,
+        external: { externalPersonId, profileUrl, rehearse: true },
+      })),
+    };
+  })();
+
+  it("offers Rehearse with <first name>, which opens the rehearsal through the one lifecycle, and Open profile for the source", () => {
+    const pushes: string[] = [];
+    registerClientRouter((path) => pushes.push(path));
+    const phases: string[] = [];
+    const stop = onNavigationPhase((state) => phases.push(state.phase));
+    try {
+      render(<AnswerCanvas block={block} focus={0} said="" />);
+      const rehearse = screen.getByRole("button", {
+        name: "Rehearse with Shadi",
+      });
+      expect(rehearse.getAttribute("data-ac-external")).not.toBeNull();
+      fireEvent.click(rehearse);
+      expect(pushes).toEqual([`/rehearsals/person/${externalPersonId}`]);
+      expect(phases.slice(0, 3)).toEqual([
+        "REQUESTED",
+        "VALIDATED",
+        "EXECUTING",
+      ]);
+      const profile = screen.getByRole("link", { name: "Open profile" });
+      expect(profile.getAttribute("href")).toBe(profileUrl);
+      expect(profile.getAttribute("target")).toBe("_blank");
+      expect(profile.getAttribute("rel")).toContain("noopener");
+      // No record behind it, so no ordinary Open button.
+      expect(document.querySelectorAll("[data-ac-open]")).toHaveLength(0);
+    } finally {
+      stop();
+      resetNavigationLifecycle();
+    }
+  });
+
+  it("offers no rehearsal when the card does not (and no profile link without a URL)", () => {
+    const plain = {
+      ...block,
+      cards: block.cards.map((card) => ({
+        ...card,
+        external: { externalPersonId, profileUrl: null, rehearse: false },
+      })),
+    };
+    render(<AnswerCanvas block={plain} focus={0} said="" />);
+    expect(screen.queryByRole("button", { name: /Rehearse with/u })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open profile" })).toBeNull();
+  });
+});
+
+describe("W4: an identity card's sources are links", () => {
+  const sources = [1, 2, 3, 4, 5].map((n) => ({
+    label: `Source ${String(n)}`,
+    url: `https://example.org/s${String(n)}`,
+  }));
+  const base = demoTop(1);
+  const block = {
+    ...base,
+    cards: base.cards.map((card) => ({
+      ...card,
+      subject: null,
+      external: {
+        externalPersonId: "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
+        profileUrl: null,
+        rehearse: false,
+        sources,
+      },
+    })),
+  };
+
+  it("shows the top three in a new tab and the rest behind More sources", () => {
+    render(<AnswerCanvas block={block} focus={0} said="" />);
+    const links = [...document.querySelectorAll("[data-ac-source-link]")];
+    expect(links).toHaveLength(5);
+    const shown = links.filter((link) => link.closest("details") === null);
+    expect(shown.map((link) => link.textContent)).toEqual([
+      "Source 1",
+      "Source 2",
+      "Source 3",
+    ]);
+    for (const link of links) {
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toContain("noopener");
+    }
+    const more = document.querySelector("[data-ac-source-links] details");
+    expect(more?.querySelector("summary")?.textContent).toBe("More sources");
+    expect(more?.querySelectorAll("a")).toHaveLength(2);
+  });
+
+  it("with three or fewer there is no disclosure", () => {
+    const few = {
+      ...block,
+      cards: block.cards.map((card) => ({
+        ...card,
+        external: card.external && {
+          ...card.external,
+          sources: sources.slice(0, 2),
+        },
+      })),
+    };
+    render(<AnswerCanvas block={few} focus={0} said="" />);
+    expect(document.querySelectorAll("[data-ac-source-link]")).toHaveLength(2);
+    expect(document.querySelector("[data-ac-source-links] details")).toBeNull();
+  });
+});
+
+describe("R5: an identity card of a prepared investor organisation", () => {
+  const externalPersonId = "0a0a5a19-7007-5711-864e-3c7d2beab5f2";
+  const investorOrganisationId = "b0075742-0000-4000-8000-0000000000c1";
+  const block = (() => {
+    const base = demoTop(1);
+    return {
+      ...base,
+      cards: base.cards.map((card) => ({
+        ...card,
+        name: "QInvest LLC",
+        subject: null,
+        external: {
+          externalPersonId,
+          investorOrganisationId,
+          profileUrl: null,
+          rehearse: true,
+        },
+      })),
+    };
+  })();
+
+  it("opens the investor rehearsal for a founder", () => {
+    const pushes: string[] = [];
+    registerClientRouter((path) => pushes.push(path));
+    registerNavigationViewer({ kind: "FOUNDER", admin: false });
+    try {
+      render(<AnswerCanvas block={block} focus={0} said="" />);
+      fireEvent.click(
+        screen.getByRole("button", { name: "Rehearse with QInvest" }),
+      );
+      expect(pushes).toEqual([
+        `/rehearsals/investor/${investorOrganisationId}`,
+      ]);
+    } finally {
+      registerNavigationViewer(null);
+      resetNavigationLifecycle();
+    }
+  });
+
+  it("hides Rehearse from an investor viewer", () => {
+    registerNavigationViewer({ kind: "INVESTOR", admin: false });
+    try {
+      render(<AnswerCanvas block={block} focus={0} said="" />);
+      expect(
+        screen.queryByRole("button", { name: /Rehearse with/u }),
+      ).toBeNull();
+    } finally {
+      registerNavigationViewer(null);
+    }
+  });
+});

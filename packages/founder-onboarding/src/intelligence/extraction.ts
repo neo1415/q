@@ -10,6 +10,7 @@ import {
   type FounderSourcePassage,
   type PromptRegistry,
 } from "@capital-q/q-core";
+import type { ModelDataPosture } from "@capital-q/contracts";
 import type { TenantId, UserId } from "@capital-q/security";
 
 import type {
@@ -86,6 +87,7 @@ export type FounderExtractionGateway = {
     request: {
       readonly taskClass: "STRUCTURED_EXTRACTION";
       readonly sensitivity: string;
+      readonly dataPosture?: ModelDataPosture | undefined;
       readonly budget: unknown;
       readonly messages: unknown;
       readonly output: unknown;
@@ -98,6 +100,8 @@ export type FounderExtractionGateway = {
     options: {
       readonly schema: unknown;
       readonly signal?: AbortSignal | undefined;
+      /** The gateway's own option: a list element that fails is dropped. */
+      readonly invalidListItems?: "REFUSE" | "DROP" | undefined;
     },
   ) => Promise<{
     readonly providerCode: string;
@@ -120,6 +124,16 @@ export type FounderExtractionDependencies = {
    * than worked around (§37, §45).
    */
   readonly sensitivity?: string | undefined;
+  /**
+   * What KIND of material this composition handles (doc 15 section 62).
+   * Set by a composition root that holds a synthetic-demo attestation;
+   * omitted means REAL_CUSTOMER, which is what every deployment serving a
+   * real person gets. It is orthogonal to `sensitivity`: the declared
+   * sensitivity still travels with the request, and nothing here widens a
+   * provider's reviewed ceiling for a customer's data.
+   */
+  readonly dataPosture?: ModelDataPosture | undefined;
+
   readonly budget?: unknown;
   readonly logger?: Logger | undefined;
 };
@@ -238,6 +252,9 @@ export function createFounderExtraction(
           {
             taskClass: "STRUCTURED_EXTRACTION",
             sensitivity: dependencies.sensitivity ?? "CONFIDENTIAL",
+            ...(dependencies.dataPosture === undefined
+              ? {}
+              : { dataPosture: dependencies.dataPosture }),
             budget: dependencies.budget,
             messages: [...rendered.messages],
             output: rendered.output,
@@ -249,6 +266,12 @@ export function createFounderExtraction(
           },
           {
             schema: FounderExtractionV2ResultSchema,
+            // One bad list element (live 2026-10-01: a taxonomy label over
+            // 80 characters) refused the whole reading twice on luna, ~8.5 s
+            // and two paid calls, before the fallback model answered. An
+            // element that fails its schema is dropped, never kept: nothing
+            // invalid is read, and the rest of the reading survives.
+            invalidListItems: "DROP",
             ...(request.signal === undefined ? {} : { signal: request.signal }),
           },
         );

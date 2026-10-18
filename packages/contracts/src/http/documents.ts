@@ -44,9 +44,57 @@ export const DOCUMENT_TYPES = [
   "CUSTOMER",
   "OPERATIONAL",
   "OTHER",
+  /**
+   * An investor's own materials (owner directive 2026-10-16): optional in
+   * investor setup, held as the firm's organisation documents, never a
+   * company's. Q may read them for the mandate; they are not a data room.
+   */
+  "FUND_DECK",
+  "INVESTMENT_THESIS",
+  "LP_LETTER",
 ] as const;
 export const DocumentTypeSchema = z.enum(DOCUMENT_TYPES);
 export type DocumentType = z.infer<typeof DocumentTypeSchema>;
+
+/**
+ * Who may download a document's file (ADR 0041; founder decision
+ * 2026-10-02), as one choice: ORGANISATION ("Only my organisation", the
+ * default) or INVESTORS ("Investors who can find us": every investor the
+ * company's pitch is viewable to). Only a PITCH_DECK may be INVESTORS.
+ */
+export const DOCUMENT_DOWNLOAD_AUDIENCES = [
+  "ORGANISATION",
+  "INVESTORS",
+] as const;
+export const DocumentDownloadAudienceSchema = z.enum(
+  DOCUMENT_DOWNLOAD_AUDIENCES,
+);
+export type DocumentDownloadAudience = z.infer<
+  typeof DocumentDownloadAudienceSchema
+>;
+
+/** `POST /v1/documents/:documentId/download-audience` — one choice, versioned. */
+export const DOCUMENT_DOWNLOAD_AUDIENCE_SEGMENT = "/download-audience" as const;
+export const SetDocumentDownloadAudienceRequestSchema = z
+  .object({
+    audience: DocumentDownloadAudienceSchema,
+    expectedVersion: ResourceVersionSchema,
+  })
+  .strict();
+export type SetDocumentDownloadAudienceRequest = z.infer<
+  typeof SetDocumentDownloadAudienceRequestSchema
+>;
+/** The choice as it now stands: never a file, a title or a URL. */
+export const DocumentDownloadAudienceDtoSchema = z
+  .object({
+    documentId: UuidSchema,
+    downloadAudience: DocumentDownloadAudienceSchema,
+    version: ResourceVersionSchema,
+  })
+  .strict();
+export type DocumentDownloadAudienceDto = z.infer<
+  typeof DocumentDownloadAudienceDtoSchema
+>;
 
 export const DOCUMENT_STATUSES = ["ACTIVE", "ARCHIVED"] as const;
 export const DocumentStatusSchema = z.enum(DOCUMENT_STATUSES);
@@ -73,6 +121,8 @@ export const DOCUMENT_MALWARE_SCAN_STATUSES = [
   "CLEAN",
   "BLOCKED",
   "ERROR",
+  /** ADR 0042: processed with no scanner attached; never clean. */
+  "NOT_SCANNED",
 ] as const;
 export const DocumentMalwareScanStatusSchema = z.enum(
   DOCUMENT_MALWARE_SCAN_STATUSES,
@@ -238,6 +288,8 @@ export const DocumentDtoSchema = z
     status: DocumentStatusSchema,
     visibilityScope: z.string(),
     sensitivityClass: z.string(),
+    /** ADR 0041: who may download the file; absent from older APIs. */
+    downloadAudience: DocumentDownloadAudienceSchema.default("ORGANISATION"),
     currentVersion: DocumentVersionDtoSchema.nullable(),
     createdAt: UtcTimestampSchema,
     updatedAt: UtcTimestampSchema,
@@ -277,6 +329,52 @@ export const DocumentResponseSchema = z
 export type DocumentResponse = z.infer<typeof DocumentResponseSchema>;
 
 export const DocumentListResponseSchema = z
-  .object({ documents: z.array(DocumentDtoSchema) })
+  .object({
+    documents: z.array(DocumentDtoSchema),
+    /**
+     * P3: the next page's cursor when `limit` was asked and more remain.
+     * Opaque; never an offset (the list changes under the reader).
+     */
+    nextCursor: z.string().max(200).optional(),
+  })
   .strict();
+
+/** P3: a page of at most this many documents. */
+export const DOCUMENT_PAGE_MAX = 100;
+
+/** P3 documents page: rename one of the organisation's own documents. */
+export const RenameDocumentRequestSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    expectedVersion: ResourceVersionSchema.optional(),
+  })
+  .strict();
+export type RenameDocumentRequest = z.infer<typeof RenameDocumentRequestSchema>;
+
+/** P3: delete (archive) or restore it; deleting can be undone. */
+export const ArchiveDocumentRequestSchema = z
+  .object({
+    archived: z.boolean(),
+    expectedVersion: ResourceVersionSchema.optional(),
+  })
+  .strict();
+export type ArchiveDocumentRequest = z.infer<
+  typeof ArchiveDocumentRequestSchema
+>;
+export const DOCUMENT_ARCHIVE_SEGMENT = "/archive" as const;
+
+/**
+ * P3: a short-lived link to the owner's own file. The URL is the storage
+ * provider's signed read, never a key or a bucket, and it expires.
+ */
+export const DocumentFileLinkSchema = z
+  .object({
+    url: z.string().url(),
+    expiresAt: UtcTimestampSchema,
+    /** False for a version no scanner has checked (ADR 0042). */
+    scanned: z.boolean(),
+  })
+  .strict();
+export type DocumentFileLink = z.infer<typeof DocumentFileLinkSchema>;
+export const DOCUMENT_FILE_SEGMENT = "/file" as const;
 export type DocumentListResponse = z.infer<typeof DocumentListResponseSchema>;

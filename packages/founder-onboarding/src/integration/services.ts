@@ -16,6 +16,12 @@ import {
 } from "@capital-q/database";
 import type { OutboxWriter } from "@capital-q/eventing";
 import {
+  createPostgresEvidenceRepositories,
+  type Document,
+  type DocumentId,
+} from "@capital-q/evidence";
+import type { TenantId } from "@capital-q/security";
+import {
   createOrganisationService,
   createPostgresOrganisationQueryPort,
   type OrganisationService,
@@ -50,6 +56,17 @@ export type FounderDomainServices = {
   readonly taxonomy: TaxonomyService;
   readonly capital: CapitalService;
   readonly resolver: ActorContextResolver;
+  /**
+   * Evidence documents the F2 step recorded, read by id within the tenant so
+   * the review and snapshot can name what is on file (CQ-PRE-REC-001 §43).
+   * Read-only; nothing here uploads or changes a document.
+   */
+  readonly documents: {
+    readonly findInTenant: (
+      tenantId: TenantId,
+      documentId: DocumentId,
+    ) => Promise<Document | null>;
+  };
 };
 
 export type FounderDomainDependencies = {
@@ -75,7 +92,12 @@ function compose(
     audit: dependencies.audit,
   };
   const resolver = createPostgresActorContextResolver({ sql });
+  const evidence = createPostgresEvidenceRepositories();
   return {
+    documents: {
+      findInTenant: (tenantId, documentId) =>
+        evidence.documents.findInTenant(sql, tenantId, documentId),
+    },
     organisations: createOrganisationService({
       ...shared,
       resolver,

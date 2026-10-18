@@ -42,6 +42,49 @@ export function canTransition(from: MediaStatus, to: MediaStatus): boolean {
   return TRANSITIONS[from].includes(to);
 }
 
+/**
+ * The legal moves from `from` to `to`, in order, or null when no sequence
+ * of moves reaches it.
+ *
+ * A provider is polled, not streamed: between two looks an asset can go
+ * from UPLOAD_PENDING straight to what the vendor calls ready. The
+ * lifecycle does not admit that jump, and it should not — each state
+ * means something to consumers. So the sync walks the intermediate states
+ * instead, and every one of them is recorded. DELETED is never walked
+ * through: deletion is a decision, not a phase, and no provider answer can
+ * imply it.
+ */
+export function transitionPath(
+  from: MediaStatus,
+  to: MediaStatus,
+): readonly MediaStatus[] | null {
+  if (from === to) return [];
+  if (to === "DELETED") return canTransition(from, to) ? [to] : null;
+  const previous = new Map<MediaStatus, MediaStatus | null>([[from, null]]);
+  const queue: MediaStatus[] = [from];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (current === undefined) break;
+    for (const next of TRANSITIONS[current]) {
+      if (next === "DELETED" || previous.has(next)) continue;
+      previous.set(next, current);
+      if (next === to) {
+        const path: MediaStatus[] = [];
+        for (
+          let step: MediaStatus | null = to;
+          step !== null && step !== from;
+        ) {
+          path.unshift(step);
+          step = previous.get(step) ?? null;
+        }
+        return path;
+      }
+      queue.push(next);
+    }
+  }
+  return null;
+}
+
 /** True once the provider considers the media playable. Not "publishable". */
 export function isReady(status: MediaStatus): boolean {
   return status === "READY";

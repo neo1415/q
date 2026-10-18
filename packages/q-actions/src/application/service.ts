@@ -11,6 +11,7 @@ import {
   type SecurityEventWriter,
 } from "@capital-q/audit";
 import {
+  canonicalJsonStringify,
   Q_CONTRACT_VERSION,
   QActionProposalIdSchema,
   QApprovalIdSchema,
@@ -87,8 +88,10 @@ import {
   type QActionRepositories,
   type QApprovalPolicy,
   type QApprovalRecord,
+  type QPendingApprovalRow,
 } from "../ports.js";
 import type { QActionRegistry } from "../registry.js";
+import { findSameIntent, proposalContent } from "../domain/same-proposal.js";
 
 /**
  * The Approval Engine (doc 12 §29-§32; doc 15 §50-§53; CQ-Q-008).
@@ -135,6 +138,22 @@ export type ProposeQActionCommand = {
 export type ProposeQActionResult = {
   readonly action: QActionRecord;
   readonly approval: QApprovalRecord;
+  /**
+   * True when nothing new was prepared: the person already has this exact
+   * change waiting for their approval, and that card is returned instead.
+   */
+  readonly existing?: boolean | undefined;
+  /**
+   * Older waiting cards of the same type and target this one replaced:
+   * they can no longer be approved (lead 2026-10-03).
+   */
+  readonly superseded?: readonly QActionRecord[] | undefined;
+  /**
+   * The same change by intent was already carried out (voiceq-63): nothing
+   * new was prepared, `action` is the executed one, and this is what Q says
+   * about it, from its record ("Already booked for Tue 10:00 — link: …").
+   */
+  readonly alreadyDone?: string | undefined;
 };
 
 export type QApprovalQuery = {
@@ -143,11 +162,74 @@ export type QApprovalQuery = {
   readonly correlationId?: CorrelationId | undefined;
 };
 
+/**
+ * How the person decided (owner 2026-10-16): the card's button, or their
+ * own typed or spoken words in the conversation. Recorded on the audit
+ * row with the message or transcript the words are in, so a decision by
+ * words is the human's, with its evidence -- never the model's. It is a
+ * record, not authority: every channel meets the same checks.
+ */
+export const Q_DECISION_CHANNELS = ["CARD", "TEXT", "VOICE"] as const;
+export type QDecisionChannel = (typeof Q_DECISION_CHANNELS)[number];
+
+export type QDecisionVia = {
+  readonly channel: QDecisionChannel;
+  /** The conversation message (TEXT) or utterance (VOICE) that decided it. */
+  readonly evidenceRef?: string | undefined;
+};
+
 export type DecideQApprovalCommand = {
   readonly actor: ActorContext;
   readonly approvalId: QApprovalId;
   readonly correlationId: CorrelationId;
   readonly reason?: string | undefined;
+  /** Absent: the card (the only channel before words could decide). */
+  readonly via?: QDecisionVia | undefined;
+};
+
+const EVIDENCE_REF = /^[A-Za-z0-9:_.-]{1,200}$/u;
+
+/** The decision's channel and evidence, as the audit row records them. */
+function decidedVia(via: QDecisionVia | undefined): {
+  readonly decidedVia: QDecisionChannel;
+  readonly evidenceRef: string | null;
+} {
+  const channel =
+    via !== undefined &&
+    (Q_DECISION_CHANNELS as readonly string[]).includes(via.channel)
+      ? via.channel
+      : "CARD";
+  // An opaque id only: never the words themselves.
+  const ref =
+    via?.evidenceRef !== undefined && EVIDENCE_REF.test(via.evidenceRef)
+      ? via.evidenceRef
+      : null;
+  return { decidedVia: channel, evidenceRef: ref };
+}
+
+/**
+ * An edit of a pending proposal by the person it waits on (BIZ-007). The
+ * new payload is validated, authorised and bound afresh; the old approval
+ * is REVOKED and its action WITHDRAWN in the same transaction, so an
+ * approval of the old words can never send the new ones, or vice versa.
+ */
+export type ReviseQApprovalCommand = {
+  readonly actor: ActorContext;
+  readonly approvalId: QApprovalId;
+  readonly correlationId: CorrelationId;
+  /** Untrusted: validated by the definition's schema and its `revisable` rule. */
+  readonly payload: unknown;
+};
+
+export type ReviseQApprovalResult = ProposeQActionResult & {
+  readonly view: QApprovalView;
+};
+
+/** A pending or decided proposal as its approver may read it, payload included. */
+export type QApprovalProposalRead = {
+  readonly view: QApprovalView;
+  readonly actionType: QActionRecord["actionType"];
+  readonly payload: QActionRecord["payload"];
 };
 
 export type DecideQApprovalResult = {
@@ -163,12 +245,62 @@ export type QActionService = {
     command: ProposeQActionCommand,
   ) => Promise<ProposeQActionResult>;
   readonly getApproval: (query: QApprovalQuery) => Promise<QApprovalView>;
+  /**
+   * The approvals still waiting on the caller (R35), for Q's briefing.
+   * Only a human acting in an organisation context has any; anyone else
+   * gets an empty list, never an error that says why.
+   */
+  readonly listPendingApprovals: (query: {
+    readonly actor: ActorContext;
+    readonly limit?: number | undefined;
+  }) => Promise<readonly QPendingApprovalRow[]>;
   readonly approve: (
     command: DecideQApprovalCommand,
   ) => Promise<DecideQApprovalResult>;
   readonly reject: (
     command: DecideQApprovalCommand,
   ) => Promise<DecideQApprovalResult>;
+  /**
+   * F24 (Zino, 7 Oct): the person's own waiting card that went stale
+   * before they decided (the conversation moved on) is superseded with a
+   * reason code: approval REVOKED, action WITHDRAWN, run completed, audit
+   * kept; never deleted. False when it was no longer waiting. Optional on
+   * the type so older doubles still compose.
+   */
+  readonly supersedeStale?: (command: {
+    readonly actor: ActorContext;
+    readonly approvalId: QApprovalId;
+    readonly correlationId: CorrelationId;
+    /** A code, e.g. NEWER_MESSAGE_FROM_THEM. */
+    readonly reason: string;
+  }) => Promise<boolean>;
+  /**
+   * Recovery D2 (audit D-01): expires every PENDING approval past its
+   * `expiresAt`, with its action, eagerly -- not only when someone tries
+   * to decide it -- so work waiting on it (a standing instruction) sees
+   * the card lapsed and can redraft or tell the person. Each in its own
+   * short transaction, re-checked under lock. Returns how many expired.
+   */
+  readonly expireLapsed?: (input?: {
+    readonly limit?: number | undefined;
+  }) => Promise<number>;
+  /** Replace a pending proposal's payload; voids the old approval (BIZ-007). */
+  readonly revise: (
+    command: ReviseQApprovalCommand,
+  ) => Promise<ReviseQApprovalResult>;
+  /** The proposal behind an approval, for its approver only. */
+  readonly readProposal: (
+    query: QApprovalQuery,
+  ) => Promise<QApprovalProposalRead>;
+  /**
+   * The current revision of an action on its run: the action itself, or
+   * the newest same-type proposal that replaced it by `revise`.
+   */
+  readonly currentRevision: (
+    tenantId: ActorContext["tenantId"],
+    runId: QRunId,
+    actionId: QActionProposalId,
+  ) => Promise<QActionProposalId>;
   /** The idempotent execution gate (CQ-Q-008 §52, §110). */
   readonly executeApproved: (
     context: QActionExecuteContext,
@@ -199,10 +331,28 @@ const AUDIT = {
   executed: AuditActionTypeSchema.parse("q.action.executed"),
   executionFailed: AuditActionTypeSchema.parse("q.action.execution_failed"),
   executionBlocked: AuditActionTypeSchema.parse("q.action.execution_blocked"),
+  superseded: AuditActionTypeSchema.parse("q.action.superseded"),
 } as const;
 
 function iso(date: Date): UtcTimestamp {
   return date.toISOString();
+}
+
+/** How far back a restated request is matched with one already carried out. */
+const ALREADY_DONE_LOOKBACK_MS = 24 * 60 * 60_000;
+
+/** What Q says about a change already carried out, from its own record. */
+export function alreadyDoneLine(
+  definition: AnyQActionDefinition,
+  action: QActionRecord,
+): string {
+  const fallback = `Already done: ${action.summary.trim().replace(/[.\s]+$/u, "")}.`;
+  if (definition.alreadyDone === undefined) return fallback;
+  const payload = definition.payload.safeParse(action.payload);
+  const result = definition.result.safeParse(action.executionResult);
+  return payload.success && result.success
+    ? definition.alreadyDone(payload.data, result.data)
+    : fallback;
 }
 
 export function idempotencyKeyFor(
@@ -285,6 +435,39 @@ export function toApprovalView(
       ...(action.executedAt === null ? {} : { executedAt: action.executedAt }),
     },
   });
+}
+
+/**
+ * The records an action is bound to (G-D23): what it declares, or -- for an
+ * action on the person's own records that names no other entity -- the
+ * proposer themselves. The same rule at proposal and at revision.
+ */
+function targetsOf(
+  definition: AnyQActionDefinition,
+  payload: unknown,
+  proposerUserId: string,
+): readonly QSubjectRef[] {
+  const declared: readonly QSubjectRef[] = definition.targets(payload);
+  return declared.length > 0
+    ? declared
+    : [{ kind: "USER", userId: proposerUserId }];
+}
+
+/**
+ * What a setter sets, for "a newer card replaces the older one": the
+ * definition's own resource key; else its declared targets. A setter that
+ * declares no targets and no key never replaces anything -- its default
+ * target (the proposer) would match every card of theirs (G-D23 follow-up).
+ */
+function supersedeKeyOf(
+  definition: AnyQActionDefinition,
+  payload: unknown,
+): string | null {
+  if (definition.supersedeKey !== undefined) {
+    return definition.supersedeKey(payload);
+  }
+  const declared = definition.targets(payload);
+  return declared.length === 0 ? null : canonicalJsonStringify([...declared]);
 }
 
 export function createQActionService(
@@ -621,6 +804,290 @@ export function createQActionService(
     }
   }
 
+  /**
+   * An older waiting card replaced by a newer one of the same type and
+   * target (lead 2026-10-03): its approval is REVOKED and its action
+   * WITHDRAWN -- the engine's existing terminal states, so it can never be
+   * approved -- its run ends, and the history and an audit entry record
+   * which card replaced it. Nothing is deleted. False when it was decided
+   * meanwhile (the newer card stands either way).
+   *
+   * `by` is a reason code instead of a card when the card went stale with
+   * no newer one yet (F24: the conversation moved on under a standing
+   * instruction's draft); the redraft follows as its own proposal.
+   */
+  async function supersede(
+    tx: TransactionContext,
+    older: {
+      readonly action: QActionRecord;
+      readonly approval: QApprovalRecord;
+    },
+    by: QActionRecord | { readonly staleReason: string },
+    actor: ActorContext,
+    now: Date,
+    correlationId: CorrelationId,
+  ): Promise<boolean> {
+    const newer = "staleReason" in by ? null : by;
+    const staleReason = "staleReason" in by ? by.staleReason : null;
+    const approval = await repositories.approvals.decide(tx, {
+      tenantId: older.approval.tenantId,
+      approvalId: older.approval.id,
+      expectedVersion: older.approval.version,
+      status: "REVOKED",
+      revokedAt: iso(now),
+      revokedByUserId: actor.userId,
+    });
+    if (approval === null) return false;
+    const action = await repositories.actions.transition(tx, {
+      tenantId: older.action.tenantId,
+      actionId: older.action.id,
+      expectedVersion: older.action.version,
+      status: "WITHDRAWN",
+    });
+    if (action === null) throw new QActionVersionConflictError();
+    // Its run waited only for this card: it ends, as a declined one does.
+    const run = await runtime.runs.lockForActor(
+      tx,
+      actor.tenantId,
+      older.action.proposedByUserId,
+      older.action.runId,
+    );
+    if (run !== null && canTransition(run.status, "COMPLETED")) {
+      await moveRun(tx, run, "COMPLETED", {
+        complete: true,
+        events: [
+          {
+            type: "q.run.completed",
+            data: { status: "COMPLETED", completedAt: iso(now) },
+          },
+        ],
+      });
+    }
+    await audit.record(tx, {
+      auditEventId: createAuditEventId(),
+      ...humanActor(actor),
+      actionType: AUDIT.superseded,
+      resourceType: RESOURCE_Q_ACTION,
+      resourceId: older.action.id,
+      occurredAt: iso(now),
+      outcome: "SUCCEEDED",
+      metadata: auditMetadata(action, {
+        approvalId: older.approval.id,
+        supersededBy: newer?.id ?? null,
+        staleReason,
+      }),
+      correlationId,
+    });
+    logger?.info(
+      {
+        actionId: older.action.id,
+        approvalId: older.approval.id,
+        supersededBy: newer?.id ?? null,
+        staleReason,
+        actionType: older.action.actionType,
+        correlationId,
+      },
+      newer === null
+        ? "q action superseded: the card went stale"
+        : "q action superseded by a newer card for the same target",
+    );
+    return true;
+  }
+
+  /**
+   * Persist one proposal and its approval request inside the caller's
+   * transaction: the exact payload and its binding hash, the run's events,
+   * audit and the outbox. A first proposal moves the run to
+   * AWAITING_APPROVAL; a revision (the run already waits) only records the
+   * new proposal it now waits on.
+   */
+  async function recordProposal(
+    tx: TransactionContext,
+    input: {
+      readonly run: QRunRecord;
+      readonly actor: ActorContext;
+      readonly definition: AnyQActionDefinition;
+      readonly payload: { readonly data: unknown };
+      readonly targets: readonly QSubjectRef[];
+      readonly described: {
+        readonly summary: string;
+        readonly preview?: string | undefined;
+      };
+      readonly actionId: QActionProposalId;
+      readonly approvalId: QApprovalId;
+      readonly now: Date;
+      readonly expiresAt: UtcTimestamp;
+      readonly correlationId: CorrelationId;
+      readonly revisedFrom?: QActionProposalId | undefined;
+    },
+  ): Promise<ProposeQActionResult> {
+    const {
+      run,
+      actor,
+      definition,
+      payload,
+      targets,
+      described,
+      actionId,
+      approvalId,
+      now,
+      expiresAt,
+      correlationId,
+      revisedFrom,
+    } = input;
+    const payloadRecord = payload.data as Record<string, unknown>;
+    const envelope = bindingEnvelope({
+      bindingVersion: 1,
+      tenantId: actor.tenantId,
+      organisationId: actor.organisationId ?? null,
+      runId: run.id,
+      actionId,
+      actionType: definition.actionType,
+      actionVersion: definition.version,
+      actionClass: definition.riskClass,
+      targets: [...targets],
+      payload: payloadRecord,
+    });
+    const payloadHash = hashBindingEnvelope(envelope);
+    const inserted = await repositories.actions.insert(tx, {
+      id: actionId,
+      tenantId: actor.tenantId,
+      runId: run.id,
+      organisationId: actor.organisationId ?? null,
+      proposedByUserId: actor.userId,
+      actionType: definition.actionType,
+      actionVersion: definition.version,
+      riskClass: definition.riskClass,
+      targets,
+      payload: payloadRecord,
+      payloadHash,
+      summary: described.summary,
+      preview: described.preview ?? null,
+      idempotencyKey: idempotencyKeyFor(run.id, actionId),
+    });
+    assertActionTransition(inserted.status, "AWAITING_APPROVAL");
+    const action = await repositories.actions.transition(tx, {
+      tenantId: actor.tenantId,
+      actionId,
+      expectedVersion: inserted.version,
+      status: "AWAITING_APPROVAL",
+    });
+    if (action === null) {
+      throw new QActionVersionConflictError();
+    }
+    const approval = await repositories.approvals.insert(tx, {
+      id: approvalId,
+      tenantId: actor.tenantId,
+      actionId,
+      requestedFromUserId: actor.userId,
+      requestedAt: iso(now),
+      expiresAt,
+    });
+
+    const proposalEvents: readonly Parameters<typeof appendRunEvent>[3][] = [
+      {
+        type: "q.action.proposed",
+        data: {
+          proposal: {
+            contractVersion: Q_CONTRACT_VERSION,
+            proposalId: actionId,
+            runId: run.id,
+            actionType: definition.actionType,
+            actionClass: definition.riskClass,
+            targets: [...targets],
+            summary: described.summary,
+            ...(described.preview === undefined
+              ? {}
+              : { preview: described.preview }),
+            approval: {
+              required: true,
+              approval: { approvalId, status: "PENDING" },
+            },
+            status: "PROPOSED",
+            createdAt: action.createdAt,
+            expiresAt,
+          },
+        },
+      },
+      {
+        type: "q.approval.required",
+        data: { proposalId: actionId, approvalId, expiresAt },
+      },
+    ];
+    if (run.status === "AWAITING_APPROVAL") {
+      // A revision: the run already waits on this person; only the
+      // proposal it waits on changes.
+      for (const event of proposalEvents) {
+        await appendRunEvent(runtime, tx, run, event);
+      }
+    } else {
+      await moveRun(tx, run, "AWAITING_APPROVAL", {
+        stage: "WAITING_FOR_APPROVAL",
+        events: proposalEvents,
+      });
+    }
+
+    await audit.record(tx, {
+      auditEventId: createAuditEventId(),
+      tenantId: actor.tenantId,
+      actorType: "Q",
+      actorId: run.id,
+      authorityUserId: actor.userId,
+      organisationId: actor.organisationId,
+      actionType: AUDIT.proposed,
+      resourceType: RESOURCE_Q_ACTION,
+      resourceId: actionId,
+      occurredAt: iso(now),
+      outcome: "SUCCEEDED",
+      metadata: auditMetadata(action, {
+        approvalId,
+        expiresAt,
+        revisedFrom: revisedFrom ?? null,
+      }),
+      correlationId,
+    });
+    if (dependencies.outbox !== undefined) {
+      await dependencies.outbox.enqueue(
+        tx,
+        qActionEvent(
+          QActionPreparedEvent,
+          eventContext(action, { type: "Q", id: run.id }, correlationId),
+          eventData(action, approvalId),
+        ),
+      );
+    }
+    metrics.proposals.add(1, { action_type: definition.actionType });
+    metrics.approvalsRequested.add(1, {
+      action_type: definition.actionType,
+    });
+    logger?.info(
+      {
+        qRunId: run.id,
+        actionId,
+        approvalId,
+        actionType: definition.actionType,
+        actionVersion: definition.version,
+        riskClass: definition.riskClass,
+        expiresAt,
+        correlationId,
+      },
+      "q action proposed; approval requested",
+    );
+    return { action, approval };
+  }
+
+  const describedFor = async (
+    definition: AnyQActionDefinition,
+    payload: unknown,
+    targets: readonly QSubjectRef[],
+    actor: ActorContext,
+  ) =>
+    definition.describeFor === undefined
+      ? definition.describe(payload, targets)
+      : definition
+          .describeFor(payload, targets, actor)
+          .catch(() => definition.describe(payload, targets));
+
   const propose: QActionService["propose"] = async (command) => {
     const { actor, correlationId } = command;
     const definition = registry.get(command.actionType);
@@ -631,14 +1098,19 @@ export function createQActionService(
     if (actor.actorType !== "HUMAN" || actor.organisationId === undefined) {
       throw new QActionNotPermittedError();
     }
+    const organisationId = actor.organisationId;
     const payload = definition.payload.safeParse(command.payload);
     if (!payload.success) {
       throw new QActionNotPermittedError();
     }
-    const targets: readonly QSubjectRef[] = definition.targets(payload.data);
-    if (targets.length === 0) {
-      throw new QActionNotPermittedError();
-    }
+    // G-D23 (2026-10-09): an action on the person's own records (their
+    // profile answer, their settings, their inbox) names no other entity.
+    // Refusing it here dropped every such card after the tool had said
+    // PREPARED, so nothing could ever be approved. Its subject is the
+    // proposer themselves, bound like any target (in the payload hash and
+    // on the action row); the definition's own authorize step below still
+    // decides whether they may take it.
+    const targets = targetsOf(definition, payload.data, actor.userId);
     // The person's authority to take THIS action, now. Approval later never
     // creates what is missing here.
     const authorized = await definition.authorize(payload.data, actor);
@@ -654,7 +1126,12 @@ export function createQActionService(
       });
       throw new QActionNotPermittedError();
     }
-    const described = definition.describe(payload.data, targets);
+    const described = await describedFor(
+      definition,
+      payload.data,
+      targets,
+      actor,
+    );
     const now = clock.now();
     const actionId = QActionProposalIdSchema.parse(randomUUID());
     const approvalId = QApprovalIdSchema.parse(randomUUID());
@@ -685,139 +1162,158 @@ export function createQActionService(
             if (run.actorOrganisationId !== (actor.organisationId ?? null)) {
               throw new QActionNotPermittedError();
             }
+            // The same change already waiting for this person, from any
+            // run or conversation: that card, never a second one. Checked
+            // before the run's own state, since nothing here moves it.
+            const content = proposalContent({
+              actionType: definition.actionType,
+              actionVersion: definition.version,
+              targets,
+              payload: payload.data,
+            });
+            const waiting = await repositories.actions.listAwaitingForProposer(
+              tx.sql,
+              {
+                tenantId: actor.tenantId,
+                userId: actor.userId,
+                organisationId,
+                actionType: definition.actionType,
+                actionVersion: definition.version,
+                now,
+                targets,
+              },
+            );
+            const same = waiting.find(
+              ({ action }) =>
+                proposalContent({
+                  actionType: action.actionType,
+                  actionVersion: action.actionVersion,
+                  targets: action.targets,
+                  payload: action.payload,
+                }) === content,
+            );
+            // The same change by intent (voiceq-63): a restated "book Nixo
+            // in five minutes" whose start differs by seconds is this card.
+            const restated =
+              same ??
+              findSameIntent(
+                definition,
+                waiting,
+                ({ action }) => ({
+                  targets: action.targets,
+                  payload: action.payload,
+                }),
+                { targets, payload: payload.data },
+              );
+            if (restated !== undefined) {
+              logger?.info(
+                {
+                  qRunId: run.id,
+                  actionId: restated.action.id,
+                  approvalId: restated.approval.id,
+                  actionType: definition.actionType,
+                  byIntent: same === undefined,
+                  correlationId,
+                },
+                "q action already waiting for approval; no second card",
+              );
+              return { ...restated, existing: true };
+            }
+            // Already carried out, recently, by intent: say so from its
+            // record and act on nothing (one booking per counterpart per
+            // intended time).
+            if (
+              definition.sameIntent !== undefined &&
+              repositories.actions.listExecutedForProposer !== undefined
+            ) {
+              const executed =
+                await repositories.actions.listExecutedForProposer(tx.sql, {
+                  tenantId: actor.tenantId,
+                  userId: actor.userId,
+                  organisationId,
+                  actionType: definition.actionType,
+                  actionVersion: definition.version,
+                  since: new Date(now.getTime() - ALREADY_DONE_LOOKBACK_MS),
+                  targets,
+                });
+              const done = findSameIntent(
+                definition,
+                executed,
+                ({ action }) => ({
+                  targets: action.targets,
+                  payload: action.payload,
+                }),
+                { targets, payload: payload.data },
+              );
+              if (done !== undefined) {
+                logger?.info(
+                  {
+                    qRunId: run.id,
+                    actionId: done.action.id,
+                    actionType: definition.actionType,
+                    correlationId,
+                  },
+                  "q action already carried out; nothing new prepared",
+                );
+                return {
+                  ...done,
+                  existing: true,
+                  alreadyDone: alreadyDoneLine(definition, done.action),
+                };
+              }
+            }
             if (!canTransition(run.status, "AWAITING_APPROVAL")) {
               throw new QActionVersionConflictError();
             }
-            const payloadRecord = payload.data as Record<string, unknown>;
-            const envelope = bindingEnvelope({
-              bindingVersion: 1,
-              tenantId: actor.tenantId,
-              organisationId: actor.organisationId ?? null,
-              runId: run.id,
-              actionId,
-              actionType: definition.actionType,
-              actionVersion: definition.version,
-              actionClass: definition.riskClass,
-              targets: [...targets],
-              payload: payloadRecord,
-            });
-            const payloadHash = hashBindingEnvelope(envelope);
-            const inserted = await repositories.actions.insert(tx, {
-              id: actionId,
-              tenantId: actor.tenantId,
-              runId: run.id,
-              organisationId: actor.organisationId ?? null,
-              proposedByUserId: actor.userId,
-              actionType: definition.actionType,
-              actionVersion: definition.version,
-              riskClass: definition.riskClass,
+            const recorded = await recordProposal(tx, {
+              run,
+              actor,
+              definition,
+              payload,
               targets,
-              payload: payloadRecord,
-              payloadHash,
-              summary: described.summary,
-              preview: described.preview ?? null,
-              idempotencyKey: idempotencyKeyFor(run.id, actionId),
-            });
-            assertActionTransition(inserted.status, "AWAITING_APPROVAL");
-            const action = await repositories.actions.transition(tx, {
-              tenantId: actor.tenantId,
+              described,
               actionId,
-              expectedVersion: inserted.version,
-              status: "AWAITING_APPROVAL",
-            });
-            if (action === null) {
-              throw new QActionVersionConflictError();
-            }
-            const approval = await repositories.approvals.insert(tx, {
-              id: approvalId,
-              tenantId: actor.tenantId,
-              actionId,
-              requestedFromUserId: actor.userId,
-              requestedAt: iso(now),
+              approvalId,
+              now,
               expiresAt,
-            });
-
-            await moveRun(tx, run, "AWAITING_APPROVAL", {
-              stage: "WAITING_FOR_APPROVAL",
-              events: [
-                {
-                  type: "q.action.proposed",
-                  data: {
-                    proposal: {
-                      contractVersion: Q_CONTRACT_VERSION,
-                      proposalId: actionId,
-                      runId: run.id,
-                      actionType: definition.actionType,
-                      actionClass: definition.riskClass,
-                      targets: [...targets],
-                      summary: described.summary,
-                      ...(described.preview === undefined
-                        ? {}
-                        : { preview: described.preview }),
-                      approval: {
-                        required: true,
-                        approval: { approvalId, status: "PENDING" },
-                      },
-                      status: "PROPOSED",
-                      createdAt: action.createdAt,
-                      expiresAt,
-                    },
-                  },
-                },
-                {
-                  type: "q.approval.required",
-                  data: { proposalId: actionId, approvalId, expiresAt },
-                },
-              ],
-            });
-
-            await audit.record(tx, {
-              auditEventId: createAuditEventId(),
-              tenantId: actor.tenantId,
-              actorType: "Q",
-              actorId: run.id,
-              authorityUserId: actor.userId,
-              organisationId: actor.organisationId,
-              actionType: AUDIT.proposed,
-              resourceType: RESOURCE_Q_ACTION,
-              resourceId: actionId,
-              occurredAt: iso(now),
-              outcome: "SUCCEEDED",
-              metadata: auditMetadata(action, { approvalId, expiresAt }),
               correlationId,
             });
-            if (dependencies.outbox !== undefined) {
-              await dependencies.outbox.enqueue(
-                tx,
-                qActionEvent(
-                  QActionPreparedEvent,
-                  eventContext(
-                    action,
-                    { type: "Q", id: run.id },
-                    correlationId,
-                  ),
-                  eventData(action, approvalId),
-                ),
+            // The same change to the same thing, but different: the new
+            // card replaces the older ones (lead 2026-10-03, run
+            // a4618f34: "investors" and "my organisation only" both
+            // waited for one deck, and approving both applied the last).
+            const resourceKey = supersedeKeyOf(definition, payload.data);
+            const replaced: QActionRecord[] = [];
+            for (const older of definition.supersedes === true &&
+            resourceKey !== null
+              ? waiting
+              : []) {
+              if (older.action.runId === run.id) continue;
+              const olderPayload = definition.payload.safeParse(
+                older.action.payload,
               );
+              if (
+                !olderPayload.success ||
+                supersedeKeyOf(definition, olderPayload.data) !== resourceKey
+              ) {
+                continue;
+              }
+              if (
+                await supersede(
+                  tx,
+                  older,
+                  recorded.action,
+                  actor,
+                  now,
+                  correlationId,
+                )
+              ) {
+                replaced.push(older.action);
+              }
             }
-            metrics.proposals.add(1, { action_type: definition.actionType });
-            metrics.approvalsRequested.add(1, {
-              action_type: definition.actionType,
-            });
-            logger?.info(
-              {
-                qRunId: run.id,
-                actionId,
-                approvalId,
-                actionType: definition.actionType,
-                actionVersion: definition.version,
-                riskClass: definition.riskClass,
-                expiresAt,
-                correlationId,
-              },
-              "q action proposed; approval requested",
-            );
-            return { action, approval };
+            return replaced.length === 0
+              ? recorded
+              : { ...recorded, superseded: replaced };
           });
         } finally {
           span.end();
@@ -837,6 +1333,22 @@ export function createQActionService(
     return toApprovalView(approval, action, clock.now());
   };
 
+  const listPendingApprovals: QActionService["listPendingApprovals"] = async (
+    query,
+  ) => {
+    const { actor } = query;
+    if (actor.actorType !== "HUMAN" || actor.organisationId === undefined) {
+      return [];
+    }
+    return repositories.approvals.listPendingForApprover(sql, {
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      organisationId: actor.organisationId,
+      now: clock.now(),
+      limit: Math.min(Math.max(query.limit ?? 20, 1), 20),
+    });
+  };
+
   type Decision = "APPROVED" | "REJECTED";
 
   async function decide(
@@ -854,7 +1366,9 @@ export function createQActionService(
           // in this transaction and the refusal is raised after it, so the
           // person's next attempt meets "already decided", not a second sweep.
           const result = await transactions.run<
-            DecideQApprovalResult | { readonly lapsed: true }
+            | DecideQApprovalResult
+            | { readonly lapsed: true }
+            | { readonly runNotWaiting: true }
           >(async (tx) => {
             const { approval, action } = await loadForActor(
               tx.sql,
@@ -904,9 +1418,13 @@ export function createQActionService(
               throw new QApprovalNotFoundError();
             }
             if (run.status !== "AWAITING_APPROVAL") {
+              // Live 2026-10-16: the revocation was made and then thrown away
+              // with the transaction, so the card stayed PENDING forever --
+              // never approvable, yet counted as "already waiting". Like a
+              // lapse, it commits here and the refusal is raised after.
               await revokeForRun(tx, approval, action);
               outcome = "run_not_waiting";
-              throw new QApprovalAlreadyDecidedError("REVOKED");
+              return { runNotWaiting: true };
             }
 
             const definition = registry.get(action.actionType);
@@ -1005,6 +1523,8 @@ export function createQActionService(
                 metadata: auditMetadata(moved, {
                   approvalId: approval.id,
                   approvalPayloadHash: recomputed,
+                  idempotencyKey: moved.idempotencyKey,
+                  ...decidedVia(command.via),
                 }),
                 correlationId,
               });
@@ -1077,6 +1597,8 @@ export function createQActionService(
               metadata: auditMetadata(moved, {
                 approvalId: approval.id,
                 reasonGiven: command.reason !== undefined,
+                idempotencyKey: moved.idempotencyKey,
+                ...decidedVia(command.via),
               }),
               correlationId,
             });
@@ -1108,6 +1630,9 @@ export function createQActionService(
           if ("lapsed" in result) {
             throw new QApprovalExpiredError();
           }
+          if ("runNotWaiting" in result) {
+            throw new QApprovalAlreadyDecidedError("REVOKED");
+          }
           logger?.info(
             {
               approvalId: command.approvalId,
@@ -1115,6 +1640,7 @@ export function createQActionService(
               qRunId: result.action.runId,
               decision,
               outcome,
+              decidedVia: decidedVia(command.via).decidedVia,
               correlationId,
             },
             "q approval decided",
@@ -1406,6 +1932,8 @@ export function createQActionService(
           let report: Awaited<ReturnType<typeof definition.executor.execute>>;
           try {
             report = await definition.executor.execute(approved, {
+              // Verified above: the approver, re-authorised just now.
+              approver: actor,
               correlationId,
               attempt: claimed.executionAttempts,
               signal: context.signal,
@@ -1580,9 +2108,229 @@ export function createQActionService(
     );
   };
 
+  const revise: QActionService["revise"] = async (command) => {
+    const { actor, correlationId } = command;
+    return transactions.run(async (tx) => {
+      const { approval, action } = await loadForActor(
+        tx.sql,
+        actor,
+        command.approvalId,
+        correlationId,
+        tx,
+      );
+      const now = clock.now();
+      if (
+        approval.status !== "PENDING" ||
+        !approvalIsOpen(approval, now) ||
+        action.status !== "AWAITING_APPROVAL"
+      ) {
+        throw new QApprovalAlreadyDecidedError(
+          projectedApprovalStatus(approval, now),
+        );
+      }
+      const definition = registry.get(action.actionType);
+      if (
+        definition?.revisable === undefined ||
+        definition.version !== action.actionVersion
+      ) {
+        throw new QActionUnavailableError();
+      }
+      const previous = definition.payload.safeParse(action.payload);
+      const next = definition.payload.safeParse(command.payload);
+      if (
+        !previous.success ||
+        !next.success ||
+        !definition.revisable(previous.data, next.data)
+      ) {
+        throw new QActionNotPermittedError();
+      }
+      // Same consequence, other words: another target is another action.
+      // The same default as at proposal (G-D23): the original proposer.
+      const targets = targetsOf(definition, next.data, action.proposedByUserId);
+      if (
+        canonicalJsonStringify([...targets]) !==
+        canonicalJsonStringify([...action.targets])
+      ) {
+        throw new QActionNotPermittedError();
+      }
+      const authorized = await definition.authorize(next.data, actor);
+      if (authorized.outcome !== "ALLOW") {
+        throw new QActionNotPermittedError();
+      }
+      const run = await runtime.runs.lockForActor(
+        tx,
+        actor.tenantId,
+        actor.userId,
+        action.runId,
+      );
+      if (run?.status !== "AWAITING_APPROVAL") {
+        throw new QActionVersionConflictError();
+      }
+      assertApprovalTransition(approval.status, "REVOKED");
+      const revoked = await repositories.approvals.decide(tx, {
+        tenantId: approval.tenantId,
+        approvalId: approval.id,
+        expectedVersion: approval.version,
+        status: "REVOKED",
+        revokedAt: iso(now),
+        revokedByUserId: actor.userId,
+      });
+      assertActionTransition(action.status, "WITHDRAWN");
+      const withdrawn =
+        revoked === null
+          ? null
+          : await repositories.actions.transition(tx, {
+              tenantId: action.tenantId,
+              actionId: action.id,
+              expectedVersion: action.version,
+              status: "WITHDRAWN",
+            });
+      if (withdrawn === null) {
+        throw new QActionVersionConflictError();
+      }
+      const result = await recordProposal(tx, {
+        run,
+        actor,
+        definition,
+        payload: next,
+        targets,
+        described: await describedFor(definition, next.data, targets, actor),
+        actionId: QActionProposalIdSchema.parse(randomUUID()),
+        approvalId: QApprovalIdSchema.parse(randomUUID()),
+        now,
+        expiresAt: iso(new Date(now.getTime() + policy.approvalTtlMs)),
+        correlationId,
+        revisedFrom: action.id,
+      });
+      return {
+        ...result,
+        view: toApprovalView(result.approval, result.action, now),
+      };
+    });
+  };
+
+  const supersedeStale: NonNullable<QActionService["supersedeStale"]> = async (
+    command,
+  ) =>
+    transactions.run(async (tx) => {
+      const now = clock.now();
+      const { approval, action } = await loadForActor(
+        tx.sql,
+        command.actor,
+        command.approvalId,
+        command.correlationId,
+        tx,
+      );
+      // Only the person's own card, still waiting: anything decided,
+      // lapsed or someone else's proposal stays exactly as it is.
+      if (
+        approval.status !== "PENDING" ||
+        action.status !== "AWAITING_APPROVAL" ||
+        action.proposedByUserId !== command.actor.userId ||
+        Date.parse(approval.expiresAt) <= now.getTime()
+      ) {
+        return false;
+      }
+      return supersede(
+        tx,
+        { action, approval },
+        { staleReason: command.reason },
+        command.actor,
+        now,
+        command.correlationId,
+      );
+    });
+
+  const readProposal: QActionService["readProposal"] = async (query) => {
+    const { approval, action } = await loadForActor(
+      sql,
+      query.actor,
+      query.approvalId,
+      query.correlationId,
+      null,
+    );
+    return {
+      view: toApprovalView(approval, action, clock.now()),
+      actionType: action.actionType,
+      payload: action.payload,
+    };
+  };
+
+  const currentRevision: QActionService["currentRevision"] = async (
+    tenantId,
+    runId,
+    actionId,
+  ) => {
+    const onRun = await repositories.actions.listForRun(sql, tenantId, runId);
+    const asked = onRun.find((candidate) => candidate.id === actionId);
+    if (asked?.status !== "WITHDRAWN") return actionId;
+    // Newest first: the live revision is the newest same-type proposal
+    // that has not itself been withdrawn.
+    const live = onRun.find(
+      (candidate) =>
+        candidate.actionType === asked.actionType &&
+        candidate.status !== "WITHDRAWN" &&
+        candidate.createdAt >= asked.createdAt,
+    );
+    return live?.id ?? actionId;
+  };
+
+  const expireLapsed: NonNullable<QActionService["expireLapsed"]> = async (
+    input,
+  ) => {
+    const list = repositories.approvals.listLapsed;
+    if (list === undefined) return 0;
+    const now = clock.now();
+    const lapsed = await list(sql, {
+      now,
+      limit: Math.min(Math.max(input?.limit ?? 100, 1), 500),
+    });
+    let expired = 0;
+    for (const one of lapsed) {
+      try {
+        const done = await transactions.run(async (tx) => {
+          const approval = await repositories.approvals.lockById(
+            tx,
+            one.tenantId,
+            one.approvalId,
+          );
+          // Decided meanwhile, or (clock skew) not yet lapsed: leave it.
+          if (
+            approval === null ||
+            approval.status !== "PENDING" ||
+            approvalIsOpen(approval, now)
+          ) {
+            return false;
+          }
+          const action = await repositories.actions.lockById(
+            tx,
+            approval.tenantId,
+            approval.actionId,
+          );
+          if (action === null) return false;
+          await expire(tx, approval, action);
+          return true;
+        });
+        if (done) expired += 1;
+      } catch (error: unknown) {
+        logger?.warn(
+          { err: error, approvalId: one.approvalId },
+          "lapsed approval not expired",
+        );
+      }
+    }
+    return expired;
+  };
+
   return {
     propose,
+    revise,
+    supersedeStale,
+    expireLapsed,
+    readProposal,
+    currentRevision,
     getApproval,
+    listPendingApprovals,
     approve: (command) => decide(command, "APPROVED"),
     reject: (command) => decide(command, "REJECTED"),
     executeApproved,

@@ -122,10 +122,42 @@ export type TaxonomyAssignmentRepository = {
     subject: Pick<TaxonomySubjectDescriptor, "subjectType" | "subjectId">,
     vocabularyCode?: TaxonomyVocabularyCode,
   ) => Promise<readonly TaxonomyEntityAssignment[]>;
+  /**
+   * S2: `listCurrent` for many subjects of one type in one statement. Each
+   * subject is still read under its own tenant (the pair must match, never
+   * a tenant set crossed with an id set). Same rows, same order per subject.
+   */
+  readonly listCurrentForSubjects: (
+    executor: DatabaseExecutor,
+    subjectType: TaxonomySubjectType,
+    subjects: readonly {
+      readonly tenantId: TenantId;
+      readonly subjectId: string;
+    }[],
+  ) => Promise<readonly TaxonomyEntityAssignment[]>;
   readonly listHistory: (
     executor: DatabaseExecutor,
     tenantId: TenantId,
     subject: Pick<TaxonomySubjectDescriptor, "subjectType" | "subjectId">,
+  ) => Promise<readonly TaxonomyEntityAssignment[]>;
+  /**
+   * Structured candidate retrieval (CQ-REC-002): ACTIVE assignments of
+   * subjects of one type under any of the nodes, across tenants — a
+   * discovery candidate lives in another tenant, and the classification
+   * itself is what discovery may read. Ids, codes and provenance only;
+   * never raw source text beyond what the assignment row already carries
+   * to its owner. Bounded and ordered by subject id, then node id.
+   *
+   * `assignmentSources`, when given, restricts the probe to those
+   * provenances inside the query, so rows of another provenance never
+   * consume the bound (CQ-REC-002 reads declared classifications only).
+   */
+  readonly listCurrentByNodes: (
+    executor: DatabaseExecutor,
+    subjectType: TaxonomySubjectType,
+    nodeIds: readonly TaxonomyNodeId[],
+    limit: number,
+    assignmentSources?: readonly TaxonomyAssignmentSource[],
   ) => Promise<readonly TaxonomyEntityAssignment[]>;
   readonly insert: (
     tx: TransactionContext,

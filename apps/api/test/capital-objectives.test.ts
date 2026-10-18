@@ -71,6 +71,8 @@ const ACTIVE: CapitalObjective = {
   instrumentCode: "safe",
   targetCloseDate: "2026-12-01",
   useOfFundsSummary: "Product and hiring.",
+  valuation: null,
+  minimumCheque: null,
   startedAt: NOW,
   closedAt: null,
   createdByUserId: USER,

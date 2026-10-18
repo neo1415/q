@@ -5,6 +5,9 @@ import {
   createUuidIdSchema,
   type CorrelationId,
   type DisclosureScope,
+  type ConnectionDto,
+  type IncomingInterestDto,
+  type InterestDto,
   type RelationshipDto,
   type RelationshipEventSummaryDto,
   type RelationshipSourceType,
@@ -105,5 +108,139 @@ export function toRelationshipEventSummaryDto(
     sourceId: event.source.id,
     visibilityScope: event.visibilityScope,
     correlationId: event.correlationId,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Interest (CQ-NET-010)
+// ---------------------------------------------------------------------------
+
+/** The interest record's identifier. Never a RelationshipId or a history event id. */
+export const InterestIdSchema = createUuidIdSchema("InterestId");
+export type InterestId = z.infer<typeof InterestIdSchema>;
+
+/** The company's answer to an interest (CQ-NET-011). */
+export const InterestResponseIdSchema =
+  createUuidIdSchema("InterestResponseId");
+export type InterestResponseId = z.infer<typeof InterestResponseIdSchema>;
+
+/** The formal bilateral connection: doc 13's `network.matches` row. */
+export const MatchIdSchema = createUuidIdSchema("MatchId");
+export type MatchId = z.infer<typeof MatchIdSchema>;
+
+export type InterestDecision = "ACCEPTED" | "DECLINED";
+
+/**
+ * An investor organisation's unilateral interest in a company, on the one
+ * canonical relationship. Interest ≠ Match: the interest itself is never
+ * bilateral, and the relationship's projected state is not changed by it.
+ * `response` and `connection` are the company's answer (CQ-NET-011), read
+ * with it so neither side ever sees an interest without its answer.
+ */
+export const INTEREST_PARTIES = ["INVESTOR", "COMPANY"] as const;
+export type InterestParty = (typeof INTEREST_PARTIES)[number];
+
+export type Interest = {
+  readonly id: InterestId;
+  /** The relationship's (company's) tenant anchor. */
+  readonly tenantId: TenantId;
+  readonly relationshipId: RelationshipId;
+  readonly companyId: CompanyId;
+  readonly investorOrganisationId: InvestorOrganisationId;
+  /**
+   * Who reached out: INVESTOR (Express Interest) or COMPANY (a founder's
+   * Connection Request, ADR 0023). The other party answers.
+   */
+  readonly expressedByParty: InterestParty;
+  readonly status: "EXPRESSED" | "WITHDRAWN";
+  readonly expressedByUserId: string;
+  readonly expressedInOrganisationId: string;
+  readonly relationshipEventId: RelationshipEventId;
+  readonly createdAt: UtcTimestamp;
+  /** Null until the other party answers. */
+  readonly response: {
+    readonly id: InterestResponseId;
+    readonly decision: InterestDecision;
+    readonly respondedAt: UtcTimestamp;
+  } | null;
+  /** The match an acceptance opened; null otherwise. */
+  readonly connection: {
+    readonly id: MatchId;
+    readonly status: "ACTIVE" | "ENDED";
+    readonly connectedAt: UtcTimestamp;
+  } | null;
+};
+
+function connectionDto(interest: Interest): ConnectionDto | null {
+  return interest.connection === null
+    ? null
+    : {
+        connectionId: interest.connection.id,
+        status: interest.connection.status,
+        connectedAt: interest.connection.connectedAt,
+      };
+}
+
+export function toInterestDto(interest: Interest): InterestDto {
+  return {
+    interestId: interest.id,
+    relationshipId: interest.relationshipId,
+    companyId: interest.companyId,
+    status: interest.status,
+    expressedAt: interest.createdAt,
+    response: interest.response?.decision ?? "PENDING",
+    respondedAt: interest.response?.respondedAt ?? null,
+    connection: connectionDto(interest),
+  };
+}
+
+/** A founder's own Connection Request (ADR 0023). */
+export function toConnectionRequestDto(interest: Interest) {
+  return {
+    interestId: interest.id,
+    relationshipId: interest.relationshipId,
+    investorOrganisationId: interest.investorOrganisationId,
+    requestedAt: interest.createdAt,
+    response: interest.response?.decision ?? "PENDING",
+    respondedAt: interest.response?.respondedAt ?? null,
+    connection: connectionDto(interest),
+  } as const;
+}
+
+/** A founder's request as the investor sees it: the company's canonical name only. */
+export function toIncomingConnectionRequestDto(
+  interest: Interest,
+  company: { readonly canonicalName: string },
+) {
+  return {
+    interestId: interest.id,
+    relationshipId: interest.relationshipId,
+    companyId: interest.companyId,
+    companyName: company.canonicalName,
+    requestedAt: interest.createdAt,
+    response: interest.response?.decision ?? "PENDING",
+    respondedAt: interest.response?.respondedAt ?? null,
+    connection: connectionDto(interest),
+  } as const;
+}
+
+/**
+ * The company's view of an incoming interest. Names the investor
+ * organisation -- the interest was addressed to the company -- and never
+ * the person who acted for it.
+ */
+export function toIncomingInterestDto(
+  interest: Interest,
+  investor: { readonly displayName: string; readonly investorType: string },
+): IncomingInterestDto {
+  return {
+    interestId: interest.id,
+    investorOrganisationId: interest.investorOrganisationId,
+    investorName: investor.displayName,
+    investorType: investor.investorType,
+    expressedAt: interest.createdAt,
+    response: interest.response?.decision ?? "PENDING",
+    respondedAt: interest.response?.respondedAt ?? null,
+    connection: connectionDto(interest),
   };
 }

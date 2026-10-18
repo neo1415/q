@@ -1,4 +1,33 @@
+import {
+  registerAnswerWordsRoutes,
+  type AnswerWordsRoutesDependencies,
+} from "./composition/answer-words.js";
+import {
+  registerUiTextRoutes,
+  type UiTextRoutesDependencies,
+} from "./composition/ui-text.js";
+import type { DatabaseHealth } from "@capital-q/database";
+import type { OwnUsage } from "./composition/usage.js";
+import { registerUsageRoutes } from "./http/usage.js";
+import { registerBriefingCommandRoutes } from "./http/briefing-command.js";
+import type { BriefingCommandReader } from "./composition/briefing-command.js";
+import type { MeetingHostRuntime } from "./composition/meeting-host-runtime.js";
+import type { RecallStatusWebhook } from "./composition/recall-bots.js";
+import { registerMeetingHostRoutes } from "./http/meeting-host.js";
+import {
+  MEETING_SCREEN_WS_PATH,
+  type MeetingScreenVision,
+} from "./composition/meeting-screen-vision.js";
+import { attachWebSocketReceiver } from "./http/ws-receiver.js";
+import { randomUUID } from "node:crypto";
+
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
+
+import {
+  Q_INTERVIEW_PATH,
+  Q_INTERVIEW_TURN_SEGMENT,
+  Q_VOICE_THINK_PATH,
+} from "@capital-q/contracts";
 import { CONTRACTS_VERSION } from "@capital-q/contracts";
 import type { QApiConfig } from "@capital-q/config/q-api";
 import {
@@ -10,6 +39,91 @@ import {
 } from "@capital-q/observability";
 
 import { registerProblemHandling } from "./http/problem-handler.js";
+import { registerRequestTiming } from "./http/request-timing.js";
+import { registerQConversationRoutes } from "./http/q-conversations.js";
+import type { QRoomFeed } from "./room/feed.js";
+import { registerQRoomRoutes } from "./room/routes.js";
+import type { FastNavigationResolver } from "./composition/fast-navigation.js";
+import { registerFastNavigationRoutes } from "./http/fast-navigation.js";
+import {
+  registerUiActReceiptRoutes,
+  type UiActReceiptLedger,
+} from "./http/ui-act-receipts.js";
+import {
+  registerQArtifactRoutes,
+  type QArtifactRoutesDependencies,
+} from "./http/q-artifacts.js";
+import {
+  registerQDocumentRoutes,
+  type QDocumentRoutesDependencies,
+} from "./http/q-documents.js";
+import type { ArtifactService } from "@capital-q/q-artifacts";
+import { registerFitRoutes, type FitRoutesDependencies } from "./http/fit.js";
+import {
+  registerInvestorPromiseRoutes,
+  type InvestorPromiseRoutesDependencies,
+} from "./http/investor-promises.js";
+import {
+  registerRecommendationExplanationRoutes,
+  type RecommendationExplanationRoutesDependencies,
+} from "./http/recommendation-explanations.js";
+import {
+  registerProfileFindingsRoutes,
+  type ProfileFindingsRoutesDependencies,
+} from "./http/profile-findings.js";
+import {
+  registerMemoryRoutes,
+  type MemoryRoutesDependencies,
+} from "./http/memory.js";
+import {
+  registerMeetingAssistantRoutes,
+  type MeetingAssistantRoutesDependencies,
+} from "./http/meeting-assistant.js";
+import {
+  registerErrandRoutes,
+  type ErrandRoutesDependencies,
+} from "./http/errands.js";
+// AUTO block (ADR 0030)
+import {
+  registerWorkRoutes,
+  type WorkRoutesDependencies,
+} from "./http/work.js";
+import {
+  registerWorkforceRoutes,
+  type WorkforceRoutesDependencies,
+} from "./http/workforce.js";
+import {
+  registerStandingRoutes,
+  type StandingRoutesDependencies,
+} from "./http/standing.js";
+import {
+  registerArrivalSnapshotInvalidation,
+  registerArrivalSnapshotRoutes,
+  type ArrivalSnapshotRoutesDependencies,
+} from "./http/q-arrival-snapshot.js";
+import {
+  registerAttentionRoutes,
+  type AttentionRoutesDependencies,
+} from "./http/q-attention.js";
+import {
+  registerDailyRoutes,
+  type DailyRoutesDependencies,
+} from "./http/daily.js";
+import {
+  registerRehearsalRoutes,
+  type RehearsalRoutesDependencies,
+} from "./http/rehearsals.js";
+import {
+  registerRehearsalVideoRoutes,
+  type RehearsalVideoRoutesDependencies,
+} from "./http/rehearsal-video.js";
+import { registerMeetingFaceRoutes } from "./http/meeting-face.js";
+import type { MeetingFaceService } from "./composition/meeting-face.js";
+import {
+  registerReadinessBlueprintRoutes,
+  type ReadinessBlueprintRoutesDependencies,
+} from "./http/readiness-blueprint.js";
+import { registerQMcpRoute, type QMcpRouteDependencies } from "./http/q-mcp.js";
 import {
   registerQApprovalRoutes,
   type QApprovalRoutesDependencies,
@@ -24,6 +138,15 @@ import {
   type QRunRoutesDependencies,
 } from "./http/q-runs.js";
 import type { RequestAuthenticator } from "./security/actor-context.js";
+import {
+  registerQVoiceRoutes,
+  type QVoiceRoutesDependencies,
+} from "./voice/routes.js";
+import { createVoiceCardTurns } from "./voice/card-turns.js";
+import { registerVoiceThinkRoute } from "./voice/think.js";
+import type { PresenceTrigger } from "./voice/presence-trigger.js";
+import { registerQInterviewRoute } from "./voice/interview-route.js";
+import type { VoiceTurnHandler } from "./voice/turn.js";
 
 export const SERVICE_NAME = "q-api";
 
@@ -41,6 +164,8 @@ export const SERVICE_NAME = "q-api";
 export type QApiSecurityDependencies = {
   readonly authenticator: RequestAuthenticator;
   readonly resolver?: QRunRoutesDependencies["resolver"] | undefined;
+  /** Application identity, for the routes a person may use before any organisation. */
+  readonly identity?: QVoiceRoutesDependencies["identity"] | undefined;
 };
 
 /**
@@ -49,17 +174,166 @@ export type QApiSecurityDependencies = {
  * without a database.
  */
 export type QApiModules = {
+  /**
+   * What /health/ready checks (audit DEF-A4). Absent: readiness reports the
+   * database NOT_CHECKED and stays 200, as it was before probes existed.
+   */
+  readonly healthProbes?:
+    { readonly database: () => Promise<DatabaseHealth> } | undefined;
+  /**
+   * Why an investor is seeing a company (CQ-REC-007). It lives here
+   * rather than beside the slate itself because the natural-language
+   * half is Q, and a person asking "why" is asking Q.
+   */
+  readonly recommendationExplanations?:
+    RecommendationExplanationRoutesDependencies["explanations"] | undefined;
+  /** MATCH block (ADR 0052): fit with the reader's own mandate, and Q's view. */
+  readonly fit?: Pick<FitRoutesDependencies, "fit" | "qViews"> | undefined;
+  /** Investor promises (2026-10-07): compare picked companies; thesis reading. */
+  readonly thesis?: InvestorPromiseRoutesDependencies["thesis"] | undefined;
+  /** What Q remembers about the person, for them to read and correct. */
+  readonly memory?: MemoryRoutesDependencies["memory"] | undefined;
+  readonly learningConsent?: MemoryRoutesDependencies["learningConsent"];
+  /** Errands: the person's own, read and stopped. */
+  readonly errands?: ErrandRoutesDependencies["errands"] | undefined;
+  /** AUTO: Q's delegated work, the person's own, read, answered, stopped. */
+  readonly work?: WorkRoutesDependencies["work"] | undefined;
+  /** WORK-58: Q's work page reads (suggestions, Not now, done). */
+  readonly workPage?: WorkRoutesDependencies["page"] | undefined;
+  /** Founder brief J5: Q's workforce, the person's own jobs and feedback. */
+  readonly workforce?:
+    | (Pick<WorkforceRoutesDependencies, "page" | "heldRetry"> & {
+        readonly onDecision?: QApprovalRoutesDependencies["onDecision"];
+      })
+    | undefined;
+  /**
+   * Pictures of who work and approvals name (founder decision
+   * 2026-10-04). Absent: those rows read as initials.
+   */
+  readonly namedPhotos?: WorkRoutesDependencies["namedPhotos"] | undefined;
+  /** The person's own usage this month (lead 2026-10-03). */
+  readonly usage?: OwnUsage | undefined;
+  /** Zino 2026-10-08: the briefing's free-form words, read into card verbs. */
+  readonly briefingCommand?: BriefingCommandReader | undefined;
+  readonly rehearsals?: RehearsalRoutesDependencies["rehearsals"] | undefined;
+  /** Owner decision 35: Q's Tavus face in Google Meet (its bridge). */
+  readonly meetingFace?: MeetingFaceService | undefined;
+  /** ADR 0066: the rehearsal met by video (a stock AI interviewer). */
+  readonly rehearsalVideo?:
+    RehearsalVideoRoutesDependencies["video"] | undefined;
+  // BILLING block (ADR 0034): the plan's rehearsal allowance.
+  readonly rehearsalEntitlements?:
+    RehearsalRoutesDependencies["entitlements"] | undefined;
+  // end BILLING block
+  // BILLING-2 block (ADR 0036): the Readiness Blueprint's plan-gated stub.
+  readonly readinessBlueprint?:
+    ReadinessBlueprintRoutesDependencies["entitlements"] | undefined;
+  /** The Blueprint v1 generator (the founder's own readiness, sequenced). */
+  readonly readinessBlueprints?:
+    ReadinessBlueprintRoutesDependencies["blueprints"] | undefined;
+  // end BILLING-2 block
+  /** Q's standing with each person: personality and patience. */
+  readonly standing?: StandingRoutesDependencies["standing"] | undefined;
+  /** Any-language interface: machine translations of the UI catalogue. */
+  readonly uiText?: UiTextRoutesDependencies["uiText"] | undefined;
+  /** Words stored for a person, in their own language (any language). */
+  readonly answerWords?:
+    | Pick<AnswerWordsRoutesDependencies, "answerWords" | "languageOf">
+    | undefined;
+  /** RECOVERY B1: what needs the person, every source (unread ≠ empty). */
+  readonly attention?: AttentionRoutesDependencies["attention"] | undefined;
+  /** W1: the Arrival Snapshot (what Q told them on arrival), one read for every surface. */
+  readonly arrivalSnapshots?:
+    ArrivalSnapshotRoutesDependencies["snapshots"] | undefined;
+  // DAILY block: The Q Daily, the person's own editions and preferences.
+  readonly daily?: DailyRoutesDependencies["daily"] | undefined;
+  /** Q in a meeting: bring it to a call, read its notes. */
+  readonly meetingAssistant?:
+    MeetingAssistantRoutesDependencies["assistant"] | undefined;
+  // MEET-HOST block (ADR 0037): Recall's live events for calls Q hosts.
+  readonly meetingHost?: MeetingHostRuntime | undefined;
+  /** meet-47: Recall's status webhook (a late transcript settles at once). */
+  readonly recallStatus?: RecallStatusWebhook | undefined;
+  /** P5: shared-screen frames from Recall's websocket, for Q's private notes. */
+  readonly meetingScreens?: MeetingScreenVision | undefined;
+  /** What Q found about the actor's own profile subject (BIZ-002). */
+  readonly profileFindings?:
+    ProfileFindingsRoutesDependencies["findings"] | undefined;
   readonly qRuntime?: QRunRoutesDependencies["qRuntime"] | undefined;
+  /** Reading what Q composed, when the artifact context is composed (ADR 0013). */
+  readonly artifacts?: ArtifactService | undefined;
+  // DOCS block: brand kit and answer exports (the document studio).
+  readonly documentStudio?:
+    | (Omit<
+        QDocumentRoutesDependencies,
+        "authenticator" | "resolver" | "identity" | "artifacts"
+      > & {
+        readonly images?: QArtifactRoutesDependencies["generatedImages"];
+      })
+    | undefined;
+  /** Q room W5: pictures dropped on a document's placeholders. */
+  readonly ownPictures?: QArtifactRoutesDependencies["ownPictures"];
   /** The orchestration boundary; absent means runs are only persisted. */
   readonly orchestration?: QRunRoutesDependencies["orchestration"];
+  /**
+   * voice-cards: the person's Q room feed (every run's answer, any path);
+   * absent means no room route and nothing published.
+   */
+  readonly room?: QRoomFeed | undefined;
+  /**
+   * RECOVERY-2026-10 (C): receipts of Q's UI acts from the person's screen;
+   * absent means no receipt route.
+   */
+  readonly uiActReceipts?: UiActReceiptLedger | undefined;
+  /** RECOVERY-2026-10 (C): the fast path's resolver; absent, no route. */
+  readonly fastNavigation?: FastNavigationResolver | undefined;
   /** The Approval Engine (CQ-Q-008); absent means no approval routes. */
   readonly qActions?: QApprovalRoutesDependencies["qActions"] | undefined;
+  /** What runs an approved action: resume, or the gate when the run cannot resume. */
+  readonly continueApproved?:
+    QApprovalRoutesDependencies["continueApproved"] | undefined;
   /** The resumable run stream (CQ-Q-009); absent means no events route. */
   readonly qStream?:
     | {
         readonly service: QEventRoutesDependencies["qStream"];
         readonly options?: QEventRoutesDependencies["options"];
       }
+    | undefined;
+  /**
+   * Q as an MCP server (doc 12 §34.2); absent means no MCP route. The
+   * composition root passes it only when configuration enables it.
+   */
+  readonly mcp?:
+    | Pick<QMcpRouteDependencies, "firewall" | "registry" | "tools" | "logger">
+    | undefined;
+  /** The realtime voice channel (CQ-Q-VOICE-001 C); absent means no voice routes. */
+  readonly voice?:
+    | ({
+        /** The turn handler, for the Deepgram think route; absent means no think route. */
+        readonly turn?: VoiceTurnHandler | undefined;
+        /** The presence read for the typed interview, as the spoken one has. */
+        readonly interviewPresence?: PresenceTrigger | undefined;
+        readonly logger?: Logger | undefined;
+      } & Pick<
+        QVoiceRoutesDependencies,
+        | "provider"
+        | "bindings"
+        | "now"
+        | "interviewAgent"
+        | "apiBaseUrl"
+        | "board"
+        | "welcome"
+        | "deepgram"
+        | "duplex"
+        | "live"
+        | "speech"
+        | "speechThrottle"
+        | "memory"
+        | "ownNames"
+        | "openerFacts"
+        | "rehearsals"
+        | "languageOf"
+      >)
     | undefined;
 };
 
@@ -128,6 +402,10 @@ export function createApp(
   });
 
   registerProblemHandling(app, logger);
+  registerRequestTiming(app);
+  if (modules.arrivalSnapshots !== undefined) {
+    registerArrivalSnapshotInvalidation(app, modules.arrivalSnapshots);
+  }
 
   // Graceful shutdown: no new connections, idle ones closed now, active
   // ones given a bounded grace and then closed, so a deploy never waits
@@ -158,8 +436,315 @@ export function createApp(
     registerQRunRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,
+      identity: security.identity,
       qRuntime: modules.qRuntime,
       orchestration: modules.orchestration,
+      room: modules.room,
+    });
+    if (modules.room !== undefined) {
+      registerQRoomRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        room: modules.room,
+      });
+    }
+    if (modules.fastNavigation !== undefined) {
+      registerFastNavigationRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        resolve: modules.fastNavigation,
+      });
+    }
+    if (modules.uiActReceipts !== undefined) {
+      registerUiActReceiptRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        receipts: modules.uiActReceipts,
+      });
+    }
+    // A person's conversations (ADR 0012): the same owner rule, the
+    // same personal-context allowance, read back from the runtime.
+    registerQConversationRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      identity: security.identity,
+      qRuntime: modules.qRuntime,
+    });
+  }
+
+  // Reading what Q composed (QX-003E). Read-only on purpose: preparing
+  // and revising happen inside a Q run, under that run's own plan.
+  if (modules.artifacts !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: the Q artifact routes require an actor context resolver",
+      );
+    }
+    registerQArtifactRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      identity: security.identity,
+      artifacts: modules.artifacts,
+      ...(modules.ownPictures === undefined
+        ? {}
+        : { ownPictures: modules.ownPictures }),
+      ...(modules.documentStudio === undefined
+        ? {}
+        : {
+            brandLogo: async (actor, version) => {
+              const studio = modules.documentStudio;
+              if (studio === undefined) return null;
+              return studio.brandKit.logo(actor, version);
+            },
+            ...(modules.documentStudio.images === undefined
+              ? {}
+              : { generatedImages: modules.documentStudio.images }),
+          }),
+    });
+    // DOCS block: the brand kit and filing one answer as a PDF.
+    if (modules.documentStudio !== undefined) {
+      registerQDocumentRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        artifacts: modules.artifacts,
+        ...modules.documentStudio,
+      });
+    }
+  }
+
+  if (modules.recommendationExplanations !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: recommendation explanations require an actor context resolver",
+      );
+    }
+    registerRecommendationExplanationRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      explanations: modules.recommendationExplanations,
+    });
+  }
+
+  if (modules.fit !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error("q-api: fit routes require an actor context resolver");
+    }
+    registerFitRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      fit: modules.fit.fit,
+      qViews: modules.fit.qViews,
+    });
+    // Q.10 / Q.02: the same reads as fit_compare and thesis_reading.
+    if (modules.thesis !== undefined) {
+      registerInvestorPromiseRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        fit: modules.fit.fit,
+        thesis: modules.thesis,
+      });
+    }
+  }
+
+  // What Q remembers about the person (ADR 0012), theirs to correct.
+  if (modules.memory !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error("q-api: memory routes require an actor context resolver");
+    }
+    registerMemoryRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      memory: modules.memory,
+      learningConsent: modules.learningConsent,
+    });
+  }
+
+  if (modules.errands !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error("q-api: errand routes require an actor context resolver");
+    }
+    registerErrandRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      errands: modules.errands,
+    });
+  }
+  // RECOVERY B1: what needs the person, every source, for every surface.
+  if (modules.attention !== undefined && security.resolver !== undefined) {
+    registerAttentionRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      attention: modules.attention,
+    });
+  }
+  // W1: what Q told them on arrival, as one canonical snapshot.
+  if (
+    modules.arrivalSnapshots !== undefined &&
+    security.resolver !== undefined
+  ) {
+    registerArrivalSnapshotRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      snapshots: modules.arrivalSnapshots,
+    });
+  }
+  // DAILY block: The Q Daily (the person's own editions and preferences).
+  if (modules.daily !== undefined && security.resolver !== undefined) {
+    registerDailyRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      daily: modules.daily,
+    });
+  }
+
+  if (
+    modules.briefingCommand !== undefined &&
+    security.resolver !== undefined
+  ) {
+    registerBriefingCommandRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      read: modules.briefingCommand,
+    });
+  }
+
+  if (modules.usage !== undefined && security.resolver !== undefined) {
+    registerUsageRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      usage: modules.usage,
+    });
+  }
+
+  // AUTO block (ADR 0030)
+  if (modules.work !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error("q-api: work routes require an actor context resolver");
+    }
+    registerWorkRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      work: modules.work,
+      page: modules.workPage,
+      namedPhotos: modules.namedPhotos,
+    });
+  }
+
+  // WORKFORCE block (founder brief J5)
+  if (modules.workforce !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: workforce routes require an actor context resolver",
+      );
+    }
+    registerWorkforceRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      page: modules.workforce.page,
+      heldRetry: modules.workforce.heldRetry,
+    });
+  }
+
+  // BILLING-2 block
+  if (modules.readinessBlueprint !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: readiness blueprint routes require an actor context resolver",
+      );
+    }
+    registerReadinessBlueprintRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      entitlements: modules.readinessBlueprint,
+      blueprints: modules.readinessBlueprints,
+    });
+  }
+  // end BILLING-2 block
+
+  if (modules.rehearsals !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: rehearsal routes require an actor context resolver",
+      );
+    }
+    registerRehearsalRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      rehearsals: modules.rehearsals,
+      video: modules.rehearsalVideo,
+      entitlements: modules.rehearsalEntitlements,
+    });
+  }
+
+  if (modules.rehearsalVideo !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: rehearsal video routes require an actor context resolver",
+      );
+    }
+    registerRehearsalVideoRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      video: modules.rehearsalVideo,
+    });
+  }
+
+  // The face's bridge: authenticated by its per-session bearer alone.
+  if (modules.meetingFace !== undefined) {
+    registerMeetingFaceRoutes(app, { face: modules.meetingFace });
+  }
+
+  if (modules.meetingAssistant !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: meeting assistant routes require an actor context resolver",
+      );
+    }
+    registerMeetingAssistantRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      assistant: modules.meetingAssistant,
+    });
+  }
+
+  // MEET-HOST block: signed per meeting, no session; meet-47: Recall's
+  // signed status webhook on the same path.
+  if (modules.meetingHost !== undefined || modules.recallStatus !== undefined) {
+    registerMeetingHostRoutes(app, {
+      host: modules.meetingHost,
+      status: modules.recallStatus,
+    });
+  }
+  // P5: Recall connects here per meeting with the URL's signed token; any
+  // other connection is refused before the upgrade. Frames are never logged.
+  const screens = modules.meetingScreens;
+  if (screens !== undefined) {
+    attachWebSocketReceiver(app.server, {
+      path: MEETING_SCREEN_WS_PATH,
+      accept: (url) => {
+        const meetingId = screens.verify(url);
+        return meetingId === null
+          ? null
+          : { message: (text) => screens.receive(meetingId, text) };
+      },
+    });
+  }
+
+  // What Q found about the actor's own profile subject (BIZ-002).
+  if (modules.profileFindings !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: profile findings require an actor context resolver",
+      );
+    }
+    registerProfileFindingsRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      findings: modules.profileFindings,
     });
   }
 
@@ -176,6 +761,9 @@ export function createApp(
       resolver: security.resolver,
       qActions: modules.qActions,
       orchestrator: modules.orchestration?.orchestrator,
+      continueApproved: modules.continueApproved,
+      namedPhotos: modules.namedPhotos,
+      onDecision: modules.workforce?.onDecision,
     });
   }
 
@@ -191,23 +779,165 @@ export function createApp(
     streams = registerQEventRoutes(app, {
       authenticator: security.authenticator,
       resolver: security.resolver,
+      identity: security.identity,
       qStream: modules.qStream.service,
       options: modules.qStream.options,
       logger,
     });
   }
 
+  // The voice session route (CQ-Q-VOICE-001 C). A credential is bound to
+  // a server-resolved actor before it is issued, so the same resolver rule
+  // applies.
+  if (modules.voice !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: the Q voice routes require an actor context resolver",
+      );
+    }
+    const voiceCards = createVoiceCardTurns();
+    registerQVoiceRoutes(app, {
+      // E-03: one registry for the card route and the think route.
+      cards: voiceCards,
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      identity: security.identity,
+      provider: modules.voice.provider,
+      bindings: modules.voice.bindings,
+      interviewAgent: modules.voice.interviewAgent,
+      apiBaseUrl: modules.voice.apiBaseUrl,
+      board: modules.voice.board,
+      welcome: modules.voice.welcome,
+      deepgram: modules.voice.deepgram,
+      speech: modules.voice.speech,
+      speechThrottle: modules.voice.speechThrottle,
+      now: modules.voice.now,
+      // Both were composed but never reached the route, so the recogniser
+      // was told no remembered or recorded name (founder live, #6).
+      memory: modules.voice.memory,
+      ownNames: modules.voice.ownNames,
+      openerFacts: modules.voice.openerFacts,
+      rehearsals: modules.voice.rehearsals,
+      duplex: modules.voice.duplex,
+      live: modules.voice.live,
+      languageOf: modules.voice.languageOf,
+    });
+    /**
+     * One Q, whatever the input was (QX-004 core gate).
+     *
+     * The typed onboarding screen used to compose its own replies from
+     * templates while the spoken one ran this interviewer. This route is
+     * what lets apps/api hand a typed turn to the same interviewer, so a
+     * keyboard and a microphone differ in transport and not in what Q
+     * knows. It needs no Deepgram and no voice binding — only the
+     * interviewer and somewhere to read the session from.
+     */
+    const interviewApiBaseUrl = modules.voice.apiBaseUrl;
+    const interviewAgent = modules.voice.interviewAgent;
+    if (interviewApiBaseUrl !== undefined && interviewAgent !== undefined) {
+      registerQInterviewRoute(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        path: `${Q_INTERVIEW_PATH}${Q_INTERVIEW_TURN_SEGMENT}`,
+        agent: interviewAgent,
+        apiBaseUrl: interviewApiBaseUrl,
+        correlation: () => randomUUID(),
+        ...(modules.voice?.interviewPresence === undefined
+          ? {}
+          : { presence: modules.voice.interviewPresence }),
+      });
+    }
+    if (modules.standing !== undefined) {
+      registerStandingRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        standing: modules.standing,
+      });
+    }
+    if (modules.answerWords !== undefined) {
+      registerAnswerWordsRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        ...modules.answerWords,
+      });
+    }
+    if (modules.uiText !== undefined) {
+      registerUiTextRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        uiText: modules.uiText,
+      });
+    }
+    if (
+      modules.voice.deepgram !== undefined &&
+      modules.voice.turn !== undefined &&
+      modules.voice.logger !== undefined
+    ) {
+      registerVoiceThinkRoute(app, {
+        path: Q_VOICE_THINK_PATH,
+        bindings: modules.voice.bindings,
+        turn: modules.voice.turn,
+        logger: modules.voice.logger,
+        // RECOVERY A4: each turn's disposition, for the screen.
+        board: modules.voice.board,
+        cards: voiceCards,
+      });
+    }
+  }
+
+  // The MCP façade (doc 12 §34.2). A host is a person with a session and an
+  // organisation, resolved server-side like every other caller.
+  if (modules.mcp !== undefined) {
+    if (security.resolver === undefined) {
+      throw new Error(
+        "q-api: the Q MCP route requires an actor context resolver",
+      );
+    }
+    registerQMcpRoute(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      ...modules.mcp,
+    });
+  }
+
   // Liveness and readiness are split per doc 21 (74-77): liveness proves the
-  // process is alive and performs no dependency checks; readiness will grow to
-  // cover configuration and critical initialisation as those are introduced.
+  // process is alive and performs no dependency checks. Readiness asks the
+  // database (audit DEF-A4): Railway's healthcheck gates a deploy's cut-over
+  // on it, and a static "ok" let a release go live with no database. The
+  // answer names the failure kind only, never a host, version or message.
   app.get("/health/live", () => ({ status: "ok", service: SERVICE_NAME }));
 
-  app.get("/health/ready", () => ({
-    status: "ok",
-    service: SERVICE_NAME,
-    environment: config.runtime.deploymentEnvironment,
-    contracts: CONTRACTS_VERSION,
-  }));
+  app.get("/health/ready", async (_request, reply) => {
+    const database =
+      modules.healthProbes === undefined
+        ? undefined
+        : await modules.healthProbes.database();
+    const body = {
+      service: SERVICE_NAME,
+      environment: config.runtime.deploymentEnvironment,
+      contracts: CONTRACTS_VERSION,
+      checks: {
+        database:
+          database === undefined
+            ? "NOT_CHECKED"
+            : database.reachable
+              ? "OK"
+              : database.failure,
+      },
+    };
+    if (database !== undefined && !database.reachable) {
+      logger.warn(
+        { check: "database", failure: database.failure },
+        "not ready",
+      );
+      return reply.code(503).send({ status: "unavailable", ...body });
+    }
+    return { status: "ok", ...body };
+  });
 
   return { app, logger, streams };
 }

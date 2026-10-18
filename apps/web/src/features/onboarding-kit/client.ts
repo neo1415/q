@@ -1,3 +1,4 @@
+import type { QConduct, QSentenceGesture } from "@capital-q/contracts";
 /**
  * The frontend-facing port for an onboarding journey, generic over the
  * journey's presentation view and composite responses. Screens and the
@@ -5,7 +6,10 @@
  * onboarding runtime contract and fed by the real API or a dev fixture.
  * Every mutation returns the whole session view.
  */
-import type { OnboardingResponseValue } from "@capital-q/contracts";
+import type {
+  OnboardingResponseValue,
+  OnboardingUnderstanding,
+} from "@capital-q/contracts";
 
 export type OnboardingClient<TView, TResponse> = {
   /** The current session, started if none exists yet. */
@@ -33,6 +37,67 @@ export type OnboardingClient<TView, TResponse> = {
         readonly resolution: "ACCEPT" | "EDIT" | "REJECT";
         readonly response?: OnboardingResponseValue | undefined;
       }) => Promise<TView>)
+    | undefined;
+  /**
+   * Answer one of Q's persisted questions on the step it names, or set it
+   * aside (CQ-PRE-REC-001). Absent when the composed client has no path.
+   */
+  readonly answerQuestion?:
+    | ((input: {
+        readonly questionId: string;
+        readonly stepKey: string;
+        readonly value: OnboardingResponseValue;
+      }) => Promise<TView>)
+    | undefined;
+  readonly dismissQuestion?:
+    ((input: { readonly questionId: string }) => Promise<TView>) | undefined;
+  /**
+   * One turn of the conversational interview (CQ-PRE-REC-001 §16-§21). The
+   * runtime places what was said where it can, or records it for Q's
+   * reading; the reply says which. Absent when the composed client has no
+   * path, so a screen never pretends Q heard something it did not.
+   */
+  /** Re-read the session from the runtime, dropping any cached view. */
+  readonly reload?: (() => Promise<TView>) | undefined;
+  /**
+   * A structured answer to one runtime step — the value a tapped option
+   * stands for, validated by the runtime exactly as a typed or spoken one
+   * (CQ-Q-VOICE-001 B §17-§18). Absent when the composed client has no
+   * direct path, so a screen falls back to saying the option's label.
+   */
+  readonly submitValue?:
+    | ((input: {
+        readonly stepKey: string;
+        readonly value: OnboardingResponseValue;
+      }) => Promise<TView>)
+    | undefined;
+  readonly say?:
+    | ((input: {
+        readonly text: string;
+        /** The exchange so far, oldest first, so Q has the same context aloud and typed. */
+        readonly recentTurns: readonly {
+          readonly role: "person" | "q";
+          readonly text: string;
+        }[];
+        /** The founder profile section they came to fill (Overview link). */
+        readonly focus?: string | undefined;
+      }) => Promise<{
+        readonly view: TView;
+        /** Null when the one Q interviewer answered; `reply` is then Q's words. */
+        readonly understood: OnboardingUnderstanding | null;
+        /** What Q said, shown as given. Never parsed to learn what was recorded. */
+        readonly reply: string | null;
+        /** Where Q is taking the person, if anywhere; "FORM" hands over to the form. */
+        readonly navigate: string | null;
+        /** What Q said it would look into (CQ-QX-005); null when nothing. */
+        readonly researching: string | null;
+        /** The steps Q's reply asks about (not the form's step cursor). */
+        readonly askingAbout?: readonly string[] | undefined;
+        /** Q's patience after the turn (founder direction 2026-09-30). */
+        readonly conduct?: QConduct | undefined;
+        /** PRESENCE: what Q's particles form for which sentence. */
+        readonly gestures?: readonly QSentenceGesture[] | undefined;
+      }>)
     | undefined;
   /** Deterministic taxonomy candidates for the user's own text. Never assigned here. */
   readonly findTaxonomyCandidates: (input: {
@@ -107,7 +172,7 @@ export class OnboardingClientError extends Error {
 
 /** The client composed when no backend is configured: honest, never a fixture. */
 export function createUnavailableClient<TView, TResponse>(
-  message = "Setup isn't available on this build yet.",
+  message = "Setup isn't available right now. Try again later.",
 ): OnboardingClient<TView, TResponse> {
   const unavailable = () =>
     Promise.reject(new OnboardingClientError("UNAVAILABLE", message));

@@ -13,6 +13,7 @@ import type {
   DocumentId,
   DocumentProcessingRun,
   DocumentStatus,
+  DocumentDownloadAudience,
   DocumentType,
   DocumentVersion,
   DocumentVersionId,
@@ -120,6 +121,12 @@ export type DocumentRepository = {
     tenantId: TenantId,
     documentId: DocumentId,
   ) => Promise<Document | null>;
+  /** Trusted pipeline only; guest custody never reaches organisation APIs. */
+  readonly findForProcessing?: (
+    executor: DatabaseExecutor,
+    tenantId: TenantId,
+    documentId: DocumentId,
+  ) => Promise<import("../contracts/index.js").ProcessingDocument | null>;
   /** Row lock for a version registration; same visibility rule as findById. */
   readonly lockById: (
     tx: TransactionContext,
@@ -131,7 +138,21 @@ export type DocumentRepository = {
     executor: DatabaseExecutor,
     tenantId: TenantId,
     ownerOrganisationId: OrganisationId,
-    filter: { readonly companyId?: string | undefined },
+    filter: {
+      readonly companyId?: string | undefined;
+      /**
+       * One page, newest change first (P3 documents page): active
+       * documents only, keyset after (updatedAt, id). Absent: every
+       * document, by creation, as before.
+       */
+      readonly page?:
+        | {
+            readonly limit: number;
+            readonly after?:
+              { readonly updatedAt: string; readonly id: string } | undefined;
+          }
+        | undefined;
+    },
   ) => Promise<readonly Document[]>;
   /** False when `expectedVersion` no longer matches. */
   readonly setCurrentVersion: (
@@ -150,6 +171,16 @@ export type DocumentRepository = {
       readonly documentId: DocumentId;
       readonly expectedVersion: number;
       readonly changes: DocumentDetailChanges;
+    },
+  ) => Promise<boolean>;
+  /** ADR 0041. False when `expectedVersion` no longer matches. */
+  readonly setDownloadAudience: (
+    tx: TransactionContext,
+    input: {
+      readonly tenantId: TenantId;
+      readonly documentId: DocumentId;
+      readonly expectedVersion: number;
+      readonly audience: DocumentDownloadAudience;
     },
   ) => Promise<boolean>;
 };
@@ -209,6 +240,8 @@ export type DocumentVersionRepository = {
     executor: DatabaseExecutor,
     tenantId: TenantId,
     ownerOrganisationId: OrganisationId,
+    /** Only these documents' current versions (one page). Absent: all. */
+    documentIds?: readonly string[],
   ) => Promise<readonly DocumentVersion[]>;
   /**
    * Byte-level duplicate detection inside one organisation only. A hash is

@@ -32,6 +32,13 @@ export const QFindingIdSchema = createUuidIdSchema("QFindingId");
 export type QFindingId = z.infer<typeof QFindingIdSchema>;
 
 /**
+ * Something Q composed for somebody to read and keep: a brief, later a
+ * deck. Identifies the artifact across its versions, never one version.
+ */
+export const QArtifactIdSchema = createUuidIdSchema("QArtifactId");
+export type QArtifactId = z.infer<typeof QArtifactIdSchema>;
+
+/**
  * A prepared, not-yet-approved, not-yet-executed action. Distinct from the
  * approval that may later bind to it and from any execution record.
  */

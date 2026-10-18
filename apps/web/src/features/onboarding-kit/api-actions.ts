@@ -2,13 +2,19 @@
 
 import { z } from "zod";
 
+import { friendlyDetail } from "./problem-words";
+
 import {
   ApiProblemError,
+  answerOnboardingQuestion,
   completeOnboardingSession,
+  dismissOnboardingQuestion,
   findTaxonomyCandidates,
   getCurrentOnboardingSession,
+  getOnboardingCoverage,
   getOnboardingSession,
   resolveOnboardingSuggestion,
+  sayToOnboarding,
   getTaxonomyNode,
   goBackInOnboarding,
   listTaxonomyNodes,
@@ -20,10 +26,13 @@ import {
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   OnboardingJourneyTypeSchema,
+  OnboardingResponseChannelSchema,
   OnboardingResponseValueSchema,
   OnboardingStepKeySchema,
+  type SayOnboardingResponse,
   TAXONOMY_CLASSIFICATION_TEXT_MAX_LENGTH,
   TaxonomyVocabularyCodeSchema,
+  type OnboardingCoverage,
   type OnboardingJourneyType,
   type OnboardingSessionView,
 } from "@capital-q/contracts";
@@ -62,11 +71,17 @@ const failure = (
 async function apiSession(): Promise<ApiSession | ActionResult<never>> {
   const { apiBaseUrl } = loadWebServerConfig();
   if (apiBaseUrl === undefined) {
-    return failure("UNAVAILABLE", "Setup isn't available on this build yet.");
+    return failure(
+      "UNAVAILABLE",
+      "Setup isn't available right now. Try again later.",
+    );
   }
   const accessToken = await getSessionAccessToken();
   if (accessToken === null) {
-    return failure("UNAVAILABLE", "Please sign in again to continue.");
+    return failure(
+      "UNAVAILABLE",
+      "Your session ended. Sign in again to continue.",
+    );
   }
   return { baseUrl: apiBaseUrl, accessToken };
 }
@@ -80,7 +95,12 @@ function isSession(
 /** Problem details → a frontend outcome. Server-authored detail only. */
 function translate(error: unknown): ActionResult<never> {
   if (error instanceof ApiProblemError) {
-    const detail = error.problem?.detail ?? error.message;
+    const friendly = friendlyDetail(error.problem?.detail ?? error.message);
+    const detail = friendly.text;
+    if (friendly.reason === "REQUIRED_STEPS_INCOMPLETE") {
+      // Waiting is the fix, so the screen offers "Try again".
+      return failure("NETWORK", detail);
+    }
     if (error.code === "VERSION_CONFLICT") {
       return failure(
         "CONFLICT",
@@ -88,17 +108,17 @@ function translate(error: unknown): ActionResult<never> {
       );
     }
     if (error.status === 401) {
-      return failure("UNAVAILABLE", "Please sign in again to continue.");
+      return failure(
+        "UNAVAILABLE",
+        "Your session ended. Sign in again to continue.",
+      );
     }
     if (error.status >= 500) {
-      return failure(
-        "NETWORK",
-        "Capital Q couldn't save that. Please try again.",
-      );
+      return failure("NETWORK", "Capital Q couldn't save that. Try again.");
     }
     return failure("REJECTED", detail);
   }
-  return failure("NETWORK", "Couldn't reach Capital Q. Please try again.");
+  return failure("NETWORK", "Couldn't reach Capital Q. Try again.");
 }
 
 async function run<T>(
@@ -150,12 +170,34 @@ export async function onboardingGetAction(
   return run((session) => getOnboardingSession(session, sessionId));
 }
 
+/**
+ * The canonical coverage of the caller's own session (lane ob1): the same
+ * picture Q reads, for the quiet progress view. Null when the API does not
+ * offer it (an older deployment): the screen keeps its step progress.
+ */
+export async function onboardingCoverageAction(
+  rawSessionId: string,
+): Promise<ActionResult<OnboardingCoverage | null>> {
+  const sessionId = Uuid.parse(rawSessionId);
+  return run(async (session) => {
+    try {
+      return (await getOnboardingCoverage(session, sessionId)).coverage;
+    } catch (error) {
+      if (error instanceof ApiProblemError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  });
+}
+
 const SubmitInput = z.object({
   sessionId: Uuid,
   stepKey: OnboardingStepKeySchema,
   value: OnboardingResponseValueSchema,
   expectedSessionVersion: Version,
   idempotencyKey: Uuid,
+  channel: OnboardingResponseChannelSchema.optional(),
 });
 
 export async function onboardingSubmitAction(
@@ -168,7 +210,10 @@ export async function onboardingSubmitAction(
       input.sessionId,
       {
         stepKey: input.stepKey,
-        response: { value: input.value },
+        response: {
+          value: input.value,
+          ...(input.channel === undefined ? {} : { channel: input.channel }),
+        },
         expectedSessionVersion: input.expectedSessionVersion,
       },
       input.idempotencyKey,
@@ -233,6 +278,100 @@ export async function onboardingResolveSuggestionAction(
           : { response: { value: input.response } }),
         expectedSessionVersion: input.expectedSessionVersion,
       },
+      input.idempotencyKey,
+    ),
+  );
+}
+
+const AnswerQuestionInput = z.object({
+  sessionId: Uuid,
+  questionId: Uuid,
+  stepKey: OnboardingStepKeySchema,
+  value: OnboardingResponseValueSchema,
+  expectedSessionVersion: Version,
+  idempotencyKey: Uuid,
+});
+
+export async function onboardingAnswerQuestionAction(
+  raw: unknown,
+): Promise<ActionResult<OnboardingSessionView>> {
+  const input = AnswerQuestionInput.parse(raw);
+  return run((session) =>
+    answerOnboardingQuestion(
+      session,
+      input.sessionId,
+      input.questionId,
+      {
+        stepKey: input.stepKey,
+        response: { value: input.value },
+        expectedSessionVersion: input.expectedSessionVersion,
+      },
+      input.idempotencyKey,
+    ),
+  );
+}
+
+const SayInput = z.object({
+  sessionId: Uuid,
+  // Empty opens the interview: Q speaks first (QX-004 core gate: one Q).
+  text: z.string().trim().max(2000),
+  expectedSessionVersion: Version,
+  idempotencyKey: Uuid,
+  // The thread so far, so the one interviewer has the same context it has
+  // aloud (QX-004 core gate: one Q). Words, never authority.
+  recentTurns: z
+    .array(
+      z.object({
+        role: z.enum(["person", "q"]),
+        text: z.string().max(1500),
+      }),
+    )
+    .max(16)
+    .default([]),
+  // The founder profile section they came to fill (Overview link).
+  focus: z
+    .string()
+    .regex(/^[a-z][a-z_]{0,39}$/)
+    .optional(),
+});
+
+/** The conversational interview (CQ-PRE-REC-001 §16-§21): one turn to Q about the current step. */
+export async function onboardingSayAction(
+  raw: unknown,
+): Promise<ActionResult<SayOnboardingResponse>> {
+  const input = SayInput.parse(raw);
+  return run((session) =>
+    sayToOnboarding(
+      session,
+      input.sessionId,
+      {
+        text: input.text,
+        expectedSessionVersion: input.expectedSessionVersion,
+        recentTurns: input.recentTurns,
+        ...(input.focus === undefined ? {} : { focus: input.focus }),
+      },
+      input.idempotencyKey,
+    ),
+  );
+}
+
+const DismissQuestionInput = z.object({
+  sessionId: Uuid,
+  questionId: Uuid,
+  expectedSessionVersion: Version,
+  idempotencyKey: Uuid,
+});
+
+export async function onboardingDismissQuestionAction(
+  raw: unknown,
+): Promise<ActionResult<OnboardingSessionView>> {
+  const input = DismissQuestionInput.parse(raw);
+  return run((session) =>
+    dismissOnboardingQuestion(
+      session,
+      input.sessionId,
+      input.questionId,
+      { expectedSessionVersion: input.expectedSessionVersion },
       input.idempotencyKey,
     ),
   );

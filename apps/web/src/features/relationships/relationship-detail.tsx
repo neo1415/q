@@ -1,0 +1,1071 @@
+import Link from "next/link";
+import type { ReactNode } from "react";
+
+import {
+  isMatchedRelationshipState,
+  type ChatThreadDto,
+  type DiligenceDto,
+  type MeetingDto,
+  type RelationshipBrief,
+  type RelationshipStatusDto,
+} from "@capital-q/contracts";
+import { buttonClassName } from "@capital-q/ui/button";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  CalendarDays,
+  ChevronDown,
+  FileText,
+  Globe,
+  ICON_SIZE,
+  MapPin,
+  MessageSquare,
+  Upload,
+} from "@capital-q/ui/icons";
+
+import { PageContainer } from "@/components/app-shell/page-container";
+import { RelationshipMail } from "@/features/integrations/relationship-mail";
+import { DockAvoidZone } from "@/features/q-dock/dock-avoid-zone";
+import { EntityAvatar, EntityCover } from "@/features/entity/entity-avatar";
+import { JoinCallForm } from "@/features/schedule/join-call-form";
+import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
+
+import { briefLines } from "./brief-lines";
+import { ScheduleDialog } from "./schedule-dialog";
+import { callToRecord } from "./call-to-record";
+
+import { AskQAboutRelationship } from "./relationship-actions";
+import type { CounterpartProfile } from "./relationship-page-data";
+import { RelationshipCommitment } from "./relationship-commitment";
+import { RelationshipDeal } from "./relationship-deal";
+import { RelationshipErrands } from "./relationship-errands";
+import { RelationshipOutcome } from "./relationship-outcome";
+import { nextStepFor, type NextStep } from "./relationships-view";
+import { StageDurations } from "./stage-durations";
+import { RelationshipTimeline } from "./relationship-timeline";
+import { JOURNEY, journeyStep } from "./journey";
+import {
+  NEXT_STEP_WORDS,
+  type RelationshipSide,
+  STATE_WORDS,
+} from "./relationship-words";
+import { QControl } from "@/features/q/control/q-control";
+import { QSection } from "@/features/q/q-section";
+import { serverTNow } from "@/features/i18n/server-now";
+
+/** States whose next step is the outcome itself, shown above More. */
+export const OUTCOME_FIRST: ReadonlySet<string> = new Set([
+  "MEETING_HELD",
+  "PAUSED",
+  "PASSED",
+]);
+
+/** States whose primary action is the way back (Resume, Reconsider). */
+export const WAY_BACK: ReadonlySet<string> = new Set(["PAUSED", "PASSED"]);
+
+/**
+ * Whether the Next card has no step of its own to lead with (interest sent,
+ * waiting for the answer). It then says so, rather than showing a lone
+ * "More" (demo-44 phone pass).
+ */
+export function nothingLeads(
+  hasActions: boolean,
+  connected: boolean,
+  state: string,
+  hasCallToRecord: boolean,
+): boolean {
+  return (
+    !hasActions && !connected && !OUTCOME_FIRST.has(state) && !hasCallToRecord
+  );
+}
+
+/**
+ * One relationship, for one side (CQ-WEB-030; doc 25 §121: "where are we,
+ * what happened, what is next"; founder design 2026-09-28, Relationship
+ * overview).
+ *
+ * A hero with who the counterpart is and where things stand; tabs to the
+ * conversation, calls and reminders; then where things stand, about them,
+ * what happened, the latest messages, and calls and reminders. The right
+ * column holds the next action (the same server-confirmed controls as
+ * before, plus links to what exists: messages, calls, reminders), their
+ * context, and Q. Every state and date is the server's per-party fold.
+ * No celebration, no score, no badge.
+ */
+
+export function RelationshipDetail({
+  side,
+  counterpart,
+  relationship,
+  actions,
+  absentSentence,
+  askQ = true,
+  profile,
+  thread = null,
+  meetings = [],
+  readAt,
+  basePath,
+  media = null,
+  diligence = null,
+  brief = null,
+  fitAndInterest = null,
+  work = null,
+  gateq = null,
+  notes = null,
+  decision = null,
+}: {
+  readonly side: RelationshipSide;
+  readonly counterpart: string;
+  readonly relationship: RelationshipStatusDto | null;
+  /** The server-confirmed action for this side and state, if any. */
+  readonly actions: ReactNode;
+  /** Said when nothing is on record that this side can see. */
+  readonly absentSentence: string;
+  /** Whether Q can be asked about it: false when nothing is on record to ask about. */
+  readonly askQ?: boolean | undefined;
+  readonly profile: CounterpartProfile;
+  /** The first page of messages, when the chat is open. */
+  readonly thread?: ChatThreadDto | null | undefined;
+  /** The relationship's calls, shown in What happened. */
+  readonly meetings?: readonly MeetingDto[] | undefined;
+  /** When the page was read, for past vs booked calls. */
+  readonly readAt: number;
+  /** This relationship's own page, e.g. /relationships/company/{id}. */
+  readonly basePath: string;
+  /** The counterpart's pitch, when this side may play it. */
+  readonly media?: ReactNode;
+  /** The diligence area once diligence started (its own tab). */
+  readonly diligence?: DiligenceDto | null | undefined;
+  /** The Relationship Brief (R1): the same read Q answers from. */
+  readonly brief?: RelationshipBrief | null | undefined;
+  /** An investor's fit and interest, kept apart (CRM record workspace). */
+  readonly fitAndInterest?: ReactNode;
+  /** Q's work with this counterpart; null when there is none to show. */
+  readonly work?: ReactNode;
+  /** GateQ applications on this relationship; null when there are none. */
+  readonly gateq?: ReactNode;
+  /** This side's private notes (CRM S3); null when there is no record. */
+  readonly notes?: ReactNode;
+  /** The latest decision with why and how much (CRM S5); null: none. */
+  readonly decision?: ReactNode;
+}) {
+  const t = serverTNow();
+
+  // The match outlives CONNECTED (relationship-state.v2).
+  const connected =
+    relationship !== null && isMatchedRelationshipState(relationship.state);
+  // The brief counts the whole history; the thread is only its first page.
+  const messageCount = brief?.messages.count ?? thread?.messages.length ?? 0;
+  const standing = brief === null ? [] : briefLines(brief, counterpart);
+  const call =
+    relationship === null
+      ? null
+      : callToRecord(relationship.state, meetings, readAt);
+  return (
+    <PageContainer className="flex flex-col gap-6">
+      <BackToRelationships />
+      <RelationshipHero
+        counterpart={counterpart}
+        relationship={relationship}
+        profile={profile}
+        note={relationship === null ? t(absentSentence) : undefined}
+        step={heroStep({
+          side,
+          relationship,
+          diligence,
+          meetings,
+          readAt,
+          basePath,
+        })}
+      />
+
+      <RelationshipTabs
+        basePath={basePath}
+        current="OVERVIEW"
+        messageCount={connected ? messageCount : null}
+        diligence={diligence}
+        calls={connected}
+      />
+
+      {relationship !== null &&
+      (OUTCOME_FIRST.has(relationship.state) || call !== null) ? (
+        // Right after a meeting, "How did it go?" comes before Next (lead
+        // decision, design-48); when paused or not proceeding, the way
+        // back does (break-it 2026-10-03: Zino could not find Resume).
+        <section
+          aria-labelledby="relationship-outcome"
+          className="flex max-w-(--cq-layout-reading) flex-col gap-3"
+          data-outcome-first
+        >
+          <h2
+            id="relationship-outcome"
+            className="cq-title-sm text-(--cq-text-primary)"
+          >
+            {WAY_BACK.has(relationship.state)
+              ? t("Where this stands")
+              : t("How did it go?")}
+          </h2>
+          <DockAvoidZone className="flex flex-col items-stretch gap-2">
+            <RelationshipOutcome
+              relationshipId={relationship.relationshipId}
+              state={relationship.state}
+              side={side}
+              counterpart={counterpart}
+              call={call}
+            />
+          </DockAvoidZone>
+        </section>
+      ) : null}
+
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="flex min-w-0 flex-col gap-8">
+          {relationship === null || !connected ? null : (
+            // Deal close (2026-10-08): the stage strip both sides see, the
+            // next step, the terms, the reports and the final state.
+            <Card title={t("Deal")} id="deal">
+              <RelationshipDeal
+                relationshipId={relationship.relationshipId}
+                counterpart={counterpart}
+                side={side}
+              />
+            </Card>
+          )}
+
+          {media === null || media === undefined ? null : (
+            <Card title={t("Pitch")} id="pitch">
+              {media}
+            </Card>
+          )}
+
+          {relationship === null || !connected ? null : (
+            <Card title={t("Commitment")} id="commitment">
+              <RelationshipCommitment
+                relationshipId={relationship.relationshipId}
+                counterpart={counterpart}
+              />
+            </Card>
+          )}
+
+          {relationship === null ||
+          !relationship.milestones.some(
+            (milestone) => milestone.state === "IN_DILIGENCE",
+          ) ? null : (
+            <Card title={t("Diligence")} id="diligence">
+              <Link
+                href={`${basePath}/diligence`}
+                className="flex min-h-14 items-center justify-between gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-3 hover:border-(--cq-border) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                data-diligence-summary
+              >
+                <span className="cq-body text-(--cq-text-primary)">
+                  {t(diligenceLine(side, diligence))}
+                </span>
+                <ArrowUpRight
+                  size={ICON_SIZE.compact}
+                  aria-hidden="true"
+                  className="shrink-0 text-(--cq-text-tertiary)"
+                />
+              </Link>
+            </Card>
+          )}
+
+          {relationship === null ||
+          relationship.milestones.length === 0 ? null : (
+            // Q's SCROLL_TO (premiere v5): the dated history, on screen.
+            <QControl id="section.relationship-history" kind="SECTION">
+              <Card
+                title={t("What happened")}
+                id="history"
+                collapsible
+                count={relationship.milestones.length}
+              >
+                <StageDurations
+                  milestones={relationship.milestones}
+                  now={readAt}
+                />
+                <RelationshipTimeline
+                  milestones={relationship.milestones}
+                  meetings={meetings}
+                  now={readAt}
+                  side={side}
+                  counterpart={counterpart}
+                />
+              </Card>
+            </QControl>
+          )}
+
+          {gateq === null || gateq === undefined ? null : (
+            <Card title="GateQ" id="gateq">
+              {gateq}
+            </Card>
+          )}
+
+          {work === null || work === undefined ? null : (
+            <Card title="Q Work" id="q-work">
+              {work}
+            </Card>
+          )}
+
+          {decision === null || decision === undefined ? null : (
+            <Card title={t("Decision")} id="decision">
+              {decision}
+            </Card>
+          )}
+
+          {notes === null || notes === undefined ? null : (
+            <Card title={t("Private notes")} id="notes">
+              {notes}
+            </Card>
+          )}
+
+          {relationship === null ? null : (
+            <RelationshipMail
+              relationshipId={relationship.relationshipId}
+              counterpart={counterpart}
+            />
+          )}
+        </div>
+
+        {/*
+          On a phone the aside's parts join the page's grid so the next
+          step can come straight after the hero, before the history
+          (re-capture 2026-10-03: Book a call sat below the whole timeline);
+          context and Ask Q follow the page.
+        */}
+        <aside
+          className="flex min-w-0 flex-col gap-6 max-lg:contents lg:sticky lg:top-6 lg:self-start"
+          aria-label={t("Next")}
+        >
+          <Card title={t("Next")} id="next" className="max-lg:order-first">
+            {/*
+              The whole next-step block, its brief included, is kept clear
+              of the Q dock (16 Oct run: "Voice paused" sat over the brief
+              just above Book a call).
+            */}
+            <DockAvoidZone>
+              {standing.length === 0 ? null : (
+                <ul
+                  className="cq-body-sm mb-3 flex flex-col gap-1 text-(--cq-text-secondary)"
+                  aria-label={t("Where this stands")}
+                  data-relationship-brief
+                >
+                  {standing.map((line) => (
+                    <li key={line}>{t(line)}</li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex flex-col items-stretch gap-2">
+                {actions}
+                {connected && relationship !== null ? (
+                  <ScheduleDialog
+                    kind="call"
+                    primary={
+                      actions === null && !WAY_BACK.has(relationship.state)
+                    }
+                  >
+                    <RelationshipSchedule
+                      relationshipId={relationship.relationshipId}
+                      counterpart={counterpart}
+                      connected={connected}
+                      focus="call"
+                    />
+                  </ScheduleDialog>
+                ) : null}
+                {connected ? (
+                  <Link
+                    href={`${basePath}/messages`}
+                    className={buttonClassName("secondary")}
+                  >
+                    <MessageSquare
+                      size={ICON_SIZE.regular}
+                      aria-hidden="true"
+                    />
+                    {t("Send a message")}
+                  </Link>
+                ) : null}
+                {relationship !== null &&
+                nothingLeads(
+                  actions !== null && actions !== undefined,
+                  connected,
+                  relationship.state,
+                  call !== null,
+                ) ? (
+                  <p className="cq-body-sm text-(--cq-text-secondary)">
+                    {t("Nothing needs you right now.")}
+                  </p>
+                ) : null}
+                {relationship === null ? null : (
+                  <>
+                    {/*
+                    One primary step above; everything else one tap away
+                    (demo audit 2026-10-03: six equal actions under Next).
+                  */}
+                    <details className="group" data-next-more>
+                      <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
+                        {t("More")}
+                        <ChevronDown
+                          size={ICON_SIZE.compact}
+                          aria-hidden="true"
+                          className="transition-transform duration-(--cq-motion-fast) group-open:rotate-180 motion-reduce:transition-none"
+                        />
+                      </summary>
+                      <div className="flex flex-col items-stretch gap-2 pt-2">
+                        <RelationshipErrands
+                          relationshipId={relationship.relationshipId}
+                          counterpart={counterpart}
+                          connected={connected}
+                        />
+                        {connected ? (
+                          <ScheduleDialog kind="join">
+                            <JoinCallForm
+                              relationshipId={relationship.relationshipId}
+                              counterpart={counterpart}
+                            />
+                          </ScheduleDialog>
+                        ) : null}
+                        <ScheduleDialog kind="reminder">
+                          <RelationshipSchedule
+                            relationshipId={relationship.relationshipId}
+                            counterpart={counterpart}
+                            connected={connected}
+                            focus="reminder"
+                          />
+                        </ScheduleDialog>
+                        {OUTCOME_FIRST.has(relationship.state) ||
+                        call !== null ? null : (
+                          <RelationshipOutcome
+                            relationshipId={relationship.relationshipId}
+                            state={relationship.state}
+                            side={side}
+                            counterpart={counterpart}
+                          />
+                        )}
+                      </div>
+                    </details>
+                  </>
+                )}
+              </div>
+            </DockAvoidZone>
+          </Card>
+
+          {fitAndInterest === null || fitAndInterest === undefined ? null : (
+            <Card title={t("Fit and interest")} id="fit">
+              {fitAndInterest}
+            </Card>
+          )}
+
+          <Card
+            className="max-lg:order-last"
+            title={
+              side === "INVESTOR"
+                ? t("About the company")
+                : t("About the investor")
+            }
+            id="context"
+          >
+            <div className="flex flex-col gap-3">
+              {profile.about === null ? (
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  {t(`${counterpart} hasn't shared a description you can see.`)}
+                </p>
+              ) : (
+                <p className="cq-body-sm line-clamp-6 text-(--cq-text-secondary)">
+                  {t(profile.about)}
+                </p>
+              )}
+              <ProfileChips profile={profile} />
+              {profile.profileHref === null ? null : (
+                <Link
+                  href={profile.profileHref}
+                  className={buttonClassName(
+                    "secondary",
+                    "compact",
+                    "self-start",
+                  )}
+                >
+                  {t("View profile")}
+                  <ArrowUpRight size={ICON_SIZE.compact} aria-hidden="true" />
+                </Link>
+              )}
+            </div>
+          </Card>
+
+          {askQ ? (
+            <section
+              aria-label={t("Ask Q")}
+              className="flex flex-col gap-3 border-t border-(--cq-border-subtle) pt-5 max-lg:order-last"
+            >
+              <AskQAboutRelationship counterpart={counterpart} />
+            </section>
+          ) : null}
+        </aside>
+      </div>
+    </PageContainer>
+  );
+}
+
+/**
+ * A relationship's other tabs (Diligence, Calls): the same back link, hero
+ * and tabs as the overview, then the tab's own content.
+ */
+export function RelationshipSection({
+  side,
+  counterpart,
+  relationship,
+  profile,
+  basePath,
+  current,
+  messageCount,
+  diligence,
+  meetings,
+  readAt,
+  children,
+}: {
+  readonly side: RelationshipSide;
+  readonly counterpart: string;
+  readonly relationship: RelationshipStatusDto;
+  readonly profile: CounterpartProfile;
+  readonly basePath: string;
+  readonly current: "DILIGENCE" | "CALLS";
+  readonly messageCount: number;
+  readonly diligence: DiligenceDto | null;
+  readonly meetings: readonly MeetingDto[];
+  readonly readAt: number;
+  readonly children: ReactNode;
+}) {
+  const t = serverTNow();
+
+  const connected = isMatchedRelationshipState(relationship.state);
+  return (
+    <PageContainer className="flex flex-col gap-6">
+      <BackToRelationships />
+      <RelationshipHero
+        counterpart={counterpart}
+        relationship={relationship}
+        profile={profile}
+        step={heroStep({
+          side,
+          relationship,
+          diligence,
+          meetings,
+          readAt,
+          basePath,
+        })}
+      />
+      <RelationshipTabs
+        basePath={basePath}
+        current={current}
+        messageCount={connected ? messageCount : null}
+        diligence={diligence}
+        calls={connected}
+      />
+      {/* Lane W: the tab on screen, by the counterpart's record. */}
+      <QSection
+        id={current === "CALLS" ? "calls" : "diligence"}
+        kind={current === "CALLS" ? "SCHEDULE" : "DILIGENCE"}
+        refs={[
+          side === "INVESTOR"
+            ? { kind: "COMPANY", id: relationship.companyId }
+            : {
+                kind: "INVESTOR_ORGANISATION",
+                id: relationship.investorOrganisationId,
+              },
+          ...(current === "CALLS"
+            ? meetings.slice(0, 11).map((meeting) => ({
+                kind: "MEETING" as const,
+                id: meeting.id,
+              }))
+            : []),
+        ]}
+        total={current === "CALLS" ? meetings.length : 1}
+        label={t(
+          `${current === "CALLS" ? "calls" : "diligence"} with ${counterpart}`,
+        )}
+      >
+        {children}
+      </QSection>
+    </PageContainer>
+  );
+}
+
+/**
+ * The top of both relationship pages: who, where, and where it stands
+ * (design-48). No card around it: the name, then the state in words with
+ * the step it reached, the bar repeating what the words say.
+ */
+export function RelationshipHero({
+  counterpart,
+  relationship,
+  profile,
+  note,
+  step: next = null,
+}: {
+  readonly counterpart: string;
+  readonly relationship: RelationshipStatusDto | null;
+  readonly profile: CounterpartProfile;
+  /** Said under the name when nothing is on record. */
+  readonly note?: string | undefined;
+  /** The one next step (the list row's own), as the hero's button. */
+  readonly step?: NextStep | null | undefined;
+}) {
+  const t = serverTNow();
+
+  const step = relationship === null ? null : journeyStep(relationship);
+  const action =
+    next === null || next.label === null || next.href === null ? null : next;
+  const ActionIcon =
+    action?.icon === "upload"
+      ? Upload
+      : action?.icon === "file"
+        ? FileText
+        : action?.icon === "reply"
+          ? MessageSquare
+          : action?.icon === "calendar"
+            ? CalendarDays
+            : null;
+  return (
+    <section
+      aria-label={t(`${counterpart} at a glance`)}
+      className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-end lg:gap-x-8"
+      data-relationship-hero
+    >
+      <div className="flex min-w-0 flex-col gap-4">
+        {typeof profile.coverUrl === "string" ? (
+          <EntityCover src={profile.coverUrl} />
+        ) : null}
+        <div className="flex items-center gap-4">
+          <EntityAvatar
+            kind={profile.companyId === undefined ? "investor" : "company"}
+            name={counterpart}
+            // An investor without a signed picture: the gated photo route by
+            // id (the name's scope). A company's null means "no photo".
+            src={
+              profile.investorOrganisationId
+                ? (profile.photoUrl ?? undefined)
+                : profile.photoUrl
+            }
+            companyId={profile.companyId}
+            investorOrganisationId={profile.investorOrganisationId}
+            size="lg"
+            decorative
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <h1 className="cq-title-lg break-words text-(--cq-text-primary)">
+              {counterpart}
+            </h1>
+            <div className="max-sm:hidden">
+              <ProfileChips profile={profile} />
+            </div>
+            {note === undefined ? null : (
+              <p className="cq-body-sm text-(--cq-text-secondary)">{note}</p>
+            )}
+          </div>
+        </div>
+        {relationship === null ? null : (
+          <div className="flex max-w-(--cq-layout-reading) flex-col gap-2">
+            {step === null ? null : (
+              <ol
+                className="grid grid-cols-5 gap-1"
+                aria-label={t("Progress")}
+                data-journey-step={step}
+              >
+                {JOURNEY.map((entry, index) => (
+                  <li
+                    key={entry.label}
+                    className="flex flex-col gap-1"
+                    aria-current={index + 1 === step ? "step" : undefined}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`h-1 ${
+                        index + 1 < step
+                          ? "bg-(--cq-text-secondary)"
+                          : index + 1 === step
+                            ? "bg-(--cq-accent)"
+                            : "bg-(--cq-surface-strong)"
+                      }`}
+                    />
+                    <span
+                      className={`cq-caption max-sm:sr-only ${
+                        index + 1 === step
+                          ? "font-medium text-(--cq-text-primary)"
+                          : "text-(--cq-text-tertiary)"
+                      }`}
+                    >
+                      {t(entry.label)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <p
+              className="cq-body-sm text-(--cq-text-secondary)"
+              data-relationship-state
+            >
+              <span className="font-medium text-(--cq-text-primary)">
+                {t(STATE_WORDS[relationship.state])}
+              </span>
+              {step === null ? null : (
+                <span className="cq-numeric">
+                  {t(` · ${String(step)} of ${String(JOURNEY.length)}`)}
+                </span>
+              )}
+              {action === null ? (
+                <span className="max-sm:sr-only">
+                  {t(` · Next: ${NEXT_STEP_WORDS[relationship.nextStep]}`)}
+                </span>
+              ) : null}
+            </p>
+          </div>
+        )}
+      </div>
+      {action === null ? null : (
+        <div className="flex flex-col gap-1.5" data-hero-action>
+          <Link
+            href={action.href ?? "#"}
+            className={buttonClassName(
+              action.urgent ? "primary" : "secondary",
+              "regular",
+              "w-full",
+            )}
+          >
+            {ActionIcon === null ? null : (
+              <ActionIcon size={ICON_SIZE.regular} aria-hidden="true" />
+            )}
+            {action.label}
+          </Link>
+          {action.why === "" ? null : (
+            <p className="cq-body-sm text-(--cq-text-secondary)">
+              {t(action.why)}
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** The hero's step: the same words the list row says for it. */
+export function heroStep(input: {
+  readonly side: RelationshipSide;
+  readonly relationship: RelationshipStatusDto | null;
+  readonly diligence: DiligenceDto | null;
+  readonly meetings: readonly MeetingDto[];
+  readonly readAt: number;
+  readonly basePath: string;
+}): NextStep | null {
+  const { relationship, diligence } = input;
+  if (relationship === null) return null;
+  const open = (diligence?.requests ?? []).filter(
+    (request) => request.status === "OPEN",
+  );
+  const nextCall = input.meetings
+    .filter(
+      (meeting) =>
+        meeting.status !== "CANCELLED" &&
+        Date.parse(meeting.startsAt) > input.readAt,
+    )
+    .toSorted((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))
+    .at(0);
+  const step = nextStepFor(
+    relationship,
+    {
+      unread: 0,
+      followUpDue: false,
+      nextCallAt: nextCall?.startsAt ?? null,
+      lastMessageAt: null,
+      diligence:
+        diligence === null || !diligence.open
+          ? null
+          : {
+              openRequests: open.length,
+              firstOpenTitle: open[0]?.title ?? null,
+              unopenedShares: diligence.shares.filter(
+                (share) => share.viewedAt === null,
+              ).length,
+            },
+    },
+    input.side,
+    input.readAt,
+    input.basePath,
+  );
+  // Answering interest stays the Next card's own server-confirmed control.
+  return step.icon === "answer" ? null : step;
+}
+
+/** The overview's one line about diligence, from the side reading it. */
+export function diligenceLine(
+  side: RelationshipSide,
+  diligence: DiligenceDto | null,
+): string {
+  if (diligence === null) return "Open diligence";
+  const open = diligence.requests.filter((r) => r.status === "OPEN").length;
+  const shared = diligence.shares.length;
+  const parts = [
+    open === 0
+      ? null
+      : side === "COMPANY"
+        ? `${String(open)} ${open === 1 ? "request" : "requests"} to answer`
+        : `${String(open)} waiting on them`,
+    shared === 0
+      ? null
+      : `${String(shared)} ${shared === 1 ? "document" : "documents"} shared`,
+  ].filter((part): part is string => part !== null);
+  return parts.length === 0 ? "Nothing requested yet" : parts.join(" · ");
+}
+
+/** The relationship's tabs: real pages and real sections, nothing else. */
+export function RelationshipTabs({
+  basePath,
+  current,
+  messageCount,
+  diligence = null,
+  calls = false,
+}: {
+  readonly basePath: string;
+  readonly current: "OVERVIEW" | "DILIGENCE" | "MESSAGES" | "CALLS";
+  /** Null when the chat isn't open: the tab is then not offered. */
+  readonly messageCount: number | null;
+  /** Offered once diligence started; its count is what waits on this side. */
+  readonly diligence?: DiligenceDto | null | undefined;
+  /** Offered once connected. */
+  readonly calls?: boolean | undefined;
+}) {
+  const t = serverTNow();
+
+  const waiting =
+    diligence === null
+      ? 0
+      : diligence.side === "COMPANY"
+        ? diligence.requests.filter((r) => r.status === "OPEN").length
+        : diligence.shares.filter((share) => share.viewedAt === null).length;
+  // The same tab treatment as the CRM's own tabs, one level down.
+  const tab = (active: boolean) =>
+    `cq-body-sm -mb-px inline-flex min-h-11 flex-none items-center gap-2 border-b-2 px-3 whitespace-nowrap transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) ${
+      active
+        ? "border-(--cq-accent) font-semibold text-(--cq-text-primary)"
+        : "border-transparent font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+    }`;
+  return (
+    <nav
+      aria-label={t("Relationship")}
+      className="relative -mx-4 flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+    >
+      <Link
+        href={basePath}
+        aria-current={current === "OVERVIEW" ? "page" : undefined}
+        className={tab(current === "OVERVIEW")}
+      >
+        {t("Overview")}
+      </Link>
+      {diligence === null ? null : (
+        <Link
+          href={`${basePath}/diligence`}
+          aria-current={current === "DILIGENCE" ? "page" : undefined}
+          className={tab(current === "DILIGENCE")}
+        >
+          {t("Diligence")}
+          {waiting > 0 ? (
+            <span className="cq-caption cq-numeric bg-(--cq-accent) px-2 text-(--cq-text-inverse)">
+              {waiting}
+            </span>
+          ) : null}
+        </Link>
+      )}
+      {messageCount === null ? null : (
+        <Link
+          href={`${basePath}/messages`}
+          aria-current={current === "MESSAGES" ? "page" : undefined}
+          className={tab(current === "MESSAGES")}
+        >
+          {t("Messages")}
+          {messageCount > 0 ? (
+            <span className="cq-caption cq-numeric bg-(--cq-surface-subtle) px-2">
+              {messageCount}
+            </span>
+          ) : null}
+        </Link>
+      )}
+      {calls ? (
+        <Link
+          href={`${basePath}/calls`}
+          aria-current={current === "CALLS" ? "page" : undefined}
+          className={tab(current === "CALLS")}
+        >
+          {t("Calls")}
+        </Link>
+      ) : null}
+    </nav>
+  );
+}
+
+function ProfileChips({ profile }: { readonly profile: CounterpartProfile }) {
+  const t = serverTNow();
+
+  if (
+    profile.location === null &&
+    profile.websiteUrl === null &&
+    profile.chips.length === 0
+  ) {
+    return null;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {profile.location === null ? null : (
+        <span className="cq-caption inline-flex items-center gap-1 text-(--cq-text-secondary)">
+          <MapPin size={ICON_SIZE.compact} aria-hidden="true" />
+          {t(profile.location)}
+        </span>
+      )}
+      {profile.websiteUrl === null ? null : (
+        <a
+          href={profile.websiteUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="cq-caption inline-flex min-h-8 items-center gap-1 text-(--cq-text-secondary) underline-offset-4 hover:underline"
+        >
+          <Globe size={ICON_SIZE.compact} aria-hidden="true" />
+          {t(
+            profile.websiteUrl.replace(/^https?:\/\//i, "").replace(/\/$/, ""),
+          )}
+        </a>
+      )}
+      {profile.chips.map((chip) => (
+        <span
+          key={chip}
+          className="cq-caption bg-(--cq-surface-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)"
+        >
+          {t(chip)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Q Pitch v6: the record's sections a tour talks about, by card id. Inert
+ * markers (`data-qp-anchor`, space-separated per track); the tour lights
+ * the one Q is speaking about. fdr.11.*: the founder track's record step.
+ */
+const QP_CARD_ANCHORS: Readonly<Record<string, string>> = {
+  deal: "fdr.11.relationship.deal",
+  history: "fdr.11.relationship.history",
+  notes: "fdr.11.relationship.notes",
+  next: "fdr.11.relationship.next",
+};
+
+function Card({
+  title,
+  id,
+  action,
+  className,
+  collapsible = false,
+  count,
+  children,
+}: {
+  readonly title: string;
+  readonly id: string;
+  readonly action?: ReactNode;
+  readonly className?: string | undefined;
+  /**
+   * Folded on a phone, open on a large screen (design-48 v2: fewer sections
+   * above the fold). The large-screen rule shows a closed <details>'s
+   * content through ::details-content; a browser without it shows the
+   * section folded, one tap from open.
+   */
+  readonly collapsible?: boolean;
+  readonly count?: number | undefined;
+  readonly children: ReactNode;
+}) {
+  const t = serverTNow();
+
+  const heading = (
+    <h2
+      id={`relationship-${id}`}
+      className="cq-title-sm text-(--cq-text-primary)"
+    >
+      {t(title)}
+      {count === undefined ? null : (
+        <span className="cq-numeric font-normal text-(--cq-text-secondary) lg:hidden">
+          {t(` · ${String(count)}`)}
+        </span>
+      )}
+    </h2>
+  );
+  if (collapsible) {
+    return (
+      <details
+        aria-labelledby={`relationship-${id}`}
+        className={`group scroll-mt-24 border-t border-(--cq-border-subtle) pt-2 lg:pt-5 lg:[&::details-content]:[content-visibility:visible] ${className ?? ""}`}
+        data-collapsible={id}
+        data-qp-anchor={QP_CARD_ANCHORS[id]}
+      >
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 lg:pointer-events-none lg:min-h-0 [&::-webkit-details-marker]:hidden">
+          {heading}
+          <ChevronDown
+            size={ICON_SIZE.regular}
+            aria-hidden="true"
+            className="text-(--cq-text-tertiary) transition-transform group-open:rotate-180 lg:hidden"
+          />
+        </summary>
+        {/* The id is inside the fold so a link to #diligence opens it. */}
+        <div id={id} className="flex scroll-mt-24 flex-col gap-4 pt-3 lg:pt-4">
+          {children}
+        </div>
+      </details>
+    );
+  }
+  return (
+    <section
+      aria-labelledby={`relationship-${id}`}
+      className={`flex scroll-mt-24 flex-col gap-4 border-t border-(--cq-border-subtle) pt-5 ${className ?? ""}`}
+      data-qp-anchor={QP_CARD_ANCHORS[id]}
+    >
+      <div className="flex items-center justify-between gap-3">
+        {heading}
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+export function BackToRelationships({
+  href = "/relationships",
+  label = "All relationships",
+}: {
+  readonly href?: string;
+  readonly label?: string;
+}) {
+  const t = serverTNow();
+
+  return (
+    <Link
+      href={href}
+      className={buttonClassName("quiet", "regular", "-ms-4 self-start")}
+    >
+      <ArrowLeft size={ICON_SIZE.regular} aria-hidden="true" />
+      {t(label)}
+    </Link>
+  );
+}
+
+/** A page that cannot answer for this person: one calm sentence. */
+export function RelationshipUnavailable({
+  sentence,
+}: {
+  readonly sentence: string;
+}) {
+  const t = serverTNow();
+
+  return (
+    <PageContainer className="flex flex-col gap-6">
+      <BackToRelationships />
+      <h1 className="cq-title-lg text-(--cq-text-primary)">
+        {t("Relationship")}
+      </h1>
+      <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
+        {t(sentence)}
+      </p>
+    </PageContainer>
+  );
+}

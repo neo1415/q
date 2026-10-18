@@ -1,0 +1,1170 @@
+// @vitest-environment jsdom
+import {
+  act,
+  cleanup,
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { DiscoveredCompanyDto } from "@capital-q/contracts";
+
+/**
+ * The Discover feed surface (CQ-WEB-022).
+ *
+ * The controller and the player already have their own suites; this is
+ * about the surface composed from them — that a card shows what was
+ * declared and nothing resembling a score, that the keyboard drives the
+ * same controller the buttons do, that Save and Pass each reach the
+ * transport exactly once, and that Ask Q names the card as the subject.
+ *
+ * The server actions are mocked at the module boundary: they are
+ * `"use server"` files and calling the real ones would need a session, an
+ * API and a network.
+ */
+
+/**
+ * Typed doubles.
+ *
+ * The signatures are not decoration: an untyped `vi.fn()` returns `any`,
+ * and the wrappers below would then quietly hand `any` to the component
+ * under test — which is the one place a test must not be looser than the
+ * code it checks.
+ */
+type ActionResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly message: string };
+
+const loadSlatePageAction =
+  vi.fn<(cursor: string | null) => Promise<ActionResult<unknown>>>();
+const recordDecisionAction =
+  vi.fn<(input: unknown) => Promise<ActionResult<unknown>>>();
+const authorisePlaybackAction =
+  vi.fn<
+    (companyId: string, mediaAssetId: string) => Promise<ActionResult<unknown>>
+  >();
+const setOpen = vi.fn<(open: boolean) => void>();
+const declaredSubjects: unknown[] = [];
+
+vi.mock("../src/features/discover/feed/feed-actions", () => ({
+  loadSlatePageAction: (cursor: string | null) => loadSlatePageAction(cursor),
+  recordDecisionAction: (input: unknown) => recordDecisionAction(input),
+}));
+
+type InterestResult =
+  | { readonly ok: true; readonly value: unknown }
+  | {
+      readonly ok: false;
+      readonly message: string;
+      readonly retryable: boolean;
+    };
+const expressInterestAction =
+  vi.fn<(input: unknown) => Promise<InterestResult>>();
+
+vi.mock("../src/features/network/interest-actions", () => ({
+  expressInterestAction: (input: unknown) => expressInterestAction(input),
+}));
+
+vi.mock("../src/features/discover/feed/playback-source", () => ({
+  authorisePlaybackAction: (companyId: string, mediaAssetId: string) =>
+    authorisePlaybackAction(companyId, mediaAssetId),
+}));
+
+vi.mock("@/components/app-shell/global-q", () => ({
+  useGlobalQ: () => ({ open: false, setOpen }),
+  useQMomentSource: () => undefined,
+}));
+
+vi.mock("@/features/q/q-subject", () => ({
+  QPageSubject: ({ subject }: { subject: unknown }) => {
+    declaredSubjects.push(subject);
+    return null;
+  },
+}));
+
+const { InvestorFeedScreen } =
+  await import("../src/features/discover/investor-feed-screen");
+const { FeedCard } = await import("../src/features/discover/feed-card");
+
+/**
+ * This suite runs on a shared machine alongside other agents' work, where
+ * a render that takes 60ms alone can take several seconds under load. The
+ * default one-second budget for `findBy*`/`waitFor` then expires before
+ * React has committed, which reads as a failure and is not one. Raising
+ * the budget weakens nothing: every expectation below is unchanged, it is
+ * only allowed to arrive late.
+ */
+configure({ asyncUtilTimeout: 8000 });
+
+/**
+ * Clicks go through `fireEvent`, not `userEvent`.
+ *
+ * `userEvent` drives a pointer state machine bound to the document, and
+ * across nineteen tests sharing one jsdom it proved order-dependent here:
+ * a click would be swallowed and the handler never ran. These are plain
+ * buttons, so a dispatched click is the whole interaction and there is
+ * nothing userEvent would additionally prove.
+ */
+const SLATE_ID = "11111111-1111-4111-8111-111111111111";
+
+function companyId(n: number): string {
+  return `0000000${n}-0000-4000-8000-000000000000`;
+}
+
+function company(
+  n: number,
+  overrides: Partial<DiscoveredCompanyDto> = {},
+): DiscoveredCompanyDto {
+  return {
+    companyId: companyId(n),
+    canonicalName: `Company ${n}`,
+    websiteUrl: null,
+    headquartersCountry: "GB",
+    currentStageCode: "SEED",
+    shortDescription: `What company ${n} does.`,
+    reasons: [{ kind: "STAGE_IN_RANGE", detail: "Seed, as you declared" }],
+    reasonCodes: ["STAGE_IN_RANGE"],
+    pitch: null,
+    ...overrides,
+  };
+}
+
+function slate(companies: readonly number[], nextCursor: string | null = null) {
+  return {
+    ok: true as const,
+    value: {
+      slateId: SLATE_ID,
+      rankingVersion: "declared.v1",
+      items: companies.map((n) => company(n)),
+      notes: [],
+      nextCursor,
+    },
+  };
+}
+
+beforeEach(() => {
+  /**
+   * The controller remembers where the reader was, in `sessionStorage`,
+   * keyed by slate. One jsdom is shared by every test in this file and
+   * they all use the same slate id, so without this each test would
+   * restore the card the previous one finished on -- the feature working
+   * exactly as designed, and a test reading the wrong card because of it.
+   */
+  window.sessionStorage.clear();
+
+  loadSlatePageAction.mockReset();
+  recordDecisionAction.mockReset();
+  expressInterestAction.mockReset();
+  authorisePlaybackAction.mockReset();
+  setOpen.mockReset();
+  declaredSubjects.length = 0;
+
+  loadSlatePageAction.mockResolvedValue(slate([1, 2, 3]));
+  recordDecisionAction.mockResolvedValue({
+    ok: true,
+    value: {
+      recorded: true,
+      deduplicated: false,
+      state: { saved: true, passed: false },
+    },
+  });
+});
+
+/**
+ * Unmount before the next test mounts.
+ *
+ * The feed listens for keys on `window`, so a tree left mounted between
+ * tests would still answer them and the next test would start on a card it
+ * did not choose. Auto-cleanup should cover this; doing it explicitly
+ * means the suite does not depend on that being configured.
+ */
+afterEach(() => {
+  cleanup();
+});
+
+async function renderFeed() {
+  const view = render(<InvestorFeedScreen />);
+  await screen.findByRole("heading", { name: "Company 1" });
+  return view;
+}
+
+/**
+ * Reasons, the website and Express Interest live in the details sheet,
+ * reached from the caption's "more" (Discover v2): "more" opens the caption
+ * in place, "All details" the sheet.
+ */
+function openDetails() {
+  fireEvent.click(screen.getByRole("button", { name: /^More about / }));
+  fireEvent.click(screen.getByRole("button", { name: "All details" }));
+}
+
+/** The feed owns its keys; they are not dispatched at the window. */
+function feedRegion(): HTMLElement {
+  return screen.getByRole("group", { name: "Companies to review" });
+}
+
+describe("a card", () => {
+  it("shows what was declared, and nothing that reads as a score", () => {
+    const { container } = render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    openDetails();
+
+    expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
+    expect(screen.getAllByText("What company 1 does.").length).toBeGreaterThan(
+      0,
+    );
+    expect(
+      within(screen.getByRole("dialog")).getByText("Seed, as you declared"),
+    ).toBeTruthy();
+
+    // No percentage, no "match", no score, anywhere in the rendered card.
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/%/);
+    expect(text).not.toMatch(/score/i);
+    expect(text).not.toMatch(/\bmatch\b/i);
+    expect(text).not.toMatch(/top pick|hot|trending/i);
+  });
+
+  it("reads a slate's alignment codes when the item carries no reasons (CQ-ACCEPT-001)", () => {
+    const { container } = render(
+      <FeedCard
+        company={company(1, {
+          headquartersCountry: "NG",
+          currentStageCode: "pre_seed",
+          reasons: [],
+          reasonCodes: ["STAGE_ALIGNED", "GEOGRAPHY_MISMATCH"],
+        })}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    openDetails();
+
+    expect(
+      within(screen.getByRole("dialog")).getByText("Pre-seed, in your range"),
+    ).toBeTruthy();
+    expect(screen.getAllByText("Pre-seed · Nigeria").length).toBeGreaterThan(0);
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/nothing in common with your mandate/i);
+    // Missingness and mismatch are never shown as a reason.
+    expect(text).not.toMatch(/mismatch/i);
+  });
+
+  it("says quietly which hard rule could not be checked for this company, and still shows it (ADR 0020)", () => {
+    render(
+      <FeedCard
+        company={company(1, { unverifiedExclusions: ["stage"] })}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    openDetails();
+    const note = within(screen.getByRole("dialog")).getByText(
+      /stage exclusion\s+wasn't\s+checked/i,
+    );
+    expect(note.className).toContain("cq-caption");
+    expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
+  });
+
+  it("says nothing about unchecked rules when every rule was checked", () => {
+    render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    expect(screen.queryByText(/checked/i)).toBeNull();
+  });
+
+  it("says plainly when there is no pitch, and shows no player", () => {
+    const { container } = render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    openDetails();
+
+    expect(
+      within(screen.getByRole("dialog")).getByText(/No pitch to show yet/i),
+    ).toBeTruthy();
+    expect(container.querySelector("video")).toBeNull();
+    // No empty frame held open for a video that does not exist: the
+    // company leads (CQ-ACCEPT-001).
+    expect(container.querySelector('[style*="aspect-ratio"]')).toBeNull();
+  });
+
+  it("opens the company's profile from its avatar, on the phone stage and the desktop panel alike (2026-10-02)", () => {
+    render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        showMedia={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    const avatar = screen.getByRole("link", { name: "Open Company 1 profile" });
+    expect(avatar.getAttribute("href")).toBe(`/company/${companyId(1)}`);
+    // Not a player and not signed: a lazy image request, or the mark.
+    expect(authorisePlaybackAction).not.toHaveBeenCalled();
+  });
+
+  it("keeps Pass neutral -- never the danger variant", () => {
+    render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+
+    const pass = screen.getByRole("button", { name: "Pass" });
+    expect(pass.dataset["variant"]).toBe("quiet");
+    expect(pass.dataset["variant"]).not.toBe("danger");
+  });
+
+  it("states saved in words, not by appearance alone", () => {
+    render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={true}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+
+    const save = screen.getByRole("button", { name: "Saved" });
+    expect(save.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("offers the company's next video on the rail only when it has more than one (ADR 0022)", () => {
+    const onNext = vi.fn();
+    const { rerender } = render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        showMedia={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+    expect(document.querySelector("[data-feed-next-video]")).toBeNull();
+    rerender(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        showMedia={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+        videos={{ index: 0, count: 3, onNext }}
+      />,
+    );
+    const next = screen.getByRole("button", {
+      name: "Next video from Company 1, video 2 of 3",
+    });
+    fireEvent.click(next);
+    expect(onNext).toHaveBeenCalledTimes(1);
+  });
+
+  it("links to the company profile", () => {
+    render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+
+    // The name opens the company, as in any feed.
+    expect(
+      screen
+        .getByRole("link", { name: company(1).canonicalName })
+        .getAttribute("href"),
+    ).toBe(`/company/${companyId(1)}`);
+  });
+});
+
+describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
+  function renderCard() {
+    return render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+      />,
+    );
+  }
+
+  it("carries the profile first, then Interest, Save, Pass, Ask Q, Share and More, with no counts (Discover v2)", () => {
+    render(
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+        onMore={() => undefined}
+      />,
+    );
+    const rail = screen.getByRole("group", { name: "Decide" });
+    // The way into the profile is always the rail's first control.
+    const first = rail.querySelector("a, button");
+    expect(first?.getAttribute("aria-label")).toBe("Open Company 1 profile");
+    const labels = [...rail.querySelectorAll("button")].map((button) =>
+      button.textContent?.trim(),
+    );
+    expect(labels).toEqual([
+      "Interest",
+      "Save",
+      "Pass",
+      "Ask Q",
+      "Share",
+      "More",
+    ]);
+    // Nothing in the rail is a number: no vanity counts.
+    expect(rail.textContent).not.toMatch(/\d/);
+  });
+
+  it("does not show Save as done before it is: unsaved Save is quiet, like Pass", () => {
+    renderCard();
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save.getAttribute("aria-pressed")).toBe("false");
+    const pass = screen.getByRole("button", { name: "Pass" });
+    expect(save.className).toBe(pass.className);
+  });
+
+  it("says why it is here beside the pitch on a desktop only", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(min-width: 1024px)",
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    try {
+      const { container } = renderCard();
+      expect(container.querySelector("[data-feed-why]")).not.toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    cleanup();
+    const { container } = renderCard();
+    expect(container.querySelector("[data-feed-why]")).toBeNull();
+  });
+
+  it("keeps the summary short: name, one line, stage · place", () => {
+    const { container } = renderCard();
+    const summary = container.querySelector("[data-feed-summary]");
+    expect(summary?.querySelector("h2")?.textContent).toBe(
+      company(1).canonicalName,
+    );
+    expect(
+      summary?.querySelector("[data-feed-one-liner]")?.className,
+    ).toContain("line-clamp-2");
+    // Reasons and the website are not over the pitch.
+    expect(summary?.querySelector("dl")).toBeNull();
+    expect(document.querySelector("[data-feed-details]")).toBeNull();
+  });
+
+  it("opens the caption in place on 'more', then the details in a closable dialog (Discover v2)", async () => {
+    renderCard();
+    const more = screen.getByRole("button", {
+      name: `More about ${company(1).canonicalName}`,
+    });
+    expect(more.textContent).toBe("more");
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(more);
+    expect(more.getAttribute("aria-expanded")).toBe("true");
+    expect(more.textContent).toBe("less");
+    // In place: the declared facts, why it is here, and the profile.
+    expect(
+      document.querySelector("[data-feed-more] [data-feed-why]"),
+    ).not.toBeNull();
+    expect(
+      document.querySelector("[data-feed-open-profile]")?.getAttribute("href"),
+    ).toBe(`/company/${companyId(1)}`);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const all = screen.getByRole("button", { name: "All details" });
+    fireEvent.click(all);
+    const dialog = await screen.findByRole("dialog", {
+      name: company(1).canonicalName,
+    });
+    expect(dialog.querySelector("[data-feed-details]")).not.toBeNull();
+    expect(all.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+  });
+
+  it("closes the details on a swipe down", async () => {
+    renderCard();
+    openDetails();
+    await screen.findByRole("dialog");
+    const details = document.querySelector("[data-feed-details]");
+    if (details === null) throw new Error("no details");
+    fireEvent.touchStart(details, { touches: [{ clientY: 100 }] });
+    fireEvent.touchEnd(details, { changedTouches: [{ clientY: 220 }] });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+  });
+
+  it("opens Express Interest at its confirmation step and sends nothing yet", () => {
+    renderCard();
+    fireEvent.click(screen.getByRole("button", { name: "Interest" }));
+    expect(
+      screen.getByRole("group", {
+        name: `Express interest in ${company(1).canonicalName}`,
+      }),
+    ).toBeTruthy();
+    expect(expressInterestAction).not.toHaveBeenCalled();
+  });
+
+  it("shares the company's address, never a media URL, and falls back to copying", async () => {
+    const writeText = vi.fn<(text: string) => Promise<void>>(() =>
+      Promise.resolve(),
+    );
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    renderCard();
+    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(
+        `${window.location.origin}/company/${companyId(1)}`,
+      );
+    });
+    expect(
+      await screen.findByRole("button", { name: "Link copied" }),
+    ).toBeTruthy();
+  });
+});
+
+describe("moving through the feed", () => {
+  it("advances and retreats on the arrow keys", async () => {
+    await renderFeed();
+
+    act(() => {
+      fireEvent.keyDown(feedRegion(), { key: "ArrowDown" });
+    });
+    expect(
+      await screen.findByRole("heading", { name: "Company 2" }),
+    ).toBeTruthy();
+
+    act(() => {
+      fireEvent.keyDown(feedRegion(), { key: "ArrowUp" });
+    });
+    expect(
+      await screen.findByRole("heading", { name: "Company 1" }),
+    ).toBeTruthy();
+  });
+
+  it("accepts j and k as well", async () => {
+    await renderFeed();
+
+    act(() => {
+      fireEvent.keyDown(feedRegion(), { key: "j" });
+    });
+    expect(
+      await screen.findByRole("heading", { name: "Company 2" }),
+    ).toBeTruthy();
+
+    act(() => {
+      fireEvent.keyDown(feedRegion(), { key: "k" });
+    });
+    expect(
+      await screen.findByRole("heading", { name: "Company 1" }),
+    ).toBeTruthy();
+  });
+
+  it("makes no request when the reader moves -- viewing is not interest", async () => {
+    await renderFeed();
+    const loadsAfterFirstPage = loadSlatePageAction.mock.calls.length;
+
+    act(() => {
+      fireEvent.keyDown(feedRegion(), { key: "ArrowDown" });
+    });
+    await screen.findByRole("heading", { name: "Company 2" });
+
+    expect(recordDecisionAction).not.toHaveBeenCalled();
+    expect(loadSlatePageAction.mock.calls.length).toBe(loadsAfterFirstPage);
+  });
+
+  it("leaves typing alone", async () => {
+    await renderFeed();
+    // A field inside the feed region, so the key really does reach the
+    // feed's own handler and is turned away by the guard rather than by
+    // never arriving.
+    const input = document.createElement("input");
+    feedRegion().appendChild(input);
+    try {
+      input.focus();
+      act(() => {
+        fireEvent.keyDown(input, { key: "j" });
+      });
+
+      // Still on the first card: the keystroke belonged to the field.
+      expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
+    } finally {
+      input.remove();
+    }
+  });
+
+  it("offers explicit Previous and Next as well as the gesture", async () => {
+    await renderFeed();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next company" }));
+    expect(
+      await screen.findByRole("heading", { name: "Company 2" }),
+    ).toBeTruthy();
+  });
+});
+
+describe("deciding", () => {
+  it("records a save once, optimistically", async () => {
+    await renderFeed();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(recordDecisionAction).toHaveBeenCalledTimes(1));
+    expect(recordDecisionAction.mock.calls[0]?.[0]).toMatchObject({
+      companyId: companyId(1),
+      intent: "SAVE",
+      slateId: SLATE_ID,
+    });
+    expect(await screen.findByRole("button", { name: "Saved" })).toBeTruthy();
+  });
+
+  it("records a pass once and moves on", async () => {
+    recordDecisionAction.mockResolvedValue({
+      ok: true,
+      value: {
+        recorded: true,
+        deduplicated: false,
+        state: { saved: false, passed: true },
+      },
+    });
+    await renderFeed();
+
+    fireEvent.click(screen.getByRole("button", { name: "Pass" }));
+
+    await waitFor(() => expect(recordDecisionAction).toHaveBeenCalledTimes(1));
+    expect(recordDecisionAction.mock.calls[0]?.[0]).toMatchObject({
+      companyId: companyId(1),
+      intent: "PASS",
+    });
+    expect(
+      await screen.findByRole("heading", { name: "Company 2" }),
+    ).toBeTruthy();
+  });
+
+  it("puts a rejected save back", async () => {
+    recordDecisionAction.mockResolvedValue({
+      ok: false,
+      message: "That did not save. Try again.",
+    });
+    await renderFeed();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("button", { name: "Save" })).toBeTruthy();
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole("button", { name: "Save" })
+          .getAttribute("aria-pressed"),
+      ).toBe("false"),
+    );
+  });
+});
+
+describe("Express Interest (CQ-NET-010)", () => {
+  const INTEREST = {
+    interestId: "22222222-2222-4222-8222-222222222222",
+    relationshipId: "33333333-3333-4333-8333-333333333333",
+    companyId: companyId(1),
+    status: "EXPRESSED" as const,
+    expressedAt: "2026-09-24T10:00:00.000Z",
+  };
+
+  /** A promise the test resolves, so the pending state can be observed. */
+  function deferred<T>() {
+    let resolve: (value: T) => void = () => undefined;
+    const promise = new Promise<T>((settle) => {
+      resolve = settle;
+    });
+    return { promise, resolve };
+  }
+
+  async function confirmInterest() {
+    openDetails();
+    fireEvent.click(screen.getByRole("button", { name: "Express interest" }));
+    // Doc 17 §70: the consequence is stated before it happens.
+    expect(
+      await screen.findByText(/It is not a commitment to invest\./),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Express interest" }));
+  }
+
+  it("asks first, then shows sending, and says sent only when the server confirms", async () => {
+    const answer = deferred<InterestResult>();
+    expressInterestAction.mockReturnValue(answer.promise);
+    await renderFeed();
+
+    await confirmInterest();
+
+    expect(
+      await screen.findByRole("button", { name: "Sending interest…" }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Interest expressed/)).toBeNull();
+    expect(expressInterestAction).toHaveBeenCalledTimes(1);
+    expect(expressInterestAction.mock.calls[0]?.[0]).toMatchObject({
+      companyId: companyId(1),
+      surface: "RECOMMENDATION_FEED",
+    });
+
+    await act(async () => {
+      answer.resolve({
+        ok: true,
+        value: { interest: INTEREST, deduplicated: false },
+      });
+      await answer.promise;
+    });
+
+    expect(
+      await screen.findByText("Interest expressed in Company 1."),
+    ).toBeTruthy();
+    // Interest is not a Save: the optimistic decision path never ran.
+    expect(recordDecisionAction).not.toHaveBeenCalled();
+  });
+
+  it("says plainly when interest was already expressed", async () => {
+    expressInterestAction.mockResolvedValue({
+      ok: true,
+      value: { interest: INTEREST, deduplicated: true },
+    });
+    await renderFeed();
+
+    await confirmInterest();
+
+    expect(
+      await screen.findByText(
+        "Your organisation has already expressed interest in Company 1.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says connected, from the server, once the company has accepted (CQ-NET-011)", async () => {
+    expressInterestAction.mockResolvedValue({
+      ok: true,
+      value: {
+        interest: {
+          ...INTEREST,
+          response: "ACCEPTED",
+          respondedAt: "2026-09-25T10:00:00.000Z",
+          connection: {
+            connectionId: "44444444-4444-4444-8444-444444444444",
+            status: "ACTIVE",
+            connectedAt: "2026-09-25T10:00:00.000Z",
+          },
+        },
+        deduplicated: true,
+      },
+    });
+    await renderFeed();
+
+    await confirmInterest();
+
+    expect(
+      await screen.findByText(
+        "Connected with Company 1. Both sides have agreed to connect.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows a refusal honestly and never claims it was sent", async () => {
+    expressInterestAction.mockResolvedValue({
+      ok: false,
+      message:
+        "Only a member of an investor organisation can express interest.",
+      retryable: false,
+    });
+    await renderFeed();
+
+    await confirmInterest();
+
+    expect(
+      await screen.findByText(
+        "Only a member of an investor organisation can express interest.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Interest expressed/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
+  it("retries a failed send with the same idempotency key", async () => {
+    expressInterestAction
+      .mockResolvedValueOnce({
+        ok: false,
+        message: "Your interest was not sent. Try again.",
+        retryable: true,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { interest: INTEREST, deduplicated: false },
+      });
+    await renderFeed();
+
+    await confirmInterest();
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+
+    expect(
+      await screen.findByText("Interest expressed in Company 1."),
+    ).toBeTruthy();
+    expect(expressInterestAction).toHaveBeenCalledTimes(2);
+    const keys = expressInterestAction.mock.calls.map(
+      (call) => (call[0] as { idempotencyKey: string }).idempotencyKey,
+    );
+    expect(keys[0]).toBe(keys[1]);
+  });
+
+  it("is not sent by Save or Pass", async () => {
+    await renderFeed();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(recordDecisionAction).toHaveBeenCalledTimes(1));
+
+    expect(expressInterestAction).not.toHaveBeenCalled();
+  });
+});
+
+describe("Ask Q", () => {
+  it("names the active card as Q's subject", async () => {
+    await renderFeed();
+
+    expect(declaredSubjects.at(-1)).toEqual({
+      kind: "COMPANY",
+      companyId: companyId(1),
+      label: "Company 1",
+      scope: "network_visible",
+    });
+  });
+
+  it("follows the reader to the next card", async () => {
+    await renderFeed();
+
+    act(() => {
+      fireEvent.keyDown(feedRegion(), { key: "ArrowDown" });
+    });
+    await screen.findByRole("heading", { name: "Company 2" });
+
+    expect(declaredSubjects.at(-1)).toMatchObject({
+      kind: "COMPANY",
+      companyId: companyId(2),
+      label: "Company 2",
+    });
+  });
+
+  it("opens the global Q sheet", async () => {
+    await renderFeed();
+
+    fireEvent.click(screen.getByRole("button", { name: "Ask Q" }));
+
+    await waitFor(() => expect(setOpen).toHaveBeenCalledWith(true));
+  });
+});
+
+describe("company profile, then Back", () => {
+  it("restores the same card the reader left from", async () => {
+    await renderFeed();
+
+    act(() => {
+      fireEvent.keyDown(feedRegion(), { key: "ArrowDown" });
+    });
+    await screen.findByRole("heading", { name: "Company 2" });
+
+    // Opening the profile is a navigation: this tree goes away.
+    cleanup();
+
+    // Back to /discover mounts a fresh feed against the same slate. The
+    // position was persisted by card id, not by index, so the restore
+    // survives even though nothing about the list was kept.
+    render(<InvestorFeedScreen />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Company 2" }),
+    ).toBeTruthy();
+  });
+
+  it("starts at the top when the slate is a different one", async () => {
+    await renderFeed();
+    act(() => {
+      fireEvent.keyDown(feedRegion(), { key: "ArrowDown" });
+    });
+    await screen.findByRole("heading", { name: "Company 2" });
+    cleanup();
+
+    loadSlatePageAction.mockResolvedValue({
+      ok: true,
+      value: {
+        slateId: "99999999-9999-4999-8999-999999999999",
+        rankingVersion: "declared.v1",
+        items: [company(1), company(2), company(3)],
+        notes: [],
+        nextCursor: null,
+      },
+    });
+    render(<InvestorFeedScreen />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Company 1" }),
+    ).toBeTruthy();
+  });
+});
+
+describe("the founder view is untouched", () => {
+  it("still renders investors as a plain server list", async () => {
+    const { DiscoverInvestors } =
+      await import("../src/features/discover/discover-screen");
+
+    render(
+      <DiscoverInvestors
+        items={[
+          {
+            investorOrganisationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            displayName: "Northbank Capital",
+            investorType: "VC",
+            websiteUrl: null,
+            hqCountry: "GB",
+            publicDescription: "Seed and Series A.",
+            deploymentState: null,
+            reasons: [],
+          },
+        ]}
+        notes={[]}
+      />,
+    );
+
+    // A list entry, not a feed card: no player, no Save, no Pass.
+    expect(
+      screen.getByRole("heading", { name: "Northbank Capital" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Pass" })).toBeNull();
+    expect(document.querySelector("video")).toBeNull();
+  });
+});
+
+describe("degraded and empty states", () => {
+  it("states a refresh calmly, with no error tone", async () => {
+    loadSlatePageAction.mockResolvedValue({
+      ok: true,
+      value: {
+        slateId: null,
+        rankingVersion: "declared.v1",
+        items: [],
+        notes: ["RECOMMENDATIONS_REFRESHING"],
+        nextCursor: null,
+      },
+    });
+
+    render(<InvestorFeedScreen />);
+
+    const note = await screen.findByText(/being prepared/i);
+    expect(note.className).toContain("cq-status-line");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says nobody is discoverable yet without blaming the reader", async () => {
+    loadSlatePageAction.mockResolvedValue({
+      ok: true,
+      value: {
+        slateId: null,
+        rankingVersion: "declared.v1",
+        items: [],
+        notes: ["NO_DISCOVERABLE_COUNTERPARTS"],
+        nextCursor: null,
+      },
+    });
+
+    render(<InvestorFeedScreen />);
+
+    expect(
+      await screen.findByText(/as founders choose to be found/i),
+    ).toBeTruthy();
+    expect(screen.getByText(/Nothing to review yet/i)).toBeTruthy();
+  });
+
+  it("names the hard rules when discoverable companies exist but every one is excluded, never 'nobody is discoverable' (ADR 0020)", async () => {
+    loadSlatePageAction.mockResolvedValue({
+      ok: true,
+      value: {
+        slateId: null,
+        rankingVersion: "declared.v1",
+        items: [],
+        notes: ["NONE_PASS_HARD_RULES"],
+        nextCursor: null,
+        unverifiableExclusions: ["red_flag"],
+        excludingRules: ["stage", "geography.country"],
+        discoverableCount: 12,
+      },
+    });
+
+    render(<InvestorFeedScreen />);
+
+    expect(
+      await screen.findByText(
+        /12 companies are discoverable\. None passes your hard rules/i,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/stage and country exclusions/i)).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", { name: /Review my hard rules/i })
+        .getAttribute("href"),
+    ).toBe("/onboarding/investor?review=1");
+    expect(
+      screen.getByText(/red-flag exclusion can't be checked/i),
+    ).toBeTruthy();
+    expect(screen.queryByText(/choose to be found/i)).toBeNull();
+    expect(screen.queryByText(/Nothing to review yet/i)).toBeNull();
+  });
+
+  it("tells companies-that-match-nothing apart from nobody discoverable", async () => {
+    loadSlatePageAction.mockResolvedValue({
+      ok: true,
+      value: {
+        slateId: null,
+        rankingVersion: "declared.v1",
+        items: [],
+        notes: ["NONE_MATCH_MANDATE"],
+        nextCursor: null,
+        discoverableCount: 1,
+      },
+    });
+
+    render(<InvestorFeedScreen />);
+
+    expect(
+      await screen.findByText(
+        /1 company is discoverable\. None matches your mandate yet/i,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/choose to be found/i)).toBeNull();
+  });
+
+  it("says a mandate is missing without calling it an error", async () => {
+    loadSlatePageAction.mockResolvedValue({
+      ok: true,
+      value: {
+        slateId: null,
+        rankingVersion: "declared.v1",
+        items: [],
+        notes: ["NO_ACTIVE_MANDATE"],
+        nextCursor: null,
+      },
+    });
+
+    render(<InvestorFeedScreen />);
+
+    expect(await screen.findByText(/mandate isn't active yet/i)).toBeTruthy();
+    // The way forward, not a claim about the market (CQ-ACCEPT-001).
+    expect(
+      screen
+        .getByRole("link", { name: "Finish my mandate" })
+        .getAttribute("href"),
+    ).toBe("/onboarding/investor");
+    expect(screen.queryByText(/founders choose to be discoverable/i)).toBe(
+      null,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ask Q" }));
+    expect(setOpen).toHaveBeenCalledWith(true);
+  });
+});
+
+describe("a first page from the server", () => {
+  it("shows the first company on the first render and does not fetch it again", () => {
+    render(
+      <InvestorFeedScreen
+        initial={{ slate: slate([1, 2]).value, authorization: null }}
+      />,
+    );
+
+    // Synchronously present: this is what puts the first card in the HTML.
+    expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
+    expect(loadSlatePageAction).not.toHaveBeenCalled();
+  });
+});

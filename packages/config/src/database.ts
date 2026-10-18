@@ -77,7 +77,20 @@ const databaseEnvSchema = z.object({
   // Bounded so a misconfiguration cannot open fifty connections per replica.
   // Total load is replicas × pool, and that product is what the database sees.
   DATABASE_POOL_MAX: boundedInt(5, 1, 20),
-  DATABASE_IDLE_TIMEOUT_SECONDS: boundedInt(20, 1, 300),
+  // Sized against Supavisor session mode (port 5432): every open client
+  // connection pins one of the pool's server connections (15 on this tier,
+  // max_connections 60) for as long as it stays open. 60 s lets a page's burst
+  // of parallel queries reuse its connections across the next navigation
+  // instead of reconnecting (~5-6 round trips each: TCP, TLS, Supavisor auth,
+  // type fetch; R4 measured 9.4 ms per round trip), while still handing burst
+  // connections back within a minute.
+  DATABASE_IDLE_TIMEOUT_SECONDS: boundedInt(60, 1, 300),
+  // Warm floor: one `select 1` every N seconds. The driver hands queries to
+  // open connections first-in-first-out, so a ping every W seconds keeps k
+  // connections alive while k * W < idle timeout: 25 s against 60 s keeps two
+  // warm per process. Three services hold ~6 of 15 slots at rest (+1 LISTEN),
+  // leaving the rest for bursts. 0 turns it off.
+  DATABASE_WARM_INTERVAL_SECONDS: boundedInt(25, 0, 240),
   DATABASE_CONNECT_TIMEOUT_SECONDS: boundedInt(10, 1, 60),
   // Interactive request budget. Long rebuilds belong in workers with their own
   // limits, not in a request-path query allowed to run for minutes.
@@ -89,6 +102,8 @@ export type DatabaseConfig = {
   readonly connectionMode: DatabaseConnectionMode;
   readonly poolMax: number;
   readonly idleTimeoutSeconds: number;
+  /** 0 = no warm ping. Always below idleTimeoutSeconds when set. */
+  readonly warmIntervalSeconds: number;
   readonly connectTimeoutSeconds: number;
   readonly statementTimeoutMs: number;
   readonly secrets: {
@@ -100,12 +115,26 @@ export type DatabaseConfig = {
 
 export function parseDatabaseConfig(env: EnvironmentInput): DatabaseConfig {
   const parsed = parseConfig("database", databaseEnvSchema, env);
+  if (
+    parsed.DATABASE_WARM_INTERVAL_SECONDS !== 0 &&
+    parsed.DATABASE_WARM_INTERVAL_SECONDS >=
+      parsed.DATABASE_IDLE_TIMEOUT_SECONDS
+  ) {
+    // A ping slower than the idle timeout keeps nothing warm; say so at boot.
+    throw new ConfigurationError("database", [
+      {
+        variable: "DATABASE_WARM_INTERVAL_SECONDS",
+        reason: "expected 0 or a value below DATABASE_IDLE_TIMEOUT_SECONDS",
+      },
+    ]);
+  }
 
   return {
     runtime: toRuntimeConfig(parsed),
     connectionMode: parsed.DATABASE_CONNECTION_MODE,
     poolMax: parsed.DATABASE_POOL_MAX,
     idleTimeoutSeconds: parsed.DATABASE_IDLE_TIMEOUT_SECONDS,
+    warmIntervalSeconds: parsed.DATABASE_WARM_INTERVAL_SECONDS,
     connectTimeoutSeconds: parsed.DATABASE_CONNECT_TIMEOUT_SECONDS,
     statementTimeoutMs: parsed.DATABASE_STATEMENT_TIMEOUT_MS,
     secrets: {

@@ -31,9 +31,13 @@ import {
   createPostgresModelCatalog,
   createPostgresModelUsageRepository,
   createProcessLocalProviderHealth,
+  createSyntheticDemoRoutingAllowance,
+  SyntheticDemoRoutingRefusedError,
   type FakeBehaviour,
   type ModelGateway,
   type ModelProvider,
+  type ProviderHealthPort,
+  type SyntheticDemoRoutingAllowance,
 } from "@capital-q/model-gateway";
 import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
@@ -221,6 +225,8 @@ export type QEvalWorld = {
   readonly providerMode: QEvalProviderMode;
   readonly providerCodes: readonly string[];
   readonly providerFilter: ModelProviderCode | null;
+  /** Present only where this process could honestly attest its data is invented. */
+  readonly syntheticDemo: SyntheticDemoRoutingAllowance | null;
   readonly logLines: readonly string[];
   /** Per-case controls. */
   readonly setPreset: (preset: QCommunicationPreset) => void;
@@ -231,6 +237,8 @@ export type QEvalWorld = {
     readonly calls: () => readonly RecordedProviderCall[];
     readonly reset: () => void;
   };
+  /** Forget which providers are in a cooling-off period, between cases. */
+  readonly resetProviderHealth: () => void;
   readonly subjectsFor: (subject: QEvalSubject) => readonly QSubjectRef[];
   readonly factsFor: (set: QEvalFactSet) => readonly AuthorisedFact[];
   readonly close: () => Promise<void>;
@@ -639,8 +647,10 @@ export async function createQEvalWorld(
   const providers: ModelProvider[] = [];
   if (options.providerMode === "FAKE") {
     // The scripted model registers under the real catalogue codes so
-    // routing, eligibility, prices and the usage ledger all apply.
-    for (const code of ["google", "groq"] as const) {
+    // routing, eligibility, prices and the usage ledger all apply. OpenAI
+    // is every policy's primary since 20261008130000 (Groq left every
+    // policy in 20261008120000), so without it no INTERNAL route exists.
+    for (const code of ["google", "groq", "openai"] as const) {
       const provider = scriptedProvider(code);
       scripted.set(code, provider);
       providers.push(recordingProvider(provider, recorded));
@@ -658,17 +668,67 @@ export async function createQEvalWorld(
     if (secrets?.groq !== undefined && options.providerFilter !== "google") {
       providers.push(
         recordingProvider(
-          createGroqModelProvider({ apiKey: secrets.groq.reveal() }),
+          createGroqModelProvider({
+            apiKey: secrets.groq.reveal(),
+            additionalApiKeys: secrets.groqKeys
+              .slice(1)
+              .map((key) => key.reveal()),
+          }),
           recorded,
         ),
       );
     }
   }
+  // Every fixture in this world is invented -- the datasets are
+  // SYNTHETIC_WITH_MARKERS and the companies, investors and facts are
+  // written a few hundred lines above -- so the harness is entitled to
+  // attest it (doc 15 section 62). It is still only the operator's half of
+  // the attestation: the factory checks the environment and that the
+  // database is loopback, and a request must declare the posture for any of
+  // it to matter. Pointed at a hosted database it refuses, and the
+  // allowance is simply absent rather than fatal, so the suites that do not
+  // depend on it still run and the one that does reports BLOCKED.
+  let syntheticDemo: SyntheticDemoRoutingAllowance | null = null;
+  const evalDatabaseUrl = process.env["DATABASE_URL"];
+  try {
+    syntheticDemo =
+      evalDatabaseUrl === undefined
+        ? null
+        : createSyntheticDemoRoutingAllowance({
+            operatorEnabled: true,
+            environment: process.env["CAPITAL_Q_ENV"],
+            databaseUrl: evalDatabaseUrl,
+          });
+  } catch (error: unknown) {
+    if (!(error instanceof SyntheticDemoRoutingRefusedError)) throw error;
+    logger.warn(
+      { reason: error.message },
+      "synthetic demo routing is not available to this eval run",
+    );
+  }
+
+  // Provider health is process-local and deliberately sticky: three
+  // availability failures inside a minute skip a provider for thirty
+  // seconds. That is correct for a service and wrong for a suite. A case
+  // that scripts an outage -- QROUTE-002 does, and so does QEXPL-006 --
+  // would otherwise decide what the next case sees, and whether that case
+  // passed would depend on how long the run took to reach it. Each case
+  // gets a fresh one, so a case's result is its own.
+  let providerHealth = createProcessLocalProviderHealth();
+  const health: ProviderHealthPort = {
+    state: (code, model, at) => providerHealth.state(code, model, at),
+    recordFailure: (code, model, failureClass, at, elapsedMs) =>
+      providerHealth.recordFailure(code, model, failureClass, at, elapsedMs),
+    recordSuccess: (code, model, at) =>
+      providerHealth.recordSuccess(code, model, at),
+  };
+
   const gateway = createModelGateway({
     catalog: createPostgresModelCatalog({ sql }),
     registry: createModelProviderRegistry(providers),
     usage: createPostgresModelUsageRepository({ sql }),
-    health: createProcessLocalProviderHealth(),
+    health,
+    syntheticDemo,
     logger,
   });
   const tenantPolicy: TenantModelPolicy | undefined =
@@ -925,12 +985,16 @@ export async function createQEvalWorld(
     providerMode: options.providerMode,
     providerCodes: providers.map((p) => p.code),
     providerFilter: options.providerFilter ?? null,
+    syntheticDemo,
     logLines,
     setPreset: (preset) => {
       currentPreset = preset;
     },
     setFacts: (set) => {
       currentFacts = factsFor(set);
+    },
+    resetProviderHealth: () => {
+      providerHealth = createProcessLocalProviderHealth();
     },
     setScript: (script) => {
       for (const provider of scripted.values()) {

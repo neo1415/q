@@ -44,6 +44,13 @@ export const MODEL_TASK_CLASSES = [
   "REALTIME_VOICE",
   "GUARDRAIL",
   "EMBEDDING",
+  // DOCS: illustrations for documents, through the image adapters only.
+  "IMAGE_GENERATION",
+  // Any-language interface (2026-10-16): the English UI catalogue put into
+  // a person's chosen language once per language, cached and shared. Its
+  // own class so its routing (cheapest capable model) and its daily spend
+  // cap are separate from Q's reasoning.
+  "UI_TRANSLATION",
 ] as const;
 export const ModelTaskClassSchema = z.enum(MODEL_TASK_CLASSES);
 export type ModelTaskClass = z.infer<typeof ModelTaskClassSchema>;
@@ -62,6 +69,7 @@ export const MODEL_TEXT_TASK_CLASSES = [
   "EVIDENCE_SYNTHESIS",
   "COMPARISON",
   "DEEP_INVESTIGATION",
+  "UI_TRANSLATION",
 ] as const satisfies readonly ModelTaskClass[];
 export const ModelTextTaskClassSchema = z.enum(MODEL_TEXT_TASK_CLASSES);
 export type ModelTextTaskClass = z.infer<typeof ModelTextTaskClassSchema>;
@@ -83,6 +91,35 @@ export function sensitivityAtMost(
 ): boolean {
   return MODEL_SENSITIVITY_RANK[sensitivity] <= MODEL_SENSITIVITY_RANK[ceiling];
 }
+
+/**
+ * What KIND of material a request carries. Orthogonal to sensitivity, and
+ * deliberately not a sensitivity class (doc 15 §62).
+ *
+ *   sensitivity  how protected this material is, if it is somebody's
+ *   data posture  whose material it is at all
+ *
+ * REAL_CUSTOMER is the default and the only posture that may ever be
+ * assumed: a request says nothing about its posture and it is treated as a
+ * customer's. SYNTHETIC_DEMO asserts that every input was invented for a
+ * demonstration — no customer, no subject, nobody to protect — which is
+ * the case doc 15 §62 names when it says free/shared inference may be used
+ * aggressively for "synthetic data" and "development" while confidential
+ * customer information still requires an approved provider.
+ *
+ * The declaration alone grants nothing. The gateway honours it only
+ * against a server-side attestation it was constructed with (see
+ * `SyntheticDemoRoutingAllowance`), so a forged or stray declaration —
+ * from a browser, a tool payload or a copied composition — changes no
+ * route. The declared sensitivity is never rewritten: it stays on the
+ * request, the ledger and the trace, and the routing reason records that
+ * the posture, not the sensitivity, is what admitted the provider. Neither
+ * value is ever sent to a provider: both stay server-side, on the request,
+ * the route record and the trace.
+ */
+export const MODEL_DATA_POSTURES = ["REAL_CUSTOMER", "SYNTHETIC_DEMO"] as const;
+export const ModelDataPostureSchema = z.enum(MODEL_DATA_POSTURES);
+export type ModelDataPosture = z.infer<typeof ModelDataPostureSchema>;
 
 /** Capability attributes a model may carry (doc 12 §24.2). */
 export const MODEL_CAPABILITIES = [
@@ -180,6 +217,9 @@ export const MODEL_TYPES = [
   "EMBEDDING",
   "REALTIME",
   "RERANKING",
+  // 20261113010000 seeds the image models (gpt-image-1, gemini image) with
+  // this type; the catalog loader must accept it or every Q run fails.
+  "IMAGE_GENERATION",
 ] as const;
 export const ModelTypeSchema = z.enum(MODEL_TYPES);
 export type ModelType = z.infer<typeof ModelTypeSchema>;
@@ -258,6 +298,10 @@ export function isRetryableModelFailure(cls: ModelFailureClass): boolean {
 }
 
 export function allowsModelFallback(cls: ModelFailureClass): boolean {
+  // A request one provider rejects as malformed is that provider's quirk
+  // (a signature it wanted back, a schema it could not take): the next
+  // candidate gets the same request rather than the person getting nothing.
+  if (cls === "INVALID_REQUEST") return true;
   return (MODEL_FALLBACK_FAILURE_CLASSES as readonly string[]).includes(cls);
 }
 
@@ -291,7 +335,15 @@ export const MODEL_MESSAGES_MAX = 64;
 export const ModelToolNameSchema = z.string().regex(/^[a-z][a-z0-9_]{1,63}$/);
 export type ModelToolName = z.infer<typeof ModelToolNameSchema>;
 
-export const MODEL_TOOLS_MAX = 16;
+/**
+ * Tools on one attempt: the providers' own documented limit (lead
+ * 2026-10-04, "increase the tool limit"). OpenAI and Gemini both accept at
+ * most 128 function declarations per request; Groq follows OpenAI. Staging
+ * logs (2026-10-04, gpt-5.6-luna) showed no latency cost from 40 to 80
+ * tools offered (median round 2.9-4.2 s at 40, 2.4-3.1 s at 78-80), so no
+ * lower bound is kept here; what a turn is offered is decided by its focus.
+ */
+export const MODEL_TOOLS_MAX = 128;
 export const MODEL_TOOL_DESCRIPTION_MAX_CHARS = 1_000;
 /** Bounded tool result text handed back to a model (JSON). */
 export const MODEL_TOOL_RESULT_MAX_CHARS = 32_000;
@@ -322,6 +374,12 @@ export const ModelToolCallSchema = z
     callId: z.string().min(1).max(128),
     name: ModelToolNameSchema,
     arguments: z.record(z.string(), z.unknown()),
+    /**
+     * Opaque state the provider attached to this call and requires back
+     * on the next request (Gemini's thought signature). Never read, never
+     * shown; carried as-is by whichever adapter issued it.
+     */
+    providerState: z.string().max(16_384).optional(),
   })
   .strict();
 export type ModelToolCall = z.infer<typeof ModelToolCallSchema>;
@@ -333,12 +391,50 @@ export type ModelToolCall = z.infer<typeof ModelToolCallSchema>;
  * are data the model reads, never instructions it must follow: the
  * caller fences and labels them accordingly.
  */
+/**
+ * An image a USER message carries for a vision-capable model (REHEARSE:
+ * the screen a person chose to share in a rehearsal). Inline base64 only,
+ * never a URL a provider would fetch; bounded so one frame can never
+ * become an unbounded upload. A request carrying one requires VISION.
+ */
+export const MODEL_IMAGE_MEDIA_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+export const MODEL_IMAGE_MAX_BASE64_CHARS = 700_000;
+export const ModelImageSchema = z
+  .object({
+    mediaType: z.enum(MODEL_IMAGE_MEDIA_TYPES),
+    dataBase64: z
+      .string()
+      .min(16)
+      .max(MODEL_IMAGE_MAX_BASE64_CHARS)
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+  })
+  .strict();
+export type ModelImage = z.infer<typeof ModelImageSchema>;
+
 export const ModelTextMessageSchema = z
   .object({
     role: z.enum(["SYSTEM", "USER"]),
     content: z.string().min(1).max(MODEL_MESSAGE_MAX_CHARS),
+    /** Images for a VISION model; read on USER messages only. */
+    images: z.array(ModelImageSchema).min(1).max(2).optional(),
   })
   .strict();
+
+/** True when a USER message carries an image: the request then needs VISION. */
+export function messagesCarryImages(
+  messages: readonly { readonly role: string; readonly images?: unknown }[],
+): boolean {
+  return messages.some(
+    (message) =>
+      message.role === "USER" &&
+      Array.isArray(message.images) &&
+      message.images.length > 0,
+  );
+}
 
 export const ModelAssistantMessageSchema = z
   .object({
@@ -408,14 +504,64 @@ export const ModelBudgetSchema = z
 export type ModelBudget = z.infer<typeof ModelBudgetSchema>;
 
 /** Who is paying and which run is asking. Identifiers only. */
+/**
+ * What a model call was for, as the person's usage view groups it (lead
+ * 2026-10-03: "This month: Q used about $X for you", by task). A closed
+ * set; absent, the gateway derives it (a Q run is a conversation, an
+ * instruction's correlation id is that instruction) or leaves it OTHER.
+ */
+export const MODEL_USAGE_PURPOSES = [
+  "CONVERSATION",
+  "INSTRUCTION",
+  "DELEGATED_WORK",
+  "REHEARSAL",
+  "RESEARCH",
+  "ONBOARDING",
+  "MEETING",
+  "DOCUMENT",
+  // DUPLEX: full-duplex voice lines; the daily spend cap sums these rows.
+  "VOICE_REALTIME",
+  "OTHER",
+] as const;
+export const ModelUsagePurposeSchema = z.enum(MODEL_USAGE_PURPOSES);
+export type ModelUsagePurpose = z.infer<typeof ModelUsagePurposeSchema>;
+
 export const ModelAttributionSchema = z
   .object({
     tenantId: UuidSchema,
     userId: UuidSchema.optional(),
     qRunId: UuidSchema.optional(),
     correlationId: z.string().min(1).max(128),
+    purpose: ModelUsagePurposeSchema.optional(),
   })
   .strict();
+
+/** The prefix an instruction's model calls carry in their correlation id. */
+export const INSTRUCTION_CORRELATION_PREFIX = "cor_instr_" as const;
+
+/**
+ * Founder brief J6: a workforce agent's model call carries its job and its
+ * agent run, so the usage ledger answers "what did this job, and this
+ * agent, cost?" (`cor_job_<job uuid>_<run uuid>`, at most 81 characters).
+ */
+export const WORKFORCE_CORRELATION_PREFIX = "cor_job_" as const;
+
+export function workforceCorrelationId(jobId: string, runId: string): string {
+  return `${WORKFORCE_CORRELATION_PREFIX}${jobId}_${runId}`;
+}
+
+/** The purpose a call is recorded under: declared, else derived. */
+export function usagePurposeOf(attribution: {
+  readonly purpose?: ModelUsagePurpose | undefined;
+  readonly qRunId?: string | undefined;
+  readonly correlationId?: string | undefined;
+}): ModelUsagePurpose {
+  if (attribution.purpose !== undefined) return attribution.purpose;
+  if (attribution.correlationId?.startsWith(INSTRUCTION_CORRELATION_PREFIX)) {
+    return "INSTRUCTION";
+  }
+  return attribution.qRunId === undefined ? "OTHER" : "CONVERSATION";
+}
 export type ModelAttribution = z.infer<typeof ModelAttributionSchema>;
 
 /**
@@ -442,6 +588,12 @@ export const ModelGatewayRequestSchema = z
     taskClass: ModelTextTaskClassSchema,
     /** The strongest class of anything in `messages`. Declared by the caller, who assembled them. */
     sensitivity: ModelSensitivitySchema,
+    /**
+     * Whose material `messages` hold. Omitted means REAL_CUSTOMER: a
+     * request never becomes demo material by saying nothing. Honoured only
+     * with a server-side attestation; see `ModelDataPosture`.
+     */
+    dataPosture: ModelDataPostureSchema.default("REAL_CUSTOMER"),
     messages: z.array(ModelMessageSchema).min(1).max(MODEL_MESSAGES_MAX),
     output: ModelOutputSpecSchema,
     /**
@@ -461,13 +613,12 @@ export const ModelGatewayRequestSchema = z
     tenantPolicy: TenantModelPolicySchema.optional(),
   })
   .strict()
-  .refine(
-    (request) => request.tools.length === 0 || request.output.kind === "TEXT",
-    {
-      message: "tools are offered with TEXT output only",
-      path: ["tools"],
-    },
-  )
+  // Tools may come with TEXT or STRUCTURED output (harden 2026-10-01): a
+  // round that may call a tool or answer carries the answer's schema, so the
+  // answer arrives in shape instead of paying a second call. The gateway
+  // returns tool calls when the model proposes them and validates the
+  // structured answer when it does not; an adapter whose provider refuses
+  // the pairing sends the tools alone and the schema still decides.
   .refine(
     (request) =>
       new Set(request.tools.map((tool) => tool.name)).size ===
@@ -571,6 +722,14 @@ export const MODEL_ELIGIBILITY_REASONS = [
   "LATENCY_ABOVE_TARGET",
   "COST_EXCEEDS_CEILING",
   "PRICE_UNKNOWN",
+  /**
+   * Eligible, but only because the request is attested synthetic demo
+   * material (doc 15 §62): the provider's reviewed terms would not carry
+   * this sensitivity if a customer's data were in it. Distinct from
+   * ELIGIBLE so a route record, a log line and an auditor can all tell
+   * the two apart without inferring it from anything.
+   */
+  "ELIGIBLE_SYNTHETIC_DEMO",
 ] as const;
 export const ModelEligibilityReasonSchema = z.enum(MODEL_ELIGIBILITY_REASONS);
 export type ModelEligibilityReason = z.infer<
@@ -631,7 +790,12 @@ export type ModelGatewayResultMetadata = z.infer<
 
 export type ModelGatewayOutput<T> =
   | { readonly kind: "TEXT"; readonly text: string }
-  | { readonly kind: "STRUCTURED"; readonly value: T }
+  | {
+      readonly kind: "STRUCTURED";
+      readonly value: T;
+      /** Paths dropped on acceptance (DROP lists, lenient fields); never values. */
+      readonly dropped?: readonly string[] | undefined;
+    }
   | {
       /** The model proposed tool calls, each naming a tool the request offered. */
       readonly kind: "TOOL_CALLS";

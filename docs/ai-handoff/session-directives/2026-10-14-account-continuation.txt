@@ -1,0 +1,390 @@
+# CAPITAL Q — CODEX ACCOUNT HANDOFF
+## 14 October 2026 · Continue existing engineering without restarting
+
+Repository: https://github.com/neo1415/q
+
+You are taking over after the previous Codex account reached its usage limit.
+
+**Your responsibility is to preserve and finish its work, close its remaining defects, continue GateQ product completion, and execute the separately appended Relationship Hub functionality directive.**
+
+This is a continuation of the existing Capital Q product, not authorization to rebuild its systems.
+
+You have broad engineering autonomy within the approved scope. Investigate real problems, make sound technical decisions, improve performance and UX, write code, test, open PRs and release verified functionality through the established process.
+
+## 1. RECOVER THE EXACT CURRENT STATE
+
+The following checkpoints were verified against GitHub immediately before this handoff. Refresh them before editing.
+
+### Production — released
+
+Branch:
+`recovery/2026-09-12`
+
+SHA:
+`62bd144af47e20212d3cfe8827a09e7d28132e0f`
+
+Production CI:
+`38526498466` — SUCCESS.
+
+PRs #74, #76, #77, #78 and #79 have been merged.
+
+The previous agent's handoff records all four Railway services as SUCCESS on this production revision.
+
+### GateQ repairs already completed
+
+Do not reimplement these fixes:
+
+- Published GateQ policy versions remain valid for applications bound to them after republication.
+- Q mandate/profile tool-routing corrections.
+- Qualification explanation improvements.
+- Transactional fact supersession with valid historical lineage.
+- Database-level correction and concurrency guarantees.
+- Recovery after failed fact persistence.
+- Durable opening-question handling.
+- Legacy session-cache key incompatibility repair.
+- Interview retry deduplication.
+
+The previous account reproduced the original PostgreSQL 23505 and cold-opening 500 errors, repaired them, and verified the resulting behavior against the deployed product.
+
+**Verified live according to the latest repository handoff:**
+
+- Fresh founder cold opening: approximately 3.56 seconds.
+- Opening replay: 299 milliseconds.
+- First country correction: approximately 3.16 seconds.
+- Completed answer retry: 589 milliseconds, deduplicated.
+- Second country correction: approximately 3.82 seconds.
+- Saved transcript retrieval: 302 milliseconds.
+- Exactly two applicant turns and three Q turns, without duplicates.
+
+Real PostgreSQL, pgTAP, concurrency, rollback, MVCC, typecheck, build and protected CI checks passed.
+
+These are observed samples, not p95 performance guarantees.
+
+**Do not claim the entire founder-to-investor journey is complete.** The most recent acceptance proved opening, answers, corrections and retries—not the complete submission, evidence disclosure and investor dossier journey.
+
+### Integration
+
+Branch:
+`build/int-rc`
+
+Latest previously verified head:
+`f35bddfcc81eef547faead4c064179981f37d081`
+
+Refresh the current head.
+
+Do not reset integration to an earlier source revision.
+
+## 2. IMMEDIATE UNFINISHED TASK — Q FOLLOW-UP ATTRIBUTION
+
+This is the outgoing account's principal unreleased code change.
+
+Branch:
+`codex/q-discover-followup-fix-oct14`
+
+SHA:
+`ed63c7c98cbd8cb23eac183d5344692dd91056b2`
+
+The underlying code commits are:
+
+- `8412bef3` — preserve authorized Discover follow-up attribution.
+- `5be2e476` — retain selected attribution alongside wider company reads.
+
+The original audit branch is:
+`codex/q-followup-reference-audit`
+
+SHA:
+`34ec2c24618614ecd275dcb97b5136e423b030b1`
+
+### Reproduced defect
+
+During the investor browser rehearsal, Q correctly identified the selected company but lost its structured company binding when producing risk findings.
+
+The failure was reported as:
+
+`FOLLOW_UP_REFERENCE_MISMATCH`
+
+The selected company was visible in Discover, but subsequent investment findings did not preserve the correct structured subject attribution.
+
+The proposed fix permits reuse of the selected company only after valid, fresh, authorized profile retrieval.
+
+It also preserves the correct company attribution when additional companies have been read.
+
+This must never become permission to use a company that the current investor is not authorized to read.
+
+### Work already done
+
+The branch includes:
+
+- Changes to `packages/model-gateway/src/q/index.ts`.
+- Expanded tests in `packages/model-gateway/test/q-answer-tools.test.ts`.
+- Shared engineering handoff updates.
+- `scripts/handoff/live/browser-proxy-pin.mjs`.
+
+The previous agent reported 62 targeted tests and relevant static checks passing.
+
+**No protected CI run or production release was established for this branch.**
+
+### Your first execution task
+
+1. Recover the exact branch and inspect its diff against current integration.
+2. Review the authorization and subject-binding invariants.
+3. Verify that multiple authorized reads cannot cause incorrect company attribution.
+4. Test stale, revoked, missing, mismatched and cross-company cases.
+5. Run protected CI on the final source head.
+6. Open a focused PR, integrate and release through normal gates.
+7. Rerun the real investor browser rehearsal against the deployed revision.
+
+Do not simply remove identity checks to make the test pass.
+
+### Separate navigation uncertainty
+
+The same investor rehearsal also experienced an unexpected return to Discover after briefly reaching a company profile.
+
+The cause is **not yet confirmed**.
+
+Inspect the settled route history, navigation receipts and fast-navigation lifecycle.
+
+Do not assume the attribution fix resolves this navigation defect.
+
+Preserve the current fast navigation behavior elsewhere in Capital Q.
+
+## 3. BROWSER REHEARSAL AND ENVIRONMENT
+
+Use the existing script:
+
+`scripts/handoff/live/investor-demo-rehearsal.mjs`
+
+The previous environment experienced a Chromium proxy certificate trust mismatch.
+
+Do not permanently expand the browser's trust store.
+
+The outgoing agent preserved an optional, isolated per-run certificate-public-key pin helper:
+
+`scripts/handoff/live/browser-proxy-pin.mjs`
+
+Review its implementation and certificate scope before use. Only use a verified, environment-authorized proxy certificate.
+
+Do not disable TLS verification globally.
+
+Existing fictional investor and founder test fixtures are private and may not be present in your new environment.
+
+If unavailable, use legitimate approved test fixtures or report the exact prerequisite. Never put session files, tokens or private credentials in Git.
+
+Browser acceptance must prove actual selected-company navigation, findings attribution, source retrieval and comparison—not just that Q generated text.
+
+## 4. GATEQ PRODUCT COMPLETION REMAINS ACTIVE
+
+GateQ still needs complete product acceptance.
+
+The latest production release established a much stronger text interview, but full acceptance must include:
+
+- Verified contact and gateway qualification.
+- Adaptive investment interview.
+- Durable transcript and resume.
+- Meaningful corrections and evidence gaps.
+- Authorized founder/guest evidence collection.
+- Document-grounded Q questions.
+- Founder disclosure review.
+- Explicit immutable submission.
+- Investor-side source-linked dossier.
+- Investor Q analysis.
+- Team review, comparison and appropriate follow-ups.
+
+Do not confuse deterministic qualification, Q analysis, investment interest, company quality and investment outcome.
+
+### Recover guest Evidence work
+
+A substantial, unfinished implementation is already pushed:
+
+Branch:
+`claude/gateq-guest-evidence`
+
+SHA:
+`5858eb1ddfac5c5d5675ce4d5cc775bd67ea15cd`
+
+It includes:
+
+- Application-owned Evidence custody.
+- Guest-scoped upload/create/complete/list/remove API routes.
+- Versioned application-document contracts.
+- Evidence integration ports.
+- Safe upload retry/cleanup behavior.
+- Guest application isolation and disclosure tests.
+- Proposed migrations `20261223120000` and `20261223130000`.
+
+The branch is **diverged from current integration**, approximately six commits ahead of its old base and fourteen commits behind integration at the last comparison.
+
+There is no verified merged release for these features.
+
+Do not merge the branch wholesale, apply the old migrations without reconciliation, or silently weaken existing Evidence rules.
+
+Reconcile it against current canonical schema, approved ADR 0067 direction, permissions, hosted migration inventory and existing extraction/malware rules.
+
+Complete the missing interfaces, disclosure/version snapshot, Q reading and investor evidence access through real vertical slices.
+
+Tests must prove that guest documents cannot leak across applications or into organization document lists, and that documents are not disclosed before Submit.
+
+### Preserved historical WIP
+
+Four additional recovery-only branches were pushed:
+
+- `codex/wip-gateq-backend-preserved-oct14`
+- `codex/wip-gateq-evidence-preserved-oct14`
+- `codex/wip-gateq-frontend-preserved-oct14`
+- `codex/wip-gateq-intelligence-preserved-oct14`
+
+They are explicitly marked **UNVERIFIED / SUPERSEDED**.
+
+Inspect only if they contain useful missing work. Never cherry-pick them wholesale or apply conflicting historical migrations.
+
+## 5. RELATIONSHIP HUB — NEW OWNER DIRECTION
+
+An additional product-owner instruction will be appended after this handoff.
+
+**That appended instruction is the current authority for CRM/Relationship Hub execution.**
+
+The previous Relationship Hub design experiment is NOT approved as Capital Q's production visual design.
+
+Design PR #75 remains open and unmerged:
+
+https://github.com/neo1415/q/pull/75
+
+It includes research, a clickable prototype, 76 screenshots and four simulated walkthrough videos.
+
+Preserve that work for reference, but do not transplant its visual design into production.
+
+### Updated decision
+
+The owner now explicitly authorizes **functional Relationship Hub implementation**, using the existing Capital Q design system.
+
+The premium visual redesign is deferred.
+
+Therefore, do not interpret the historical PR #75 design-approval requirement as blocking functional CRM development.
+
+Build actual CRM functionality with the existing product's colors, typography, themes, spacing, components, navigation and responsive behavior.
+
+Keep business logic, query contracts, data access and Q control separate from presentation so the later redesign can change the appearance without requiring a functional rewrite.
+
+The appended CRM directive will provide the complete scope and implementation slices.
+
+## 6. NON-NEGOTIABLE ARCHITECTURE
+
+Read `AGENTS.md`, `CLAUDE.md`, the latest `docs/ai-handoff/` records, the locked PADL, Real Capital Q Product Specification, Final System Review, MVP/V1 definition and relevant architectural documents before making changes.
+
+Preserve:
+
+- One canonical company.
+- One investor organization.
+- One canonical company-investor relationship.
+- Append-oriented relationship events.
+- The distinction between Person, Organisation and Membership.
+- Server-side authorization and Supabase RLS.
+- The Context Firewall.
+- Q as a governed institutional analyst, not an authoritative database.
+- Provenance, confidence, permissions and source time.
+- Typed/versioned module contracts and bounded contexts.
+- Existing Q memory, work, voice and navigation.
+- Human approval for consequential actions.
+- Existing scoring and investment methodology.
+
+Do not create a new Q brain, new independent agent/workforce engine, second CRM database, duplicate GateQ inbox or unrelated orchestration layer.
+
+Do not change Q Pitch's canonical blueprint or presentation engine.
+
+The goal is to complete the existing product.
+
+## 7. EXECUTION MODEL — IMPORTANT FOR USAGE LIMITS
+
+The outgoing session spent significant execution time on investigations, concurrent tests, live releases and multiple workers.
+
+Do not restart all of that.
+
+Prioritize concrete, bounded work.
+
+Use:
+
+**Recover → Verify → Implement → Test → Commit → Push → Continue.**
+
+Do not create five simultaneous coding workers at startup.
+
+You may delegate genuinely independent tasks with clear ownership and limited budgets, but preserve one integration owner.
+
+For every functional slice:
+
+- Keep the diff bounded.
+- Test real behavior.
+- Push verified work promptly.
+- Run protected CI before integration.
+- Release only after correct migration/security gates.
+- Verify deployed behavior.
+- Record what remains unproven.
+
+Use actual measurements for performance.
+
+Never claim production success from unit tests alone.
+
+Never let significant finished work exist only in an ephemeral Codex workspace.
+
+When working capacity becomes constrained, push a clear WIP checkpoint with exact pending tests and known risks.
+
+## 8. DELIVERY ORDER
+
+Use engineering judgment to coordinate independent work, but start with the following priorities:
+
+**P0 — Close the pending Q follow-up defect**
+
+Recover the pushed Q attribution branch, validate it and complete the release and live browser proof. Investigate the separate unexpected navigation behavior.
+
+**P1 — Complete GateQ acceptance**
+
+Retain the released repairs; continue real submission-to-investor verification and reconcile the existing guest Evidence branch. Fix actual defects and missing functionality.
+
+**P2 — Execute the appended CRM functionality assignment**
+
+Start functional Relationship Hub vertical slices using the actual Capital Q design system, canonical data, Q navigation and Q Work. You may run this alongside independent GateQ work when branches and file ownership do not conflict.
+
+Do not delay all CRM work until GateQ is perfect, but do not compromise the active GateQ release to build the Hub.
+
+**P3 — Final end-to-end integration**
+
+Verify role-aware Hub access, Q navigation, authorized documents and transcripts, relationship histories, Q Work, GateQ and relevant exports together.
+
+Keep UX simple and consistent even before the future premium redesign.
+
+## 9. REPORTING
+
+On takeover, provide only a concise current-state confirmation:
+
+- Actual branch and HEAD.
+- Current production revision.
+- Unreleased Q follow-up branch.
+- GateQ Evidence recovery branch.
+- Immediate work items.
+- Any real blocker.
+
+Do not spend the session creating another large plan.
+
+Begin implementation immediately.
+
+At each meaningful checkpoint report:
+
+- What was fixed or built.
+- Commit/PR.
+- Exact tests and results.
+- Whether deployed.
+- What was actually browser-verified.
+- What remains incomplete.
+
+Keep the shared handoff updated.
+
+## 10. START
+
+Recover current repository state.
+
+Finish the pending Q Discover follow-up repair first, without undermining authorization or fast navigation.
+
+Continue GateQ completion and the appended functional CRM initiative through separate, safe vertical slices.
+
+**Success means actual functioning product capabilities, reliable Q control, trusted investor intelligence and verified user journeys—not the number of agents launched or reports written.**
+
+START EXECUTION.

@@ -12,9 +12,11 @@ import {
   createDocumentProcessingPipeline,
   type DocumentPipelineOptions,
 } from "../src/documents/pipeline.js";
-import type {
-  MalwareScanner,
-  MalwareVerdictStatus,
+import {
+  decideOnVerdict,
+  MALWARE_POLICIES,
+  type MalwareScanner,
+  type MalwareVerdictStatus,
 } from "../src/documents/malware.js";
 import type { ParserResult, ParserSandbox } from "../src/parser/sandbox.js";
 import type { QueueMessage } from "../src/queue/pgmq.js";
@@ -238,7 +240,7 @@ describe("document processing pipeline", () => {
     });
   });
 
-  it("refuses a job for another pipeline version", async () => {
+  it("leaves a job for another pipeline version to its own worker (deploy overlap)", async () => {
     const version = makeVersion();
     const evidence = createFakeEvidence({
       version,
@@ -256,8 +258,10 @@ describe("document processing pipeline", () => {
         pipelineVersion: "evidence-processing-v9",
       }),
     );
+    // Left for the worker of that version (deploy overlap), never
+    // dead-lettered on first sight; the attempt limit still ends it.
     expect(outcome).toEqual({
-      kind: "PERMANENT",
+      kind: "RETRY",
       errorCode: "PIPELINE_VERSION_MISMATCH",
     });
     expect(evidence.calls).toEqual([]);
@@ -362,6 +366,135 @@ describe("document processing pipeline", () => {
       (call) => call.name === "completeDocumentProcessing",
     );
     expect(completion?.input).toMatchObject({ scannedClean: false });
+  });
+
+  it("stores and scans a voice note without parsing it, recording a clean verdict (R34)", async () => {
+    const version = makeVersion({ mimeType: "audio/webm" });
+    const evidence = createFakeEvidence({
+      version,
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    const storage = storageStub(version.sizeBytes);
+    let parsed = false;
+    const { handle } = build({
+      evidence: evidence.service,
+      storage: storage.provider,
+      sandbox: {
+        run: () => {
+          parsed = true;
+          return Promise.resolve(successfulParse);
+        },
+      },
+    });
+
+    await handle(jobMessage({ documentVersionId: version.id }));
+
+    expect(parsed).toBe(false);
+    const advance = evidence.calls.findLast(
+      (call) => call.name === "advanceVersionProcessingState",
+    );
+    expect(advance?.input).toMatchObject({
+      malwareScanStatus: "CLEAN",
+      textExtractionStatus: "UNSUPPORTED",
+    });
+  });
+
+  it("never claims CLEAN for an unscanned voice note", async () => {
+    const version = makeVersion({ mimeType: "audio/mp4" });
+    const evidence = createFakeEvidence({
+      version,
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    const storage = storageStub(version.sizeBytes);
+    const { handle } = build({
+      evidence: evidence.service,
+      storage: storage.provider,
+      scanner: scannerStub("UNAVAILABLE"),
+      malwarePolicy: "ALLOW_UNSCANNED",
+    });
+
+    await handle(jobMessage({ documentVersionId: version.id }));
+
+    const advance = evidence.calls.findLast(
+      (call) => call.name === "advanceVersionProcessingState",
+    );
+    expect(advance?.input).not.toHaveProperty("malwareScanStatus");
+  });
+
+  it("ADR 0042: with no scanner, the interim policy processes the file and records NOT_SCANNED -- never CLEAN", async () => {
+    const version = makeVersion();
+    const evidence = createFakeEvidence({
+      version,
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    const storage = storageStub(version.sizeBytes);
+    let parsed = false;
+    const { handle } = build({
+      evidence: evidence.service,
+      storage: storage.provider,
+      scanner: scannerStub("UNAVAILABLE"),
+      malwarePolicy: "ALLOW_UNSCANNED_WITH_WARNING",
+      sandbox: {
+        run: () => {
+          parsed = true;
+          return Promise.resolve(successfulParse);
+        },
+      },
+    });
+
+    await handle(jobMessage({ documentVersionId: version.id }));
+
+    expect(parsed).toBe(true);
+    const completion = evidence.calls.find(
+      (call) => call.name === "completeDocumentProcessing",
+    );
+    expect(completion?.input).toMatchObject({
+      scannedClean: false,
+      notScanned: true,
+      provenance: {
+        metadata: {
+          scanned: false,
+          malwarePolicy: "ALLOW_UNSCANNED_WITH_WARNING",
+        },
+      },
+    });
+    for (const call of evidence.calls) {
+      expect(JSON.stringify(call.input)).not.toContain('"CLEAN"');
+    }
+  });
+
+  it("ADR 0042: an unscanned voice note under the interim policy is NOT_SCANNED, never CLEAN", async () => {
+    const version = makeVersion({ mimeType: "audio/webm" });
+    const evidence = createFakeEvidence({
+      version,
+      pipelineVersion: PIPELINE_VERSION,
+    });
+    const storage = storageStub(version.sizeBytes);
+    const { handle } = build({
+      evidence: evidence.service,
+      storage: storage.provider,
+      scanner: scannerStub("UNAVAILABLE"),
+      malwarePolicy: "ALLOW_UNSCANNED_WITH_WARNING",
+    });
+    await handle(jobMessage({ documentVersionId: version.id }));
+    const advance = evidence.calls.findLast(
+      (call) => call.name === "advanceVersionProcessingState",
+    );
+    expect(advance?.input).toMatchObject({ malwareScanStatus: "NOT_SCANNED" });
+  });
+
+  it("ADR 0042: under the interim policy an infected file is still blocked and a failing scanner still retried", () => {
+    for (const [status, expected] of [
+      ["INFECTED", "BLOCK"],
+      ["ERROR", "RETRY"],
+    ] as const) {
+      expect(
+        decideOnVerdict(
+          { status, scannerId: "s", scannerVersion: null },
+          "ALLOW_UNSCANNED_WITH_WARNING",
+        ).kind,
+      ).toBe(expected);
+    }
   });
 
   it("retries when the scanner itself fails", async () => {
@@ -611,4 +744,56 @@ describe("document processing pipeline", () => {
     });
     expect(outcome).toEqual({ kind: "PERMANENT", errorCode: "INVALID_JOB" });
   });
+});
+
+/** ADR 0042: the whole verdict × policy matrix, and CLEAN only from CLEAN. */
+describe("the malware policy matrix", () => {
+  const expected = {
+    REQUIRE_CLEAN: {
+      CLEAN: "PROCEED/scanned",
+      INFECTED: "BLOCK",
+      ERROR: "RETRY",
+      UNAVAILABLE: "BLOCK",
+    },
+    ALLOW_UNSCANNED: {
+      CLEAN: "PROCEED/scanned",
+      INFECTED: "BLOCK",
+      ERROR: "PROCEED/unscanned",
+      UNAVAILABLE: "PROCEED/unscanned",
+    },
+    ALLOW_UNSCANNED_WITH_WARNING: {
+      CLEAN: "PROCEED/scanned",
+      INFECTED: "BLOCK",
+      ERROR: "RETRY",
+      UNAVAILABLE: "PROCEED/not-scanned",
+    },
+  } as const;
+  for (const policy of MALWARE_POLICIES) {
+    for (const status of [
+      "CLEAN",
+      "INFECTED",
+      "ERROR",
+      "UNAVAILABLE",
+    ] as const) {
+      it(`${policy} × ${status}`, () => {
+        const decision = decideOnVerdict(
+          { status, scannerId: "s", scannerVersion: null },
+          policy,
+        );
+        const said =
+          decision.kind !== "PROCEED"
+            ? decision.kind
+            : decision.scanned
+              ? "PROCEED/scanned"
+              : decision.recordNotScanned === true
+                ? "PROCEED/not-scanned"
+                : "PROCEED/unscanned";
+        expect(said).toBe(expected[policy][status]);
+        // A scanned (CLEAN-writing) decision comes from a CLEAN verdict only.
+        if (decision.kind === "PROCEED" && decision.scanned) {
+          expect(status).toBe("CLEAN");
+        }
+      });
+    }
+  }
 });

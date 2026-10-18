@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   InvestorDeploymentStateSchema,
+  InvestorInboundPreferenceSchema,
   InvestorTypeSchema,
   InvestorVerificationStateSchema,
   UtcTimestampSchema,
@@ -59,6 +60,8 @@ const InvestorRow = z.object({
   public_description: z.string().nullable(),
   verification_state: InvestorVerificationStateSchema,
   deployment_state: InvestorDeploymentStateSchema.nullable(),
+  inbound_preference: InvestorInboundPreferenceSchema.nullable(),
+  marketplace_visibility: z.enum(["organisation_private", "network_visible"]),
   version: z.number().int().min(1),
   created_at: Timestamp,
   updated_at: Timestamp,
@@ -77,6 +80,8 @@ function toInvestor(row: unknown): InvestorOrganisation {
     publicDescription: r.public_description,
     verificationState: r.verification_state,
     deploymentState: r.deployment_state,
+    inboundPreference: r.inbound_preference,
+    visibility: r.marketplace_visibility,
     version: r.version,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -87,7 +92,8 @@ function investorSelect(executor: DatabaseExecutor) {
   return executor`
     select i.id, i.tenant_id, i.organisation_id, i.investor_type, i.display_name,
            i.website_url, i.hq_country, i.public_description, i.verification_state,
-           i.deployment_state, i.version, i.created_at, i.updated_at
+           i.deployment_state, i.inbound_preference, i.marketplace_visibility,
+           i.version, i.created_at, i.updated_at
       from core.investor_organisations i`;
 }
 
@@ -99,6 +105,7 @@ const COLUMN_BY_FIELD: Readonly<Record<keyof InvestorProfileChanges, string>> =
     hqCountry: "hq_country",
     publicDescription: "public_description",
     deploymentState: "deployment_state",
+    inboundPreference: "inbound_preference",
   };
 
 /** Whitelisted column mapping. verification_state is not reachable from here. */
@@ -168,6 +175,25 @@ export function createPostgresInvestorOrganisationRepository(): InvestorOrganisa
     lockOrganisation: async (tx, organisationId) => {
       await tx.sql`
         select pg_advisory_xact_lock(hashtext('investor.create'), hashtext(${organisationId}::text))`;
+    },
+
+    updateVisibility: async (tx, input) => {
+      const updated = await tx.sql`
+        update core.investor_organisations i
+           set marketplace_visibility = ${input.visibility},
+               version = i.version + 1
+         where i.id = ${input.investorOrganisationId}
+           and i.tenant_id = ${input.tenantId}
+           and i.organisation_id = ${input.organisationId}
+           and i.version = ${input.expectedVersion}
+        returning i.id`;
+      if (updated.length === 0) {
+        return null;
+      }
+      const rows = await tx.sql`
+        ${investorSelect(tx.sql)}
+         where i.id = ${input.investorOrganisationId} and i.tenant_id = ${input.tenantId}`;
+      return toInvestor(rows[0]);
     },
 
     updateProfile: async (tx, input) => {
@@ -378,6 +404,72 @@ export function createPostgresInvestorOrganisationQueryPort(options: {
           from core.investor_organisations i
          where i.id = ${id}`;
       return rows.length === 0 ? null : toIdentity(rows[0]);
+    },
+  };
+}
+
+/**
+ * The declared investor profile with trusted ownership, permission-neutral
+ * (BIZ-004). For a context that projects an allowlist of declared fields
+ * under its own disclosure rule -- the Q Card -- and must not read this
+ * context's tables. Callers authorise before they show anything.
+ */
+export type InvestorProfileFacts = {
+  readonly id: string;
+  readonly tenantId: string;
+  readonly organisationId: string;
+  readonly investorType: string;
+  readonly displayName: string;
+  readonly websiteUrl: string | null;
+  readonly hqCountry: string | null;
+  readonly publicDescription: string | null;
+  readonly deploymentState: string | null;
+  readonly verificationState: string;
+};
+
+export type InvestorProfileQueryPort = {
+  readonly findCanonicalInvestorProfile: (
+    investorOrganisationId: string,
+  ) => Promise<InvestorProfileFacts | null>;
+};
+
+export function createPostgresInvestorProfileQueryPort(options: {
+  readonly sql: DatabaseExecutor;
+}): InvestorProfileQueryPort {
+  const { sql } = options;
+  return {
+    findCanonicalInvestorProfile: async (id) => {
+      const rows = await sql`
+        select i.id, i.tenant_id, i.organisation_id, i.investor_type, i.display_name,
+               i.website_url, i.hq_country, i.public_description, i.deployment_state,
+               i.verification_state
+          from core.investor_organisations i
+         where i.id = ${id}`;
+      if (rows.length === 0) return null;
+      const parsed = InvestorRow.pick({
+        id: true,
+        tenant_id: true,
+        organisation_id: true,
+        investor_type: true,
+        display_name: true,
+        website_url: true,
+        hq_country: true,
+        public_description: true,
+        deployment_state: true,
+        verification_state: true,
+      }).parse(rows[0]);
+      return {
+        id: parsed.id,
+        tenantId: parsed.tenant_id,
+        organisationId: parsed.organisation_id,
+        investorType: parsed.investor_type,
+        displayName: parsed.display_name,
+        websiteUrl: parsed.website_url,
+        hqCountry: parsed.hq_country,
+        publicDescription: parsed.public_description,
+        deploymentState: parsed.deployment_state,
+        verificationState: parsed.verification_state,
+      };
     },
   };
 }

@@ -1,0 +1,36 @@
+{
+  "name": "@capital-q/q-artifacts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Q artifacts: what Q composes for somebody to read, keep and change -- versioned, owner-scoped derived material that is never canonical truth and never evidence.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@capital-q/contracts": "workspace:*",
+    "@capital-q/database": "workspace:*",
+    "@capital-q/observability": "workspace:*",
+    "@capital-q/security": "workspace:*",
+    "zod": "4.5.4"
+  },
+  "devDependencies": {
+    "@capital-q/config": "workspace:*",
+    "@types/node": "^24.13.3",
+    "typescript": "5.9.3"
+  }
+}

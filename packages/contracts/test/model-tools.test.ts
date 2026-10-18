@@ -103,7 +103,7 @@ describe("model tool contracts", () => {
     ).toBe(false);
   });
 
-  it("offers tools with TEXT output only, uniquely named and bounded", () => {
+  it("offers tools with TEXT or STRUCTURED output, uniquely named and bounded", () => {
     expect(
       ModelGatewayRequestSchema.safeParse(baseRequest({ tools: [TOOL] }))
         .success,
@@ -115,7 +115,7 @@ describe("model tool contracts", () => {
           output: { kind: "STRUCTURED", schemaName: "X", jsonSchema: {} },
         }),
       ).success,
-    ).toBe(false);
+    ).toBe(true);
     expect(
       ModelGatewayRequestSchema.safeParse(baseRequest({ tools: [TOOL, TOOL] }))
         .success,

@@ -999,12 +999,13 @@ describe("@capital-q/investors mandates against local PostgreSQL", () => {
             }).listActiveMandates(actor.tenantId, investorA)
           ).map((m) => m.id),
         ).toEqual([mandate.id]);
-        // Nothing was ranked synchronously: no slate/recommendation table exists.
+        // Nothing was ranked synchronously: activation publishes an event;
+        // the slate (CQ-REC-006) is built by the worker, never in this call.
         expect(
           (
             await tx.sql<{ n: string }[]>`
-            select table_name as n from information_schema.tables
-             where table_name like '%slate%' or table_name like '%recommendation%'`
+            select id::text as n from recommendation.slates
+             where investor_organisation_id = ${investorA}`
           ).length,
         ).toBe(0);
 

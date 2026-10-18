@@ -1,11 +1,14 @@
 import { z } from "zod";
 
+import type { OnboardingSessionView } from "@capital-q/contracts";
+
 import type { ChoiceOption } from "@capital-q/ui/choice-list";
 import type { SnapshotSection } from "@capital-q/ui/intelligence-snapshot";
 import type { CurrencyOption } from "@capital-q/ui/money-input";
 
 import type { MaterialFileView } from "../../onboarding-kit/materials";
 import type { TaxonomyCandidateView } from "../../onboarding-kit/client";
+import type { QuestionView } from "../../onboarding-kit/session";
 
 /**
  * Frontend presentation contract for founder onboarding.
@@ -41,6 +44,8 @@ export type FounderSuggestionView = {
   readonly source: string | undefined;
   /** Q's own confidence word. Never a percentage, never invented. */
   readonly confidence: string | undefined;
+  /** The journey step it answers, when known (the website, say). */
+  readonly stepKey?: string | undefined;
 };
 
 export const SECTION_IDS = ["company", "business", "raise", "review"] as const;
@@ -112,6 +117,8 @@ export const StepResponseSchema = z.discriminatedUnion("kind", [
     instrument: z.string().optional(),
     timeframe: z.string().optional(),
     useOfFunds: z.array(z.string()).optional(),
+    /** v4: smallest cheque, a whole amount in the raise's currency. */
+    minCheque: z.string().regex(/^\d+$/).optional(),
   }),
   z.object({ kind: z.literal("snapshot"), confirmed: z.literal(true) }),
 ]);
@@ -166,6 +173,11 @@ export type ReviewItem = {
   readonly editStepId: string;
 };
 
+/** A persisted question with the screen that answers it, for a step to render (CQ-PRE-REC-001). */
+export type AskedQuestionView = QuestionView & {
+  readonly editStepId: string | undefined;
+};
+
 export type StepView =
   | (StepBase<"choice"> & {
       readonly options: readonly ChoiceOption[];
@@ -181,11 +193,18 @@ export type StepView =
       readonly placeholder?: string | undefined;
       readonly maxLength: number;
       readonly voiceEnabled: boolean;
+      /** F7 only: what Q still wants to ask, most material first. */
+      readonly questions?: readonly AskedQuestionView[] | undefined;
       readonly response?:
         Extract<StepResponse, { kind: "narrative" }> | undefined;
     })
   | (StepBase<"company_basics"> & {
       readonly countries: readonly ChoiceOption[];
+      /**
+       * The website Q's research found and has not been confirmed: offered
+       * as a one-tap fill, never entered for them (founder live 2026-10-05).
+       */
+      readonly suggestedWebsite?: string | undefined;
       readonly response?:
         Extract<StepResponse, { kind: "company_basics" }> | undefined;
     })
@@ -242,6 +261,8 @@ export type StepView =
       readonly timeframeOptions: readonly ChoiceOption[];
       readonly useOfFundsOptions: readonly ChoiceOption[];
       readonly currencies: readonly CurrencyOption[];
+      /** v4 sessions ask for the smallest cheque (optional). */
+      readonly asksMinCheque: boolean;
       /** Present when an objective already exists: saving recalibrates it. */
       readonly existingObjective:
         { readonly amount: string; readonly currency: string } | undefined;
@@ -299,6 +320,12 @@ export type FounderOnboardingSessionView = {
   readonly currentStepId: string;
   /** Absent only once the session is complete. */
   readonly step: StepView | undefined;
+  /** Questions Q still wants answered, most material first. */
+  readonly questions: readonly QuestionView[];
   /** Which adapter produced this view. Synthetic views say so on screen. */
   readonly source: { readonly adapter: string; readonly synthetic: boolean };
+  /** Plain labels for taxonomy ids the view mentions, so Q shows categories as words. */
+  readonly labels?: Readonly<Record<string, string>> | undefined;
+  /** The runtime's own view, for the Q-led interview (CQ-PRE-REC-001). */
+  readonly raw?: OnboardingSessionView | undefined;
 };

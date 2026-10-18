@@ -15,7 +15,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(28);
+select plan(30);
 
 -- Fixtures ------------------------------------------------------------------------
 insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug) values
@@ -69,11 +69,18 @@ select throws_ok(
      values (pg_temp.rls_id('tenant_a'), 'COMPANY', '00000000-0000-4000-8000-0000000009c2', pg_temp.rls_id('org_b'), 'FOUNDER_PITCH', pg_temp.rls_id('user_a')) $$,
   '23503', null, 'media cannot be owned by an organisation outside its tenant');
 
--- The single primary pitch --------------------------------------------------------------
+-- Several live pitches (ADR 0022) ----------------------------------------------------------
+select lives_ok(
+  $$ insert into media.media_assets (id, tenant_id, owner_type, owner_id, owner_organisation_id, purpose, created_by_user_id)
+     values ('00000000-0000-4000-8000-0000000009a9', pg_temp.rls_id('tenant_a'), 'COMPANY', '00000000-0000-4000-8000-0000000009c1', pg_temp.rls_id('org_a'), 'FOUNDER_PITCH', pg_temp.rls_id('user_a')) $$,
+  'a company may have several live pitch videos; a second one is another video, not a replacement');
+select is((select audience from media.media_assets where id = '00000000-0000-4000-8000-0000000009a9'),
+  'INVESTORS', 'a new video is for investors only until its owner opens it to the network (ADR 0021)');
 select throws_ok(
-  $$ insert into media.media_assets (tenant_id, owner_type, owner_id, owner_organisation_id, purpose, created_by_user_id)
-     values (pg_temp.rls_id('tenant_a'), 'COMPANY', '00000000-0000-4000-8000-0000000009c1', pg_temp.rls_id('org_a'), 'FOUNDER_PITCH', pg_temp.rls_id('user_a')) $$,
-  '23505', null, 'a company has one current pitch; a second is a replacement, not a creation');
+  $$ update media.media_assets set audience = 'EVERYONE_ON_EARTH' where id = '00000000-0000-4000-8000-0000000009a9' $$,
+  '23514', null, 'the audience is one of the named codes');
+-- Removed again so the lineage counts below speak about one video only.
+delete from media.media_assets where id = '00000000-0000-4000-8000-0000000009a9';
 select lives_ok(
   $$ insert into media.media_assets (tenant_id, owner_type, owner_id, owner_organisation_id, purpose, created_by_user_id)
      values (pg_temp.rls_id('tenant_a'), 'COMPANY', '00000000-0000-4000-8000-0000000009c1', pg_temp.rls_id('org_a'), 'COMPANY_PRODUCT_DEMO', pg_temp.rls_id('user_a')) $$,

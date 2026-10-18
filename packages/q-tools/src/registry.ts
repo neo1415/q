@@ -1,15 +1,58 @@
 import { z } from "zod";
 
 import {
+  MODEL_TOOLS_MAX,
   ModelToolDefinitionSchema,
+  Q_CLIENT_ACTION_TOOLS,
   QToolNameSchema,
   type ModelToolDefinition,
   type QToolName,
 } from "@capital-q/contracts";
 import type { QOfferedTool, QToolExecutionContext } from "@capital-q/q-runtime";
 
+import { APP_ACTIONS, appActionToolNames } from "@capital-q/app-actions";
+
+import { capabilityArea, Q_CAPABILITIES } from "./capabilities.js";
 import type { AnyQToolDefinition } from "./definition.js";
 import { planScopeKinds } from "./plan.js";
+import {
+  BIND_CATALOGUE,
+  type CapabilityCatalogue,
+} from "./tools/use-capability.js";
+
+/**
+ * The most tools one turn is offered: everything one request carries,
+ * less the one slot `use_capability` keeps (lead 2026-10-04: "increase the
+ * tool limit... make sure Q is able to get all its tools whenever it needs
+ * them"). The 40 of 2026-10-02 cut research from a research turn (run
+ * 13955ca2) and get_company from investor questions; staging logs showed
+ * no latency gain from it. The focus still decides what is relevant (cost),
+ * and anything relevant but not offered is one `use_capability` call away
+ * in the same turn.
+ */
+export const Q_TURN_TOOLS_MAX = MODEL_TOOLS_MAX - 1;
+
+/** The browser's own actions (they happen in the page, at once). */
+const CLIENT_ACTIONS: ReadonlySet<string> = new Set(Q_CLIENT_ACTION_TOOLS);
+
+/** Each tool's capability area, by provider name (the reader's areas). */
+const TOOL_AREAS: ReadonlyMap<string, string> = new Map(
+  Q_CAPABILITIES.flatMap((capability) =>
+    capability.performedBy.kind === "TOOL"
+      ? [
+          [
+            capability.performedBy.providerName,
+            capability.area ?? capabilityArea(capability.group),
+          ] as const,
+        ]
+      : [],
+  ),
+);
+
+/** The area a tool is listed under, or null when no capability names it. */
+export function toolAreaOf(providerName: string): string | null {
+  return TOOL_AREAS.get(providerName) ?? null;
+}
 
 /**
  * The Capital Q-owned Tool Registry (doc 12 §33; packet §8-§12).
@@ -44,8 +87,21 @@ export type QToolRegistry = {
   readonly get: (id: QToolName, version: number) => QToolRecord | undefined;
   readonly getActive: (id: QToolName) => QToolRecord | undefined;
   readonly list: () => readonly QToolRecord[];
-  /** The minimum tool set for this context, in stable id order. */
+  /**
+   * The tool set for this context: the core, then the tools serving this
+   * run's purpose, in a deterministic priority order, bounded by
+   * MODEL_TOOLS_MAX. What the bound cut is in `ranked` past the bound.
+   */
   readonly eligible: (context: QToolExecutionContext) => readonly QToolRecord[];
+  /** Every tool relevant to this context, in priority order, unbounded. */
+  readonly ranked: (context: QToolExecutionContext) => readonly QToolRecord[];
+  /**
+   * The reader's list: the unfocused offer, then the declared app actions
+   * this plan's scopes allow on any purpose (each executes only when named).
+   */
+  readonly available: (
+    context: QToolExecutionContext,
+  ) => readonly QToolRecord[];
   /** Resolve a model's proposal to the record that was offered, if any. */
   readonly offeredByProviderName: (
     context: QToolExecutionContext,
@@ -99,6 +155,26 @@ export function toOfferedTool(record: QToolRecord): QOfferedTool {
   };
 }
 
+/**
+ * The hand-written proposers that still serve a declared action (a
+ * `legacyTool` named propose_*): as much declared actions as a generated
+ * tool (QA run 92e8545d: "Remind me on Monday at 10am to review
+ * Tallyloom's deck" was refused -- the turn was about a company, the
+ * purpose did not list propose_reminder, and only generated tools were
+ * eligible when named, so the router never saw it).
+ */
+const DECLARED_PROPOSERS: ReadonlySet<string> = new Set(
+  appActionToolNames(APP_ACTIONS).filter((name) => name.startsWith("propose_")),
+);
+
+/** A declared app action's tool: offered when named, on any purpose its scopes allow. */
+function declaredAction(record: QToolRecord): boolean {
+  return (
+    record.definition.eligibleWhenNamed === true ||
+    DECLARED_PROPOSERS.has(record.definition.providerName)
+  );
+}
+
 export function createQToolRegistry(
   definitions: readonly AnyQToolDefinition[],
 ): QToolRegistry {
@@ -112,13 +188,24 @@ export function createQToolRegistry(
     if (!Number.isInteger(definition.version) || definition.version < 1) {
       throw new Error(`tool ${id} has an invalid version`);
     }
-    if (definition.riskClass !== "SAFE_READ") {
+    /**
+     * Two lanes, and only two (ADR 0016). SAFE_READ tools read. The one
+     * write lane is LOW_RISK_INTERNAL with a SIDE_EFFECT classification:
+     * a write to the caller's own record, at their own word, that the
+     * owning service validates again and that is idempotent there — an
+     * onboarding answer. Anything that needs approval (CONFIRM_REQUIRED
+     * and above) is an Approval Engine action, never a tool.
+     */
+    const read =
+      definition.riskClass === "SAFE_READ" &&
+      definition.classification === "READ_ONLY";
+    const ownWrite =
+      definition.riskClass === "LOW_RISK_INTERNAL" &&
+      definition.classification === "SIDE_EFFECT";
+    if (!read && !ownWrite) {
       throw new Error(
-        `tool ${id} is ${definition.riskClass}; only SAFE_READ tools can be registered before the approval engine exists`,
+        `tool ${id} is ${definition.riskClass}/${definition.classification}; a tool is SAFE_READ/READ_ONLY or LOW_RISK_INTERNAL/SIDE_EFFECT, and anything else is an approval-engine action`,
       );
-    }
-    if (definition.classification !== "READ_ONLY") {
-      throw new Error(`tool ${id} must be READ_ONLY to be SAFE_READ`);
     }
     const versionId = versionIdOf(id, definition.version);
     if (byVersion.has(versionId)) {
@@ -153,32 +240,169 @@ export function createQToolRegistry(
   records.sort((a, b) => a.versionId.localeCompare(b.versionId));
   Object.freeze(records);
 
-  const eligible = (context: QToolExecutionContext): readonly QToolRecord[] => {
+  /**
+   * Relevance, then priority (R33, lead decision 2026-09-27): the core
+   * first; then the tools that declare fewer purposes, being the more
+   * specific to this one; then id. Deterministic for the same catalogue
+   * and plan, so the same run always offers the same tools.
+   */
+  const ranked = (context: QToolExecutionContext): readonly QToolRecord[] => {
     if (context.actor.actorType !== "HUMAN") {
       return [];
     }
     const kinds = planScopeKinds(context.plan);
     const purpose = context.plan.purpose.taskClass;
+    const core = (record: QToolRecord) => record.definition.core === true;
+    const readOnly = (record: QToolRecord) =>
+      record.definition.classification === "READ_ONLY";
+    const focus = context.focus;
+    const focused =
+      focus !== undefined && (focus.areas.length > 0 || focus.tools.length > 0);
+    const areas = new Set(focus?.areas ?? []);
+    const named = new Set(focus?.tools ?? []);
+    // Focused: the core, the tools the turn named (whatever their
+    // purposes), and this purpose's tools in the turn's areas. A tool no
+    // capability lists has no area to judge it by, so it is kept.
+    const readsOnly = focus?.readsOnly === true;
+    const relevant = (record: QToolRecord): boolean => {
+      const name = record.definition.providerName;
+      // A question keeps the core's reads, its browser actions (Q shows
+      // and navigates while it answers) and use_capability; the core's
+      // own change-makers (approve, edit, stop) wait for a request to act.
+      if (core(record)) {
+        return (
+          !readsOnly ||
+          readOnly(record) ||
+          CLIENT_ACTIONS.has(name) ||
+          named.has(name)
+        );
+      }
+      const forPurpose = record.definition.supportedPurposes.includes(purpose);
+      const app = declaredAction(record);
+      // A named tool off this purpose is offered only when it is a declared
+      // app action: what is offered is what may execute. (Unfocused, no
+      // tool is named, so this is the focused rule only.)
+      if (named.has(name)) return forPurpose || app;
+      // A question to Q: the change-preparing tools are not shown (each
+      // schema is paid on every round); use_capability, in the core,
+      // loads one the moment the answer needs it.
+      if (readsOnly && !readOnly(record)) return false;
+      if (!focused) return forPurpose;
+      const area = TOOL_AREAS.get(name);
+      const inArea = area !== undefined && areas.has(area);
+      // A declared app action is offered whenever its area is in the
+      // turn's focus, whatever the purpose (lead 2026-10-03, run d396af2f:
+      // a reader that named nothing left diligence_documents unreachable).
+      if (!forPurpose) return app && inArea;
+      return focus?.widen === true || area === undefined || inArea;
+    };
+    const focusArea = (record: QToolRecord): boolean => {
+      const area = TOOL_AREAS.get(record.definition.providerName);
+      return area !== undefined && areas.has(area);
+    };
     return [...activeById.values()]
-      .filter(({ definition }) =>
-        definition.supportedPurposes.includes(purpose),
-      )
+      .filter(relevant)
       .filter(
         ({ definition }) =>
           definition.requiredScopeKinds.length === 0 ||
           definition.requiredScopeKinds.some((kind) => kinds.has(kind)),
       )
-      .sort((a, b) => a.definition.id.localeCompare(b.definition.id));
+      .sort(
+        (a, b) =>
+          Number(core(b)) - Number(core(a)) ||
+          // What the turn named leads, so no bound can cut it.
+          Number(named.has(b.definition.providerName)) -
+            Number(named.has(a.definition.providerName)) ||
+          // Then what is in the turn's areas, so a widened offer keeps
+          // what the turn is about within the bound.
+          Number(focusArea(b)) - Number(focusArea(a)) ||
+          a.definition.supportedPurposes.length -
+            b.definition.supportedPurposes.length ||
+          a.definition.id.localeCompare(b.definition.id),
+      );
   };
+
+  const eligible = (context: QToolExecutionContext): readonly QToolRecord[] =>
+    ranked(context).slice(0, Math.min(Q_TURN_TOOLS_MAX, MODEL_TOOLS_MAX));
+
+  // What the run's purpose and plan allow, exactly as before a turn's focus
+  // existed, within what one request can carry.
+  const unfocused = (context: QToolExecutionContext): readonly QToolRecord[] =>
+    ranked({ ...context, focus: undefined }).slice(0, MODEL_TOOLS_MAX);
+
+  // The declared app actions this plan's scopes allow, whatever the purpose
+  // (lead 2026-10-03: "We've decided not to proceed with Ledgerfold" plans
+  // as INVESTOR_QUESTION, and relationship_outcome was refused there).
+  const nameable = (context: QToolExecutionContext): readonly QToolRecord[] =>
+    ranked({
+      ...context,
+      focus: {
+        areas: [],
+        tools: [...activeById.values()]
+          .filter(declaredAction)
+          .map(({ definition }) => definition.providerName),
+      },
+    }).filter(declaredAction);
+
+  /** The tool's area is one the turn is about. */
+  const inFocusArea = (
+    context: QToolExecutionContext,
+    providerName: string,
+  ): boolean => {
+    const area = TOOL_AREAS.get(providerName);
+    return area !== undefined && (context.focus?.areas.includes(area) ?? false);
+  };
+
+  const available = (
+    context: QToolExecutionContext,
+  ): readonly QToolRecord[] => {
+    const listed = unfocused(context);
+    const names = new Set(listed.map(({ definition }) => definition.id));
+    return [
+      ...listed,
+      ...nameable(context).filter(
+        ({ definition }) => !names.has(definition.id),
+      ),
+    ];
+  };
+
+  // use_capability reads what this run may use from here, never more.
+  for (const record of records) {
+    const bind = (
+      record.definition as {
+        readonly [BIND_CATALOGUE]?: (catalogue: CapabilityCatalogue) => void;
+      }
+    )[BIND_CATALOGUE];
+    bind?.((context) =>
+      available(context).map(({ definition }) => ({
+        providerName: definition.providerName,
+        description: definition.description,
+      })),
+    );
+  }
 
   return {
     get: (id, version) => byVersion.get(versionIdOf(id, version)),
     getActive: (id) => activeById.get(id),
     list: () => records,
     eligible,
+    ranked,
+    // What may execute is what the run's purpose and plan allow, exactly as
+    // before a turn's focus existed: the focus narrows what the model is
+    // shown (cost), never what the run is authorised to use. A code read
+    // of a fact the model was not shown this turn still runs.
+    // A declared app action the turn named may execute on any purpose its
+    // plan's scopes allow; nothing else the focus names widens authority.
     offeredByProviderName: (context, providerName) =>
-      eligible(context).find(
+      unfocused(context).find(
         (record) => record.definition.providerName === providerName,
-      ),
+      ) ??
+      (context.focus?.tools.includes(providerName) === true ||
+      inFocusArea(context, providerName)
+        ? nameable(context).find(
+            (record) => record.definition.providerName === providerName,
+          )
+        : undefined),
+    available,
   };
 }

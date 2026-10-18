@@ -57,6 +57,10 @@ import {
   type UpsertMyInvestorRepresentativeCommand,
 } from "./representative-use-cases.js";
 import {
+  createSetInvestorVisibility,
+  type SetInvestorVisibilityCommand,
+} from "./set-investor-visibility.js";
+import {
   createUpdateInvestorOrganisation,
   type UpdateInvestorOrganisationCommand,
 } from "./update-investor-organisation.js";
@@ -77,6 +81,9 @@ export type InvestorService = {
   ) => Promise<InvestorOrganisation>;
   readonly updateInvestorOrganisation: (
     command: UpdateInvestorOrganisationCommand,
+  ) => Promise<InvestorOrganisation>;
+  readonly setInvestorVisibility: (
+    command: SetInvestorVisibilityCommand,
   ) => Promise<InvestorOrganisation>;
   readonly getMyInvestorRepresentative: (
     query: GetMyInvestorRepresentativeQuery,
@@ -149,6 +156,7 @@ export function createInvestorService(
     getCurrentInvestorOrganisation:
       createGetCurrentInvestorOrganisation(dependencies),
     updateInvestorOrganisation: createUpdateInvestorOrganisation(dependencies),
+    setInvestorVisibility: createSetInvestorVisibility(dependencies),
     getMyInvestorRepresentative:
       createGetMyInvestorRepresentative(dependencies),
     upsertMyInvestorRepresentative:

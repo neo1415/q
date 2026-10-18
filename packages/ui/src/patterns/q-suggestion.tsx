@@ -31,7 +31,7 @@ export function QSuggestion({
       role="group"
       aria-label={title}
       className={cx(
-        "flex flex-col gap-3 rounded-lg border border-(--cq-accent-soft) bg-(--cq-surface-raised) p-3",
+        "flex flex-col gap-3 border border-(--cq-accent-soft) bg-(--cq-surface-raised) p-3",
         className,
       )}
     >
@@ -42,7 +42,7 @@ export function QSuggestion({
           <div className="cq-body text-(--cq-text-primary)">{children}</div>
         </div>
       </div>
-      <div className="flex gap-2 pl-9">
+      <div className="flex gap-2 ps-9">
         <Button variant="primary" size="compact" onClick={onUse}>
           {useLabel}
         </Button>

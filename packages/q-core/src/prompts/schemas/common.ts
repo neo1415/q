@@ -72,7 +72,16 @@ export const TaskFrameSchema = {
   /** Rendered communication guidance (from the profile), trusted text. */
   communicationGuidance: z.string().max(4_000),
   /** What the runtime honestly knows about its own limits, trusted text. */
-  environmentNotes: z.string().max(2_000),
+  // 2,600 since 2026-09-17: the research guidance and the profile-change
+  // instruction (ADR 0011) together did not fit 2,000 on a company
+  // conversation. 4,000 since 2026-09-29 (founder: the fixed budget was
+  // crowding out what Q can do). 7,000 since 2026-10-01: with research
+  // offered (most Home Q runs) what Q can do still never fitted, and how a
+  // reply ends (next step + offer) joined it. The rendered charter stays
+  // bounded. 9,400 since RECOVERY-2026-10 (B7: what a proposing tool does
+  // and where a point comes from, ~160 characters, without dropping what
+  // Q can do).
+  environmentNotes: z.string().max(9_400),
 };
 
 /** A finding as a model may state it: vocabulary only, no ids, no references. */

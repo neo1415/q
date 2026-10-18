@@ -50,7 +50,7 @@ function observation(
       promptBundleVersion: "q-system.v1",
       orchestrationVersion: "q-orchestrator-v5",
       routingPolicyCode: "normal_dialogue.v1",
-      firewallPolicyVersion: "context-firewall-v1",
+      firewallPolicyVersion: "context-firewall-v2",
       toolVersions: ["company.get/v1"],
       latencyMs: 120,
       timeToFirstEventMs: null,
@@ -111,7 +111,9 @@ function observation(
       streamConverged: null,
       providerCallsAfterCancel: null,
       routing: null,
+      explanation: null,
       comparison: null,
+      gateq: null,
     },
     ...overrides,
   };
@@ -214,7 +216,6 @@ describe("datasets", () => {
       "Q_RETRIEVAL",
       "Q_MEMORY",
       "Q_VOICE",
-      "RECOMMENDATION",
       "Q_CONNECTOR",
       "Q_TEMPORAL",
     ] as const) {
@@ -223,6 +224,20 @@ describe("datasets", () => {
         Q_EVAL_DATASETS.flatMap((d) => d.cases).some((c) => c.suite === suite),
       ).toBe(false);
     }
+  });
+
+  it("activates RECOMMENDATION only because it now has cases", () => {
+    // It was DEFERRED ("Wave 6") until CQ-REC-007 gave it something real to
+    // run. Activating a suite the datasets do not cover would claim
+    // coverage that does not exist, so the status and the cases are
+    // asserted together.
+    const cases = Q_EVAL_DATASETS.flatMap((d) => d.cases);
+    expect(Q_EVAL_SUITE_STATUS.RECOMMENDATION.status).toBe("ACTIVE");
+    const recommendation = cases.filter((c) => c.suite === "RECOMMENDATION");
+    expect(recommendation).toHaveLength(10);
+    expect(
+      recommendation.every((c) => c.execution.kind === "EXPLANATION"),
+    ).toBe(true);
   });
 
   it("defines profiles: deterministic ones with the scripted model, live as opt-in, staging and scheduled as contracts", () => {
@@ -238,8 +253,20 @@ describe("datasets", () => {
     expect(fast).not.toContain("QSTREAM-001");
     expect(fast).toContain("QPERM-001");
     expect(datasetsForProfile("CI_CORE").flatMap((d) => d.cases)).toHaveLength(
-      29,
+      59,
     );
+    // QGATE is the GateQ applicant interview on its own, so a change to
+    // the interview can be run in seconds without the whole Q gate.
+    expect(Q_EVAL_PROFILE_DEFINITIONS.QGATE.providerMode).toBe("FAKE");
+    const gate = datasetsForProfile("QGATE").flatMap((d) => d.cases);
+    expect(gate).toHaveLength(20);
+    expect(gate.every((c) => c.suite === "Q_GATEQ_INTAKE")).toBe(true);
+    // And it is in the release gate too: a suite nobody runs is not a gate.
+    expect(
+      datasetsForProfile("CI_CORE").some(
+        (d) => d.datasetId === "q-evals-gateq",
+      ),
+    ).toBe(true);
   });
 });
 
@@ -471,7 +498,7 @@ describe("reports and baselines", () => {
       environment: {
         contractsVersion: "0.0.0",
         orchestrationVersion: "q-orchestrator-v5",
-        firewallPolicyVersion: "context-firewall-v1",
+        firewallPolicyVersion: "context-firewall-v2",
         toolVersions: ["company.get/v1"],
         promptBundleVersions: ["q-system.v1"],
         routingPolicyCodes: ["normal_dialogue.v1"],

@@ -1,9 +1,13 @@
-import {
-  Q_VISIBLE_STAGE_LABELS,
-  type QMessage,
-  type QResultBlock,
+import type {
+  QConfidenceLevel,
+  QFindingType,
+  QMessage,
+  QResultBlock,
+  QSentenceGesture,
 } from "@capital-q/contracts";
 import type { QStreamState } from "@capital-q/api-client";
+
+import { wireNow } from "./wire";
 
 /**
  * From Q stream state to what a person sees (CQ-C5-R1 §14, §17, §18).
@@ -32,6 +36,10 @@ export type QTurn =
   | {
       readonly kind: "Q";
       readonly id: string;
+      /** DOCS: the run this answer belongs to, for filing it as a PDF. */
+      readonly runId?: string | undefined;
+      /** When it was recorded (ISO); the Board's timeline groups by it. */
+      readonly at?: string | undefined;
       readonly text: string;
       /** True while more text may still arrive for this message. */
       readonly streaming: boolean;
@@ -42,7 +50,169 @@ export type QTurn =
        * render time — not something this projection may pre-empt (§18).
        */
       readonly sourceCount: number;
+      /**
+       * Public web pages Q read for this answer (R23, R38): the answer is
+       * said first and these sit behind Sources. Public fields only.
+       */
+      readonly publicSources: readonly QTurnPublicSource[];
+      /** What Q found, in plain statements, as the server labelled them. */
+      readonly findings: readonly QTurnFinding[];
+      /** What Q could not settle, and what would settle it. */
+      readonly uncertainties: readonly QTurnUncertainty[];
+      /**
+       * The objects the answer referred to, in the server's own order
+       * (QX-001 §8): a company or investor, a comparison, a question
+       * back, a proposed action, a navigation it suggests.
+       *
+       * Everything an evidence reference carries is deliberately absent.
+       * A reference is only ids, and whether a person may see the
+       * document behind one is disclosure's decision at render time, not
+       * something this projection may pre-empt (§18) -- so evidence
+       * arrives as `sourceCount` above and an identifier never crosses
+       * into the browser's model of the conversation.
+       */
+      readonly blocks: readonly QTurnObjectBlock[];
+      /** PRESENCE: what Q's particles form for which sentence (closed set). */
+      readonly gestures?: readonly QSentenceGesture[] | undefined;
     };
+
+/**
+ * The block kinds a turn carries as objects.
+ *
+ * TEXT, FINDING and UNCERTAINTY are already projected into prose and
+ * lists above; EVIDENCE is projected into a count. What is left is what
+ * a person can act on, and it is the only thing the renderer receives.
+ */
+export type QTurnObjectBlock = Extract<
+  QResultBlock,
+  {
+    kind:
+      | "COMPANY_REFERENCE"
+      | "INVESTOR_REFERENCE"
+      | "COMPARISON"
+      | "COMPARISON_CARDS"
+      | "ANSWER_CARDS"
+      | "CLARIFICATION_REQUEST"
+      | "ACTION_PROPOSAL"
+      | "ARTIFACT_REFERENCE"
+      | "UI_INTENT"
+      // RECOVERY-2026-10 E4: laid-out data, rendered in the answer.
+      | "TABLE"
+      | "CHART"
+      | "MAP"
+      | "TIMELINE"
+      // G-R4: what needs the person, as one report.
+      | "ATTENTION";
+  }
+>;
+
+export type QTurnPublicSource = Omit<
+  Extract<QResultBlock, { kind: "PUBLIC_SOURCE" }>,
+  "kind"
+>;
+
+function publicSourcesOf(
+  blocks: readonly QResultBlock[] | undefined,
+): readonly QTurnPublicSource[] {
+  if (blocks === undefined) {
+    return [];
+  }
+  const sources: QTurnPublicSource[] = [];
+  for (const block of blocks) {
+    if (block.kind === "PUBLIC_SOURCE") {
+      const { kind: _kind, ...source } = block;
+      sources.push(source);
+    }
+  }
+  return sources;
+}
+
+function objectBlocksOf(
+  blocks: readonly QResultBlock[] | undefined,
+): readonly QTurnObjectBlock[] {
+  if (blocks === undefined) {
+    return [];
+  }
+  return blocks.filter((block): block is QTurnObjectBlock => {
+    switch (block.kind) {
+      case "COMPANY_REFERENCE":
+      case "INVESTOR_REFERENCE":
+      case "COMPARISON":
+      case "COMPARISON_CARDS":
+      case "ANSWER_CARDS":
+      case "CLARIFICATION_REQUEST":
+      case "ACTION_PROPOSAL":
+      case "ARTIFACT_REFERENCE":
+      case "TABLE":
+      case "CHART":
+      case "MAP":
+      case "TIMELINE":
+      case "ATTENTION":
+        return true;
+      case "UI_INTENT":
+        // SHOW_EVIDENCE carries the same references an evidence block
+        // does, so it is dropped for the same reason. There is no
+        // evidence surface to send anybody to yet either.
+        return block.intent.kind !== "SHOW_EVIDENCE";
+      // Already projected into prose, a list or a count above. EVIDENCE
+      // in particular must not pass: a reference is only identifiers.
+      case "TEXT":
+      case "EVIDENCE":
+      case "FINDING":
+      case "UNCERTAINTY":
+      case "PUBLIC_SOURCE": // carried as the turn's own public sources
+        return false;
+    }
+  });
+}
+
+export type QTurnFinding = {
+  readonly id: string;
+  readonly type: QFindingType;
+  readonly statement: string;
+  readonly confidence: QConfidenceLevel;
+  /** How many recorded sources this finding rests on. */
+  readonly sourceCount: number;
+};
+
+export type QTurnUncertainty = {
+  readonly statement: string;
+  readonly missing: readonly string[];
+};
+
+function findingsOf(
+  blocks: readonly QResultBlock[] | undefined,
+): readonly QTurnFinding[] {
+  if (blocks === undefined) {
+    return [];
+  }
+  return blocks.flatMap((block) =>
+    block.kind === "FINDING"
+      ? [
+          {
+            id: block.finding.findingId,
+            type: block.finding.type,
+            statement: block.finding.statement,
+            confidence: block.finding.confidence,
+            sourceCount: block.finding.evidenceRefs.length,
+          },
+        ]
+      : [],
+  );
+}
+
+function uncertaintiesOf(
+  blocks: readonly QResultBlock[] | undefined,
+): readonly QTurnUncertainty[] {
+  if (blocks === undefined) {
+    return [];
+  }
+  return blocks.flatMap((block) =>
+    block.kind === "UNCERTAINTY"
+      ? [{ statement: block.statement, missing: block.missing ?? [] }]
+      : [],
+  );
+}
 
 /** What a person typed, before the server has a message id for it. */
 export type PendingTurn = {
@@ -67,6 +237,30 @@ function sourceCountOf(blocks: readonly QResultBlock[] | undefined): number {
   );
 }
 
+/**
+ * How far apart the browser's clock and the server's may be for a recorded
+ * turn to still count as the one just typed. Generous, because the cost of
+ * being wrong is one sentence shown twice for a moment, not a lost turn.
+ */
+const CONFIRMATION_SKEW_MS = 5 * 60 * 1000;
+
+function isConfirmed(
+  turn: PendingTurn,
+  confirmed: ReadonlyMap<string, readonly string[]>,
+): boolean {
+  const recorded = confirmed.get(turn.text.trim());
+  if (recorded === undefined) {
+    return false;
+  }
+  const typedAt = Date.parse(turn.at);
+  if (Number.isNaN(typedAt)) {
+    return true;
+  }
+  return recorded.some(
+    (at) => Date.parse(at) >= typedAt - CONFIRMATION_SKEW_MS,
+  );
+}
+
 export function turnsFrom(
   state: QStreamState,
   pending: readonly PendingTurn[],
@@ -76,7 +270,8 @@ export function turnsFrom(
   // event before the person's own turn has been confirmed, and rendering
   // the reply above the question it answers is a conversation nobody had.
   const dated: { readonly at: string; readonly turn: QTurn }[] = [];
-  const confirmed = new Set<string>();
+  // Every confirmed turn of the person, by text, with when it was recorded.
+  const confirmed = new Map<string, string[]>();
 
   for (const message of state.messages) {
     const text = textOf(message);
@@ -84,7 +279,8 @@ export function turnsFrom(
       continue;
     }
     if (message.role === "USER") {
-      confirmed.add(text.trim());
+      const key = text.trim();
+      confirmed.set(key, [...(confirmed.get(key) ?? []), message.createdAt]);
       dated.push({
         at: message.createdAt,
         turn: {
@@ -101,17 +297,30 @@ export function turnsFrom(
       turn: {
         kind: "Q",
         id: message.messageId,
+        runId: message.runId,
+        at: message.createdAt,
         text,
         streaming: false,
         sourceCount: sourceCountOf(message.blocks),
+        publicSources: publicSourcesOf(message.blocks),
+        findings: findingsOf(message.blocks),
+        uncertainties: uncertaintiesOf(message.blocks),
+        blocks: objectBlocksOf(message.blocks),
+        ...(message.gestures === undefined
+          ? {}
+          : { gestures: message.gestures }),
       },
     });
   }
 
   // Anything the server has now confirmed stops being a placeholder. Text
-  // is the only thing the two sides share before a message id exists.
+  // is the only thing the two sides share before a message id exists — but
+  // only a turn recorded around the time this one was typed confirms it.
+  // The same question asked again later in a conversation is a new turn,
+  // and an identical older one must not swallow its placeholder (seen in
+  // the browser: the repeated question vanished until a refresh).
   for (const turn of pending) {
-    if (!confirmed.has(turn.text.trim())) {
+    if (!isConfirmed(turn, confirmed)) {
       dated.push({
         at: turn.at,
         turn: {
@@ -139,9 +348,18 @@ export function turnsFrom(
     turns.push({
       kind: "Q",
       id: state.partial.messageId,
+      // The run it belongs to: whether this tab asked it (seenAtOpen).
+      ...(state.runId === null ? {} : { runId: state.runId }),
       text: state.partial.text,
       streaming: true,
       sourceCount: 0,
+      publicSources: [],
+      findings: [],
+      uncertainties: [],
+      // A partial answer has no blocks: they arrive with the persisted
+      // message, and a card that appears then rearranges is worse than a
+      // card that arrives once.
+      blocks: [],
     });
   }
 
@@ -157,7 +375,12 @@ export function turnsFrom(
  * reviewed is not.
  */
 export function workingLabel(state: QStreamState): string | undefined {
-  return state.stage === null ? undefined : Q_VISIBLE_STAGE_LABELS[state.stage];
+  // W7: the labels come with the wire's contracts; until those are in
+  // (a moment after the first paint), nothing is said rather than a guess.
+  const labels = wireNow()?.Q_VISIBLE_STAGE_LABELS;
+  return state.stage === null || labels === undefined
+    ? undefined
+    : labels[state.stage];
 }
 
 /**
@@ -168,12 +391,47 @@ export function workingLabel(state: QStreamState): string | undefined {
  * closed list, and rewording it here would be a second vocabulary drifting
  * from the first. The fallback covers a transport failure, where no public
  * projection exists because nothing was received.
+ *
+ * When the conversation core composed Q's own notice for this failure
+ * (CQ-QX-005) — named by the subsystem that failed, said once — that is
+ * what the person reads instead.
  */
 export function failureMessage(
-  failure: { readonly message?: string | undefined } | null,
+  failure: {
+    readonly message?: string | undefined;
+    readonly notice?: string | undefined;
+  } | null,
 ): string {
+  const notice = failure?.notice;
+  if (notice !== undefined && notice.length > 0) return notice;
   const message = failure?.message;
   return message !== undefined && message.length > 0
     ? message
-    : "I couldn't answer that right now. Please try again.";
+    : "I couldn't answer that right now. Try again.";
+}
+
+/**
+ * After a failure, what Q can still do: one sentence, so a person is never
+ * left with only an apology (§19). Deterministic, by failure code.
+ */
+const RECOVERY_HINTS: Readonly<Partial<Record<string, string>>> = {
+  EVIDENCE_UNAVAILABLE:
+    "You can ask something narrower, point Q at a website to read, or try again in a moment.",
+  Q_TIMEOUT:
+    "Ask it again in a moment, or ask for something smaller and build up.",
+  NOT_AVAILABLE_IN_CONTEXT:
+    "Say which company or investor you mean, or finish setting one up.",
+  EXPIRED: "Nothing was lost; asking again starts it from the beginning.",
+  CANCELLED: "Ask again whenever you're ready.",
+  Q_UNAVAILABLE: "Give it a moment and ask again; your conversation is kept.",
+};
+
+export function recoveryHint(failure: QStreamState["failure"]): string {
+  // Q's own notice already says what still works; a stacked hint would be
+  // a second apology for the same failure.
+  if (failure?.notice !== undefined && failure.notice.length > 0) return "";
+  return (
+    (failure === null ? undefined : RECOVERY_HINTS[failure.code]) ??
+    "Try it another way, or ask for something Q can check directly."
+  );
 }

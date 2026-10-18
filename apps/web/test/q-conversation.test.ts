@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import {
   createQStreamState,
@@ -16,6 +16,13 @@ import {
   turnsFrom,
   workingLabel,
 } from "../src/features/q/conversation";
+import { loadWire } from "../src/features/q/wire";
+
+// W7: the wire's contracts load after the first paint in the browser;
+// here they are in before any test reads Q's data.
+beforeAll(async () => {
+  await loadWire();
+});
 
 /**
  * What a person sees while Q answers (CQ-C5-R1 §14, §17-§19).
@@ -106,6 +113,31 @@ describe("C5R1-W01 · the turns a person reads are the server's", () => {
     expect(turns[0]).toMatchObject({ unconfirmed: false, id: USER_MESSAGE });
   });
 
+  it("keeps a repeated question as a placeholder when only an older identical turn exists", () => {
+    // The person asks the same thing again, minutes later. The earlier turn
+    // is history, not confirmation of the one just typed.
+    const earlier = apply([
+      durable("q.message.completed", {
+        message: {
+          messageId: "msg_user_earlier",
+          runId: RUN,
+          role: "USER",
+          text: "Analyse Northstar.",
+          createdAt: "2026-09-12T09:00:00.000Z",
+        },
+      }),
+    ]);
+    const turns = turnsFrom(earlier, [
+      {
+        id: "local-2",
+        text: "Analyse Northstar.",
+        at: "2026-09-12T10:00:00.000Z",
+      },
+    ]);
+    expect(turns).toHaveLength(2);
+    expect(turns[1]).toMatchObject({ kind: "PERSON", unconfirmed: true });
+  });
+
   it("streams Q's answer, then lets the persisted message replace it", () => {
     const streaming = apply([
       userTurn,
@@ -172,9 +204,7 @@ describe("C5R1-W02 · working states and failures are the server's words", () =>
 
   it("falls back to one plain sentence when nothing was received", () => {
     const fallback = failureMessage(null);
-    expect(fallback).toBe(
-      "I couldn't answer that right now. Please try again.",
-    );
+    expect(fallback).toBe("I couldn't answer that right now. Try again.");
     // Nothing technical reaches a person (§19).
     expect(fallback).not.toMatch(/\d{3}|http|sql|queue|provider|stack/i);
   });
@@ -203,6 +233,45 @@ describe("C5R1-W03 · a conversation outlives its runs", () => {
     const turns = turnsFrom(merged, []);
     expect(turns.map((turn) => turn.kind)).toEqual(["PERSON", "Q", "PERSON"]);
     expect(turns[2]).toMatchObject({ text: "What worries you most?" });
+  });
+
+  it("carries public web sources beside the answer, not in it (R23, R38)", () => {
+    const withSource = apply([
+      durable("q.message.completed", {
+        message: {
+          messageId: Q_MESSAGE,
+          runId: RUN,
+          role: "Q",
+          text: "Public sources say Northstar opened a Kenya hub.",
+          blocks: [
+            {
+              kind: "PUBLIC_SOURCE",
+              url: "https://news.example.com/2026/09/northstar",
+              domain: "news.example.com",
+              title: "Northstar expands to Kenya",
+              publishedOn: "2026-09-02",
+              retrievedOn: "2026-09-27",
+            },
+          ],
+          createdAt: NOW,
+        },
+      }),
+    ]);
+    const [turn] = turnsFrom(withSource, []);
+    expect(turn).toMatchObject({
+      kind: "Q",
+      text: "Public sources say Northstar opened a Kenya hub.",
+      publicSources: [
+        {
+          url: "https://news.example.com/2026/09/northstar",
+          domain: "news.example.com",
+          title: "Northstar expands to Kenya",
+          publishedOn: "2026-09-02",
+          retrievedOn: "2026-09-27",
+        },
+      ],
+      blocks: [],
+    });
   });
 
   it("reports how many sources an answer cites, and never their identifiers", () => {
@@ -237,5 +306,30 @@ describe("C5R1-W03 · a conversation outlives its runs", () => {
     expect(JSON.stringify(turns)).not.toContain(
       "a0000000-0000-4000-8000-00000000000b",
     );
+  });
+});
+
+describe("PRESENCE: an answer's gestures reach the turn", () => {
+  it("carries the closed-set gestures from the completion event, and none when absent", () => {
+    const state = apply([
+      durable("q.message.completed", {
+        message: {
+          messageId: "msg_q_gestures",
+          runId: RUN,
+          role: "Q",
+          text: "Revenue doubled. Well done.",
+          gestures: [
+            { sentence: 0, gesture: "CHART_UP" },
+            { sentence: 1, gesture: "CLAP" },
+          ],
+          createdAt: "2026-09-12T09:00:01.000Z",
+        },
+      }),
+    ]);
+    const turn = turnsFrom(state, []).find((item) => item.kind === "Q");
+    expect(turn?.kind === "Q" ? turn.gestures : null).toEqual([
+      { sentence: 0, gesture: "CHART_UP" },
+      { sentence: 1, gesture: "CLAP" },
+    ]);
   });
 });

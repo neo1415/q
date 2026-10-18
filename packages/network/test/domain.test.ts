@@ -120,8 +120,41 @@ describe("relationship event registry", () => {
     RELATIONSHIP_EVENT_DEFINITIONS,
   );
 
-  it("registers discovered only, with private scopes only", () => {
-    expect(registry.types()).toEqual(["discovered"]);
+  it("registers discovered with private scopes only", () => {
+    expect(registry.types()).toEqual([
+      "discovered",
+      "interest_expressed",
+      "connection_accepted",
+      "interest_declined",
+      "outreach_sent",
+      "reply_received",
+      "message_sent",
+      "meeting_scheduled",
+      "meeting_rescheduled",
+      "meeting_cancelled",
+      "meeting_held",
+      "commitment_stated",
+      "commitment_confirmed",
+      "commitment_withdrawn",
+      "meeting_recording_declined",
+      "commitment_detected",
+      "commitment_disputed",
+      "commitment_transfer_sent",
+      "commitment_received",
+      "meeting_no_show",
+      "relationship_passed",
+      "relationship_paused",
+      "relationship_resumed",
+      "diligence_started",
+      "relationship_progressed",
+      "document_requested",
+      "document_shared",
+      "data_room_access_requested",
+      "data_room_access_granted",
+      "deal_terms_recorded",
+      "deal_terms_signed",
+      "deal_closed",
+    ]);
     expect(DiscoveredRelationshipEvent.allowedVisibilityScopes).not.toContain(
       "relationship_shared",
     );
@@ -145,11 +178,7 @@ describe("relationship event registry", () => {
   });
 
   it("rejects unknown types, disallowed scopes, unknown keys and private-body fields", () => {
-    for (const eventType of [
-      "investment_won",
-      "interest_expressed",
-      "match_created",
-    ]) {
+    for (const eventType of ["investment_won", "match_created"]) {
       expect(() =>
         registry.validate({
           eventType,
@@ -175,6 +204,45 @@ describe("relationship event registry", () => {
         registry.validate({
           eventType: "discovered",
           visibilityScope: "investor_private",
+          payload,
+        }),
+      ).toThrow(ContractValidationError);
+    }
+  });
+
+  it("registers interest_expressed as relationship_shared only, naming the interest and nothing else (CQ-NET-010)", () => {
+    const interestId = "77777777-0000-4000-8000-000000000001";
+    expect(
+      registry.validate({
+        eventType: "interest_expressed",
+        visibilityScope: "relationship_shared",
+        payload: { interestId },
+      }),
+    ).toEqual({ interestId });
+    for (const scope of [
+      "investor_private",
+      "organisation_private",
+      "network_visible",
+      "public_external",
+    ] as const) {
+      expect(() =>
+        registry.validate({
+          eventType: "interest_expressed",
+          visibilityScope: scope,
+          payload: { interestId },
+        }),
+      ).toThrow(RelationshipEventVisibilityNotAllowedError);
+    }
+    for (const payload of [
+      {},
+      { interestId: "not-a-uuid" },
+      { interestId, message: "We love your deck" },
+      { interestId, matched: true },
+    ]) {
+      expect(() =>
+        registry.validate({
+          eventType: "interest_expressed",
+          visibilityScope: "relationship_shared",
           payload,
         }),
       ).toThrow(ContractValidationError);
@@ -251,17 +319,32 @@ describe("DTOs", () => {
 });
 
 describe("module surface", () => {
-  it("exposes no state setter, no history update or delete, and no relationship delete", () => {
+  it("exposes no state setter, no history update or delete, no relationship delete, no answer overwrite, no match ending and no interest withdrawal", () => {
+    // Spec 6.6.14: a commitment withdrawn is an appended status and a
+    // `commitment_withdrawn` history event, never a delete or an interest
+    // withdrawal; only its event names are allowed through.
+    const commitmentEvents = new Set([
+      "CommitmentWithdrawnRelationshipEvent",
+      "RELATIONSHIP_EVENT_COMMITMENT_WITHDRAWN",
+    ]);
     const names = Object.keys(network);
-    for (const forbidden of names.filter((name) =>
-      /set.*state|update.*event|delete|remove|projector|interest|match/i.test(
-        name,
-      ),
+    for (const forbidden of names.filter(
+      (name) =>
+        !commitmentEvents.has(name) &&
+        /set.*state|update|delete|remove|withdraw|end.*match|overwrite/i.test(
+          name,
+        ),
     )) {
       expect(forbidden, forbidden).toBe("");
     }
     expect(names).toContain("createEnsureRelationship");
     expect(names).toContain("createRelationshipEventAppender");
+    // CQ-NET-010/011: Express Interest and the company's answer are the
+    // only interest commands.
+    expect(names).toContain("createExpressInterest");
+    expect(names).toContain("createRespondToInterest");
+    // CQ-NET-012: state is written only by the deterministic projector.
+    expect(names).toContain("createRelationshipStateProjector");
   });
 });
 
@@ -299,5 +382,56 @@ describe("network domain events", () => {
         },
       }).ok,
     ).toBe(false);
+  });
+});
+
+/**
+ * Post-meeting outcomes (2026-10-02): shared, because both sides are their
+ * subject, and a pass never carries its reason (founder decision (a)).
+ */
+describe("outcome events", () => {
+  const registry = createRelationshipEventRegistry(
+    RELATIONSHIP_EVENT_DEFINITIONS,
+  );
+  const passId = "00000000-0000-4000-8000-0000000000a1";
+
+  it("a pass carries whether the reason was shared, never the reason", () => {
+    expect(
+      registry.validate({
+        eventType: "relationship_passed",
+        visibilityScope: "relationship_shared",
+        payload: { passId, side: "INVESTOR", reasonShared: false },
+      }),
+    ).toEqual({ passId, side: "INVESTOR", reasonShared: false });
+    for (const extra of [
+      { reasonCode: "VALUATION" },
+      { note: "too early for us" },
+    ]) {
+      expect(() =>
+        registry.validate({
+          eventType: "relationship_passed",
+          visibilityScope: "relationship_shared",
+          payload: { passId, side: "INVESTOR", reasonShared: true, ...extra },
+        }),
+      ).toThrow();
+    }
+  });
+
+  it("is never private to one side", () => {
+    for (const eventType of [
+      "relationship_passed",
+      "relationship_paused",
+      "relationship_resumed",
+      "diligence_started",
+      "relationship_progressed",
+    ]) {
+      expect(() =>
+        registry.validate({
+          eventType,
+          visibilityScope: "investor_private",
+          payload: { side: "INVESTOR" },
+        }),
+      ).toThrow();
+    }
   });
 });

@@ -9,10 +9,14 @@ import {
 } from "react";
 
 import { Button } from "@capital-q/ui/button";
+import { EvidenceStatus } from "@capital-q/ui/evidence-status";
+import { QMark } from "@capital-q/ui/q-mark";
+import { Select } from "@capital-q/ui/select";
 import { InlineNotice } from "@capital-q/ui/states";
 
 import type { MaterialFileView } from "../models/presentation";
 import { StepHeading, type StepProps } from "./step-props";
+import { useT } from "@/features/i18n/language";
 
 /**
  * F2 — "What do you already have?" (CQ-Q-021 §3, §12, §14, §57).
@@ -54,6 +58,7 @@ export function MaterialsStep({
   busy,
   actions,
 }: StepProps<"materials">): React.ReactElement {
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<string>(step.kinds[0]?.value ?? "OTHER");
   const [dragging, setDragging] = useState(false);
@@ -114,29 +119,16 @@ export function MaterialsStep({
       */}
       <StepHeading title={step.title} prompt={step.prompt} help={step.help} />
 
-      <div className="flex flex-col gap-2">
-        <label
-          htmlFor={kindFieldId}
-          className="cq-label text-(--cq-text-secondary)"
-        >
-          What is this?
-        </label>
-        <select
-          id={kindFieldId}
-          value={kind}
-          onChange={(event) => {
-            setKind(event.target.value);
-          }}
-          disabled={busy || atCapacity}
-          className="cq-body h-11 rounded-md border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) disabled:opacity-50"
-        >
-          {step.kinds.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <Select
+        id={kindFieldId}
+        label={t("What is this?")}
+        value={kind}
+        onChange={(event) => {
+          setKind(event.target.value);
+        }}
+        disabled={busy || atCapacity}
+        options={step.kinds}
+      />
 
       {/*
         The drop zone is decoration around a real control. Everything it
@@ -145,7 +137,7 @@ export function MaterialsStep({
       */}
       <div
         className={[
-          "flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-8 text-center transition-colors duration-(--cq-motion-fast)",
+          "flex flex-col items-center gap-3 border border-dashed px-4 py-8 text-center transition-colors duration-(--cq-motion-fast)",
           dragging
             ? "border-(--cq-border-strong) bg-(--cq-surface-sunken)"
             : "border-(--cq-border) bg-(--cq-surface-raised)",
@@ -170,7 +162,7 @@ export function MaterialsStep({
           onClick={() => inputRef.current?.click()}
           disabled={busy || atCapacity}
         >
-          Choose files
+          {t("Choose files")}
         </Button>
         <input
           ref={inputRef}
@@ -208,13 +200,24 @@ export function MaterialsStep({
               <div className="flex items-center gap-3">
                 {/*
                   A live region: a founder who cannot see the list still
-                  learns when a document finishes being read.
+                  learns when a document finishes being read. A read
+                  document is evidence from the founder's materials; one
+                  still being read is Q at work, said as a status line and
+                  never as a spinner.
                 */}
-                <span
-                  className={`cq-caption ${STATE_TONE[file.state]}`}
-                  role="status"
-                >
-                  {file.stateLabel}
+                <span role="status" className="inline-flex">
+                  {file.state === "ready" ? (
+                    <EvidenceStatus kind="from_document" detail="read by Q" />
+                  ) : file.state === "unreadable" ? (
+                    <span className={`cq-caption ${STATE_TONE[file.state]}`}>
+                      {file.stateLabel}
+                    </span>
+                  ) : (
+                    <span className="cq-status-line">
+                      <QMark size="sm" state="WORKING" />
+                      {file.stateLabel}
+                    </span>
+                  )}
                 </span>
                 {file.state === "unreadable" ? (
                   <Button
@@ -225,7 +228,7 @@ export function MaterialsStep({
                     }}
                     disabled={busy}
                   >
-                    Remove and try another
+                    {t("Remove and try another")}
                   </Button>
                 ) : null}
               </div>

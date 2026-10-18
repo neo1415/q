@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import {
   createUuidIdSchema,
+  type OnboardingInterviewTurnChannel,
+  type OnboardingInterviewTurnRole,
   type OnboardingJourneyType,
   type OnboardingResponseType,
   type OnboardingResponseValue,
@@ -10,6 +12,8 @@ import {
   type OnboardingStepStateStatus,
   type OnboardingStepType,
   type OnboardingSubjectType,
+  type OnboardingQuestionOptionView,
+  type OnboardingQuestionReason,
   type OnboardingSuggestionStatus,
   type UtcTimestamp,
 } from "@capital-q/contracts";
@@ -67,6 +71,18 @@ export const OnboardingSuggestionIdSchema = createUuidIdSchema(
 export type OnboardingSuggestionId = z.infer<
   typeof OnboardingSuggestionIdSchema
 >;
+
+export const OnboardingInterviewQuestionIdSchema = createUuidIdSchema(
+  "OnboardingInterviewQuestionId",
+);
+export type OnboardingInterviewQuestionId = z.infer<
+  typeof OnboardingInterviewQuestionIdSchema
+>;
+
+export const OnboardingUtteranceIdSchema = createUuidIdSchema(
+  "OnboardingUtteranceId",
+);
+export type OnboardingUtteranceId = z.infer<typeof OnboardingUtteranceIdSchema>;
 
 export const ONBOARDING_DEFINITION_STATUSES = ["ACTIVE", "RETIRED"] as const;
 export const OnboardingDefinitionStatusSchema = z.enum(
@@ -181,9 +197,15 @@ export type OnboardingResponse = {
   readonly value: OnboardingResponseValue;
   /** What the user actually typed or said, for text responses only. */
   readonly rawText: string | null;
+  /** The person's own meaning where the options could not hold it; never a filter. */
+  readonly note: string | null;
   readonly sourceModality: OnboardingSourceModality;
+  /** FORM or CONVERSATION, as the client declared it; null when unknown. */
+  readonly channel?: "FORM" | "CONVERSATION" | null | undefined;
   readonly createdAt: UtcTimestamp;
   readonly supersededByResponseId: OnboardingResponseId | null;
+  /** When the person took this answer back without replacing it; history only. */
+  readonly withdrawnAt?: UtcTimestamp | null | undefined;
 };
 
 /** A validated, step-compatible response ready to persist. */
@@ -192,7 +214,9 @@ export type ValidatedOnboardingResponse = {
   readonly responseType: OnboardingResponseType;
   readonly value: OnboardingResponseValue;
   readonly rawText: string | null;
+  readonly note: string | null;
   readonly sourceModality: OnboardingSourceModality;
+  readonly channel?: "FORM" | "CONVERSATION" | null | undefined;
 };
 
 export const OnboardingSourceRefSchema = z
@@ -227,4 +251,89 @@ export type OnboardingSuggestion = {
   readonly modelRunId: string | null;
   readonly createdAt: UtcTimestamp;
   readonly resolvedAt: UtcTimestamp | null;
+  /** Why it was proposed, as said to the person (Q recommendations). */
+  readonly rationale?: string | null | undefined;
+};
+
+// ---------------------------------------------------------------------------
+// Interview questions (CQ-PRE-REC-001): what Q still wants to ask
+// ---------------------------------------------------------------------------
+
+export const ONBOARDING_QUESTION_STATUSES = [
+  "PENDING",
+  "ANSWERED",
+  "DISMISSED",
+  "SUPERSEDED",
+] as const;
+export type OnboardingQuestionStatus =
+  (typeof ONBOARDING_QUESTION_STATUSES)[number];
+
+/**
+ * A persisted question. Journey state, never a value: answering submits a
+ * normal validated response to `stepKey` (or an option's step) and marks
+ * the row ANSWERED. Options are server-built and each is already a valid
+ * response for the step it names.
+ */
+export type OnboardingInterviewQuestion = {
+  readonly id: OnboardingInterviewQuestionId;
+  readonly sessionId: OnboardingSessionId;
+  readonly stepKey: string;
+  readonly factKey: string;
+  readonly question: string;
+  readonly why: string | null;
+  readonly reason: OnboardingQuestionReason;
+  readonly readings: readonly string[];
+  readonly options: readonly OnboardingQuestionOptionView[];
+  readonly sourceRefs: readonly OnboardingSourceRef[];
+  readonly status: OnboardingQuestionStatus;
+  readonly createdAt: UtcTimestamp;
+  readonly resolvedAt: UtcTimestamp | null;
+};
+
+export const ONBOARDING_UTTERANCE_STATUSES = [
+  "PENDING",
+  "READ",
+  "IGNORED",
+] as const;
+export type OnboardingUtteranceStatus =
+  (typeof ONBOARDING_UTTERANCE_STATUSES)[number];
+
+/**
+ * Something a person said in the conversational interview that no
+ * deterministic rule could place (CQ-PRE-REC-001 §20). Journey state that
+ * awaits Q's reading; its proposals arrive as suggestions and questions,
+ * and the utterance itself is never a value.
+ */
+export type OnboardingUtterance = {
+  readonly id: OnboardingUtteranceId;
+  readonly sessionId: OnboardingSessionId;
+  readonly stepKey: string | null;
+  readonly text: string;
+  readonly status: OnboardingUtteranceStatus;
+  readonly createdAt: UtcTimestamp;
+  readonly readAt: UtcTimestamp | null;
+};
+
+export const OnboardingInterviewTurnIdSchema = createUuidIdSchema(
+  "OnboardingInterviewTurnId",
+);
+export type OnboardingInterviewTurnId = z.infer<
+  typeof OnboardingInterviewTurnIdSchema
+>;
+
+/**
+ * One side of one exchange in the interview thread (CQ-QX-006), as it was
+ * shown: the person's words or Q's reply, typed or spoken. A display
+ * record for redrawing the conversation after a reload; never a response,
+ * never evidence of what was recorded.
+ */
+export type OnboardingInterviewTurnRecord = {
+  readonly id: OnboardingInterviewTurnId;
+  readonly sessionId: OnboardingSessionId;
+  readonly role: OnboardingInterviewTurnRole;
+  readonly text: string;
+  readonly stepKey: string | null;
+  readonly channel: OnboardingInterviewTurnChannel;
+  readonly turnRef: string | null;
+  readonly createdAt: UtcTimestamp;
 };

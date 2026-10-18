@@ -6,7 +6,7 @@
  */
 export const THEME_COLORS = {
   light: {
-    accent: "#2673df",
+    accent: "#1767d1",
     canvas: "#fbfaf7",
   },
   dark: {
@@ -15,14 +15,61 @@ export const THEME_COLORS = {
   },
 } as const;
 
+/**
+ * sRGB renderings of the light-theme surface, text and border tokens, for
+ * raster renderers that cannot read a custom property -- the Q Card's
+ * link-preview image (next/og, BIZ-004). Mirrors tokens.css; nothing that
+ * can read `--cq-*` should use these.
+ */
+export const RASTER_COLORS = {
+  surface: "#fefdfb",
+  textPrimary: "#0f141b",
+  textSecondary: "#50565f",
+  border: "#d3d6db",
+} as const;
+
+/**
+ * The Q Card's dark rendering in sRGB, for the downloadable image and PDF
+ * (a raster cannot read custom properties). Mirrors the dark
+ * `--cq-qcard-*` tokens in tokens.css.
+ */
+export const QCARD_RASTER = {
+  surface: "#0c1630",
+  text: "#f4f6fb",
+  muted: "#a3adc2",
+  edge: "#4c8dff",
+  glow: "rgba(76, 141, 255, 0.22)",
+  arc: "rgba(90, 150, 255, 0.2)",
+  qrPaper: "#ffffff",
+  qrInk: "#0c1630",
+} as const;
+
+/**
+ * Motion timing in seconds, for the rare script-driven animation (Web
+ * Animations API, a future Motion for React) that cannot read a custom
+ * property. Mirrors `--cq-motion-*` and `--cq-ease*` in tokens.css exactly;
+ * CSS transitions read the tokens directly and never these.
+ */
+export const MOTION = {
+  instant: 0.09,
+  fast: 0.14,
+  base: 0.2,
+  emphasis: 0.28,
+  slow: 0.36,
+} as const;
+export const EASE_STANDARD = [0.22, 1, 0.36, 1] as const;
+export const EASE_EXIT = [0.4, 0, 1, 1] as const;
+
 /** Semantic z-layers; the CSS custom properties are the source of truth. */
 export const Z_LAYERS = [
   "base",
   "sticky",
   "navigation",
+  "presence",
   "popover",
   "sheet",
   "modal",
+  "modal-popover",
   "toast",
 ] as const;
 export type ZLayer = (typeof Z_LAYERS)[number];

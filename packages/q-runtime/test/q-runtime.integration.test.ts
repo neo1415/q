@@ -6,6 +6,7 @@ import { createPostgresSecurityEventWriter } from "@capital-q/audit";
 import { createPostgresCompanyQueryPort } from "@capital-q/companies";
 import { parseDatabaseConfig } from "@capital-q/config/database";
 import {
+  QRunIdSchema,
   QRunSummarySchema,
   QStreamEventSchema,
   type CorrelationId,
@@ -13,17 +14,24 @@ import {
 } from "@capital-q/contracts";
 import {
   createRequestDatabaseClient,
+  createRoundTripCounter,
+  withRoundTripCounter,
   type RequestDatabase,
   type TransactionContext,
   type TransactionManager,
 } from "@capital-q/database";
 import { createLogger, type Logger } from "@capital-q/observability";
-import { ActorContextSchema, type ActorContext } from "@capital-q/security";
+import {
+  ActorContextSchema,
+  TenantIdSchema,
+  type ActorContext,
+} from "@capital-q/security";
 
 import {
   appendRunEvent,
   createCompanyQSubjectResolver,
   createPostgresQRuntimeRepositories,
+  createQOrchestrationRuntime,
   createQRuntimeService,
   createQSubjectResolverRegistry,
   QConversationNotFoundError,
@@ -73,6 +81,7 @@ type World = {
   readonly tenantA: string;
   readonly tenantB: string;
   readonly companyA: string;
+  readonly companyA2: string;
   readonly companyB: string;
   readonly adminA: Person;
   readonly memberA: Person;
@@ -227,6 +236,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
         const orgA = await insertOrganisation(tx, tenantA, "Org A");
         const orgB = await insertOrganisation(tx, tenantB, "Org B");
         const companyA = await insertCompany(tx, tenantA, orgA, "Apex A");
+        const companyA2 = await insertCompany(tx, tenantA, orgA, "Apex A2");
         const companyB = await insertCompany(tx, tenantB, orgB, "Apex B");
         const adminA = await insertMember(tx, tenantA, orgA);
         const memberA = await insertMember(tx, tenantA, orgA);
@@ -241,6 +251,7 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
           tenantA,
           tenantB,
           companyA,
+          companyA2,
           companyB,
           adminA,
           memberA,
@@ -260,6 +271,90 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
   // -------------------------------------------------------------------------
   // Creation, persistence, projection
   // -------------------------------------------------------------------------
+
+  it("recalls older exact-company discussions before loose recent matches without widening ownership", async () => {
+    await withWorld(async ({ tx, adminA, memberA, adminB, companyA }) => {
+      const repositories = createPostgresQRuntimeRepositories();
+      async function conversation(
+        person: Person,
+        exact: boolean,
+        date: string,
+      ) {
+        const created = await repositories.conversations.insert(tx, {
+          tenantId: person.actor.tenantId,
+          userId: person.actor.userId,
+          organisationId: person.actor.organisationId ?? null,
+          subjects: exact ? [{ kind: "COMPANY", companyId: companyA }] : [],
+        });
+        await tx.sql`update q_runtime.conversations
+          set title = 'Compare companies', summary = 'Compare earlier findings',
+              last_message_at = ${date}::timestamptz
+          where id = ${created.id} and tenant_id = ${person.actor.tenantId}`;
+        return created.id;
+      }
+      const olderExact = await conversation(
+        adminA,
+        true,
+        "2026-09-01T00:00:00Z",
+      );
+      const newerExact = await conversation(
+        adminA,
+        true,
+        "2026-09-02T00:00:00Z",
+      );
+      const loose = [];
+      for (let day = 1; day <= 4; day += 1) {
+        loose.push(
+          await conversation(
+            adminA,
+            false,
+            `2026-10-0${String(day)}T00:00:00Z`,
+          ),
+        );
+      }
+      await conversation(memberA, true, "2026-10-10T00:00:00Z");
+      await conversation(adminB, true, "2026-10-10T00:00:00Z");
+      const archived = await conversation(adminA, true, "2026-10-10T00:00:00Z");
+      await repositories.conversations.archiveForOwner(
+        tx,
+        adminA.actor.tenantId,
+        adminA.actor.userId,
+        archived,
+      );
+      const excluded = await conversation(adminA, true, "2026-10-11T00:00:00Z");
+      const found = await repositories.conversations.searchForOwner(
+        tx.sql,
+        adminA.actor.tenantId,
+        adminA.actor.userId,
+        {
+          companyIds: [companyA],
+          terms: ["Compare"],
+          except: [excluded],
+          limit: 4,
+        },
+      );
+      expect(found.map((item) => item.id)).toEqual([
+        newerExact,
+        olderExact,
+        loose[3],
+        loose[2],
+      ]);
+      const withoutCompany = await repositories.conversations.searchForOwner(
+        tx.sql,
+        adminA.actor.tenantId,
+        adminA.actor.userId,
+        {
+          companyIds: [],
+          terms: ["Compare"],
+          except: [excluded],
+          limit: 4,
+        },
+      );
+      expect(withoutCompany.map((item) => item.id)).toEqual(
+        [...loose].reverse(),
+      );
+    });
+  });
 
   it("accepts a run durably: conversation, run, opening message and first event, nothing analysed", async () => {
     await withWorld(async ({ tx, service, adminA, companyA }) => {
@@ -319,6 +414,43 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
     });
   });
 
+  it("R21: records the screen on the run, with only the entities that resolved, and reads it back", async () => {
+    await withWorld(async ({ tx, service, adminA, companyA }) => {
+      const result = await service.createRun({
+        actor: adminA.actor,
+        input: {
+          ...request(),
+          screen: {
+            route: "COMPANY",
+            companyId: companyA,
+            // Not this person's (nor anybody's): dropped, never written.
+            documentId: randomUUID(),
+          },
+        },
+        idempotencyKey: "create-screen-0001",
+        correlationId: CORRELATION(),
+      });
+      expect(result.run.screen).toEqual({
+        route: "COMPANY",
+        companyId: companyA,
+      });
+      const rows = await tx.sql<
+        { screen: unknown }[]
+      >`select screen from q_runtime.runs where id = ${result.run.id}`;
+      expect(rows[0]?.screen).toEqual({
+        route: "COMPANY",
+        companyId: companyA,
+      });
+      const without = await service.createRun({
+        actor: adminA.actor,
+        input: request(),
+        idempotencyKey: "create-screen-0002",
+        correlationId: CORRELATION(),
+      });
+      expect(without.run.screen).toBeNull();
+    });
+  });
+
   it("reads the run back as its owner through the public projection", async () => {
     await withWorld(async ({ service, adminA }) => {
       const created = await service.createRun({
@@ -373,8 +505,9 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
           capability: "COMPARE",
           conversationId: first.conversation.id,
           message: { text: "And compared to last quarter?" },
-          // Different subjects for this run: the conversation's own are
-          // never rewritten.
+          // This turn names nothing, which is what "and compared to last
+          // quarter?" is: a question about what is already being
+          // discussed.
           subjects: [],
         }),
         idempotencyKey: "create-0004",
@@ -387,11 +520,380 @@ describe("@capital-q/q-runtime against local PostgreSQL", () => {
       expect(second.conversation.subjects).toEqual([
         { kind: "COMPANY", companyId: companyA },
       ]);
+      // And the run itself inherits it, re-resolved for this actor. A turn
+      // that names nothing used to arrive with no subject at all, so Q
+      // answered that no company had been named one sentence after naming
+      // one.
+      expect(second.run.subjects).toEqual([
+        { kind: "COMPANY", companyId: companyA },
+      ]);
 
       const runs = await tx.sql<
         { id: string }[]
-      >`select id from q_runtime.runs where conversation_id = ${first.conversation.id} order by created_at`;
-      expect(runs.map((r) => r.id)).toEqual([first.run.id, second.run.id]);
+      >`select id from q_runtime.runs where conversation_id = ${first.conversation.id}`;
+      // Both runs are created inside one transaction, so they share
+      // `now()`; membership is the invariant, not a timestamp order.
+      expect(runs.map((r) => r.id).sort()).toEqual(
+        [first.run.id, second.run.id].sort(),
+      );
+    });
+  });
+
+  // Founder fixture failure #9, live again 2026-10-01: one dictation was
+  // stored as fourteen growing fragments, each its own run. Read back, an
+  // utterance is one turn, its latest form, and the fragments do not take
+  // the conversation's window.
+  it("reads one utterance as one turn, before the window is applied", async () => {
+    await withWorld(async ({ tx, service, adminA, tenantA }) => {
+      const repositories = createPostgresQRuntimeRepositories();
+      const first = await service.createRun({
+        actor: adminA.actor,
+        input: request({ message: { text: "Hey Q." } }),
+        idempotencyKey: "utt-0000",
+        correlationId: CORRELATION(),
+      });
+      const words = [
+        "All those kinds",
+        "of things",
+        "and eleven labs",
+        "have you tested that",
+      ];
+      let said = "";
+      let last = first;
+      for (const [index, word] of words.entries()) {
+        said = `${said} ${word}`.trim();
+        last = await service.createRun({
+          actor: adminA.actor,
+          input: request({
+            conversationId: first.conversation.id,
+            message: { text: said },
+          }),
+          utteranceRef: "voice:session:0.abc",
+          idempotencyKey: `utt-000${String(index + 1)}`,
+          correlationId: CORRELATION(),
+        });
+      }
+      const read = await repositories.messages.listRecentForConversationOfRun(
+        tx.sql,
+        TenantIdSchema.parse(tenantA),
+        last.run.id,
+        2,
+      );
+      // The window of two holds the opening and the whole utterance once.
+      expect(read.map((m) => m.content)).toEqual([
+        "Hey Q.",
+        "All those kinds of things and eleven labs have you tested that",
+      ]);
+      const history = await repositories.messages.listRecentForConversation(
+        tx.sql,
+        TenantIdSchema.parse(tenantA),
+        first.conversation.id,
+        64,
+      );
+      expect(history.filter((m) => m.role === "USER")).toHaveLength(2);
+      // R5: with the run read cache, every window is a slice of ONE read at
+      // the widest window, and each equals what its own query returns.
+      const cached = createPostgresQRuntimeRepositories({
+        runCacheRoot: tx.sql,
+      });
+      const counter = createRoundTripCounter(last.run.id);
+      const windows = [2, 8, 64, 3] as const;
+      const fromCache = await withRoundTripCounter(counter, () =>
+        Promise.all(
+          windows.map((limit) =>
+            cached.messages.listRecentForConversationOfRun(
+              tx.sql,
+              TenantIdSchema.parse(tenantA),
+              last.run.id,
+              limit,
+            ),
+          ),
+        ),
+      );
+      expect(counter.count).toBe(1);
+      for (const [index, limit] of windows.entries()) {
+        const own = await repositories.messages.listRecentForConversationOfRun(
+          tx.sql,
+          TenantIdSchema.parse(tenantA),
+          last.run.id,
+          limit,
+        );
+        expect(fromCache[index]).toEqual(own);
+      }
+      // Every fragment is still stored: history is never rewritten.
+      const stored = await tx.sql<{ n: number }[]>`
+        select count(*)::int as n from q_runtime.conversation_messages
+         where conversation_id = ${first.conversation.id} and role = 'USER'`;
+      expect(stored[0]?.n).toBe(5);
+    });
+  });
+
+  it("lets the owner hide one of their lines from Q, and nobody else", async () => {
+    await withWorld(async ({ tx, service, adminA, memberA, tenantA }) => {
+      const repositories = createPostgresQRuntimeRepositories();
+      const first = await service.createRun({
+        actor: adminA.actor,
+        input: request({ message: { text: "Hey Q." } }),
+        idempotencyKey: "hide-0001",
+        correlationId: CORRELATION(),
+      });
+      const dictation = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "Have you tested eleven labs?" },
+        }),
+        idempotencyKey: "hide-0002",
+        correlationId: CORRELATION(),
+      });
+      const other = await service.createRun({
+        actor: adminA.actor,
+        input: request({ message: { text: "A different conversation." } }),
+        idempotencyKey: "hide-0003",
+        correlationId: CORRELATION(),
+      });
+      // Someone else in the tenant: not found, nothing marked.
+      await expect(
+        service.hideConversationMessage({
+          actor: memberA.actor,
+          conversationId: first.conversation.id,
+          messageId: dictation.message.id,
+        }),
+      ).rejects.toThrow(QConversationNotFoundError);
+      // A message of another conversation: not found.
+      await expect(
+        service.hideConversationMessage({
+          actor: adminA.actor,
+          conversationId: first.conversation.id,
+          messageId: other.message.id,
+        }),
+      ).rejects.toThrow(QConversationNotFoundError);
+      // The owner, twice: idempotent.
+      for (let i = 0; i < 2; i += 1) {
+        await service.hideConversationMessage({
+          actor: adminA.actor,
+          conversationId: first.conversation.id,
+          messageId: dictation.message.id,
+        });
+      }
+      const marks = await tx.sql<{ mark: string; marked_by: string }[]>`
+        select mark, marked_by from q_runtime.conversation_message_marks
+         where message_id = ${dictation.message.id}`;
+      expect(marks).toEqual([
+        { mark: "HIDDEN_BY_PERSON", marked_by: "PERSON" },
+      ]);
+      const readBack =
+        await repositories.messages.listRecentForConversationOfRun(
+          tx.sql,
+          TenantIdSchema.parse(tenantA),
+          first.run.id,
+          64,
+        );
+      expect(readBack.map((m) => m.content)).toEqual(["Hey Q."]);
+    });
+  });
+
+  // Founder live 2026-10-01: a name said to someone else and a dictation
+  // were stored as the person's turns and read back as context. A mark
+  // keeps a line out of what Q reads back, append-only; history keeps it.
+  it("keeps a marked line out of what Q reads back, and never rewrites history", async () => {
+    await withWorld(async ({ tx, service, adminA, tenantA }) => {
+      const repositories = createPostgresQRuntimeRepositories();
+      const tenant = TenantIdSchema.parse(tenantA);
+      const first = await service.createRun({
+        actor: adminA.actor,
+        input: request({ message: { text: "Hey Q." } }),
+        idempotencyKey: "mark-0001",
+        correlationId: CORRELATION(),
+      });
+      const overheard = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "Neo, n e u. N e u." },
+        }),
+        idempotencyKey: "mark-0002",
+        correlationId: CORRELATION(),
+      });
+      const latest = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "What do you call me?" },
+        }),
+        idempotencyKey: "mark-0003",
+        correlationId: CORRELATION(),
+      });
+      const overheardId = overheard.message.id;
+      const nested = nestedTransactions(tx);
+      await nested.run(
+        (inner) =>
+          repositories.messages.mark?.(inner, {
+            tenantId: tenant,
+            conversationId: first.conversation.id,
+            messageIds: [overheardId],
+            mark: "NOT_ADDRESSED_TO_Q",
+            markedBy: "Q_READING",
+            runId: latest.run.id,
+          }) ?? Promise.resolve(),
+      );
+      const readBack =
+        await repositories.messages.listRecentForConversationOfRun(
+          tx.sql,
+          tenant,
+          latest.run.id,
+          64,
+        );
+      expect(readBack.map((m) => m.content)).toEqual([
+        "Hey Q.",
+        "What do you call me?",
+      ]);
+      const learned = await repositories.messages.listRecentForConversation(
+        tx.sql,
+        tenant,
+        first.conversation.id,
+        64,
+        { readBack: true },
+      );
+      expect(learned.map((m) => m.id)).not.toContain(overheardId);
+      // The person's own history still shows what was said.
+      const history = await repositories.messages.listRecentForConversation(
+        tx.sql,
+        tenant,
+        first.conversation.id,
+        64,
+      );
+      expect(history.map((m) => m.id)).toContain(overheardId);
+      // Marking twice is a no-op; a mark is never rewritten.
+      await nested.run(
+        (inner) =>
+          repositories.messages.mark?.(inner, {
+            tenantId: tenant,
+            conversationId: first.conversation.id,
+            messageIds: [overheardId],
+            mark: "NOT_ADDRESSED_TO_Q",
+            markedBy: "Q_READING",
+          }) ?? Promise.resolve(),
+      );
+      await expect(
+        nested.run(
+          (inner) =>
+            inner.sql`update q_runtime.conversation_message_marks set mark = 'HIDDEN_BY_PERSON' where message_id = ${overheardId}`,
+        ),
+      ).rejects.toThrow(/append-only/);
+    });
+  });
+
+  it("lists and reopens the owner's conversations, newest activity first, and hides them from everyone else (ADR 0012)", async () => {
+    await withWorld(
+      async ({ tx, service, adminA, memberA, adminB, companyA }) => {
+        const first = await service.createRun({
+          actor: adminA.actor,
+          input: request({
+            subjects: [{ kind: "COMPANY", companyId: companyA }],
+            message: { text: "How much runway does Apex have?" },
+          }),
+          idempotencyKey: "list-0001",
+          correlationId: CORRELATION(),
+        });
+        const second = await service.createRun({
+          actor: adminA.actor,
+          input: request({
+            subjects: [{ kind: "COMPANY", companyId: companyA }],
+            message: { text: "Compare Apex with Paystack." },
+          }),
+          idempotencyKey: "list-0002",
+          correlationId: CORRELATION(),
+        });
+        // Activity, not creation, orders the list: a turn in the first
+        // conversation brings it to the top.
+        await tx.sql`update q_runtime.conversations set last_message_at = now() + interval '1 minute' where id = ${first.conversation.id}`;
+
+        const listed = await service.listConversations({ actor: adminA.actor });
+        expect(listed.items.map((c) => c.conversationId)).toEqual([
+          first.conversation.id,
+          second.conversation.id,
+        ]);
+        // No title yet: the opening words stand in.
+        expect(listed.items[0]?.title).toBe("How much runway does Apex have?");
+        expect(listed.nextBefore).toBeUndefined();
+
+        const opened = await service.getConversation({
+          actor: adminA.actor,
+          conversationId: second.conversation.id,
+        });
+        expect(opened.detail.messages.map((m) => m.text)).toEqual([
+          "Compare Apex with Paystack.",
+        ]);
+        expect(opened.detail.latestRun?.runId).toBe(second.run.id);
+
+        // Another person in the same tenant, and another tenant: nothing.
+        expect(
+          (await service.listConversations({ actor: memberA.actor })).items,
+        ).toEqual([]);
+        expect(
+          (await service.listConversations({ actor: adminB.actor })).items,
+        ).toEqual([]);
+        await expect(
+          service.getConversation({
+            actor: memberA.actor,
+            conversationId: second.conversation.id,
+          }),
+        ).rejects.toBeInstanceOf(QConversationNotFoundError);
+
+        // Archived: gone from the list, still readable by its owner.
+        await service.archiveConversation({
+          actor: adminA.actor,
+          conversationId: second.conversation.id,
+        });
+        expect(
+          (await service.listConversations({ actor: adminA.actor })).items.map(
+            (c) => c.conversationId,
+          ),
+        ).toEqual([first.conversation.id]);
+      },
+    );
+  });
+
+  it("changes the subject when a turn names a different one, and carries the new one on", async () => {
+    await withWorld(async ({ service, adminA, companyA, companyA2 }) => {
+      const first = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          subjects: [{ kind: "COMPANY", companyId: companyA }],
+        }),
+        idempotencyKey: "create-0003b",
+        correlationId: CORRELATION(),
+      });
+
+      const moved = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "Actually, tell me about the other one." },
+          subjects: [{ kind: "COMPANY", companyId: companyA2 }],
+        }),
+        idempotencyKey: "create-0004b",
+        correlationId: CORRELATION(),
+      });
+      expect(moved.run.subjects).toEqual([
+        { kind: "COMPANY", companyId: companyA2 },
+      ]);
+
+      const after = await service.createRun({
+        actor: adminA.actor,
+        input: request({
+          conversationId: first.conversation.id,
+          message: { text: "And how big is it?" },
+          subjects: [],
+        }),
+        idempotencyKey: "create-0005b",
+        correlationId: CORRELATION(),
+      });
+      // "It" is the one just named, not the one the conversation opened on.
+      expect(after.run.subjects).toEqual([
+        { kind: "COMPANY", companyId: companyA2 },
+      ]);
     });
   });
 
@@ -1003,6 +1505,88 @@ describe("@capital-q/q-runtime concurrency against local PostgreSQL", () => {
     }
   });
 
+  it("R5: one-statement appends under contention: no gaps, no duplicates, in commit order, mixed with the two-statement path", async () => {
+    const world = await commitWorld();
+    try {
+      const created = await service().createRun({
+        actor: world.actor,
+        input: request(),
+        idempotencyKey: `conc-append-next-${randomUUID()}`,
+        correlationId: CORRELATION(),
+      });
+      const repositories = createPostgresQRuntimeRepositories();
+      expect(repositories.runEvents.appendNext).toBeDefined();
+      // The store without appendNext: allocate, then append.
+      const { appendNext: _omitted, ...legacyEvents } = repositories.runEvents;
+      const legacy = { ...repositories, runEvents: legacyEvents };
+      const stages = [
+        "UNDERSTANDING_REQUEST",
+        "REVIEWING_COMPANY",
+        "CHECKING_EVIDENCE",
+        "PREPARING_ANALYSIS",
+      ] as const;
+      const appended = await Promise.all(
+        Array.from({ length: 24 }, (_, i) =>
+          db.transactions.run((tx) =>
+            appendRunEvent(
+              i % 3 === 0 ? legacy : repositories,
+              tx,
+              created.run,
+              {
+                type: "q.stage.changed",
+                data: {
+                  stage: stages[i % stages.length] ?? "UNDERSTANDING_REQUEST",
+                },
+              },
+            ),
+          ),
+        ),
+      );
+      const sequences = appended.map((e) => e.sequence).sort((a, b) => a - b);
+      expect(sequences).toEqual(Array.from({ length: 24 }, (_, i) => i + 2));
+      const stored = await repositories.runEvents.listForRun(
+        db.sql,
+        world.actor.tenantId,
+        created.run.id,
+      );
+      expect(stored.map((e) => e.sequence)).toEqual(
+        Array.from({ length: 25 }, (_, i) => i + 1),
+      );
+      // A run that does not exist (or another tenant's) gets nothing.
+      const appendNext = repositories.runEvents.appendNext;
+      if (appendNext === undefined) throw new Error("no appendNext");
+      const missing = await db.transactions.run((tx) =>
+        appendNext(tx, {
+          tenantId: world.actor.tenantId,
+          runId: QRunIdSchema.parse(randomUUID()),
+          eventType: "q.stage.changed",
+          visibleStage: "UNDERSTANDING_REQUEST",
+          payload: { stage: "UNDERSTANDING_REQUEST" },
+        }),
+      );
+      expect(missing).toBeNull();
+      // A rolled-back append leaves no gap: the sequence rolls back with it.
+      await expect(
+        db.transactions.run(async (tx) => {
+          await appendRunEvent(repositories, tx, created.run, {
+            type: "q.stage.changed",
+            data: { stage: "PREPARING_ANALYSIS" },
+          });
+          throw new Error("abort");
+        }),
+      ).rejects.toThrow("abort");
+      const next = await db.transactions.run((tx) =>
+        appendRunEvent(repositories, tx, created.run, {
+          type: "q.stage.changed",
+          data: { stage: "PREPARING_ANALYSIS" },
+        }),
+      );
+      expect(next.sequence).toBe(26);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
   it("resolves two concurrent cancels to one cancellation and one terminal event", async () => {
     const world = await commitWorld();
     try {
@@ -1069,6 +1653,126 @@ describe("@capital-q/q-runtime concurrency against local PostgreSQL", () => {
         { n: number }[]
       >`select count(*)::int as n from q_runtime.runs where tenant_id = ${world.tenantId}`;
       expect(runs[0]?.n).toBe(1);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
+  it("S2: a lifecycle chain is one statement and leaves exactly what the step-by-step path leaves; a replay or a pending cancel falls back", async () => {
+    const world = await commitWorld();
+    try {
+      const repositories = createPostgresQRuntimeRepositories();
+      const withoutChain = {
+        ...repositories,
+        runs: { ...repositories.runs, moveChain: undefined },
+      };
+      const make = (repos: typeof repositories) =>
+        createQOrchestrationRuntime({
+          sql: db.sql,
+          transactions: db.transactions,
+          subjects: createQSubjectResolverRegistry([]),
+          securityEvents: createPostgresSecurityEventWriter({ sql: db.sql }),
+          repositories: repos,
+        });
+      const fast = make(repositories);
+      const slow = make(withoutChain);
+      const newRun = async () => {
+        const created = await service().createRun({
+          actor: world.actor,
+          input: request(),
+          idempotencyKey: `chain-${randomUUID()}`,
+          correlationId: CORRELATION(),
+        });
+        return {
+          runId: created.run.id,
+          tenantId: world.actor.tenantId,
+          actorUserId: world.actor.userId,
+        };
+      };
+      const drive = async (
+        runtime: typeof fast,
+        ref: Awaited<ReturnType<typeof newRun>>,
+      ) => {
+        const trips: number[] = [];
+        const counted = async <T>(work: () => Promise<T>): Promise<T> => {
+          const counter = createRoundTripCounter(ref.runId);
+          const value = await withRoundTripCounter(counter, work);
+          trips.push(counter.count);
+          return value;
+        };
+        await counted(() => runtime.begin(ref, "test-v1"));
+        await counted(() =>
+          runtime.advanceThrough(ref, ["CONTEXT_RESOLUTION", "POLICY_CHECK"]),
+        );
+        await counted(() => runtime.advance(ref, "PLANNING"));
+        // A replay of a move already made: unchanged, nothing appended.
+        const replay = await counted(() => runtime.advance(ref, "PLANNING"));
+        expect(replay.kind).toBe("UNCHANGED");
+        await counted(() => runtime.advanceThrough(ref, ["RETRIEVAL"]));
+        await counted(() =>
+          runtime.advance(ref, "SYNTHESIS", "PREPARING_ANALYSIS"),
+        );
+        // The stage is already showing: the move happens, the event does not.
+        await counted(() =>
+          runtime.advanceThrough(
+            ref,
+            ["VERIFICATION", "SYNTHESIS"],
+            "PREPARING_ANALYSIS",
+          ),
+        );
+        const done = await counted(() =>
+          runtime.complete(ref, { modelPolicyVersion: "p1" }),
+        );
+        expect(done.kind).toBe("ADVANCED");
+        const after = await counted(() => runtime.advance(ref, "SYNTHESIS"));
+        expect(after.kind).toBe("TERMINAL");
+        const run = await runtime.readRun(ref);
+        const events = await db.sql<
+          {
+            sequence: number;
+            event_type: string;
+            visible_stage: string | null;
+          }[]
+        >`select sequence, event_type, visible_stage from q_runtime.run_events
+           where run_id = ${ref.runId} order by sequence`;
+        return { trips, run, events };
+      };
+      const a = await drive(fast, await newRun());
+      const b = await drive(slow, await newRun());
+      expect(a.run?.status).toBe("COMPLETED");
+      expect(a.run?.version).toBe(b.run?.version);
+      expect(a.run?.lastEventSequence).toBe(b.run?.lastEventSequence);
+      expect(a.run?.modelPolicyVersion).toBe(b.run?.modelPolicyVersion);
+      expect(
+        a.events.map((e) => [e.sequence, e.event_type, e.visible_stage]),
+      ).toEqual(
+        b.events.map((e) => [e.sequence, e.event_type, e.visible_stage]),
+      );
+      // begin, the two chains, the stage move, complete: one statement each.
+      expect(a.trips[0]).toBe(1);
+      expect(a.trips[1]).toBe(1);
+      expect(a.trips[2]).toBe(1);
+      expect(a.trips[4]).toBe(1);
+      expect(a.trips[5]).toBe(1);
+      expect(a.trips[7]).toBe(1);
+      expect(Math.max(...b.trips)).toBeGreaterThan(1);
+
+      // A pending cancellation is only completed, never worked past.
+      const ref = await newRun();
+      await fast.begin(ref, "test-v1");
+      await service().cancelRun({
+        actor: world.actor,
+        runId: ref.runId,
+        correlationId: CORRELATION(),
+      });
+      const blocked = await fast.advance(ref, "CONTEXT_RESOLUTION");
+      expect(["CANCEL_REQUESTED", "TERMINAL"]).toContain(blocked.kind);
+      // Another person's reference moves nothing.
+      const stranger = {
+        ...(await newRun()),
+        actorUserId: randomUUID() as never,
+      };
+      await expect(fast.begin(stranger, "test-v1")).rejects.toThrow();
     } finally {
       await cleanup(world);
     }
