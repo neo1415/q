@@ -83,7 +83,10 @@ import {
   OrganisationVersionConflictError,
 } from "@capital-q/organisations";
 import type { DocumentUploadFailureCode } from "@capital-q/contracts";
-import { SlateCursorRejectedError } from "@capital-q/discovery";
+import {
+  UnicornPotentialDiscoverDeniedError,
+  SlateCursorRejectedError,
+} from "@capital-q/discovery";
 import { IntakeRefusedError } from "@capital-q/gateq-intake";
 import {
   ClaimNotFoundError,
@@ -303,6 +306,14 @@ function toProblem(
       code: "RESOURCE_CONFLICT",
       requestId,
       detail: GATEQ_SUBMIT_NOT_READY_DETAIL,
+    });
+  }
+
+  if (error instanceof UnicornPotentialDiscoverDeniedError) {
+    return createProblemDetails({
+      code: "PERMISSION_DENIED",
+      requestId,
+      detail: "Premium Unicorn Potential access is required for this filter.",
     });
   }
 

@@ -617,6 +617,7 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
       Record<string, readonly EligibilityReasonCode[]>
     >;
     readonly mandateId?: string | null;
+    readonly companyAssessmentNames?: boolean;
     readonly unclaimed?: readonly string[];
     readonly investability?: ReadonlyMap<string, InvestabilityDto>;
   }) {
@@ -624,6 +625,12 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     const scored: string[][] = [];
     const evaluated: string[][] = [];
     const service = createFitService({
+      companyIdentities: options.companyAssessmentNames
+        ? (ids) =>
+            Promise.resolve(
+              new Map(ids.map((id) => [id, { name: "Visible company" }])),
+            )
+        : undefined,
       investorSubject: {
         investorOrganisationFor: () =>
           Promise.resolve(
@@ -791,6 +798,28 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     expect(await w.service.profiles(actor, [ID(1)])).toEqual({
       kind: "NO_MANDATE",
     });
+    expect(w.read).toEqual([]);
+  });
+
+  it("shows company assessments before mandate setup without inventing suitability or reading a hidden company", async () => {
+    const w = world({
+      mandateId: null,
+      companyAssessmentNames: true,
+      reasons: {
+        [ID(1)]: ["NO_ACTIVE_MANDATE"],
+        [ID(2)]: ["NO_ACTIVE_MANDATE", "COMPANY_NOT_DISCOVERABLE_BY_INVESTOR"],
+      },
+    });
+    const result = await w.service.profiles(actor, [ID(1), ID(2)]);
+    expect(result.kind).toBe("OK");
+    if (result.kind !== "OK") throw new Error("Expected visible assessments");
+    expect(
+      result.items.map((item) => item.assessment.profile.companyId),
+    ).toEqual([ID(1)]);
+    expect(result.items[0]?.scores?.suitability?.score).toBeNull();
+    expect(result.items[0]?.scores?.suitability?.status).toBe(
+      "NOT_ENOUGH_INFORMATION",
+    );
     expect(w.read).toEqual([]);
   });
 

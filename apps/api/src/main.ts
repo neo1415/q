@@ -1,3 +1,5 @@
+import { createGateqUnicornReader } from "./gateq/unicorn.js";
+import type { ActorContext } from "@capital-q/security";
 /**
  * Capital Q application API — deployable composition root (doc 23, 8; ERA-002).
  *
@@ -104,6 +106,8 @@ import {
 } from "@capital-q/capital";
 import { createResultsReader } from "@capital-q/results";
 import {
+  createPostgresUnicornPotentialStore,
+  UNICORN_POTENTIAL_METHOD_VERSION,
   createPostgresReadinessStore,
   createReadinessService,
   readinessDataRoomFrom,
@@ -243,6 +247,7 @@ import {
 import {
   createBillingAccounts,
   createEntitlementService,
+  FEATURE_UNICORN_POTENTIAL,
   createFeeLedger,
   createStripeBillingProvider,
   createWebhookApplier,
@@ -1250,6 +1255,30 @@ const disclosure = createDisclosureAccessService({
 // plan lets the feed page. Today every plan carries the slate policy's
 // own number, so nothing changes; ranking never reads a plan.
 const recommendationVolume = createEntitlementService({ sql: database.sql });
+const unicornStore = createPostgresUnicornPotentialStore({
+  sql: database.sql,
+  transactions: database.transactions,
+});
+const unicornDiscover = {
+  readMany: async ({
+    actor,
+    companyIds,
+  }: {
+    readonly actor: ActorContext;
+    readonly companyIds: readonly string[];
+  }) => {
+    const access = await recommendationVolume.check(
+      billingAccountOf(actor),
+      FEATURE_UNICORN_POTENTIAL,
+    );
+    if (!access.allowed) return null;
+    const values = await unicornStore.current(
+      companyIds,
+      UNICORN_POTENTIAL_METHOD_VERSION,
+    );
+    return new Map([...values].map(([id, value]) => [id, value.overallScore]));
+  },
+};
 // end BILLING-2 block
 const companySectors = createPostgresCompanySectorsPort({ sql: database.sql });
 // ADR 0041: the investor-facing team projection (allow-listed fields).
@@ -1378,6 +1407,7 @@ const gateqInboxService = createGateqInbox({
   }),
 });
 const slates = createSlateReadPipeline({
+  unicornPotential: unicornDiscover,
   sql: database.sql,
   disclosure,
   // discover-feed-eligibility.v1, re-checked at read: a pitch that stopped
@@ -2958,6 +2988,25 @@ const { app, logger } = createApp(config, security, {
           },
         }),
   // F27: the founder's own unlinked applications are repaired on read.
+  gateqUnicornPotential: createGateqUnicornReader({
+    onError: (error) =>
+      gateqLogger.warn(
+        { errorName: error instanceof Error ? error.name : "unknown" },
+        "GateQ current company assessment unavailable",
+      ),
+    premium: async (actor) =>
+      (
+        await entitlements.check(
+          billingAccountOf(actor),
+          FEATURE_UNICORN_POTENTIAL,
+        )
+      ).allowed,
+    companies: gateqFounders.scoreCompanies,
+    investorMayRead: async (actor, companyId) =>
+      (await resolveViewableCompany(actor, companyId)) !== null,
+    current: (companyIds) =>
+      unicornStore.current(companyIds, UNICORN_POTENTIAL_METHOD_VERSION),
+  }),
   gateqMyApplications: async (actor) => {
     for (const row of await gateqFounders.unlinkedFor(actor)) {
       await joinGateqRelationship({ ...row, actor }).catch((error: unknown) =>

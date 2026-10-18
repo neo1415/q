@@ -47,3 +47,13 @@ export type FeedTransport = {
     readonly clientEventId: string;
   }): Promise<InteractionRecordedDto>;
 };
+
+/** A server refusal, preserved across the server-action/client boundary. */
+export class FeedPremiumAccessError extends Error {
+  constructor() {
+    super(
+      "Unicorn Potential filters require premium investor access. Clear filters to return to your recommendations.",
+    );
+    this.name = "FeedPremiumAccessError";
+  }
+}

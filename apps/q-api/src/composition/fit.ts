@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import { CompanyIdSchema, type CompanyQueryPort } from "@capital-q/companies";
-import type { CompanyDeckView, QViewDto } from "@capital-q/contracts";
+import type {
+  CompanyDeckView,
+  QViewDto,
+  UnicornPotentialDto,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import {
   createFitInputSource,
@@ -51,6 +55,12 @@ export type FitQViews = {
 
 export type FitCompositionDependencies = {
   readonly sql: DatabaseExecutor;
+  readonly unicornPotential?:
+    | ((
+        actor: ActorContext,
+        companyIds: readonly string[],
+      ) => Promise<ReadonlyMap<string, UnicornPotentialDto>>)
+    | undefined;
   readonly eligibilityPorts: EligibilityPorts;
   readonly eligibility: Pick<EligibilityService, "evaluate">;
   readonly companies: Pick<CompanyQueryPort, "findCanonicalCompany"> &
@@ -216,6 +226,17 @@ export function createFitComposition(
     sql: dependencies.sql,
   });
   const fit = createFitService({
+    companyIdentities: async (ids) => {
+      const found = await Promise.all(ids.map(identity));
+      return new Map(
+        found.flatMap((company) =>
+          company === null
+            ? []
+            : [[company.id, { name: company.canonicalName }] as const],
+        ),
+      );
+    },
+    unicornPotential: dependencies.unicornPotential,
     investability: (companyIds) =>
       investabilityStore.current(companyIds, INVESTABILITY_METHOD_VERSION),
     investabilityMethodVersion: INVESTABILITY_METHOD_VERSION,

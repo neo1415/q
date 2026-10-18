@@ -38,7 +38,7 @@ import {
   type FeedPrefetchWindow,
   type FeedState,
 } from "./feed-state";
-import type { FeedTransport } from "./feed-transport";
+import { FeedPremiumAccessError, type FeedTransport } from "./feed-transport";
 
 /**
  * The investor feed controller (CQ-WEB-020).
@@ -112,6 +112,7 @@ export type InvestorFeed = {
    * expired session the optimistic flag went back with no word at all.
    */
   readonly decisionNotice: string | null;
+  readonly premiumAccessRequired: boolean;
 };
 
 export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
@@ -122,6 +123,7 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
     newClientEventId = defaultClientEventId,
   } = options;
 
+  const [premiumAccessRequired, setPremiumAccessRequired] = useState(false);
   const [state, dispatch] = useReducer(
     feedReducer,
     options.initialSlate ?? null,
@@ -162,6 +164,7 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
   const loadPage = useCallback((cursor: string | null, signal: AbortSignal) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
+    setPremiumAccessRequired(false);
     dispatch({ type: "LOAD_STARTED" });
 
     const input = cursor === null ? { signal } : { cursor, signal };
@@ -172,8 +175,9 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
         if (signal.aborted) return;
         dispatch({ type: "PAGE_LOADED", slate });
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (signal.aborted) return;
+        setPremiumAccessRequired(error instanceof FeedPremiumAccessError);
         dispatch({ type: "LOAD_FAILED" });
       })
       .finally(() => {
@@ -314,6 +318,7 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
     decisionFor: (companyId: string) => decisionFor(state, companyId),
     isDeciding: (companyId: string) => isDecisionPending(state, companyId),
     decisionNotice,
+    premiumAccessRequired,
   };
 }
 

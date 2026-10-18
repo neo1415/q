@@ -80,6 +80,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('core', 'company_readiness_action_events', 'RLS_REQUIRED',       '{SELECT}'),
   -- 2026-10-16 Investability (InvestIQ) and Suitability; suite 976.
   ('core', 'company_investability_assessments', 'RLS_REQUIRED',     '{SELECT}'),
+  ('core', 'company_unicorn_potential_assessments', 'INTERNAL_SERVER_ONLY', '{}'),
   ('core', 'investor_company_suitability', 'RLS_REQUIRED',          '{SELECT}'),
   -- Capital rounds (2026-10-04): the company's organisation reads them (suite 760).
   ('core', 'capital_rounds',                'RLS_REQUIRED',         '{SELECT}'),

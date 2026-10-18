@@ -283,6 +283,20 @@ export function activeFilterChips(
       without: { ...filters, hasPitch: false },
     });
   }
+  if (
+    filters.unicornPotentialMin !== undefined ||
+    filters.unicornPotentialSort === true
+  ) {
+    chips.push({
+      key: "unicorn",
+      label: `Unicorn Potential${filters.unicornPotentialMin === undefined ? "" : ` ${filters.unicornPotentialMin}+`}${filters.unicornPotentialSort === true ? " · sorted" : ""}`,
+      without: canonicalDiscoverFilters({
+        ...filters,
+        unicornPotentialMin: undefined,
+        unicornPotentialSort: false,
+      }),
+    });
+  }
   return chips;
 }
 
