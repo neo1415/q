@@ -362,7 +362,8 @@ async function main() {
           { waitUntil: "domcontentloaded", timeout: 60000 },
         );
         await page
-          .locator('[data-company-scores="full"]')
+          .getByRole("heading", { name: visible.name, exact: true })
+          .first()
           .waitFor({ timeout: 45000 });
         assert.equal(
           await page.locator('[data-score="unicorn-potential"]').count(),
