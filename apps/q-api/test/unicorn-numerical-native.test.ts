@@ -26,7 +26,6 @@ import {
 } from "@capital-q/readiness";
 import { ActorContextSchema, AuthUserIdSchema } from "@capital-q/security";
 import { registerFitRoutes } from "../src/http/fit.js";
-import { renderSyntheticUnicornAssessment } from "../../web/test/support/unicorn-native-render.js";
 
 const configured = process.env["CQ_UNICORN_NUMERIC_PROOF_DATABASE_URL"];
 const id = (n: number) =>
@@ -90,6 +89,20 @@ describe("SYNTHETIC numerical native round trip (thin parents/auth fixture ports
           DATABASE_POOL_MAX: "2",
         }),
       );
+      // The web project checks its own React/Next dependencies. Load its real
+      // test renderer at runtime without pulling web aliases into backend tsc.
+      const rendererModule = new URL(
+        "../../web/test/support/unicorn-native-render.ts",
+        import.meta.url,
+      ).href;
+      const { renderSyntheticUnicornAssessment } = (await import(
+        /* @vite-ignore */ rendererModule
+      )) as {
+        renderSyntheticUnicornAssessment: (
+          companyId: string,
+          score: UnicornPotentialDto,
+        ) => string;
+      };
       const { sql } = database;
       const server = Fastify();
       let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
