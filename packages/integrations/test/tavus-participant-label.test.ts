@@ -29,9 +29,7 @@ describe("the name on Q's video tile is who Q plays, never the face's name", () 
     expect(tavusParticipantLabel({ surface: "INTERVIEW", fund: null })).toBe(
       "Q (AI interviewer)",
     );
-    expect(tavusParticipantLabel({ surface: "MEETING" })).toBe(
-      "Q · Capital Q (AI assistant)",
-    );
+    expect(tavusParticipantLabel({ surface: "MEETING" })).toBe("Capital Q");
   });
 
   it("stays within the provider's bound and keeps saying it is Q", () => {

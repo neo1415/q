@@ -73,6 +73,15 @@ export type MeetingFacePort = {
   /** One of Q's lines, already decided by the host. */
   readonly say: (meetingId: string, text: string) => void;
   readonly end: (meetingId: string, reason: MeetingFaceEndReason) => void;
+  /** The face is still being sent: Q's voice waits for it rather than doubling. */
+  readonly starting?: (meetingId: string) => boolean;
+  /** Settles when the start for a meeting has finished. */
+  readonly settled?: (meetingId: string) => Promise<void>;
+  /**
+   * The host is composing an answer: the face's next turn waits for it,
+   * named or not (a conversation's follow-up never says "Q").
+   */
+  readonly expect?: (meetingId: string) => void;
 };
 
 export type MeetingFaceService = MeetingFacePort & {
@@ -88,7 +97,6 @@ export type MeetingFaceService = MeetingFacePort & {
    * their end.
    */
   readonly sweep: (options?: { readonly atBoot?: boolean }) => Promise<void>;
-  /** Settles when the start for a meeting has finished (tests). */
   readonly settled: (meetingId: string) => Promise<void>;
 };
 
@@ -149,6 +157,10 @@ type Session = {
   conversationId: string | null;
   lines: { readonly text: string; readonly at: number }[];
   waiter: ((text: string | null) => void) | null;
+  /** When the host last began an answer; a turn waits for it. */
+  expectedAt: number;
+  /** Wakes a turn waiting to learn whether the host is answering. */
+  expecting: (() => void) | null;
   timer: ReturnType<typeof setTimeout> | null;
 };
 
@@ -189,10 +201,14 @@ export function createMeetingFace(dependencies: {
   readonly now?: () => number;
   /** How long the bridge waits for the host's answer to a line aimed at Q. */
   readonly answerWaitMs?: number;
+  readonly expectGraceMs?: number;
   readonly logger?: Logger;
 }): MeetingFaceService {
   const now = dependencies.now ?? (() => Date.now());
   const waitMs = dependencies.answerWaitMs ?? 12_000;
+  // The call's words reach the host through the note-taker a moment after
+  // the face's own turn ends; this long is given to see an answer begin.
+  const expectGraceMs = dependencies.expectGraceMs ?? 1_500;
   const { client, store, logger } = dependencies;
   const faceId = dependencies.faceId;
   const base = dependencies.publicBaseUrl?.replace(/\/+$/u, "") ?? null;
@@ -270,6 +286,8 @@ export function createMeetingFace(dependencies: {
       conversationId: null,
       lines: [],
       waiter: null,
+      expectedAt: Number.NEGATIVE_INFINITY,
+      expecting: null,
       timer: null,
     };
     byMeeting.set(meetingId, session);
@@ -387,6 +405,14 @@ export function createMeetingFace(dependencies: {
       starting.set(meetingId, run);
     },
     live: (meetingId) => byMeeting.get(meetingId)?.state === "LIVE",
+    starting: (meetingId) =>
+      starting.has(meetingId) || byMeeting.get(meetingId)?.state === "STARTING",
+    expect: (meetingId) => {
+      const session = byMeeting.get(meetingId);
+      if (session?.state !== "LIVE") return;
+      session.expectedAt = now();
+      session.expecting?.();
+    },
     say: (meetingId, text) => {
       const session = byMeeting.get(meetingId);
       if (session?.state !== "LIVE") return;
@@ -398,6 +424,7 @@ export function createMeetingFace(dependencies: {
       }
       session.lines.push({ text, at: now() });
       if (session.lines.length > 4) session.lines.shift();
+      session.expecting?.();
     },
     end,
     settled: async (meetingId) => {
@@ -424,7 +451,26 @@ export function createMeetingFace(dependencies: {
       const pending = freshLines(session);
       if (pending !== null) return { kind: "LINE", text: pending };
       // Words from the call are data: they only decide whether to wait.
-      if (!addressedToQ(userLines.at(-1) ?? "")) return { kind: "SILENT" };
+      // Q's name, or the host already answering (a conversation's
+      // follow-up never names Q: owner 2026-10-18).
+      const expected = () => now() - session.expectedAt <= waitMs;
+      if (!addressedToQ(userLines.at(-1) ?? "") && !expected()) {
+        await new Promise<void>((resolve) => {
+          const done = () => {
+            clearTimeout(timer);
+            if (session.expecting === done) session.expecting = null;
+            resolve();
+          };
+          const timer = setTimeout(done, expectGraceMs);
+          timer.unref();
+          session.expecting = done;
+          signal.addEventListener("abort", done, { once: true });
+        });
+        if (signal.aborted) return { kind: "SILENT" };
+        const arrived = freshLines(session);
+        if (arrived !== null) return { kind: "LINE", text: arrived };
+        if (!expected()) return { kind: "SILENT" };
+      }
       session.waiter?.(null);
       const text = await new Promise<string | null>((resolve) => {
         const timer = setTimeout(() => {

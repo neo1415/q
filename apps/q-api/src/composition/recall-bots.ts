@@ -144,7 +144,8 @@ function providerBody(transcriber: RecallTranscriber): Record<string, unknown> {
 
 /** Q's own spoken lines, as the captions hand them back unattributed. */
 const Q_OWN_LINE = /\b(?:i'?m|i am) q from capital q\b/i;
-const Q_BOT_NAME = /^q\b.*capital q/i;
+// The note-taker, and the face (Meet showed it as "PAL AI": live 2026-10-18).
+const Q_BOT_NAME = /^(?:q\b.*capital q|capital q\b|pal ai$)/i;
 
 /**
  * A transcript line's speaker. Q's own voice comes back as "Unknown"

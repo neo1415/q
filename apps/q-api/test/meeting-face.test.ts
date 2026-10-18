@@ -334,6 +334,27 @@ describe("Q's face in a Meet call", () => {
     });
   });
 
+  it("waits for an answer the host has begun, though the line never named Q (a conversation's follow-up)", async () => {
+    const { face, memory, bearer } = setup();
+    face.start(MEETING);
+    await face.settled(MEETING);
+    const id = [...memory.rows.values()][0]?.id ?? "";
+    expect(face.starting?.(MEETING)).toBe(false);
+    const followUp = face.bridge(
+      id,
+      bearer(),
+      [{ role: "user", text: "and how much are they raising" }],
+      signal(),
+    );
+    // The host hears the line through the note-taker and starts answering.
+    face.expect?.(MEETING);
+    face.say(MEETING, "Two million dollars, on a SAFE.");
+    await expect(followUp).resolves.toEqual({
+      kind: "LINE",
+      text: "Two million dollars, on a SAFE.",
+    });
+  });
+
   it("refuses the bridge without the session's own bearer", async () => {
     const { face, memory } = setup();
     face.start(MEETING);

@@ -400,6 +400,9 @@ const HEARD_KEPT = 2_000;
 const HEARD_SAVE_EVERY_MS = 10_000;
 /** Q's mp3 (ElevenLabs mp3_44100_128): bytes to milliseconds of audio. */
 const MP3_BYTES_PER_MS = 128_000 / 8 / 1_000;
+
+/** The longest Q waits for its face to finish joining before it speaks. */
+const FACE_START_WAIT_MS = 20_000;
 /** A first sentence longer than this is split at its first comma. */
 const FIRST_PIECE_MAX = 70;
 
@@ -810,6 +813,15 @@ export function createMeetingHostRuntime(dependencies: {
     why: string,
   ): Promise<void> {
     const face = dependencies.face;
+    // One Q in the call (owner 2026-10-18, live ef8a7091: the note-taker
+    // greeted in its own voice seconds before the face greeted again).
+    // While the face is still being sent, Q's line waits for it.
+    if (face?.starting?.(session.meetingId) === true) {
+      await Promise.race([
+        face.settled?.(session.meetingId) ?? Promise.resolve(),
+        wait(FACE_START_WAIT_MS),
+      ]);
+    }
     if (face?.live(session.meetingId) === true) {
       face.say(session.meetingId, text);
       logger?.info?.(
@@ -1051,6 +1063,8 @@ export function createMeetingHostRuntime(dependencies: {
       case "COMPOSE": {
         const askedAt = now();
         session.addressed += 1;
+        // The face's turn waits for this answer, though nobody said "Q".
+        dependencies.face?.expect?.(session.meetingId);
         const answer = {
           heardAt: action.heardAt ?? askedAt,
           early: action.early === true,
