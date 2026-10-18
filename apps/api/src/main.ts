@@ -1,5 +1,4 @@
 import { createGateqUnicornReader } from "./gateq/unicorn.js";
-import type { ActorContext } from "@capital-q/security";
 /**
  * Capital Q application API — deployable composition root (doc 23, 8; ERA-002).
  *
