@@ -10,8 +10,6 @@ import { join } from "node:path";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
 import { chromium } from "@playwright/test";
-import { renderToStaticMarkup } from "react-dom/server";
-import { createElement } from "react";
 import {
   UnicornPotentialDtoSchema,
   notAssessedUnicornPotential,
@@ -28,7 +26,7 @@ import {
 } from "@capital-q/readiness";
 import { ActorContextSchema, AuthUserIdSchema } from "@capital-q/security";
 import { registerFitRoutes } from "../src/http/fit.js";
-import { UnicornPotential } from "../../web/src/features/scores/unicorn-potential";
+import { renderSyntheticUnicornAssessment } from "../../web/test/support/unicorn-native-render.js";
 
 const configured = process.env["CQ_UNICORN_NUMERIC_PROOF_DATABASE_URL"];
 const id = (n: number) =>
@@ -307,11 +305,9 @@ describe("SYNTHETIC numerical native round trip (thin parents/auth fixture ports
             headers: { authorization: "Bearer synthetic-premium" },
           });
           expect(read.statusCode).toBe(200);
-          const component = renderToStaticMarkup(
-            createElement(UnicornPotential, {
-              companyId: company,
-              score: UnicornPotentialDtoSchema.parse(read.json<unknown>()),
-            }),
+          const component = renderSyntheticUnicornAssessment(
+            company,
+            UnicornPotentialDtoSchema.parse(read.json<unknown>()),
           );
           return `<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1"><style>*{box-sizing:border-box}body{margin:16px;font:16px system-ui;overflow-wrap:anywhere}details{max-width:100%;padding:8px;border:1px solid}summary{cursor:pointer}li{overflow-wrap:anywhere}</style><h1>SYNTHETIC numerical fixture — not a production company</h1><p>Actual Unicorn component with baseline local CSS. Production layout is separately verified.</p>${component}`;
         });
