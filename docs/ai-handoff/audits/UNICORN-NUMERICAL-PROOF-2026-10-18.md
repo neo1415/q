@@ -20,3 +20,7 @@ CQ_UNICORN_NUMERIC_PROOF_DATABASE_URL=postgresql://agent@127.0.0.1:55439/cq_unic
 ```
 
 The bootstrap refuses other hosts/database names and never drops an existing database. Do not bootstrap over an already initialized proof. Normal CI skips the opt-in test without this environment variable; skipped is not numerical acceptance. Protected real pgTAP and fresh live authenticated desktop/mobile acceptance remain separate release gates.
+
+## Current v4 recheck — 18 October 2026, 13:13 UTC
+
+The opt-in proof passed again after the typed TEAM adapter, with inputs.v4: one test, real67→65 append revisions, route authorization, source withdrawal and actual React screenshots. Current durable private receipts: `/workspace/.cq-private/cq-unicorn-SYNTHETIC-numeric-1UIovn/`. The earlier `/tmp` receipts were observed in the earlier runtime but did not survive its replacement; do not claim they remain available. Full Supabase authentication and production CSS remain separate checks.
