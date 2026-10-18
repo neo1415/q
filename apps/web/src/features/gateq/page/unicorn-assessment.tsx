@@ -8,8 +8,10 @@ import { useT } from "@/features/i18n/language";
 /** Optional server-authorized assessment; never computed from application names. */
 export function GateqUnicornAssessment({
   value,
+  audience = "INVESTOR",
 }: {
   readonly value: GateqInboxDetailDto["unicornPotential"];
+  readonly audience?: "FOUNDER" | "INVESTOR";
 }) {
   const t = useT();
   if (value === undefined) return null;
@@ -29,7 +31,11 @@ export function GateqUnicornAssessment({
           )}
         </p>
       </div>
-      <UnicornPotential companyId={value.companyId} score={value.assessment} />
+      <UnicornPotential
+        companyId={value.companyId}
+        score={value.assessment}
+        audience={audience}
+      />
     </section>
   );
 }

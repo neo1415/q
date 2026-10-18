@@ -1,3 +1,4 @@
+import { typedTeamCoverage } from "./team-coverage.js";
 import {
   structuredSignals,
   deckStructuredFact,
@@ -167,6 +168,9 @@ export function observeUnicornPotential(
   const now = Date.parse(asOf);
   if (!Number.isFinite(now)) throw new Error("Invalid assessment timestamp");
   const out: UnicornObservation[] = [];
+  const team = typedTeamCoverage(
+    inputs.deck?.sections.find((section) => section.section === "TEAM"),
+  );
   for (const source of sourcesOf(inputs, now)) {
     const quality = reliabilityOf(source);
     if (
@@ -175,6 +179,42 @@ export function observeUnicornPotential(
       source.truthClass === "UNKNOWN"
     )
       continue;
+    if (source.kind === "DECK_SECTION" && inputs.deck !== null) {
+      const coverage = team.find(
+        (item) =>
+          source.id === `${inputs.deck?.extractionId}:TEAM:${item.index}`,
+      );
+      if (coverage !== undefined) {
+        const policy = UNICORN_PILLARS.find((p) => p.id === "P9")?.criteria[0];
+        const date = Date.parse(coverage.at);
+        const asserted = Date.parse(inputs.deck.readAt);
+        const stale =
+          policy === undefined ||
+          date > now ||
+          date > asserted ||
+          !Number.isFinite(asserted) ||
+          now - date > policy.freshnessDays * 86400000;
+        out.push({
+          pillar: "P9",
+          criterion: "A",
+          grade: 2,
+          source: { ...source, at: coverage.at },
+          reliability: stale ? quality * 0.5 : quality,
+          stale,
+          conflicted:
+            source.lifecycleStatus === "CONTRADICTORY" ||
+            source.lifecycleStatus === "DISPUTED",
+          rule: "structured.team.function_coverage.dated_three_functions_not_execution_quality",
+          inputMetadata: {
+            function: coverage.function,
+            requiredSourceIds: team.map(
+              (item) => `${inputs.deck?.extractionId}:TEAM:${item.index}`,
+            ),
+            coverageOnly: true,
+          },
+        });
+      }
+    }
     let claim =
       source.kind === "CLAIM"
         ? inputs.claims.find((c) => c.id === source.id)

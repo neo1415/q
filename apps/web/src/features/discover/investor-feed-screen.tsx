@@ -472,6 +472,9 @@ function InvestorFeed({
       way back, rather than a sentence about the market that the filters,
       not the market, made true.
     */
+    const unicornSelection =
+      filters?.unicornPotentialMin !== undefined ||
+      filters?.unicornPotentialSort === true;
     return (
       <div className="flex flex-col gap-4">
         {controls.row("flex")}
@@ -479,14 +482,27 @@ function InvestorFeed({
           <p className="cq-status-line">{controls.notice}</p>
         )}
         <EmptyState
-          title={t("No companies match these filters.")}
+          title={t(
+            unicornSelection
+              ? "No scored companies match these filters."
+              : "No companies match these filters.",
+          )}
           description={t(
-            "Your recommendations are unchanged; these filters leave none of them in view.",
+            unicornSelection
+              ? "Unicorn Potential needs sufficient current evidence before an overall score is available. This view excludes companies without a score; missing evidence is not a judgment of business quality."
+              : "Your recommendations are unchanged; these filters leave none of them in view.",
           )}
           action={
-            <Button variant="primary" onClick={controls.clear}>
-              {t("Clear filters")}
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="primary" onClick={controls.clear}>
+                {t("Clear filters")}
+              </Button>
+              {unicornSelection ? (
+                <Link href="/explore" className={buttonClassName("secondary")}>
+                  {t("Open Explore")}
+                </Link>
+              ) : null}
+            </div>
           }
         />
       </div>

@@ -1,5 +1,33 @@
 # Capital Q — Current shared engineering state
 
+## Unicorn completion — 18 October 2026, 13:18 UTC
+
+PR233 was normally integrated and released through protected PR236/72679cbec89d9a2d4ed9b139913587ea4b80455f. The current shared production release is PR243/a026a39a727faab0cf52866965c8900be40b53fb; all four Railway services are SUCCESS at that exact SHA. Root preserved and merged the newer integration e05528768; no Q Pitch changes.
+
+Current focused PR237 (`codex/unicorn-product-completion-oct18`) contains useful unscored/Discover recovery, existing founder evidence links, three priority gaps, and a conservative typed P9.A staffing adapter (inputs.v4). All three dated positive functions are required; preserve individual source lineage; undated, partial, forecast and conflicting sets stay unknown. Weights, grading scale, 60% gate and mandatory pillars unchanged. Actual ten-company API/deck audit confirms four matching canonical sections. See `audits/UNICORN-COVERAGE-2026-10-18.md` for per-pillar sample and exact evidence needs; it is not a newly proven global top-ten ranking.
+
+Fresh live Q exposed an additional root cause: Q emitted the correct EXPAND intent but answered that the assessment was unavailable because the screen prefetch loaded only get_company. The new bounded repair hydrates the visible single-company panel through existing authorized fit_profile before synthesis, including the actual stored summary and all twelve pillars. No new model round, engine or authorization path. This is locally tested, NOT yet deployed or client-DONE-certified. Do not mark Q acceptance complete.
+
+Local validation: 53 package builds; 72 scoring/storage tests, 20 manifest tests, 35 UI tests; isolated actual PostgreSQL numerical test PASS under inputs.v4 (67→65), with explicit thin-parent/auth-port/static-CSS limitations. Root and app types passed before the final manifest patch; final checks/protected PR237 CI and live release acceptance remain required. Numerical receipts now persist under `/workspace/.cq-private/`; old /tmp sessions were lost after runtime replacement. Credentials are never committed.
+
+**External audit blocker:** the previously authorized Supabase Management token now returns401 Invalid access token. A secure binding update was requested; Railway and existing-session auth work. Earlier direct v3 replay:461 assessed,0 scored,342 partial,401 observations,max44.5%; do not call those refreshed global counts. Fresh selected36-company feed:0 scored,28 partial,max29%; separate ten-company sample includes Shiftwell44.5%. Fresh global461 census/v4 replay remains blocked. No methodology change is applied or awaiting approval.
+
+Existing investor, free-negative and provided Kathryn/Spheros founder API reads pass; the existing founder application remains5bc3daac-046f-4401-9418-38b03ed68e80. Temporary fictional Kestrel feature override expired at08:13UTC and currently correctly returns404; no fresh premium no-mandate acceptance is claimed and original43 customer grants are untouched. The earlier selected-context change was restored through its existing memberships; do not grant access to real customers to hide this proof gap.
+
+Next: exact-head protected237 gates, protected promotion, all affected Railway revisions, fresh Q EXPAND/DONE and grounded answer, real desktop/mobile CTA/browser acceptance. Finish global census/replay after secure Management access is restored; never fabricate production numbers or lower gates.
+
+## Unicorn completion continuation — 18 October 2026, 06:46 UTC
+
+PR233 exact source df7874fdcd7fa301d04942da9b89c00e0a9beb5d passed protected CI39102654240 and was merged normally. Integration fba01f927f5c32d0a956cd96b234f099e8d876fb passed CI39104139040. Production release PR236 is OPEN: candidate39104140057 has build/types/lint/pgTAP green, tests pending. Production is still the documented234 baseline; no new deployment or inputs.v3 count is claimed yet.
+
+Follow-up PR237 (`codex/unicorn-product-completion-oct18`) adds meaningful Discover empty score-filter recovery, editable Q missing-evidence drafts, existing founder documents/profile links and progressive disclosure of three priority gaps. No rubric/threshold/permissions/migration changes. 53 package builds, web types and34 focused UI tests passed; updated component11tests passed. Synthetic numerical proof is integrated but its first run stopped before tests on a react-dom dependency boundary; repair and root gates are pending. Source receipt proof now requires exact EXPAND + DONE. Do not call the synthetic proof passed or production numerical scores available.
+
+Current source audit is read-only and in progress; report target `audits/UNICORN-COVERAGE-2026-10-18.md`. Earlier v1.1 adapter on preserved branches is obsolete and must not be applied blindly. Preserve older local branch `codex/unicorn-pre-takeover-preserved-oct18@6d743f209`.
+
+Live actor fixtures privately reconstructed from existing sessions and explicitly provided Kathryn identity. Temporary feature-only access for existing fictional Kestrel no-mandate organisation3cb03c31-761b-49c1-814f-ede0994e0e34 expires2026-10-18T08:13:52.403Z; revoke only this own override after proof (`/tmp/cq-unicorn-nomandate-entitlement.mjs --revoke`). No account/email/subscription or paid-usage change, original43 grants untouched. Private fixtures `/tmp/cq-unicorn-oct18-live-fixtures.json`; no private bodies in Git. Existing safe helper files and sessions are ephemeral, not portable secrets.
+
+Next: finish236candidate gates/release, verify Railway affected services and paced461v3 reassessment; execute exact Q EXPAND/DONE and real desktop/mobile acceptance; finish factual ten-company audit, genuine isolated numerical proof and237protected release. Never manufacture real scores or silently change methodology. No Home Q/web research/Q Pitch scope.
+
 ## Latest Unicorn checkpoint — 18 October 2026, 07:04 WAT
 
 Unicorn is deployed from PR227/cfd51ef60191e560a4726fa08695712fa62972f9, with both reviewed migrations applied (248 hosted) and all 43 explicit existing-organisation feature ACCESS grants applied. No paid subscriptions or usage entitlements changed. Completed worker sweep: 461 companies, 0 scored, 461 insufficient, 342 with partial evidence, maximum coverage 33.5% under inputs.v2. This does not certify a positive numeric score.
