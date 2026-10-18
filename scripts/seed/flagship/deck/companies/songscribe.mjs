@@ -77,20 +77,51 @@ table.t td.n{font-family:"Geist Mono",monospace;white-space:nowrap;color:var(--t
 `;
 
 const SIDES = {
-  A: { name: "Side A — the song", tracks: ["Thesis", "At a glance", "Problem", "Solution", "Product", "Difference"] },
-  B: { name: "Side B — the business", tracks: ["Market", "Sizing", "Model", "Segments", "Competition", "Moat", "Traction", "Planning"] },
-  C: { name: "Liner notes & credits", tracks: ["Roadmap", "Team", "Risks", "Funding", "Next steps", "Sources"] },
+  A: {
+    name: "Side A — the song",
+    tracks: [
+      "Thesis",
+      "At a glance",
+      "Problem",
+      "Solution",
+      "Product",
+      "Difference",
+    ],
+  },
+  B: {
+    name: "Side B — the business",
+    tracks: [
+      "Market",
+      "Sizing",
+      "Model",
+      "Segments",
+      "Competition",
+      "Moat",
+      "Traction",
+      "Planning",
+    ],
+  },
+  C: {
+    name: "Liner notes & credits",
+    tracks: ["Roadmap", "Team", "Risks", "Funding", "Next steps", "Sources"],
+  },
 };
 
 const strip = (side, track) =>
-  `<div class="strip mono"><span class="side">${esc(SIDES[side].name)}</span>${SIDES[side].tracks
-    .map((t, k) => `<span class="${t === track ? "on" : ""}">${side}${k + 1} ${esc(t)}</span>`)
+  `<div class="strip mono"><span class="side">${esc(SIDES[side].name)}</span>${SIDES[
+    side
+  ].tracks
+    .map(
+      (t, k) =>
+        `<span class="${t === track ? "on" : ""}">${side}${k + 1} ${esc(t)}</span>`,
+    )
     .join("")}</div>`;
 
 const foot = ({ i, n }) =>
   `<div class="foot"><span>SongScribe AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">${String(i).padStart(2, "0")} / ${n}</span></div>`;
 
-const trackNo = (side, track) => `${side}${SIDES[side].tracks.indexOf(track) + 1}`;
+const trackNo = (side, track) =>
+  `${side}${SIDES[side].tracks.indexOf(track) + 1}`;
 
 const page = (side, track, title, body, opts = {}) => ({
   red: !!opts.red,
@@ -98,13 +129,23 @@ const page = (side, track, title, body, opts = {}) => ({
     `${strip(side, track)}<div class="box"><div class="trk mono">${trackNo(side, track)} · ${esc(track.toLowerCase())}</div><h2>${title}</h2>${body}</div>${foot(ctx)}`,
 });
 
-const S = (id, title, uses, p) => ({ id: p.red ? `${id} red` : id, title, uses, html: p.html });
+const S = (id, title, uses, p) => ({
+  id: p.red ? `${id} red` : id,
+  title,
+  uses,
+  html: p.html,
+});
 
 const slides = [
   {
     id: "title",
     title: "Thesis — your story, turned into a song",
-    uses: ["proposition and pitch lines (SELF_REPORTED, songscribe.ai)", "generation time 30-60 s, 2 variations (SELF_REPORTED, FAQ)", "founders (OWNER_PROVIDED)", "UK entity (VERIFIED_PUBLIC)"],
+    uses: [
+      "proposition and pitch lines (SELF_REPORTED, songscribe.ai)",
+      "generation time 30-60 s, 2 variations (SELF_REPORTED, FAQ)",
+      "founders (OWNER_PROVIDED)",
+      "UK entity (VERIFIED_PUBLIC)",
+    ],
     html: (ctx) => `
       <div class="wmpos wm"><span class="s">SONG</span>SCRIBE</div>
       <h1>Your story, turned into <span>a song.</span></h1>
@@ -116,7 +157,12 @@ const slides = [
   S(
     "glance",
     "At a glance — company record",
-    ["UK entity, inc. 2026-02-13, Taverham Norwich, SIC 59200, sole director/PSC (VERIFIED_PUBLIC, Companies House)", "Terms name 'SongScribe Ltd', Nigerian law (SELF_REPORTED, /terms)", "payment rails (SELF_REPORTED)", "Nigerian entity (UNKNOWN)"],
+    [
+      "UK entity, inc. 2026-02-13, Taverham Norwich, SIC 59200, sole director/PSC (VERIFIED_PUBLIC, Companies House)",
+      "Terms name 'SongScribe Ltd', Nigerian law (SELF_REPORTED, /terms)",
+      "payment rails (SELF_REPORTED)",
+      "Nigerian entity (UNKNOWN)",
+    ],
     page(
       "A",
       "At a glance",
@@ -141,7 +187,11 @@ const slides = [
   S(
     "problem",
     "Problem — a personal song costs about $199 and takes days",
-    ["Songfinch ~$199 per human-made song, 3-7 days (VERIFIED_PUBLIC, Digital Music News)", "pitch line No Studios/Producers/Waiting (SELF_REPORTED)", "segment use cases (SELF_REPORTED)"],
+    [
+      "Songfinch ~$199 per human-made song, 3-7 days (VERIFIED_PUBLIC, Digital Music News)",
+      "pitch line No Studios/Producers/Waiting (SELF_REPORTED)",
+      "segment use cases (SELF_REPORTED)",
+    ],
     page(
       "A",
       "Problem",
@@ -157,7 +207,11 @@ const slides = [
   S(
     "solution",
     "Solution — brief, generate, refine, license",
-    ["eight-step form and AI Producer (SELF_REPORTED)", "30-60 s, 2 variations, revisions (SELF_REPORTED, FAQ)", "MP3/WAV, PDF licence certificate (SELF_REPORTED)"],
+    [
+      "eight-step form and AI Producer (SELF_REPORTED)",
+      "30-60 s, 2 variations, revisions (SELF_REPORTED, FAQ)",
+      "MP3/WAV, PDF licence certificate (SELF_REPORTED)",
+    ],
     page(
       "A",
       "Solution",
@@ -174,7 +228,13 @@ const slides = [
   S(
     "product",
     "Working product & capabilities — live, stated, undisclosed",
-    ["live pricing page and free demo (SELF_REPORTED)", "genres shown (SELF_REPORTED)", "multi-language 'Quality may vary' (SELF_REPORTED)", "samples hosted on public R2 (VERIFIED_PUBLIC)", "underlying model (UNKNOWN)"],
+    [
+      "live pricing page and free demo (SELF_REPORTED)",
+      "genres shown (SELF_REPORTED)",
+      "multi-language 'Quality may vary' (SELF_REPORTED)",
+      "samples hosted on public R2 (VERIFIED_PUBLIC)",
+      "underlying model (UNKNOWN)",
+    ],
     page(
       "A",
       "Product",
@@ -193,7 +253,10 @@ const slides = [
   S(
     "difference",
     "The difference — story-first, African genres, licences you can show",
-    ["claimed differentiators (SELF_REPORTED)", "competitive implication (ASSUMPTION, research.md §12)"],
+    [
+      "claimed differentiators (SELF_REPORTED)",
+      "competitive implication (ASSUMPTION, research.md §12)",
+    ],
     page(
       "A",
       "Difference",
@@ -209,7 +272,11 @@ const slides = [
   S(
     "market red",
     "Market context — recorded music and the generative-AI music market",
-    ["IFPI 2024: $29.6B (+4.8%), Sub-Saharan Africa $110M (+22.6%) (VERIFIED_PUBLIC, MBW / Music In Africa)", "CISAC/PMP 2024 projection: €64B output, €9B provider revenue by 2028 (VERIFIED_PUBLIC)", "Suno ~$200M revenue, $2.45B valuation (VERIFIED_PUBLIC, TechCrunch)"],
+    [
+      "IFPI 2024: $29.6B (+4.8%), Sub-Saharan Africa $110M (+22.6%) (VERIFIED_PUBLIC, MBW / Music In Africa)",
+      "CISAC/PMP 2024 projection: €64B output, €9B provider revenue by 2028 (VERIFIED_PUBLIC)",
+      "Suno ~$200M revenue, $2.45B valuation (VERIFIED_PUBLIC, TechCrunch)",
+    ],
     page(
       "B",
       "Market",
@@ -227,7 +294,10 @@ const slides = [
   S(
     "sizing",
     "Opportunity sizing — TAM / SAM / SOM (Assumption)",
-    ["CISAC €9B 2028 provider revenue (VERIFIED_PUBLIC projection)", "all percentages and subscriber counts (ASSUMPTION, research.md §18)"],
+    [
+      "CISAC €9B 2028 provider revenue (VERIFIED_PUBLIC projection)",
+      "all percentages and subscriber counts (ASSUMPTION, research.md §18)",
+    ],
     page(
       "B",
       "Sizing",
@@ -243,7 +313,11 @@ const slides = [
   S(
     "model",
     "Business model — credit subscriptions plus licences, with conflicting public tiers",
-    ["live pricing table (SELF_REPORTED, /pricing)", "credit rules (SELF_REPORTED)", "four conflicting tier schemes, $179 vs $199 (VERIFIED_PUBLIC observation)"],
+    [
+      "live pricing table (SELF_REPORTED, /pricing)",
+      "credit rules (SELF_REPORTED)",
+      "four conflicting tier schemes, $179 vs $199 (VERIFIED_PUBLIC observation)",
+    ],
     page(
       "B",
       "Model",
@@ -274,7 +348,11 @@ const slides = [
   S(
     "segments",
     "Segments & distribution",
-    ["segments and use cases (SELF_REPORTED)", "published channels (SELF_REPORTED)", "inferred motion: gifting virality, church communities, diaspora (ASSUMPTION)"],
+    [
+      "segments and use cases (SELF_REPORTED)",
+      "published channels (SELF_REPORTED)",
+      "inferred motion: gifting virality, church communities, diaspora (ASSUMPTION)",
+    ],
     page(
       "B",
       "Segments",
@@ -293,7 +371,11 @@ const slides = [
   S(
     "competition",
     "Competition — named players and their public numbers",
-    ["competitor table (VERIFIED_PUBLIC third-party reports, research.md §12)", "ElevenLabs Music not verified (UNKNOWN)", "agencies price point (ASSUMPTION)"],
+    [
+      "competitor table (VERIFIED_PUBLIC third-party reports, research.md §12)",
+      "ElevenLabs Music not verified (UNKNOWN)",
+      "agencies price point (ASSUMPTION)",
+    ],
     page(
       "B",
       "Competition",
@@ -312,7 +394,10 @@ const slides = [
   S(
     "moat",
     "Defensibility — where SongScribe can hold ground",
-    ["packaging/genre wedge and vendor dependency (ASSUMPTION, research.md §12)", "commoditisation risk (research.md §16)"],
+    [
+      "packaging/genre wedge and vendor dependency (ASSUMPTION, research.md §12)",
+      "commoditisation risk (research.md §16)",
+    ],
     page(
       "B",
       "Moat",
@@ -332,7 +417,10 @@ const slides = [
   S(
     "traction",
     "Traction & proof points — none published yet",
-    ["traction, customers, revenue, testimonials (UNKNOWN — none published)", "samples presented as 'Real songs created in seconds' (SELF_REPORTED)"],
+    [
+      "traction, customers, revenue, testimonials (UNKNOWN — none published)",
+      "samples presented as 'Real songs created in seconds' (SELF_REPORTED)",
+    ],
     page(
       "B",
       "Traction",
@@ -354,7 +442,12 @@ const slides = [
   S(
     "planning",
     "Planning assumptions — not actual results",
-    ["5,000 subscribers × $15 blended (ASSUMPTION, research.md §18)", "scenario arithmetic (ASSUMPTION)", "list prices $7/$19 (SELF_REPORTED)", "cost per song, conversion, churn (UNKNOWN)"],
+    [
+      "5,000 subscribers × $15 blended (ASSUMPTION, research.md §18)",
+      "scenario arithmetic (ASSUMPTION)",
+      "list prices $7/$19 (SELF_REPORTED)",
+      "cost per song, conversion, churn (UNKNOWN)",
+    ],
     page(
       "B",
       "Planning",
@@ -379,7 +472,12 @@ const slides = [
   S(
     "roadmap",
     "Roadmap & scalability",
-    ["founder vision line (SELF_REPORTED, zinomario.com)", "Agency/Enterprise white-label and API (SELF_REPORTED, /licensing)", "steps the evidence calls for (ASSUMPTION)", "EU AI Act Art. 50 from 2 Aug 2026 (research.md §17)"],
+    [
+      "founder vision line (SELF_REPORTED, zinomario.com)",
+      "Agency/Enterprise white-label and API (SELF_REPORTED, /licensing)",
+      "steps the evidence calls for (ASSUMPTION)",
+      "EU AI Act Art. 50 from 2 Aug 2026 (research.md §17)",
+    ],
     page(
       "C",
       "Roadmap",
@@ -401,7 +499,13 @@ const slides = [
   S(
     "team",
     "Team & founders",
-    ["cofounders Zino Mario and Excel Chukwu (OWNER_PROVIDED)", "Zino Mario sole director/≥75% PSC (VERIFIED_PUBLIC)", "Zino Aviation CEO (VERIFIED_PUBLIC, Nairametrics)", "music producer self-claim (SELF_REPORTED)", "Excel Chukwu role/equity (UNKNOWN)"],
+    [
+      "cofounders Zino Mario and Excel Chukwu (OWNER_PROVIDED)",
+      "Zino Mario sole director/≥75% PSC (VERIFIED_PUBLIC)",
+      "Zino Aviation CEO (VERIFIED_PUBLIC, Nairametrics)",
+      "music producer self-claim (SELF_REPORTED)",
+      "Excel Chukwu role/equity (UNKNOWN)",
+    ],
     page(
       "C",
       "Team",
@@ -432,7 +536,10 @@ const slides = [
   S(
     "risks",
     "Key risks & mitigations (incl. chain-of-title and regulation)",
-    ["risks 1-7 and regulatory items (research.md §16-17)", "mitigations (ASSUMPTION)"],
+    [
+      "risks 1-7 and regulatory items (research.md §16-17)",
+      "mitigations (ASSUMPTION)",
+    ],
     page(
       "C",
       "Risks",
@@ -472,7 +579,10 @@ const slides = [
   S(
     "next red",
     "Investment opportunity & next steps",
-    ["thesis summary (SELF_REPORTED + VERIFIED_PUBLIC market data + ASSUMPTION)", "open questions 1-9 (research.md §19)"],
+    [
+      "thesis summary (SELF_REPORTED + VERIFIED_PUBLIC market data + ASSUMPTION)",
+      "open questions 1-9 (research.md §19)",
+    ],
     page(
       "C",
       "Next steps",
@@ -498,7 +608,9 @@ const slides = [
     id: "sources",
     title: "Sources & evidence status",
     uses: ["all source URLs and fetch dates (facts.json)"],
-    html: (ctx) => `${strip("C", "Sources")}<div class="box"><div class="trk mono">C6 · liner notes</div><h2 style="font-size:34px;margin-bottom:14px">Sources & evidence status</h2>
+    html: (
+      ctx,
+    ) => `${strip("C", "Sources")}<div class="box"><div class="trk mono">C6 · liner notes</div><h2 style="font-size:34px;margin-bottom:14px">Sources & evidence status</h2>
       <div class="cols" style="grid-template-columns:1.6fr 1fr;gap:36px">
        <table class="t" style="font-size:11.5px">
         <tr><th>Source (all fetched 2026-10-18 UTC)</th><th>Status</th></tr>
@@ -537,7 +649,7 @@ export default {
   slides,
   readme: {
     direction:
-      "Dark cinematic SongScribe brand (#0A0A0A, red #E63946/#DC2B3C, maroon #7F1D1D, amber #F59E0B; Inter Display heavy headlines, Geist Mono labels). Narrative device: an album — Side A \"the song\" (product), Side B \"the business\", then \"liner notes & credits\". A tracklist strip on every slide shows position; the market and next-steps slides are full red \"singles\"; the title uses a square red record sleeve. Visually distinct from KUUZA's two-column investor-call layout.",
+      'Dark cinematic SongScribe brand (#0A0A0A, red #E63946/#DC2B3C, maroon #7F1D1D, amber #F59E0B; Inter Display heavy headlines, Geist Mono labels). Narrative device: an album — Side A "the song" (product), Side B "the business", then "liner notes & credits". A tracklist strip on every slide shows position; the market and next-steps slides are full red "singles"; the title uses a square red record sleeve. Visually distinct from KUUZA\'s two-column investor-call layout.',
     brand: [
       "Colours from `brand.json` (site HTML and compiled CSS). Space Grotesk (brand display font, itself an ASSUMPTION in brand.json) is not available offline, so headlines use Inter Display; Geist Mono is the OFL file in `scripts/seed/flagship/deck/fonts/`.",
       "No logo file used: the site publishes no asset licence ('All rights reserved'). The wordmark is typographic — SONG in red, SCRIBE in white — matching the logo's split colouring without the S glyph. Logo source recorded in brand.json: https://www.songscribe.ai/images/songscribe-logo.png.",

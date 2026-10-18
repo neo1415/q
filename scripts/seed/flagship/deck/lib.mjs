@@ -10,8 +10,10 @@ import { execFileSync } from "node:child_process";
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const REPO = resolve(HERE, "../../../..");
-const PW = "/home/user/q/node_modules/.pnpm/playwright@1.62.1/node_modules/playwright";
-const PDFLIB = "/home/user/q/node_modules/.pnpm/pdf-lib@1.17.1/node_modules/pdf-lib";
+const PW =
+  "/home/user/q/node_modules/.pnpm/playwright@1.62.1/node_modules/playwright";
+const PDFLIB =
+  "/home/user/q/node_modules/.pnpm/pdf-lib@1.17.1/node_modules/pdf-lib";
 
 /** Escape text for HTML. Content modules call this for every fact string. */
 export const esc = (s) =>
@@ -91,7 +93,10 @@ export async function render(htmlPath, pdfPath) {
   const browser = await chromium
     .launch({ args: ["--allow-file-access-from-files"] })
     .catch(() =>
-      chromium.launch({ executablePath: "/opt/pw-browsers/chromium", args: ["--allow-file-access-from-files"] }),
+      chromium.launch({
+        executablePath: "/opt/pw-browsers/chromium",
+        args: ["--allow-file-access-from-files"],
+      }),
     );
   const page = await browser.newPage();
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -99,15 +104,22 @@ export async function render(htmlPath, pdfPath) {
   await page.evaluate(() => document.fonts.ready);
   const problems = await page.evaluate(() => {
     const out = [];
-    const fontsLoaded = [...document.fonts].filter((f) => f.status !== "loaded").map((f) => f.family);
-    if (fontsLoaded.length) out.push(`fonts not loaded: ${[...new Set(fontsLoaded)].join(", ")}`);
+    const fontsLoaded = [...document.fonts]
+      .filter((f) => f.status !== "loaded")
+      .map((f) => f.family);
+    if (fontsLoaded.length)
+      out.push(`fonts not loaded: ${[...new Set(fontsLoaded)].join(", ")}`);
     // Content boxes must contain their children too (catches text running into the footer).
-    for (const box of document.querySelectorAll(".slide .box, .slide .main, .slide .full")) {
+    for (const box of document.querySelectorAll(
+      ".slide .box, .slide .main, .slide .full",
+    )) {
       const r = box.getBoundingClientRect();
       for (const el of box.querySelectorAll("*")) {
         const b = el.getBoundingClientRect();
         if (b.width && b.height && b.bottom > r.bottom + 1)
-          out.push(`slide ${box.closest(".slide").dataset.slide}: <${el.tagName.toLowerCase()} class="${el.className}"> below its content box by ${Math.round(b.bottom - r.bottom)}px`);
+          out.push(
+            `slide ${box.closest(".slide").dataset.slide}: <${el.tagName.toLowerCase()} class="${el.className}"> below its content box by ${Math.round(b.bottom - r.bottom)}px`,
+          );
       }
     }
     for (const s of document.querySelectorAll(".slide")) {
@@ -116,15 +128,34 @@ export async function render(htmlPath, pdfPath) {
         if (el.closest("[data-allow-bleed]")) continue;
         const b = el.getBoundingClientRect();
         if (!b.width || !b.height) continue;
-        if (b.right > r.right + 0.5 || b.bottom > r.bottom + 0.5 || b.left < r.left - 0.5 || b.top < r.top - 0.5)
-          out.push(`slide ${s.dataset.slide}: <${el.tagName.toLowerCase()} class="${el.className}"> outside slide`);
-        if (el.scrollHeight > el.clientHeight + 2 && getComputedStyle(el).overflow === "hidden")
-          out.push(`slide ${s.dataset.slide}: <${el.tagName.toLowerCase()} class="${el.className}"> clipped`);
+        if (
+          b.right > r.right + 0.5 ||
+          b.bottom > r.bottom + 0.5 ||
+          b.left < r.left - 0.5 ||
+          b.top < r.top - 0.5
+        )
+          out.push(
+            `slide ${s.dataset.slide}: <${el.tagName.toLowerCase()} class="${el.className}"> outside slide`,
+          );
+        if (
+          el.scrollHeight > el.clientHeight + 2 &&
+          el.ownerDocument.defaultView.getComputedStyle(el).overflow ===
+            "hidden"
+        )
+          out.push(
+            `slide ${s.dataset.slide}: <${el.tagName.toLowerCase()} class="${el.className}"> clipped`,
+          );
       }
     }
     return out;
   });
-  await page.pdf({ path: pdfPath, width: "1280px", height: "720px", printBackground: true, preferCSSPageSize: true });
+  await page.pdf({
+    path: pdfPath,
+    width: "1280px",
+    height: "720px",
+    printBackground: true,
+    preferCSSPageSize: true,
+  });
   await browser.close();
   return problems;
 }
@@ -134,19 +165,41 @@ export async function verify(pdfPath, expectedPages, previewDir, previewPages) {
   const { PDFDocument } = require(PDFLIB);
   const doc = await PDFDocument.load(readFileSync(pdfPath));
   const pages = doc.getPages();
-  const sizes = [...new Set(pages.map((p) => `${Math.round(p.getWidth() / 0.75)}x${Math.round(p.getHeight() / 0.75)}`))];
+  const sizes = [
+    ...new Set(
+      pages.map(
+        (p) =>
+          `${Math.round(p.getWidth() / 0.75)}x${Math.round(p.getHeight() / 0.75)}`,
+      ),
+    ),
+  ];
   const bytes = statSync(pdfPath).size;
   const emptyText = [];
   for (let i = 1; i <= pages.length; i++) {
-    const t = execFileSync("pdftotext", ["-f", String(i), "-l", String(i), "-layout", pdfPath, "-"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
+    const t = execFileSync(
+      "pdftotext",
+      ["-f", String(i), "-l", String(i), "-layout", pdfPath, "-"],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      },
+    );
     if (t.replace(/\s/g, "").length < 40) emptyText.push(i);
   }
   mkdirSync(previewDir, { recursive: true });
   for (const p of previewPages) {
-    execFileSync("pdftoppm", ["-f", String(p), "-l", String(p), "-r", "72", "-png", "-singlefile", pdfPath, join(previewDir, `p${String(p).padStart(2, "0")}`)]);
+    execFileSync("pdftoppm", [
+      "-f",
+      String(p),
+      "-l",
+      String(p),
+      "-r",
+      "72",
+      "-png",
+      "-singlefile",
+      pdfPath,
+      join(previewDir, `p${String(p).padStart(2, "0")}`),
+    ]);
   }
   return {
     pages: pages.length,
@@ -155,7 +208,12 @@ export async function verify(pdfPath, expectedPages, previewDir, previewPages) {
     bytes,
     mb: +(bytes / 1048576).toFixed(2),
     emptyTextPages: emptyText,
-    ok: pages.length === expectedPages && sizes.length === 1 && sizes[0] === "1280x720" && !emptyText.length && bytes < 15 * 1048576,
+    ok:
+      pages.length === expectedPages &&
+      sizes.length === 1 &&
+      sizes[0] === "1280x720" &&
+      !emptyText.length &&
+      bytes < 15 * 1048576,
   };
 }
 
@@ -177,7 +235,9 @@ export function writeReadme(deck, outDir, result) {
     "",
     "| # | Slide | Facts used (status) |",
     "| - | ----- | ------------------- |",
-    ...deck.slides.map((s, i) => `| ${i + 1} | ${s.title} | ${s.uses.join("; ")} |`),
+    ...deck.slides.map(
+      (s, i) => `| ${i + 1} | ${s.title} | ${s.uses.join("; ")} |`,
+    ),
     "",
     "## Left out on purpose",
     "",

@@ -10,12 +10,19 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { REPO, esc, st } from "../lib.mjs";
 
-const ICON = readFileSync(join(REPO, "apps/web/app/icon.svg"), "utf8").replace("<svg ", '<svg aria-hidden="true" ');
-const WM_SRC = readFileSync(join(REPO, "apps/web/src/features/splash/capital-wordmark.tsx"), "utf8");
+const ICON = readFileSync(join(REPO, "apps/web/app/icon.svg"), "utf8").replace(
+  "<svg ",
+  '<svg aria-hidden="true" ',
+);
+const WM_SRC = readFileSync(
+  join(REPO, "apps/web/src/features/splash/capital-wordmark.tsx"),
+  "utf8",
+);
 const WM_D = WM_SRC.match(/<path d="([^"]+)"/)[1];
 const WORDMARK = (h, color) =>
   `<svg aria-hidden="true" viewBox="-35 40 3057 1050" style="height:${h}px;width:auto;fill:${color}"><path d="${WM_D}"/></svg>`;
-const QMARK = (size) => `<span class="qmark" style="font-size:${size}px">Q</span>`;
+const QMARK = (size) =>
+  `<span class="qmark" style="font-size:${size}px">Q</span>`;
 
 const css = `
 :root{--cv:#FBFAF7;--sf:#FEFDFC;--sb:#F4F3F0;--ss:#E8E6E1;--tp:#101419;--t2:#4C5057;--t3:#686C72;--bd:#CED1D6;--bs:#DFE1E5;--ac:#1767D1;--acs:#DDECFF;--ps:#0D773A;--wn:#975D00;--dg:#D02C2A;--stage:#0B0F18;--sacc:#77B2FF;--gold:#C9A227}
@@ -100,8 +107,13 @@ const slides = [
   {
     id: "title",
     title: "Thesis — evidence before opinion in private capital",
-    uses: ["category line (SELF_REPORTED, Product Specification)", "public page and publisher (VERIFIED_PUBLIC, fdncapitalpartners.com/capitalq/)", "cofounders (OWNER_PROVIDED)", "brand marks from repository (owner assets)"],
-    html: (ctx) => `
+    uses: [
+      "category line (SELF_REPORTED, Product Specification)",
+      "public page and publisher (VERIFIED_PUBLIC, fdncapitalpartners.com/capitalq/)",
+      "cofounders (OWNER_PROVIDED)",
+      "brand marks from repository (owner assets)",
+    ],
+    html: () => `
       <div class="top">${ICON}${WORDMARK(34, "#EFEEEB")} <span class="qmark" style="font-size:24px;border-color:var(--sacc);color:var(--sacc)">Q</span></div>
       <h1>Private capital runs on <em>information asymmetry.</em> Capital Q is built to reduce it — with evidence, not opinion.</h1>
       <div class="sub">An AI-native Investment Intelligence Operating System for private capital: founders become more investable, investors find and evaluate relevant opportunities, and both manage one shared relationship — with one institutional analyst, Q, throughout.</div>
@@ -111,7 +123,11 @@ const slides = [
   {
     id: "problem",
     title: "Problem — information asymmetry on both sides of the table",
-    uses: ["Product Specification Ch.1 §3.1 proposition (SELF_REPORTED)", "marketing line 'months … minutes' (SELF_REPORTED, FDN page)", "GateQ inbound layer (SELF_REPORTED, GateQ spec)"],
+    uses: [
+      "Product Specification Ch.1 §3.1 proposition (SELF_REPORTED)",
+      "marketing line 'months … minutes' (SELF_REPORTED, FDN page)",
+      "GateQ inbound layer (SELF_REPORTED, GateQ spec)",
+    ],
     html: memo(
       "01",
       "Problem",
@@ -131,7 +147,11 @@ const slides = [
   {
     id: "solution",
     title: "Solution — one Q, one canonical relationship, human authority",
-    uses: ["one Q, intelligence vs commercial authority (SELF_REPORTED, Final System Review §2)", "Prepare→Recommend→Approve→Execute (repo architecture)", "canonical relationship (research §8)"],
+    uses: [
+      "one Q, intelligence vs commercial authority (SELF_REPORTED, Final System Review §2)",
+      "Prepare→Recommend→Approve→Execute (repo architecture)",
+      "canonical relationship (research §8)",
+    ],
     html: memo(
       "02",
       "Solution",
@@ -152,7 +172,10 @@ const slides = [
   {
     id: "product",
     title: "Working product & capabilities — by engineering evidence stage",
-    uses: ["feature table with evidence stages CODE OBSERVED / DEPLOYED / LIVE VERIFIED / NOT VERIFIED (research §8)", "fictional demo accounts flagged"],
+    uses: [
+      "feature table with evidence stages CODE OBSERVED / DEPLOYED / LIVE VERIFIED / NOT VERIFIED (research §8)",
+      "fictional demo accounts flagged",
+    ],
     html: wide(
       "03",
       "Working product",
@@ -172,8 +195,14 @@ const slides = [
   },
   {
     id: "scores",
-    title: "Scores that refuse to guess — Investability, Suitability, Unicorn Potential",
-    uses: ["InvestIQ nine dimensions, Investability = InvestIQ×25 (ADR 0068/0074)", "Suitability, fit-order.v2 0.75/0.25 (ADR 0074/0059)", "Unicorn Potential 0 of 461 numeric (ADR 0076, STATE.md)", "InvestIQ owned by FDN (OWNER_PROVIDED)"],
+    title:
+      "Scores that refuse to guess — Investability, Suitability, Unicorn Potential",
+    uses: [
+      "InvestIQ nine dimensions, Investability = InvestIQ×25 (ADR 0068/0074)",
+      "Suitability, fit-order.v2 0.75/0.25 (ADR 0074/0059)",
+      "Unicorn Potential 0 of 461 numeric (ADR 0076, STATE.md)",
+      "InvestIQ owned by FDN (OWNER_PROVIDED)",
+    ],
     html: memo(
       "04",
       "Assessment",
@@ -196,7 +225,12 @@ const slides = [
   {
     id: "trust",
     title: "Trust architecture — why investors and founders can both use it",
-    uses: ["Context Firewall release-blocking invariant (Final System Review Finding 2)", "no pay-to-rank (OWNER_PROVIDED, ADR 0034)", "deterministic ranking (repo)", "EU data residency (ADR 0014)"],
+    uses: [
+      "Context Firewall release-blocking invariant (Final System Review Finding 2)",
+      "no pay-to-rank (OWNER_PROVIDED, ADR 0034)",
+      "deterministic ranking (repo)",
+      "EU data residency (ADR 0014)",
+    ],
     html: memo(
       "05",
       "Trust",
@@ -218,7 +252,12 @@ const slides = [
   {
     id: "market",
     title: "Market context — private markets and the Africa–GCC corridor",
-    uses: ["BlackRock ~US$13T AUM late 2024, >US$20T 2030 (VERIFIED_PUBLIC, BusinessWire)", "Preqin PE ~US$6.7T (VERIFIED_PUBLIC, UK Parliament evidence)", "AVCA US$3.9bn/506; Partech US$4.1bn/570; Big Deal US$2.2bn equity (VERIFIED_PUBLIC)", "Deloitte 86% GenAI adoption (VERIFIED_PUBLIC)"],
+    uses: [
+      "BlackRock ~US$13T AUM late 2024, >US$20T 2030 (VERIFIED_PUBLIC, BusinessWire)",
+      "Preqin PE ~US$6.7T (VERIFIED_PUBLIC, UK Parliament evidence)",
+      "AVCA US$3.9bn/506; Partech US$4.1bn/570; Big Deal US$2.2bn equity (VERIFIED_PUBLIC)",
+      "Deloitte 86% GenAI adoption (VERIFIED_PUBLIC)",
+    ],
     html: wide(
       "06",
       "Market context",
@@ -235,7 +274,10 @@ const slides = [
   {
     id: "sizing",
     title: "Opportunity sizing — TAM / SAM / SOM (Assumption)",
-    uses: ["US$13T AUM base (VERIFIED_PUBLIC)", "all rates, counts and prices (ASSUMPTION, research §13)"],
+    uses: [
+      "US$13T AUM base (VERIFIED_PUBLIC)",
+      "all rates, counts and prices (ASSUMPTION, research §13)",
+    ],
     html: memo(
       "07",
       "Sizing",
@@ -256,8 +298,14 @@ const slides = [
   },
   {
     id: "model",
-    title: "Business model — free diagnosis, Pro intelligence, optional human execution",
-    uses: ["PADL #85 three-layer model (OWNER_PROVIDED)", "ADR 0034 billing PROPOSED; gated features", "no prices (UNKNOWN)", "revenue (UNKNOWN)"],
+    title:
+      "Business model — free diagnosis, Pro intelligence, optional human execution",
+    uses: [
+      "PADL #85 three-layer model (OWNER_PROVIDED)",
+      "ADR 0034 billing PROPOSED; gated features",
+      "no prices (UNKNOWN)",
+      "revenue (UNKNOWN)",
+    ],
     html: memo(
       "08",
       "Business model",
@@ -279,7 +327,12 @@ const slides = [
   {
     id: "segments",
     title: "Segments & distribution",
-    uses: ["target users (research §6, §9)", "Join the Waitlist / Book a Demo (SELF_REPORTED, FDN page)", "FDN offices Doha and Lagos (SELF_REPORTED)", "Qatar demo entities are not partnerships"],
+    uses: [
+      "target users (research §6, §9)",
+      "Join the Waitlist / Book a Demo (SELF_REPORTED, FDN page)",
+      "FDN offices Doha and Lagos (SELF_REPORTED)",
+      "Qatar demo entities are not partnerships",
+    ],
     html: memo(
       "09",
       "Segments & distribution",
@@ -301,7 +354,10 @@ const slides = [
   {
     id: "competition",
     title: "Competition — named, by job to be done",
-    uses: ["competitor list (research §12, illustrative)", "claimed differentiation (SELF_REPORTED, locked sources)"],
+    uses: [
+      "competitor list (research §12, illustrative)",
+      "claimed differentiation (SELF_REPORTED, locked sources)",
+    ],
     html: wide(
       "10",
       "Competition",
@@ -319,7 +375,11 @@ const slides = [
   {
     id: "moat",
     title: "Defensibility — what compounds",
-    uses: ["differentiation (SELF_REPORTED)", "data-partner and pilot options (ASSUMPTION, research §16)", "marketplace dynamics risk (research §15)"],
+    uses: [
+      "differentiation (SELF_REPORTED)",
+      "data-partner and pilot options (ASSUMPTION, research §16)",
+      "marketplace dynamics risk (research §15)",
+    ],
     html: memo(
       "11",
       "Defensibility",
@@ -341,7 +401,11 @@ const slides = [
   {
     id: "traction",
     title: "Traction & proof points — what is evidenced, and what is not",
-    uses: ["live-verified journeys with fictional accounts (repo handoff)", "43 access grants are not revenue (STATE.md)", "paying customers, revenue, waitlist, LOIs (UNKNOWN)"],
+    uses: [
+      "live-verified journeys with fictional accounts (repo handoff)",
+      "43 access grants are not revenue (STATE.md)",
+      "paying customers, revenue, waitlist, LOIs (UNKNOWN)",
+    ],
     html: memo(
       "12",
       "Traction",
@@ -368,7 +432,11 @@ const slides = [
   {
     id: "planning",
     title: "Planning assumptions — not actual results",
-    uses: ["US$6,000/yr per investor org, US$600/yr Pro, 5% conversion (ASSUMPTION, research §13)", "scenario arithmetic (ASSUMPTION)", "unit costs (UNKNOWN, research §14)"],
+    uses: [
+      "US$6,000/yr per investor org, US$600/yr Pro, 5% conversion (ASSUMPTION, research §13)",
+      "scenario arithmetic (ASSUMPTION)",
+      "unit costs (UNKNOWN, research §14)",
+    ],
     html: memo(
       "13",
       "Planning assumptions",
@@ -392,7 +460,11 @@ const slides = [
   {
     id: "roadmap",
     title: "Roadmap & scalability",
-    uses: ["repository roadmap items (research §16)", "analyst options (ASSUMPTION)", "capital intensity (research §14)"],
+    uses: [
+      "repository roadmap items (research §16)",
+      "analyst options (ASSUMPTION)",
+      "capital intensity (research §14)",
+    ],
     html: memo(
       "14",
       "Roadmap",
@@ -419,7 +491,11 @@ const slides = [
   {
     id: "team",
     title: "Team & founders",
-    uses: ["cofounders Zino Mario and David Nwankwo (OWNER_PROVIDED)", "FDN team page roles (SELF_REPORTED)", "Fortune Nwankwo role in Capital Q (UNKNOWN)"],
+    uses: [
+      "cofounders Zino Mario and David Nwankwo (OWNER_PROVIDED)",
+      "FDN team page roles (SELF_REPORTED)",
+      "Fortune Nwankwo role in Capital Q (UNKNOWN)",
+    ],
     html: memo(
       "15",
       "Team",
@@ -444,7 +520,10 @@ const slides = [
   {
     id: "risks",
     title: "Key risks & mitigations (incl. regulatory)",
-    uses: ["risks 1-7 (research §15)", "mitigations (ASSUMPTION; PADL #74 human advisory)"],
+    uses: [
+      "risks 1-7 (research §15)",
+      "mitigations (ASSUMPTION; PADL #74 human advisory)",
+    ],
     html: wide(
       "16",
       "Risks",
@@ -463,7 +542,10 @@ const slides = [
   {
     id: "funding",
     title: "Funding: to be confirmed by the founders",
-    uses: ["funding, round, valuation (UNKNOWN)", "legal entity and FDN relationship (UNKNOWN)"],
+    uses: [
+      "funding, round, valuation (UNKNOWN)",
+      "legal entity and FDN relationship (UNKNOWN)",
+    ],
     html: memo(
       "17",
       "Funding",
@@ -514,7 +596,9 @@ const slides = [
     id: "sources",
     title: "Sources & evidence status",
     uses: ["all sources and fetch dates (facts.json)"],
-    html: (ctx) => `${head("§19 Sources")}<div class="body" style="width:auto;right:64px"><div class="sec">§19 — Sources & evidence status</div>
+    html: (
+      ctx,
+    ) => `${head("§19 Sources")}<div class="body" style="width:auto;right:64px"><div class="sec">§19 — Sources & evidence status</div>
       <div class="g2" style="grid-template-columns:1.55fr 1fr;gap:32px">
        <table class="t" style="font-size:11.5px">
         <tr><th>Source (web fetched 2026-10-18 UTC; repo at build/int-rc cb7b20969)</th><th>Status</th></tr>
@@ -559,7 +643,7 @@ export default {
       "Capital Q's own light-first tokens (canvas #FBFAF7, text #101419, accent #1767D1, borders #CED1D6), with the stage canvas #0B0F18 only on the title. Narrative device: an investment memorandum — numbered § sections, editorial serif headlines, and a right-hand evidence margin on each slide that cites the repository or public source and its status. Engineering claims carry evidence stages (code observed / deployed / live verified / not verified) as in the research.",
     brand: [
       "Colours from `brand.json` (packages/ui/src/tokens/tokens.css, hex approximations of OKLCH). UI font is the `--cq-font-ui` system stack (renders as Liberation Sans offline); editorial serif is `--cq-font-editorial` Georgia with Lora (OFL) as the offline stand-in; Geist Mono is the app's local mono.",
-      "Official owner marks from the repository: `apps/web/app/icon.svg` (gold Q icon) and the outlined \"Capital\" wordmark path from `apps/web/src/features/splash/capital-wordmark.tsx`, read at build time. The Q mark is the word-mark in an accent frame, never a sparkle or orb.",
+      'Official owner marks from the repository: `apps/web/app/icon.svg` (gold Q icon) and the outlined "Capital" wordmark path from `apps/web/src/features/splash/capital-wordmark.tsx`, read at build time. The Q mark is the word-mark in an accent frame, never a sparkle or orb.',
       "No FDN-hosted landing imagery (needs FDN permission). No product screenshots.",
     ],
     omitted: [

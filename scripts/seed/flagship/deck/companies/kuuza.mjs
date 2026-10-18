@@ -84,14 +84,15 @@ const full = (label, title, body) => (ctx) =>
 const slides = [
   {
     id: "title",
-    title: "Thesis — conversation practice for the calls the rest of the world makes",
+    title:
+      "Thesis — conversation practice for the calls the rest of the world makes",
     uses: [
       "proposition (SELF_REPORTED, kuuza.ai)",
       "taglines (SELF_REPORTED)",
       "operating base Lagos (ASSUMPTION)",
       "founders (OWNER_PROVIDED)",
     ],
-    html: (ctx) => `
+    html: () => `
       <div class="top"><div class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><div class="wm">KUUZA <b>AI</b></div></div>
       <h1>Rehearse the hard conversation <span>before</span> it costs you the deal.</h1>
       <div class="sub">KUUZA AI describes itself as “the Global AI Simulator and Coach for Sales, Service and All Human Communication”: voice, video and text roleplay with AI personas, scored instantly. The thesis: accent, culture and noisy-line realism for Africa, the Middle East and Asia is a wedge the funded Western tools do not target.</div>
@@ -123,7 +124,11 @@ const slides = [
   {
     id: "solution",
     title: "Solution — pick a scenario, talk to a persona, get scored",
-    uses: ["how it works (SELF_REPORTED, kuuza.ai home)", "persona moods polite→hostile (SELF_REPORTED, /features)", "scoring dimensions (SELF_REPORTED)"],
+    uses: [
+      "how it works (SELF_REPORTED, kuuza.ai home)",
+      "persona moods polite→hostile (SELF_REPORTED, /features)",
+      "scoring dimensions (SELF_REPORTED)",
+    ],
     html: call(
       "What does KUUZA actually do?",
       "the solution",
@@ -162,7 +167,12 @@ const slides = [
   {
     id: "edge",
     title: "The claimed edge — culture, accent and noisy-line realism",
-    uses: ["Cultural & Contextual Intelligence claim (SELF_REPORTED)", "noisy-channel audio (SELF_REPORTED)", "name etymology (VERIFIED_PUBLIC, Wiktionary)", "evidence gap (ASSUMPTION)"],
+    uses: [
+      "Cultural & Contextual Intelligence claim (SELF_REPORTED)",
+      "noisy-channel audio (SELF_REPORTED)",
+      "name etymology (VERIFIED_PUBLIC, Wiktionary)",
+      "evidence gap (ASSUMPTION)",
+    ],
     html: full(
       "why kuuza, why here",
       `Most practice tools rehearse a quiet call in a Western office. KUUZA says it rehearses the call people actually get.`,
@@ -196,7 +206,11 @@ const slides = [
   {
     id: "sizing",
     title: "Opportunity sizing — TAM / SAM / SOM (Assumption)",
-    uses: ["$394.5B and $208.2B base figures (VERIFIED_PUBLIC)", "every percentage (ASSUMPTION, research.md §18)", "B2C excluded (UNKNOWN monetisation)"],
+    uses: [
+      "$394.5B and $208.2B base figures (VERIFIED_PUBLIC)",
+      "every percentage (ASSUMPTION, research.md §18)",
+      "B2C excluded (UNKNOWN monetisation)",
+    ],
     html: full(
       "opportunity sizing · assumption arithmetic",
       `TAM ≈ $3.9B · SAM ≈ $167M · SOM ≈ $1.7M ARR<span style="display:block;font-size:20px;font-weight:500;color:var(--mu);margin-top:10px">Every line below is an Assumption. Only the two base spend figures are sourced.</span>`,
@@ -212,7 +226,12 @@ const slides = [
   {
     id: "model",
     title: "Business model — free demo funnel into custom enterprise plans",
-    uses: ["Free Demo (SELF_REPORTED, /pricing)", "Custom plan, no published price (SELF_REPORTED)", "enterprise contract model (ASSUMPTION)", "B2C monetisation (UNKNOWN)"],
+    uses: [
+      "Free Demo (SELF_REPORTED, /pricing)",
+      "Custom plan, no published price (SELF_REPORTED)",
+      "enterprise contract model (ASSUMPTION)",
+      "B2C monetisation (UNKNOWN)",
+    ],
     html: call(
       "How does KUUZA make money?",
       "business model",
@@ -229,7 +248,11 @@ const slides = [
   {
     id: "segments",
     title: "Segments & distribution",
-    uses: ["segments and industries named (SELF_REPORTED)", "published channels (SELF_REPORTED)", "founder-led enterprise motion (ASSUMPTION)"],
+    uses: [
+      "segments and industries named (SELF_REPORTED)",
+      "published channels (SELF_REPORTED)",
+      "founder-led enterprise motion (ASSUMPTION)",
+    ],
     html: call(
       "Who buys, and how do you reach them?",
       "segments & distribution",
@@ -251,7 +274,10 @@ const slides = [
   {
     id: "competition",
     title: "Competition — named, funded, mostly North American",
-    uses: ["competitor table (VERIFIED_PUBLIC third-party reports, research.md §12)", "Yoodli funding not verified (UNKNOWN)"],
+    uses: [
+      "competitor table (VERIFIED_PUBLIC third-party reports, research.md §12)",
+      "Yoodli funding not verified (UNKNOWN)",
+    ],
     html: full(
       "competition",
       `The category is real and funded. KUUZA must win where the leaders are not looking.`,
@@ -270,7 +296,10 @@ const slides = [
   {
     id: "defensibility",
     title: "Defensibility — the wedge and what must be proven",
-    uses: ["wedge: accent/culture/noisy-channel + price fit (ASSUMPTION, research.md §12)", "evidence gaps (UNKNOWN)"],
+    uses: [
+      "wedge: accent/culture/noisy-channel + price fit (ASSUMPTION, research.md §12)",
+      "evidence gaps (UNKNOWN)",
+    ],
     html: call(
       "Why can’t Second Nature just add accents?",
       "defensibility",
@@ -285,10 +314,11 @@ const slides = [
   },
   {
     id: "traction",
-    title: "Traction & proof points — published testimonials, with related-party flags",
+    title:
+      "Traction & proof points — published testimonials, with related-party flags",
     uses: [
       "testimonials on /success-stories (SELF_REPORTED, labelled Published testimonial)",
-      "related-party relationships (VERIFIED from founder site / research.md §15)",
+      "related-party relationships (SELF_REPORTED on zinomario.com; research.md §15)",
       "customer count, revenue, retention (UNKNOWN)",
     ],
     html: full(
@@ -317,7 +347,11 @@ const slides = [
   {
     id: "planning",
     title: "Planning assumptions — not actual results",
-    uses: ["seat-price model 50 seats × $30/month (ASSUMPTION, research.md §18)", "account scenarios (ASSUMPTION arithmetic)", "unit cost per simulated minute (UNKNOWN)"],
+    uses: [
+      "seat-price model 50 seats × $30/month (ASSUMPTION, research.md §18)",
+      "account scenarios (ASSUMPTION arithmetic)",
+      "unit cost per simulated minute (UNKNOWN)",
+    ],
     html: full(
       "planning assumptions — not actual results",
       `Planning assumptions — not actual results`,
@@ -347,7 +381,11 @@ const slides = [
   {
     id: "roadmap",
     title: "Roadmap & scalability",
-    uses: ["'Building towards immersive Virtual Reality' (SELF_REPORTED, zinomario.com)", "Custom plan items (SELF_REPORTED)", "diligence-readiness steps (ASSUMPTION, from research gaps)"],
+    uses: [
+      "'Building towards immersive Virtual Reality' (SELF_REPORTED, zinomario.com)",
+      "Custom plan items (SELF_REPORTED)",
+      "diligence-readiness steps (ASSUMPTION, from research gaps)",
+    ],
     html: call(
       "Where does this go, and does it scale?",
       "roadmap & scalability",
@@ -405,7 +443,10 @@ const slides = [
   {
     id: "risks",
     title: "Key risks & mitigations (incl. regulatory)",
-    uses: ["risks 1-8 and regulatory items (research.md §16-17)", "mitigations (ASSUMPTION)"],
+    uses: [
+      "risks 1-8 and regulatory items (research.md §16-17)",
+      "mitigations (ASSUMPTION)",
+    ],
     html: full(
       "key risks & mitigations",
       `The risks are known and nameable. Most are fixable with documents.`,
@@ -423,7 +464,10 @@ const slides = [
   {
     id: "funding",
     title: "Funding: to be confirmed by the founders",
-    uses: ["funding raised (UNKNOWN — not zero)", "cap table, entity, price list (UNKNOWN)"],
+    uses: [
+      "funding raised (UNKNOWN — not zero)",
+      "cap table, entity, price list (UNKNOWN)",
+    ],
     html: call(
       "How much are you raising, and for what?",
       "funding",
@@ -441,7 +485,10 @@ const slides = [
   {
     id: "next",
     title: "Investment opportunity & next steps",
-    uses: ["thesis summary (SELF_REPORTED + ASSUMPTION)", "open questions 1-11 (research.md §19)"],
+    uses: [
+      "thesis summary (SELF_REPORTED + ASSUMPTION)",
+      "open questions 1-11 (research.md §19)",
+    ],
     html: full(
       "investment opportunity & next steps",
       `An early bet on conversation practice built outside the Western default — if the evidence lands.`,
@@ -466,7 +513,9 @@ const slides = [
     id: "sources",
     title: "Sources & evidence status",
     uses: ["all source URLs and fetch dates (facts.json)"],
-    html: (ctx) => `<div class="full" style="top:48px"><div class="who mono">sources & evidence status</div>
+    html: (
+      ctx,
+    ) => `<div class="full" style="top:48px"><div class="who mono">sources & evidence status</div>
       <h2 style="font-size:30px;margin-bottom:14px">Sources & evidence status</h2>
       <div class="grid2" style="grid-template-columns:1.5fr 1fr;gap:36px">
        <table class="t" style="font-size:11.5px">
