@@ -6,6 +6,8 @@ import {
   type UnicornSource,
 } from "@capital-q/contracts";
 import { useRef } from "react";
+import Link from "next/link";
+import { useGlobalQ } from "@/components/app-shell/global-q";
 
 import { useQControl } from "@/features/q/control/q-control";
 
@@ -77,10 +79,13 @@ function Source({ source }: { readonly source: UnicornSource }) {
 export function UnicornPotential({
   score,
   companyId,
+  audience = "INVESTOR",
 }: {
   readonly score: UnicornPotentialDto;
   readonly companyId: string;
+  readonly audience?: "FOUNDER" | "INVESTOR";
 }) {
+  const { askAbout } = useGlobalQ();
   const summaryRef = useRef<HTMLElement>(null);
   useQControl({
     id: "disclosure.unicorn-potential",
@@ -178,9 +183,65 @@ export function UnicornPotential({
                   </li>
                 ))}
                 {score.missing.map((gap) => (
-                  <li key={gap}>{gap}</li>
+                  <li key={gap} className="flex flex-col items-start gap-1">
+                    <span>{gap}</span>
+                    <button
+                      type="button"
+                      className="cq-caption min-h-11 text-start underline underline-offset-4"
+                      aria-label={`Ask Q about missing evidence: ${gap}`}
+                      onClick={() =>
+                        askAbout(
+                          `For company ${companyId}, explain this Unicorn Potential evidence gap: ${JSON.stringify(gap)}. What specific evidence would resolve it? Use only information I am authorized to see; distinguish missing evidence from poor performance. Do not send messages or change records.`,
+                        )
+                      }
+                    >
+                      Ask Q about this gap
+                    </button>
+                  </li>
                 ))}
               </ul>
+              {score.missing.length === 0 ? null : (
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  {audience === "FOUNDER" ? (
+                    <>
+                      <Link
+                        href="/documents?tab=mine"
+                        className="cq-caption min-h-11 py-3 underline underline-offset-4"
+                      >
+                        Add evidence in your documents
+                      </Link>
+                      <Link
+                        href="/profile"
+                        className="cq-caption min-h-11 py-3 underline underline-offset-4"
+                      >
+                        Update your company profile
+                      </Link>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="cq-caption min-h-11 text-start underline underline-offset-4"
+                      onClick={() =>
+                        askAbout(
+                          `For company ${companyId}, prepare a draft evidence request covering these Unicorn Potential gaps: ${JSON.stringify(score.missing.slice(0, 3))}. Keep it courteous and specific. Prepare the text for my review only; do not contact anyone, send it or change records.`,
+                        )
+                      }
+                    >
+                      Draft an evidence request with Q
+                    </button>
+                  )}
+                  <p className="cq-caption text-(--cq-text-tertiary)">
+                    {audience === "INVESTOR"
+                      ? "Draft requests cover up to three priority gaps. "
+                      : ""}
+                    Q opens with a draft question for you to review. Nothing is
+                    sent automatically.
+                    {audience === "FOUNDER"
+                      ? " Use your document controls to choose what to share; private uploads do not automatically become investor-visible."
+                      : ""}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

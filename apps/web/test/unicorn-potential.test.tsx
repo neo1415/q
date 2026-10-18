@@ -6,13 +6,16 @@ import {
   screen,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   UNICORN_PILLAR_IDS,
   UNICORN_POTENTIAL_CAVEAT,
   type UnicornPotentialDto,
 } from "@capital-q/contracts";
+
+const q = vi.hoisted(() => ({ askAbout: vi.fn(), askNow: vi.fn() }));
+vi.mock("@/components/app-shell/global-q", () => ({ useGlobalQ: () => q }));
 
 import {
   UnicornPotential,
@@ -75,10 +78,95 @@ const score: UnicornPotentialDto = {
 
 afterEach(() => {
   cleanup();
+  q.askAbout.mockClear();
+  q.askNow.mockClear();
   resetControls();
 });
 
 describe("Unicorn Potential progressive assessment", () => {
+  it("opens an exact evidence gap as a reviewable Q draft without sending", () => {
+    render(<UnicornPotential score={score} companyId="company-1" />);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Ask Q about missing evidence: Share dated retention cohorts",
+        hidden: true,
+      }),
+    );
+    expect(q.askAbout).toHaveBeenCalledTimes(1);
+    expect(q.askAbout.mock.calls[0]?.[0]).toContain("company-1");
+    expect(q.askAbout.mock.calls[0]?.[0]).toContain(
+      "Share dated retention cohorts",
+    );
+    expect(q.askAbout.mock.calls[0]?.[0]).toContain(
+      "Do not send messages or change records",
+    );
+    expect(q.askNow).not.toHaveBeenCalled();
+  });
+  it("prepares a request for human review through the existing Q draft composer", () => {
+    render(<UnicornPotential score={score} companyId="company-1" />);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Draft an evidence request with Q",
+        hidden: true,
+      }),
+    );
+    expect(q.askAbout.mock.calls[0]?.[0]).toContain(
+      "Share dated retention cohorts",
+    );
+    expect(q.askAbout.mock.calls[0]?.[0]).toContain("for my review only");
+    expect(q.askAbout.mock.calls[0]?.[0]).toContain("do not contact anyone");
+    expect(q.askNow).not.toHaveBeenCalled();
+  });
+  it("gives founders existing own-document and profile flows instead of an investor request", () => {
+    render(
+      <UnicornPotential
+        score={score}
+        companyId="company-1"
+        audience="FOUNDER"
+      />,
+    );
+    expect(
+      screen
+        .getByRole("link", {
+          name: "Add evidence in your documents",
+          hidden: true,
+        })
+        .getAttribute("href"),
+    ).toBe("/documents?tab=mine");
+    expect(
+      screen
+        .getByRole("link", {
+          name: "Update your company profile",
+          hidden: true,
+        })
+        .getAttribute("href"),
+    ).toBe("/profile");
+    expect(
+      screen.queryByRole("button", {
+        name: "Draft an evidence request with Q",
+        hidden: true,
+      }),
+    ).toBeNull();
+    expect(
+      screen.getByText(
+        /private uploads do not automatically become investor-visible/,
+      ),
+    ).toBeTruthy();
+  });
+  it("does not invent an evidence action when no gap is recorded", () => {
+    render(
+      <UnicornPotential
+        score={{ ...score, missing: [] }}
+        companyId="company-1"
+      />,
+    );
+    expect(
+      screen.queryByRole("button", {
+        name: "Draft an evidence request with Q",
+        hidden: true,
+      }),
+    ).toBeNull();
+  });
   it("keeps the summary calm and all twelve pillar calculations available on expansion", () => {
     render(<UnicornPotential score={score} companyId="company-1" />);
     const root = document.querySelector<HTMLDetailsElement>(

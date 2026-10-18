@@ -7,6 +7,10 @@ import {
   type FounderApplicationDto,
 } from "@capital-q/contracts";
 
+vi.mock("@/components/app-shell/global-q", () => ({
+  useGlobalQ: () => ({ askAbout: vi.fn() }),
+}));
+
 vi.mock("../src/features/gateq/page/gateq-actions", () => ({
   claimAction: vi.fn(),
   claimEvidenceCompleteAction: vi.fn(),
@@ -24,7 +28,10 @@ import { syntheticUnicornAssessment } from "./fixtures/unicorn-potential";
 
 const value = {
   companyId: "00000000-0000-4000-8000-000000000001",
-  assessment: syntheticUnicornAssessment,
+  assessment: {
+    ...syntheticUnicornAssessment,
+    missing: ["Share dated retention cohorts"],
+  },
 };
 const application: FounderApplicationDto = {
   applicationId: "00000000-0000-4000-8000-000000000002",
@@ -81,5 +88,19 @@ describe("GateQ current company assessment", () => {
     );
     expect(screen.getAllByTestId("gateq-unicorn-assessment")).toHaveLength(1);
     expect(screen.getByText("Second synthetic investor")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("link", {
+          name: "Add evidence in your documents",
+          hidden: true,
+        })
+        .getAttribute("href"),
+    ).toBe("/documents?tab=mine");
+    expect(
+      screen.queryByRole("button", {
+        name: "Draft an evidence request with Q",
+        hidden: true,
+      }),
+    ).toBeNull();
   });
 });
