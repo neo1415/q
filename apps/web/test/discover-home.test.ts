@@ -50,6 +50,8 @@ describe("Discover is where the product starts", () => {
     expect(PRIMARY_NAVIGATION[0]?.href).toBe("/discover");
     expect(MOBILE_NAVIGATION[0]?.href).toBe("/discover");
     expect(MOBILE_NAVIGATION[2]?.href).toBe("/home");
-    expect(MOBILE_NAVIGATION).toHaveLength(4);
+    // Work replaced More in the bar (option B, owner 2026-10-18).
+    expect(MOBILE_NAVIGATION).toHaveLength(5);
+    expect(MOBILE_NAVIGATION[4]?.href).toBe("/work");
   });
 });

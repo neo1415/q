@@ -38,8 +38,12 @@ test.describe("mobile application shell", () => {
 
     const nav = page.getByRole("navigation", { name: "Primary" });
     await expect(nav).toBeVisible();
-    await expect(nav.getByRole("link")).toHaveCount(4);
-    await expect(nav.getByRole("button", { name: "More" })).toBeVisible();
+    await expect(nav.getByRole("link")).toHaveCount(5);
+    // Work replaced More (option B, 2026-10-18); You is in the header.
+    await expect(nav.getByRole("link", { name: "Work" })).toBeVisible();
+    await expect(
+      page.getByRole("banner").getByRole("button", { name: "You" }),
+    ).toBeVisible();
     await expect(nav.getByRole("link", { name: "Discover" })).toHaveAttribute(
       "aria-current",
       "page",
@@ -86,7 +90,10 @@ test.describe("mobile application shell", () => {
       expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
       expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
     }
-    const more = await nav.getByRole("button", { name: "More" }).boundingBox();
+    const more = await page
+      .getByRole("banner")
+      .getByRole("button", { name: "You" })
+      .boundingBox();
     expect(more?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(more?.width ?? 0).toBeGreaterThanOrEqual(44);
 
@@ -124,9 +131,9 @@ test.describe("mobile application shell", () => {
     ).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
-    await nav.getByRole("button", { name: "More" }).tap();
+    await page.getByRole("banner").getByRole("button", { name: "You" }).tap();
     await page
-      .getByRole("navigation", { name: "More sections" })
+      .getByRole("navigation", { name: "Your sections" })
       .getByRole("link", { name: "Profile" })
       .tap();
     await expect(page).toHaveURL(/\/profile$/);

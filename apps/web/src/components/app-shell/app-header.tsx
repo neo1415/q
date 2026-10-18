@@ -4,19 +4,30 @@ import Link from "next/link";
 
 import { ContextIndicator } from "@capital-q/ui/context-indicator";
 
-import { ThemeMenu } from "@/features/appearance/theme-menu";
 import { NotificationCenter } from "@/features/work/notification-center";
 
+import type { VerifyNudge } from "@/features/verification/verify-state";
+
 import type { ShellContext } from "./app-shell";
+import { YouSheet } from "./mobile-navigation";
 import { useT } from "@/features/i18n/language";
 
 /**
  * Compact mobile top bar: wordmark, the current context (the scope, never
- * inside the input), notices and the theme as one icon. Every other
- * section, Profile and Settings included, is under the More tab. Q is the floating dock on a phone
+ * inside the input), notices, and You. You opens Profile, Usage, Settings,
+ * Admin, who they act for, the theme (worded) and sign out: what the More
+ * tab held before Work replaced it in the bar (owner-approved option B,
+ * 2026-10-18; the theme left the header so a 360 px phone still fits the
+ * wordmark, context, bell and You). Q is the floating dock on a phone
  * (ADR 0017 F1), not a header button. Hidden on desktop.
  */
-export function AppHeader({ context }: { readonly context: ShellContext }) {
+export function AppHeader({
+  context,
+  verifyNudge = null,
+}: {
+  readonly context: ShellContext;
+  readonly verifyNudge?: VerifyNudge | null | undefined;
+}) {
   const t = useT();
   return (
     <header className="cq-shell-header">
@@ -35,7 +46,13 @@ export function AppHeader({ context }: { readonly context: ShellContext }) {
             compact
           />
           <NotificationCenter />
-          <ThemeMenu align="end" />
+          <YouSheet
+            scope={context.scope}
+            admin={context.admin === true}
+            qPitch={context.qPitch === true}
+            organisations={context.organisations ?? []}
+            verifyNudge={verifyNudge}
+          />
         </div>
       </div>
     </header>

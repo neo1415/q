@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 import { cx } from "@capital-q/ui";
 import { ArrowUpRight, ICON_SIZE } from "@capital-q/ui/icons";
@@ -17,6 +17,44 @@ import {
   type HubView,
 } from "./hub-view";
 import { useT } from "@/features/i18n/language";
+
+/**
+ * One tab strip for every workspace that has tabs (the CRM, Work): a
+ * bottom-ruled row that scrolls sideways on a phone, bleeding to the
+ * gutter, with no visible scrollbar and no page-level sideways scroll.
+ */
+export const TAB_STRIP_CLASS =
+  "relative -mx-4 flex items-stretch gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden";
+
+/** A tab in that strip: 44 px tall, the open one ruled and bold. */
+export function tabClass(open: boolean): string {
+  return cx(
+    "cq-body-sm relative -mb-px inline-flex min-h-11 flex-none items-center gap-1.5 border-b-2 px-3 whitespace-nowrap transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
+    open
+      ? "border-(--cq-accent) font-semibold text-(--cq-text-primary)"
+      : "border-transparent font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
+  );
+}
+
+/** Keeps the open tab in view on a narrow, scrolling strip. */
+export function useOpenTabInView(
+  ref: RefObject<HTMLElement | null>,
+  key: string,
+): void {
+  useEffect(() => {
+    const strip = ref.current;
+    const open = strip?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (strip === null || open === null || open === undefined) return;
+    // Measured on screen, so it holds right to left (Arabic) as well:
+    // a relative scrollLeft step moves the same way in both directions.
+    const box = open.getBoundingClientRect();
+    const frame = strip.getBoundingClientRect();
+    if (box.right > frame.right)
+      strip.scrollLeft += box.right - frame.right + 16;
+    else if (box.left < frame.left)
+      strip.scrollLeft -= frame.left - box.left + 16;
+  }, [ref, key]);
+}
 
 /**
  * The CRM workspace's own tabs. Links own the state, so refresh, back and
@@ -63,28 +101,10 @@ export function HubNavigation({
     },
   });
 
-  // Keep the open tab in view on a narrow, scrolling strip.
-  useEffect(() => {
-    const strip = ref.current;
-    const open = strip?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (strip === null || strip === undefined || open === null) return;
-    if (open === undefined) return;
-    // Measured on screen, so it holds right to left (Arabic) as well:
-    // a relative scrollLeft step moves the same way in both directions.
-    const box = open.getBoundingClientRect();
-    const frame = strip.getBoundingClientRect();
-    if (box.right > frame.right)
-      strip.scrollLeft += box.right - frame.right + 16;
-    else if (box.left < frame.left)
-      strip.scrollLeft -= frame.left - box.left + 16;
-  }, [view]);
+  useOpenTabInView(ref, view);
 
   return (
-    <nav
-      ref={ref}
-      aria-label={t("CRM")}
-      className="relative -mx-4 flex items-stretch gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
-    >
+    <nav ref={ref} aria-label={t("CRM")} className={TAB_STRIP_CLASS}>
       <QPageState
         {...(view === "overview" ? { tab: "overview" as const } : {})}
         filters={{ view }}
@@ -99,12 +119,7 @@ export function HubNavigation({
             href={entry.href}
             data-hub-view={entry.view}
             aria-current={open ? "page" : undefined}
-            className={cx(
-              "cq-body-sm relative -mb-px inline-flex min-h-11 flex-none items-center border-b-2 px-3 whitespace-nowrap transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)",
-              open
-                ? "border-(--cq-accent) font-semibold text-(--cq-text-primary)"
-                : "border-transparent font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
-            )}
+            className={tabClass(open)}
           >
             {t(entry.label)}
             <LinkPending />

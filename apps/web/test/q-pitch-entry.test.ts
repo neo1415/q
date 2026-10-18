@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  moreSectionsFor,
+  youSectionsFor,
   navigationGroupsFor,
 } from "../src/components/app-shell/navigation";
 import { APP_ROUTE_PATTERNS } from "@/features/q/control/app-routes";
@@ -25,7 +25,7 @@ describe("Q Pitch out of the sidebar (owner, 17 Oct): Profile links it", () => {
     ] as const) {
       expect(hrefs(scope, true)).not.toContain("/q-pitch");
       expect(
-        moreSectionsFor(scope, { qPitch: true }).map((i) => i.href),
+        youSectionsFor(scope, { qPitch: true }).map((i) => i.href),
       ).not.toContain("/q-pitch");
     }
   });
