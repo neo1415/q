@@ -1,4 +1,8 @@
-import { structuredSignals, deckStructuredFact } from "./structured-facts.js";
+import {
+  structuredSignals,
+  deckStructuredFact,
+  confirmedNarrativeSignals,
+} from "./structured-facts.js";
 import type { UnicornPotentialDto } from "@capital-q/contracts";
 import {
   INVESTOR_ELIGIBLE_SCOPES,
@@ -183,7 +187,57 @@ export function observeUnicornPotential(
             `${inputs.deck.extractionId}:${section.section}:${String(index)}`
           )
             continue;
-          const mapped = deckStructuredFact(fact);
+          if (
+            fact.kind === "TEXT" &&
+            fact.value !== null &&
+            source.truthClass === "USER_CLAIM"
+          ) {
+            for (const signal of confirmedNarrativeSignals(
+              section.section,
+              fact.label,
+              fact.value,
+              inputs.deck.readAt,
+            )) {
+              const policy = UNICORN_PILLARS.find((p) => p.id === signal.pillar)
+                ?.criteria[signal.criterion === "A" ? 0 : 1];
+              if (policy === undefined) continue;
+              const captured = Date.parse(inputs.deck.readAt);
+              const stale =
+                !Number.isFinite(captured) ||
+                captured > now ||
+                now - captured > policy.freshnessDays * 86400000;
+              out.push({
+                pillar: signal.pillar,
+                criterion: signal.criterion,
+                grade: Math.min(3, signal.grade),
+                source: { ...source, at: inputs.deck.readAt },
+                reliability: stale ? quality * 0.5 : quality,
+                stale,
+                conflicted:
+                  source.lifecycleStatus === "DISPUTED" ||
+                  source.lifecycleStatus === "CONTRADICTORY",
+                rule: signal.rule,
+                inputMetadata: {
+                  captureDateOnly: true,
+                  section: section.section,
+                  originalFactAsOf: fact.asOf,
+                },
+              });
+            }
+          }
+          let mapped = deckStructuredFact(fact);
+          if (
+            mapped?.claimKey === "market.size" &&
+            mapped.structuredValue["asOf"] === null
+          ) {
+            mapped = {
+              ...mapped,
+              structuredValue: {
+                ...mapped.structuredValue,
+                asOf: inputs.deck.readAt.slice(0, 10),
+              },
+            };
+          }
           if (mapped !== null)
             claim = {
               id: source.id,

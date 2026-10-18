@@ -9,6 +9,14 @@ export type StructuredSignal = {
 };
 export function metricDate(value: unknown): string | null {
   if (typeof value !== "string") return null;
+  if (
+    /^(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+20\d\d$/iu.test(
+      value.trim(),
+    )
+  ) {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+  }
   const match = /^(20\d\d)-(0[1-9]|1[0-2])(?:-([0-2]\d|3[01]))?$/u.exec(value);
   if (match === null) return null;
   const date = `${match[1]}-${match[2]}-${match[3] ?? "01"}T00:00:00.000Z`;
@@ -173,6 +181,7 @@ const CURRENCIES = new Set([
   "JPY",
   "CNY",
   "SGD",
+  "VND",
   "BRL",
   "MXN",
 ]);
@@ -187,9 +196,24 @@ export function deckStructuredFact(fact: {
   readonly structuredValue: Readonly<Record<string, unknown>>;
 } | null {
   if (fact.kind !== "FIGURE" || fact.value === null) return null;
-  const key = DECK_KEYS[fact.label.trim().toLowerCase()];
+  const label = fact.label.trim().toLowerCase();
+  const key =
+    DECK_KEYS[label] ??
+    (/\b(?:arr|annual recurring revenue)\b/iu.test(label)
+      ? "financial.arr"
+      : /\b(?:mrr|monthly recurring revenue)\b/iu.test(label)
+        ? "financial.monthly_revenue"
+        : /\b(?:tam|sam|som|market size)\b/iu.test(label)
+          ? "market.size"
+          : undefined);
   if (key === undefined) return null;
   const text = fact.value.trim();
+  if (
+    /\b(forecast|projected|projection|target|planned)\b/iu.test(
+      `${label} ${text}`,
+    )
+  )
+    return null;
   if (
     key === "financial.nrr" ||
     key === "financial.gross_margin" ||
@@ -217,7 +241,7 @@ export function deckStructuredFact(fact: {
         };
   }
   const m =
-    /^(USD|EUR|GBP|NGN|KES|ZAR|\$)\s*(\d[\d,]*(?:\.\d+)?)\s*(k|m|million|billion|bn)?$/iu.exec(
+    /^(?:about\s+|approximately\s+|~\s*)?(USD|EUR|GBP|NGN|KES|ZAR|AUD|CAD|INR|VND|SGD|CHF|JPY|CNY|\$|£|€|₦|₹|₫)\s*(\d[\d,]*(?:\.\d+)?)\s*(k|m|million|billion|bn)?(?:\s+(?:annual revenue|ARR|MRR|run.rate))?$/iu.exec(
       text,
     );
   if (m === null) return null;
@@ -235,7 +259,15 @@ export function deckStructuredFact(fact: {
     structuredValue: {
       kind: "MONEY",
       amount: String(amount),
-      currency: m[1] === "$" ? "USD" : m[1]?.toUpperCase(),
+      currency:
+        {
+          $: "USD",
+          "£": "GBP",
+          "€": "EUR",
+          "₦": "NGN",
+          "₹": "INR",
+          "₫": "VND",
+        }[m[1] ?? ""] ?? m[1]?.toUpperCase(),
       asOf: fact.asOf,
     },
   };
@@ -253,3 +285,148 @@ const DECK_KEYS: Readonly<Record<string, string>> = {
   "contribution margin": "financial.contribution_margin",
   "market size": "market.size",
 };
+/** Current, confirmed narrative claims have a capture date, not an invented measurement period. */
+export function confirmedNarrativeSignals(
+  section: string,
+  label: string,
+  value: string,
+  recordedAt: string,
+): readonly StructuredSignal[] {
+  const text = `${label} ${value}`;
+  if (
+    /\b(forecast|projection|projected|target|hypothetical|could|would|not yet|no evidence)\b/iu.test(
+      text,
+    )
+  )
+    return [];
+  const out: StructuredSignal[] = [];
+  const emit = (
+    pillar: PillarId,
+    criterion: "A" | "B",
+    grade: number,
+    rule: string,
+  ) =>
+    out.push({
+      pillar,
+      criterion,
+      grade,
+      at: recordedAt,
+      rule: `confirmed-narrative.${section}.${rule}; evidence captured ${recordedAt}, not a metric measurement date`,
+    });
+  if (section === "FOUNDERS") {
+    if (
+      /\b(?:\d+\+?\s*years?|previously|former|experience|background|expertise)\b/iu.test(
+        text,
+      )
+    )
+      emit(
+        "P1",
+        "A",
+        2,
+        "specific_professional_experience_not_independently_validated_domain_fit",
+      );
+    if (
+      /\b(?:previously (?:built|founded|led|scaled)|founded and (?:sold|scaled)|shipped|delivered|successful exit)\b/iu.test(
+        text,
+      )
+    )
+      emit("P1", "B", 3, "affirmative_prior_delivery");
+  }
+  if (section === "MARKET") {
+    if (
+      /\b(?:expand|expansion|enter|launch).{0,70}\b(?:market|countr|region|geograph|adjacent)/iu.test(
+        text,
+      )
+    )
+      emit("P2", "B", 2, "specific_expansion_plan_not_execution");
+    if (
+      /\b(?:new regulation|regulatory change|regulatory reform|structural shift|growing demand|rising demand|adoption (?:is )?(?:growing|rising))\b/iu.test(
+        text,
+      )
+    )
+      emit(
+        "P10",
+        "A",
+        2,
+        "claimed_structural_tailwind_not_independent_verification",
+      );
+  }
+  if (section === "PROBLEM") {
+    if (
+      /\b(?:customers?|buyers?|businesses|merchants?|patients?|farmers?|companies|smes?|enterprises?)\b/iu.test(
+        text,
+      ) &&
+      /\b(?:manual|expensive|unreliable|fragmented|slow|costly|loss|lost|delay)\b/iu.test(
+        text,
+      )
+    )
+      emit("P3", "A", 2, "specific_customer_problem_claim_not_paid_validation");
+  }
+  if (section === "TRACTION" || section === "SOLUTION") {
+    if (
+      /\b(?:pilot|customer test).{0,60}\b(?:completed|successful|live|operational)\b/iu.test(
+        text,
+      ) &&
+      !/\b(?:retention|renewal|cohort|growth|percent|%)\b/iu.test(text)
+    )
+      emit("P3", "B", 2, "completed_stage_appropriate_pilot_claim");
+  }
+  if (section === "COMPETITION") {
+    if (
+      /\b(?:proprietary|patented|licensed|exclusive (?:data|license|technology)|network effect)\b/iu.test(
+        text,
+      )
+    )
+      emit("P6", "A", 2, "specific_claimed_differentiated_asset");
+    if (
+      /\b(?:unlike|compared (?:with|to)|whereas|alternatives?).{0,120}\b(?:integration|cost|price|speed|workflow|data|distribution|feature|support)\b/iu.test(
+        text,
+      )
+    )
+      emit("P6", "B", 2, "specific_comparative_claim_not_independent_test");
+  }
+  if (section === "GO_TO_MARKET") {
+    if (
+      /\b(?:direct sales|channel partners|partner distribution|enterprise sales|distribution agreement|sales agents|reseller|referral channel)\b/iu.test(
+        text,
+      )
+    )
+      emit(
+        "P7",
+        "A",
+        2,
+        "specified_acquisition_mechanism_not_proven_repeatability",
+      );
+    if (
+      /\b(?:word.of.mouth|referrals|organic acquisition|organic demand)\b/iu.test(
+        text,
+      )
+    )
+      emit(
+        "P7",
+        "B",
+        2,
+        "specific_organic_channel_claim_not_measured_efficiency",
+      );
+  }
+  if (section === "SOLUTION" || section === "GO_TO_MARKET") {
+    if (
+      /\b(?:deployed|operational|serving).{0,70}\b(?:multiple countries|multiple markets|across countries|across markets|multiple customers)\b/iu.test(
+        text,
+      )
+    )
+      emit("P11", "B", 2, "claimed_repeat_deployment");
+    if (
+      /\b(?:active partnership|executed partnership|signed (?:distribution|partnership)|partnership agreement)\b/iu.test(
+        text,
+      )
+    )
+      emit(
+        "P12",
+        "A",
+        2,
+        "specific_partner_agreement_claim_not_quality_inference",
+      );
+  }
+  return out;
+}

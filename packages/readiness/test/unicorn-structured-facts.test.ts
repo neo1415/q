@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 import type { DeckSection } from "@capital-q/contracts";
+import {
+  confirmedNarrativeSignals,
+  metricDate,
+  deckStructuredFact,
+} from "../src/unicorn-potential/structured-facts.js";
 import { assessUnicornPotential } from "../src/unicorn-potential/assess.js";
 import type { InvestabilityInputs } from "../src/investability/inputs.js";
 const NOW = "2026-10-17T12:00:00.000Z";
@@ -56,6 +61,94 @@ describe("canonical structured evidence mapping", () => {
       );
       expect(assessUnicornPotential(input, NOW).observations).toEqual([]);
     }
+  });
+  it("dates confirmed founder experience as evidence capture, never a measurement window", () => {
+    const facts = confirmedNarrativeSignals(
+      "FOUNDERS",
+      "Professional background",
+      "Previously worked for 12 years in industry",
+      NOW,
+    );
+    expect(facts).toHaveLength(1);
+    expect(facts[0]).toMatchObject({
+      pillar: "P1",
+      criterion: "A",
+      grade: 2,
+      at: NOW,
+    });
+    expect(facts[0]?.rule).toContain("not a metric measurement date");
+  });
+  it("does not infer founder quality or team complementarity from names and titles", () => {
+    expect(
+      confirmedNarrativeSignals(
+        "FOUNDERS",
+        "Founders",
+        "Person A CEO; Person B CTO",
+        NOW,
+      ),
+    ).toEqual([]);
+    expect(
+      confirmedNarrativeSignals("TEAM", "Team", "CEO CTO COO", NOW),
+    ).toEqual([]);
+  });
+  it("does not use capture time for growth, unit economics, cash or timed delivery", () => {
+    for (const section of [
+      "TRACTION",
+      "FINANCIALS",
+      "BUSINESS_MODEL",
+      "THE_ASK",
+      "TEAM",
+    ]) {
+      expect(
+        confirmedNarrativeSignals(
+          section,
+          "Growth and cash metrics",
+          "Revenue grew 50%, current runway 18 months, 70% margin and milestones delivered on time",
+          NOW,
+        ),
+      ).toEqual([]);
+    }
+  });
+  it("normalizes actual month names and currency symbols but not an undated year", () => {
+    expect(metricDate("September 2026")).toBe("2026-09-01T00:00:00.000Z");
+    expect(metricDate("2026")).toBeNull();
+    expect(
+      deckStructuredFact({
+        label: "Current ARR",
+        value: "£2.7m",
+        kind: "FIGURE",
+        asOf: "September 2026",
+      }),
+    ).toMatchObject({
+      claimKey: "financial.arr",
+      structuredValue: { currency: "GBP", amount: "2700000" },
+    });
+  });
+  it("allows only bounded section-related narrative observations", () => {
+    expect(
+      confirmedNarrativeSignals(
+        "PROBLEM",
+        "Problem",
+        "SMEs face unreliable manual workflows",
+        NOW,
+      ),
+    ).toMatchObject([{ pillar: "P3", criterion: "A", grade: 2 }]);
+    expect(
+      confirmedNarrativeSignals(
+        "TEAM",
+        "Problem",
+        "SMEs face unreliable manual workflows",
+        NOW,
+      ),
+    ).toEqual([]);
+    expect(
+      confirmedNarrativeSignals(
+        "COMPETITION",
+        "Moat",
+        "Proprietary licensed data",
+        NOW,
+      ),
+    ).toMatchObject([{ pillar: "P6", criterion: "A", grade: 2 }]);
   });
 
   it("supports canonical PERCENTAGE as well as source PERCENT vocabulary", () => {
