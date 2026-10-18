@@ -197,6 +197,14 @@ export function YouSheet({
         </button>
       </SheetTrigger>
       <SheetContent title={t("You")}>
+        {/* ADR 0017 F4: Light · Device · Dark is the menu's first row on a
+            phone, now that the header has no theme icon. */}
+        <div className="mb-3 flex flex-col gap-2 border-b border-(--cq-border-subtle) px-3 pb-4">
+          <span className="cq-label text-(--cq-text-secondary)">
+            {t("Appearance")}
+          </span>
+          <ThemeToggle />
+        </div>
         {/* G2: who they act for, first, when they have two or more. */}
         <MoreOrganisationSwitcher
           organisations={organisations}
@@ -279,12 +287,6 @@ export function YouSheet({
             <VerifyNudgeLink nudge={verifyNudge} onNavigate={close} />
           </div>
         )}
-        <div className="mt-3 flex flex-col gap-2 border-t border-(--cq-border-subtle) px-3 pt-4">
-          <span className="cq-label text-(--cq-text-secondary)">
-            {t("Appearance")}
-          </span>
-          <ThemeToggle />
-        </div>
         <div className="mt-3 border-t border-(--cq-border-subtle) pt-2">
           <SignOutControl appearance="row" />
         </div>
