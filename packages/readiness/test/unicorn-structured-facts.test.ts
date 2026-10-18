@@ -39,9 +39,133 @@ function company(
     ],
   };
 }
+function deckCompany(
+  label: string,
+  value: string,
+  asOf: string | null,
+): InvestabilityInputs {
+  return {
+    ...company("unknown", {}),
+    claims: [],
+    deck: {
+      extractionId: "deck",
+      readAt: NOW,
+      sections: [
+        {
+          section: "TRACTION",
+          status: "PRESENT",
+          summary: null,
+          pages: [2],
+          confidence: "HIGH",
+          facts: [
+            {
+              label,
+              value,
+              kind: "FIGURE",
+              asOf,
+              pages: [2],
+              unknownReason: null,
+              truthClass: "USER_CLAIM",
+              evidenceStatus: "SELF_REPORTED",
+              confidence: "HIGH",
+            },
+          ],
+        },
+      ],
+    },
+  };
+}
 const criterion = (x: InvestabilityInputs, p: number, c = 0) =>
   assessUnicornPotential(x, NOW).view.pillars[p]?.criteria[c];
 describe("canonical structured evidence mapping", () => {
+  it("uses dated ARR comparisons as ARR growth without inventing earned revenue or a capture-period date", () => {
+    const input = deckCompany(
+      "ARR trend",
+      "$2.2m in Oct 2025 to $3.9m in Sep 2026",
+      "October 2025 to September 2026",
+    );
+    const result = assessUnicornPotential(input, NOW);
+    expect(result.view.pillars[3]?.criteria[0]?.grade).toBe(3);
+    expect(
+      result.observations.find((o) => o.pillar === "P4" && o.criterion === "A"),
+    ).toMatchObject({
+      source: { at: "2026-09-01T00:00:00.000Z" },
+      inputMetadata: {
+        structuredValue: {
+          metric: "ARR",
+          startAmount: "2200000",
+          endAmount: "3900000",
+          periodStart: "2025-10-01",
+          periodEnd: "2026-09-01",
+          currency: "USD",
+        },
+      },
+    });
+  });
+  it("withholds incomparable, zero-baseline, undated, reversed and future growth windows", () => {
+    for (const text of [
+      "$2.2m in Oct 2025 to NGN 3.9m in Sep 2026",
+      "$0 in Oct 2025 to $3.9m in Sep 2026",
+      "$2.2m to $3.9m",
+      "$2.2m in Oct 2026 to $3.9m in Sep 2025",
+      "$2.2m in Oct 2025 to $3.9m in Sep 2027",
+    ])
+      expect(
+        criterion(deckCompany("ARR trend", text, null), 3)?.grade,
+      ).toBeNull();
+  });
+  it("recognizes an explicitly named retention metric inside a generic figure label", () => {
+    const input = deckCompany(
+      "Retention",
+      "117.5% net revenue retention",
+      "October 2026",
+    );
+    expect(criterion(input, 2, 1)?.grade).toBe(3);
+    expect(criterion(input, 3, 1)?.grade).toBe(3);
+    expect(
+      criterion(
+        deckCompany(
+          "Gross margin",
+          "117.5% net revenue retention",
+          "October 2026",
+        ),
+        4,
+      )?.grade,
+    ).toBeNull();
+    expect(
+      criterion(
+        deckCompany("Retention", "117.5% net income", "October 2026"),
+        2,
+        1,
+      )?.grade,
+    ).toBeNull();
+  });
+  it("recognizes current cash runway only with an actual measurement date, excluding financing-dependent runway", () => {
+    expect(
+      criterion(
+        deckCompany("Runway at current burn", "13.5 months", "October 2026"),
+        7,
+      )?.grade,
+    ).toBe(3);
+    expect(
+      criterion(
+        deckCompany("Current runway", "About 9 months", "October 2026"),
+        7,
+      )?.grade,
+    ).toBe(2);
+    expect(
+      criterion(deckCompany("Runway at current burn", "13.5 months", null), 7)
+        ?.grade,
+    ).toBeNull();
+    expect(
+      criterion(
+        deckCompany("Runway after raise", "27 months", "After the raise"),
+        7,
+      )?.grade,
+    ).toBeNull();
+    expect(metricDate("Sept 2026")).toBe("2026-09-01T00:00:00.000Z");
+  });
+
   it("labels an undated confirmed market estimate with capture time rather than an invented measurement date", () => {
     const input = company("market.size", {
       kind: "MONEY",
