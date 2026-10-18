@@ -1,0 +1,81 @@
+{
+  "observedAt": "2026-10-18T17:15:00Z",
+  "usageTerms": "No public brand licence found; obtain Zino Aviation's written permission. Unsplash images are under the Unsplash License (third-party photographers). GT Alpina is a commercial font.",
+  "logos": [
+    {
+      "name": "logo-gold",
+      "url": "https://jet.zinoaviation.com/assets/img/logo-gold.svg",
+      "format": "svg"
+    },
+    {
+      "name": "logo-black",
+      "url": "https://jet.zinoaviation.com/assets/img/logo-black.svg",
+      "format": "svg"
+    },
+    {
+      "name": "gateway-logo",
+      "url": "https://www.zinoaviation.com/assets/logo.svg",
+      "format": "svg"
+    },
+    {
+      "name": "academy-white-logo",
+      "url": "https://static.wixstatic.com/media/ad758c_6a67a7219fe142ce812f6d0d795c1372~mv2.png",
+      "format": "png"
+    }
+  ],
+  "colors": {
+    "jet": {
+      "source": "https://jet.zinoaviation.com/css/style.css?v=20261006a :root",
+      "gold": "#B59B48",
+      "goldLight": "#D9C48A",
+      "goldDark": "#8A7434",
+      "navy": "#222222",
+      "navy2": "#141414",
+      "inkSoft": "#7A7A7A",
+      "paper": "#FFFFFF",
+      "cream": "#F6F4EF",
+      "line": "#E7E2D6"
+    },
+    "academy": {
+      "source": "https://academy.zinoaviation.com/ Wix palette vars",
+      "color_18": "#EBC64D",
+      "color_19": "#9D8433",
+      "color_17": "#F2DFA0",
+      "color_15": "#282828",
+      "color_23": "#E34110"
+    },
+    "logoGoldFillRange": ["#B0974B", "#BEA85F"]
+  },
+  "fonts": {
+    "jet": {
+      "sans": "Poppins (Google Fonts)",
+      "serif": "'ZA Trademark', 'GT Alpina', 'Cormorant Garamond', Georgia, serif",
+      "alsoLoaded": ["Jost", "Cormorant Garamond"]
+    },
+    "academy": [
+      "Avenir LT 35 Light",
+      "Avenir LT 85 Heavy",
+      "Aileron Heavy (uploaded)"
+    ]
+  },
+  "imagery": [
+    "https://jet.zinoaviation.com/assets/img/Businessman_in_private_jet_2K_202607211129.jpeg",
+    "https://jet.zinoaviation.com/assets/img/crew-cabin-welcome.jpeg",
+    "https://jet.zinoaviation.com/assets/img/jv-selection-feature.jpg",
+    "https://www.zinoaviation.com/assets/img/gw-jet.jpg",
+    "https://www.zinoaviation.com/assets/img/gw-academy.jpg",
+    "https://static.wixstatic.com/media/ad758c_6f412f4c1cbf4a1280687af85c6a8382~mv2.jpg",
+    "https://images.unsplash.com/photo-1474302770737-173ee21bab63",
+    "https://images.unsplash.com/photo-1540962351504-03099e0a754b",
+    "https://images.unsplash.com/photo-1513002749550-c59d786b8e6c",
+    "https://images.unsplash.com/photo-1521790797524-b2497295b8a0",
+    "https://images.unsplash.com/photo-1661954864180-e61dea14208a",
+    "https://images.unsplash.com/photo-1436491865332-7a61a109cc05",
+    "https://images.unsplash.com/photo-1573497491208-6b1acb260507"
+  ],
+  "taglines": [
+    "Private Aviation, Simplified.",
+    "Stop Dreaming Start Flying",
+    "Every detail, thoughtfully arranged."
+  ]
+}

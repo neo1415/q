@@ -1,0 +1,314 @@
+[
+  {
+    "field": "brand_name",
+    "value": "Zino Aviation",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.zinoaviation.com/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Gateway page; © 2026 Zino Aviation"
+  },
+  {
+    "field": "divisions",
+    "value": "Zino Aviation Jet (jet.zinoaviation.com); Zino Aviation Academy (academy.zinoaviation.com)",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.zinoaviation.com/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Gateway splits brand into two cards"
+  },
+  {
+    "field": "jet_academy_legal_structure",
+    "value": "Divisions/trading sub-brands of one Zino Aviation brand; no separate legal entity named",
+    "status": "ASSUMPTION",
+    "sourceUrl": "https://jet.zinoaviation.com/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Both footers read 'Zino Aviation'; no Ltd/RC number on either site"
+  },
+  {
+    "field": "uk_legal_entity",
+    "value": "ZINO AVIATION LTD, company 13100002, active, private limited",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/13100002",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "uk_incorporation_date",
+    "value": "2020-12-24",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/13100002",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "uk_registered_office",
+    "value": "1 Church Close, Edgware, Middlesex, England, HA8 9NS",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/13100002",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "uk_sic",
+    "value": "70229 Management consultancy activities other than financial management",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/13100002",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "uk_accounts_status",
+    "value": "Overdue: FY to 2025-12-31 was due 2026-09-30; last accounts made up to 2024-12-31",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/13100002",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "As observed 2026-10-18"
+  },
+  {
+    "field": "uk_directors",
+    "value": "Efezino MARIO-GHAE; Temisan MARIO-GHAE (appointed 2020-12-24)",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/13100002/officers",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Personal data beyond names deliberately omitted"
+  },
+  {
+    "field": "nigerian_cac_entity",
+    "value": "Not found",
+    "status": "UNKNOWN",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "No RC number in any footer, privacy policy or press"
+  },
+  {
+    "field": "zino_group",
+    "value": "Umbrella name used in job adverts; no registered entity found",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://academy.zinoaviation.com/careers",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "founded_year",
+    "value": "2018",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://academy.zinoaviation.com/start-flying",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Bio: 'In 2018, he founded Zino Aviation'; UK company incorporated 2020"
+  },
+  {
+    "field": "founder_ceo",
+    "value": "Captain Zino Mario (registered name Efezino Mario-Ghae)",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/13100002/officers",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Director name verified; CEO title is SELF_REPORTED"
+  },
+  {
+    "field": "cofounder_coo",
+    "value": "Temisan Mario",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.thisdaylive.com/2022/09/09/zino-aviation-takes-off-with-pilot-masterclass/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Quoted as COO and Co-Founder in ThisDay 2022"
+  },
+  {
+    "field": "hq",
+    "value": "Lagos, Nigeria (Victoria Island)",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://jet.zinoaviation.com/contact.html",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Jet footer; academy careers 'VI, Lagos'"
+  },
+  {
+    "field": "academy_footer_locations",
+    "value": "London, Lagos, Johannesburg, Megara",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://academy.zinoaviation.com/start-flying",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Johannesburg and Megara are partner school locations"
+  },
+  {
+    "field": "founder_licences",
+    "value": "EASA, FAA and ICAO licences",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://academy.zinoaviation.com/start-flying",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Licence numbers not verified"
+  },
+  {
+    "field": "founder_youngest_commercial_pilot",
+    "value": "Nigeria's youngest commercial pilot at 19",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.zinomario.com/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Unverified superlative"
+  },
+  {
+    "field": "founder_retired_flying",
+    "value": "2021",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://academy.zinoaviation.com/start-flying",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "ThisDay: stopped flying at 26"
+  },
+  {
+    "field": "founder_other_roles",
+    "value": "Partner, FDN Capital Partners; Kuuza AI; SongScribe AI",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.zinomario.com/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "simulator_737ng",
+    "value": "Zino Aviation owns a Boeing 737NG flight simulator in Victoria Island, Lagos",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.zinomario.com/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Also CEO in Nairametrics; /simulator page does not name type; no FSTD qualification found"
+  },
+  {
+    "field": "simulator_hours",
+    "value": "Mon-Fri 9-18, Sat 8-12; ~1h30 sessions",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://academy.zinoaviation.com/simulator",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "network_size",
+    "value": "More than 8,000 aspiring pilots in network",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://nairametrics.com/2026/07/19/zino-aviation-ceo-why-many-licensed-nigerian-pilots-remain-unemployed/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "airline_agreements",
+    "value": "'Established agreements with airlines'; none named",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://academy.zinoaviation.com/pilotjob",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "partner_school_safefly",
+    "value": "SafeFly Express, Lanseria (SACAA)",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://academy.zinoaviation.com/sacaa",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Guardian Nigeria headline reports alliance; terms unknown"
+  },
+  {
+    "field": "partner_school_tae",
+    "value": "TAE Aviation Academy, Megara (EASA)",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://academy.zinoaviation.com/easa",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "call_prices",
+    "value": "NGN 95,000 / 30 min; NGN 150,000 / 60 min",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://academy.zinoaviation.com/call",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "ncaa_aoc",
+    "value": "No AOC held by any Zino entity found; Jet pages do not mention AOC or NCAA",
+    "status": "UNKNOWN",
+    "sourceUrl": "https://jet.zinoaviation.com/charter.html",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Must not be stated or implied"
+  },
+  {
+    "field": "ncaa_ato",
+    "value": "No NCAA ATO approval found",
+    "status": "UNKNOWN",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "aircraft_owned",
+    "value": "None described",
+    "status": "UNKNOWN",
+    "sourceUrl": "https://jet.zinoaviation.com/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Jet pages refer only to client aircraft"
+  },
+  {
+    "field": "jet_charter",
+    "value": "Quote form live; no operator, aircraft or completed flight named",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://jet.zinoaviation.com/charter.html",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Status MARKETED"
+  },
+  {
+    "field": "jet_coming_soon_services",
+    "value": "Sales, Management, Financing, Interiors, Advisory, About, Privacy, Terms",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://jet.zinoaviation.com/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Links point to coming-soon.html"
+  },
+  {
+    "field": "jetvault",
+    "value": "Experience Centre + digital platform described; no address, no evidence platform is live",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://jet.zinoaviation.com/aircraft-acquisition.html",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "jet_site_build",
+    "value": "CSS versioned 20261006a",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://jet.zinoaviation.com/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Observed in page source"
+  },
+  {
+    "field": "revenue",
+    "value": "Not published",
+    "status": "UNKNOWN",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "headcount",
+    "value": "20-50 (employer self-description on Fuzu)",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.fuzu.com/nigeria/company/zino-aviation",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": null
+  },
+  {
+    "field": "africa_pilot_demand_2025_2044",
+    "value": "23,000 new pilots",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://investors.boeing.com/investors/news/press-release-details/2025/Boeing-Forecasts-20-Year-Global-Demand-for-Nearly-2-4-Million-New-Commercial-Pilots-Technicians-Cabin-Crew/default.aspx",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Boeing forecast (a projection, not a fact)"
+  },
+  {
+    "field": "nigeria_private_jets",
+    "value": "~240 (CEO, Minister) vs 'over 157 by 2024' (AllAfrica)",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://nairametrics.com/2026/07/19/zino-aviation-ceo-why-many-licensed-nigerian-pilots-remain-unemployed/",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Conflicting definitions"
+  },
+  {
+    "field": "academy_som_illustrative",
+    "value": "~US$0.30M/yr",
+    "status": "ASSUMPTION",
+    "sourceUrl": null,
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "See research.md section 13"
+  }
+]
