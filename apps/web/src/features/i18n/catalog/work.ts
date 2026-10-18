@@ -7,6 +7,10 @@
  */
 export const WORK_AR: Readonly<Record<string, string>> = {
   Work: "المهام",
+  // Work's tabs and the phone's You sheet (owner-approved 2026-10-18).
+  Tasks: "قائمة المهام",
+  "{n} waiting for you": "{n} بانتظارك",
+  "Your sections": "أقسامك",
   "Q’s work": "عمل Q",
   "Q's work": "عمل Q",
   "Open Q’s work": "افتح عمل Q",

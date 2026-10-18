@@ -124,7 +124,13 @@ export function RehearsalsHome({
   history,
   allowance,
   withId,
+  titled = true,
 }: {
+  /**
+   * False under Work's header (owner 2026-10-18), whose h1 is "Work" and
+   * whose Rehearsals tab names the page: no second h1.
+   */
+  readonly titled?: boolean;
   readonly basePath: string;
   readonly partners: QRehearsalPartnersDto & {
     readonly role: "FOUNDER" | "INVESTOR";
@@ -173,7 +179,9 @@ export function RehearsalsHome({
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 sm:gap-10">
       <header className="flex flex-col gap-1">
-        <h1 className="cq-title-xl text-(--cq-text-primary)">Rehearsals</h1>
+        {titled ? (
+          <h1 className="cq-title-xl text-(--cq-text-primary)">Rehearsals</h1>
+        ) : null}
         {allowance === null ? null : (
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {allowance.words}{" "}

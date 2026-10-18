@@ -11,10 +11,15 @@ import { EmptyState } from "@capital-q/ui/states";
 
 import { PageContainer } from "@/components/app-shell/page-container";
 import { remainingOf, unitsOf } from "@/features/billing/plan-words";
-import { apiSession, qApiSession } from "@/features/q/context";
+import {
+  apiSession,
+  qApiSession,
+  resolveOwnContext,
+} from "@/features/q/context";
 import { RehearsalsHome } from "@/features/rehearsal/rehearsals-home";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { WorkHeader, workSideOf } from "@/features/work/work-header";
 
 export const metadata: Metadata = { title: "Rehearsals" };
 export const dynamic = "force-dynamic";
@@ -33,10 +38,13 @@ export default async function RehearsalsPage({
 }) {
   const t = await serverT();
   const params = await searchParams;
-  const [session, billingSession] = await Promise.all([
+  const [session, billingSession, context] = await Promise.all([
     qApiSession(),
     apiSession(),
+    // The shell already read this for the request; React's cache shares it.
+    resolveOwnContext().catch(() => null),
   ]);
+  const side = workSideOf(context);
   const [partners, history, plan] =
     session === null
       ? [null, null, null]
@@ -56,6 +64,7 @@ export default async function RehearsalsPage({
   if (partners === null) {
     return (
       <PageContainer>
+        <WorkHeader view="rehearsals" side={side} />
         <QSection id="rehearsals" kind="REHEARSAL" label={t("your rehearsals")}>
           <EmptyState
             title={t("Rehearsals couldn't load.")}
@@ -73,6 +82,7 @@ export default async function RehearsalsPage({
   if (partners.role === null) {
     return (
       <PageContainer>
+        <WorkHeader view="rehearsals" side={side} />
         <QSection id="rehearsals" kind="REHEARSAL" label={t("your rehearsals")}>
           <EmptyState
             title={t("Rehearsals are for founders and investors.")}
@@ -102,8 +112,10 @@ export default async function RehearsalsPage({
         };
   return (
     <PageContainer>
+      <WorkHeader view="rehearsals" side={side} />
       <QSection id="rehearsals" kind="REHEARSAL" label={t("your rehearsals")}>
         <RehearsalsHome
+          titled={false}
           basePath="/rehearsals"
           partners={{ ...partners, role: partners.role }}
           history={history}

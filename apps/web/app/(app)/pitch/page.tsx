@@ -4,14 +4,12 @@ import Link from "next/link";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
-import {
-  PageContainer,
-  PageHeader,
-} from "@/components/app-shell/page-container";
+import { PageContainer } from "@/components/app-shell/page-container";
 import { PitchGrid } from "@/features/pitch/pitch-grid";
 import { resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { WorkHeader, workSideOf } from "@/features/work/work-header";
 
 export const metadata: Metadata = { title: "Pitch & media" };
 
@@ -42,7 +40,7 @@ export default async function PitchPage() {
         }
         label={t("your pitch and media")}
       >
-        <PageHeader title={t("Pitch & media")} />
+        <WorkHeader view="pitch" side={workSideOf(context)} />
         {context.kind === "FOUNDER" ? (
           <PitchGrid companyId={context.companyId} />
         ) : context.kind === "NONE" && context.unavailable === true ? (

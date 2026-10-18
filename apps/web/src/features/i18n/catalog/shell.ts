@@ -249,6 +249,8 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
   "This invitation was already used": "استُخدمت هذه الدعوة من قبل",
   "This invitation was cancelled": "أُلغيت هذه الدعوة",
   "Type instead": "اكتب بدلاً من ذلك",
+  Mute: "كتم الصوت",
+  Unmute: "إلغاء كتم الصوت",
   "Type to Q": "اكتب إلى Q",
   Type: "اكتب",
   "Update password": "تحديث كلمة المرور",

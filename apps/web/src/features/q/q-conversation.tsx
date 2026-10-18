@@ -14,7 +14,7 @@ import {
 
 import { describeQStreamTransport } from "@capital-q/api-client";
 import { cx } from "@capital-q/ui";
-import { Button } from "@capital-q/ui/button";
+import { Button, IconButton } from "@capital-q/ui/button";
 import {
   Captions,
   FileText,
@@ -1422,7 +1422,15 @@ export function QConversationPanel({
                     data-q-thread-status
                   >
                     {q.working ? <QSwarm state="WORKING" pixels={40} /> : null}
-                    <span className="cq-caption text-(--cq-text-secondary)">
+                    <span className="inline-flex items-center gap-2 cq-caption text-(--cq-text-secondary)">
+                      {/* The same dot as the arrival's (owner 2026-10-18). */}
+                      {voice.active ? (
+                        <span
+                          aria-hidden="true"
+                          className="size-2 rounded-full bg-(--cq-accent) motion-safe:animate-pulse"
+                          data-q-state-dot
+                        />
+                      ) : null}
                       {t(stateLabel ?? "Q")}
                       {q.working &&
                       stage !== undefined &&
@@ -1615,18 +1623,13 @@ export function QConversationPanel({
                 disabled={q.working && !voice.active}
                 {...(voice.active
                   ? {
-                      actions: (
-                        <div
-                          className="flex items-center gap-1"
-                          data-q-voice-controls
-                        >
-                          <button
+                      iconActions: (
+                        <>
+                          <IconButton
                             type="button"
-                            className={
-                              client.muted
-                                ? "cq-q-field-control is-active"
-                                : "cq-q-field-control"
-                            }
+                            variant="quiet"
+                            aria-label={t(client.muted ? "Unmute" : "Mute")}
+                            title={t(client.muted ? "Unmute" : "Mute")}
                             aria-pressed={client.muted}
                             disabled={!client.connected}
                             onClick={() => client.setMuted(!client.muted)}
@@ -1634,39 +1637,40 @@ export function QConversationPanel({
                           >
                             {client.muted ? (
                               <MicOff
-                                size={ICON_SIZE.compact}
+                                size={ICON_SIZE.prominent}
+                                strokeWidth={2}
                                 aria-hidden="true"
                               />
                             ) : (
                               <Mic
-                                size={ICON_SIZE.compact}
+                                size={ICON_SIZE.prominent}
+                                strokeWidth={2}
                                 aria-hidden="true"
                               />
                             )}
-                            {client.muted ? "Unmute" : "Mute"}
-                          </button>
-                          <button
+                          </IconButton>
+                          <IconButton
                             type="button"
-                            className="cq-q-field-control is-end"
+                            variant="quiet"
+                            aria-label={t("End")}
+                            title={t("End")}
                             onClick={end}
                             data-q-control="end"
                           >
                             <Square
-                              size={ICON_SIZE.compact}
+                              size={ICON_SIZE.prominent}
+                              strokeWidth={2}
                               aria-hidden="true"
                             />
-                            {t("End")}
-                          </button>
-                        </div>
+                          </IconButton>
+                        </>
                       ),
                     }
                   : {})}
                 {...(connected && !voice.active
                   ? { onVoice: () => void talk(), voiceLabel: "Talk with Q" }
                   : {})}
-                placeholder={
-                  voice.active ? "Type instead — Q hears this too" : "Message Q"
-                }
+                placeholder={voice.active ? "Type instead" : "Message Q"}
                 attachments={attachments}
                 {...(connected
                   ? { onAttach: attach, attachLabel: "Attach a document" }

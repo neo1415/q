@@ -76,6 +76,11 @@ export const PRIMARY_NAVIGATION: readonly NavigationItem[] = [
   // Investment Hub. Results is now its Reports tab, so has no entry of its
   // own; /results and /crm still mark this entry as current.
   { href: "/relationships", label: "CRM", icon: Users },
+  // Work (owner-approved 2026-10-18): one entry for the person's desk. Its
+  // tabs are Tasks (/work), Documents, Pitch (a founder's), Rehearsals and
+  // The Q Daily; each keeps its own address, so it is marked current on
+  // all of them (AREA_ALIASES).
+  { href: "/work", label: "Work", icon: ListChecks },
 ];
 
 const byHref = (href: NavigationItem["href"]): NavigationItem => {
@@ -182,14 +187,10 @@ export const GATEQ_NAVIGATION: NavigationItem = {
 };
 
 /**
- * Q's work (WORK-58): what Q suggests, what waits for their yes, what it
- * runs and what it finished. Reached from the bell before; now a section.
+ * Work (WORK-58; one entry since 2026-10-18): Q's work and approvals, with
+ * the person's documents, pitch, rehearsals and The Q Daily as its tabs.
  */
-export const WORK_NAVIGATION: NavigationItem = {
-  href: "/work",
-  label: "Work",
-  icon: ListChecks,
-};
+export const WORK_NAVIGATION: NavigationItem = byHref("/work");
 
 /** What Q used for them this month (lead 2026-10-03), under You. */
 export const USAGE_NAVIGATION: NavigationItem = {
@@ -221,15 +222,18 @@ export const FIND_NAVIGATION: NavigationItem = {
 
 /**
  * The phone's tab bar (founder directive, 2026-09-27; Explore design
- * 2026-10-06): Discover, Explore, Q in the centre, Relationships, then
- * More. Capital is the CRM's Capital tab (owner 2026-10-16). There is no separate Chats area. More (founder report,
- * 2026-10-01) opens every other section, Profile first.
+ * 2026-10-06; owner-approved option B, 2026-10-18): Discover, Explore, Q
+ * in the centre, CRM, then Work, which replaced More. What More held
+ * (Profile first, Usage, Settings, Admin, the organisation switcher,
+ * appearance and sign out) opens from the "You" button in the phone's
+ * header, from the same source as the desktop sidebar.
  */
 export const MOBILE_NAVIGATION: readonly NavigationItem[] = [
   byHref("/discover"),
   byHref("/explore"),
   byHref("/home"),
   byHref("/relationships"),
+  byHref("/work"),
 ];
 
 /** Profile and Settings: the person's own pages, on every side. */
@@ -239,15 +243,16 @@ export const ACCOUNT_NAVIGATION: readonly NavigationItem[] = [
 ];
 
 /**
- * The sidebar's groups (WORK-58, founder-approved 2026-10-04): the main
- * areas with no label, then Workspace, You, and Admin for platform admins
+ * The sidebar's groups (WORK-58, founder-approved 2026-10-04; the
+ * Workspace folder became the one Work entry, owner-approved 2026-10-18):
+ * the main areas with no label, then You, and Admin for platform admins
  * only. Few short labels, never a heading per item. The one source both
- * the desktop sidebar and the phone's More sheet read, so the two never
+ * the desktop sidebar and the phone's You sheet read, so the two never
  * drift. Showing a link is not access: each route's server decides.
  */
 export type NavigationGroup = {
   /** Null for the main areas, which need no label. */
-  readonly label: "Workspace" | "You" | "Admin" | null;
+  readonly label: "You" | "Admin" | null;
   readonly items: readonly NavigationItem[];
 };
 
@@ -258,28 +263,18 @@ export type NavigationOptions = {
 };
 
 export function navigationGroupsFor(
-  scope: ContextScope,
+  // Every side sees the same entries since Work's tabs took the
+  // side-specific ones (a founder's Pitch); kept so callers stay as they are.
+  _scope: ContextScope,
   options: NavigationOptions = {},
 ): readonly NavigationGroup[] {
-  const founder = scope === "founder_private";
-  const investor = scope === "investor_private";
   return [
+    // Owner 2026-10-17: fewer entries. GateQ, company requests and a
+    // founder's applications are CRM tabs; Q Pitch lives in Profile.
+    // Owner 2026-10-18: Documents, Pitch & media (with the data room),
+    // Rehearsals and The Q Daily are Work's tabs (workTabs). Their pages
+    // and addresses are unchanged (Q still opens them).
     { label: null, items: PRIMARY_NAVIGATION },
-    {
-      label: "Workspace",
-      // Owner 2026-10-17: fewer entries. GateQ, company requests and a
-      // founder's applications are CRM tabs; Q Pitch lives in Profile.
-      // Their pages and addresses are unchanged (Q still opens them).
-      items: [
-        WORK_NAVIGATION,
-        ...(founder
-          ? [FOUNDER_MEDIA_NAVIGATION, FOUNDER_DATA_ROOM_NAVIGATION]
-          : []),
-        DOCUMENTS_NAVIGATION,
-        ...(founder || investor ? [REHEARSALS_NAVIGATION] : []),
-        DAILY_NAVIGATION,
-      ],
-    },
     {
       label: "You",
       items: [PROFILE_NAVIGATION, USAGE_NAVIGATION, SETTINGS_NAVIGATION],
@@ -308,10 +303,11 @@ export function sectionsFor(
 }
 
 /**
- * What the More sheet lists, in groups: everything not on a tab. Profile
- * heads the sheet.
+ * What the phone's You sheet lists, in groups: everything not on a tab
+ * (it holds what the More tab did before Work replaced it, 2026-10-18).
+ * Profile heads the sheet.
  */
-export function moreGroupsFor(
+export function youGroupsFor(
   scope: ContextScope,
   options: NavigationOptions = {},
 ): readonly NavigationGroup[] {
@@ -326,14 +322,14 @@ export function moreGroupsFor(
     .filter((group) => group.items.length > 0);
 }
 
-/** What the More sheet lists, flat: Profile, then every group's. */
-export function moreSectionsFor(
+/** What the You sheet lists, flat: Profile, then every group's. */
+export function youSectionsFor(
   scope: ContextScope,
   options: NavigationOptions = {},
 ): readonly NavigationItem[] {
   return [
     PROFILE_NAVIGATION,
-    ...moreGroupsFor(scope, options).flatMap((group) => group.items),
+    ...youGroupsFor(scope, options).flatMap((group) => group.items),
   ];
 }
 
@@ -347,6 +343,15 @@ export const MOBILE_CENTRE_HREF = "/home" satisfies NavigationItem["href"];
 const AREA_ALIASES: Readonly<Record<string, readonly string[]>> = {
   // GateQ and company requests are CRM tabs (owner 2026-10-17).
   "/relationships": ["/results", "/crm", "/capital", "/gateq", "/investors"],
+  // Work's tabs keep their own addresses (owner 2026-10-18); the data
+  // room is reached from Pitch.
+  "/work": [
+    "/documents",
+    "/pitch",
+    "/company/data-room",
+    "/rehearsals",
+    "/daily",
+  ],
 };
 
 export function isActiveRoute(pathname: string, href: string): boolean {

@@ -28,7 +28,7 @@ export function NavGroupToggle({
   readonly onToggle: () => void;
   /** The folded rail: an icon-sized button, its name in a tooltip. */
   readonly compact?: boolean;
-  /** The phone's More sheet sets a step larger. */
+  /** The phone's You sheet sets a step larger. */
   readonly size?: "regular" | "large";
 }) {
   const count = !open && waiting > 0 ? waiting : null;

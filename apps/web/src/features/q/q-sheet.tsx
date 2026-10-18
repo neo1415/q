@@ -256,9 +256,7 @@ export function QSheetConversation({
           contextScope={subject.scope}
           contextDetail={subject.kind === "NONE" ? undefined : subject.label}
           disabled={q.working}
-          placeholder={
-            voice.active ? t("Type instead — Q hears this too") : t("Ask Q")
-          }
+          placeholder={voice.active ? t("Type instead") : t("Ask Q")}
           {...(connected
             ? {
                 // Only a connected line carries typed words (live

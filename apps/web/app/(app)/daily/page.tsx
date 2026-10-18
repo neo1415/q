@@ -4,10 +4,7 @@ import Link from "next/link";
 import { getQDaily } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
 
-import {
-  PageContainer,
-  PageHeader,
-} from "@/components/app-shell/page-container";
+import { PageContainer } from "@/components/app-shell/page-container";
 import { formatDayTime } from "@/components/date-format";
 import { DailyArchive } from "@/features/daily/archive";
 import { Newspaper } from "@/features/daily/newspaper";
@@ -15,9 +12,10 @@ import {
   PrepareEditionButton,
   PreparingNotice,
 } from "@/features/daily/prepare-edition";
-import { qApiSession } from "@/features/q/context";
+import { qApiSession, resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { WorkHeader, workSideOf } from "@/features/work/work-header";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await serverT();
@@ -42,7 +40,12 @@ export default async function DailyPage({
     typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)
       ? raw
       : undefined;
-  const session = await qApiSession();
+  const [session, context] = await Promise.all([
+    qApiSession(),
+    // The shell already read this for the request; React's cache shares it.
+    resolveOwnContext().catch(() => null),
+  ]);
+  const side = workSideOf(context);
   const home =
     session === null
       ? null
@@ -52,7 +55,7 @@ export default async function DailyPage({
     return (
       <PageContainer width="reading" className="flex flex-col gap-4">
         <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
-          <PageHeader title={t("The Q Daily")} />
+          <WorkHeader view="daily" side={side} />
           <p
             className="cq-body text-(--cq-text-secondary)"
             data-state="unavailable"
@@ -74,8 +77,9 @@ export default async function DailyPage({
     return (
       <PageContainer width="reading" className="flex flex-col gap-6">
         <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
-          <PageHeader
-            title={t("The Q Daily")}
+          <WorkHeader
+            view="daily"
+            side={side}
             description={t("Earlier editions.")}
           />
           <DailyArchive items={home.archive} nextCursor={home.nextCursor} />
@@ -95,6 +99,7 @@ export default async function DailyPage({
     return (
       <PageContainer width="content" className="flex flex-col gap-10">
         <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
+          <WorkHeader view="daily" side={side} />
           {home.preparing ? <PreparingNotice /> : null}
           <div data-qp-anchor="fdr.15.daily.paper">
             <Newspaper edition={latest} />
@@ -112,8 +117,9 @@ export default async function DailyPage({
   return (
     <PageContainer width="reading" className="flex flex-col gap-5">
       <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
-        <PageHeader
-          title={t("The Q Daily")}
+        <WorkHeader
+          view="daily"
+          side={side}
           description={t("Your news, every story sourced.")}
         />
         {preferences.frequency === "OFF" ? (
