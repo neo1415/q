@@ -319,6 +319,26 @@ if (DRY) {
   process.exit(0);
 }
 
+// Pre-write guard (read-only). onboarding.sessions and memberships key on
+// identity.user_profiles.id, not auth.users.id; a steward that already owns
+// a company has a COMPLETED founder session, and the form then shows "setup
+// is complete" with no way to start a second company. Refuse rather than
+// touch the existing company.
+{
+  const rows = await q(
+    `select p.id, (select count(*) from identity.organisation_memberships m where m.user_id = p.id and m.membership_status = 'active')::int as active, (select count(*) from core.companies c where c.canonical_name ilike '%kuuza%' or c.website_url ilike '%kuuza%')::int as kuuza from identity.user_profiles p join auth.users u on u.id = p.auth_user_id where lower(u.email) = lower('${plan.STEWARD}')`,
+  );
+  const r = rows[0];
+  log("pre-write check:", JSON.stringify(r ?? null));
+  if (!r) throw new Error("steward profile not found");
+  if (r.kuuza > 0 && !state.companyId)
+    throw new Error("a KUUZA company already exists outside this seed state");
+  if (r.active > 0 && !state.companyId)
+    throw new Error(
+      `steward already has ${r.active} active membership(s); refusing to create KUUZA under it`,
+    );
+}
+
 const { browser, signIn } = await import(SIGNIN_LIB);
 const b = await browser();
 const ctx = await b.newContext({
