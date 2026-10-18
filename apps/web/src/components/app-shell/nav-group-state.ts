@@ -5,7 +5,7 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 import { isActiveRoute, type NavigationGroup } from "./navigation";
 
 /**
- * Whether each labelled navigation group (Workspace, You, Admin) is open
+ * Whether each labelled navigation group (You, Admin) is open
  * (founder direction 2026-10-07: "let all of those be collapsible, and the
  * default should be that it is closed").
  *
@@ -17,13 +17,13 @@ import { isActiveRoute, type NavigationGroup } from "./navigation";
  *   Storage is a convenience: blocked or absent, groups simply start
  *   closed again.
  *
- * The desktop sidebar and the phone's More sheet read the same choices.
+ * The desktop sidebar and the phone's You sheet read the same choices.
  */
 export type GroupLabel = Exclude<NavigationGroup["label"], null>;
 export type GroupChoices = Readonly<Partial<Record<GroupLabel, boolean>>>;
 
 export const NAV_GROUPS_STORAGE_KEY = "cq.nav.groups.v1";
-const LABELS: readonly GroupLabel[] = ["Workspace", "You", "Admin"];
+const LABELS: readonly GroupLabel[] = ["You", "Admin"];
 const EMPTY: GroupChoices = Object.freeze({});
 
 /** Reads the saved choices; anything malformed reads as no choice. */
@@ -72,7 +72,7 @@ export function groupIsOpen(
 }
 
 // One in-memory copy, shared by every reader in the tab, so the sidebar
-// and the More sheet agree even where storage is unavailable.
+// and the You sheet agree even where storage is unavailable.
 let current: GroupChoices | null = null;
 const listeners = new Set<() => void>();
 

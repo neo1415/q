@@ -5,10 +5,11 @@ import { Q_NAVIGATE_DESTINATIONS } from "@capital-q/contracts";
 import {
   ACCOUNT_NAVIGATION,
   MOBILE_NAVIGATION,
-  moreSectionsFor,
+  youSectionsFor,
   sectionsFor,
 } from "../src/components/app-shell/navigation";
 import { destinationPath } from "../src/features/voice/destinations";
+import { WORK_DATA_ROOM_HREF, workTabs } from "../src/features/work/work-tabs";
 
 /**
  * Every screen in the navigation is one Q can open (R20): a destination
@@ -28,16 +29,21 @@ describe("every navigation screen is a screen Q can open", () => {
     );
     // Every section either side can reach, on the desktop and the phone.
     const scopes = ["founder_private", "investor_private", "unset"] as const;
-    const hrefs = new Set(
-      scopes
+    const hrefs = new Set([
+      ...scopes
         .flatMap((scope) => [
           ...sectionsFor(scope),
           ...ACCOUNT_NAVIGATION,
           ...MOBILE_NAVIGATION,
-          ...moreSectionsFor(scope),
+          ...youSectionsFor(scope),
         ])
         .map((item) => item.href),
-    );
+      // Work's tabs (owner 2026-10-18) and the data room reached from Pitch.
+      ...(["COMPANY", "INVESTOR", "NONE"] as const).flatMap((side) =>
+        workTabs(side).map((tab) => tab.href),
+      ),
+      WORK_DATA_ROOM_HREF,
+    ]);
     // Results is the CRM's Reports tab now; the CRM entry is /relationships.
     expect(hrefs).toContain("/relationships");
     expect(hrefs).not.toContain("/results");

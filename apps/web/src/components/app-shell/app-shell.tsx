@@ -107,7 +107,7 @@ export function AppShell({
         </a>
         <DesktopSidebar context={context} />
         <div className="cq-shell-body">
-          <AppHeader context={context} />
+          <AppHeader context={context} verifyNudge={verifyNudge} />
           <NetworkStatus />
           <WakeIndicator />
           {verifyNudge === null ? null : (
@@ -119,13 +119,7 @@ export function AppShell({
             {children}
             <FictionalNames />
           </main>
-          <MobileNavigation
-            scope={context.scope}
-            admin={context.admin === true}
-            qPitch={context.qPitch === true}
-            organisations={context.organisations ?? []}
-            verifyNudge={verifyNudge}
-          />
+          <MobileNavigation />
         </div>
       </div>
       {/* DOCS: the one owner of document-ready cards, on every page. */}

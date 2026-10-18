@@ -7,10 +7,7 @@ import {
 } from "@capital-q/api-client";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
-import {
-  PageContainer,
-  PageHeader,
-} from "@/components/app-shell/page-container";
+import { PageContainer } from "@/components/app-shell/page-container";
 import { getSessionAccessToken } from "@/auth/session";
 import { DocumentsScreen } from "@/features/documents/documents-screen";
 import { loadLibraryPageAction } from "@/features/documents/library-actions";
@@ -21,6 +18,7 @@ import { documentsTabOf } from "@/features/documents/requests/requests-model";
 import { resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
+import { WorkHeader, workSideOf } from "@/features/work/work-header";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await serverT();
@@ -100,7 +98,7 @@ export default async function DocumentsPage({
         }
         label={t("your documents")}
       >
-        <PageHeader title={t("Documents")} />
+        <WorkHeader view="documents" side={workSideOf(context)} />
         {companyId === null ? null : (
           <DocumentsTabBar
             active={tab}
