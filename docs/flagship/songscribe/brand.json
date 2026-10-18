@@ -1,0 +1,112 @@
+{
+  "company": "SongScribe AI",
+  "fetchedAt": "2026-10-18T17:15:00Z",
+  "usageTerms": "No published brand guidelines or asset licence; '(c) 2026 SongScribe AI. All rights reserved.' Obtain founder permission before reuse. Sample songs contain real people's names.",
+  "logos": [
+    {
+      "name": "Primary logo (S glyph + SONG red + SCRIBE white)",
+      "url": "https://www.songscribe.ai/images/songscribe-logo.png",
+      "format": "png",
+      "size": "588x146",
+      "background": "dark",
+      "source": "header/footer <img alt='SongScribe'>"
+    },
+    {
+      "name": "Favicon",
+      "url": "https://www.songscribe.ai/favicon.ico",
+      "format": "ico",
+      "size": "48x48",
+      "source": "<link rel='icon'>"
+    }
+  ],
+  "svgAvailable": false,
+  "ogImage": null,
+  "colors": [
+    {
+      "role": "primary red / CTA",
+      "hex": "#E63946",
+      "foundIn": "home HTML bg-[#e63946] x151, text x36; most frequent hex in /_next/static/immutable/chunks/3-7na4sx69238.css"
+    },
+    {
+      "role": "logo/heading red",
+      "hex": "#DC2B3C",
+      "foundIn": "text-[#dc2b3c], bg-[#dc2b3c]; logo samples ~#D82838"
+    },
+    { "role": "red hover", "hex": "#D32F3C", "foundIn": "bg-[#d32f3c]" },
+    { "role": "red pressed", "hex": "#C22533", "foundIn": "bg-[#c22533]" },
+    { "role": "deep maroon", "hex": "#7F1D1D", "foundIn": "bg-[#7f1d1d]" },
+    {
+      "role": "background",
+      "hex": "#0A0A0A",
+      "foundIn": "bg-[#0a0a0a]; shadcn --background (dark)"
+    },
+    {
+      "role": "background deepest",
+      "hex": "#050505",
+      "foundIn": "bg-[#050505]"
+    },
+    { "role": "muted text", "hex": "#9CA3AF", "foundIn": "text-[#9ca3af] x55" },
+    { "role": "light text", "hex": "#D1D5DB", "foundIn": "text-[#d1d5db] x28" },
+    {
+      "role": "light surface",
+      "hex": "#FAFAFA",
+      "foundIn": "CSS shadcn tokens (light)"
+    },
+    { "role": "accent amber", "hex": "#F59E0B", "foundIn": "CSS .bg-[#F59E0B]" }
+  ],
+  "fonts": [
+    { "family": "Inter", "hosting": "next/font", "use": "body/UI" },
+    {
+      "family": "Space Grotesk",
+      "hosting": "next/font",
+      "use": "display/headings (ASSUMPTION)"
+    },
+    {
+      "family": "Geist Mono",
+      "hosting": "CSS variable --font-geist-mono",
+      "use": "mono accents"
+    }
+  ],
+  "style": [
+    "dark cinematic",
+    "bold red CTAs",
+    "split red/white wordmark",
+    "lifestyle photography",
+    "shadcn/Radix components",
+    "square sample cover art with genre tags"
+  ],
+  "productImagery": [
+    {
+      "url": "https://www.songscribe.ai/images/hero-couple.jpg",
+      "note": "home hero"
+    },
+    {
+      "url": "https://www.songscribe.ai/images/card-personal.jpg",
+      "note": "segment card"
+    },
+    {
+      "url": "https://www.songscribe.ai/images/card-creators.jpg",
+      "note": "segment card"
+    },
+    {
+      "url": "https://www.songscribe.ai/images/card-business.jpg",
+      "note": "segment card"
+    },
+    {
+      "url": "https://www.songscribe.ai/images/samples-hero-bg.png",
+      "note": "samples hero"
+    },
+    {
+      "url": "https://www.songscribe.ai/images/licensing-hero-bg.jpg",
+      "note": "licensing hero"
+    },
+    {
+      "url": "https://pub-dac0caed4dc94ff68cc15f3661cbee79.r2.dev/Personal%20Gifts/Bella%20My%20Forever%20Love/For%20Bella.png",
+      "note": "sample cover art (public R2); contains a personal name"
+    },
+    {
+      "url": "https://pub-dac0caed4dc94ff68cc15f3661cbee79.r2.dev/Beats/Instrumentals/Afrolove%20Afrobeat/Afrolove%20Afrobeat.png",
+      "note": "sample cover art (instrumental)"
+    }
+  ]
+}

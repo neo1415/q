@@ -1,0 +1,373 @@
+[
+  {
+    "field": "tradingName",
+    "value": "SongScribe.AI / SongScribe AI",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": "Not the unrelated open-source 'Songscribe' transcription project nor songscription.ai."
+  },
+  {
+    "field": "termsCompanyName",
+    "value": "SongScribe Ltd",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/terms",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": "Terms effective 17 November 2025."
+  },
+  {
+    "field": "ukLegalEntity",
+    "value": "SONGSCRIBE AI LTD, company no. 17031583, private limited, Active",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/17031583",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Link between this entity and songscribe.ai is ASSUMPTION (high confidence): name match + director identity + founder's Norwich ties. Name differs from 'SongScribe Ltd' in Terms."
+  },
+  {
+    "field": "ukIncorporationDate",
+    "value": "2026-02-13",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/17031583",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Postdates the Terms' effective date (2025-11-17). First accounts due 2027-11-13."
+  },
+  {
+    "field": "ukRegisteredOffice",
+    "value": "Taverham, Norwich, England",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/17031583",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": "Street address omitted here deliberately (also the director's correspondence address); see register."
+  },
+  {
+    "field": "ukSicCode",
+    "value": "59200 - Sound recording and music publishing activities",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/17031583",
+    "fetchedAt": "2026-10-18T17:15:00Z",
+    "note": ""
+  },
+  {
+    "field": "ukDirectorAndPsc",
+    "value": "Mario-Ghae Efezino - sole director and sole PSC (>=75% shares, >=75% votes, right to appoint/remove directors); British nationality; ID verified",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://find-and-update.company-information.service.gov.uk/company/17031583/persons-with-significant-control",
+    "fetchedAt": "2026-10-18T17:16:00Z",
+    "note": "Matches 'Capt. Zino Mario-Ghae' (ThisDay). Excel Chukwu is not an officer/PSC; any other holders together hold <=25%."
+  },
+  {
+    "field": "nigeriaCacRegistration",
+    "value": null,
+    "status": "UNKNOWN",
+    "sourceUrl": "https://search.cac.gov.ng/",
+    "fetchedAt": "2026-10-18T17:16:00Z",
+    "note": "CAC portal is JS-only; 'SongScribe Ltd' under Nigerian law may exist; needs RC number from founders."
+  },
+  {
+    "field": "governingLaw",
+    "value": "Federal Republic of Nigeria",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/terms",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "headquartersOperating",
+    "value": "Lagos, Nigeria",
+    "status": "ASSUMPTION",
+    "sourceUrl": "https://www.zinomario.com/",
+    "fetchedAt": "2026-10-18T17:12:00Z",
+    "note": "Medium confidence: founder based in Lagos; Nigerian law, Nigerian payment rails (Flutterwave, Seerbit), Nigerian-language samples. Legal domicile of the verified entity is England."
+  },
+  {
+    "field": "proposition",
+    "value": "Your Story, Turned Into a Song. Create beautiful, custom music in seconds. For personal moments, content creators, and brands.",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "missionVision",
+    "value": null,
+    "status": "UNKNOWN",
+    "sourceUrl": "https://www.songscribe.ai/",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": "No formal statement on songscribe.ai; zinomario.com: 'to turn ideas into music, instantly.'"
+  },
+  {
+    "field": "founders",
+    "value": ["Zino Mario", "Excel Chukwu"],
+    "status": "OWNER_PROVIDED",
+    "sourceUrl": "",
+    "fetchedAt": "2026-10-18T17:16:00Z",
+    "note": "songscribe.ai names no founders; zinomario.com lists SongScribe under Zino without a cofounder; UK register shows Zino (Mario-Ghae Efezino) only."
+  },
+  {
+    "field": "sector",
+    "value": "Consumer/creator software; media & entertainment (generative AI)",
+    "status": "ASSUMPTION",
+    "sourceUrl": "https://www.songscribe.ai/",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": "Analyst classification."
+  },
+  {
+    "field": "subsector",
+    "value": "AI music generation; personalised song gifting; sonic branding/jingles; creator music; church & ministry",
+    "status": "ASSUMPTION",
+    "sourceUrl": "https://www.songscribe.ai/",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": "Analyst classification."
+  },
+  {
+    "field": "segments",
+    "value": ["Personal", "Creators", "Businesses & Brands"],
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "capabilities",
+    "value": [
+      "full-song generation (lyrics, vocals, music)",
+      "2 variations per generation",
+      "revisions",
+      "instrumental option",
+      "AI Producer chat/voice brief",
+      "8-step guided form",
+      "multi-language lyrics",
+      "MP3/WAV downloads",
+      "PDF licence certificate",
+      "account library stored indefinitely"
+    ],
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/faq",
+    "fetchedAt": "2026-10-18T17:10:00Z",
+    "note": "FAQ answers read from the site's client JS bundle; not independently tested."
+  },
+  {
+    "field": "generationTime",
+    "value": "typically 30-60 seconds",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/faq",
+    "fetchedAt": "2026-10-18T17:10:00Z",
+    "note": ""
+  },
+  {
+    "field": "underlyingModel",
+    "value": null,
+    "status": "UNKNOWN",
+    "sourceUrl": "",
+    "fetchedAt": "2026-10-18T17:16:00Z",
+    "note": "Not disclosed; critical for licence chain-of-title."
+  },
+  {
+    "field": "pricing.freeDemo",
+    "value": "$0; 10 AI variations; 60-second previews; no downloads; resets daily",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/pricing",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": "FAQ: 2 variations per generation, i.e. 5 generations/day."
+  },
+  {
+    "field": "pricing.free",
+    "value": "$0.00; 3,000 credits to start; preview only",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/pricing",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "pricing.starter",
+    "value": "USD 7.00/month; 12,000 credits/month; personal-use licence",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/pricing",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "pricing.creator",
+    "value": "USD 19.00/month; 40,000 credits/month; commercial licence (marked Popular)",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/pricing",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "pricing.pro",
+    "value": "USD 69.00/month; 150,000 credits/month; exclusive licence",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/pricing",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "pricing.studio",
+    "value": "USD 179.00/month; 600,000 credits/month; full rights, team use",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/pricing",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": "CONFLICT: FAQ says 'Studio Pro tier ($199/mo)' and that most plans are one-time purchases."
+  },
+  {
+    "field": "pricing.enterprise",
+    "value": "Contact Sales: bulk pricing, custom licensing, white-label, API access",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/licensing",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "pricing.creditRules",
+    "value": "Monthly credits reset each billing period; separately bought top-ups expire 12 months after purchase; credits per generation not published",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/pricing",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "pricing.inconsistency",
+    "value": "Four tier schemes on live site: /pricing (Free/Starter/Creator/Pro/Studio monthly), FAQ (one-time + Studio Pro $199/mo), /terms (Personal/Standard/Business/Exclusive/Studio Pro), /licensing (Personal&Standard/Business/Exclusive)",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://www.songscribe.ai/pricing",
+    "fetchedAt": "2026-10-18T17:10:00Z",
+    "note": "Observation of the public pages themselves."
+  },
+  {
+    "field": "licensing.exclusive",
+    "value": "Song not resold; global perpetual use in any media; Content ID registration; Official Ownership Certificate; no stock resale, no authorship claim, no AI retraining",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/licensing",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": "Enforceability depends on undisclosed model provenance and copyrightability of AI output."
+  },
+  {
+    "field": "refundPolicy",
+    "value": "All sales final; store credit only if nothing delivered; chargebacks treated as Terms violation",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/refund",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": "Effective 17/11/2025."
+  },
+  {
+    "field": "paymentProcessors",
+    "value": ["Stripe", "Flutterwave", "Payoneer", "Seerbit"],
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/terms",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "minimumAge",
+    "value": "13 (under-18 needs guardian permission)",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/terms",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "contactEmail",
+    "value": "support@songscribe.ai",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.songscribe.ai/terms",
+    "fetchedAt": "2026-10-18T17:08:00Z",
+    "note": ""
+  },
+  {
+    "field": "sampleHosting",
+    "value": "Public Cloudflare R2 bucket (pub-dac0caed4dc94ff68cc15f3661cbee79.r2.dev)",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://www.songscribe.ai/samples",
+    "fetchedAt": "2026-10-18T17:10:00Z",
+    "note": "Observed in page HTML (23 cover images)."
+  },
+  {
+    "field": "traction",
+    "value": null,
+    "status": "UNKNOWN",
+    "sourceUrl": "",
+    "fetchedAt": "2026-10-18T17:16:00Z",
+    "note": "No users, revenue, testimonials or logos published. Unknown is not zero."
+  },
+  {
+    "field": "fundingRaised",
+    "value": null,
+    "status": "UNKNOWN",
+    "sourceUrl": "",
+    "fetchedAt": "2026-10-18T17:16:00Z",
+    "note": ""
+  },
+  {
+    "field": "founder.ZinoMario.music",
+    "value": "Multi-instrumentalist and music producer",
+    "status": "SELF_REPORTED",
+    "sourceUrl": "https://www.zinomario.com/",
+    "fetchedAt": "2026-10-18T17:12:00Z",
+    "note": "See kuuza/facts.json for full founder rows."
+  },
+  {
+    "field": "founder.ExcelChukwu.role",
+    "value": null,
+    "status": "UNKNOWN",
+    "sourceUrl": "",
+    "fetchedAt": "2026-10-18T17:19:00Z",
+    "note": "Not named on songscribe.ai or in UK register; no public footprint found."
+  },
+  {
+    "field": "market.recordedMusic2024",
+    "value": "USD 29.6B global (+4.8%); Sub-Saharan Africa USD 110M (+22.6%)",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://www.musicbusinessworldwide.com/global-recorded-music-revenues-hit-29-6bn-in-2024-up-4-8-yoy-users-of-paid-music-subscriptions-reach-752m",
+    "fetchedAt": "2026-10-18T17:19:00Z",
+    "note": "IFPI Global Music Report 2025; SSA figure via https://musicinafrica.net/node/358892"
+  },
+  {
+    "field": "market.cisacGenAi2028",
+    "value": "Gen-AI music+AV output market ~EUR 3B -> EUR 64B (2028); Gen-AI provider revenue EUR 0.3B -> EUR 9B (2028)",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://www.cisac.org/Newsroom/news-releases/global-economic-study-shows-human-creators-future-risk-generative-ai",
+    "fetchedAt": "2026-10-18T17:19:00Z",
+    "note": "CISAC/PMP Strategy projection, Dec 2024."
+  },
+  {
+    "field": "market.sunoRevenue",
+    "value": "~USD 200M annual revenue; USD 2.45B valuation (Nov 2025)",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://techcrunch.com/2025/11/19/legally-embattled-ai-music-startup-suno-raises-at-2-45b-valuation-on-200m-revenue/",
+    "fetchedAt": "2026-10-18T17:19:00Z",
+    "note": "Third-party press."
+  },
+  {
+    "field": "market.TAM",
+    "value": "~EUR 4.5B (2028)",
+    "status": "ASSUMPTION",
+    "sourceUrl": "https://www.cisac.org/Newsroom/news-releases/global-economic-study-shows-human-creators-future-risk-generative-ai",
+    "fetchedAt": "2026-10-18T17:19:00Z",
+    "note": "EUR 9B provider revenue x 50% music share."
+  },
+  {
+    "field": "market.SAM",
+    "value": "~EUR 135M",
+    "status": "ASSUMPTION",
+    "sourceUrl": "",
+    "fetchedAt": "2026-10-18T17:19:00Z",
+    "note": "3% of TAM: Africa/diaspora personalised songs, SMB jingles, creators."
+  },
+  {
+    "field": "market.SOM",
+    "value": "~EUR 1.35M/yr in 3-5 years",
+    "status": "ASSUMPTION",
+    "sourceUrl": "",
+    "fetchedAt": "2026-10-18T17:19:00Z",
+    "note": "1% of SAM; cross-check 5,000 subs x $15/mo x 12 = ~$0.9M."
+  },
+  {
+    "field": "competitor.Songfinch",
+    "value": "~USD 199 per human-made personalised song, 3-7 day delivery",
+    "status": "VERIFIED_PUBLIC",
+    "sourceUrl": "https://www.digitalmusicnews.com/?p=208933",
+    "fetchedAt": "2026-10-18T17:19:00Z",
+    "note": "Reported price; may be dated."
+  }
+]
