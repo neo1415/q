@@ -1,5 +1,11 @@
 # Capital Q — Current shared engineering state
 
+## Latest combined-release blocker — 18October06:24WAT
+
+Another engineer promoted PR229 as4ef8daeccbb6f6874cd52f8f2743b6fe7d457ac4 during227rollout. It containscfdUnicorn unchanged plus226/228GateQ/onboarding. Its API build FAILED: TS2300 duplicateActorContext imports atmain.ts2/241, caused bytextualmergeof217/226. ActiveAPI/q-api/workers reachedhealthy cfd51ef6; web still914atlastread while4efbuildsqueue. Do NOTclaimuniform4efdeployment orCIgreen:229candidate39100138762build/typesFAIL; source/integration/candidateUnicorn gates allPASS, oldproductionpush39100042323CANCELED bynew4efrun39100142562.
+
+Runtimefix **0aca7b1470487c41839dc2e4d13dfb6d45d23224** removesonlytheduplicateleadingtypeimport, preservingtheconsolidatedsecurityimport andallnewbehavior. Latestintegration4e131c25d merged into dedicatedsourcebranch; privateBuildlog confirmedexactfailure. Coordination/ownership posted on229 (issuecomments6246050837,6246064155). Awaitnewprotectedrepairgates; donotrollback/overwriteotherengineerwork. Schema248remainsapplied;43ACCESSgrantsstillunapplied; backfill/browseracceptancenotcomplete. Next: gate/releaseone-lineAPIrepair, verifyfinalfourrunningrevisions, grant43 andfinishactualUnicornjourneys.
+
 ## Latest Unicorn rollout — 18 October,06:17WAT
 
 PR227 merged normally as **cfd51ef60191e560a4726fa08695712fa62972f9**, after source39098259746, integration39098720633 and candidate39098756517 allpassed everyprotectedgate. Candidateacba and productioncfd have identicaltrees. Source217 prematureintegration was quarantined until allchecks passed; no prematureproductionpromotion. ProductionpushCI39100042323 is running. Both reviewed migrations28200000/28201500 are APPLIED, hosted248/none missing.
