@@ -829,3 +829,12 @@ Production `recovery/2026-09-12` = `d5600677` (all four Railway services SUCCESS
 - #231: one-line API build repair (duplicate ActorContext import between #226 and Unicorn 2a6ce51ab); Codex withdrew #230/#232 in its favour.
 
 Open / next: Work one-page design awaiting owner approval (`claude/work-page-design-oct17`, video + screens under `design/work-page/deliverables/`; decisions: one Work entry, phone option A vs B). Phone CRM header shows a duplicate "Company requests" button. Onboarding opener sometimes skips the first question (NEM Insurance transcript). Live onboarding and GateQ-applicant flows not yet exercised end-to-end on production. Codex (Workstream A) asked to hold overlapping production releases while Unicorn acceptance finishes. The disposable Supabase token used for read-only queries should be revoked.
+
+## 18 October 2026, 08:15 UTC — Claude Workstream B (follow-up)
+
+Production `recovery/2026-09-12` = `a026a39a` (web/api on `a026a39a`; q-api/workers redeploying the same commit; q-api previously `16c34629`). Released (owner: "release as soon as stuff is ready"):
+- #238 → #240: phone Q voice controls are icon Mute/End in the composer's icon row, "Type instead" placeholder, gold dot while listening/speaking; duplicate CRM "Company requests" header button removed (live-verified: button gone; voice state not exercised live to avoid a provider call).
+- #239 → #241: onboarding reopening re-asks the step Q's last line asked (`stepStillAsked`), without "Picking up…" when the person hasn't spoken (NEM transcript defect). Not exercised live (needs a new founder onboarding).
+- #242 → #243: owner-approved Work page, phone option B. Sidebar Discover · Explore · Q · CRM · Work; Work tabs Tasks/Documents/Pitch(founder)/Rehearsals/The Q Daily on the existing addresses; phone bar Work replaces More; More's items in a header "You" sheet with Light/Device/Dark first (ADR 0017 F4). Live-verified on Savanna Seed (phone 390px: bar, You sheet, no horizontal scroll; desktop Documents tab). Playwright mobile specs updated but not run (`shell.mobile.spec.ts` was already stale).
+
+Open: Supabase read-only token still to be revoked.
