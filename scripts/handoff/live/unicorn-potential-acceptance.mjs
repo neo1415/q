@@ -491,6 +491,12 @@ async function main() {
           )
           .first();
         await panel.waitFor({ timeout: 45000 });
+        // Use the existing dismissal so the unrelated arrival greeting does not
+        // obscure the assessment in readable desktop/mobile viewport evidence.
+        const closeBriefing = page
+          .locator("[data-arrival-dock]")
+          .getByRole("button", { name: "Close", exact: true });
+        if (await closeBriefing.isVisible()) await closeBriefing.click();
         await panel.locator(":scope > summary").click();
         assert.equal(
           (await panel.getAttribute("open")) !== null,
