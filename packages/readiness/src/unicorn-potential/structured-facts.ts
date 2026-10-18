@@ -65,8 +65,17 @@ export function structuredSignals(
     return [];
   const key = claim.claimKey.toLowerCase();
   if (claim.truthClass === "ESTIMATE" && !key.startsWith("market.")) return [];
+  const captured =
+    key === "market.size" &&
+    typeof v.evidenceCapturedAt === "string" &&
+    Number.isFinite(Date.parse(v.evidenceCapturedAt))
+      ? new Date(v.evidenceCapturedAt).toISOString()
+      : null;
   const at =
-    metricDate(v.asOf) ?? metricDate(v.periodEnd) ?? metricDate(v.period);
+    metricDate(v.asOf) ??
+    metricDate(v.periodEnd) ??
+    metricDate(v.period) ??
+    captured;
   const out: StructuredSignal[] = [];
   const emit = (
     pillar: PillarId,
@@ -79,7 +88,10 @@ export function structuredSignals(
       criterion,
       grade,
       at,
-      rule: `structured.${key}.${rule}; measured ${String(v.amount ?? v.value)}${typeof v.currency === "string" ? ` ${v.currency}` : ""}; period ${at ?? "unknown"}`,
+      rule:
+        captured !== null
+          ? `structured.${key}.${rule}; evidence captured ${captured}; market measurement period unknown`
+          : `structured.${key}.${rule}; measured ${String(v.amount ?? v.value)}${typeof v.currency === "string" ? ` ${v.currency}` : ""}; period ${at ?? "unknown"}`,
     });
   if (v.kind === "MONEY") {
     const n = number(v.amount);

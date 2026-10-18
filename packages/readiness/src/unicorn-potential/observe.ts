@@ -234,7 +234,7 @@ export function observeUnicornPotential(
               ...mapped,
               structuredValue: {
                 ...mapped.structuredValue,
-                asOf: inputs.deck.readAt.slice(0, 10),
+                evidenceCapturedAt: inputs.deck.readAt,
               },
             };
           }

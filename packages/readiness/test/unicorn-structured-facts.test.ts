@@ -42,6 +42,24 @@ function company(
 const criterion = (x: InvestabilityInputs, p: number, c = 0) =>
   assessUnicornPotential(x, NOW).view.pillars[p]?.criteria[c];
 describe("canonical structured evidence mapping", () => {
+  it("labels an undated confirmed market estimate with capture time rather than an invented measurement date", () => {
+    const input = company("market.size", {
+      kind: "MONEY",
+      amount: "1000000",
+      currency: "USD",
+      asOf: null,
+      evidenceCapturedAt: NOW,
+    });
+    const result = assessUnicornPotential(input, NOW);
+    expect(result.view.pillars[1]?.criteria[0]?.grade).toBe(2);
+    expect(result.observations[0]?.rule).toContain(
+      "market measurement period unknown",
+    );
+    expect(
+      result.observations[0]?.inputMetadata?.structuredValue,
+    ).toMatchObject({ asOf: null, evidenceCapturedAt: NOW });
+  });
+
   it("omits expired and future sources from persisted observations so recompute can authorize remaining evidence", () => {
     for (const changes of [
       { validTo: NOW },
