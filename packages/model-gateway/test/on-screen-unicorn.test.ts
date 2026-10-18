@@ -100,6 +100,7 @@ describe("the selected persisted Unicorn assessment is read before answering", (
             {
               kind: "COMPANY_PROFILE",
               id: "other",
+              total: 1,
               refs: [
                 { kind: "COMPANY", id: "00000000-0000-4000-8000-000000000002" },
               ],
