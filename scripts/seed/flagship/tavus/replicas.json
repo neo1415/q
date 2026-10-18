@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "source": "docs/seed/tavus-20/plan.json (stock replicas already used; no Tavus API call made to list them)",
+  "note": "Every face is a Tavus stock actor. None represents or impersonates a real founder; each flagship presenter speaks in the third person and is disclosed as an AI presenter. Each of these faces also plays a fictional founder in the tavus-20 seed set, so the presenter is never given a personal name.",
+  "stockReplicasUsed": [
+    {
+      "replicaId": "rccbeedfc684",
+      "name": "Darius - Outdoor",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Tobenna Okafor (Ledgerline, fictional)"
+    },
+    {
+      "replicaId": "r38a383b0173",
+      "name": "Destiny",
+      "model": "phoenix-3",
+      "usedInTavus20As": "Adaeze Nwosu (Termly, fictional)"
+    },
+    {
+      "replicaId": "rd27826c12a6",
+      "name": "Julia - Business",
+      "model": "phoenix-4",
+      "usedInTavus20As": "Helena Marsh (Clearwater Assurance, fictional)"
+    },
+    {
+      "replicaId": "r8495a788aa1",
+      "name": "Lee",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Daniel Park (Tensorgate, fictional)"
+    },
+    {
+      "replicaId": "r4dc9377a68e",
+      "name": "Priya - Office",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Priya Raman (Drishti Health, fictional)"
+    },
+    {
+      "replicaId": "r4f5b5ef55c8",
+      "name": "Celine - Studio",
+      "model": "phoenix-4",
+      "usedInTavus20As": "Halima Bello (Silo Credit, fictional)"
+    },
+    {
+      "replicaId": "rca8a38779a8",
+      "name": "Carter",
+      "model": "phoenix-3",
+      "usedInTavus20As": "Karim Haddad (Portside, fictional)"
+    },
+    {
+      "replicaId": "re6220ec0195",
+      "name": "Raj - Business",
+      "model": "phoenix-4",
+      "usedInTavus20As": "Vikram Chandiramani (MedTrail, fictional)"
+    },
+    {
+      "replicaId": "red9211eea81",
+      "name": "Mary - Office",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Anjali Shah (Baridi, fictional)"
+    },
+    {
+      "replicaId": "rbb3d627a705",
+      "name": "Mateo",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Rafael Moreira (Prumo, fictional)"
+    },
+    {
+      "replicaId": "rff4f230c435",
+      "name": "Thomas",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Matthias Krüger (Ferrolith, fictional)"
+    },
+    {
+      "replicaId": "r37a25df750d",
+      "name": "Samantha - Office",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Megan Holloway (Shiftwell, fictional)"
+    },
+    {
+      "replicaId": "r3f4182ef554",
+      "name": "Lucas - Studio",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Callum Reid (Halyard Security, fictional)"
+    },
+    {
+      "replicaId": "r0df0ace1c0a",
+      "name": "Zane",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Minh Tran (Hui, fictional)"
+    },
+    {
+      "replicaId": "r044d76f4490",
+      "name": "Diego - Office V2",
+      "model": "phoenix-3",
+      "usedInTavus20As": "Santiago Ruiz (Cosecha Labs, fictional)"
+    },
+    {
+      "replicaId": "rc39f215e8cb",
+      "name": "Daniel - Library",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Youssef Kamal (Mizan, fictional)"
+    },
+    {
+      "replicaId": "ra60269d91d3",
+      "name": "Janet",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Elize van der Merwe (Rand Treasury, fictional)"
+    },
+    {
+      "replicaId": "r78c9b897fbc",
+      "name": "Margo",
+      "model": "phoenix-4",
+      "usedInTavus20As": "Camille Laurent (Orphéa Genomics, fictional)"
+    },
+    {
+      "replicaId": "rf90eb925bd8",
+      "name": "Ruby - Office",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Meera Iyer (Akshar, fictional)"
+    },
+    {
+      "replicaId": "rb1d65103218",
+      "name": "Victor - Office",
+      "model": "phoenix-4.5",
+      "usedInTavus20As": "Kenji Moriyama (Railhead Robotics, fictional)"
+    }
+  ],
+  "flagshipChoices": [
+    {
+      "slug": "kuuza",
+      "replicaId": "rd27826c12a6",
+      "name": "Julia - Business"
+    },
+    {
+      "slug": "songscribe",
+      "replicaId": "rbb3d627a705",
+      "name": "Mateo"
+    },
+    {
+      "slug": "capital-q",
+      "replicaId": "r4f5b5ef55c8",
+      "name": "Celine - Studio"
+    },
+    {
+      "slug": "zino-aviation",
+      "replicaId": "re6220ec0195",
+      "name": "Raj - Business"
+    }
+  ]
+}
