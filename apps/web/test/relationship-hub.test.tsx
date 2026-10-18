@@ -7,6 +7,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -94,8 +95,20 @@ beforeEach(() => {
   mocks.steps.mockResolvedValue([]);
 });
 
+/**
+ * Renders a page and lets its streamed blocks land (instant tabs
+ * 2026-10-18: each Overview block and the list stream into their own
+ * boundary under the header, which is sent first).
+ */
+async function show(page: ReactNode) {
+  await act(async () => {
+    render(page);
+    await Promise.resolve();
+  });
+}
+
 async function overview() {
-  render(
+  await show(
     await RelationshipsPage({
       searchParams: Promise.resolve({ view: "overview" }),
     }),
@@ -482,7 +495,7 @@ describe("S2: the Pipeline is the one record list", () => {
 
   it("opens the list under the Pipeline tab, with List current and Table and Board beside it", async () => {
     mocks.digests.mockResolvedValue({});
-    render(
+    await show(
       await RelationshipsPage({
         searchParams: Promise.resolve({ view: "pipeline", layout: "list" }),
       }),
@@ -514,7 +527,7 @@ describe("S2: the Pipeline is the one record list", () => {
       organisationName: "Fund",
       pipelineFit: [],
     });
-    render(await RelationshipsPage({ searchParams: Promise.resolve({}) }));
+    await show(await RelationshipsPage({ searchParams: Promise.resolve({}) }));
     expect(
       screen
         .getByRole("link", { name: "Overview" })

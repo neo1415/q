@@ -26,7 +26,7 @@ import {
   type ReminderDto,
 } from "@capital-q/contracts";
 import { EmptyState, ErrorState } from "@capital-q/ui/states";
-import { Suspense } from "react";
+import { Suspense, use } from "react";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, Plus } from "@capital-q/ui/icons";
 
@@ -59,7 +59,12 @@ import {
   hubViewOf,
   pipelineLayoutOf,
   pipelineListHref,
+  type HubSide,
 } from "@/features/relationships/hub-view";
+import {
+  HubListLoading,
+  HubPanelLoading,
+} from "@/features/relationships/crm-loading";
 import { PipelineLayoutSwitch } from "@/features/relationships/pipeline-layout-switch";
 import { CapitalSkeleton } from "@/features/capital/capital-book";
 import { CapitalScreen } from "@/features/capital/capital-screen";
@@ -329,75 +334,57 @@ export default async function RelationshipsPage({
       side === "NONE"
         ? [null, null]
         : await Promise.all([apiSession(), qApiSession()]);
-    // The queue's reads run beside the period's, never after them; the
-    // portfolio's commitments follow the list alone, so they run beside
-    // the period's read too instead of after it (tab switch latency,
-    // owner 2026-10-16).
+    // Instant tabs (2026-10-18): every read starts here, side by side, and
+    // nothing is awaited before the header and tabs are sent. Each block
+    // streams into its own boundary as its own reads land, so the period
+    // report never holds the queue (or the tabs) back.
     const listed =
       side === "NONE" ? Promise.resolve([]) : ownRelationships(context);
-    const withCommitments = listed.then(async (items) => {
-      // S4: the investor's portfolio, from the same list; each of the
-      // first rows reads its current commitment, side by side.
-      const portfolio =
-        side === "INVESTOR" && items !== undefined
-          ? portfolioOf(items)
-          : undefined;
-      const commitments = new Map(
-        session === null || portfolio === undefined
-          ? []
-          : await Promise.all(
-              portfolio
-                .slice(0, PORTFOLIO_READ_LIMIT)
-                .map(
-                  async (item) =>
-                    [
-                      item.relationshipId,
-                      await getRelationshipCommitments(
-                        session,
-                        item.relationshipId,
-                      ).catch(() => undefined),
-                    ] as const,
-                ),
-            ),
-      );
-      return { items, portfolio, commitments };
-    });
     const now = readClock();
-    const needsRead =
-      side === "NONE"
-        ? Promise.resolve({ notices: [], reminders: [], unavailable: false })
-        : noticesAndReminders();
-    // Each relationship's own next step, decided as Pipeline decides it,
-    // so "Needs you" is one list everywhere (live check 2026-10-16).
-    const stepsRead = Promise.all([listed, needsRead]).then(([items, needs]) =>
-      items === undefined
-        ? []
-        : relationshipSteps(context, items, needs.reminders, now),
-    );
-    const [
-      results,
-      usage,
-      { items, portfolio, commitments },
-      needs,
-      steps,
-      deckReview,
-    ] = await Promise.all([
-      session === null ? null : getResults(session, period).catch(() => null),
+    const resultsRead =
+      session === null
+        ? Promise.resolve(null)
+        : getResults(session, period).catch(() => null);
+    const usageRead =
       qSession === null || side !== "INVESTOR"
-        ? null
-        : getMyUsage(qSession).catch(() => null),
-      withCommitments,
-      needsRead,
-      stepsRead,
-      // Founders: Q's deck reading waiting on their check (lead 2026-10-16).
-      side === "COMPANY" ? ownDeckReview() : Promise.resolve(null),
-    ]);
-    // The Results endpoint authorises each projection. A conflicting role read
-    // is unavailable, never silently rendered as the other party's perspective.
-    const available =
-      results !== null &&
-      ((side === "INVESTOR" && results.side === "INVESTOR") ||
-        (side === "COMPANY" && results.side === "FOUNDER"));
+        ? Promise.resolve(null)
+        : getMyUsage(qSession).catch(() => null);
+    // Only the blocks this side shows are read, so no read is left without
+    // a reader.
+    const queueRead =
+      side === "NONE" ? null : overviewQueueRead(context, listed, side, now);
+    // S4: the investor's portfolio, from the same list; each of the first
+    // rows reads its current commitment, side by side.
+    const portfolioRead =
+      side === "INVESTOR"
+        ? Promise.all([
+            listed.then(async (items) => {
+              const portfolio =
+                items === undefined ? undefined : portfolioOf(items);
+              const commitments = new Map(
+                session === null || portfolio === undefined
+                  ? []
+                  : await Promise.all(
+                      portfolio
+                        .slice(0, PORTFOLIO_READ_LIMIT)
+                        .map(
+                          async (item) =>
+                            [
+                              item.relationshipId,
+                              await getRelationshipCommitments(
+                                session,
+                                item.relationshipId,
+                              ).catch(() => undefined),
+                            ] as const,
+                        ),
+                    ),
+              );
+              return { portfolio, commitments };
+            }),
+            resultsRead,
+          ] as const)
+        : null;
+    const periodRead = Promise.all([resultsRead, usageRead] as const);
     const unset =
       side === "NONE" &&
       context.kind === "NONE" &&
@@ -423,114 +410,84 @@ export default async function RelationshipsPage({
             }
           />
         ) : null}
-        {side === "NONE" ? null : (
-          <NeedsYouQueue
-            cards={needsYouCards({
-              notices: needs.notices,
-              reminders: needs.reminders,
-              items: items ?? [],
-              side,
-              now,
-              steps,
-              deckReview:
-                deckReview === null
-                  ? null
-                  : {
-                      pending: deckReview.pending,
-                      href: deckReview.href,
-                      at: new Date(now).toISOString(),
-                    },
-            })}
-            now={now}
-            unavailable={needs.unavailable}
-          />
-        )}
-        {side === "INVESTOR" ? (
-          <PortfolioSection
-            items={portfolio}
-            commitments={commitments}
-            agreed={
-              results !== null &&
-              results.side === "INVESTOR" &&
-              results.commitments !== undefined
-                ? commitmentLines(results.commitments).find(
-                    (line) => line.status === "CONFIRMED",
-                  )
-                : undefined
-            }
-          />
-        ) : null}
-        {unset ? null : !available || results === null ? (
-          // Partial: the queue above still stands when the period cannot.
-          <ErrorState
-            title={t("The period report couldn't load")}
-            description={t(
-              "Your records are unchanged. Try again in a moment.",
-            )}
-            action={
-              <Link
-                className={buttonClassName("secondary")}
-                href="/relationships?view=overview"
-              >
-                {t("Try again")}
-              </Link>
-            }
-          />
-        ) : (
-          <QSection
-            id="hub-overview"
-            kind="RELATIONSHIP_LIST"
-            refs={hubOverviewRefs(results, stage)}
-            total={hubOverviewRefs(results, stage).length}
-            label={t("Relationships in the overview")}
+        {queueRead === null || side === "NONE" ? null : (
+          <Suspense
+            key="overview-queue"
+            fallback={<HubPanelLoading rows={3} label="queue" lead />}
           >
-            <QControl id="section.hub-overview" kind="SECTION">
-              <ResultsDashboard
-                heading={t("This period")}
-                headingLevel={2}
-                basePath="/relationships?view=overview"
-                range={range}
-                stage={stage}
-                download={new URLSearchParams(period).toString()}
-                usage={usage}
-                results={results}
-              />
-            </QControl>
-          </QSection>
+            <OverviewQueue read={queueRead} side={side} now={now} />
+          </Suspense>
+        )}
+        {portfolioRead === null ? null : (
+          <Suspense
+            key="overview-portfolio"
+            fallback={<HubPanelLoading rows={3} label="portfolio" />}
+          >
+            <OverviewPortfolio read={portfolioRead} />
+          </Suspense>
+        )}
+        {unset ? null : (
+          <Suspense
+            key="overview-period"
+            fallback={<HubPanelLoading rows={4} label="period" />}
+          >
+            <OverviewPeriod
+              read={periodRead}
+              side={side}
+              range={range}
+              stage={stage}
+              download={new URLSearchParams(period).toString()}
+              words={{
+                failed: t("The period report couldn't load"),
+                failedBody: t(
+                  "Your records are unchanged. Try again in a moment.",
+                ),
+                retry: t("Try again"),
+                section: t("Relationships in the overview"),
+                heading: t("This period"),
+              }}
+            />
+          </Suspense>
         )}
       </PageContainer>
     );
   }
-  const [items, unread, commitments] = await Promise.all([
-    ownRelationships(context),
-    unreadByRelationship(),
-    ownCommitmentFacts(context),
-  ]);
+  // Instant tabs (2026-10-18): every read of the list starts here and none
+  // is awaited before the header, tabs and layout switch are sent; the
+  // rows stream into their own boundary below them.
+  const itemsRead = ownRelationships(context);
   // Owner 2026-10-17: an investor's list is ranked by Suitability unless
   // they chose the latest change first. The first page's cards are read in
-  // full in the order shown (later pages by id), so a ranked list waits for
-  // the scores; a founder's (or a time-ordered) list reads both side by
-  // side (L1 latency sweep).
+  // full in the order shown (later pages by id). A ranked list longer than
+  // a page waits for the scores to know its first page; one page or less
+  // is the same set of rows in any order, so its cards are read beside
+  // the scores (as a founder's, or a time-ordered, list always is).
   const sort = listSortOf(params["sort"], side);
-  const scored =
+  const scoredRead =
     side === "INVESTOR"
-      ? relationshipScores(items)
+      ? itemsRead.then((items) => relationshipScores(items))
       : Promise.resolve(undefined);
-  const firstPage = (
-    scores: Readonly<Record<string, PipelineScores>> | undefined,
-  ) =>
-    items === undefined
-      ? Promise.resolve({})
-      : relationshipDigests(
-          context,
-          listOrdered(items, scores, sort).slice(0, PAGE_SIZE),
-        );
-  const [digests, read] =
-    sort === "suitability" || sort === "unicorn"
-      ? await scored.then(
-          async (found) => [await firstPage(found?.scores), found] as const,
-        )
-      : await Promise.all([firstPage(undefined), scored]);
+  const digestsRead = itemsRead.then((items) => {
+    if (items === undefined) return {};
+    const firstPage = (
+      scores: Readonly<Record<string, PipelineScores>> | undefined,
+    ) =>
+      relationshipDigests(
+        context,
+        listOrdered(items, scores, sort).slice(0, PAGE_SIZE),
+      );
+    return (sort === "suitability" || sort === "unicorn") &&
+      items.length > PAGE_SIZE
+      ? scoredRead.then((found) => firstPage(found?.scores))
+      : firstPage(undefined);
+  });
+  const listRead = Promise.all([
+    itemsRead,
+    unreadByRelationship(),
+    ownCommitmentFacts(context),
+    digestsRead,
+    scoredRead,
+  ] as const);
   const now = readClock();
   // The search carries into Table and Board when it is a valid one.
   const searched = RelationshipPipelineQuerySchema.safeParse(
@@ -571,32 +528,239 @@ export default async function RelationshipsPage({
           board: pipelineHref(listQuery, "board"),
         }}
       />
-      {/* Q room R1: every relationship on this page, by id, for Q. */}
-      <QSection
-        id="relationships"
-        kind="RELATIONSHIP_LIST"
-        refs={(items ?? []).slice(0, 12).map((item) => ({
-          kind: item.counterpart.kind,
-          id: item.counterpart.id,
-        }))}
-        total={items?.length ?? 0}
-        label={t(`${String(items?.length ?? 0)} relationships`)}
-      >
-        <RelationshipsIndex
-          // Another order is another first page: the list starts afresh.
-          key={sort}
+      {/* Another order is another first page: the list starts afresh. */}
+      <Suspense key={`list:${sort}`} fallback={<HubListLoading />}>
+        <RelationshipsListBody
+          read={listRead}
           side={side}
-          items={items}
-          unread={unread}
-          digests={digests}
-          now={now}
-          fits={read?.profiles}
-          scores={read?.scores}
           sort={sort}
-          commitments={commitments}
+          now={now}
+          label={(count) => t(`${String(count)} relationships`)}
         />
-      </QSection>
+      </Suspense>
     </PageContainer>
+  );
+}
+
+type OwnPageContext = Awaited<ReturnType<typeof resolveOwnContext>>;
+type OwnItems = Awaited<ReturnType<typeof ownRelationships>>;
+
+/** The list's rows, once its reads land (fed by the page's promises). */
+function RelationshipsListBody({
+  read,
+  side,
+  sort,
+  now,
+  label,
+}: {
+  readonly read: Promise<
+    readonly [
+      OwnItems,
+      Awaited<ReturnType<typeof unreadByRelationship>>,
+      Awaited<ReturnType<typeof ownCommitmentFacts>>,
+      Awaited<ReturnType<typeof relationshipDigests>>,
+      Awaited<ReturnType<typeof relationshipScores>> | undefined,
+    ]
+  >;
+  readonly side: HubSide;
+  readonly sort: ReturnType<typeof listSortOf>;
+  readonly now: number;
+  readonly label: (count: number) => string;
+}) {
+  const [items, unread, commitments, digests, scored] = use(read);
+  return (
+    // Q room R1: every relationship on this page, by id, for Q.
+    <QSection
+      id="relationships"
+      kind="RELATIONSHIP_LIST"
+      refs={(items ?? []).slice(0, 12).map((item) => ({
+        kind: item.counterpart.kind,
+        id: item.counterpart.id,
+      }))}
+      total={items?.length ?? 0}
+      label={label(items?.length ?? 0)}
+    >
+      <RelationshipsIndex
+        key={sort}
+        side={side}
+        items={items}
+        unread={unread}
+        digests={digests}
+        now={now}
+        fits={scored?.profiles}
+        scores={scored?.scores}
+        sort={sort}
+        commitments={commitments}
+      />
+    </QSection>
+  );
+}
+
+/**
+ * What the Overview's "Needs you" queue reads: the person's notices and
+ * reminders, the list, each relationship's own next step (decided as
+ * Pipeline decides it, so "Needs you" is one list everywhere, live check
+ * 2026-10-16), and a founder's deck reading waiting on their check.
+ */
+function overviewQueueRead(
+  context: OwnPageContext,
+  listed: Promise<OwnItems>,
+  side: "COMPANY" | "INVESTOR",
+  now: number,
+) {
+  const needsRead = noticesAndReminders();
+  const stepsRead = Promise.all([listed, needsRead]).then(([items, needs]) =>
+    items === undefined
+      ? []
+      : relationshipSteps(context, items, needs.reminders, now),
+  );
+  return Promise.all([
+    needsRead,
+    listed,
+    stepsRead,
+    // Founders: Q's deck reading waiting on their check (lead 2026-10-16).
+    side === "COMPANY" ? ownDeckReview() : Promise.resolve(null),
+  ] as const);
+}
+
+function OverviewQueue({
+  read,
+  side,
+  now,
+}: {
+  readonly read: ReturnType<typeof overviewQueueRead>;
+  readonly side: "COMPANY" | "INVESTOR";
+  readonly now: number;
+}) {
+  const [needs, items, steps, deckReview] = use(read);
+  return (
+    <NeedsYouQueue
+      cards={needsYouCards({
+        notices: needs.notices,
+        reminders: needs.reminders,
+        items: items ?? [],
+        side,
+        now,
+        steps,
+        deckReview:
+          deckReview === null
+            ? null
+            : {
+                pending: deckReview.pending,
+                href: deckReview.href,
+                at: new Date(now).toISOString(),
+              },
+      })}
+      now={now}
+      unavailable={needs.unavailable}
+    />
+  );
+}
+
+type PeriodResults = Awaited<ReturnType<typeof getResults>> | null;
+
+function OverviewPortfolio({
+  read,
+}: {
+  readonly read: Promise<
+    readonly [
+      {
+        readonly portfolio: ReturnType<typeof portfolioOf> | undefined;
+        readonly commitments: ReadonlyMap<
+          string,
+          Awaited<ReturnType<typeof getRelationshipCommitments>> | undefined
+        >;
+      },
+      PeriodResults,
+    ]
+  >;
+}) {
+  const [{ portfolio, commitments }, results] = use(read);
+  return (
+    <PortfolioSection
+      items={portfolio}
+      commitments={commitments}
+      agreed={
+        results !== null &&
+        results.side === "INVESTOR" &&
+        results.commitments !== undefined
+          ? commitmentLines(results.commitments).find(
+              (line) => line.status === "CONFIRMED",
+            )
+          : undefined
+      }
+    />
+  );
+}
+
+function OverviewPeriod({
+  read,
+  side,
+  range,
+  stage,
+  download,
+  words,
+}: {
+  readonly read: Promise<
+    readonly [PeriodResults, Awaited<ReturnType<typeof getMyUsage>> | null]
+  >;
+  readonly side: HubSide;
+  readonly range: ReturnType<typeof rangeOf>;
+  readonly stage: string | null;
+  readonly download: string;
+  readonly words: {
+    readonly failed: string;
+    readonly failedBody: string;
+    readonly retry: string;
+    readonly section: string;
+    readonly heading: string;
+  };
+}) {
+  const [results, usage] = use(read);
+  // The Results endpoint authorises each projection. A conflicting role read
+  // is unavailable, never silently rendered as the other party's perspective.
+  const available =
+    results !== null &&
+    ((side === "INVESTOR" && results.side === "INVESTOR") ||
+      (side === "COMPANY" && results.side === "FOUNDER"));
+  if (!available || results === null) {
+    // Partial: the queue above still stands when the period cannot.
+    return (
+      <ErrorState
+        title={words.failed}
+        description={words.failedBody}
+        action={
+          <Link
+            className={buttonClassName("secondary")}
+            href="/relationships?view=overview"
+          >
+            {words.retry}
+          </Link>
+        }
+      />
+    );
+  }
+  return (
+    <QSection
+      id="hub-overview"
+      kind="RELATIONSHIP_LIST"
+      refs={hubOverviewRefs(results, stage)}
+      total={hubOverviewRefs(results, stage).length}
+      label={words.section}
+    >
+      <QControl id="section.hub-overview" kind="SECTION">
+        <ResultsDashboard
+          heading={words.heading}
+          headingLevel={2}
+          basePath="/relationships?view=overview"
+          range={range}
+          stage={stage}
+          download={download}
+          usage={usage}
+          results={results}
+        />
+      </QControl>
+    </QSection>
   );
 }
 
