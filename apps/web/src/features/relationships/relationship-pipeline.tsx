@@ -7,10 +7,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import {
+  isPipelineUnicornSort,
   RELATIONSHIP_STATES_V2,
-  RelationshipPipelineQuerySchema,
+  RelationshipPipelineViewQuerySchema,
+  RelationshipViewQuerySchema,
   type RelationshipPipelineDto,
-  type RelationshipPipelineQuery,
+  type RelationshipPipelineViewQuery,
   type RelationshipSummaryDto,
   type SavedRelationshipViewList,
 } from "@capital-q/contracts";
@@ -41,8 +43,9 @@ import {
   type PipelinePreferences,
 } from "./pipeline-preferences";
 import { PipelineSavedViews, type AppliedView } from "./pipeline-saved-views";
-import { ScoreFigure, ScoreLine } from "./pipeline-score-figure";
+import { ScoreFigure, ScoreLine, UnicornFigure } from "./pipeline-score-figure";
 import {
+  hasUnicornScores,
   scoreOf,
   UNKNOWN_SCORES,
   type PipelineScores,
@@ -65,15 +68,39 @@ function localStorageOrNull() {
 
 /**
  * The URL's sort for a chosen option: Suitability is the investor's default
- * (no `sort`); every other order is the API's own.
+ * (no `sort`); a Unicorn Potential view is ranked by the server over the
+ * whole pipeline; every other order is the API's own.
  */
-function sortParam(value: string): RelationshipPipelineQuery["sort"] {
-  return value === "oldest" || value === "name" || value === "name-desc"
+function sortParam(value: string): RelationshipPipelineViewQuery["sort"] {
+  return value === "oldest" ||
+    value === "name" ||
+    value === "name-desc" ||
+    value === "recent" ||
+    isPipelineUnicornSort(value)
     ? value
-    : value === "recent"
-      ? "recent"
-      : undefined;
+    : undefined;
 }
+
+/** The Unicorn Potential narrowing a person can choose (premium only). */
+const UNICORN_FILTERS = [
+  { value: "unicorn", label: "Unicorn Potential: all companies" },
+  { value: "unicorn-scored", label: "Unicorn Potential: with a score" },
+  { value: "unicorn-40", label: "Unicorn Potential: 40 and above" },
+  { value: "unicorn-60", label: "Unicorn Potential: 60 and above" },
+  { value: "unicorn-80", label: "Unicorn Potential: 80 and above" },
+  {
+    value: "unicorn-insufficient",
+    label: "Unicorn Potential: insufficient evidence",
+  },
+] as const;
+const UNICORN_SUMMARY: Readonly<Record<string, string>> = {
+  unicorn: "Unicorn Potential first",
+  "unicorn-scored": "Unicorn Potential scored",
+  "unicorn-40": "Unicorn Potential 40+",
+  "unicorn-60": "Unicorn Potential 60+",
+  "unicorn-80": "Unicorn Potential 80+",
+  "unicorn-insufficient": "Unicorn: insufficient evidence",
+};
 
 /** Presentation and personal preferences only. The API owns scope/filter/state. */
 export function RelationshipPipeline({
@@ -96,7 +123,7 @@ export function RelationshipPipeline({
   /** The server's saved views; null when they could not be read. */
   readonly views?: SavedRelationshipViewList | null;
   readonly data: RelationshipPipelineDto;
-  readonly query: RelationshipPipelineQuery;
+  readonly query: RelationshipPipelineViewQuery;
   readonly scopeKey: string;
   readonly layout: "table" | "board";
   readonly side: "INVESTOR" | "COMPANY";
@@ -140,12 +167,15 @@ export function RelationshipPipeline({
     if (!writePipelinePreferences(scopeKey, next, localStorageOrNull()))
       setNotice("Preferences could not be saved on this device.");
   };
-  const shown = (target: string, next: RelationshipPipelineQuery) =>
+  const unicornOn = hasUnicornScores(scores);
+  const unicornSort =
+    unicornOn && isPipelineUnicornSort(query.sort) ? query.sort : null;
+  const shown = (target: string, next: RelationshipPipelineViewQuery) =>
     currentRoute() === target &&
     document.querySelector<HTMLElement>("[data-pipeline-root]")?.dataset[
       "pipelineQuery"
-    ] === JSON.stringify(RelationshipPipelineQuerySchema.parse(next));
-  const move = (next: RelationshipPipelineQuery) =>
+    ] === JSON.stringify(RelationshipPipelineViewQuerySchema.parse(next));
+  const move = (next: RelationshipPipelineViewQuery) =>
     router.push(pipelineHref(next, layout));
   useQControlGroup({
     kind: "LIST",
@@ -212,10 +242,13 @@ export function RelationshipPipeline({
     onAct: async (intent) => {
       if (
         typeof intent.value !== "string" ||
-        !["recent", "oldest", "name", "name-desc", "suitability"].includes(
-          intent.value,
+        !(
+          ["recent", "oldest", "name", "name-desc", "suitability"].includes(
+            intent.value,
+          ) || isPipelineUnicornSort(intent.value)
         ) ||
-        (intent.value === "suitability" && scores === undefined)
+        (intent.value === "suitability" && scores === undefined) ||
+        (isPipelineUnicornSort(intent.value) && !unicornOn)
       )
         return "NOT_APPLICABLE";
       const next = {
@@ -268,17 +301,28 @@ export function RelationshipPipeline({
         ? "Name Z–A"
         : query.sort === "oldest"
           ? "Earliest first"
-          : null,
+          : unicornSort !== null
+            ? (UNICORN_SUMMARY[unicornSort] ?? null)
+            : null,
     layout === "board" ? "Board" : null,
   ]
     .filter((part): part is string => part !== null)
     .join(" · ");
   const exports = new URLSearchParams({ scope: data.scope });
+  // A Unicorn view is the web's own ranking: the export (the API's) keeps
+  // its filters and never carries premium scores.
   for (const [key, value] of Object.entries(query))
-    if (key !== "cursor" && key !== "pageSize" && value !== undefined)
+    if (
+      key !== "cursor" &&
+      key !== "pageSize" &&
+      value !== undefined &&
+      !(key === "sort" && isPipelineUnicornSort(value))
+    )
       exports.set(key, String(value));
   if (selected.length > 0) exports.set("selected", selected.join(","));
-  const filtered = query.q !== undefined || query.state !== undefined;
+  const unicornNarrowed = unicornSort !== null && unicornSort !== "unicorn";
+  const filtered =
+    query.q !== undefined || query.state !== undefined || unicornNarrowed;
   const rows = pipelinePresentedRows(data.items, layout);
   return (
     <div
@@ -410,11 +454,41 @@ export function RelationshipPipeline({
                   {t("Suitability, highest first")}
                 </option>
               )}
+              {unicornOn ? (
+                <option value={unicornSort ?? "unicorn"}>
+                  {t("Unicorn Potential, highest first")}
+                </option>
+              ) : null}
               <option value="recent">{t("Latest state change")}</option>
               <option value="oldest">{t("Earliest state change")}</option>
               <option value="name">{t("Name A–Z")}</option>
               <option value="name-desc">{t("Name Z–A")}</option>
             </select>
+            {unicornOn ? (
+              <select
+                aria-label={t("Unicorn Potential")}
+                className={selectClass}
+                value={unicornSort ?? "any"}
+                onChange={(event) =>
+                  move({
+                    ...query,
+                    sort:
+                      event.target.value === "any"
+                        ? undefined
+                        : sortParam(event.target.value),
+                    cursor: undefined,
+                  })
+                }
+                data-pipeline-unicorn-filter
+              >
+                <option value="any">{t("Unicorn Potential: any")}</option>
+                {UNICORN_FILTERS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {t(option.label)}
+                  </option>
+                ))}
+              </select>
+            ) : null}
             {layout === "table" ? (
               <details className="cq-body-sm relative">
                 <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
@@ -452,9 +526,7 @@ export function RelationshipPipeline({
               persist({ ...preferences, views: [...next] })
             }
             current={{
-              query: RelationshipPipelineQuerySchema.omit({
-                cursor: true,
-              }).parse(
+              query: RelationshipViewQuerySchema.parse(
                 Object.fromEntries(
                   Object.entries(query).filter(([key]) => key !== "cursor"),
                 ),
@@ -494,43 +566,68 @@ export function RelationshipPipeline({
         {ranked && (data.nextCursor !== null || query.cursor !== undefined)
           ? ` · ${t("ranked by suitability within each page")}`
           : ""}
+        {unicornSort !== null && unicornOn
+          ? ` · ${t("ranked by Unicorn Potential across your pipeline")}`
+          : ""}
       </p>
+      {unicornSort !== null && unicornOn ? (
+        <p className="cq-caption text-(--cq-text-secondary)" data-unicorn-note>
+          {t(
+            "Insufficient evidence is not a low score: those companies have no Unicorn Potential yet.",
+          )}
+        </p>
+      ) : null}
       {data.total === 0 ? (
         <div
           className="flex flex-col items-start gap-3 border-y border-(--cq-border-subtle) py-8"
           data-pipeline-empty
         >
           <p className="cq-body text-(--cq-text-primary)">
-            {filtered
-              ? t("No relationships match this view.")
-              : t("No relationships yet.")}
+            {unicornNarrowed
+              ? t(
+                  "No company in this view has a Unicorn Potential score here yet.",
+                )
+              : filtered
+                ? t("No relationships match this view.")
+                : t("No relationships yet.")}
           </p>
           <p className="cq-body-sm max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
-            {filtered
-              ? t("Clear the search or the state to see every relationship.")
-              : side === "INVESTOR"
-                ? t(
-                    "A relationship starts when you express interest in a company.",
-                  )
-                : t(
-                    "When an investor expresses interest in your company, it appears here. Investors can only find you once your company is visible.",
-                  )}
+            {unicornNarrowed
+              ? t(
+                  "Most companies don't have enough evidence for a numerical assessment yet. Every relationship is still in your pipeline.",
+                )
+              : filtered
+                ? t("Clear the search or the state to see every relationship.")
+                : side === "INVESTOR"
+                  ? t(
+                      "A relationship starts when you express interest in a company.",
+                    )
+                  : t(
+                      "When an investor expresses interest in your company, it appears here. Investors can only find you once your company is visible.",
+                    )}
           </p>
           <Link
             className={buttonClassName("secondary")}
             href={
-              filtered
-                ? pipelineHref({ sort: query.sort }, layout)
-                : side === "INVESTOR"
-                  ? "/discover"
-                  : "/company/visibility"
+              unicornNarrowed
+                ? pipelineHref({ q: query.q, state: query.state }, layout)
+                : filtered
+                  ? pipelineHref(
+                      { sort: unicornSort === null ? query.sort : undefined },
+                      layout,
+                    )
+                  : side === "INVESTOR"
+                    ? "/discover"
+                    : "/company/visibility"
             }
           >
-            {filtered
-              ? t("Clear filters")
-              : side === "INVESTOR"
-                ? t("Open Discover")
-                : t("Check visibility")}
+            {unicornNarrowed
+              ? t("Show all relationships")
+              : filtered
+                ? t("Clear filters")
+                : side === "INVESTOR"
+                  ? t("Open Discover")
+                  : t("Check visibility")}
           </Link>
         </div>
       ) : layout === "table" ? (
@@ -553,6 +650,11 @@ export function RelationshipPipeline({
                   <>
                     <th className="py-2 pe-4 text-end">{t("Suitability")}</th>
                     <th className="py-2 pe-4 text-end">{t("Investability")}</th>
+                    {unicornOn ? (
+                      <th className="py-2 pe-4 text-end">
+                        {t("Unicorn Potential")}
+                      </th>
+                    ) : null}
                   </>
                 )}
                 {preferences.columns.includes("state") ? (
@@ -630,6 +732,22 @@ export function RelationshipPipeline({
                           variant="cell"
                         />
                       </td>
+                      {unicornOn ? (
+                        <td className="py-3 pe-4 text-end whitespace-nowrap">
+                          {row.counterpart.kind !== "COMPANY" ? null : (
+                            <UnicornFigure
+                              cell={
+                                scoreOf(scores, row)?.unicorn ?? {
+                                  status: "NOT_ASSESSED",
+                                  score: null,
+                                }
+                              }
+                              companyId={row.counterpart.id}
+                              variant="cell"
+                            />
+                          )}
+                        </td>
+                      ) : null}
                     </>
                   )}
                   {preferences.columns.includes("state") ? (
@@ -716,6 +834,7 @@ export function RelationshipPipeline({
                         ) : (
                           <ScoreLine
                             scores={scoreOf(scores, row) ?? UNKNOWN_SCORES}
+                            companyId={row.counterpart.id}
                           />
                         )}
                         {row.nextStep === "NONE" ? null : (

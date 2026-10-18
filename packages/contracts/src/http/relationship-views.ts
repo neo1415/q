@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { UuidSchema } from "../common/ids.js";
 import { UtcTimestampSchema } from "../common/time.js";
-import { RelationshipPipelineQuerySchema } from "./relationship-pipeline.js";
+import { RelationshipPipelineViewQuerySchema } from "./relationship-pipeline.js";
 
 /**
  * CRM saved views (owner directive 2026-10-15 §D): a named pipeline filter,
@@ -25,9 +25,9 @@ export const PipelineColumnsSchema = z
   });
 export type PipelineColumn = (typeof PIPELINE_COLUMNS)[number];
 
-export const RelationshipViewQuerySchema = RelationshipPipelineQuerySchema.omit(
-  { cursor: true },
-);
+// A Unicorn Potential view is saved in `sort` (stored keys unchanged).
+export const RelationshipViewQuerySchema =
+  RelationshipPipelineViewQuerySchema.omit({ cursor: true });
 
 export const RELATIONSHIP_VIEW_SCOPES = ["PERSONAL", "ORGANISATION"] as const;
 export const RelationshipViewScopeSchema = z.enum(RELATIONSHIP_VIEW_SCOPES);

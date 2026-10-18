@@ -14,8 +14,13 @@ import {
 } from "@capital-q/api-client";
 import {
   FIT_IDS_MAX,
+  isPipelineUnicornSort,
   RelationshipPipelineQuerySchema,
+  RelationshipPipelineViewQuerySchema,
   type FitProfileDto,
+  type PipelineUnicornSort,
+  type RelationshipPipelineDto,
+  type RelationshipPipelineQuery,
   type NotificationDto,
   type RelationshipSummaryDto,
   type ReminderDto,
@@ -74,17 +79,24 @@ import {
   PAGE_SIZE,
 } from "@/features/relationships/relationships-view";
 import {
+  hasUnicornScores,
   listOrdered,
   listSortOf,
   pipelineScoresById,
   rankBySuitability,
   scoreOf,
+  unicornView,
   type PipelineScores,
 } from "@/features/relationships/pipeline-scores";
 import { serverT } from "@/features/i18n/server";
 
 /** The API's widest page: what a Suitability-ranked Table/Board ranks. */
 const RANKED_PAGE_SIZE = 50;
+/**
+ * A Unicorn Potential view ranks the reader's whole pipeline, read a full
+ * API page at a time up to this many pages; past it the count says "up to".
+ */
+const UNICORN_MAX_PAGES = 10;
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await serverT();
@@ -141,7 +153,7 @@ export default async function RelationshipsPage({
   const side = hubSideOf(context);
   if (view === "pipeline" && layout !== "list") {
     const [session, user] = await Promise.all([apiSession(), getSessionUser()]);
-    const parsed = RelationshipPipelineQuerySchema.safeParse(
+    const parsed = RelationshipPipelineViewQuerySchema.safeParse(
       Object.fromEntries(
         Object.entries(params).filter(([key]) =>
           ["q", "state", "sort", "cursor", "pageSize"].includes(key),
@@ -150,19 +162,43 @@ export default async function RelationshipsPage({
     );
     const ownCompany =
       context.kind === "FOUNDER" ? context.companyId : undefined;
+    // A Unicorn Potential view (investor; premium decided by the Q API) is
+    // ranked here over the whole pipeline; the API is asked in its own
+    // order and never sees the view.
+    const unicorn: PipelineUnicornSort | null =
+      side === "INVESTOR" &&
+      parsed.success &&
+      isPipelineUnicornSort(parsed.data.sort)
+        ? parsed.data.sort
+        : null;
+    const apiParsed: RelationshipPipelineQuery | undefined = parsed.success
+      ? {
+          ...parsed.data,
+          sort: isPipelineUnicornSort(parsed.data.sort)
+            ? undefined
+            : parsed.data.sort,
+          ...(unicorn === null ? {} : { cursor: undefined }),
+        }
+      : undefined;
     // Owner 2026-10-17: with no sort chosen, an investor's view is ranked
     // by Suitability. The API pages by its own keys, so the widest page is
     // read and ranked here, and the view says it ranks page by page. A
     // chosen sort stays the API's.
     const ranked =
-      side === "INVESTOR" && parsed.success && parsed.data.sort === undefined;
+      side === "INVESTOR" &&
+      apiParsed !== undefined &&
+      apiParsed.sort === undefined &&
+      unicorn === null;
     const apiQuery =
-      parsed.success && ranked
+      apiParsed !== undefined && (ranked || unicorn !== null)
         ? {
-            ...parsed.data,
-            pageSize: parsed.data.pageSize ?? RANKED_PAGE_SIZE,
+            ...apiParsed,
+            pageSize:
+              unicorn !== null
+                ? RANKED_PAGE_SIZE
+                : (apiParsed.pageSize ?? RANKED_PAGE_SIZE),
           }
-        : parsed.data;
+        : apiParsed;
     // The saved views are their own read: a failure leaves the pipeline
     // working and says the views couldn't load.
     const [read, views] =
@@ -172,28 +208,48 @@ export default async function RelationshipsPage({
       apiQuery === undefined
         ? [null, null]
         : await Promise.all([
-            queryRelationshipPipeline(session, apiQuery, ownCompany).catch(
-              () => null,
-            ),
+            (unicorn === null
+              ? queryRelationshipPipeline(session, apiQuery, ownCompany)
+              : wholePipeline(session, apiQuery, ownCompany)
+            ).catch(() => null),
             listRelationshipViews(session, ownCompany).catch(() => null),
           ]);
-    // The page's companies' scores (investor only); unknown ranks last.
+    // The companies' scores (investor only); unknown ranks last.
     const scored =
       read === null || side !== "INVESTOR"
         ? undefined
         : (await relationshipScores(read.items)).scores;
-    const data =
-      read === null || !ranked || scored === undefined
-        ? read
-        : {
-            ...read,
-            items: [
-              ...rankBySuitability(
+    const data: RelationshipPipelineDto | null =
+      read === null
+        ? null
+        : unicorn !== null && scored !== undefined && hasUnicornScores(scored)
+          ? unicornPage(
+              read,
+              unicornView(
                 read.items,
-                (item) => scoreOf(scored, item)?.suitability ?? null,
+                (item) => scoreOf(scored, item)?.unicorn,
+                unicorn,
               ),
-            ],
-          };
+              parsed.success ? parsed.data.cursor : undefined,
+            )
+          : unicorn !== null
+            ? // Not entitled (or nothing to rank): the usual first page.
+              {
+                ...read,
+                items: read.items.slice(0, RANKED_PAGE_SIZE),
+                nextCursor: null,
+              }
+            : !ranked || scored === undefined
+              ? read
+              : {
+                  ...read,
+                  items: [
+                    ...rankBySuitability(
+                      read.items,
+                      (item) => scoreOf(scored, item)?.suitability ?? null,
+                    ),
+                  ],
+                };
     const subjectId =
       context.kind === "FOUNDER"
         ? context.companyId
@@ -470,7 +526,7 @@ export default async function RelationshipsPage({
           listOrdered(items, scores, sort).slice(0, PAGE_SIZE),
         );
   const [digests, read] =
-    sort === "suitability"
+    sort === "suitability" || sort === "unicorn"
       ? await scored.then(
           async (found) => [await firstPage(found?.scores), found] as const,
         )
@@ -542,6 +598,58 @@ export default async function RelationshipsPage({
       </QSection>
     </PageContainer>
   );
+}
+
+/**
+ * The reader's whole authorised pipeline for a Unicorn Potential view: the
+ * API's own pages, in its order, up to UNICORN_MAX_PAGES. `nextCursor` is
+ * non-null only when it stopped short, so the count can say "up to".
+ */
+async function wholePipeline(
+  session: NonNullable<Awaited<ReturnType<typeof apiSession>>>,
+  query: RelationshipPipelineQuery,
+  ownCompany: string | undefined,
+): Promise<RelationshipPipelineDto> {
+  const first = await queryRelationshipPipeline(
+    session,
+    { ...query, cursor: undefined },
+    ownCompany,
+  );
+  const items = [...first.items];
+  let next = first.nextCursor;
+  for (let page = 1; next !== null && page < UNICORN_MAX_PAGES; page += 1) {
+    const more = await queryRelationshipPipeline(
+      session,
+      { ...query, cursor: next },
+      ownCompany,
+    );
+    items.push(...more.items);
+    next = more.nextCursor;
+  }
+  return { ...first, items, nextCursor: next };
+}
+
+/**
+ * One page of a Unicorn Potential view. Its cursor ("u" and the position)
+ * is the web's own, over a list ranked in full on the server, so paging is
+ * stable and never re-ranks; the API's cursor is never involved.
+ */
+function unicornPage(
+  read: RelationshipPipelineDto,
+  view: readonly RelationshipSummaryDto[],
+  cursor: string | undefined,
+): RelationshipPipelineDto {
+  const at = /^u(\d{1,4})$/.exec(cursor ?? "");
+  const from = at === null ? 0 : Math.min(Number(at[1]), view.length);
+  const to = from + RANKED_PAGE_SIZE;
+  return {
+    items: view.slice(from, to),
+    total: view.length,
+    // Exact only when the whole pipeline was read and checked.
+    totalExact: read.nextCursor === null && read.totalExact !== false,
+    scope: read.scope,
+    nextCursor: to < view.length ? `u${String(to)}` : null,
+  };
 }
 
 function hubSideOf(

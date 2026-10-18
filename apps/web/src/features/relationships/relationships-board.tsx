@@ -24,8 +24,9 @@ import { effectShown } from "@/features/q/control/perform";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
 import { RelationshipFitLine } from "@/features/fit/relationship-fit-chips";
 
-import { ScoreFigure, ScoreLine } from "./pipeline-score-figure";
+import { ScoreFigure, ScoreLine, UnicornFigure } from "./pipeline-score-figure";
 import {
+  hasUnicornScores,
   listOrdered,
   scoreOf,
   UNKNOWN_SCORES,
@@ -110,6 +111,10 @@ const TONE: Readonly<Record<ReturnType<typeof stageTone>, StatusTone>> = {
 const GRID_PLAIN = "lg:grid-cols-[40px_minmax(0,1fr)_150px_96px_190px]";
 const GRID_SCORED =
   "lg:grid-cols-[40px_minmax(0,1fr)_84px_84px_140px_88px_176px]";
+// With Unicorn Potential (premium): a third, wider score column, whose
+// words ("Insufficient evidence") wrap within it rather than squeeze.
+const GRID_UNICORN =
+  "lg:grid-cols-[40px_minmax(0,1fr)_76px_76px_96px_128px_80px_168px]";
 
 const ICONS = {
   upload: Upload,
@@ -186,10 +191,15 @@ export function RelationshipsBoard({
     },
   });
   const [digests, setDigests] = useState(initialDigests);
+  const unicornOn = hasUnicornScores(scores);
   const sort: ListSort =
-    scores === undefined || initialSort !== "suitability"
+    scores === undefined || initialSort === "recent"
       ? "recent"
-      : "suitability";
+      : initialSort === "unicorn" && unicornOn
+        ? "unicorn"
+        : "suitability";
+  const grid =
+    scores === undefined ? GRID_PLAIN : unicornOn ? GRID_UNICORN : GRID_SCORED;
   const ordered = useMemo(
     () => listOrdered(items, scores, sort),
     [items, scores, sort],
@@ -273,8 +283,8 @@ export function RelationshipsBoard({
   // with it); the choice stays in the URL, so a reload keeps it.
   const chooseSort = (next: ListSort) => {
     const url = new URL(window.location.href);
-    if (next === "recent") url.searchParams.set("sort", "recent");
-    else url.searchParams.delete("sort");
+    if (next === "suitability") url.searchParams.delete("sort");
+    else url.searchParams.set("sort", next);
     router.push(`${url.pathname}${url.search}`);
   };
 
@@ -314,7 +324,11 @@ export function RelationshipsBoard({
             value={sort}
             onChange={(event) =>
               chooseSort(
-                event.target.value === "recent" ? "recent" : "suitability",
+                event.target.value === "recent"
+                  ? "recent"
+                  : event.target.value === "unicorn"
+                    ? "unicorn"
+                    : "suitability",
               )
             }
             className="cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface-raised) px-3 pe-8 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
@@ -323,6 +337,11 @@ export function RelationshipsBoard({
             <option value="suitability">
               {t("Suitability, highest first")}
             </option>
+            {unicornOn ? (
+              <option value="unicorn">
+                {t("Unicorn Potential, highest first")}
+              </option>
+            ) : null}
             <option value="recent">{t("Latest state change")}</option>
           </select>
         </label>
@@ -384,7 +403,7 @@ export function RelationshipsBoard({
             aria-hidden="true"
             className={cx(
               "cq-caption hidden gap-3 px-4 text-(--cq-text-tertiary) lg:grid",
-              scores === undefined ? GRID_PLAIN : GRID_SCORED,
+              grid,
             )}
           >
             <span />
@@ -393,6 +412,7 @@ export function RelationshipsBoard({
               <>
                 <span>{t("Suitability")}</span>
                 <span>{t("Investability")}</span>
+                {unicornOn ? <span>{t("Unicorn Potential")}</span> : null}
               </>
             )}
             <span>{t("Stage")}</span>
@@ -425,6 +445,8 @@ export function RelationshipsBoard({
                   }
                   unread={(row.facts?.unread ?? 0) > 0}
                   now={now}
+                  grid={grid}
+                  unicornColumn={unicornOn}
                   scores={
                     scores === undefined
                       ? undefined
@@ -476,7 +498,13 @@ function RelationshipRow({
   now,
   fit,
   scores,
+  grid,
+  unicornColumn,
 }: {
+  /** The list's column template, so rows align with its header. */
+  readonly grid: string;
+  /** The list shows Unicorn Potential (premium): this row has its column. */
+  readonly unicornColumn: boolean;
   readonly item: RelationshipSummaryDto;
   readonly fit?: FitProfileDto | null | undefined;
   /** Undefined: no score columns on this list. */
@@ -512,7 +540,7 @@ function RelationshipRow({
       aria-labelledby={`relationship-${item.relationshipId}`}
       className={cx(
         "relative grid grid-cols-[40px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 p-3.5 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:px-4 lg:py-3",
-        scores === undefined ? GRID_PLAIN : GRID_SCORED,
+        grid,
       )}
       data-relationship-card={item.state}
     >
@@ -564,7 +592,15 @@ function RelationshipRow({
         {scores === undefined ? null : (
           // A phone card says both scores, labelled; from tablet-landscape
           // up they are the columns beside the name.
-          <ScoreLine scores={scores} className="mt-0.5 lg:hidden" />
+          <ScoreLine
+            scores={scores}
+            companyId={
+              item.counterpart.kind === "COMPANY"
+                ? item.counterpart.id
+                : undefined
+            }
+            className="mt-0.5 lg:hidden"
+          />
         )}
         <div className="flex items-center gap-2 lg:hidden">
           {pill}
@@ -587,6 +623,19 @@ function RelationshipRow({
               variant="column"
             />
           </div>
+          {unicornColumn ? (
+            <div className="hidden lg:block">
+              {item.counterpart.kind !== "COMPANY" ? null : (
+                <UnicornFigure
+                  cell={
+                    scores.unicorn ?? { status: "NOT_ASSESSED", score: null }
+                  }
+                  companyId={item.counterpart.id}
+                  variant="column"
+                />
+              )}
+            </div>
+          ) : null}
         </>
       )}
       <div className="hidden lg:block">{pill}</div>
