@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Work on a phone (proposed)</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="stage">
+      <div class="stage-title">
+        <h1 class="t-title-lg">Work on a phone</h1>
+        <span class="muted">390 × 844 · investor · light · Black and gold</span>
+      </div>
+      <div class="devices">
+        <div class="device">
+          <div class="device-frame">
+            <iframe title="Work tabs" src="index.html?tab=documents&amp;nav=a" data-frame="tabs"></iframe>
+          </div>
+          <div class="device-label">Work tabs<span>One strip that scrolls sideways</span></div>
+        </div>
+        <div class="device">
+          <div class="device-frame">
+            <iframe title="Option A" src="index.html?tab=tasks&amp;nav=a" data-frame="a"></iframe>
+          </div>
+          <div class="device-label">
+            Option A: Work first in More<span>Bar: Discover · Explore · Q · CRM · More</span>
+          </div>
+        </div>
+        <div class="device">
+          <div class="device-frame">
+            <iframe title="Option B" src="index.html?tab=tasks&amp;nav=b" data-frame="b"></iframe>
+          </div>
+          <div class="device-label">
+            Option B: Work replaces More<span>Bar: Discover · Explore · Q · CRM · Work</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="caption" data-caption></div>
+    <script>
+      window.cq = {
+        setCaption(text, sub) {
+          document.querySelector("[data-caption]").innerHTML = text
+            ? text + (sub ? "<small>" + sub + "</small>" : "")
+            : "";
+        },
+        frame(name) {
+          return document.querySelector('[data-frame="' + name + '"]').contentWindow;
+        },
+      };
+    </script>
+  </body>
+</html>
