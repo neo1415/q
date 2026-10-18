@@ -492,16 +492,7 @@ export default async function RelationshipsPage({
         actions={
           side === "NONE" ? null : (
             <>
-              {side === "INVESTOR" ? (
-                // ADR 0023: founders' Connection Requests wait on the investor here.
-                <Link
-                  href="/investors"
-                  className={buttonClassName("quiet", "compact")}
-                  data-company-requests-link
-                >
-                  {t("Company requests")}
-                </Link>
-              ) : null}
+              {/* Company requests is a CRM tab (2026-10-17), not a link here. */}
               {/* A relationship starts where its first step is taken:
                   interest from Discover, or a request from Investors. */}
               <Link
