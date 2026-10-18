@@ -354,7 +354,7 @@ async function main() {
         const page = await context.newPage();
         await page.goto(
           new URL(
-            actor.profilePath ?? `/companies/${fixture.scoredCompanyId}`,
+            actor.profilePath ?? `/company/${fixture.scoredCompanyId}`,
             web,
           ).href,
           { waitUntil: "domcontentloaded", timeout: 60000 },
@@ -474,7 +474,7 @@ async function main() {
           new URL(
             actor.role === "premiumFounder"
               ? actor.gateqPath
-              : (actor.profilePath ?? `/companies/${fixture.scoredCompanyId}`),
+              : (actor.profilePath ?? `/company/${fixture.scoredCompanyId}`),
             web,
           ).href,
           { waitUntil: "domcontentloaded", timeout: 60000 },
@@ -657,7 +657,7 @@ async function main() {
         });
         if (actor.role === "premiumInvestor") {
           await page.goto(
-            new URL(`/companies/${fixture.unscoredCompanyId}`, web).href,
+            new URL(`/company/${fixture.unscoredCompanyId}`, web).href,
             { waitUntil: "domcontentloaded", timeout: 60000 },
           );
           const thinPanel = page.locator(
