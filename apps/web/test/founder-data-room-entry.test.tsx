@@ -3,8 +3,12 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { classifyRoute } from "@/auth/route-policy";
-import { navigationGroupsFor } from "@/components/app-shell/navigation";
+import {
+  isActiveRoute,
+  navigationGroupsFor,
+} from "@/components/app-shell/navigation";
 import { isAppRoute } from "@/features/q/control/app-routes";
+import { WORK_DATA_ROOM_HREF, workTabs } from "@/features/work/work-tabs";
 
 const mocks = vi.hoisted(() => ({
   redirect: vi.fn((to: string) => {
@@ -32,13 +36,18 @@ afterEach(() => {
 
 /** Owner 2026-10-15: a founder's data room and deck, easy to reach. */
 describe("the founder's own data room entry", () => {
-  it("is in the founder's sidebar only, and a protected app route", () => {
+  it("is reached from the founder's Pitch tab under Work, and a protected app route", () => {
+    // Owner 2026-10-18: no sidebar entry of its own; Work's Pitch tab (a
+    // founder's only) links it, and Work stays current on it.
     const hrefs = (scope: "founder_private" | "investor_private") =>
       navigationGroupsFor(scope).flatMap((group) =>
         group.items.map((item) => item.href),
       );
-    expect(hrefs("founder_private")).toContain("/company/data-room");
-    expect(hrefs("investor_private")).not.toContain("/company/data-room");
+    expect(hrefs("founder_private")).not.toContain("/company/data-room");
+    expect(workTabs("COMPANY").map((tab) => tab.href)).toContain("/pitch");
+    expect(workTabs("INVESTOR").map((tab) => tab.href)).not.toContain("/pitch");
+    expect(WORK_DATA_ROOM_HREF).toBe("/company/data-room");
+    expect(isActiveRoute("/company/data-room", "/work")).toBe(true);
     expect(isAppRoute("/company/data-room")).toBe(true);
     expect(classifyRoute("/company/data-room")).toBe("protected");
   });

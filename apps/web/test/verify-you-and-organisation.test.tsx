@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { AdminVerificationRowDto, KybDto } from "@capital-q/contracts";
 
-import { MobileNavigation } from "../src/components/app-shell/mobile-navigation";
+import { YouSheet } from "../src/components/app-shell/mobile-navigation";
 import { verificationGroups } from "../src/features/admin/verification-groups";
 import {
   personVerificationOptional,
@@ -133,25 +133,25 @@ describe("Verify you and <organisation> (ADMIN-4)", () => {
     );
   });
 
-  it("sits inside More on a phone, and is gone when there is nothing to show", () => {
+  it("sits inside You on a phone, and is gone when there is nothing to show", () => {
     const { unmount } = render(
-      <MobileNavigation
+      <YouSheet
         scope="founder_private"
         verifyNudge={verifyNudge(kyb("PENDING", "NOT_REQUESTED"))}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("button", { name: "You" }));
     const link = screen.getByRole("link", { name: /Verify you and Nixo/ });
     expect(link.getAttribute("href")).toBe("/verification");
     expect(link.textContent).toContain("Needs something from you");
     unmount();
     render(
-      <MobileNavigation
+      <YouSheet
         scope="founder_private"
         verifyNudge={verifyNudge(kyb("VERIFIED", "VERIFIED"))}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(screen.getByRole("button", { name: "You" }));
     expect(screen.queryByRole("link", { name: /Verify you and/ })).toBeNull();
   });
 });

@@ -58,7 +58,7 @@ afterEach(() => {
 describe("sidebar groups", () => {
   it("are disclosures, closed by default on a first visit", () => {
     render(<DesktopSidebar context={INVESTOR} />);
-    for (const name of ["Workspace", "You"]) {
+    for (const name of ["You"]) {
       const button = toggle(name);
       expect(button.getAttribute("aria-expanded")).toBe("false");
       const list = document.getElementById(
@@ -66,7 +66,9 @@ describe("sidebar groups", () => {
       );
       expect(list?.hidden).toBe(true);
     }
-    expect(screen.queryByRole("link", { name: /^Work/ })).toBeNull();
+    // Work is one main entry since 2026-10-18 (no Workspace folder).
+    expect(screen.queryByRole("button", { name: /^Workspace/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /^Work/ })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
     // The main areas have no label and never fold.
     expect(screen.getByRole("link", { name: "Discover" })).toBeTruthy();
@@ -77,7 +79,7 @@ describe("sidebar groups", () => {
     await userEvent.click(toggle("You"));
     expect(toggle("You").getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByRole("link", { name: "Settings" })).toBeTruthy();
-    expect(toggle("Workspace").getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("link", { name: /^Work/ })).toBeTruthy();
     expect(
       parseGroupChoices(window.localStorage.getItem(NAV_GROUPS_STORAGE_KEY)),
     ).toEqual({ You: true });
@@ -100,7 +102,7 @@ describe("sidebar groups", () => {
         .getByRole("link", { name: "Settings" })
         .getAttribute("aria-current"),
     ).toBe("page");
-    expect(toggle("Workspace").getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("link", { name: /^Work/ })).toBeTruthy();
     expect(window.localStorage.getItem(NAV_GROUPS_STORAGE_KEY)).toBeNull();
     // The person may still close it.
     await userEvent.click(toggle("You"));
@@ -132,8 +134,11 @@ describe("sidebar groups", () => {
 
   it("ignore malformed saved choices", () => {
     expect(parseGroupChoices("{not json")).toEqual({});
-    expect(parseGroupChoices('{"You":"yes","Workspace":true,"x":1}')).toEqual({
-      Workspace: true,
+    // The retired Workspace folder's saved choice is ignored.
+    expect(
+      parseGroupChoices('{"You":"yes","Admin":true,"Workspace":true,"x":1}'),
+    ).toEqual({
+      Admin: true,
     });
     expect(parseGroupChoices("null")).toEqual({});
   });

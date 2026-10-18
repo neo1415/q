@@ -3,10 +3,9 @@ import { Suspense } from "react";
 
 import { Skeleton } from "@capital-q/ui/states";
 
-import {
-  PageContainer,
-  PageHeader,
-} from "@/components/app-shell/page-container";
+import { PageContainer } from "@/components/app-shell/page-container";
+import { resolveOwnContext } from "@/features/q/context";
+import { WorkHeader, workSideOf } from "@/features/work/work-header";
 import {
   pendingQApprovalsAction,
   readQApprovalAction,
@@ -133,12 +132,15 @@ export default async function WorkRoute({
 }: {
   readonly searchParams: Promise<{ readonly view?: string | string[] }>;
 }) {
-  const t = await serverT();
+  // Remembers the person's language for the header below (serverTNow).
+  await serverT();
 
   const view = workViewOf((await searchParams).view);
+  // The shell already read this for the request; React's cache shares it.
+  const context = await resolveOwnContext().catch(() => null);
   return (
     <PageContainer>
-      <PageHeader title={t("Work")} />
+      <WorkHeader view="tasks" side={workSideOf(context)} />
       <Suspense fallback={<Skeleton lines={6} />}>
         <WorkLists view={view} />
       </Suspense>

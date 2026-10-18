@@ -63,7 +63,7 @@ export function DesktopSidebar({
   });
   // What waits on them, from the shell's one notice read (no extra call).
   const needsYou = useNeedsYouCount();
-  // Workspace, You and Admin fold away, closed until opened (2026-10-07).
+  // You and Admin fold away, closed until opened (2026-10-07).
   const disclosure = useNavGroups(groups, pathname);
   const t = useT();
 
