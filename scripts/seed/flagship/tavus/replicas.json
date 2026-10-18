@@ -128,22 +128,27 @@
     {
       "slug": "kuuza",
       "replicaId": "rd27826c12a6",
-      "name": "Julia - Business"
+      "name": "Julia - Business",
+      "why": "Business-wardrobe variant; composed, executive delivery suits a confident B2B sales-training pitch."
     },
     {
       "slug": "songscribe",
       "replicaId": "rbb3d627a705",
-      "name": "Mateo"
+      "name": "Mateo",
+      "why": "Animated, story-telling delivery suits a creative, music-led consumer and brand product."
     },
     {
       "slug": "capital-q",
       "replicaId": "r4f5b5ef55c8",
-      "name": "Celine - Studio"
+      "name": "Celine - Studio",
+      "why": "Studio variant; calm and understated, fits a restrained institutional tone."
     },
     {
       "slug": "zino-aviation",
       "replicaId": "re6220ec0195",
-      "name": "Raj - Business"
+      "name": "Raj - Business",
+      "why": "Business-wardrobe variant; steady, premium delivery for third-person founder storytelling. Not cast as, and never named as, Captain Zino Mario."
     }
-  ]
+  ],
+  "beforeRender": "Preview each chosen replica in the Tavus dashboard (look, wardrobe, voice) before --apply; the temperaments in tavus-20 describe fictional characters, not the actors."
 }
