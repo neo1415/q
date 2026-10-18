@@ -889,3 +889,7 @@ Original fact correction is deployed23a65ce3 across four SUCCESS services and re
 ### Unicorn release continuation — 17 October, 22:29 UTC
 
 PR217 / `codex/unicorn-qfiles-oct17`: locale failure repaired; canonical structured-input repair and UUID/current-vs-historical source guard implemented. Full hosted461 audit, package/root/app gates, exact-head protected CI, normal integration/production gates, unapplied28200000+28201500,43scoped ACCESS grants, paced backfill and actual investor/founder desktop/mobile/Q/Discover/denial acceptance remain. No release claim; Home Q files/public web paused. See workstreams/UNICORN-QFILES-OCT17.md.
+
+## 18 October,05:45WAT — Unicorn release continuation
+
+Recovered narrativeWIP, verified42scoring tests, preserved current8693integration and fourproductionSUCCESS c36b99bb. Prior21727c7protectedCI39075445136 PASS; new sourcehead requires freshCI.461frozenaudit now recognizes342companies with partialevidence (baseline1), but0overall scores; maxcoverage33.5% belowunchanged60%. No migrations/grants/deployments performed. See workstreams/UNICORN-QFILES-OCT17.md latest checkpoint. Continue protected release and real unscored/gaps acceptance; never certify a numeric score without evidence.

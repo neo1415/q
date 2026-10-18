@@ -1,5 +1,9 @@
 # Capital Q — Current shared engineering state
 
+## Latest Unicorn release checkpoint — 18 October, 05:45 WAT
+
+PR217 is OPEN. Prior27c7a17b6 is CI GREEN39075445136; latest narrative/provenance/retraction repairs and integration reconciliation require new exact-head gates. Source branch `codex/unicorn-qfiles-oct17`; latest integrated upstream8693a41ac preserved. Production allfourRailway SUCCESS c36b99bb57a31c6946eef85bac0a11122132fae3. Unicorn is not deployed;28200000/28201500 migrations UNAPPLIED,43scoped grants NOT applied. Frozen461audit:0scored,461insufficient;342have legitimate pillar coverage afterrepair (baseline1), max33.5%, no fabricated scores. See [current workstream](workstreams/UNICORN-QFILES-OCT17.md#resumed-release-checkpoint--18-october-0545-wat) for exact checks, recovery and release sequence. Home files/public web paused.
+
 ## Unicorn release continuation — 17 October, 22:29 UTC (latest observed state)
 
 PR217 is still OPEN and Unicorn is not deployed. Continue `codex/unicorn-qfiles-oct17`; latest recovered remote17ea9a33 had CI39072870845 database/types/build/lint PASS, test/quality FAIL on two missing locale labels. Repairs preserve the existing implementation and scoring gates; see [workstream evidence](workstreams/UNICORN-QFILES-OCT17.md#release-repair-checkpoint--17-october-2229-utc). New protected exact-head CI is mandatory before integration/release.

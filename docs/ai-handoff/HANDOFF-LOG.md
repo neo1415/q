@@ -809,3 +809,7 @@ Open items and every SHA: `docs/ai-handoff/Q-CONVERSATION-FIXES-2026-10-17.md`.
 ## 17 October 2026, 22:29 UTC — PR217 release repair checkpoint
 
 Recovered latest PR21717ea9a33, preserved older overlapping WIP to pushed branches. Fixed locale gate and canonical structured evidence projection/mapping; added UUID-safe current-source authorization and separately authorized history. Targeted engine/repository and focused nativePG checks passed; full new protected CI and actual hosted461 audit remain pending. Production allfourSUCCESSa70e66a8; latest migration28190000; no Unicorn migration/grant/deployment performed.43existing-org plan reconstructed without widening signup/usage rules. Exact commits, migration/test limits and next gates recorded in workstreams/UNICORN-QFILES-OCT17.md. Continue this existing PR; do not merge preserved alternate foundations wholesale.
+
+## 18 October,05:45WAT — Unicorn release continuation
+
+Recovered narrativeWIP, verified42scoring tests, preserved current8693integration and fourproductionSUCCESS c36b99bb. Prior21727c7protectedCI39075445136 PASS; new sourcehead requires freshCI.461frozenaudit now recognizes342companies with partialevidence (baseline1), but0overall scores; maxcoverage33.5% belowunchanged60%. No migrations/grants/deployments performed. See workstreams/UNICORN-QFILES-OCT17.md latest checkpoint. Continue protected release and real unscored/gaps acceptance; never certify a numeric score without evidence.
