@@ -227,6 +227,16 @@ async function main() {
     writeFileSync(join(evidence, name), JSON.stringify(value, null, 2), {
       mode: 0o600,
     });
+  const selectedRoles = process.env.CQ_UNICORN_ACCEPTANCE_ROLES?.split(",");
+  assert.ok(
+    selectedRoles === undefined ||
+      (selectedRoles.length > 0 &&
+        selectedRoles.every((role) => ROLES.includes(role))),
+    "Explicit known acceptance roles required",
+  );
+  const skippedRoles = ROLES.filter(
+    (role) => selectedRoles !== undefined && !selectedRoles.includes(role),
+  );
   const outcomes = [];
   let browser;
   let activePage;
@@ -250,6 +260,7 @@ async function main() {
       args: ["--no-sandbox"],
     });
     for (const actor of fixture.actors) {
+      if (skippedRoles.includes(actor.role)) continue;
       const cookies = new Map();
       const client = createServerClient(
         config.NEXT_PUBLIC_SUPABASE_URL,
@@ -890,6 +901,9 @@ async function main() {
         evidence,
         checks: outcomes.length,
         remaining: [
+          ...skippedRoles.map(
+            (role) => `${role}: NOT_RUN (explicit role subset)`,
+          ),
           ...(fixture.expectedAssessmentStatus === "INSUFFICIENT_EVIDENCE"
             ? [
                 "genuinely scored company and nonempty numeric Discover sort unavailable; not certified",

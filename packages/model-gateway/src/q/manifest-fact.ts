@@ -1,5 +1,6 @@
 import {
   manifestRefs,
+  UnicornPotentialDtoSchema,
   type QManifestMedia,
   type QManifestNotice,
   type QManifestNoticeCode,
@@ -89,6 +90,16 @@ export function manifestReads(
       name: "gateq_inbox_summarise",
       arguments: { applicationId: id },
     });
+  }
+  if (available.has("fit_profile")) {
+    for (const companyId of assessmentCompanies(manifest)) {
+      const key = `fit_profile:${companyId}`;
+      reads.set(key, {
+        key,
+        name: "fit_profile",
+        arguments: { companyId },
+      });
+    }
   }
   let companies = 0;
   for (const ref of manifestRefs(manifest)) {
@@ -518,7 +529,10 @@ export function manifestFacts(
   results: ManifestReadResults,
 ): readonly AuthorisedFact[] {
   const parts: string[] = [];
-  const selectedSources = selectedDossierFacts(manifest, results);
+  const selectedSources = [
+    ...selectedDossierFacts(manifest, results),
+    ...selectedAssessmentFacts(manifest, results),
+  ];
   const top = manifest.dialogs.at(-1);
   if (top !== undefined) {
     const shown = lines(top.refs, results, EXPANDED_ITEMS);
@@ -658,4 +672,65 @@ function fact(statement: string): AuthorisedFact {
     evidenceStatus: "NO_EVIDENCE",
     source: "Their screen, read back through their own access",
   };
+}
+
+/** One visible company assessment, never a feed-wide score prefetch. */
+function assessmentCompanies(manifest: QPageManifest): readonly string[] {
+  if (
+    !manifest.controls?.some(
+      (control) =>
+        control.id === "disclosure.unicorn-potential" &&
+        control.kind === "DISCLOSURE",
+    )
+  )
+    return [];
+  const ids = new Set(
+    manifest.sections
+      .filter((section) => section.kind === "COMPANY_PROFILE")
+      .flatMap((section) => section.refs)
+      .filter((ref) => ref.kind === "COMPANY")
+      .map((ref) => ref.id.toLowerCase()),
+  );
+  return ids.size === 1 ? [...ids] : [];
+}
+
+/** Actual persisted arithmetic and source axes, not a second assessment. */
+function selectedAssessmentFacts(
+  manifest: QPageManifest,
+  results: ManifestReadResults,
+): readonly AuthorisedFact[] {
+  const facts: AuthorisedFact[] = [];
+  for (const id of assessmentCompanies(manifest)) {
+    const read = results.get(`fit_profile:${id}`);
+    if (!isRecord(read) || read["status"] !== "OK") continue;
+    const scores = read["scores"];
+    if (!isRecord(scores)) continue;
+    const parsed = UnicornPotentialDtoSchema.safeParse(
+      scores["unicornPotential"],
+    );
+    if (!parsed.success) continue; // Denied/absent/invalid is never inferred from profile text.
+    const { pillars, ...summary } = parsed.data;
+    const source =
+      "Persisted Unicorn Potential, through the person's authorized fit reader";
+    const header = `CURRENT COMPANY ASSESSMENT ${id}. Stored heuristic calculation, not verified company performance or a probability. Unknown is null, never zero. Calculation: 25 times the weighted mean of graded pillars, rounded once; insufficient evidence remains unscored. Actual stored result: ${JSON.stringify(summary)}`;
+    for (const statement of [
+      header,
+      ...pillars.map(
+        (pillar) =>
+          `CURRENT COMPANY ASSESSMENT ${id}, actual stored pillar and source truth/evidence axes: ${JSON.stringify(pillar)}`,
+      ),
+    ]) {
+      // The tool already bounds repeated evidence prose. Never truncate arithmetic.
+      for (let offset = 0; offset < statement.length; offset += FACT_CHARS) {
+        facts.push({
+          scope: "COMPANY_ASSESSMENT",
+          statement: statement.slice(offset, offset + FACT_CHARS),
+          truthClass: "Q_INFERENCE",
+          evidenceStatus: "PLATFORM_VERIFIED",
+          source,
+        });
+      }
+    }
+  }
+  return facts;
 }
