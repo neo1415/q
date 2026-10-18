@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import console from "node:console";
 import process from "node:process";
+import { URL } from "node:url";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 const url = new URL(
