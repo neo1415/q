@@ -1,0 +1,94 @@
+1
+00:00:00,300 --> 00:00:02,300
+Hello. I'm an AI presenter,
+
+2
+00:00:02,300 --> 00:00:03,500
+introducing KUUZA AI.
+
+3
+00:00:03,700 --> 00:00:06,100
+Every sales leader knows the problem:
+
+4
+00:00:06,100 --> 00:00:08,500
+new reps learn on real customers,
+
+5
+00:00:08,500 --> 00:00:11,300
+and real customers rarely
+give second chances.
+
+6
+00:00:11,500 --> 00:00:16,300
+KUUZA AI describes itself as an
+AI simulator and coach for sales,
+
+7
+00:00:16,300 --> 00:00:17,900
+service and human communication.
+
+8
+00:00:18,100 --> 00:00:20,100
+A rep picks a scenario,
+
+9
+00:00:20,100 --> 00:00:22,500
+a cold call, a discovery call,
+
+10
+00:00:22,500 --> 00:00:27,300
+an angry complaint, and speaks
+naturally with an AI persona by voice,
+
+11
+00:00:27,300 --> 00:00:28,500
+video or text.
+
+12
+00:00:28,700 --> 00:00:31,900
+The persona pushes back
+with tone and attitude.
+
+13
+00:00:32,100 --> 00:00:35,300
+The rep gets instant
+scoring and a debrief,
+
+14
+00:00:35,300 --> 00:00:37,300
+and managers see team analytics.
+
+15
+00:00:37,500 --> 00:00:40,700
+The company says its simulations
+add real-world noise,
+
+16
+00:00:40,700 --> 00:00:42,700
+like poor signal and interruptions,
+
+17
+00:00:42,700 --> 00:00:46,700
+and are built for accents and
+communication norms across Africa,
+
+18
+00:00:46,700 --> 00:00:48,700
+Asia and the Middle East.
+
+19
+00:00:48,900 --> 00:00:51,700
+Founded by Zino Mario and Excel Chukwu,
+
+20
+00:00:51,700 --> 00:00:53,700
+KUUZA offers a free demo,
+
+21
+00:00:53,700 --> 00:00:55,300
+with no account needed.
+
+22
+00:00:55,500 --> 00:00:57,100
+Simulate today. Dominate tomorrow.

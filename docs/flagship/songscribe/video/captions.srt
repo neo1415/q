@@ -1,0 +1,89 @@
+1
+00:00:00,300 --> 00:00:02,300
+Hi, I'm an AI presenter,
+
+2
+00:00:02,300 --> 00:00:04,300
+and this is SongScribe AI.
+
+3
+00:00:04,500 --> 00:00:07,300
+Some moments deserve more than a card.
+
+4
+00:00:07,500 --> 00:00:10,700
+SongScribe turns your story
+into an original song,
+
+5
+00:00:10,700 --> 00:00:12,700
+with music, lyrics and vocals,
+
+6
+00:00:12,700 --> 00:00:14,700
+built from a guided brief.
+
+7
+00:00:14,900 --> 00:00:17,700
+Tell its AI Producer about a birthday,
+
+8
+00:00:17,700 --> 00:00:20,100
+a wedding or someone you miss,
+
+9
+00:00:20,100 --> 00:00:22,100
+by chat or by voice.
+
+10
+00:00:22,300 --> 00:00:25,100
+It shows the cost before spending credits,
+
+11
+00:00:25,100 --> 00:00:29,100
+then returns two variations,
+typically in thirty to sixty seconds.
+
+12
+00:00:29,300 --> 00:00:32,500
+Creators use it for
+intros and theme music.
+
+13
+00:00:32,700 --> 00:00:34,700
+Brands use it for jingles,
+
+14
+00:00:34,700 --> 00:00:36,700
+sonic logos and campaign soundtracks.
+
+15
+00:00:36,900 --> 00:00:40,900
+Genres run from acoustic and
+gospel to Afrobeat and Amapiano,
+
+16
+00:00:40,900 --> 00:00:42,900
+and lyrics can blend English,
+
+17
+00:00:42,900 --> 00:00:44,100
+pidgin and Yoruba.
+
+18
+00:00:44,300 --> 00:00:47,900
+The rules are clear: no
+copyrighted lyrics or melodies,
+
+19
+00:00:47,900 --> 00:00:49,500
+and no artist sound-alikes.
+
+20
+00:00:49,700 --> 00:00:53,300
+Start free, then choose a
+personal or commercial licence.
+
+21
+00:00:53,500 --> 00:00:55,900
+Your story, turned into a song.

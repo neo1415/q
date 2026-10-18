@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "status": "PROPOSED — for review; not rendered, no Tavus credits spent",
+  "slug": "songscribe",
+  "company": "SongScribe AI",
+  "videoName": "Capital Q flagship — SongScribe AI (AI presenter)",
+  "replicaId": "rbb3d627a705",
+  "replicaName": "Mateo",
+  "startWithWave": false,
+  "targetSeconds": 54,
+  "estimate": {
+    "words": 134,
+    "seconds": 53.6,
+    "wordsPerSecond": 2.5
+  },
+  "tone": "Warm, creative, light energy; smiles on the occasion examples, steady on the rules line.",
+  "script": "Hi, I'm an AI presenter, and this is SongScribe AI. Some moments deserve more than a card. SongScribe turns your story into an original song, with music, lyrics and vocals, built from a guided brief. Tell its AI Producer about a birthday, a wedding or someone you miss, by chat or by voice. It shows the cost before spending credits, then returns two variations, typically in thirty to sixty seconds. Creators use it for intros and theme music. Brands use it for jingles, sonic logos and campaign soundtracks. Genres run from acoustic and gospel to Afrobeat and Amapiano, and lyrics can blend English, pidgin and Yoruba. The rules are clear: no copyrighted lyrics or melodies, and no artist sound-alikes. Start free, then choose a personal or commercial licence. Your story, turned into a song.",
+  "disclosure": {
+    "spoken": "The first sentence says the presenter is an AI presenter.",
+    "caption": "AI presenter · Tavus stock actor · not the founder",
+    "rule": "Burn the caption in for the whole video (bottom-left, small, high contrast). The presenter is never given a personal name and never speaks as the founder."
+  },
+  "background": {
+    "url": null,
+    "notes": "Full-frame presenter only (no Tavus background_url). Brand framing, lower-thirds and end card are added in post; see storyboard.md."
+  },
+  "visualNotes": "Dark frame with SongScribe red (#DC2B3C); waveform-free, no glowing visuals. No music under the presenter unless it is a SongScribe-generated track the founders confirm they hold the rights to; never a sound-alike of a real artist or voice.",
+  "sources": [
+    "docs/flagship/songscribe/research.md",
+    "docs/flagship/songscribe/facts.json",
+    "docs/flagship/songscribe/brand.md"
+  ],
+  "claims": [
+    {
+      "claim": "Turns a story into an original song: music, lyrics, vocals, from a guided brief",
+      "status": "SELF_REPORTED",
+      "source": "research.md §1, §2"
+    },
+    {
+      "claim": "AI Producer by chat or voice; shows cost before spending credits",
+      "status": "SELF_REPORTED",
+      "source": "research.md §8"
+    },
+    {
+      "claim": "Two variations, typically 30–60 seconds",
+      "status": "SELF_REPORTED (FAQ)",
+      "source": "research.md §2"
+    },
+    {
+      "claim": "Creators: intros, theme music; brands: jingles, sonic logos, campaign soundtracks",
+      "status": "SELF_REPORTED",
+      "source": "research.md §9"
+    },
+    {
+      "claim": "Genres incl. acoustic, gospel, Afrobeat, Amapiano; English/pidgin/Yoruba lyric blend in samples",
+      "status": "SELF_REPORTED",
+      "source": "research.md §4, §8"
+    },
+    {
+      "claim": "No copyrighted lyrics or melodies; no artist sound-alikes",
+      "status": "SELF_REPORTED (terms)",
+      "source": "research.md §11"
+    },
+    {
+      "claim": "Free start; personal and commercial licences on paid plans",
+      "status": "SELF_REPORTED (/pricing)",
+      "source": "research.md §10"
+    }
+  ],
+  "deliberatelyExcluded": [
+    "Prices (four conflicting tier schemes; $179 vs $199)",
+    "'Exclusive' / 'full rights' / ownership-certificate claims (chain of title unproven)",
+    "User counts or revenue (none published)",
+    "Underlying model vendor (undisclosed)",
+    "Legal entity (Terms vs UK register mismatch)"
+  ],
+  "guardrails": [
+    "No traction, revenue, customer count, valuation or funding is stated.",
+    "Company marketing claims are attributed ('describes itself', 'says', 'by his own account') or limited to offerings visible on the company's own pages.",
+    "Script words are fixed after review; captions.srt is generated from this script."
+  ]
+}

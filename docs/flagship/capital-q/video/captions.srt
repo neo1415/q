@@ -1,0 +1,84 @@
+1
+00:00:00,300 --> 00:00:02,300
+Hello. I'm an AI presenter,
+
+2
+00:00:02,300 --> 00:00:03,500
+introducing Capital Q.
+
+3
+00:00:03,700 --> 00:00:06,500
+Private capital still
+runs on scattered decks,
+
+4
+00:00:06,500 --> 00:00:08,900
+partial information
+and long email threads.
+
+5
+00:00:09,100 --> 00:00:14,300
+Capital Q is an investment intelligence
+system built around one analyst, called Q.
+
+6
+00:00:14,500 --> 00:00:19,300
+For investors, Q helps you understand
+a company from its own materials,
+
+7
+00:00:19,300 --> 00:00:24,500
+and shows where each point comes
+from and how well it is supported.
+
+8
+00:00:24,700 --> 00:00:27,500
+It matches opportunities
+to your declared mandate,
+
+9
+00:00:27,500 --> 00:00:29,500
+with reasons you can inspect.
+
+10
+00:00:29,700 --> 00:00:32,500
+And it helps you progress
+qualified relationships,
+
+11
+00:00:32,500 --> 00:00:34,500
+from first interest to diligence,
+
+12
+00:00:34,500 --> 00:00:37,300
+while every commercial
+decision stays with you.
+
+13
+00:00:37,500 --> 00:00:39,900
+Founders upload what they already have,
+
+14
+00:00:39,900 --> 00:00:42,700
+and Q shows what is still missing.
+
+15
+00:00:42,900 --> 00:00:47,700
+Unicorn Potential is an evidence-based
+indicator of what the record supports today.
+
+16
+00:00:47,900 --> 00:00:49,900
+It is not a prediction,
+
+17
+00:00:49,900 --> 00:00:51,900
+and where evidence is thin,
+
+18
+00:00:51,900 --> 00:00:53,100
+it says so.
+
+19
+00:00:53,300 --> 00:00:55,300
+Capital Q. Evidence before opinion.

@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "status": "PROPOSED — for review; not rendered, no Tavus credits spent",
+  "slug": "zino-aviation",
+  "company": "Zino Aviation",
+  "videoName": "Capital Q flagship — Zino Aviation (AI presenter)",
+  "replicaId": "re6220ec0195",
+  "replicaName": "Raj - Business",
+  "startWithWave": false,
+  "targetSeconds": 51,
+  "estimate": {
+    "words": 127,
+    "seconds": 50.8,
+    "wordsPerSecond": 2.5
+  },
+  "tone": "Premium, assured, founder-led story told in the third person. Slightly slower on the closing line.",
+  "script": "Hello. I'm an AI presenter, telling the story of Zino Aviation. Captain Zino Mario, by his own account, flew airplanes and helicopters, including offshore operations, before retiring from active flying to run Zino Aviation full time. From Lagos, Zino Aviation Academy guides aspiring pilots from their first question towards their first job: mentorship, ground school, simulator sessions, and flight training delivered through partner schools in South Africa and Greece. Type ratings and medicals come through partner providers, so each step sits with the right specialist. Alongside the Academy, Zino Aviation Jet is a new advisory and brokerage service for private aviation, taking charter and acquisition enquiries today, with more services on the way. One brand, one point of contact, from the classroom to the cabin. Zino Aviation.",
+  "disclosure": {
+    "spoken": "The first sentence says the presenter is an AI presenter.",
+    "caption": "AI presenter · Tavus stock actor · not the founder",
+    "rule": "Burn the caption in for the whole video (bottom-left, small, high contrast). The presenter is never given a personal name and never speaks as the founder."
+  },
+  "background": {
+    "url": null,
+    "notes": "Full-frame presenter only (no Tavus background_url). Brand framing, lower-thirds and end card are added in post; see storyboard.md."
+  },
+  "visualNotes": "Premium dark frame; cutaways only of Zino's own published imagery with permission (classroom, simulator room). Never show an aircraft as Zino-owned or operated, never show a cockpit badge implying a qualified device, and no airline logos.",
+  "sources": [
+    "docs/flagship/zino-aviation/research.md",
+    "docs/flagship/zino-aviation/facts.json",
+    "docs/flagship/zino-aviation/brand.md"
+  ],
+  "claims": [
+    {
+      "claim": "Captain Zino Mario flew airplanes and helicopters incl. offshore; retired from active flying to run Zino Aviation full time",
+      "status": "SELF_REPORTED (attributed: 'by his own account')",
+      "source": "research.md §2, §10"
+    },
+    {
+      "claim": "Lagos base",
+      "status": "SELF_REPORTED",
+      "source": "research.md §3"
+    },
+    {
+      "claim": "Academy: mentorship, ground school, simulator sessions",
+      "status": "ACTIVE (bookable / job adverts)",
+      "source": "research.md §7"
+    },
+    {
+      "claim": "Flight training via partner schools in South Africa and Greece",
+      "status": "PARTNER-DELIVERED; partners named on Zino's site",
+      "source": "research.md §7, §11"
+    },
+    {
+      "claim": "Type ratings and medicals via partner providers",
+      "status": "PARTNER-DELIVERED",
+      "source": "research.md §7"
+    },
+    {
+      "claim": "Jet: new advisory and brokerage service, taking charter and acquisition enquiries, more services coming",
+      "status": "MARKETED / PLANNED",
+      "source": "research.md §7"
+    }
+  ],
+  "deliberatelyExcluded": [
+    "Any aircraft ownership or operation, AOC, or charter flights as operated",
+    "Licences (numbers unverified) and the 737NG simulator type or qualification",
+    "'Youngest commercial pilot', high-jump title, 'world's first and leading'",
+    "8,000-pilot network, placements, airline agreements",
+    "Founding year (2018 vs 2020 discrepancy)"
+  ],
+  "guardrails": [
+    "No traction, revenue, customer count, valuation or funding is stated.",
+    "Company marketing claims are attributed ('describes itself', 'says', 'by his own account') or limited to offerings visible on the company's own pages.",
+    "Script words are fixed after review; captions.srt is generated from this script."
+  ]
+}

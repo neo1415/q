@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "status": "PROPOSED — for review; not rendered, no Tavus credits spent",
+  "slug": "capital-q",
+  "company": "Capital Q",
+  "videoName": "Capital Q flagship — Capital Q (AI presenter)",
+  "replicaId": "r4f5b5ef55c8",
+  "replicaName": "Celine - Studio",
+  "startWithWave": false,
+  "targetSeconds": 53,
+  "estimate": {
+    "words": 133,
+    "seconds": 53.2,
+    "wordsPerSecond": 2.5
+  },
+  "tone": "Restrained, institutional, unhurried. No hype words; pauses before 'It is not a prediction'.",
+  "script": "Hello. I'm an AI presenter, introducing Capital Q. Private capital still runs on scattered decks, partial information and long email threads. Capital Q is an investment intelligence system built around one analyst, called Q. For investors, Q helps you understand a company from its own materials, and shows where each point comes from and how well it is supported. It matches opportunities to your declared mandate, with reasons you can inspect. And it helps you progress qualified relationships, from first interest to diligence, while every commercial decision stays with you. Founders upload what they already have, and Q shows what is still missing. Unicorn Potential is an evidence-based indicator of what the record supports today. It is not a prediction, and where evidence is thin, it says so. Capital Q. Evidence before opinion.",
+  "disclosure": {
+    "spoken": "The first sentence says the presenter is an AI presenter.",
+    "caption": "AI presenter · Tavus stock actor · not the founder",
+    "rule": "Burn the caption in for the whole video (bottom-left, small, high contrast). The presenter is never given a personal name and never speaks as the founder."
+  },
+  "background": {
+    "url": null,
+    "notes": "Full-frame presenter only (no Tavus background_url). Brand framing, lower-thirds and end card are added in post; see storyboard.md."
+  },
+  "visualNotes": "Capital Q tokens (--cq-*; light canvas first-class), native sans for overlays, Q mark as word-mark in accent frame. Prohibited: glowing brains, particles, purple-blue AI gradients, Sparkles icon, holographic UI. Product cutaways only from certified Q Pitch surfaces (docs/specs/q-pitch/CERTIFICATION_MANIFEST.md).",
+  "sources": [
+    "docs/flagship/capital-q/research.md",
+    "docs/flagship/capital-q/facts.json",
+    "docs/flagship/capital-q/brand.md"
+  ],
+  "claims": [
+    {
+      "claim": "Investment intelligence system built around one analyst, Q",
+      "status": "Product sources (PADL / Product Spec)",
+      "source": "research.md §1, §8"
+    },
+    {
+      "claim": "Q helps understand a company from its own materials and shows provenance and support level",
+      "status": "DEPLOYED (evidence axes, deck reading)",
+      "source": "research.md §8"
+    },
+    {
+      "claim": "Matches to declared mandate with inspectable reasons",
+      "status": "DEPLOYED (Suitability, fit-order.v2)",
+      "source": "research.md §8"
+    },
+    {
+      "claim": "Progresses qualified relationships from interest to diligence; humans keep commercial authority",
+      "status": "DEPLOYED (Relationship Hub H1 live verified); end-to-end diligence NOT VERIFIED, so the line says 'helps you progress', not 'completes'",
+      "source": "research.md §8"
+    },
+    {
+      "claim": "Founders upload what they have; Q shows what is missing",
+      "status": "DEPLOYED (onboarding)",
+      "source": "research.md §8"
+    },
+    {
+      "claim": "Unicorn Potential is an evidence-based indicator, not a prediction; says so when evidence is thin",
+      "status": "DEPLOYED (ADR 0076); 0 numeric production scores",
+      "source": "research.md §8"
+    }
+  ],
+  "deliberatelyExcluded": [
+    "'Predictor' language",
+    "Customers, partners, Invest Qatar (demo entities only)",
+    "Legal owner / HQ (UNKNOWN)",
+    "Railway hostname as the official site (use https://www.fdncapitalpartners.com/capitalq/ on the end card)",
+    "Feature claims beyond the Q Pitch certification manifest"
+  ],
+  "guardrails": [
+    "No traction, revenue, customer count, valuation or funding is stated.",
+    "Company marketing claims are attributed ('describes itself', 'says', 'by his own account') or limited to offerings visible on the company's own pages.",
+    "Script words are fixed after review; captions.srt is generated from this script."
+  ]
+}

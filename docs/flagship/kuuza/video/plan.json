@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "status": "PROPOSED — for review; not rendered, no Tavus credits spent",
+  "slug": "kuuza",
+  "company": "KUUZA AI",
+  "videoName": "Capital Q flagship — KUUZA AI (AI presenter)",
+  "replicaId": "rd27826c12a6",
+  "replicaName": "Julia - Business",
+  "startWithWave": false,
+  "targetSeconds": 55,
+  "estimate": {
+    "words": 138,
+    "seconds": 55.2,
+    "wordsPerSecond": 2.5
+  },
+  "tone": "Confident, executive, crisp. Medium-close shot, steady eye line.",
+  "script": "Hello. I'm an AI presenter, introducing KUUZA AI. Every sales leader knows the problem: new reps learn on real customers, and real customers rarely give second chances. KUUZA AI describes itself as an AI simulator and coach for sales, service and human communication. A rep picks a scenario, a cold call, a discovery call, an angry complaint, and speaks naturally with an AI persona by voice, video or text. The persona pushes back with tone and attitude. The rep gets instant scoring and a debrief, and managers see team analytics. The company says its simulations add real-world noise, like poor signal and interruptions, and are built for accents and communication norms across Africa, Asia and the Middle East. Founded by Zino Mario and Excel Chukwu, KUUZA offers a free demo, with no account needed. Simulate today. Dominate tomorrow.",
+  "disclosure": {
+    "spoken": "The first sentence says the presenter is an AI presenter.",
+    "caption": "AI presenter · Tavus stock actor · not the founder",
+    "rule": "Burn the caption in for the whole video (bottom-left, small, high contrast). The presenter is never given a personal name and never speaks as the founder."
+  },
+  "background": {
+    "url": null,
+    "notes": "Full-frame presenter only (no Tavus background_url). Brand framing, lower-thirds and end card are added in post; see storyboard.md."
+  },
+  "visualNotes": "Dark charcoal frame with crimson accent (brand.md: crimson #E9273B, charcoal #131313, teal #7DBDC1); Inter for overlays. Cutaway suggestions are public product screenshots only, no testimonial portraits.",
+  "sources": [
+    "docs/flagship/kuuza/research.md",
+    "docs/flagship/kuuza/facts.json",
+    "docs/flagship/kuuza/brand.md"
+  ],
+  "claims": [
+    {
+      "claim": "AI simulator and coach for sales, service and human communication",
+      "status": "SELF_REPORTED",
+      "source": "research.md §1"
+    },
+    {
+      "claim": "Scenario → voice/video/text persona → instant scoring and debrief → manager team analytics",
+      "status": "SELF_REPORTED",
+      "source": "research.md §1, §8"
+    },
+    {
+      "claim": "Real-world noise (poor signal, interruptions) and accent/culture focus for Africa, Asia, Middle East",
+      "status": "SELF_REPORTED (attributed: 'the company says')",
+      "source": "research.md §8"
+    },
+    {
+      "claim": "Founded by Zino Mario and Excel Chukwu",
+      "status": "SELF_REPORTED (/about)",
+      "source": "research.md §3, §14"
+    },
+    {
+      "claim": "Free demo, no account needed",
+      "status": "SELF_REPORTED (/pricing)",
+      "source": "research.md §7, §10"
+    },
+    {
+      "claim": "'Simulate Today, Dominate Tomorrow'",
+      "status": "SELF_REPORTED tagline",
+      "source": "research.md §1"
+    }
+  ],
+  "deliberatelyExcluded": [
+    "HQ (Nairobi chip is placeholder; Lagos is an assumption)",
+    "Testimonials (related parties)",
+    "Hero-widget metrics (+34% close rate etc. are mock-ups)",
+    "30+ languages, 20+ CRM integrations, SSO (unverified)",
+    "Funding (UNKNOWN)"
+  ],
+  "guardrails": [
+    "No traction, revenue, customer count, valuation or funding is stated.",
+    "Company marketing claims are attributed ('describes itself', 'says', 'by his own account') or limited to offerings visible on the company's own pages.",
+    "Script words are fixed after review; captions.srt is generated from this script."
+  ]
+}
