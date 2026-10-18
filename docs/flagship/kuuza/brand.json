@@ -1,0 +1,39 @@
+{
+  "company": "KUUZA AI",
+  "fetchedAt": "2026-10-18T17:15:00Z",
+  "usageTerms": "No published brand guidelines or asset licence; Terms/Privacy pages 404. Treat as company copyright; obtain founder permission or founder-supplied files before reuse.",
+  "logos": [
+    {"name": "Primary lockup (gradient mark + white wordmark)", "url": "https://www.kuuza.ai/logo-assets/Lockup%20PNG%2CSVG/Logo-Lock-Gradient.png", "format": "png", "background": "dark", "source": "header/footer <img alt='KUUZA AI Logo'>"},
+    {"name": "Alternate lockup Ice/Red", "url": "https://www.kuuza.ai/logo-assets/Logo-Lock-Ice-Red.png", "format": "png", "background": "dark", "source": "footer/CTA <img alt='KUUZA AI'>"},
+    {"name": "Favicon", "url": "https://www.kuuza.ai/favicon.ico", "format": "ico", "size": "48x48", "source": "<link rel='icon'>"}
+  ],
+  "svgAvailable": false,
+  "ogImage": null,
+  "colors": [
+    {"token": "crimson", "hex": "#E9273B", "role": "primary accent / CTA", "foundIn": "_next/static/chunks/05zxubf11s_zm.css .bg-crimson/.text-crimson; logo mark ~#E82038"},
+    {"token": "charcoal", "hex": "#131313", "role": "page background", "foundIn": "CSS .bg-charcoal; body{background-color:#131313}"},
+    {"token": "ice-blue", "hex": "#EFF6FC", "role": "light text / wordmark", "foundIn": "CSS .bg-ice-blue/.text-ice-blue; wordmark ~#E8F0F8"},
+    {"token": "teal", "hex": "#7DBDC1", "role": "secondary accent", "foundIn": "CSS .bg-teal/.text-teal; logo gradient base"},
+    {"token": "teal-deep", "hex": "#6AAEB2", "role": "secondary accent tints", "foundIn": "CSS .text-[#6aaeb2]"},
+    {"token": "crimson-deep-1", "hex": "#A40F1E", "role": "gradient end", "foundIn": "CSS .to-[#a40f1e]"},
+    {"token": "crimson-deep-2", "hex": "#A4202D", "role": "gradient end", "foundIn": "CSS .to-[#a4202d]"},
+    {"token": "surface", "hex": "#1A1A1A", "role": "cards / gradient start", "foundIn": "CSS .bg-[#1a1a1a], .from-[#1a1a1a]"},
+    {"token": "text-subtle", "hex": "#9CA3AF", "role": "secondary text", "foundIn": "CSS .text-text-subtle"}
+  ],
+  "gradients": ["linear #1A1A1A -> #A40F1E", "linear #1A1A1A -> #A4202D"],
+  "fonts": [
+    {"family": "Inter", "hosting": "self-hosted TTF (Inter 18pt, Thin-Black + italics)", "use": "all text"},
+    {"family": "JetBrains Mono", "hosting": "CSS variable --font-jetbrains-mono", "use": "mono accents"}
+  ],
+  "style": ["dark-first", "crimson CTAs", "teal secondary", "photographic African-professional imagery", "glass stat cards (backdrop-blur)", "mock live-session UI", "emoji stat chips"],
+  "productImagery": [
+    {"url": "https://www.kuuza.ai/images/features-analytics.jpg", "note": "carries 'HQ: Nairobi, Kenya' overlay chip"},
+    {"url": "https://www.kuuza.ai/images/founders.jpg", "note": "founders likeness; consent required"},
+    {"url": "https://www.kuuza.ai/images/showcase-trainee.jpg", "note": "session UI showcase"},
+    {"url": "https://www.kuuza.ai/images/showcase-coach.jpg", "note": "session UI showcase"},
+    {"url": "https://www.kuuza.ai/images/features-hero.png", "note": "hero"},
+    {"url": "https://www.kuuza.ai/images/pricing-hero.jpg", "note": "hero"},
+    {"url": "https://www.kuuza.ai/images/fpkdl.com_750_1764538186_portrait-beautiful-smiling-black-woman_484921-108046.jpg", "note": "Freepik stock via downloader site; licence UNKNOWN; do not reuse"},
+    {"url": "https://www.kuuza.ai/images/image_fx.png", "note": "likely AI-generated (ImageFX) - ASSUMPTION"}
+  ]
+}
