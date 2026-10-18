@@ -37,7 +37,9 @@ export function ContinueLater({
     <span className="flex items-center gap-2">
       <button
         type="button"
-        className={className ?? buttonClassName("quiet", "regular", "px-3")}
+        // A bordered button by default (owner 2026-10-17: it read as text
+        // and was missed); always takes them into the app.
+        className={className ?? buttonClassName("secondary", "compact")}
         disabled={leaving}
         onClick={() => {
           setLeaving(true);
