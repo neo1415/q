@@ -233,6 +233,17 @@ describe("Unicorn Potential progressive assessment", () => {
     expect(root?.open).toBe(true);
   });
 
+  it("can be closed from the end of the open assessment", () => {
+    render(<UnicornPotential score={score} companyId="company-1" />);
+    const root = document.querySelector<HTMLDetailsElement>(
+      '[data-score="unicorn-potential"]',
+    ) as HTMLDetailsElement;
+    root.scrollIntoView = vi.fn();
+    root.open = true;
+    fireEvent.click(screen.getByRole("button", { name: "Close assessment" }));
+    expect(root.open).toBe(false);
+  });
+
   it("shows source lineage and support without pretending a founder claim is verified", () => {
     render(<UnicornPotential score={score} companyId="company-1" />);
     const source = screen
