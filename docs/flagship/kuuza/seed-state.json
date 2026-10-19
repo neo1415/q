@@ -1,0 +1,53 @@
+{
+  "company": "KUUZA AI",
+  "steward": "steward.kuuza@fictional.capitalq.local",
+  "companyId": "866bcc12-7f36-4e21-9eda-42b1df7d992f",
+  "organisationId": null,
+  "organisationIdNote": "not read: hosted SQL token returns 401; the app exposes only the company id",
+  "seededAt": "2026-10-19",
+  "method": "product UI via Playwright, signed in as the steward (onboarding 'Use the form')",
+  "done": {
+    "onboarding": true,
+    "profile": true,
+    "images": true,
+    "deckUpload": true,
+    "deckSectionsConfirmed": true,
+    "deckDownloadAudience": "INVESTORS",
+    "scenarioUpload": true,
+    "dataRoomVisibility": "NOT SET (left 'Only your team'; Public was blocked by the session permission classifier)",
+    "companyVisibility": "NOT CHANGED (coordinator: owner releases after pitch video)"
+  },
+  "filled": {
+    "name": "KUUZA AI",
+    "website": "https://www.kuuza.ai",
+    "country": "Nigeria",
+    "city": "Lagos",
+    "oneLine": "AI simulator and coach for practising sales, customer-service and other workplace conversations.",
+    "description": "research.md proposition (SELF_REPORTED) + founders (OWNER_PROVIDED)",
+    "categories": ["Business Customer", "Enterprise Software", "HR Technology", "B2B SaaS", "Edtech"],
+    "categoriesMissing": ["Artificial Intelligence (no such taxonomy node)"],
+    "revenueModel": "free tier up to 1,000 AI calls; custom team plans after a demo (SELF_REPORTED pricing facts)"
+  },
+  "placeholders": {
+    "stage": "Pre-seed",
+    "role": "Something else (steward is not a founder)",
+    "founders": "2 (owner-provided names)",
+    "foundersFullTime": "All founders are full-time",
+    "teamSize": 3,
+    "earlySignal": "Pilots running",
+    "pilotCount": "Not sure / not tracked",
+    "currency": "Not sure / not tracked",
+    "burnCashRunway": "Not sure / not tracked",
+    "raising": "Not right now (both 'Preparing to raise' and 'Yes, actively' require a target amount; no amount invented)"
+  },
+  "assets": {
+    "logo": "docs/flagship/kuuza/assets/kuuza-logo.png (mark cropped from official lockup)",
+    "cover": "docs/flagship/kuuza/assets/kuuza-cover.png (rendered by scripts/seed/flagship/brand-assets.mjs)",
+    "logoSource": "https://www.kuuza.ai/logo-assets/Lockup%20PNG%2CSVG/Logo-Lock-Gradient.png",
+    "licence": "no published asset licence; owner is the founder and approved use of the official logo"
+  },
+  "documents": {
+    "deck": "kuuza-investor-deck (Pitch deck, 19 slides; uploaded in onboarding)",
+    "scenario": "Illustrative high-growth scenario (synthetic) (Document, Other documents folder)"
+  }
+}
