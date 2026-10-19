@@ -5,7 +5,7 @@ import {
   type UnicornPotentialDto,
   type UnicornSource,
 } from "@capital-q/contracts";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useGlobalQ } from "@/components/app-shell/global-q";
 
@@ -104,13 +104,24 @@ export function UnicornPotential({
     </li>
   );
   const summaryRef = useRef<HTMLElement>(null);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
   useQControl({
     id: "disclosure.unicorn-potential",
     kind: "DISCLOSURE",
     ref: summaryRef,
   });
+  // Opened from the CRM's Unicorn Potential (owner 2026-10-18): arriving at
+  // this assessment's own address opens it and brings it into view.
+  useEffect(() => {
+    const details = detailsRef.current;
+    if (details === null) return;
+    if (window.location.hash !== `#${details.id}`) return;
+    details.open = true;
+    details.scrollIntoView({ block: "start" });
+  }, [companyId]);
   return (
     <details
+      ref={detailsRef}
       id={`unicorn-potential-${companyId}`}
       data-score="unicorn-potential"
       className="group min-w-0 rounded-xl border border-(--cq-border-subtle) sm:col-span-2"

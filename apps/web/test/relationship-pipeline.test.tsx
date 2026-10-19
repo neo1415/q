@@ -624,3 +624,176 @@ it("Q search filters through the server and confirms the resulting query", async
       .value,
   ).toBe("Maji");
 });
+
+describe("Unicorn Potential in the Pipeline (owner 2026-10-18)", () => {
+  const kivu = "c0000000-0000-4000-8000-000000000001";
+  const maji = "c0000000-0000-4000-8000-000000000002";
+  const premium = {
+    [kivu]: {
+      suitability: 74,
+      investability: 61,
+      unicorn: { status: "SCORED" as const, score: 67 },
+    },
+    [maji]: {
+      suitability: 50,
+      investability: null,
+      unicorn: { status: "INSUFFICIENT_EVIDENCE" as const, score: null },
+    },
+  };
+
+  it("adds a third column with the score or the honest words, each opening the assessment", () => {
+    render(
+      <RelationshipPipeline
+        {...props}
+        data={{ ...data, nextCursor: null }}
+        scores={premium}
+        ranked
+      />,
+    );
+    const headers = screen
+      .getAllByRole("columnheader")
+      .map((th) => th.textContent);
+    expect(headers.slice(1, 5)).toEqual([
+      "Company",
+      "Suitability",
+      "Investability",
+      "Unicorn Potential",
+    ]);
+    const score = screen.getByRole("link", {
+      name: "Unicorn Potential 67. Open the assessment",
+    });
+    expect(score.getAttribute("href")).toBe(
+      `/company/${kivu}#unicorn-potential-${kivu}`,
+    );
+    const words = screen.getByRole("link", {
+      name: "Unicorn Potential: Insufficient evidence. Open the assessment",
+    });
+    expect(words.textContent).toBe("Insufficient evidence");
+    expect(words.textContent).not.toContain("0");
+  });
+
+  it("shows no Unicorn column, option or filter without premium", () => {
+    render(
+      <RelationshipPipeline
+        {...props}
+        query={{ sort: "unicorn-60" }}
+        scores={{ [kivu]: { suitability: 74, investability: 61 } }}
+        ranked={false}
+      />,
+    );
+    expect(
+      screen
+        .getAllByRole("columnheader")
+        .map((th) => th.textContent)
+        .includes("Unicorn Potential"),
+    ).toBe(false);
+    expect(
+      screen.queryByRole("combobox", { name: "Unicorn Potential" }),
+    ).toBeNull();
+    expect(document.querySelector("[data-unicorn-link]")).toBeNull();
+  });
+
+  it("sorts and narrows through the URL, keeping search and state, and exports without the view", () => {
+    render(
+      <RelationshipPipeline
+        {...props}
+        query={{ q: "kivu", state: "IN_DILIGENCE" }}
+        scores={premium}
+        ranked
+      />,
+    );
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Sort relationships" }),
+      { target: { value: "unicorn" } },
+    );
+    expect(mock.push).toHaveBeenLastCalledWith(
+      "/relationships?view=pipeline&layout=table&q=kivu&state=IN_DILIGENCE&sort=unicorn",
+    );
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Unicorn Potential" }),
+      { target: { value: "unicorn-60" } },
+    );
+    expect(mock.push).toHaveBeenLastCalledWith(
+      "/relationships?view=pipeline&layout=table&q=kivu&state=IN_DILIGENCE&sort=unicorn-60",
+    );
+    cleanup();
+    render(
+      <RelationshipPipeline
+        {...props}
+        query={{ sort: "unicorn-60" }}
+        scores={premium}
+      />,
+    );
+    const exportLink = screen.getByRole("link", {
+      name: "Export filtered CSV",
+    });
+    expect(exportLink.getAttribute("href")).not.toContain("unicorn");
+    expect(screen.getByText(/ranked by Unicorn Potential/)).toBeDefined();
+    expect(
+      screen.getByText(/Insufficient evidence is not a low score/),
+    ).toBeDefined();
+  });
+
+  it("an empty Unicorn narrowing says so and returns to every relationship", () => {
+    render(
+      <RelationshipPipeline
+        {...props}
+        data={{ ...data, items: [], total: 0, nextCursor: null }}
+        query={{ state: "CONNECTED", sort: "unicorn-80" }}
+        scores={premium}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "No company in this view has a Unicorn Potential score here yet.",
+      ),
+    ).toBeDefined();
+    expect(
+      screen
+        .getByRole("link", { name: "Show all relationships" })
+        .getAttribute("href"),
+    ).toBe("/relationships?view=pipeline&layout=table&state=CONNECTED");
+  });
+
+  it("saves a Unicorn view as the view's sort", async () => {
+    render(
+      <RelationshipPipeline
+        {...props}
+        query={{ sort: "unicorn-40" }}
+        scores={premium}
+        views={{ items: [], teamEditable: false }}
+      />,
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
+      target: { value: "Unicorn 40+" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save view" }));
+    const option = await within(
+      screen.getByRole("combobox", { name: "Saved view" }),
+    ).findByRole<HTMLOptionElement>("option", { name: "Unicorn 40+" });
+    const input = mock.save.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+    expect(input["query"]).toEqual({ sort: "unicorn-40" });
+    // Opening it again re-runs the same view through the URL.
+    fireEvent.change(screen.getByRole("combobox", { name: "Saved view" }), {
+      target: { value: option.value },
+    });
+    expect(mock.push).toHaveBeenLastCalledWith(
+      "/relationships?view=pipeline&layout=table&sort=unicorn-40",
+    );
+  });
+
+  it("shows the three scores, labelled, on Board cards", () => {
+    const { container } = render(
+      <RelationshipPipeline
+        {...props}
+        layout="board"
+        scores={premium}
+        ranked
+      />,
+    );
+    const card = container.querySelector('[data-board-column="CONNECTED"] li');
+    expect(card?.querySelector("[data-pipeline-scores]")?.textContent).toBe(
+      "Suitability50Investability—Not known yetUnicorn PotentialInsufficient evidence",
+    );
+  });
+});

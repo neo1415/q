@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { RelationshipPipelineQuerySchema } from "@capital-q/contracts";
+import {
+  RelationshipPipelineViewQuerySchema,
+  RelationshipViewQuerySchema,
+} from "@capital-q/contracts";
 
 export const PipelineColumnsSchema = z
   .array(z.enum(["state", "since", "next"]))
@@ -9,7 +12,7 @@ export const PipelineSavedViewSchema = z
   .object({
     id: z.string().uuid(),
     name: z.string().trim().min(1).max(64),
-    query: RelationshipPipelineQuerySchema.omit({ cursor: true }),
+    query: RelationshipViewQuerySchema,
     layout: z.enum(["table", "board"]),
     columns: PipelineColumnsSchema,
   })
@@ -61,7 +64,7 @@ export function writePipelinePreferences(
   }
 }
 export function pipelineHref(
-  query: z.infer<typeof RelationshipPipelineQuerySchema>,
+  query: z.infer<typeof RelationshipPipelineViewQuerySchema>,
   layout: "table" | "board",
 ) {
   const params = new URLSearchParams({ view: "pipeline", layout });
@@ -75,9 +78,14 @@ export function pipelineHref(
  * step. It filters in place, so only the search travels with the link.
  */
 export function pipelineListLayoutHref(
-  query: Pick<z.infer<typeof RelationshipPipelineQuerySchema>, "q">,
+  query: Pick<
+    z.infer<typeof RelationshipPipelineViewQuerySchema>,
+    "q" | "sort"
+  >,
 ): string {
   const params = new URLSearchParams({ view: "pipeline", layout: "list" });
   if (query.q !== undefined && query.q !== "") params.set("q", query.q);
+  // The List ranks by Unicorn Potential too (its narrowing is the Table's).
+  if (query.sort?.startsWith("unicorn") === true) params.set("sort", "unicorn");
   return `/relationships?${params.toString()}`;
 }
