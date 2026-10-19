@@ -282,7 +282,7 @@ describe("the profile, for an investor", () => {
     expect(stripText(investorProfile())).toContain("$1.5M");
   });
 
-  it("a synthetic-demo attestation shows a quiet 'Demo verified (synthetic)' with its basis, never the gold badge", () => {
+  it("a synthetic-demo attestation is shown as not verified: never gold, never a demo label (owner 2026-10-19)", () => {
     const base = investorProfile();
     renderProfile(
       investorProfile({
@@ -296,12 +296,11 @@ describe("the profile, for an investor", () => {
       screen.queryAllByText("Organisation verified by Capital Q"),
     ).toHaveLength(0);
     expect(document.querySelector("[data-verified-badge]")).toBeNull();
-    const demo = document.querySelector("[data-demo-attestation]");
-    expect(demo?.textContent).toBe("Demo verified (synthetic)");
-    expect(demo?.getAttribute("title")).toMatch(/synthetic-demo attestation/u);
-    expect(demo?.getAttribute("title")).toMatch(
-      /not verified a real organisation/u,
-    );
+    expect(document.querySelector("[data-demo-attestation]")).toBeNull();
+    expect(document.body.textContent).not.toContain("Demo verified");
+    expect(
+      screen.getAllByText(/Not verified by Capital Q yet/u).length,
+    ).toBeGreaterThan(0);
   });
 
   it("an operator or provider verification keeps the gold badge", () => {

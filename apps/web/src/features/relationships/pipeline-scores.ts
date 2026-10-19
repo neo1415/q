@@ -32,6 +32,8 @@ export type UnicornCell = {
   readonly status: UnicornPotentialDto["status"];
   /** 0-100 only when SCORED. */
   readonly score: number | null;
+  /** Weighted evidence coverage (0-1) behind an unscored assessment. */
+  readonly coverage?: number | undefined;
 };
 
 export const UNKNOWN_SCORES: PipelineScores = {
@@ -58,6 +60,9 @@ export function pipelineScoresOf(
           unicorn: {
             status: unicorn.status,
             score: unicorn.status === "SCORED" ? unicorn.overallScore : null,
+            ...(unicorn.status === "INSUFFICIENT_EVIDENCE"
+              ? { coverage: unicorn.coverage }
+              : {}),
           },
         }),
   };
