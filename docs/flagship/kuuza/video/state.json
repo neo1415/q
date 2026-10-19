@@ -5,8 +5,13 @@
   "scriptSha256": "4c352d84458024885c5bd784b9318a400903b36d08f325f73554e1f3ff0139ca",
   "estimatedSeconds": 55.2,
   "video_id": "41f2bc85d4",
-  "status": "queued",
+  "status": "ready",
   "hosted_url": "https://tavus.video/41f2bc85d4",
   "created_at": "Mon, 19 Oct 2026 00:36:15 GMT",
-  "recordedAt": "2026-10-19T00:36:16.905Z"
+  "recordedAt": "2026-10-19T00:36:16.905Z",
+  "status_details": "Your request has processed successfully!",
+  "updated_at": "Mon, 19 Oct 2026 00:43:51 GMT",
+  "checkedAt": "2026-10-19T00:43:51.872Z",
+  "downloadedTo": "/tmp/claude-0/acc/flagship/video/kuuza.mp4",
+  "downloadedAt": "2026-10-19T00:43:53.864Z"
 }

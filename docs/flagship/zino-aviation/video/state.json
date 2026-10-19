@@ -5,8 +5,13 @@
   "scriptSha256": "82c92fd2144f59fa09f6a21fdaaad8b60457a3a397f531e287e0cc6a667feb44",
   "estimatedSeconds": 50.8,
   "video_id": "52661436c4",
-  "status": "queued",
+  "status": "ready",
   "hosted_url": "https://tavus.video/52661436c4",
   "created_at": "Mon, 19 Oct 2026 00:36:37 GMT",
-  "recordedAt": "2026-10-19T00:36:38.916Z"
+  "recordedAt": "2026-10-19T00:36:38.916Z",
+  "status_details": "Your request has processed successfully!",
+  "updated_at": "Mon, 19 Oct 2026 00:43:47 GMT",
+  "checkedAt": "2026-10-19T00:43:59.865Z",
+  "downloadedTo": "/tmp/claude-0/acc/flagship/video/zino-aviation.mp4",
+  "downloadedAt": "2026-10-19T00:44:01.115Z"
 }
