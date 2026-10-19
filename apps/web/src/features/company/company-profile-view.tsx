@@ -14,7 +14,7 @@ import { deckAskTerms } from "@capital-q/contracts";
 import { ChevronRight, Globe, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { formatLongDay } from "@/components/date-format";
-import { DemoVerifiedBadge, VerifiedBadge } from "@/components/verified-badge";
+import { VerifiedBadge } from "@/components/verified-badge";
 import { capitalTabHref } from "@/features/capital/capital-tabs";
 
 import { ExpressInterest } from "../network/express-interest";
@@ -262,6 +262,10 @@ export function CompanyProfileView({
   readonly scores?: ReactNode;
 }) {
   const { overview } = profile;
+  // A verification that rests only on the synthetic-demo attestation is
+  // not a real one: shown as not verified, never gold and never a demo
+  // label (owner 2026-10-19).
+  const demoOnly = overview?.organisationDemoAttested === true;
   const investor = profile.viewer === "INVESTOR";
   // The owner (and their team) reading their own company: nothing here is
   // "shared with you" -- it is theirs. Previewing as an investor keeps the
@@ -408,10 +412,7 @@ export function CompanyProfileView({
             {line === "" ? null : (
               <p className="cq-caption text-(--cq-text-secondary)">{line}</p>
             )}
-            {overview?.organisationVerified === true &&
-            overview.organisationDemoAttested === true ? (
-              <DemoVerifiedBadge className="self-start" />
-            ) : (
+            {demoOnly ? null : (
               <VerifiedBadge
                 status={
                   overview?.organisationVerified === true ? "VERIFIED" : null
@@ -850,10 +851,8 @@ export function CompanyProfileView({
                     foundedYear === null
                       ? "Founded date not declared"
                       : `Founded ${foundedYear}`,
-                    overview.organisationVerified
-                      ? overview.organisationDemoAttested === true
-                        ? "Demo verified (synthetic)"
-                        : "Verified by Capital Q"
+                    overview.organisationVerified && !demoOnly
+                      ? "Verified by Capital Q"
                       : "Not verified by Capital Q yet",
                   ].join(" · ")}
                 >
@@ -868,10 +867,8 @@ export function CompanyProfileView({
                       ["Legal name", overview.legalName ?? "Not declared"],
                       [
                         "Verification",
-                        overview.organisationVerified
-                          ? overview.organisationDemoAttested === true
-                            ? "Demo verified (synthetic): demo data, not a real verification"
-                            : "Organisation verified by Capital Q"
+                        overview.organisationVerified && !demoOnly
+                          ? "Organisation verified by Capital Q"
                           : "Not verified by Capital Q yet",
                       ],
                       ...(overview.websiteUrl === null
