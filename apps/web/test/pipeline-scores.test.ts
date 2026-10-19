@@ -180,7 +180,7 @@ describe("Unicorn Potential in the Pipeline (owner 2026-10-18)", () => {
           status: "INSUFFICIENT_EVIDENCE",
         },
       }).unicorn,
-    ).toEqual({ status: "INSUFFICIENT_EVIDENCE", score: null });
+    ).toEqual({ status: "INSUFFICIENT_EVIDENCE", score: null, coverage: 0 });
     expect(hasUnicornScores({ a: pipelineScoresOf(base) })).toBe(false);
     expect(
       hasUnicornScores({

@@ -104,9 +104,12 @@ async function show(page: ReactNode) {
   await act(async () => {
     render(page);
     // Streamed blocks resolve over a few turns of the event loop, more on
-    // a loaded CI runner than locally: let them all land.
-    for (let turn = 0; turn < 5; turn += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
+    // a loaded CI runner than locally: wait until no loading shape is left
+    // (bounded, so a block that never resolves still fails its assertion).
+    for (let turn = 0; turn < 200; turn += 1) {
+      await new Promise((resolve) => setTimeout(resolve, turn < 5 ? 0 : 10));
+      if (turn >= 4 && document.querySelector("[data-loading-rows]") === null)
+        break;
     }
   });
 }

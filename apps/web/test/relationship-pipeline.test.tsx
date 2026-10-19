@@ -16,6 +16,7 @@ import {
   type RelationshipPipelineQuery,
 } from "@capital-q/contracts";
 import { RelationshipPipeline } from "@/features/relationships/relationship-pipeline";
+import { UnicornFigure } from "@/features/relationships/pipeline-score-figure";
 import {
   BOARD_STATES,
   pipelinePresentedRows,
@@ -670,6 +671,19 @@ describe("Unicorn Potential in the Pipeline (owner 2026-10-18)", () => {
     });
     expect(words.textContent).toBe("Insufficient evidence");
     expect(words.textContent).not.toContain("0");
+  });
+
+  it("says how far an unscored company's evidence has got", () => {
+    render(
+      <UnicornFigure
+        cell={{ status: "INSUFFICIENT_EVIDENCE", score: null, coverage: 0.48 }}
+        companyId="c-1"
+        variant="column"
+      />,
+    );
+    expect(document.querySelector("[data-unicorn-coverage]")?.textContent).toBe(
+      "48% of evidence",
+    );
   });
 
   it("shows no Unicorn column, option or filter without premium", () => {
