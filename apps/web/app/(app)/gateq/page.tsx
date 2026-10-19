@@ -65,8 +65,11 @@ export default async function GateqPage({ searchParams }: Props) {
   const t = await serverT();
 
   const params = await searchParams;
-  const context = await resolveOwnContext();
-  const session = await apiSession();
+  // Side by side: the context resolves its own session read as well.
+  const [context, session] = await Promise.all([
+    resolveOwnContext(),
+    apiSession(),
+  ]);
 
   if (context.kind === "NONE" && context.unavailable === true) {
     return (
@@ -237,21 +240,29 @@ export default async function GateqPage({ searchParams }: Props) {
     )
       ? wantedRaw.toLowerCase()
       : undefined;
-  const wantedDetail: GateqInboxDetailDto | null =
+  const explicitView = GateqInboxViewSchema.catch("INBOX").parse(
+    one(params["view"]),
+  );
+  // Instant tabs (2026-10-18): the folder the address names is read beside
+  // the linked application, not after it; it is read again only when the
+  // application turns out to sit in another folder.
+  const readInbox = (folder: typeof explicitView) =>
+    getGateqInbox(session, gatewayId, folder).catch(
+      (): GateqInboxDto | null => null,
+    );
+  const [wantedDetail, namedInbox] = await Promise.all([
     wanted === undefined
       ? null
-      : await getGateqInboxItem(session, gatewayId, wanted).catch(() => null);
+      : getGateqInboxItem(session, gatewayId, wanted).catch(() => null),
+    readInbox(explicitView),
+  ]);
   const missingItem = wantedRaw !== undefined && wantedDetail === null;
-  const explicitView = one(params["view"]);
   // The linked application's own folder wins, so the list holds it.
   const view = GateqInboxViewSchema.catch("INBOX").parse(
     wantedDetail?.item.folder ?? explicitView,
   );
-  const inbox: GateqInboxDto | null = await getGateqInbox(
-    session,
-    gatewayId,
-    view,
-  ).catch(() => null);
+  const inbox: GateqInboxDto | null =
+    view === explicitView ? namedInbox : await readInbox(view);
   const first = wantedRaw === undefined ? inbox?.items[0] : undefined;
   const detail: GateqInboxDetailDto | null =
     wantedRaw !== undefined

@@ -117,6 +117,8 @@ type SubjectContextValue = {
   /** The record open on the page, by name, when it is no subject kind. */
   readonly focus: string | null;
   readonly focusOn: (label: string | null) => void;
+  /** False only outside the shell's provider: the person is not known. */
+  readonly provided: boolean;
 };
 
 const SubjectContext = createContext<SubjectContextValue>({
@@ -125,6 +127,7 @@ const SubjectContext = createContext<SubjectContextValue>({
   declare: () => undefined,
   focus: null,
   focusOn: () => undefined,
+  provided: false,
 });
 
 export function QSubjectProvider({
@@ -152,12 +155,22 @@ export function QSubjectProvider({
     [declared, pathname],
   );
   const value = useMemo<SubjectContextValue>(
-    () => ({ own, page, declare, focus, focusOn: setFocus }),
+    () => ({ own, page, declare, focus, focusOn: setFocus, provided: true }),
     [own, page, declare, focus],
   );
   return (
     <SubjectContext.Provider value={value}>{children}</SubjectContext.Provider>
   );
+}
+
+/**
+ * The person's own subject as the shell resolved it on the server, or
+ * null outside the shell. For drawing only (a loading strip's tabs): it is
+ * never authority, which every page and API read decides for itself.
+ */
+export function useOwnSubject(): QSubject | null {
+  const { own, provided } = useContext(SubjectContext);
+  return provided ? own : null;
 }
 
 /** The subject Q should look at right now: the page's if it declared one, else the person's own. */

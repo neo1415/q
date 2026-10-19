@@ -7,6 +7,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -94,8 +95,24 @@ beforeEach(() => {
   mocks.steps.mockResolvedValue([]);
 });
 
+/**
+ * Renders a page and lets its streamed blocks land (instant tabs
+ * 2026-10-18: each Overview block and the list stream into their own
+ * boundary under the header, which is sent first).
+ */
+async function show(page: ReactNode) {
+  await act(async () => {
+    render(page);
+    // Streamed blocks resolve over a few turns of the event loop, more on
+    // a loaded CI runner than locally: let them all land.
+    for (let turn = 0; turn < 5; turn += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  });
+}
+
 async function overview() {
-  render(
+  await show(
     await RelationshipsPage({
       searchParams: Promise.resolve({ view: "overview" }),
     }),
@@ -355,7 +372,7 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
       within(queue).getByRole("link", { name: "Reply" }).getAttribute("href"),
     ).toBe(`/relationships/company/${companyId}/messages`);
     // The queue comes before the period's figures in reading order.
-    const period = screen.getByText("Fund");
+    const period = await screen.findByText("Fund");
     expect(
       queue.compareDocumentPosition(period) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
@@ -482,7 +499,7 @@ describe("S2: the Pipeline is the one record list", () => {
 
   it("opens the list under the Pipeline tab, with List current and Table and Board beside it", async () => {
     mocks.digests.mockResolvedValue({});
-    render(
+    await show(
       await RelationshipsPage({
         searchParams: Promise.resolve({ view: "pipeline", layout: "list" }),
       }),
@@ -514,7 +531,7 @@ describe("S2: the Pipeline is the one record list", () => {
       organisationName: "Fund",
       pipelineFit: [],
     });
-    render(await RelationshipsPage({ searchParams: Promise.resolve({}) }));
+    await show(await RelationshipsPage({ searchParams: Promise.resolve({}) }));
     expect(
       screen
         .getByRole("link", { name: "Overview" })

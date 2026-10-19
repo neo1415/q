@@ -1,14 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useRef } from "react";
 
+import { IntentLink } from "@/components/app-shell/intent-link";
 import { LinkPending } from "@/components/link-pending";
 import { useT } from "@/features/i18n/language";
 import { useQControlGroup } from "@/features/q/control/q-control";
 import {
   TAB_STRIP_CLASS,
   tabClass,
+  useChosenTab,
   useOpenTabInView,
 } from "@/features/relationships/hub-navigation";
 import type { HubSide } from "@/features/relationships/hub-view";
@@ -43,7 +44,9 @@ export function WorkNavigation({
       "tab.work-daily": '[data-work-tab="daily"]',
     },
   });
-  useOpenTabInView(ref, view);
+  // The tab just clicked is drawn open at once, until its page arrives.
+  const chosen = useChosenTab(view);
+  useOpenTabInView(ref, chosen.open);
 
   const notices = useNotices();
   const needsYou = (notices.items ?? []).filter(
@@ -53,10 +56,10 @@ export function WorkNavigation({
   return (
     <nav ref={ref} aria-label={t("Work")} className={TAB_STRIP_CLASS}>
       {workTabs(side).map((entry) => {
-        const open = view === entry.view;
+        const open = chosen.open === entry.view;
         const waiting = entry.view === "tasks" && needsYou > 0 ? needsYou : 0;
         return (
-          <Link
+          <IntentLink
             key={entry.view}
             href={entry.href}
             data-work-tab={entry.view}
@@ -67,6 +70,7 @@ export function WorkNavigation({
                 : `${t(entry.label)}, ${t(`${String(waiting)} waiting for you`)}`
             }
             className={tabClass(open)}
+            onClick={chosen.choose(entry.view)}
           >
             {t(entry.label)}
             {waiting === 0 ? null : (
@@ -78,7 +82,7 @@ export function WorkNavigation({
               </span>
             )}
             <LinkPending />
-          </Link>
+          </IntentLink>
         );
       })}
     </nav>

@@ -4,7 +4,10 @@ import { Suspense } from "react";
 
 import { PageContainer } from "@/components/app-shell/page-container";
 
-import { HubLoadingTabs } from "./hub-loading-tabs";
+import { PageLoading } from "@/components/app-shell/page-loading";
+
+import { HubLoadingTabs, useOwnSide } from "./hub-loading-tabs";
+import type { HubSide, HubView } from "./hub-view";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -72,11 +75,32 @@ function PanelShape({
 }
 
 /**
+ * One Overview panel while its own read streams in (instant tabs
+ * 2026-10-18): the header and tabs are already on screen above it.
+ */
+export function HubPanelLoading({
+  rows,
+  label,
+  lead = false,
+}: {
+  readonly rows: number;
+  readonly label: string;
+  readonly lead?: boolean;
+}) {
+  return <PanelShape rows={rows} label={label} lead={lead} />;
+}
+
+/** The Pipeline list's rows while they stream in under the real header. */
+export function HubListLoading() {
+  return <Rows count={6} label="list" />;
+}
+
+/**
  * The CRM header and tabs, then the open tab's shape. The tab just chosen
  * is underlined at once (HubLoadingTabs reads the new address), so a
  * switch answers the click before the server does.
  */
-export function HubLoading() {
+export function HubLoading({ view }: { readonly view?: HubView } = {}) {
   const t = useT();
 
   return (
@@ -96,11 +120,53 @@ export function HubLoading() {
             <span className="flex min-h-11 border-b border-(--cq-border-subtle)" />
           }
         >
-          <HubLoadingTabs />
+          <HubLoadingTabs {...(view === undefined ? {} : { view })} />
         </Suspense>
       </div>
       <PanelShape rows={3} label="queue" lead />
       <PanelShape rows={4} label="list" />
+    </PageContainer>
+  );
+}
+
+/**
+ * A CRM tab that is a page of its own (GateQ, company requests): the CRM's
+ * strip first, its tab underlined, then that page's title line and rows,
+ * as the page draws them (instant tabs 2026-10-18).
+ */
+export function HubRouteLoading({
+  view,
+  label,
+  only,
+}: {
+  readonly view: HubView;
+  readonly label: string;
+  /** The page is this CRM tab for this side only (a founder's /investors is a directory). */
+  readonly only?: HubSide;
+}) {
+  const t = useT();
+  const side = useOwnSide();
+  if (only !== undefined && side !== only) return <PageLoading />;
+  return (
+    <PageContainer>
+      <div
+        className="flex flex-col gap-4"
+        role="status"
+        aria-busy="true"
+        aria-label={t(label)}
+      >
+        <Suspense
+          fallback={
+            <span className="flex min-h-11 border-b border-(--cq-border-subtle)" />
+          }
+        >
+          <HubLoadingTabs view={view} />
+        </Suspense>
+        <span className="flex min-h-9 items-center">
+          <span className={`${bar} h-7 w-40`} />
+        </span>
+        <Rows count={4} label={view} />
+      </div>
     </PageContainer>
   );
 }

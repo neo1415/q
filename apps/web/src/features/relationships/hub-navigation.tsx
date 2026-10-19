@@ -1,7 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type RefObject,
+} from "react";
+
+import { IntentLink } from "@/components/app-shell/intent-link";
 
 import { cx } from "@capital-q/ui";
 import { ArrowUpRight, ICON_SIZE } from "@capital-q/ui/icons";
@@ -34,6 +43,53 @@ export function tabClass(open: boolean): string {
       ? "border-(--cq-accent) font-semibold text-(--cq-text-primary)"
       : "border-transparent font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
   );
+}
+
+/**
+ * The tab drawn as open (instant tabs 2026-10-18): the one just clicked,
+ * at once, until the server's view arrives; then the server's again. A
+ * chosen tab belongs to the view it was chosen from, so it resets by
+ * itself the moment the page's view changes, and back/forward drops it.
+ * Drawing only: what the page shows is still the server's read, and Q's
+ * tab confirmation still waits for the route to settle.
+ */
+export function useChosenTab<V extends string>(
+  view: V,
+): {
+  readonly open: V;
+  readonly choose: (next: V) => (event: MouseEvent<HTMLElement>) => void;
+} {
+  const [chosen, setChosen] = useState<{
+    readonly from: V;
+    readonly to: V;
+  } | null>(null);
+  useEffect(() => {
+    const drop = () => {
+      setChosen(null);
+    };
+    window.addEventListener("popstate", drop);
+    return () => {
+      window.removeEventListener("popstate", drop);
+    };
+  }, []);
+  const open = chosen !== null && chosen.from === view ? chosen.to : view;
+  const choose = useCallback(
+    (next: V) => (event: MouseEvent<HTMLElement>) => {
+      // Only a plain click navigates here; a new tab or window does not.
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      setChosen({ from: view, to: next });
+    },
+    [view],
+  );
+  return { open, choose };
 }
 
 /** Keeps the open tab in view on a narrow, scrolling strip. */
@@ -101,29 +157,33 @@ export function HubNavigation({
     },
   });
 
-  useOpenTabInView(ref, view);
+  const chosen = useChosenTab(view);
+  useOpenTabInView(ref, chosen.open);
 
   return (
     <nav ref={ref} aria-label={t("CRM")} className={TAB_STRIP_CLASS}>
+      {/* Q's page state is the server's view, never the optimistic one. */}
       <QPageState
         {...(view === "overview" ? { tab: "overview" as const } : {})}
         filters={{ view }}
       />
       {hubTabs(side).map((entry) => {
-        // The tapped tab's pending mark is LinkPending (perf lane): one
-        // mechanism for instant tab feedback across the CRM.
-        const open = view === entry.view;
+        // The tab just clicked is drawn open at once (useChosenTab); its
+        // pending mark is LinkPending (perf lane) while the view is read.
+        // Hover, focus or touch prefetches it in full (IntentLink).
+        const open = chosen.open === entry.view;
         return (
-          <Link
+          <IntentLink
             key={entry.view}
             href={entry.href}
             data-hub-view={entry.view}
             aria-current={open ? "page" : undefined}
             className={tabClass(open)}
+            onClick={chosen.choose(entry.view)}
           >
             {t(entry.label)}
             <LinkPending />
-          </Link>
+          </IntentLink>
         );
       })}
     </nav>
