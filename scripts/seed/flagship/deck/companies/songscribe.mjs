@@ -201,7 +201,8 @@ const slides = [
         <div class="rule stat"><div class="v">3–7 days</div><div class="l">Too slow for the moment it is for: the birthday, the proposal, the campaign launch next week.</div><div style="margin-top:12px">${st("VP", "same report")}</div></div>
         <div class="rule stat"><div class="v">rights?</div><div class="l">Creators and small brands need music they can actually use in ads and monetised video, with a licence they can show.</div><div style="margin-top:12px">${st("AS")}</div></div>
        </div>
-       <p class="small" style="margin-top:30px">The research cites no survey of buyer demand. The price anchor is a third-party report on one competitor, not a market average.</p>`,
+       <p style="margin-top:26px;font-size:17px">As of October 2026, businesses, creators and families who want a custom song find it expensive and slow: about $199 and 3–7 days for a human-made personalised song.</p>
+       <p class="small" style="margin-top:10px">The research cites no survey of buyer demand. The price anchor is a third-party report on one competitor, not a market average.</p>`,
     ),
   ),
   S(
@@ -239,13 +240,14 @@ const slides = [
       "A",
       "Product",
       `What is public today — and the one thing that is not.`,
-      `<table class="t">
+      `<table class="t" style="font-size:13.5px">
         <tr><th style="width:36%">Capability</th><th style="width:40%">Evidence</th><th>Status</th></tr>
         <tr><td><b>Free demo</b> — 10 AI variations per day, 60-second previews, no downloads</td><td>Public pricing page, no sign-up</td><td>${st("SR", "offered publicly")}</td></tr>
         <tr><td><b>Paid plans</b> Starter to Studio, with downloads and licences</td><td>Public pricing page, USD</td><td>${st("SR")}</td></tr>
         <tr><td><b>Sample library</b> — acoustic, hip-hop/trap, R&B, Afrobeat, Amapiano, gospel, EDM house, instrumentals</td><td>/samples; files served from a public Cloudflare R2 bucket</td><td>${st("VP", "hosting observed")}</td></tr>
         <tr><td><b>Multi-language lyrics</b>, e.g. a wedding song blending English, pidgin and Yoruba</td><td>FAQ: “Quality may vary by language”</td><td>${st("SR")}</td></tr>
         <tr><td><b>Agency & Enterprise</b> — white-label, API access, custom licensing</td><td>/licensing, “Contact Sales”</td><td>${st("SR", "availability unverified")}</td></tr>
+        <tr><td><b>Market window</b> — the product is deployed and live with paid plans</td><td>songscribe.ai, as of October 2026</td><td>${st("SR")}</td></tr>
         <tr><td><b>Underlying generation model or vendor</b></td><td>Not disclosed anywhere</td><td>${st("UN")}</td></tr>
        </table>`,
     ),
@@ -283,11 +285,12 @@ const slides = [
       `People already pay for AI songs. <span class="r">Africa is the fast-growing edge.</span>`,
       `<div class="cols c4" style="gap:28px">
         <div class="stat"><div class="v">$29.6B</div><div class="l">Global recorded music revenue, 2024, up 4.8% (IFPI).</div></div>
-        <div class="stat"><div class="v">+22.6%</div><div class="l">Sub-Saharan Africa growth in 2024, to $110M — the second-fastest region (IFPI).</div></div>
+        <div class="stat"><div class="v">+22.6%</div><div class="l">Growing demand: Sub-Saharan Africa recorded-music revenue grew 22.6% in 2024, to $110M — the second-fastest region (IFPI).</div></div>
         <div class="stat"><div class="v">€9B</div><div class="l">Projected 2028 revenue of Gen-AI music and AV providers, from €0.3B; output market to €64B (CISAC / PMP, projection).</div></div>
         <div class="stat"><div class="v">~$200M</div><div class="l">Suno’s reported annual revenue at a $2.45B valuation, Nov 2025.</div></div>
        </div>
-       <div class="small" style="margin-top:34px;line-height:1.7">${st("VP")} IFPI Global Music Report 2025 via musicbusinessworldwide.com and musicinafrica.net/node/358892 · CISAC, Dec 2024: cisac.org/Newsroom/news-releases/global-economic-study-shows-human-creators-future-risk-generative-ai · TechCrunch, 2025-11-19 · all fetched 2026-10-18. CISAC figures are projections.</div>`,
+       <div class="small" style="margin-top:34px;line-height:1.7">${st("VP")} IFPI Global Music Report 2025 via musicbusinessworldwide.com and musicinafrica.net/node/358892 · CISAC, Dec 2024: cisac.org/Newsroom/news-releases/global-economic-study-shows-human-creators-future-risk-generative-ai · TechCrunch, 2025-11-19 · all fetched 2026-10-18. CISAC figures are projections.</div>
+       <p style="margin-top:14px;font-size:16.5px">Expansion plan (as of October 2026): expand into the agency and enterprise market with white-label licensing and API access, offered today through Contact Sales.</p>`,
       { red: true },
     ),
   ),
@@ -304,7 +307,7 @@ const slides = [
       `TAM ≈ €4.5B · SAM ≈ €135M · SOM ≈ €1.35M/yr<span style="display:block;font-size:20px;font-weight:500;color:var(--mu);letter-spacing:0;margin-top:10px">Every line is an Assumption. Only the €9B base is sourced, and it is itself a 2028 projection.</span>`,
       `<div class="arith">
         <div><span class="k">TAM ${st("AS")}</span><span class="x">CISAC 2028 Gen-AI provider revenue, music and AV, €9B × 50% music share</span><span class="r">≈ €4.5B</span></div>
-        <div><span class="k">SAM ${st("AS")}</span><span class="x">Personalised songs, SMB jingles and creator music for Africa, the diaspora and English-speaking SMBs: 3% of TAM</span><span class="r">≈ €135M</span></div>
+        <div><span class="k">SAM ${st("AS")}</span><span class="x">Serviceable market, an estimate from stated assumptions (as of October 2026). Personalised songs, SMB jingles and creator music for Africa, the diaspora and English-speaking SMBs: 3% of TAM</span><span class="r">≈ €135M</span></div>
         <div><span class="k">SOM ${st("AS")}</span><span class="x">1% of SAM within about 3–5 years</span><span class="r">≈ €1.35M / yr</span></div>
         <div><span class="k">cross-check ${st("AS")}</span><span class="x">5,000 paying subscribers × blended $15 per month (weighted to Starter and Creator) × 12</span><span class="r">≈ $0.9M ARR</span></div>
        </div>`,
@@ -363,7 +366,7 @@ const slides = [
         <div><h3 class="mono">businesses & brands ${st("SR")}</h3><ul class="lst"><li>Brand anthems, ads, launches</li><li>Sonic logos and jingles</li><li>Also listed: church and ministry, events, film and TV</li></ul></div>
        </div>
        <div class="cols c2" style="margin-top:24px;gap:40px">
-        <p style="font-size:16.5px"><b>Published channels</b> ${st("SR")} — free demo with no sign-up; sample pages with “Create Like This”; Agency & Enterprise “Contact Sales”; Business & Licensing contact route.</p>
+        <p style="font-size:16.5px"><b>Published channels</b> ${st("SR")} — Agency & Enterprise plans are sold through direct sales (Contact Sales); free demo with no sign-up; sample pages with “Create Like This”; Agency & Enterprise “Contact Sales”; Business & Licensing contact route.</p>
         <p style="font-size:16.5px"><b>Likely motion</b> ${st("AS")} — occasion-led social sharing; the founder’s network and church communities; diaspora gifting over Stripe plus African payment rails.</p>
        </div>`,
     ),
@@ -380,7 +383,7 @@ const slides = [
       "B",
       "Competition",
       `A category with a $2.45B leader and a $199 human incumbent.`,
-      `<table class="t">
+      `<table class="t" style="font-size:13.5px">
         <tr><th style="width:20%">Competitor</th><th style="width:30%">Model</th><th>Public data point</th></tr>
         <tr><td><b>Suno</b></td><td>Prompt-to-song, subscription</td><td>$250M Series C at $2.45B; ~$200M annual revenue (TechCrunch, Nov 2025); settled with Warner Music, Nov 2025 (Fortune) ${st("VP")}</td></tr>
         <tr><td><b>Udio</b></td><td>Prompt-to-song</td><td>Settlements and partnerships with UMG and Warner reported, late 2025 (Boston Globe) ${st("VP")}</td></tr>
@@ -388,7 +391,8 @@ const slides = [
         <tr><td><b>ElevenLabs Music</b></td><td>AI music, commercially cleared</td><td>Not individually verified ${st("UN")}</td></tr>
         <tr><td><b>Soundraw, Beatoven.ai, Mubert, Loudly</b></td><td>Royalty-free AI background music</td><td>Category comparators</td></tr>
         <tr><td><b>Sonic-branding agencies, local jingle producers</b></td><td>Human, bespoke</td><td>The price point SongScribe undercuts for SMB jingles ${st("AS")}</td></tr>
-       </table>`,
+       </table>
+       <p style="margin-top:8px;font-size:14px;line-height:1.4">${st("SR")} As of October 2026: unlike human-made song services at about $199 and 3–7 days, SongScribe returns two variations in 30–60 seconds at a lower price. Every paid plan includes licensed use, from personal to commercial to exclusive, with an ownership certificate.</p>`,
     ),
   ),
   S(
@@ -518,6 +522,7 @@ const slides = [
             <li>Sole director and ≥75% PSC of SONGSCRIBE AI LTD, registered as Mario-Ghae Efezino ${st("VP")}</li>
             <li>Founder and CEO of Zino Aviation, Lagos (Nairametrics, 2026-07-19) ${st("VP")}</li>
             <li>“Multi-instrumentalist and music producer”; founder of SongScribe AI ${st("SR", "zinomario.com")}</li>
+            <li>Previously founded Zino Aviation (2018, Lagos), which he leads as CEO; experience as a licensed pilot in Nigeria and the UK (as of October 2026) ${st("SR")}</li>
           </ul>
         </div>
         <div>
