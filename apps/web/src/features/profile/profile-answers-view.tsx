@@ -24,6 +24,7 @@ import {
 import { AnswerEditor } from "./answer-editor";
 import {
   EXTRA_EDIT_STEPS,
+  unansweredGroup,
   type AnswerGroup,
   type ProfileJourney,
 } from "./profile-answers";
@@ -105,9 +106,26 @@ export function ProfileAnswers({
       ? fullState
       : {
           status: "READ",
-          groups: fullState.groups.filter((group) =>
-            include.includes(group.id),
-          ),
+          groups: include.flatMap((id) => {
+            const group = fullState.groups.find(
+              (candidate) => candidate.id === id && candidate.lines.length > 0,
+            );
+            if (group !== undefined) return [group];
+            // A finished setup keeps its editor even when the session view
+            // lists none of the card's answers (the founder's sector card
+            // otherwise fell back to "appears here once you tell Q",
+            // leaving no way to change the company's categories). The
+            // card shows "Not added" and edits in place; the server still
+            // decides whether the step may be revised.
+            const blank =
+              fullState.completed === true
+                ? unansweredGroup(journey, id)
+                : null;
+            return blank !== null &&
+              editableOf(journey, blank, fullState) !== null
+              ? [blank]
+              : [];
+          }),
         };
   if (state.status === "UNAVAILABLE") {
     return (
