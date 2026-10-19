@@ -256,6 +256,33 @@ describe("a save made on an earlier visit (R30 #7)", () => {
   });
 });
 
+describe("undo a pass (the feed's toast)", () => {
+  it("clears the pass at once and puts it back if the undo fails", () => {
+    const passed = run(
+      [
+        { type: "DECISION_REQUESTED", companyId: "c-1", intent: "PASS" },
+        {
+          type: "DECISION_CONFIRMED",
+          companyId: "c-1",
+          state: { saved: false, passed: true },
+        },
+      ],
+      loaded([1, 2]),
+    );
+    const undone = feedReducer(passed, {
+      type: "DECISION_REQUESTED",
+      companyId: "c-1",
+      intent: "UNPASS",
+    });
+    expect(decisionFor(undone, "c-1")).toEqual({ saved: false, passed: false });
+    const failed = feedReducer(undone, {
+      type: "DECISION_FAILED",
+      companyId: "c-1",
+    });
+    expect(decisionFor(failed, "c-1").passed).toBe(true);
+  });
+});
+
 describe("optimistic save and pass", () => {
   it("shows a save immediately, before the server has answered", () => {
     const state = feedReducer(loaded([1, 2]), {

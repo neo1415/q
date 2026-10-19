@@ -35,12 +35,13 @@ export function actionFeedTransport(
       return result.value;
     },
 
-    decide: async ({ companyId, intent, slateId, clientEventId }) => {
+    decide: async ({ companyId, intent, slateId, clientEventId, reason }) => {
       const result = await recordDecisionAction({
         companyId,
         intent,
         slateId,
         clientEventId,
+        ...(reason === undefined ? {} : { reason }),
       });
       if (!result.ok) throw new Error(result.message);
       return result.value;

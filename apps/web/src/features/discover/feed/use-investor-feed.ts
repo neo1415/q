@@ -34,6 +34,7 @@ import {
   shouldLoadMore,
   type FeedDecision,
   type FeedDecisionIntent,
+  type FeedPassReason,
   type FeedPrefetchBudget,
   type FeedPrefetchWindow,
   type FeedState,
@@ -104,6 +105,13 @@ export type InvestorFeed = {
   readonly unsave: (companyId: string) => void;
   /** Records the pass. Advancing is the caller's, so a keyboard pass can differ. */
   readonly pass: (companyId: string) => void;
+  /** Undo a pass from the feed (the pass toast's Undo). */
+  readonly unpass: (companyId: string) => void;
+  /**
+   * The person's optional reason for a pass already recorded: a second
+   * pass record carrying it (the server keeps the latest reason).
+   */
+  readonly passReason: (companyId: string, reason: FeedPassReason) => void;
   readonly decisionFor: (companyId: string) => FeedDecision;
   readonly isDeciding: (companyId: string) => boolean;
   /**
@@ -250,7 +258,11 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
 
   const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
   const decide = useCallback(
-    (companyId: string, intent: FeedDecisionIntent) => {
+    (
+      companyId: string,
+      intent: FeedDecisionIntent,
+      reason?: FeedPassReason,
+    ) => {
       dispatch({ type: "DECISION_REQUESTED", companyId, intent });
       transportRef.current
         .decide({
@@ -258,6 +270,7 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
           intent,
           slateId: state.slateId,
           clientEventId: newClientEventId(),
+          ...(reason === undefined ? {} : { reason }),
         })
         .then((recorded) => {
           setDecisionNotice(null);
@@ -296,6 +309,15 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
     (companyId: string) => decide(companyId, "PASS"),
     [decide],
   );
+  const unpass = useCallback(
+    (companyId: string) => decide(companyId, "UNPASS"),
+    [decide],
+  );
+  const passReason = useCallback(
+    (companyId: string, reason: FeedPassReason) =>
+      decide(companyId, "PASS", reason),
+    [decide],
+  );
 
   const prefetch = useMemo(
     () => prefetchWindow(state, budget),
@@ -315,6 +337,8 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
     save,
     unsave,
     pass,
+    unpass,
+    passReason,
     decisionFor: (companyId: string) => decisionFor(state, companyId),
     isDeciding: (companyId: string) => isDecisionPending(state, companyId),
     decisionNotice,

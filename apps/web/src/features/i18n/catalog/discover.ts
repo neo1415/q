@@ -203,4 +203,14 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "companies you passed": "شركات تجاوزتها",
   // Discover A desktop dossier (2026-10-19).
   "Q's read": "قراءة Q",
+  "Interest recorded": "تم تسجيل الاهتمام",
+  "Its founders are told.": "يُبلَّغ مؤسسوها.",
+  "Noted for your feed": "سُجّل لخلاصتك",
+  "Review saved companies": "راجع الشركات المحفوظة",
+  Suggested: "مقترح",
+  "Today's slate": "قائمة اليوم",
+  "View in CRM": "اعرض في إدارة العلاقات",
+  "Why, if you like": "السبب، إن أردت",
+  "You're through today's slate.": "أنهيت قائمة اليوم.",
+  "what you can see": "ما يمكنك رؤيته",
 };

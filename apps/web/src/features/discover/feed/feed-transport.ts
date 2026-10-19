@@ -3,7 +3,7 @@ import type {
   InteractionRecordedDto,
 } from "@capital-q/contracts";
 
-import type { FeedDecisionIntent } from "./feed-state";
+import type { FeedDecisionIntent, FeedPassReason } from "./feed-state";
 
 /**
  * What the controller needs from the outside world, and nothing else.
@@ -45,6 +45,8 @@ export type FeedTransport = {
     readonly intent: FeedDecisionIntent;
     readonly slateId: string | null;
     readonly clientEventId: string;
+    /** PASS only: the reason the person chose afterwards, if any. */
+    readonly reason?: FeedPassReason | undefined;
   }): Promise<InteractionRecordedDto>;
 };
 

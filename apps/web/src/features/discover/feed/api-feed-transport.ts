@@ -2,6 +2,7 @@ import {
   ApiProblemError,
   discoverCompanies,
   passCompany,
+  unpassCompany,
   saveCompany,
   unsaveCompany,
   type ApiSession,
@@ -48,7 +49,7 @@ export function apiFeedTransport(
       }
     },
 
-    decide: ({ companyId, intent, slateId, clientEventId }) => {
+    decide: ({ companyId, intent, slateId, clientEventId, reason }) => {
       // `slateId` is optional on the wire and omitted rather than sent as
       // null: the request schema is strict, and "I was not in a slate" is
       // a different statement from "I was in slate null".
@@ -64,9 +65,15 @@ export function apiFeedTransport(
         case "UNSAVE":
           return unsaveCompany(session, companyId, body);
         case "PASS":
-          // No reason is sent. Doc 17 §67: pass is fast, and a mandatory
-          // feedback modal after every pass is explicitly not wanted.
-          return passCompany(session, companyId, body);
+          // Pass is fast (doc 17 §67): a reason is only ever the person's
+          // optional answer afterwards, sent as a second record.
+          return passCompany(
+            session,
+            companyId,
+            reason === undefined ? body : { ...body, reason },
+          );
+        case "UNPASS":
+          return unpassCompany(session, companyId, body);
       }
     },
   };

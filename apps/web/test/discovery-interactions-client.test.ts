@@ -138,6 +138,41 @@ describe("the feed transport", () => {
     expect("reason" in body).toBe(false);
   });
 
+  it("sends a pass's reason only when the person chose one, on the pass path", async () => {
+    const { session, calls } = sessionDouble();
+
+    await apiFeedTransport(session).decide({
+      companyId: COMPANY_ID,
+      intent: "PASS",
+      slateId: SLATE_ID,
+      clientEventId: "cq:test:0004",
+      reason: "SECTOR",
+    });
+
+    expect(calls[0]?.path).toBe(`/v1/discovery/companies/${COMPANY_ID}/pass`);
+    expect(calls[0]?.body).toEqual({
+      clientEventId: "cq:test:0004",
+      surface: "RECOMMENDATION_FEED",
+      slateId: SLATE_ID,
+      reason: "SECTOR",
+    });
+  });
+
+  it("undoes a pass from the feed on its own path, with no reason", async () => {
+    const { session, calls } = sessionDouble();
+
+    await apiFeedTransport(session).decide({
+      companyId: COMPANY_ID,
+      intent: "UNPASS",
+      slateId: SLATE_ID,
+      clientEventId: "cq:test:0005",
+    });
+
+    expect(calls[0]?.method).toBe("POST");
+    expect(calls[0]?.path).toBe(`/v1/discovery/companies/${COMPANY_ID}/unpass`);
+    expect("reason" in (calls[0]?.body as Record<string, unknown>)).toBe(false);
+  });
+
   it("returns the server's own saved/passed state", async () => {
     const { session } = sessionDouble();
 

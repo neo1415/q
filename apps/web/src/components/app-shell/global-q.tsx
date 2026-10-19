@@ -390,6 +390,23 @@ export function GlobalQTrigger({
   );
 }
 
+/**
+ * The same conversation the side panel shows, in a place a page gives it
+ * (Discover A: Ask Q over the dossier, the pitch still playing beside it).
+ * One Q: this reads the one store, so it is never a second conversation.
+ */
+export function GlobalQInline({
+  seed = null,
+}: {
+  /** A draft question to open with; the person edits or sends it. */
+  readonly seed?: string | null | undefined;
+}) {
+  const { connected, moment } = useContext(GlobalQContext);
+  return (
+    <QSheetConversation connected={connected} seed={seed} moment={moment} />
+  );
+}
+
 function GlobalQSheet() {
   const { open, setOpen, connected, seed, moment } = useContext(GlobalQContext);
   const subject = useQSubject();

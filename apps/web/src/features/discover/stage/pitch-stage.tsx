@@ -280,6 +280,10 @@ export type PitchStageProps = {
   readonly onExtraKey?: ((key: string) => boolean) | undefined;
   /** The stage's element, for a feed that reads the pitch in view. */
   readonly onStage?: ((stage: HTMLDivElement | null) => void) | undefined;
+  /** Where the card in view is ("3 of 24"), between Previous and Next. */
+  readonly positionLabel?: string | null | undefined;
+  /** Over the stage instead of the cards: the end of the slate. */
+  readonly ending?: ReactNode;
 };
 
 export function PitchStage({
@@ -306,6 +310,8 @@ export function PitchStage({
   onNotInterested,
   onExtraKey,
   onStage,
+  positionLabel = null,
+  ending = null,
 }: PitchStageProps) {
   const t = useT();
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -739,7 +745,9 @@ export function PitchStage({
           else. Owned by .cq-feed-overlay in globals.css. On a desktop the
           panel sits beside the pitch, in the app's theme.
         */}
-        <div className="cq-feed-overlay">{overlay({ openOptions })}</div>
+        <div className="cq-feed-overlay">
+          {ending ?? overlay({ openOptions })}
+        </div>
 
         {/*
           The explicit equivalents of the swipe, always present. Position is
@@ -760,6 +768,11 @@ export function PitchStage({
               strokeWidth={ICON_STROKE}
             />
           </button>
+          {positionLabel === null ? null : (
+            <span className="cq-feed-nav-position" data-feed-nav-position>
+              {positionLabel}
+            </span>
+          )}
           <button
             type="button"
             className="cq-feed-nav-button"

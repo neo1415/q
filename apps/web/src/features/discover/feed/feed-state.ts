@@ -46,7 +46,21 @@ const UNDECIDED: FeedDecision = { saved: false, passed: false };
  * and is server-confirmed (CQ-NET-010); an optimistic local flag for it
  * would show a person a relationship that does not exist yet.
  */
-export type FeedDecisionIntent = "SAVE" | "UNSAVE" | "PASS";
+export type FeedDecisionIntent = "SAVE" | "UNSAVE" | "PASS" | "UNPASS";
+
+/**
+ * Why a company was passed, when the person says (the contract's own
+ * optional codes, never required: doc 17 §67, no feedback modal).
+ */
+export type FeedPassReason =
+  | "NOT_NOW"
+  | "STAGE"
+  | "SECTOR"
+  | "GEOGRAPHY"
+  | "TRACTION"
+  | "RAISE"
+  | "TIMING"
+  | "OTHER";
 
 /** An optimistic decision still in flight, with what to put back if it fails. */
 export type FeedPendingDecision = {
@@ -74,6 +88,8 @@ function applyIntent(
       return { saved: false, passed: current.passed };
     case "PASS":
       return { saved: current.saved, passed: true };
+    case "UNPASS":
+      return { saved: current.saved, passed: false };
   }
 }
 

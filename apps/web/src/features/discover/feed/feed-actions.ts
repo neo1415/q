@@ -16,6 +16,7 @@ import {
 import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   DiscoverFiltersSchema,
+  PassCompanyRequestSchema,
   type DiscoveryCompanySlateDto,
   type InteractionRecordedDto,
   type NetworkPitchPageDto,
@@ -51,7 +52,9 @@ const CursorInput = z.string().min(1).max(200);
 const CompanyIdInput = z.string().uuid();
 const SlateIdInput = z.string().uuid();
 const ClientEventIdInput = z.string().regex(/^[A-Za-z0-9_:-]{8,64}$/);
-const IntentInput = z.enum(["SAVE", "UNSAVE", "PASS"]);
+const IntentInput = z.enum(["SAVE", "UNSAVE", "PASS", "UNPASS"]);
+/** A pass's optional reason, in the contract's own codes. */
+const PassReasonInput = PassCompanyRequestSchema.shape.reason;
 /** Where a decision was made; the feed unless a company's profile says so. */
 const SurfaceInput = z.enum(["RECOMMENDATION_FEED", "COMPANY_PROFILE"]);
 
@@ -117,7 +120,7 @@ export async function loadSlatePageAction(
 }
 
 /**
- * One of save, unsave or pass.
+ * One of save, unsave, pass or undo a pass (the feed's Undo).
  *
  * The client sends its own idempotency key and the slate it was looking
  * at, and nothing else. Rank, ranking version, organisation and tenant are
@@ -125,10 +128,12 @@ export async function loadSlatePageAction(
  */
 export async function recordDecisionAction(input: {
   readonly companyId: string;
-  readonly intent: "SAVE" | "UNSAVE" | "PASS";
+  readonly intent: "SAVE" | "UNSAVE" | "PASS" | "UNPASS";
   readonly slateId: string | null;
   readonly clientEventId: string;
   readonly surface?: "RECOMMENDATION_FEED" | "COMPANY_PROFILE" | undefined;
+  /** PASS only, and only when the person chose one. */
+  readonly reason?: string | undefined;
 }): Promise<FeedActionResult<InteractionRecordedDto>> {
   const active = await session();
   if (active === null) return { ok: false, message: NO_SESSION };
@@ -141,12 +146,14 @@ export async function recordDecisionAction(input: {
   const clientEventId = ClientEventIdInput.safeParse(input.clientEventId);
   const slateId =
     input.slateId === null ? null : SlateIdInput.safeParse(input.slateId);
+  const reason = PassReasonInput.safeParse(input.reason);
 
   if (
     !companyId.success ||
     !intent.success ||
     !clientEventId.success ||
     !surface.success ||
+    !reason.success ||
     (slateId !== null && !slateId.success)
   ) {
     return {
@@ -167,9 +174,17 @@ export async function recordDecisionAction(input: {
         ? await saveCompany(active, companyId.data, body)
         : intent.data === "UNSAVE"
           ? await unsaveCompany(active, companyId.data, body)
-          : // No reason is sent. Doc 17 §67: pass is fast, and a mandatory
-            // feedback modal after every pass is explicitly not wanted.
-            await passCompany(active, companyId.data, body);
+          : intent.data === "UNPASS"
+            ? await unpassCompany(active, companyId.data, body)
+            : // Pass is fast (doc 17 §67): a reason is only the person's
+              // optional answer afterwards, sent as a second record.
+              await passCompany(
+                active,
+                companyId.data,
+                reason.data === undefined
+                  ? body
+                  : { ...body, reason: reason.data },
+              );
     return { ok: true, value: recorded };
   } catch {
     return { ok: false, message: "That did not save. Try again." };

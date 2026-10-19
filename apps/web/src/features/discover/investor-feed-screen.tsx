@@ -28,7 +28,15 @@ import { QPageState } from "@/features/q/q-section";
 import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
 import { QPageSubject } from "@/features/q/q-subject";
 
+import { DossierQ } from "./dossier-q";
 import { FeedCard } from "./feed-card";
+import {
+  EndOfSlate,
+  FeedMomentToast,
+  NO_TALLY,
+  type FeedMoment,
+  type FeedTally,
+} from "./feed-moments";
 import { useDiscoverTab } from "./discover-tab";
 import { ruleList } from "./mandate-rules";
 import {
@@ -329,6 +337,12 @@ function InvestorFeed({
   // (follow-55; one active player per page).
   const offTab = useDiscoverTab() !== "FOR_YOU";
   const index = feed.state.index;
+  // Discover A's moments: the toast after a pass or a confirmed interest,
+  // this visit's tally, and the end of the slate.
+  const [moment, setMoment] = useState<FeedMoment | null>(null);
+  const momentCount = useRef(0);
+  const [tally, setTally] = useState<FeedTally>(NO_TALLY);
+  const [ended, setEnded] = useState(false);
   const hold = tabHidden || splashUp || offTab;
   // Founder, 2026-10-09: pitches are always loud from the start, also with
   // Q open or the voice line on; only Q's own speech quiets them. (Muting
@@ -680,17 +694,53 @@ function InvestorFeed({
 
   const decision = feed.decisionFor(card.companyId);
   const policyByCompanyId = feed.prefetch.policyByCompanyId;
+  // Nothing after this card, and no page still to come.
+  const lastCard = !feed.canAdvance && feed.state.nextCursor === null;
+  const moveOn = () => {
+    if (lastCard) setEnded(true);
+    else next();
+  };
+  const noteMoment = (kind: FeedMoment["kind"]) => {
+    momentCount.current += 1;
+    setMoment({
+      kind,
+      id: momentCount.current,
+      companyId: card.companyId,
+      companyName: card.canonicalName,
+    });
+  };
+  const save = () => {
+    if (decision.saved) return;
+    feed.save(card.companyId);
+    setTally((was) => ({ ...was, saved: was.saved + 1 }));
+  };
+  /** Every pass from the feed: recorded, said with Undo, and moved on. */
+  const passCard = () => {
+    feed.pass(card.companyId);
+    setTally((was) => ({ ...was, passed: was.passed + 1 }));
+    noteMoment("PASSED");
+    moveOn();
+  };
+  const undoPass = (companyId: string) => {
+    feed.unpass(companyId);
+    setTally((was) => ({ ...was, passed: Math.max(0, was.passed - 1) }));
+    setEnded(false);
+    feed.moveTo(companyId);
+  };
 
   const onDecide = (verdict: "SAVE" | "PASS") => {
     // Right keeps it (saved, optimistic); left passes. Expressing interest
     // stays its own confirmed step: it tells the founder.
     if (verdict === "SAVE") {
-      if (!decision.saved) feed.save(card.companyId);
+      save();
+      moveOn();
     } else {
-      feed.pass(card.companyId);
+      passCard();
     }
-    next();
   };
+  const positionLabel = `${String(index + 1)} ${t("of")} ${String(
+    shownItems.length,
+  )}${feed.state.nextCursor === null ? "" : "+"}`;
 
   return (
     <PitchStage
@@ -710,10 +760,21 @@ function InvestorFeed({
       label={t("Companies to review")}
       onStage={setStage}
       onDecide={onDecide}
-      onNotInterested={() => {
-        feed.pass(card.companyId);
-        next();
-      }}
+      onNotInterested={passCard}
+      positionLabel={positionLabel}
+      ending={
+        ended ? (
+          <>
+            <EndOfSlate tally={tally} onBack={() => setEnded(false)} />
+            <FeedMomentToast
+              moment={moment}
+              onUndoPass={undoPass}
+              onPassReason={feed.passReason}
+              onDone={() => setMoment(null)}
+            />
+          </>
+        ) : null
+      }
       before={
         /*
           Q looks at the card the person is looking at. Declaring it grants
@@ -775,17 +836,19 @@ function InvestorFeed({
               <QAperture state={session?.presence.state ?? "IDLE"} size={24} />
             }
             onSave={() =>
-              decision.saved
-                ? feed.unsave(card.companyId)
-                : feed.save(card.companyId)
+              decision.saved ? feed.unsave(card.companyId) : save()
             }
-            onPass={() => {
-              feed.pass(card.companyId);
-              // Passing moves on. The record and the movement are separate
-              // so a keyboard pass can choose not to.
-              next();
-            }}
+            // Passing moves on, with Undo and an optional reason in the
+            // toast. The record and the movement stay separate in the
+            // feed so a keyboard pass can choose not to.
+            onPass={passCard}
             onAskQ={() => setOpen(true)}
+            askPanel={<DossierQ />}
+            position={positionLabel}
+            onInterestConfirmed={() => {
+              setTally((was) => ({ ...was, interest: was.interest + 1 }));
+              noteMoment("INTEREST");
+            }}
             onMore={openOptions}
             sectorLabels={sectorLabels}
             feedNotes={
@@ -813,6 +876,12 @@ function InvestorFeed({
             }
           />
           <KeyHints />
+          <FeedMomentToast
+            moment={moment}
+            onUndoPass={undoPass}
+            onPassReason={feed.passReason}
+            onDone={() => setMoment(null)}
+          />
         </>
       )}
     />

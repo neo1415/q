@@ -1308,6 +1308,152 @@
     color: var(--cq-stage-text);
     rotate: 8deg;
   }
+  /*
+   * Discover A's moments (owner 2026-10-19): one quiet toast at a time
+   * after a pass (Undo, an optional reason) or a confirmed interest, the
+   * end of the slate, and Q over the dossier. Pass stays neutral.
+   */
+  .cq-feed-toast-layer {
+    position: fixed;
+    inset-inline: 0;
+    bottom: calc(var(--cq-bottom-nav-height) + var(--cq-safe-bottom) + 16px);
+    z-index: var(--cq-z-toast);
+    display: flex;
+    justify-content: center;
+    padding-inline: 12px;
+    pointer-events: none;
+  }
+  .cq-feed-toast {
+    display: flex;
+    max-width: min(780px, 100%);
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 10px 12px 10px 16px;
+    border: 1px solid var(--cq-border);
+    /* Solid: over a pitch the stage's surfaces are translucent. */
+    background: var(--cq-canvas);
+    color: var(--cq-text-primary);
+    box-shadow: var(--cq-shadow-overlay);
+    pointer-events: auto;
+    animation: cq-feed-toast-in var(--cq-motion-base) var(--cq-ease) both;
+  }
+  .cq-feed-toast-text {
+    font-size: 14px;
+  }
+  .cq-feed-toast-reasons {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .cq-feed-toast-chip {
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--cq-border-subtle);
+    background: transparent;
+    color: var(--cq-text-secondary);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition:
+      color var(--cq-motion-fast) var(--cq-ease),
+      border-color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-feed-toast-chip:hover,
+  .cq-feed-toast-chip:focus-visible {
+    color: var(--cq-text-primary);
+    border-color: var(--cq-border-strong);
+  }
+  .cq-feed-toast-chip:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .cq-feed-toast-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--cq-text-secondary);
+    font-size: 13px;
+  }
+  .cq-feed-toast-action {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    padding: 0 10px;
+    border: 0;
+    background: transparent;
+    color: var(--cq-accent);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cq-feed-toast-action:hover,
+  .cq-feed-toast-action:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+  /* On a phone the toast sits under the tabs, clear of the company's
+     words and the rail at the foot of the pitch. */
+  @media (max-width: 1023px) {
+    .cq-feed-toast-layer {
+      top: calc(56px + var(--cq-safe-top));
+      bottom: auto;
+    }
+    .cq-feed-toast {
+      max-width: 100%;
+      font-size: 13px;
+    }
+  }
+  @keyframes cq-feed-toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  .cq-feed-end {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+    background: var(--cq-canvas);
+    animation: cq-feed-toast-in var(--cq-motion-slow) var(--cq-ease) both;
+  }
+  .cq-feed-end-tally {
+    display: flex;
+    gap: 28px;
+    margin: 4px 0;
+  }
+  .cq-feed-end-tally div {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 2px;
+  }
+  .cq-feed-end-tally dt {
+    color: var(--cq-text-secondary);
+    font-size: 13px;
+  }
+  .cq-feed-end-tally dd {
+    font-size: 22px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .cq-feed-reason-mark {
+    color: var(--cq-accent);
+  }
+  .cq-feed-nav-position {
+    color: var(--cq-stage-text-muted);
+    font-size: 12px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-feed-toast,
+    .cq-feed-end {
+      animation: none;
+    }
+  }
+
   /* Pitch captions (Discover A): legible over any frame, on the stage
      night at a whisper behind the words only. */
   .cq-feed-video::cue {
@@ -2316,6 +2462,14 @@
       margin-inline-start: auto;
       gap: 2px;
     }
+    /* A confirmed interest says so above the row, so the row keeps its
+       shape (the decision stays where it was made). */
+    .cq-feed-actions > .cq-status-line,
+    .cq-feed-actions > [role="group"],
+    .cq-feed-actions > [role="status"] {
+      flex-basis: 100%;
+      order: -1;
+    }
     .cq-feed-open-full {
       display: inline-flex;
       min-height: 44px;
@@ -2329,6 +2483,118 @@
     .cq-feed-open-full:hover,
     .cq-feed-open-full:focus-visible {
       text-decoration: underline;
+    }
+    .cq-feed-dossier-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    /* Stage, Raising, Location: one row of three, ruled above and below. */
+    .cq-feed-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin: 0;
+      border-block: 1px solid var(--cq-border-subtle);
+    }
+    .cq-feed-strip > div {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px 14px;
+    }
+    .cq-feed-strip > div:first-child {
+      padding-inline-start: 0;
+    }
+    .cq-feed-strip > div + div {
+      border-inline-start: 1px solid var(--cq-border-subtle);
+    }
+    .cq-feed-strip dt {
+      color: var(--cq-text-secondary);
+      font-size: 12px;
+    }
+    .cq-feed-strip dd {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin: 0;
+      color: var(--cq-text-primary);
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .cq-feed-strip-axis {
+      color: var(--cq-text-secondary);
+      font-size: 12px;
+      font-weight: 400;
+    }
+    /* A new company settles in row by row, 30 ms apart: calm, not flashy. */
+    .cq-feed-overlay .cq-feed-card > *,
+    .cq-feed-overlay .cq-feed-more-body > * {
+      animation: cq-feed-row-in 320ms var(--cq-ease) both;
+    }
+    .cq-feed-overlay .cq-feed-more-body > :nth-child(2) {
+      animation-delay: 30ms;
+    }
+    .cq-feed-overlay .cq-feed-more-body > :nth-child(3) {
+      animation-delay: 60ms;
+    }
+    .cq-feed-overlay .cq-feed-more-body > :nth-child(4) {
+      animation-delay: 90ms;
+    }
+    .cq-feed-overlay .cq-feed-more-body > :nth-child(n + 5) {
+      animation-delay: 120ms;
+    }
+    @keyframes cq-feed-row-in {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+    }
+    /* Q over the dossier: slides in from the panel's edge. */
+    .cq-feed-ask {
+      display: flex;
+      min-height: 100%;
+      flex-direction: column;
+      gap: 12px;
+      animation: cq-feed-ask-in var(--cq-motion-slow) var(--cq-ease) both;
+    }
+    .cq-feed-ask-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cq-feed-ask-pin {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--cq-surface-subtle);
+    }
+    .cq-feed-ask-body {
+      display: flex;
+      min-height: 0;
+      flex: 1;
+      flex-direction: column;
+    }
+    @keyframes cq-feed-ask-in {
+      from {
+        opacity: 0;
+        transform: translateX(16px);
+      }
+    }
+    .cq-feed-end {
+      margin-top: 8px;
+    }
+    .cq-feed-toast-layer {
+      bottom: 24px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .cq-feed-overlay .cq-feed-card > *,
+      .cq-feed-overlay .cq-feed-more-body > *,
+      .cq-feed-ask {
+        animation: none;
+      }
     }
     /* The rail beside the 9:16 stage, on the stage's own tokens. */
     .cq-feed-rail {

@@ -1,9 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 import type {
+  CompanyScoresDto,
   DiscoveredCompanyDto,
   DiscoveryReasonDto,
 } from "@capital-q/contracts";
@@ -11,8 +18,10 @@ import { Button } from "@capital-q/ui/button";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import {
   ArrowDown,
+  ArrowLeft,
   Bookmark,
   BookmarkCheck,
+  Check,
   ChevronRight,
   Globe,
   Handshake,
@@ -27,7 +36,10 @@ import { moneyText } from "../company/money-text";
 import { RaiseFact } from "../company/raise-fact";
 import { raiseWords, translatedRaise } from "../company/raise-words";
 import { countryLabel, stageLabel } from "../company/declared-labels";
-import { ExpressInterest } from "../network/express-interest";
+import {
+  ExpressInterest,
+  type ExpressInterestPort,
+} from "../network/express-interest";
 import { useDockAvoid } from "../q-dock/dock-avoid";
 
 import type { FeedPreloadPolicy } from "./feed/feed-state";
@@ -140,8 +152,19 @@ function Reasons({
   return (
     <dl className="flex flex-col gap-1">
       {reasons.map((reason) => (
-        <div key={`${reason.kind}-${reason.detail}`} className="flex gap-2">
-          <dt className="cq-label text-(--cq-text-tertiary)">
+        <div
+          key={`${reason.kind}-${reason.detail}`}
+          className="cq-feed-reason flex gap-2"
+        >
+          <dt className="cq-label flex items-center gap-1.5 text-(--cq-text-tertiary)">
+            {/* Declared alignment that holds: a mark beside the word, never
+                colour alone (Discover A). */}
+            <Check
+              aria-hidden="true"
+              className="cq-feed-reason-mark"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+            />
             {t(REASON_LABELS[reason.kind])}
           </dt>
           <dd className="cq-body-sm text-(--cq-text-secondary)">
@@ -260,6 +283,11 @@ export function FeedCard({
   feedNotes = null,
   videos,
   sectorLabels = NO_LABELS,
+  position = null,
+  askPanel,
+  onInterestConfirmed,
+  initialScores,
+  expressInterest,
 }: {
   readonly company: DiscoveredCompanyDto;
   readonly policy: FeedPreloadPolicy;
@@ -294,6 +322,20 @@ export function FeedCard({
     | undefined;
   /** The industry vocabulary's names, for the card's sector. */
   readonly sectorLabels?: ReadonlyMap<string, string> | undefined;
+  /** Where this card is in the slate ("3 of 24"), when the feed knows. */
+  readonly position?: string | null | undefined;
+  /**
+   * Q beside the dossier (Discover A): on a desktop Ask Q opens this over
+   * the panel, the company pinned and the pitch still playing. Absent, Ask
+   * Q opens Q's own panel (onAskQ), as on a phone.
+   */
+  readonly askPanel?: ReactNode;
+  /** The server confirmed this reader's interest (the feed's toast). */
+  readonly onInterestConfirmed?: (() => void) | undefined;
+  /** Scores already read (a review harness); otherwise read for the page. */
+  readonly initialScores?: ReadonlyMap<string, CompanyScoresDto> | undefined;
+  /** The interest port (a review harness); the server action otherwise. */
+  readonly expressInterest?: ExpressInterestPort | undefined;
 }) {
   const t = useT();
   // Stage first, then where: "Seed · Nigeria".
@@ -306,6 +348,12 @@ export function FeedCard({
     .join(" · ");
   const decisions = useRef<HTMLDivElement>(null);
   useDockAvoid(decisions);
+  // The dossier's line under the name also names the sector (Discover A).
+  const sectorWords = (company.summary?.sectorNodeIds ?? [])
+    .map((id) => sectorLabels.get(id))
+    .filter((label): label is string => label !== undefined)
+    .slice(0, 2)
+    .map((label) => t(label));
   const unverified = company.unverifiedExclusions ?? [];
   const filterUnknown = company.filterUnknown ?? [];
   const sheetDrag = useRef<number | null>(null);
@@ -315,7 +363,14 @@ export function FeedCard({
   const wide = useDesktopPanel();
   // Investability and Suitability (owner 2026-10-16; ADR 0074): read for
   // the page in one batched call, off the swipe path; absent until known.
-  const scores = useCompanyScores([company.companyId]);
+  const scores = useCompanyScores(
+    [company.companyId],
+    initialScores === undefined ? {} : { initial: initialScores },
+  );
+  // Discover A: Ask Q over the dossier on a desktop, back with Escape.
+  const [asking, setAsking] = useState(false);
+  const askInPanel = wide && askPanel !== undefined;
+  const askQ = askInPanel ? () => setAsking(true) : onAskQ;
   // The server-rendered control cannot open Q until its handler is attached.
   // Keep it disabled through hydration so an early press is never discarded.
   const interactive = useSyncExternalStore(
@@ -362,7 +417,20 @@ export function FeedCard({
         place, two lines, and "more" that opens it in place. The scrim sits
         behind the words only, never a block over the picture.
       */}
-      <div className="cq-feed-info flex flex-col gap-1" data-feed-summary>
+      {asking && askInPanel ? (
+        <DossierAsk
+          company={company}
+          place={place}
+          onBack={() => setAsking(false)}
+        >
+          {askPanel}
+        </DossierAsk>
+      ) : null}
+      <div
+        className="cq-feed-info flex flex-col gap-1"
+        data-feed-summary
+        hidden={asking && askInPanel}
+      >
         {company.sinceYouLastSaw === undefined ? null : (
           // Passed before, offered again because something is new (doc 19
           // §67). Words, not a colour or a badge.
@@ -401,7 +469,9 @@ export function FeedCard({
             </h2>
             {place === "" ? null : (
               <span className="cq-caption cq-feed-muted" data-feed-place>
-                {place}
+                {wide && sectorWords.length > 0
+                  ? `${place} · ${sectorWords.join(", ")}`
+                  : place}
               </span>
             )}
           </span>
@@ -463,7 +533,7 @@ export function FeedCard({
         desktop (spec §9.2): the declared facts, why it is here, and the
         way into the profile. Declared alignment only; never a score.
       */}
-      {open ? (
+      {open && !(asking && askInPanel) ? (
         <div
           className="cq-feed-more-body flex flex-col gap-4"
           id={`cq-feed-more-${company.companyId}`}
@@ -476,10 +546,12 @@ export function FeedCard({
               deciding={deciding}
               onSave={onSave}
               onPass={onPass}
-              onAskQ={onAskQ}
+              onAskQ={askQ}
               onMore={onMore}
               askQMark={askQMark}
               interactive={interactive}
+              onInterestConfirmed={onInterestConfirmed}
+              expressInterest={expressInterest}
               shared={shared}
               onShare={() => {
                 void shareCompany(company).then(setShared);
@@ -487,7 +559,11 @@ export function FeedCard({
               videos={videos}
             />
           ) : null}
-          <CardFacts company={company} sectorLabels={sectorLabels} />
+          {wide ? (
+            <FactStrip company={company} />
+          ) : (
+            <CardFacts company={company} sectorLabels={sectorLabels} />
+          )}
           <div className="cq-feed-why flex flex-col gap-1" data-feed-why>
             <h3 className="cq-label text-(--cq-text-primary)">
               {t("Why it's here")}
@@ -525,18 +601,28 @@ export function FeedCard({
               Interest the details. A desktop's dossier ends with the way
               into the full profile. */}
           {wide ? (
-            <Link
-              href={`/company/${company.companyId}`}
-              className="cq-feed-open-full"
-              data-feed-open-profile
-            >
-              {t("Open full profile")}
-              <ChevronRight
-                aria-hidden="true"
-                size={ICON_SIZE.compact}
-                strokeWidth={ICON_STROKE}
-              />
-            </Link>
+            <div className="cq-feed-dossier-foot">
+              <Link
+                href={`/company/${company.companyId}`}
+                className="cq-feed-open-full"
+                data-feed-open-profile
+              >
+                {t("Open full profile")}
+                <ChevronRight
+                  aria-hidden="true"
+                  size={ICON_SIZE.compact}
+                  strokeWidth={ICON_STROKE}
+                />
+              </Link>
+              {position === null ? null : (
+                <span
+                  className="cq-caption text-(--cq-text-secondary)"
+                  data-feed-position
+                >
+                  {position}
+                </span>
+              )}
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -644,6 +730,10 @@ export function FeedCard({
                 companyName={company.canonicalName}
                 surface="RECOMMENDATION_FEED"
                 startConfirming={confirming}
+                onConfirmed={onInterestConfirmed}
+                {...(expressInterest === undefined
+                  ? {}
+                  : { express: expressInterest })}
               />
             </div>
           </div>
@@ -799,6 +889,127 @@ export function FeedCard({
 }
 
 /**
+ * The dossier's three facts in a row (Discover A): stage, the raise as the
+ * server read it for this reader, and where. Unknown is said, never blank
+ * and never zero.
+ */
+function FactStrip({ company }: { readonly company: DiscoveredCompanyDto }) {
+  const t = useT();
+  const stage = stageLabel(company.currentStageCode);
+  const country = countryLabel(company.headquartersCountry);
+  const summary = company.summary;
+  return (
+    <dl className="cq-feed-strip" data-feed-facts>
+      <div>
+        <dt>{t("Stage")}</dt>
+        <dd>{stage === null ? t("Not stated") : t(stage)}</dd>
+      </div>
+      <div>
+        <dt>{t("Raising")}</dt>
+        <dd className="cq-numeric">
+          {summary?.raiseView !== undefined ? (
+            <RaiseFact
+              words={translatedRaise(raiseWords(summary.raiseView, false), t)}
+            />
+          ) : summary === undefined || summary.raise === null ? (
+            <span className="cq-feed-fact-unknown">
+              {t("Not shared with you")}
+            </span>
+          ) : (
+            <>
+              {moneyText(summary.raise.money)}
+              <span className="cq-feed-strip-axis">
+                {t(
+                  evidenceWords(
+                    summary.raise.truthClass,
+                    summary.raise.evidenceStatus,
+                  ),
+                )}
+              </span>
+            </>
+          )}
+        </dd>
+      </div>
+      <div>
+        <dt>{t("Location")}</dt>
+        <dd>{country === null ? t("Not stated") : t(country)}</dd>
+      </div>
+    </dl>
+  );
+}
+
+/**
+ * Ask Q over the dossier (Discover A): the company pinned at the top so it
+ * is plain what Q is looking at, then Q's own conversation -- the one the
+ * dock opens, so nothing is a second Q. The pitch keeps playing beside it.
+ */
+function DossierAsk({
+  company,
+  place,
+  onBack,
+  children,
+}: {
+  readonly company: DiscoveredCompanyDto;
+  readonly place: string;
+  readonly onBack: () => void;
+  readonly children: ReactNode;
+}) {
+  const t = useT();
+  const backRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    backRef.current?.focus({ preventScroll: true });
+  }, []);
+  return (
+    <section
+      className="cq-feed-ask"
+      aria-label={t("Ask Q")}
+      data-feed-ask-panel
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.stopPropagation();
+          onBack();
+        }
+      }}
+    >
+      <div className="cq-feed-ask-head">
+        <button
+          ref={backRef}
+          type="button"
+          className="cq-stage-quiet"
+          aria-label={t("Back to the company")}
+          onClick={onBack}
+          data-feed-ask-back
+        >
+          <ArrowLeft
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+          />
+        </button>
+        <h3 className="cq-label text-(--cq-text-primary)">{t("Ask Q")}</h3>
+      </div>
+      <div className="cq-feed-ask-pin" data-feed-ask-pin>
+        <CompanyAvatar
+          companyId={company.companyId}
+          photoUrl={company.photoUrl}
+          size={32}
+        />
+        <span className="flex min-w-0 flex-col">
+          <span className="cq-body-sm font-medium text-(--cq-text-primary)">
+            {t("About")} {company.canonicalName}
+          </span>
+          <span className="cq-caption text-(--cq-text-secondary)">
+            {place === "" ? "" : `${place} · `}
+            {t("what you can see")}
+          </span>
+        </span>
+      </div>
+      <div className="cq-feed-ask-body">{children}</div>
+    </section>
+  );
+}
+
+/**
  * The desktop dossier's decisions (Discover A, owner 2026-10-19): beside
  * the pitch rather than on a rail over it. Express interest is the
  * server-confirmed step in place (it asks first, CQ-NET-010); Save and
@@ -817,7 +1028,11 @@ function DossierActions({
   shared,
   onShare,
   videos,
+  onInterestConfirmed,
+  expressInterest,
 }: {
+  readonly onInterestConfirmed?: (() => void) | undefined;
+  readonly expressInterest?: ExpressInterestPort | undefined;
   readonly company: DiscoveredCompanyDto;
   readonly saved: boolean;
   readonly deciding: boolean;
@@ -850,6 +1065,8 @@ function DossierActions({
         companyName={company.canonicalName}
         surface="RECOMMENDATION_FEED"
         prominent
+        onConfirmed={onInterestConfirmed}
+        {...(expressInterest === undefined ? {} : { express: expressInterest })}
       />
       <Button
         variant="secondary"
