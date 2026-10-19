@@ -1294,10 +1294,10 @@
     letter-spacing: 0.04em;
     pointer-events: none;
   }
-  /* Right keeps the company (Save): never "Interested", which is its own
-     confirmed step that tells the founder (CQ-NET-010). */
-  .cq-feed-media[data-swipe="save"]::after {
-    content: "Save";
+  /* Right asks for interest: the stamp names it, and the confirmation
+     opens before anything is sent (CQ-NET-010). */
+  .cq-feed-media[data-swipe="interest"]::after {
+    content: "Interest";
     inset-inline-start: 8%;
     color: var(--cq-accent);
     rotate: -8deg;
@@ -1308,6 +1308,332 @@
     color: var(--cq-stage-text);
     rotate: 8deg;
   }
+  /* The first reason over the pitch, a press from the rest (Discover A). */
+  .cq-feed-reason-chip {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    align-self: flex-start;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--cq-text-primary);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .cq-feed-reason-chip > svg {
+    color: var(--cq-accent);
+  }
+  .cq-feed-reason-more {
+    color: var(--cq-text-secondary);
+  }
+  .cq-feed-one-liner {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  .cq-feed-unverified {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-top: 2px;
+    color: var(--cq-text-secondary);
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+  .cq-feed-unverified > svg {
+    flex: none;
+    margin-top: 1px;
+  }
+  .cq-feed-reason dt {
+    min-width: 92px;
+  }
+  .cq-feed-reason dd {
+    color: var(--cq-text-primary);
+  }
+  .cq-feed-sheet-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .cq-feed-still-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--cq-text-secondary);
+    font-size: 12px;
+  }
+  /* Stage, Raising, Location: one row of three, ruled above and below. */
+  .cq-feed-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0;
+    border-block: 1px solid var(--cq-border-subtle);
+  }
+  .cq-feed-strip > div {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+  }
+  .cq-feed-strip > div:first-child {
+    padding-inline-start: 0;
+  }
+  .cq-feed-strip > div + div {
+    border-inline-start: 1px solid var(--cq-border-subtle);
+  }
+  .cq-feed-strip dt {
+    color: var(--cq-text-secondary);
+    font-size: 12px;
+  }
+  .cq-feed-strip dd {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    color: var(--cq-text-primary);
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .cq-feed-strip-axis {
+    color: var(--cq-text-secondary);
+    font-size: 12px;
+    font-weight: 400;
+    text-decoration: underline;
+    text-decoration-color: var(--cq-border-strong);
+    text-underline-offset: 3px;
+  }
+  /*
+   * Q's read (Discover A): a row per score -- the number on the right, a
+   * bar for how much has evidence (coverage, never the score), a press to
+   * see what it is made of.
+   */
+  .cq-q-read {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .cq-q-read-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 4px;
+    color: var(--cq-text-primary);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .cq-q-read-head {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label value"
+      "bar bar";
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 6px;
+    padding: 10px 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+  }
+  button.cq-q-read-head {
+    cursor: pointer;
+  }
+  button.cq-q-read-head:focus-visible {
+    outline: 2px solid var(--cq-focus-ring);
+    outline-offset: 2px;
+  }
+  .cq-q-read-label {
+    grid-area: label;
+    color: var(--cq-text-primary);
+    font-size: 14px;
+  }
+  .cq-q-read-value {
+    grid-area: value;
+    color: var(--cq-text-primary);
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .cq-q-read-bar,
+  .cq-q-read-coverage {
+    grid-row: 2;
+  }
+  .cq-q-read-head:has(.cq-q-read-bar) {
+    grid-template-columns: 160px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label label value"
+      "bar coverage coverage";
+  }
+  .cq-q-read-bar {
+    grid-area: bar;
+    position: relative;
+    height: 3px;
+    background: var(--cq-border-subtle);
+  }
+  .cq-q-read-bar > span {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    background: var(--cq-text-secondary);
+  }
+  .cq-q-read-coverage {
+    grid-area: coverage;
+    color: var(--cq-text-secondary);
+    font-size: 12px;
+  }
+  .cq-q-read-head:not(:has(.cq-q-read-bar)) .cq-q-read-coverage:empty {
+    display: none;
+  }
+  .cq-q-read-row[data-score="unicorn-potential"] .cq-q-read-value {
+    color: var(--cq-text-secondary);
+    font-size: 13px;
+    font-weight: 400;
+  }
+  .cq-q-read-why {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows var(--cq-motion-slow) var(--cq-ease),
+      opacity var(--cq-motion-base) var(--cq-ease);
+  }
+  .cq-q-read-why[data-open] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  .cq-q-read-reasons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    font-size: 12.5px;
+  }
+  .cq-q-read-reasons dt {
+    color: var(--cq-text-secondary);
+  }
+  .cq-q-read-reasons dd {
+    margin: 0;
+    color: var(--cq-text-primary);
+  }
+  /* Express interest while the server confirms, and once it has. */
+  .cq-interest-sending {
+    position: relative;
+    overflow: hidden;
+  }
+  .cq-interest-sending-line {
+    position: absolute;
+    inset-inline-start: 0;
+    bottom: 0;
+    height: 2px;
+    width: 40%;
+    background: var(--cq-text-inverse);
+    animation: cq-interest-line 1.1s var(--cq-ease) infinite;
+  }
+  @keyframes cq-interest-line {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(260%);
+    }
+  }
+  /* Settled, not celebrated: the mark and the words carry it, the tint
+     only confirms (never colour alone). */
+  .cq-interest-sent {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 18px;
+    border-radius: 8px;
+    background: var(--cq-positive-soft);
+    color: var(--cq-positive);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  /* Sending keeps its weight: it is in progress, not unavailable. */
+  .cq-feed-actions button.cq-interest-sending:disabled,
+  .cq-feed-interest button.cq-interest-sending:disabled {
+    opacity: 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-q-read-why {
+      transition: none;
+    }
+    .cq-interest-sending-line {
+      animation: none;
+    }
+  }
+
+  /* Q over the dossier: slides in from the panel's edge. */
+  .cq-feed-ask {
+    display: flex;
+    min-height: 100%;
+    flex-direction: column;
+    gap: 12px;
+    animation: cq-feed-ask-in var(--cq-motion-slow) var(--cq-ease) both;
+  }
+  .cq-feed-ask-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .cq-feed-ask-pin {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--cq-surface-subtle);
+  }
+  .cq-feed-ask-body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+  }
+  @keyframes cq-feed-ask-in {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+  }
+
+  /* Phone (Discover A): Q's read rows keep one line, the no-pitch card
+     sits high, the end of the slate takes the screen, captions are the
+     video's size. */
+  @media (max-width: 1023px) {
+    .cq-q-read-head:has(.cq-q-read-bar) {
+      grid-template-columns: 96px minmax(0, 1fr) auto;
+    }
+    .cq-feed-slot .cq-feed-still {
+      justify-content: flex-start;
+      padding: 30% 24px 24px;
+    }
+    .cq-feed-slot .cq-feed-still .cq-body {
+      font-size: 20px;
+      line-height: 1.35;
+      padding-inline-end: 56px;
+    }
+    .cq-feed-stage:has(.cq-feed-end) > .cq-feed-media {
+      visibility: hidden;
+    }
+    .cq-feed-stage:has(.cq-feed-end) .cq-feed-overlay {
+      top: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background: var(--cq-stage-canvas);
+    }
+    .cq-feed-video::cue {
+      font-size: 15px;
+    }
+  }
+
   /*
    * Discover A's moments (owner 2026-10-19): one quiet toast at a time
    * after a pass (Undo, an optional reason) or a confirmed interest, the
@@ -1403,6 +1729,10 @@
     .cq-feed-toast {
       max-width: 100%;
       font-size: 13px;
+    }
+    /* A phone's pass toast is the record and Undo; reasons are a desk's. */
+    .cq-feed-toast-reasons {
+      display: none;
     }
   }
   @keyframes cq-feed-toast-in {
@@ -1532,16 +1862,19 @@
     font-size: 12px;
     font-weight: 500;
   }
+  /* No pitch (Discover A): said plainly at the foot of the frame, with the
+     company's mark and what Q can speak to instead. */
   .cq-feed-still {
     position: absolute;
     inset: 0;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 24px;
-    text-align: center;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 24px 24px 30%;
+    background: var(--cq-stage-surface);
+    text-align: start;
   }
   /* Centred over the pitch: the explicit Play, a problem, a pause. Clear
      of the rail on a phone. */
@@ -1708,8 +2041,9 @@
   }
 
   /*
-   * The rail: one quiet capsule down the right on a phone, the company's
-   * mark on top. The capsule is the floor under every label (≥ 62%).
+   * The rail on a phone (Discover A): the company's mark on top, then the
+   * decisions, straight on the picture. No capsule: each icon and label
+   * carries its own halo, so they hold contrast over any frame.
    */
   .cq-feed-rail {
     position: absolute;
@@ -1719,11 +2053,18 @@
     width: 64px;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
-    padding: 8px 0 6px;
+    gap: 4px;
+    padding: 0;
     border-radius: 0;
-    background: var(--cq-feed-scrim-floor);
+    background: none;
     transition: opacity var(--cq-motion-base) var(--cq-ease);
+  }
+  .cq-feed-rail .cq-feed-rail-button,
+  .cq-feed-rail .cq-feed-rail-profile {
+    text-shadow: 0 1px 3px var(--cq-feed-scrim-floor);
+  }
+  .cq-feed-rail .cq-feed-rail-button > svg {
+    filter: drop-shadow(0 1px 2px var(--cq-feed-scrim-floor));
   }
   .cq-feed-rail-profile {
     display: flex;
@@ -2352,8 +2693,9 @@
       margin-inline-end: 28px;
       height: var(--cq-feed-video-h);
       aspect-ratio: 9 / 16;
-      border: 1px solid var(--cq-stage-border);
-      border-radius: 0;
+      overflow: hidden;
+      border: 0;
+      border-radius: 12px;
     }
     .cq-scrubber {
       inset-inline-end: 12px;
@@ -2466,7 +2808,7 @@
        shape (the decision stays where it was made). */
     .cq-feed-actions > .cq-status-line,
     .cq-feed-actions > [role="group"],
-    .cq-feed-actions > [role="status"] {
+    .cq-feed-actions > [role="status"]:not(.cq-interest-sent) {
       flex-basis: 100%;
       order: -1;
     }
@@ -2489,44 +2831,6 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-    }
-    /* Stage, Raising, Location: one row of three, ruled above and below. */
-    .cq-feed-strip {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      margin: 0;
-      border-block: 1px solid var(--cq-border-subtle);
-    }
-    .cq-feed-strip > div {
-      display: flex;
-      min-width: 0;
-      flex-direction: column;
-      gap: 4px;
-      padding: 12px 14px;
-    }
-    .cq-feed-strip > div:first-child {
-      padding-inline-start: 0;
-    }
-    .cq-feed-strip > div + div {
-      border-inline-start: 1px solid var(--cq-border-subtle);
-    }
-    .cq-feed-strip dt {
-      color: var(--cq-text-secondary);
-      font-size: 12px;
-    }
-    .cq-feed-strip dd {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      margin: 0;
-      color: var(--cq-text-primary);
-      font-size: 16px;
-      font-weight: 600;
-    }
-    .cq-feed-strip-axis {
-      color: var(--cq-text-secondary);
-      font-size: 12px;
-      font-weight: 400;
     }
     /* A new company settles in row by row, 30 ms apart: calm, not flashy. */
     .cq-feed-overlay .cq-feed-card > *,
@@ -2551,40 +2855,28 @@
         transform: translateY(6px);
       }
     }
-    /* Q over the dossier: slides in from the panel's edge. */
-    .cq-feed-ask {
-      display: flex;
-      min-height: 100%;
-      flex-direction: column;
-      gap: 12px;
-      animation: cq-feed-ask-in var(--cq-motion-slow) var(--cq-ease) both;
+    /* The end of the slate sits where the pitch was; the dossier column
+       is left quiet (Discover A). */
+    /* Ask Q fills the dossier's height, its composer at the foot. */
+    .cq-feed-overlay .cq-feed-ask {
+      min-height: calc(var(--cq-feed-video-h) - 56px);
     }
-    .cq-feed-ask-head {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .cq-feed-stage:has(.cq-feed-end) > .cq-feed-media {
+      visibility: hidden;
     }
-    .cq-feed-ask-pin {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: var(--cq-surface-subtle);
-    }
-    .cq-feed-ask-body {
-      display: flex;
-      min-height: 0;
-      flex: 1;
-      flex-direction: column;
-    }
-    @keyframes cq-feed-ask-in {
-      from {
-        opacity: 0;
-        transform: translateX(16px);
-      }
+    .cq-feed-stage:has(.cq-feed-end) > .cq-feed-overlay {
+      grid-column: 1;
+      grid-row: 1;
+      justify-self: end;
+      align-self: center;
+      width: calc(var(--cq-feed-video-h) * 9 / 16);
+      margin-inline-end: 28px;
+      padding: 0;
+      background: none;
     }
     .cq-feed-end {
-      margin-top: 8px;
+      background: none;
+      padding: 0;
     }
     .cq-feed-toast-layer {
       bottom: 24px;
@@ -2638,7 +2930,36 @@
     }
     /* Previous and Next at the top of the stage's column, clear of the
        rail beside the pitch. */
-    /* Previous and Next just left of the pitch, centred on it. */
+    /* Previous and Next just left of the pitch, centred on it: round, with
+       where you are between them. */
+    .cq-feed-nav .cq-feed-nav-button {
+      border-radius: 999px;
+      border-color: var(--cq-stage-border);
+      background: transparent;
+    }
+    .cq-feed-nav .cq-feed-nav-button:hover:not(:disabled) {
+      background: var(--cq-stage-surface);
+    }
+    .cq-feed-nav-position {
+      line-height: 1.35;
+    }
+    /* The dossier's head, larger than a phone's caption (Discover A). */
+    .cq-feed-company h2 {
+      font-size: 26px;
+    }
+    .cq-feed-one-liner {
+      margin-top: 10px;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    .cq-feed-actions button,
+    .cq-feed-actions .cq-interest-sent {
+      min-height: 44px;
+      border-radius: 8px;
+    }
+    .cq-feed-actions button:active:not(:disabled) {
+      transform: scale(0.97);
+    }
     .cq-feed-nav {
       top: 50%;
       inset-inline-end: auto;

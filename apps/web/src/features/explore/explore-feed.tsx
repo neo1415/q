@@ -163,6 +163,7 @@ export function ExploreFeed({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const [interestAsked, setInterestAsked] = useState(0);
   const current = items[at] ?? anchor;
   if (anchor === undefined || current === undefined) return null;
   const relatedLabel = `Related to ${anchor.canonicalName}`;
@@ -194,11 +195,13 @@ export function ExploreFeed({
         nextLabel="Next related pitch"
         previousLabel="Previous pitch"
         onDecide={(verdict) => {
-          if (verdict === "SAVE") {
-            if (!isSaved) onSave(current);
-          } else {
-            onHide(current);
+          // As on Discover: right asks for interest (its confirmation
+          // opens), left hides and moves on.
+          if (verdict === "INTEREST") {
+            setInterestAsked((n) => n + 1);
+            return;
           }
+          onHide(current);
           next();
         }}
         onNotInterested={() => {
@@ -256,6 +259,7 @@ export function ExploreFeed({
               }
               onMore={openOptions}
               sectorLabels={sectorLabels}
+              interestRequest={interestAsked}
               feedNotes={
                 <div className="flex flex-col gap-1">
                   <p className="cq-status-line" data-explore-why>

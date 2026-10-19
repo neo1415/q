@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { GlobalQInline } from "@/components/app-shell/global-q";
 import { useQSessionOptional } from "@/features/q/q-session";
 import { useT } from "@/features/i18n/language";
@@ -16,12 +18,14 @@ const DOSSIER_QUESTIONS = [
  * The company is already Q's subject (QPageSubject above), so a question
  * is about it without saying so.
  */
-export function DossierQ() {
+export function DossierQ({ companyName }: { readonly companyName: string }) {
   const t = useT();
   const session = useQSessionOptional();
+  // The first questions are a way in; once one is asked they step aside.
+  const [asked, setAsked] = useState(false);
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      {session === null ? null : (
+      {session === null || asked ? null : (
         <div className="flex flex-col gap-2" data-feed-ask-suggested>
           <span className="cq-caption text-(--cq-text-secondary)">
             {t("Suggested")}
@@ -33,7 +37,10 @@ export function DossierQ() {
                 type="button"
                 className="cq-feed-toast-chip"
                 disabled={session.q.working}
-                onClick={() => void session.q.ask(t(question))}
+                onClick={() => {
+                  setAsked(true);
+                  void session.q.ask(t(question));
+                }}
               >
                 {t(question)}
               </button>
@@ -41,7 +48,7 @@ export function DossierQ() {
           </div>
         </div>
       )}
-      <GlobalQInline />
+      <GlobalQInline placeholder={`${t("Ask about")} ${companyName}…`} />
     </div>
   );
 }

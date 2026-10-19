@@ -77,6 +77,7 @@ vi.mock("../src/features/discover/feed/playback-source", () => ({
 vi.mock("@/components/app-shell/global-q", () => ({
   useGlobalQ: () => ({ open: false, setOpen }),
   useQMomentSource: () => undefined,
+  GlobalQInline: () => <div data-test-q-inline />,
 }));
 
 vi.mock("@/features/q/q-subject", () => ({
@@ -193,11 +194,11 @@ async function renderFeed() {
 }
 
 /**
- * Reasons, the website and Express Interest live in the details sheet,
- * reached from the rail's Interest (Discover A: no All details row).
+ * Reasons, Q's read, the website and Express Interest live in the details
+ * sheet, reached from the first reason over the pitch (Discover A).
  */
 function openDetails() {
-  fireEvent.click(screen.getByRole("button", { name: "Interest" }));
+  fireEvent.click(screen.getByRole("button", { name: /^More about / }));
 }
 
 /** The feed owns its keys; they are not dispatched at the window. */
@@ -281,10 +282,11 @@ describe("a card", () => {
       />,
     );
     openDetails();
+    // Unknown never excludes (ADR 0020): said quietly, with a mark.
     const note = within(screen.getByRole("dialog")).getByText(
-      /stage exclusion\s+wasn't\s+checked/i,
+      /stage exclusion\s+can't be checked yet, so nobody is hidden/i,
     );
-    expect(note.className).toContain("cq-caption");
+    expect(note.className).toContain("cq-feed-unverified");
     expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
   });
 
@@ -461,7 +463,7 @@ describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
     );
   }
 
-  it("carries the profile first, then Interest, Save, Pass, Ask Q, Share and More, with no counts (Discover v2)", () => {
+  it("carries the profile first, then Save, Pass, Ask Q and More, with no counts (Discover A)", () => {
     render(
       <FeedCard
         company={company(1)}
@@ -482,14 +484,9 @@ describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
     const labels = [...rail.querySelectorAll("button")].map((button) =>
       button.textContent?.trim(),
     );
-    expect(labels).toEqual([
-      "Interest",
-      "Save",
-      "Pass",
-      "Ask Q",
-      "Share",
-      "More",
-    ]);
+    // Discover A: Interest is the swipe right (and the details' own
+    // control), Share is in the details; the rail keeps the four.
+    expect(labels).toEqual(["Save", "Pass", "Ask Q", "More"]);
     // Nothing in the rail is a number: no vanity counts.
     expect(rail.textContent).not.toMatch(/\d/);
   });
@@ -534,35 +531,42 @@ describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
     expect(document.querySelector("[data-feed-details]")).toBeNull();
   });
 
-  it("opens the caption in place on 'more', then the details in a closable dialog (Discover v2)", async () => {
+  it("shows the first reason over the pitch, and opens the details in a closable sheet (Discover A)", async () => {
     renderCard();
     const more = screen.getByRole("button", {
       name: `More about ${company(1).canonicalName}`,
     });
-    expect(more.textContent).toBe("more");
+    // The first declared alignment, in its own words; no score over the pitch.
+    expect(more.textContent).toContain("Seed, as you declared");
     expect(more.getAttribute("aria-expanded")).toBe("false");
-    fireEvent.click(more);
-    expect(more.getAttribute("aria-expanded")).toBe("true");
-    expect(more.textContent).toBe("less");
-    // In place: the declared facts, why it is here, and the profile.
-    expect(
-      document.querySelector("[data-feed-more] [data-feed-why]"),
-    ).not.toBeNull();
-    // Discover A: no Open profile or All details row under it; the rail's
-    // avatar is the way into the profile, its Interest the details.
+    // No Open profile or All details row: the rail's avatar is the way in.
     expect(document.querySelector("[data-feed-open-profile]")).toBeNull();
     expect(screen.queryByRole("button", { name: "All details" })).toBeNull();
     expect(
       document.querySelector(".cq-feed-rail-profile a")?.getAttribute("href"),
     ).toBe(`/company/${companyId(1)}`);
     expect(screen.queryByRole("dialog")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Interest" }));
+    fireEvent.click(more);
     const dialog = await screen.findByRole("dialog", {
       name: company(1).canonicalName,
     });
     expect(dialog.querySelector("[data-feed-details]")).not.toBeNull();
+    expect(dialog.querySelector("[data-feed-why]")).not.toBeNull();
+    expect(more.getAttribute("aria-expanded")).toBe("true");
 
     fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+  });
+
+  it("closes the details on Escape pressed inside them, as any sheet does", async () => {
+    renderCard();
+    openDetails();
+    const dialog = await screen.findByRole("dialog");
+    const inside = dialog.querySelector("[data-feed-details] button");
+    if (inside === null) throw new Error("nothing focusable in the details");
+    fireEvent.keyDown(inside, { key: "Escape" });
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).toBeNull();
     });
@@ -581,9 +585,24 @@ describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
     });
   });
 
-  it("opens Express Interest at its confirmation step and sends nothing yet", () => {
-    renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "Interest" }));
+  it("opens Express Interest at its confirmation step on a swipe right, and sends nothing yet", () => {
+    const card = (interestRequest: number) => (
+      <FeedCard
+        company={company(1)}
+        policy="ACTIVE"
+        reducedMotion={false}
+        saved={false}
+        deciding={false}
+        onSave={() => undefined}
+        onPass={() => undefined}
+        onAskQ={() => undefined}
+        interestRequest={interestRequest}
+      />
+    );
+    const { rerender } = render(card(0));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // The feed bumps the request when the person swipes right.
+    rerender(card(1));
     expect(
       screen.getByRole("group", {
         name: `Express interest in ${company(1).canonicalName}`,
@@ -601,7 +620,8 @@ describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
       configurable: true,
     });
     renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    openDetails();
+    fireEvent.click(await screen.findByRole("button", { name: "Share" }));
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith(
         `${window.location.origin}/company/${companyId(1)}`,
@@ -770,8 +790,10 @@ describe("Express Interest (CQ-NET-010)", () => {
   }
 
   async function confirmInterest() {
-    // The rail's Interest opens the details at the confirmation step.
     openDetails();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Express interest" }),
+    );
     // Doc 17 §70: the consequence is stated before it happens.
     expect(
       await screen.findByText(/It is not a commitment to invest\./),
@@ -787,7 +809,7 @@ describe("Express Interest (CQ-NET-010)", () => {
     await confirmInterest();
 
     expect(
-      await screen.findByRole("button", { name: "Sending interest…" }),
+      await screen.findByRole("button", { name: /Sending interest…/ }),
     ).toBeTruthy();
     expect(screen.queryByText(/Interest expressed/)).toBeNull();
     expect(expressInterestAction).toHaveBeenCalledTimes(1);
@@ -938,12 +960,18 @@ describe("Ask Q", () => {
     });
   });
 
-  it("opens the global Q sheet", async () => {
+  it("opens Q over the card with the company pinned: the one conversation, not a second Q (Discover A)", async () => {
     await renderFeed();
 
     fireEvent.click(screen.getByRole("button", { name: "Ask Q" }));
 
-    await waitFor(() => expect(setOpen).toHaveBeenCalledWith(true));
+    const sheet = await screen.findByRole("dialog", { name: "Ask Q" });
+    expect(within(sheet).getByText(/About Company 1/).textContent).toContain(
+      "Company 1",
+    );
+    // The app's own Q conversation, inline: no separate store.
+    expect(sheet.querySelector("[data-test-q-inline]")).not.toBeNull();
+    expect(setOpen).not.toHaveBeenCalled();
   });
 });
 

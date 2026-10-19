@@ -213,4 +213,26 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "Why, if you like": "السبب، إن أردت",
   "You're through today's slate.": "أنهيت قائمة اليوم.",
   "what you can see": "ما يمكنك رؤيته",
+  // Discover A: Q's read and the no-pitch card (2026-10-19).
+  "Assessed once the company is listed": "يُقيَّم بعد إدراج الشركة",
+  "Lowered by": "خفّضه",
+  "No pitch video yet": "لا يوجد فيديو عرض بعد",
+  "Outside your mandate": "خارج تفويضك",
+  "Q can only speak to the profile": "يستطيع Q الحديث فقط عن الملف الذي نشرته",
+  "Raise not shared": "الجولة غير مُشارَكة",
+  "Suitability for you": "الملاءمة لك",
+  "The other": "العوامل الأخرى",
+  "There is not enough shared evidence for a number yet.":
+    "لا توجد أدلة مُشارَكة كافية لرقم بعد.",
+  "Unicorn potential": "إمكانية أن تصبح يونيكورن",
+  "Would raise confidence": "سيرفع الثقة",
+  "factors have evidence": "عوامل لها أدلة",
+  "factors.": "عاملًا.",
+  "have no evidence yet. They count as unknown, never against":
+    "بلا أدلة بعد. تُحسب مجهولة، ولا تُحسب أبدًا ضد",
+  "is notified": "أُبلِغت",
+  "is read from": "مقروء من",
+  "mandate checks known": "من فحوص التفويض معروفة",
+  "published so far.": "حتى الآن.",
+  "Ask about": "اسأل عن",
 };

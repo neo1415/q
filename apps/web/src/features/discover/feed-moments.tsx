@@ -26,12 +26,17 @@ export const PASS_REASON_CHOICES: readonly {
   readonly label: string;
 }[] = [
   { reason: "SECTOR", label: "Not my sector" },
-  { reason: "STAGE", label: "Wrong stage" },
-  { reason: "TRACTION", label: "Too early" },
+  { reason: "STAGE", label: "Too early" },
   { reason: "OTHER", label: "Other" },
 ];
 
 export type FeedMoment =
+  | {
+      readonly kind: "SAVED";
+      readonly id: number;
+      readonly companyId: string;
+      readonly companyName: string;
+    }
   | {
       readonly kind: "PASSED";
       readonly id: number;
@@ -68,18 +73,27 @@ function useAutoDismiss(id: number, onDone: () => void) {
 export function FeedMomentToast({
   moment,
   onUndoPass,
+  onUndoSave,
   onPassReason,
   onDone,
 }: {
   readonly moment: FeedMoment | null;
   readonly onUndoPass: (companyId: string) => void;
+  readonly onUndoSave: (companyId: string) => void;
   readonly onPassReason: (companyId: string, reason: FeedPassReason) => void;
   readonly onDone: () => void;
 }) {
   if (moment === null) return null;
   return (
     <div className="cq-feed-toast-layer" data-feed-toast-layer>
-      {moment.kind === "PASSED" ? (
+      {moment.kind === "SAVED" ? (
+        <SavedToast
+          key={moment.id}
+          moment={moment}
+          onUndo={onUndoSave}
+          onDone={onDone}
+        />
+      ) : moment.kind === "PASSED" ? (
         <PassToast
           key={moment.id}
           moment={moment}
@@ -90,6 +104,43 @@ export function FeedMomentToast({
       ) : (
         <InterestToast key={moment.id} moment={moment} onDone={onDone} />
       )}
+    </div>
+  );
+}
+
+function SavedToast({
+  moment,
+  onUndo,
+  onDone,
+}: {
+  readonly moment: Extract<FeedMoment, { kind: "SAVED" }>;
+  readonly onUndo: (companyId: string) => void;
+  readonly onDone: () => void;
+}) {
+  const t = useT();
+  const hold = useAutoDismiss(moment.id, onDone);
+  return (
+    <div
+      className="cq-feed-toast"
+      role="status"
+      aria-live="polite"
+      data-feed-toast="saved"
+      {...hold}
+    >
+      <span className="cq-feed-toast-text">
+        {t("Saved")} {moment.companyName}
+      </span>
+      <button
+        type="button"
+        className="cq-feed-toast-action"
+        onClick={() => {
+          onUndo(moment.companyId);
+          onDone();
+        }}
+        data-feed-undo-save
+      >
+        {t("Undo")}
+      </button>
     </div>
   );
 }
@@ -188,8 +239,7 @@ function InterestToast({
         strokeWidth={ICON_STROKE}
       />
       <span className="cq-feed-toast-text">
-        {t("Interest recorded")} · {moment.companyName} ·{" "}
-        {t("Its founders are told.")}
+        {t("Interest recorded")} · {moment.companyName} {t("is notified")}
       </span>
       <Link
         href={`/relationships/company/${encodeURIComponent(moment.companyId)}`}

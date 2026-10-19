@@ -343,6 +343,8 @@ function InvestorFeed({
   const momentCount = useRef(0);
   const [tally, setTally] = useState<FeedTally>(NO_TALLY);
   const [ended, setEnded] = useState(false);
+  // A swipe right: the card opens Express interest's confirmation.
+  const [interestAsked, setInterestAsked] = useState(0);
   const hold = tabHidden || splashUp || offTab;
   // Founder, 2026-10-09: pitches are always loud from the start, also with
   // Q open or the voice line on; only Q's own speech quiets them. (Muting
@@ -713,6 +715,11 @@ function InvestorFeed({
     if (decision.saved) return;
     feed.save(card.companyId);
     setTally((was) => ({ ...was, saved: was.saved + 1 }));
+    noteMoment("SAVED");
+  };
+  const undoSave = (companyId: string) => {
+    feed.unsave(companyId);
+    setTally((was) => ({ ...was, saved: Math.max(0, was.saved - 1) }));
   };
   /** Every pass from the feed: recorded, said with Undo, and moved on. */
   const passCard = () => {
@@ -728,15 +735,11 @@ function InvestorFeed({
     feed.moveTo(companyId);
   };
 
-  const onDecide = (verdict: "SAVE" | "PASS") => {
-    // Right keeps it (saved, optimistic); left passes. Expressing interest
-    // stays its own confirmed step: it tells the founder.
-    if (verdict === "SAVE") {
-      save();
-      moveOn();
-    } else {
-      passCard();
-    }
+  const onDecide = (verdict: "INTEREST" | "PASS") => {
+    // Right asks for interest: its confirmation opens (it tells the
+    // founder, so it is never sent by a gesture); left passes, with Undo.
+    if (verdict === "INTEREST") setInterestAsked((n) => n + 1);
+    else passCard();
   };
   const positionLabel = `${String(index + 1)} ${t("of")} ${String(
     shownItems.length,
@@ -769,6 +772,7 @@ function InvestorFeed({
             <FeedMomentToast
               moment={moment}
               onUndoPass={undoPass}
+              onUndoSave={undoSave}
               onPassReason={feed.passReason}
               onDone={() => setMoment(null)}
             />
@@ -843,8 +847,9 @@ function InvestorFeed({
             // feed so a keyboard pass can choose not to.
             onPass={passCard}
             onAskQ={() => setOpen(true)}
-            askPanel={<DossierQ />}
+            askPanel={<DossierQ companyName={card.canonicalName} />}
             position={positionLabel}
+            interestRequest={interestAsked}
             onInterestConfirmed={() => {
               setTally((was) => ({ ...was, interest: was.interest + 1 }));
               noteMoment("INTEREST");
@@ -879,6 +884,7 @@ function InvestorFeed({
           <FeedMomentToast
             moment={moment}
             onUndoPass={undoPass}
+            onUndoSave={undoSave}
             onPassReason={feed.passReason}
             onDone={() => setMoment(null)}
           />

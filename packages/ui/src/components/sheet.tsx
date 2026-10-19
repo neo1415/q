@@ -55,12 +55,20 @@ export function SheetContent({
   side = "bottom",
   children,
   className,
+  bare = false,
 }: {
   readonly title: string;
   readonly description?: string | undefined;
   readonly side?: SheetSide | undefined;
   readonly children: ReactNode;
   readonly className?: string | undefined;
+  /**
+   * A sheet whose content carries its own heading and way out (a feed's
+   * details over a pitch): a drag handle instead of the title row. The
+   * title is still given to assistive technology; Escape and the backdrop
+   * still close it.
+   */
+  readonly bare?: boolean | undefined;
 }) {
   const t = useUiText();
   return (
@@ -74,29 +82,39 @@ export function SheetContent({
             className,
           )}
         >
-          <div className="flex items-start gap-3 px-4 pt-4 pb-2">
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <BaseDialog.Title className="cq-title-md text-(--cq-text-primary)">
-                {title}
-              </BaseDialog.Title>
-              {description !== undefined ? (
-                <BaseDialog.Description className="cq-body-sm text-(--cq-text-secondary)">
-                  {description}
-                </BaseDialog.Description>
-              ) : null}
+          {bare ? (
+            <div className="flex justify-center pt-2 pb-3">
+              <span
+                aria-hidden="true"
+                className="h-1 w-10 rounded-full bg-(--cq-border-strong)"
+              />
+              <BaseDialog.Title className="sr-only">{title}</BaseDialog.Title>
             </div>
-            <BaseDialog.Close
-              render={
-                <IconButton aria-label={t("Close")} variant="quiet">
-                  <X
-                    aria-hidden="true"
-                    size={ICON_SIZE.prominent}
-                    strokeWidth={ICON_STROKE}
-                  />
-                </IconButton>
-              }
-            />
-          </div>
+          ) : (
+            <div className="flex items-start gap-3 px-4 pt-4 pb-2">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <BaseDialog.Title className="cq-title-md text-(--cq-text-primary)">
+                  {title}
+                </BaseDialog.Title>
+                {description !== undefined ? (
+                  <BaseDialog.Description className="cq-body-sm text-(--cq-text-secondary)">
+                    {description}
+                  </BaseDialog.Description>
+                ) : null}
+              </div>
+              <BaseDialog.Close
+                render={
+                  <IconButton aria-label={t("Close")} variant="quiet">
+                    <X
+                      aria-hidden="true"
+                      size={ICON_SIZE.prominent}
+                      strokeWidth={ICON_STROKE}
+                    />
+                  </IconButton>
+                }
+              />
+            </div>
+          )}
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
             {children}
           </div>

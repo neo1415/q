@@ -397,13 +397,21 @@ export function GlobalQTrigger({
  */
 export function GlobalQInline({
   seed = null,
+  placeholder,
 }: {
   /** A draft question to open with; the person edits or sends it. */
   readonly seed?: string | null | undefined;
+  readonly placeholder?: string | undefined;
 }) {
   const { connected, moment } = useContext(GlobalQContext);
   return (
-    <QSheetConversation connected={connected} seed={seed} moment={moment} />
+    <QSheetConversation
+      connected={connected}
+      seed={seed}
+      moment={moment}
+      inline
+      {...(placeholder === undefined ? {} : { placeholder })}
+    />
   );
 }
 

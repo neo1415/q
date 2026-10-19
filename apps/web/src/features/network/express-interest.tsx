@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 
 import type { InterestDto, RelationshipStateV2 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
+import { Check, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
 import {
   expressInterestAction,
@@ -173,13 +174,50 @@ export function ExpressInterest({
       );
 
     case "SENDING":
-      return (
+      return prominent ? (
+        // Discover A: the same control, with a line that runs while the
+        // server confirms -- progress, not a promise.
+        <Button
+          variant="primary"
+          disabled
+          aria-busy="true"
+          className="cq-interest-sending"
+        >
+          {t("Sending…")}
+          <span className="sr-only"> {t("Sending interest…")}</span>
+          <span aria-hidden="true" className="cq-interest-sending-line" />
+        </Button>
+      ) : (
         <Button variant="secondary" disabled aria-busy="true">
           {t("Sending interest…")}
         </Button>
       );
 
     case "SENT":
+      // Discover A: a confirmed, unanswered interest stays where it was
+      // made, as a settled control with a mark and the words.
+      if (
+        prominent &&
+        phase.interest.response !== "ACCEPTED" &&
+        phase.interest.response !== "DECLINED"
+      ) {
+        return (
+          <span className="cq-interest-sent" role="status">
+            <Check
+              aria-hidden="true"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+            />
+            {t("Interest sent")}
+            <span className="sr-only">
+              {" "}
+              {phase.alreadySent
+                ? `Your organisation has already expressed interest in ${companyName}.`
+                : `Interest expressed in ${companyName}.`}
+            </span>
+          </span>
+        );
+      }
       // The company's answer, as the server reported it (CQ-NET-011).
       // Institutional words only: no celebration, and a decline is said
       // plainly without a reason, because none is recorded.

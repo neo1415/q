@@ -71,6 +71,7 @@ const globalQ: {
   source: (() => unknown) | null;
 } = { open: false, source: null };
 vi.mock("@/components/app-shell/global-q", () => ({
+  GlobalQInline: () => null,
   useGlobalQ: () => ({ open: globalQ.open, setOpen: vi.fn() }),
   useQMomentSource: (source: () => unknown) => {
     globalQ.source = source;
@@ -424,7 +425,7 @@ describe("swipe", () => {
     expect(media?.dataset["swipe"]).toBeUndefined();
   });
 
-  it("keeps it on a swipe right and moves on", async () => {
+  it("asks for interest on a swipe right: the confirmation opens, nothing is sent, the card stays (Discover A)", async () => {
     const { container } = await renderFeed();
     const region = feedRegion();
     const media = container.querySelector<HTMLElement>(".cq-feed-media");
@@ -432,9 +433,16 @@ describe("swipe", () => {
     fireEvent.touchStart(region, { touches: at(100) });
     fireEvent.touchMove(region, { touches: at(180) });
     fireEvent.touchMove(region, { touches: at(260) });
-    expect(media?.dataset["swipe"]).toBe("save");
+    expect(media?.dataset["swipe"]).toBe("interest");
     fireEvent.touchEnd(region, { changedTouches: at(260) });
-    await screen.findByRole("heading", { name: "Company 2" });
+    // Express interest tells the founders, so a gesture only asks: the
+    // details open at its confirmation step.
+    expect(
+      await screen.findByRole("group", {
+        name: "Express interest in Company 1",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Company 1" })).toBeTruthy();
   });
 
   it("settles back on a short drag", async () => {
@@ -644,9 +652,8 @@ describe("tap to pause (founder directive, 2026-09-27)", () => {
       get: () => false,
     });
     pause.mockClear();
-    fireEvent.click(screen.getByRole("button", { name: "Share" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     fireEvent.click(screen.getByRole("button", { name: /^More about / }));
-    fireEvent.click(screen.getByRole("button", { name: "Interest" }));
     expect(pause).not.toHaveBeenCalled();
   });
 });
@@ -663,7 +670,6 @@ describe("the details sheet over the feed", () => {
       get: () => false,
     });
     fireEvent.click(screen.getByRole("button", { name: /^More about / }));
-    fireEvent.click(screen.getByRole("button", { name: "Interest" }));
     const dialog = await screen.findByRole("dialog");
     pause.mockClear();
 

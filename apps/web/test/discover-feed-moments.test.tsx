@@ -36,6 +36,7 @@ describe("the pass toast", () => {
           companyName: "Watchly",
         }}
         onUndoPass={onUndo}
+        onUndoSave={() => undefined}
         onPassReason={onReason}
         onDone={onDone}
       />,
@@ -67,6 +68,7 @@ describe("the pass toast", () => {
           companyName: "Watchly",
         }}
         onUndoPass={() => undefined}
+        onUndoSave={() => undefined}
         onPassReason={() => undefined}
         onDone={onDone}
       />,
@@ -81,7 +83,7 @@ describe("the pass toast", () => {
 });
 
 describe("the interest toast", () => {
-  it("says the founders are told and links to the relationship", () => {
+  it("says the company is notified and links to the relationship", () => {
     render(
       <FeedMomentToast
         moment={{
@@ -91,18 +93,42 @@ describe("the interest toast", () => {
           companyName: "Watchly",
         }}
         onUndoPass={() => undefined}
+        onUndoSave={() => undefined}
         onPassReason={() => undefined}
         onDone={() => undefined}
       />,
     );
     expect(screen.getByRole("status").textContent).toContain(
-      "Interest recorded",
+      "Interest recorded · Watchly is notified",
     );
     expect(
       screen.getByRole("link", { name: "View in CRM" }).getAttribute("href"),
     ).toBe(`/relationships/company/${COMPANY}`);
     // No Undo for a server-confirmed interest: it already told someone.
     expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+  });
+});
+
+describe("the save toast", () => {
+  it("says what was saved and undoes it", () => {
+    const onUndoSave = vi.fn();
+    render(
+      <FeedMomentToast
+        moment={{
+          kind: "SAVED",
+          id: 4,
+          companyId: COMPANY,
+          companyName: "Watchly",
+        }}
+        onUndoPass={() => undefined}
+        onUndoSave={onUndoSave}
+        onPassReason={() => undefined}
+        onDone={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("status").textContent).toContain("Saved Watchly");
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(onUndoSave).toHaveBeenCalledExactlyOnceWith(COMPANY);
   });
 });
 

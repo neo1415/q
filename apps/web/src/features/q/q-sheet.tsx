@@ -52,8 +52,18 @@ export function QSheetConversation({
   connected,
   seed = null,
   moment = null,
+  inline = false,
+  placeholder,
 }: {
   readonly connected: boolean;
+  /**
+   * Inside a page's own panel (Discover A's Ask Q over the dossier): the
+   * conversation and its composer only -- the page pins the subject and
+   * owns the way out, so the dock's header and footer are not repeated.
+   */
+  readonly inline?: boolean | undefined;
+  /** The composer's words, when the host names the subject ("Ask about X…"). */
+  readonly placeholder?: string | undefined;
   /** A draft question to open with; the person edits or sends it. */
   readonly seed?: string | null | undefined;
   /** Where in a pitch the person was when this opening happened. */
@@ -95,78 +105,80 @@ export function QSheetConversation({
         output={voice.client.outputLevel}
         side="right"
       />
-      <div className="flex items-center gap-4">
-        <ViewTransition name="q-aperture" share="cq-q-morph" default="none">
-          <QAperture
-            state={presence.state}
-            size="panel"
-            inputLevel={voice.client.inputLevel}
-            outputLevel={voice.client.outputLevel}
-          />
-        </ViewTransition>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="cq-label text-(--cq-text-primary)" role="status">
-            {label}
-          </span>
-          {/* Q room R1: what Q sees of the page behind the dock. */}
-          <QCanSee />
-        </div>
-        {connected ? (
-          <Tooltip content={t(voice.active ? "End voice" : "Talk with Q")}>
-            <IconButton
-              aria-label={t(voice.active ? "End voice" : "Talk with Q")}
-              variant={voice.active ? "secondary" : "primary"}
-              onClick={
-                voice.active
-                  ? () => void voice.end()
-                  : () => void session.talk()
-              }
-              data-q-control={voice.active ? "end" : "talk"}
-            >
-              {voice.active ? (
-                <Square aria-hidden="true" size={ICON_SIZE.prominent} />
-              ) : (
-                <Mic
-                  aria-hidden="true"
-                  size={ICON_SIZE.prominent}
-                  strokeWidth={ICON_STROKE}
-                />
-              )}
-            </IconButton>
-          </Tooltip>
-        ) : null}
-        {voice.active ? (
-          <Tooltip
-            content={
-              voice.client.muted ? "Unmute microphone" : "Mute microphone"
-            }
-          >
-            <IconButton
-              aria-label={
+      {inline ? null : (
+        <div className="flex items-center gap-4">
+          <ViewTransition name="q-aperture" share="cq-q-morph" default="none">
+            <QAperture
+              state={presence.state}
+              size="panel"
+              inputLevel={voice.client.inputLevel}
+              outputLevel={voice.client.outputLevel}
+            />
+          </ViewTransition>
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="cq-label text-(--cq-text-primary)" role="status">
+              {label}
+            </span>
+            {/* Q room R1: what Q sees of the page behind the dock. */}
+            <QCanSee />
+          </div>
+          {connected ? (
+            <Tooltip content={t(voice.active ? "End voice" : "Talk with Q")}>
+              <IconButton
+                aria-label={t(voice.active ? "End voice" : "Talk with Q")}
+                variant={voice.active ? "secondary" : "primary"}
+                onClick={
+                  voice.active
+                    ? () => void voice.end()
+                    : () => void session.talk()
+                }
+                data-q-control={voice.active ? "end" : "talk"}
+              >
+                {voice.active ? (
+                  <Square aria-hidden="true" size={ICON_SIZE.prominent} />
+                ) : (
+                  <Mic
+                    aria-hidden="true"
+                    size={ICON_SIZE.prominent}
+                    strokeWidth={ICON_STROKE}
+                  />
+                )}
+              </IconButton>
+            </Tooltip>
+          ) : null}
+          {voice.active ? (
+            <Tooltip
+              content={
                 voice.client.muted ? "Unmute microphone" : "Mute microphone"
               }
-              variant="quiet"
-              className={cx(
-                "",
-                voice.client.muted ? "bg-(--cq-accent-soft)" : "",
-              )}
-              aria-pressed={voice.client.muted}
-              onClick={() => voice.client.setMuted(!voice.client.muted)}
-              data-q-control="mute"
             >
-              {voice.client.muted ? (
-                <MicOff aria-hidden="true" size={ICON_SIZE.prominent} />
-              ) : (
-                <Mic
-                  aria-hidden="true"
-                  size={ICON_SIZE.prominent}
-                  strokeWidth={ICON_STROKE}
-                />
-              )}
-            </IconButton>
-          </Tooltip>
-        ) : null}
-      </div>
+              <IconButton
+                aria-label={
+                  voice.client.muted ? "Unmute microphone" : "Mute microphone"
+                }
+                variant="quiet"
+                className={cx(
+                  "",
+                  voice.client.muted ? "bg-(--cq-accent-soft)" : "",
+                )}
+                aria-pressed={voice.client.muted}
+                onClick={() => voice.client.setMuted(!voice.client.muted)}
+                data-q-control="mute"
+              >
+                {voice.client.muted ? (
+                  <MicOff aria-hidden="true" size={ICON_SIZE.prominent} />
+                ) : (
+                  <Mic
+                    aria-hidden="true"
+                    size={ICON_SIZE.prominent}
+                    strokeWidth={ICON_STROKE}
+                  />
+                )}
+              </IconButton>
+            </Tooltip>
+          ) : null}
+        </div>
+      )}
 
       {voice.notice !== null ? (
         <InlineNotice tone="warning" title={voice.notice}>
@@ -177,7 +189,10 @@ export function QSheetConversation({
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
-        {turns.length === 0 && spokenOnly.length === 0 && !q.working ? (
+        {!inline &&
+        turns.length === 0 &&
+        spokenOnly.length === 0 &&
+        !q.working ? (
           <p className="cq-body-sm text-(--cq-text-secondary)">
             {subject.kind === "NONE"
               ? "Ask Q anything about what you're looking at."
@@ -256,7 +271,10 @@ export function QSheetConversation({
           contextScope={subject.scope}
           contextDetail={subject.kind === "NONE" ? undefined : subject.label}
           disabled={q.working}
-          placeholder={voice.active ? t("Type instead") : t("Ask Q")}
+          placeholder={
+            voice.active ? t("Type instead") : (placeholder ?? t("Ask Q"))
+          }
+          {...(inline ? { showContext: false } : {})}
           {...(connected
             ? {
                 // Only a connected line carries typed words (live
@@ -279,38 +297,40 @@ export function QSheetConversation({
               }
             : {})}
         />
-        <div className="flex items-center justify-between gap-2">
-          <MenuRoot>
-            <MenuTrigger>
-              <button
-                type="button"
-                className="inline-flex min-h-11 items-center gap-1.5 px-2 cq-caption text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"
-                data-q-dock-menu
-              >
-                <Move
-                  aria-hidden="true"
-                  size={ICON_SIZE.compact}
-                  strokeWidth={ICON_STROKE}
-                />
-                {t("Move Q")}
-              </button>
-            </MenuTrigger>
-            <MenuContent>
-              {dockMenu.items.map((item) => (
-                <MenuItem key={item.label} onClick={item.run}>
-                  {item.label}
-                </MenuItem>
-              ))}
-            </MenuContent>
-          </MenuRoot>
-          <Link
-            href={homeHref(q.conversationId)}
-            className="inline-flex min-h-11 items-center px-2 cq-label text-(--cq-accent) underline-offset-2 hover:underline"
-            data-q-open-page
-          >
-            {t("Open Q")}
-          </Link>
-        </div>
+        {inline ? null : (
+          <div className="flex items-center justify-between gap-2">
+            <MenuRoot>
+              <MenuTrigger>
+                <button
+                  type="button"
+                  className="inline-flex min-h-11 items-center gap-1.5 px-2 cq-caption text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"
+                  data-q-dock-menu
+                >
+                  <Move
+                    aria-hidden="true"
+                    size={ICON_SIZE.compact}
+                    strokeWidth={ICON_STROKE}
+                  />
+                  {t("Move Q")}
+                </button>
+              </MenuTrigger>
+              <MenuContent>
+                {dockMenu.items.map((item) => (
+                  <MenuItem key={item.label} onClick={item.run}>
+                    {item.label}
+                  </MenuItem>
+                ))}
+              </MenuContent>
+            </MenuRoot>
+            <Link
+              href={homeHref(q.conversationId)}
+              className="inline-flex min-h-11 items-center px-2 cq-label text-(--cq-accent) underline-offset-2 hover:underline"
+              data-q-open-page
+            >
+              {t("Open Q")}
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

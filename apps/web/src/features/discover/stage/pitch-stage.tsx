@@ -15,6 +15,7 @@ import type {
 import {
   ChevronDown,
   ChevronUp,
+  CircleHelp,
   ICON_SIZE,
   ICON_STROKE,
   Play,
@@ -23,6 +24,7 @@ import {
 import type { FeedPreloadPolicy } from "../feed/feed-state";
 import type { PlaybackSource } from "../player/pitch-playback";
 import { attachHlsOrNativeSource } from "../player/hls-source";
+import { CompanyAvatar } from "../../company/company-avatar";
 import { PitchPlayer } from "../player/pitch-player";
 import { usePitchPlayback } from "../player/use-pitch-playback";
 import { useLongPress } from "./long-press";
@@ -153,11 +155,24 @@ function FeedMedia({
         >
           {item.pitch === null ? (
             <div className="cq-feed-still">
-              <span className="cq-title-lg text-(--cq-text-primary)">
-                {item.canonicalName}
+              {/* Discover A: no pitch, said plainly, and what Q can speak to
+                  instead -- only what the company published. */}
+              <span className="cq-feed-still-note">
+                <CircleHelp
+                  aria-hidden="true"
+                  size={ICON_SIZE.compact}
+                  strokeWidth={ICON_STROKE}
+                />
+                {t("No pitch video yet")}
               </span>
-              <span className="cq-caption text-(--cq-text-secondary)">
-                {t("No pitch to show yet")}
+              <CompanyAvatar
+                companyId={item.companyId}
+                photoUrl={item.photoUrl}
+                size={48}
+              />
+              <span className="cq-body text-(--cq-text-primary)">
+                {t("Q can only speak to the profile")} {item.canonicalName}{" "}
+                {t("published so far.")}
               </span>
             </div>
           ) : (
@@ -272,8 +287,12 @@ export type PitchStageProps = {
   readonly overlay: (stage: { readonly openOptions: () => void }) => ReactNode;
   /** Before the stage in the tree (a Q subject declaration). */
   readonly before?: ReactNode;
-  /** Sideways swipe: right keeps, left passes. Absent, sideways does nothing. */
-  readonly onDecide?: ((verdict: "SAVE" | "PASS") => void) | undefined;
+  /**
+   * Sideways swipe (Discover A, owner 2026-10-19): right asks to express
+   * interest (the feed opens its confirmation; a gesture never sends it),
+   * left passes. Absent, sideways does nothing.
+   */
+  readonly onDecide?: ((verdict: "INTEREST" | "PASS") => void) | undefined;
   /** The options sheet's Not interested. */
   readonly onNotInterested?: (() => void) | undefined;
   /** Keys the feed adds (Escape to close, S to save); true when handled. */
@@ -597,7 +616,7 @@ export function PitchStage({
     slot.style.translate = `${String(dx)}px 0`;
     slot.style.rotate = `${String(dx / 24)}deg`;
     if (Math.abs(dx) > 60) {
-      media.dataset["swipe"] = dx > 0 ? "save" : "pass";
+      media.dataset["swipe"] = dx > 0 ? "interest" : "pass";
     } else {
       delete media.dataset["swipe"];
     }
@@ -639,9 +658,9 @@ export function PitchStage({
       setSideways(null);
       if (current === null) return;
       if (current.axis === "x") {
-        // Right keeps it (saved, optimistic); left passes. Expressing
-        // interest stays its own confirmed step: it tells the founder.
-        if (current.dx > DECIDE_THRESHOLD) onDecide?.("SAVE");
+        // Right asks for interest (confirmed before it is sent: it tells
+        // the founder); left passes, with Undo.
+        if (current.dx > DECIDE_THRESHOLD) onDecide?.("INTEREST");
         else if (current.dx < -DECIDE_THRESHOLD) onDecide?.("PASS");
         return;
       }
@@ -769,8 +788,17 @@ export function PitchStage({
             />
           </button>
           {positionLabel === null ? null : (
+            // "1" over "of 24", between the arrows.
             <span className="cq-feed-nav-position" data-feed-nav-position>
-              {positionLabel}
+              {positionLabel.split(" ").map((part, at) =>
+                at === 0 ? (
+                  <span key="n" className="block">
+                    {part}
+                  </span>
+                ) : (
+                  <span key={`p${String(at)}`}> {part}</span>
+                ),
+              )}
             </span>
           )}
           <button

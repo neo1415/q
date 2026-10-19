@@ -13,6 +13,7 @@ import {
 import { GlobalQProvider } from "@/components/app-shell/global-q";
 import { DossierQ } from "@/features/discover/dossier-q";
 import { FeedCard } from "@/features/discover/feed-card";
+import { QAperture } from "@/features/q-aperture";
 import {
   EndOfSlate,
   FeedMomentToast,
@@ -24,6 +25,11 @@ import type { FeedPreloadPolicy } from "@/features/discover/feed/feed-state";
 import { PitchStage } from "@/features/discover/stage/pitch-stage";
 import type { ExpressInterestPort } from "@/features/network/express-interest";
 import { NO_SUBJECT } from "@/features/q/q-subject";
+
+const FINTECH = "a0000000-0000-4000-8000-000000000051";
+const SECTORS: ReadonlyMap<string, string> = new Map([
+  [FINTECH, "Financial services, Fintech"],
+]);
 
 function fictional(
   n: number,
@@ -46,7 +52,7 @@ function fictional(
       "TAXONOMY_EXACT",
     ],
     summary: {
-      sectorNodeIds: [],
+      sectorNodeIds: [FINTECH],
       raise: {
         money: { amount: raise, currency: "USD" },
         truthClass: "USER_CLAIM",
@@ -85,6 +91,18 @@ const COMPANIES: readonly DiscoveredCompanyDto[] = [
     "Inference scheduling that cuts GPU spend for African AI teams.",
     "2500000.00",
   ),
+  {
+    ...fictional(
+      4,
+      "Kora Ledger (fictional)",
+      "NG",
+      "Bookkeeping for small businesses, built from their mobile-money statements.",
+      "0",
+    ),
+    currentStageCode: "pre_seed",
+    summary: { sectorNodeIds: [], raise: null },
+    pitch: null,
+  },
 ];
 
 /** Sample reads, shaped as the server sends them; never a real company's. */
@@ -125,15 +143,35 @@ function sampleScores(
       missing: ["Traction: not known yet"],
       configVersion: "ranking-config.v4",
     },
+    // Not assessed: an assessed one carries all twelve pillars, which a
+    // sample has no honest values for.
+    unicornPotential: {
+      status: "NOT_ASSESSED",
+      overallScore: null,
+      band: null,
+      confidence: "LOW",
+      coverage: 0,
+      stage: null,
+      methodVersion: "unicorn-potential.v1.0.0",
+      inputRulesVersion: "unicorn-inputs.v1",
+      assessedAt: null,
+      pillars: [],
+      up: [],
+      down: [],
+      missing: [],
+      momentum: null,
+      benchmark: "Comparable benchmark unavailable",
+    },
   });
 }
 
-const [WATCHLY, HALYARD, TENSORGATE] = COMPANIES;
+const [WATCHLY, HALYARD, TENSORGATE, KORA] = COMPANIES;
 const SCORES: ReadonlyMap<string, CompanyScoresDto> = new Map(
   [
     WATCHLY === undefined ? null : sampleScores(WATCHLY, 54, 85),
     HALYARD === undefined ? null : sampleScores(HALYARD, 62, 71),
     TENSORGATE === undefined ? null : sampleScores(TENSORGATE, 47, 66),
+    KORA === undefined ? null : sampleScores(KORA, 41, 71),
   ]
     .filter((scores): scores is CompanyScoresDto => scores !== null)
     .map((scores) => [scores.companyId, scores]),
@@ -191,6 +229,7 @@ function Feed() {
   const momentCount = useRef(0);
   const [tally, setTally] = useState<FeedTally>(NO_TALLY);
   const [ended, setEnded] = useState(false);
+  const [interestAsked, setInterestAsked] = useState(0);
   const card = COMPANIES[index];
   if (card === undefined) return null;
   const last = index === COMPANIES.length - 1;
@@ -220,6 +259,7 @@ function Feed() {
     if (saved.has(card.companyId)) return;
     setSaved((current) => new Set([...current, card.companyId]));
     setTally((was) => ({ ...was, saved: was.saved + 1 }));
+    note("SAVED");
   };
   const pass = () => {
     setDecided(`PASS:${card.companyId}`);
@@ -234,6 +274,14 @@ function Feed() {
         setTally((was) => ({ ...was, passed: Math.max(0, was.passed - 1) }));
         setEnded(false);
         setIndex(COMPANIES.findIndex((item) => item.companyId === companyId));
+      }}
+      onUndoSave={(companyId) => {
+        setSaved((current) => {
+          const next = new Set(current);
+          next.delete(companyId);
+          return next;
+        });
+        setTally((was) => ({ ...was, saved: Math.max(0, was.saved - 1) }));
       }}
       onPassReason={(companyId, reason) =>
         setDecided(`PASS:${companyId}:${reason}`)
@@ -262,10 +310,9 @@ function Feed() {
         label="Companies to review"
         positionLabel={`${String(index + 1)} of ${String(COMPANIES.length)}`}
         onDecide={(verdict) => {
-          if (verdict === "SAVE") {
-            setDecided(`SAVE:${card.companyId}`);
-            save();
-            moveOn();
+          if (verdict === "INTEREST") {
+            setDecided(`INTEREST:${card.companyId}`);
+            setInterestAsked((n) => n + 1);
           } else {
             pass();
           }
@@ -290,11 +337,14 @@ function Feed() {
               onSave={save}
               onPass={pass}
               onAskQ={() => undefined}
-              askPanel={<DossierQ />}
+              askQMark={<QAperture state="IDLE" size={24} />}
+              askPanel={<DossierQ companyName={card.canonicalName} />}
               onMore={openOptions}
               showMedia={false}
               position={`${String(index + 1)} of ${String(COMPANIES.length)}`}
               initialScores={SCORES}
+              sectorLabels={SECTORS}
+              interestRequest={interestAsked}
               expressInterest={sampleInterest}
               onInterestConfirmed={() => {
                 setTally((was) => ({ ...was, interest: was.interest + 1 }));

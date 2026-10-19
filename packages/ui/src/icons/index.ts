@@ -28,6 +28,7 @@ export {
   ChevronUp,
   ChevronsUpDown,
   CircleAlert,
+  CircleHelp,
   CircleUser,
   Clock,
   Compass,

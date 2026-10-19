@@ -262,8 +262,8 @@ describe("the card's declared facts", () => {
       }),
     );
     const facts = document.querySelector("[data-feed-facts]");
-    expect(facts?.textContent).toContain("Fintech");
-    expect(facts?.textContent).toContain("USD 1,500,000");
+    // Discover A: the raise short, with where it came from.
+    expect(facts?.textContent).toContain("$1.5M");
     expect(facts?.textContent).toContain("founder-stated");
   });
 
@@ -274,9 +274,12 @@ describe("the card's declared facts", () => {
     expect(facts?.textContent).not.toMatch(/\b0\b/);
   });
 
-  it("says nothing about facts the API did not send", () => {
+  it("says nothing about a raise the API did not send", () => {
     renderOpen(card(undefined));
-    expect(document.querySelector("[data-feed-facts]")).toBeNull();
+    const facts = document.querySelector("[data-feed-facts]");
+    // Stage and place are the card's own fields; the raise is not guessed.
+    expect(facts?.textContent).not.toContain("Raising");
+    expect(facts?.textContent).not.toContain("Not shared with you");
   });
 
   it("only VERIFIED reads as verified", () => {
