@@ -31,7 +31,7 @@ const B = {
   },
   songscribe: {
     bg: "#0A0A0A", accent: "#E63946", ink: "#F5F5F5",
-    mark: `<div style="width:146px;height:146px;background:url(${src}) no-repeat;background-size:588px 146px;background-position:0 0;transform:scale(2.4)"></div>`,
+    mark: `<div style="width:62px;height:146px;overflow:hidden;background:url(${src}) no-repeat;background-size:588px 146px;background-position:0 0;transform:scale(2.4)"></div>`,
     tagline: "Your story, turned into a song",
   },
   "zino-aviation": {

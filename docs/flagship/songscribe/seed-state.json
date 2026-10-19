@@ -1,0 +1,50 @@
+{
+  "company": "SongScribe AI",
+  "steward": "steward.songscribe@fictional.capitalq.local",
+  "companyId": "b3308b98-f795-4883-a579-550d7f246393",
+  "organisationId": null,
+  "organisationIdNote": "not read: hosted SQL token returns 401",
+  "seededAt": "2026-10-19",
+  "method": "product UI via Playwright as the steward (onboarding 'Use the form')",
+  "done": {
+    "onboarding": true,
+    "profile": true,
+    "images": true,
+    "deckUpload": "version 1 = reworded deck (claude/flagship-decks-reword-oct19 c5376112f), uploaded in onboarding",
+    "deckSectionsConfirmed": true,
+    "deckDownloadAudience": "INVESTORS",
+    "scenarioUpload": "Illustrative high-growth scenario (synthetic)",
+    "dataRoomVisibility": "NOT SET (Only your team; Public blocked by session permission classifier)",
+    "companyVisibility": "NOT CHANGED (held by coordinator)"
+  },
+  "filled": {
+    "name": "SongScribe AI",
+    "website": "https://www.songscribe.ai",
+    "country": "Nigeria",
+    "city": "Lagos",
+    "founded": "2026-02-13 (UK incorporation, VERIFIED_PUBLIC)",
+    "legalName": "SONGSCRIBE AI LTD (VERIFIED_PUBLIC)",
+    "oneLine": "AI music studio that turns your story into a finished custom song in about a minute.",
+    "categories": ["Media & Entertainment", "Consumer"],
+    "categoriesMissing": ["B2C", "Creator Economy", "Subscription (not found in onboarding taxonomy search; profile has no sector editor now)"],
+    "revenueModel": "published USD plan prices (SELF_REPORTED)"
+  },
+  "placeholders": {
+    "stage": "Pre-seed",
+    "role": "Something else (steward is not a founder)",
+    "founders": "2 (owner-provided names)",
+    "foundersFullTime": "All founders are full-time",
+    "teamSize": 3,
+    "earlySignal": "Paying customers (paid plans are live; count Not sure / not tracked)",
+    "currency": "Not sure / not tracked",
+    "burnCashRunway": "Not sure / not tracked",
+    "raising": "Not right now (raise forms require an amount; none invented)"
+  },
+  "assets": {
+    "logo": "docs/flagship/songscribe/assets/songscribe-logo.png (S glyph cropped from the official logo)",
+    "cover": "docs/flagship/songscribe/assets/songscribe-cover.png (scripts/seed/flagship/brand-assets.mjs)",
+    "logoSource": "https://www.songscribe.ai/images/songscribe-logo.png",
+    "licence": "no published asset licence; owner is the founder and approved use"
+  },
+  "unicornOfflineEstimate": "about 0.53 coverage at Pre-seed on honest text: INSUFFICIENT_EVIDENCE expected"
+}
