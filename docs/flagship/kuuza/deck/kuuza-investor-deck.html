@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>KUUZA AI — Investor deck</title>
+<meta name="description" content="KUUZA AI investor deck. Generated offline from docs/flagship/kuuza/research.md, facts.json and brand.json.">
+<style>
+@font-face{font-family:"JetBrains Mono";src:url("../../../../scripts/seed/flagship/deck/fonts/JetBrainsMono-Regular.ttf");font-weight:400;font-style:normal;font-display:block}
+@font-face{font-family:"JetBrains Mono";src:url("../../../../scripts/seed/flagship/deck/fonts/JetBrainsMono-Bold.ttf");font-weight:700;font-style:normal;font-display:block}
+
+*{box-sizing:border-box;margin:0;padding:0}
+@page{size:1280px 720px;margin:0}
+html,body{width:1280px;background:#777}
+.slide{width:1280px;height:720px;position:relative;overflow:hidden;page-break-after:always;break-after:page}
+.slide:last-child{page-break-after:auto;break-after:auto}
+ul{list-style:none}
+table{border-collapse:collapse}
+
+
+:root{--ch:#131313;--sf:#1A1A1A;--sf2:#202020;--cr:#E9273B;--cr2:#A40F1E;--te:#7DBDC1;--te2:#6AAEB2;--ice:#EFF6FC;--mu:#9CA3AF;--ln:#2C2C2C}
+body{font-family:Inter,-apple-system,"Segoe UI",sans-serif;color:var(--ice)}
+.slide{background:var(--ch)}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+.wm{font-weight:200;letter-spacing:.32em;font-size:20px;color:var(--ice)}
+.wm b{font-weight:200;color:var(--cr)}
+.stripes{display:flex;flex-direction:column;gap:5px;width:56px}
+.stripes i{display:block;height:5px;border-radius:1px}
+.stripes i:nth-child(1){background:#E9273B}.stripes i:nth-child(2){background:#C7414F}.stripes i:nth-child(3){background:#A6656E}
+.stripes i:nth-child(4){background:#8F9497}.stripes i:nth-child(5){background:#7DBDC1}
+.foot{position:absolute;left:72px;right:64px;bottom:26px;display:flex;justify-content:space-between;font-size:12px;color:var(--mu)}
+.foot .mono{color:var(--mu)}
+.has-rail .foot{left:432px}
+.rail{position:absolute;left:0;top:0;bottom:0;width:384px;background:var(--sf);padding:60px 44px 0 64px;border-right:1px solid var(--ln)}
+.rail .who{font-size:13px;color:var(--te);margin-bottom:18px}
+.rail h2{font-size:40px;line-height:1.14;font-weight:700;letter-spacing:-.01em}
+.rail .num{position:absolute;left:64px;bottom:64px;font-size:12px;color:var(--mu)}
+.main{position:absolute;left:432px;right:64px;top:60px;bottom:62px}
+.main .who{font-size:13px;color:var(--cr);margin-bottom:14px}
+.lead{font-size:27px;line-height:1.34;font-weight:500;margin-bottom:24px}
+.lead em{font-style:normal;color:var(--cr)}
+p{font-size:18px;line-height:1.5;color:#D6DCE2}
+.small{font-size:14px;color:var(--mu);line-height:1.45}
+.st{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px;white-space:nowrap;padding-left:9px;border-left:3px solid var(--mu);color:var(--ice);line-height:1.2;display:inline-block}
+.st-VP{border-color:var(--te)}.st-SR,.st-PT{border-color:var(--cr)}.st-OP{border-color:#E8B54D}.st-AS{border-color:#B0B6BE}.st-UN{border-color:#555;color:var(--mu)}
+.rows>div{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:baseline;padding:14px 0;border-top:1px solid var(--ln)}
+.rows>div:last-child{border-bottom:1px solid var(--ln)}
+.rows .t{font-size:18px;line-height:1.42}
+.rows .t b{font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.col h3{font-size:16px;font-weight:600;color:var(--te);margin-bottom:8px}
+.col li{font-size:17px;line-height:1.42;padding:7px 0;border-top:1px solid var(--ln)}
+.big{font-weight:800;font-size:64px;letter-spacing:-.03em;line-height:1}
+.src{position:absolute;left:432px;right:64px;bottom:50px;font-size:11px;color:var(--mu)}
+table.t{width:100%;font-size:15px}
+table.t th{text-align:left;font-weight:600;color:var(--te);font-size:13.5px;padding:0 12px 9px 0;border-bottom:1px solid var(--te2)}
+table.t td{padding:11px 12px 11px 0;border-bottom:1px solid var(--ln);vertical-align:top;line-height:1.38}
+table.t td.n{font-family:"JetBrains Mono",monospace;white-space:nowrap}
+/* title */
+.s-title{background:linear-gradient(118deg,#131313 0%,#1A1A1A 52%,#4A0E15 100%)}
+.s-title .top{position:absolute;left:72px;top:64px;display:flex;align-items:center;gap:22px}
+.s-title h1{position:absolute;left:72px;top:196px;width:900px;font-size:66px;line-height:1.04;font-weight:800;letter-spacing:-.025em}
+.s-title h1 span{color:var(--cr)}
+.s-title .sub{position:absolute;left:72px;top:448px;width:760px;font-size:21px;line-height:1.45;color:#D6DCE2}
+.s-title .meta{position:absolute;left:72px;bottom:56px;font-size:12.5px;color:var(--mu);line-height:1.6}
+.s-title .tag{position:absolute;right:72px;bottom:56px;text-align:right;font-size:15px;color:var(--te)}
+/* section-style full slides */
+.full{position:absolute;left:72px;right:72px;top:60px;bottom:72px}
+.full .who{font-size:13px;color:var(--te);margin-bottom:12px}
+.full h2{font-size:44px;font-weight:750;letter-spacing:-.015em;line-height:1.1;margin-bottom:26px;max-width:1040px}
+.kpi{border-top:2px solid var(--cr);padding-top:14px}
+.kpi .v{font-family:"JetBrains Mono",monospace;font-size:48px;font-weight:700;letter-spacing:-.02em}
+.kpi .l{font-size:17px;color:#D6DCE2;margin-top:6px;line-height:1.4}
+.arith{font-family:"JetBrains Mono",monospace;font-size:15px}
+.arith>div{display:grid;grid-template-columns:170px 1fr 200px;gap:20px;padding:16px 0;border-top:1px solid var(--ln);align-items:baseline}
+.arith .k{color:var(--te);font-weight:700}
+.arith .r{text-align:right;font-weight:700;color:var(--ice);font-size:22px}
+.arith .x{font-family:Inter,sans-serif;font-size:16.5px;color:#D6DCE2;line-height:1.4}
+.quote{font-size:18px;line-height:1.45;padding:14px 0;border-top:1px solid var(--ln)}
+.quote .by{font-size:14px;color:var(--mu);margin-top:6px}
+.flag{color:#F2A3AB}
+.s-problem .rows>div{padding:10px 0}
+
+</style></head><body>
+<section class="slide s-title" data-slide="1" aria-label="Thesis — conversation practice for the calls the rest of the world makes">
+      <div class="top"><div class="stripes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><div class="wm">KUUZA <b>AI</b></div></div>
+      <h1>Rehearse the hard conversation <span>before</span> it costs you the deal.</h1>
+      <div class="sub">KUUZA AI describes itself as “the Global AI Simulator and Coach for Sales, Service and All Human Communication”: voice, video and text roleplay with AI personas, scored instantly. The thesis: accent, culture and noisy-line realism for Africa, the Middle East and Asia is a wedge the funded Western tools do not target.</div>
+      <div class="meta">Investor deck · October 2026 · Cofounders Zino Mario and Excel Chukwu <span class="st st-OP">Owner-provided</span><br>Operating base: Lagos, Nigeria <span class="st st-AS">Assumption · medium confidence</span> · Every claim carries its evidence status</div>
+      <div class="tag">“Born in Africa. Built for the World” <span class="st st-SR">Self-reported</span></div></section>
+<section class="slide s-problem" data-slide="2" aria-label="Problem — sales and service skills are learned on live customers"><div class="has-rail"><div class="rail"><div class="who mono">investor asks</div><h2>What is broken today?</h2></div>
+   <div class="main"><div class="who mono">kuuza answers · the problem</div><div class="lead">New reps and service agents practise on <em>real customers</em>. Mistakes are paid for in lost deals, escalations and slow ramp-up.</div>
+       <div class="rows">
+        <div><div class="t"><b>Training is slow.</b> The founders started KUUZA “after experiencing firsthand how painfully slow sales training can be” in a previous startup.</div><span class="st st-SR">Self-reported · /about</span></div>
+        <div><div class="t"><b>Roleplay does not scale.</b> Practice depends on a manager’s time. KUUZA’s page claims managers spend 70–80% of their time coaching (no source given).</div><span class="st st-SR">Self-reported · unsourced</span></div>
+        <div><div class="t"><b>Practice tools assume a Western call.</b> The company argues most AI platforms are “built predominantly just for Western markets”: clean lines, familiar accents, familiar norms.</div><span class="st st-SR">Self-reported</span></div>
+        <div><div class="t"><b>The hard calls are emotional.</b> Complaints with shouting, crying or sarcasm; objections; interviews; pitches. They are rarely rehearsed at all.</div><span class="st st-SR">Self-reported · use cases</span></div>
+       </div>
+       <p class="small" style="margin-top:16px">No independent survey of the problem is cited in the research. The size of the pain is an open diligence question.</p></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">02 / 19</span></div></div></section>
+<section class="slide s-solution" data-slide="3" aria-label="Solution — pick a scenario, talk to a persona, get scored"><div class="has-rail"><div class="rail"><div class="who mono">investor asks</div><h2>What does KUUZA actually do?</h2></div>
+   <div class="main"><div class="who mono">kuuza answers · the solution</div><div class="lead">A flight simulator for conversations: the user rehearses a real scenario with an AI persona that answers “with emotion, tone, attitude, and cultural nuance”. <span class="st st-SR">Self-reported</span></div>
+       <div class="grid2" style="margin-top:6px">
+        <div class="col"><h3 class="mono">1 · choose a scenario</h3><ul><li>Cold call, discovery, objection handling, upsell, demo</li><li>Complaint and de-escalation</li><li>Interview, negotiation, investor pitch, public speaking</li></ul></div>
+        <div class="col"><h3 class="mono">2 · speak naturally</h3><ul><li>Voice, video or text</li><li>Persona moods “from polite to frustrated… hostile”</li><li>Named demo personas, e.g. “Sarah — Sales AI”</li></ul></div>
+        <div class="col"><h3 class="mono">3 · get scored at once</h3><ul><li>Accuracy, tone, structure, speed, clarity, empathy, objection skill</li><li>Speech pace, readiness score, script compliance</li></ul></div>
+        <div class="col"><h3 class="mono">4 · managers see the team</h3><ul><li>Dashboard, leaderboard, learning paths, benchmarking</li><li>Upload scripts, FAQs and customer profiles</li></ul></div>
+       </div>
+       <p class="small" style="margin-top:14px">All capabilities as published on kuuza.ai (fetched 2026-10-18). Not independently tested for this deck.</p></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">03 / 19</span></div></div></section>
+<section class="slide s-product" data-slide="4" aria-label="Working product &amp; capabilities — what is live vs. listed"><div class="has-rail"><div class="rail"><div class="who mono">investor asks</div><h2>What can I use today, and what is only listed?</h2></div>
+   <div class="main"><div class="who mono">kuuza answers · product status</div><table class="t" style="font-size:14px">
+        <tr><th style="width:44%">Capability</th><th style="width:24%">Where it appears</th><th>Status</th></tr>
+        <tr><td><b>Free Demo</b> — no account, password or card; BDR/SDR/AE roleplay, video simulations, real-time feedback, transcription, objection detection; “Up to 1,000 AI calls”</td><td>Public pricing page; self-serve</td><td><span class="st st-SR">Self-reported · offered publicly</span></td></tr>
+        <tr><td><b>Realistic audio</b> — traffic noise, poor signal, interruptions, network delay</td><td>/features</td><td><span class="st st-SR">Self-reported</span></td></tr>
+        <tr><td><b>Custom plan</b> — unlimited custom bots, AI bot builder, hiring assessments, custom scorecards, real-call scoring, simulated auto-dialer</td><td>Pricing page, sold via “Book a Demo”</td><td><span class="st st-SR">Self-reported · listed; live status unverified</span></td></tr>
+        <tr><td><b>Integrations</b> — “CRM Integration (20+)”, HubSpot, Salesforce, Zoho, LMS/LXP, “SSO & Advanced Security”, “Multilingual Support (30+ Languages)”</td><td>Pricing page and /features</td><td><span class="st st-SR">Self-reported · live or roadmap unknown</span></td></tr>
+        <tr><td><b>Model and speech stack, latency, security certification</b></td><td>Not published</td><td><span class="st st-UN">Unknown</span></td></tr>
+       </table>
+       <p class="small" style="margin-top:14px">Hero widgets on kuuza.ai (“+34% Close Rate”, “11.7% Book Rate”, “12 Days Streak”) are illustrative UI mock-ups, not reported results. They are deliberately not used as traction here.</p></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">04 / 19</span></div></div></section>
+<section class="slide s-edge" data-slide="5" aria-label="The claimed edge — culture, accent and noisy-line realism"><div class="full"><div class="who mono">why kuuza, why here</div><h2>Most practice tools rehearse a quiet call in a Western office. KUUZA says it rehearses the call people actually get.</h2><div class="grid3">
+        <div class="kpi"><div class="v">accents</div><div class="l">The AI “understands accents, slang, tone, culture, and communication norms… especially within Africa, Asia and The Middle East”.</div><div style="margin-top:12px"><span class="st st-SR">Self-reported · /features</span></div></div>
+        <div class="kpi"><div class="v">bad lines</div><div class="l">Simulated traffic noise, poor signal, interruptions and network delay. Uncommon in Western competitors’ marketing; fits emerging-market call reality.</div><div style="margin-top:12px"><span class="st st-SR">Self-reported · /features</span></div></div>
+        <div class="kpi"><div class="v">kuuza</div><div class="l">Swahili for “to sell”. The brand is built around selling from an African starting point: “Born in Africa. Built for the World”.</div><div style="margin-top:12px"><span class="st st-VP">Verified public · Wiktionary</span></div></div>
+       </div>
+       <div style="margin-top:34px;padding:18px 22px;background:var(--sf);border-left:3px solid var(--te)"><p><b>What would make this a moat, not a slogan</b> <span class="st st-AS">Assumption</span> — evaluation data on non-Western accents, a published model and vendor stack, and named customers outside the founders’ network. None of these is public yet; they are first-call diligence items.</p></div></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">05 / 19</span></div></section>
+<section class="slide s-market" data-slide="6" aria-label="Market context — a $394.5B training budget, and funded competitors"><div class="full"><div class="who mono">market context</div><h2>Companies already spend heavily on training. Investors are already funding AI roleplay.</h2><div class="grid3" style="grid-template-columns:1.25fr 1fr 1fr">
+        <div class="kpi"><div class="v">$394.5B</div><div class="l">Global corporate training spend, 2025. Excludes consumer spend. 2026 estimate: $398.8B.</div></div>
+        <div class="kpi"><div class="v">$208.2B</div><div class="l">Of that, spend outside North America (North America: $186.4B). KUUZA’s claimed home ground sits here.</div></div>
+        <div class="kpi" style="border-color:var(--te)"><div class="v">$22M · $15M</div><div class="l">Second Nature Series B (Oct 2025) and Hyperbound Series A (Sep 2025): the category is funded, mostly in North America.</div></div>
+       </div>
+       <div class="small" style="margin-top:30px;line-height:1.7"><span class="st st-VP">Verified public</span> Sources: Training Industry, “Size of the Training Industry” — trainingindustry.com/wiki/strategy-alignment-and-planning/size-of-training-industry/ · Built In NYC, 2025-10-20 — builtinnyc.com/articles/second-nature-raises-22m-series-b-20251020 · Entrepreneur India — india.entrepreneur.com/?p=87366 · all fetched 2026-10-18. Funding figures are third-party reports.</div></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">06 / 19</span></div></section>
+<section class="slide s-sizing" data-slide="7" aria-label="Opportunity sizing — TAM / SAM / SOM (Assumption)"><div class="full"><div class="who mono">opportunity sizing · assumption arithmetic</div><h2>TAM ≈ $3.9B · SAM ≈ $167M · SOM ≈ $1.7M ARR<span style="display:block;font-size:20px;font-weight:500;color:var(--mu);margin-top:10px">Every line below is an Assumption. Only the two base spend figures are sourced.</span></h2><div class="arith">
+        <div><span class="k">TAM <span class="st st-AS">Assumption</span></span><span class="x">$394.5B corporate training × 10% sales and service communication training × 10% addressable by AI simulation software</span><span class="r">≈ $3.9B</span></div>
+        <div><span class="k">SAM <span class="st st-AS">Assumption</span></span><span class="x">$208.2B rest-of-world spend × 8% Africa, Middle East and South Asia × 10% communication share × 10% software share</span><span class="r">≈ $167M</span></div>
+        <div><span class="k">SOM <span class="st st-AS">Assumption</span></span><span class="x">1% of SAM within about five years</span><span class="r">≈ $1.7M ARR</span></div>
+        <div><span class="k">cross-check <span class="st st-AS">Assumption</span></span><span class="x">100 enterprise accounts × 50 seats × $30 per seat per month × 12 (KUUZA publishes no price)</span><span class="r">≈ $1.8M ARR</span></div>
+       </div>
+       <p class="small" style="margin-top:18px">The two base figures are sourced (Training Industry, fetched 2026-10-18). Every percentage, seat count and price above is an analyst assumption, not a sourced number. Consumer coaching is excluded because whether KUUZA monetises it is unknown.</p></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">07 / 19</span></div></section>
+<section class="slide s-model" data-slide="8" aria-label="Business model — free demo funnel into custom enterprise plans"><div class="has-rail"><div class="rail"><div class="who mono">investor asks</div><h2>How does KUUZA make money?</h2></div>
+   <div class="main"><div class="who mono">kuuza answers · business model</div><div class="lead">Free self-serve demo at the top; custom enterprise plans sold through “Book a Demo”. <em>No price is published.</em></div>
+       <div class="rows">
+        <div><div class="t"><b>Free Demo</b> — “No Account, No Password, No Credit Card”. For individuals, small teams and founders; “Up to 1,000 AI calls”.</div><span class="st st-SR">Self-reported · /pricing</span></div>
+        <div><div class="t"><b>Custom Plan</b> (“Recommended”) — custom bots, scorecards, real-call scoring, integrations, a dedicated account manager.</div><span class="st st-SR">Self-reported · price not published</span></div>
+        <div><div class="t"><b>Revenue model</b> — enterprise contracts at custom prices, sales-led after the demo.</div><span class="st st-AS">Assumption</span></div>
+        <div><div class="t"><b>Consumer</b> — the Individuals page sells “Start Training Free →”. Whether B2C earns anything is not public.</div><span class="st st-UN">Unknown</span></div>
+       </div>
+       <p class="small" style="margin-top:16px">The page headline reads “Simple, Transparent” but shows no numeric price (fetched 2026-10-18). A price list is a founder deliverable.</p></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">08 / 19</span></div></div></section>
+<section class="slide s-segments" data-slide="9" aria-label="Segments &amp; distribution"><div class="has-rail"><div class="rail"><div class="who mono">investor asks</div><h2>Who buys, and how do you reach them?</h2></div>
+   <div class="main"><div class="who mono">kuuza answers · segments &amp; distribution</div><div class="grid2">
+        <div class="col"><h3 class="mono">segments <span class="st st-SR">Self-reported</span></h3><ul>
+          <li><b>Sales teams</b> — BDR, SDR, AE onboarding and objection handling</li>
+          <li><b>Customer service and call centres</b> — de-escalation and empathy</li>
+          <li><b>Individuals</b> — job seekers, students, founders, professionals</li>
+          <li><b>Industries named</b> — aviation, banking, healthcare, tech, e-commerce, retail, logistics, government</li></ul></div>
+        <div class="col"><h3 class="mono">distribution</h3><ul>
+          <li>Free self-serve demo, then “Book a Custom Demo” <span class="st st-SR">Self-reported</span></li>
+          <li>“Partner With Us… training institutions & tech” <span class="st st-SR">Self-reported</span></li>
+          <li>LinkedIn, Instagram, YouTube (@kuuza-ai); newsletter; email, phone, WhatsApp, Zoom <span class="st st-SR">Self-reported</span></li>
+          <li>Founder-led enterprise sales seeded through the founders’ network, then Nigerian SMEs and services firms <span class="st st-AS">Assumption</span></li></ul></div>
+       </div>
+       <p class="small" style="margin-top:18px">The contact form defaults to Nigeria (+234). A one-off “HQ: Nairobi, Kenya” chip on a decorative image on /features is treated as placeholder copy, not an office; the founders should remove or confirm it.</p></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">09 / 19</span></div></div></section>
+<section class="slide s-competition" data-slide="10" aria-label="Competition — named, funded, mostly North American"><div class="full"><div class="who mono">competition</div><h2>The category is real and funded. KUUZA must win where the leaders are not looking.</h2><table class="t">
+        <tr><th style="width:18%">Competitor</th><th style="width:44%">Positioning</th><th>Public data point</th></tr>
+        <tr><td><b>Second Nature</b></td><td>AI roleplay for sales and service teams</td><td>$22M Series B, Oct 2025, led by Sienna VC; Zoom is investor and customer <span class="st st-VP">Verified public</span></td></tr>
+        <tr><td><b>Hyperbound</b></td><td>AI sales roleplay and real-call scoring (YC)</td><td>$15M Series A, Sep 2025, led by Peak XV; $18.3M total <span class="st st-VP">Verified public</span></td></tr>
+        <tr><td><b>Yoodli</b></td><td>AI communication and roleplay coach, individual and enterprise</td><td>Funding not verified <span class="st st-UN">Unknown</span></td></tr>
+        <tr><td><b>FullyRamped</b></td><td>AI roleplay for sales reps</td><td>$2.3M raise (IT Brief UK) <span class="st st-VP">Verified public</span></td></tr>
+        <tr><td><b>Awarathon</b> (India)</td><td>AI video roleplay (“Trinity”)</td><td>Emerging-market comparator</td></tr>
+        <tr><td><b>Milameet</b> (Togo)</td><td>African AI sales-simulation entrant</td><td>MIT Solve submission</td></tr>
+        <tr><td><b>Mindtickle, Gong, Zenarate, Retorio</b></td><td>Sales-readiness, revenue-intelligence and contact-centre simulation incumbents</td><td>Category incumbents; links not individually verified</td></tr>
+       </table></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">10 / 19</span></div></section>
+<section class="slide s-defensibility" data-slide="11" aria-label="Defensibility — the wedge and what must be proven"><div class="has-rail"><div class="rail"><div class="who mono">investor asks</div><h2>Why can’t Second Nature just add accents?</h2></div>
+   <div class="main"><div class="who mono">kuuza answers · defensibility</div><div class="lead">They could. The defensible version of KUUZA is one that owns the <em>data and the distribution</em> in markets the leaders under-serve. <span class="st st-AS">Assumption</span></div>
+       <div class="rows">
+        <div><div class="t"><b>Local realism as data.</b> Accent, slang and noisy-line scenarios built from African, Middle Eastern and South Asian calls compound with every customer.</div><span class="st st-AS">Assumption</span></div>
+        <div><div class="t"><b>Price fit.</b> Enterprises outside North America buy at different price points than US sales teams.</div><span class="st st-AS">Assumption</span></div>
+        <div><div class="t"><b>Breadth of use.</b> One engine for sales, service and individual practice widens the funnel — but risks diluting focus (see risks).</div><span class="st st-AS">Assumption</span></div>
+        <div><div class="t"><b>Not yet public:</b> accent evaluation data, the model and vendor stack, IP ownership, and independent customers.</div><span class="st st-UN">Unknown</span></div>
+       </div></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">11 / 19</span></div></div></section>
+<section class="slide s-traction" data-slide="12" aria-label="Traction &amp; proof points — published testimonials, with related-party flags"><div class="full"><div class="who mono">traction &amp; proof points</div><h2>Early proof is published testimonials. Most come from the founders’ own network.</h2><div class="grid2" style="grid-template-columns:1.35fr 1fr;gap:40px">
+        <div>
+          <div class="quote"><b>Zino Aviation</b> — Rita Ekwonu (Exec. Asst to the CEO) and Olabisi Ajikanle (Head of Growth & Revenue) <span class="st st-PT">Published testimonial</span><div class="by flag">Related party: Zino Mario’s own company. The job title differs between pages.</div></div>
+          <div class="quote"><b>FDN Advisory</b> — David Nwankwo, CEO <span class="st st-PT">Published testimonial</span><div class="by flag">Related party: David Nwankwo is Managing Partner of FDN Capital Partners, where Zino Mario is a Partner.</div></div>
+          <div class="quote"><b>Setu Down (Nigeria)</b> — Samson Popola, CEO: “We tested KUUZA AI” <span class="st st-PT">Published testimonial</span><div class="by">Relationship unknown. A test is not necessarily paid use.</div></div>
+          <div class="quote" style="border-bottom:1px solid var(--ln)"><b>“Nia Thompson, CEO OF Proxima”</b> on /features <span class="st st-PT">Published testimonial</span><div class="by">Unidentifiable.</div></div>
+        </div>
+        <div>
+          <div class="who mono" style="color:var(--te);font-size:13px;margin-bottom:10px">not published</div>
+          <div class="rows">
+            <div><div class="t">Customer count</div><span class="st st-UN">Unknown</span></div>
+            <div><div class="t">Paying customers</div><span class="st st-UN">Unknown</span></div>
+            <div><div class="t">ARR or revenue</div><span class="st st-UN">Unknown</span></div>
+            <div><div class="t">Usage volumes, retention</div><span class="st st-UN">Unknown</span></div>
+          </div>
+          <p class="small" style="margin-top:14px">Unknown is not zero. These are the first numbers to request from the founders, with related parties separated from independent customers.</p>
+        </div>
+       </div></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">12 / 19</span></div></section>
+<section class="slide s-planning" data-slide="13" aria-label="Planning assumptions — not actual results"><div class="full"><div class="who mono">planning assumptions — not actual results</div><h2>Planning assumptions — not actual results</h2><p style="margin:-12px 0 20px;max-width:980px">KUUZA has published no revenue, price or cost data. The scenarios below only show how the research’s seat-price assumption scales. They are not forecasts and not company figures.</p>
+       <div class="grid2" style="grid-template-columns:1.2fr 1fr;gap:44px">
+        <div>
+          <table class="t">
+            <tr><th>Scenario <span class="st st-AS">Assumption</span></th><th>Accounts</th><th>Seats each</th><th>$ / seat / month</th><th>ARR</th></tr>
+            <tr><td>Early</td><td class="n">25</td><td class="n">50</td><td class="n">30</td><td class="n">$0.45M</td></tr>
+            <tr><td>Research cross-check</td><td class="n">100</td><td class="n">50</td><td class="n">30</td><td class="n">$1.8M</td></tr>
+            <tr><td>Stretch</td><td class="n">200</td><td class="n">50</td><td class="n">30</td><td class="n">$3.6M</td></tr>
+          </table>
+          <p class="small" style="margin-top:10px">Arithmetic: accounts × seats × $30 × 12. Same inputs as the research’s bottom-up check.</p>
+        </div>
+        <div>
+          <div class="who mono" style="color:var(--te);font-size:13px;margin-bottom:10px">inputs still unknown</div>
+          <div class="rows">
+            <div><div class="t">Real list price per seat or contract</div><span class="st st-UN">Unknown</span></div>
+            <div><div class="t">Cost per simulated minute (speech, LLM, voice, avatar vendors)</div><span class="st st-UN">Unknown</span></div>
+            <div><div class="t">Gross margin, latency</div><span class="st st-UN">Unknown</span></div>
+            <div><div class="t">Sales cycle, conversion from free demo</div><span class="st st-UN">Unknown</span></div>
+          </div>
+        </div>
+       </div></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">13 / 19</span></div></section>
+<section class="slide s-roadmap" data-slide="14" aria-label="Roadmap &amp; scalability"><div class="has-rail"><div class="rail"><div class="who mono">investor asks</div><h2>Where does this go, and does it scale?</h2></div>
+   <div class="main"><div class="who mono">kuuza answers · roadmap &amp; scalability</div><div class="grid2">
+        <div class="col"><h3 class="mono">stated direction <span class="st st-SR">Self-reported</span></h3><ul>
+          <li>“Building towards immersive Virtual Reality” (founder’s site; not on the product site)</li>
+          <li>Hiring assessments, real-call scoring and a custom scorecard builder (Custom plan)</li>
+          <li>“Multilingual Support (30+ Languages)” and “CRM Integration (20+)”</li>
+          <li>Mission: “the global backbone of skills training”</li></ul></div>
+        <div class="col"><h3 class="mono">next steps the evidence calls for <span class="st st-AS">Assumption</span></h3><ul>
+          <li>Publish terms and a privacy notice (both 404 today)</li>
+          <li>Name the legal entity and registered office</li>
+          <li>Publish the model and vendor stack and an accent evaluation</li>
+          <li>Win and name independent paying customers</li></ul></div>
+       </div>
+       <p style="margin-top:20px"><b>Scalability</b> <span class="st st-AS">Assumption</span> — software delivery scales across markets, but real-time voice and video usually rely on third-party speech and model APIs, so cost per minute and latency scale with vendor pricing. Unit cost is unknown.</p></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">14 / 19</span></div></div></section>
+<section class="slide s-team" data-slide="15" aria-label="Team &amp; founders"><div class="full"><div class="who mono">team &amp; founders</div><h2>“Zino brought the vision, Excel brought the tech.” <span style="font-size:18px;font-weight:500"><span class="st st-SR">Self-reported · /about</span></span></h2><div class="grid2" style="gap:48px">
+        <div>
+          <div style="font-size:26px;font-weight:700;margin-bottom:4px">Zino Mario <span style="font-size:15px;font-weight:400;color:var(--mu)">cofounder</span></div>
+          <div style="margin-bottom:10px"><span class="st st-OP">Owner-provided · cofounder role</span></div>
+          <div class="rows">
+            <div><div class="t">Capt. Zino Mario (Mario-Ghae): founder and CEO of Zino Aviation, Lagos; licensed pilot at 18, retired from flying at 26 (ThisDay; Nairametrics 2026-07-19)</div><span class="st st-VP">Verified public</span></div>
+            <div><div class="t">Raised in the UK; Sikorsky S-92 offshore pilot; two-time TEDx speaker; Partner at FDN Capital Partners. “Youngest commercial pilot” is unverified</div><span class="st st-SR">Self-reported</span></div>
+            <div><div class="t">Prior UK companies Pilot Pairing, Mariozino and Delta Dash Aviation — all dissolved</div><span class="st st-VP">Verified public · Companies House</span></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:26px;font-weight:700;margin-bottom:4px">Excel Chukwu <span style="font-size:15px;font-weight:400;color:var(--mu)">cofounder, technology</span></div>
+          <div style="margin-bottom:10px"><span class="st st-OP">Owner-provided · cofounder role</span></div>
+          <div class="rows">
+            <div><div class="t">Named cofounder on kuuza.ai/about (“Excel brought the tech”)</div><span class="st st-SR">Self-reported</span></div>
+            <div><div class="t">Professional background, prior roles and technical track record</div><span class="st st-UN">Unknown</span></div>
+            <div><div class="t">Equity and IP-assignment position</div><span class="st st-UN">Unknown</span></div>
+          </div>
+          <p class="small" style="margin-top:14px">Founder bandwidth is a diligence point: Zino Mario also runs Zino Aviation, SongScribe AI, an FDN partnership and the Man-Up Initiative.</p>
+        </div>
+       </div></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">15 / 19</span></div></section>
+<section class="slide s-risks" data-slide="16" aria-label="Key risks &amp; mitigations (incl. regulatory)"><div class="full"><div class="who mono">key risks &amp; mitigations</div><h2>The risks are known and nameable. Most are fixable with documents.</h2><table class="t" style="font-size:14.5px">
+        <tr><th style="width:30%">Risk</th><th style="width:40%">Why it matters</th><th>Mitigation <span class="st st-AS">Assumption</span></th></tr>
+        <tr><td><b>EU AI Act Art. 5(1)(f)</b> — emotion recognition at work banned from 2 Feb 2025; hiring AI may be high-risk (Annex III)</td><td>Scoring employees’ “empathy” or “confidence” from voice; the Custom plan lists hiring assessments</td><td>Scope scoring to skills, not inferred emotion, before any EU sale; legal review of hiring use</td></tr>
+        <tr><td><b>NDPA 2023 (Nigeria), UK/EU GDPR, US BIPA and NYC LL144</b></td><td>Voice, video and scores of employees are personal data; voice can become biometric</td><td>Publish privacy notice and DPA; data-residency and retention policy; avoid voice identification</td></tr>
+        <tr><td><b>Missing legal pages</b></td><td>/terms and /privacy-policy return 404</td><td>Publish before enterprise or investor diligence</td></tr>
+        <tr><td><b>Related-party traction</b></td><td>3 of 4 named stories are founder-affiliated</td><td>Report independent customers separately</td></tr>
+        <tr><td><b>Technical cofounder opacity; vendor dependency</b></td><td>No public footprint; IP, stack and unit cost unknown</td><td>CV, IP assignment, stack and cost per minute in the data room</td></tr>
+        <tr><td><b>Crowded category; scope sprawl; founder bandwidth; public inconsistencies</b></td><td>Funded US leaders; dating and preaching use cases; several ventures; Nairobi chip, mock metrics</td><td>Focus on enterprise sales and service; fix site copy; state time commitment</td></tr>
+       </table></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">16 / 19</span></div></section>
+<section class="slide s-funding" data-slide="17" aria-label="Funding: to be confirmed by the founders"><div class="has-rail"><div class="rail"><div class="who mono">investor asks</div><h2>How much are you raising, and for what?</h2></div>
+   <div class="main"><div class="who mono">kuuza answers · funding</div><div class="lead">Funding: <em>to be confirmed by the founders.</em> No raise, round size, valuation or use of funds has been published, and none is assumed here. <span class="st st-UN">Unknown</span></div>
+       <div class="who mono" style="color:var(--te);margin:4px 0 10px">what the founders need to supply</div>
+       <div class="rows">
+        <div><div class="t">Amount sought, instrument and valuation expectations</div><span class="st st-UN">Unknown</span></div>
+        <div><div class="t">Funding raised to date (none found publicly — unknown, not zero)</div><span class="st st-UN">Unknown</span></div>
+        <div><div class="t">Use of funds by line: product, go-to-market, compliance, hiring</div><span class="st st-UN">Unknown</span></div>
+        <div><div class="t">Legal entity, jurisdiction, incorporation date and cap table</div><span class="st st-UN">Unknown</span></div>
+        <div><div class="t">Runway and monthly burn</div><span class="st st-UN">Unknown</span></div>
+       </div></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">17 / 19</span></div></div></section>
+<section class="slide s-next" data-slide="18" aria-label="Investment opportunity &amp; next steps"><div class="full"><div class="who mono">investment opportunity &amp; next steps</div><h2>An early bet on conversation practice built outside the Western default — if the evidence lands.</h2><div class="grid2" style="gap:48px">
+        <div class="col"><h3 class="mono">the opportunity</h3><ul>
+          <li>A publicly usable product with a free demo and an enterprise plan <span class="st st-SR">Self-reported</span></li>
+          <li>A large, sourced training budget and a funded category <span class="st st-VP">Verified public</span></li>
+          <li>A differentiated wedge — accent, culture and noisy lines in under-served markets <span class="st st-AS">Assumption</span></li>
+          <li>A founder with a press-verified aviation operating history <span class="st st-VP">Verified public</span>; aviation is a named target industry <span class="st st-SR">Self-reported</span></li></ul></div>
+        <div class="col"><h3 class="mono">next steps — the data-room request</h3><ul>
+          <li>Entity, cap table, IP assignment, Excel Chukwu’s CV</li>
+          <li>Paying customers and ARR, related parties separated</li>
+          <li>Custom-plan price list; whether B2C is monetised</li>
+          <li>Stack, cost per minute, latency; accent evaluation data</li>
+          <li>Proof that 30+ languages, 20+ CRMs and SSO are live</li>
+          <li>Privacy policy, terms, DPA, hosting location</li></ul></div>
+       </div>
+       <p class="small" style="margin-top:20px">Contact (published): support@kuuza.ai <span class="st st-SR">Self-reported</span></p></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">18 / 19</span></div></section>
+<section class="slide s-sources" data-slide="19" aria-label="Sources &amp; evidence status"><div class="full" style="top:48px"><div class="who mono">sources & evidence status</div>
+      <h2 style="font-size:30px;margin-bottom:14px">Sources & evidence status</h2>
+      <div class="grid2" style="grid-template-columns:1.5fr 1fr;gap:36px">
+       <table class="t" style="font-size:11.5px">
+        <tr><th>Source (all fetched 2026-10-18 UTC)</th><th>Status</th></tr>
+        <tr><td>kuuza.ai — /, /about, /features, /pricing, /contact, /faq, /success-stories, solutions pages</td><td><span class="st st-SR">Self-reported</span></td></tr>
+        <tr><td>kuuza.ai/terms, /privacy-policy — HTTP 404</td><td><span class="st st-VP">Verified public</span></td></tr>
+        <tr><td>zinomario.com</td><td><span class="st st-SR">Self-reported</span></td></tr>
+        <tr><td>thisdaylive.com/2022/09/09/zino-aviation-takes-off-with-pilot-masterclass/</td><td><span class="st st-VP">Verified public</span></td></tr>
+        <tr><td>nairametrics.com/2026/07/19/zino-aviation-ceo-why-many-licensed-nigerian-pilots-remain-unemployed/</td><td><span class="st st-VP">Verified public</span></td></tr>
+        <tr><td>find-and-update.company-information.service.gov.uk — search “kuuza”; officer appointments</td><td><span class="st st-VP">Verified public</span></td></tr>
+        <tr><td>trainingindustry.com/wiki/strategy-alignment-and-planning/size-of-training-industry/</td><td><span class="st st-VP">Verified public</span></td></tr>
+        <tr><td>builtinnyc.com/articles/second-nature-raises-22m-series-b-20251020</td><td><span class="st st-VP">Verified public</span></td></tr>
+        <tr><td>india.entrepreneur.com/?p=87366 · itbrief.co.uk (FullyRamped) · solve.mit.edu/solutions/95306</td><td><span class="st st-VP">Verified public</span></td></tr>
+        <tr><td>wiktionary.com/wiki/uza</td><td><span class="st st-VP">Verified public</span></td></tr>
+        <tr><td>search.cac.gov.ng — not queryable (JavaScript-only)</td><td><span class="st st-UN">Unknown</span></td></tr>
+       </table>
+       <div>
+        <div class="rows" style="font-size:13px">
+          <div><div class="t" style="font-size:13px">Independent record or third-party press</div><span class="st st-VP">Verified public</span></div>
+          <div><div class="t" style="font-size:13px">Company or founder’s own website</div><span class="st st-SR">Self-reported</span></div>
+          <div><div class="t" style="font-size:13px">Testimonial published by the company</div><span class="st st-PT">Published testimonial</span></div>
+          <div><div class="t" style="font-size:13px">Supplied by the Capital Q owner</div><span class="st st-OP">Owner-provided</span></div>
+          <div><div class="t" style="font-size:13px">Analyst arithmetic or inference</div><span class="st st-AS">Assumption</span></div>
+          <div><div class="t" style="font-size:13px">Not publicly findable; never read as zero</div><span class="st st-UN">Unknown</span></div>
+        </div>
+        <p class="small" style="margin-top:12px;font-size:11.5px">Prepared offline from docs/flagship/kuuza/research.md and facts.json. No founder documents were used. Typographic wordmark only: brand assets carry no published licence.</p>
+       </div>
+      </div></div><div class="foot"><span>KUUZA AI · Investor deck · October 2026 · prepared offline from public sources</span><span class="mono">19 / 19</span></div></section>
+</body></html>

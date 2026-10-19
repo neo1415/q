@@ -50,3 +50,6 @@ docs/product-sources/landing-capture-*/
 
 # Generated product guide (built by scripts/handoff/docs/build.mjs)
 docs/guide/capital-q-guide.html
+
+# Generated investor decks (built by scripts/seed/flagship/deck/build.mjs)
+docs/flagship/*/deck/*.html

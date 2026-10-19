@@ -1,0 +1,639 @@
+{
+  "metadata": {
+    "synthetic": true,
+    "scenario": "illustrative-high-growth-v1",
+    "label": "Illustrative high-growth scenario — synthetic evidence"
+  },
+  "company": "SongScribe AI",
+  "asOf": "2026-10-18T00:00:00.000Z",
+  "stageNote": "Pre-seed. The UK entity was incorporated on 2026-02-13 and no funding is public (UNKNOWN, not zero); the scenario assumes a small pre-seed SAFE and keeps the company at pre-seed.",
+  "inputs": {
+    "companyId": "synthetic-songscribe",
+    "stageCode": "pre_seed",
+    "sectorCodes": ["consumer_software", "media_entertainment"],
+    "businessModelCodes": ["subscription", "licensing"],
+    "profile": {
+      "listed": true,
+      "description": true,
+      "website": true,
+      "updatedAt": "2026-10-15T09:00:00.000Z"
+    },
+    "verification": {
+      "organisation": false,
+      "domain": false,
+      "decidedAt": null
+    },
+    "founders": [
+      {
+        "id": "songscribe-founder-ceo",
+        "title": "and CEO",
+        "detail": "previously built and led two Lagos businesses with founder-led consumer marketing; the technical lead has 7 years of experience in audio signal processing and audio ML.",
+        "recordedAt": "2026-10-15T09:00:00.000Z",
+        "documentSupported": false,
+        "visibilityScope": "network_visible",
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P1.A"
+        }
+      }
+    ],
+    "claims": [
+      {
+        "id": "songscribe-p1b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p1b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "founder.execution",
+        "statement": "The founders shipped Nigerian-language vocal generation in March 2026 and changed the pricing tiers in response to customer feedback from 400 subscribers in May 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P1.B"
+        }
+      },
+      {
+        "id": "songscribe-p2a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p2a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "market.accessible_demand",
+        "statement": "Bottom-up accessible market sized from customer spending of USD 192 per paying subscriber per year (Q3 2026 average) across about 1.2 million creators, churches and small businesses in Nigeria, Ghana, Kenya and the UK diaspora that buy music today, or about USD 230 million per year.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P2.A"
+        }
+      },
+      {
+        "id": "songscribe-p2b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p2b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "market.expansion",
+        "statement": "Expansion into Ghana and Kenya launched successfully in July 2026 with mobile-money checkout: 640 of the 2,900 paying subscribers at September 2026 are in those two countries.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P2.B"
+        }
+      },
+      {
+        "id": "songscribe-p3a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p3a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "customers.problem_validation",
+        "statement": "Paying customers buy SongScribe for one problem: a custom song or jingle from a studio costs USD 150 to USD 600 and takes about two weeks; 2,900 subscribers paid in September 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P3.A"
+        }
+      },
+      {
+        "id": "songscribe-p3b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p3b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "customers.retention",
+        "statement": "Retained customers: 71% of the January 2026 paying cohort was still subscribed in September 2026, and 38% of brand and church accounts made repeat purchases of new tracks.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P3.B"
+        }
+      },
+      {
+        "id": "songscribe-p4a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p4a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "traction.revenue_velocity",
+        "statement": "Subscription revenue grew 34% quarter on quarter in 2026: USD 96,000 in Q2 (April 2026 to June 2026) to USD 128,600 in Q3 (July 2026 to September 2026).",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P4.A"
+        }
+      },
+      {
+        "id": "songscribe-p4b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p4b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "traction.recurring_revenue",
+        "statement": "Recurring revenue from 2,900 subscribers reached USD 46,400 MRR in September 2026 (USD 556,800 annualised).",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P4.B"
+        }
+      },
+      {
+        "id": "songscribe-p5a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p5a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "financial.contribution_economics",
+        "statement": "Positive contribution margin of 58% measured on Q3 2026 actual revenue of USD 128,600 after GPU generation, payment processing and rights-clearance costs of USD 54,000.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P5.A"
+        }
+      },
+      {
+        "id": "songscribe-p5b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p5b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "financial.acquisition_payback",
+        "statement": "Acquisition payback measured at 4.1 months for subscribers acquired in Q3 2026: blended paid CAC of USD 38 against USD 9.28 monthly contribution per subscriber.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P5.B"
+        }
+      },
+      {
+        "id": "songscribe-p6a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p6a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "product.differentiated_asset",
+        "statement": "Proprietary dataset deployed in the production model: 120,000 commissioned Afrobeats, highlife, gospel and Nigerian-language vocal stems, owned outright and used by customers since March 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P6.A"
+        }
+      },
+      {
+        "id": "songscribe-p7a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p7a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "distribution.channel",
+        "statement": "Short-video acquisition channel is repeatable: creator clips sourced 61% of new subscribers in every month from April 2026 to September 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P7.A"
+        }
+      },
+      {
+        "id": "songscribe-p7b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p7b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "distribution.organic_pull",
+        "statement": "Referrals measured: every shared song carries a SongScribe link, and referrals sourced 27% of new paying subscribers between April 2026 and September 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P7.B"
+        }
+      },
+      {
+        "id": "songscribe-p8a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p8a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "capital.runway",
+        "statement": "Current runway is 16 months at September 2026 net burn of USD 15,000 per month, from cash of USD 240,000 held on 30 September 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P8.A"
+        }
+      },
+      {
+        "id": "songscribe-p8b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p8b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "capital.strategic_support",
+        "statement": "Strategic support executed in March 2026: a USD 350,000 pre-seed SAFE from two music-industry angels, with an active agreement giving SongScribe access to a Lagos studio's session vocalists.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P8.B"
+        }
+      },
+      {
+        "id": "songscribe-p9a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p9a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "team.function_coverage",
+        "statement": "Technical, commercial and operational functions are covered: a 3-person audio ML and engineering team, a growth and partnerships lead, and an operations lead appointed in May 2026 who runs rights clearance and support.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P9.A"
+        }
+      },
+      {
+        "id": "songscribe-p9b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p9b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "team.delivery",
+        "statement": "Product milestones for 2026 were delivered on time: Nigerian-language vocals in March 2026, Ghana and Kenya checkout in July 2026 and the agency licence tier in September 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P9.B"
+        }
+      },
+      {
+        "id": "songscribe-p10a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p10a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "market.timing",
+        "statement": "Technology shift measured: generative music models reached commercial vocal quality in 2024 and 2025, and IFPI reported Sub-Saharan Africa as the second-fastest-growing recorded music region in 2024 (+22.6%).",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P10.A"
+        }
+      },
+      {
+        "id": "songscribe-p10b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p10b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "market.window",
+        "statement": "The market window is being used: SongScribe is deployed with 2,900 paying subscribers in Nigeria, Ghana, Kenya and the UK as of September 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P10.B"
+        }
+      },
+      {
+        "id": "songscribe-p11a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p11a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "financial.operating_leverage",
+        "statement": "Revenue growth exceeds cost growth in actual 2026 results: Q3 2026 revenue rose 34% over Q2 2026 while total operating costs rose 15%.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P11.A"
+        }
+      },
+      {
+        "id": "songscribe-p11b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p11b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "operations.repeat_deployment",
+        "statement": "Repeat deployments completed in 2026: localised checkout, pricing and language packs went live in Ghana in July 2026 and Kenya in August 2026 using the Nigeria playbook.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P11.B"
+        }
+      },
+      {
+        "id": "songscribe-p12a",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p12a.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "ecosystem.partnership",
+        "statement": "Platform partnership active since June 2026 with a church-media network, delivering in-app ordering to 1,400 member churches.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P12.A"
+        }
+      },
+      {
+        "id": "songscribe-p12b",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-p12b.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario",
+        "claimKey": "strategy.adjacent_opportunity",
+        "statement": "Strategic opportunity in sonic branding has a signed customer: a Lagos consumer-goods brand licensed an exclusive campaign anthem and jingle set in August 2026.",
+        "structuredValue": null,
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "P12.B"
+        }
+      },
+      {
+        "id": "songscribe-arr",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-arr.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario_metric",
+        "claimKey": "financial.arr",
+        "statement": "ARR run-rate USD 556,800 at September 2026 (MRR USD 46,400 x 12).",
+        "structuredValue": {
+          "kind": "MONEY",
+          "amount": "556800",
+          "currency": "USD",
+          "asOf": "2026-09"
+        },
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "structured"
+        }
+      },
+      {
+        "id": "songscribe-cm",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-cm.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario_metric",
+        "claimKey": "financial.contribution_margin",
+        "statement": "Contribution margin 58% on Q3 2026 revenue.",
+        "structuredValue": {
+          "kind": "PERCENT",
+          "value": "58",
+          "asOf": "2026-09"
+        },
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "structured"
+        }
+      },
+      {
+        "id": "songscribe-runway",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-runway.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario_metric",
+        "claimKey": "financial.runway_months",
+        "statement": "Cash runway 16 months at 30 September 2026.",
+        "structuredValue": {
+          "kind": "MONTHS",
+          "value": "16",
+          "asOf": "2026-09-30"
+        },
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "structured"
+        }
+      },
+      {
+        "id": "songscribe-growth",
+        "truthClass": "USER_CLAIM",
+        "evidenceStatus": "SELF_REPORTED",
+        "lifecycleStatus": "CURRENT",
+        "visibilityScope": "network_visible",
+        "assertedAt": "2026-10-15T09:00:00.000Z",
+        "validFrom": null,
+        "validTo": null,
+        "revisionId": "songscribe-growth.r1",
+        "revisionNumber": 1,
+        "claimType": "synthetic_scenario_metric",
+        "claimKey": "traction.growth",
+        "statement": "Revenue up 34% from Q2 2026 to Q3 2026.",
+        "structuredValue": {
+          "kind": "PERCENT",
+          "metric": "REVENUE",
+          "value": "34",
+          "periodStart": "2026-04",
+          "periodEnd": "2026-09",
+          "currency": "USD"
+        },
+        "metadata": {
+          "synthetic": true,
+          "scenario": "illustrative-high-growth-v1",
+          "label": "Illustrative high-growth scenario — synthetic evidence",
+          "criterion": "structured"
+        }
+      }
+    ],
+    "deck": null,
+    "pitch": null
+  }
+}

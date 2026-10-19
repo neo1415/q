@@ -1,0 +1,420 @@
+{
+  "metadata": {
+    "synthetic": true,
+    "scenario": "illustrative-high-growth-v1",
+    "label": "Illustrative high-growth scenario — synthetic evidence"
+  },
+  "company": "Capital Q",
+  "asOf": "2026-10-18T00:00:00.000Z",
+  "unicornPotential": {
+    "status": "SCORED",
+    "overallScore": 75,
+    "band": "STRONG_SIGNALS",
+    "confidence": "LOW",
+    "coverage": 0.96,
+    "stage": "PRE_SEED",
+    "methodVersion": "unicorn-potential.v1.0.0",
+    "inputRulesVersion": "unicorn-potential-inputs.v4",
+    "basisHash": "3e90ea0dee18792035251347cb354d25895ab6bab591eacd9aa89f83546a1806",
+    "pillars": [
+      {
+        "id": "P1",
+        "label": "Founder quality & founder–market fit",
+        "weight": 15,
+        "grade": 3,
+        "contribution": 11.25,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P1.A",
+            "label": "Relevant founder expertise",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-founders"]
+          },
+          {
+            "id": "P1.B",
+            "label": "Adaptability and founder execution",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p1b"]
+          }
+        ]
+      },
+      {
+        "id": "P2",
+        "label": "Market opportunity & expansion",
+        "weight": 15,
+        "grade": 3,
+        "contribution": 11.25,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P2.A",
+            "label": "Accessible market demand",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p2a"]
+          },
+          {
+            "id": "P2.B",
+            "label": "Credible expansion path",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p2b"]
+          }
+        ]
+      },
+      {
+        "id": "P3",
+        "label": "Problem intensity & product–market fit",
+        "weight": 15,
+        "grade": 3,
+        "contribution": 11.25,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P3.A",
+            "label": "Problem severity and willingness to pay",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-arr", "capital-q-p3a"]
+          },
+          {
+            "id": "P3.B",
+            "label": "Repeated adoption or stage-appropriate tests",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-nrr", "capital-q-p3b"]
+          }
+        ]
+      },
+      {
+        "id": "P4",
+        "label": "Traction & growth velocity",
+        "weight": 8,
+        "grade": 3,
+        "contribution": 6,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P4.A",
+            "label": "Dated growth velocity",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-growth", "capital-q-p4a"]
+          },
+          {
+            "id": "P4.B",
+            "label": "Retention-supported traction",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-arr", "capital-q-nrr"]
+          }
+        ]
+      },
+      {
+        "id": "P5",
+        "label": "Business model & unit economics",
+        "weight": 6,
+        "grade": 3,
+        "contribution": 4.5,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P5.A",
+            "label": "Contribution economics and pricing",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-cm", "capital-q-p5a"]
+          },
+          {
+            "id": "P5.B",
+            "label": "Sustainable acquisition and monetization",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p5b"]
+          }
+        ]
+      },
+      {
+        "id": "P6",
+        "label": "Defensibility & competitive moat",
+        "weight": 8,
+        "grade": 3,
+        "contribution": 6,
+        "coverage": 0.5,
+        "criteria": [
+          {
+            "id": "P6.A",
+            "label": "Differentiated assets",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p6a"]
+          },
+          {
+            "id": "P6.B",
+            "label": "Independent defensibility test",
+            "state": "UNKNOWN",
+            "grade": null,
+            "anchor": "Dated third-party benchmark or documented competitive evaluation",
+            "sourceIds": []
+          }
+        ]
+      },
+      {
+        "id": "P7",
+        "label": "Distribution & organic influence",
+        "weight": 5,
+        "grade": 3,
+        "contribution": 3.75,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P7.A",
+            "label": "Repeatable acquisition channels",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p7a"]
+          },
+          {
+            "id": "P7.B",
+            "label": "Organic pull or channel efficiency",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p7b"]
+          }
+        ]
+      },
+      {
+        "id": "P8",
+        "label": "Capital strength & investor support",
+        "weight": 5,
+        "grade": 3,
+        "contribution": 3.75,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P8.A",
+            "label": "Runway and capital access",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p8a", "capital-q-runway"]
+          },
+          {
+            "id": "P8.B",
+            "label": "Relevant investor or strategic support",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p8b"]
+          }
+        ]
+      },
+      {
+        "id": "P9",
+        "label": "Team & execution",
+        "weight": 8,
+        "grade": 3,
+        "contribution": 6,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P9.A",
+            "label": "Critical function coverage",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p9a"]
+          },
+          {
+            "id": "P9.B",
+            "label": "Time-bound delivery",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p9b"]
+          }
+        ]
+      },
+      {
+        "id": "P10",
+        "label": "Timing & structural tailwinds",
+        "weight": 5,
+        "grade": 3,
+        "contribution": 3.75,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P10.A",
+            "label": "Structural demand or technology shift",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p10a"]
+          },
+          {
+            "id": "P10.B",
+            "label": "Ability to exploit the window",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p10b"]
+          }
+        ]
+      },
+      {
+        "id": "P11",
+        "label": "Scalability & operating leverage",
+        "weight": 6,
+        "grade": 3,
+        "contribution": 4.5,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P11.A",
+            "label": "Growth decoupled from costs",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p11a"]
+          },
+          {
+            "id": "P11.B",
+            "label": "Repeatable deployment",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p11b"]
+          }
+        ]
+      },
+      {
+        "id": "P12",
+        "label": "Ecosystem position & strategic optionality",
+        "weight": 4,
+        "grade": 3,
+        "contribution": 3,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P12.A",
+            "label": "Ecosystem access and partnerships",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p12a"]
+          },
+          {
+            "id": "P12.B",
+            "label": "Strategic adjacent opportunities",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["capital-q-p12b"]
+          }
+        ]
+      }
+    ],
+    "up": [
+      {
+        "label": "Founder quality & founder–market fit",
+        "detail": "Founder team previously built and led a private-capital advisory practice and an aviation services business; the cofounders have 15 years of combined experience in private capital, venture advisory an"
+      },
+      {
+        "label": "Market opportunity & expansion",
+        "detail": "Bottom-up accessible market sized from customer spending of USD 18,000 per investor organisation per year (Q3 2026 average of 24 paying organisations) across about 2,400 active venture, angel and fami"
+      },
+      {
+        "label": "Problem intensity & product–market fit",
+        "detail": "ARR run-rate USD 432,000 at September 2026 (MRR USD 36,000 x 12).; Net revenue retention 108% for the January 2026 launch cohort at September 2026."
+      }
+    ],
+    "down": [],
+    "missing": [
+      "Defensibility & competitive moat: Dated third-party benchmark or documented competitive evaluation"
+    ],
+    "rulesFired": [
+      "P3.A g3 capital-q-arr structured.financial.arr.actual_paid_revenue; measured 432000 USD; period 2026-09-01T00:00:00.000Z",
+      "P4.B g3 capital-q-arr structured.financial.arr.dated_recurring_revenue; measured 432000 USD; period 2026-09-01T00:00:00.000Z",
+      "P5.A g3 capital-q-cm structured.financial.contribution_margin.measured_contribution_margin; measured 76; period 2026-09-01T00:00:00.000Z",
+      "P1.A g3 capital-q-founders P1.A.demonstrated",
+      "P4.A g3 capital-q-growth structured.traction.growth.dated_comparable_window",
+      "P3.B g3 capital-q-nrr structured.financial.nrr.measured_net_revenue_retention; measured 108; period 2026-09-01T00:00:00.000Z",
+      "P4.B g3 capital-q-nrr structured.financial.nrr.retention_supported_traction; measured 108; period 2026-09-01T00:00:00.000Z",
+      "P10.A g3 capital-q-p10a P10.A.demonstrated",
+      "P10.B g3 capital-q-p10b P10.B.demonstrated",
+      "P11.A g3 capital-q-p11a P11.A.demonstrated",
+      "P11.B g3 capital-q-p11b P11.B.demonstrated",
+      "P12.A g3 capital-q-p12a P12.A.demonstrated",
+      "P12.B g3 capital-q-p12b P12.B.demonstrated",
+      "P1.B g3 capital-q-p1b P1.B.demonstrated",
+      "P2.A g3 capital-q-p2a P2.A.demonstrated",
+      "P2.B g3 capital-q-p2b P2.B.demonstrated",
+      "P3.A g3 capital-q-p3a P3.A.demonstrated",
+      "P3.B g3 capital-q-p3b P3.B.demonstrated",
+      "P4.A g3 capital-q-p4a P4.A.demonstrated",
+      "P5.A g3 capital-q-p5a P5.A.demonstrated",
+      "P5.B g3 capital-q-p5b P5.B.demonstrated",
+      "P6.A g3 capital-q-p6a P6.A.demonstrated",
+      "P7.A g3 capital-q-p7a P7.A.demonstrated",
+      "P7.B g3 capital-q-p7b P7.B.demonstrated",
+      "P8.A g3 capital-q-p8a P8.A.demonstrated",
+      "P8.B g3 capital-q-p8b P8.B.demonstrated",
+      "P9.A g3 capital-q-p9a P9.A.demonstrated",
+      "P9.B g3 capital-q-p9b P9.B.demonstrated",
+      "P8.A g3 capital-q-runway structured.financial.runway_months.measured_current_cash_runway; measured 20; period 2026-09-30T00:00:00.000Z"
+    ]
+  },
+  "investability": {
+    "note": "Reported separately. Same synthetic inputs, unchanged investor-facing Investability scorer.",
+    "basisHash": "338cc0b93cb0ffa59491050f5f706ebdc6295523e358894609aa0194835271f9",
+    "view": {
+      "status": "SCORED",
+      "score": 58,
+      "band": "INVESTABLE",
+      "confidence": "LOW",
+      "cappedByConfidence": false,
+      "provisional": true,
+      "range": {
+        "low": 34,
+        "high": 84
+      },
+      "coverage": {
+        "areasScored": 0,
+        "areasTotal": 8,
+        "criteriaScored": 3,
+        "criteriaApplicable": 46
+      },
+      "stage": "Pre-seed",
+      "up": [
+        {
+          "label": "Founder quality",
+          "detail": "Founders' relevant experience stated · self-reported"
+        }
+      ],
+      "down": [],
+      "missing": [
+        "Business fundamentals: market, product and business model in a confirmed deck",
+        "Management & team: founder backgrounds and the team, shared with investors",
+        "Commercial strength: dated traction and customer figures",
+        "Investment case: the raise, instrument and use of funds"
+      ],
+      "methodVersion": "investiq/v2+investability-inputs.v3"
+    }
+  }
+}

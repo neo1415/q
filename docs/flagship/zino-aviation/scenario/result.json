@@ -1,0 +1,418 @@
+{
+  "metadata": {
+    "synthetic": true,
+    "scenario": "illustrative-high-growth-v1",
+    "label": "Illustrative high-growth scenario — synthetic evidence"
+  },
+  "company": "Zino Aviation",
+  "asOf": "2026-10-18T00:00:00.000Z",
+  "unicornPotential": {
+    "status": "SCORED",
+    "overallScore": 75,
+    "band": "STRONG_SIGNALS",
+    "confidence": "LOW",
+    "coverage": 0.955,
+    "stage": "SERIES_A_GROWTH",
+    "methodVersion": "unicorn-potential.v1.0.0",
+    "inputRulesVersion": "unicorn-potential-inputs.v4",
+    "basisHash": "5ffaf7e69301c186a44d6d505f1937b6c6512e84fa66a0e029d15f5cd3f9c1a0",
+    "pillars": [
+      {
+        "id": "P1",
+        "label": "Founder quality & founder–market fit",
+        "weight": 8,
+        "grade": 3,
+        "contribution": 6,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P1.A",
+            "label": "Relevant founder expertise",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-founder-ceo"]
+          },
+          {
+            "id": "P1.B",
+            "label": "Adaptability and founder execution",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p1b"]
+          }
+        ]
+      },
+      {
+        "id": "P2",
+        "label": "Market opportunity & expansion",
+        "weight": 11,
+        "grade": 3,
+        "contribution": 8.25,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P2.A",
+            "label": "Accessible market demand",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p2a"]
+          },
+          {
+            "id": "P2.B",
+            "label": "Credible expansion path",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p2b"]
+          }
+        ]
+      },
+      {
+        "id": "P3",
+        "label": "Problem intensity & product–market fit",
+        "weight": 10,
+        "grade": 3,
+        "contribution": 7.5,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P3.A",
+            "label": "Problem severity and willingness to pay",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p3a", "zino-aviation-revenue"]
+          },
+          {
+            "id": "P3.B",
+            "label": "Repeated adoption or stage-appropriate tests",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p3b"]
+          }
+        ]
+      },
+      {
+        "id": "P4",
+        "label": "Traction & growth velocity",
+        "weight": 16,
+        "grade": 3,
+        "contribution": 12,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P4.A",
+            "label": "Dated growth velocity",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-growth", "zino-aviation-p4a"]
+          },
+          {
+            "id": "P4.B",
+            "label": "Retention-supported traction",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p4b"]
+          }
+        ]
+      },
+      {
+        "id": "P5",
+        "label": "Business model & unit economics",
+        "weight": 12,
+        "grade": 3,
+        "contribution": 9,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P5.A",
+            "label": "Contribution economics and pricing",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-cm", "zino-aviation-p5a"]
+          },
+          {
+            "id": "P5.B",
+            "label": "Sustainable acquisition and monetization",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p5b"]
+          }
+        ]
+      },
+      {
+        "id": "P6",
+        "label": "Defensibility & competitive moat",
+        "weight": 9,
+        "grade": 3,
+        "contribution": 6.75,
+        "coverage": 0.5,
+        "criteria": [
+          {
+            "id": "P6.A",
+            "label": "Differentiated assets",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p6a"]
+          },
+          {
+            "id": "P6.B",
+            "label": "Independent defensibility test",
+            "state": "UNKNOWN",
+            "grade": null,
+            "anchor": "Dated third-party benchmark or documented competitive evaluation",
+            "sourceIds": []
+          }
+        ]
+      },
+      {
+        "id": "P7",
+        "label": "Distribution & organic influence",
+        "weight": 8,
+        "grade": 3,
+        "contribution": 6,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P7.A",
+            "label": "Repeatable acquisition channels",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p7a"]
+          },
+          {
+            "id": "P7.B",
+            "label": "Organic pull or channel efficiency",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p7b"]
+          }
+        ]
+      },
+      {
+        "id": "P8",
+        "label": "Capital strength & investor support",
+        "weight": 6,
+        "grade": 3,
+        "contribution": 4.5,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P8.A",
+            "label": "Runway and capital access",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p8a", "zino-aviation-runway"]
+          },
+          {
+            "id": "P8.B",
+            "label": "Relevant investor or strategic support",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p8b"]
+          }
+        ]
+      },
+      {
+        "id": "P9",
+        "label": "Team & execution",
+        "weight": 6,
+        "grade": 3,
+        "contribution": 4.5,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P9.A",
+            "label": "Critical function coverage",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p9a"]
+          },
+          {
+            "id": "P9.B",
+            "label": "Time-bound delivery",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p9b"]
+          }
+        ]
+      },
+      {
+        "id": "P10",
+        "label": "Timing & structural tailwinds",
+        "weight": 3,
+        "grade": 3,
+        "contribution": 2.25,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P10.A",
+            "label": "Structural demand or technology shift",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p10a"]
+          },
+          {
+            "id": "P10.B",
+            "label": "Ability to exploit the window",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p10b"]
+          }
+        ]
+      },
+      {
+        "id": "P11",
+        "label": "Scalability & operating leverage",
+        "weight": 9,
+        "grade": 3,
+        "contribution": 6.75,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P11.A",
+            "label": "Growth decoupled from costs",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p11a"]
+          },
+          {
+            "id": "P11.B",
+            "label": "Repeatable deployment",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p11b"]
+          }
+        ]
+      },
+      {
+        "id": "P12",
+        "label": "Ecosystem position & strategic optionality",
+        "weight": 2,
+        "grade": 3,
+        "contribution": 1.5,
+        "coverage": 1,
+        "criteria": [
+          {
+            "id": "P12.A",
+            "label": "Ecosystem access and partnerships",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p12a"]
+          },
+          {
+            "id": "P12.B",
+            "label": "Strategic adjacent opportunities",
+            "state": "OBSERVED",
+            "grade": 3,
+            "anchor": "Demonstrated stage-appropriate execution",
+            "sourceIds": ["zino-aviation-p12b"]
+          }
+        ]
+      }
+    ],
+    "up": [
+      {
+        "label": "Traction & growth velocity",
+        "detail": "Revenue up 42% from Q3 2025 to Q3 2026.; Repeat purchase revenue of USD 268,000 in Q3 2026 (July 2026 to September 2026) came from returning airline, operator and simulator customers, 44% of revenue."
+      },
+      {
+        "label": "Business model & unit economics",
+        "detail": "Contribution margin 46% on Q3 2026 revenue.; Acquisition payback measured at 2.5 months for corporate and cadet accounts won in Q2 2026 and Q3 2026: blended CAC of USD 1,500 against USD 600 monthly co"
+      },
+      {
+        "label": "Market opportunity & expansion",
+        "detail": "Bottom-up accessible market sized from customer spending of USD 9,500 per pilot per year on type-rating preparation, recurrent simulator time and placement (Q3 2026 average of paying pilots) across ab"
+      }
+    ],
+    "down": [],
+    "missing": [
+      "Defensibility & competitive moat: Dated third-party benchmark or documented competitive evaluation"
+    ],
+    "rulesFired": [
+      "P5.A g3 zino-aviation-cm structured.financial.contribution_margin.measured_contribution_margin; measured 46; period 2026-09-01T00:00:00.000Z",
+      "P1.A g3 zino-aviation-founder-ceo P1.A.demonstrated",
+      "P4.A g3 zino-aviation-growth structured.traction.growth.dated_comparable_window",
+      "P10.A g3 zino-aviation-p10a P10.A.demonstrated",
+      "P10.B g3 zino-aviation-p10b P10.B.demonstrated",
+      "P11.A g3 zino-aviation-p11a P11.A.demonstrated",
+      "P11.B g3 zino-aviation-p11b P11.B.demonstrated",
+      "P12.A g3 zino-aviation-p12a P12.A.demonstrated",
+      "P12.B g3 zino-aviation-p12b P12.B.demonstrated",
+      "P1.B g3 zino-aviation-p1b P1.B.demonstrated",
+      "P2.A g3 zino-aviation-p2a P2.A.demonstrated",
+      "P2.B g3 zino-aviation-p2b P2.B.demonstrated",
+      "P3.A g3 zino-aviation-p3a P3.A.demonstrated",
+      "P3.B g3 zino-aviation-p3b P3.B.demonstrated",
+      "P4.A g3 zino-aviation-p4a P4.A.demonstrated",
+      "P4.B g3 zino-aviation-p4b P4.B.demonstrated",
+      "P5.A g3 zino-aviation-p5a P5.A.demonstrated",
+      "P5.B g3 zino-aviation-p5b P5.B.demonstrated",
+      "P6.A g3 zino-aviation-p6a P6.A.demonstrated",
+      "P7.A g3 zino-aviation-p7a P7.A.demonstrated",
+      "P7.B g3 zino-aviation-p7b P7.B.demonstrated",
+      "P8.A g3 zino-aviation-p8a P8.A.demonstrated",
+      "P8.B g3 zino-aviation-p8b P8.B.demonstrated",
+      "P9.A g3 zino-aviation-p9a P9.A.demonstrated",
+      "P9.B g3 zino-aviation-p9b P9.B.demonstrated",
+      "P3.A g3 zino-aviation-revenue structured.financial.revenue.actual_paid_revenue; measured 610000 USD; period 2026-09-01T00:00:00.000Z",
+      "P8.A g3 zino-aviation-runway structured.financial.runway_months.measured_current_cash_runway; measured 26; period 2026-09-30T00:00:00.000Z"
+    ]
+  },
+  "investability": {
+    "note": "Reported separately. Same synthetic inputs, unchanged investor-facing Investability scorer.",
+    "basisHash": "51d15581765a4546fc044f659fd913f89fabc8c9a0f7294710934f69f43cf768",
+    "view": {
+      "status": "SCORED",
+      "score": 58,
+      "band": "INVESTABLE",
+      "confidence": "LOW",
+      "cappedByConfidence": false,
+      "provisional": true,
+      "range": {
+        "low": 37,
+        "high": 87
+      },
+      "coverage": {
+        "areasScored": 0,
+        "areasTotal": 8,
+        "criteriaScored": 3,
+        "criteriaApplicable": 48
+      },
+      "stage": "Growth",
+      "up": [
+        {
+          "label": "Founder quality",
+          "detail": "Founders' relevant experience stated · self-reported"
+        }
+      ],
+      "down": [],
+      "missing": [
+        "Commercial strength: dated traction and customer figures",
+        "Financial readiness: historical financials, forecasts or runway",
+        "Management & team: founder backgrounds and the team, shared with investors",
+        "Business fundamentals: market, product and business model in a confirmed deck"
+      ],
+      "methodVersion": "investiq/v2+investability-inputs.v3"
+    }
+  }
+}
