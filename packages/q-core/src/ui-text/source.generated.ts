@@ -2702,6 +2702,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Q's memory couldn't be read just now. Reload in a moment.",
   "Q's pause",
   "Q's personality",
+  "Q's read",
   "Q's reading",
   "Q's reading of public pages. Not on your profile until you confirm it.",
   "Q's reading of this submission isn't ready yet.",

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { PublicBrandStyle } from "@/features/brand-theme/public-brand-style";
+
 import { DiscoverHarness } from "./discover-harness";
 
 // Read per request: the harness's gate is the running server's setting.
@@ -28,5 +30,11 @@ export default function DiscoverHarnessPage() {
   ) {
     notFound();
   }
-  return <DiscoverHarness />;
+  return (
+    <>
+      {/* The app's own black and gold, as the signed-in shell applies it. */}
+      <PublicBrandStyle />
+      <DiscoverHarness />
+    </>
+  );
 }

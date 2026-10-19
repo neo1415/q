@@ -416,12 +416,15 @@ export function FeedCard({
           </p>
         )}
 
-        <CompanyScoresFor
-          scores={scores}
-          companyId={company.companyId}
-          variant="compact"
-          className="cq-feed-muted"
-        />
+        {/* On a desktop the panel reads the scores in full, below. */}
+        {wide ? null : (
+          <CompanyScoresFor
+            scores={scores}
+            companyId={company.companyId}
+            variant="compact"
+            className="cq-feed-muted"
+          />
+        )}
 
         {/*
           Filters the reader applied that this company could not be checked
@@ -466,6 +469,24 @@ export function FeedCard({
           id={`cq-feed-more-${company.companyId}`}
           data-feed-more
         >
+          {wide ? (
+            <DossierActions
+              company={company}
+              saved={saved}
+              deciding={deciding}
+              onSave={onSave}
+              onPass={onPass}
+              onAskQ={onAskQ}
+              onMore={onMore}
+              askQMark={askQMark}
+              interactive={interactive}
+              shared={shared}
+              onShare={() => {
+                void shareCompany(company).then(setShared);
+              }}
+              videos={videos}
+            />
+          ) : null}
           <CardFacts company={company} sectorLabels={sectorLabels} />
           <div className="cq-feed-why flex flex-col gap-1" data-feed-why>
             <h3 className="cq-label text-(--cq-text-primary)">
@@ -482,10 +503,41 @@ export function FeedCard({
               </p>
             )}
           </div>
+          {wide && scores.has(company.companyId) ? (
+            <section
+              className="flex flex-col gap-2"
+              aria-label={t("Q's read")}
+              data-feed-q-read
+            >
+              <h3 className="cq-label text-(--cq-text-primary)">
+                {t("Q's read")}
+              </h3>
+              <CompanyScoresFor
+                scores={scores}
+                companyId={company.companyId}
+                variant="full"
+              />
+            </section>
+          ) : null}
           {feedNotes}
-          {/* Discover A (owner 2026-10-19): no Open profile or All details
-              row here -- the rail's avatar is the way into the profile and
-              its Interest opens the details with the confirmed decision. */}
+          {/* Discover A (owner 2026-10-19): a phone has no Open profile or
+              All details row -- the rail's avatar opens the profile and its
+              Interest the details. A desktop's dossier ends with the way
+              into the full profile. */}
+          {wide ? (
+            <Link
+              href={`/company/${company.companyId}`}
+              className="cq-feed-open-full"
+              data-feed-open-profile
+            >
+              {t("Open full profile")}
+              <ChevronRight
+                aria-hidden="true"
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+              />
+            </Link>
+          ) : null}
         </div>
       ) : null}
 
@@ -743,6 +795,149 @@ export function FeedCard({
         </span>
       </div>
     </article>
+  );
+}
+
+/**
+ * The desktop dossier's decisions (Discover A, owner 2026-10-19): beside
+ * the pitch rather than on a rail over it. Express interest is the
+ * server-confirmed step in place (it asks first, CQ-NET-010); Save and
+ * Pass stay optimistic and Pass stays neutral.
+ */
+function DossierActions({
+  company,
+  saved,
+  deciding,
+  onSave,
+  onPass,
+  onAskQ,
+  onMore,
+  askQMark,
+  interactive,
+  shared,
+  onShare,
+  videos,
+}: {
+  readonly company: DiscoveredCompanyDto;
+  readonly saved: boolean;
+  readonly deciding: boolean;
+  readonly onSave: () => void;
+  readonly onPass: () => void;
+  readonly onAskQ: () => void;
+  readonly onMore?: (() => void) | undefined;
+  readonly askQMark?: ReactNode;
+  readonly interactive: boolean;
+  readonly shared: ShareOutcome | null;
+  readonly onShare: () => void;
+  readonly videos?:
+    | {
+        readonly index: number;
+        readonly count: number;
+        readonly onNext: () => void;
+      }
+    | undefined;
+}) {
+  const t = useT();
+  return (
+    <div
+      className="cq-feed-actions"
+      role="group"
+      aria-label={t("Decide")}
+      data-feed-dossier-actions
+    >
+      <ExpressInterest
+        companyId={company.companyId}
+        companyName={company.canonicalName}
+        surface="RECOMMENDATION_FEED"
+        prominent
+      />
+      <Button
+        variant="secondary"
+        aria-pressed={saved}
+        disabled={deciding}
+        onClick={onSave}
+      >
+        {saved ? (
+          <BookmarkCheck
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+          />
+        ) : (
+          <Bookmark
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+          />
+        )}
+        {t(saved ? "Saved" : "Save")}
+      </Button>
+      <Button variant="secondary" disabled={deciding} onClick={onPass}>
+        <ArrowDown
+          aria-hidden="true"
+          size={ICON_SIZE.compact}
+          strokeWidth={ICON_STROKE}
+        />
+        {t("Pass")}
+      </Button>
+      <Button
+        variant="quiet"
+        disabled={!interactive}
+        onClick={onAskQ}
+        className="cq-feed-actions-ask"
+        data-feed-ask-q
+      >
+        {askQMark}
+        {t("Ask Q")}
+      </Button>
+      <span className="cq-feed-actions-tail">
+        {videos === undefined || videos.count < 2 ? null : (
+          <Button
+            variant="quiet"
+            onClick={videos.onNext}
+            aria-label={`Next video from ${company.canonicalName}, video ${String(
+              ((videos.index + 1) % videos.count) + 1,
+            )} of ${String(videos.count)}`}
+            data-feed-next-video
+          >
+            <ChevronRight
+              aria-hidden="true"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+            />
+          </Button>
+        )}
+        <Button
+          variant="quiet"
+          onClick={onShare}
+          aria-label={t(shared === "COPIED" ? "Link copied" : "Share")}
+          title={t(shared === "COPIED" ? "Link copied" : "Share")}
+          data-feed-share
+        >
+          <Share2
+            aria-hidden="true"
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+          />
+        </Button>
+        {onMore === undefined ? null : (
+          <Button
+            variant="quiet"
+            onClick={onMore}
+            aria-haspopup="dialog"
+            aria-label={t("More")}
+            title={t("More")}
+            data-feed-more-options
+          >
+            <MoreHorizontal
+              aria-hidden="true"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+            />
+          </Button>
+        )}
+      </span>
+    </div>
   );
 }
 

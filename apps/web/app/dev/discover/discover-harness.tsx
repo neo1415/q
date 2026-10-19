@@ -30,6 +30,14 @@ function fictional(
       "GEOGRAPHY_COUNTRY_ALIGNED",
       "TAXONOMY_EXACT",
     ],
+    summary: {
+      sectorNodeIds: [],
+      raise: {
+        money: { amount: "1000000.00", currency: "USD" },
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+      },
+    },
     pitch: {
       mediaAssetId: `aaaaaaa${String(n)}-aaaa-4aaa-8aaa-aaaaaaaaaaa${String(n)}`,
       aspectRatio: "9:16",

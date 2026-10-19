@@ -70,6 +70,7 @@ export function ExpressInterest({
   onConfirmed,
   startConfirming = false,
   relationshipState = null,
+  prominent = false,
 }: {
   readonly companyId: string;
   readonly companyName: string;
@@ -89,6 +90,8 @@ export function ExpressInterest({
    * 2026-10-03: a relationship in diligence still read "Connected").
    */
   readonly relationshipState?: RelationshipStateV2 | null;
+  /** The decision a surface leads with (Discover A's dossier): primary. */
+  readonly prominent?: boolean | undefined;
 }) {
   const t = useT();
   const [phase, setPhase] = useState<Phase>(
@@ -139,7 +142,7 @@ export function ExpressInterest({
     case "IDLE":
       return (
         <Button
-          variant="secondary"
+          variant={prominent ? "primary" : "secondary"}
           onClick={() => setPhase({ kind: "CONFIRMING" })}
         >
           {t("Express interest")}

@@ -2174,16 +2174,25 @@
     .cq-feed {
       height: 100dvh;
     }
+    /*
+     * Discover A, stage and dossier (owner 2026-10-19): the pitch and the
+     * decision side by side, as one group -- no dead gutter between them
+     * and no rail over the pitch (the decisions are in the dossier). A
+     * quiet spacer column keeps the pair a little right of centre.
+     */
     .cq-feed-stage {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 440px;
+      grid-template-columns:
+        minmax(0, 1fr) var(--cq-feed-panel-w)
+        minmax(0, 0.25fr);
       container-type: size;
       user-select: auto;
+      --cq-feed-panel-w: min(560px, calc(100cqw - 420px));
       /* The 9:16 stage's height: the workspace less its gutters, narrowed
-         when the column is too slim to leave room for the rail beside it. */
+         when the column is too slim to leave room for the arrows. */
       --cq-feed-video-h: min(
         calc(100cqh - 48px),
-        calc((100cqw - 440px - 232px) * 16 / 9)
+        calc(((100cqw - var(--cq-feed-panel-w)) / 1.25 - 140px) * 16 / 9)
       );
     }
     .cq-feed-stage::before {
@@ -2193,7 +2202,8 @@
       position: relative;
       inset: auto;
       align-self: center;
-      justify-self: center;
+      justify-self: end;
+      margin-inline-end: 28px;
       height: var(--cq-feed-video-h);
       aspect-ratio: 9 / 16;
       border: 1px solid var(--cq-stage-border);
@@ -2225,8 +2235,8 @@
       align-self: stretch;
       overflow-y: auto;
       gap: 16px;
-      padding: 72px 28px 20px;
-      border-inline-start: 1px solid var(--cq-app-border-subtle);
+      /* Clear of the tabs above it. */
+      padding: 72px 4px 20px 0;
       background: var(--cq-app-canvas);
       color: var(--cq-app-text-primary);
       color-scheme: light dark;
@@ -2291,6 +2301,35 @@
       padding: 10px 0;
       border-bottom: 1px solid var(--cq-border-subtle);
     }
+    /* The dossier carries the decisions on a desktop: no rail. */
+    .cq-feed-stage .cq-feed-rail {
+      display: none;
+    }
+    .cq-feed-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+    .cq-feed-actions-tail {
+      display: inline-flex;
+      margin-inline-start: auto;
+      gap: 2px;
+    }
+    .cq-feed-open-full {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      gap: 4px;
+      align-self: flex-start;
+      font-weight: 500;
+      color: var(--cq-text-primary);
+      text-underline-offset: 4px;
+    }
+    .cq-feed-open-full:hover,
+    .cq-feed-open-full:focus-visible {
+      text-decoration: underline;
+    }
     /* The rail beside the 9:16 stage, on the stage's own tokens. */
     .cq-feed-rail {
       bottom: calc((100cqh - var(--cq-feed-video-h)) / 2 + 4px);
@@ -2333,10 +2372,15 @@
     }
     /* Previous and Next at the top of the stage's column, clear of the
        rail beside the pitch. */
+    /* Previous and Next just left of the pitch, centred on it. */
     .cq-feed-nav {
-      top: 24px;
-      inset-inline-end: calc(440px + 16px);
-      transform: none;
+      top: 50%;
+      inset-inline-end: auto;
+      inset-inline-start: calc(
+        (100cqw - var(--cq-feed-panel-w)) / 1.25 - 28px -
+          var(--cq-feed-video-h) * 9 / 16 - 72px
+      );
+      transform: translateY(-50%);
     }
     .cq-feed-keys {
       display: flex;
@@ -2405,7 +2449,8 @@
     .cq-discover:has(> div[data-feed-immersive]:not([hidden]))
       .cq-discover-tabs {
       top: 16px;
-      inset-inline-start: calc(100% - 440px + 22px);
+      /* Over the dossier's column (Discover A's stage-and-dossier grid). */
+      inset-inline-start: calc((100% - min(560px, 100% - 420px)) / 1.25);
       transform: none;
     }
     .cq-discover:has(> div:not([hidden]) [data-feed-immersive])

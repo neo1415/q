@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { PublicBrandStyle } from "@/features/brand-theme/public-brand-style";
+
 import { QNavShell } from "./q-nav-shell";
 
 // Read per request: the harness's gate is the running server's setting.
@@ -33,5 +35,11 @@ export default function QNavLayout({
   ) {
     notFound();
   }
-  return <QNavShell>{children}</QNavShell>;
+  return (
+    <>
+      {/* The app's own black and gold, as the signed-in shell applies it. */}
+      <PublicBrandStyle />
+      <QNavShell>{children}</QNavShell>
+    </>
+  );
 }

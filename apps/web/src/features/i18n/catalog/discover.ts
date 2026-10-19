@@ -201,4 +201,6 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "Your videos": "مقاطعك",
   "companies side by side": "شركات جنباً إلى جنب",
   "companies you passed": "شركات تجاوزتها",
+  // Discover A desktop dossier (2026-10-19).
+  "Q's read": "قراءة Q",
 };
