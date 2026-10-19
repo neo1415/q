@@ -697,6 +697,7 @@ export const RELATIONSHIPS_AR: Readonly<Record<string, string>> = {
   // CRM Unicorn Potential (2026-10-18).
   "Unicorn Potential": "إمكانية الشركة المليارية",
   "Insufficient evidence": "أدلة غير كافية",
+  "{n}% of evidence": "{n}% من الأدلة",
   "Not assessed": "لم يُقيَّم بعد",
   "Unicorn Potential, highest first": "إمكانية الشركة المليارية، الأعلى أولاً",
   "Unicorn Potential: any": "إمكانية الشركة المليارية: الكل",

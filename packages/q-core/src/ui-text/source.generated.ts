@@ -4720,6 +4720,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "{n} work items",
   "{n}% confirmed, {n2}% with soft commitments",
   "{n}% discount",
+  "{n}% of evidence",
   "{n}d",
   "{n}h",
   "{n}m",

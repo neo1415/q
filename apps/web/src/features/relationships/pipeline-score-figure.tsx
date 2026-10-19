@@ -115,6 +115,12 @@ export function UnicornFigure({
       {words ?? String(cell.score)}
     </Link>
   );
+  // How far the evidence has got, so an unscored company still says
+  // something (owner 2026-10-19); the engine scores from 60%.
+  const progress =
+    cell.score === null && cell.coverage !== undefined
+      ? t(`${String(Math.round(cell.coverage * 100))}% of evidence`)
+      : null;
   if (variant === "inline") {
     return (
       <span
@@ -125,6 +131,14 @@ export function UnicornFigure({
           {t("Unicorn Potential")}
         </span>
         <span className="cq-body-sm cq-numeric">{figure}</span>
+        {progress === null ? null : (
+          <span
+            className="cq-caption text-(--cq-text-tertiary)"
+            data-unicorn-coverage
+          >
+            · {progress}
+          </span>
+        )}
       </span>
     );
   }
@@ -134,6 +148,14 @@ export function UnicornFigure({
       data-pipeline-score="unicorn"
     >
       {figure}
+      {progress === null ? null : (
+        <span
+          className="cq-caption block text-(--cq-text-tertiary)"
+          data-unicorn-coverage
+        >
+          {progress}
+        </span>
+      )}
     </span>
   );
 }
