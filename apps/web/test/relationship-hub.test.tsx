@@ -103,7 +103,11 @@ beforeEach(() => {
 async function show(page: ReactNode) {
   await act(async () => {
     render(page);
-    await Promise.resolve();
+    // Streamed blocks resolve over a few turns of the event loop, more on
+    // a loaded CI runner than locally: let them all land.
+    for (let turn = 0; turn < 5; turn += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
   });
 }
 
@@ -368,7 +372,7 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
       within(queue).getByRole("link", { name: "Reply" }).getAttribute("href"),
     ).toBe(`/relationships/company/${companyId}/messages`);
     // The queue comes before the period's figures in reading order.
-    const period = screen.getByText("Fund");
+    const period = await screen.findByText("Fund");
     expect(
       queue.compareDocumentPosition(period) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
