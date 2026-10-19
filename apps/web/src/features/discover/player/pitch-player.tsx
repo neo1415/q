@@ -84,6 +84,63 @@ export function pitchFrame(aspectRatio: string | null | undefined): {
   };
 }
 
+/** Where a stage cue's foot sits, in percent of the pitch's height. */
+const CUE_FOOT_MAX = 94;
+const CUE_FOOT_MIN = 55;
+
+/**
+ * Places the showing cues of a stage pitch low, but clear of the company's
+ * words where they lie over the pitch (a phone): the cue's foot sits just
+ * above them; where they are beside it, at the pitch's foot.
+ */
+function placeCues(video: HTMLVideoElement): void {
+  const frame = video.getBoundingClientRect();
+  if (frame.height <= 0) return;
+  const words = video
+    .closest(".cq-feed")
+    ?.querySelector<HTMLElement>(".cq-feed-overlay [data-feed-summary]")
+    ?.getBoundingClientRect();
+  const over =
+    words !== undefined &&
+    words.height > 0 &&
+    words.left < frame.right &&
+    words.right > frame.left &&
+    words.top < frame.bottom &&
+    words.top > frame.top;
+  const foot = over
+    ? ((words.top - frame.top) / frame.height) * 100 - 3
+    : CUE_FOOT_MAX;
+  const line = Math.max(CUE_FOOT_MIN, Math.min(CUE_FOOT_MAX, foot));
+  // The rail floats over a phone's pitch: the words stay to its left.
+  const rail = video
+    .closest(".cq-feed")
+    ?.querySelector<HTMLElement>(".cq-feed-rail")
+    ?.getBoundingClientRect();
+  const width =
+    rail !== undefined &&
+    rail.width > 0 &&
+    rail.left > frame.left &&
+    rail.left < frame.right
+      ? Math.max(50, ((rail.left - frame.left) / frame.width) * 100 - 4)
+      : 100;
+  const tracks = video.textTracks;
+  for (let i = 0; i < tracks.length; i += 1) {
+    const cues = tracks[i]?.cues;
+    if (cues === null || cues === undefined) continue;
+    for (let j = 0; j < cues.length; j += 1) {
+      const cue = cues[j];
+      if (cue instanceof VTTCue && (cue.line !== line || cue.size !== width)) {
+        cue.snapToLines = false;
+        cue.lineAlign = "end";
+        cue.line = line;
+        cue.size = width;
+        cue.position = width / 2 + (100 - width > 0 ? 2 : 0);
+        cue.positionAlign = "center";
+      }
+    }
+  }
+}
+
 /** Set every text track on the element to showing or hidden. */
 function showCaptions(video: HTMLVideoElement | null, on: boolean): void {
   const tracks = video?.textTracks;
@@ -131,6 +188,11 @@ type PitchPlayerProps = {
   /** Stage only: captions shown, when the pitch has them. */
   readonly captionsOn?: boolean | undefined;
   /**
+   * Stage only, the card in view: the captions switch on the pitch itself
+   * (Discover A, owner 2026-10-19), beside the sound. Absent, no switch.
+   */
+  readonly onCaptionsChange?: ((on: boolean) => void) | undefined;
+  /**
    * Stage only, the card in view: its element, for the feed's progress
    * bar and speed. Called with null when it stops being that card.
    */
@@ -174,6 +236,7 @@ export function PitchPlayer({
   startOnRequest = false,
   rate = 1,
   captionsOn: stageCaptionsOn = true,
+  onCaptionsChange,
   onElement,
   offline = false,
 }: PitchPlayerProps) {
@@ -449,6 +512,42 @@ export function PitchPlayer({
     if (variant === "stage") showCaptions(videoRef.current, stageCaptionsOn);
   }, [variant, stageCaptionsOn, playbackUrl]);
 
+  // Discover A (owner 2026-10-19: "the captions are a bit too high"): on
+  // the stage each cue sits low, just clear of the company's words over
+  // the pitch -- never on them -- and at the foot of the pitch where those
+  // words are beside it (a desktop). Placed per cue, as each one shows.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (variant !== "stage" || video === null || playbackUrl === null) return;
+    const place = () => placeCues(video);
+    const tracks = video.textTracks as TextTrackList | undefined;
+    // An engine without text-track events (a test DOM) keeps its cues as
+    // they come.
+    if (
+      tracks === undefined ||
+      typeof tracks.addEventListener !== "function" ||
+      typeof VTTCue === "undefined"
+    ) {
+      return;
+    }
+    const listen = () => {
+      for (let i = 0; i < tracks.length; i += 1) {
+        tracks[i]?.addEventListener("cuechange", place);
+      }
+      place();
+    };
+    listen();
+    tracks.addEventListener("addtrack", listen);
+    window.addEventListener("resize", place);
+    return () => {
+      tracks.removeEventListener("addtrack", listen);
+      window.removeEventListener("resize", place);
+      for (let i = 0; i < tracks.length; i += 1) {
+        tracks[i]?.removeEventListener("cuechange", place);
+      }
+    };
+  }, [variant, playbackUrl]);
+
   // The card in view hands its element to the feed's progress bar.
   useEffect(() => {
     if (onElement === undefined) return;
@@ -638,6 +737,33 @@ export function PitchPlayer({
             </button>
             {/* The browser, not the person, has the sound off: say how to
                 get it back, once, quietly (TikTok's "Tap to unmute"). */}
+            {captions && onCaptionsChange !== undefined ? (
+              <button
+                type="button"
+                className="cq-feed-sound"
+                aria-pressed={stageCaptionsOn}
+                aria-label={t(
+                  stageCaptionsOn ? "Turn captions off" : "Turn captions on",
+                )}
+                title={t(stageCaptionsOn ? "Captions on" : "Captions off")}
+                onClick={() => onCaptionsChange(!stageCaptionsOn)}
+                data-stage-captions-toggle
+              >
+                {stageCaptionsOn ? (
+                  <Captions
+                    aria-hidden="true"
+                    size={ICON_SIZE.prominent}
+                    strokeWidth={ICON_STROKE}
+                  />
+                ) : (
+                  <CaptionsOff
+                    aria-hidden="true"
+                    size={ICON_SIZE.prominent}
+                    strokeWidth={ICON_STROKE}
+                  />
+                )}
+              </button>
+            ) : null}
             {soundBlocked && !muted && playing ? (
               <button
                 type="button"

@@ -66,7 +66,7 @@ export const LEAN_SHIFT = 0.07;
 const CLOUD_FIGURES: ReadonlySet<FigureKind> = new Set(["CLOUD", "ATTENTIVE"]);
 
 /** The letter Q (the Q moment) turns least of all, so it reads as the mark. */
-const MARK_FIGURES: ReadonlySet<FigureKind> = new Set(["LETTER_Q"]);
+const MARK_FIGURES: ReadonlySet<FigureKind> = new Set(["LETTER_Q", "ROOM_Q"]);
 
 const WORKING: ReadonlySet<QApertureState> = new Set(["THINKING", "WORKING"]);
 

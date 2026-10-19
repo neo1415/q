@@ -146,4 +146,10 @@ export const Q_AR: Readonly<Record<string, string>> = {
   "mandate fit, of 10": "التوافق مع التفويض، من 10",
   "mandate fit, out of 10": "التوافق مع التفويض، من أصل 10",
   of: "من",
+  // Q home voice room (2026-10-19): public sources as cards.
+  "Public, unverified": "عام، غير موثّق",
+  Published: "تاريخ النشر",
+  "Read by Capital Q": "قرأته Capital Q",
+  "Show all": "اعرض الكل",
+  read: "قُرئ",
 };

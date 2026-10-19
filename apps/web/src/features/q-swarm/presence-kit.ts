@@ -13,6 +13,7 @@ export type FigureKind =
   | "SPIRAL"
   | "CONSTELLATION"
   | "LETTER_Q"
+  | "ROOM_Q"
   | "RIBBON"
   | "QUESTION"
   | "EXCLAIM"

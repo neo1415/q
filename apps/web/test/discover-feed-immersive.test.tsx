@@ -432,7 +432,7 @@ describe("swipe", () => {
     fireEvent.touchStart(region, { touches: at(100) });
     fireEvent.touchMove(region, { touches: at(180) });
     fireEvent.touchMove(region, { touches: at(260) });
-    expect(media?.dataset["swipe"]).toBe("interested");
+    expect(media?.dataset["swipe"]).toBe("save");
     fireEvent.touchEnd(region, { changedTouches: at(260) });
     await screen.findByRole("heading", { name: "Company 2" });
   });
@@ -646,7 +646,7 @@ describe("tap to pause (founder directive, 2026-09-27)", () => {
     pause.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Share" }));
     fireEvent.click(screen.getByRole("button", { name: /^More about / }));
-    fireEvent.click(screen.getByRole("button", { name: "All details" }));
+    fireEvent.click(screen.getByRole("button", { name: "Interest" }));
     expect(pause).not.toHaveBeenCalled();
   });
 });
@@ -663,7 +663,7 @@ describe("the details sheet over the feed", () => {
       get: () => false,
     });
     fireEvent.click(screen.getByRole("button", { name: /^More about / }));
-    fireEvent.click(screen.getByRole("button", { name: "All details" }));
+    fireEvent.click(screen.getByRole("button", { name: "Interest" }));
     const dialog = await screen.findByRole("dialog");
     pause.mockClear();
 

@@ -62,6 +62,8 @@ export type QApertureProps = {
   readonly stage?: boolean | undefined;
   /** Answer cards are on screen beside this presence (P11: the Q mark). */
   readonly showing?: boolean | undefined;
+  /** The Q home's voice room at rest: the room is a large, dim Q. */
+  readonly room?: boolean | undefined;
   readonly className?: string | undefined;
 };
 
@@ -94,6 +96,7 @@ export function QAperture({
   detail,
   stage: onStage = false,
   showing = false,
+  room = false,
   className,
 }: QApertureProps) {
   const stage = useStageApertureSize();
@@ -127,6 +130,7 @@ export function QAperture({
           outputLevel={outputLevel}
           stage={onStage}
           showing={showing}
+          room={room}
         />
       </div>
       {text !== undefined || detail !== undefined ? (

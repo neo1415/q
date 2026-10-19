@@ -42,6 +42,7 @@ export const FIGURE_KINDS: readonly FigureKind[] = [
   "SPIRAL",
   "CONSTELLATION",
   "LETTER_Q",
+  "ROOM_Q",
   "RIBBON",
   "QUESTION",
   "EXCLAIM",
@@ -597,6 +598,36 @@ function letterQPoints(count: number, random: () => number): RawPoint[] {
   return out;
 }
 
+/**
+ * The voice room at rest (Q home, owner 2026-10-19): the letter Q, large
+ * and loose, at low light, so the room itself reads as Q while the
+ * welcome over it stays legible. Each point drifts on its own slow orbit;
+ * talking gathers it into the cloud (presence-machine.ts).
+ */
+const ROOM_SCALE = 1.55;
+const ROOM_DRIFT = 0.05;
+
+function roomFigure(count: number, random: () => number): Figure {
+  const set = toPointSet(letterQPoints(count, random), count);
+  const phase = Float32Array.from({ length: count }, () => random() * TAU);
+  return {
+    kind: "ROOM_Q",
+    flow: 0.03,
+    evaluate: ({ t }, out) => {
+      for (let i = 0; i < count; i += 1) {
+        const p = phase[i] ?? 0;
+        out.x[i] =
+          (set.x[i] ?? 0) * ROOM_SCALE + Math.sin(t * 0.2 + p) * ROOM_DRIFT;
+        out.y[i] =
+          (set.y[i] ?? 0) * ROOM_SCALE + Math.cos(t * 0.17 + p) * ROOM_DRIFT;
+        out.z[i] = 0;
+        // Dim, and a little uneven, so it reads as a field and not a logo.
+        out.b[i] = 0.3 + 0.12 * Math.sin(t * 0.5 + p * 3) ** 2;
+      }
+    },
+  };
+}
+
 /** Two hands meeting and parting: Q applauding. */
 function clapFigure(count: number): Figure {
   const random = seeded(311);
@@ -684,6 +715,8 @@ export function buildFigure(kind: FigureKind, count: number): Figure {
       return glyphFigure(kind, chartPoints(count, random), count);
     case "LETTER_Q":
       return glyphFigure(kind, letterQPoints(count, random), count);
+    case "ROOM_Q":
+      return roomFigure(count, random);
     case "CLAP":
       return clapFigure(count);
     case "HANDS":

@@ -89,6 +89,7 @@ function FeedMedia({
   paused,
   rate,
   captionsOn,
+  onCaptionsChange,
   offline,
   onActiveElement,
   scrubber,
@@ -96,6 +97,7 @@ function FeedMedia({
   readonly paused: boolean;
   readonly rate: number;
   readonly captionsOn: boolean;
+  readonly onCaptionsChange: (on: boolean) => void;
   readonly offline: boolean;
   readonly onActiveElement: (video: HTMLVideoElement | null) => void;
   readonly scrubber: ReactNode;
@@ -177,7 +179,12 @@ function FeedMedia({
               rate={rate}
               captionsOn={captionsOn}
               offline={offline}
-              {...(offset === 0 ? { onElement: onActiveElement } : {})}
+              {...(offset === 0
+                ? {
+                    onElement: onActiveElement,
+                    onCaptionsChange,
+                  }
+                : {})}
             />
           )}
         </div>
@@ -584,7 +591,7 @@ export function PitchStage({
     slot.style.translate = `${String(dx)}px 0`;
     slot.style.rotate = `${String(dx / 24)}deg`;
     if (Math.abs(dx) > 60) {
-      media.dataset["swipe"] = dx > 0 ? "interested" : "pass";
+      media.dataset["swipe"] = dx > 0 ? "save" : "pass";
     } else {
       delete media.dataset["swipe"];
     }
@@ -704,6 +711,7 @@ export function PitchStage({
           paused={tapPaused}
           rate={rate}
           captionsOn={captionsOn}
+          onCaptionsChange={setCaptionsOn}
           offline={!online}
           onActiveElement={setActiveVideo}
           scrubber={

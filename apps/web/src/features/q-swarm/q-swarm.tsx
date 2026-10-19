@@ -44,6 +44,7 @@ export function QSwarm({
   outputLevel,
   stage = false,
   showing = false,
+  room = false,
 }: {
   readonly state: QApertureState;
   readonly pixels: number;
@@ -53,6 +54,8 @@ export function QSwarm({
   readonly stage?: boolean | undefined;
   /** Answer cards are on screen beside this presence: the Q mark. */
   readonly showing?: boolean | undefined;
+  /** The Q home's voice room at rest: the room is the letter Q. */
+  readonly room?: boolean | undefined;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const environment = useQMotion();
@@ -67,6 +70,7 @@ export function QSwarm({
     outputLevel,
     onStage,
     showing,
+    room,
     motion,
     bloom,
   });
@@ -77,10 +81,11 @@ export function QSwarm({
       outputLevel,
       onStage,
       showing,
+      room,
       motion,
       bloom,
     };
-  }, [state, inputLevel, outputLevel, onStage, showing, motion, bloom]);
+  }, [state, inputLevel, outputLevel, onStage, showing, room, motion, bloom]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -102,6 +107,7 @@ export function QSwarm({
       state: live.current.state,
       stage: live.current.onStage,
       showing: live.current.showing,
+      room: live.current.room,
       motion: live.current.motion,
       bloom: live.current.bloom,
     });
@@ -215,7 +221,7 @@ export function QSwarm({
   // still presence changes shape, and it is exactly when it should.
   useEffect(() => {
     canvasRef.current?.dispatchEvent(new Event("cq:redraw"));
-  }, [state, onStage, showing, motion, bloom]);
+  }, [state, onStage, showing, room, motion, bloom]);
 
   return (
     <canvas
@@ -224,6 +230,7 @@ export function QSwarm({
       style={{ width: pixels, height: pixels }}
       className="block"
       data-q-swarm={state}
+      data-q-room={room ? "" : undefined}
     />
   );
 }

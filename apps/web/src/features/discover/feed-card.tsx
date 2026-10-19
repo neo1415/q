@@ -7,7 +7,7 @@ import type {
   DiscoveredCompanyDto,
   DiscoveryReasonDto,
 } from "@capital-q/contracts";
-import { Button, buttonClassName } from "@capital-q/ui/button";
+import { Button } from "@capital-q/ui/button";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 import {
   ArrowDown,
@@ -483,26 +483,9 @@ export function FeedCard({
             )}
           </div>
           {feedNotes}
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/company/${company.companyId}`}
-              className={buttonClassName("primary")}
-              data-feed-open-profile
-            >
-              {t("Open profile")}
-            </Link>
-            {/* Everything else, with Express interest at its first step:
-                the website, the notes, and the server-confirmed decision. */}
-            <Button
-              variant="secondary"
-              onClick={() => openDetails(false)}
-              aria-haspopup="dialog"
-              aria-expanded={expanded}
-              data-feed-all-details
-            >
-              {t("All details")}
-            </Button>
-          </div>
+          {/* Discover A (owner 2026-10-19): no Open profile or All details
+              row here -- the rail's avatar is the way into the profile and
+              its Interest opens the details with the confirmed decision. */}
         </div>
       ) : null}
 

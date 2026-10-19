@@ -1,6 +1,6 @@
 import type { QApertureState } from "../q-aperture/aperture-state";
 import type { QMotion } from "../q-aperture/aperture-frame";
-import { figureForState, presenceFor, SMALL_PIXELS } from "./presence-machine";
+import { presenceFor, SMALL_PIXELS } from "./presence-machine";
 import { createPresenceSim, MAX_DT } from "./presence-dynamics";
 import { createQMoment } from "./presence-q-moment";
 import {
@@ -40,6 +40,8 @@ export type PresenceInputs = {
   /** The Q page's own stage (`isStage`): the Q moment shows here only. */
   readonly stage: boolean;
   readonly showing: boolean;
+  /** The voice room at rest (presence-machine.ts). */
+  readonly room?: boolean | undefined;
   readonly motion: QMotion;
   readonly bloom: boolean;
 };
@@ -114,7 +116,8 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
   const sim = createPresenceSim({
     count: scaledParticleCount(pixels, host.cores),
     // A surface opens already in its state's shape: no flourish on mount.
-    initial: figureForState(inputs.state, small),
+    initial: presenceFor({ state: inputs.state, small, room: inputs.room })
+      .figure,
     seed: pixels * 7 + 3,
   });
 
@@ -163,19 +166,23 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
       state: inputs.state,
       small,
       showing: inputs.showing,
+      room: inputs.room,
     });
     const interval = last === 0 ? 0 : now - last;
     // The Q moment lays the letter over a resting presence now and then;
     // the state's own figure is untouched and flows back in after it.
-    const shown = moment.at(
-      clock,
-      inputs.state,
-      inputs.stage,
-      inputs.showing,
-      inputs.motion,
-    )
-      ? "LETTER_Q"
-      : view.figure;
+    // The room is already the letter: no Q moment over it.
+    const shown =
+      inputs.room !== true &&
+      moment.at(
+        clock,
+        inputs.state,
+        inputs.stage,
+        inputs.showing,
+        inputs.motion,
+      )
+        ? "LETTER_Q"
+        : view.figure;
     if (moving) {
       sim.setFigure(shown);
       // The swarm's own clock advances by the step it integrates, so a

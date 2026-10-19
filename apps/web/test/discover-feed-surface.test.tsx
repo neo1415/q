@@ -194,12 +194,10 @@ async function renderFeed() {
 
 /**
  * Reasons, the website and Express Interest live in the details sheet,
- * reached from the caption's "more" (Discover v2): "more" opens the caption
- * in place, "All details" the sheet.
+ * reached from the rail's Interest (Discover A: no All details row).
  */
 function openDetails() {
-  fireEvent.click(screen.getByRole("button", { name: /^More about / }));
-  fireEvent.click(screen.getByRole("button", { name: "All details" }));
+  fireEvent.click(screen.getByRole("button", { name: "Interest" }));
 }
 
 /** The feed owns its keys; they are not dispatched at the window. */
@@ -550,17 +548,19 @@ describe("the phone overlay and rail (founder directive, 2026-09-27)", () => {
     expect(
       document.querySelector("[data-feed-more] [data-feed-why]"),
     ).not.toBeNull();
+    // Discover A: no Open profile or All details row under it; the rail's
+    // avatar is the way into the profile, its Interest the details.
+    expect(document.querySelector("[data-feed-open-profile]")).toBeNull();
+    expect(screen.queryByRole("button", { name: "All details" })).toBeNull();
     expect(
-      document.querySelector("[data-feed-open-profile]")?.getAttribute("href"),
+      document.querySelector(".cq-feed-rail-profile a")?.getAttribute("href"),
     ).toBe(`/company/${companyId(1)}`);
     expect(screen.queryByRole("dialog")).toBeNull();
-    const all = screen.getByRole("button", { name: "All details" });
-    fireEvent.click(all);
+    fireEvent.click(screen.getByRole("button", { name: "Interest" }));
     const dialog = await screen.findByRole("dialog", {
       name: company(1).canonicalName,
     });
     expect(dialog.querySelector("[data-feed-details]")).not.toBeNull();
-    expect(all.getAttribute("aria-expanded")).toBe("true");
 
     fireEvent.keyDown(dialog, { key: "Escape" });
     await waitFor(() => {
@@ -770,8 +770,8 @@ describe("Express Interest (CQ-NET-010)", () => {
   }
 
   async function confirmInterest() {
+    // The rail's Interest opens the details at the confirmation step.
     openDetails();
-    fireEvent.click(screen.getByRole("button", { name: "Express interest" }));
     // Doc 17 §70: the consequence is stated before it happens.
     expect(
       await screen.findByText(/It is not a commitment to invest\./),

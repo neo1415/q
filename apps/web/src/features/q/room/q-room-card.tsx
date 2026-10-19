@@ -14,6 +14,7 @@ import type { QManifestRef, QShowInQRoomIntent } from "@capital-q/contracts";
 import { ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
 
 import type { QTurn, QTurnPublicSource } from "../conversation";
+import { PublicSourceList } from "../public-source-card";
 import { useQSection } from "../q-section";
 
 import { QRoomDeck, type DeckLoaders } from "./q-room-deck";
@@ -381,25 +382,5 @@ function SourceCards({
       </p>
     );
   }
-  return (
-    <ul className="grid gap-2 sm:grid-cols-2">
-      {sources.slice(0, 6).map((source) => (
-        <li key={source.url}>
-          <a
-            href={source.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex min-h-11 flex-col gap-0.5 border border-(--cq-border-subtle) px-3 py-2 hover:bg-(--cq-surface-subtle)"
-          >
-            <span className="cq-body-sm text-(--cq-text-primary)">
-              {source.title}
-            </span>
-            <span className="cq-caption text-(--cq-text-secondary)">
-              {source.domain}
-            </span>
-          </a>
-        </li>
-      ))}
-    </ul>
-  );
+  return <PublicSourceList sources={sources} />;
 }

@@ -2,10 +2,9 @@
 
 import type { QFindingType } from "@capital-q/contracts";
 
-import { formatDay } from "@/components/date-format";
-
 import { useCardHidden } from "./cards/card-visibility";
 import type { QTurn, QTurnObjectBlock } from "./conversation";
+import { PublicSourceList } from "./public-source-card";
 import { QResultBlocks } from "./q-result-blocks";
 import { Q_CONFIDENCE_LABELS } from "./wire-constants";
 import { useT } from "@/features/i18n/language";
@@ -207,26 +206,7 @@ export function QEvidenceBody({
           <span className="cq-label text-(--cq-text-tertiary)">
             {t("Public sources, unverified")}
           </span>
-          <ul className="flex flex-col gap-2">
-            {turn.publicSources.map((source) => (
-              <li key={source.url} className="flex flex-col gap-0.5">
-                <a
-                  className="cq-body text-(--cq-text-primary) underline underline-offset-2"
-                  href={source.url}
-                  target="_blank"
-                  rel="noopener noreferrer nofollow"
-                >
-                  {source.title}
-                </a>
-                <span className="cq-caption text-(--cq-text-secondary)">
-                  {source.domain} ·{" "}
-                  {source.publishedOn === null
-                    ? `read ${formatDay(source.retrievedOn)}`
-                    : formatDay(source.publishedOn)}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <PublicSourceList sources={turn.publicSources} />
         </div>
       ) : null}
       {evidence.length > 0 ? (

@@ -22,6 +22,7 @@ import type { FigureKind } from "./presence-figures";
  * | speaking                     | the wave, rolling with Q's voice       |
  * | asking, waiting on approval  | the "?"                                |
  * | resting with answer cards up | the Q mark in knots of light           |
+ * | resting in the voice room    | the room: a large, dim, loose Q        |
  *
  * Below 72 px a wave, a "?" or the Q mark cannot be read: a small
  * surface keeps to the cloud, the lean, the spiral and the ring.
@@ -84,6 +85,11 @@ export type PresenceInput = {
   readonly small: boolean;
   /** Answer cards are on screen beside this presence. */
   readonly showing?: boolean | undefined;
+  /**
+   * The Q home's voice room before anything is said: at rest the room
+   * itself is the letter Q (ROOM_Q); any other state gathers it.
+   */
+  readonly room?: boolean | undefined;
 };
 
 /** Q's figure for this moment: pure, total and deterministic. */
@@ -93,6 +99,9 @@ export function presenceFor(input: PresenceInput): PresenceView {
   // and gives way the moment Q listens, thinks or speaks again.
   if (input.showing === true && !input.small && RESTING.has(input.state)) {
     return { figure: "CONSTELLATION", dim };
+  }
+  if (input.room === true && !input.small && RESTING.has(input.state)) {
+    return { figure: "ROOM_Q", dim };
   }
   return {
     figure: figureForState(input.state, input.small),

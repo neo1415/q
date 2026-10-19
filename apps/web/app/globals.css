@@ -1294,8 +1294,10 @@
     letter-spacing: 0.04em;
     pointer-events: none;
   }
-  .cq-feed-media[data-swipe="interested"]::after {
-    content: "Interested";
+  /* Right keeps the company (Save): never "Interested", which is its own
+     confirmed step that tells the founder (CQ-NET-010). */
+  .cq-feed-media[data-swipe="save"]::after {
+    content: "Save";
     inset-inline-start: 8%;
     color: var(--cq-accent);
     rotate: -8deg;
@@ -1305,6 +1307,22 @@
     inset-inline-end: 8%;
     color: var(--cq-stage-text);
     rotate: 8deg;
+  }
+  /* Pitch captions (Discover A): legible over any frame, on the stage
+     night at a whisper behind the words only. */
+  .cq-feed-video::cue {
+    /* Explicit: a cue inherits the page's no-wrap and would run under
+       the rail instead of wrapping. */
+    white-space: pre-line;
+    font-family: inherit;
+    font-size: 0.95em;
+    line-height: 1.35;
+    color: var(--cq-stage-text);
+    background-color: color-mix(
+      in oklab,
+      var(--cq-stage-canvas) 72%,
+      transparent
+    );
   }
   .cq-feed-player,
   .cq-feed-video {
@@ -2822,6 +2840,284 @@
   }
   .cq-stage-said {
     text-wrap: balance;
+  }
+  /*
+   * The voice room's night (Q home, owner 2026-10-19): a sparse field of
+   * stars behind everything on the Q page, at a whisper, so the page has
+   * depth without competing with Q -- the only thing on it that moves with
+   * meaning. Three tiles of co-prime sizes keep the pattern from reading
+   * as a grid; one layer breathes very slowly, and not at all for reduced
+   * motion. Painted on a pseudo-element: no element, no layout, no work
+   * after the first paint beyond one opacity animation.
+   */
+  .cq-q-home {
+    position: relative;
+    isolation: isolate;
+  }
+  .cq-q-home::before,
+  .cq-q-home::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .cq-q-home::before {
+    background-image:
+      radial-gradient(
+        circle at 23% 31%,
+        var(--cq-stage-star) 0 1px,
+        transparent 1.5px
+      ),
+      radial-gradient(
+        circle at 71% 64%,
+        var(--cq-stage-star-faint) 0 1px,
+        transparent 1.5px
+      ),
+      radial-gradient(
+        circle at 47% 83%,
+        var(--cq-stage-star-faint) 0 0.8px,
+        transparent 1.3px
+      );
+    background-size:
+      293px 293px,
+      211px 211px,
+      157px 157px;
+  }
+  .cq-q-home::after {
+    background-image:
+      radial-gradient(
+        circle at 62% 18%,
+        var(--cq-stage-star) 0 1.2px,
+        transparent 1.8px
+      ),
+      radial-gradient(
+        circle at 12% 77%,
+        var(--cq-stage-star-faint) 0 1px,
+        transparent 1.5px
+      );
+    background-size:
+      389px 389px,
+      251px 251px;
+    opacity: 0.6;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .cq-q-home::after {
+      animation: cq-stars-breathe 9s ease-in-out infinite alternate;
+    }
+  }
+  @keyframes cq-stars-breathe {
+    from {
+      opacity: 0.25;
+    }
+    to {
+      opacity: 0.75;
+    }
+  }
+  @media (forced-colors: active) {
+    .cq-q-home::before,
+    .cq-q-home::after {
+      display: none;
+    }
+  }
+
+  /*
+   * The voice room's presence (Q home, 2026-10-19). Before anything is
+   * said the room itself is a large, dim Q (ROOM_Q): the canvas is drawn
+   * larger than its layout box and overflows behind the welcome, so the
+   * page does not move. Talking gathers it: the same canvas scales down to
+   * the stage size (transform only) while the particles flow into the
+   * cloud, then back out when the line closes.
+   */
+  .cq-room-presence {
+    position: relative;
+    width: var(--cq-room-box);
+    height: var(--cq-room-box);
+    pointer-events: none;
+  }
+  .cq-room-presence > * {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(1);
+    transition: transform 900ms var(--cq-ease);
+  }
+  .cq-room-presence.is-gathered > * {
+    transform: translate(-50%, -50%) scale(var(--cq-room-gather));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-room-presence > * {
+      transition: none;
+    }
+  }
+
+  /* Rolling captions: the words being said now, large, under Q. */
+  .cq-rolling-caption {
+    margin: 0 auto;
+    max-width: 42rem;
+    min-height: 3lh;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    text-align: center;
+    text-wrap: balance;
+    font-size: 22px;
+    line-height: 1.4;
+    font-weight: 500;
+    color: var(--cq-stage-text);
+    overflow-wrap: anywhere;
+  }
+  .cq-rolling-caption.is-q {
+    font-size: 19px;
+    font-weight: 400;
+    color: var(--cq-stage-text-muted);
+  }
+  @media (max-width: 639px) {
+    .cq-rolling-caption {
+      font-size: 18px;
+      min-height: 4lh;
+    }
+    .cq-rolling-caption.is-q {
+      font-size: 17px;
+    }
+  }
+  /* The voice room's one way out of the line, round so it reads as a key. */
+  .cq-room-end {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 0 20px;
+    border-radius: 999px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-surface);
+    border: 1px solid var(--cq-stage-border);
+    cursor: pointer;
+    transition: background-color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-room-end:hover,
+  .cq-room-end:focus-visible {
+    background: var(--cq-stage-surface-strong);
+  }
+  .cq-room-end > i {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--cq-stage-accent);
+  }
+  /*
+   * A public page Q read, as a card that opens in place (2026-10-19). The
+   * panel grows from 0fr to 1fr, so it opens to its own height smoothly
+   * and nothing below jumps; reduced motion opens it at once.
+   */
+  .cq-source-card {
+    border: 1px solid var(--cq-border-subtle);
+    background: var(--cq-surface);
+    transition: border-color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-source-card[data-open] {
+    border-color: var(--cq-border-strong);
+  }
+  .cq-source-card-head {
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+  .cq-source-card-head:hover,
+  .cq-source-card-head:focus-visible {
+    background: var(--cq-surface-subtle);
+    outline: none;
+  }
+  .cq-source-card-mark {
+    display: inline-flex;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    align-items: center;
+    justify-content: center;
+    color: var(--cq-text-secondary);
+    background: var(--cq-surface-subtle);
+  }
+  .cq-source-card-chevron {
+    flex: none;
+    margin-top: 6px;
+    color: var(--cq-text-secondary);
+    transition: transform var(--cq-motion-base) var(--cq-ease);
+  }
+  .cq-source-card[data-open] .cq-source-card-chevron {
+    transform: rotate(180deg);
+  }
+  .cq-source-card-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows var(--cq-motion-slow) var(--cq-ease),
+      opacity var(--cq-motion-base) var(--cq-ease);
+  }
+  .cq-source-card[data-open] .cq-source-card-panel {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  /* The Sources disclosure under an answer opens to its height, smoothly. */
+  @supports (interpolate-size: allow-keywords) {
+    .cq-q-evidence {
+      interpolate-size: allow-keywords;
+    }
+    .cq-q-evidence::details-content {
+      height: 0;
+      overflow: clip;
+      transition:
+        height var(--cq-motion-slow) var(--cq-ease),
+        content-visibility var(--cq-motion-slow) allow-discrete;
+    }
+    .cq-q-evidence[open]::details-content {
+      height: auto;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-source-card-panel,
+    .cq-source-card-chevron,
+    .cq-q-evidence::details-content {
+      transition: none;
+    }
+  }
+
+  /* Talk to Q, under the welcome: the room's invitation (one press). */
+  .cq-room-talk {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 0 22px;
+    border-radius: 999px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--cq-stage-text);
+    background: var(--cq-stage-surface);
+    border: 1px solid var(--cq-stage-accent);
+    cursor: pointer;
+    transition:
+      background-color var(--cq-motion-fast) var(--cq-ease),
+      transform var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-room-talk:hover,
+  .cq-room-talk:focus-visible {
+    background: var(--cq-stage-surface-strong);
+  }
+  .cq-room-talk:active {
+    transform: scale(0.97);
   }
   .cq-stage-scroll {
     scrollbar-width: thin;

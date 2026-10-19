@@ -173,6 +173,9 @@
   --cq-stage-text: oklch(0.98 0.004 92);
   --cq-stage-text-muted: oklch(1 0 0 / 0.62);
   --cq-stage-accent: oklch(0.76 0.14 258);
+  /* The voice room's stars (Q home, 2026-10-19): a whisper, far below text. */
+  --cq-stage-star: oklch(1 0 0 / 0.42);
+  --cq-stage-star-faint: oklch(1 0 0 / 0.2);
 
   /*
    * The Q Aperture's light (ADR 0017 F2). One hue family -- the accent hue

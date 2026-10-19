@@ -106,6 +106,25 @@ describe("which figure: one fixed mapping from Q's state (P11)", () => {
     expect(presenceFor({ state: "IDLE", small: false }).figure).toBe("CLOUD");
   });
 
+  it("rests as the room-sized Q in the voice room, and gathers for anything else", () => {
+    const room = (state: (typeof Q_APERTURE_STATES)[number], small = false) =>
+      presenceFor({ state, small, room: true }).figure;
+    expect(room("IDLE")).toBe("ROOM_Q");
+    expect(room("COMPLETE")).toBe("ROOM_Q");
+    // Listening, thinking, speaking: the room gathers into Q's own shapes.
+    expect(room("LISTENING")).toBe("ATTENTIVE");
+    expect(room("THINKING")).toBe("SPIRAL");
+    expect(room("SPEAKING")).toBe("WAVE");
+    // A paused Q is not at rest; a small surface cannot read a letter.
+    expect(room("ERROR")).toBe("CLOUD");
+    expect(room("IDLE", true)).toBe("CLOUD");
+    // Answer cards still take the Q mark.
+    expect(
+      presenceFor({ state: "IDLE", small: false, room: true, showing: true })
+        .figure,
+    ).toBe("CONSTELLATION");
+  });
+
   it("shows the Q mark while answer cards are up and Q is resting, and only then", () => {
     expect(
       presenceFor({ state: "IDLE", small: false, showing: true }).figure,

@@ -59,7 +59,8 @@ export function morphSeconds(to: FigureKind): number {
   if (GESTURE_FIGURES.has(to)) return 0.8;
   if (to === "CLOUD" || to === "ATTENTIVE") return 1.2;
   // The Q moment gathers as calmly as the cloud settles (presence-q-moment).
-  if (to === "LETTER_Q") return 1.2;
+  // The room opens out as calmly as the cloud settles.
+  if (to === "LETTER_Q" || to === "ROOM_Q") return 1.2;
   return 1;
 }
 

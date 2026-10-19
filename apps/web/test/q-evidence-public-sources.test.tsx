@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { QTurn } from "../src/features/q/conversation";
@@ -37,19 +37,31 @@ const TURN: Extract<QTurn, { kind: "Q" }> = {
 };
 
 describe("QEvidence public sources", () => {
-  it("lists each page as a link with its site and date, behind a closed Sources", () => {
+  it("lists each page as a card with its site and date, behind a closed Sources, that opens to its link", () => {
     const { container } = render(<QEvidence turn={TURN} />);
     const details = container.querySelector("details[data-q-evidence]");
     expect(details).not.toBeNull();
     expect(details?.hasAttribute("open")).toBe(false);
     expect(details?.textContent).toContain("2 sources");
-    const link = screen.getByRole("link", {
-      name: "Northstar expands to Kenya",
+    // Each page is a card that opens in place (2026-10-19): closed, its
+    // link is out of reach; open, "Open page" goes to it.
+    const card = screen.getByRole("button", {
+      name: /Northstar expands to Kenya/,
     });
+    expect(card.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      card.closest("[data-q-public-source]")?.querySelector("[inert]"),
+    ).not.toBeNull();
+    fireEvent.click(card);
+    expect(card.getAttribute("aria-expanded")).toBe("true");
+    const opened = card.closest("[data-q-public-source]");
+    if (!(opened instanceof HTMLElement)) throw new Error("no card");
+    const link = within(opened).getByRole("link", { name: "Open page" });
     expect(link.getAttribute("href")).toBe(
       "https://news.example.com/2026/09/northstar",
     );
     expect(link.getAttribute("rel")).toContain("noopener");
+    expect(link.getAttribute("target")).toBe("_blank");
     expect(container.textContent).toContain("news.example.com · 2 Sept 2026");
     expect(container.textContent).toContain(
       "northstar.example.com · read 27 Sept 2026",
