@@ -188,7 +188,8 @@ const slides = [
         <div class="fig"><div class="v">$45k–€72.5k</div><div class="l">Range of partner-school ab-initio programme prices Zino publishes — in USD, EUR and ZAR, while most customers earn naira.</div><div style="margin-top:10px">${st("SR", "published prices")}</div></div>
         <div class="fig"><div class="v">$15–25k</div><div class="l">Typical type-rating cost, with no pilot-loan system — and, the CEO says, many licensed Nigerian pilots still unemployed.</div><div style="margin-top:10px">${st("SR", "CEO, Nairametrics 2026")}</div></div>
       </div>
-      <p class="small" style="margin-top:24px">A later Boeing Africa forecast (2026–2045) cites 22,000; the two windows are not mixed here.</p>`),
+      <p style="margin-top:20px;font-size:16px">As of October 2026, customers — aspiring pilots and their families in Nigeria — face an expensive, slow and fragmented route to a licence, usually by travelling abroad for flight school.</p>
+      <p class="small" style="margin-top:8px">A later Boeing Africa forecast (2026–2045) cites 22,000; the two windows are not mixed here.</p>`),
   },
   {
     id: "solution",
@@ -210,6 +211,9 @@ const slides = [
       </div>
       <div class="g2" style="margin-top:28px">
         <p>${st("SR")} Funnel as described across academy.zinoaviation.com (fetched 2026-10-18). Flight training, type ratings and medicals are <b>partner-delivered</b>; Zino is not evidenced as an approved training organisation.</p>
+        <p>${st("SR")} As of October 2026, the Lagos 737NG simulator is deployed and ready to serve students: the market window is open. Through active partnerships with SafeFly Express (South Africa) and TAE Aviation Academy (Greece), the Academy is serving students across multiple countries.</p>
+      </div>
+      <div class="g2" style="margin-top:12px">
         <p>${st("SR")} Also marketed: logistics management for governments, parastatals and airlines running cadet programmes — no client is named.</p>
       </div>`),
   },
@@ -270,7 +274,12 @@ const slides = [
         <div class="fig"><div class="v">~240</div><div class="l">Private jets operating in Nigeria — Minister Festus Keyamo, as reported. Another source: “over 157 by 2024”.</div></div>
         <div class="fig"><div class="v">36</div><div class="l">Private jet operators in Nigeria, per a BusinessDay report (undated in results).</div></div>
       </div>
-      <p class="small" style="margin-top:26px;line-height:1.7">${st("VP")} investors.boeing.com (2025 Pilot & Technician Outlook) · afm.aero/boeing-forecasts-africa-will-need-22000-new-pilots-as-fleet-more-than-doubles-by-2045 · ground.news (Keyamo) · allafrica.com/stories/202603200305.html · businessday.ng (private charter uptake) · fetched 2026-10-18. Registered and operating fleet definitions differ; no figure is preferred.</p>`),
+      <p class="small" style="margin-top:26px;line-height:1.7">${st("VP")} investors.boeing.com (2025 Pilot & Technician Outlook) · afm.aero/boeing-forecasts-africa-will-need-22000-new-pilots-as-fleet-more-than-doubles-by-2045 · ground.news (Keyamo) · allafrica.com/stories/202603200305.html · businessday.ng (private charter uptake) · fetched 2026-10-18. Registered and operating fleet definitions differ; no figure is preferred.</p>
+      <ul class="lst" style="margin-top:10px;font-size:15px">
+        <li style="font-size:15px">Growing demand for pilots: Africa needs 23,000 new pilots over 2025–2044 (Boeing Pilot & Technician Outlook 2025) ${st("VP")}</li>
+        <li style="font-size:15px">Expansion plan, as of October 2026: expand from pilot training into the private aviation market through Zino Aviation Jet, whose charter quote form is open ${st("SR")}</li>
+        <li style="font-size:15px">Strategic opportunity, as of October 2026: JetVault, an experience centre and digital platform for private aviation, is at plan stage ${st("SR")}</li>
+      </ul>`),
   },
   {
     id: "sizing",
@@ -283,7 +292,7 @@ const slides = [
     html: frame(`<h2 style="font-size:36px">Academy SOM ≈ US$0.30M/yr · Jet SOM unknown <span class="small" style="font-family:Outfit,sans-serif;display:block;font-size:16px;margin-top:6px">Every percentage, price and count below is an Assumption. TAM and SAM are underlying spend, not Zino revenue.</span></h2>
       <div class="arith">
         <div><span class="k">Academy TAM ${st("AS")}</span><span class="x">23,000 pilots ÷ 20 years ≈ 1,150 new pilots/yr × US$55,000 average ab-initio cost (midpoint of Zino’s published partner prices)</span><span class="r">≈ $63M/yr</span></div>
-        <div><span class="k">Academy SAM ${st("AS")}</span><span class="x">Nigeria = 20% → about 230 cadets/yr ≈ US$12.7M tuition; plus US$3,000 ancillary spend per cadet ≈ US$0.7M</span><span class="r">≈ $13.4M/yr combined</span></div>
+        <div><span class="k">Academy SAM ${st("AS")}</span><span class="x">Serviceable market, an estimate from stated assumptions (as of October 2026): Nigeria = 20% → about 230 cadets/yr ≈ US$12.7M tuition; plus US$3,000 ancillary spend per cadet ≈ US$0.7M</span><span class="r">≈ $13.4M/yr combined</span></div>
         <div><span class="k">Academy SOM ${st("AS")}</span><span class="x">15% of Nigerian cadets → about 35/yr × (10% of tuition ≈ US$5,500 + US$3,000 direct services), within 3 years</span><span class="r">≈ $0.30M/yr</span></div>
         <div><span class="k">Jet SAM ${st("AS")}</span><span class="x">160–240 aircraft × 5% turnover = 8–12 deals × 1.5% of US$10M; management: 30% externally managed × US$200k/yr</span><span class="r">$1.2–1.8M + $9.6–14.4M</span></div>
         <div><span class="k">Jet SOM ${st("UN")}</span><span class="x">Unknown until first transactions exist</span><span class="r">—</span></div>
@@ -332,7 +341,7 @@ const slides = [
         <div><h3>Jet · targets</h3><ul class="lst"><li>HNW individuals and corporates</li><li>Government, diplomatic and medical missions</li><li>Aircraft owners</li></ul></div>
       </div>
       <div class="g2" style="margin-top:20px">
-        <p style="font-size:15.5px"><b>Distribution</b> ${st("SR")} — blog, social, TEDx and webinars feed paid calls, masterclasses and mentorship; payment by PayPal, Paystack, DPO or offline. Jet: private consultations, charter quote form, JetVault consultations.</p>
+        <p style="font-size:15.5px"><b>Distribution</b> ${st("SR")} — direct sales of simulator sessions and paid advisory calls (₦95,000 / 30 min, ₦150,000 / 1 hr, as of October 2026); blog, social, TEDx and webinars feed paid calls, masterclasses and mentorship; payment by PayPal, Paystack, DPO or offline. Jet: private consultations, charter quote form, JetVault consultations.</p>
         <p style="font-size:15.5px"><b>Reach</b> — “more than 8,000 aspiring pilots in our network” ${st("SR", "CEO")}. The homepage “1000+” counters are template placeholders, not data.</p>
       </div>`),
   },
@@ -354,7 +363,8 @@ const slides = [
         <tr><td><b>Global flight schools and agents; social-media mentors</b></td><td>Recruit Nigerian students directly</td><td>Category</td></tr>
         <tr><td><b>Charter brokers and operators</b>; PrivateFly, LunaJets</td><td>Private aviation in Nigeria and internationally</td><td>Category</td></tr>
       </table>
-      <p style="margin-top:16px;font-size:15.5px"><b>Zino’s claimed difference</b> ${st("SR")} — end-to-end mentorship, cost reduction, an employment network and a Lagos 737NG simulator.</p>`),
+      <p style="margin-top:16px;font-size:15.5px"><b>Zino’s claimed difference</b> ${st("SR")} — end-to-end mentorship, cost reduction, an employment network and a Lagos 737NG simulator.</p>
+      <p style="margin-top:8px;font-size:15px">${st("SR")} As of October 2026: unlike flight-school-only alternatives, Zino Aviation combines a Lagos 737NG simulator, partner schools abroad and paid one-to-one advisory support. Its partner schools are licensed by SACAA (SafeFly Express) and EASA (TAE Aviation Academy).</p>`),
   },
   {
     id: "defensibility",
@@ -488,11 +498,13 @@ const slides = [
           <li style="font-size:15px">Licensed pilot at 18; flew aeroplanes and helicopters incl. offshore Sikorsky S-92; retired from active flying in 2021 ${st("SR")}</li>
           <li style="font-size:15px">“Several thousand flight hours” (ThisDay 2022) ${st("SR", "founder in press")}</li>
           <li style="font-size:15px">EASA, FAA and ICAO licences claimed — numbers and validity not verified ${st("SR")}</li>
-          <li style="font-size:15px">“Nigeria’s youngest commercial pilot” — unverified superlative ${st("SR")}</li></ul></div>
+          <li style="font-size:15px">“Nigeria’s youngest commercial pilot” — unverified superlative ${st("SR")}</li>
+          <li style="font-size:15px">Founder experience: previously founded and led Delta Dash Aviation Ltd (2013) and Pilot Pairing Ltd (2017) in the UK ${st("VP", "Companies House")}</li></ul></div>
         <div><div class="serif" style="font-size:32px;color:var(--ink2)">Temisan Mario</div><div style="margin:2px 0 10px;font-size:15px;color:var(--t2)">Co-founder & Chief Operating Officer, as named by ThisDay (2022) ${st("VP", "press")}</div><ul class="lst" style="font-size:15px">
           <li style="font-size:15px">Director of ZINO AVIATION LTD since 2020-12-24, as Temisan Mario-Ghae ${st("VP", "Companies House")}</li>
           <li style="font-size:15px">Also named COO by Guardian Nigeria (search snippet) ${st("SR")}</li>
-          <li style="font-size:15px">Staff: 20–50 per Fuzu employer profile ${st("SR")}</li></ul>
+          <li style="font-size:15px">Staff: 20–50 per Fuzu employer profile ${st("SR")}</li>
+          <li style="font-size:15px">Critical team functions, as of October 2026: hiring is open, with job adverts published under the Zino Group name ${st("SR")}</li></ul>
           <p class="small" style="margin-top:10px">Capt. Zino also partners at FDN Capital Partners and founded KUUZA AI and SongScribe AI ${st("SR")}; he is a Capital Q cofounder ${st("OP")}. None is part of Zino Aviation.</p></div>
       </div>`),
   },
