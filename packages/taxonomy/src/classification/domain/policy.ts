@@ -43,6 +43,17 @@ export type TaxonomyClassificationPolicy = {
      * below it; a misspelt label ("paymnt", "insurers") is above it.
      */
     readonly unmatchedSimilarityFloor: number;
+    /**
+     * v4 (live 2026-10-19): a multi-word candidate that shares only some of
+     * its words with the query ("sales" of "Hardware Sales", "customer" of
+     * "know your customer") is not a match on that word alone. Such a
+     * partial hit stands only on whole-label similarity at or above this
+     * floor, which a misspelt label still reaches ("payment infrastucture")
+     * and an unrelated label sharing one generic word does not. It is higher
+     * than the unmatched floor because the shared word's own trigrams
+     * already inflate the similarity.
+     */
+    readonly partialMatchSimilarityFloor: number;
     /** Below this score a lexical hit is not offered (LOW_CONFIDENCE). */
     readonly candidateMinimumScore: number;
     /** Two same-vocabulary hits at/above this and within the margin are AMBIGUOUS. */
@@ -73,6 +84,7 @@ export const TAXONOMY_CLASSIFICATION_POLICY_V1: TaxonomyClassificationPolicy = {
     retrievalSimilarityFloor: 0.3,
     similarityMinCandidateLength: 6,
     unmatchedSimilarityFloor: 0.5,
+    partialMatchSimilarityFloor: 0.75,
     candidateMinimumScore: 0.35,
     strongScore: 0.6,
     ambiguityMargin: 0.02,

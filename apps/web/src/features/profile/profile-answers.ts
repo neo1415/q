@@ -202,6 +202,32 @@ function journeyOf(journey: ProfileJourney): {
     : { vocabulary: INVESTOR_VOCABULARY, groups: INVESTOR_GROUPS };
 }
 
+/**
+ * A group as it reads with nothing recorded: each of its steps "Not
+ * added" (unknown stays unknown, never zero). The profile uses it so a
+ * completed setup can still edit a card whose answers the session view
+ * did not list -- the founder's sector above all, which has no other
+ * editor once setup is finished. Null for a group the journey lacks.
+ */
+export function unansweredGroup(
+  journey: ProfileJourney,
+  groupId: string,
+): AnswerGroup | null {
+  const { vocabulary, groups } = journeyOf(journey);
+  const spec = groups.find((candidate) => candidate.id === groupId);
+  if (spec === undefined) return null;
+  return {
+    id: spec.id,
+    label: spec.label,
+    lines: spec.stepKeys.map((stepKey) => ({
+      stepKey,
+      title: TITLE_OVERRIDES[stepKey] ?? vocabulary.stepTitle(stepKey),
+      value: null,
+      items: null,
+    })),
+  };
+}
+
 /** The taxonomy ids the shown answers name, for the page to label (at most 40). */
 export function taxonomyIdsIn(view: OnboardingSessionView): readonly string[] {
   const ids = new Set<string>();
