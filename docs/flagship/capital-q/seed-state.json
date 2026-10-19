@@ -1,0 +1,20 @@
+{
+  "company": "Capital Q",
+  "account": "founder.capitalq@fictional.capitalq.local (existing owner; no new company created)",
+  "companyId": "ee75a7d8-d457-4b59-9ad8-0d64b3026a3d",
+  "organisationId": "f95c3469-ef29-4574-a508-c1ba1131d842 (from the 2026-10-18 read-only audit)",
+  "seededAt": "2026-10-19",
+  "rule": "additive only (coordinator 2026-10-19): nothing removed or replaced",
+  "done": {
+    "scenarioUpload": "Illustrative high-growth scenario (synthetic), Other documents, Only your team",
+    "logoCover": "kept existing (both already set); rendered alternatives in docs/flagship/capital-q/assets are unused",
+    "deck": "owned by the coordinator (capital-q.mjs), not touched here",
+    "companyVisibility": "unchanged (network_visible per audit)"
+  },
+  "notChangedButFlagged": [
+    "Website is https://www.fdncapitalpartners.com/capitalq.html, which research found returns 404; live page is https://www.fdncapitalpartners.com/capitalq/ (replacement needs owner approval)",
+    "Description says FDN offices are in 'Lagos, Nigeria and Dubai, UAE'; research facts.json fdn_offices says Doha, Qatar and Lagos",
+    "Team shows 1 founder and team size 1; owner-provided cofounders are Zino Mario and David Nwankwo",
+    "Headline/name 'Capital Q demo founder ... (demonstration account)' visibly says 'demo'"
+  ]
+}

@@ -52,7 +52,10 @@ const coverHtml = `<html><body style="margin:0;width:1600px;height:600px;backgro
 <div style="position:absolute;left:0;top:0;bottom:0;width:14px;background:${B.accent}"></div>
 <div style="position:absolute;right:-180px;top:-180px;width:640px;height:640px;border-radius:50%;border:2px solid ${B.accent};opacity:.35"></div>
 <div style="position:absolute;right:-60px;top:-60px;width:400px;height:400px;border-radius:50%;border:2px solid ${B.accent};opacity:.2"></div>
-<div style="position:absolute;left:120px;top:190px"><img src="${src}" style="height:${slug === "kuuza" ? 160 : 110}px;${slug === "kuuza" ? "margin-left:-60px" : ""}"></div>
+<div style="position:absolute;left:120px;top:190px;display:flex;align-items:center;gap:28px"><img src="${src}" style="height:${slug === "kuuza" ? 160 : 110}px;${slug === "kuuza" ? "margin-left:-60px" : ""}">${
+  // The app icon has no wordmark; the product name is set in the editorial serif.
+  slug === "capital-q" ? `<span style="color:${B.ink};font-size:84px;letter-spacing:-.5px">Capital Q</span>` : ""
+}</div>
 <div style="position:absolute;left:120px;top:380px;color:${B.ink};font-size:34px;letter-spacing:.2px;opacity:.85">${B.tagline}</div>
 </body></html>`;
 
