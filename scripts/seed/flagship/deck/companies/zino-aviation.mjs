@@ -101,6 +101,7 @@ const LEGS = [
   "Risks",
   "Funding",
   "Arrival",
+  "Key facts",
   "Sources",
 ];
 
@@ -566,6 +567,36 @@ const slides = [
           <li style="font-size:15.5px">Founder licence documents; trademarks; NDPA compliance</li></ul></div>
       </div>
       <p class="small" style="margin-top:12px">Contact (published): enquiries@zinoaviation.com ${st("SR")}</p>`),
+  },
+  {
+    // One plain fact per line, each in the section it belongs to, so a
+    // reader (or Q) can confirm them one by one. Every line restates a
+    // research.md / facts.json fact; nothing new is introduced here.
+    id: "keyfacts",
+    title: "Key facts, as of October 2026 — by section",
+    uses: [
+      "founder companies (VERIFIED_PUBLIC, Companies House)",
+      "Boeing 23,000 pilots (VERIFIED_PUBLIC)",
+      "simulator, partner schools, call prices, network (SELF_REPORTED)",
+      "SafeFly alliance (VERIFIED_PUBLIC press headline)",
+      "Jet quote form, JetVault, Zino Group job adverts (SELF_REPORTED)",
+    ],
+    html: frame(`<h2 style="font-size:32px;margin-bottom:12px">Key facts, as of October 2026 — by section</h2>
+      <table class="t" style="font-size:12.5px">
+        <tr><th style="width:15%;padding:5px 10px">Section</th><th style="padding:5px 10px">Fact (as of October 2026)</th></tr>
+        <tr><td style="padding:5px 10px"><b>Founders</b></td><td style="padding:5px 10px">Founder experience: Capt. Zino Mario previously founded and led Delta Dash Aviation Ltd (2013) and Pilot Pairing Ltd (2017) in the UK, after years of experience as a licensed pilot ${st("VP")}</td></tr>
+        <tr><td style="padding:5px 10px"><b>Problem</b></td><td style="padding:5px 10px">Customer problem: customers, aspiring pilots and their families in Nigeria, face an expensive, slow and fragmented route to a licence, usually abroad ${st("SR")}</td></tr>
+        <tr><td style="padding:5px 10px"><b>Market</b></td><td style="padding:5px 10px">Growing demand: Africa needs 23,000 new pilots over 2025–2044, structural demand documented by Boeing ${st("VP")}</td></tr>
+        <tr><td style="padding:5px 10px"><b>Market</b></td><td style="padding:5px 10px">Serviceable market: about US$13.4M a year, an estimate from stated assumptions ${st("AS")}</td></tr>
+        <tr><td style="padding:5px 10px"><b>Market</b></td><td style="padding:5px 10px">Expansion plan: expand from pilot training into the private aviation market through Zino Aviation Jet ${st("SR")}</td></tr>
+        <tr><td style="padding:5px 10px"><b>Solution</b></td><td style="padding:5px 10px">Market window: the Boeing 737NG simulator in Lagos is deployed and ready to serve students ${st("SR")}</td></tr>
+        <tr><td style="padding:5px 10px"><b>Solution</b></td><td style="padding:5px 10px">Delivery: the Academy is serving students across multiple countries through partner schools in South Africa and Greece ${st("SR")}</td></tr>
+        <tr><td style="padding:5px 10px"><b>Go-to-market</b></td><td style="padding:5px 10px">Partners: active partnership with SafeFly Express (Guardian Nigeria reported the alliance) and TAE Aviation Academy ${st("SR")}</td></tr>
+        <tr><td style="padding:5px 10px"><b>Go-to-market</b></td><td style="padding:5px 10px">Sales channel: direct sales of simulator sessions and paid advisory calls ${st("SR")}</td></tr>
+        <tr><td style="padding:5px 10px"><b>Competition</b></td><td style="padding:5px 10px">Licensed partners: training runs through partner schools licensed by SACAA (SafeFly Express) and EASA (TAE Aviation Academy) ${st("SR")}</td></tr>
+        <tr><td style="padding:5px 10px"><b>Competition</b></td><td style="padding:5px 10px">Difference: unlike flight-school-only alternatives, Zino Aviation combines the Lagos simulator, partner schools abroad and one-to-one advisory support ${st("SR")}</td></tr>
+        <tr><td style="padding:5px 10px"><b>Team</b></td><td style="padding:5px 10px">Critical team functions: hiring is open, with job adverts published under the Zino Group name ${st("SR")}</td></tr>
+      </table>`),
   },
   {
     id: "sources",
