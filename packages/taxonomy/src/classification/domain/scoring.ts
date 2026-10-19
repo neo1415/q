@@ -1,7 +1,9 @@
 import type { TaxonomyClassificationPolicy } from "./policy.js";
 
 /**
- * The lexical scoring formula of taxonomy-lexical-v2 and v3 (v3 adds stop words only), in one place.
+ * The lexical scoring formula of taxonomy-lexical-v2 to v4 (v3 adds stop
+ * words only; v4 zeroes a partial word match below
+ * partialMatchSimilarityFloor), in one place.
  *
  *   coverage = credited candidate tokens / candidate tokens
  *              (exact token = 1; prefix of length >= minPrefixLength either
@@ -93,7 +95,13 @@ export function lexicalScore(
     matched > 0 || similarity >= policy.lexical.unmatchedSimilarityFloor
       ? similarity
       : 0;
-  const score = fieldWeight * Math.max(blend, standalone);
+  // v4: some but not all of a multi-word label's words is no match unless
+  // the whole label is (typo-tolerantly) present.
+  const partial = matched > 0 && matched < input.candidateTokens.length;
+  const score =
+    partial && similarity < policy.lexical.partialMatchSimilarityFloor
+      ? 0
+      : fieldWeight * Math.max(blend, standalone);
   return {
     score: round4(clamp01(score)),
     matchedTokens: matched,
