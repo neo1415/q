@@ -1,0 +1,48 @@
+{
+  "company": "Zino Aviation",
+  "steward": "steward.zino-aviation@fictional.capitalq.local",
+  "companyId": "8f38cb3a-6c6c-42fa-98f0-69ca00740879",
+  "organisationId": null,
+  "organisationIdNote": "not read: hosted SQL token returns 401",
+  "seededAt": "2026-10-19",
+  "method": "product UI via Playwright as the steward (onboarding 'Use the form')",
+  "done": {
+    "onboarding": true,
+    "profile": true,
+    "images": true,
+    "deckUpload": "version 1 = reworded deck (claude/flagship-decks-reword-oct19 58622a8dd), uploaded in onboarding",
+    "deckSectionsConfirmed": "all; MARKET corrected in the founder's words (Q had flagged the 23,000 vs 22,000 forecast windows and jet-fleet sources as a contradiction; the correction states both as different windows/sources)",
+    "deckDownloadAudience": "INVESTORS",
+    "scenarioUpload": "Illustrative high-growth scenario (synthetic)",
+    "dataRoomVisibility": "NOT SET (Only your team; Public blocked by session permission classifier)",
+    "companyVisibility": "NOT CHANGED (held by coordinator)"
+  },
+  "filled": {
+    "name": "Zino Aviation",
+    "website": "https://www.zinoaviation.com",
+    "country": "Nigeria",
+    "city": "Lagos",
+    "legalName": "ZINO AVIATION LTD (UK, VERIFIED_PUBLIC)",
+    "founded": "not set (2018 is SELF_REPORTED year only; UK entity date 2020-12-24 is a different fact)",
+    "categories": ["Education", "Edtech", "Consumer"],
+    "categoriesMissing": ["Aviation", "Travel (not in taxonomy search)"]
+  },
+  "placeholders": {
+    "stage": "Pre-seed (owner decision 2026-10-19: no institutional round known)",
+    "role": "Something else (steward is not a founder)",
+    "founders": "2 (Capt. Zino Mario, Temisan Mario)",
+    "foundersFullTime": "All founders are full-time",
+    "teamSize": 8,
+    "earlySignal": "Paying customers (revenue-generating; count Not sure / not tracked)",
+    "currency": "Not sure / not tracked",
+    "burnCashRunway": "Not sure / not tracked",
+    "raising": "Not right now (raise forms require an amount; none invented)"
+  },
+  "assets": {
+    "logo": "docs/flagship/zino-aviation/assets/zino-aviation-logo.png (stripe mark cropped from the official gold wordmark)",
+    "cover": "docs/flagship/zino-aviation/assets/zino-aviation-cover.png (scripts/seed/flagship/brand-assets.mjs)",
+    "logoSource": "https://jet.zinoaviation.com/assets/img/logo-gold.svg",
+    "licence": "no published asset licence; owner is the founder and approved use"
+  },
+  "unicornOfflineEstimate": "0.62 coverage, SCORED/DEVELOPING at Pre-seed in scratchpad uni.mjs on unicorn-offline-spec.json (assumes Q extracts the dated deck lines as facts); real result only after visibility (profile.listed)"
+}

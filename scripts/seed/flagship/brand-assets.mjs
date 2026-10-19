@@ -36,7 +36,8 @@ const B = {
   },
   "zino-aviation": {
     bg: "#141414", accent: "#B59B48", ink: "#F6F4EF",
-    mark: `<img src="${src}" style="width:440px">`,
+    // Square logo: the four-stripe mark at the right of the official wordmark.
+    mark: `<div style="width:196px;height:138px;overflow:hidden;background:url(${src}) no-repeat;background-size:904px 138px;background-position:-708px 0;transform:scale(1.7)"></div>`,
     tagline: "Pilot training, simulator and private aviation, Lagos",
   },
   "capital-q": {
