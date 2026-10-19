@@ -129,7 +129,9 @@ export function UnicornPotential({
       <summary
         ref={summaryRef}
         data-q-control="disclosure.unicorn-potential"
-        className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-xl p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-text-primary)"
+        // Open, the bar stays at the top while the assessment scrolls by,
+        // so it can be closed from anywhere (owner 2026-10-19).
+        className="flex min-h-11 cursor-pointer list-none flex-wrap items-center justify-between gap-x-6 gap-y-2 rounded-xl p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-text-primary) group-open:sticky group-open:top-0 group-open:rounded-b-none group-open:border-b group-open:border-(--cq-border-subtle) group-open:bg-(--cq-surface-raised)"
       >
         <span className="min-w-0">
           <span className="cq-label block text-(--cq-text-primary)">
@@ -156,9 +158,9 @@ export function UnicornPotential({
               </span>
             </span>
           )}
-          <span className="cq-caption text-(--cq-text-secondary)">
+          <span className="cq-caption inline-flex min-h-9 items-center rounded-full border border-(--cq-border) px-3 text-(--cq-text-primary)">
             <span className="group-open:hidden">View assessment</span>
-            <span className="hidden group-open:inline">Close assessment</span>
+            <span className="hidden group-open:inline">Close ✕</span>
           </span>
         </span>
       </summary>
@@ -282,12 +284,20 @@ export function UnicornPotential({
                 data-unicorn-pillar={pillar.id}
                 className="min-w-0"
               >
-                <summary className="grid min-h-11 cursor-pointer grid-cols-1 gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                  <span className="cq-body-sm min-w-0 text-(--cq-text-primary)">
-                    {pillar.id} · {pillar.label}
+                {/* Stacked at every width: the panel is often narrower than
+                    the screen, and a side-by-side row squeezed the name to a
+                    word per line (owner screenshot 2026-10-19). */}
+                <summary className="group/pillar flex min-h-11 cursor-pointer list-none flex-col gap-1.5 py-3 [&::-webkit-details-marker]:hidden">
+                  <span className="flex min-w-0 items-start justify-between gap-3">
+                    <span className="cq-body-sm min-w-0 break-words text-(--cq-text-primary)">
+                      <span className="text-(--cq-text-tertiary)">
+                        {pillar.id}
+                      </span>{" "}
+                      {pillar.label}
+                    </span>
                     <span
                       aria-hidden="true"
-                      className="ml-2 text-(--cq-text-tertiary)"
+                      className="flex-none text-(--cq-text-tertiary) transition-transform duration-(--cq-motion-fast) group-open/pillar:rotate-180"
                     >
                       ⌄
                     </span>
@@ -401,6 +411,18 @@ export function UnicornPotential({
             </p>
           </section>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            const details = detailsRef.current;
+            if (details === null) return;
+            details.open = false;
+            details.scrollIntoView({ block: "nearest" });
+          }}
+          className="cq-caption mt-5 inline-flex min-h-11 items-center rounded-full border border-(--cq-border) px-4 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-text-primary)"
+        >
+          Close assessment
+        </button>
       </div>
     </details>
   );
