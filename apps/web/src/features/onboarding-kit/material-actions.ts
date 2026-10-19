@@ -42,6 +42,13 @@ import type { MaterialFileView, MaterialState } from "./materials";
 const UploadInput = z.object({
   /** Absent for an organisation's own documents (an investor's profile or mandate). */
   companyId: z.string().uuid().optional(),
+  /**
+   * A further version of a document the person already has (the deck's
+   * "Upload a new version"). Input, not proof: Evidence looks it up inside
+   * the caller's own tenant and organisation and requires document.manage
+   * on it before issuing a target; the document keeps its sharing.
+   */
+  existingDocumentId: z.string().uuid().optional(),
   documentType: DocumentTypeSchema,
   filename: z.string().min(1).max(255),
   mimeType: z.string().min(3).max(129),
@@ -116,6 +123,9 @@ export async function materialUploadTargetAction(
     const created = await createDocumentUploadSession(
       session,
       {
+        ...(input.existingDocumentId === undefined
+          ? {}
+          : { existingDocumentId: input.existingDocumentId }),
         ...(input.companyId === undefined
           ? {}
           : { companyId: input.companyId }),

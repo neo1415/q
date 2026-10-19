@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import {
@@ -34,6 +34,10 @@ import {
   type OpenedFile,
 } from "./material-actions";
 import { useT } from "@/features/i18n/language";
+import {
+  materialUploadCompleteAction,
+  materialUploadTargetAction,
+} from "@/features/onboarding-kit/material-actions";
 
 /**
  * The Pitch deck tab (overnight plan A4-A6; design-a "deck-*" and "coach-*").
@@ -354,6 +358,101 @@ function qAsk(words: string) {
   return `/home?ask=${encodeURIComponent(words)}`;
 }
 
+/**
+ * "Upload a new version" (bug 2026-10-19): the file becomes version N+1 of
+ * this same deck document, never a second deck, so its sharing and
+ * download audience stay as they are and Q reads the new current version.
+ * The document id is input, not proof: Evidence finds it inside the
+ * caller's tenant and organisation and requires document.manage on it.
+ */
+function DeckNewVersion({
+  companyId,
+  documentId,
+}: {
+  readonly companyId: string;
+  readonly documentId: string;
+}) {
+  const t = useT();
+  const router = useRouter();
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const upload = async (file: File) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const target = await materialUploadTargetAction({
+        companyId,
+        existingDocumentId: documentId,
+        documentType: "PITCH_DECK",
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+      });
+      if (!target.ok) {
+        setError(target.message);
+        return;
+      }
+      const stored = await fetch(target.value.url, {
+        method: target.value.method,
+        headers: target.value.headers,
+        body: file,
+      })
+        .then((response) => response.ok)
+        .catch(() => false);
+      if (!stored) {
+        setError("The upload stopped. Try again.");
+        return;
+      }
+      const completed = await materialUploadCompleteAction(
+        target.value.uploadSessionId,
+      );
+      if (!completed.ok) {
+        setError(completed.message);
+        return;
+      }
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <input
+        ref={input}
+        type="file"
+        accept=".pdf,.ppt,.pptx,application/pdf"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        data-deck-new-version-input
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          event.currentTarget.value = "";
+          if (file !== undefined) void upload(file);
+        }}
+      />
+      <button
+        type="button"
+        className={buttonClassName("secondary", "regular")}
+        disabled={busy}
+        aria-busy={busy}
+        onClick={() => input.current?.click()}
+      >
+        <Upload size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+        {t("Upload a new version")}
+      </button>
+      {error === null ? null : (
+        <p role="alert" className="cq-body-sm text-(--cq-text-secondary)">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function DeckCoach({
   companyId,
   view,
@@ -417,13 +516,7 @@ export function DeckCoach({
               · Uploaded {longDay(deck.uploadedAt)}
             </p>
           </div>
-          <Link
-            href="/documents"
-            className={buttonClassName("secondary", "regular")}
-          >
-            <Upload size={ICON_SIZE.compact} aria-hidden="true" />{" "}
-            {t("Upload a new version")}
-          </Link>
+          <DeckNewVersion companyId={companyId} documentId={deck.documentId} />
         </div>
 
         {view.extraction !== null && !confirmed ? (
