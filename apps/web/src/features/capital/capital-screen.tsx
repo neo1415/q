@@ -32,7 +32,10 @@ import {
   FounderBook,
   InvestorBook,
   investorCommitments,
+  type UnrecordedInvestment,
 } from "./capital-book";
+import { MandateObservation, SavedCompaniesCard } from "./mandate-observation";
+import { CrmToastProvider } from "@/features/relationships/crm-kit";
 import { needsYouCount, nowCount } from "./capital-counts";
 import { NextSteps, RaiseSummary, StopYourRaise } from "./capital-overview";
 import { CapitalTabBar, TabBadge } from "./capital-tab-bar";
@@ -184,29 +187,80 @@ export async function CapitalScreen({
   }
 
   const [relationships, mine] = await Promise.all([
-    inCrm ? Promise.resolve(undefined) : relationshipsOf(context),
+    relationshipsOf(context),
     context.kind === "INVESTOR" ? investorCommitments() : Promise.resolve(null),
   ]);
+  // Invested with no commitment recorded at all: an unknown amount, said
+  // and recordable, never a zero (design 2026-10-20).
+  const withMoney = new Set(
+    (mine?.commitments ?? []).map((item) => item.counterpartId),
+  );
+  const unrecorded: UnrecordedInvestment[] = (relationships ?? []).flatMap(
+    (item) =>
+      item.state === "INVESTED" &&
+      item.counterpart.kind === "COMPANY" &&
+      !withMoney.has(item.counterpart.id)
+        ? [
+            {
+              relationshipId: item.relationshipId,
+              companyId: item.counterpart.id,
+              name: item.counterpart.name,
+              since: item.stateSince,
+            },
+          ]
+        : [],
+  );
   return (
     <div className="flex flex-col gap-10">
       {context.kind === "INVESTOR" ? (
-        <>
-          <PageSection id="commitments" title={t("My commitments")}>
-            {mine === null ? (
-              <QuietEmpty sentence="Your commitments couldn't load." retry />
-            ) : (
-              <InvestorBook mine={mine} />
-            )}
-          </PageSection>
-          <PageSection id="mandate" title={t("Your mandate")}>
-            <MandateSummary
-              investorOrganisationId={context.investorOrganisationId}
-            />
-            <div className="pt-4">
+        // Mandate beside the book (design 2026-10-20): what they declared
+        // on the left, what they committed on the right; Q's observation
+        // sits under the mandate and never rewrites it.
+        <CrmToastProvider>
+          <div
+            className="grid items-start gap-7 lg:grid-cols-[340px_minmax(0,1fr)]"
+            data-capital-investor
+          >
+            <aside
+              id="mandate"
+              aria-label={t("Your mandate")}
+              className="flex flex-col gap-3.5 lg:sticky lg:top-4"
+            >
+              <MandateSummary
+                investorOrganisationId={context.investorOrganisationId}
+              />
+              <Suspense fallback={null}>
+                <MandateObservation relationships={relationships} />
+              </Suspense>
+              <Suspense fallback={null}>
+                <SavedCompaniesCard />
+              </Suspense>
               <AskQChips asks={INVESTOR_ASKS} />
-            </div>
-          </PageSection>
-        </>
+            </aside>
+            <section
+              id="commitments"
+              aria-labelledby="book-title"
+              className="flex min-w-0 flex-col gap-3"
+            >
+              <div className="flex flex-wrap items-baseline gap-3">
+                <h2
+                  id="book-title"
+                  className="text-xl font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
+                >
+                  {t("Your book")}
+                </h2>
+                <span className="text-xs text-(--cq-text-tertiary)">
+                  {t("Received is confirmed by the company")}
+                </span>
+              </div>
+              {mine === null ? (
+                <QuietEmpty sentence="Your commitments couldn't load." retry />
+              ) : (
+                <InvestorBook mine={mine} unrecorded={unrecorded} />
+              )}
+            </section>
+          </div>
+        </CrmToastProvider>
       ) : (
         <PageSection id="rounds" title={t("Your raise")}>
           <QuietEmpty sentence="Your rounds couldn't load." retry />
