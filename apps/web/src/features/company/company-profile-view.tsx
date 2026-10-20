@@ -380,7 +380,9 @@ export function CompanyProfileView({
     <article
       className={
         investor
-          ? "grid grid-cols-1 gap-6 [grid-template-areas:'head'_'fit'_'tabs'_'body'] lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-x-10 lg:[grid-template-areas:'head_fit'_'tabs_fit'_'body_fit']"
+          ? // A tall fit column's spare height goes to the body row, never
+            // between the header and the tabs (owner 2026-10-20).
+            "grid grid-cols-1 content-start gap-6 [grid-template-areas:'head'_'fit'_'tabs'_'body'] lg:grid-cols-[minmax(0,1fr)_340px] lg:grid-rows-[auto_auto_1fr] lg:gap-x-10 lg:[grid-template-areas:'head_fit'_'tabs_fit'_'body_fit']"
           : "grid grid-cols-1 gap-6 [grid-template-areas:'head'_'tabs'_'body']"
       }
       aria-labelledby="company-name"

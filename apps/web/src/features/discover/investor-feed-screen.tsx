@@ -21,7 +21,7 @@ import { Button, buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
 import { useGlobalQ, useQMomentSource } from "@/components/app-shell/global-q";
-import { QAperture } from "@/features/q-aperture";
+import { QNavIcon } from "@/components/app-shell/q-nav-icon";
 import { Q_FEED_EVENT } from "@/features/q/client-actions";
 import { useQSessionOptional } from "@/features/q/q-session";
 import { QPageState } from "@/features/q/q-section";
@@ -811,8 +811,11 @@ function InvestorFeed({
       }
       overlay={({ openOptions }) => (
         <>
-          {controls.row("hidden lg:flex")}
-          <SavedAndPassedLinks className="hidden lg:flex" />
+          {/* The panel's tools on one line: filters, then Saved and Passed. */}
+          <div className="cq-feed-panel-tools hidden lg:flex">
+            {controls.row("flex min-w-0")}
+            <SavedAndPassedLinks className="flex shrink-0" />
+          </div>
           <FeedCard
             key={card.companyId}
             company={withVideo(card)}
@@ -836,9 +839,7 @@ function InvestorFeed({
             saved={decision.saved}
             deciding={feed.isDeciding(card.companyId)}
             showMedia={false}
-            askQMark={
-              <QAperture state={session?.presence.state ?? "IDLE"} size={24} />
-            }
+            askQMark={<QNavIcon size={20} aria-hidden="true" />}
             onSave={() =>
               decision.saved ? feed.unsave(card.companyId) : save()
             }

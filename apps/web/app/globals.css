@@ -2723,8 +2723,11 @@
       align-self: stretch;
       overflow-y: auto;
       gap: 16px;
-      /* Clear of the tabs above it. */
-      padding: 72px 4px 20px 0;
+      /* Clear of the tabs above it, with a reading margin on both sides. */
+      padding: 72px 24px 24px;
+      /* The panel scrolls by wheel, touch and keys without a bar of its own
+         in the middle of the page (owner 2026-10-20). */
+      scrollbar-width: none;
       background: var(--cq-app-canvas);
       color: var(--cq-app-text-primary);
       color-scheme: light dark;
@@ -2751,6 +2754,22 @@
     }
     .cq-feed-overlay:has([data-caption-open]) {
       background: var(--cq-app-canvas);
+    }
+    .cq-feed-overlay::-webkit-scrollbar {
+      display: none;
+    }
+    /* Filters, then Saved and Passed, on one quiet line. */
+    .cq-feed-panel-tools {
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--cq-border-subtle);
+    }
+    .cq-feed-panel-tools > :first-child {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
     .cq-feed-info,
     .cq-feed-more-body,
@@ -3037,7 +3056,7 @@
       .cq-discover-tabs {
       top: 16px;
       /* Over the dossier's column (Discover A's stage-and-dossier grid). */
-      inset-inline-start: calc((100% - min(560px, 100% - 420px)) / 1.25);
+      inset-inline-start: calc((100% - min(560px, 100% - 420px)) / 1.25 + 14px);
       transform: none;
     }
     .cq-discover:has(> div:not([hidden]) [data-feed-immersive])
