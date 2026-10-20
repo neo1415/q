@@ -19,6 +19,7 @@ import {
   type RequestDiligenceDocumentRequest,
 } from "@capital-q/contracts";
 
+import { getCurrentIdentity } from "@/auth/current-identity";
 import { apiSession } from "@/features/q/context";
 
 import {
@@ -181,6 +182,42 @@ export async function uploadAndFulfilAction(
       key.data,
     ),
   );
+}
+
+/**
+ * A shared document to read in place (request checklist, 2026-10-20): an
+ * inline, short-lived signed URL, and the reader's own name for the
+ * watermark over it. The watermark deters and attributes; it does not
+ * prevent a screenshot, and nothing claims it does. Opening it is what
+ * "Viewed" means to the founder.
+ */
+export async function diligenceViewAction(
+  relationshipId: string,
+  documentId: string,
+): Promise<
+  DiligenceResult<{ readonly url: string; readonly watermark: string }>
+> {
+  const id = Id.safeParse(relationshipId);
+  const document = Id.safeParse(documentId);
+  if (!id.success || !document.success)
+    return { ok: false, message: DOWNLOAD_UNAVAILABLE };
+  const [link, identity] = await Promise.all([
+    run(
+      async (session) =>
+        (await diligenceDownload(session, id.data, document.data, true)).url,
+      DOWNLOAD_UNAVAILABLE,
+    ),
+    getCurrentIdentity(),
+  ]);
+  if (!link.ok) return link;
+  const name =
+    identity.status === "AVAILABLE" ? identity.me.user.displayName : null;
+  // No "view only": a diligence share can also be downloaded.
+  const watermark = [name, new Date().toISOString().slice(0, 10)]
+    .filter((part): part is string => part !== null && part.trim() !== "")
+    .join(" · ")
+    .slice(0, 200);
+  return { ok: true, value: { url: link.value, watermark } };
 }
 
 export async function diligenceDownloadAction(

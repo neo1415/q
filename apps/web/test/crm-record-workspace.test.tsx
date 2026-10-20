@@ -175,7 +175,8 @@ describe("fit and interest stay separate", () => {
       />,
     );
     expect(screen.getByText("Fit with your mandate")).toBeDefined();
-    expect(screen.getByText("Your interest")).toBeDefined();
+    // The record prototype's two cards: "Fit with your mandate" and "Interest".
+    expect(screen.getByText("Interest")).toBeDefined();
     expect(screen.getByText("Not expressed")).toBeDefined();
     expect(screen.getByText("Couldn't be read right now")).toBeDefined();
     expect(document.body.textContent).not.toMatch(/\d+\s?%/);

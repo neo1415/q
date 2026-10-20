@@ -115,18 +115,27 @@ export function stripSteps(
   });
 }
 
+// Done is evidence on record (positive); the current step the accent; a
+// stage passed with no record of its own a hairline; ahead a quiet track.
 const BAR: Readonly<Record<StripStep["status"], string>> = {
-  done: "bg-(--cq-text-tertiary)",
+  done: "bg-(--cq-positive)",
   skipped: "bg-(--cq-border)",
   current: "bg-(--cq-accent)",
   ended: "bg-(--cq-text-secondary)",
-  next: "bg-(--cq-border-subtle)",
+  next: "bg-(--cq-surface-strong)",
 };
 
+/**
+ * The strip as the record prototype draws it: seven rounded bars in a row,
+ * each named underneath, done ticked, the current one in bold. `compact`
+ * is the Overview card's thinner form.
+ */
 export function DealStageStrip({
   view,
+  compact = false,
 }: {
   readonly view: Pick<DealViewDto, "stages" | "current" | "end">;
+  readonly compact?: boolean | undefined;
 }) {
   // Rendered only inside the client deal card; dealDay above stays usable
   // from server code.
@@ -135,13 +144,16 @@ export function DealStageStrip({
   return (
     <ol
       aria-label={t("Where this deal is")}
-      className="grid grid-cols-1 gap-1 sm:grid-flow-col sm:auto-cols-fr sm:gap-1.5"
+      className={`grid gap-1 sm:gap-1.5 ${compact ? "" : "mb-1"}`}
+      style={{
+        gridTemplateColumns: `repeat(${String(steps.length)}, minmax(0, 1fr))`,
+      }}
       data-deal-strip
     >
       {steps.map((step) => (
         <li
           key={step.key}
-          className="flex items-center justify-between gap-3 sm:flex-col sm:items-stretch sm:justify-start sm:gap-1.5"
+          className="flex min-w-0 flex-col gap-1.5"
           data-stage={step.key}
           data-status={step.status}
           aria-current={
@@ -149,36 +161,34 @@ export function DealStageStrip({
               ? "step"
               : undefined
           }
+          title={step.date ?? undefined}
         >
           <span
             aria-hidden="true"
-            className={`order-first hidden h-1.5 rounded-full sm:block ${BAR[step.status]}`}
+            className={`rounded-full transition-colors duration-(--cq-motion-emphasis) ${compact ? "h-1.5" : "h-2"} ${BAR[step.status]}`}
           />
           <span
-            className={`cq-body-sm ${
+            className={`cq-caption truncate max-sm:whitespace-normal max-sm:text-[11px] max-sm:leading-tight ${
               step.status === "current" || step.status === "ended"
                 ? "font-semibold text-(--cq-text-primary)"
-                : step.status === "done" || step.status === "skipped"
-                  ? "text-(--cq-text-secondary)"
-                  : "text-(--cq-text-tertiary)"
+                : "text-(--cq-text-tertiary)"
             }`}
           >
-            <span
-              aria-hidden="true"
-              className={`me-2 inline-block size-2 rounded-full sm:hidden ${BAR[step.status]}`}
-            />
+            {step.status === "done" && !compact ? (
+              <span aria-hidden="true">{"✓ "}</span>
+            ) : null}
             {t(step.label)}
-          </span>
-          <span className="cq-caption text-(--cq-text-tertiary)">
-            {step.status === "skipped" ? t("Not recorded") : (step.date ?? "")}
             <span className="sr-only">
+              {step.status === "skipped"
+                ? `, ${t("passed without its own record")}`
+                : step.date === null
+                  ? ""
+                  : `, ${step.date}`}
               {step.status === "next"
                 ? ` ${t("still ahead")}`
                 : step.status === "current"
                   ? ` ${t("(current)")}`
-                  : step.status === "skipped"
-                    ? `, ${t("passed without its own record")}`
-                    : ""}
+                  : ""}
             </span>
           </span>
         </li>

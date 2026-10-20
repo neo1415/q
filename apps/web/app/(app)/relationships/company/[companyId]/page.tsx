@@ -19,9 +19,11 @@ import {
 } from "@/features/relationships/record-workspace-data";
 import {
   FitAndInterest,
+  PitchClaim,
   recordGateqSlot,
   recordWorkSlot,
 } from "@/features/relationships/record-workspace-sections";
+import { pitchTermsOf } from "@/features/relationships/record-workspace";
 import { serverUiLanguage } from "@/features/i18n/server";
 import { serverT } from "@/features/i18n/server";
 
@@ -129,7 +131,14 @@ export default async function InvestorRelationshipPage({
                 ? { kind: "UNAVAILABLE" }
                 : { kind: "READ", value: own.interest }
             }
+            meetings={loaded.meetingsRead ? loaded.meetings : undefined}
+            now={loaded.meetingsRead ? loaded.readAt : undefined}
           />
+        }
+        pitchClaim={
+          pitchTermsOf(fit).length === 0 ? null : (
+            <PitchClaim terms={pitchTermsOf(fit)} />
+          )
         }
         work={recordWorkSlot(work)}
         absentSentence={loaded.absentSentence}

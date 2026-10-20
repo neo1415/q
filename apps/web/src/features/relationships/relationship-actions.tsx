@@ -11,6 +11,8 @@ import { ExpressInterest } from "@/features/network/express-interest";
 import { IncomingInterest } from "@/features/network/incoming-interest";
 import { useT } from "@/features/i18n/language";
 
+import { QCircle } from "./record-parts";
+
 /**
  * The relationship page's interactive parts (CQ-WEB-030).
  *
@@ -66,21 +68,34 @@ export function CompanyRelationshipActions({
  */
 export function AskQAboutRelationship({
   counterpart,
+  compact = false,
 }: {
   readonly counterpart: string;
+  /** The record header's short form: "Ask Q" beside Q's circled mark. */
+  readonly compact?: boolean | undefined;
 }) {
   const t = useT();
 
   const { askNow } = useGlobalQ();
+  const ask = () =>
+    askNow(
+      `Where does our relationship with ${counterpart} stand, what has happened so far, and what comes next?`,
+    );
+  if (compact) {
+    return (
+      <Button
+        variant="secondary"
+        className="h-11! rounded-(--cq-radius-md) px-3"
+        aria-label={t("Ask Q about this relationship")}
+        onClick={ask}
+      >
+        <QCircle />
+        {t("Ask Q")}
+      </Button>
+    );
+  }
   return (
-    <Button
-      variant="secondary"
-      onClick={() =>
-        askNow(
-          `Where does our relationship with ${counterpart} stand, what has happened so far, and what comes next?`,
-        )
-      }
-    >
+    <Button variant="secondary" onClick={ask}>
       <QAperture state="IDLE" size="chrome" />
       {t("Ask Q about this relationship")}
     </Button>

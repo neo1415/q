@@ -9,6 +9,7 @@ import { UtcTimestampSchema } from "../common/time.js";
  *
  *   GET  /v1/relationships/:relationshipId/meetings        the relationship's calls
  *   POST /v1/relationships/:relationshipId/meeting-slots   three free slots
+ *   POST /v1/relationships/:relationshipId/meeting-availability   own busy times, for the week
  *   POST /v1/relationships/:relationshipId/meetings        invite (idempotent)
  *   POST /v1/relationships/:relationshipId/meetings/join   Q joins a running Meet (idempotent)
  *   POST /v1/meetings/:meetingId/cancel                    organiser only
@@ -103,6 +104,38 @@ export const MeetingSlotsResponseSchema = z
   })
   .strict();
 export type MeetingSlotsResponse = z.infer<typeof MeetingSlotsResponseSchema>;
+
+/**
+ * The CRM's week of calls (2026-10-20): the person's OWN busy times over a
+ * window, so the week can be drawn with free hours to propose. Never the
+ * other side's calendar (reading theirs needs a consent that does not
+ * exist), never an event's title, attendees or link: an interval only.
+ *
+ *   POST /v1/relationships/:relationshipId/meeting-availability   own busy times (a read by POST)
+ */
+export const RELATIONSHIP_MEETING_AVAILABILITY_PATH =
+  "/v1/relationships/:relationshipId/meeting-availability" as const;
+
+export const MeetingAvailabilityRequestSchema = z
+  .object({
+    from: UtcTimestampSchema,
+    to: UtcTimestampSchema,
+    timeZone: TimeZoneSchema.optional(),
+  })
+  .strict();
+export type MeetingAvailabilityRequest = z.infer<
+  typeof MeetingAvailabilityRequestSchema
+>;
+
+export const MeetingAvailabilityResponseSchema = z
+  .object({
+    timeZone: TimeZoneSchema,
+    busy: z.array(MeetingSlotSchema).max(300),
+  })
+  .strict();
+export type MeetingAvailabilityResponse = z.infer<
+  typeof MeetingAvailabilityResponseSchema
+>;
 
 export const ScheduleMeetingRequestSchema = z
   .object({

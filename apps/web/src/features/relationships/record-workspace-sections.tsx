@@ -1,12 +1,15 @@
 import Link from "next/link";
 
-import type {
-  FitProfileDto,
-  InterestDto,
-  RelationshipGateqApplicationsDto,
+import {
+  FIT_PARAMETER_LABELS,
+  type FitProfileDto,
+  type InterestDto,
+  type MeetingDto,
+  type RelationshipGateqApplicationsDto,
 } from "@capital-q/contracts";
 import { ArrowUpRight, ICON_SIZE } from "@capital-q/ui/icons";
 
+import { FitGlyph, glyphKindOf, outcomeWord } from "@/features/fit/fit-glyph";
 import { RelationshipFitChips } from "@/features/fit/relationship-fit-chips";
 import { CompanyScoresLive } from "@/features/scores";
 
@@ -31,57 +34,184 @@ export function FitAndInterest({
   companyId,
   fit,
   interest,
+  meetings = [],
+  now,
 }: {
   /** Investability and Suitability beside the fit (ADR 0074); absent: not shown. */
   readonly companyId?: string | undefined;
   readonly fit: Read<FitProfileDto | null>;
   readonly interest: Read<InterestDto | null>;
+  /** The relationship's calls, for "held" and "booked" in Interest. */
+  readonly meetings?: readonly MeetingDto[] | undefined;
+  /** When the page was read: a call ended before it is held. */
+  readonly now?: number | undefined;
 }) {
   const t = serverTNow();
 
   const state = fitState(fit);
+  const profile = fit.kind === "READ" ? fit.value : null;
+  // Only what the investor declared counts: an undeclared parameter is
+  // neither known nor unknown here.
+  const declared =
+    profile === null
+      ? []
+      : profile.parameters.filter((parameter) => parameter.applicable);
+  const known = declared.filter((p) => p.outcome !== "UNKNOWN").length;
+  const read = now ?? 0;
+  const live = meetings.filter((m) => m.status === "SCHEDULED");
+  const held = live.filter((m) => Date.parse(m.endsAt) <= read).length;
+  const booked = live.length - held;
+  const card =
+    "flex min-w-0 flex-col gap-2.5 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-5 py-[18px]";
+  const heading = "cq-body-sm font-medium text-(--cq-text-secondary)";
   return (
-    <div className="flex flex-col gap-4">
-      {companyId === undefined ? null : (
-        <CompanyScoresLive companyId={companyId} variant="full" />
-      )}
-      <dl className="flex flex-col gap-4" data-fit-and-interest>
-        <div className="flex flex-col gap-1.5">
-          <dt className="cq-body-sm font-medium text-(--cq-text-primary)">
-            {t("Fit with your mandate")}
-          </dt>
-          <dd className="flex flex-col gap-1.5">
-            {state === "UNAVAILABLE" ? (
-              <span className="cq-body-sm text-(--cq-text-secondary)">
-                {t("Couldn't be read right now")}
-              </span>
-            ) : (
-              <RelationshipFitChips
-                profile={fit.kind === "READ" ? fit.value : null}
-              />
-            )}
-            <span className="cq-caption text-(--cq-text-secondary)">
+    <div className="grid gap-3.5 md:grid-cols-2" data-fit-and-interest>
+      <section aria-labelledby="rec-fit" className={card}>
+        <h3 id="rec-fit" className={heading}>
+          {t("Fit with your mandate")}
+        </h3>
+        {companyId === undefined ? null : (
+          <CompanyScoresLive companyId={companyId} variant="compact" />
+        )}
+        {state === "UNAVAILABLE" ? (
+          <span className="cq-body-sm text-(--cq-text-secondary)">
+            {t("Couldn't be read right now")}
+          </span>
+        ) : profile === null ? (
+          <RelationshipFitChips profile={null} />
+        ) : (
+          <>
+            <span className="cq-caption cq-numeric text-(--cq-text-tertiary)">
               {t(
-                "From your declared mandate and what the company has shared. Unknown stays unknown.",
+                `${String(known)} of ${String(declared.length)} criteria known`,
               )}
             </span>
-          </dd>
+            <ul className="flex flex-col">
+              {declared.map((parameter) => {
+                const kind = glyphKindOf(parameter);
+                return (
+                  <li
+                    key={parameter.parameter}
+                    className="cq-body-sm flex min-h-7 items-center gap-2.5"
+                    data-fit-row={kind}
+                  >
+                    <FitGlyph kind={kind} size={18} />
+                    <span className="flex-1 text-(--cq-text-primary)">
+                      {t(FIT_PARAMETER_LABELS[parameter.parameter])}
+                    </span>
+                    <span className="cq-caption text-(--cq-text-tertiary)">
+                      {t(outcomeWord(kind))}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+        <span className="cq-caption text-(--cq-text-tertiary)">
+          {t(
+            "From your declared mandate and what the company has shared. Unknown stays unknown.",
+          )}
+        </span>
+      </section>
+      <section aria-labelledby="rec-interest" className={card}>
+        <h3 id="rec-interest" className={heading}>
+          {t("Interest")}
+        </h3>
+        <div
+          className="cq-body-sm flex flex-col gap-2 text-(--cq-text-primary)"
+          data-interest-words
+        >
+          {interest.kind === "UNAVAILABLE" || interest.value === null ? (
+            <span>{t(interestWords(interest, dealDay))}</span>
+          ) : (
+            <>
+              <span>
+                {interest.value.status === "WITHDRAWN"
+                  ? t("You withdrew your interest.")
+                  : t(
+                      `You expressed interest on ${dealDay(interest.value.expressedAt)}.`,
+                    )}
+              </span>
+              {interest.value.status === "WITHDRAWN" ? null : (
+                <span>
+                  {t(
+                    acceptedWords(
+                      interest.value.response,
+                      interest.value.expressedAt,
+                      interest.value.respondedAt,
+                    ),
+                  )}
+                </span>
+              )}
+            </>
+          )}
+          {now === undefined || live.length === 0 ? null : (
+            <span>
+              {t(
+                `You've held ${String(held)} ${held === 1 ? "call" : "calls"}; ${String(booked)} ${booked === 1 ? "is" : "are"} booked.`,
+              )}
+            </span>
+          )}
         </div>
-        <div className="flex flex-col gap-1.5">
-          <dt className="cq-body-sm font-medium text-(--cq-text-primary)">
-            {t("Your interest")}
-          </dt>
-          <dd
-            className="cq-body-sm text-(--cq-text-secondary)"
-            data-interest-words
-          >
-            {t(interestWords(interest, dealDay))}
-          </dd>
-        </div>
-      </dl>
+        <span className="cq-caption text-(--cq-text-tertiary)">
+          {t(
+            "What you did, kept apart from fit. Neither is a score for the relationship.",
+          )}
+        </span>
+      </section>
     </div>
   );
 }
+
+/** Their answer to the interest, in words, with its day when known. */
+function acceptedWords(
+  response: InterestDto["response"],
+  expressedAt: string,
+  respondedAt: string | null,
+): string {
+  if (response === "PENDING") return "They haven't answered yet.";
+  const verb = response === "ACCEPTED" ? "accepted" : "declined";
+  if (respondedAt === null) return `They ${verb}.`;
+  return dealDay(respondedAt) === dealDay(expressedAt)
+    ? `They ${verb} the same day.`
+    : `They ${verb} on ${dealDay(respondedAt)}.`;
+}
+
+/**
+ * The pitch's round in one line, as their claim (record prototype's Pitch
+ * card): what the company stated and where, never verified here. Null when
+ * nothing is stated.
+ */
+export function PitchClaim({
+  terms,
+}: {
+  readonly terms: readonly {
+    readonly label: string;
+    readonly value: string;
+    readonly source: string;
+  }[];
+}) {
+  const t = serverTNow();
+  if (terms.length === 0) return null;
+  const sources = [...new Set(terms.map((term) => term.source))];
+  return (
+    <div className="flex flex-col gap-1.5" data-pitch-claim>
+      <p className="cq-body text-(--cq-text-primary)">
+        {terms.map((term) => `${t(term.label)} ${term.value}`).join(" · ")}{" "}
+        <span className="cq-caption inline-flex items-center rounded-full bg-(--cq-warning-soft) px-2 py-0.5 whitespace-nowrap text-(--cq-warning)">
+          {t("Founder's claim")}
+        </span>
+      </p>
+      <span className="cq-caption text-(--cq-text-tertiary)">
+        {t(`${capitalise(sources.join(" and "))}. Not verified.`)}
+      </span>
+    </div>
+  );
+}
+
+const capitalise = (text: string) =>
+  text.length === 0 ? text : `${text[0]?.toUpperCase() ?? ""}${text.slice(1)}`;
 
 /**
  * Q's work with this counterpart: each job that has a lane for them, with

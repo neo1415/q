@@ -89,6 +89,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH": cap(
     "tool.find_meeting_times",
   ),
+  // The CRM week: the person's own busy times, the same read as free times.
+  "api/http/schedule.ts POST RELATIONSHIP_MEETING_AVAILABILITY_PATH": cap(
+    "tool.find_meeting_times",
+  ),
   "api/http/schedule.ts GET MEETING_BRIEF_PATH": cap("tool.list_schedule"),
   "api/http/schedule.ts GET REMINDERS_PATH": cap("tool.list_schedule"),
   "api/http/schedule.ts GET NOTIFICATIONS_PATH": exempt(
@@ -1094,6 +1098,10 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/relationships/company/[companyId]/calls": cap("tool.open_page"),
   "/relationships/investor/[investorOrganisationId]/calls":
     cap("tool.open_page"),
+  // The record's deal and close (2026-10-20): the same deal tools as the card.
+  "/relationships/company/[companyId]/deal": cap("tool.open_page"),
+  "/relationships/investor/[investorOrganisationId]/deal":
+    cap("tool.open_page"),
 };
 
 const APPS = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -1158,7 +1166,8 @@ const CAPABILITY_IDS = new Set(Q_CAPABILITIES.map((c) => c.id));
  */
 // P5 (2026-10-05): 92 counted the operations console's 15 writes, which
 // ADR 0040 keeps exempt; they are now excluded by classification instead.
-const LEGACY_MUTATION_ROUTES_MAX = 77;
+// 2026-10-20: 76 once reads by POST stopped counting as writes.
+const LEGACY_MUTATION_ROUTES_MAX = 76;
 
 /**
  * Q room W5 (R8): a picture dropped on a document's placeholder in the Q
@@ -1278,6 +1287,7 @@ const HELD_RETRY: ReadonlySet<string> = new Set([
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([
   "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH",
+  "api/http/schedule.ts POST RELATIONSHIP_MEETING_AVAILABILITY_PATH",
 ]);
 
 /**
@@ -1372,6 +1382,8 @@ describe("every route and page is something Q can do, or exempt with a reason (R
         !Q_ROOM_DOCUMENT_DROPS.has(key) &&
         !Q_STANDING_SETTINGS.has(key) &&
         !HELD_RETRY.has(key) &&
+        // A read by POST (a search with a body) changes nothing.
+        !READS_BY_POST.has(key) &&
         // ADR 0040: the operations console stays exempt (never Q's to act
         // on), so its writes are not legacy waiting to migrate.
         ROUTE_COVERAGE[key] !== OPERATIONS_CONSOLE,

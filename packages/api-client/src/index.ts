@@ -293,6 +293,7 @@ export {
   dismissReminder,
   findMeetingSlots,
   getMeetingBrief,
+  findMeetingAvailability,
   listNotifications,
   listRelationshipMeetings,
   listReminders,

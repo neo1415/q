@@ -1,8 +1,9 @@
-import type {
-  FitProfileDto,
-  InterestDto,
-  QWorkDto,
-  RelationshipGateqApplicationsDto,
+import {
+  FIT_CONTEXT_SOURCE_LABELS,
+  type FitProfileDto,
+  type InterestDto,
+  type QWorkDto,
+  type RelationshipGateqApplicationsDto,
 } from "@capital-q/contracts";
 
 import {
@@ -91,6 +92,37 @@ export function interestWords(
     : value.response === "DECLINED"
       ? `${since} · they declined`
       : `${since} · awaiting their answer`;
+}
+
+/**
+ * What the company stated about its round, from the fit's own context
+ * (a pitch, a confirmed deck): the raise, the instrument, the cap. Their
+ * claim, never scored and never verified here. The investor's own mandate
+ * values are left out. Empty when fit is not set up or nothing is stated.
+ */
+export function pitchTermsOf(fit: Read<FitProfileDto | null>): readonly {
+  readonly label: string;
+  readonly value: string;
+  readonly source: string;
+}[] {
+  if (fit.kind !== "READ" || fit.value === null) return [];
+  return fit.value.parameters
+    .filter(
+      (parameter) =>
+        parameter.parameter === "ROUND_TERMS" ||
+        parameter.parameter === "CHEQUE_SIZE",
+    )
+    .flatMap((parameter) => parameter.context?.items ?? [])
+    .filter((item) => item.source !== "YOUR_MANDATE")
+    .filter(
+      (item, index, all) =>
+        all.findIndex((other) => other.label === item.label) === index,
+    )
+    .map((item) => ({
+      label: item.label,
+      value: item.value,
+      source: FIT_CONTEXT_SOURCE_LABELS[item.source].toLowerCase(),
+    }));
 }
 
 /** Fit with the investor's declared mandate: a band, or why there is none. */

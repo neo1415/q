@@ -197,6 +197,14 @@
   --cq-stage-q-core: oklch(0.985 0.014 85);
   --cq-stage-q-bloom: oklch(0.7 0.17 258 / 0.48);
   --cq-stage-q-ember: oklch(0.63 0.035 258);
+  /*
+   * Warm charcoal (CRM record, calls and deal, owner 2026-10-20): the dark
+   * surfaces and primary buttons of those pages only, warm rather than
+   * black. Read through a page scope (.cq-charcoal), never directly.
+   */
+  --cq-charcoal: oklch(0.33 0.014 70);
+  --cq-charcoal-hover: oklch(0.29 0.012 70);
+  --cq-on-charcoal: oklch(0.96 0.014 85);
 }
 
 @media (min-width: 640px) {
@@ -264,6 +272,10 @@
     --cq-q-ember: oklch(0.63 0.035 258);
     --cq-q-sweep: var(--cq-q-core);
     --cq-q-ink: 0;
+    /* Warm charcoal reads as a warm light on a dark canvas. */
+    --cq-charcoal: oklch(0.86 0.018 80);
+    --cq-charcoal-hover: oklch(0.9 0.016 80);
+    --cq-on-charcoal: oklch(0.2 0.012 70);
   }
 }
 
@@ -318,6 +330,9 @@
   --cq-q-ember: oklch(0.63 0.035 258);
   --cq-q-sweep: var(--cq-q-core);
   --cq-q-ink: 0;
+  --cq-charcoal: oklch(0.86 0.018 80);
+  --cq-charcoal-hover: oklch(0.9 0.016 80);
+  --cq-on-charcoal: oklch(0.2 0.012 70);
 }
 
 @layer base {

@@ -51,6 +51,13 @@ vi.mock("../src/features/chat/chat-actions", () => ({
   reportChatAction: (...args: unknown[]) => report(...args),
 }));
 
+const startDraft = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+const readDraft = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+vi.mock("../src/features/chat/reply-draft-actions", () => ({
+  startReplyDraftAction: (...args: unknown[]) => startDraft(...args),
+  readReplyDraftAction: (...args: unknown[]) => readDraft(...args),
+}));
+
 const { RelationshipChat } =
   await import("../src/features/chat/relationship-chat");
 const { voiceContainer } = await import("../src/features/chat/voice-recorder");
@@ -90,6 +97,38 @@ afterEach(() => {
   send.mockReset();
   block.mockReset();
   report.mockReset();
+});
+
+describe("Draft a reply (inbox split, 2026-10-20)", () => {
+  it("fills the composer with Q's draft, labelled as Q's, and sends nothing", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    startDraft.mockResolvedValue({
+      ok: true,
+      value: { runId: "00000000-0000-4000-8000-00000000e001" },
+    });
+    readDraft.mockResolvedValue({
+      ok: true,
+      value: { done: true, text: "Thanks, Ada. Could you send the method?" },
+    });
+    render(
+      <RelationshipChat
+        relationshipId={REL}
+        counterpart="Apex"
+        initial={thread("OPEN")}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Draft a reply" }));
+      await vi.advanceTimersByTimeAsync(1600);
+    });
+    expect(startDraft).toHaveBeenCalledWith(REL, "Apex");
+    expect(
+      screen.getByLabelText<HTMLTextAreaElement>("Message Apex").value,
+    ).toBe("Thanks, Ada. Could you send the method?");
+    expect(screen.getByText(/Draft by Q from your conversation/u)).toBeTruthy();
+    expect(send).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
 });
 
 describe("RelationshipChat", () => {

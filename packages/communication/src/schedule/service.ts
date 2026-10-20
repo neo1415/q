@@ -226,6 +226,24 @@ export type ScheduleService = {
       readonly slots: readonly Interval[];
     }>
   >;
+  /**
+   * The CRM week (2026-10-20): the person's OWN busy intervals over a
+   * window of at most two weeks, to draw their week. The same precheck as
+   * findSlots (a party, connected, their own calendar); never the other
+   * side's calendar and never an event's details, only when it is busy.
+   */
+  readonly busyTimes: (input: {
+    readonly actor: ActorContext;
+    readonly relationshipId: string;
+    readonly from: Date;
+    readonly to: Date;
+    readonly timeZone?: string | undefined;
+  }) => Promise<
+    ScheduleOutcome<{
+      readonly timeZone: string;
+      readonly busy: readonly Interval[];
+    }>
+  >;
   /** The person's own Google Calendar zone, or null when unknown. */
   readonly timeZoneOf: (actor: ActorContext) => Promise<string | null>;
   /**
@@ -782,6 +800,39 @@ export function createScheduleService(
             timeZone,
             busy,
           }),
+        };
+      } catch (error: unknown) {
+        return failed(error);
+      }
+    },
+
+    busyTimes: async (input) => {
+      if (
+        input.to <= input.from ||
+        input.to.getTime() - input.from.getTime() > 14 * 24 * 3_600_000
+      ) {
+        return refusal("INVALID_TIME");
+      }
+      const checked = await precheck(input.actor, input.relationshipId);
+      if (typeof checked === "string") return refusal(checked);
+      try {
+        const timeZone = await organiserZone(checked, input.timeZone);
+        const busy = await checked.busy({ from: input.from, to: input.to });
+        // Intervals only, clipped to the window: no title, no attendees.
+        return {
+          outcome: "OK",
+          timeZone,
+          busy: busy
+            .map((interval) => ({
+              start: new Date(
+                Math.max(interval.start.getTime(), input.from.getTime()),
+              ),
+              end: new Date(
+                Math.min(interval.end.getTime(), input.to.getTime()),
+              ),
+            }))
+            .filter((interval) => interval.end > interval.start)
+            .slice(0, 300),
         };
       } catch (error: unknown) {
         return failed(error);

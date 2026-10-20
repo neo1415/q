@@ -7,6 +7,7 @@ import {
   RelationshipUnavailable,
 } from "@/features/relationships/relationship-detail";
 import {
+  DiligenceAskButton,
   DiligenceUnavailable,
   RelationshipDiligence,
 } from "@/features/relationships/relationship-diligence";
@@ -68,6 +69,11 @@ export default async function InvestorDiligencePage({
         diligence={diligence}
         meetings={loaded.meetings}
         readAt={loaded.readAt}
+        action={
+          diligence !== null && diligence.open ? (
+            <DiligenceAskButton />
+          ) : undefined
+        }
       >
         {diligence === null ? (
           <DiligenceUnavailable href={`${basePath}/diligence`} />

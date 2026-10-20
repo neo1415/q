@@ -29,7 +29,7 @@ vi.mock("../src/features/relationships/relationship-outcome", () => ({
 }));
 
 const { journeyStep } = await import("../src/features/relationships/journey");
-const { RelationshipHero } =
+const { RelationshipHero, RelationshipJourney } =
   await import("../src/features/relationships/relationship-detail");
 
 afterEach(cleanup);
@@ -73,18 +73,33 @@ describe("the relationship journey (design-48)", () => {
   });
 
   it("says the state in words, with the step, and marks the current step", () => {
+    // Record prototype (2026-10-20): the header carries the state as a
+    // pill; the journey, dated, opens the Overview's evidence.
     render(
-      <RelationshipHero
-        counterpart="Savanna Seed Partners"
-        relationship={rel("IN_DILIGENCE", ["CONNECTED", "MEETING_HELD"])}
-        profile={profile}
-      />,
+      <>
+        <RelationshipHero
+          counterpart="Savanna Seed Partners"
+          relationship={rel("IN_DILIGENCE", ["CONNECTED", "MEETING_HELD"])}
+          profile={profile}
+        />
+        <RelationshipJourney
+          relationship={rel("IN_DILIGENCE", [
+            "CONNECTED",
+            "MEETING_HELD",
+            "IN_DILIGENCE",
+          ])}
+        />
+      </>,
     );
+    expect(
+      document.querySelector("[data-state-pill=IN_DILIGENCE]")?.textContent,
+    ).toBe("In diligence");
     const line = document.querySelector("[data-relationship-state]");
     expect(line?.textContent).toContain("In diligence · 4 of 5");
-    expect(
-      screen.getByText("Diligence").closest("li")?.getAttribute("aria-current"),
-    ).toBe("step");
+    const current = screen.getByText("Diligence").closest("li");
+    expect(current?.getAttribute("aria-current")).toBe("step");
+    // The step reached carries its day: "since 3 Oct".
+    expect(current?.textContent).toContain("since 3 Oct");
     expect(document.querySelector(".cq-glow-card")).toBeNull();
   });
 });

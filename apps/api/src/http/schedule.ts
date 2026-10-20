@@ -4,6 +4,8 @@ import {
   createProblemDetails,
   MarkNotificationsReadRequestSchema,
   MEETING_BRIEF_PATH,
+  MeetingAvailabilityRequestSchema,
+  MeetingAvailabilityResponseSchema,
   MeetingBriefDtoSchema,
   MeetingListSchema,
   MeetingSlotsRequestSchema,
@@ -14,6 +16,7 @@ import {
   NotificationListSchema,
   parseContract,
   PROBLEM_CONTENT_TYPE,
+  RELATIONSHIP_MEETING_AVAILABILITY_PATH,
   RELATIONSHIP_MEETING_SLOTS_PATH,
   RELATIONSHIP_MEETINGS_PATH,
   REMINDERS_PATH,
@@ -134,6 +137,36 @@ export function registerScheduleRoutes(
       return MeetingSlotsResponseSchema.parse({
         timeZone: found.timeZone,
         slots: found.slots.map((slot) => ({
+          startsAt: slot.start.toISOString(),
+          endsAt: slot.end.toISOString(),
+        })),
+      });
+    },
+  );
+
+  // The CRM week (2026-10-20): the person's own busy times, intervals only.
+  app.post(
+    RELATIONSHIP_MEETING_AVAILABILITY_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const input = parseContract(
+        MeetingAvailabilityRequestSchema,
+        request.body ?? {},
+        "The availability request is not valid.",
+      );
+      const found = await schedule.busyTimes({
+        actor: getActorContext(request),
+        relationshipId: param(request, "relationshipId"),
+        from: new Date(input.from),
+        to: new Date(input.to),
+        timeZone: input.timeZone,
+      });
+      if (found.outcome !== "OK")
+        return send(reply, problemFor(request, found));
+      void reply.header("Cache-Control", "no-store");
+      return MeetingAvailabilityResponseSchema.parse({
+        timeZone: found.timeZone,
+        busy: found.busy.map((slot) => ({
           startsAt: slot.start.toISOString(),
           endsAt: slot.end.toISOString(),
         })),

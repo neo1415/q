@@ -7,7 +7,9 @@ import {
   cancelMeeting,
   createReminder,
   dismissReminder,
+  findMeetingAvailability,
   findMeetingSlots,
+  getMeetingBrief,
   joinMeetingCall,
   markNotificationsRead,
   scheduleMeeting,
@@ -21,6 +23,8 @@ import {
   ReminderTitleSchema,
   TimeZoneSchema,
   UtcTimestampSchema,
+  type MeetingAvailabilityResponse,
+  type MeetingBriefDto,
   type MeetingDto,
   type MeetingSlotsResponse,
   type ReminderDto,
@@ -94,6 +98,45 @@ export async function findSlotsAction(
       ...(zone.data === undefined ? {} : { timeZone: zone.data }),
     }),
   );
+}
+
+/**
+ * The CRM week (2026-10-20): the person's own busy times for the days on
+ * screen, from their own calendar. Intervals only; the API checks the
+ * party, the connection and the calendar exactly as for free times.
+ */
+export async function weekAvailabilityAction(
+  relationshipId: string,
+  from: string,
+  to: string,
+  timeZone: string | undefined,
+): Promise<ScheduleActionResult<MeetingAvailabilityResponse>> {
+  const parsed = z
+    .object({
+      relationshipId: Id,
+      from: UtcTimestampSchema,
+      to: UtcTimestampSchema,
+      timeZone: TimeZoneSchema.optional(),
+    })
+    .safeParse({ relationshipId, from, to, timeZone });
+  if (!parsed.success) return invalid;
+  const { relationshipId: id, ...request } = parsed.data;
+  return run((session) =>
+    findMeetingAvailability(session, id, {
+      from: request.from,
+      to: request.to,
+      ...(request.timeZone === undefined ? {} : { timeZone: request.timeZone }),
+    }),
+  );
+}
+
+/** A call's prep brief, the person's own (the API answers only its party). */
+export async function meetingBriefAction(
+  meetingId: string,
+): Promise<ScheduleActionResult<MeetingBriefDto>> {
+  const id = Id.safeParse(meetingId);
+  if (!id.success) return invalid;
+  return run((session) => getMeetingBrief(session, id.data));
 }
 
 export async function bookMeetingAction(input: {
