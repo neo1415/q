@@ -97,3 +97,54 @@ describe("following the newest message", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * Founder report 2026-10-20: a reply reported in pieces showed each piece
+ * as its own row, split around the stored answer.
+ */
+describe("a spoken reply in pieces", () => {
+  const pieces = [
+    {
+      id: "u1",
+      role: "user" as const,
+      text: "Who should I pitch?",
+      after: "t1",
+    },
+    { id: "q1", role: "q" as const, text: "I'm pulling your", after: "t1" },
+    { id: "q2", role: "q" as const, text: "best fit investors", after: "t1" },
+    { id: "q3", role: "q" as const, text: "now.", after: "t1" },
+  ];
+
+  it("is one row under the first piece's id", () => {
+    expect(spokenNotYetStored(pieces, [])).toEqual([
+      pieces[0],
+      {
+        id: "q1",
+        role: "q",
+        text: "I'm pulling your best fit investors now.",
+        after: "t1",
+      },
+    ]);
+  });
+
+  it("gives way as a whole once the stored reply exists", () => {
+    expect(
+      spokenNotYetStored(pieces, [
+        { kind: "PERSON", text: "Who should I pitch?" },
+        { kind: "Q", text: "For Nixo, the most beneficial investors..." },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("keeps two replies heard at different places apart", () => {
+    expect(
+      spokenNotYetStored(
+        [
+          { id: "q1", role: "q" as const, text: "Welcome back.", after: null },
+          { id: "q2", role: "q" as const, text: "Here it is.", after: "t2" },
+        ],
+        [],
+      ).map((line) => line.id),
+    ).toEqual(["q1", "q2"]);
+  });
+});

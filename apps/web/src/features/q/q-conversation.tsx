@@ -91,7 +91,6 @@ import {
 import { useBoardMarks } from "./q-board";
 import { QNow } from "./q-now";
 import { QCanSee } from "./q-can-see";
-import { QRollingCaption } from "./q-rolling-caption";
 import { QPresenceStage, showOnStage } from "./q-presence-stage";
 import { useQSession } from "./q-session";
 import { QSurfaceToolsContext, type QSurfaceTools } from "./q-surface-tools";
@@ -656,20 +655,6 @@ export function QConversationPanel({
   // The voice room (owner 2026-10-19): the arrival's room-sized Q gathers
   // into the stage's cloud whenever Q is doing anything at all.
   const stagePixels = useStageApertureSize();
-  // What the rolling captions show: the words being heard now, else the
-  // newest line of the conversation (Q's reply as it is said).
-  const newestLine = thread.at(-1);
-  const saying: {
-    readonly text: string;
-    readonly speaker: "person" | "q";
-  } | null = liveIsPerson
-    ? { text: live.text, speaker: "person" }
-    : newestLine === undefined
-      ? null
-      : {
-          text: plainFromMarkdown(newestLine.text),
-          speaker: newestLine.role === "person" ? "person" : "q",
-        };
   const roomGathered =
     voice.active ||
     q.working ||
@@ -1066,7 +1051,7 @@ export function QConversationPanel({
                   ))}
                 </div>
               ) : null}
-              {conversing && view === "presence" ? (
+              {conversing && view === "presence" && !voice.active ? (
                 <button
                   type="button"
                   aria-pressed={captions}
@@ -1271,21 +1256,17 @@ export function QConversationPanel({
                       onShowingChange={setObjectShown}
                       onCardsShowingChange={setStageCards}
                       turns={turns}
-                      captions={captions}
+                      captions={captions || voice.active}
                       caption={
                         voice.active ? (
-                          // The voice room's rolling captions: only the
-                          // words being said now (the transcript is Chat).
+                          // The voice room shows no captions (owner
+                          // 2026-10-20: words appearing and leaving moved
+                          // the room up and down); only its way out, in a
+                          // place that never moves. The transcript is Chat.
                           <div
-                            className="flex w-full flex-col items-center gap-4"
-                            data-q-voice-captions
+                            className="flex w-full flex-col items-center"
+                            data-q-voice-room-end
                           >
-                            {saying === null ? null : (
-                              <QRollingCaption
-                                text={saying.text}
-                                speaker={saying.speaker}
-                              />
-                            )}
                             <button
                               type="button"
                               className="cq-room-end"

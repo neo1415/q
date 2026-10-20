@@ -3583,36 +3583,6 @@
     }
   }
 
-  /* Rolling captions: the words being said now, large, under Q. */
-  .cq-rolling-caption {
-    margin: 0 auto;
-    max-width: 42rem;
-    min-height: 3lh;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    text-align: center;
-    text-wrap: balance;
-    font-size: 22px;
-    line-height: 1.4;
-    font-weight: 500;
-    color: var(--cq-stage-text);
-    overflow-wrap: anywhere;
-  }
-  .cq-rolling-caption.is-q {
-    font-size: 19px;
-    font-weight: 400;
-    color: var(--cq-stage-text-muted);
-  }
-  @media (max-width: 639px) {
-    .cq-rolling-caption {
-      font-size: 18px;
-      min-height: 4lh;
-    }
-    .cq-rolling-caption.is-q {
-      font-size: 17px;
-    }
-  }
   /* The voice room's one way out of the line, round so it reads as a key. */
   .cq-room-end {
     display: inline-flex;

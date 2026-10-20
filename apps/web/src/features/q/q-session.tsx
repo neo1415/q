@@ -575,9 +575,9 @@ export function QSessionProvider({
     setHeardAfter(next);
   }
   const spokenOnly = spokenNotYetStored(
-    spoken,
+    spoken.map((line) => ({ ...line, after: heardAfter.get(line.id) })),
     turns.map((turn) => ({ kind: turn.kind, text: turn.text })),
-  ).map((line) => ({ ...line, after: heardAfter.get(line.id) }));
+  );
 
   const state = apertureStateFor({
     voice: voice.active ? voice.client.state : null,

@@ -83,10 +83,37 @@ export type StoredTurnText = {
  * it, and once that line is stored with a Q turn after it, the stored
  * reply is the one shown.
  */
-export function spokenNotYetStored(
+/**
+ * Q's reply as one line. Some voice lines report a reply in pieces, each
+ * under its own key ("I'm pulling your", "best fit investors", "now."),
+ * and each piece became its own row in the thread, split around the
+ * stored answer (founder report 2026-10-20). Consecutive Q lines heard
+ * at the same place in the thread are one reply: they join under the
+ * first piece's id, so the reply keeps its place, and carry the latest
+ * piece's turn.
+ */
+export function joinReplies(
   spoken: readonly SpokenLine[],
+): readonly SpokenLine[] {
+  const out: SpokenLine[] = [];
+  for (const line of spoken) {
+    const last = out.at(-1);
+    if (last?.role === "q" && line.role === "q" && last.after === line.after) {
+      out[out.length - 1] = {
+        ...last,
+        text: `${last.text} ${line.text}`.trim(),
+        ...(line.turnId === undefined ? {} : { turnId: line.turnId }),
+      };
+    } else out.push(line);
+  }
+  return out;
+}
+
+export function spokenNotYetStored(
+  pieces: readonly SpokenLine[],
   storedTurns: readonly StoredTurnText[],
 ): readonly SpokenLine[] {
+  const spoken = joinReplies(pieces);
   const stored = new Set(storedTurns.map((turn) => asWords(turn.text)));
   /** Person turns, by words, that already have a stored reply after them. */
   const answered = new Set<string>();
