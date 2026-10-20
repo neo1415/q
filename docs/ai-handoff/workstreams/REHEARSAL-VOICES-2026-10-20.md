@@ -87,8 +87,23 @@ Deepgram Flux `eot_threshold 0.85`, `eot_timeout_ms 4000` for every line (`provi
 
 ## 4. Gates
 
-(filled in below after running)
+Run on Windows, 2026-10-20/21, keys disabled (no live provider call in any test):
+
+- `pnpm exec turbo run build --filter=./packages/*`: 53/53 successful.
+- `vitest run apps/q-api/test/rehearsal-voices.test.ts`: 42/42 passed (picker, place → accent, fallbacks, sticky voice, unknown → neutral, age/patience, spec, tone settings, v3 peaks, refusal kinds, relay: v4 turbo + persona settings, Q's voice untouched, angry line → v3 tags, impatient line → turbo voice settings, English-only → flash v2, missing voice → premade, missing model → skipped and remembered, unknown id never Q's voice, Flux end of turn).
+- Existing suites touched by this change (voice-speak-elevenlabs, voice-rehearsal-delivery, voice-laugh, voice-speech-performance, voice-session-token, rehearsals, voice-language, q-voice, voice-synthesis, external-investor-rehearsal, packages/config): 24 files, 298/298 passed.
+- `tsc --noEmit -p apps/q-api/tsconfig.json`: exit 0.
+- eslint on changed .ts files: clean (one exhaustive-switch error fixed).
+- prettier --check on changed files: clean (`.env.example` has no prettier parser).
+- Root typecheck (`tsc --noEmit -p tsconfig.json`, includes tests): exit 0 after adding `voiceProfile` to the billing-gates test stub; billing-gates 7/7.
 
 ## 5. Live check
 
-(filled in below)
+**OPEN.** Q has no ElevenLabs key locally (only in Railway). The coordinating session said not to use Kuuza's key and is asking the owner how to supply Q's. Nothing live was called, nothing was spent, no Tavus room was opened.
+
+When a key is available (env `ELEVENLABS_API_KEY`, never committed):
+
+1. `node --import ../../scripts/dev-env.mjs src/dev/sync-voice-catalog.ts` in `apps/q-api` → re-generates `catalog-data.ts` from Q's own account; review and commit.
+2. v4 availability: one `GET https://api.elevenlabs.io/v1/models` (free) and look for `eleven_v4_turbo`. If absent, the relay already skips it (MODEL_UNAVAILABLE) and serves flash v2.5; pin `Q_REHEARSAL_TTS_MODEL=eleven_flash_v2_5` to avoid the first refused call.
+3. ~10 one-sentence samples (Emirati male skeptical, Nigerian female warm, British male impatient, …) on v4 turbo and v3, measuring first-byte latency; well under $1.
+4. Check that v4 turbo honours `<break>`/audio tags before widening its markup (today: neither is sent).
