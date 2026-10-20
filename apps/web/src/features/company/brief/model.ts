@@ -167,7 +167,11 @@ export function keyNumbers(input: {
   const words = input.raiseWords ?? null;
   if (words !== null && (words.amount !== null || terms.amount === undefined)) {
     // The same raise, in the same words, as the Discover card (R2).
-    out.push({ label: "Raising", value: words.amount ?? words.label, raise: words });
+    out.push({
+      label: "Raising",
+      value: words.amount ?? words.label,
+      raise: words,
+    });
   } else {
     const raising = terms.amount ?? input.raise;
     if (raising !== null) out.push({ label: "Raising", value: raising });

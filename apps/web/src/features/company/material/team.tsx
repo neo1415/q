@@ -218,7 +218,9 @@ export function TeamTab({
             <span className="cq-brief-dot" data-k="ok" />
             <div>
               <b>{member.name}’s identity</b>
-              <span className="cq-brief-label">{t("Checked by Capital Q")}</span>
+              <span className="cq-brief-label">
+                {t("Checked by Capital Q")}
+              </span>
             </div>
           </div>
         ))}

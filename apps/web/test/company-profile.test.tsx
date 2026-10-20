@@ -397,10 +397,12 @@ describe("the profile, for an investor", () => {
         ?.textContent,
     ).toBe("Not shared with you");
     expect(screen.getByText("Raise not shared with you")).toBeTruthy();
-    expect(screen.getAllByText("Not shared with you yet").length).toBeGreaterThan(
-      0,
+    expect(
+      screen.getAllByText("Not shared with you yet").length,
+    ).toBeGreaterThan(0);
+    expect(document.body.textContent).not.toMatch(
+      /doesn.t exist|no deck exists/iu,
     );
-    expect(document.body.textContent).not.toMatch(/doesn.t exist|no deck exists/iu);
     expect(
       screen.queryByRole("button", { name: /Download pitch deck/ }),
     ).toBeNull();
@@ -431,7 +433,9 @@ describe("the profile, for an investor", () => {
         ?.textContent,
     ).toBe("Not shared with you yet");
     expect(
-      screen.getByRole("link", { name: "Ask in diligence" }).getAttribute("href"),
+      screen
+        .getByRole("link", { name: "Ask in diligence" })
+        .getAttribute("href"),
     ).toBe("/relationships/company/x#diligence");
     expect(screen.getByText("Cap table")).toBeTruthy();
   });
@@ -459,7 +463,10 @@ describe("the team (ADR 0041)", () => {
   it("shows no team section when none is shown to this reader", () => {
     const base = investorProfile();
     if (base.overview === null) throw new Error("expected an overview");
-    renderProfile({ ...base, overview: { ...base.overview, team: [] } }, "team");
+    renderProfile(
+      { ...base, overview: { ...base.overview, team: [] } },
+      "team",
+    );
     expect(screen.queryByRole("region", { name: "Team" })).toBeNull();
   });
 });
@@ -612,9 +619,9 @@ describe("the overview, decluttered, with what the pitch says", () => {
   it("still says not shared when there is no raise from the pitch (unknown stays unknown)", () => {
     renderProfile(withPitch({ raiseFromPitch: null, pitchClaims: [] }));
     // No figure at all: no key numbers, and the header says not shared.
-    expect(stripText(withPitch({ raiseFromPitch: null, pitchClaims: [] }))).toBe(
-      "",
-    );
+    expect(
+      stripText(withPitch({ raiseFromPitch: null, pitchClaims: [] })),
+    ).toBe("");
     expect(screen.getByText("Raise not shared with you")).toBeTruthy();
     expect(
       document.querySelector("[data-overview-fold=company-traction]")

@@ -311,8 +311,12 @@ describe("a pitch figure and unshared round details never read as a contradictio
     renderProfile(PITCH, "INVESTOR", deck);
     // Profile option 1: the terms are rows of the raise, each the deck's
     // claim with its slide; the lead the deck does not name, not known yet.
-    const terms = document.querySelector('[data-overview-fold="company-raise"]');
-    expect(terms?.textContent).toContain("Post-money SAFEFounder’s claimDeck, slide 12");
+    const terms = document.querySelector(
+      '[data-overview-fold="company-raise"]',
+    );
+    expect(terms?.textContent).toContain(
+      "Post-money SAFEFounder’s claimDeck, slide 12",
+    );
     expect(terms?.textContent).toContain("$30m");
     expect(terms?.textContent).toContain("$100k");
     expect(terms?.textContent).toContain(

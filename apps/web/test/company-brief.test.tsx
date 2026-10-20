@@ -98,9 +98,9 @@ describe("the next-step journey", () => {
     });
     expect(journey?.steps[0]?.kind).toBe("CONNECT");
     expect(journey?.steps[0]?.action).toBe("Express interest");
-    expect(
-      journey?.steps.slice(1).every((step) => step.mark === "LATER"),
-    ).toBe(true);
+    expect(journey?.steps.slice(1).every((step) => step.mark === "LATER")).toBe(
+      true,
+    );
     const pending = journeyFor({
       ...BASE,
       state: "INTEREST_EXPRESSED",
@@ -119,13 +119,11 @@ describe("the next-step journey", () => {
       "21 Oct, 14:00",
     );
     const meetings = fixtures.reviewMeetings();
-    expect(nextCallOf(meetings, Date.parse("2030-01-01"))?.hasBrief).toBe(
-      true,
-    );
+    expect(nextCallOf(meetings, Date.parse("2030-01-01"))?.hasBrief).toBe(true);
     expect(nextCallOf(meetings, Date.parse("2031-01-01"))).toBeNull();
     expect(
       nextCallOf(
-        [{ ...meetings[0]!, status: "CANCELLED" }],
+        meetings.map((m) => ({ ...m, status: "CANCELLED" as const })),
         Date.parse("2030-01-01"),
       ),
     ).toBeNull();
@@ -274,8 +272,9 @@ describe("the section-by-section track", () => {
     );
     expect(screen.getByText("1 of 3 · Problem")).toBeTruthy();
     expect(
-      (screen.getByRole("button", { name: "Previous section" }) as HTMLButtonElement)
-        .disabled,
+      screen
+        .getByRole("button", { name: "Previous section" })
+        .hasAttribute("disabled"),
     ).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Next section" }));
     expect(screen.getByText("2 of 3 · Moats")).toBeTruthy();

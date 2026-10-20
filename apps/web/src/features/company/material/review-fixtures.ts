@@ -189,7 +189,7 @@ export function reviewProfile(
             title: "Traction update, September",
           },
         ],
-  } as CompanyProfileDto;
+  };
 }
 
 const doc = (
@@ -801,7 +801,11 @@ export function reviewFit(): FitCompanyDto {
       applicable: false,
     }),
     param("TEAM", "UNKNOWN", "No preference declared", { applicable: false }),
-    param("THESIS", "PARTIAL", "Claims automation overlaps part of your thesis"),
+    param(
+      "THESIS",
+      "PARTIAL",
+      "Claims automation overlaps part of your thesis",
+    ),
     param("ROUND_TERMS", "UNKNOWN", "A SAFE is stated in the pitch", {
       stated: true,
     }),
@@ -840,7 +844,10 @@ export function reviewFit(): FitCompanyDto {
         },
         stage: "Seed",
         up: [
-          { label: "Traction", detail: "Dated revenue in the confirmed deck · self-reported" },
+          {
+            label: "Traction",
+            detail: "Dated revenue in the confirmed deck · self-reported",
+          },
         ],
         down: [
           { label: "Market", detail: "One top-down figure from a 2022 report" },
@@ -908,20 +915,41 @@ const assumption = (
 /** Q.07's board as Northbound would see it: three gaps and one asked. */
 export function reviewBoard(): AssumptionBoardDto {
   const assumptions: AssumptionDto[] = [
-    assumption("THE_ASK:unknown", "The ask", "Lead investor", "UNKNOWN",
-      "Does the round still need a lead investor?"),
-    assumption("TRACTION:unknown", "Traction", "Retention", "UNKNOWN",
-      "What share of clinics are still live after twelve months?"),
-    assumption("MARKET:unknown", "Market", "Market source", "UNKNOWN",
-      "Where does the $1.2bn claims market figure come from?"),
-    assumption("TRACTION:1", "Traction", "Clinics live", "CLAIMED",
-      "How many of the 140 clinics pay every month?", {
+    assumption(
+      "THE_ASK:unknown",
+      "The ask",
+      "Lead investor",
+      "UNKNOWN",
+      "Does the round still need a lead investor?",
+    ),
+    assumption(
+      "TRACTION:unknown",
+      "Traction",
+      "Retention",
+      "UNKNOWN",
+      "What share of clinics are still live after twelve months?",
+    ),
+    assumption(
+      "MARKET:unknown",
+      "Market",
+      "Market source",
+      "UNKNOWN",
+      "Where does the $1.2bn claims market figure come from?",
+    ),
+    assumption(
+      "TRACTION:1",
+      "Traction",
+      "Clinics live",
+      "CLAIMED",
+      "How many of the 140 clinics pay every month?",
+      {
         asked: {
           questionId: id(801),
           askedAt: "2026-10-16T10:00:00.000Z",
           answer: null,
         },
-      }),
+      },
+    ),
   ];
   return {
     companyId: REVIEW_COMPANY_ID,

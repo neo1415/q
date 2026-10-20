@@ -76,7 +76,8 @@ export default async function ProfileReviewPage({
       typeof params["tab"] === "string" ? params["tab"] : undefined,
     ) ?? "overview";
   const empty = state === "empty";
-  const relKey = typeof params["rel"] === "string" ? params["rel"] : "diligence";
+  const relKey =
+    typeof params["rel"] === "string" ? params["rel"] : "diligence";
   const relationshipState =
     side === "INVESTOR" ? (RELATIONSHIPS[relKey] ?? "IN_DILIGENCE") : null;
   const connected =

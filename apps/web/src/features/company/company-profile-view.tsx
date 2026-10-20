@@ -42,7 +42,10 @@ import { InvestorDataRoom, OwnerDataRoom } from "./material/data-room";
 import { DeckCoach } from "./material/deck";
 import { ProfileFitProvider } from "./material/fit-panel-slot";
 import { TeamTab } from "./material/team";
-import { pitchProfileSections, type PitchProfileSection } from "./pitch-profile";
+import {
+  pitchProfileSections,
+  type PitchProfileSection,
+} from "./pitch-profile";
 import type { ProfileTab } from "./profile-tab";
 import { ProfilePanelSkeleton, ProfileTabPanel } from "./profile-tabs";
 
@@ -344,7 +347,8 @@ export function CompanyProfileView({
                   verified={verified}
                   connected={connected}
                   legacy={
-                    overviewExtra === null && overviewStreamed === null ? null : (
+                    overviewExtra === null &&
+                    overviewStreamed === null ? null : (
                       <>
                         {overviewExtra}
                         {overviewStreamed}
@@ -599,7 +603,10 @@ function DiligencePanel({
         ),
         "company-market":
           overview.primaryDescription === null ? null : (
-            <section className="flex flex-col gap-2" aria-labelledby="company-words">
+            <section
+              className="flex flex-col gap-2"
+              aria-labelledby="company-words"
+            >
               <h4
                 id="company-words"
                 className="cq-label text-(--cq-text-secondary)"

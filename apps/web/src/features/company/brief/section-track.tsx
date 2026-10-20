@@ -61,41 +61,56 @@ export function SectionTrack({
     report.current = onIndex;
   }, [onIndex]);
 
+  /** Scroll the track to a section; no state, so effects may call it. */
+  const scrollTo = useCallback((index: number, smooth: boolean) => {
+    const root = track.current;
+    const card = root?.children[index];
+    if (
+      root !== null &&
+      card instanceof HTMLElement &&
+      typeof root.scrollTo === "function"
+    ) {
+      root.scrollTo({
+        left: card.offsetLeft - root.offsetLeft,
+        behavior: smooth ? "smooth" : "instant",
+      });
+    }
+  }, []);
+
   const go = useCallback(
     (next: number, smooth: boolean) => {
-      const root = track.current;
       const clamped = Math.max(0, Math.min(sections.length - 1, next));
-      const card = root?.children[clamped];
-      if (
-        root !== null &&
-        card instanceof HTMLElement &&
-        typeof root.scrollTo === "function"
-      ) {
-        root.scrollTo({
-          left: card.offsetLeft - root.offsetLeft,
-          behavior: smooth ? "smooth" : "instant",
-        });
-      }
+      scrollTo(clamped, smooth);
       // The observer confirms it; say it now so the strip answers at once.
       shown.current = clamped;
       setAt(clamped);
       report.current?.(clamped);
     },
-    [sections.length],
+    [sections.length, scrollTo],
   );
 
   // Opening on a section asked for from outside (Q, a link): no animation.
   const opening = useRef(at);
   useEffect(() => {
-    if (opening.current > 0) go(opening.current, false);
-  }, [go]);
-  // Only a new outside request moves the track.
-  const asked = useRef(initial);
+    if (opening.current > 0) scrollTo(opening.current, false);
+  }, [scrollTo]);
+  // Only a new outside request moves the track: the state follows it while
+  // rendering, the scroll after.
+  const [asked, setAsked] = useState(initial);
+  const [glide, setGlide] = useState<number | null>(null);
+  if (initial !== asked) {
+    setAsked(initial);
+    if (initial >= 0) {
+      const clamped = Math.max(0, Math.min(sections.length - 1, initial));
+      setAt(clamped);
+      setGlide(clamped);
+    }
+  }
   useEffect(() => {
-    if (initial === asked.current) return;
-    asked.current = initial;
-    if (initial >= 0) go(initial, true);
-  }, [initial, go]);
+    if (glide === null) return;
+    shown.current = glide;
+    scrollTo(glide, true);
+  }, [glide, scrollTo]);
 
   useEffect(() => {
     const root = track.current;

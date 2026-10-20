@@ -707,7 +707,11 @@ function ConnectedDataRoom({
                 <i
                   key={one.key}
                   data-step={
-                    index === at ? "now" : one.done || index < at ? "done" : undefined
+                    index === at
+                      ? "now"
+                      : one.done || index < at
+                        ? "done"
+                        : undefined
                   }
                 />
               ))}

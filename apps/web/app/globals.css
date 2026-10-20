@@ -4946,7 +4946,11 @@
     height: 4px;
     overflow: hidden;
     border-radius: 2px;
-    background: color-mix(in oklab, var(--cq-warning) 18%, var(--cq-warning-soft));
+    background: color-mix(
+      in oklab,
+      var(--cq-warning) 18%,
+      var(--cq-warning-soft)
+    );
   }
   .cq-room-expiry > b {
     display: block;
