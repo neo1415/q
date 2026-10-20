@@ -8,7 +8,10 @@ import {
   RelationshipSection,
   RelationshipUnavailable,
 } from "@/features/relationships/relationship-detail";
-import { RelationshipTimeline } from "@/features/relationships/relationship-timeline";
+import { ScheduleDialog } from "@/features/relationships/schedule-dialog";
+import { CallsEarlier } from "@/features/schedule/calls-earlier";
+import { CallsWeek } from "@/features/schedule/calls-week";
+import { JoinCallForm } from "@/features/schedule/join-call-form";
 import { messageCountOf } from "@/features/relationships/brief-lines";
 import { loadCompanySideRelationship } from "@/features/relationships/relationship-page-data";
 import { RelationshipSchedule } from "@/features/schedule/relationship-schedule";
@@ -62,8 +65,9 @@ export default async function CompanyCallsPage({
         diligence={loaded.diligence}
         meetings={loaded.meetings}
         readAt={loaded.readAt}
+        charcoal
       >
-        <section className="flex max-w-(--cq-layout-reading) flex-col gap-4">
+        <div className="flex flex-col gap-6">
           {loaded.meetingsRead ? null : (
             // R1: an unread schedule is unknown, never "no calls".
             <p
@@ -75,20 +79,29 @@ export default async function CompanyCallsPage({
               )}
             </p>
           )}
-          <RelationshipSchedule
+          <CallsWeek
             relationshipId={relationship.relationshipId}
             counterpart={loaded.counterpart}
-            connected
-            focus="call"
+            initialMeetings={loaded.meetings}
           />
-          <RelationshipTimeline
-            milestones={relationship.milestones}
-            meetings={loaded.meetings}
-            now={loaded.readAt}
-            side="COMPANY"
-            counterpart={loaded.counterpart}
-          />
-        </section>
+          <CallsEarlier meetings={loaded.meetings} now={loaded.readAt} />
+          <div className="flex flex-wrap gap-2">
+            <ScheduleDialog kind="join">
+              <JoinCallForm
+                relationshipId={relationship.relationshipId}
+                counterpart={loaded.counterpart}
+              />
+            </ScheduleDialog>
+            <ScheduleDialog kind="reminder">
+              <RelationshipSchedule
+                relationshipId={relationship.relationshipId}
+                counterpart={loaded.counterpart}
+                connected
+                focus="reminder"
+              />
+            </ScheduleDialog>
+          </div>
+        </div>
       </RelationshipSection>
     </>
   );
