@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-
-import { isMatchedRelationshipState } from "@capital-q/contracts";
 
 import { QSection } from "@/features/q/q-section";
 import { QPageSubject } from "@/features/q/q-subject";
-import { RelationshipConversation } from "@/features/relationships/relationship-conversation";
+import { RelationshipInbox } from "@/features/relationships/relationship-inbox";
 import { RelationshipUnavailable } from "@/features/relationships/relationship-detail";
 import { messageCountOf } from "@/features/relationships/brief-lines";
 import { loadCompanySideRelationship } from "@/features/relationships/relationship-page-data";
-import { serverT } from "@/features/i18n/server";
+import { STATE_WORDS } from "@/features/relationships/relationship-words";
+import { serverT, serverUiLanguage } from "@/features/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await serverT();
@@ -17,27 +15,29 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export const dynamic = "force-dynamic";
 
-/** A company's conversation with one investor organisation (R34). */
+/**
+ * A company's conversations, with the one with this investor organisation
+ * open (R34; inbox split, 2026-10-20). Before both sides agree to connect
+ * the pane says why it is empty and when it opens.
+ */
 export default async function CompanyConversationPage({
   params,
+  searchParams,
 }: {
   readonly params: Promise<{ readonly investorOrganisationId: string }>;
+  readonly searchParams?: Promise<{ readonly inbox?: string }> | undefined;
 }) {
+  await serverUiLanguage();
   const t = await serverT();
 
   const { investorOrganisationId } = await params;
+  const showList = (await searchParams)?.inbox === "1";
   const loaded = await loadCompanySideRelationship(investorOrganisationId);
   if (loaded.kind === "UNAVAILABLE") {
     return <RelationshipUnavailable sentence={loaded.sentence} />;
   }
   if (loaded.relationship === null) {
     return <RelationshipUnavailable sentence={loaded.absentSentence} />;
-  }
-  // Messages open only once both sides have agreed to connect. Before
-  // that the thread cannot load, so the relationship page is the answer,
-  // not "Messages couldn't load" over a live composer (demo-44 phone pass).
-  if (!isMatchedRelationshipState(loaded.relationship.state)) {
-    redirect(`/relationships/investor/${investorOrganisationId}`);
   }
   return (
     <>
@@ -57,13 +57,14 @@ export default async function CompanyConversationPage({
         total={messageCountOf(loaded)}
         label={t(`chat with ${loaded.counterpart} open`)}
       >
-        <RelationshipConversation
-          side="COMPANY"
+        <RelationshipInbox
           counterpart={loaded.counterpart}
           relationship={loaded.relationship}
           profile={loaded.profile}
           thread={loaded.thread}
           basePath={`/relationships/investor/${investorOrganisationId}`}
+          stateLine={STATE_WORDS[loaded.relationship.state]}
+          showList={showList}
         />
       </QSection>
     </>
