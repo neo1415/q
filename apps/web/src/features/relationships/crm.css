@@ -1,0 +1,141 @@
+/*
+ * CRM pages (Overview, Pipeline, Capital): the motion the chosen designs
+ * use (2026-10-20). Tokens only; every movement stops under reduced motion.
+ */
+
+/* New content settles in: a short rise and fade. */
+@keyframes cq-crm-swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.cq-crm-swap {
+  animation: cq-crm-swap-in var(--cq-motion-slow) var(--cq-ease) both;
+}
+.cq-crm-stagger > * {
+  animation: cq-crm-swap-in var(--cq-motion-slow) var(--cq-ease) both;
+}
+.cq-crm-stagger > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+.cq-crm-stagger > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+.cq-crm-stagger > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+.cq-crm-stagger > *:nth-child(5) {
+  animation-delay: 160ms;
+}
+
+/* A finished card leaves to the side before the list closes up. */
+.cq-crm-leaving {
+  opacity: 0;
+  transform: translateX(24px);
+}
+
+/* A pressed button gives a little, mouse or touch. */
+.cq-crm-press {
+  transition:
+    background-color var(--cq-motion-fast) ease,
+    border-color var(--cq-motion-fast) ease,
+    color var(--cq-motion-fast) ease,
+    transform 140ms var(--cq-ease);
+}
+.cq-crm-press:active {
+  transform: scale(0.97);
+}
+
+/* While the server confirms: a thin bar grows under the label. */
+@keyframes cq-crm-pend {
+  from {
+    width: 0;
+  }
+  to {
+    width: 92%;
+  }
+}
+.cq-crm-pending-bar {
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: 0;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.55;
+  animation: cq-crm-pend 1.1s var(--cq-ease) forwards;
+}
+
+/* A tick that lands. */
+@keyframes cq-crm-tick-in {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.cq-crm-tick-in {
+  animation: cq-crm-tick-in 360ms var(--cq-ease);
+}
+
+/* The completion ring fills as things are done. */
+.cq-crm-ring-fill {
+  transition: stroke-dashoffset 600ms var(--cq-ease);
+}
+
+/* Toast: rises from the bottom, or drops from the top on a phone. */
+.cq-crm-toast {
+  transition:
+    transform var(--cq-motion-base) var(--cq-ease),
+    opacity var(--cq-motion-base) ease;
+}
+
+/* Hover lifts a card by 2px, mouse only. */
+@media (hover: hover) and (pointer: fine) {
+  .cq-crm-lift {
+    transition:
+      transform 180ms var(--cq-ease),
+      box-shadow 180ms ease,
+      border-color var(--cq-motion-fast) ease;
+  }
+  .cq-crm-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--cq-shadow-sm);
+  }
+}
+
+/* Hatched fill for money that is sent but not yet confirmed. */
+.cq-crm-hatch {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--cq-positive) 0 3px,
+    var(--cq-positive-soft) 3px 6px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cq-crm-swap,
+  .cq-crm-stagger > *,
+  .cq-crm-tick-in,
+  .cq-crm-pending-bar {
+    animation-duration: 1ms;
+  }
+  .cq-crm-press:active,
+  .cq-crm-lift:hover {
+    transform: none;
+  }
+  .cq-crm-ring-fill,
+  .cq-crm-toast {
+    transition-duration: 1ms;
+  }
+}

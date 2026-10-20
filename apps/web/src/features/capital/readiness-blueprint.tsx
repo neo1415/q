@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import {
   ApiProblemError,
   createReadinessBlueprint,
@@ -13,6 +11,9 @@ import { PageSection } from "@/components/app-shell/page-container";
 import { qApiSession } from "@/features/q/context";
 import { PrivateNote } from "@/features/readiness/readiness-section";
 
+import { Segmented } from "@/features/relationships/crm-kit";
+
+import { capitalTabHref } from "./capital-tabs";
 import { ReadinessBlueprintEntry } from "./readiness-blueprint-entry";
 import { serverT } from "@/features/i18n/server";
 
@@ -123,26 +124,16 @@ export async function ReadinessBlueprintSection({
     >
       <div className="flex flex-col gap-4">
         <PrivateNote />
-        <nav
-          aria-label={t("Plan horizon")}
-          className="inline-flex self-start rounded-(--cq-radius-md) border border-(--cq-border) p-1"
-        >
-          {BLUEPRINT_HORIZONS.map((months) => (
-            <Link
-              key={months}
-              href={`/capital?tab=plan&horizon=${String(months)}`}
-              aria-current={months === horizon ? "page" : undefined}
-              scroll={false}
-              className={`cq-body-sm inline-flex min-h-11 min-w-20 items-center justify-center rounded-(--cq-radius-sm) px-3 ${
-                months === horizon
-                  ? "bg-(--cq-surface-raised) font-semibold text-(--cq-text-primary) ring-1 ring-(--cq-border)"
-                  : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
-              }`}
-            >
-              {months} months
-            </Link>
-          ))}
-        </nav>
+        <Segmented
+          label={t("Plan horizon")}
+          value={String(horizon)}
+          className="self-start"
+          options={BLUEPRINT_HORIZONS.map((months) => ({
+            key: String(months),
+            label: t(`${String(months)} months`),
+            href: capitalTabHref("plan", { horizon: String(months) }),
+          }))}
+        />
         {load.kind === "UNAVAILABLE" ? (
           <p className="cq-body text-(--cq-text-secondary)" data-state="error">
             {t("Your plan couldn't load. Reload to try again.")}
@@ -178,47 +169,56 @@ function BlueprintBody({
           Nothing to sequence: your action plan has no open steps right now.
         </p>
       ) : (
-        <ol className="grid gap-4 md:grid-cols-3">
+        // The plan as one line through time (design 2026-10-20): each
+        // phase on its weeks, its steps under it.
+        <ol
+          key={phases.map((phase) => phase.label).join("|")}
+          className="cq-crm-stagger ms-2 flex flex-col border-s-2 border-(--cq-border)"
+        >
           {phases.map((phase) => (
             <li
               key={phase.label}
-              className="flex flex-col gap-1 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
+              className="relative grid gap-3 py-3 ps-[18px] sm:grid-cols-[96px_minmax(0,1fr)]"
             >
-              <div className="flex items-baseline justify-between gap-2">
-                <h3 className="cq-title-sm text-(--cq-text-primary)">
+              <span
+                aria-hidden="true"
+                className="absolute top-[17px] -start-[7px] size-3 rounded-full border-2 border-(--cq-accent) bg-(--cq-surface-raised)"
+              />
+              <b className="pt-0.5 text-[13px] font-medium text-(--cq-text-secondary)">
+                {phase.weeks}
+              </b>
+              <div className="flex min-w-0 flex-col gap-1">
+                <h3 className="text-[15px] font-semibold text-(--cq-text-primary)">
                   {phase.label}
                 </h3>
-                <span className="cq-body-sm text-(--cq-text-tertiary)">
-                  {phase.weeks}
-                </span>
+                <ul className="flex flex-col">
+                  {phase.steps.map((step) => (
+                    <li
+                      key={step.id}
+                      className="flex flex-col gap-0.5 border-t border-(--cq-border-subtle) py-2.5 first:border-t-0"
+                    >
+                      <span className="text-[15px] text-(--cq-text-primary)">
+                        {step.title}
+                      </span>
+                      <span className="text-[13px] text-(--cq-text-secondary)">
+                        {step.why}
+                      </span>
+                      <span className="text-[13px] text-(--cq-text-secondary)">
+                        Done when: {step.doneWhen}
+                      </span>
+                      <span className="text-xs text-(--cq-text-tertiary)">
+                        {stepMeta(step)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul className="flex flex-col">
-                {phase.steps.map((step) => (
-                  <li
-                    key={step.id}
-                    className="flex flex-col gap-1 border-t border-(--cq-border-subtle) py-3 first:border-t-0"
-                  >
-                    <span className="cq-body font-semibold text-(--cq-text-primary)">
-                      {step.title}
-                    </span>
-                    <span className="cq-body-sm text-(--cq-text-secondary)">
-                      {step.why}
-                    </span>
-                    <span className="cq-body-sm text-(--cq-text-secondary)">
-                      Done when: {step.doneWhen}
-                    </span>
-                    <span className="cq-body-sm text-(--cq-text-tertiary)">
-                      {stepMeta(step)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
             </li>
           ))}
         </ol>
       )}
       {blueprint.uncertainty.length === 0 ? null : (
-        <div className="border border-(--cq-border-subtle) bg-(--cq-surface) p-4">
+        <div className="rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4">
           <h3 className="cq-title-sm text-(--cq-text-primary)">
             What Q could not assess
           </h3>

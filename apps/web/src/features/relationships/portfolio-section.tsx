@@ -4,13 +4,19 @@ import type {
   RelationshipCommitmentsDto,
   RelationshipSummaryDto,
 } from "@capital-q/contracts";
+import { ChevronRight, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { PagedList } from "@/components/paged-list";
-import { Panel } from "@/components/panel";
+import { money, moneyList } from "@/features/capital/money";
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 
+import { UnknownValue } from "./crm-kit";
 import { dealDay } from "./deal-stage-strip";
-import { commitmentLine, PORTFOLIO_READ_LIMIT } from "./portfolio";
+import {
+  commitmentStatusWords,
+  PORTFOLIO_READ_LIMIT,
+  portfolioTotals,
+} from "./portfolio";
 import { relationshipHref } from "./relationship-words";
 import { serverTNow } from "@/features/i18n/server-now";
 
@@ -18,13 +24,12 @@ import { serverTNow } from "@/features/i18n/server-now";
 export const PORTFOLIO_PAGE = 8;
 
 /**
- * Portfolio on the investor's CRM Overview (S4; redesign 2026-10-16):
- * every company the firm invested in, one row each, opening the
- * relationship record. Company on the left, the money line (the current
- * commitment in words) and since when on the right, aligned for scanning.
- * A company past the first rows says to open it rather than read every
- * commitment here. `items` undefined: the relationships could not be read
- * (said, not none).
+ * Portfolio on the investor's CRM Overview (design 2026-10-20, "Morning
+ * brief"): every company the firm invested in, newest first, one row each
+ * opening the relationship record. The amount sits on the right; one that
+ * is not recorded says so instead of counting as zero, and the known total
+ * under the list says what it leaves out. `items` undefined: the
+ * relationships could not be read (said, not none).
  */
 export function PortfolioSection({
   items,
@@ -46,37 +51,47 @@ export function PortfolioSection({
   >;
 }) {
   const t = serverTNow();
+  const totals =
+    items === undefined || items.length === 0
+      ? null
+      : portfolioTotals(items, commitments);
 
   return (
-    <Panel
+    <section
       id="portfolio"
-      title={t("Portfolio")}
-      count={
-        items === undefined || items.length === 0 ? undefined : items.length
-      }
-      description={t("Companies you have invested in, newest first.")}
-      flush
+      aria-label={t("Portfolio")}
+      className="flex flex-col"
       data-portfolio
     >
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <h2 className="text-lg font-semibold tracking-[-0.01em] text-(--cq-text-primary)">
+          {t("Portfolio")}
+        </h2>
+        {items === undefined || items.length === 0 ? null : (
+          <span className="text-xs text-(--cq-text-tertiary)">
+            {t("Newest first")}
+          </span>
+        )}
+      </div>
       {items === undefined ? (
         <p
-          className="cq-body-sm px-4 py-4 text-(--cq-text-secondary) sm:px-5"
+          className="rounded-(--cq-radius-lg) border border-dashed border-(--cq-border) bg-(--cq-surface-subtle) px-4 py-4 text-sm text-(--cq-text-secondary)"
           data-state="unavailable"
         >
           {t("Your portfolio couldn't be read just now. Nothing is lost.")}
         </p>
       ) : items.length === 0 ? (
         <div
-          className="flex flex-col gap-2 px-4 py-4 sm:px-5"
+          className="flex flex-col gap-2 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-4"
           data-state="empty"
         >
-          <p className="cq-body-sm text-(--cq-text-secondary)">
+          <p className="text-sm text-(--cq-text-secondary)">
             {t(
               "No investments recorded yet. A company joins your portfolio when its money is marked received.",
             )}
           </p>
           {agreed === undefined || agreed.count === 0 ? null : (
-            <p className="cq-body-sm cq-numeric text-(--cq-text-primary)">
+            <p className="cq-numeric text-sm text-(--cq-text-primary)">
               {agreed.count === 1
                 ? "1 commitment is confirmed and not yet received"
                 : t(
@@ -95,43 +110,107 @@ export function PortfolioSection({
           )}
         </div>
       ) : (
-        <PagedList
-          items={items.map((item, index) => ({
-            key: item.relationshipId,
-            node: (
-              <Link
-                href={relationshipHref(item)}
-                className="grid min-h-14 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-0.5 px-4 py-2.5 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:px-5"
-                data-portfolio-row
-              >
-                <EntityAvatar
-                  kind="company"
-                  name={item.counterpart.name}
-                  companyId={item.counterpart.id}
-                  size="sm"
-                  decorative
-                />
-                <span className="cq-body-sm min-w-0 truncate font-semibold text-(--cq-text-primary)">
-                  {item.counterpart.name}
-                </span>
-                <span className="cq-caption cq-numeric col-start-2 text-(--cq-text-secondary) sm:col-start-3 sm:text-end">
-                  {index < PORTFOLIO_READ_LIMIT
-                    ? commitmentLine(commitments.get(item.relationshipId))
-                    : "Open for the commitment"}
-                  {" · since "}
-                  <time dateTime={item.stateSince}>
-                    {t(dealDay(item.stateSince))}
-                  </time>
-                </span>
-              </Link>
-            ),
-          }))}
-          pageSize={PORTFOLIO_PAGE}
-          noun="companies"
-          className="flex flex-col divide-y divide-(--cq-border-subtle)"
-          footerClassName="border-t border-(--cq-border-subtle) px-4 py-2 sm:px-5"
-        />
+        <>
+          <PagedList
+            items={items.map((item, index) => {
+              const read =
+                index < PORTFOLIO_READ_LIMIT
+                  ? commitments.get(item.relationshipId)
+                  : undefined;
+              const current = read?.current ?? null;
+              const status = commitmentStatusWords(read);
+              return {
+                key: item.relationshipId,
+                node: (
+                  <Link
+                    href={relationshipHref(item)}
+                    className="grid min-h-14 w-full grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3.5 px-4 py-3 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+                    data-portfolio-row
+                  >
+                    <EntityAvatar
+                      kind="company"
+                      name={item.counterpart.name}
+                      companyId={item.counterpart.id}
+                      src={item.counterpart.photoUrl}
+                      size={28}
+                      decorative
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold text-(--cq-text-primary)">
+                        {item.counterpart.name}
+                      </span>
+                      <span className="block text-xs text-(--cq-text-tertiary)">
+                        {t(`Invested ${dealDay(item.stateSince)}`)}
+                      </span>
+                    </span>
+                    {index >= PORTFOLIO_READ_LIMIT ? (
+                      <span className="text-xs text-(--cq-text-tertiary)">
+                        {t("Open for the amount")}
+                      </span>
+                    ) : read === undefined ? (
+                      <span className="text-xs text-(--cq-text-tertiary)">
+                        {t("Amount couldn't be read")}
+                      </span>
+                    ) : current === null ? (
+                      <UnknownValue>{t("Amount not recorded")}</UnknownValue>
+                    ) : (
+                      <span className="flex flex-col items-end">
+                        <span className="cq-numeric font-semibold text-(--cq-text-primary)">
+                          {money(current.amount, current.currencyCode)}
+                        </span>
+                        {status === null || status === "received" ? null : (
+                          <span className="text-xs text-(--cq-text-tertiary)">
+                            {t(status)}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                    <ChevronRight
+                      size={ICON_SIZE.compact}
+                      aria-hidden="true"
+                      className="text-(--cq-text-tertiary)"
+                    />
+                  </Link>
+                ),
+              };
+            })}
+            pageSize={PORTFOLIO_PAGE}
+            noun="companies"
+            className="flex flex-col divide-y divide-(--cq-border-subtle) overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
+            footerClassName="pt-2"
+          />
+          {totals === null ? null : (
+            <p
+              className="cq-numeric mx-0.5 mt-2.5 text-xs text-(--cq-text-tertiary)"
+              data-portfolio-total
+            >
+              {totalLine(totals, t)}
+            </p>
+          )}
+        </>
       )}
-    </Panel>
+    </section>
   );
+}
+
+/** The known total, and exactly what it leaves out. */
+function totalLine(
+  totals: ReturnType<typeof portfolioTotals>,
+  t: (text: string) => string,
+): string {
+  const known =
+    totals.known.length === 0
+      ? t("No amount is recorded yet.")
+      : t(`Known total: ${moneyList(totals.known)}.`);
+  const gap =
+    totals.unread > 0
+      ? t("Some amounts aren't read here, so the total is incomplete.")
+      : totals.unrecorded === 1
+        ? t("One amount is not recorded, so the total is incomplete.")
+        : totals.unrecorded > 1
+          ? t(
+              `${String(totals.unrecorded)} amounts are not recorded, so the total is incomplete.`,
+            )
+          : null;
+  return gap === null ? known : `${known} ${gap}`;
 }

@@ -104,22 +104,36 @@ export async function MandateSummary({
   const mandate = await activeMandate(investorOrganisationId);
   if (mandate === undefined) {
     return (
-      <p className="cq-body text-(--cq-text-secondary)">
-        {t("Your mandate couldn't load. Try again in a moment.")}
-      </p>
+      <div
+        className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+        data-mandate-summary
+      >
+        <h3 className="text-[13px] font-medium text-(--cq-text-secondary)">
+          {t("Your mandate")}
+        </h3>
+        <p className="text-sm text-(--cq-text-secondary)">
+          {t("Your mandate couldn't load. Try again in a moment.")}
+        </p>
+      </div>
     );
   }
   if (mandate === null) {
     return (
-      <div className="flex flex-col items-start gap-3">
-        <p className="cq-body text-(--cq-text-secondary)">
+      <div
+        className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+        data-mandate-summary
+      >
+        <h3 className="text-[13px] font-medium text-(--cq-text-secondary)">
+          {t("Your mandate")}
+        </h3>
+        <p className="text-sm text-(--cq-text-secondary)">
           {t(
             "No active mandate yet. Tell Q what you invest in and Discover orders companies against it.",
           )}
         </p>
         <Link
           href="/onboarding/investor"
-          className={buttonClassName("primary")}
+          className={buttonClassName("primary", "regular", "w-full")}
         >
           {t("Set your mandate")}
         </Link>
@@ -156,11 +170,12 @@ export async function MandateSummary({
   ];
   const hardRules = mandate.constraints.filter((c) => c.isHardExclusion).length;
 
+  // The design's order (2026-10-20): stage, sectors, geography, cheque.
   const rows: readonly (readonly [string, string])[] = [
     ["Stage", stageLine(mandate)],
-    ["Cheque", chequeLine(mandate)],
     ["Sectors", sectors.length === 0 ? "Not stated" : sectors.join(", ")],
     ["Geography", places.length === 0 ? "Not stated" : places.join(", ")],
+    ["Cheque", chequeLine(mandate)],
     [
       "Business models and customers",
       attributes.length === 0 ? "Not stated" : attributes.join(", "),
@@ -178,38 +193,50 @@ export async function MandateSummary({
                 ]),
           ].join(", "),
     ],
+    [
+      "Thesis",
+      mandate.rawMandateText === null || mandate.rawMandateText.trim() === ""
+        ? "Not stated"
+        : mandate.rawMandateText.trim(),
+    ],
   ];
 
   return (
-    <div className="flex flex-col gap-4" data-mandate-summary>
-      <dl className="flex max-w-(--cq-layout-reading) flex-col divide-y divide-(--cq-border-subtle)">
+    <div
+      className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+      data-mandate-summary
+    >
+      <h3 className="text-[13px] font-medium text-(--cq-text-secondary)">
+        {t("Your mandate")}
+      </h3>
+      {/* Declared only: what the organisation said, never what it did. */}
+      <dl className="flex flex-col">
         {rows.map(([term, value]) => (
           <div
             key={term}
-            className="flex flex-wrap justify-between gap-x-4 gap-y-1 py-3"
+            className="flex justify-between gap-3 border-t border-(--cq-border-subtle) py-2.5 text-sm"
           >
-            <dt className="cq-label text-(--cq-text-secondary)">{term}</dt>
-            <dd className="cq-body text-end text-(--cq-text-primary)">
-              {value}
+            <dt className="text-(--cq-text-secondary)">{t(term)}</dt>
+            <dd
+              className={`line-clamp-3 text-end font-medium ${value === "Not stated" ? "text-(--cq-text-tertiary)" : "text-(--cq-text-primary)"}`}
+            >
+              {value === "Not stated" ? t(value) : value}
             </dd>
           </div>
         ))}
       </dl>
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href="/onboarding/investor?review=1"
-          className={buttonClassName("primary")}
-        >
-          {t("Review my mandate")}
-        </Link>
-        {/* One primary; the rest are quiet ways out, not equal choices. */}
-        <Link href="/discover/saved" className={buttonClassName("quiet")}>
-          {t("Saved companies")}
-        </Link>
-        <Link href="/gateq?tab=gate" className={buttonClassName("quiet")}>
-          {t("Your gateway")}
-        </Link>
-      </div>
+      <Link
+        href="/onboarding/investor?review=1"
+        className={buttonClassName("secondary", "regular", "w-full")}
+      >
+        {t("Review my mandate")}
+      </Link>
+      <Link
+        href="/gateq?tab=gate"
+        className={buttonClassName("quiet", "compact", "self-start")}
+      >
+        {t("Your gateway")}
+      </Link>
     </div>
   );
 }

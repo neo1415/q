@@ -7,24 +7,19 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import type {
   FitProfileDto,
   RelationshipSummaryDto,
+  SavedRelationshipViewList,
 } from "@capital-q/contracts";
-import { buttonClassName } from "@capital-q/ui/button";
 import { cx } from "@capital-q/ui";
-import {
-  CalendarDays,
-  FileText,
-  ICON_SIZE,
-  MessageSquare,
-  Search,
-  Upload,
-} from "@capital-q/ui/icons";
+import { ChevronDown, Flag, ICON_SIZE } from "@capital-q/ui/icons";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { effectShown } from "@/features/q/control/perform";
 import { useQControl, useQControlGroup } from "@/features/q/control/q-control";
-import { RelationshipFitLine } from "@/features/fit/relationship-fit-chips";
 
-import { ScoreFigure, ScoreLine, UnicornFigure } from "./pipeline-score-figure";
+import { crmButton, StateTag } from "./crm-kit";
+import { PipelineLayoutSwitch } from "./pipeline-layout-switch";
+import { pipelineHref } from "./pipeline-preferences";
+import { PipelineSavedViews } from "./pipeline-saved-views";
 import {
   hasUnicornScores,
   listOrdered,
@@ -33,7 +28,9 @@ import {
   type ListSort,
   type PipelineScores,
 } from "./pipeline-scores";
+import { PipelineExport, PipelineSearch, StateChips } from "./pipeline-toolbar";
 import type { RelationshipDigest } from "./relationship-data";
+import { peekClick, RelationshipPeek } from "./relationship-peek";
 import { relationshipHref, STATE_WORDS } from "./relationship-words";
 import { moreRelationshipDigestsAction } from "./relationships-actions";
 import {
@@ -43,22 +40,21 @@ import {
   PAGE_SIZE,
   rowFacts,
   since,
-  stageTone,
   type CommitmentFact,
   type ListSide,
   type NextStep,
 } from "./relationships-view";
-import { StatusPill, type StatusTone } from "./status-pill";
 import { useT } from "@/features/i18n/language";
 
 /**
- * The Relationships list (founder critique 2026-10-04): search first, then
- * where each stands as tabs with counts, then one row per relationship with its
- * counterpart, its stage, the time since anything last happened, and the
- * ONE next step as a button. For an investor, each company's Suitability
- * and Investability sit beside it and the list is ranked by Suitability,
- * unless they chose the latest change first (owner 2026-10-17); a founder's
- * list keeps the projection's own time. Row details load a page at a time.
+ * The Pipeline's List layout (design 2026-10-20, "One list, three
+ * layouts"): the bar (search, the layout switch, Export), the state chips
+ * with counts, the saved views and the order, then one row per
+ * relationship: who, what they do, where it stands in words, its one next
+ * step (in the accent with a flag when it waits on this side) and when
+ * anything last happened. A row opens the record peek; a modified click
+ * opens the relationship. An investor's list is ranked by Suitability
+ * unless they chose the latest change first (owner 2026-10-17).
  */
 
 type Filter =
@@ -97,34 +93,6 @@ const Q_BOARD_SEARCH: Readonly<Record<string, string>> = {
   "input.relationship-search": "[data-relationships-search]",
 };
 
-const TONE: Readonly<Record<ReturnType<typeof stageTone>, StatusTone>> = {
-  positive: "positive",
-  waiting: "waiting",
-  accent: "attention",
-  neutral: "neutral",
-};
-
-/**
- * The List's columns from tablet-landscape up. An investor's rows carry the
- * two score columns after the name (literal classes, for Tailwind).
- */
-const GRID_PLAIN = "lg:grid-cols-[40px_minmax(0,1fr)_150px_96px_190px]";
-const GRID_SCORED =
-  "lg:grid-cols-[40px_minmax(0,1fr)_84px_84px_140px_88px_176px]";
-// With Unicorn Potential (premium): a third, wider score column, whose
-// words ("Insufficient evidence") wrap within it rather than squeeze.
-const GRID_UNICORN =
-  "lg:grid-cols-[40px_minmax(0,1fr)_76px_76px_96px_128px_80px_168px]";
-
-const ICONS = {
-  upload: Upload,
-  file: FileText,
-  reply: MessageSquare,
-  calendar: CalendarDays,
-  answer: null,
-  money: null,
-} as const;
-
 export function RelationshipsBoard({
   side,
   items,
@@ -135,6 +103,9 @@ export function RelationshipsBoard({
   fits,
   scores,
   sort: initialSort = "recent",
+  layoutHrefs,
+  exportScope,
+  views,
 }: {
   readonly side: ListSide;
   /**
@@ -144,8 +115,8 @@ export function RelationshipsBoard({
   readonly fits?: Readonly<Record<string, FitProfileDto | null>> | undefined;
   /**
    * Suitability and Investability by company id, from the Q API (ADR 0074).
-   * Absent: no score columns (a founder's list). A company missing from it
-   * shows both as not known yet.
+   * Absent: no scores (a founder's list). A company missing from it shows
+   * them as not known yet.
    */
   readonly scores?: Readonly<Record<string, PipelineScores>> | undefined;
   /** The order the page was asked for (URL); suitability needs `scores`. */
@@ -158,12 +129,25 @@ export function RelationshipsBoard({
   readonly commitments?: Readonly<Record<string, CommitmentFact>> | undefined;
   /** When the page was read, so server and browser say the same "2h". */
   readonly now: number;
+  /** The layout switch's addresses; absent: no switch (a preview). */
+  readonly layoutHrefs?:
+    | { readonly list: string; readonly table: string; readonly board: string }
+    | undefined;
+  /**
+   * The export scope binding for the whole list (from the pipeline read);
+   * null: unavailable just now; absent: no Export (a preview).
+   */
+  readonly exportScope?: string | null | undefined;
+  /** The saved views; null when they could not be read; absent: none shown. */
+  readonly views?: SavedRelationshipViewList | null | undefined;
 }) {
   const t = useT();
   const router = useRouter();
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("ALL");
+  const [peek, setPeek] = useState<RelationshipSummaryDto | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   // RECOVERY-2026-10 (C1): the board's search, list and filter, for Q. The
   // filter takes a code (ALL, NEEDS_YOU, ...) through the pills' own setter.
   const boardRef = useRef<HTMLDivElement>(null);
@@ -180,7 +164,7 @@ export function RelationshipsBoard({
       const key = FILTERS.find((one) => one === wanted);
       if (key === undefined) return "NOT_APPLICABLE";
       setFilter(key);
-      // DONE once the pill shows it is on, not when it was asked.
+      // DONE once the chip shows it is on, not when it was asked.
       return effectShown(
         () =>
           filterRef.current
@@ -198,8 +182,6 @@ export function RelationshipsBoard({
       : initialSort === "unicorn" && unicornOn
         ? "unicorn"
         : "suitability";
-  const grid =
-    scores === undefined ? GRID_PLAIN : unicornOn ? GRID_UNICORN : GRID_SCORED;
   const ordered = useMemo(
     () => listOrdered(items, scores, sort),
     [items, scores, sort],
@@ -288,182 +270,194 @@ export function RelationshipsBoard({
     router.push(`${url.pathname}${url.search}`);
   };
 
-  const tabs = FILTERS.filter(
+  const chips = FILTERS.filter(
     (key) => key === "ALL" || key === "NEEDS_YOU" || (counts.get(key) ?? 0) > 0,
   );
+
+  // Export: exactly what is shown. A chip or a search exports those rows
+  // by id (the API checks each again); with neither, the whole list.
+  const narrowed = filter !== "ALL" || needle.length > 0;
+  const exportIds = filtered.map((row) => row.item.relationshipId);
+  const exportHref =
+    exportScope === undefined || exportScope === null
+      ? null
+      : narrowed && (exportIds.length === 0 || exportIds.length > 200)
+        ? null
+        : `/relationships/export?${new URLSearchParams({
+            scope: exportScope,
+            ...(narrowed ? { selected: exportIds.join(",") } : {}),
+          }).toString()}`;
+  const peekRow =
+    peek === null
+      ? undefined
+      : rows.find((row) => row.item.relationshipId === peek.relationshipId);
 
   return (
     <div
       ref={boardRef}
-      className="flex flex-col gap-5"
+      className="flex flex-col gap-3.5"
       data-relationships-board
     >
-      <label className="flex min-h-12 items-center gap-2.5 rounded-xl border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 focus-within:outline-2 focus-within:outline-(--cq-focus-ring)">
-        <Search
-          size={ICON_SIZE.regular}
-          aria-hidden="true"
-          className="shrink-0 text-(--cq-text-tertiary)"
-        />
-        <span className="sr-only">{t("Search relationships")}</span>
-        <input
+      <div className="flex flex-wrap items-center gap-2.5">
+        <PipelineSearch
+          side={side}
           type="search"
+          label={t("Search relationships")}
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={
-            side === "INVESTOR" ? t("Search companies") : t("Search investors")
-          }
-          className="cq-body min-w-0 flex-1 bg-transparent text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary)"
+          onChange={setQuery}
           data-relationships-search
         />
-      </label>
-
-      {scores === undefined ? null : (
-        <label className="cq-body-sm flex flex-wrap items-center gap-2 text-(--cq-text-secondary)">
-          {t("Sort relationships")}
-          <select
-            value={sort}
-            onChange={(event) =>
-              chooseSort(
-                event.target.value === "recent"
-                  ? "recent"
-                  : event.target.value === "unicorn"
-                    ? "unicorn"
-                    : "suitability",
-              )
-            }
-            className="cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface-raised) px-3 pe-8 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-            data-relationships-sort
-          >
-            <option value="suitability">
-              {t("Suitability, highest first")}
-            </option>
-            {unicornOn ? (
-              <option value="unicorn">
-                {t("Unicorn Potential, highest first")}
-              </option>
-            ) : null}
-            <option value="recent">{t("Latest state change")}</option>
-          </select>
-        </label>
-      )}
-
-      <div
-        ref={filterRef}
-        role="group"
-        aria-label={t("Show")}
-        className="relative -mx-(--cq-page-gutter) flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-(--cq-page-gutter) [scrollbar-width:none]"
-      >
-        {tabs.map((key) => {
-          const count = counts.get(key) ?? 0;
-          return (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={filter === key}
-              onClick={() => setFilter(key)}
-              className={cx(
-                "cq-body-sm -mb-px inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-2.5 whitespace-nowrap",
-                filter === key
-                  ? "border-(--cq-text-primary) font-medium text-(--cq-text-primary)"
-                  : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
-              )}
-              data-filter={key}
-            >
-              {t(FILTER_WORDS[key])}{" "}
-              <span
-                className={cx(
-                  "cq-caption cq-numeric rounded-full px-1.5",
-                  key === "NEEDS_YOU" && count > 0
-                    ? "bg-(--cq-accent) text-(--cq-text-inverse)"
-                    : "bg-(--cq-surface-subtle)",
-                )}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
+        <div className="ms-auto flex items-center gap-2">
+          {layoutHrefs === undefined ? null : (
+            <PipelineLayoutSwitch layout="list" hrefs={layoutHrefs} />
+          )}
+          {exportScope === undefined ? null : (
+            <PipelineExport
+              href={exportHref}
+              count={narrowed ? exportIds.length : rows.length}
+              scope={
+                filter === "ALL"
+                  ? needle.length > 0
+                    ? t("matching your search")
+                    : t("all states")
+                  : t(FILTER_WORDS[filter])
+              }
+              iconOnly
+            />
+          )}
+        </div>
       </div>
 
+      <div ref={filterRef}>
+        <StateChips
+          label={t("Show")}
+          chips={chips.map((key) => ({
+            key,
+            label: FILTER_WORDS[key],
+            count: counts.get(key) ?? 0,
+            on: filter === key,
+            onSelect: () => setFilter(key),
+          }))}
+        />
+      </div>
+
+      {views === undefined && scores === undefined ? null : (
+        <div className="flex flex-wrap items-center gap-2">
+          {views === undefined ? null : (
+            <PipelineSavedViews
+              initial={views}
+              device={[]}
+              onDeviceChange={() => undefined}
+              current={{ query: {}, layout: "table", columns: [] }}
+              onApply={(view) => {
+                router.push(pipelineHref(view.query, view.layout));
+                return Promise.resolve(true);
+              }}
+              onNotice={setNotice}
+              canSave={false}
+            />
+          )}
+          {scores === undefined ? null : (
+            <label className="ms-auto inline-flex items-center gap-2 text-[13px] text-(--cq-text-secondary)">
+              <span className="sr-only">{t("Sort relationships")}</span>
+              <span className="relative inline-flex">
+                <select
+                  aria-label={t("Sort relationships")}
+                  value={sort}
+                  onChange={(event) =>
+                    chooseSort(
+                      event.target.value === "recent"
+                        ? "recent"
+                        : event.target.value === "unicorn"
+                          ? "unicorn"
+                          : "suitability",
+                    )
+                  }
+                  className="min-h-11 appearance-none rounded-full border border-(--cq-border) bg-(--cq-surface-raised) ps-3.5 pe-8 text-[13px] font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-10"
+                  data-relationships-sort
+                >
+                  <option value="suitability">{t("Best suited first")}</option>
+                  {unicornOn ? (
+                    <option value="unicorn">
+                      {t("Unicorn Potential, highest first")}
+                    </option>
+                  ) : null}
+                  <option value="recent">{t("Latest state change")}</option>
+                </select>
+                <ChevronDown
+                  size={ICON_SIZE.compact}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-(--cq-text-tertiary)"
+                />
+              </span>
+            </label>
+          )}
+        </div>
+      )}
+      {notice === null ? null : (
+        <p role="status" className="text-[13px] text-(--cq-text-secondary)">
+          {t(notice)}
+        </p>
+      )}
+
       {visible.length === 0 ? (
-        <p
-          className="cq-body text-(--cq-text-secondary)"
+        <div
+          className="cq-crm-swap flex flex-col items-center gap-2 rounded-(--cq-radius-lg) border border-dashed border-(--cq-border) bg-(--cq-surface-subtle) px-6 py-10 text-center"
           role="status"
           data-state="filtered-empty"
         >
-          {needle.length > 0
-            ? t(`Nothing matches “${query.trim()}”.`)
-            : filter === "NEEDS_YOU"
-              ? t("Nothing needs you right now.")
-              : t(`None ${FILTER_WORDS[filter].toLowerCase()} right now.`)}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <div
-            aria-hidden="true"
-            className={cx(
-              "cq-caption hidden gap-3 px-4 text-(--cq-text-tertiary) lg:grid",
-              grid,
-            )}
-          >
-            <span />
-            <span>{t("Name")}</span>
-            {scores === undefined ? null : (
-              <>
-                <span>{t("Suitability")}</span>
-                <span>{t("Investability")}</span>
-                {unicornOn ? <span>{t("Unicorn Potential")}</span> : null}
-              </>
-            )}
-            <span>{t("Stage")}</span>
-            <span className="text-end">{t("Last activity")}</span>
-            <span className="text-end">{t("Next step")}</span>
-          </div>
-          {/* One surface with hairline rows, not a card per relationship
-              (redesign 2026-10-15). */}
-          <ul
-            aria-label={t("Relationships")}
-            className="flex flex-col divide-y divide-(--cq-border-subtle) overflow-hidden rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
-            data-relationships-list
-            data-qp-anchor="fdr.07.crm.pipeline"
-          >
-            {visible.map((row) => (
-              <li
-                key={row.item.relationshipId}
-                data-relationship-id={row.item.relationshipId}
-                data-q-item
-              >
-                <RelationshipRow
-                  item={row.item}
-                  step={row.step}
-                  activity={row.activity}
-                  about={digests[row.item.relationshipId]?.about ?? null}
-                  photoUrl={
-                    row.item.counterpart.photoUrl ??
-                    digests[row.item.relationshipId]?.photoUrl ??
-                    null
-                  }
-                  unread={(row.facts?.unread ?? 0) > 0}
-                  now={now}
-                  grid={grid}
-                  unicornColumn={unicornOn}
-                  scores={
-                    scores === undefined
-                      ? undefined
-                      : (scoreOf(scores, row.item) ?? UNKNOWN_SCORES)
-                  }
-                  fit={
-                    fits === undefined ||
-                    row.item.counterpart.kind !== "COMPANY" ||
-                    !(row.item.counterpart.id in fits)
-                      ? undefined
-                      : (fits[row.item.counterpart.id] ?? null)
-                  }
-                />
-              </li>
-            ))}
-          </ul>
+          <b className="text-base text-(--cq-text-primary)">
+            {needle.length > 0
+              ? t(`Nothing matches “${query.trim()}”.`)
+              : filter === "NEEDS_YOU"
+                ? t("Nothing needs you right now.")
+                : t(`None ${FILTER_WORDS[filter].toLowerCase()} right now.`)}
+          </b>
+          {needle.length > 0 || filter !== "ALL" ? (
+            <button
+              type="button"
+              className={crmButton("secondary")}
+              onClick={() => {
+                setQuery("");
+                setFilter("ALL");
+              }}
+            >
+              {t("Clear filters")}
+            </button>
+          ) : null}
         </div>
+      ) : (
+        // One surface with hairline rows, not a card per relationship.
+        <ul
+          key={`${filter}:${needle}`}
+          aria-label={t("Relationships")}
+          className="cq-crm-swap flex flex-col divide-y divide-(--cq-border-subtle) overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
+          data-relationships-list
+          data-qp-anchor="fdr.07.crm.pipeline"
+        >
+          {visible.map((row) => (
+            <li
+              key={row.item.relationshipId}
+              data-relationship-id={row.item.relationshipId}
+              data-q-item
+            >
+              <RelationshipRow
+                item={row.item}
+                step={row.step}
+                activity={row.activity}
+                about={digests[row.item.relationshipId]?.about ?? null}
+                photoUrl={
+                  row.item.counterpart.photoUrl ??
+                  digests[row.item.relationshipId]?.photoUrl ??
+                  null
+                }
+                unread={(row.facts?.unread ?? 0) > 0}
+                now={now}
+                onPeek={() => setPeek(row.item)}
+              />
+            </li>
+          ))}
+        </ul>
       )}
 
       {paging && shown < filtered.length ? (
@@ -472,7 +466,7 @@ export function RelationshipsBoard({
             type="button"
             onClick={more}
             disabled={loading}
-            className={buttonClassName("quiet")}
+            className={crmButton("quiet")}
             data-show-more
           >
             {loading ? t("Loading…") : t("Show more")}
@@ -484,6 +478,28 @@ export function RelationshipsBoard({
           ) : null}
         </div>
       ) : null}
+
+      <RelationshipPeek
+        item={peek}
+        onClose={() => setPeek(null)}
+        side={side}
+        now={now}
+        step={peekRow?.step}
+        activity={peekRow?.activity}
+        scores={
+          scores === undefined || peek === null
+            ? undefined
+            : (scoreOf(scores, peek) ?? UNKNOWN_SCORES)
+        }
+        fit={
+          fits === undefined ||
+          peek === null ||
+          peek.counterpart.kind !== "COMPANY" ||
+          !(peek.counterpart.id in fits)
+            ? undefined
+            : (fits[peek.counterpart.id] ?? null)
+        }
+      />
     </div>
   );
 }
@@ -496,52 +512,28 @@ function RelationshipRow({
   photoUrl,
   unread,
   now,
-  fit,
-  scores,
-  grid,
-  unicornColumn,
+  onPeek,
 }: {
-  /** The list's column template, so rows align with its header. */
-  readonly grid: string;
-  /** The list shows Unicorn Potential (premium): this row has its column. */
-  readonly unicornColumn: boolean;
   readonly item: RelationshipSummaryDto;
-  readonly fit?: FitProfileDto | null | undefined;
-  /** Undefined: no score columns on this list. */
-  readonly scores?: PipelineScores | undefined;
   readonly step: NextStep;
   readonly activity: string;
   readonly about: string | null;
   readonly photoUrl: string | null;
   readonly unread: boolean;
   readonly now: number;
+  readonly onPeek: () => void;
 }) {
   const t = useT();
-
   const href = relationshipHref(item);
   const name = item.counterpart.name;
-  const Icon = step.icon === null ? null : ICONS[step.icon];
-  const pill = (
-    <StatusPill tone={TONE[stageTone(item.state)]}>
-      {t(STATE_WORDS[item.state])}
-    </StatusPill>
-  );
-  const when = (
-    <time
-      dateTime={activity}
-      className="cq-caption cq-numeric text-(--cq-text-tertiary)"
-    >
-      {t(since(activity, now))}
-    </time>
-  );
-  const quiet = step.label === null && step.why === "";
+  const own = isOwnStep(step);
+  const next = step.label ?? (step.why === "" ? null : step.why);
+  const label =
+    item.state === "INTEREST_EXPRESSED" ? "Awaiting reply" : undefined;
   return (
     <article
       aria-labelledby={`relationship-${item.relationshipId}`}
-      className={cx(
-        "relative grid grid-cols-[40px_minmax(0,1fr)] items-center gap-x-3 gap-y-1 p-3.5 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:px-4 lg:py-3",
-        grid,
-      )}
+      className="relative grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:grid-cols-[auto_minmax(0,1.4fr)_auto_minmax(0,1fr)_auto] lg:gap-4"
       data-relationship-card={item.state}
     >
       {item.counterpart.kind === "COMPANY" ? (
@@ -550,7 +542,7 @@ function RelationshipRow({
           name={name}
           companyId={item.counterpart.id}
           src={photoUrl}
-          size={40}
+          size={28}
           decorative
         />
       ) : (
@@ -559,126 +551,68 @@ function RelationshipRow({
           name={name}
           investorOrganisationId={item.counterpart.id}
           src={photoUrl ?? undefined}
-          size={40}
+          size={28}
           decorative
         />
       )}
-      <div className="flex min-w-0 flex-col gap-0.5">
+      <div className="min-w-0">
         <h2
           id={`relationship-${item.relationshipId}`}
-          className="cq-body flex min-w-0 items-center gap-2 font-semibold text-(--cq-text-primary)"
+          className="flex min-w-0 items-center gap-2 font-semibold text-(--cq-text-primary)"
         >
           {unread ? (
+            // The next step says it in words; the dot only echoes it.
             <span
-              // The why line says it in words; the dot only echoes it.
               aria-hidden="true"
               className="size-2 shrink-0 rounded-full bg-(--cq-accent)"
             />
           ) : null}
-          {/* The whole row opens the relationship; the button stays its own. */}
+          {/* The whole row opens the peek; a modified click, the record. */}
           <Link
             href={href}
+            onClick={(event) => peekClick(event, onPeek)}
             className="truncate after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-(--cq-focus-ring)"
           >
             {name}
           </Link>
         </h2>
-        {about === null ? null : (
-          <p className="cq-body-sm hidden truncate text-(--cq-text-secondary) lg:block">
-            {t(about)}
-          </p>
-        )}
-        {fit === undefined ? null : <RelationshipFitLine profile={fit} />}
-        {scores === undefined ? null : (
-          // A phone card says both scores, labelled; from tablet-landscape
-          // up they are the columns beside the name.
-          <ScoreLine
-            scores={scores}
-            companyId={
-              item.counterpart.kind === "COMPANY"
-                ? item.counterpart.id
-                : undefined
-            }
-            className="mt-0.5 lg:hidden"
-          />
-        )}
-        <div className="flex items-center gap-2 lg:hidden">
-          {pill}
-          {when}
-        </div>
+        <p className="truncate text-[13px] text-(--cq-text-secondary)">
+          {about === null ? (next === null ? null : t(next)) : t(about)}
+        </p>
       </div>
-      {scores === undefined ? null : (
-        <>
-          <div className="hidden lg:block">
-            <ScoreFigure
-              label="Suitability"
-              value={scores.suitability}
-              variant="column"
-            />
-          </div>
-          <div className="hidden lg:block">
-            <ScoreFigure
-              label="Investability"
-              value={scores.investability}
-              variant="column"
-            />
-          </div>
-          {unicornColumn ? (
-            <div className="hidden lg:block">
-              {item.counterpart.kind !== "COMPANY" ? null : (
-                <UnicornFigure
-                  cell={
-                    scores.unicorn ?? { status: "NOT_ASSESSED", score: null }
-                  }
-                  companyId={item.counterpart.id}
-                  variant="column"
-                />
-              )}
-            </div>
-          ) : null}
-        </>
-      )}
-      <div className="hidden lg:block">{pill}</div>
-      <div className="hidden text-end lg:block">{when}</div>
-      <div
+      <div className="hidden lg:block">
+        <StateTag state={item.state} label={label} />
+      </div>
+      <p
         className={cx(
-          "col-span-2 flex items-center justify-between gap-3 lg:col-span-1 lg:justify-end",
-          quiet
-            ? "hidden lg:flex"
-            : "mt-2 border-t border-(--cq-border-subtle) pt-2.5 lg:mt-0 lg:border-0 lg:pt-0",
+          "hidden items-center gap-1.5 text-[13px] lg:flex",
+          own
+            ? "font-semibold text-(--cq-accent)"
+            : "text-(--cq-text-secondary)",
         )}
+        data-next-step-text={own ? "yours" : "theirs"}
       >
-        <span className="cq-body-sm min-w-0 truncate text-(--cq-text-secondary) lg:hidden">
-          {t(step.why)}
+        {own ? <Flag size={14} aria-hidden="true" /> : null}
+        {next === null ? null : t(next)}
+      </p>
+      <div className="flex items-center justify-end gap-2">
+        <span className="lg:hidden">
+          <StateTag state={item.state} label={label} />
         </span>
-        {step.label === null || step.href === null ? (
-          <span className="cq-body-sm hidden text-(--cq-text-tertiary) lg:inline">
-            {t(step.why)}
-          </span>
-        ) : (
-          <Link
-            href={step.href}
-            className={cx(
-              buttonClassName(step.urgent ? "primary" : "secondary", "compact"),
-              "relative shrink-0",
-            )}
-            data-next-step
-          >
-            {Icon === null ? null : (
-              <Icon size={ICON_SIZE.compact} aria-hidden="true" />
-            )}
-            {t(step.label)}
-          </Link>
-        )}
+        <time
+          dateTime={activity}
+          className="cq-numeric hidden text-xs text-(--cq-text-tertiary) lg:inline"
+        >
+          {t(since(activity, now) || "No activity")}
+        </time>
       </div>
     </article>
   );
 }
 
 /**
- * Needs you: one card per relationship and action, newest first; three at
- * a time, the rest one tap away. Acting on a card (or dismissing it) clears
- * every notice it stands for.
+ * A counterpart's picture by id: its photo route answers only where this
+ * reader may see the name.
  */
 export function CounterpartAvatar({
   item,

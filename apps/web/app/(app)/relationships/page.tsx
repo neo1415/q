@@ -19,6 +19,7 @@ import {
   RelationshipPipelineViewQuerySchema,
   type FitProfileDto,
   type PipelineUnicornSort,
+  type RelationshipStateV2,
   type RelationshipPipelineDto,
   type RelationshipPipelineQuery,
   type NotificationDto,
@@ -31,7 +32,10 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { ICON_SIZE, Plus } from "@capital-q/ui/icons";
 
 import { getSessionUser } from "@/auth/session";
-import { RelationshipPipeline } from "@/features/relationships/relationship-pipeline";
+import {
+  RelationshipPipeline,
+  type PipelineOverview,
+} from "@/features/relationships/relationship-pipeline";
 import { pipelinePresentedRows } from "@/features/relationships/pipeline-presentation";
 import {
   pipelineHref,
@@ -77,11 +81,16 @@ import { NeedsYouQueue } from "@/features/relationships/needs-you-queue";
 import {
   portfolioOf,
   PORTFOLIO_READ_LIMIT,
+  unrecordedInvestments,
 } from "@/features/relationships/portfolio";
+import { Segmented } from "@/features/relationships/crm-kit";
 import { PortfolioSection } from "@/features/relationships/portfolio-section";
 import {
+  listOrder,
   needsYouCards,
   PAGE_SIZE,
+  snoozedRelationships,
+  type NeedsYouCard,
 } from "@/features/relationships/relationships-view";
 import {
   hasUnicornScores,
@@ -205,25 +214,29 @@ export default async function RelationshipsPage({
           }
         : apiParsed;
     // The saved views are their own read: a failure leaves the pipeline
-    // working and says the views couldn't load.
-    const [read, views] =
+    // working and says the views couldn't load. The whole pipeline's counts
+    // and steps (the chips, Needs you, the next step) are read beside it.
+    const now = readClock();
+    const [read, views, overview] =
       session === null ||
       side === "NONE" ||
       !parsed.success ||
       apiQuery === undefined
-        ? [null, null]
+        ? [null, null, null]
         : await Promise.all([
             (unicorn === null
               ? queryRelationshipPipeline(session, apiQuery, ownCompany)
               : wholePipeline(session, apiQuery, ownCompany)
             ).catch(() => null),
             listRelationshipViews(session, ownCompany).catch(() => null),
+            pipelineOverview(context, now).catch(() => null),
           ]);
     // The companies' scores (investor only); unknown ranks last.
-    const scored =
+    const scoredRead =
       read === null || side !== "INVESTOR"
         ? undefined
-        : (await relationshipScores(read.items)).scores;
+        : await relationshipScores(read.items);
+    const scored = scoredRead?.scores;
     const data: RelationshipPipelineDto | null =
       read === null
         ? null
@@ -308,6 +321,9 @@ export default async function RelationshipsPage({
               layout={layout}
               scores={scored}
               ranked={ranked}
+              overview={overview}
+              fits={scoredRead?.profiles}
+              now={now}
             />
           </QSection>
         )}
@@ -330,6 +346,20 @@ export default async function RelationshipsPage({
       from !== undefined && day.test(from)
         ? { from, ...(to !== undefined && day.test(to) ? { to } : {}) }
         : { range };
+    // The period switch (design 2026-10-20): 30 days, 90 days or this year
+    // (from 1 January). An older link (7 days, all time, a custom span)
+    // still reads, and the switch then shows none of the three as chosen.
+    const yearStart = `${String(new Date().getUTCFullYear())}-01-01`;
+    const periodKey: "30" | "90" | "year" | "other" =
+      "from" in period
+        ? period.from === yearStart && period.to === undefined
+          ? "year"
+          : "other"
+        : range === "30d"
+          ? "30"
+          : range === "90d"
+            ? "90"
+            : "other";
     const [session, qSession] =
       side === "NONE"
         ? [null, null]
@@ -410,45 +440,96 @@ export default async function RelationshipsPage({
             }
           />
         ) : null}
-        {queueRead === null || side === "NONE" ? null : (
-          <Suspense
-            key="overview-queue"
-            fallback={<HubPanelLoading rows={3} label="queue" lead />}
-          >
-            <OverviewQueue read={queueRead} side={side} now={now} />
-          </Suspense>
-        )}
-        {portfolioRead === null ? null : (
-          <Suspense
-            key="overview-portfolio"
-            fallback={<HubPanelLoading rows={3} label="portfolio" />}
-          >
-            <OverviewPortfolio read={portfolioRead} />
-          </Suspense>
-        )}
-        {unset ? null : (
-          <Suspense
-            key="overview-period"
-            fallback={<HubPanelLoading rows={4} label="period" />}
-          >
-            <OverviewPeriod
-              read={periodRead}
-              side={side}
-              range={range}
-              stage={stage}
-              download={new URLSearchParams(period).toString()}
-              words={{
-                failed: t("The period report couldn't load"),
-                failedBody: t(
-                  "Your records are unchanged. Try again in a moment.",
-                ),
-                retry: t("Try again"),
-                section: t("Relationships in the overview"),
-                heading: t("This period"),
-              }}
-            />
-          </Suspense>
-        )}
+        {/* Morning brief (design 2026-10-20): what needs you, how the
+            period went, then what you hold, in one reading column. */}
+        <div className="flex w-full max-w-[860px] flex-col gap-7">
+          {queueRead === null || side === "NONE" ? null : (
+            <Suspense
+              key="overview-queue"
+              fallback={<HubPanelLoading rows={3} label="queue" lead />}
+            >
+              <OverviewQueue
+                read={queueRead}
+                portfolio={portfolioRead}
+                side={side}
+                now={now}
+              />
+            </Suspense>
+          )}
+          {unset ? null : (
+            <section
+              aria-labelledby="period-title"
+              className="flex flex-col"
+              data-period-report
+            >
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <h2
+                  id="period-title"
+                  className="text-lg font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
+                >
+                  {periodKey === "year"
+                    ? t("This year")
+                    : periodKey === "90"
+                      ? t("Last 90 days")
+                      : periodKey === "30"
+                        ? t("Last 30 days")
+                        : t("This period")}
+                </h2>
+                <Segmented
+                  label={t("Period")}
+                  className="ms-auto"
+                  value={periodKey}
+                  options={[
+                    {
+                      key: "30",
+                      label: t("30 days"),
+                      href: "/relationships?view=overview&range=30d",
+                    },
+                    {
+                      key: "90",
+                      label: t("90 days"),
+                      href: "/relationships?view=overview&range=90d",
+                    },
+                    {
+                      key: "year",
+                      label: t("This year"),
+                      href: `/relationships?view=overview&from=${yearStart}`,
+                    },
+                  ]}
+                />
+              </div>
+              <Suspense
+                key={`overview-period:${periodKey}`}
+                fallback={<HubPanelLoading rows={4} label="period" />}
+              >
+                <OverviewPeriod
+                  read={periodRead}
+                  side={side}
+                  range={range}
+                  stage={stage}
+                  download={new URLSearchParams(period).toString()}
+                  words={{
+                    failed: t("The period report couldn't load"),
+                    failedBody: t(
+                      "Your records are unchanged. Try again in a moment.",
+                    ),
+                    retry: t("Try again"),
+                    section: t("Relationships in the overview"),
+                    heading: t("This period"),
+                  }}
+                />
+              </Suspense>
+            </section>
+          )}
+          {portfolioRead === null ? null : (
+            <Suspense
+              key="overview-portfolio"
+              fallback={<HubPanelLoading rows={3} label="portfolio" />}
+            >
+              <OverviewPortfolio read={portfolioRead} />
+            </Suspense>
+          )}
+        </div>
       </PageContainer>
     );
   }
@@ -489,6 +570,24 @@ export default async function RelationshipsPage({
     scoredRead,
   ] as const);
   const now = readClock();
+  // The bar's Export and saved views (design 2026-10-20): the whole list's
+  // export binding is the pipeline's own (one row read for it), and the
+  // views are their own read; either failing leaves the list working.
+  const toolsRead: Promise<ListTools> =
+    side === "NONE"
+      ? Promise.resolve({ scope: null, views: null })
+      : apiSession().then(async (session) => {
+          if (session === null) return { scope: null, views: null };
+          const ownCompany =
+            context.kind === "FOUNDER" ? context.companyId : undefined;
+          const [scope, views] = await Promise.all([
+            queryRelationshipPipeline(session, { pageSize: 1 }, ownCompany)
+              .then((page) => page.scope)
+              .catch(() => null),
+            listRelationshipViews(session, ownCompany).catch(() => null),
+          ]);
+          return { scope, views };
+        });
   // The search carries into Table and Board when it is a valid one.
   const searched = RelationshipPipelineQuerySchema.safeParse(
     typeof params["q"] === "string" ? { q: params["q"] } : {},
@@ -520,21 +619,19 @@ export default async function RelationshipsPage({
           )
         }
       />
-      <PipelineLayoutSwitch
-        layout="list"
-        hrefs={{
-          list: "/relationships?view=pipeline&layout=list",
-          table: pipelineHref(listQuery, "table"),
-          board: pipelineHref(listQuery, "board"),
-        }}
-      />
       {/* Another order is another first page: the list starts afresh. */}
       <Suspense key={`list:${sort}`} fallback={<HubListLoading />}>
         <RelationshipsListBody
           read={listRead}
+          tools={toolsRead}
           side={side}
           sort={sort}
           now={now}
+          layoutHrefs={{
+            list: "/relationships?view=pipeline&layout=list",
+            table: pipelineHref(listQuery, "table"),
+            board: pipelineHref(listQuery, "board"),
+          }}
           label={(count) => t(`${String(count)} relationships`)}
         />
       </Suspense>
@@ -543,16 +640,65 @@ export default async function RelationshipsPage({
 }
 
 type OwnPageContext = Awaited<ReturnType<typeof resolveOwnContext>>;
+
+/**
+ * What Table and Board show beside their page (design 2026-10-20): every
+ * relationship's state for the chips' counts, each one's next step as the
+ * List decides it (so Needs you is one list everywhere), when anything
+ * last happened, and the one line about the first rows' counterparts.
+ */
+async function pipelineOverview(
+  context: OwnPageContext,
+  now: number,
+): Promise<PipelineOverview | null> {
+  const items = await ownRelationships(context);
+  if (items === undefined) return null;
+  const [needs, digests] = await Promise.all([
+    noticesAndReminders(),
+    relationshipDigests(context, items.toSorted(listOrder).slice(0, PAGE_SIZE)),
+  ]);
+  const steps = await relationshipSteps(context, items, needs.reminders, now);
+  const counts: Partial<Record<RelationshipStateV2, number>> = {};
+  for (const item of items) counts[item.state] = (counts[item.state] ?? 0) + 1;
+  return {
+    total: items.length,
+    counts,
+    steps: Object.fromEntries(
+      steps.map((entry) => [entry.item.relationshipId, entry.step]),
+    ),
+    activity: Object.fromEntries(
+      steps.map((entry) => [entry.item.relationshipId, entry.at]),
+    ),
+    about: Object.fromEntries(
+      Object.entries(digests).flatMap(([id, digest]) =>
+        digest.about === null ? [] : [[id, digest.about]],
+      ),
+    ),
+  };
+}
 type OwnItems = Awaited<ReturnType<typeof ownRelationships>>;
+
+type ListTools = {
+  readonly scope: string | null;
+  readonly views: Awaited<ReturnType<typeof listRelationshipViews>> | null;
+};
 
 /** The list's rows, once its reads land (fed by the page's promises). */
 function RelationshipsListBody({
   read,
+  tools,
   side,
   sort,
   now,
+  layoutHrefs,
   label,
 }: {
+  readonly tools: Promise<ListTools>;
+  readonly layoutHrefs: {
+    readonly list: string;
+    readonly table: string;
+    readonly board: string;
+  };
   readonly read: Promise<
     readonly [
       OwnItems,
@@ -568,6 +714,8 @@ function RelationshipsListBody({
   readonly label: (count: number) => string;
 }) {
   const [items, unread, commitments, digests, scored] = use(read);
+  const { scope, views } = use(tools);
+  const empty = items === undefined || items.length === 0;
   return (
     // Q room R1: every relationship on this page, by id, for Q.
     <QSection
@@ -580,6 +728,13 @@ function RelationshipsListBody({
       total={items?.length ?? 0}
       label={label(items?.length ?? 0)}
     >
+      {/* With nothing to list the bar has nothing to act on; the switch
+          still leads to the other layouts. */}
+      {empty && side !== "NONE" ? (
+        <div className="mb-4">
+          <PipelineLayoutSwitch layout="list" hrefs={layoutHrefs} />
+        </div>
+      ) : null}
       <RelationshipsIndex
         key={sort}
         side={side}
@@ -591,6 +746,9 @@ function RelationshipsListBody({
         scores={scored?.scores}
         sort={sort}
         commitments={commitments}
+        layoutHrefs={layoutHrefs}
+        exportScope={scope}
+        views={views}
       />
     </QSection>
   );
@@ -625,56 +783,83 @@ function overviewQueueRead(
 
 function OverviewQueue({
   read,
+  portfolio,
   side,
   now,
 }: {
   readonly read: ReturnType<typeof overviewQueueRead>;
+  /** The investor's portfolio read: unrecorded amounts become cards. */
+  readonly portfolio: PortfolioRead | null;
   readonly side: "COMPANY" | "INVESTOR";
   readonly now: number;
 }) {
   const [needs, items, steps, deckReview] = use(read);
+  const held = portfolio === null ? null : use(portfolio)[0];
+  const snoozed = snoozedRelationships(needs.reminders, now);
+  const records: NeedsYouCard[] =
+    held === null || held.portfolio === undefined
+      ? []
+      : unrecordedInvestments(held.portfolio, held.commitments)
+          .filter((item) => !snoozed.has(item.relationshipId))
+          .map((item) => ({
+            key: `${item.relationshipId}|record`,
+            title: "Record what you invested",
+            relationship: item,
+            latestAt: item.stateSince,
+            count: 1,
+            noticeIds: [],
+            reminderId: null,
+            action: { label: "Record amount", href: null },
+            step: true,
+            record: {
+              relationshipId: item.relationshipId,
+              name: item.counterpart.name,
+              since: item.stateSince,
+            },
+          }));
+  const listed = needsYouCards({
+    notices: needs.notices,
+    reminders: needs.reminders,
+    items: items ?? [],
+    side,
+    now,
+    steps,
+    deckReview:
+      deckReview === null
+        ? null
+        : {
+            pending: deckReview.pending,
+            href: deckReview.href,
+            at: new Date(now).toISOString(),
+          },
+  });
+  // A money gap sorts with the rest by when it happened, newest first.
+  const cards = [...listed, ...records].toSorted(
+    (a, b) =>
+      (b.key === "deck-review" ? 1 : 0) - (a.key === "deck-review" ? 1 : 0) ||
+      Date.parse(b.latestAt) - Date.parse(a.latestAt),
+  );
   return (
-    <NeedsYouQueue
-      cards={needsYouCards({
-        notices: needs.notices,
-        reminders: needs.reminders,
-        items: items ?? [],
-        side,
-        now,
-        steps,
-        deckReview:
-          deckReview === null
-            ? null
-            : {
-                pending: deckReview.pending,
-                href: deckReview.href,
-                at: new Date(now).toISOString(),
-              },
-      })}
-      now={now}
-      unavailable={needs.unavailable}
-    />
+    <NeedsYouQueue cards={cards} now={now} unavailable={needs.unavailable} />
   );
 }
 
+type PortfolioRead = Promise<
+  readonly [
+    {
+      readonly portfolio: ReturnType<typeof portfolioOf> | undefined;
+      readonly commitments: ReadonlyMap<
+        string,
+        Awaited<ReturnType<typeof getRelationshipCommitments>> | undefined
+      >;
+    },
+    PeriodResults,
+  ]
+>;
+
 type PeriodResults = Awaited<ReturnType<typeof getResults>> | null;
 
-function OverviewPortfolio({
-  read,
-}: {
-  readonly read: Promise<
-    readonly [
-      {
-        readonly portfolio: ReturnType<typeof portfolioOf> | undefined;
-        readonly commitments: ReadonlyMap<
-          string,
-          Awaited<ReturnType<typeof getRelationshipCommitments>> | undefined
-        >;
-      },
-      PeriodResults,
-    ]
-  >;
-}) {
+function OverviewPortfolio({ read }: { readonly read: PortfolioRead }) {
   const [{ portfolio, commitments }, results] = use(read);
   return (
     <PortfolioSection
@@ -752,6 +937,7 @@ function OverviewPeriod({
         <ResultsDashboard
           heading={words.heading}
           headingLevel={2}
+          header={false}
           basePath="/relationships?view=overview"
           range={range}
           stage={stage}

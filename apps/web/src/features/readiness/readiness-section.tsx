@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+
+import { Flag } from "@capital-q/ui/icons";
 
 import {
   READINESS_STATUSES,
@@ -10,6 +13,7 @@ import {
 
 import { AskQChips } from "@/features/capital/ask-q-chips";
 import { QControl } from "@/features/q/control/q-control";
+import { crmButton, CrmSheet, QLine } from "@/features/relationships/crm-kit";
 
 import { ReadinessStatusBadge } from "./readiness-status";
 import { useT } from "@/features/i18n/language";
@@ -104,58 +108,98 @@ export function ReadinessSection({
   readonly readiness: ReadinessDto;
 }) {
   const t = useT();
+  const [open, setOpen] = useState<string | null>(null);
+  const pillar = readiness.pillars.find((entry) => entry.pillar === open);
+  const onFile = readiness.pillars.filter(
+    (entry) => entry.status === "STRONG" || entry.status === "DEVELOPING",
+  ).length;
   return (
-    <div className="flex flex-col gap-6" data-readiness>
-      <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+    <div className="flex flex-col gap-3.5" data-readiness>
+      {/* The words carry the status; the shapes repeat it (design
+          2026-10-20: each area says on file, developing or missing). */}
+      <ReadinessTally readiness={readiness} />
+
+      <QControl id="list.pillars" kind="LIST">
+        <ul
+          aria-label={t("Readiness by pillar")}
+          className="grid grid-cols-2 gap-2.5 lg:grid-cols-4"
+        >
+          {readiness.pillars.map((entry) => {
+            const missing =
+              entry.status === "GAP" || entry.status === "UNKNOWN";
+            return (
+              <li key={entry.pillar}>
+                <button
+                  type="button"
+                  onClick={() => setOpen(entry.pillar)}
+                  className={`cq-crm-lift flex min-h-[120px] w-full flex-col gap-2 rounded-(--cq-radius-lg) border p-3.5 text-start focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) ${missing ? "border-dashed border-(--cq-border) bg-(--cq-surface-subtle)" : "border-(--cq-border-subtle) bg-(--cq-surface-raised)"}`}
+                  data-readiness-pillar={entry.pillar}
+                >
+                  <span className="flex flex-wrap items-center justify-between gap-2">
+                    <b className="font-semibold text-(--cq-text-primary)">
+                      {t(entry.label)}
+                    </b>
+                    <ReadinessStatusBadge status={entry.status} />
+                  </span>
+                  <span className="text-[13px] text-(--cq-text-secondary)">
+                    {t(entry.summary)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </QControl>
+
+      <QLine
+        small={t(
+          "Q's reading of what you shared. No score is given, and nothing missing is counted against you.",
+        )}
+      >
+        {t(
+          `${String(onFile)} of ${String(readiness.pillars.length)} areas are strong or developing.`,
+        )}
+      </QLine>
+
+      {readiness.blockers.length === 0 ? null : (
         <QControl id="section.risks" kind="SECTION">
           <section
             aria-labelledby="stop-raise-heading"
-            className="border border-(--cq-border-subtle) bg-(--cq-surface) p-5"
+            className="flex flex-col gap-2 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
           >
             <h3
               id="stop-raise-heading"
-              className="cq-title-sm text-(--cq-text-primary)"
+              className="text-[13px] font-medium text-(--cq-text-secondary)"
             >
               {t("What could stop your raise")}
             </h3>
-            {readiness.blockers.length === 0 ? (
-              <p className="cq-body-sm pt-2 text-(--cq-text-secondary)">
-                {t(
-                  "Nothing that investors at your stage usually ask for first is missing from what you've shared.",
-                )}
-              </p>
-            ) : (
-              <QControl id="list.risks" kind="LIST">
-                <ol className="flex flex-col pt-2">
-                  {readiness.blockers.map((blocker, index) => (
-                    <li
-                      key={blocker.id}
-                      data-q-item
-                      className="grid grid-cols-[1.5rem_1fr] gap-3 border-t border-(--cq-border-subtle) py-3 first:border-t-0"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
-                      >
-                        {index + 1}
+            <QControl id="list.risks" kind="LIST">
+              <ol className="flex flex-col gap-2">
+                {readiness.blockers.map((blocker) => (
+                  <li
+                    key={blocker.id}
+                    data-q-item
+                    className="flex items-start gap-2.5 text-sm text-(--cq-text-primary)"
+                  >
+                    <Flag
+                      size={15}
+                      aria-hidden="true"
+                      className="mt-0.5 flex-none text-(--cq-text-secondary)"
+                    />
+                    <span>
+                      {blocker.title}{" "}
+                      <span className="text-(--cq-text-secondary)">
+                        {blocker.why}
                       </span>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="cq-body font-semibold text-(--cq-text-primary)">
-                          {blocker.title}
-                        </span>
-                        <span className="cq-body-sm text-(--cq-text-secondary)">
-                          {blocker.why}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </QControl>
-            )}
-            <div className="flex flex-wrap gap-2 pt-3">
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </QControl>
+            <div className="flex flex-wrap gap-2 pt-1">
               <Link
                 href="/relationships?view=capital&tab=action-plan"
-                className="cq-label inline-flex min-h-11 items-center bg-(--cq-accent) px-4 text-(--cq-text-inverse) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
+                className={crmButton("secondary")}
               >
                 {t("Open the action plan")}
               </Link>
@@ -171,113 +215,74 @@ export function ReadinessSection({
             </div>
           </section>
         </QControl>
-        <section
-          aria-labelledby="glance-heading"
-          className="border border-(--cq-border-subtle) bg-(--cq-surface) p-5"
-        >
-          <h3
-            id="glance-heading"
-            className="cq-title-sm text-(--cq-text-primary)"
-          >
-            {t("At a glance")}
-          </h3>
-          <div className="pt-3">
-            <ReadinessTally readiness={readiness} />
-          </div>
-          <p className="cq-body-sm pt-3 text-(--cq-text-secondary)">
-            {t(
-              "No score: each pillar says what Q can see and what is missing. Not shared yet means Q has nothing to go on, and it is never counted against you.",
-            )}
-          </p>
-          <ul className="cq-caption flex flex-col gap-1 pt-2 text-(--cq-text-tertiary)">
-            {readiness.uncertainty.slice(0, 3).map((line) => (
-              <li key={line}>{t(line)}</li>
-            ))}
-          </ul>
-        </section>
-      </div>
-
-      <QControl id="list.pillars" kind="LIST">
-        <ul
-          aria-label={t("Readiness by pillar")}
-          className="overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
-        >
-          {readiness.pillars.map((pillar) => (
-            <li
-              key={pillar.pillar}
-              className="border-t border-(--cq-border-subtle) first:border-t-0"
-            >
-              <details className="group">
-                <summary className="grid min-h-11 cursor-pointer list-none grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-5 py-3.5 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:grid-cols-[11rem_9rem_1fr_auto]">
-                  <span className="cq-body font-semibold text-(--cq-text-primary)">
-                    {t(pillar.label)}
-                  </span>
-                  <ReadinessStatusBadge status={pillar.status} />
-                  <span className="cq-body-sm col-span-2 text-(--cq-text-secondary) lg:col-span-1">
-                    {t(pillar.summary)}
-                  </span>
-                  <span className="cq-caption hidden text-(--cq-text-tertiary) lg:inline">
-                    {t(
-                      pillar.evidence.length === 1
-                        ? "1 piece of evidence"
-                        : `${String(pillar.evidence.length)} pieces of evidence`,
-                    )}
-                  </span>
-                </summary>
-                <div className="grid gap-5 border-t border-dashed border-(--cq-border) bg-(--cq-surface-raised) px-5 py-4 lg:grid-cols-2">
-                  <div>
-                    <h4 className="cq-caption pb-2 font-semibold text-(--cq-text-tertiary)">
-                      {t("Evidence")}
-                    </h4>
-                    {pillar.evidence.length === 0 ? (
-                      <p className="cq-body-sm text-(--cq-text-secondary)">
-                        {t("Nothing on record yet.")}
-                      </p>
-                    ) : (
-                      <ul className="flex flex-col">
-                        {pillar.evidence.map((line, index) => (
-                          <li
-                            key={`${t(line.label)}-${String(index)}`}
-                            className="cq-body-sm flex justify-between gap-3 border-t border-(--cq-border-subtle) py-2 first:border-t-0"
-                          >
-                            <span className="text-(--cq-text-primary)">
-                              {t(line.label)}
-                            </span>
-                            <span className="cq-caption shrink-0 rounded-(--cq-radius-sm) border border-(--cq-border) px-1.5 py-0.5 text-(--cq-text-secondary)">
-                              {t(evidenceTag(line))}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="cq-caption pb-2 font-semibold text-(--cq-text-tertiary)">
-                      {t("What would move it")}
-                    </h4>
-                    {pillar.improve.length === 0 ? (
-                      <p className="cq-body-sm text-(--cq-text-secondary)">
-                        {t("Nothing expected is missing here.")}
-                      </p>
-                    ) : (
-                      <ul className="cq-body-sm flex list-disc flex-col gap-1 ps-5 text-(--cq-text-secondary)">
-                        {pillar.improve.map((line) => (
-                          <li key={line}>{t(line)}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              </details>
-            </li>
+      )}
+      {readiness.uncertainty.length === 0 ? null : (
+        <ul className="flex flex-col gap-1 text-xs text-(--cq-text-tertiary)">
+          {readiness.uncertainty.slice(0, 3).map((line) => (
+            <li key={line}>{t(line)}</li>
           ))}
         </ul>
-      </QControl>
-      <p className="cq-caption text-(--cq-text-tertiary)">
+      )}
+      <p className="text-xs text-(--cq-text-tertiary)">
         Rules {readiness.rulesVersion.replace("readiness-rules/", "")} ·
         revision {readiness.revision} · recomputed every time you open this
         page.
       </p>
+
+      {pillar === undefined ? null : (
+        <CrmSheet
+          open
+          onOpenChange={(next) => {
+            if (!next) setOpen(null);
+          }}
+          title={t(pillar.label)}
+          sub={t(pillar.summary)}
+        >
+          <ReadinessStatusBadge status={pillar.status} />
+          <div className="flex flex-col gap-2 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4">
+            <h4 className="text-[13px] font-medium text-(--cq-text-secondary)">
+              {t("Evidence")}
+            </h4>
+            {pillar.evidence.length === 0 ? (
+              <p className="text-sm text-(--cq-text-secondary)">
+                {t("Nothing on record yet.")}
+              </p>
+            ) : (
+              <ul className="flex flex-col">
+                {pillar.evidence.map((line, index) => (
+                  <li
+                    key={`${line.label}-${String(index)}`}
+                    className="flex justify-between gap-3 border-t border-(--cq-border-subtle) py-2 text-sm first:border-t-0"
+                  >
+                    <span className="text-(--cq-text-primary)">
+                      {t(line.label)}
+                    </span>
+                    <span className="shrink-0 rounded-full bg-(--cq-surface-strong) px-2 py-0.5 text-xs text-(--cq-text-secondary)">
+                      {t(evidenceTag(line))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="flex flex-col gap-2 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4">
+            <h4 className="text-[13px] font-medium text-(--cq-text-secondary)">
+              {t("What would move it")}
+            </h4>
+            {pillar.improve.length === 0 ? (
+              <p className="text-sm text-(--cq-text-secondary)">
+                {t("Nothing expected is missing here.")}
+              </p>
+            ) : (
+              <ul className="flex list-disc flex-col gap-1 ps-5 text-sm text-(--cq-text-secondary)">
+                {pillar.improve.map((line) => (
+                  <li key={line}>{t(line)}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </CrmSheet>
+      )}
     </div>
   );
 }

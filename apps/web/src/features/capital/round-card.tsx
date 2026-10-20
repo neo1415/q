@@ -1,12 +1,13 @@
 "use client";
 
-import type { CSSProperties } from "react";
-
 import type { CapitalLedgerDto } from "@capital-q/contracts";
 
 import { formatDay } from "@/components/date-format";
+import { Check } from "@capital-q/ui/icons";
+import { Tag } from "@/features/relationships/crm-kit";
 
-import { figure, money, percent, shareOf } from "./money";
+import { money } from "./money";
+import { RaiseBar, raiseParts } from "./raise-bar";
 import { RoundControls } from "./round-controls";
 import { instrumentLabel } from "./round-labels";
 import type { LeadOption } from "./round-terms-fields";
@@ -21,25 +22,6 @@ import { useT } from "@/features/i18n/language";
 export { INSTRUMENT_LABELS, instrumentLabel } from "./round-labels";
 
 type Round = CapitalLedgerDto["rounds"][number];
-
-/**
- * One hue, three steps (dataviz: a meter's parts are one ramp): raised is
- * the accent, confirmed a lighter step, pledged lighter still and hatched,
- * so the three read apart without colour. Tokens only.
- */
-const METER: Readonly<
-  Record<"raised" | "confirmed" | "pledged", CSSProperties>
-> = {
-  raised: { background: "var(--cq-accent)" },
-  confirmed: {
-    background:
-      "color-mix(in srgb, var(--cq-accent) 52%, var(--cq-surface-raised))",
-  },
-  pledged: {
-    background:
-      "repeating-linear-gradient(135deg, color-mix(in srgb, var(--cq-accent) 40%, var(--cq-surface-raised)) 0 3px, var(--cq-accent-soft) 3px 6px)",
-  },
-};
 
 const day = (value: string | null) =>
   value === null ? null : formatDay(value.slice(0, 10));
@@ -171,99 +153,48 @@ export function RoundCard({
   round,
   rounds,
   leads,
+  commitments = [],
 }: {
   readonly round: Round;
   readonly rounds: readonly Round[];
   readonly leads: readonly LeadOption[];
+  /** The book, so money marked sent shows apart from money received. */
+  readonly commitments?: CapitalLedgerDto["commitments"];
 }) {
-  const target = round.target.amount;
-  const currency = round.target.currency;
-  const parts = [
-    { key: "raised", label: "Raised", amount: round.sums.raised },
-    { key: "confirmed", label: "Confirmed", amount: round.sums.confirmed },
-    { key: "pledged", label: "Pledged", amount: round.sums.pledged },
-  ] as const;
-  // Each segment is its share of the target; together they never pass it.
-  let left = 10000;
-  const widths = parts.map((part) => {
-    const width = Math.min(shareOf(part.amount, target), left);
-    left -= width;
-    return width;
-  });
-  const raised = shareOf(round.sums.raised, target);
+  const t = useT();
   const terms = termsOf(round, rounds, leads);
   return (
+    // The open round (design 2026-10-20): its name and state, whether it
+    // is open to investors, and one bar split by how far each amount has
+    // come. Raised is RECEIVED money only. Its terms, closes, what to know
+    // and the steps it can take follow (P8).
     <article
-      className="cq-glow-card flex flex-col gap-4 rounded-2xl p-5 sm:p-6"
+      className="flex flex-col gap-4 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
       data-round={round.id}
       aria-labelledby={`round-${round.id}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-0.5">
-          <h3
-            id={`round-${round.id}`}
-            className="cq-title-sm text-(--cq-text-primary)"
-          >
-            {round.name}
-          </h3>
-          <span className="cq-caption text-(--cq-text-tertiary)">
-            {instrumentLabel(round.instrument)}
-            {datesOf(round) === "" ? null : `, ${datesOf(round)}`}
-          </span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <h3
+          id={`round-${round.id}`}
+          className="text-base font-semibold text-(--cq-text-primary)"
+        >
+          {t(`${round.name}, ${STATUS_WORDS[round.status].toLowerCase()}`)}
+        </h3>
+        {round.status === "OPEN" || round.status === "FIRST_CLOSED" ? (
+          <Tag tone="positive" icon={<Check aria-hidden="true" />}>
+            {t("Open to investors")}
+          </Tag>
+        ) : (
           <StatusPill status={round.status} />
-          <span className="cq-caption rounded-full bg-(--cq-accent-soft) px-2.5 py-1 text-(--cq-text-primary)">
-            Current round
-          </span>
-        </div>
-      </div>
-      <div className="flex flex-col gap-1">
-        <p className="cq-display cq-numeric text-(--cq-text-primary)">
-          {money(round.sums.raised, currency)}
-        </p>
-        <p className="cq-body-sm cq-numeric text-(--cq-text-secondary)">
-          raised of {money(target, currency)}, {percent(raised)}
-        </p>
-      </div>
-      <div
-        className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-(--cq-surface-strong)"
-        role="img"
-        aria-label={`Raised ${percent(widths[0] ?? 0)}, confirmed ${percent(widths[1] ?? 0)}, pledged ${percent(widths[2] ?? 0)} of the target`}
-      >
-        {parts.map((part, index) =>
-          (widths[index] ?? 0) === 0 ? null : (
-            <span
-              key={part.key}
-              data-meter={part.key}
-              className="h-full"
-              style={{
-                ...METER[part.key],
-                width: `${String((widths[index] ?? 0) / 100)}%`,
-              }}
-            />
-          ),
         )}
+        <span className="text-xs text-(--cq-text-tertiary)">
+          {instrumentLabel(round.instrument)}
+          {datesOf(round) === "" ? null : `, ${datesOf(round)}`}
+        </span>
       </div>
-      <dl className="grid grid-cols-3 gap-3">
-        {parts.map((part) => (
-          <div key={part.key} className="flex flex-col gap-0.5">
-            <dt className="cq-caption flex items-center gap-1.5 text-(--cq-text-secondary)">
-              <span
-                aria-hidden
-                className="inline-block size-2.5 rounded-[3px]"
-                style={METER[part.key]}
-              />
-              {part.label}
-            </dt>
-            <dd className="cq-body-sm cq-numeric font-semibold text-(--cq-text-primary)">
-              {figure(part.amount)}
-            </dd>
-          </div>
-        ))}
-      </dl>
+      <RaiseBar parts={raiseParts(round, commitments)} words={t} />
       {terms.length === 0 ? null : (
-        <p className="cq-body-sm text-(--cq-text-secondary)">
+        <p className="text-[13px] text-(--cq-text-secondary)">
           {terms.join(" · ")}
         </p>
       )}

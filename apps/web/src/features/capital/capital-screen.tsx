@@ -14,6 +14,7 @@ import {
   resolveOwnContext,
   type OwnContext,
 } from "@/features/q/context";
+import { QControl } from "@/features/q/control/q-control";
 import { QSection } from "@/features/q/q-section";
 import { ActionPlanBoard } from "@/features/readiness/action-plan-board";
 import { ownReadiness } from "@/features/readiness/readiness-data";
@@ -23,6 +24,12 @@ import {
 } from "@/features/readiness/readiness-section";
 import { ownRelationships } from "@/features/relationships/relationship-data";
 import { RelationshipList } from "@/features/relationships/relationship-list";
+import {
+  NEXT_STEP_WORDS,
+  relationshipHref,
+  STATE_WORDS,
+} from "@/features/relationships/relationship-words";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 
 import { AskQChips } from "./ask-q-chips";
 import {
@@ -32,7 +39,10 @@ import {
   FounderBook,
   InvestorBook,
   investorCommitments,
+  type UnrecordedInvestment,
 } from "./capital-book";
+import { MandateObservation, SavedCompaniesCard } from "./mandate-observation";
+import { CrmToastProvider } from "@/features/relationships/crm-kit";
 import { needsYouCount, nowCount } from "./capital-counts";
 import { NextSteps, RaiseSummary, StopYourRaise } from "./capital-overview";
 import { CapitalTabBar, TabBadge } from "./capital-tab-bar";
@@ -184,29 +194,88 @@ export async function CapitalScreen({
   }
 
   const [relationships, mine] = await Promise.all([
-    inCrm ? Promise.resolve(undefined) : relationshipsOf(context),
+    relationshipsOf(context),
     context.kind === "INVESTOR" ? investorCommitments() : Promise.resolve(null),
   ]);
+  // Invested with no commitment recorded at all: an unknown amount, said
+  // and recordable, never a zero (design 2026-10-20).
+  const withMoney = new Set(
+    (mine?.commitments ?? []).map((item) => item.counterpartId),
+  );
+  const unrecorded: UnrecordedInvestment[] = (relationships ?? []).flatMap(
+    (item) =>
+      item.state === "INVESTED" &&
+      item.counterpart.kind === "COMPANY" &&
+      !withMoney.has(item.counterpart.id)
+        ? [
+            {
+              relationshipId: item.relationshipId,
+              companyId: item.counterpart.id,
+              name: item.counterpart.name,
+              since: item.stateSince,
+            },
+          ]
+        : [],
+  );
   return (
     <div className="flex flex-col gap-10">
       {context.kind === "INVESTOR" ? (
-        <>
-          <PageSection id="commitments" title={t("My commitments")}>
-            {mine === null ? (
-              <QuietEmpty sentence="Your commitments couldn't load." retry />
-            ) : (
-              <InvestorBook mine={mine} />
-            )}
-          </PageSection>
-          <PageSection id="mandate" title={t("Your mandate")}>
-            <MandateSummary
-              investorOrganisationId={context.investorOrganisationId}
-            />
-            <div className="pt-4">
-              <AskQChips asks={INVESTOR_ASKS} />
-            </div>
-          </PageSection>
-        </>
+        // Mandate beside the book (design 2026-10-20): what they declared
+        // on the left, what they committed on the right; Q's observation
+        // sits under the mandate and never rewrites it.
+        <CrmToastProvider>
+          <div
+            className="grid items-start gap-7 lg:grid-cols-[340px_minmax(0,1fr)]"
+            data-capital-investor
+          >
+            <QControl id="section.mandate" kind="SECTION">
+              <aside
+                id="mandate"
+                aria-label={t("Your mandate")}
+                className="flex flex-col gap-3.5 lg:sticky lg:top-4"
+              >
+                <MandateSummary
+                  investorOrganisationId={context.investorOrganisationId}
+                />
+                <Suspense fallback={null}>
+                  <MandateObservation relationships={relationships} />
+                </Suspense>
+                <Suspense fallback={null}>
+                  <SavedCompaniesCard />
+                </Suspense>
+                <AskQChips asks={INVESTOR_ASKS} />
+              </aside>
+            </QControl>
+            {/* Q reaches the book by name, as it reached the old section. */}
+            <QControl id="section.commitments" kind="SECTION">
+              <section
+                id="commitments"
+                aria-labelledby="book-title"
+                className="flex min-w-0 flex-col gap-3"
+              >
+                <div className="flex flex-wrap items-baseline gap-3">
+                  <h2
+                    id="book-title"
+                    className="text-xl font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
+                  >
+                    {t("Your book")}
+                  </h2>
+                  <span className="text-xs text-(--cq-text-tertiary)">
+                    {t("Received is confirmed by the company")}
+                  </span>
+                </div>
+                {mine === null ? (
+                  <QuietEmpty
+                    sentence="Your commitments couldn't load."
+                    retry
+                  />
+                ) : (
+                  <InvestorBook mine={mine} unrecorded={unrecorded} />
+                )}
+              </section>
+            </QControl>
+          </div>
+        </CrmToastProvider>
       ) : (
         <PageSection id="rounds" title={t("Your raise")}>
           <QuietEmpty sentence="Your rounds couldn't load." retry />
@@ -242,12 +311,14 @@ export async function FounderTab({
         readinessOf(),
       ]);
       return (
-        <div className="flex flex-col gap-6" data-capital-overview>
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-            <RaiseSummary ledger={ledger} />
-            <StopYourRaise readiness={readiness} />
-          </div>
-          <NextSteps readiness={readiness} />
+        <div className="flex flex-col gap-[22px]" data-capital-overview>
+          <RaiseSummary ledger={ledger} />
+          <StopYourRaise readiness={readiness} />
+          <NextSteps
+            readiness={readiness}
+            ledger={ledger}
+            currentRoundId={ledger?.currentRoundId ?? null}
+          />
           <AskQChips asks={FOUNDER_ASKS} />
         </div>
       );
@@ -354,9 +425,7 @@ export async function FounderTab({
       );
     case "investors": {
       const relationships = await relationshipsOf(context);
-      return (
-        <RelationshipsPanel relationships={relationships} investor={false} />
-      );
+      return <InvestorsCard relationships={relationships} />;
     }
   }
 }
@@ -383,6 +452,69 @@ function RelationshipsPanel({
         />
       )}
     </PageSection>
+  );
+}
+
+/**
+ * Investors (design 2026-10-20): the investors the founder is talking to,
+ * one row each with where it stands and what is next, opening the record.
+ */
+async function InvestorsCard({
+  relationships,
+}: {
+  readonly relationships: Awaited<ReturnType<typeof ownRelationships>>;
+}) {
+  const t = await serverT();
+  if (relationships === undefined)
+    return (
+      <QuietEmpty sentence="Your relationships couldn't load. Try again in a moment." />
+    );
+  const investors = relationships.filter(
+    (item) => item.counterpart.kind === "INVESTOR_ORGANISATION",
+  );
+  if (investors.length === 0)
+    return (
+      <QuietEmpty sentence="No investor relationships yet. When an investor expresses interest, it appears here." />
+    );
+  return (
+    <ul
+      id="relationships"
+      aria-label={t("Relationships")}
+      className="flex flex-col rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-[18px] py-1"
+    >
+      {investors.map((item) => (
+        <li
+          key={item.relationshipId}
+          className="border-t border-(--cq-border-subtle) first:border-t-0"
+          data-relationship-id={item.relationshipId}
+        >
+          <Link
+            href={relationshipHref(item)}
+            className="grid min-h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          >
+            <EntityAvatar
+              kind="investor"
+              name={item.counterpart.name}
+              investorOrganisationId={item.counterpart.id}
+              src={item.counterpart.photoUrl ?? undefined}
+              size={28}
+              decorative
+            />
+            <span className="min-w-0">
+              <b className="block truncate font-semibold text-(--cq-text-primary)">
+                {item.counterpart.name}
+              </b>
+              <span className="block text-xs text-(--cq-text-tertiary)">
+                {t(STATE_WORDS[item.state])}
+              </span>
+            </span>
+            <span className="text-end text-xs text-(--cq-text-tertiary)">
+              {t(NEXT_STEP_WORDS[item.nextStep])}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 

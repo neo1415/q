@@ -1,6 +1,7 @@
 import type {
   FitProfileDto,
   RelationshipSummaryDto,
+  SavedRelationshipViewList,
 } from "@capital-q/contracts";
 import type { RelationshipDigest } from "./relationship-data";
 import { RelationshipsBoard } from "./relationships-board";
@@ -28,7 +29,18 @@ export function RelationshipsIndex({
   scores,
   sort,
   commitments,
+  layoutHrefs,
+  exportScope,
+  views,
 }: {
+  /** The Pipeline's layout switch; absent: none (a preview). */
+  readonly layoutHrefs?:
+    | { readonly list: string; readonly table: string; readonly board: string }
+    | undefined;
+  /** The export scope for the whole list; null: unavailable just now. */
+  readonly exportScope?: string | null | undefined;
+  /** The saved views; null when they could not be read. */
+  readonly views?: SavedRelationshipViewList | null | undefined;
   /** Suitability and Investability by company id (investor only). */
   readonly scores?: Readonly<Record<string, PipelineScores>> | undefined;
   /** The list's order; an investor's default is Suitability. */
@@ -82,6 +94,9 @@ export function RelationshipsIndex({
       scores={scores}
       sort={sort}
       commitments={commitments}
+      layoutHrefs={layoutHrefs}
+      exportScope={exportScope}
+      views={views}
     />
   );
 }
