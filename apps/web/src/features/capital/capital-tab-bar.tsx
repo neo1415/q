@@ -134,7 +134,9 @@ export function CapitalTabBar({
       // The second level under the CRM's tabs (owner 2026-10-16): a
       // segmented strip, filled when selected, so it never reads as a
       // second copy of the underlined row above it.
-      className="relative -mx-4 flex gap-1 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:w-fit sm:max-w-full sm:border sm:border-(--cq-border-subtle) sm:bg-(--cq-surface) sm:p-1 [&::-webkit-scrollbar]:hidden"
+      // Pills under the CRM's underlined tabs (design 2026-10-20), so the
+      // two levels never look alike.
+      className="relative -mx-4 -mt-1.5 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
     >
       {CAPITAL_TABS.map((tab) => {
         const selected = tab.key === chosen;
@@ -151,7 +153,7 @@ export function CapitalTabBar({
             tabIndex={selected ? 0 : -1}
             onKeyDown={onKeyDown}
             onClick={() => setPick({ tab: tab.key, from: active })}
-            className={`cq-body-sm relative inline-flex min-h-11 flex-none items-center gap-2 px-3 whitespace-nowrap transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9 ${selected ? "bg-(--cq-surface-strong) font-semibold text-(--cq-text-primary)" : "font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"}`}
+            className={`relative inline-flex min-h-11 flex-none items-center gap-2 rounded-full border px-3.5 text-[13px] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-10 ${selected ? "border-(--cq-border) bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-(--cq-shadow-xs)" : "border-transparent text-(--cq-text-secondary) hover:text-(--cq-text-primary)"}`}
           >
             {tab.label}
             {badges[tab.key] ?? null}
@@ -174,7 +176,7 @@ export function TabBadge({
     // `relative`: the sr-only text is absolutely positioned; without a
     // positioned ancestor inside the scrolling bar it escaped the bar's clip
     // and widened the page by 116 px at 390 px (live check 2026-10-16).
-    <span className="cq-caption cq-numeric relative bg-(--cq-surface-subtle) px-2 py-0.5 font-medium text-(--cq-text-secondary)">
+    <span className="cq-numeric relative rounded-full bg-(--cq-accent-soft) px-1.5 text-[11px] font-semibold text-(--cq-accent)">
       <span aria-hidden="true">{text}</span>
       <span className="sr-only">{`, ${spoken}`}</span>
     </span>

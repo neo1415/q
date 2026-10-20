@@ -4,24 +4,31 @@ import Link from "next/link";
 
 import type {
   CapitalLedgerDto,
+  LedgerCommitmentDto,
   ReadinessAction,
   ReadinessDto,
 } from "@capital-q/contracts";
-import { buttonClassName } from "@capital-q/ui/button";
+import { cx } from "@capital-q/ui";
+import { Flag } from "@capital-q/ui/icons";
 
+import { useGlobalQ } from "@/components/app-shell/global-q";
 import { QControl } from "@/features/q/control/q-control";
+import { crmButton } from "@/features/relationships/crm-kit";
+import { formatDay } from "@/components/date-format";
 
-import { needsYouCount } from "./capital-counts";
+import { CommitmentStepButton } from "./commitment-sheet";
 import { capitalTabHref } from "./capital-tabs";
-import { money, percent, shareOf } from "./money";
+import { money } from "./money";
+import { RaiseBar, raiseParts } from "./raise-bar";
 import { instrumentLabel } from "./round-labels";
 import { NOTICE_WORDS, STATUS_WORDS } from "./round-words";
 import { useT } from "@/features/i18n/language";
 
 /**
- * Capital's Overview tab (design: docs/design/2026-10-08/capital-tabs): a
- * short landing. The raise in one card, what could stop it, and the next
- * three steps, each with the way to the tab that holds the rest.
+ * Capital's Summary tab (design 2026-10-20, "Sub-tab strip"): the raise in
+ * one card with its bar split by how far each amount has come, what could
+ * stop it, and the next three steps as cards, each with its one action.
+ * Money waiting on the founder comes first; then the action plan.
  */
 
 const ORDER: Readonly<Record<ReadinessAction["priority"], number>> = {
@@ -47,14 +54,8 @@ export function nextSteps(
     .map(({ action }) => action);
 }
 
-const PRIORITY_WORDS: Readonly<Record<ReadinessAction["priority"], string>> = {
-  NOW: "Now",
-  NEXT: "Next",
-  LATER: "Later",
-};
-
 const card =
-  "flex flex-col gap-3 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 sm:p-6";
+  "flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5";
 
 export function RaiseSummary({
   ledger,
@@ -71,19 +72,16 @@ export function RaiseSummary({
       >
         <h2
           id="overview-raise"
-          className="cq-title-sm text-(--cq-text-primary)"
+          className="text-base font-semibold text-(--cq-text-primary)"
         >
-          Your raise
+          {t("Your raise")}
         </h2>
-        <p className="cq-body-sm text-(--cq-text-secondary)">
+        <p className="text-sm text-(--cq-text-secondary)">
           Your rounds couldn&apos;t load.
         </p>
         <div>
-          <Link
-            href={capitalTabHref("raise")}
-            className={buttonClassName("secondary")}
-          >
-            Open Raise &amp; rounds
+          <Link href={capitalTabHref("raise")} className={crmButton("secondary")}>
+            {t("Open Raise & rounds")}
           </Link>
         </div>
       </section>
@@ -91,84 +89,62 @@ export function RaiseSummary({
   }
   const current =
     ledger.rounds.find((round) => round.id === ledger.currentRoundId) ?? null;
-  const waiting = needsYouCount(ledger);
   if (current === null) {
     return (
       <section className={card} aria-labelledby="overview-raise">
         <h2
           id="overview-raise"
-          className="cq-title-sm text-(--cq-text-primary)"
+          className="text-base font-semibold text-(--cq-text-primary)"
         >
-          No round open
+          {t("No round open")}
         </h2>
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          Open one to track what you raise in it.
+        <p className="text-sm text-(--cq-text-secondary)">
+          {t("Open one to track what you raise in it.")}
         </p>
         <div>
-          <Link
-            href={capitalTabHref("raise")}
-            className={buttonClassName("primary")}
-          >
-            Open a round
+          <Link href={capitalTabHref("raise")} className={crmButton("primary")}>
+            {t("Open a round")}
           </Link>
         </div>
       </section>
     );
   }
-  const currency = current.target.currency;
-  const raised = shareOf(current.sums.raised, current.target.amount);
+  const terms = [
+    instrumentLabel(current.instrument),
+    STATUS_WORDS[current.status].toLowerCase(),
+  ].join(", ");
   return (
     <section
       className={card}
       aria-labelledby="overview-raise"
       data-overview-raise
     >
-      <div className="flex flex-col gap-0.5">
+      <div className="flex flex-wrap items-baseline gap-3">
         <h2
           id="overview-raise"
-          className="cq-title-sm text-(--cq-text-primary)"
+          className="text-base font-semibold text-(--cq-text-primary)"
         >
-          {current.name}
+          {t(`${current.name}, ${money(current.target.amount, current.target.currency)}`)}
         </h2>
-        <span className="cq-caption text-(--cq-text-tertiary)">
-          {instrumentLabel(current.instrument)} · {STATUS_WORDS[current.status]}
-        </span>
+        <span className="text-xs text-(--cq-text-tertiary)">{t(terms)}</span>
       </div>
-      <div className="flex flex-col gap-1">
-        <p className="cq-display cq-numeric text-(--cq-text-primary)">
-          {money(current.sums.raised, currency)}
-        </p>
-        <p className="cq-body-sm cq-numeric text-(--cq-text-secondary)">
-          raised of {money(current.target.amount, currency)}, {percent(raised)}
-          {" · "}
-          {money(current.sums.confirmed, currency)} confirmed
-          {" · "}
-          {money(current.sums.pledged, currency)} pledged
-        </p>
-      </div>
+      <RaiseBar parts={raiseParts(current, ledger.commitments)} words={t} />
       {current.notices.length === 0 ? null : (
         <ul className="flex flex-col gap-1">
           {current.notices.map((notice) => (
             <li
               key={notice}
               data-notice={notice}
-              className="cq-body-sm text-(--cq-text-secondary)"
+              className="text-[13px] text-(--cq-text-secondary)"
             >
               {t(NOTICE_WORDS[notice])}
             </li>
           ))}
         </ul>
       )}
-      <div>
-        <Link
-          href={capitalTabHref("raise")}
-          className={buttonClassName("secondary")}
-        >
-          {waiting === 0
-            ? "Open the round"
-            : `Open the round · ${String(waiting)} commitment${waiting === 1 ? " needs" : "s need"} you`}
-        </Link>
-      </div>
+      <span className="text-xs text-(--cq-text-tertiary)">
+        {t("Raised counts only money you confirmed received.")}
+      </span>
     </section>
   );
 }
@@ -178,125 +154,201 @@ export function StopYourRaise({
 }: {
   readonly readiness: ReadinessDto | null;
 }) {
+  const t = useT();
   return (
     <QControl id="section.risks" kind="SECTION">
       <section className={card} aria-labelledby="overview-stop">
-        <h2 id="overview-stop" className="cq-title-sm text-(--cq-text-primary)">
-          What could stop your raise
+        <h2
+          id="overview-stop"
+          className="text-[13px] font-medium text-(--cq-text-secondary)"
+        >
+          {t("What could stop it")}
         </h2>
         {readiness === null ? (
-          <p className="cq-body-sm text-(--cq-text-secondary)">
+          <p className="text-sm text-(--cq-text-secondary)">
             Your readiness couldn&apos;t load.
           </p>
         ) : readiness.blockers.length === 0 ? (
-          <p className="cq-body-sm text-(--cq-text-secondary)">
-            Nothing that investors at your stage usually ask for first is
-            missing from what you&apos;ve shared.
+          <p className="text-sm text-(--cq-text-secondary)">
+            {t(
+              "Nothing that investors at your stage usually ask for first is missing from what you've shared.",
+            )}
           </p>
         ) : (
           <QControl id="list.risks" kind="LIST">
-            <ol className="flex flex-col">
-              {readiness.blockers.slice(0, 3).map((blocker, index) => (
+            <ol className="flex flex-col gap-2">
+              {readiness.blockers.slice(0, 3).map((blocker) => (
                 <li
                   key={blocker.id}
-                  className="grid grid-cols-[1.5rem_1fr] gap-3 border-t border-(--cq-border-subtle) py-3 first:border-t-0 first:pt-0"
+                  className="flex items-start gap-2.5 text-sm text-(--cq-text-primary)"
                 >
-                  <span
+                  <Flag
+                    size={15}
                     aria-hidden="true"
-                    className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
-                  >
-                    {index + 1}
+                    className="mt-0.5 flex-none text-(--cq-text-secondary)"
+                  />
+                  <span>
+                    {t(blocker.title)}{" "}
+                    <span className="text-(--cq-text-secondary)">
+                      {t(blocker.why)}
+                    </span>
                   </span>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="cq-body font-semibold text-(--cq-text-primary)">
-                      {blocker.title}
-                    </span>
-                    <span className="cq-body-sm text-(--cq-text-secondary)">
-                      {blocker.why}
-                    </span>
-                  </div>
                 </li>
               ))}
             </ol>
           </QControl>
         )}
-        <div>
-          <Link
-            href={capitalTabHref("readiness")}
-            className={buttonClassName("secondary")}
-          >
-            See readiness
-          </Link>
-        </div>
+        <Link
+          href={capitalTabHref("readiness")}
+          className={crmButton("quiet", "self-start")}
+        >
+          {t("See readiness")}
+        </Link>
       </section>
     </QControl>
   );
 }
 
+type Step =
+  | { readonly kind: "money"; readonly item: LedgerCommitmentDto }
+  | { readonly kind: "plan"; readonly action: ReadinessAction };
+
+function moneyStepWords(item: LedgerCommitmentDto): {
+  readonly title: string;
+  readonly why: string;
+} {
+  const amount = money(item.amount, item.currencyCode);
+  switch (item.next) {
+    case "CONFIRM_RECEIVED":
+      return {
+        title: `Confirm ${item.counterpartName}'s ${amount}`,
+        why: `They marked it sent on ${formatDay(item.at)}.`,
+      };
+    case "CONFIRM_AMOUNT":
+      return {
+        title: `Confirm ${item.counterpartName}'s ${amount}`,
+        why:
+          item.status === "DETECTED"
+            ? "Q heard it in your call. Nothing counts until you confirm."
+            : "They stated it. Confirming tells them you agree.",
+      };
+    case "MARK_SENT":
+    case null:
+      return { title: `${item.counterpartName}, ${amount}`, why: "" };
+  }
+}
+
 export function NextSteps({
   readiness,
+  ledger = null,
+  currentRoundId = null,
 }: {
   readonly readiness: ReadinessDto | null;
+  /** Money waiting on the founder comes first. */
+  readonly ledger?: CapitalLedgerDto | null;
+  readonly currentRoundId?: string | null;
 }) {
   const t = useT();
-  const steps = readiness === null ? [] : nextSteps(readiness);
+  const { askNow } = useGlobalQ();
+  const money_ = (ledger?.commitments ?? [])
+    .filter((item) => item.next !== null)
+    .map((item): Step => ({ kind: "money", item }));
+  const plan = (readiness === null ? [] : nextSteps(readiness)).map(
+    (action): Step => ({ kind: "plan", action }),
+  );
+  const steps = [...money_, ...plan].slice(0, 3);
   return (
     <QControl id="section.next-steps" kind="SECTION">
-      <section className={card} aria-labelledby="overview-next" data-next-steps>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <section
+        className="flex flex-col gap-3"
+        aria-labelledby="overview-next"
+        data-next-steps
+      >
+        <div className="flex flex-wrap items-center gap-3">
           <h2
             id="overview-next"
-            className="cq-title-sm text-(--cq-text-primary)"
+            className="text-lg font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
           >
-            Next steps
+            {t("Next three steps")}
           </h2>
           <Link
             href={capitalTabHref("action-plan")}
-            className={buttonClassName("secondary")}
+            className={crmButton("quiet", "ms-auto")}
           >
-            Open the action plan
+            {t("Open the action plan")}
           </Link>
         </div>
-        {readiness === null ? (
-          <p className="cq-body-sm text-(--cq-text-secondary)">
+        {readiness === null && money_.length === 0 ? (
+          <p className="text-sm text-(--cq-text-secondary)">
             Your action plan couldn&apos;t load.
           </p>
         ) : steps.length === 0 ? (
-          <p className="cq-body-sm text-(--cq-text-secondary)">
-            Nothing open. Steps appear here when Q finds a gap worth closing.
+          <p className="text-sm text-(--cq-text-secondary)">
+            {t("Nothing open. Steps appear here when Q finds a gap worth closing.")}
           </p>
         ) : (
-          <ol className="flex flex-col">
-            {steps.map((step, index) => (
-              <li
-                key={step.key}
-                className="grid grid-cols-[1.5rem_1fr] gap-3 border-t border-(--cq-border-subtle) py-3 first:border-t-0"
-              >
-                <span
-                  aria-hidden="true"
-                  className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-surface-subtle) font-semibold text-(--cq-text-secondary)"
+          <ol className="grid gap-3 md:grid-cols-3">
+            {steps.map((step, index) => {
+              const variant = index === 0 ? "primary" : "secondary";
+              const words =
+                step.kind === "money"
+                  ? moneyStepWords(step.item)
+                  : { title: step.action.title, why: step.action.next };
+              return (
+                <li
+                  key={step.kind === "money" ? step.item.id : step.action.key}
+                  className="flex flex-col gap-2.5 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-3.5"
+                  data-next-step-card={step.kind}
                 >
-                  {index + 1}
-                </span>
-                <div className="flex flex-col gap-0.5">
-                  <span className="cq-body font-semibold text-(--cq-text-primary)">
-                    {step.title}{" "}
-                    <span className="cq-caption rounded-full border border-(--cq-border-subtle) px-2 py-0.5 font-normal text-(--cq-text-secondary)">
-                      {t(PRIORITY_WORDS[step.priority])}
+                  <span className="text-xs font-semibold text-(--cq-accent)">
+                    {t(`Step ${String(index + 1)}`)}
+                  </span>
+                  <b className="font-semibold text-(--cq-text-primary)">
+                    {t(words.title)}
+                  </b>
+                  {words.why === "" ? null : (
+                    <span className="text-[13px] text-(--cq-text-secondary)">
+                      {t(words.why)}
                     </span>
+                  )}
+                  <span className="mt-auto flex">
+                    {step.kind === "money" ? (
+                      <CommitmentStepButton
+                        item={step.item}
+                        side="COMPANY"
+                        currentRoundId={currentRoundId}
+                        variant={variant}
+                        className="w-full"
+                      />
+                    ) : step.action.askQ !== null ? (
+                      <button
+                        type="button"
+                        className={cx(crmButton(variant), "w-full")}
+                        onClick={() => {
+                          if (step.action.askQ !== null)
+                            askNow(step.action.askQ);
+                        }}
+                      >
+                        {t("Let Q do it")}
+                      </button>
+                    ) : (
+                      <Link
+                        href={step.action.href ?? capitalTabHref("action-plan")}
+                        className={cx(crmButton(variant), "w-full")}
+                      >
+                        {step.action.href === null
+                          ? t("Open the action plan")
+                          : t("Go there")}
+                      </Link>
+                    )}
                   </span>
-                  <span className="cq-body-sm text-(--cq-text-secondary)">
-                    {step.next}
-                  </span>
-                  <span className="cq-caption text-(--cq-text-tertiary)">
-                    {step.ownerLabel}
-                  </span>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ol>
         )}
       </section>
     </QControl>
   );
 }
+

@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 
 import { getCapitalLedger, getMyCommitments } from "@capital-q/api-client";
 import type {
@@ -12,10 +11,10 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { apiSession } from "@/features/q/context";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
-import { UnknownValue } from "@/features/relationships/crm-kit";
+import { Check } from "@capital-q/ui/icons";
+import { Tag, UnknownValue } from "@/features/relationships/crm-kit";
 import { serverT } from "@/features/i18n/server";
 
-import { CommitmentCard } from "./commitment-card";
 import { CommitmentLadder, LADDER, ladderStep } from "./commitment-ladder";
 import { CommitmentStepButton, RecordAmountButton } from "./commitment-sheet";
 import { isZero, money, moneyList, totalsByCurrency } from "./money";
@@ -70,28 +69,6 @@ function groups(items: readonly LedgerCommitmentDto[]) {
   ].filter((group) => group.items.length > 0);
 }
 
-function Group({
-  title,
-  count,
-  children,
-}: {
-  readonly title: string;
-  readonly count: number;
-  readonly children: ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-3" aria-label={title}>
-      <h3 className="cq-label text-(--cq-text-secondary)">
-        {title} <span className="cq-numeric">({String(count)})</span>
-      </h3>
-      {/* One card takes the column's width, not half of it (live check
-          2026-10-16: the card and the mandate list sat at different widths). */}
-      <div className={count > 1 ? "grid gap-3 md:grid-cols-2" : "grid gap-3"}>
-        {children}
-      </div>
-    </section>
-  );
-}
 
 /** A round's name from the raise's stage code ("pre_seed" -> "Pre-seed"). */
 function stageName(code: string | null): string {
@@ -171,7 +148,12 @@ export function FounderBook({
           aria-label="Rounds"
           data-qp-anchor="fdr.08.capital.round"
         >
-          <RoundCard round={current} rounds={ledger.rounds} leads={leads} />
+          <RoundCard
+            round={current}
+            rounds={ledger.rounds}
+            leads={leads}
+            commitments={ledger.commitments}
+          />
           <TotalCard totals={ledger.totals} rounds={ledger.rounds} />
           <div className="lg:col-span-2">
             <OpenRound
@@ -188,14 +170,20 @@ export function FounderBook({
         aria-labelledby="commitments"
         data-qp-anchor="fdr.08.capital.commitments"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="commitments" className="cq-title-md text-(--cq-text-primary)">
+        <div className="flex flex-wrap items-baseline gap-3">
+          <h2
+            id="commitments"
+            className="text-xl font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
+          >
             Commitments
           </h2>
+          <span className="text-xs text-(--cq-text-tertiary)">
+            Each with its next step
+          </span>
           {ledger.commitments.length === 0 ? null : (
             <a
               href="/capital/export"
-              className={buttonClassName("quiet", "compact")}
+              className={buttonClassName("quiet", "compact", "ms-auto")}
               download
             >
               Download CSV
@@ -208,27 +196,34 @@ export function FounderBook({
             here.
           </p>
         ) : (
-          groups(ledger.commitments).map((group) => (
-            <Group
-              key={group.key}
-              title={group.title}
-              count={group.items.length}
-            >
-              {group.items.map((item) => (
-                <CommitmentCard
+          <ul
+            aria-label="Commitments"
+            className="flex flex-col rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-[18px] py-1"
+          >
+            {groups(ledger.commitments)
+              .flatMap((group) => group.items)
+              .map((item) => (
+                <BookRow
                   key={item.id}
                   item={item}
                   side="COMPANY"
                   currentRoundId={ledger.currentRoundId}
-                  roundName={
-                    item.roundId === null
-                      ? null
-                      : (nameOf.get(item.roundId) ?? null)
+                  note={
+                    [
+                      item.roundId === null
+                        ? null
+                        : (nameOf.get(item.roundId) ?? null),
+                      item.transferReference === null
+                        ? null
+                        : `Reference ${item.transferReference}`,
+                    ]
+                      .filter((part): part is string => part !== null)
+                      .join(" · ") || null
                   }
+                  words={(english) => english}
                 />
               ))}
-            </Group>
-          ))
+          </ul>
         )}
       </section>
 
@@ -433,16 +428,22 @@ export async function InvestorBook({
 function BookRow({
   item,
   words,
+  side = "INVESTOR",
+  currentRoundId = null,
+  note = null,
 }: {
   readonly item: LedgerCommitmentDto;
   readonly words: (english: string) => string;
+  readonly side?: "INVESTOR" | "COMPANY";
+  readonly currentRoundId?: string | null;
+  readonly note?: string | null;
 }) {
   const waiting =
     item.next !== null
       ? null
       : item.status === "STATED"
         ? `Waiting for ${item.counterpartName} to confirm`
-        : item.status === "TRANSFER_SENT"
+        : item.status === "TRANSFER_SENT" && side === "INVESTOR"
           ? `Waiting for ${item.counterpartName} to confirm receipt`
           : null;
   return (
@@ -451,13 +452,23 @@ function BookRow({
       data-book-row={item.status}
       data-commitment={item.status}
     >
-      <EntityAvatar
-        kind="company"
-        name={item.counterpartName}
-        companyId={item.counterpartId}
-        size={28}
-        decorative
-      />
+      {side === "COMPANY" ? (
+        <EntityAvatar
+          kind="investor"
+          name={item.counterpartName}
+          investorOrganisationId={item.counterpartId}
+          size={28}
+          decorative
+        />
+      ) : (
+        <EntityAvatar
+          kind="company"
+          name={item.counterpartName}
+          companyId={item.counterpartId}
+          size={28}
+          decorative
+        />
+      )}
       <div className="min-w-0">
         <b className="font-semibold text-(--cq-text-primary)">
           {item.counterpartName}
@@ -467,6 +478,16 @@ function BookRow({
             ? words(LEVEL_WORDS[item.level])
             : instrumentLabel(item.round.instrument)}
         </span>
+        {item.quote === null || item.status !== "DETECTED" ? null : (
+          <span className="block text-xs text-(--cq-text-secondary)">
+            “{item.quote}”
+          </span>
+        )}
+        {note === null ? null : (
+          <span className="block text-xs text-(--cq-text-tertiary)">
+            {note}
+          </span>
+        )}
         <div className="mt-2">
           <CommitmentLadder step={ladderStep(item)} words={words} />
         </div>
@@ -478,9 +499,14 @@ function BookRow({
         {item.next !== null ? (
           <CommitmentStepButton
             item={item}
-            side="INVESTOR"
-            currentRoundId={null}
+            side={side}
+            currentRoundId={currentRoundId}
+            variant={item.next === "CONFIRM_RECEIVED" ? "primary" : "secondary"}
           />
+        ) : item.status === "RECEIVED" ? (
+          <Tag tone="positive" icon={<Check aria-hidden="true" />}>
+            {words("Received")}
+          </Tag>
         ) : waiting !== null ? (
           <span className="text-xs text-(--cq-text-tertiary)">
             {words(waiting)}

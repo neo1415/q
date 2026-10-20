@@ -296,12 +296,14 @@ export async function FounderTab({
         readinessOf(),
       ]);
       return (
-        <div className="flex flex-col gap-6" data-capital-overview>
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-            <RaiseSummary ledger={ledger} />
-            <StopYourRaise readiness={readiness} />
-          </div>
-          <NextSteps readiness={readiness} />
+        <div className="flex flex-col gap-[22px]" data-capital-overview>
+          <RaiseSummary ledger={ledger} />
+          <StopYourRaise readiness={readiness} />
+          <NextSteps
+            readiness={readiness}
+            ledger={ledger}
+            currentRoundId={ledger?.currentRoundId ?? null}
+          />
           <AskQChips asks={FOUNDER_ASKS} />
         </div>
       );
