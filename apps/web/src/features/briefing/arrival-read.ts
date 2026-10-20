@@ -1,0 +1,311 @@
+import type {
+  ArrivalSnapshot,
+  ChatThreadDto,
+  NotificationDto,
+  QApprovalView,
+  QAttentionReport,
+  QPendingApproval,
+  QWorkDoneItemDto,
+  QWorkSinceDto,
+  ReadinessFollowUp,
+} from "@capital-q/contracts";
+import type { ArrivalActivity } from "@capital-q/q-core/speech";
+
+import type { OwnContext } from "@/features/q/context";
+import { decisionGroups, decisionTitle } from "@/features/work/decisions";
+import { readPlan } from "@/features/work/plan-words";
+import { groupNotices } from "@/features/work/notice-groups";
+import type { WorkforceView } from "@/features/work/workforce-actions";
+
+import type { ArrivalCard, ArrivalData } from "./arrival";
+import {
+  attentionFromReads,
+  attentionFromSnapshot,
+  sourceOfNotice,
+} from "./attention";
+import type { ArrivalMatches } from "./matches";
+
+/**
+ * The arrival briefing's reads, put together (arrival-actions.ts wires the
+ * person's own session into them). Every read is injected, so the order
+ * they run in is a test: a read that fails is null (absent, or named as
+ * unread), never an error that stops Q.
+ */
+
+/** Cards read in full (exact message and their latest words). */
+export const CARDS_MAX = 6;
+
+export type ArrivalReads = {
+  readonly account: () => Promise<{
+    readonly displayName: string | null;
+  } | null>;
+  readonly workSince: (since: string) => Promise<QWorkSinceDto | null>;
+  /** Null: the approvals could not be read. */
+  readonly approvals: () => Promise<readonly QPendingApproval[] | null>;
+  readonly approval: (approvalId: string) => Promise<QApprovalView | null>;
+  readonly workforce: () => Promise<WorkforceView | null>;
+  /** The done list's items; null: not read. */
+  readonly done: () => Promise<readonly QWorkDoneItemDto[] | null>;
+  /** Their notices; null: not read. */
+  readonly notices: () => Promise<readonly NotificationDto[] | null>;
+  readonly context: () => Promise<OwnContext | null>;
+  /** Investors only. */
+  readonly matches: (
+    seen: ReadonlySet<string> | null,
+  ) => Promise<ArrivalMatches | null>;
+  /** Founders only (Q.01). */
+  readonly questions: () => Promise<readonly ReadinessFollowUp[] | null>;
+  /** Founders only (lead 2026-10-16). */
+  readonly deckReview: () => Promise<{
+    readonly pending: number;
+    readonly href: string;
+  } | null>;
+  readonly thread: (relationshipId: string) => Promise<ChatThreadDto | null>;
+  readonly snapshot: () => Promise<ArrivalSnapshot | null>;
+  readonly attention: (since: string) => Promise<QAttentionReport | null>;
+};
+
+export type ArrivalReadInput = {
+  readonly now: number;
+  readonly since: string;
+  readonly hoursAway: number | null;
+  readonly seenMatches: readonly string[] | null | undefined;
+  readonly dismissedHeld: readonly string[];
+  /** When given: when each read settled, in ms from the start. */
+  readonly timings?: Record<string, number> | undefined;
+};
+
+function firstNameOf(display: string | null | undefined): string | null {
+  const first = display?.trim().split(/\s+/u)[0];
+  return first === undefined || first.length === 0 ? null : first.slice(0, 40);
+}
+
+/** Their words since we last wrote, newest last; null when we wrote last. */
+function theirLatest(thread: ChatThreadDto | null): string | null {
+  if (thread === null) return null;
+  const messages = [...thread.messages]
+    .filter((message) => !message.unsent)
+    .sort((a, b) => a.sentAt.localeCompare(b.sentAt));
+  const last = messages.at(-1);
+  if (last === undefined || last.mine) return null;
+  return last.body;
+}
+
+/** The exact content an approval binds to, as the person is shown it. */
+export function shownOf(view: QApprovalView | null): {
+  readonly message: string | null;
+  readonly preview: string | null;
+} {
+  if (view === null) return { message: null, preview: null };
+  if (view.action.actionType === "chat.message.send") {
+    return { message: readPlan(view.action.preview).quote, preview: null };
+  }
+  return { message: null, preview: view.action.preview ?? null };
+}
+
+function activityOf(since: QWorkSinceDto | null): ArrivalActivity | null {
+  if (since === null) return null;
+  return {
+    sent: since.sent,
+    booked: since.booked,
+    interest: since.interest,
+    held: since.held,
+    replies: since.replies,
+    matches: since.matches,
+  };
+}
+
+/** What their agents finished in the window, from the jobs read. */
+function jobsDoneOf(
+  workforce: WorkforceView | null,
+  since: string,
+): { readonly n: number; readonly names: readonly string[] } | null {
+  if (workforce === null) return null;
+  const from = Date.parse(since);
+  const done = workforce.jobs.filter(
+    ({ job }) => job.status === "DONE" && Date.parse(job.updatedAt) >= from,
+  );
+  return {
+    n: done.length,
+    names: done.slice(0, 3).map(({ job }) => job.goal.slice(0, 120)),
+  };
+}
+
+/**
+ * Everything the briefing needs. A read that fails is absent (null
+ * activity, fewer cards) and, for what needs them, named as unread.
+ */
+export async function readArrival(
+  reads: ArrivalReads,
+  input: ArrivalReadInput,
+): Promise<ArrivalData> {
+  const { now, since } = input;
+  const started = Date.now();
+  const safe = <T>(name: string, read: () => Promise<T>): Promise<T | null> =>
+    Promise.resolve()
+      .then(read)
+      .catch(() => null)
+      .finally(() => {
+        if (input.timings !== undefined) {
+          input.timings[name] = Date.now() - started;
+        }
+      });
+  const seen =
+    input.seenMatches === null || input.seenMatches === undefined
+      ? null
+      : new Set(input.seenMatches);
+  const attentionRead = safe("attention", () => reads.attention(since));
+  const snapshotRead = safe("snapshot", () => reads.snapshot());
+  const [account, sinceRead, approvals, workforce, done, notices, context] =
+    await Promise.all([
+      safe("account", () => reads.account()),
+      safe("workSince", () => reads.workSince(since)),
+      safe("approvals", () => reads.approvals()),
+      safe("workforce", () => reads.workforce()),
+      safe("done", () => reads.done()),
+      safe("notices", () => reads.notices()),
+      safe("context", () => reads.context()),
+    ]);
+  const matches =
+    context?.kind === "INVESTOR"
+      ? await safe("matches", () => reads.matches(seen))
+      : undefined;
+  const questions =
+    context?.kind === "FOUNDER"
+      ? await safe("questions", () => reads.questions())
+      : undefined;
+  const deckReview =
+    context?.kind === "FOUNDER"
+      ? await safe("deckReview", () => reads.deckReview())
+      : undefined;
+  const needsYouNotices =
+    notices === null
+      ? null
+      : groupNotices(notices).needsYou.map((group) => group.notice);
+  const waitingNotices = (needsYouNotices ?? []).map((notice) => notice.title);
+  const waiting = approvals ?? [];
+  const read = await Promise.all(
+    waiting
+      .slice(0, CARDS_MAX)
+      .map((approval) =>
+        safe(`approval:${approval.approvalId}`, () =>
+          reads.approval(approval.approvalId),
+        ),
+      ),
+  );
+  const views = new Map<string, QApprovalView>();
+  for (const view of read) {
+    if (view !== null) views.set(view.approvalId, view);
+  }
+  const groups = decisionGroups({
+    approvals: waiting,
+    views,
+    jobs: workforce?.jobs ?? [],
+    now,
+    known: done ?? undefined,
+    // Dropped on Work stays dropped here (audit D-E6).
+    dismissedHeld: new Set(input.dismissedHeld),
+  });
+  // One card per decision, in the queue's order, bounded.
+  const flat = groups
+    .flatMap((group) => group.items.map((item) => ({ group, item })))
+    .slice(0, CARDS_MAX);
+  const threads = new Map<string, Promise<ChatThreadDto | null>>();
+  const threadOf = (relationshipId: string) => {
+    let thread = threads.get(relationshipId);
+    if (thread === undefined) {
+      thread = safe(`thread:${relationshipId}`, () =>
+        reads.thread(relationshipId),
+      );
+      threads.set(relationshipId, thread);
+    }
+    return thread;
+  };
+  const cards = await Promise.all(
+    flat.map(async ({ group, item }): Promise<ArrivalCard> => {
+      const theySaid =
+        group.relationshipId === null
+          ? null
+          : theirLatest(await threadOf(group.relationshipId));
+      if (item.kind === "HELD") {
+        return {
+          key: item.draftId,
+          kind: "HELD",
+          approvalId: null,
+          draftId: item.draftId,
+          relationshipId: group.relationshipId,
+          counterpart: group.name,
+          named: group.named,
+          title: decisionTitle(item),
+          summary: item.reason,
+          message: item.body,
+          theySaid,
+          reason: item.reason,
+          canDecide: true,
+          at: item.at,
+        };
+      }
+      const shown = shownOf(item.view);
+      return {
+        key: item.approvalId,
+        kind: "APPROVAL",
+        approvalId: item.approvalId,
+        draftId: null,
+        relationshipId: group.relationshipId,
+        counterpart: group.name,
+        named: group.named,
+        title: decisionTitle(item),
+        summary: item.summary,
+        message: shown.message,
+        theySaid,
+        reason: shown.preview,
+        // Never decided unseen: a card whose content could not be read is
+        // decided on Work, where it is read in full.
+        canDecide: item.view?.canDecide === true,
+        at: item.at,
+      };
+    }),
+  );
+  const snapshot = await snapshotRead;
+  return {
+    firstName: firstNameOf(account?.displayName),
+    timeZone: sinceRead?.timeZone ?? null,
+    activity: activityOf(sinceRead),
+    hoursAway: input.hoursAway,
+    cards,
+    waiting: waitingNotices,
+    // E2: one report of what needs them, unread sources named: workstream
+    // B's read when it answered, else the bridge from this page's reads.
+    attention:
+      (snapshot === null ? null : attentionFromSnapshot(snapshot)) ??
+      (await attentionRead) ??
+      attentionFromReads({
+        cards: approvals === null ? null : cards,
+        notices: needsYouNotices,
+        jobs: workforce?.jobs ?? null,
+        newMatches:
+          matches === undefined ? undefined : (matches?.total ?? null),
+        since,
+        now: new Date(now),
+      }),
+    ...(snapshot === null ? {} : { snapshot }),
+    attentionLinks: Object.fromEntries(
+      (needsYouNotices ?? []).flatMap((notice) =>
+        notice.linkPath === null
+          ? []
+          : [
+              [
+                `${sourceOfNotice(notice.kind)}:${notice.id}`.slice(0, 160),
+                notice.linkPath,
+              ],
+            ],
+      ),
+    ),
+    jobsDone: jobsDoneOf(workforce, since),
+    ...(matches === undefined ? {} : { matches }),
+    ...(questions === undefined ? {} : { questions }),
+    ...(deckReview === undefined || deckReview === null
+      ? {}
+      : { deckReview: { pending: deckReview.pending, href: deckReview.href } }),
+  };
+}

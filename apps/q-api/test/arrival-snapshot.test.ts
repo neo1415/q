@@ -338,6 +338,34 @@ describe("P4: the snapshot carries the person's prepared Q Daily stories", () =>
     expect(s.reads()).toBe(1);
   });
 
+  it("reads the edition beside the probe and build, not after them (speed lane 2026-10-20)", async () => {
+    const order: string[] = [];
+    let releaseProbe: () => void = () => undefined;
+    const probeHeld = new Promise<void>((resolve) => {
+      releaseProbe = resolve;
+    });
+    const snapshots = createArrivalSnapshots({
+      now: () => NOW,
+      attention: () => Promise.resolve(tensorGateReport()),
+      briefs: () => Promise.resolve([tensorGateBrief({ sequence: 7 })]),
+      probe: async () => {
+        order.push("probe");
+        await probeHeld;
+        return { epoch: "a".repeat(32), stamp: "s1" };
+      },
+      daily: () => {
+        order.push("daily");
+        return Promise.resolve(edition);
+      },
+    });
+    const reading = snapshots.forActor(ACTOR);
+    await Promise.resolve();
+    // The probe is still out: the edition read has already started.
+    expect(order).toEqual(["probe", "daily"]);
+    releaseProbe();
+    expect((await reading)?.daily[0]?.storyId).toBe("lead1");
+  });
+
   it("a failed or empty edition read is no stories, never an error", async () => {
     const failed = build(() => Promise.reject(new Error("db down")));
     expect((await failed.snapshots.forActor(ACTOR))?.daily).toEqual([]);

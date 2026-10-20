@@ -589,16 +589,21 @@ export function createArrivalSnapshots(dependencies: {
     { at: number; stories: readonly ArrivalDailyStory[] }
   >();
   const DAILY_TRUST_MS = 60_000;
-  async function withDaily(
+  /**
+   * Read beside the snapshot, never after it (speed lane 2026-10-20: the
+   * edition read waited for the probe and any build first). A failed read
+   * is "none": the welcome says no news, never invents.
+   */
+  async function dailyStories(
     actor: ActorContext,
-    snapshot: ArrivalSnapshot,
-  ): Promise<ArrivalSnapshot> {
-    if (dependencies.daily === undefined) return snapshot;
+  ): Promise<readonly ArrivalDailyStory[]> {
+    if (dependencies.daily === undefined || actor.actorType !== "HUMAN") {
+      return [];
+    }
     const key = keyOf(actor);
     const at = now().getTime();
     let held = dailyHeld.get(key);
     if (held === undefined || at - held.at >= DAILY_TRUST_MS) {
-      // A failed read is "none": the welcome says no news, never invents.
       const edition = await dependencies.daily(actor).catch(() => null);
       held = { at, stories: dailyStoriesOf(edition, now()) };
       dailyHeld.set(key, held);
@@ -608,17 +613,23 @@ export function createArrivalSnapshots(dependencies: {
         dailyHeld.delete(oldest);
       }
     }
-    if (held.stories.length === 0) return snapshot;
+    return held.stories;
+  }
+  function withDaily(
+    snapshot: ArrivalSnapshot,
+    stories: readonly ArrivalDailyStory[],
+  ): ArrivalSnapshot {
+    if (stories.length === 0) return snapshot;
     return {
       ...snapshot,
       contractVersion: ARRIVAL_SNAPSHOT_VERSION,
       version: createHash("sha256")
         .update(
-          `${snapshot.version}|${held.stories.map((one) => one.storyId).join(",")}`,
+          `${snapshot.version}|${stories.map((one) => one.storyId).join(",")}`,
         )
         .digest("hex")
         .slice(0, 32),
-      daily: [...held.stories],
+      daily: [...stories],
     };
   }
   const forActorCore = async (
@@ -668,8 +679,11 @@ export function createArrivalSnapshots(dependencies: {
   const rebuilding = new Map<string, Promise<void>>();
   return {
     forActor: async (actor) => {
-      const base = await forActorCore(actor);
-      return base === null ? null : withDaily(actor, base);
+      const [base, stories] = await Promise.all([
+        forActorCore(actor),
+        dailyStories(actor),
+      ]);
+      return base === null ? null : withDaily(base, stories);
     },
     refreshAfterWrite: (actor) => {
       invalidateActor(actor.userId);
