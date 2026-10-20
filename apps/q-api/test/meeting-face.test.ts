@@ -485,3 +485,55 @@ describe("Q's face in a Meet call", () => {
     expect(meetingFaceSecondsFrom("abc")).toBe(600);
   });
 });
+
+describe("2026-10-20: an answer streamed through the face", () => {
+  it("says the first sentence at once and the rest in the same turn", async () => {
+    const { face, memory, bearer } = setup();
+    face.start(MEETING);
+    await face.settled(MEETING);
+    const id = [...memory.rows.values()][0]?.id ?? "";
+    const asked = face.bridge(
+      id,
+      bearer(),
+      [{ role: "user", text: "Q, how much are they raising?" }],
+      signal(),
+    );
+    face.say(MEETING, "The deck says two million dollars.", true);
+    const result = await asked;
+    expect(result).toMatchObject({
+      kind: "STREAM",
+      first: "The deck says two million dollars.",
+    });
+    if (result.kind !== "STREAM") return;
+    const rest: string[] = [];
+    const reading = (async () => {
+      for await (const part of result.rest) rest.push(part);
+    })();
+    face.say(MEETING, "It closes in March.");
+    await reading;
+    expect(rest).toEqual(["It closes in March."]);
+  });
+
+  it("an answer with nothing more ends its turn when the host says so", async () => {
+    const { face, memory, bearer } = setup();
+    face.start(MEETING);
+    await face.settled(MEETING);
+    const id = [...memory.rows.values()][0]?.id ?? "";
+    const asked = face.bridge(
+      id,
+      bearer(),
+      [{ role: "user", text: "Q, are you there?" }],
+      signal(),
+    );
+    face.say(MEETING, "Yes, I'm here and listening.", true);
+    const result = await asked;
+    if (result.kind !== "STREAM") throw new Error("not streamed");
+    const rest: string[] = [];
+    const reading = (async () => {
+      for await (const part of result.rest) rest.push(part);
+    })();
+    face.finish?.(MEETING);
+    await reading;
+    expect(rest).toEqual([]);
+  });
+});

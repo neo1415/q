@@ -153,17 +153,20 @@ export function createMeetingHostFollowThrough(
       const found = await meetingOf(meetingId);
       if (found === null) return;
       const { meeting, people } = found;
-      await mark(meetingId, meeting);
-      for (const person of people) {
-        await tell(
-          meetingId,
-          meeting,
-          person,
-          `Nobody joined ${meeting.purpose} before Q's wait ended`,
-          "Q waited in the call as long as it is allowed to, then left. Your meeting is exactly as it was: nothing was cancelled or moved. If you want another time, open the relationship and ask Q to propose one; it only changes once the other person accepts.",
-          "no-show",
-        );
-      }
+      // 2026-10-20: everyone is told at once, not one after another.
+      await Promise.all([
+        mark(meetingId, meeting),
+        ...people.map((person) =>
+          tell(
+            meetingId,
+            meeting,
+            person,
+            `Nobody joined ${meeting.purpose} before Q's wait ended`,
+            "Q waited in the call as long as it is allowed to, then left. Your meeting is exactly as it was: nothing was cancelled or moved. If you want another time, open the relationship and ask Q to propose one; it only changes once the other person accepts.",
+            "no-show",
+          ),
+        ),
+      ]);
     },
 
     oneSided: async (meetingId, outcome) => {
@@ -176,28 +179,30 @@ export function createMeetingHostFollowThrough(
       const absent = people.filter((p) => p.side === outcome.absentSide);
       const presentNames =
         present.map((p) => p.display_name).join(" and ") || "The other side";
-      for (const person of absent) {
-        await tell(
-          meetingId,
-          meeting,
-          person,
-          `We missed you at ${meeting.purpose}`,
-          `${presentNames} waited in the call. Your meeting is unchanged. If you would like another time, open the relationship; nothing is booked or moved until you accept a proposed time.`,
-          "one-sided-missed",
-        );
-      }
-      for (const person of present) {
-        await tell(
-          meetingId,
-          meeting,
-          person,
-          `Q left the call for ${meeting.purpose}`,
-          outcome.rescheduleRequested
-            ? "You asked for a new time. Open the relationship and propose one or more options; the other person decides, and nothing changes until they accept."
-            : "The other participant did not join before Q's wait ended. Your meeting is unchanged; nothing was cancelled or rescheduled.",
-          "one-sided-left",
-        );
-      }
+      await Promise.all([
+        ...absent.map((person) =>
+          tell(
+            meetingId,
+            meeting,
+            person,
+            `We missed you at ${meeting.purpose}`,
+            `${presentNames} waited in the call. Your meeting is unchanged. If you would like another time, open the relationship; nothing is booked or moved until you accept a proposed time.`,
+            "one-sided-missed",
+          ),
+        ),
+        ...present.map((person) =>
+          tell(
+            meetingId,
+            meeting,
+            person,
+            `Q left the call for ${meeting.purpose}`,
+            outcome.rescheduleRequested
+              ? "You asked for a new time. Open the relationship and propose one or more options; the other person decides, and nothing changes until they accept."
+              : "The other participant did not join before Q's wait ended. Your meeting is unchanged; nothing was cancelled or rescheduled.",
+            "one-sided-left",
+          ),
+        ),
+      ]);
     },
 
     proposals: async (meetingId, count) => {

@@ -115,9 +115,12 @@ export function createMeetingSnapshotBuilder(
         ];
         const viewer = await investorActor;
         if (viewer !== null && context.companyId !== null) {
-          const company = (
-            await knowledge.companies(viewer, [context.companyId])
-          ).get(context.companyId);
+          // 2026-10-20: the company and the mandate are read together.
+          const [companies, mandate] = await Promise.all([
+            knowledge.companies(viewer, [context.companyId]),
+            knowledge.mandateSummary(viewer),
+          ]);
+          const company = companies.get(context.companyId);
           if (company !== undefined) {
             const sector = names(labels, company.sectorCodes, 3);
             const stage =
@@ -144,7 +147,6 @@ export function createMeetingSnapshotBuilder(
                   : "UNKNOWN",
             });
           }
-          const mandate = await knowledge.mandateSummary(viewer);
           if (mandate !== null) {
             const stages = [mandate.minStageCode, mandate.maxStageCode]
               .filter((s): s is string => s !== null)
@@ -193,10 +195,14 @@ export function createMeetingSnapshotBuilder(
           throw new Error("no investor view");
         }
         const facts: SnapshotFact[] = [];
+        // 2026-10-20: the data room and the deck are read together.
+        const companyId = context.companyId;
+        const [roomView, deckView] = await Promise.all([
+          dependencies.dataRoom?.(viewer, companyId),
+          dependencies.deck?.(viewer, companyId),
+        ]);
         if (dependencies.dataRoom !== undefined) {
-          const room = DataRoomInvestorViewSchema.safeParse(
-            await dependencies.dataRoom(viewer, context.companyId),
-          );
+          const room = DataRoomInvestorViewSchema.safeParse(roomView);
           if (room.success) {
             // Only what this investor may open now: shared or open to them.
             for (const document of room.data.documents.filter(
@@ -213,9 +219,7 @@ export function createMeetingSnapshotBuilder(
           }
         }
         if (dependencies.deck !== undefined) {
-          const deck = CompanyDeckViewSchema.safeParse(
-            await dependencies.deck(viewer, context.companyId),
-          );
+          const deck = CompanyDeckViewSchema.safeParse(deckView);
           if (deck.success && deck.data.extraction !== null) {
             for (const section of deck.data.extraction.sections) {
               if (

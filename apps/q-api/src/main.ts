@@ -296,7 +296,10 @@ import {
   createRehearsalService,
   type Sourced,
 } from "./composition/rehearsals.js";
-import { createMeetingNotesComposer } from "./composition/meeting-notes.js";
+import {
+  createMeetingNotesComposer,
+  createRollingMeetingNotes,
+} from "./composition/meeting-notes.js";
 import { createPostgresMeetingEventStore } from "./composition/meeting-events.js";
 import { createMeetingSnapshotBuilder } from "./composition/meeting-snapshot.js";
 import { createWorkingSnapshots } from "./composition/working-snapshot.js";
@@ -4632,7 +4635,18 @@ setInterval(() => {
     logger.warn({ err: error }, "meeting face sweep failed");
   });
 }, 60_000).unref();
+// 2026-10-20 (meetings speed): the meeting record is drafted while the call
+// is live and finished when it ends, so its notes are ready seconds after.
+const meetingNotes = createRollingMeetingNotes(
+  createMeetingNotesComposer({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  { logger },
+);
 const meetingHost = createMeetingHostRuntime({
+  notes: meetingNotes,
   face: meetingFace,
   seesScreens: meetingScreensOn,
   seesCameras: meetingCamerasOn,
@@ -4782,11 +4796,7 @@ const meetingAssistant = createMeetingAssistantService({
       html: message.html,
     });
   },
-  composer: createMeetingNotesComposer({
-    gateway: modelGateway,
-    dataPosture: demoDataPosture,
-    logger,
-  }),
+  composer: meetingNotes,
   // ADR 0027: the call is marked on the relationship's history once its
   // record exists, through Network's own appender.
   onHeld: async (held) => {

@@ -174,6 +174,11 @@ export type MeetingNotes = {
 
 export type MeetingNotesComposer = {
   readonly compose: (input: {
+    /**
+     * 2026-10-20: the call, so a composer that drafted the notes while it
+     * was live (rolling notes) finishes from that draft. Optional.
+     */
+    readonly meetingId?: string;
     readonly tenantId: string;
     readonly userId: string;
     readonly purpose: string;
@@ -921,16 +926,20 @@ export function createMeetingAssistantService(dependencies: {
     partial: { readonly failure: string; readonly why: string } | null,
   ): Promise<void> {
     const transcript = transcriptText(transcriptLines);
-    await update(row.id, {
-      status: "COMPOSING",
-      transcript: transcriptLines,
-    });
+    // 2026-10-20: the name is read while the status is written.
+    const [, organiserName] = await Promise.all([
+      update(row.id, {
+        status: "COMPOSING",
+        transcript: transcriptLines,
+      }),
+      dependencies.nameOf(row.user_id),
+    ]);
     const notes = await composer.compose({
+      meetingId: row.meeting_id,
       tenantId: row.tenant_id,
       userId: row.user_id,
       purpose: row.purpose,
-      organiserName:
-        (await dependencies.nameOf(row.user_id)) ?? "the organiser",
+      organiserName: organiserName ?? "the organiser",
       transcript,
       callDate: row.starts_at.toISOString().slice(0, 10),
     });
@@ -969,7 +978,9 @@ export function createMeetingAssistantService(dependencies: {
         });
       });
     }
-    await step("held", async () =>
+    // 2026-10-20: what the call is marked as, the proposals made to Q and
+    // the outcome reading run together; the notices follow the reading.
+    const held = step("held", async () =>
       dependencies.onHeld?.({
         relationshipId: row.relationship_id,
         meetingId: row.meeting_id,
@@ -985,25 +996,28 @@ export function createMeetingAssistantService(dependencies: {
     // "How did it go?" (2026-10-02): Q proposes what the call led to from
     // its own notes, and offers its follow-ups and the proposals made to it
     // in the call; the person confirms on their relationship page or to Q.
-    const inCallProposals = await sql<{ n: number }[]>`
-      select count(*)::int as n from communication.meeting_host_notes
-       where meeting_id = ${row.meeting_id} and kind = 'PROPOSAL'`
-      .then((rows) => rows[0]?.n ?? 0)
-      .catch(() => 0);
-    const questions = await notesQuestions(
-      {
-        agreements: notes.agreements,
-        followUps: notes.followUps,
-        inCallProposals,
-      },
-      dependencies.outcomeReader === undefined
-        ? undefined
-        : (lines) =>
-            dependencies.outcomeReader?.(
-              { tenantId: row.tenant_id, userId: row.user_id },
-              lines,
-            ) ?? Promise.resolve(null),
-    );
+    const notesQuestionsFor = async () => {
+      const inCallProposals = await sql<{ n: number }[]>`
+        select count(*)::int as n from communication.meeting_host_notes
+         where meeting_id = ${row.meeting_id} and kind = 'PROPOSAL'`
+        .then((rows) => rows[0]?.n ?? 0)
+        .catch(() => 0);
+      return notesQuestions(
+        {
+          agreements: notes.agreements,
+          followUps: notes.followUps,
+          inCallProposals,
+        },
+        dependencies.outcomeReader === undefined
+          ? undefined
+          : (lines) =>
+              dependencies.outcomeReader?.(
+                { tenantId: row.tenant_id, userId: row.user_id },
+                lines,
+              ) ?? Promise.resolve(null),
+      );
+    };
+    const [questions] = await Promise.all([notesQuestionsFor(), held]);
     const ask = questions.organiser;
     // A notice's link is a plain path: the notifications check allows no
     // fragment or query (an outcome fragment failed it live, 2026-10-04).
