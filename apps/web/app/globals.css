@@ -4677,3 +4677,225 @@
   ) {
   unicode-bidi: plaintext;
 }
+
+/*
+ * Data room option 1 (owner 2026-10-20): the room as a library -- folders,
+ * documents, and the opened one beside them on a wide screen. Before the
+ * founders accept, three steps say how it opens.
+ */
+@layer components {
+  .cq-room-locked {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 28px 32px;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: 12px;
+    background: var(--cq-surface-raised);
+  }
+  .cq-room-lock {
+    color: var(--cq-accent);
+  }
+  .cq-room-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .cq-room-step {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 14px 16px;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: 10px;
+    background: var(--cq-surface);
+  }
+  .cq-room-step[data-step="now"] {
+    border-color: var(--cq-accent);
+    background: var(--cq-accent-soft);
+  }
+  .cq-room-step-mark {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    border-radius: var(--cq-radius-circle);
+    border: 1.5px solid var(--cq-border-strong);
+  }
+  .cq-room-step[data-step="now"] .cq-room-step-mark {
+    border-color: var(--cq-accent);
+  }
+  .cq-room-step[data-step="done"] .cq-room-step-mark {
+    border-color: var(--cq-positive);
+    background: var(--cq-positive);
+    color: var(--cq-text-inverse);
+  }
+  .cq-room-folder-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--cq-text-primary);
+    background: var(--cq-surface-subtle);
+  }
+  .cq-room-next {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 20px;
+    border: 1px solid var(--cq-accent);
+    border-inline-start-width: 4px;
+    border-radius: 12px;
+    background: var(--cq-surface-raised);
+    animation: cq-room-in var(--cq-motion-slow) var(--cq-ease) both;
+  }
+  [data-data-room="investor"] {
+    container-type: inline-size;
+  }
+  .cq-room-library {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  @container (min-width: 560px) {
+    .cq-room-library {
+      grid-template-columns: 190px minmax(0, 1fr);
+    }
+  }
+  @container (min-width: 900px) {
+    .cq-room-library {
+      grid-template-columns: 200px minmax(0, 1fr) minmax(0, 0.9fr);
+    }
+  }
+  .cq-room-shelves {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cq-room-shelf {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 14px;
+    color: var(--cq-text-secondary);
+    background: transparent;
+    cursor: pointer;
+    transition:
+      background-color var(--cq-motion-fast) var(--cq-ease),
+      color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-room-shelf:hover {
+    color: var(--cq-text-primary);
+    background: var(--cq-surface-subtle);
+  }
+  .cq-room-shelf[aria-pressed="true"] {
+    color: var(--cq-text-primary);
+    font-weight: 500;
+    border-color: var(--cq-border-subtle);
+    background: var(--cq-surface-raised);
+  }
+  .cq-room-doc {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: 10px;
+    background: var(--cq-surface-raised);
+    animation: cq-room-in var(--cq-motion-slow) var(--cq-ease) both;
+    transition: border-color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-room-doc[data-selected] {
+    border-color: var(--cq-accent);
+  }
+  .cq-room-doc-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 46px;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: 6px;
+    color: var(--cq-text-tertiary);
+    background: var(--cq-surface);
+  }
+  .cq-room-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: 10px;
+  }
+  .cq-room-note > svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .cq-room-preview {
+    position: sticky;
+    top: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 560px;
+    padding: 20px;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: 12px;
+    background: var(--cq-surface-raised);
+  }
+  .cq-room-preview-open {
+    align-self: stretch;
+    animation: cq-room-in var(--cq-motion-slow) var(--cq-ease) both;
+  }
+  @keyframes cq-room-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-room-next,
+    .cq-room-doc,
+    .cq-room-preview-open {
+      animation: none;
+    }
+  }
+  @container (max-width: 559px) {
+    .cq-room-shelves {
+      flex-direction: row;
+      overflow-x: auto;
+      gap: 6px;
+      padding-bottom: 2px;
+    }
+    .cq-room-shelf {
+      flex-shrink: 0;
+      border-color: var(--cq-border-subtle);
+    }
+  }
+  @media (max-width: 639px) {
+    .cq-room-locked {
+      padding: 20px;
+    }
+    .cq-room-steps {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .cq-room-next {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+}

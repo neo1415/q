@@ -91,7 +91,7 @@ describe("the investor's data room", () => {
     expect(screen.getByText("Requested")).toBeTruthy();
   });
 
-  it("filters to what is open to them", () => {
+  it("shows one folder at a time from the library's shelves", () => {
     render(
       <InvestorDataRoom
         companyId={fixtures.REVIEW_COMPANY_ID}
@@ -99,9 +99,53 @@ describe("the investor's data room", () => {
         view={fixtures.reviewInvestorRoom()}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Open to you" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Fundraising summary/ }),
+    );
     expect(screen.queryByText("Memorandum and articles")).toBeNull();
     expect(screen.getByText("One-page summary")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^All documents/ }));
+    expect(screen.getByText("Memorandum and articles")).toBeTruthy();
+  });
+
+  it("names the next step when documents are on request, and asks for all of them", () => {
+    render(
+      <InvestorDataRoom
+        companyId={fixtures.REVIEW_COMPANY_ID}
+        companyName="Kora Health"
+        view={fixtures.reviewInvestorRoom()}
+      />,
+    );
+    expect(screen.getByText("Next step in the data room")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Request all" }));
+    expect(screen.getByText("Request every on-request document")).toBeTruthy();
+  });
+
+  it("before the founders accept: three steps, folder names, never titles", () => {
+    render(
+      <InvestorDataRoom
+        companyId={fixtures.REVIEW_COMPANY_ID}
+        companyName="Kora Health"
+        view={{
+          viewer: "INVESTOR",
+          companyId: fixtures.REVIEW_COMPANY_ID,
+          access: "LOCKED",
+          locked: {
+            reason: "INTEREST_PENDING",
+            outline: [
+              { code: "legal_ip", label: "Legal and IP", documents: 2 },
+            ],
+          },
+          folders: [],
+          documents: [],
+        }}
+      />,
+    );
+    const steps = screen.getByRole("list", { name: "How the room opens" });
+    expect(within(steps).getAllByRole("listitem")).toHaveLength(3);
+    expect(screen.getByText("Kora Health accepts")).toBeTruthy();
+    expect(screen.getByText(/It holds 2 documents in 1 folder/)).toBeTruthy();
+    expect(screen.getByText("Legal and IP")).toBeTruthy();
   });
 
   it("says plainly when nothing is open to them", () => {

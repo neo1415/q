@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell/app-shell";
+import { PublicBrandStyle } from "@/features/brand-theme/public-brand-style";
 import { PageContainer } from "@/components/app-shell/page-container";
 import {
   CompanyProfileView,
@@ -57,36 +58,39 @@ export default async function ProfileReviewPage({
     ) ?? "overview";
   const empty = state === "empty";
   return (
-    <AppShell
-      context={{
-        scope: side === "OWNER" ? "founder_private" : "investor_private",
-        label:
-          side === "OWNER"
-            ? "Kora Health (fictional)"
-            : "Northbound Capital (fictional)",
-        admin: false,
-      }}
-    >
-      <PageContainer className="flex flex-col gap-6">
-        {params["view"] === "person" ? (
-          <FounderPerson person={reviewFounder(!empty)} />
-        ) : (
-          <CompanyProfileView
-            profile={reviewProfile(side, empty)}
-            tab={tab}
-            interest={null}
-            connected={false}
-            sectorLabels={["Health insurance software"]}
-            dataRoom={
-              side === "OWNER"
-                ? reviewOwnerRoom(empty)
-                : reviewInvestorRoom(empty)
-            }
-            deck={reviewDeck(side, state)}
-            previewAsInvestor={params["as"] === "investor"}
-          />
-        )}
-      </PageContainer>
-    </AppShell>
+    <>
+      <PublicBrandStyle />
+      <AppShell
+        context={{
+          scope: side === "OWNER" ? "founder_private" : "investor_private",
+          label:
+            side === "OWNER"
+              ? "Kora Health (fictional)"
+              : "Northbound Capital (fictional)",
+          admin: false,
+        }}
+      >
+        <PageContainer className="flex flex-col gap-6">
+          {params["view"] === "person" ? (
+            <FounderPerson person={reviewFounder(!empty)} />
+          ) : (
+            <CompanyProfileView
+              profile={reviewProfile(side, empty)}
+              tab={tab}
+              interest={null}
+              connected={false}
+              sectorLabels={["Health insurance software"]}
+              dataRoom={
+                side === "OWNER"
+                  ? reviewOwnerRoom(empty)
+                  : reviewInvestorRoom(empty)
+              }
+              deck={reviewDeck(side, state)}
+              previewAsInvestor={params["as"] === "investor"}
+            />
+          )}
+        </PageContainer>
+      </AppShell>
+    </>
   );
 }
