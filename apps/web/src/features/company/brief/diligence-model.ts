@@ -292,7 +292,7 @@ export function diligenceLedger(input: {
   ];
   const raiseLead =
     pitchOnly && !own
-      ? `${name} states ${amount ?? "a raise"} in its pitch, its own statement; the round isn’t formally shared with you yet.`
+      ? `${name} states ${amount ?? "a raise"} in its pitch, its own statement; the round isn't formally shared with you yet.`
       : pitchOnly && own
         ? "Investors who can watch your pitch see the amount you say in it, as your statement. Your round details stay private until you share them."
         : null;
@@ -432,6 +432,7 @@ export function diligenceLedger(input: {
     {
       id: "company-raise",
       title: "The raise",
+      // R2: exactly the Discover card's words for the one raise read.
       summary:
         amount === null
           ? own
@@ -439,7 +440,9 @@ export function diligenceLedger(input: {
             : input.inDiligence === true
               ? "Not shared with you yet"
               : "Not shared with you"
-          : `${amount} ${view?.source === "DISCLOSED_OBJECTIVE" ? "declared by the company" : own ? "stated in your pitch" : "stated in their pitch"}.${overview.raise === null && !own ? " The round isn’t formally shared with you yet." : ""}`,
+          : view === null || view.amount === null
+            ? `${amount} · ${own ? "Said in your pitch" : "Said in their pitch"}`
+            : `${view.amount} · ${view.label}`,
       lead: raiseLead,
       note: null,
       rows: raiseRows,

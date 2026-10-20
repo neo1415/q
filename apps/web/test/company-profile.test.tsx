@@ -643,9 +643,7 @@ describe("the overview, decluttered, with what the pitch says", () => {
     expect(
       document.querySelector("[data-overview-fold=company-raise] summary p")
         ?.textContent,
-    ).toBe(
-      "$4M stated in their pitch. The round isn’t formally shared with you yet.",
-    );
+    ).toBe("$4M · Said in their pitch");
   });
 
   it("tells the owner when their pitch says a raise the profile does not show", () => {

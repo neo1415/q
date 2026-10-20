@@ -309,12 +309,15 @@ describe("a pitch figure and unshared round details never read as a contradictio
       },
     } as CompanyDeckView;
     renderProfile(PITCH, "INVESTOR", deck);
-    const terms = document.querySelector("[data-deck-round-terms]");
-    expect(terms?.textContent).toContain("From their confirmed deck");
-    expect(terms?.textContent).toContain("Post-money SAFE");
+    // Profile option 1: the terms are rows of the raise, each the deck's
+    // claim with its slide; the lead the deck does not name, not known yet.
+    const terms = document.querySelector('[data-overview-fold="company-raise"]');
+    expect(terms?.textContent).toContain("Post-money SAFEFounder’s claimDeck, slide 12");
     expect(terms?.textContent).toContain("$30m");
     expect(terms?.textContent).toContain("$100k");
-    expect(terms?.textContent).toContain("Not in the deck");
+    expect(terms?.textContent).toContain(
+      "Lead investorNot statedNot known yetNot in the deck",
+    );
   });
 
   it("has no explainer when the company declared its raise", () => {

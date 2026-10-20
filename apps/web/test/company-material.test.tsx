@@ -86,7 +86,9 @@ describe("the investor's data room", () => {
     expect(screen.getByText("Cap table summary")).toBeTruthy();
     expect(screen.queryByText(/Litigation/)).toBeNull();
     expect(screen.getAllByText("On request").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Shared with you").length).toBeGreaterThan(0);
+    // Data room option 1: access in words, with a time-limited share's end.
+    expect(screen.getAllByText("Open to you").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^Shared until /u).length).toBeGreaterThan(0);
     // A waiting request is not offered twice.
     expect(screen.getByText("Requested")).toBeTruthy();
   });

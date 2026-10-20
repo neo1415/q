@@ -12,6 +12,7 @@ import { useT } from "@/features/i18n/language";
 
 import { ProfileUnicornAssessment } from "../material/fit-panel-slot";
 import type { PitchProfileSection } from "../pitch-profile";
+import { RaiseFact } from "../raise-fact";
 import { useProfileTab } from "../profile-tabs";
 import { useBrief } from "./brief-context";
 import type { KeyNumber } from "./model";
@@ -94,7 +95,13 @@ export function OverviewBrief({
               <div key={number.label}>
                 <dt className="cq-brief-label">{number.label}</dt>
                 <dd className="m-0">
-                  <b>{number.value}</b>
+                  <b>
+                    {number.raise === undefined ? (
+                      number.value
+                    ) : (
+                      <RaiseFact words={number.raise} />
+                    )}
+                  </b>
                 </dd>
               </div>
             ))}

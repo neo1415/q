@@ -495,8 +495,9 @@ describe("the Overview and Diligence tabs", () => {
       "team",
     ]);
     expect(container.querySelector("[data-pitch-profile]")).not.toBeNull();
-    // The strip stays on the Overview; the old folds are Diligence's.
-    expect(container.querySelector("[data-profile-key-facts]")).not.toBeNull();
+    // Key numbers show only what is stated: nothing here, so no placeholder
+    // grid (profile option 1). The old folds are Diligence's.
+    expect(container.querySelector("[data-profile-key-facts]")).toBeNull();
     expect(container.querySelector("#company-raise")).toBeNull();
   });
 

@@ -36,6 +36,7 @@ import { CompanyDeeperView } from "./company-deeper-view";
 import { DeckDownload } from "./company-profile-parts";
 import { compactMoneyText, moneyText } from "./money-text";
 import { OwnerPitchNotice } from "./overview-sections";
+import { raiseWords } from "./raise-words";
 import { ReadMore } from "./read-more";
 import { InvestorDataRoom, OwnerDataRoom } from "./material/data-room";
 import { DeckCoach } from "./material/deck";
@@ -494,6 +495,10 @@ function OverviewPanel({
       numbers={keyNumbers({
         deck: deck?.extraction?.sections ?? null,
         raise: pitchRaise,
+        raiseWords:
+          overview?.raiseView === undefined
+            ? null
+            : raiseWords(overview.raiseView, own),
       })}
       own={own}
       investor={investor}

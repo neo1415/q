@@ -10,7 +10,7 @@ import {
 
 import { compactMoneyText } from "../money-text";
 import { pitchMoment } from "../overview-sections";
-import { raiseWords } from "../raise-words";
+import { raiseWords, type RaiseWords } from "../raise-words";
 import type { Evidence } from "./parts";
 
 /**
@@ -107,7 +107,12 @@ export function headerRaise(input: {
   };
 }
 
-export type KeyNumber = { readonly label: string; readonly value: string };
+export type KeyNumber = {
+  readonly label: string;
+  readonly value: string;
+  /** The raise cell: the one raise read's words (R2), same as Discover. */
+  readonly raise?: RaiseWords | undefined;
+};
 
 const LOOK: readonly (readonly [string, DeckSectionCode[], RegExp])[] = [
   [
@@ -153,12 +158,20 @@ function factIn(
 export function keyNumbers(input: {
   readonly deck: readonly DeckSection[] | null;
   readonly raise: string | null;
+  /** The server's one raise read for this reader, where it sent one. */
+  readonly raiseWords?: RaiseWords | null | undefined;
 }): readonly KeyNumber[] {
   const deck = input.deck ?? [];
   const terms = deckAskTerms(deck);
   const out: KeyNumber[] = [];
-  const raising = terms.amount ?? input.raise;
-  if (raising !== null) out.push({ label: "Raising", value: raising });
+  const words = input.raiseWords ?? null;
+  if (words !== null && (words.amount !== null || terms.amount === undefined)) {
+    // The same raise, in the same words, as the Discover card (R2).
+    out.push({ label: "Raising", value: words.amount ?? words.label, raise: words });
+  } else {
+    const raising = terms.amount ?? input.raise;
+    if (raising !== null) out.push({ label: "Raising", value: raising });
+  }
   if (terms.valuationCap !== undefined)
     out.push({ label: "Valuation cap", value: terms.valuationCap });
   else if (terms.valuation !== undefined)
