@@ -211,7 +211,9 @@ export function RelationshipDetail({
         readAt={readAt}
         note={relationship === null ? t(absentSentence) : undefined}
         action={
-          askQ ? <AskQAboutRelationship counterpart={counterpart} compact /> : null
+          askQ ? (
+            <AskQAboutRelationship counterpart={counterpart} compact />
+          ) : null
         }
       />
 
@@ -378,7 +380,11 @@ export function RelationshipDetail({
             {profile.profileHref === null ? null : (
               <Link
                 href={profile.profileHref}
-                className={buttonClassName("secondary", "compact", "self-start")}
+                className={buttonClassName(
+                  "secondary",
+                  "compact",
+                  "self-start",
+                )}
               >
                 {t("View profile")}
                 <ArrowUpRight size={ICON_SIZE.compact} aria-hidden="true" />
@@ -635,7 +641,12 @@ function NextCard({
             </Link>
           ) : null}
           {relationship !== null &&
-          nothingLeads(hasActions, connected, relationship.state, call !== null) ? (
+          nothingLeads(
+            hasActions,
+            connected,
+            relationship.state,
+            call !== null,
+          ) ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
               {t("Nothing needs you right now.")}
             </p>
@@ -882,7 +893,10 @@ export function RelationshipSection({
   const connected = isMatchedRelationshipState(relationship.state);
   return (
     <PageContainer
-      className={cx("flex flex-col gap-5", charcoal ? "cq-charcoal" : undefined)}
+      className={cx(
+        "flex flex-col gap-5",
+        charcoal ? "cq-charcoal" : undefined,
+      )}
     >
       <RelationshipHero
         counterpart={counterpart}
@@ -1056,7 +1070,9 @@ export function RelationshipHero({
           >
             <Globe size={ICON_SIZE.compact} aria-hidden="true" />
             {t(
-              profile.websiteUrl.replace(/^https?:\/\//i, "").replace(/\/$/, ""),
+              profile.websiteUrl
+                .replace(/^https?:\/\//i, "")
+                .replace(/\/$/, ""),
             )}
           </a>
         )}
@@ -1069,7 +1085,11 @@ export function RelationshipHero({
 }
 
 /** The state as a small pill: its words, the accent only repeating them. */
-function StatePill({ state }: { readonly state: RelationshipStatusDto["state"] }) {
+function StatePill({
+  state,
+}: {
+  readonly state: RelationshipStatusDto["state"];
+}) {
   const t = serverTNow();
   const tone =
     state === "INVESTED"

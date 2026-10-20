@@ -13,13 +13,7 @@ import {
 
 import type { ChatMessageDto, ChatThreadDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
-import {
-  Send,
-  FileText,
-  ICON_SIZE,
-  Play,
-  Upload,
-} from "@capital-q/ui/icons";
+import { Send, FileText, ICON_SIZE, Play, Upload } from "@capital-q/ui/icons";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
 import { QCircle, TILE } from "@/features/relationships/record-parts";
@@ -46,7 +40,10 @@ import {
 import { useFollowNewest } from "@/features/q/follow-newest";
 import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 
-import { startReplyDraftAction, readReplyDraftAction } from "./reply-draft-actions";
+import {
+  startReplyDraftAction,
+  readReplyDraftAction,
+} from "./reply-draft-actions";
 import { VoiceRecorder } from "./voice-recorder";
 import { useT } from "@/features/i18n/language";
 
@@ -529,154 +526,156 @@ export function RelationshipChat({
         ) : null}
         {messages.map((message, index) => (
           <Fragment key={message.messageId}>
-          {index === 0 ||
-          dayMarker(messages[index - 1]?.sentAt ?? "") !==
-            dayMarker(message.sentAt) ? (
-            <li
-              className="cq-caption self-center rounded-full bg-(--cq-surface-subtle) px-2.5 py-1 text-(--cq-text-tertiary)"
-              data-chat-day
-            >
-              <span suppressHydrationWarning>
-                {t(dayMarker(message.sentAt))}
-              </span>
-            </li>
-          ) : null}
-          <li
-            className={`group flex max-w-[72%] min-w-0 flex-col gap-0.5 max-sm:max-w-[86%] ${message.mine ? "items-end self-end" : "items-start self-start"}`}
-            data-chat-message={message.mine ? "mine" : "theirs"}
-          >
-            <div
-              className={`flex max-w-full min-w-0 flex-col gap-1 rounded-(--cq-radius-xl) px-3.5 py-2.5 ${
-                message.mine
-                  ? `rounded-ee-[6px] ${TILE}`
-                  : "rounded-es-[6px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) text-(--cq-text-primary)"
-              } ${index === messages.length - 1 && message.mine ? "cq-arrive" : ""}`}
-            >
-              {!message.mine &&
-              (index === 0 ||
-                messages[index - 1]?.mine === true ||
-                messages[index - 1]?.senderName !== message.senderName) ? (
-                // Who is speaking, once per run of their messages.
-                <span
-                  className="cq-caption font-semibold text-(--cq-text-secondary)"
-                  data-chat-sender
-                >
-                  {message.senderName}
+            {index === 0 ||
+            dayMarker(messages[index - 1]?.sentAt ?? "") !==
+              dayMarker(message.sentAt) ? (
+              <li
+                className="cq-caption self-center rounded-full bg-(--cq-surface-subtle) px-2.5 py-1 text-(--cq-text-tertiary)"
+                data-chat-day
+              >
+                <span suppressHydrationWarning>
+                  {t(dayMarker(message.sentAt))}
                 </span>
-              ) : null}
-              {message.unsent ? (
-                <p className="cq-body-sm italic text-(--cq-text-secondary)">
-                  {message.mine
-                    ? "You unsent this message."
-                    : "This message was unsent."}
-                </p>
-              ) : (
-                <>
-                  {message.attachment === null ? null : message.kind ===
-                    "VOICE_NOTE" ? (
-                    playing?.messageId === message.messageId ? (
-                      // The signed URL lasts a minute; the element has
-                      // already fetched the bytes by then.
-                      <audio
-                        controls
-                        autoPlay
-                        src={playing.url}
-                        className="max-w-full"
-                        aria-label={`Voice note from ${message.mine ? "you" : message.senderName}`}
-                      />
+              </li>
+            ) : null}
+            <li
+              className={`group flex max-w-[72%] min-w-0 flex-col gap-0.5 max-sm:max-w-[86%] ${message.mine ? "items-end self-end" : "items-start self-start"}`}
+              data-chat-message={message.mine ? "mine" : "theirs"}
+            >
+              <div
+                className={`flex max-w-full min-w-0 flex-col gap-1 rounded-(--cq-radius-xl) px-3.5 py-2.5 ${
+                  message.mine
+                    ? `rounded-ee-[6px] ${TILE}`
+                    : "rounded-es-[6px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) text-(--cq-text-primary)"
+                } ${index === messages.length - 1 && message.mine ? "cq-arrive" : ""}`}
+              >
+                {!message.mine &&
+                (index === 0 ||
+                  messages[index - 1]?.mine === true ||
+                  messages[index - 1]?.senderName !== message.senderName) ? (
+                  // Who is speaking, once per run of their messages.
+                  <span
+                    className="cq-caption font-semibold text-(--cq-text-secondary)"
+                    data-chat-sender
+                  >
+                    {message.senderName}
+                  </span>
+                ) : null}
+                {message.unsent ? (
+                  <p className="cq-body-sm italic text-(--cq-text-secondary)">
+                    {message.mine
+                      ? "You unsent this message."
+                      : "This message was unsent."}
+                  </p>
+                ) : (
+                  <>
+                    {message.attachment === null ? null : message.kind ===
+                      "VOICE_NOTE" ? (
+                      playing?.messageId === message.messageId ? (
+                        // The signed URL lasts a minute; the element has
+                        // already fetched the bytes by then.
+                        <audio
+                          controls
+                          autoPlay
+                          src={playing.url}
+                          className="max-w-full"
+                          aria-label={`Voice note from ${message.mine ? "you" : message.senderName}`}
+                        />
+                      ) : (
+                        <Button
+                          variant="quiet"
+                          className={`-mx-2 ${message.mine ? "text-inherit!" : ""}`}
+                          onClick={() => void openAttachment(message)}
+                        >
+                          <Play size={ICON_SIZE.regular} aria-hidden="true" />
+                          Voice note
+                          {message.voiceDurationMs === null ? null : (
+                            <span className="cq-numeric text-(--cq-text-secondary)">
+                              {formatDuration(message.voiceDurationMs)}
+                            </span>
+                          )}
+                        </Button>
+                      )
                     ) : (
                       <Button
                         variant="quiet"
-                        className={`-mx-2 ${message.mine ? "text-inherit!" : ""}`}
+                        className={`-mx-2 max-w-full justify-start ${message.mine ? "text-inherit!" : ""}`}
                         onClick={() => void openAttachment(message)}
+                        aria-label={`Open ${message.attachment.title}`}
                       >
-                        <Play size={ICON_SIZE.regular} aria-hidden="true" />
-                        Voice note
-                        {message.voiceDurationMs === null ? null : (
-                          <span className="cq-numeric text-(--cq-text-secondary)">
-                            {formatDuration(message.voiceDurationMs)}
-                          </span>
-                        )}
+                        <FileText size={ICON_SIZE.regular} aria-hidden="true" />
+                        <span className="truncate">
+                          {message.attachment.title}
+                        </span>
                       </Button>
-                    )
-                  ) : (
-                    <Button
-                      variant="quiet"
-                      className={`-mx-2 max-w-full justify-start ${message.mine ? "text-inherit!" : ""}`}
-                      onClick={() => void openAttachment(message)}
-                      aria-label={`Open ${message.attachment.title}`}
-                    >
-                      <FileText size={ICON_SIZE.regular} aria-hidden="true" />
-                      <span className="truncate">
-                        {message.attachment.title}
-                      </span>
-                    </Button>
-                  )}
-                  {message.body === null ? null : (
-                    // A long unbroken word or link wraps inside the bubble
-                    // (break-it sweep 2026-10-03: it ran off the left edge).
-                    <p className="cq-body whitespace-pre-wrap wrap-anywhere">
-                      {message.body}
-                    </p>
-                  )}
-                </>
-              )}
-              <span
-                className={`cq-caption flex gap-1.5 ${message.mine ? "justify-end opacity-70" : "text-(--cq-text-tertiary)"}`}
-              >
-                {/* AUTO (ADR 0030): every message Q sent is labelled as Q's. */}
-                {message.viaQ ? (
-                  <span>Sent by Q for {message.senderName}</span>
-                ) : null}
-                {message.edited && !message.unsent ? (
-                  <span>{t("Edited")}</span>
-                ) : null}
-                <time
-                  dateTime={message.sentAt}
-                  className="cq-numeric"
-                  title={formatRelationshipDate(message.sentAt)}
-                  suppressHydrationWarning
+                    )}
+                    {message.body === null ? null : (
+                      // A long unbroken word or link wraps inside the bubble
+                      // (break-it sweep 2026-10-03: it ran off the left edge).
+                      <p className="cq-body whitespace-pre-wrap wrap-anywhere">
+                        {message.body}
+                      </p>
+                    )}
+                  </>
+                )}
+                <span
+                  className={`cq-caption flex gap-1.5 ${message.mine ? "justify-end opacity-70" : "text-(--cq-text-tertiary)"}`}
                 >
-                  {Number.isNaN(Date.parse(message.sentAt))
-                    ? formatRelationshipDate(message.sentAt)
-                    : TIME_ONLY.format(new Date(message.sentAt))}
-                </time>
-                {index === lastMineIndex && seenIndex >= lastMineIndex ? (
-                  <span>{t("read")}</span>
+                  {/* AUTO (ADR 0030): every message Q sent is labelled as Q's. */}
+                  {message.viaQ ? (
+                    <span>Sent by Q for {message.senderName}</span>
+                  ) : null}
+                  {message.edited && !message.unsent ? (
+                    <span>{t("Edited")}</span>
+                  ) : null}
+                  <time
+                    dateTime={message.sentAt}
+                    className="cq-numeric"
+                    title={formatRelationshipDate(message.sentAt)}
+                    suppressHydrationWarning
+                  >
+                    {Number.isNaN(Date.parse(message.sentAt))
+                      ? formatRelationshipDate(message.sentAt)
+                      : TIME_ONLY.format(new Date(message.sentAt))}
+                  </time>
+                  {index === lastMineIndex && seenIndex >= lastMineIndex ? (
+                    <span>{t("read")}</span>
+                  ) : null}
+                </span>
+              </div>
+              {/* Per-message actions out of the way until hovered or
+                focused, as a chat app keeps them. */}
+              <span className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                {message.mine && !message.unsent ? (
+                  <Button
+                    variant="quiet"
+                    size="compact"
+                    className="min-h-8"
+                    onClick={() => void unsend(message.messageId)}
+                  >
+                    {t("Unsend")}
+                  </Button>
+                ) : null}
+                {!message.mine &&
+                !message.unsent &&
+                message.side !== ownSide ? (
+                  <Button
+                    variant="quiet"
+                    size="compact"
+                    className="min-h-8"
+                    aria-label={`Report message from ${message.senderName}`}
+                    onClick={() =>
+                      setSafety({
+                        kind: "REPORT",
+                        messageId: message.messageId,
+                      })
+                    }
+                  >
+                    {t("Report")}
+                  </Button>
                 ) : null}
               </span>
-            </div>
-            {/* Per-message actions out of the way until hovered or
-                focused, as a chat app keeps them. */}
-            <span className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-              {message.mine && !message.unsent ? (
-                <Button
-                  variant="quiet"
-                  size="compact"
-                  className="min-h-8"
-                  onClick={() => void unsend(message.messageId)}
-                >
-                  {t("Unsend")}
-                </Button>
-              ) : null}
-              {!message.mine && !message.unsent && message.side !== ownSide ? (
-                <Button
-                  variant="quiet"
-                  size="compact"
-                  className="min-h-8"
-                  aria-label={`Report message from ${message.senderName}`}
-                  onClick={() =>
-                    setSafety({
-                      kind: "REPORT",
-                      messageId: message.messageId,
-                    })
-                  }
-                >
-                  {t("Report")}
-                </Button>
-              ) : null}
-            </span>
-          </li>
+            </li>
           </Fragment>
         ))}
         <li ref={end} aria-hidden="true" />

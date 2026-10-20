@@ -213,6 +213,55 @@ describe("slot proposal", () => {
     );
   });
 
+  it("draws the person's own week: their busy intervals only, clipped, never the other side's", async () => {
+    const w = world();
+    w.investorCalendar.busyTimes = [
+      {
+        start: new Date("2026-10-04T22:00:00Z"),
+        end: new Date("2026-10-05T09:00:00Z"),
+      },
+    ];
+    w.founderCalendar.busyTimes = [
+      {
+        start: new Date("2026-10-06T10:00:00Z"),
+        end: new Date("2026-10-06T11:00:00Z"),
+      },
+    ];
+    const result = await w.service.busyTimes({
+      actor: INVESTOR,
+      relationshipId: REL,
+      from: new Date("2026-10-05T00:00:00Z"),
+      to: new Date("2026-10-10T00:00:00Z"),
+    });
+    expect(w.founderCalendar.busyQueries).toBe(0);
+    expect(result).toEqual({
+      outcome: "OK",
+      timeZone: "Europe/London",
+      busy: [
+        {
+          start: new Date("2026-10-05T00:00:00Z"),
+          end: new Date("2026-10-05T09:00:00Z"),
+        },
+      ],
+    });
+    expect(
+      await w.service.busyTimes({
+        actor: STRANGER,
+        relationshipId: REL,
+        from: new Date("2026-10-05T00:00:00Z"),
+        to: new Date("2026-10-10T00:00:00Z"),
+      }),
+    ).toMatchObject({ outcome: "REFUSED" });
+    expect(
+      await w.service.busyTimes({
+        actor: INVESTOR,
+        relationshipId: REL,
+        from: new Date("2026-10-05T00:00:00Z"),
+        to: new Date("2026-11-05T00:00:00Z"),
+      }),
+    ).toEqual({ outcome: "REFUSED", code: "INVALID_TIME" });
+  });
+
   it("refuses a non-party, an unconnected relationship and an unconnected calendar", async () => {
     expect(
       (

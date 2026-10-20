@@ -123,11 +123,9 @@ describe("Draft a reply (inbox split, 2026-10-20)", () => {
     });
     expect(startDraft).toHaveBeenCalledWith(REL, "Apex");
     expect(
-      (screen.getByLabelText("Message Apex") as HTMLTextAreaElement).value,
+      screen.getByLabelText<HTMLTextAreaElement>("Message Apex").value,
     ).toBe("Thanks, Ada. Could you send the method?");
-    expect(
-      screen.getByText(/Draft by Q from your conversation/u),
-    ).toBeTruthy();
+    expect(screen.getByText(/Draft by Q from your conversation/u)).toBeTruthy();
     expect(send).not.toHaveBeenCalled();
     vi.useRealTimers();
   });

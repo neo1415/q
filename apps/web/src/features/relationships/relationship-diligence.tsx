@@ -176,7 +176,9 @@ export function openQuestionsNotAsked(
   const asked = new Set(requests.map((r) => r.title.trim().toLowerCase()));
   return questions
     .map((question) => question.trim())
-    .filter((question) => question !== "" && !asked.has(question.toLowerCase()));
+    .filter(
+      (question) => question !== "" && !asked.has(question.toLowerCase()),
+    );
 }
 
 /**
@@ -458,14 +460,12 @@ export function RelationshipDiligence({
   // Shared first, then waiting, then what was not asked (prototype order).
   const rows: readonly Row[] = [
     ...requests
-      .map(
-        (request): Row => ({
-          kind: "REQUEST",
-          key: request.requestId,
-          request,
-          status: requestStatus(request, area.shares),
-        }),
-      )
+      .map((request): Row => ({
+        kind: "REQUEST",
+        key: request.requestId,
+        request,
+        status: requestStatus(request, area.shares),
+      }))
       .toSorted(
         (a, b) =>
           (a.kind === "REQUEST" && a.status.share !== null ? 0 : 1) -
@@ -500,7 +500,9 @@ export function RelationshipDiligence({
           </Link>
         </p>
       ) : counts.asked === 0 ? null : (
-        <QLine note={t("From your requests and what was shared. Not a verdict.")}>
+        <QLine
+          note={t("From your requests and what was shared. Not a verdict.")}
+        >
           {t(
             `${String(counts.answered)} of ${String(counts.asked)} ${counts.asked === 1 ? "request is" : "requests are"} answered.`,
           )}
@@ -569,7 +571,9 @@ export function RelationshipDiligence({
                 <ChecklistRow
                   label={row.question}
                   tone="open"
-                  icon={<CircleHelp size={ICON_SIZE.regular} aria-hidden="true" />}
+                  icon={
+                    <CircleHelp size={ICON_SIZE.regular} aria-hidden="true" />
+                  }
                   tag={<Tag tone="dash">{t("Not asked yet")}</Tag>}
                   line={
                     <>
@@ -709,6 +713,7 @@ export function RelationshipDiligence({
         </>
       )}
       <ViewerSheet
+        key={viewing?.policyId ?? "closed"}
         share={viewing}
         relationshipId={relationshipId}
         counterpart={counterpart}
@@ -826,12 +831,16 @@ function RequestRow({
   const share = status.share;
   const shared = share !== null;
   const asked = founder
-    ? t(`${request.requestedByName ?? counterpart} asked ${since(request.requestedAt, now)} ago`)
+    ? t(
+        `${request.requestedByName ?? counterpart} asked ${since(request.requestedAt, now)} ago`,
+      )
     : t(`Asked ${dealDay(request.requestedAt)}.`);
   const tag = shared ? (
     <Tag tone="evidence" icon={<Check aria-hidden="true" />}>
       {status.words === "Viewed"
-        ? t(`Shared, opened ${since(share.viewedAt ?? share.sharedAt, now)} ago`)
+        ? t(
+            `Shared, opened ${since(share.viewedAt ?? share.sharedAt, now)} ago`,
+          )
         : t(`Shared ${dealDay(share.sharedAt)}`)}
     </Tag>
   ) : status.words === "Declined" ? (
@@ -839,7 +848,9 @@ function RequestRow({
   ) : status.words.startsWith("Answered") ? (
     <Tag
       tone={status.tone === "positive" ? "evidence" : "stone"}
-      icon={status.tone === "positive" ? <Check aria-hidden="true" /> : undefined}
+      icon={
+        status.tone === "positive" ? <Check aria-hidden="true" /> : undefined
+      }
     >
       {t(status.words)}
     </Tag>
@@ -926,9 +937,7 @@ function RequestRow({
           data-request-declined
         >
           {founder ? t("You declined") : t("They declined")}
-          {request.declineNote === null
-            ? "."
-            : t(`: “${request.declineNote}”`)}
+          {request.declineNote === null ? "." : t(`: “${request.declineNote}”`)}
         </p>
       ) : null}
       {request.questions === null || request.questions.length === 0 ? null : (
@@ -1043,15 +1052,19 @@ function ViewerSheet({
   const t = useT();
   const [file, setFile] = useState<
     | { readonly kind: "LOADING" }
-    | { readonly kind: "READ"; readonly url: string; readonly watermark: string }
+    | {
+        readonly kind: "READ";
+        readonly url: string;
+        readonly watermark: string;
+      }
     | { readonly kind: "FAILED"; readonly message: string }
   >({ kind: "LOADING" });
   const documentId = share?.documentId ?? null;
 
   useEffect(() => {
     if (documentId === null) return;
+    // Each opening mounts afresh (keyed by the share), so it starts LOADING.
     let live = true;
-    setFile({ kind: "LOADING" });
     void diligenceViewAction(relationshipId, documentId)
       .then((result) => {
         if (!live) return;
@@ -1111,7 +1124,9 @@ function ViewerSheet({
         )}
       </div>
       {share?.qSummary === null || share === null ? null : (
-        <QLine note={t("Q's one line on it. Read the document for the detail.")}>
+        <QLine
+          note={t("Q's one line on it. Read the document for the detail.")}
+        >
           {t(share.qSummary)}
         </QLine>
       )}
@@ -1192,7 +1207,9 @@ function AskSheet({
         if (!next) onClose();
       }}
       title={t("Ask for a document")}
-      description={t(`${counterpart} sees your request in their diligence list`)}
+      description={t(
+        `${counterpart} sees your request in their diligence list`,
+      )}
     >
       {suggestions.length === 0 ? null : (
         <fieldset className="flex flex-col gap-2">
@@ -1363,7 +1380,9 @@ function RemindSheet({
         />
       </label>
       <span className="cq-caption text-(--cq-text-tertiary)">
-        {t("Nothing is sent until you press Send. Both sides see the conversation.")}
+        {t(
+          "Nothing is sent until you press Send. Both sides see the conversation.",
+        )}
       </span>
       {error === null ? null : (
         <p role="alert" className="cq-body-sm text-(--cq-text-primary)">

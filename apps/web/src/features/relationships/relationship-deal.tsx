@@ -19,7 +19,12 @@ import type {
 import { cx } from "@capital-q/ui";
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot } from "@capital-q/ui/dialog";
-import { ArrowUpRight, Check, CircleHelp, ICON_SIZE } from "@capital-q/ui/icons";
+import {
+  ArrowUpRight,
+  Check,
+  CircleHelp,
+  ICON_SIZE,
+} from "@capital-q/ui/icons";
 import {
   formatAmountForDisplay,
   MoneyInput,
@@ -363,7 +368,11 @@ function TermsWorkspace({
   );
   const [discount, setDiscount] = useState(current?.discountPercent ?? "");
   const [proRata, setProRata] = useState<"YES" | "NO" | null>(
-    current?.proRata === true ? "YES" : current?.proRata === false ? "NO" : null,
+    current?.proRata === true
+      ? "YES"
+      : current?.proRata === false
+        ? "NO"
+        : null,
   );
   const [other, setOther] = useState(current?.otherTerms ?? "");
   const [document, setDocument] = useState(current?.termsDocumentId ?? "");
@@ -461,8 +470,8 @@ function TermsWorkspace({
     .map((key) => rows.find((row) => row.key === key)?.label.toLowerCase())
     .filter((word): word is string => word !== undefined);
 
-  const stated = pitchTerms.filter(
-    (term) => /instrument|cap|valuation|raise/i.test(term.label),
+  const stated = pitchTerms.filter((term) =>
+    /instrument|cap|valuation|raise/i.test(term.label),
   );
 
   return (
@@ -503,7 +512,9 @@ function TermsWorkspace({
                 type="button"
                 className="cq-caption inline-flex min-h-8 items-center self-start text-(--cq-text-tertiary) underline underline-offset-2 hover:text-(--cq-text-primary)"
                 onClick={() =>
-                  setBasis(pricedBasis === "PRE_MONEY" ? "POST_MONEY" : "PRE_MONEY")
+                  setBasis(
+                    pricedBasis === "PRE_MONEY" ? "POST_MONEY" : "PRE_MONEY",
+                  )
                 }
               >
                 {pricedBasis === "PRE_MONEY"
@@ -665,9 +676,7 @@ function TermsWorkspace({
           <Button
             variant="primary"
             disabled={pending || amount.amount === "" || recordedAsShown}
-            onClick={() =>
-              void onRecord(terms, termsApprovalKey(nonce, terms))
-            }
+            onClick={() => void onRecord(terms, termsApprovalKey(nonce, terms))}
           >
             {pending
               ? t("Recording…")
@@ -783,7 +792,11 @@ export function DealSummary({
         href={href}
         className={buttonClassName("secondary", "compact", "self-start")}
       >
-        {t(view.nextSteps.includes("RECORD_TERMS") ? "Record the terms" : "Deal and close")}
+        {t(
+          view.nextSteps.includes("RECORD_TERMS")
+            ? "Record the terms"
+            : "Deal and close",
+        )}
         <ArrowUpRight size={ICON_SIZE.compact} aria-hidden="true" />
       </Link>
     </div>

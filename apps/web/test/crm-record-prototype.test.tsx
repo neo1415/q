@@ -187,12 +187,14 @@ describe("terms beside what gets recorded (deal option 2)", () => {
     expect(
       document.querySelector("[data-terms-state=stale]")?.textContent,
     ).toContain("revision 2");
-    expect(
-      document.querySelector("[data-changed=yes]")?.textContent,
-    ).toContain("$22,000,000");
+    expect(document.querySelector("[data-changed=yes]")?.textContent).toContain(
+      "$22,000,000",
+    );
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Approve revision 2" }));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Approve revision 2" }),
+      );
       await Promise.resolve();
     });
     expect(recordTerms).toHaveBeenCalledTimes(1);
@@ -342,13 +344,26 @@ describe("the inbox split (messages option 3)", () => {
     } as unknown as RelationshipBrief;
     const rows = inboxRows(
       [
-        item("00000000-0000-4000-8000-000000000501", "Lumenfold", "INTEREST_EXPRESSED", "2026-10-08T09:00:00.000Z"),
-        item("00000000-0000-4000-8000-000000000502", "Tessellate Labs", "IN_DILIGENCE", "2026-10-19T09:00:00.000Z"),
+        item(
+          "00000000-0000-4000-8000-000000000501",
+          "Lumenfold",
+          "INTEREST_EXPRESSED",
+          "2026-10-08T09:00:00.000Z",
+        ),
+        item(
+          "00000000-0000-4000-8000-000000000502",
+          "Tessellate Labs",
+          "IN_DILIGENCE",
+          "2026-10-19T09:00:00.000Z",
+        ),
       ],
       new Map([["00000000-0000-4000-8000-000000000502", brief]]),
       new Map([["00000000-0000-4000-8000-000000000502", 1]]),
     );
-    expect(rows.map((row) => row.name)).toEqual(["Tessellate Labs", "Lumenfold"]);
+    expect(rows.map((row) => row.name)).toEqual([
+      "Tessellate Labs",
+      "Lumenfold",
+    ]);
     expect(rows[0]).toMatchObject({
       matched: true,
       unread: 1,
@@ -371,9 +386,9 @@ describe("the record's Decision (record option 3)", () => {
       />,
     );
     expect(
-      screen.getByRole("radio", { name: /Keep going/u }).getAttribute(
-        "aria-checked",
-      ),
+      screen
+        .getByRole("radio", { name: /Keep going/u })
+        .getAttribute("aria-checked"),
     ).toBe("true");
     fireEvent.click(screen.getByRole("radio", { name: /Not proceeding/u }));
     const note = await screen.findByLabelText("Draft note, for you to edit");

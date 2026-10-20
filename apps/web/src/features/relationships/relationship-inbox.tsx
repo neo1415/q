@@ -26,7 +26,6 @@ import type { CounterpartProfile } from "./relationship-page-data";
 import { inboxRows, type InboxRow } from "./inbox-rows";
 import { TILE } from "./record-parts";
 
-
 /**
  * Messages as the CRM prototype's inbox split (messages option 3, owner
  * 2026-10-20): every conversation this side has, newest first, with the
@@ -294,9 +293,7 @@ export async function RelationshipInbox({
       )}
     >
       <div className={showList ? "contents" : "contents max-lg:hidden"}>
-        {side === "NONE" ? null : (
-          <HubHeader side={side} view="pipeline" />
-        )}
+        {side === "NONE" ? null : <HubHeader side={side} view="pipeline" />}
         <div className="flex flex-wrap items-baseline gap-x-3">
           <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-(--cq-text-primary)">
             {t("Messages")}

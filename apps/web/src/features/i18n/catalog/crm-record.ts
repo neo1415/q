@@ -65,8 +65,10 @@ export const CRM_RECORD_AR: Readonly<Record<string, string>> = {
   "The terms": "الشروط",
   "{name} recorded {date}": "سُجّل {name} في {date}",
   "What will be recorded": "ما سيُسجّل",
-  "Approved {date} today, as shown above.": "تمت الموافقة اليوم {date}، كما هو معروض أعلاه.",
-  "Approved on {date}, as shown above.": "تمت الموافقة في {date}، كما هو معروض أعلاه.",
+  "Approved {date} today, as shown above.":
+    "تمت الموافقة اليوم {date}، كما هو معروض أعلاه.",
+  "Approved on {date}, as shown above.":
+    "تمت الموافقة في {date}، كما هو معروض أعلاه.",
   "Approve revision {n}": "الموافقة على المراجعة {n}",
   Recorded: "مسجّل",
   "Recording…": "جارٍ التسجيل…",

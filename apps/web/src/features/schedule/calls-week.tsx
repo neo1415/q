@@ -4,6 +4,7 @@ import {
   useEffect,
   useId,
   useState,
+  useSyncExternalStore,
   useTransition,
   type ReactNode,
 } from "react";
@@ -41,6 +42,18 @@ import {
  */
 
 const HOURS = [9, 10, 11, 12, 13, 14, 15, 16, 17] as const;
+
+// The week is the reader's own, in their own zone: decided in the browser.
+// The server (and the first paint) has no "now"; the browser's is read once.
+let mountedAt: number | null = null;
+const noSubscription = () => () => undefined;
+function useMountedNow(): number | null {
+  return useSyncExternalStore(
+    noSubscription,
+    () => (mountedAt ??= Date.now()),
+    () => null,
+  );
+}
 const DAYS = 5;
 
 type Busy = { readonly start: number; readonly end: number };
@@ -114,34 +127,37 @@ export function CallsWeek({
   const t = useT();
   const [meetings, setMeetings] = useState(initialMeetings);
   const [offset, setOffset] = useState(0);
-  const [now, setNow] = useState<number | null>(null);
-  const [busy, setBusy] = useState<readonly Busy[] | null>(null);
-  const [calendar, setCalendar] = useState<
-    "LOADING" | "READ" | { readonly message: string }
-  >("LOADING");
-  const [day, setDay] = useState(0);
+  const now = useMountedNow();
+  // The calendar read, by the week it was made for: another week's read is
+  // a week still loading, never this one's.
+  const [read, setRead] = useState<{
+    readonly from: number;
+    readonly busy: readonly Busy[] | null;
+    readonly message: string | null;
+  } | null>(null);
+  const [dayChoice, setDay] = useState<number | null>(null);
   const [proposing, setProposing] = useState<number | null>(null);
   const [open, setOpen] = useState<MeetingDto | null>(null);
   const [sent, setSent] = useState<ReadonlySet<string>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
 
-  // The week is the reader's own, in their own zone: decided in the browser.
-  useEffect(() => {
-    const at = Date.now();
-    setNow(at);
-    const today = (new Date(at).getDay() + 6) % 7;
-    setDay(today < DAYS ? today : 0);
-  }, []);
-
   const monday = now === null ? null : weekStart(new Date(now), offset);
   const from = monday?.getTime() ?? null;
+  const today = now === null ? 0 : (new Date(now).getDay() + 6) % 7;
+  const day = dayChoice ?? (today < DAYS ? today : 0);
+  const current = read !== null && read.from === from ? read : null;
+  const busy = current?.busy ?? null;
+  const calendar =
+    current === null
+      ? ("LOADING" as const)
+      : current.message === null
+        ? ("READ" as const)
+        : { message: current.message };
 
   useEffect(() => {
     if (from === null) return;
     let live = true;
-    setCalendar("LOADING");
-    setBusy(null);
     const to = new Date(from);
     to.setDate(to.getDate() + DAYS);
     void weekAvailabilityAction(
@@ -152,19 +168,26 @@ export function CallsWeek({
     )
       .then((result) => {
         if (!live) return;
-        if (result.ok) {
-          setBusy(
-            result.value.busy.map((b) => ({
-              start: Date.parse(b.startsAt),
-              end: Date.parse(b.endsAt),
-            })),
-          );
-          setCalendar("READ");
-        } else setCalendar({ message: result.message });
+        setRead(
+          result.ok
+            ? {
+                from,
+                busy: result.value.busy.map((b) => ({
+                  start: Date.parse(b.startsAt),
+                  end: Date.parse(b.endsAt),
+                })),
+                message: null,
+              }
+            : { from, busy: null, message: result.message },
+        );
       })
       .catch(() => {
         if (live)
-          setCalendar({ message: "Your calendar couldn't be read just now." });
+          setRead({
+            from,
+            busy: null,
+            message: "Your calendar couldn't be read just now.",
+          });
       });
     return () => {
       live = false;
@@ -193,21 +216,24 @@ export function CallsWeek({
   };
   const cell = (date: Date, hour: number) => {
     const start = hourAt(date, hour);
-    return { start, ...slotKind(start, start + 3_600_000, meetings, busy, now) };
+    return {
+      start,
+      ...slotKind(start, start + 3_600_000, meetings, busy, now),
+    };
   };
 
-  const block = (
-    date: Date,
-    hour: number,
-    phone: boolean,
-  ): ReactNode => {
+  const block = (date: Date, hour: number, phone: boolean): ReactNode => {
     const slot = cell(date, hour);
     const key = `${String(date.getDay())}-${String(hour)}`;
     const base = phone
       ? "flex min-h-[52px] w-full items-center gap-3 rounded-(--cq-radius-lg) border px-3.5 text-start text-sm"
       : "absolute inset-[3px] flex flex-col items-start gap-0.5 rounded-(--cq-radius-md) px-2 py-1.5 text-start text-xs transition-[background-color,border-color,color] duration-(--cq-motion-fast)";
     const time = (
-      <b className={phone ? "w-[52px] flex-none font-semibold tabular-nums" : "sr-only"}>
+      <b
+        className={
+          phone ? "w-[52px] flex-none font-semibold tabular-nums" : "sr-only"
+        }
+      >
         {hourLabel(hour)}
       </b>
     );
@@ -215,8 +241,7 @@ export function CallsWeek({
       const meeting = slot.meeting;
       // Only its first hour carries the words; the rest is the same block.
       const first =
-        Date.parse(meeting.startsAt) >= slot.start ||
-        hour === HOURS[0];
+        Date.parse(meeting.startsAt) >= slot.start || hour === HOURS[0];
       const invited = sent.has(meeting.id) || meeting.status === "SCHEDULING";
       return (
         <button
@@ -266,7 +291,10 @@ export function CallsWeek({
     if (slot.kind === "past") {
       return phone ? (
         <div
-          className={cx(base, "border-(--cq-border-subtle) text-(--cq-text-tertiary)")}
+          className={cx(
+            base,
+            "border-(--cq-border-subtle) text-(--cq-text-tertiary)",
+          )}
           data-slot="past"
         >
           {time}
@@ -307,7 +335,11 @@ export function CallsWeek({
   };
 
   const weekWords =
-    offset === 0 ? "This week" : offset === 1 ? "Next week" : `Week of ${WHEN.format(monday)}`;
+    offset === 0
+      ? "This week"
+      : offset === 1
+        ? "Next week"
+        : `Week of ${WHEN.format(monday)}`;
 
   return (
     <section
@@ -333,7 +365,11 @@ export function CallsWeek({
             aria-label={t("Previous week")}
             disabled={offset === 0}
             onClick={() => setOffset((o) => Math.max(0, o - 1))}
-            className={buttonClassName("quiet", "compact", "size-11 px-0 lg:size-9")}
+            className={buttonClassName(
+              "quiet",
+              "compact",
+              "size-11 px-0 lg:size-9",
+            )}
           >
             <ChevronLeft size={ICON_SIZE.compact} aria-hidden="true" />
           </button>
@@ -342,7 +378,11 @@ export function CallsWeek({
             aria-label={t("Next week")}
             disabled={offset >= 3}
             onClick={() => setOffset((o) => Math.min(3, o + 1))}
-            className={buttonClassName("quiet", "compact", "size-11 px-0 lg:size-9")}
+            className={buttonClassName(
+              "quiet",
+              "compact",
+              "size-11 px-0 lg:size-9",
+            )}
           >
             <ChevronRight size={ICON_SIZE.compact} aria-hidden="true" />
           </button>
@@ -377,7 +417,8 @@ export function CallsWeek({
         <div className="border-b border-(--cq-border-subtle) bg-(--cq-surface)" />
         {days.map((date) => {
           const today = date.toDateString() === todayKey;
-          const tomorrow = new Date(now + 86_400_000).toDateString() === date.toDateString();
+          const tomorrow =
+            new Date(now + 86_400_000).toDateString() === date.toDateString();
           return (
             <div
               key={date.toISOString()}
@@ -393,7 +434,11 @@ export function CallsWeek({
                   ? t("Today")
                   : tomorrow
                     ? t("Tomorrow")
-                    : t(new Intl.DateTimeFormat("en-GB", { month: "short" }).format(date))}
+                    : t(
+                        new Intl.DateTimeFormat("en-GB", {
+                          month: "short",
+                        }).format(date),
+                      )}
               </span>
             </div>
           );
@@ -438,7 +483,9 @@ export function CallsWeek({
               )}
             >
               <b className="text-[15px]">{t(DAY_HEAD.format(date))}</b>
-              {t(`${String(date.getDate())} ${new Intl.DateTimeFormat("en-GB", { month: "short" }).format(date)}`)}
+              {t(
+                `${String(date.getDate())} ${new Intl.DateTimeFormat("en-GB", { month: "short" }).format(date)}`,
+              )}
             </button>
           ))}
         </div>
@@ -477,7 +524,9 @@ export function CallsWeek({
         onClose={() => setOpen(null)}
         onCancelled={(id) => {
           setMeetings((current) =>
-            current.map((m) => (m.id === id ? { ...m, status: "CANCELLED" } : m)),
+            current.map((m) =>
+              m.id === id ? { ...m, status: "CANCELLED" } : m,
+            ),
           );
           setOpen(null);
           setNotice("Cancelled. Everyone invited has been told.");
@@ -618,19 +667,24 @@ function MeetingSheet({
   readonly onCancelled: (id: string) => void;
 }) {
   const t = useT();
-  const [brief, setBrief] = useState<string | null>(null);
+  const [briefRead, setBrief] = useState<{
+    readonly id: string;
+    readonly body: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const id = meeting?.id ?? null;
   const hasBrief = meeting?.hasBrief === true;
 
+  const brief =
+    briefRead !== null && briefRead.id === id ? briefRead.body : null;
+
   useEffect(() => {
-    setBrief(null);
     if (id === null || !hasBrief) return;
     let live = true;
     void meetingBriefAction(id)
       .then((result) => {
-        if (live && result.ok) setBrief(result.value.body);
+        if (live && result.ok) setBrief({ id, body: result.value.body });
       })
       .catch(() => undefined);
     return () => {

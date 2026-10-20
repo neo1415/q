@@ -36,14 +36,13 @@ export function inboxRows(
       const matched = isMatchedRelationshipState(item.state);
       const latest = briefs.get(item.relationshipId)?.messages.latest;
       const message = latest?.status === "OK" ? latest.message : null;
-      const preview =
-        !matched
-          ? item.state === "INTEREST_EXPRESSED"
-            ? `Interest sent ${formatStamp(item.stateSince)}`
-            : STATE_WORDS[item.state]
-          : message === null
-            ? "No messages yet"
-            : `${message.from === "YOU" ? "You" : message.senderName}: ${message.preview ?? ""}`;
+      const preview = !matched
+        ? item.state === "INTEREST_EXPRESSED"
+          ? `Interest sent ${formatStamp(item.stateSince)}`
+          : STATE_WORDS[item.state]
+        : message === null
+          ? "No messages yet"
+          : `${message.from === "YOU" ? "You" : message.senderName}: ${message.preview ?? ""}`;
       return {
         relationshipId: item.relationshipId,
         name: item.counterpart.name,
@@ -60,4 +59,3 @@ export function inboxRows(
     })
     .toSorted((a, b) => Date.parse(b.at) - Date.parse(a.at));
 }
-
