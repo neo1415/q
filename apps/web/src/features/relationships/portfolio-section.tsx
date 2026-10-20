@@ -202,18 +202,15 @@ function totalLine(
     totals.known.length === 0
       ? t("No amount is recorded yet.")
       : t(`Known total: ${moneyList(totals.known)}.`);
-  const gaps = [
-    totals.unrecorded === 0
-      ? null
+  const gap =
+    totals.unread > 0
+      ? t("Some amounts aren't read here, so the total is incomplete.")
       : totals.unrecorded === 1
-        ? t("One amount is not recorded")
-        : t(`${String(totals.unrecorded)} amounts are not recorded`),
-    totals.unread === 0
-      ? null
-      : totals.unread === 1
-        ? t("one isn't read here")
-        : t(`${String(totals.unread)} aren't read here`),
-  ].filter((part): part is string => part !== null);
-  if (gaps.length === 0) return known;
-  return `${known} ${gaps.join(t(", and "))}${t(", so the total is incomplete.")}`;
+        ? t("One amount is not recorded, so the total is incomplete.")
+        : totals.unrecorded > 1
+          ? t(
+              `${String(totals.unrecorded)} amounts are not recorded, so the total is incomplete.`,
+            )
+          : null;
+  return gap === null ? known : `${known} ${gap}`;
 }
