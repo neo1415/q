@@ -1,4 +1,5 @@
 import type { PresenceSim } from "./presence-dynamics";
+import { presenceLighting } from "./presence-uniforms";
 
 /**
  * The 2D swarm (PRESENCE spec §6), now the fallback (ADR 0049): where
@@ -59,6 +60,12 @@ export type DrawOptions = {
   readonly pixels: number;
   readonly colour: Rgb;
   readonly dim: boolean;
+  /**
+   * The surface behind Q is dark. The 2D swarm already draws "over"
+   * (canvas source-over), so on paper it is ink; it only gains the same
+   * weight per point the 3D swarm does (presenceLighting).
+   */
+  readonly dark?: boolean | undefined;
 };
 
 let points = new Float32Array(0);
@@ -74,8 +81,9 @@ export function layoutPoints(
   const unit = half / FRAME_HALF_UNITS;
   // Small surfaces get relatively larger points, so they still read.
   const base = Math.max(1.6, options.pixels / 150);
-  const fade = options.dim ? 0.45 : 1;
-  const floor = 0.25;
+  const lighting = presenceLighting(options.dark !== false);
+  const fade = (options.dim ? 0.45 : 1) * lighting.weight;
+  const floor = Math.max(0.25, lighting.floor);
   for (let i = 0; i < n; i += 1) {
     const depth = Math.max(-1, Math.min(1, sim.z[i] ?? 0));
     const light = Math.max(0, Math.min(1.3, sim.b[i] ?? 0));

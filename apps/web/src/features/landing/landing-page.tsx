@@ -50,7 +50,7 @@ const hanken = localFont({
  */
 export function LandingPage() {
   return (
-    <div className={`lp cq-landing ${hanken.variable}`}>
+    <div className={`lp cq-landing cq-cinema ${hanken.variable}`}>
       {/* An installed launch never sees this page (src/auth/landing-route.ts). */}
       <script dangerouslySetInnerHTML={{ __html: PWA_STANDALONE_SCRIPT }} />
       <PublicBrandStyle />

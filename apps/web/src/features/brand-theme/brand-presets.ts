@@ -68,7 +68,11 @@ export type PresetChrome = {
   readonly soft: string;
 };
 
-/** The Q stage (the Q page and Discover's player), dark in both themes. */
+/**
+ * The night: the Q stage in the dark theme, and the cinema (Discover's
+ * player, Explore's tiles, every video frame) in both. The light theme's
+ * stage is paper, derived from the light mode itself (presetPaperStage).
+ */
 export type PresetStage = {
   readonly canvas: string;
   readonly accent: string;
@@ -224,13 +228,21 @@ export function presetStyleSheet(preset: BrandPreset): string {
   if (!values.every((value) => HEX.test(value))) return "";
   const block = (mode: PresetMode) =>
     PRESET_TOKENS.map((token) => `--cq-${token}:${mode[token]};`).join("");
+  const paper = presetPaperStage(light);
+  if (!Object.values(paper).every((value) => HEX.test(value))) return "";
   const root = [
     `--cq-nav-accent:${chrome.accent};`,
-    `--cq-stage-canvas:${stage.canvas};`,
-    `--cq-stage-accent:${stage.accent};`,
-    `--cq-stage-q-light:${stage.qLight};`,
-    `--cq-stage-q-ember:${stage.qEmber};`,
-    `--cq-stage-q-bloom:${stage.qBloom};`,
+    `--cq-night-canvas:${stage.canvas};`,
+    `--cq-night-accent:${stage.accent};`,
+    `--cq-night-q-light:${stage.qLight};`,
+    `--cq-night-q-ember:${stage.qEmber};`,
+    `--cq-night-q-bloom:${stage.qBloom};`,
+    // Light theme: the stage is the preset's own paper. The dark theme
+    // re-points --cq-stage-* at the night (tokens.css), which outranks
+    // this bare :root.
+    ...Object.entries(paper).map(
+      ([token, value]) => `--cq-stage-${token}:${value};`,
+    ),
   ].join("");
   const nav = [
     "color-scheme:dark;",
@@ -261,6 +273,43 @@ export function presetStyleSheet(preset: BrandPreset): string {
     `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.cq-shell-sidebar,.cq-bottom-nav){${nav}}}`,
     `:root[data-theme="dark"] :is(.cq-shell-sidebar,.cq-bottom-nav){${nav}}`,
   ].join("\n");
+}
+
+/** Ink alpha steps on the paper stage (hex alpha suffixes). */
+const PAPER_INK = {
+  surface: "0b", // ~4.5%
+  "surface-strong": "16", // ~8.5%
+  border: "29", // ~16%
+  star: "33", // ~20%
+  "star-faint": "1a", // ~10%
+} as const;
+
+/**
+ * The Q stage on paper (owner 2026-10-20: the Q page follows the theme):
+ * the light page's own canvas and text, wells and stars in its ink at a
+ * whisper, and Q's light as the light theme draws it (ink on paper). Keyed
+ * by the token's name after `--cq-stage-`.
+ */
+export function presetPaperStage(
+  light: PresetMode,
+): Readonly<Record<string, string>> {
+  const ink = light["text-primary"].slice(0, 7);
+  return {
+    canvas: light.canvas,
+    surface: `${ink}${PAPER_INK.surface}`,
+    "surface-strong": `${ink}${PAPER_INK["surface-strong"]}`,
+    border: `${ink}${PAPER_INK.border}`,
+    text: light["text-primary"],
+    "text-muted": light["text-secondary"],
+    accent: light.accent,
+    star: `${ink}${PAPER_INK.star}`,
+    "star-faint": `${ink}${PAPER_INK["star-faint"]}`,
+    veil: `${light.canvas.slice(0, 7)}e0`,
+    "q-light": light["q-light"],
+    "q-sweep": light["q-light"],
+    "q-ember": light["q-ember"],
+    "q-bloom": light["q-bloom"],
+  };
 }
 
 /** One contrast requirement between two colours. */

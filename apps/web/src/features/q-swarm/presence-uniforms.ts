@@ -136,3 +136,58 @@ export function stepLean(
     lean[v] = (c - w * (offset + c * dt)) * decay;
   }
 }
+
+/**
+ * How Q's light meets the surface behind it (owner 2026-10-20: the Q page
+ * follows the theme). On the night the swarm is light: points add up
+ * (additive blending), the dense core whitens and a wide, soft halo shows.
+ * On paper additive light washes out -- white on white is no light at
+ * all -- so the swarm is ink, matching the aperture's --cq-q-ink: 1:
+ * normal ("over") blending so dense points deepen to Q's own colour, no
+ * whitened core, more weight per point, and a tight, faint bloom.
+ * Glow stays on Q only; reduced motion changes how Q moves, not this.
+ */
+export type PresenceLighting = {
+  /** "add": light (ONE, ONE). "over": ink (ONE, ONE_MINUS_SRC_ALPHA). */
+  readonly blend: "add" | "over";
+  /** How far the dense core may whiten, 0..1. */
+  readonly white: number;
+  /** Alpha multiplier on every point (clamped to 1 per point). */
+  readonly weight: number;
+  /**
+   * The faintest a point may be drawn, 0..1, over the figure's own floor:
+   * ink needs a body that light does not, or the dim room Q reads as dust.
+   */
+  readonly floor: number;
+  /** The halo's peak alpha per unit of glow. */
+  readonly halo: number;
+  /** The halo's reach, as a share of half the frame. */
+  readonly haloReach: number;
+  /** Whether the near-white light over Q's centre is drawn. */
+  readonly coreLight: boolean;
+};
+
+export const NIGHT_LIGHTING: PresenceLighting = {
+  blend: "add",
+  white: 1,
+  weight: 1,
+  floor: 0,
+  halo: 0.24,
+  haloReach: 0.98,
+  coreLight: true,
+};
+
+export const PAPER_LIGHTING: PresenceLighting = {
+  blend: "over",
+  white: 0,
+  weight: 1.7,
+  floor: 0.6,
+  halo: 0.05,
+  haloReach: 0.5,
+  coreLight: false,
+};
+
+/** The lighting for a surface: light on the night, ink on paper. */
+export function presenceLighting(dark: boolean): PresenceLighting {
+  return dark ? NIGHT_LIGHTING : PAPER_LIGHTING;
+}

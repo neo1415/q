@@ -13,7 +13,7 @@ export function FeedSkeleton({
 }) {
   return (
     <div
-      className="cq-stage cq-feed cq-feed-skeleton"
+      className="cq-stage cq-cinema cq-feed cq-feed-skeleton"
       data-feed-immersive
       data-feed-loading
       aria-busy="true"

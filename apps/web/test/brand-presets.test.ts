@@ -125,7 +125,13 @@ describe("brand presets", () => {
       ':root[data-theme="dark"] :is(.cq-shell-sidebar,.cq-bottom-nav){',
     );
     expect(css).not.toMatch(/^\.cq-shell-sidebar/mu);
-    expect(css).toContain("--cq-stage-q-light:#e2b858");
+    // The night (dark theme, and the cinema in both) is gold light; the
+    // light theme's stage is the preset's own paper, Q drawn in bronze ink.
+    expect(css).toContain("--cq-night-q-light:#e2b858");
+    expect(css).toContain("--cq-night-canvas:#0b0a08");
+    expect(css).toContain("--cq-stage-canvas:#f6f4ef");
+    expect(css).toContain("--cq-stage-q-light:#8a6a12");
+    expect(css).toContain("--cq-stage-text:#16140f");
     expect(css).not.toMatch(/<\/style|<script/iu);
     expect(presetStyleSheet(CLASSIC_BLUE)).toBe("");
   });
