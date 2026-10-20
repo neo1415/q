@@ -149,18 +149,18 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
     left === 0 ? (
       <div
         role="status"
-        className="cq-stage flex min-h-80 flex-1 items-center justify-center rounded-(--cq-radius-xl) p-8 text-center"
+        className="cq-stage cq-cinema flex min-h-80 flex-1 items-center justify-center rounded-(--cq-radius-xl) p-8 text-center"
       >
         {props.closingNote}
       </div>
     ) : props.joinUrl === null ? (
-      <div className="cq-stage flex min-h-80 flex-1 flex-col items-center justify-center gap-3 rounded-(--cq-radius-xl) p-8 text-center">
+      <div className="cq-stage cq-cinema flex min-h-80 flex-1 flex-col items-center justify-center gap-3 rounded-(--cq-radius-xl) p-8 text-center">
         {props.unavailableNote}
       </div>
     ) : (
       // A floor keeps the room usable on a landscape phone, where the
       // controls and footnote would otherwise squeeze it to a sliver.
-      <div className="cq-stage relative min-h-60 flex-1 overflow-hidden rounded-(--cq-radius-xl)">
+      <div className="cq-stage cq-cinema relative min-h-60 flex-1 overflow-hidden rounded-(--cq-radius-xl)">
         <iframe
           src={
             joinUrlWithName(props.joinUrl, props.participantName ?? "") ??
@@ -176,7 +176,7 @@ export function ProviderVideoRoom(props: ProviderVideoRoomProps) {
 
   return (
     <section
-      className="cq-stage fixed inset-0 z-(--cq-z-modal) flex flex-col gap-4 overflow-y-auto p-4 sm:p-6"
+      className="cq-stage cq-cinema fixed inset-0 z-(--cq-z-modal) flex flex-col gap-4 overflow-y-auto p-4 sm:p-6"
       data-video-room
     >
       <div className="flex flex-wrap items-center justify-between gap-3">

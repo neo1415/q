@@ -1,7 +1,11 @@
 import type { PresenceSim } from "./presence-dynamics";
 import { DEPTH_UNITS } from "./presence-kit";
 import { presenceCounters, type Rgb } from "./presence-gl";
-import type { PresenceUniforms } from "./presence-uniforms";
+import {
+  presenceLighting,
+  type PresenceLighting,
+  type PresenceUniforms,
+} from "./presence-uniforms";
 
 /**
  * Q's presence in 3D (ADR 0049), loaded with a dynamic import so it never
@@ -14,8 +18,10 @@ import type { PresenceUniforms } from "./presence-uniforms";
  * turns that space towards the cursor, projects it in perspective and
  * sizes and lights each point by its depth -- nearer is larger and
  * brighter, the core whitens on a dark surface -- and the fragment shader
- * draws a soft disc. Blending is additive, so the core's density becomes
- * light and the draw order (depth) needs no sort.
+ * draws a soft disc. On a dark surface blending is additive, so the core's
+ * density becomes light; on paper it is normal blending, so the density
+ * becomes ink (presenceLighting). Every point is Q's one colour, so in
+ * either mode the draw order (depth) needs no sort.
  *
  * One WebGL2 context for the whole page, every surface drawn in turn and
  * copied onto its own 2D canvas, as before: a page with five Q surfaces
@@ -69,7 +75,7 @@ void main(){
   float r2=dot(d,d);
   if(r2>1.)discard;
   // A small bright disc with a soft rim: crisp at a distance, never a square.
-  float a=vA*(1.-smoothstep(.25,1.,r2)*.85);
+  float a=min(1.,vA*(1.-smoothstep(.25,1.,r2)*.85));
   vec3 c=mix(uC,uW,clamp(pow(vCore,2.2)*.78,0.,1.)*uWhite);
   o=vec4(c*a,a);
 }`;
@@ -160,8 +166,6 @@ function context(): Gl | null {
   gl.enableVertexAttribArray(aS);
   gl.vertexAttribPointer(aS, 2, gl.FLOAT, false, 0, 0);
   gl.enable(gl.BLEND);
-  // Additive: overlapping points add up to light, in any order.
-  gl.blendFunc(gl.ONE, gl.ONE);
   gl.clearColor(0, 0, 0, 0);
   canvas.addEventListener("webglcontextlost", (event) => {
     event.preventDefault();
@@ -257,9 +261,16 @@ export function drawPresence3d(
   gl.clear(gl.COLOR_BUFFER_BIT);
   const unit = size / 2 / FRAME_HALF_UNITS;
   const [r, gr, b] = options.colour;
-  // On a light surface the core deepens rather than whitening: white
-  // light on white paper is no light at all.
-  const white = options.dark ? 1 : 0;
+  // Light on the night, ink on paper: white light on white paper is no
+  // light at all, so there the core deepens rather than whitening.
+  const lighting = presenceLighting(options.dark);
+  if (lighting.blend === "add") {
+    // Overlapping points add up to light, in any order.
+    gl.blendFunc(gl.ONE, gl.ONE);
+  } else {
+    // Premultiplied "over": overlapping points deepen to Q's colour.
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  }
   gl.uniform2f(g.u["uRes"] ?? null, size, size);
   gl.uniform1f(g.u["uUnit"] ?? null, unit);
   // Point size follows the surface, so a dock swarm still reads.
@@ -268,13 +279,13 @@ export function drawPresence3d(
   gl.uniform2f(g.u["uShift"] ?? null, u.shiftX, u.shiftY);
   gl.uniform1f(g.u["uDepth"] ?? null, DEPTH_UNITS);
   gl.uniform1f(g.u["uKeep"] ?? null, u.keep);
-  gl.uniform1f(g.u["uFade"] ?? null, u.fade * (options.dark ? 1 : 1.25));
+  gl.uniform1f(g.u["uFade"] ?? null, u.fade * lighting.weight);
   gl.uniform1f(g.u["uScale"] ?? null, u.pointScale);
-  gl.uniform1f(g.u["uFloor"] ?? null, u.floor);
+  gl.uniform1f(g.u["uFloor"] ?? null, Math.max(u.floor, lighting.floor));
   gl.uniform1f(g.u["uLift"] ?? null, u.lift);
   gl.uniform3f(g.u["uC"] ?? null, r, gr, b);
   gl.uniform3f(g.u["uW"] ?? null, 1, 0.97, 0.91);
-  gl.uniform1f(g.u["uWhite"] ?? null, white * Math.max(0.5, u.core));
+  gl.uniform1f(g.u["uWhite"] ?? null, lighting.white * Math.max(0.5, u.core));
   gl.bindBuffer(gl.ARRAY_BUFFER, g.points);
   gl.bufferData(gl.ARRAY_BUFFER, points.subarray(0, n * 4), gl.STREAM_DRAW);
   // Surfaces with different counts share the seed buffer: re-sent only
@@ -288,29 +299,44 @@ export function drawPresence3d(
 
   target.setTransform(1, 0, 0, 1, 0, 0);
   target.clearRect(0, 0, size, size);
-  if (options.bloom && u.glow > 0) halo(target, size, unit, options, u);
+  if (options.bloom && u.glow > 0) {
+    halo(target, size, unit, options.colour, lighting, u);
+  }
   target.drawImage(canvas, 0, 0, size, size, 0, 0, size, size);
-  if (options.bloom && options.dark && u.glow > 0) core(target, size, unit, u);
+  if (options.bloom && lighting.coreLight && u.glow > 0) {
+    core(target, size, unit, u);
+  }
   presenceCounters.frames += 1;
   presenceCounters.renderer = "3d";
   return true;
 }
 
-/** The soft light behind Q, in Q's own hue, fading to nothing at the edge. */
+/**
+ * The soft light behind Q, in Q's own hue, fading to nothing at the edge:
+ * wide on the night, tight and faint on paper.
+ */
 function halo(
   target: CanvasRenderingContext2D,
   size: number,
   unit: number,
-  options: Draw3dOptions,
+  colour: Rgb,
+  lighting: PresenceLighting,
   u: PresenceUniforms,
 ): void {
   const half = size / 2;
   const x = half + u.shiftX * unit;
   const y = half + u.shiftY * unit;
-  const [r, g, b] = options.colour.map((c) => Math.round(c * 255));
+  const [r, g, b] = colour.map((c) => Math.round(c * 255));
   const rgb = `${String(r)},${String(g)},${String(b)}`;
-  const strength = (options.dark ? 0.24 : 0.1) * u.glow;
-  const gradient = target.createRadialGradient(x, y, 0, x, y, half * 0.98);
+  const strength = lighting.halo * u.glow;
+  const gradient = target.createRadialGradient(
+    x,
+    y,
+    0,
+    x,
+    y,
+    half * lighting.haloReach,
+  );
   gradient.addColorStop(0, `rgba(${rgb},${String(strength)})`);
   gradient.addColorStop(0.35, `rgba(${rgb},${String(strength * 0.38)})`);
   gradient.addColorStop(1, `rgba(${rgb},0)`);

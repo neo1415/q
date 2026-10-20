@@ -265,6 +265,52 @@ describe("the component: fallback and pause", () => {
     expect(frames.size).toBe(1);
   });
 
+  it("redraws for a theme switch with no reload: a chosen theme or the device's", async () => {
+    // Owner 2026-10-20: the Q page follows the theme, so the swarm must
+    // re-read paper or night the moment either changes.
+    const schemeListeners = new Set<() => void>();
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: (_type: string, listener: () => void) => {
+        if (query.includes("prefers-color-scheme")) {
+          schemeListeners.add(listener);
+        }
+      },
+      removeEventListener: (_type: string, listener: () => void) => {
+        schemeListeners.delete(listener);
+      },
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: () => true,
+    }));
+    window.localStorage.setItem(Q_MOTION_STORAGE_KEY, "calm");
+    const { container, unmount } = render(<QSwarm state="IDLE" pixels={96} />);
+    const canvas = container.querySelector("canvas");
+    await waitFor(() => expect(canvas?.dataset["qRenderer"]).toBe("2d"));
+    act(() => runFrames(1));
+    // A still presence asks for nothing until something changes.
+    expect(frames.size).toBe(0);
+    expect(schemeListeners.size).toBe(1);
+
+    // The device switches (theme "system").
+    act(() => {
+      for (const listener of schemeListeners) listener();
+    });
+    expect(frames.size).toBe(1);
+    act(() => runFrames(1));
+    expect(frames.size).toBe(0);
+
+    // The person picks a theme: `data-theme` on the root.
+    document.documentElement.setAttribute("data-theme", "dark");
+    await waitFor(() => expect(frames.size).toBe(1));
+    document.documentElement.removeAttribute("data-theme");
+
+    unmount();
+    expect(schemeListeners.size).toBe(0);
+  });
+
   it("under reduced motion draws a still and schedules no animation", async () => {
     window.localStorage.setItem(Q_MOTION_STORAGE_KEY, "calm");
     const { container } = render(<QSwarm state="IDLE" pixels={96} />);

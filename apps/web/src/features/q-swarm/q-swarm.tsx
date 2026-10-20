@@ -176,14 +176,24 @@ export function QSwarm({
     let onScreen = true;
     const redraw = () => loop.set(inputs());
 
-    const themeWatch = new MutationObserver(() => {
+    // The theme switches live (owner 2026-10-20: the Q page follows it):
+    // a chosen theme is `data-theme` on the root; "system" follows the
+    // device, which can change under an open page. Either way the swarm
+    // re-reads its colour and whether it now sits on paper or the night.
+    const retheme = () => {
       const next = readColour();
       loop.setColour(next.colour, next.dark);
-    });
+    };
+    const themeWatch = new MutationObserver(retheme);
     themeWatch.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ["data-theme", "data-q-mood"],
     });
+    const scheme =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(prefers-color-scheme: dark)")
+        : null;
+    scheme?.addEventListener("change", retheme);
     window.addEventListener("pointermove", onPointer, { passive: true });
     window.addEventListener("pointerdown", onPointer, { passive: true });
     window.addEventListener("pointerup", onPointerGone, { passive: true });
@@ -210,6 +220,7 @@ export function QSwarm({
       document.removeEventListener("pointerout", onPointerGone);
       canvas.removeEventListener("cq:redraw", redraw);
       themeWatch.disconnect();
+      scheme?.removeEventListener("change", retheme);
       visibility.disconnect();
       document.removeEventListener("visibilitychange", onHidden);
       loop.dispose();
