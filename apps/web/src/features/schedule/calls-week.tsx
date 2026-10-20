@@ -119,10 +119,18 @@ export function CallsWeek({
   relationshipId,
   counterpart,
   initialMeetings,
+  initialBusy,
 }: {
   readonly relationshipId: string;
   readonly counterpart: string;
   readonly initialMeetings: readonly MeetingDto[];
+  /**
+   * Design review only (/dev/crm): this week's busy times, given, so the
+   * calendar paints without reading. Other weeks still read.
+   */
+  readonly initialBusy?:
+    | readonly { readonly startsAt: string; readonly endsAt: string }[]
+    | undefined;
 }) {
   const t = useT();
   const [meetings, setMeetings] = useState(initialMeetings);
@@ -146,7 +154,19 @@ export function CallsWeek({
   const from = monday?.getTime() ?? null;
   const today = now === null ? 0 : (new Date(now).getDay() + 6) % 7;
   const day = dayChoice ?? (today < DAYS ? today : 0);
-  const current = read !== null && read.from === from ? read : null;
+  // A design review's busy times stand for this week; nothing is read.
+  const given =
+    initialBusy !== undefined && offset === 0 && from !== null
+      ? {
+          from,
+          busy: initialBusy.map((b) => ({
+            start: Date.parse(b.startsAt),
+            end: Date.parse(b.endsAt),
+          })),
+          message: null,
+        }
+      : null;
+  const current = given ?? (read !== null && read.from === from ? read : null);
   const busy = current?.busy ?? null;
   const calendar =
     current === null
@@ -157,6 +177,7 @@ export function CallsWeek({
 
   useEffect(() => {
     if (from === null) return;
+    if (initialBusy !== undefined && offset === 0) return;
     let live = true;
     const to = new Date(from);
     to.setDate(to.getDate() + DAYS);
@@ -192,7 +213,7 @@ export function CallsWeek({
     return () => {
       live = false;
     };
-  }, [relationshipId, from]);
+  }, [relationshipId, from, initialBusy, offset]);
 
   if (monday === null || now === null) {
     return (

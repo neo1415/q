@@ -78,7 +78,15 @@ export async function RelationshipInbox({
   basePath,
   stateLine,
   showList,
+  given,
 }: {
+  /** Design review only (/dev/crm): the side's conversations, given. */
+  readonly given?:
+    | {
+        readonly side: "INVESTOR" | "COMPANY" | "NONE";
+        readonly rows: readonly InboxRow[] | undefined;
+      }
+    | undefined;
   readonly counterpart: string;
   readonly relationship: RelationshipStatusDto;
   readonly profile: CounterpartProfile;
@@ -90,7 +98,7 @@ export async function RelationshipInbox({
   readonly showList: boolean;
 }) {
   const t = serverTNow();
-  const { side, rows } = await loadRows();
+  const { side, rows } = given ?? (await loadRows());
   const matched = isMatchedRelationshipState(relationship.state);
   const listHref = `${basePath}/messages?inbox=1`;
 

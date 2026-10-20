@@ -92,12 +92,15 @@ async function fitOf(
 
 export async function MandateObservation({
   relationships,
+  given,
 }: {
   readonly relationships: readonly RelationshipSummaryDto[] | undefined;
+  /** Design review only (/dev/crm): the fit profiles, given. */
+  readonly given?: readonly FitProfileDto[] | undefined;
 }) {
   const t = await serverT();
   if (relationships === undefined) return null;
-  const seen = mandateObservation(await fitOf(relationships));
+  const seen = mandateObservation(given ?? (await fitOf(relationships)));
   if (seen === null) return null;
   const words = WORDS[seen.dimension];
   return (
@@ -128,16 +131,24 @@ export async function MandateObservation({
   );
 }
 
-/** Saved companies, as a card that opens them; unknown is not "0 saved". */
-export async function SavedCompaniesCard() {
-  const t = await serverT();
+async function savedCount(): Promise<number | null> {
   const session = await apiSession();
-  const saved =
-    session === null
-      ? null
-      : await listSavedCompanies(session)
-          .then((list) => list.companyIds.length)
-          .catch(() => null);
+  return session === null
+    ? null
+    : listSavedCompanies(session)
+        .then((list) => list.companyIds.length)
+        .catch(() => null);
+}
+
+/** Saved companies, as a card that opens them; unknown is not "0 saved". */
+export async function SavedCompaniesCard({
+  given,
+}: {
+  /** Design review only (/dev/crm): the count, given (null: unread). */
+  readonly given?: number | null;
+} = {}) {
+  const t = await serverT();
+  const saved = given !== undefined ? given : await savedCount();
   return (
     <Link
       href="/discover/saved"

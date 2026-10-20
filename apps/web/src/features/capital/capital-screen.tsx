@@ -5,7 +5,14 @@ import {
   ApiProblemError,
   getCurrentCapitalObjective,
 } from "@capital-q/api-client";
-import type { CapitalObjectiveDto } from "@capital-q/contracts";
+import type {
+  CapitalLedgerDto,
+  CapitalObjectiveDto,
+  FitProfileDto,
+  InvestorMandateDto,
+  MyCommitmentsDto,
+  ReadinessDto,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { PageSection } from "@/components/app-shell/page-container";
@@ -51,6 +58,7 @@ import { MandateSummary } from "./mandate-summary";
 import { RaiseTerms } from "./raise-terms";
 import {
   type BlueprintHorizon,
+  type BlueprintLoad,
   horizonFrom,
   ReadinessBlueprintSection,
 } from "./readiness-blueprint";
@@ -91,6 +99,44 @@ const ledgerOf = cache(founderLedger);
 const readinessOf = cache(ownReadiness);
 const objectiveOf = cache(currentObjective);
 const relationshipsOf = cache(ownRelationships);
+
+/** Every read the screen makes, so a design review can hand them in. */
+export type CapitalReads = {
+  readonly ledger: (companyId: string) => Promise<CapitalLedgerDto | null>;
+  readonly readiness: () => Promise<ReadinessDto | null>;
+  readonly objective: (
+    companyId: string,
+  ) => Promise<CapitalObjectiveDto | null>;
+  readonly relationships: (
+    context: OwnContext,
+  ) => ReturnType<typeof ownRelationships>;
+  readonly mine: () => Promise<MyCommitmentsDto | null>;
+};
+
+const LIVE: CapitalReads = {
+  ledger: ledgerOf,
+  readiness: readinessOf,
+  objective: objectiveOf,
+  relationships: relationshipsOf,
+  mine: investorCommitments,
+};
+
+/**
+ * The design-review harness (/dev/crm) only: the context and every answer
+ * the screen would read, given, so it renders without a session. Absent in
+ * the product, where every read is the person's own.
+ */
+export type CapitalReview = {
+  readonly context: OwnContext;
+  readonly reads: CapitalReads;
+  readonly blueprint: BlueprintLoad;
+  readonly mandate: {
+    readonly mandate: InvestorMandateDto | null | undefined;
+    readonly labels: ReadonlyMap<string, string>;
+  };
+  readonly fit: readonly FitProfileDto[];
+  readonly saved: number | null;
+};
 
 const FOUNDER_ASKS = [
   {
@@ -135,7 +181,10 @@ export async function CapitalScreen({
   hadTabParam = false,
   horizon,
   inCrm = false,
+  review,
 }: {
+  /** Design review only: the context and reads, given (see CapitalReview). */
+  readonly review?: CapitalReview | undefined;
   /**
    * Shown as the CRM's Capital tab: the relationships list is the CRM's
    * own Pipeline there, so it is not repeated under the investor's book.
@@ -149,7 +198,8 @@ export async function CapitalScreen({
   readonly horizon?: string | undefined;
 } = {}) {
   const t = await serverT();
-  const context = await resolveOwnContext();
+  const context = review?.context ?? (await resolveOwnContext());
+  const reads = review?.reads ?? LIVE;
   if (context.kind === "FOUNDER") {
     const companyId = context.companyId;
     return (
@@ -160,17 +210,17 @@ export async function CapitalScreen({
           badges={{
             raise: (
               <Suspense fallback={null}>
-                <RaiseBadge companyId={companyId} />
+                <RaiseBadge companyId={companyId} reads={reads} />
               </Suspense>
             ),
             readiness: (
               <Suspense fallback={null}>
-                <ReadinessBadge />
+                <ReadinessBadge reads={reads} />
               </Suspense>
             ),
             "action-plan": (
               <Suspense fallback={null}>
-                <NowBadge />
+                <NowBadge reads={reads} />
               </Suspense>
             ),
           }}
@@ -186,6 +236,8 @@ export async function CapitalScreen({
               tab={tab}
               context={context}
               horizon={horizonFrom(horizon)}
+              reads={reads}
+              blueprint={review?.blueprint}
             />
           </Suspense>
         </div>
@@ -194,8 +246,8 @@ export async function CapitalScreen({
   }
 
   const [relationships, mine] = await Promise.all([
-    relationshipsOf(context),
-    context.kind === "INVESTOR" ? investorCommitments() : Promise.resolve(null),
+    reads.relationships(context),
+    context.kind === "INVESTOR" ? reads.mine() : Promise.resolve(null),
   ]);
   // Invested with no commitment recorded at all: an unknown amount, said
   // and recordable, never a zero (design 2026-10-20).
@@ -236,12 +288,18 @@ export async function CapitalScreen({
               >
                 <MandateSummary
                   investorOrganisationId={context.investorOrganisationId}
+                  given={review?.mandate}
                 />
                 <Suspense fallback={null}>
-                  <MandateObservation relationships={relationships} />
+                  <MandateObservation
+                    relationships={relationships}
+                    given={review?.fit}
+                  />
                 </Suspense>
                 <Suspense fallback={null}>
-                  <SavedCompaniesCard />
+                  <SavedCompaniesCard
+                    {...(review === undefined ? {} : { given: review.saved })}
+                  />
                 </Suspense>
                 <AskQChips asks={INVESTOR_ASKS} />
               </aside>
@@ -298,17 +356,23 @@ export async function FounderTab({
   tab,
   context,
   horizon,
+  reads = LIVE,
+  blueprint,
 }: {
   readonly tab: CapitalTab;
   readonly context: FounderContext;
   readonly horizon: BlueprintHorizon;
+  /** The reads (the person's own unless a design review hands them in). */
+  readonly reads?: CapitalReads | undefined;
+  /** Design review only: the plan, given. */
+  readonly blueprint?: BlueprintLoad | undefined;
 }) {
   const t = await serverT();
   switch (tab) {
     case "overview": {
       const [ledger, readiness] = await Promise.all([
-        ledgerOf(context.companyId),
-        readinessOf(),
+        reads.ledger(context.companyId),
+        reads.readiness(),
       ]);
       return (
         <div className="flex flex-col gap-[22px]" data-capital-overview>
@@ -325,9 +389,9 @@ export async function FounderTab({
     }
     case "raise": {
       const [objective, relationships, ledger] = await Promise.all([
-        objectiveOf(context.companyId),
-        relationshipsOf(context),
-        ledgerOf(context.companyId),
+        reads.objective(context.companyId),
+        reads.relationships(context),
+        reads.ledger(context.companyId),
       ]);
       return (
         <PageSection id="rounds" title={t("Your raise")}>
@@ -373,7 +437,7 @@ export async function FounderTab({
     }
     // Q.03/Q.04: founder-private (docs/design/2026-10-07/founder-readiness).
     case "readiness": {
-      const readiness = await readinessOf();
+      const readiness = await reads.readiness();
       return (
         <PageSection
           id="readiness"
@@ -394,7 +458,7 @@ export async function FounderTab({
       );
     }
     case "action-plan": {
-      const readiness = await readinessOf();
+      const readiness = await reads.readiness();
       return (
         <PageSection
           id="action-plan"
@@ -421,10 +485,11 @@ export async function FounderTab({
         <ReadinessBlueprintSection
           companyId={context.companyId}
           horizon={horizon}
+          given={blueprint}
         />
       );
     case "investors": {
-      const relationships = await relationshipsOf(context);
+      const relationships = await reads.relationships(context);
       return <InvestorsCard relationships={relationships} />;
     }
   }
@@ -519,8 +584,14 @@ async function InvestorsCard({
 }
 
 /** Raise & rounds: commitments waiting on the founder. */
-async function RaiseBadge({ companyId }: { readonly companyId: string }) {
-  const ledger = await ledgerOf(companyId);
+async function RaiseBadge({
+  companyId,
+  reads,
+}: {
+  readonly companyId: string;
+  readonly reads: CapitalReads;
+}) {
+  const ledger = await reads.ledger(companyId);
   const count = ledger === null ? 0 : needsYouCount(ledger);
   return count === 0 ? null : (
     <TabBadge
@@ -531,8 +602,8 @@ async function RaiseBadge({ companyId }: { readonly companyId: string }) {
 }
 
 /** Readiness: what could stop the raise. */
-async function ReadinessBadge() {
-  const readiness = await readinessOf();
+async function ReadinessBadge({ reads }: { readonly reads: CapitalReads }) {
+  const readiness = await reads.readiness();
   const count = readiness === null ? 0 : readiness.blockers.length;
   return count === 0 ? null : (
     <TabBadge
@@ -543,8 +614,8 @@ async function ReadinessBadge() {
 }
 
 /** Action plan: open steps in Now. */
-async function NowBadge() {
-  const readiness = await readinessOf();
+async function NowBadge({ reads }: { readonly reads: CapitalReads }) {
+  const readiness = await reads.readiness();
   const count = readiness === null ? 0 : nowCount(readiness);
   return count === 0 ? null : (
     <TabBadge

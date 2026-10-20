@@ -97,11 +97,22 @@ async function labelsFor(
 
 export async function MandateSummary({
   investorOrganisationId,
+  given,
 }: {
   readonly investorOrganisationId: string;
+  /** Design review only (/dev/crm): the mandate and its labels, given. */
+  readonly given?:
+    | {
+        readonly mandate: InvestorMandateDto | null | undefined;
+        readonly labels: ReadonlyMap<string, string>;
+      }
+    | undefined;
 }) {
   const t = await serverT();
-  const mandate = await activeMandate(investorOrganisationId);
+  const mandate =
+    given === undefined
+      ? await activeMandate(investorOrganisationId)
+      : given.mandate;
   if (mandate === undefined) {
     return (
       <div
@@ -140,7 +151,7 @@ export async function MandateSummary({
       </div>
     );
   }
-  const labels = await labelsFor(mandate);
+  const labels = given?.labels ?? (await labelsFor(mandate));
   // F6 (2026-10-08): business models and customer types are business
   // attributes, not sectors.
   const kindOf = (code: string) =>

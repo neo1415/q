@@ -107,12 +107,15 @@ export function stepMeta(step: BlueprintStep): string {
 export async function ReadinessBlueprintSection({
   companyId,
   horizon,
+  given,
 }: {
   readonly companyId: string;
   readonly horizon: BlueprintHorizon;
+  /** Design review only (/dev/crm): the plan, given. */
+  readonly given?: BlueprintLoad | undefined;
 }) {
   const t = await serverT();
-  const load = await loadBlueprint(companyId, horizon);
+  const load = given ?? (await loadBlueprint(companyId, horizon));
   if (load.kind === "NOT_ON_PLAN") return <ReadinessBlueprintEntry />;
   return (
     <PageSection

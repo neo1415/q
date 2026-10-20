@@ -933,6 +933,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/profile": exempt(
     "development-only page (design review, fictional data)",
   ),
+  "/dev/crm": exempt("development-only page"),
   "/dev/presence": exempt("development-only page"),
   "/dev/work": exempt("development-only page"),
   "/dev/briefing": exempt("development-only page"),

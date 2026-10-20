@@ -54,13 +54,18 @@ function newKey(): string {
 export function RelationshipCommitment({
   relationshipId,
   counterpart,
+  initial = null,
 }: {
   readonly relationshipId: string;
   readonly counterpart: string;
+  /** For the design harness: a read to render without reading. */
+  readonly initial?: RelationshipCommitmentsDto | null | undefined;
 }) {
   const t = useT();
 
-  const [state, setState] = useState<RelationshipCommitmentsDto | null>(null);
+  const [state, setState] = useState<RelationshipCommitmentsDto | null>(
+    initial,
+  );
   const [editing, setEditing] = useState(false);
   const [money, setMoney] = useState<MoneyValue>({
     amount: "",
@@ -71,6 +76,7 @@ export function RelationshipCommitment({
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
+    if (initial !== null) return;
     let live = true;
     void readCommitmentsAction(relationshipId).then((result) => {
       if (live && result.ok) setState(result.value);
@@ -78,7 +84,7 @@ export function RelationshipCommitment({
     return () => {
       live = false;
     };
-  }, [relationshipId]);
+  }, [relationshipId, initial]);
 
   if (state === null || !state.connected) return null;
   const current = state.current;

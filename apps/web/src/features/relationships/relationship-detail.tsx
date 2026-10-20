@@ -4,9 +4,11 @@ import type { ReactNode } from "react";
 import {
   isMatchedRelationshipState,
   type ChatThreadDto,
+  type DealViewDto,
   type DiligenceDto,
   type MeetingDto,
   type RelationshipBrief,
+  type RelationshipCommitmentsDto,
   type RelationshipStatusDto,
 } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
@@ -136,7 +138,18 @@ export function RelationshipDetail({
   gateq = null,
   notes = null,
   decision = null,
+  review,
 }: {
+  /**
+   * Design review only (/dev/crm): the deal and the commitment, given, so
+   * their cards render without reading. Absent in the product.
+   */
+  readonly review?:
+    | {
+        readonly deal: DealViewDto;
+        readonly commitments: RelationshipCommitmentsDto;
+      }
+    | undefined;
   readonly side: RelationshipSide;
   readonly counterpart: string;
   readonly relationship: RelationshipStatusDto | null;
@@ -253,6 +266,7 @@ export function RelationshipDetail({
               <DealSummary
                 relationshipId={relationship.relationshipId}
                 href={`${basePath}/deal`}
+                initial={review?.deal}
               />
             </RecCard>
           )}
@@ -277,6 +291,7 @@ export function RelationshipDetail({
               <RelationshipCommitment
                 relationshipId={relationship.relationshipId}
                 counterpart={counterpart}
+                initial={review?.commitments}
               />
             </RecCard>
           ) : null}

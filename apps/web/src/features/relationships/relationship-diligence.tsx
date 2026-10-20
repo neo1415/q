@@ -307,12 +307,18 @@ export function RelationshipDiligence({
   counterpart,
   initial,
   now,
+  initialQuestions,
 }: {
   readonly relationshipId: string;
   readonly companyId: string;
   readonly counterpart: string;
   readonly initial: DiligenceDto;
   readonly now: number;
+  /**
+   * Design review only (/dev/crm): Q's open questions, given, so "not
+   * asked" paints without reading Q's view.
+   */
+  readonly initialQuestions?: readonly string[] | undefined;
 }) {
   const t = useT();
 
@@ -335,12 +341,14 @@ export function RelationshipDiligence({
   const [reminding, setReminding] = useState<DiligenceRequest | null>(null);
   // Q's open questions on this company, asked after the list has rendered,
   // never on the critical path; unknown when Q has no view.
-  const [questions, setQuestions] = useState<readonly string[]>([]);
+  const [questions, setQuestions] = useState<readonly string[]>(
+    initialQuestions ?? [],
+  );
 
   const founder = area.side === "COMPANY";
 
   useEffect(() => {
-    if (founder) return;
+    if (founder || initialQuestions !== undefined) return;
     let live = true;
     void fitQViewAction(companyId)
       .then((view) => {
@@ -352,7 +360,7 @@ export function RelationshipDiligence({
     return () => {
       live = false;
     };
-  }, [companyId, founder]);
+  }, [companyId, founder, initialQuestions]);
 
   useEffect(() => {
     if (founder || !area.open) return;
