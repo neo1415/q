@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useCallback,
   useEffect,
   useRef,
@@ -13,16 +14,15 @@ import {
 import type { ChatMessageDto, ChatThreadDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import {
-  ArrowUp,
+  Send,
   FileText,
   ICON_SIZE,
   Play,
-  Plus,
   Upload,
 } from "@capital-q/ui/icons";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
-import { EntityAvatar } from "@/features/entity/entity-avatar";
+import { QCircle, TILE } from "@/features/relationships/record-parts";
 import { QAperture } from "@/features/q-aperture";
 import {
   materialUploadCompleteAction,
@@ -46,6 +46,7 @@ import {
 import { useFollowNewest } from "@/features/q/follow-newest";
 import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 
+import { startReplyDraftAction, readReplyDraftAction } from "./reply-draft-actions";
 import { VoiceRecorder } from "./voice-recorder";
 import { useT } from "@/features/i18n/language";
 
@@ -105,6 +106,32 @@ function blockedNotice(byYourSide: boolean): string {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** How long a reply draft is waited for: about half a minute. */
+const DRAFT_POLLS = 20;
+
+/** "Wednesday 15 Oct" or "Today": the day a run of messages was sent. */
+export function dayMarker(iso: string, now: Date = new Date()): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return "";
+  if (at.toDateString() === now.toDateString()) return "Today";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (at.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    ...(at.getFullYear() === now.getFullYear()
+      ? {}
+      : { year: "numeric" as const }),
+  }).format(at);
+}
+
+const TIME_ONLY = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
 export function RelationshipChat({
   relationshipId,
   counterpart,
@@ -124,7 +151,6 @@ export function RelationshipChat({
   readonly headerEnd?: ReactNode | undefined;
 }) {
   const t = useT();
-  const [attachOpen, setAttachOpen] = useState(false);
   const { askNow } = useGlobalQ();
   const [messages, setMessages] = useState<ChatMessageDto[]>(
     () => initial?.messages.slice() ?? [],
@@ -138,6 +164,10 @@ export function RelationshipChat({
     initial?.counterpartLastReadMessageId ?? null,
   );
   const [draft, setDraft] = useState("");
+  const [drafting, setDrafting] = useState(false);
+  // The composer holds Q's draft until the person changes or sends it.
+  const [qDrafted, setQDrafted] = useState(false);
+  const draftField = useRef<HTMLTextAreaElement>(null);
   const [notice, setNotice] = useState<string | null>(
     initial === null ? "Messages couldn't load just now." : null,
   );
@@ -257,7 +287,10 @@ export function RelationshipChat({
       return;
     }
     setBusy(true);
-    if (await deliver({ kind: "TEXT", body: text })) setDraft("");
+    if (await deliver({ kind: "TEXT", body: text })) {
+      setDraft("");
+      setQDrafted(false);
+    }
     setBusy(false);
   };
 
@@ -394,6 +427,44 @@ export function RelationshipChat({
   const lastMineIndex =
     lastMine === undefined ? -1 : messages.indexOf(lastMine);
 
+  // "Draft a reply": Q writes, the composer fills, the person edits and
+  // sends -- or not. Nothing here sends.
+  const draftWithQ = async () => {
+    if (drafting) return;
+    setDrafting(true);
+    setNotice(null);
+    try {
+      const started = await startReplyDraftAction(relationshipId, counterpart);
+      if (!started.ok) {
+        setNotice(started.message);
+        return;
+      }
+      for (let attempt = 0; attempt < DRAFT_POLLS; attempt += 1) {
+        await wait(1500);
+        const read = await readReplyDraftAction(started.value.runId);
+        if (!read.ok) {
+          setNotice(read.message);
+          return;
+        }
+        if (read.value.done) {
+          if (read.value.text === null) {
+            setNotice("Q couldn't draft a reply just now.");
+          } else {
+            setDraft(read.value.text.slice(0, 4000));
+            setQDrafted(true);
+            draftField.current?.focus();
+          }
+          return;
+        }
+      }
+      setNotice("Q is still writing. Try Draft a reply again in a moment.");
+    } catch {
+      setNotice("Q couldn't draft a reply just now.");
+    } finally {
+      setDrafting(false);
+    }
+  };
+
   const hasDraft = draft.trim().length > 0;
   return (
     <section
@@ -457,36 +528,42 @@ export function RelationshipChat({
           </li>
         ) : null}
         {messages.map((message, index) => (
+          <Fragment key={message.messageId}>
+          {index === 0 ||
+          dayMarker(messages[index - 1]?.sentAt ?? "") !==
+            dayMarker(message.sentAt) ? (
+            <li
+              className="cq-caption self-center rounded-full bg-(--cq-surface-subtle) px-2.5 py-1 text-(--cq-text-tertiary)"
+              data-chat-day
+            >
+              <span suppressHydrationWarning>
+                {t(dayMarker(message.sentAt))}
+              </span>
+            </li>
+          ) : null}
           <li
-            key={message.messageId}
-            className={`group flex max-w-[80%] min-w-0 flex-col gap-0.5 ${message.mine ? "items-end self-end" : "items-start self-start"}`}
+            className={`group flex max-w-[72%] min-w-0 flex-col gap-0.5 max-sm:max-w-[86%] ${message.mine ? "items-end self-end" : "items-start self-start"}`}
             data-chat-message={message.mine ? "mine" : "theirs"}
           >
-            {!message.mine &&
-            (index === 0 ||
-              messages[index - 1]?.mine === true ||
-              messages[index - 1]?.senderName !== message.senderName) ? (
-              // Who is speaking, once per run of their messages. A
-              // person's photo is theirs alone today: initials here.
-              <span className="flex items-center gap-1.5" data-chat-sender>
-                <EntityAvatar
-                  kind="person"
-                  name={message.senderName}
-                  size="xs"
-                  decorative
-                />
-                <span className="cq-caption text-(--cq-text-secondary)">
+            <div
+              className={`flex max-w-full min-w-0 flex-col gap-1 rounded-(--cq-radius-xl) px-3.5 py-2.5 ${
+                message.mine
+                  ? `rounded-ee-[6px] ${TILE}`
+                  : "rounded-es-[6px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) text-(--cq-text-primary)"
+              } ${index === messages.length - 1 && message.mine ? "cq-arrive" : ""}`}
+            >
+              {!message.mine &&
+              (index === 0 ||
+                messages[index - 1]?.mine === true ||
+                messages[index - 1]?.senderName !== message.senderName) ? (
+                // Who is speaking, once per run of their messages.
+                <span
+                  className="cq-caption font-semibold text-(--cq-text-secondary)"
+                  data-chat-sender
+                >
                   {message.senderName}
                 </span>
-              </span>
-            ) : null}
-            <div
-              className={`max-w-full min-w-0 px-3 py-2 ${
-                message.mine
-                  ? "bg-(--cq-accent-soft) text-(--cq-text-primary)"
-                  : "bg-(--cq-surface-subtle) text-(--cq-text-primary)"
-              }`}
-            >
+              ) : null}
               {message.unsent ? (
                 <p className="cq-body-sm italic text-(--cq-text-secondary)">
                   {message.mine
@@ -510,7 +587,7 @@ export function RelationshipChat({
                     ) : (
                       <Button
                         variant="quiet"
-                        className="-mx-2"
+                        className={`-mx-2 ${message.mine ? "text-inherit!" : ""}`}
                         onClick={() => void openAttachment(message)}
                       >
                         <Play size={ICON_SIZE.regular} aria-hidden="true" />
@@ -525,7 +602,7 @@ export function RelationshipChat({
                   ) : (
                     <Button
                       variant="quiet"
-                      className="-mx-2 max-w-full justify-start"
+                      className={`-mx-2 max-w-full justify-start ${message.mine ? "text-inherit!" : ""}`}
                       onClick={() => void openAttachment(message)}
                       aria-label={`Open ${message.attachment.title}`}
                     >
@@ -544,7 +621,9 @@ export function RelationshipChat({
                   )}
                 </>
               )}
-              <span className="cq-caption flex justify-end gap-1.5 pt-0.5 text-(--cq-text-tertiary)">
+              <span
+                className={`cq-caption flex gap-1.5 ${message.mine ? "justify-end opacity-70" : "text-(--cq-text-tertiary)"}`}
+              >
                 {/* AUTO (ADR 0030): every message Q sent is labelled as Q's. */}
                 {message.viaQ ? (
                   <span>Sent by Q for {message.senderName}</span>
@@ -552,11 +631,18 @@ export function RelationshipChat({
                 {message.edited && !message.unsent ? (
                   <span>{t("Edited")}</span>
                 ) : null}
-                <time dateTime={message.sentAt} className="cq-numeric">
-                  {formatRelationshipDate(message.sentAt)}
+                <time
+                  dateTime={message.sentAt}
+                  className="cq-numeric"
+                  title={formatRelationshipDate(message.sentAt)}
+                  suppressHydrationWarning
+                >
+                  {Number.isNaN(Date.parse(message.sentAt))
+                    ? formatRelationshipDate(message.sentAt)
+                    : TIME_ONLY.format(new Date(message.sentAt))}
                 </time>
                 {index === lastMineIndex && seenIndex >= lastMineIndex ? (
-                  <span aria-label={t("Seen")}>✓✓</span>
+                  <span>{t("read")}</span>
                 ) : null}
               </span>
             </div>
@@ -591,6 +677,7 @@ export function RelationshipChat({
               ) : null}
             </span>
           </li>
+          </Fragment>
         ))}
         <li ref={end} aria-hidden="true" />
       </ol>
@@ -611,7 +698,7 @@ export function RelationshipChat({
         <form
           ref={composer}
           onSubmit={(event) => void submit(event)}
-          className="flex flex-col gap-2 border-t border-(--cq-border-subtle) px-2 py-2"
+          className="sticky bottom-0 flex flex-col gap-2 bg-(--cq-canvas) px-3 pt-2.5 pb-1"
         >
           {documents === null ? null : documents.length === 0 ? (
             <p className="cq-body-sm px-2 text-(--cq-text-secondary)">
@@ -643,74 +730,69 @@ export function RelationshipChat({
               ))}
             </ul>
           )}
-          {attachOpen ? (
-            <div
-              className="flex gap-2 px-1"
-              role="group"
-              aria-label={t("Attach")}
-            >
-              <Button
-                type="button"
-                variant="secondary"
-                size="compact"
-                disabled={busy}
-                onClick={() => {
-                  setAttachOpen(false);
-                  fileInput.current?.click();
-                }}
-              >
-                <Upload size={ICON_SIZE.compact} aria-hidden="true" />
-                {t("File")}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="compact"
-                disabled={busy}
-                onClick={() => {
-                  setAttachOpen(false);
-                  void openDocuments();
-                }}
-                aria-expanded={documents !== null}
-              >
-                <FileText size={ICON_SIZE.compact} aria-hidden="true" />
-                {t("Document")}
-              </Button>
-            </div>
-          ) : null}
-          <div className="flex items-end gap-2">
+          <div
+            className="flex gap-2 overflow-x-auto [scrollbar-width:none]"
+            role="group"
+            aria-label={t("Attach")}
+          >
             <button
               type="button"
-              aria-label={t("Attach")}
-              aria-expanded={attachOpen}
-              onClick={() => setAttachOpen((open) => !open)}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
+              disabled={busy || drafting}
+              onClick={() => void draftWithQ()}
+              className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary) disabled:opacity-60"
+              data-draft-reply
             >
-              <Plus size={ICON_SIZE.regular} aria-hidden="true" />
+              <QCircle />
+              {drafting ? t("Q is drafting…") : t("Draft a reply")}
             </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void openDocuments()}
+              aria-expanded={documents !== null}
+              className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary)"
+            >
+              <FileText size={ICON_SIZE.compact} aria-hidden="true" />
+              {t("Attach a shared document")}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => fileInput.current?.click()}
+              className="cq-body-sm inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:border-(--cq-border-strong) hover:text-(--cq-text-primary)"
+            >
+              <Upload size={ICON_SIZE.compact} aria-hidden="true" />
+              {t("Upload a file")}
+            </button>
+          </div>
+          {qDrafted && hasDraft ? (
+            <span
+              className="cq-caption cq-swap flex items-center gap-1.5 text-(--cq-accent)"
+              data-q-draft-note
+            >
+              <QCircle className="size-4 text-[9px]" />
+              {t("Draft by Q from your conversation. Edit it before sending.")}
+            </span>
+          ) : null}
+          <div className="flex items-end gap-2 rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised) py-1.5 ps-3.5 pe-1.5 transition-[border-color,box-shadow] duration-(--cq-motion-fast) focus-within:border-(--cq-text-secondary) focus-within:shadow-[0_0_0_3px_var(--cq-accent-soft)]">
             <label htmlFor="chat-draft" className="sr-only">
               Message {counterpart}
             </label>
             <textarea
+              ref={draftField}
               id="chat-draft"
               value={draft}
               maxLength={4000}
               rows={1}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                if (event.target.value.trim() === "") setQDrafted(false);
+              }}
               onKeyDown={onKeyDown}
-              placeholder={t("Message")}
-              className="cq-body field-sizing-content max-h-40 min-h-11 flex-1 resize-none rounded-3xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary)"
+              placeholder={t(`Write to ${counterpart}`)}
+              className="cq-body field-sizing-content max-h-40 min-h-11 flex-1 resize-none bg-transparent py-2.5 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-none"
             />
-            {hasDraft ? (
-              <button
-                type="submit"
-                disabled={busy}
-                aria-label={t("Send")}
-                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--cq-accent) text-(--cq-text-inverse) hover:bg-(--cq-accent-hover) disabled:opacity-50"
-              >
-                <ArrowUp size={ICON_SIZE.regular} aria-hidden="true" />
-              </button>
-            ) : (
+            {hasDraft ? null : (
               <VoiceRecorder
                 compact
                 disabled={busy}
@@ -720,6 +802,15 @@ export function RelationshipChat({
                 onError={setNotice}
               />
             )}
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={busy || !hasDraft}
+              aria-label={t("Send")}
+            >
+              <Send size={ICON_SIZE.compact} aria-hidden="true" />
+              {t("Send")}
+            </Button>
             <input
               ref={fileInput}
               type="file"
@@ -733,6 +824,11 @@ export function RelationshipChat({
               }}
             />
           </div>
+          <span className="cq-caption text-(--cq-text-tertiary)">
+            {t(
+              "Both sides see this conversation. Private notes stay on the Overview.",
+            )}
+          </span>
         </form>
       ) : null}
     </section>
