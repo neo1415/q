@@ -685,7 +685,7 @@ export function PitchStage({
 
   return (
     <div
-      className="cq-stage cq-feed"
+      className="cq-stage cq-cinema cq-feed"
       data-feed-immersive
       data-clear-display={clearDisplay ? "" : undefined}
       data-scrubbing={scrubbing ? "" : undefined}

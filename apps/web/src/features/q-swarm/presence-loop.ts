@@ -239,6 +239,7 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
         pixels: device,
         colour,
         dim: view.dim,
+        dark,
       });
     }
     if (moving && renderer !== "pending") {

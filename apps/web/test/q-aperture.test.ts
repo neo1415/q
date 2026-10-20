@@ -267,7 +267,9 @@ describe("aperture contrast", () => {
     },
   );
 
-  it("holds 3:1 on the stage, which is one night in either theme", () => {
+  // The paper stage (light theme); the night is asserted with every other
+  // stage pair in q-stage-theme.test.ts.
+  it("holds 3:1 on the paper stage the light theme draws", () => {
     const canvas = token(light, "cq-stage-canvas");
     const surfaces = [
       canvas,

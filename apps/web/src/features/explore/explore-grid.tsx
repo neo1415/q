@@ -163,7 +163,7 @@ export function ExploreTile({
         type="button"
         onClick={onOpen}
         {...(onIntent === undefined ? {} : intentHandlers(onIntent))}
-        className="cq-explore-tile"
+        className="cq-explore-tile cq-cinema"
         aria-label={label}
       >
         {poster === null ? (

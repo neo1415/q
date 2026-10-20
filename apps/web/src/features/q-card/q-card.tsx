@@ -151,7 +151,7 @@ export function QCard({
           <span
             role="img"
             aria-label={`QR code linking to ${displayUrl}`}
-            className="block aspect-square w-full rounded-2xl bg-(--cq-stage-text) p-2.5 text-(--cq-stage-canvas) [&>svg]:h-full [&>svg]:w-full"
+            className="cq-cinema block aspect-square w-full rounded-2xl bg-(--cq-stage-text) p-2.5 text-(--cq-stage-canvas) [&>svg]:h-full [&>svg]:w-full"
             // Our own server-rendered SVG (uqr), never user input.
             dangerouslySetInnerHTML={{ __html: qrSvg }}
           />
