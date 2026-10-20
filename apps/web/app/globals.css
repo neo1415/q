@@ -2669,18 +2669,19 @@
      */
     .cq-feed-stage {
       display: grid;
-      grid-template-columns:
-        minmax(0, 1fr) var(--cq-feed-panel-w)
-        minmax(0, 0.25fr);
+      /* The pitch at its own width, the dossier filling the rest of the
+         page (owner 2026-10-20: "let those stuff spread and fill the
+         page"). */
+      grid-template-columns: auto minmax(0, 1fr);
       container-type: size;
       user-select: auto;
-      --cq-feed-panel-w: min(560px, calc(100cqw - 420px));
-      /* The 9:16 stage's height: the workspace less its gutters, narrowed
-         when the column is too slim to leave room for the arrows. */
+      /* The 9:16 stage's height: the workspace less its gutters, and never
+         so wide that the dossier has less than 560px. */
       --cq-feed-video-h: min(
         calc(100cqh - 48px),
-        calc(((100cqw - var(--cq-feed-panel-w)) / 1.25 - 140px) * 16 / 9)
+        calc((100cqw - 560px - 48px) * 16 / 9)
       );
+      --cq-feed-video-w: calc(var(--cq-feed-video-h) * 9 / 16);
     }
     .cq-feed-stage::before {
       display: none;
@@ -2689,8 +2690,8 @@
       position: relative;
       inset: auto;
       align-self: center;
-      justify-self: end;
-      margin-inline-end: 28px;
+      justify-self: start;
+      margin-inline: 24px;
       height: var(--cq-feed-video-h);
       aspect-ratio: 9 / 16;
       overflow: hidden;
@@ -2725,9 +2726,11 @@
       gap: 16px;
       /* Clear of the tabs above it, with a reading margin on both sides. */
       padding: 72px 24px 24px;
-      /* The panel scrolls by wheel, touch and keys without a bar of its own
-         in the middle of the page (owner 2026-10-20). */
-      scrollbar-width: none;
+      /* Anything below the fold stays reachable: a quiet bar at the
+         page's own edge. */
+      scrollbar-width: thin;
+      scrollbar-color: var(--cq-app-border-strong) transparent;
+      container-type: inline-size;
       background: var(--cq-app-canvas);
       color: var(--cq-app-text-primary);
       color-scheme: light dark;
@@ -2755,8 +2758,40 @@
     .cq-feed-overlay:has([data-caption-open]) {
       background: var(--cq-app-canvas);
     }
-    .cq-feed-overlay::-webkit-scrollbar {
-      display: none;
+    .cq-feed-dossier {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .cq-feed-overlay > .cq-feed-card,
+    .cq-feed-overlay > .cq-feed-panel-tools {
+      width: 100%;
+      max-width: 1180px;
+    }
+    /* A wide dossier reads in two columns (owner 2026-10-20): the decision
+       and the facts across, then why it is here beside Q's read. Narrower
+       than that, one column. */
+    @container (min-width: 820px) {
+      .cq-feed-overlay .cq-feed-more-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        column-gap: 40px;
+        row-gap: 16px;
+        align-items: start;
+      }
+      .cq-feed-overlay .cq-feed-more-body > * {
+        grid-column: 1 / -1;
+      }
+      .cq-feed-overlay .cq-feed-more-body > .cq-feed-why {
+        grid-column: 1;
+      }
+      .cq-feed-overlay .cq-feed-more-body > .cq-q-read {
+        grid-column: 2;
+        grid-row: span 3;
+      }
+      .cq-feed-overlay .cq-feed-more-body > .cq-feed-dossier-foot {
+        grid-column: 1;
+      }
     }
     /* Filters, then Saved and Passed, on one quiet line. */
     .cq-feed-panel-tools {
@@ -2886,10 +2921,10 @@
     .cq-feed-stage:has(.cq-feed-end) > .cq-feed-overlay {
       grid-column: 1;
       grid-row: 1;
-      justify-self: end;
+      justify-self: start;
       align-self: center;
-      width: calc(var(--cq-feed-video-h) * 9 / 16);
-      margin-inline-end: 28px;
+      width: var(--cq-feed-video-w);
+      margin-inline: 24px;
       padding: 0;
       background: none;
     }
@@ -2954,7 +2989,8 @@
     .cq-feed-nav .cq-feed-nav-button {
       border-radius: 999px;
       border-color: var(--cq-stage-border);
-      background: transparent;
+      /* Over the pitch: a quiet disc that reads on any frame. */
+      background: color-mix(in oklch, var(--cq-stage-canvas) 50%, transparent);
     }
     .cq-feed-nav .cq-feed-nav-button:hover:not(:disabled) {
       background: var(--cq-stage-surface);
@@ -2979,14 +3015,16 @@
     .cq-feed-actions button:active:not(:disabled) {
       transform: scale(0.97);
     }
+    /* Previous and Next on the pitch's right edge, centred on it, so the
+       pitch keeps its full size (owner 2026-10-20). */
     .cq-feed-nav {
       top: 50%;
       inset-inline-end: auto;
-      inset-inline-start: calc(
-        (100cqw - var(--cq-feed-panel-w)) / 1.25 - 28px -
-          var(--cq-feed-video-h) * 9 / 16 - 72px
-      );
+      inset-inline-start: calc(24px + var(--cq-feed-video-w) - 60px);
       transform: translateY(-50%);
+    }
+    .cq-feed-nav-position {
+      display: none;
     }
     .cq-feed-keys {
       display: flex;
@@ -3056,7 +3094,9 @@
       .cq-discover-tabs {
       top: 16px;
       /* Over the dossier's column (Discover A's stage-and-dossier grid). */
-      inset-inline-start: calc((100% - min(560px, 100% - 420px)) / 1.25 + 14px);
+      inset-inline-start: calc(
+        48px + min(100dvh - 48px, (100% - 608px) * 16 / 9) * 9 / 16 + 14px
+      );
       transform: none;
     }
     .cq-discover:has(> div:not([hidden]) [data-feed-immersive])

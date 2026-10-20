@@ -526,7 +526,7 @@ export function FeedCard({
       {/* The desktop dossier (Discover A, owner 2026-10-19). */}
       {wide && !askOpenHere ? (
         <div
-          className="cq-feed-more-body flex flex-col gap-4"
+          className="cq-feed-more-body cq-feed-dossier"
           id={`cq-feed-more-${company.companyId}`}
           data-feed-more
         >

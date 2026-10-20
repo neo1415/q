@@ -849,7 +849,6 @@ function InvestorFeed({
             onPass={passCard}
             onAskQ={() => setOpen(true)}
             askPanel={<DossierQ companyName={card.canonicalName} />}
-            position={positionLabel}
             interestRequest={interestAsked}
             onInterestConfirmed={() => {
               setTally((was) => ({ ...was, interest: was.interest + 1 }));

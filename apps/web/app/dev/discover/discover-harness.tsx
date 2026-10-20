@@ -341,7 +341,6 @@ function Feed() {
               askPanel={<DossierQ companyName={card.canonicalName} />}
               onMore={openOptions}
               showMedia={false}
-              position={`${String(index + 1)} of ${String(COMPANIES.length)}`}
               initialScores={SCORES}
               sectorLabels={SECTORS}
               interestRequest={interestAsked}
