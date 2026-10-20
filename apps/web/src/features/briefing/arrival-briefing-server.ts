@@ -199,4 +199,3 @@ export async function readArrivalBriefing(
   });
   return data;
 }
-

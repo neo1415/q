@@ -146,7 +146,11 @@ function readsFor(
   };
 }
 
-const FOUNDER: OwnContext = { kind: "FOUNDER", companyId: id(77), label: "Zino" };
+const FOUNDER: OwnContext = {
+  kind: "FOUNDER",
+  companyId: id(77),
+  label: "Zino",
+};
 const INVESTOR: OwnContext = {
   kind: "INVESTOR",
   investorOrganisationId: id(78),

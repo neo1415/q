@@ -12,7 +12,11 @@ import type {
 import type { ArrivalActivity } from "@capital-q/q-core/speech";
 
 import type { OwnContext } from "@/features/q/context";
-import { decisionGroups, decisionTitle } from "@/features/work/decisions";
+import {
+  decisionGroups,
+  decisionTitle,
+  relationshipOf,
+} from "@/features/work/decisions";
 import { readPlan } from "@/features/work/plan-words";
 import { groupNotices } from "@/features/work/notice-groups";
 import type { WorkforceView } from "@/features/work/workforce-actions";
@@ -154,45 +158,82 @@ export async function readArrival(
     input.seenMatches === null || input.seenMatches === undefined
       ? null
       : new Set(input.seenMatches);
-  const attentionRead = safe("attention", () => reads.attention(since));
+  // Speed lane 2026-10-20: each read starts the moment what it needs is
+  // known, and nothing waits on a read it does not use. They used to run in
+  // rounds (all seven, then matches, then readiness, then the deck, then
+  // the approvals' content, then the threads): the slowest of each round
+  // added up.
   const snapshotRead = safe("snapshot", () => reads.snapshot());
-  const [account, sinceRead, approvals, workforce, done, notices, context] =
-    await Promise.all([
-      safe("account", () => reads.account()),
-      safe("workSince", () => reads.workSince(since)),
-      safe("approvals", () => reads.approvals()),
-      safe("workforce", () => reads.workforce()),
-      safe("done", () => reads.done()),
-      safe("notices", () => reads.notices()),
-      safe("context", () => reads.context()),
-    ]);
-  const matches =
+  // The snapshot carries the attention report; the separate report (a
+  // second build of the same sources on the Q API) only when it did not.
+  const attentionRead = snapshotRead.then((snapshot) =>
+    snapshot === null ? safe("attention", () => reads.attention(since)) : null,
+  );
+  const accountRead = safe("account", () => reads.account());
+  const workSinceRead = safe("workSince", () => reads.workSince(since));
+  const workforceRead = safe("workforce", () => reads.workforce());
+  const doneRead = safe("done", () => reads.done());
+  const noticesRead = safe("notices", () => reads.notices());
+  const contextRead = safe("context", () => reads.context());
+  // Investors only, once the context is known: the slate is theirs.
+  const matchesRead = contextRead.then((context) =>
     context?.kind === "INVESTOR"
-      ? await safe("matches", () => reads.matches(seen))
-      : undefined;
-  const questions =
+      ? safe("matches", () => reads.matches(seen))
+      : undefined,
+  );
+  // Founders (Q.01): the questions Q still has for them, answerable here;
+  // and (lead 2026-10-16) deck sections Q read, not yet checked.
+  const questionsRead = contextRead.then((context) =>
     context?.kind === "FOUNDER"
-      ? await safe("questions", () => reads.questions())
-      : undefined;
-  const deckReview =
+      ? safe("questions", () => reads.questions())
+      : undefined,
+  );
+  const deckRead = contextRead.then((context) =>
     context?.kind === "FOUNDER"
-      ? await safe("deckReview", () => reads.deckReview())
-      : undefined;
+      ? safe("deckReview", () => reads.deckReview())
+      : undefined,
+  );
+  const threads = new Map<string, Promise<ChatThreadDto | null>>();
+  const threadOf = (relationshipId: string) => {
+    let thread = threads.get(relationshipId);
+    if (thread === undefined) {
+      thread = safe(`thread:${relationshipId}`, () =>
+        reads.thread(relationshipId),
+      );
+      threads.set(relationshipId, thread);
+    }
+    return thread;
+  };
+  const approvalsRead = safe("approvals", () => reads.approvals());
+  // An approval's content as soon as the list is in; its thread as soon as
+  // the content names the relationship (the card's group takes the same
+  // relationship, decisions.ts `relationshipOf`).
+  const viewsRead = approvalsRead.then((approvals) =>
+    Promise.all(
+      (approvals ?? []).slice(0, CARDS_MAX).map((approval) =>
+        safe(`approval:${approval.approvalId}`, () =>
+          reads.approval(approval.approvalId),
+        ).then((view) => {
+          const relationshipId = relationshipOf(view);
+          if (relationshipId !== null) void threadOf(relationshipId);
+          return view;
+        }),
+      ),
+    ),
+  );
+  const [approvals, read, workforce, done, notices] = await Promise.all([
+    approvalsRead,
+    viewsRead,
+    workforceRead,
+    doneRead,
+    noticesRead,
+  ]);
   const needsYouNotices =
     notices === null
       ? null
       : groupNotices(notices).needsYou.map((group) => group.notice);
   const waitingNotices = (needsYouNotices ?? []).map((notice) => notice.title);
   const waiting = approvals ?? [];
-  const read = await Promise.all(
-    waiting
-      .slice(0, CARDS_MAX)
-      .map((approval) =>
-        safe(`approval:${approval.approvalId}`, () =>
-          reads.approval(approval.approvalId),
-        ),
-      ),
-  );
   const views = new Map<string, QApprovalView>();
   for (const view of read) {
     if (view !== null) views.set(view.approvalId, view);
@@ -210,17 +251,6 @@ export async function readArrival(
   const flat = groups
     .flatMap((group) => group.items.map((item) => ({ group, item })))
     .slice(0, CARDS_MAX);
-  const threads = new Map<string, Promise<ChatThreadDto | null>>();
-  const threadOf = (relationshipId: string) => {
-    let thread = threads.get(relationshipId);
-    if (thread === undefined) {
-      thread = safe(`thread:${relationshipId}`, () =>
-        reads.thread(relationshipId),
-      );
-      threads.set(relationshipId, thread);
-    }
-    return thread;
-  };
   const cards = await Promise.all(
     flat.map(async ({ group, item }): Promise<ArrivalCard> => {
       const theySaid =
@@ -266,7 +296,15 @@ export async function readArrival(
       };
     }),
   );
-  const snapshot = await snapshotRead;
+  const [account, sinceRead, matches, questions, deckReview, snapshot] =
+    await Promise.all([
+      accountRead,
+      workSinceRead,
+      matchesRead,
+      questionsRead,
+      deckRead,
+      snapshotRead,
+    ]);
   return {
     firstName: firstNameOf(account?.displayName),
     timeZone: sinceRead?.timeZone ?? null,

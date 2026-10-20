@@ -45,7 +45,9 @@ describe("the arrival read's route", () => {
     const [url, init] = fetchImpl.mock.calls[0] ?? [];
     expect(url).toBe(ARRIVAL_READ_PATH);
     expect(init?.method).toBe("POST");
-    expect(JSON.parse(String(init?.body))).toMatchObject({
+    const body = init?.body;
+    if (typeof body !== "string") throw new Error("no JSON body");
+    expect(JSON.parse(body)).toMatchObject({
       since: "2026-10-20T06:00:00.000Z",
       browser: { dismissedHeld: ["held-1"] },
     });
