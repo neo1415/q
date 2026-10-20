@@ -89,7 +89,7 @@ export function StateChips({
     <div
       role="group"
       aria-label={label}
-      className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+      className="relative -mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
     >
       {chips.map((chip) => (
         <button

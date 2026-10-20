@@ -236,7 +236,7 @@ export function PipelineSavedViews({
       role="group"
       aria-label={t("Saved views")}
       aria-busy={pending}
-      className="-mx-4 flex min-w-0 items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+      className="relative -mx-4 flex min-w-0 items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
       data-pipeline-views
     >
       {initial === null ? (

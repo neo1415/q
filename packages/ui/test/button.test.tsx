@@ -29,7 +29,10 @@ describe("Button", () => {
   });
 
   it("exposes its classes for router links without a router dependency", () => {
-    expect(buttonClassName("primary")).toContain("bg-(--cq-accent)");
+    // The primary fill is the accent unless a page scopes its own primary action (CRM warm charcoal).
+    expect(buttonClassName("primary")).toContain(
+      "bg-[var(--cq-primary-action,var(--cq-accent))]",
+    );
     expect(buttonClassName("secondary", "compact", "w-full")).toContain(
       "w-full",
     );

@@ -219,13 +219,13 @@ describe("Readiness (section.risks, list.risks, list.pillars)", () => {
     expect(second !== null && inView.has(second)).toBe(true);
   });
 
-  it("opens the second pillar through its own summary, DONE once it is open", async () => {
+  it("opens the second pillar's detail sheet through its own card, DONE once it is open", async () => {
     render(<ReadinessSection readiness={READINESS} />);
     const receipt = await act(() =>
       performUiAct(intent("SELECT_ITEM", { target: "list.pillars", index: 2 })),
     );
     expect(receipt.status).toBe("DONE");
-    expect(screen.getByText("Financials").closest("details")?.open).toBe(true);
+    expect(screen.getByRole("dialog", { name: "Financials" })).toBeTruthy();
   });
 });
 
