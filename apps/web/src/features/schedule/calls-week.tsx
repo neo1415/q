@@ -270,6 +270,9 @@ export function CallsWeek({
           onClick={() => setOpen(meeting)}
           className={cx(
             base,
+            // The purpose is cut with an ellipsis inside the block, never
+            // run into the next day's column.
+            "min-w-0 overflow-hidden",
             invited
               ? "cq-arrive border-[1.5px] border-dashed border-(--cq-accent) bg-(--cq-accent-soft) text-(--cq-text-primary)"
               : cx("border-transparent", TILE),
@@ -282,7 +285,13 @@ export function CallsWeek({
               <b className="font-semibold">
                 {invited ? t("Invite sent") : counterpart}
               </b>
-              <span className={phone ? "truncate" : "truncate opacity-90"}>
+              <span
+                className={
+                  phone
+                    ? "block max-w-full truncate"
+                    : "block max-w-full truncate opacity-90"
+                }
+              >
                 {invited
                   ? t("Waiting for them")
                   : t(`${meeting.purpose}, ${String(minutes(meeting))} min`)}
