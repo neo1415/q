@@ -64,7 +64,8 @@ function list(items: readonly string[]): string {
   const shown = items.slice(0, 3).map((item) => item.toLowerCase());
   const rest = items.length - shown.length;
   if (shown.length === 0) return "";
-  if (rest > 0) return `${shown.join(", ")} and ${plural(rest, "more", "more")}`;
+  if (rest > 0)
+    return `${shown.join(", ")} and ${plural(rest, "more", "more")}`;
   if (shown.length === 1) return shown[0] ?? "";
   return `${shown.slice(0, -1).join(", ")} and ${shown.at(-1) ?? ""}`;
 }

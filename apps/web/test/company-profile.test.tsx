@@ -177,7 +177,7 @@ function renderProfile(
   profile: CompanyProfileDto,
   // Lane ov 2026-10-16: the old Overview's folds are the Diligence tab;
   // the strip stays on the Overview (`stripText`).
-  tab: "overview" | "diligence" | "elevator" = "diligence",
+  tab: "overview" | "diligence" | "elevator" | "team" = "diligence",
 ) {
   return render(
     <CompanyProfileView
@@ -267,12 +267,14 @@ describe("the profile, for an investor", () => {
       screen.getByRole("heading", { name: "In their words" }),
     ).toBeTruthy();
     expect(screen.getAllByText("Energy storage").length).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText("Organisation verified by Capital Q").length,
-    ).toBeGreaterThan(0);
+    // Profile option 1: verification is a word in the header and the ledger.
+    expect(screen.getAllByText("Verified by Capital Q").length).toBeGreaterThan(
+      0,
+    );
     expect(
       screen.getByRole("button", { name: /Download pitch deck/ }),
     ).toBeTruthy();
+    // Not connected yet: the next step is Express interest, with Pass beside it.
     expect(screen.getByRole("button", { name: "Pass" })).toBeTruthy();
     expect(
       screen.getByRole("button", { name: /Express interest/i }),
@@ -314,8 +316,8 @@ describe("the profile, for an investor", () => {
       }),
     );
     expect(
-      document.querySelector("[data-verified-badge]")?.textContent,
-    ).toContain("Organisation verified by Capital Q");
+      document.querySelector("[data-profile-facts]")?.textContent,
+    ).toContain("Verified by Capital Q");
     expect(document.querySelector("[data-demo-attestation]")).toBeNull();
   });
 
@@ -389,7 +391,16 @@ describe("the profile, for an investor", () => {
       ...base,
       overview: { ...base.overview, raise: null, deck: null },
     });
-    expect(screen.getAllByText("Not shared with you")).toHaveLength(2);
+    // The raise fold says it; the deck row is locked, never "none".
+    expect(
+      document.querySelector("[data-overview-fold=company-raise] summary .fs")
+        ?.textContent,
+    ).toBe("Not shared with you");
+    expect(screen.getByText("Raise not shared with you")).toBeTruthy();
+    expect(screen.getAllByText("Not shared with you yet").length).toBeGreaterThan(
+      0,
+    );
+    expect(document.body.textContent).not.toMatch(/doesn.t exist|no deck exists/iu);
     expect(
       screen.queryByRole("button", { name: /Download pitch deck/ }),
     ).toBeNull();
@@ -415,11 +426,14 @@ describe("the profile, for an investor", () => {
       />,
     );
     expect(screen.queryByText("Not shared with you")).toBeNull();
-    expect(screen.getAllByText("Not shared with you yet")).toHaveLength(2);
     expect(
-      screen.getAllByRole("link", { name: "Ask in diligence" }),
-    ).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "Cap table" })).toBeTruthy();
+      document.querySelector("[data-overview-fold=company-raise] summary .fs")
+        ?.textContent,
+    ).toBe("Not shared with you yet");
+    expect(
+      screen.getByRole("link", { name: "Ask in diligence" }).getAttribute("href"),
+    ).toBe("/relationships/company/x#diligence");
+    expect(screen.getByText("Cap table")).toBeTruthy();
   });
 
   it("formats money from its decimal string without a float", () => {
@@ -434,10 +448,10 @@ describe("the profile, for an investor", () => {
 
 describe("the team (ADR 0041)", () => {
   it("lists names, declared roles in words and short bios for an investor", () => {
-    renderProfile(investorProfile());
+    renderProfile(investorProfile(), "team");
     const team = screen.getByRole("region", { name: "Team" });
     expect(team.textContent).toContain("Ada Obi");
-    expect(team.textContent).toContain("Founder · CEO");
+    expect(team.textContent).toContain("Co-founder · CEO");
     expect(team.textContent).toContain("Built grid storage at two utilities.");
     expect(team.textContent).toContain("Advisor");
   });
@@ -445,7 +459,7 @@ describe("the team (ADR 0041)", () => {
   it("shows no team section when none is shown to this reader", () => {
     const base = investorProfile();
     if (base.overview === null) throw new Error("expected an overview");
-    renderProfile({ ...base, overview: { ...base.overview, team: [] } });
+    renderProfile({ ...base, overview: { ...base.overview, team: [] } }, "team");
     expect(screen.queryByRole("region", { name: "Team" })).toBeNull();
   });
 });
@@ -499,7 +513,8 @@ describe("the profile, for its owner (founder 2026-10-08)", () => {
 describe("the Elevator tab (A2: replaces Videos)", () => {
   it("signs nothing until Play, then exactly the pressed video, one player at a time", async () => {
     const { container } = renderProfile(investorProfile(), "elevator");
-    expect(screen.getAllByRole("button", { name: /^Play / })).toHaveLength(2);
+    // Profile option 1: one poster, its video picked from the list below.
+    expect(screen.getAllByRole("button", { name: /^Play / })).toHaveLength(1);
     expect(authorisePlaybackAction).not.toHaveBeenCalled();
     expect(container.querySelector("video")).toBeNull();
 
@@ -512,6 +527,7 @@ describe("the Elevator tab (A2: replaces Videos)", () => {
     ).toBe(true);
 
     // Playing the second replaces the first: never two players.
+    fireEvent.click(screen.getByRole("button", { name: /^Video 2/ }));
     fireEvent.click(screen.getByRole("button", { name: "Play Video 2" }));
     await waitFor(() => {
       expect(authorisePlaybackAction).toHaveBeenCalledWith(COMPANY_ID, VIDEO_B);
@@ -519,7 +535,7 @@ describe("the Elevator tab (A2: replaces Videos)", () => {
     expect(
       container.querySelectorAll("[data-company-pitch]").length,
     ).toBeLessThanOrEqual(1);
-    expect(screen.getByRole("button", { name: "Play The pitch" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^The pitch/ })).toBeTruthy();
   });
 });
 
@@ -578,30 +594,35 @@ describe("the overview, decluttered, with what the pitch says", () => {
         pitchClaims: [saidRaise, traction],
       }),
     );
-    expect(strip).toContain("$4M seed");
-    expect(strip).toContain("Said in their pitch, 0:43");
+    // Key numbers: the pitch's figure, labelled as the founder's claim.
+    expect(strip).toContain("Raising$4M");
+    expect(strip).toContain("founder’s claims");
     expect(strip).not.toContain("Not shared");
-    const quote = document.querySelector("blockquote[data-pitch-claim=RAISE]");
-    expect(quote?.textContent).toContain("raising a $4 million seed");
-    expect(quote?.textContent).toContain("0:43");
-    expect(quote?.textContent).toContain("own claim, self-reported");
+    // The ledger names where it was said, and labels it a claim.
+    const raise = document.querySelector("[data-overview-fold=company-raise]");
+    expect(raise?.textContent).toContain("$4M");
+    expect(raise?.textContent).toContain("Pitch video, 0:43");
+    expect(raise?.textContent).toContain("Founder’s claim");
     expect(
-      document.querySelector("li[data-pitch-claim=TRACTION]")?.textContent,
-    ).toContain("31 million requests served · said at 0:38");
+      document.querySelector("[data-overview-fold=company-traction]")
+        ?.textContent,
+    ).toContain("“31 million requests served”Founder’s claimPitch video, 0:38");
   });
 
   it("still says not shared when there is no raise from the pitch (unknown stays unknown)", () => {
     renderProfile(withPitch({ raiseFromPitch: null, pitchClaims: [] }));
-    expect(
-      stripText(withPitch({ raiseFromPitch: null, pitchClaims: [] })),
-    ).toContain("Not shared");
+    // No figure at all: no key numbers, and the header says not shared.
+    expect(stripText(withPitch({ raiseFromPitch: null, pitchClaims: [] }))).toBe(
+      "",
+    );
+    expect(screen.getByText("Raise not shared with you")).toBeTruthy();
     expect(
       document.querySelector("[data-overview-fold=company-traction]")
         ?.textContent,
-    ).toContain("Nothing stated in their pitch yet");
+    ).toContain("Nothing stated yet");
   });
 
-  it("folds every section, closed, each with a one-line summary", () => {
+  it("folds every section, the raise open first, each with a one-line summary", () => {
     renderProfile(withPitch({ raiseFromPitch: saidRaise }));
     const folds = [...document.querySelectorAll("details[data-overview-fold]")];
     expect(
@@ -614,15 +635,17 @@ describe("the overview, decluttered, with what the pitch says", () => {
       "company-unknowns",
       "company-details",
     ]);
-    for (const fold of folds) {
-      expect(fold.hasAttribute("open")).toBe(false);
+    for (const [index, fold] of folds.entries()) {
+      expect(fold.hasAttribute("open")).toBe(index === 0);
       const line = fold.querySelector("summary p")?.textContent ?? "";
       expect(line.length).toBeGreaterThan(3);
     }
     expect(
       document.querySelector("[data-overview-fold=company-raise] summary p")
         ?.textContent,
-    ).toBe("$4M seed, said in their pitch · deck shared with you");
+    ).toBe(
+      "$4M stated in their pitch. The round isn’t formally shared with you yet.",
+    );
   });
 
   it("tells the owner when their pitch says a raise the profile does not show", () => {
@@ -694,8 +717,8 @@ describe("moving between a profile's tabs", () => {
     if (team === null) throw new Error("no Team tab");
     fireEvent.click(team);
 
-    // A shallow URL change, and the Team panel shown at once.
-    expect(pushes).toEqual([`${base}?tab=team`]);
+    // A shallow URL change after the open panel fades out (120 ms).
+    await waitFor(() => expect(pushes).toEqual([`${base}?tab=team`]));
     expect(team.getAttribute("aria-current")).toBe("page");
     expect(
       container

@@ -11,7 +11,11 @@ import {
   type CompanyScoresDto,
   type ScoreFactor,
 } from "@capital-q/contracts";
-import { PopoverContent, PopoverRoot, PopoverTrigger } from "@capital-q/ui/popover";
+import {
+  PopoverContent,
+  PopoverRoot,
+  PopoverTrigger,
+} from "@capital-q/ui/popover";
 
 import { FitBreakdownSheet } from "@/features/fit";
 import { FitGlyph, glyphKindOf, outcomeWord } from "@/features/fit/fit-glyph";
@@ -30,7 +34,11 @@ export function ScoresCard({ companyName }: { readonly companyName: string }) {
   const fit = useProfileFit();
   if (fit.status !== "READY" || fit.fit.scores === undefined) return null;
   return (
-    <section className="cq-brief-card" data-profile-scores data-company-scores="brief">
+    <section
+      className="cq-brief-card"
+      data-profile-scores
+      data-company-scores="brief"
+    >
       <Scores scores={fit.fit.scores} companyName={companyName} />
     </section>
   );
@@ -85,7 +93,11 @@ function Scores({
     <div className="cq-brief-scores">
       <PopoverRoot>
         <PopoverTrigger>
-          <button type="button" className="cq-brief-score" data-score="investability">
+          <button
+            type="button"
+            className="cq-brief-score"
+            data-score="investability"
+          >
             <span className="cq-brief-label">{t("Investability")}</span>
             {inv.score === null ? (
               <span className="sv" data-none="">
@@ -145,7 +157,10 @@ function Scores({
             {inv.missing.length === 0 ? null : (
               <Factors
                 title={t("Would raise coverage or confidence")}
-                factors={inv.missing.map((m) => ({ label: m, detail: "missing" }))}
+                factors={inv.missing.map((m) => ({
+                  label: m,
+                  detail: "missing",
+                }))}
               />
             )}
           </div>
@@ -154,7 +169,11 @@ function Scores({
       {suit === null ? null : (
         <PopoverRoot>
           <PopoverTrigger>
-            <button type="button" className="cq-brief-score" data-score="suitability">
+            <button
+              type="button"
+              className="cq-brief-score"
+              data-score="suitability"
+            >
               <span className="cq-brief-label">{t("Suitability for you")}</span>
               {suit.score === null ? (
                 <span className="sv" data-none="">
@@ -176,7 +195,10 @@ function Scores({
                 aria-label={`${String(suit.coverage.known)} of ${String(suit.coverage.applicable)} criteria known`}
               >
                 {Array.from({ length: suit.coverage.applicable }, (_, k) => (
-                  <i key={k} data-k={k < suit.coverage.known ? "ok" : undefined} />
+                  <i
+                    key={k}
+                    data-k={k < suit.coverage.known ? "ok" : undefined}
+                  />
                 ))}
               </span>
               <span className="cq-brief-label">
@@ -203,7 +225,10 @@ function Scores({
                   : ` Still open: ${suit.missing.join("; ").toLowerCase()}.`}
               </p>
               <Factors title={t("Raised by")} factors={suit.up} />
-              <Factors title={t("Lowered or held back by")} factors={suit.down} />
+              <Factors
+                title={t("Lowered or held back by")}
+                factors={suit.down}
+              />
             </div>
           </PopoverContent>
         </PopoverRoot>
@@ -226,7 +251,11 @@ export function FitCard({
   if (fit.status === "NONE") return null;
   if (fit.status === "LOADING") {
     return (
-      <section className="cq-brief-card" aria-busy="true" data-fit-panel="LOADING">
+      <section
+        className="cq-brief-card"
+        aria-busy="true"
+        data-fit-panel="LOADING"
+      >
         <h3>{t("Fit with your mandate")}</h3>
         <p className="cq-brief-label">{t("Reading your fit…")}</p>
       </section>

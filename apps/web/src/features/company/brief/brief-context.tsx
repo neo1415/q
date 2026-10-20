@@ -52,7 +52,10 @@ export type QuestionDraft = {
   /** What it is about, in a few words ("Lead investor"). */
   readonly topic: string;
   /** The assumption it came from, so the board can show it answered. */
-  readonly about: { readonly assumptionId: string; readonly label: string } | null;
+  readonly about: {
+    readonly assumptionId: string;
+    readonly label: string;
+  } | null;
   readonly from: "BOARD" | "GAP" | "Q";
 };
 
@@ -214,8 +217,7 @@ export function BriefProvider({
   }, []);
   const hasGap = useCallback(
     (key: string) =>
-      gaps.some((draft) => draft.id === `gap:${key}`) ||
-      sent.has(`gap:${key}`),
+      gaps.some((draft) => draft.id === `gap:${key}`) || sent.has(`gap:${key}`),
     [gaps, sent],
   );
   const markRequested = useCallback(
@@ -354,7 +356,8 @@ function QuestionsSheet({
   const valid =
     chosen.length > 0 &&
     words.every(
-      (text) => text.length >= 3 && text.length <= ASSUMPTION_QUESTION_MAX_LENGTH,
+      (text) =>
+        text.length >= 3 && text.length <= ASSUMPTION_QUESTION_MAX_LENGTH,
     );
   const rekey = () => {
     key.current = `questions-${crypto.randomUUID()}`;
@@ -430,7 +433,9 @@ function QuestionsSheet({
                       type="button"
                       onClick={() => {
                         rekey();
-                        setDropped((current) => new Set([...current, draft.id]));
+                        setDropped(
+                          (current) => new Set([...current, draft.id]),
+                        );
                       }}
                       aria-label={`Remove question ${String(index + 1)}`}
                       className="cq-brief-iconbtn"

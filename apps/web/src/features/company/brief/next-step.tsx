@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import type {
   DataRoomView,
@@ -30,6 +29,22 @@ import { QMark } from "./parts";
  * the relationship record. Before the founders accept, the step is the
  * server-confirmed Express interest (Pass stays beside it, neutral).
  */
+
+const PHONE = "(max-width: 1023px)";
+function subscribePhone(listener: () => void): () => void {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function")
+    return () => undefined;
+  const query = window.matchMedia(PHONE);
+  query.addEventListener("change", listener);
+  return () => query.removeEventListener("change", listener);
+}
+function isPhone(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia(PHONE).matches
+  );
+}
 
 export type NextCall = Pick<MeetingDto, "startsAt" | "timeZone" | "hasBrief">;
 
@@ -76,9 +91,11 @@ export function NextStepRibbon({
   readonly interest: InterestDto | null;
 }) {
   const t = useT();
-  const router = useRouter();
   const brief = useBrief();
   const tab = useProfileTab() ?? serverTab;
+  // One of the two at a time, so the step's controls (Express interest
+  // keeps its own state) exist once: the ribbon, or on a phone the dock.
+  const phone = useSyncExternalStore(subscribePhone, isPhone, () => false);
   const requested = brief?.requested ?? new Set<string>();
   const roomDocs =
     dataRoom !== null && dataRoom.viewer === "INVESTOR"
@@ -96,12 +113,11 @@ export function NextStepRibbon({
     drafts: brief?.drafts ?? [],
     waiting: brief?.waiting ?? 0,
     requestable: requestable.map((doc) => doc.title),
-    requested:
-      roomDocs.filter(
-        (doc) =>
-          doc.access === "REQUESTED" ||
-          (doc.access === "REQUESTABLE" && asked(doc.documentId)),
-      ).length,
+    requested: roomDocs.filter(
+      (doc) =>
+        doc.access === "REQUESTED" ||
+        (doc.access === "REQUESTABLE" && asked(doc.documentId)),
+    ).length,
     nextCall,
     met,
   });
@@ -131,7 +147,6 @@ export function NextStepRibbon({
           initialInterest={interest}
           relationshipState={state}
           prominent
-          onConfirmed={() => router.refresh()}
         />
       );
     }
@@ -161,9 +176,7 @@ export function NextStepRibbon({
     }
     return (
       <Link
-        href={
-          step.kind === "CALL" ? `${record}/calls` : `${record}#commitment`
-        }
+        href={step.kind === "CALL" ? `${record}/calls` : `${record}#commitment`}
         className={buttonClassName("primary")}
         data-next-step={step.kind}
       >
@@ -192,44 +205,46 @@ export function NextStepRibbon({
   return (
     <>
       {/* The data room has its own next step (data room option 1). */}
-      {tab === "dataroom" ? null : (
-      <section
-        key={`ribbon-${String(moved)}`}
-        className="cq-brief-ribbon"
-        data-place="page"
-        data-moved={moved > 0 ? "" : undefined}
-        aria-label={t("Next step")}
-        data-next-step-ribbon={step.kind}
-      >
-        <div className="rb">
-          <p className="rk">
-            <QMark />
-            {t("Next step")}
-          </p>
-          <p className="rt">{step.title}</p>
-          <p className="rw">{step.reason}</p>
-          <Marks steps={journey.steps} />
-        </div>
-        <div className="ra">
-          {secondary}
-          {primary("ribbon")}
-        </div>
-      </section>
+      {tab === "dataroom" || phone ? null : (
+        <section
+          key={`ribbon-${String(moved)}`}
+          className="cq-brief-ribbon"
+          data-place="page"
+          data-moved={moved > 0 ? "" : undefined}
+          aria-label={t("Next step")}
+          data-next-step-ribbon={step.kind}
+        >
+          <div className="rb">
+            <p className="rk">
+              <QMark />
+              {t("Next step")}
+            </p>
+            <p className="rt">{step.title}</p>
+            <p className="rw">{step.reason}</p>
+            <Marks steps={journey.steps} />
+          </div>
+          <div className="ra">
+            {secondary}
+            {primary("ribbon")}
+          </div>
+        </section>
       )}
-      <div
-        key={`dock-${String(moved)}`}
-        className="cq-brief-dock"
-        data-moved={moved > 0 ? "" : undefined}
-        data-next-step-dock={step.kind}
-      >
-        <p className="dt">
-          <span>
-            Next step {journey.now + 1} of {total}
-          </span>
-          <b>{step.title}</b>
-        </p>
-        {primary("dock")}
-      </div>
+      {!phone ? null : (
+        <div
+          key={`dock-${String(moved)}`}
+          className="cq-brief-dock"
+          data-moved={moved > 0 ? "" : undefined}
+          data-next-step-dock={step.kind}
+        >
+          <p className="dt">
+            <span>
+              Next step {journey.now + 1} of {total}
+            </span>
+            <b>{step.title}</b>
+          </p>
+          {primary("dock")}
+        </div>
+      )}
     </>
   );
 }

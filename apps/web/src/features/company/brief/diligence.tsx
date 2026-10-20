@@ -9,7 +9,11 @@ import { ChevronDown, ICON_SIZE } from "@capital-q/ui/icons";
 import { useT } from "@/features/i18n/language";
 
 import { useBrief } from "./brief-context";
-import { ledgerCounts, type LedgerFold, type LedgerRow } from "./diligence-model";
+import {
+  ledgerCounts,
+  type LedgerFold,
+  type LedgerRow,
+} from "./diligence-model";
 import { callMoment } from "./journey";
 import { plural } from "./model";
 import type { NextCall } from "./next-step";
@@ -63,7 +67,9 @@ export function DiligenceBrief({
   const drafts = brief?.drafts ?? [];
   const asked = (board?.assumptions ?? []).filter((a) => a.asked !== undefined);
   const room =
-    dataRoom !== null && dataRoom.viewer === "INVESTOR" ? dataRoom.documents : [];
+    dataRoom !== null && dataRoom.viewer === "INVESTOR"
+      ? dataRoom.documents
+      : [];
   const requested = brief?.requested ?? new Set<string>();
   const onRequest = room.filter(
     (doc) => doc.access === "REQUESTABLE" || doc.access === "REQUESTED",
@@ -103,7 +109,9 @@ export function DiligenceBrief({
             <h2 id="questions-title" className="cq-brief-title m-0">
               {t("Questions to investigate")}
             </h2>
-            <span className="cq-brief-label">{t("What to ask before a call")}</span>
+            <span className="cq-brief-label">
+              {t("What to ask before a call")}
+            </span>
           </div>
           {drafts.length === 0 && asked.length === 0 ? (
             <p className="cq-body-sm text-(--cq-text-secondary)">
@@ -112,7 +120,11 @@ export function DiligenceBrief({
           ) : (
             <ol className="m-0 flex list-none flex-col p-0">
               {drafts.map((draft, index) => (
-                <li key={draft.id} className="cq-brief-qrow" data-question="DRAFT">
+                <li
+                  key={draft.id}
+                  className="cq-brief-qrow"
+                  data-question="DRAFT"
+                >
                   <span className="cq-brief-num" aria-hidden="true">
                     {index + 1}
                   </span>
@@ -130,7 +142,9 @@ export function DiligenceBrief({
                 <li
                   key={a.id}
                   className="cq-brief-qrow"
-                  data-question={a.asked?.answer === null ? "WAITING" : "ANSWERED"}
+                  data-question={
+                    a.asked?.answer === null ? "WAITING" : "ANSWERED"
+                  }
                 >
                   <span className="cq-brief-num" aria-hidden="true">
                     {drafts.length + index + 1}
@@ -148,8 +162,10 @@ export function DiligenceBrief({
                           {a.asked.answer.text}
                         </span>
                         <span className="cq-brief-label">
-                          Founder’s answer, {shortDay(a.asked.answer.answeredAt)} ·{" "}
-                          {a.asked.answer.evidenceStatus === "DOCUMENT_SUPPORTED"
+                          Founder’s answer,{" "}
+                          {shortDay(a.asked.answer.answeredAt)} ·{" "}
+                          {a.asked.answer.evidenceStatus ===
+                          "DOCUMENT_SUPPORTED"
                             ? "their claim, with a document"
                             : "their claim, self-reported"}
                         </span>
@@ -201,7 +217,10 @@ export function DiligenceBrief({
       </QReadCard>
       <BriefCard title={t("Your requests")} data-diligence-requests="">
         <div className="cq-brief-rq">
-          <span className="cq-brief-dot" data-k={drafts.length === 0 ? "ok" : "req"} />
+          <span
+            className="cq-brief-dot"
+            data-k={drafts.length === 0 ? "ok" : "req"}
+          />
           <div>
             <b>
               {drafts.length === 0
@@ -244,7 +263,10 @@ export function DiligenceBrief({
           </div>
         </div>
         <div className="cq-brief-rq">
-          <span className="cq-brief-dot" data-k={nextCall === null ? "miss" : "ok"} />
+          <span
+            className="cq-brief-dot"
+            data-k={nextCall === null ? "miss" : "ok"}
+          />
           <div>
             <b>
               {nextCall === null
@@ -278,7 +300,10 @@ export function DiligenceBrief({
 
 function LedgerRowView({ row }: { readonly row: LedgerRow }) {
   return (
-    <div className="cq-brief-erow" data-gap={row.value === null ? "" : undefined}>
+    <div
+      className="cq-brief-erow"
+      data-gap={row.value === null ? "" : undefined}
+    >
       <span className="ek">{row.label}</span>
       <span className="evv">{row.value ?? "Not stated"}</span>
       <span className="et">
@@ -312,7 +337,9 @@ function LedgerFoldView({
         <span className="ftally">
           <EvidenceBar
             size="sm"
-            marks={fold.rows.map((row) => (row.value === null ? "unk" : row.evidence))}
+            marks={fold.rows.map((row) =>
+              row.value === null ? "unk" : row.evidence,
+            )}
           />
         </span>
         <span className="chev">

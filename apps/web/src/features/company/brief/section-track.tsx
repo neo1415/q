@@ -128,9 +128,8 @@ export function SectionTrack({
     event.preventDefault();
     // Right-to-left reading turns the other way.
     const rtl =
-      typeof document !== "undefined" &&
-      document.documentElement.dir === "rtl";
-    go(at + ((forward ? 1 : -1) * (rtl ? -1 : 1)), false);
+      typeof document !== "undefined" && document.documentElement.dir === "rtl";
+    go(at + (forward ? 1 : -1) * (rtl ? -1 : 1), false);
   };
 
   const current = sections[at];

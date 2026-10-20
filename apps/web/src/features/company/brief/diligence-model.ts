@@ -100,15 +100,15 @@ function summaryOf(rows: readonly LedgerRow[], lead: string): string {
   const open = rows
     .filter((row) => row.value === null)
     .map((row) => row.label.toLowerCase());
-  return [
+  const line = [
     lead,
     open.length === 0
       ? null
       : `${open.slice(0, 2).join(" and ")} not known yet${open.length > 2 ? `, and ${String(open.length - 2)} more` : ""}`,
   ]
     .filter((part) => part !== null && part !== "")
-    .join(". ")
-    .replace(/^$/u, `${plural(known, "fact")}`);
+    .join(". ");
+  return line === "" ? plural(known, "fact") : line;
 }
 
 export function diligenceLedger(input: {
@@ -119,6 +119,8 @@ export function diligenceLedger(input: {
   readonly sections: readonly PitchProfileSection[];
   readonly board: AssumptionBoardDto | null;
   readonly sharedInDiligence: readonly string[];
+  /** In diligence, "not shared" is a next step: "not shared with you yet". */
+  readonly inDiligence?: boolean | undefined;
   readonly verified: boolean;
 }): readonly LedgerFold[] {
   const { profile, own, deck, board } = input;
@@ -130,8 +132,11 @@ export function diligenceLedger(input: {
 
   // 1. The raise.
   const view =
-    overview.raiseView === undefined ? null : raiseWords(overview.raiseView, own);
-  const said = overview.raiseFromPitch ?? claims.find((c) => c.kind === "RAISE");
+    overview.raiseView === undefined
+      ? null
+      : raiseWords(overview.raiseView, own);
+  const said =
+    overview.raiseFromPitch ?? claims.find((c) => c.kind === "RAISE");
   const terms = deckAskTerms(deck);
   const ask = sectionOf(deck, "THE_ASK");
   const askWhere = (value: string | undefined) => {
@@ -145,7 +150,8 @@ export function diligenceLedger(input: {
       : said?.money !== null && said?.money !== undefined
         ? compactMoneyText(said.money)
         : null);
-  const pitchOnly = overview.raise === null && said !== undefined && said !== null;
+  const pitchOnly =
+    overview.raise === null && said !== undefined && said !== null;
   const instrument = claims.find((c) => c.kind === "INSTRUMENT");
   const raiseRows: LedgerRow[] = [
     {
@@ -163,7 +169,9 @@ export function diligenceLedger(input: {
           ? terms.amount === undefined
             ? null
             : askWhere(terms.amount)
-          : said !== undefined && said !== null && view?.source !== "DISCLOSED_OBJECTIVE"
+          : said !== undefined &&
+              said !== null &&
+              view?.source !== "DISCLOSED_OBJECTIVE"
             ? pitchWhere(said)
             : "Declared on Capital Q",
     },
@@ -173,7 +181,11 @@ export function diligenceLedger(input: {
           {
             key: "instrument",
             label: "Instrument",
-            value: instrument?.instrument ?? terms.instrument ?? instrument?.statement ?? null,
+            value:
+              instrument?.instrument ??
+              terms.instrument ??
+              instrument?.statement ??
+              null,
             evidence: "claim" as const,
             where:
               instrument === undefined
@@ -229,9 +241,8 @@ export function diligenceLedger(input: {
             key: "lead",
             label: "Lead investor",
             value:
-              ask?.facts.find((f) =>
-                /\b(committed|lead)\b/iu.test(f.label),
-              )?.value ?? null,
+              ask?.facts.find((f) => /\b(committed|lead)\b/iu.test(f.label))
+                ?.value ?? null,
             evidence: "claim" as const,
             where: "Deck",
           },
@@ -252,8 +263,11 @@ export function diligenceLedger(input: {
             key: "round",
             label: "Round details",
             value:
-              overview.raise === null ? "Not shared yet" : moneyText(overview.raise),
-            evidence: overview.raise === null ? ("lock" as const) : ("claim" as const),
+              overview.raise === null
+                ? "Not shared yet"
+                : moneyText(overview.raise),
+            evidence:
+              overview.raise === null ? ("lock" as const) : ("claim" as const),
             where: overview.raise === null ? null : "Shared with you",
           },
         ]),
@@ -321,9 +335,13 @@ export function diligenceLedger(input: {
     {
       key: "sector",
       label: "Sector",
-      value: input.sectorLabels.length === 0 ? null : input.sectorLabels.join(", "),
+      value:
+        input.sectorLabels.length === 0 ? null : input.sectorLabels.join(", "),
       evidence: input.sectorLabels.length === 0 ? "unk" : "claim",
-      where: input.sectorLabels.length === 0 ? "Not declared" : "Declared by the company",
+      where:
+        input.sectorLabels.length === 0
+          ? "Not declared"
+          : "Declared by the company",
     },
     ...deckRows(deck, ["MARKET"]),
     ...unknownRows(board, /market/iu, taken),
@@ -356,14 +374,23 @@ export function diligenceLedger(input: {
       label: "Legal name",
       value: overview.legalName,
       evidence: overview.legalName === null ? "unk" : "claim",
-      where: overview.legalName === null ? "Not declared" : "Declared by the company",
+      where:
+        overview.legalName === null
+          ? "Not declared"
+          : "Declared by the company",
     },
     {
       key: "founded",
       label: "Founded",
-      value: overview.foundedDate === null ? null : formatLongDay(overview.foundedDate),
+      value:
+        overview.foundedDate === null
+          ? null
+          : formatLongDay(overview.foundedDate),
       evidence: overview.foundedDate === null ? "unk" : "claim",
-      where: overview.foundedDate === null ? "Not declared" : "Declared by the company",
+      where:
+        overview.foundedDate === null
+          ? "Not declared"
+          : "Declared by the company",
     },
     {
       key: "hq",
@@ -373,7 +400,8 @@ export function diligenceLedger(input: {
           .filter((part): part is string => part !== null && part !== "")
           .join(", ") || null,
       evidence:
-        profile.headquartersCity === null && profile.headquartersCountry === null
+        profile.headquartersCity === null &&
+        profile.headquartersCountry === null
           ? "unk"
           : "claim",
       where: null,
@@ -408,7 +436,9 @@ export function diligenceLedger(input: {
         amount === null
           ? own
             ? "Not added yet"
-            : "Not shared with you"
+            : input.inDiligence === true
+              ? "Not shared with you yet"
+              : "Not shared with you"
           : `${amount} ${view?.source === "DISCLOSED_OBJECTIVE" ? "declared by the company" : own ? "stated in your pitch" : "stated in their pitch"}.${overview.raise === null && !own ? " The round isn’t formally shared with you yet." : ""}`,
       lead: raiseLead,
       note: null,
@@ -474,7 +504,9 @@ export function diligenceLedger(input: {
       title: "Company details",
       summary: [
         founded === null ? "Founded date not declared" : `Founded ${founded}`,
-        input.verified ? "Verified by Capital Q" : "Not verified by Capital Q yet",
+        input.verified
+          ? "Verified by Capital Q"
+          : "Not verified by Capital Q yet",
       ].join(" · "),
       lead: null,
       note: null,

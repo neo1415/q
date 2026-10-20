@@ -68,20 +68,33 @@ export function momentsOf(
     const id = `${String(claim.atSeconds)}:${claim.kind}`;
     if (seen.has(id)) continue;
     seen.add(id);
-    out.push({ key: `c-${id}`, at: claim.atSeconds, kind: KIND_WORDS[claim.kind], words });
+    out.push({
+      key: `c-${id}`,
+      at: claim.atSeconds,
+      kind: KIND_WORDS[claim.kind],
+      words,
+    });
   }
   for (const fact of sections) {
     if (fact.pitchId !== pitchId) continue;
     const id = `${String(fact.atSeconds)}:${fact.label}`;
     if (seen.has(id)) continue;
     seen.add(id);
-    out.push({ key: `s-${id}`, at: fact.atSeconds, kind: fact.label, words: fact.value });
+    out.push({
+      key: `s-${id}`,
+      at: fact.atSeconds,
+      kind: fact.label,
+      words: fact.value,
+    });
   }
   return out.sort((a, b) => a.at - b.at);
 }
 
 /** Wait for the player's video, then play it from `at` (muted, inline). */
-function useSeek(container: HTMLElement | null, request: { at: number; n: number } | null) {
+function useSeek(
+  container: HTMLElement | null,
+  request: { at: number; n: number } | null,
+) {
   useEffect(() => {
     if (container === null || request === null) return;
     let done = false;
@@ -136,7 +149,9 @@ export function ElevatorBrief({
   const [pick, setPick] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [moment, setMoment] = useState<number | null>(null);
-  const [request, setRequest] = useState<{ at: number; n: number } | null>(null);
+  const [request, setRequest] = useState<{ at: number; n: number } | null>(
+    null,
+  );
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const counter = useRef(0);
   useSeek(frame, request);
@@ -144,7 +159,11 @@ export function ElevatorBrief({
   const video = videos[pick];
   if (video === undefined) {
     return (
-      <section className="flex flex-col gap-4" aria-label="Elevator" data-profile-elevator>
+      <section
+        className="flex flex-col gap-4"
+        aria-label="Elevator"
+        data-profile-elevator
+      >
         <p className="cq-body-sm text-(--cq-text-secondary)">
           {t("No videos you can watch yet.")}
         </p>
@@ -153,7 +172,7 @@ export function ElevatorBrief({
   }
   const moments = momentsOf(video.mediaAssetId, claims, sections);
   const length = video.durationSeconds;
-  const title = video.title ?? "Elevator pitch";
+  const title = video.title ?? `Video ${String(pick + 1)}`;
   const raiseSaid = claims.find(
     (c) => c.pitchId === video.mediaAssetId && c.kind === "RAISE",
   );
@@ -171,15 +190,22 @@ export function ElevatorBrief({
     pitchRaise !== null &&
     deckRaise !== null &&
     pitchRaise.toLowerCase().replace(/\.0+(?=[a-z])/u, "") ===
-      deckRaise.toLowerCase().replace(/\s/gu, "").replace(/\.0+(?=[a-z])/u, "");
+      deckRaise
+        .toLowerCase()
+        .replace(/\s/gu, "")
+        .replace(/\.0+(?=[a-z])/u, "");
 
   const main = (
     <>
-      <section className="cq-brief-card" aria-label="Elevator" data-profile-elevator>
+      <section
+        className="cq-brief-card"
+        aria-label="Elevator"
+        data-profile-elevator
+      >
         <div className="cq-brief-row">
           <b className="cq-brief-title">
-            {plural(videos.length, "video")} and pitch{videos.length === 1 ? "" : "es"} from the
-            founders
+            {plural(videos.length, "video")} and pitch
+            {videos.length === 1 ? "" : "es"} from the founders
           </b>
           <span className="cq-brief-label">
             {[title, length === null ? null : pitchMoment(length)]
@@ -200,7 +226,10 @@ export function ElevatorBrief({
             ) : (
               <div className="cq-brief-poster">
                 <span className="pt">
-                  <span className="cq-brief-av" style={{ width: 28, height: 28, fontSize: 11 }}>
+                  <span
+                    className="cq-brief-av"
+                    style={{ width: 28, height: 28, fontSize: 11 }}
+                  >
                     {initials(company.canonicalName)}
                   </span>
                   {company.canonicalName}
@@ -224,7 +253,9 @@ export function ElevatorBrief({
             <p className="cq-brief-label" style={{ marginBottom: 6 }}>
               {moments.length === 0
                 ? t("Q hasn’t read moments from this video yet.")
-                : t("What they say, moment by moment. Tap one to play from there.")}
+                : t(
+                    "What they say, moment by moment. Tap one to play from there.",
+                  )}
             </p>
             {moments.map((m) => (
               <button
@@ -251,7 +282,11 @@ export function ElevatorBrief({
           {t("The company’s own claims, from its pitch video. Not verified.")}
         </p>
         {videos.length <= 1 ? null : (
-          <div className="cq-brief-chips" aria-label={t("Their videos")} role="group">
+          <div
+            className="cq-brief-chips"
+            aria-label={t("Their videos")}
+            role="group"
+          >
             {videos.map((v, index) => (
               <button
                 key={v.mediaAssetId}
@@ -267,7 +302,9 @@ export function ElevatorBrief({
                 data-tone={index === pick ? "claim" : undefined}
               >
                 {v.title ?? `Video ${String(index + 1)}`}
-                {v.durationSeconds === null ? "" : ` · ${pitchMoment(v.durationSeconds)}`}
+                {v.durationSeconds === null
+                  ? ""
+                  : ` · ${pitchMoment(v.durationSeconds)}`}
               </button>
             ))}
           </div>
@@ -285,8 +322,8 @@ export function ElevatorBrief({
             ))}
           </div>
           <p className="cq-brief-label m-0">
-            Unknown is not negative. These stay open until {company.canonicalName}{" "}
-            answers or shares a document.
+            Unknown is not negative. These stay open until{" "}
+            {company.canonicalName} answers or shares a document.
           </p>
         </BriefCard>
       )}
@@ -306,8 +343,9 @@ export function ElevatorBrief({
         </p>
         {notSaid.length === 0 ? null : (
           <p className="qual">
-            The pitch doesn’t mention {notSaid.slice(0, 2).join(" or ").toLowerCase()}, the
-            first things to ask.
+            The pitch doesn’t mention{" "}
+            {notSaid.slice(0, 2).join(" or ").toLowerCase()}, the first things
+            to ask.
           </p>
         )}
       </QReadCard>
@@ -328,7 +366,11 @@ export function ElevatorBrief({
           <div>
             <dt className="cq-brief-label">{t("Captions")}</dt>
             <dd className="m-0">
-              <b>{video.captionState === "AVAILABLE" ? t("On") : t("Not ready yet")}</b>
+              <b>
+                {video.captionState === "AVAILABLE"
+                  ? t("On")
+                  : t("Not ready yet")}
+              </b>
             </dd>
           </div>
           <div>

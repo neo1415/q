@@ -21,7 +21,9 @@ import type { Evidence } from "./parts";
  */
 
 /** The relationship chip's words beside the company's facts. */
-export function relationshipWords(state: RelationshipStateV2 | null): string | null {
+export function relationshipWords(
+  state: RelationshipStateV2 | null,
+): string | null {
   switch (state) {
     case null:
     case "DISCOVERED":
@@ -108,7 +110,11 @@ export function headerRaise(input: {
 export type KeyNumber = { readonly label: string; readonly value: string };
 
 const LOOK: readonly (readonly [string, DeckSectionCode[], RegExp])[] = [
-  ["Contracted ARR", ["TRACTION", "FINANCIALS"], /\b(arr|recurring revenue)\b/iu],
+  [
+    "Contracted ARR",
+    ["TRACTION", "FINANCIALS"],
+    /\b(arr|recurring revenue)\b/iu,
+  ],
   ["Revenue", ["TRACTION", "FINANCIALS"], /\b(revenue|mrr|sales|gmv)\b/iu],
   [
     "Customers",

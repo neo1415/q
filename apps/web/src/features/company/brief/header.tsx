@@ -10,7 +10,11 @@ import type {
   RelationshipStateV2,
 } from "@capital-q/contracts";
 import { Check, ICON_SIZE } from "@capital-q/ui/icons";
-import { PopoverContent, PopoverRoot, PopoverTrigger } from "@capital-q/ui/popover";
+import {
+  PopoverContent,
+  PopoverRoot,
+  PopoverTrigger,
+} from "@capital-q/ui/popover";
 
 import { useT } from "@/features/i18n/language";
 
@@ -82,7 +86,11 @@ export function BriefHeader({
             </span>
           ) : null}
           {chip === null ? null : (
-            <span className="cq-brief-tag" data-tone="claim" data-relationship-chip>
+            <span
+              className="cq-brief-tag"
+              data-tone="claim"
+              data-relationship-chip
+            >
               {t(chip)}
             </span>
           )}

@@ -545,6 +545,7 @@ function DiligencePanel({
     sections,
     board,
     sharedInDiligence: diligence?.titles ?? [],
+    inDiligence: diligence !== null,
     verified,
   });
   const raiseMissing =

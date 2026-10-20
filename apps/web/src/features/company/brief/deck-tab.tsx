@@ -126,7 +126,9 @@ export function DeckBrief({
             >
               <span className="cq-brief-label">{deck.title}</span>
               <span className="cq-brief-title" style={{ fontSize: 20 }}>
-                {pending ? t("Opening…") : `Open the deck at slide ${String(slide)}`}
+                {pending
+                  ? t("Opening…")
+                  : `Open the deck at slide ${String(slide)}`}
               </span>
               <span className="cq-brief-label">
                 {deck.downloadable || owner
@@ -142,7 +144,9 @@ export function DeckBrief({
                 title={`${deck.title}, slide ${String(slide)}`}
                 referrerPolicy="no-referrer"
               />
-              {file.watermark === null ? null : <Watermark words={file.watermark} />}
+              {file.watermark === null ? null : (
+                <Watermark words={file.watermark} />
+              )}
             </div>
           )}
         </div>
@@ -219,7 +223,11 @@ export function DeckBrief({
           data-deck-carousel=""
           data-deck-section={section.sectionKey}
         >
-          <div className="cq-brief-secdetail" key={section.sectionKey} style={{ paddingTop: 0, minHeight: 0 }}>
+          <div
+            className="cq-brief-secdetail"
+            key={section.sectionKey}
+            style={{ paddingTop: 0, minHeight: 0 }}
+          >
             <DeckSectionDetail
               section={section}
               companyName={companyName}
@@ -236,11 +244,14 @@ export function DeckBrief({
               : `${plural(provided.length, "section")} of ${String(sections.length)} are covered. ${gaps
                   .slice(0, 4)
                   .map((g) => g.label)
-                  .join(", ")}${gaps.length > 4 ? ` and ${String(gaps.length - 4)} more` : ""} ${gaps.length === 1 ? "is" : "are"} missing.`}
+                  .join(
+                    ", ",
+                  )}${gaps.length > 4 ? ` and ${String(gaps.length - 4)} more` : ""} ${gaps.length === 1 ? "is" : "are"} missing.`}
           </p>
           <p className="qual">
             Every figure in it is the company’s own. Q read it on{" "}
-            {longDay(extraction.readAt)}, from version {extraction.versionNumber}.
+            {longDay(extraction.readAt)}, from version{" "}
+            {extraction.versionNumber}.
           </p>
         </QReadCard>
       )}
@@ -249,11 +260,17 @@ export function DeckBrief({
 
   const rail = (
     <>
-      <section className="cq-brief-card" data-deck={owner ? "owner-preview" : "investor"}>
+      <section
+        className="cq-brief-card"
+        data-deck={owner ? "owner-preview" : "investor"}
+      >
         <h3 id="deck-title">
           {companyName} deck, version {deck.versionNumber}
         </h3>
-        <div className="cq-brief-title" style={{ fontSize: 15, fontWeight: 500, marginTop: -4 }}>
+        <div
+          className="cq-brief-title"
+          style={{ fontSize: 15, fontWeight: 500, marginTop: -4 }}
+        >
           {deck.title}
         </div>
         <span className="cq-brief-label" style={{ marginTop: -8 }}>
@@ -397,7 +414,9 @@ function DeckSectionDetail({
         {section.label}
         <span className="cq-brief-tag" data-tone="positive">
           <FileText size={ICON_SIZE.compact} aria-hidden="true" />
-          {page === undefined ? t("From the pitch") : `In the deck, slide ${String(page)}`}
+          {page === undefined
+            ? t("From the pitch")
+            : `In the deck, slide ${String(page)}`}
         </span>
       </h4>
       {section.summary === null ? null : <p>{section.summary}</p>}

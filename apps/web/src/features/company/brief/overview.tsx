@@ -109,7 +109,9 @@ export function OverviewBrief({
       >
         <div className="cq-brief-row">
           <h2 id="pitch-profile-title" className="cq-brief-title m-0">
-            {own ? t("Your profile, section by section") : t("Section by section")}
+            {own
+              ? t("Your profile, section by section")
+              : t("Section by section")}
           </h2>
           <div className="cq-brief-legend" data-pitch-profile-summary>
             <span>
