@@ -219,7 +219,7 @@ export function HubRelated({ side }: { readonly side: HubSide }) {
           key={entry.id}
           href={entry.href}
           data-hub-link={entry.id}
-          className="cq-body-sm inline-flex min-h-11 items-center gap-1 px-2 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="cq-body-sm inline-flex min-h-11 items-center gap-1 rounded-(--cq-radius-md) px-2 text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
           {t(entry.label)}
           <ArrowUpRight

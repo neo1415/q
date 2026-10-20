@@ -1648,7 +1648,7 @@ export function QOnboardingWorkspace({
       {otherProposals.length > 0 ? (
         <section
           aria-label={t("What Q picked up")}
-          className="flex flex-col gap-3 border border-(--cq-border-subtle) p-3"
+          className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) p-3"
           data-q-picked-up
         >
           <span className="cq-label text-(--cq-text-secondary)">
@@ -2033,7 +2033,7 @@ export function QOnboardingWorkspace({
             </Button>
           </div>
           {showGaps ? (
-            <ul className="flex flex-col gap-3 border border-(--cq-border-subtle) p-3">
+            <ul className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) p-3">
               {gaps.map((gap) => (
                 <GapItem
                   key={gap.question.id}
@@ -2092,7 +2092,7 @@ export function QOnboardingWorkspace({
       {showReview ? (
         <section
           aria-label={t("What Q knows")}
-          className="flex flex-col gap-3 border border-(--cq-border-subtle) p-3"
+          className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) p-3"
           data-q-review
         >
           {review.map((group) => (
@@ -2356,7 +2356,7 @@ function QLine({
       <p
         className={
           kind === "PERSON"
-            ? "cq-body max-w-(--cq-layout-narrow) bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
+            ? "cq-body max-w-(--cq-layout-narrow) rounded-md bg-(--cq-surface-sunken) px-3 py-2 text-(--cq-text-primary)"
             : "cq-body cq-prose whitespace-pre-wrap text-(--cq-text-secondary)"
         }
         data-streaming={streaming ? "true" : undefined}

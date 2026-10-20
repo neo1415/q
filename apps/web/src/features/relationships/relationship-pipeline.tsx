@@ -53,7 +53,7 @@ import {
 import { useT } from "@/features/i18n/language";
 
 const inputClass =
-  "cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)";
+  "cq-body-sm min-h-11 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)";
 /** A select reads as a quiet control in the view bar, not a form field. */
 const selectClass = `${inputClass} max-w-full pe-8`;
 const href = (row: RelationshipSummaryDto) =>
@@ -396,7 +396,7 @@ export function RelationshipPipeline({
         className="group md:[&::details-content]:[content-visibility:visible]"
         data-pipeline-options
       >
-        <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) md:hidden [&::-webkit-details-marker]:hidden">
+        <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) md:hidden [&::-webkit-details-marker]:hidden">
           <span className="font-medium">{t("View options")}</span>
           <span className="truncate text-(--cq-text-secondary)">
             {optionsSummary !== ""
@@ -491,7 +491,7 @@ export function RelationshipPipeline({
             ) : null}
             {layout === "table" ? (
               <details className="cq-body-sm relative">
-                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
+                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-(--cq-radius-md) px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
                   {t("Columns")}
                 </summary>
                 <div className="flex flex-col px-3 pb-1">
@@ -798,7 +798,7 @@ export function RelationshipPipeline({
               <section
                 key={state}
                 aria-labelledby={`board-${state}`}
-                className="flex w-[80%] flex-none snap-start flex-col gap-2 bg-(--cq-surface-subtle) p-2 sm:w-64"
+                className="flex w-[80%] flex-none snap-start flex-col gap-2 rounded-(--cq-radius-lg) bg-(--cq-surface-subtle) p-2 sm:w-64"
                 data-board-column={state}
               >
                 <h2

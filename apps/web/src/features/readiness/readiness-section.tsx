@@ -135,7 +135,7 @@ export function ReadinessSection({
                     >
                       <span
                         aria-hidden="true"
-                        className="cq-caption grid size-6 place-items-center bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
+                        className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
                       >
                         {index + 1}
                       </span>
@@ -200,7 +200,7 @@ export function ReadinessSection({
       <QControl id="list.pillars" kind="LIST">
         <ul
           aria-label={t("Readiness by pillar")}
-          className="overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)"
+          className="overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
         >
           {readiness.pillars.map((pillar) => (
             <li
@@ -243,7 +243,7 @@ export function ReadinessSection({
                             <span className="text-(--cq-text-primary)">
                               {t(line.label)}
                             </span>
-                            <span className="cq-caption shrink-0 border border-(--cq-border) px-1.5 py-0.5 text-(--cq-text-secondary)">
+                            <span className="cq-caption shrink-0 rounded-(--cq-radius-sm) border border-(--cq-border) px-1.5 py-0.5 text-(--cq-text-secondary)">
                               {t(evidenceTag(line))}
                             </span>
                           </li>

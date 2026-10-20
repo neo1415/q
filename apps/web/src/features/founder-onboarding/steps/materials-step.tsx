@@ -137,7 +137,7 @@ export function MaterialsStep({
       */}
       <div
         className={[
-          "flex flex-col items-center gap-3 border border-dashed px-4 py-8 text-center transition-colors duration-(--cq-motion-fast)",
+          "flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-8 text-center transition-colors duration-(--cq-motion-fast)",
           dragging
             ? "border-(--cq-border-strong) bg-(--cq-surface-sunken)"
             : "border-(--cq-border) bg-(--cq-surface-raised)",

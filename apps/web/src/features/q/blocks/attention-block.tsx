@@ -79,7 +79,7 @@ export function AttentionBody({
           {report.items.map((item) => (
             <li
               key={item.key}
-              className="flex min-h-11 items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-1.5"
+              className="flex min-h-11 items-center gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-1.5"
               data-q-attention-item={item.source}
             >
               <span className="flex min-w-0 flex-1 flex-col">

@@ -55,11 +55,11 @@ export function WorkforceCost({
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={Math.round(share)}
-              className="h-2 overflow-hidden bg-(--cq-surface-subtle)"
+              className="h-2 overflow-hidden rounded-[4px] bg-(--cq-surface-subtle)"
             >
               <div
                 className={cx(
-                  "h-full",
+                  "h-full rounded-[4px]",
                   overview.paused ? "bg-(--cq-warning)" : "bg-(--cq-accent)",
                 )}
                 style={{ width: `${String(share)}%` }}
@@ -101,9 +101,9 @@ export function WorkforceCost({
                       {row.name}
                     </th>
                     <td className="py-1.5 align-middle">
-                      <div className="h-2 bg-(--cq-surface-subtle)">
+                      <div className="h-2 rounded-[4px] bg-(--cq-surface-subtle)">
                         <div
-                          className="h-full bg-(--cq-text-primary)"
+                          className="h-full rounded-[4px] bg-(--cq-text-primary)"
                           style={{ width: `${String(row.share)}%` }}
                         />
                       </div>

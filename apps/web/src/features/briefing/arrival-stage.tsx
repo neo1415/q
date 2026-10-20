@@ -124,7 +124,7 @@ function browserZone(): string | null {
 const REVEAL_SETTLE_MS = 12_000;
 
 const CARD =
-  "flex flex-col gap-2 border border-(--cq-border) bg-(--cq-surface-raised) p-4";
+  "flex flex-col gap-2 rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised) p-4";
 
 function GroupHead({
   title,
@@ -213,7 +213,7 @@ export function AttentionList({
       {lines.slice(0, 6).map((item) => (
         <li
           key={item.key}
-          className="flex min-h-11 items-center gap-2 border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-1.5"
+          className="flex min-h-11 items-center gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-1.5"
           data-arrival-attention-item={item.source}
           data-q-attention-item={item.source}
         >

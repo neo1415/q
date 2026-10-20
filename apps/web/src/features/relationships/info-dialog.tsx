@@ -26,7 +26,7 @@ export function InfoDialog({
         <button
           type="button"
           aria-label={t(title)}
-          className="flex size-11 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
+          className="flex size-11 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
         >
           <Info size={ICON_SIZE.regular} aria-hidden="true" />
         </button>

@@ -47,7 +47,7 @@ export function InstrumentChoice({
         {options.map((option) => (
           <label
             key={option.value ?? "NOT_STATED"}
-            className="cq-body-sm inline-flex min-h-11 cursor-pointer items-center border border-(--cq-border) px-4 text-(--cq-text-primary) has-checked:border-transparent has-checked:bg-(--cq-accent-soft) has-focus-visible:outline-2 has-focus-visible:outline-(--cq-focus-ring)"
+            className="cq-body-sm inline-flex min-h-11 cursor-pointer items-center rounded-full border border-(--cq-border) px-4 text-(--cq-text-primary) has-checked:border-transparent has-checked:bg-(--cq-accent-soft) has-focus-visible:outline-2 has-focus-visible:outline-(--cq-focus-ring)"
           >
             <input
               type="radio"

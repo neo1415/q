@@ -99,11 +99,11 @@ export function QRoomPdfOffer({
 
   return (
     <section
-      className="flex w-full flex-wrap items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
+      className="flex w-full flex-wrap items-center gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
       aria-label={t("Make a PDF")}
       data-q-room-pdf-offer
     >
-      <span className="flex size-9 flex-none items-center justify-center border border-(--cq-border) text-(--cq-text-secondary)">
+      <span className="flex size-9 flex-none items-center justify-center rounded-(--cq-radius-md) border border-(--cq-border) text-(--cq-text-secondary)">
         <FileText
           aria-hidden="true"
           size={ICON_SIZE.compact}

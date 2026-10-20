@@ -63,7 +63,7 @@ export function ActivityBars({
                 className="flex h-full min-w-0 flex-1 items-end"
               >
                 <span
-                  className={`block w-full ${
+                  className={`block w-full rounded-t-[3px] ${
                     active === index
                       ? "bg-(--cq-accent-hover)"
                       : "bg-(--cq-accent)"

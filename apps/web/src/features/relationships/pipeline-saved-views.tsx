@@ -30,7 +30,7 @@ export type AppliedView = {
 };
 
 const inputClass =
-  "cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary)";
+  "cq-body-sm min-h-11 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary)";
 
 /**
  * CRM saved views (2026-10-15): the person's own and their workspace's,
@@ -241,7 +241,7 @@ export function PipelineSavedViews({
       {/* Naming, sharing and changing a view are occasional: one tap
           away, so the bar shows only the views themselves. */}
       <details data-pipeline-view-manage>
-        <summary className="cq-body-sm inline-flex min-h-11 cursor-pointer list-none items-center gap-1 px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
+        <summary className="cq-body-sm inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-(--cq-radius-md) px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
           <Bookmark size={ICON_SIZE.compact} aria-hidden="true" />
           {t("Manage views")}
         </summary>

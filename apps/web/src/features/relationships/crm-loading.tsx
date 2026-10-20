@@ -16,7 +16,7 @@ import { useT } from "@/features/i18n/language";
  * no text that changes; the pulse stops under reduced motion.
  */
 const bar =
-  "block animate-pulse bg-(--cq-surface-strong) motion-reduce:animate-none";
+  "block animate-pulse rounded-(--cq-radius-sm) bg-(--cq-surface-strong) motion-reduce:animate-none";
 
 function Rows({
   count,

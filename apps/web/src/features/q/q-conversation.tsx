@@ -940,7 +940,7 @@ export function QConversationPanel({
         <div
           role="status"
           aria-live="polite"
-          className="flex items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
+          className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
         >
           <span className="cq-body text-(--cq-text-primary)">
             {voiceNotice}
@@ -1031,7 +1031,7 @@ export function QConversationPanel({
                 <div
                   role="group"
                   aria-label={t("View")}
-                  className="flex items-center border border-(--cq-border-subtle) p-0.5"
+                  className="flex items-center rounded-md border border-(--cq-border-subtle) p-0.5"
                   data-q-control="view"
                 >
                   {(["presence", "chat"] as const).map((option) => (

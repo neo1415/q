@@ -9,7 +9,7 @@ import { cx } from "../primitives/class-names.js";
  */
 
 const chipBase =
-  "inline-flex min-h-9 items-center gap-1.5 border px-3 cq-label transition-colors duration-(--cq-motion-fast)";
+  "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 cq-label transition-colors duration-(--cq-motion-fast)";
 
 export type ChipProps = Omit<HTMLAttributes<HTMLSpanElement>, "className"> & {
   readonly className?: string | undefined;

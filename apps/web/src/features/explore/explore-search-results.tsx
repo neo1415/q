@@ -153,7 +153,7 @@ export function ExploreSearchResults({
               <Link
                 href={searchHref(chip.without, tab)}
                 aria-label={`Remove ${chip.label}`}
-                className="grid size-7 place-items-center hover:bg-(--cq-surface-subtle)"
+                className="grid size-7 place-items-center rounded-full hover:bg-(--cq-surface-subtle)"
               >
                 <X size={14} aria-hidden="true" />
               </Link>

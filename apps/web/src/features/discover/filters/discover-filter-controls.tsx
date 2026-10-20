@@ -50,7 +50,7 @@ function FilterCountBadge({ count }: { readonly count: number }) {
   if (count === 0) return null;
   return (
     <span
-      className="cq-caption cq-numeric inline-flex min-w-5 items-center justify-center bg-(--cq-accent) px-1.5 text-(--cq-text-inverse)"
+      className="cq-caption cq-numeric inline-flex min-w-5 items-center justify-center rounded-full bg-(--cq-accent) px-1.5 text-(--cq-text-inverse)"
       aria-hidden="true"
     >
       {count}
@@ -445,7 +445,7 @@ export function DiscoverFilterRow({
         <button
           key={chip.key}
           type="button"
-          className="cq-label inline-flex min-h-11 items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary) hover:border-(--cq-border-strong) lg:min-h-9"
+          className="cq-label inline-flex min-h-11 items-center gap-1.5 rounded-full border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary) hover:border-(--cq-border-strong) lg:min-h-9"
           onClick={() => onChange(chip.without)}
           aria-label={`Remove filter: ${chip.label}`}
         >

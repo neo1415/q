@@ -28,7 +28,7 @@ export function StatusPill({
   return (
     <span
       className={cx(
-        "cq-caption inline-flex items-center gap-1.5 border px-2.5 py-0.5 whitespace-nowrap",
+        "cq-caption inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 whitespace-nowrap",
         TONES[tone],
       )}
       data-status-pill={tone}

@@ -33,7 +33,7 @@ export function Tooltip({ content, children, side = "top" }: TooltipProps) {
           sideOffset={6}
           className="z-(--cq-z-popover)"
         >
-          <BaseTooltip.Popup className="max-w-64 bg-(--cq-text-primary) px-2.5 py-1.5 cq-caption text-(--cq-text-inverse) shadow-(--cq-shadow-overlay) transition-opacity duration-(--cq-motion-fast) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0">
+          <BaseTooltip.Popup className="max-w-64 rounded-sm bg-(--cq-text-primary) px-2.5 py-1.5 cq-caption text-(--cq-text-inverse) shadow-(--cq-shadow-overlay) transition-opacity duration-(--cq-motion-fast) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0">
             {content}
           </BaseTooltip.Popup>
         </BaseTooltip.Positioner>

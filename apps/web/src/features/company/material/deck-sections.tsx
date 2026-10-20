@@ -99,7 +99,7 @@ export function DeckReadSummary({
   // 2026-10-11). Native <details>: opens by keyboard and AT with no script.
   return (
     <details
-      className="group bg-(--cq-surface-subtle)"
+      className="group rounded-lg bg-(--cq-surface-subtle)"
       aria-labelledby="deck-read-title"
       data-deck-read
     >
@@ -228,7 +228,7 @@ export function ReadSectionCard({
   const t = useT();
   return (
     <article
-      className="flex h-full flex-col gap-4 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+      className="flex h-full flex-col gap-4 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
       aria-label={section.label}
       {...(attribute === "deck"
         ? { "data-deck-section": section.key }
@@ -517,7 +517,7 @@ export function ReadCarousel({
             role="tab"
             aria-selected={visible === at}
             onClick={() => go(at)}
-            className={`cq-body-sm min-h-11 shrink-0 border px-4 ${
+            className={`cq-body-sm min-h-11 shrink-0 rounded-full border px-4 ${
               visible === at
                 ? "border-(--cq-text-primary) bg-(--cq-text-primary) text-(--cq-text-inverse)"
                 : "border-(--cq-border) text-(--cq-text-primary)"

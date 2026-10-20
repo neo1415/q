@@ -47,7 +47,7 @@ export function PipelineLayoutSwitch({
       ref={ref}
       role="group"
       aria-label={t("Layout")}
-      className="inline-flex self-start border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
+      className="inline-flex self-start rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
       data-pipeline-layouts
     >
       {(["list", "table", "board"] as const).map((entry) => (

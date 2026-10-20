@@ -147,7 +147,7 @@ export function PitchOptionsSheet({
                 role="radio"
                 aria-checked={option === rate}
                 onClick={() => onRate(option)}
-                className={`cq-numeric min-h-11 text-sm transition-[background-color,transform] duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) active:scale-[0.97] ${
+                className={`cq-numeric min-h-11 rounded-md text-sm transition-[background-color,transform] duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) active:scale-[0.97] ${
                   option === rate
                     ? "bg-(--cq-text-primary) font-semibold text-(--cq-surface-raised)"
                     : "bg-(--cq-surface-subtle) text-(--cq-text-primary) hover:bg-(--cq-surface-strong)"

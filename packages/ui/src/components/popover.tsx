@@ -41,7 +41,7 @@ export function PopoverContent({
       >
         <BasePopover.Popup
           className={cx(
-            "w-72 max-w-[calc(100vw-32px)] border border-(--cq-border) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-base) data-[ending-style]:translate-y-1 data-[ending-style]:opacity-0 data-[starting-style]:translate-y-1 data-[starting-style]:opacity-0",
+            "w-72 max-w-[calc(100vw-32px)] rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) p-4 shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-base) data-[ending-style]:translate-y-1 data-[ending-style]:opacity-0 data-[starting-style]:translate-y-1 data-[starting-style]:opacity-0",
             className,
           )}
         >

@@ -82,7 +82,7 @@ export function DesktopSidebar({
         {collapsed ? null : (
           <Link
             href={home}
-            className="cq-title-md inline-block text-(--cq-text-primary)"
+            className="cq-title-md inline-block rounded-xs text-(--cq-text-primary)"
           >
             Capital Q
           </Link>
@@ -261,7 +261,7 @@ function SidebarLink({
       aria-current={active ? "page" : undefined}
       aria-label={compact || waiting !== null ? name : undefined}
       className={cx(
-        "relative flex min-h-11 items-center cq-body-sm pointer-fine:min-h-9 transition-colors duration-(--cq-motion-fast)",
+        "relative flex min-h-11 items-center rounded-md cq-body-sm pointer-fine:min-h-9 transition-colors duration-(--cq-motion-fast)",
         compact ? "w-11 justify-center" : "gap-3 px-3",
         active
           ? "bg-(--cq-accent-soft) font-medium text-(--cq-text-primary)"

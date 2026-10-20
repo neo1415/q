@@ -195,7 +195,7 @@ function Header({
       <div className="flex flex-wrap items-center gap-2">
         <nav
           aria-label={tr("Period")}
-          className="inline-flex border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
+          className="inline-flex rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) p-0.5"
         >
           {RESULTS_PERIODS.map((period) => {
             const active = props.range === period.value;
@@ -205,7 +205,7 @@ function Header({
                 href={pageHref(props.basePath, { range: period.value })}
                 aria-current={active ? "page" : undefined}
                 className={cx(
-                  "cq-body-sm inline-flex min-h-11 items-center px-3 transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-10",
+                  "cq-body-sm inline-flex min-h-11 items-center rounded-(--cq-radius-sm) px-3 transition-colors duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-10",
                   active
                     ? "bg-(--cq-surface-strong) font-semibold text-(--cq-text-primary)"
                     : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
@@ -386,7 +386,7 @@ function Pipeline({
                     )}
                     aria-current={on ? "true" : undefined}
                     className={cx(
-                      "grid min-h-11 grid-cols-[7.5rem_1fr_2.5rem] items-center gap-3 px-2 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
+                      "grid min-h-11 grid-cols-[7.5rem_1fr_2.5rem] items-center gap-3 rounded-(--cq-radius-sm) px-2 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)",
                       on
                         ? "bg-(--cq-accent-soft) font-semibold"
                         : "hover:bg-(--cq-surface-subtle)",
@@ -397,10 +397,10 @@ function Pipeline({
                     </span>
                     <span
                       aria-hidden="true"
-                      className="h-2 bg-(--cq-surface-subtle)"
+                      className="h-2 rounded-(--cq-radius-xs) bg-(--cq-surface-subtle)"
                     >
                       <span
-                        className="block h-2 bg-(--cq-accent)"
+                        className="block h-2 rounded-(--cq-radius-xs) bg-(--cq-accent)"
                         style={{
                           width: `${String(Math.max(4, Math.round((stage.count / max) * 100)))}%`,
                         }}
@@ -833,7 +833,7 @@ function RaisePanel({ results }: { readonly results: FounderResults }) {
             aria-label={tr(
               `${String(Math.round(confirmedPct))}% confirmed, ${String(Math.round(softPct))}% with soft commitments`,
             )}
-            className="relative h-2.5 overflow-hidden bg-(--cq-surface-subtle)"
+            className="relative h-2.5 overflow-hidden rounded-(--cq-radius-full) bg-(--cq-surface-subtle)"
           >
             <span
               className="absolute inset-y-0 start-0 bg-(--cq-accent-soft) [background-image:repeating-linear-gradient(135deg,transparent_0_4px,var(--cq-border)_4px_5px)]"

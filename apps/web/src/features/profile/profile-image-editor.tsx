@@ -172,7 +172,7 @@ export function ProfileImageEditor(props: ProfileImageEditorProps) {
         disabled={phase.step === "SAVING"}
         className={
           props.className ??
-          "inline-flex size-11 items-center justify-center border border-(--cq-border-subtle) bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-(--cq-shadow-sm) transition-colors hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
+          "inline-flex size-11 items-center justify-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-(--cq-shadow-sm) transition-colors hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
         }
         data-image-editor={props.kind}
       >
@@ -298,7 +298,7 @@ function Toast({
         type="button"
         onClick={onDismiss}
         aria-label={t("Dismiss")}
-        className="inline-flex size-11 shrink-0 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle)"
       >
         <X size={ICON_SIZE.compact} strokeWidth={ICON_STROKE} aria-hidden />
       </button>

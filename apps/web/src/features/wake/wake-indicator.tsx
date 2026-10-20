@@ -62,14 +62,14 @@ export function WakeIndicator() {
           <button
             type="button"
             onClick={() => setWakePausedByYou(live)}
-            className="inline-flex min-h-11 items-center px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+            className="inline-flex min-h-11 items-center rounded-full px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           >
             {live ? "Pause" : "Resume"}
           </button>
         ) : (
           <Link
             href="/settings#q"
-            className="inline-flex min-h-11 items-center px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+            className="inline-flex min-h-11 items-center rounded-full px-3 font-medium text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
           >
             {t("Settings")}
           </Link>

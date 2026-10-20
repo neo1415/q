@@ -112,7 +112,7 @@ export function SettingsIndex({
           <li key={section.id} className="shrink-0">
             <a
               href={`#${section.id}`}
-              className="cq-body-sm flex min-h-11 items-center px-3 whitespace-nowrap text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"
+              className="cq-body-sm flex min-h-11 items-center rounded-(--cq-radius-md) px-3 whitespace-nowrap text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary)"
             >
               {section.label}
             </a>

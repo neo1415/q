@@ -26,12 +26,12 @@ export function CounterpartMark({
     size === "stage"
       ? "size-20 sm:size-28 text-3xl sm:text-4xl"
       : "size-28 text-4xl";
-  // Organisations and agencies sit in a square (a logo's shape);
+  // Organisations and agencies sit in a rounded square (a logo's shape);
   // people in a circle.
   const shape =
     simulation?.entityKind === undefined || simulation.entityKind === "PERSON"
-      ? "rounded-full"
-      : "";
+      ? "rounded-(--cq-radius-full)"
+      : "rounded-(--cq-radius-lg)";
   if (simulation?.imageUrl) {
     return (
       // Our stored asset: an <img> keeps it a direct CDN read, never proxied.
@@ -63,7 +63,7 @@ export function SimulationChip({
   readonly simulation: ExternalSimulationDto;
 }) {
   return (
-    <span className="cq-caption inline-flex w-fit items-center border border-(--cq-stage-text-muted) px-2 py-0.5 text-(--cq-stage-text-muted)">
+    <span className="cq-caption inline-flex w-fit items-center rounded-(--cq-radius-full) border border-(--cq-stage-text-muted) px-2 py-0.5 text-(--cq-stage-text-muted)">
       {simulation.label}
     </span>
   );

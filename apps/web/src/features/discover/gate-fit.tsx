@@ -40,7 +40,7 @@ export function GateFit({
   const shown = compact ? listed.slice(0, CARD_ROWS) : listed;
   return (
     <div className="flex flex-col gap-2" data-gate-fit={gate.publicId}>
-      <span className="cq-label inline-flex w-fit items-center gap-1.5 border border-(--cq-accent) px-2 py-0.5 text-(--cq-accent)">
+      <span className="cq-label inline-flex w-fit items-center gap-1.5 rounded-full border border-(--cq-accent) px-2 py-0.5 text-(--cq-accent)">
         <Words>
           {gate.criteria.length === 0
             ? "Has a gate · no published criteria yet"

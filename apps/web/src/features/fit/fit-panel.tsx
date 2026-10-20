@@ -67,7 +67,7 @@ export function FitPanel({
       data-fit-panel={fit.status}
     >
       {fit.status === "LOADING" ? (
-        <section className="flex flex-col gap-3.5 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-[18px]">
+        <section className="flex flex-col gap-3.5 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-[18px]">
           <h2 className="cq-label text-(--cq-text-secondary)">
             {t("Fit with your mandate")}
           </h2>
@@ -111,7 +111,7 @@ function ReadyPanel({
   const profile = fit.fit.profile;
   return (
     <>
-      <section className="flex flex-col gap-3.5 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-[18px]">
+      <section className="flex flex-col gap-3.5 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-[18px]">
         <h2 className="cq-label text-(--cq-text-secondary)">
           {t("Fit with your mandate")}
         </h2>
@@ -166,7 +166,7 @@ function ReadyPanel({
       </section>
       {view === null || view.status !== "READY" ? null : (
         <section
-          className="flex flex-col gap-3 bg-(--cq-surface-subtle) p-[18px]"
+          className="flex flex-col gap-3 rounded-(--cq-radius-lg) bg-(--cq-surface-subtle) p-[18px]"
           data-q-view={view.verdict}
         >
           <div className="flex items-center gap-2.5">

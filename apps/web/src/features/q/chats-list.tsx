@@ -138,7 +138,7 @@ export function ChatsList({
           aria-expanded={!folded}
           aria-controls={listId}
           onClick={toggle}
-          className="flex min-h-10 items-center gap-1 px-1 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+          className="flex min-h-10 items-center gap-1 rounded-md px-1 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
         >
           <ChevronDown
             aria-hidden="true"

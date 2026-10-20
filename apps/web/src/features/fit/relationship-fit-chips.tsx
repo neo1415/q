@@ -24,7 +24,7 @@ export function RelationshipFitChips({
 }) {
   const t = useT();
   const chip =
-    "inline-flex items-center gap-[5px] whitespace-nowrap border border-(--cq-border-subtle) px-2 py-[3px] text-[12.5px] text-(--cq-text-secondary)";
+    "inline-flex items-center gap-[5px] whitespace-nowrap rounded-full border border-(--cq-border-subtle) px-2 py-[3px] text-[12.5px] text-(--cq-text-secondary)";
   if (profile === null) {
     return (
       <span

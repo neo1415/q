@@ -163,7 +163,7 @@ export function FitBreakdownSheet({
             )}
           </p>
           {profile.hardRule === null ? null : (
-            <p className="cq-body-sm bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)">
+            <p className="cq-body-sm rounded-(--cq-radius-md) bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-primary)">
               {profile.hardRule.label}
             </p>
           )}

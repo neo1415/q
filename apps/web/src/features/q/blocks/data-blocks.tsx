@@ -331,7 +331,7 @@ export function MapBody({ map }: { readonly map: QMapSpec }) {
       {world === null ? (
         <div
           aria-hidden="true"
-          className="aspect-[720/284] w-full bg-(--cq-surface-subtle)"
+          className="aspect-[720/284] w-full rounded-(--cq-radius-md) bg-(--cq-surface-subtle)"
         />
       ) : (
         <svg

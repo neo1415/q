@@ -70,9 +70,9 @@ function QSheetPending() {
       aria-busy="true"
       aria-label={t("Opening Q")}
     >
-      <div className="h-4 w-2/3 bg-(--cq-surface-subtle)" />
-      <div className="h-4 w-1/2 bg-(--cq-surface-subtle)" />
-      <div className="mt-auto h-12 w-full bg-(--cq-surface-subtle)" />
+      <div className="h-4 w-2/3 rounded-sm bg-(--cq-surface-subtle)" />
+      <div className="h-4 w-1/2 rounded-sm bg-(--cq-surface-subtle)" />
+      <div className="mt-auto h-12 w-full rounded-md bg-(--cq-surface-subtle)" />
     </div>
   );
 }

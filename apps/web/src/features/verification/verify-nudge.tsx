@@ -31,7 +31,7 @@ export function VerifyNudgeLink({
       href="/verification"
       {...(onNavigate === undefined ? {} : { onClick: onNavigate })}
       data-verify-nudge={nudge.state}
-      className="flex min-h-11 min-w-0 items-center gap-2 px-3 py-1.5 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)"
+      className="flex min-h-11 min-w-0 items-center gap-2 rounded-md px-3 py-1.5 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)"
     >
       <ShieldCheck
         aria-hidden="true"

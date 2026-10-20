@@ -108,7 +108,7 @@
   min-height: 44px;
   display: inline-grid;
   place-items: center;
-  border-radius: 0;
+  border-radius: 12px;
   border: 0;
   background: transparent;
   color: var(--cq-text-secondary);
@@ -162,7 +162,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px 6px 6px;
-  border-radius: 0;
+  border-radius: 12px;
   border: 1px solid color-mix(in oklab, var(--hue) 22%, var(--cq-border-subtle));
   background: var(--cq-surface-raised);
   color: var(--cq-text-primary);
@@ -197,7 +197,7 @@
   --tint: color-mix(in oklab, var(--hue) 11%, var(--cq-surface-raised));
   position: relative;
   overflow: hidden;
-  border-radius: 0;
+  border-radius: 16px;
   background: var(--cq-surface-raised);
   border: 1px solid color-mix(in oklab, var(--hue) 22%, var(--cq-border-subtle));
   box-shadow: var(--cq-shadow-sm);
@@ -254,7 +254,7 @@
   min-height: 44px;
   min-width: 44px;
   padding: 0 12px;
-  border-radius: 0;
+  border-radius: var(--cq-radius-md);
   border: 1px solid var(--cq-border-subtle);
   background: var(--cq-surface-raised);
   color: var(--cq-text-primary);
@@ -329,7 +329,7 @@
 }
 .cq-ac-talking i {
   width: 3px;
-  border-radius: 0;
+  border-radius: 2px;
   background: var(--hue);
   height: 4px;
   animation: cq-ac-talk 900ms ease-in-out infinite;
@@ -446,7 +446,7 @@
 .cq-ac-btn {
   min-height: 40px;
   padding: 0 12px;
-  border-radius: 0;
+  border-radius: 12px;
   border: 1px solid var(--cq-border);
   background: var(--cq-surface-raised);
   color: var(--cq-text-primary);
@@ -485,7 +485,7 @@
   gap: 8px;
   max-width: 640px;
   padding: 16px;
-  border-radius: 0;
+  border-radius: var(--cq-radius-lg);
   border: 1px solid var(--cq-border-subtle);
   background: var(--cq-surface-raised);
 }
@@ -497,7 +497,7 @@
 .cq-ac-chip {
   min-height: 44px;
   padding: 0 16px;
-  border-radius: 0;
+  border-radius: 22px;
   border: 1px solid var(--cq-border);
   background: var(--cq-surface-raised);
   color: var(--cq-text-primary);
@@ -679,7 +679,7 @@
 /* Comparison: one object, columns per company. Not a PDF. */
 .cq-ac-compare {
   border: 1px solid var(--cq-border-subtle);
-  border-radius: 0;
+  border-radius: 16px;
   background: var(--cq-surface-raised);
   box-shadow: var(--cq-shadow-sm);
   overflow: hidden;
@@ -829,7 +829,7 @@
   gap: 8px;
   width: min(420px, calc(100vw - 32px));
   padding: 6px 4px 6px 6px;
-  border-radius: 0;
+  border-radius: 20px;
   background: var(--cq-surface-raised);
   border: 1px solid var(--cq-border);
   box-shadow: var(--cq-shadow-overlay);
@@ -870,7 +870,7 @@
 .cq-answer-chip .open {
   min-height: 40px;
   padding: 0 12px;
-  border-radius: 0;
+  border-radius: 12px;
   border: 0;
   background: var(--cq-accent);
   color: var(--cq-text-inverse);
@@ -988,7 +988,7 @@
 }
 .cq-board-item {
   border: 1px solid var(--cq-border-subtle);
-  border-radius: 0;
+  border-radius: 14px;
   background: var(--cq-surface-raised);
   padding: 10px 6px 10px 14px;
 }
@@ -1028,7 +1028,7 @@
   gap: 8px;
   min-height: 36px;
   padding: 0 10px 0 8px;
-  border-radius: 0;
+  border-radius: 10px;
   background: color-mix(in oklab, var(--hue) 11%, var(--cq-surface-raised));
   border: 1px solid color-mix(in oklab, var(--hue) 25%, transparent);
   font-size: 13.5px;
@@ -1060,7 +1060,7 @@
   cursor: pointer;
   color: var(--cq-text-secondary);
   font-size: 13.5px;
-  border-radius: 0;
+  border-radius: 8px;
 }
 .cq-board-src summary::-webkit-details-marker {
   display: none;
@@ -1118,7 +1118,7 @@
   margin-bottom: 28px;
 }
 .cq-board-pin {
-  border-radius: 0;
+  border-radius: 14px;
   padding: 12px 6px 12px 14px;
   background: color-mix(in oklab, var(--hue) 9%, var(--cq-surface-raised));
   border: 1px solid color-mix(in oklab, var(--hue) 22%, var(--cq-border-subtle));
@@ -1157,7 +1157,7 @@
 .cq-board-file .ficon {
   width: 40px;
   height: 40px;
-  border-radius: 0;
+  border-radius: 10px;
   background: var(--cq-surface-subtle);
   display: grid;
   place-items: center;
@@ -1278,7 +1278,7 @@
 .cq-ac-how > summary:focus-visible {
   outline: 2px solid var(--cq-focus-ring);
   outline-offset: 2px;
-  border-radius: 0;
+  border-radius: var(--cq-radius-md);
 }
 
 /* A resting card with an Open control keeps a column for it, so Open is

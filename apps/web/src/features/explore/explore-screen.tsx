@@ -506,7 +506,7 @@ export function ExploreScreen({
       <div
         role="status"
         data-q-notice="TOAST"
-        className="fixed bottom-[calc(var(--cq-bottom-nav-height)+20px)] left-1/2 z-(--cq-z-toast) -translate-x-1/2 bg-(--cq-text-primary) px-4 py-3 text-sm text-(--cq-canvas) shadow-(--cq-shadow-overlay) lg:bottom-6"
+        className="fixed bottom-[calc(var(--cq-bottom-nav-height)+20px)] left-1/2 z-(--cq-z-toast) -translate-x-1/2 rounded-(--cq-radius-md) bg-(--cq-text-primary) px-4 py-3 text-sm text-(--cq-canvas) shadow-(--cq-shadow-overlay) lg:bottom-6"
       >
         {toast}
       </div>
@@ -554,7 +554,7 @@ export function ExploreScreen({
             type="button"
             aria-pressed={topicOn(topic)}
             onClick={() => choose(topic)}
-            className={`inline-flex min-h-9 shrink-0 items-center border px-3.5 text-sm whitespace-nowrap ${
+            className={`inline-flex min-h-9 shrink-0 items-center rounded-(--cq-radius-full) border px-3.5 text-sm whitespace-nowrap ${
               topicOn(topic)
                 ? "border-(--cq-text-primary) bg-(--cq-text-primary) text-(--cq-canvas)"
                 : "border-(--cq-border) bg-(--cq-surface-raised) text-(--cq-text-secondary) hover:text-(--cq-text-primary)"

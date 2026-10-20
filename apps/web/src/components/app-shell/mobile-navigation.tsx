@@ -84,7 +84,7 @@ export function MobileNavigation() {
                 {active ? (
                   <span
                     aria-hidden="true"
-                    className="absolute inset-x-4 top-0 h-0.5 bg-(--cq-accent)"
+                    className="absolute inset-x-4 top-0 h-0.5 rounded-b-full bg-(--cq-accent)"
                   />
                 ) : null}
                 {item.href === MOBILE_CENTRE_HREF ? (
@@ -216,7 +216,7 @@ export function YouSheet({
             href={PROFILE_NAVIGATION.href}
             aria-current={profileActive ? "page" : undefined}
             onClick={close}
-            className="flex min-h-14 items-center gap-3 px-3 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)"
+            className="flex min-h-14 items-center gap-3 rounded-md px-3 transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)"
           >
             <PROFILE_NAVIGATION.icon
               aria-hidden="true"
@@ -312,7 +312,7 @@ function YouLink({
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
       className={cx(
-        "flex min-h-12 items-center gap-3 px-3 cq-body transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
+        "flex min-h-12 items-center gap-3 rounded-md px-3 cq-body transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)",
         active
           ? "bg-(--cq-accent-soft) font-semibold text-(--cq-text-primary)"
           : "text-(--cq-text-primary)",

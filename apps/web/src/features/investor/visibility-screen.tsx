@@ -429,7 +429,7 @@ function InboundPreference({
         {INBOUND_CHOICES.map((option) => (
           <label
             key={option.value}
-            className="flex min-h-11 cursor-pointer items-start gap-3 px-1 py-1.5 hover:bg-(--cq-surface-subtle)"
+            className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md px-1 py-1.5 hover:bg-(--cq-surface-subtle)"
           >
             <input
               type="radio"

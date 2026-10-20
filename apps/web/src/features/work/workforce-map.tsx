@@ -273,7 +273,7 @@ export function WorkforceTeam({
             aria-pressed={filter === state}
             onClick={() => setFilter((now) => (now === state ? null : state))}
             className={cx(
-              "inline-flex min-h-11 flex-none items-center gap-1.5 border px-3 text-[13.5px] lg:min-h-9",
+              "inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border px-3 text-[13.5px] lg:min-h-9",
               filter === state
                 ? state === "asking"
                   ? "border-transparent bg-(--cq-accent) text-(--cq-text-inverse)"
@@ -300,7 +300,7 @@ export function WorkforceTeam({
               aria-pressed={mode === one}
               onClick={() => setMode(one)}
               className={cx(
-                "min-h-10 px-3 text-[14px] lg:min-h-8",
+                "min-h-10 rounded-[8px] px-3 text-[14px] lg:min-h-8",
                 mode === one
                   ? "bg-(--cq-surface-subtle) font-medium text-(--cq-text-primary)"
                   : "text-(--cq-text-secondary)",
@@ -324,7 +324,7 @@ export function WorkforceTeam({
       <ul
         aria-label={t("Q’s team, by state")}
         className={cx(
-          "m-0 list-none overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-0",
+          "m-0 list-none overflow-hidden rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-0",
           mode === "map" && "sr-only",
         )}
       >
@@ -698,7 +698,7 @@ function TeamMap({
                 data-agent={node.role}
                 data-state={node.state}
                 className={cx(
-                  "absolute transition-opacity duration-(--cq-motion-base)",
+                  "absolute rounded-[14px] transition-opacity duration-(--cq-motion-base)",
                   level === "far"
                     ? "w-auto max-w-[150px] p-1.5"
                     : cx(
@@ -849,7 +849,7 @@ function TeamMap({
       {hovered === undefined || hover === null ? null : (
         <div
           role="tooltip"
-          className="pointer-events-none fixed z-(--cq-z-popover) w-[280px] border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 py-3 text-[13px] shadow-[0_12px_32px_-12px_rgb(0_0_0/0.35)]"
+          className="pointer-events-none fixed z-(--cq-z-popover) w-[280px] rounded-[12px] border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 py-3 text-[13px] shadow-[0_12px_32px_-12px_rgb(0_0_0/0.35)]"
           style={{ left: hover.left, top: hover.top }}
           data-agent-hover
         >
@@ -894,7 +894,7 @@ function MapButton({
       type="button"
       aria-label={t(label)}
       onClick={onClick}
-      className="grid h-11 w-11 place-items-center hover:bg-(--cq-surface-subtle) lg:h-10 lg:w-10"
+      className="grid h-11 w-11 place-items-center rounded-[9px] hover:bg-(--cq-surface-subtle) lg:h-10 lg:w-10"
     >
       {children}
     </button>

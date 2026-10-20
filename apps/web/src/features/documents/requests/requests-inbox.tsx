@@ -62,7 +62,7 @@ const FILTERS: readonly (readonly [InboxFilter, string])[] = [
 ];
 
 const selectClass =
-  "cq-body-sm min-h-11 w-full border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary)";
+  "cq-body-sm min-h-11 w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3 text-(--cq-text-primary)";
 
 /**
  * A server action that throws (a lost connection, an ended session) reads
@@ -164,7 +164,7 @@ function Who({
 
 function Chip({ children }: { readonly children: React.ReactNode }) {
   return (
-    <span className="cq-caption inline-flex shrink-0 items-center bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)">
+    <span className="cq-caption inline-flex shrink-0 items-center rounded-full bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)">
       {children}
     </span>
   );
@@ -427,7 +427,7 @@ function DocumentRequestCard({
                   value={note}
                   maxLength={1000}
                   onChange={(event) => setNote(event.target.value)}
-                  className="cq-body-sm min-h-20 border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
+                  className="cq-body-sm min-h-20 rounded-md border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
                   placeholder={t("For example: after a term sheet.")}
                 />
               </label>
@@ -536,7 +536,7 @@ function QuestionRow({
         </p>
       )}
       {question.answer !== null ? (
-        <div className="flex flex-col gap-1 border border-(--cq-border-subtle) bg-(--cq-surface) p-3">
+        <div className="flex flex-col gap-1 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) p-3">
           <p className="cq-caption text-(--cq-text-tertiary)">
             {t("Your answer,")} {t(shortDate(question.answer.answeredAt))} ·{" "}
             {question.answer.evidenceStatus === "DOCUMENT_SUPPORTED"
@@ -578,7 +578,7 @@ function QuestionRow({
             maxLength={2000}
             onChange={(event) => setText(event.target.value)}
             placeholder={t("Your answer, in your words.")}
-            className="cq-body-sm min-h-24 border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
+            className="cq-body-sm min-h-24 rounded-md border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
             data-question-text
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -619,7 +619,7 @@ function QuestionRow({
                     )
                       setAttached((now) => [...now, chosen].slice(0, 5));
                   }}
-                  className="cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface) px-2 text-(--cq-text-primary)"
+                  className="cq-body-sm min-h-11 rounded-md border border-(--cq-border) bg-(--cq-surface) px-2 text-(--cq-text-primary)"
                 >
                   <option value="">{t("Or one you have…")}</option>
                   {documents.map((document) => (
@@ -636,7 +636,7 @@ function QuestionRow({
             {attached.map((document) => (
               <span
                 key={document.documentId}
-                className="cq-caption inline-flex items-center gap-1 bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)"
+                className="cq-caption inline-flex items-center gap-1 rounded-full bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)"
               >
                 {t(document.title)}
                 <button
@@ -823,8 +823,8 @@ export function RequestsInbox({
             onClick={() => setFilter(value)}
             className={
               filter === value
-                ? "min-h-11 bg-(--cq-text-primary) px-3.5 cq-body-sm text-(--cq-canvas) lg:min-h-9"
-                : "min-h-11 border border-(--cq-border-subtle) px-3.5 cq-body-sm text-(--cq-text-secondary) hover:border-(--cq-border-strong) lg:min-h-9"
+                ? "min-h-11 rounded-full bg-(--cq-text-primary) px-3.5 cq-body-sm text-(--cq-canvas) lg:min-h-9"
+                : "min-h-11 rounded-full border border-(--cq-border-subtle) px-3.5 cq-body-sm text-(--cq-text-secondary) hover:border-(--cq-border-strong) lg:min-h-9"
             }
             data-requests-filter={value}
           >

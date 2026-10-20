@@ -137,7 +137,7 @@ function FollowUpQuestions({
           <li
             key={question.id}
             data-question-reason={question.reason}
-            className="flex flex-col gap-2 border border-(--cq-border-subtle) p-4"
+            className="flex flex-col gap-2 rounded-(--cq-radius-md) border border-(--cq-border-subtle) p-4"
           >
             <p className="cq-body text-(--cq-text-primary)">
               {question.question}

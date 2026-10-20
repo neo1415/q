@@ -129,7 +129,7 @@ function FolderHeader({
       className="flex min-h-14 w-full items-center gap-3 py-3 text-start"
       data-folder={folder.code}
     >
-      <span className="flex size-9 shrink-0 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
         <Icon size={ICON_SIZE.regular} aria-hidden="true" />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
@@ -178,7 +178,7 @@ function LevelChip({
   const { label, icon: Icon, tone } = SHOWN_AS[shownAs];
   return (
     <span
-      className={`cq-caption inline-flex items-center gap-1 border px-2 py-0.5 ${tone}`}
+      className={`cq-caption inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${tone}`}
     >
       <Icon size={ICON_SIZE.compact} aria-hidden="true" />
       {label}
@@ -895,7 +895,7 @@ function RequestSheet({
                 placeholder={t(
                   "For example: we're preparing for our investment committee on 20 October.",
                 )}
-                className="cq-body border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
+                className="cq-body rounded-md border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
               />
             </label>
             <p className="cq-body-sm text-(--cq-text-secondary)">
@@ -954,7 +954,7 @@ function LevelControl({
     <div
       role="radiogroup"
       aria-label={`Who can see ${document.title}`}
-      className="grid w-full shrink-0 grid-cols-4 gap-1 bg-(--cq-surface-subtle) p-1 lg:flex lg:w-auto"
+      className="grid w-full shrink-0 grid-cols-4 gap-1 rounded-md bg-(--cq-surface-subtle) p-1 lg:flex lg:w-auto"
     >
       {LEVELS.map(([level, label, Icon]) => {
         const active = document.level === level;
@@ -966,7 +966,7 @@ function LevelControl({
             aria-checked={active}
             disabled={disabled}
             onClick={() => (active ? undefined : onChange(level))}
-            className={`cq-caption inline-flex min-h-11 flex-col items-center justify-center gap-0.5 px-1 text-center sm:flex-row sm:gap-1 sm:px-2.5 lg:min-h-9 ${
+            className={`cq-caption inline-flex min-h-11 flex-col items-center justify-center gap-0.5 rounded px-1 text-center sm:flex-row sm:gap-1 sm:px-2.5 lg:min-h-9 ${
               active
                 ? "bg-(--cq-surface-raised) font-medium text-(--cq-text-primary) shadow-(--cq-shadow-xs)"
                 : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
@@ -1214,7 +1214,7 @@ export function OwnerDataRoom({
 
       {view.checklist.length === 0 ? null : (
         <div
-          className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+          className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
           data-readiness
         >
           <p className="cq-title-sm text-(--cq-text-primary)">
@@ -1225,7 +1225,7 @@ export function OwnerDataRoom({
             {view.checklist.map((item) => (
               <span
                 key={item.code}
-                className={`h-1.5 flex-1 ${item.present ? "bg-(--cq-positive)" : "bg-(--cq-border-subtle)"}`}
+                className={`h-1.5 flex-1 rounded-full ${item.present ? "bg-(--cq-positive)" : "bg-(--cq-border-subtle)"}`}
               />
             ))}
           </div>
@@ -1277,7 +1277,7 @@ export function OwnerDataRoom({
             {waiting.map((request) => (
               <li
                 key={request.requestId}
-                className="flex flex-col gap-3 border border-(--cq-border-subtle) p-3 sm:flex-row sm:items-center"
+                className="flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) p-3 sm:flex-row sm:items-center"
                 data-room-request
               >
                 <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -1307,7 +1307,7 @@ export function OwnerDataRoom({
                           [request.requestId]: Number(event.target.value),
                         }))
                       }
-                      className="cq-body-sm min-h-11 border border-(--cq-border) bg-(--cq-surface) px-2 text-(--cq-text-primary)"
+                      className="cq-body-sm min-h-11 rounded-md border border-(--cq-border) bg-(--cq-surface) px-2 text-(--cq-text-primary)"
                     >
                       {DATA_ROOM_GRANT_DAYS.map((n) => (
                         <option key={n} value={n}>
@@ -1450,7 +1450,7 @@ export function OwnerDataRoom({
                               (mark) => (
                                 <span
                                   key={`${mark.who}:${mark.status}`}
-                                  className="cq-caption mt-1 inline-flex w-fit items-center gap-1 bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)"
+                                  className="cq-caption mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-(--cq-surface-subtle) px-2 py-0.5 text-(--cq-text-secondary)"
                                   data-requested-mark={mark.status}
                                 >
                                   <History
@@ -1582,7 +1582,7 @@ function FolderControl({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="cq-body-sm min-h-11 max-w-56 border border-(--cq-border) bg-(--cq-surface) px-2 text-(--cq-text-primary)"
+        className="cq-body-sm min-h-11 max-w-56 rounded-md border border-(--cq-border) bg-(--cq-surface) px-2 text-(--cq-text-primary)"
         data-folder-control
       >
         {folders.map((folder) => (

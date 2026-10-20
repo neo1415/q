@@ -101,7 +101,7 @@ export function LiveLine({
         <button
           type="button"
           onClick={live.refresh}
-          className="min-h-11 px-2 font-medium text-(--cq-text-primary) underline-offset-2 hover:underline lg:min-h-8"
+          className="min-h-11 rounded-md px-2 font-medium text-(--cq-text-primary) underline-offset-2 hover:underline lg:min-h-8"
         >
           {t("Try now")}
         </button>

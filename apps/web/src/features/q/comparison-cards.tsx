@@ -53,13 +53,13 @@ export function ComparisonCards({
         {block.items.map((item, index) => (
           <li
             key={`${item.name}-${String(index)}`}
-            className="flex min-w-0 flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+            className="flex min-w-0 flex-col gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
             data-q-comparison-card
           >
             <div className="flex min-w-0 items-center gap-3">
               <span
                 aria-hidden="true"
-                className="inline-flex size-10 shrink-0 items-center justify-center border border-(--cq-border-subtle) bg-(--cq-surface) text-sm font-semibold text-(--cq-text-secondary)"
+                className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface) text-sm font-semibold text-(--cq-text-secondary)"
               >
                 {monogram(item.name)}
               </span>

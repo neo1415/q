@@ -31,7 +31,7 @@ export function QSuggestion({
       role="group"
       aria-label={title}
       className={cx(
-        "flex flex-col gap-3 border border-(--cq-accent-soft) bg-(--cq-surface-raised) p-3",
+        "flex flex-col gap-3 rounded-lg border border-(--cq-accent-soft) bg-(--cq-surface-raised) p-3",
         className,
       )}
     >

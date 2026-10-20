@@ -351,7 +351,7 @@ export function QRoomDeck({
 
   if (failed) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center bg-(--cq-surface-subtle)">
+      <div className="flex aspect-video w-full items-center justify-center rounded-(--cq-radius-md) bg-(--cq-surface-subtle)">
         <RoomLoadFailed onRetry={retry} className="items-center" />
       </div>
     );
@@ -359,7 +359,7 @@ export function QRoomDeck({
   if (state === null) {
     return (
       <div className="flex flex-col gap-2" aria-busy="true" data-q-room-loading>
-        <div className="aspect-video w-full bg-(--cq-surface-subtle)" />
+        <div className="aspect-video w-full rounded-(--cq-radius-md) bg-(--cq-surface-subtle)" />
       </div>
     );
   }
@@ -378,7 +378,7 @@ export function QRoomDeck({
         <p className="cq-body-sm text-(--cq-text-secondary)">
           {state.progress ?? "Q is making it."}
         </p>
-        <div className="aspect-video w-full bg-(--cq-surface-subtle)" />
+        <div className="aspect-video w-full rounded-(--cq-radius-md) bg-(--cq-surface-subtle)" />
       </div>
     );
   }
@@ -392,7 +392,7 @@ export function QRoomDeck({
 
   if (slidesFailed) {
     return (
-      <div className="flex aspect-video w-full items-center justify-center bg-(--cq-surface-subtle)">
+      <div className="flex aspect-video w-full items-center justify-center rounded-(--cq-radius-md) bg-(--cq-surface-subtle)">
         <RoomLoadFailed onRetry={retry} className="items-center" />
       </div>
     );
@@ -401,7 +401,7 @@ export function QRoomDeck({
   if (drawingNow === null && version !== null) {
     return (
       <div className="flex flex-col gap-2" aria-busy="true" data-q-room-loading>
-        <div className="aspect-video w-full bg-(--cq-surface-subtle)" />
+        <div className="aspect-video w-full rounded-(--cq-radius-md) bg-(--cq-surface-subtle)" />
       </div>
     );
   }
@@ -491,7 +491,7 @@ export function QRoomDeck({
       ) : (
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_10.75rem]">
           <div
-            className="relative aspect-video w-full overflow-hidden border border-(--cq-border-subtle)"
+            className="relative aspect-video w-full overflow-hidden rounded-(--cq-radius-md) border border-(--cq-border-subtle)"
             data-q-deck-slide={page}
           >
             {slidePicture === undefined ? null : (
@@ -546,7 +546,7 @@ export function QRoomDeck({
                 <li key={`thumb-${String(at)}`}>
                   <button
                     type="button"
-                    className={`relative block w-full overflow-hidden border-2 ${
+                    className={`relative block w-full overflow-hidden rounded-(--cq-radius-sm) border-2 ${
                       at === index
                         ? "border-(--cq-accent)"
                         : "border-transparent"
@@ -602,7 +602,7 @@ export function QRoomDeck({
         )}
         <button
           type="button"
-          className="cq-stage-primary min-h-12 w-full justify-center px-5 shadow-(--cq-shadow-overlay) md:w-auto"
+          className="cq-stage-primary min-h-12 w-full justify-center rounded-full px-5 shadow-(--cq-shadow-overlay) md:w-auto"
           onClick={() => chooseFor(target)}
           disabled={busy}
           data-q-deck-upload
@@ -651,7 +651,7 @@ function PlaceholderTarget({
   return (
     <button
       type="button"
-      className={`absolute flex items-center justify-center border-2 border-dashed p-2 text-center transition-colors ${
+      className={`absolute flex items-center justify-center rounded-(--cq-radius-sm) border-2 border-dashed p-2 text-center transition-colors ${
         active
           ? "border-(--cq-accent) bg-(--cq-accent-soft)"
           : "border-(--cq-border-strong) bg-transparent hover:bg-(--cq-accent-soft)"

@@ -61,7 +61,7 @@ export function DialogContent({
         <BaseDialog.Backdrop className="fixed inset-0 z-(--cq-z-modal) bg-(--cq-overlay) transition-opacity duration-(--cq-motion-base) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
         <BaseDialog.Popup
           className={cx(
-            "fixed top-1/2 left-1/2 z-(--cq-z-modal) flex w-[calc(100vw-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-base) data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0",
+            "fixed top-1/2 left-1/2 z-(--cq-z-modal) flex w-[calc(100vw-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 shadow-(--cq-shadow-overlay) outline-none transition-[opacity,transform] duration-(--cq-motion-base) data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0",
             className,
           )}
         >
@@ -228,7 +228,7 @@ export function DialogViewerContent({
               data-cq-sheet-drag
               className="flex h-5 shrink-0 touch-none items-center justify-center sm:hidden"
             >
-              <span className="h-1 w-10 bg-(--cq-border-strong)" />
+              <span className="h-1 w-10 rounded-full bg-(--cq-border-strong)" />
             </div>
           )}
           {children}

@@ -8,7 +8,7 @@ import { QNavIcon } from "@/components/app-shell/q-nav-icon";
  * The Q Card (BIZ-004, R26; founder design 2026-09-28): the shareable
  * identity as a landscape card, about 1.8:1. A card surface with a thin lit
  * edge and one soft arc of light at the right (the founder's amendment to
- * ADR 0017; kept faint). Top left: Q's mark in a tile, a hairline
+ * ADR 0017; kept faint). Top left: Q's mark in a rounded tile, a hairline
  * divider and "Q Card". Then the name, large; under it the company or
  * group in a quieter grey (nothing when there is none); a short rule; the
  * @handle, which opens the public page. The QR sits on a white tile at the
@@ -69,7 +69,7 @@ export function QCard({
       aria-label={`Q Card for ${name}`}
       style={style}
       className={cx(
-        "relative m-0 flex min-h-48 w-full sm:aspect-[1.8/1] max-w-[34rem] overflow-hidden border border-(--cq-card-edge) bg-(--cq-qcard-surface) text-(--cq-qcard-text) shadow-[0_0_24px_var(--cq-qcard-glow)]",
+        "relative m-0 flex min-h-48 w-full sm:aspect-[1.8/1] max-w-[34rem] overflow-hidden rounded-[1.75rem] border border-(--cq-card-edge) bg-(--cq-qcard-surface) text-(--cq-qcard-text) shadow-[0_0_24px_var(--cq-qcard-glow)]",
         className,
       )}
     >
@@ -80,7 +80,7 @@ export function QCard({
       />
       <div className="relative flex min-w-0 flex-1 flex-col justify-between gap-3 p-[6%]">
         <div className="flex items-center gap-3">
-          <span className="inline-flex size-9 items-center justify-center border border-(--cq-card-edge) shadow-[0_0_10px_var(--cq-qcard-glow)]">
+          <span className="inline-flex size-9 items-center justify-center rounded-xl border border-(--cq-card-edge) shadow-[0_0_10px_var(--cq-qcard-glow)]">
             <QNavIcon
               size={18}
               strokeWidth={2}
@@ -125,12 +125,12 @@ export function QCard({
         <div className="flex min-w-0 flex-col gap-1">
           <a
             href={href ?? `https://${displayUrl}`}
-            className="flex min-h-11 w-fit max-w-full items-center gap-2 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+            className="flex min-h-11 w-fit max-w-full items-center gap-2 rounded-full focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
             data-q-card-handle
           >
             <span
               aria-hidden="true"
-              className="inline-flex size-7 shrink-0 items-center justify-center border border-(--cq-card-edge) text-sm font-semibold text-(--cq-card-edge)"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-(--cq-card-edge) text-sm font-semibold text-(--cq-card-edge)"
             >
               @
             </span>
@@ -151,7 +151,7 @@ export function QCard({
           <span
             role="img"
             aria-label={`QR code linking to ${displayUrl}`}
-            className="block aspect-square w-full bg-(--cq-stage-text) p-2.5 text-(--cq-stage-canvas) [&>svg]:h-full [&>svg]:w-full"
+            className="block aspect-square w-full rounded-2xl bg-(--cq-stage-text) p-2.5 text-(--cq-stage-canvas) [&>svg]:h-full [&>svg]:w-full"
             // Our own server-rendered SVG (uqr), never user input.
             dangerouslySetInnerHTML={{ __html: qrSvg }}
           />

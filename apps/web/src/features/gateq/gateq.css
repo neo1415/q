@@ -22,7 +22,7 @@
 .gq-card {
   background: var(--cq-surface-raised);
   border: 1px solid var(--cq-border-subtle);
-  border-radius: 0;
+  border-radius: var(--cq-radius-lg);
 }
 .gq-hair > * + * {
   border-top: 1px solid var(--cq-border-subtle);
@@ -31,7 +31,7 @@
   display: grid;
   place-items: center;
   flex: none;
-  border-radius: 0;
+  border-radius: 12px;
   font-weight: 600;
   color: var(--cq-text-primary);
   background: var(--cq-surface-strong);
@@ -69,7 +69,7 @@
   width: 100%;
   min-height: 44px;
   padding: 0 14px;
-  border-radius: 0;
+  border-radius: var(--cq-radius-md);
   border: 1px solid var(--cq-border);
   background: var(--cq-surface);
   color: var(--cq-text-primary);
@@ -98,7 +98,7 @@ textarea.gq-input {
   gap: 10px;
   align-items: flex-start;
   padding: 12px 14px;
-  border-radius: 0;
+  border-radius: var(--cq-radius-md);
   border: 1px solid var(--cq-border-subtle);
   background: var(--cq-surface-subtle);
   font-size: 14px;
@@ -123,7 +123,7 @@ textarea.gq-input {
 .gq-state-ic {
   width: 44px;
   height: 44px;
-  border-radius: 0;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   background: var(--cq-surface-subtle);
@@ -131,7 +131,7 @@ textarea.gq-input {
 }
 .gq-sk {
   background: var(--cq-surface-strong);
-  border-radius: 0;
+  border-radius: 8px;
 }
 @media (prefers-reduced-motion: no-preference) {
   .gq-sk {
@@ -167,14 +167,14 @@ textarea.gq-input {
   font-size: 12px;
   color: var(--cq-text-secondary);
   padding: 2px 7px;
-  border-radius: 0;
+  border-radius: 999px;
   border: 1px solid var(--cq-border-subtle);
   white-space: nowrap;
 }
 .gq-lbl {
   font-size: 11.5px;
   padding: 1px 7px;
-  border-radius: 0;
+  border-radius: 6px;
   background: var(--cq-surface-strong);
   color: var(--cq-text-secondary);
   white-space: nowrap;
@@ -242,7 +242,7 @@ textarea.gq-input {
   gap: 6px;
   min-height: 36px;
   padding: 0 14px;
-  border-radius: 0;
+  border-radius: var(--cq-radius-full);
   border: 1px solid var(--cq-border);
   font-size: 14px;
   color: var(--cq-text-secondary);
@@ -319,7 +319,7 @@ textarea.gq-input {
 .gq-steps i {
   flex: 1;
   height: 4px;
-  border-radius: 0;
+  border-radius: 2px;
   background: var(--cq-surface-strong);
 }
 .gq-steps i.on {
@@ -343,7 +343,7 @@ textarea.gq-input {
 .gq-opt {
   min-height: 44px;
   padding: 0 16px;
-  border-radius: 0;
+  border-radius: 999px;
   border: 1px solid var(--cq-border);
   background: var(--cq-surface-raised);
   font-size: 15px;
@@ -451,7 +451,7 @@ textarea.gq-input {
     height: calc(100dvh - 210px);
     min-height: 640px;
     border: 1px solid var(--cq-border-subtle);
-    border-radius: 0;
+    border-radius: 14px;
     overflow: hidden;
     background: var(--cq-surface);
   }
@@ -512,7 +512,7 @@ textarea.gq-input {
   top: 12px;
   bottom: 12px;
   width: 3px;
-  border-radius: 0;
+  border-radius: 0 3px 3px 0;
   background: var(--cq-accent);
 }
 .gq-row .gq-ck,
@@ -522,7 +522,7 @@ textarea.gq-input {
   display: grid;
   place-items: center;
   color: var(--cq-text-tertiary);
-  border-radius: 0;
+  border-radius: 8px;
 }
 .gq-row .gq-st {
   width: 30px;
@@ -586,14 +586,14 @@ textarea.gq-input {
   padding: 6px 8px;
   background: var(--cq-text-primary);
   color: var(--cq-canvas);
-  border-radius: 0;
+  border-radius: 12px;
   flex-wrap: wrap;
 }
 .gq-bulk button {
   color: var(--cq-canvas);
   min-height: 36px;
   padding: 0 10px;
-  border-radius: 0;
+  border-radius: 8px;
   display: inline-flex;
   gap: 6px;
   align-items: center;
@@ -624,7 +624,7 @@ textarea.gq-input {
   gap: 12px;
   align-items: flex-start;
   padding: 14px 16px;
-  border-radius: 0;
+  border-radius: var(--cq-radius-lg);
   background: var(--cq-surface-subtle);
 }
 .gq-qview .gq-who {
@@ -697,7 +697,7 @@ textarea.gq-input {
   font-size: 12px;
   padding: 1px 5px;
   border: 1px solid var(--cq-border);
-  border-radius: 0;
+  border-radius: 4px;
 }
 .gq-pick {
   display: flex;
@@ -730,7 +730,7 @@ textarea.gq-input {
 }
 .gq-search .gq-input {
   padding-inline-start: 44px;
-  border-radius: 0;
+  border-radius: var(--cq-radius-full);
   background: var(--cq-surface-subtle);
   border-color: transparent;
 }
@@ -748,7 +748,7 @@ textarea.gq-input {
   max-width: 100%;
   padding: 3px;
   gap: 2px;
-  border-radius: 0;
+  border-radius: 10px;
   background: var(--cq-surface-subtle);
   align-self: flex-start;
 }

@@ -108,7 +108,7 @@ export function PitchGrid({ companyId }: { readonly companyId: string }) {
         <ul
           // A short-video profile grid: three across on every screen,
           // hairline gaps, posters edge to edge.
-          className="grid grid-cols-3 gap-0.5 overflow-hidden md:gap-1 lg:grid-cols-4"
+          className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-(--cq-radius-md) md:gap-1 lg:grid-cols-4"
           data-pitch-grid
         >
           {videos.map((video) => (

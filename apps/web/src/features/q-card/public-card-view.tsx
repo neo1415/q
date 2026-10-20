@@ -171,7 +171,7 @@ export function PublicCardView({
       >
         <Link
           href="/"
-          className="flex min-h-11 items-center gap-2 text-(--cq-text-primary)"
+          className="flex min-h-11 items-center gap-2 rounded-md text-(--cq-text-primary)"
         >
           <QNavIcon
             size={20}
@@ -197,7 +197,7 @@ export function PublicCardView({
           <Link
             href="/search"
             aria-label="Search"
-            className="inline-flex size-11 items-center justify-center text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
+            className="inline-flex size-11 items-center justify-center rounded-md text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
           >
             <Search aria-hidden="true" size={18} strokeWidth={ICON_STROKE} />
           </Link>
@@ -209,7 +209,7 @@ export function PublicCardView({
         <img
           src={cover}
           alt=""
-          className="aspect-[4/1] w-full object-cover"
+          className="aspect-[4/1] w-full rounded-xl object-cover"
           data-card-cover
         />
       )}
@@ -275,7 +275,7 @@ export function PublicCardView({
             rel="nofollow ugc noopener noreferrer"
             target="_blank"
             data-card-action="website"
-            className="flex min-h-12 items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-4 text-(--cq-text-primary) hover:border-(--cq-border-strong)"
+            className="flex min-h-12 items-center gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 text-(--cq-text-primary) hover:border-(--cq-border-strong)"
           >
             <Globe aria-hidden="true" size={18} strokeWidth={ICON_STROKE} />
             <span className="cq-body min-w-0 flex-1 truncate">
@@ -473,7 +473,7 @@ function Fold({
   return (
     <details
       open={open}
-      className="group border border-(--cq-border-subtle) bg-(--cq-surface)"
+      className="group rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface)"
       data-card-section={id}
     >
       <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
@@ -501,7 +501,7 @@ function Tile({
   readonly icon?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
+    <div className="flex flex-col gap-0.5 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
       <span className="cq-body flex items-center gap-1.5 text-(--cq-text-primary)">
         {icon}
         {value}
@@ -517,7 +517,7 @@ function Chips({ items }: { readonly items: readonly string[] }) {
       {items.map((item) => (
         <li
           key={item}
-          className="cq-body-sm border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 py-0.5"
+          className="cq-body-sm rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 py-0.5"
         >
           {item}
         </li>

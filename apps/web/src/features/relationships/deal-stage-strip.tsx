@@ -152,7 +152,7 @@ export function DealStageStrip({
         >
           <span
             aria-hidden="true"
-            className={`order-first hidden h-1.5 sm:block ${BAR[step.status]}`}
+            className={`order-first hidden h-1.5 rounded-full sm:block ${BAR[step.status]}`}
           />
           <span
             className={`cq-body-sm ${

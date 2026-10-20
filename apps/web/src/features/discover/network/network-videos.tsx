@@ -194,7 +194,7 @@ export function NetworkVideos({
   const current = watching === null ? undefined : items[watching];
   return (
     <div className="flex flex-col gap-4" data-network-videos>
-      <ul className="grid grid-cols-3 gap-0.5 overflow-hidden md:gap-1 lg:grid-cols-4">
+      <ul className="grid grid-cols-3 gap-0.5 overflow-hidden rounded-(--cq-radius-md) md:gap-1 lg:grid-cols-4">
         {items.map((item, at) => {
           const poster = posters[item.pitch.mediaAssetId] ?? null;
           return (
@@ -299,7 +299,7 @@ export function NetworkVideos({
               </>
             }
           >
-            <div className="overflow-hidden bg-(--cq-stage-canvas)">
+            <div className="overflow-hidden rounded-(--cq-radius-lg) bg-(--cq-stage-canvas)">
               <PitchPlayer
                 company={asCompany(current)}
                 policy="ACTIVE"

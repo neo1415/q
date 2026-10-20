@@ -49,7 +49,7 @@ function StatusPill({ status }: { readonly status: Round["status"] }) {
   const t = useT();
   return (
     <span
-      className="cq-caption inline-flex items-center gap-1.5 border border-(--cq-border-subtle) px-2.5 py-1 text-(--cq-text-primary)"
+      className="cq-caption inline-flex items-center gap-1.5 rounded-full border border-(--cq-border-subtle) px-2.5 py-1 text-(--cq-text-primary)"
       data-status={status}
     >
       <span
@@ -141,7 +141,7 @@ function Notices({ round }: { readonly round: Round }) {
       {round.notices.map((notice) => (
         <li
           key={notice}
-          className="cq-body-sm border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)"
+          className="cq-body-sm rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-(--cq-text-primary)"
           data-notice={notice}
         >
           {t(NOTICE_WORDS[notice])}
@@ -194,7 +194,7 @@ export function RoundCard({
   const terms = termsOf(round, rounds, leads);
   return (
     <article
-      className="cq-glow-card flex flex-col gap-4 p-5 sm:p-6"
+      className="cq-glow-card flex flex-col gap-4 rounded-2xl p-5 sm:p-6"
       data-round={round.id}
       aria-labelledby={`round-${round.id}`}
     >
@@ -213,7 +213,7 @@ export function RoundCard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={round.status} />
-          <span className="cq-caption bg-(--cq-accent-soft) px-2.5 py-1 text-(--cq-text-primary)">
+          <span className="cq-caption rounded-full bg-(--cq-accent-soft) px-2.5 py-1 text-(--cq-text-primary)">
             Current round
           </span>
         </div>
@@ -227,7 +227,7 @@ export function RoundCard({
         </p>
       </div>
       <div
-        className="flex h-3 gap-0.5 overflow-hidden bg-(--cq-surface-strong)"
+        className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-(--cq-surface-strong)"
         role="img"
         aria-label={`Raised ${percent(widths[0] ?? 0)}, confirmed ${percent(widths[1] ?? 0)}, pledged ${percent(widths[2] ?? 0)} of the target`}
       >
@@ -251,7 +251,7 @@ export function RoundCard({
             <dt className="cq-caption flex items-center gap-1.5 text-(--cq-text-secondary)">
               <span
                 aria-hidden
-                className="inline-block size-2.5"
+                className="inline-block size-2.5 rounded-[3px]"
                 style={METER[part.key]}
               />
               {part.label}
@@ -318,7 +318,7 @@ export function TotalCard({
       round.terms.reportedRaised !== null && round.terms.reportedRaised !== "0",
   );
   return (
-    <article className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 sm:p-6">
+    <article className="flex flex-col gap-3 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 sm:p-6">
       <h3 className="cq-body-sm text-(--cq-text-secondary)">
         Raised on Capital Q, all rounds
       </h3>
@@ -468,7 +468,7 @@ function TimelineItem({
   const terms = termsOf(round, rounds, leads);
   return (
     <li
-      className="flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-4 sm:px-5"
+      className="flex flex-col gap-3 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-4 sm:px-5"
       data-round={round.id}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

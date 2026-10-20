@@ -257,7 +257,7 @@ export function RehearsalLobby({
 
   if (failed !== null) {
     return (
-      <section className="flex flex-col items-start gap-4 border border-(--cq-border-subtle) p-6">
+      <section className="flex flex-col items-start gap-4 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) p-6">
         <h2 className="cq-title-md text-(--cq-text-primary)">
           {t("Q couldn’t get ready for this rehearsal")}
         </h2>
@@ -283,10 +283,10 @@ export function RehearsalLobby({
     return (
       <section
         aria-busy="true"
-        className="cq-stage flex min-h-[60vh] flex-col items-center justify-center gap-4 p-8 text-center"
+        className="cq-stage flex min-h-[60vh] flex-col items-center justify-center gap-4 rounded-(--cq-radius-xl) p-8 text-center"
         data-qp-anchor="fdr.13.rehearsal.stage"
       >
-        <div className="size-24 animate-pulse rounded-full bg-(--cq-stage-surface-strong) motion-reduce:animate-none" />
+        <div className="size-24 animate-pulse rounded-(--cq-radius-full) bg-(--cq-stage-surface-strong) motion-reduce:animate-none" />
         <p className="cq-body text-(--cq-stage-text)">
           {t("Q is reading up on who you’re meeting…")}
         </p>
@@ -310,7 +310,7 @@ export function RehearsalLobby({
           <CounterpartIdentity name={name} simulation={persona.simulation} />
         ) : (
           <>
-            <div className="flex size-28 items-center justify-center rounded-full bg-(--cq-stage-surface-strong) text-4xl font-medium">
+            <div className="flex size-28 items-center justify-center rounded-(--cq-radius-full) bg-(--cq-stage-surface-strong) text-4xl font-medium">
               {initialsOf(name)}
             </div>
             <p className="cq-title-md text-(--cq-stage-text)">{name}</p>
@@ -365,7 +365,7 @@ export function RehearsalLobby({
             {(["MALE", "FEMALE"] as const).map((choice) => (
               <label
                 key={choice}
-                className={`cq-body-sm inline-flex min-h-11 cursor-pointer items-center gap-2 border px-3 ${
+                className={`cq-body-sm inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-(--cq-radius-md) border px-3 ${
                   voice === choice
                     ? "border-(--cq-accent) text-(--cq-text-primary)"
                     : "border-(--cq-border) text-(--cq-text-secondary)"
@@ -394,7 +394,7 @@ export function RehearsalLobby({
               <label
                 key={choice.value}
                 title={choice.hint}
-                className={`cq-body-sm inline-flex min-h-11 cursor-pointer items-center gap-2 border px-3 ${
+                className={`cq-body-sm inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-(--cq-radius-md) border px-3 ${
                   difficulty === choice.value
                     ? "border-(--cq-accent) text-(--cq-text-primary)"
                     : "border-(--cq-border) text-(--cq-text-secondary)"
@@ -460,7 +460,7 @@ export function RehearsalLobby({
               {(["VOICE", "VIDEO"] as const).map((choice) => (
                 <label
                   key={choice}
-                  className={`cq-body-sm inline-flex min-h-11 cursor-pointer items-center gap-2 border px-3 ${
+                  className={`cq-body-sm inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-(--cq-radius-md) border px-3 ${
                     meetBy === choice
                       ? "border-(--cq-accent) text-(--cq-text-primary)"
                       : "border-(--cq-border) text-(--cq-text-secondary)"

@@ -266,7 +266,7 @@ export function DeckReadingReview({
                   <label className="cq-caption text-(--cq-text-secondary)">
                     {t("What your deck says, in your words")}
                     <textarea
-                      className="cq-body-sm mt-1 min-h-20 w-full border border-(--cq-border) bg-(--cq-surface) p-2 text-(--cq-text-primary)"
+                      className="cq-body-sm mt-1 min-h-20 w-full rounded-md border border-(--cq-border) bg-(--cq-surface) p-2 text-(--cq-text-primary)"
                       maxLength={600}
                       value={words}
                       onChange={(event) => setWords(event.target.value)}

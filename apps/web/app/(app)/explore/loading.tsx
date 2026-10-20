@@ -13,12 +13,12 @@ export default function ExploreLoading() {
         aria-busy="true"
         aria-label="Loading pitches"
       >
-        <div className="h-12 w-full border border-(--cq-border) bg-(--cq-surface-raised)" />
+        <div className="h-12 w-full rounded-(--cq-radius-full) border border-(--cq-border) bg-(--cq-surface-raised)" />
         <div className="flex gap-2 overflow-hidden py-0.5">
           {[72, 96, 120, 84, 104].map((width) => (
             <div
               key={width}
-              className="h-9 shrink-0 border border-(--cq-border) bg-(--cq-surface-raised)"
+              className="h-9 shrink-0 rounded-(--cq-radius-full) border border-(--cq-border) bg-(--cq-surface-raised)"
               style={{ width }}
             />
           ))}

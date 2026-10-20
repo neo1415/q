@@ -113,10 +113,10 @@ export function UsageView({ usage }: { readonly usage: QUsageDto }) {
                 </span>
                 <span
                   aria-hidden="true"
-                  className="col-span-2 row-start-2 h-2.5 overflow-hidden bg-(--cq-surface-subtle) sm:col-span-1 sm:row-start-auto"
+                  className="col-span-2 row-start-2 h-2.5 overflow-hidden rounded-(--cq-radius-xs) bg-(--cq-surface-subtle) sm:col-span-1 sm:row-start-auto"
                 >
                   <span
-                    className="block h-full bg-(--cq-accent)"
+                    className="block h-full rounded-(--cq-radius-xs) bg-(--cq-accent)"
                     style={{
                       width: `${String(Math.max(2, (Number(row.usd) / largest) * 100))}%`,
                     }}
@@ -283,10 +283,10 @@ function Meter({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={clamped}
-      className="mt-1 block h-1.5 overflow-hidden bg-(--cq-surface-strong)"
+      className="mt-1 block h-1.5 overflow-hidden rounded-full bg-(--cq-surface-strong)"
     >
       <span
-        className="block h-full bg-(--cq-accent)"
+        className="block h-full rounded-full bg-(--cq-accent)"
         style={{ width: `${String(clamped)}%` }}
       />
     </span>

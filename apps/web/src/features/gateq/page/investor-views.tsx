@@ -155,7 +155,7 @@ export function FindView({
       )}
       {state === "loading" || pending ? (
         <>
-          <div className="flex items-center gap-3 bg-(--cq-surface-subtle) p-3.5">
+          <div className="flex items-center gap-3 rounded-xl bg-(--cq-surface-subtle) p-3.5">
             <QNavIcon size={22} strokeWidth={2} aria-hidden />
             <span className="cq-body-sm">
               {t("Searching the companies you can see…")}
@@ -523,7 +523,7 @@ export function GateView({
             {t("Preview the form")}
           </Link>
         </div>
-        <code className="cq-caption block break-all bg-(--cq-surface-subtle) p-3">
+        <code className="cq-caption block break-all rounded-xl bg-(--cq-surface-subtle) p-3">
           <Copy {...icon} className="me-1.5 inline" />
           {snippet}
         </code>
@@ -532,7 +532,7 @@ export function GateView({
         {showQr ? (
           <SheetContent title={t("Your gate's QR code")} side="side">
             <div
-              className="mx-auto size-56 bg-(--cq-surface) p-3 text-(--cq-text-primary)"
+              className="mx-auto size-56 rounded-2xl bg-(--cq-surface) p-3 text-(--cq-text-primary)"
               role="img"
               aria-label={t("QR code for your gate")}
               // Our own encoder's SVG, built on the server; no user markup.

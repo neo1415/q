@@ -36,7 +36,7 @@ export function QMark({ size = "md", state = "IDLE", className }: QMarkProps) {
       aria-hidden="true"
       data-q-state={state}
       className={cx(
-        "inline-flex shrink-0 select-none items-center justify-center font-semibold tracking-tight transition-colors duration-(--cq-motion-base)",
+        "inline-flex shrink-0 select-none items-center justify-center rounded-md font-semibold tracking-tight transition-colors duration-(--cq-motion-base)",
         stateFrame[state],
         className,
       )}

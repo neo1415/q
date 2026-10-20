@@ -351,7 +351,7 @@ export function ArtifactViewer({
       >
         <span
           aria-hidden="true"
-          className="mt-0.5 hidden size-10 shrink-0 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary) sm:flex"
+          className="mt-0.5 hidden size-10 shrink-0 items-center justify-center rounded-md bg-(--cq-surface-subtle) text-(--cq-text-secondary) sm:flex"
         >
           {isDeck ? (
             <Presentation size={ICON_SIZE.regular} strokeWidth={ICON_STROKE} />
@@ -498,7 +498,7 @@ export function ArtifactViewer({
         {drawingPending && current !== undefined ? (
           <div
             aria-hidden="true"
-            className="aspect-video w-full animate-pulse bg-(--cq-surface-strong)"
+            className="aspect-video w-full animate-pulse rounded-md bg-(--cq-surface-strong)"
             data-q-artifact-slides-loading
           />
         ) : null}
@@ -536,8 +536,8 @@ export function ArtifactViewer({
                   alt={`Slide ${String(page + 1)}`}
                   className={
                     fit === "page"
-                      ? "h-auto max-h-[calc(100dvh-260px)] w-auto max-w-full border border-(--cq-border-subtle) object-contain"
-                      : "h-auto w-full border border-(--cq-border-subtle)"
+                      ? "h-auto max-h-[calc(100dvh-260px)] w-auto max-w-full rounded-md border border-(--cq-border-subtle) object-contain"
+                      : "h-auto w-full rounded-md border border-(--cq-border-subtle)"
                   }
                   data-q-artifact-slide={String(page + 1)}
                 />
@@ -630,7 +630,7 @@ export function ArtifactViewer({
             className={
               current.content.look?.background === undefined
                 ? "mx-auto flex w-full max-w-(--cq-layout-narrow) flex-col gap-5"
-                : "mx-auto flex w-full max-w-(--cq-layout-narrow) flex-col gap-5 p-6"
+                : "mx-auto flex w-full max-w-(--cq-layout-narrow) flex-col gap-5 rounded-lg p-6"
             }
             style={documentLookStyle(current.content.look)}
             data-q-artifact-body

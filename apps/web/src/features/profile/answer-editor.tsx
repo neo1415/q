@@ -405,7 +405,7 @@ function CategoryField({
               type="button"
               onClick={() => onChange(ids.filter((known) => known !== id))}
               aria-label={`Remove ${nameOf(id)}`}
-              className="inline-flex size-7 items-center justify-center text-(--cq-text-secondary) hover:bg-(--cq-surface-strong)"
+              className="inline-flex size-7 items-center justify-center rounded-full text-(--cq-text-secondary) hover:bg-(--cq-surface-strong)"
             >
               <X size={ICON_SIZE.compact} aria-hidden="true" />
             </button>

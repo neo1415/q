@@ -110,7 +110,7 @@ export function RelationshipNotes({
           onChange={(event) => setDraft(event.target.value)}
           maxLength={RELATIONSHIP_NOTE_MAX_LENGTH}
           rows={3}
-          className="cq-body-sm min-h-24 w-full resize-y border border-(--cq-border) bg-(--cq-surface-raised) px-3 py-2 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="cq-body-sm min-h-24 w-full resize-y rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 py-2 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
           placeholder={t("What you learned, what to check next")}
           aria-describedby={error === null ? undefined : `${field}-error`}
         />

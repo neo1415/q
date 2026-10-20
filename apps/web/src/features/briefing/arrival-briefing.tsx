@@ -419,7 +419,7 @@ function Editor({
         onChange={(event) => setText(event.target.value)}
         rows={Math.min(10, Math.max(4, text.split("\n").length + 1))}
         maxLength={4000}
-        className="w-full border border-(--cq-border) bg-(--cq-surface) px-3 py-2.5 cq-body-sm text-(--cq-text-primary) outline-none focus:border-(--cq-border-strong)"
+        className="w-full rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) px-3 py-2.5 cq-body-sm text-(--cq-text-primary) outline-none focus:border-(--cq-border-strong)"
         data-arrival-editor
       />
       <div className="flex flex-wrap items-center gap-1">
@@ -471,7 +471,7 @@ function FocusCard({
     <article
       aria-label={`${card.title}${card.counterpart === null ? "" : `, ${card.counterpart}`}${place}`}
       className={cx(
-        "relative flex flex-col border border-(--cq-border) bg-(--cq-surface-raised)",
+        "relative flex flex-col rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface-raised)",
         compact ? "gap-2 p-3" : "gap-3 p-4",
       )}
       data-arrival-card={card.key}
@@ -516,7 +516,7 @@ function FocusCard({
               : "Here's your version. Send this exact message?"}
           </p>
           <blockquote
-            className="m-0 bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)"
+            className="m-0 rounded-(--cq-radius-md) bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)"
             data-arrival-confirm
           >
             <span className="sr-only">{t("What will be sent:")} </span>
@@ -568,7 +568,7 @@ function FocusCard({
               </p>
               <blockquote
                 className={cx(
-                  "m-0 bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)",
+                  "m-0 rounded-(--cq-radius-md) bg-(--cq-surface-sunken) px-3 py-2.5 cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)",
                   compact && "max-h-32 overflow-y-auto",
                 )}
               >
@@ -1062,7 +1062,7 @@ export function Sequence({
           {left > 0 ? (
             <div
               aria-hidden="true"
-              className="absolute inset-x-3 -bottom-1.5 h-full border border-(--cq-border-subtle) bg-(--cq-surface)"
+              className="absolute inset-x-3 -bottom-1.5 h-full rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
             />
           ) : null}
           {focusCard}

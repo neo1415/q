@@ -181,7 +181,7 @@ function IdentityDetails({
 
   const [note, setNote] = useState<string | null>(null);
   return (
-    <div className="mt-1 flex flex-col gap-0.5 border border-(--cq-border-subtle) px-3 py-2">
+    <div className="mt-1 flex flex-col gap-0.5 rounded-md border border-(--cq-border-subtle) px-3 py-2">
       <span className="cq-body-sm text-(--cq-text-primary)">
         {t("Name on ID:")} {identity.nameOnId} · {t(identity.role)}
       </span>
@@ -232,7 +232,7 @@ function KybDetails({
 
   const [note, setNote] = useState<string | null>(null);
   return (
-    <div className="mt-1 flex flex-col gap-0.5 border border-(--cq-border-subtle) px-3 py-2">
+    <div className="mt-1 flex flex-col gap-0.5 rounded-md border border-(--cq-border-subtle) px-3 py-2">
       {/* ADMIN-4 block: automatic requests and the email-domain signal. */}
       {kyb.source === "AUTO" ? (
         <span className="cq-caption text-(--cq-text-secondary)">

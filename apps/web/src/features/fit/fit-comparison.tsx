@@ -61,7 +61,7 @@ function Rank({ n }: { readonly n: number }) {
   return (
     <span
       aria-hidden="true"
-      className="grid size-[26px] shrink-0 place-items-center bg-(--cq-text-primary) text-[13px] font-semibold text-(--cq-canvas)"
+      className="grid size-[26px] shrink-0 place-items-center rounded-full bg-(--cq-text-primary) text-[13px] font-semibold text-(--cq-canvas)"
     >
       {n}
     </span>
@@ -292,7 +292,7 @@ export function FitComparisonView({
             <article
               key={e.companyId}
               className={cx(
-                "overflow-hidden border bg-(--cq-surface-raised)",
+                "overflow-hidden rounded-(--cq-radius-lg) border bg-(--cq-surface-raised)",
                 isOpen
                   ? "border-(--cq-border-strong)"
                   : "border-(--cq-border-subtle)",
@@ -362,7 +362,7 @@ export function FitComparisonView({
                     ))}
                   </div>
                   {view === null || view.status !== "READY" ? null : (
-                    <div className="flex items-start gap-2.5 bg-(--cq-surface-subtle) px-3 py-2.5 text-sm">
+                    <div className="flex items-start gap-2.5 rounded-xl bg-(--cq-surface-subtle) px-3 py-2.5 text-sm">
                       <span className="mt-px">
                         <QViewMark />
                       </span>

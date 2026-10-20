@@ -62,7 +62,7 @@ function InvestorCard({
   const cover = item.coverUrl ?? null;
   return (
     <div
-      className="flex h-full flex-col overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface) transition-colors duration-(--cq-motion-base) hover:border-(--cq-border-strong)"
+      className="flex h-full flex-col overflow-hidden rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) transition-colors duration-(--cq-motion-base) hover:border-(--cq-border-strong)"
       data-investor-card={item.investorOrganisationId}
     >
       <Link
@@ -119,7 +119,7 @@ function InvestorCard({
           )}
           {footer}
           {inboundLabel(item.inboundPreference) === null ? null : (
-            <span className="cq-caption mt-auto self-start border border-(--cq-border-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)">
+            <span className="cq-caption mt-auto self-start rounded-full border border-(--cq-border-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)">
               <Words>{inboundLabel(item.inboundPreference) ?? ""}</Words>
             </span>
           )}

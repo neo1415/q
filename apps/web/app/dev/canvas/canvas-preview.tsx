@@ -208,7 +208,7 @@ export function CanvasPreview({
     return (
       <div className="min-h-dvh bg-(--cq-canvas) p-4 sm:p-6">
         <h1 className="m-0 mb-4 text-2xl font-medium">Discover</h1>
-        <div className="aspect-[9/13] max-w-[760px] bg-(--cq-surface-strong) sm:aspect-[16/10]" />
+        <div className="aspect-[9/13] max-w-[760px] rounded-[18px] bg-(--cq-surface-strong) sm:aspect-[16/10]" />
         <AnswerChipView
           chip={{
             answerId: "a2",

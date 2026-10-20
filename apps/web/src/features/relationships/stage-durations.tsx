@@ -38,7 +38,7 @@ export function StageDurations({
             key={span.key}
             title={t(`${STATE_WORDS[span.state]}: ${durationWords(span.ms)}`)}
             className={cx(
-              "h-2 min-w-1",
+              "h-2 min-w-1 rounded-(--cq-radius-xs)",
               span.to === null ? "bg-(--cq-accent)" : "bg-(--cq-text-tertiary)",
             )}
             style={{ flexGrow: span.ms / total, flexBasis: 0 }}

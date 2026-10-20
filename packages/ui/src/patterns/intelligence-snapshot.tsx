@@ -124,7 +124,7 @@ export function IntelligenceSnapshot({
               <li key={step.id} className="flex gap-3">
                 <span
                   aria-hidden="true"
-                  className="flex size-6 shrink-0 items-center justify-center bg-(--cq-accent-soft) cq-caption cq-numeric font-semibold text-(--cq-accent)"
+                  className="flex size-6 shrink-0 items-center justify-center rounded-full bg-(--cq-accent-soft) cq-caption cq-numeric font-semibold text-(--cq-accent)"
                 >
                   {index + 1}
                 </span>

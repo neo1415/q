@@ -133,7 +133,7 @@ export function ArtifactCard({
     <section
       className={
         framed
-          ? "flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+          ? "flex flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
           : "flex flex-col gap-3"
       }
       aria-label={`${artifactTypeLabel(block.type)}: ${block.title}`}
@@ -145,7 +145,7 @@ export function ArtifactCard({
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)"
+          className="flex size-10 shrink-0 items-center justify-center rounded-md bg-(--cq-surface-subtle) text-(--cq-text-secondary)"
         >
           <TypeIcon size={ICON_SIZE.regular} strokeWidth={ICON_STROKE} />
         </span>

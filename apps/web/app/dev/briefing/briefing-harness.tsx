@@ -245,7 +245,7 @@ export function BriefingHarness({
           id="harness-say"
           value={said}
           onChange={(event) => setSaid(event.target.value)}
-          className="flex-1 border border-(--cq-border) bg-(--cq-surface) px-3"
+          className="flex-1 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface) px-3"
           data-harness-say
         />
         <button type="submit" className="min-h-11 px-3" data-harness-say-send>

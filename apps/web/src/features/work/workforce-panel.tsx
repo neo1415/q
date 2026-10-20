@@ -352,7 +352,7 @@ function JobCard({
   const shown = all ? lines : lines.slice(-JOB_LINES_PREVIEW);
   return (
     <article
-      className="mb-3 overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-raised) [contain-intrinsic-size:auto_160px] [content-visibility:auto]"
+      className="mb-3 overflow-hidden rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) [contain-intrinsic-size:auto_160px] [content-visibility:auto]"
       data-job={job.job.id}
       data-work-state={workStateOf(job.job)}
     >
@@ -367,7 +367,7 @@ function JobCard({
         </div>
         <span
           className={cx(
-            "inline-flex items-center gap-1.5 px-2.5 py-1 text-[13px] font-medium whitespace-nowrap",
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] font-medium whitespace-nowrap",
             status.tone === "needs"
               ? "bg-(--cq-accent-soft) text-(--cq-accent)"
               : "bg-(--cq-surface-subtle)",
@@ -571,7 +571,7 @@ function Mono({
     <span
       aria-hidden="true"
       className={cx(
-        "grid h-[30px] w-[30px] place-items-center text-[11.5px] font-semibold tracking-[0.01em] lg:h-[34px] lg:w-[34px] lg:text-[12.5px]",
+        "grid h-[30px] w-[30px] place-items-center rounded-[10px] text-[11.5px] font-semibold tracking-[0.01em] lg:h-[34px] lg:w-[34px] lg:text-[12.5px]",
         tone === "lead"
           ? "bg-(--cq-stage-canvas) text-(--cq-stage-q-core)"
           : tone === "you"
@@ -635,7 +635,7 @@ function Step({
           </div>
         )}
         {line.feedback === undefined || line.feedback.length === 0 ? null : (
-          <p className="mt-1.5 mb-0 bg-(--cq-surface-subtle) px-2.5 py-2 text-[13.5px] text-(--cq-text-secondary)">
+          <p className="mt-1.5 mb-0 rounded-[10px] bg-(--cq-surface-subtle) px-2.5 py-2 text-[13.5px] text-(--cq-text-secondary)">
             {t(line.feedback)}
           </p>
         )}
@@ -747,7 +747,7 @@ function Team({ overview }: { readonly overview: WorkforceOverviewDto }) {
       <h3 id="workforce-team" className="mb-2.5 text-[15px] font-semibold">
         {t("Who’s on it")}
       </h3>
-      <ul className="m-0 list-none border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-0 py-1">
+      <ul className="m-0 list-none rounded-[16px] border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-0 py-1">
         {members.map((member) => (
           <li
             key={member.role}
@@ -823,7 +823,7 @@ function Cost({
                 <td className="w-[120px] py-[5px] align-middle">{row.name}</td>
                 <td className="py-[5px] align-middle">
                   <div
-                    className="h-2 min-w-0.5 bg-(--cq-accent) opacity-85"
+                    className="h-2 min-w-0.5 rounded-[4px] bg-(--cq-accent) opacity-85"
                     style={{ width: `${String(row.share)}%` }}
                   />
                 </td>

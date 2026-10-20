@@ -54,7 +54,7 @@ const PRIORITY_WORDS: Readonly<Record<ReadinessAction["priority"], string>> = {
 };
 
 const card =
-  "flex flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 sm:p-6";
+  "flex flex-col gap-3 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 sm:p-6";
 
 export function RaiseSummary({
   ledger,
@@ -203,7 +203,7 @@ export function StopYourRaise({
                 >
                   <span
                     aria-hidden="true"
-                    className="cq-caption grid size-6 place-items-center bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
+                    className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-warning-soft) font-semibold text-(--cq-warning)"
                   >
                     {index + 1}
                   </span>
@@ -274,14 +274,14 @@ export function NextSteps({
               >
                 <span
                   aria-hidden="true"
-                  className="cq-caption grid size-6 place-items-center bg-(--cq-surface-subtle) font-semibold text-(--cq-text-secondary)"
+                  className="cq-caption grid size-6 place-items-center rounded-full bg-(--cq-surface-subtle) font-semibold text-(--cq-text-secondary)"
                 >
                   {index + 1}
                 </span>
                 <div className="flex flex-col gap-0.5">
                   <span className="cq-body font-semibold text-(--cq-text-primary)">
                     {step.title}{" "}
-                    <span className="cq-caption border border-(--cq-border-subtle) px-2 py-0.5 font-normal text-(--cq-text-secondary)">
+                    <span className="cq-caption rounded-full border border-(--cq-border-subtle) px-2 py-0.5 font-normal text-(--cq-text-secondary)">
                       {t(PRIORITY_WORDS[step.priority])}
                     </span>
                   </span>

@@ -269,7 +269,7 @@ export function VoiceStage({
           {showAll ? (
             <ol
               ref={listRef}
-              className="cq-stage-scroll w-full max-w-2xl flex-none space-y-3 overflow-y-auto border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
+              className="cq-stage-scroll w-full max-w-2xl flex-none space-y-3 overflow-y-auto rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface) p-4"
               style={{ maxHeight: "32vh" }}
               aria-label={t("Everything we've said")}
             >
@@ -309,7 +309,7 @@ export function VoiceStage({
             <div
               role="status"
               aria-live="polite"
-              className="flex items-center gap-3 border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
+              className="flex items-center gap-3 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
             >
               <span className="cq-body text-(--cq-text-primary)">{notice}</span>
               <button

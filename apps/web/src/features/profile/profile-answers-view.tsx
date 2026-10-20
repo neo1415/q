@@ -217,7 +217,7 @@ function Chips({ items }: { readonly items: readonly string[] }) {
       {items.map((item) => (
         <li
           key={item}
-          className="cq-body-sm border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 py-0.5 text-(--cq-text-primary)"
+          className="cq-body-sm rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 py-0.5 text-(--cq-text-primary)"
         >
           {item}
         </li>
@@ -282,7 +282,7 @@ function AnswerGroupView({
           id={headingId}
           className="cq-title-sm flex items-center gap-2 text-(--cq-text-primary)"
         >
-          <span className="inline-flex size-8 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
+          <span className="inline-flex size-8 items-center justify-center rounded-lg bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
             <Icon size={ICON_SIZE.regular} aria-hidden="true" />
           </span>
           {translate(group.label)}

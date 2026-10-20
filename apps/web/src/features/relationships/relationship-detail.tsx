@@ -253,7 +253,7 @@ export function RelationshipDetail({
             <Card title={t("Diligence")} id="diligence">
               <Link
                 href={`${basePath}/diligence`}
-                className="flex min-h-14 items-center justify-between gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-3 hover:border-(--cq-border) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-4 py-3 hover:border-(--cq-border) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                 data-diligence-summary
               >
                 <span className="cq-body text-(--cq-text-primary)">
@@ -400,7 +400,7 @@ export function RelationshipDetail({
                     (demo audit 2026-10-03: six equal actions under Next).
                   */}
                     <details className="group" data-next-more>
-                      <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
+                      <summary className="cq-body-sm flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-(--cq-radius-md) text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
                         {t("More")}
                         <ChevronDown
                           size={ICON_SIZE.compact}
@@ -676,7 +676,7 @@ export function RelationshipHero({
                   >
                     <span
                       aria-hidden="true"
-                      className={`h-1 ${
+                      className={`h-1 rounded-full ${
                         index + 1 < step
                           ? "bg-(--cq-text-secondary)"
                           : index + 1 === step
@@ -865,7 +865,7 @@ export function RelationshipTabs({
         >
           {t("Diligence")}
           {waiting > 0 ? (
-            <span className="cq-caption cq-numeric bg-(--cq-accent) px-2 text-(--cq-text-inverse)">
+            <span className="cq-caption cq-numeric rounded-full bg-(--cq-accent) px-2 text-(--cq-text-inverse)">
               {waiting}
             </span>
           ) : null}
@@ -879,7 +879,7 @@ export function RelationshipTabs({
         >
           {t("Messages")}
           {messageCount > 0 ? (
-            <span className="cq-caption cq-numeric bg-(--cq-surface-subtle) px-2">
+            <span className="cq-caption cq-numeric rounded-full bg-(--cq-surface-subtle) px-2">
               {messageCount}
             </span>
           ) : null}
@@ -932,7 +932,7 @@ function ProfileChips({ profile }: { readonly profile: CounterpartProfile }) {
       {profile.chips.map((chip) => (
         <span
           key={chip}
-          className="cq-caption bg-(--cq-surface-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)"
+          className="cq-caption rounded-full bg-(--cq-surface-subtle) px-2.5 py-0.5 text-(--cq-text-secondary)"
         >
           {t(chip)}
         </span>

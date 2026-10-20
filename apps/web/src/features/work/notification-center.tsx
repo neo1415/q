@@ -110,7 +110,7 @@ function NoticeRow({
         <Link
           href={notice.linkPath ?? "/"}
           onClick={onOpen}
-          className="flex min-h-12 items-center gap-3 py-2 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          className="flex min-h-12 items-center gap-3 rounded-sm py-2 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
         >
           <span
             aria-hidden="true"
@@ -215,7 +215,7 @@ export function NotificationCenter() {
             {unread === 0 ? null : (
               <span
                 aria-hidden="true"
-                className="cq-caption cq-numeric absolute -top-0.5 -right-0.5 min-w-4 bg-(--cq-accent) px-1 text-center leading-4 text-(--cq-canvas)"
+                className="cq-caption cq-numeric absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-(--cq-accent) px-1 text-center leading-4 text-(--cq-canvas)"
               >
                 {unread > 9 ? "9+" : unread}
               </span>

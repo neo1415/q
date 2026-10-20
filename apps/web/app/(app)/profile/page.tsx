@@ -582,7 +582,7 @@ function OrganisationImages({
       </div>
       <div className="flex items-center gap-4">
         <div className="relative shrink-0">
-          <div className="size-16 overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-subtle)">
+          <div className="size-16 overflow-hidden rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle)">
             {avatarUrl === null ? null : (
               // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, browser to storage directly
               <img
@@ -602,7 +602,7 @@ function OrganisationImages({
             />
           </div>
         </div>
-        <div className="relative aspect-[4/1] h-16 min-w-0 overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-strong)">
+        <div className="relative aspect-[4/1] h-16 min-w-0 overflow-hidden rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-strong)">
           {coverUrl === null ? null : (
             // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, browser to storage directly
             <img src={coverUrl} alt="" className="size-full object-cover" />
@@ -724,7 +724,7 @@ async function StatRow({ journey }: { readonly journey: ProfileJourney }) {
       {stats.map((stat) => (
         <div
           key={stat.label}
-          className="flex flex-col gap-1 border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
+          className="flex flex-col gap-1 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
         >
           <dt className="cq-caption text-(--cq-text-secondary)">
             {stat.label}
@@ -750,7 +750,7 @@ function StatRowSkeleton() {
       {[0, 1, 2].map((key) => (
         <div
           key={key}
-          className="h-16 animate-pulse border border-(--cq-border-subtle) bg-(--cq-surface-subtle) motion-reduce:animate-none"
+          className="h-16 animate-pulse rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) motion-reduce:animate-none"
         />
       ))}
     </div>

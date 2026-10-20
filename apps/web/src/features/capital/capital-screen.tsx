@@ -434,7 +434,7 @@ function QuietEmpty({
 }) {
   return (
     <div
-      className="flex max-w-(--cq-layout-reading) flex-col gap-3 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+      className="flex max-w-(--cq-layout-reading) flex-col gap-3 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
       data-state={retry ? "error" : "empty"}
     >
       <p className="cq-body text-(--cq-text-primary)">{sentence}</p>

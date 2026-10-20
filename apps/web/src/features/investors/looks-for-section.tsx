@@ -50,7 +50,7 @@ export function StandingBadge({
 }) {
   return (
     <span
-      className={`cq-label inline-flex shrink-0 items-center gap-1.5 py-0.5 ps-2 pe-2.5 whitespace-nowrap ${TONE[standing]}`}
+      className={`cq-label inline-flex shrink-0 items-center gap-1.5 rounded-full py-0.5 ps-2 pe-2.5 whitespace-nowrap ${TONE[standing]}`}
       data-standing={standing}
     >
       <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
@@ -115,7 +115,7 @@ async function readProfileReasons(
 
 function Rows({ rows }: { readonly rows: readonly LooksForRow[] }) {
   return (
-    <ul className="flex flex-col overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
+    <ul className="flex flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)">
       {rows.map((row) => (
         <li
           key={`${row.label}-${row.words}`}

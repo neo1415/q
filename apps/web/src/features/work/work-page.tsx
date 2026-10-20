@@ -608,7 +608,7 @@ function TaskComposer() {
             type="submit"
             aria-label={t("Give Q this task")}
             disabled={busy}
-            className="flex size-11 shrink-0 items-center justify-center bg-(--cq-accent) text-(--cq-text-inverse) motion-safe:transition-transform motion-safe:duration-(--cq-motion-fast) active:scale-[0.97] disabled:opacity-50 lg:size-12"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--cq-accent) text-(--cq-text-inverse) motion-safe:transition-transform motion-safe:duration-(--cq-motion-fast) active:scale-[0.97] disabled:opacity-50 lg:size-12"
           >
             <ArrowUp aria-hidden="true" size={20} strokeWidth={2} />
           </button>
@@ -618,7 +618,7 @@ function TaskComposer() {
             aria-label={t("Talk to Q")}
             disabled={session === null}
             onClick={() => void session?.talk()}
-            className="flex size-11 shrink-0 items-center justify-center bg-(--cq-accent) text-(--cq-text-inverse) motion-safe:transition-transform motion-safe:duration-(--cq-motion-fast) active:scale-[0.97] disabled:opacity-50 lg:size-12"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-(--cq-accent) text-(--cq-text-inverse) motion-safe:transition-transform motion-safe:duration-(--cq-motion-fast) active:scale-[0.97] disabled:opacity-50 lg:size-12"
             data-work-mic
           >
             <Mic aria-hidden="true" size={20} strokeWidth={2} />
@@ -737,7 +737,7 @@ function PreparedPlan({
         <div className="flex flex-wrap gap-2">
           <Link
             href={qPage}
-            className="inline-flex min-h-11 items-center px-3 cq-body-sm font-medium text-(--cq-accent) hover:bg-(--cq-surface-subtle) lg:min-h-10"
+            className="inline-flex min-h-11 items-center rounded-md px-3 cq-body-sm font-medium text-(--cq-accent) hover:bg-(--cq-surface-subtle) lg:min-h-10"
           >
             {t("Continue with Q")}
           </Link>
@@ -915,7 +915,7 @@ function ApprovalPlan({
         {editHref === undefined ? null : (
           <Link
             href={editHref}
-            className="inline-flex min-h-11 items-center px-4 cq-body-sm font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-10"
+            className="inline-flex min-h-11 items-center rounded-md px-4 cq-body-sm font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-10"
           >
             {t("Edit")}
           </Link>
@@ -1008,7 +1008,7 @@ function Suggestions({
           {t("Suggestions couldn’t load.")}
         </p>
       ) : (
-        <ul className="overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
+        <ul className="overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)">
           {items.map((item, index) => (
             <li
               key={item.key}
@@ -1398,7 +1398,7 @@ function NoticeRow({ group }: { readonly group: NoticeGroup }) {
       : (notice.body ?? shortAge(notice.createdAt));
   return (
     <div className="flex min-h-16 items-center gap-3 py-2.5">
-      <span className="flex size-8 shrink-0 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
         <Bell aria-hidden="true" size={16} strokeWidth={ICON_STROKE} />
       </span>
       <div className="min-w-0 flex-1">
@@ -1417,7 +1417,7 @@ function NoticeRow({ group }: { readonly group: NoticeGroup }) {
         <Link
           href={notice.linkPath}
           onClick={done}
-          className="inline-flex min-h-11 items-center border border-(--cq-border-strong) px-3 cq-body-sm font-medium text-(--cq-text-primary) hover:bg-(--cq-surface-subtle) pointer-fine:min-h-9"
+          className="inline-flex min-h-11 items-center rounded-md border border-(--cq-border-strong) px-3 cq-body-sm font-medium text-(--cq-text-primary) hover:bg-(--cq-surface-subtle) pointer-fine:min-h-9"
         >
           {t("Open")}
         </Link>
@@ -1455,7 +1455,7 @@ function NeedRow({
       {namedMarkShown(named, namedName) ? (
         <NamedMark named={named} name={namedName} size={32} />
       ) : (
-        <span className="flex size-8 shrink-0 items-center justify-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
           <Icon aria-hidden="true" size={16} strokeWidth={ICON_STROKE} />
         </span>
       )}
@@ -1748,11 +1748,11 @@ function RunningRow({
             </p>
             <div
               aria-hidden="true"
-              className="mt-1.5 h-[3px] overflow-hidden bg-(--cq-surface-strong)"
+              className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-(--cq-surface-strong)"
             >
               <div
                 className={cx(
-                  "h-full",
+                  "h-full rounded-full",
                   share >= 100
                     ? "bg-(--cq-warning)"
                     : "bg-(--cq-text-tertiary)",
@@ -1900,7 +1900,7 @@ function DelegationSwitch({
         aria-labelledby={labelId}
         disabled={pending}
         onClick={flip}
-        className="inline-flex size-11 shrink-0 items-center justify-center disabled:opacity-60"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-full disabled:opacity-60"
       >
         <span
           aria-hidden="true"

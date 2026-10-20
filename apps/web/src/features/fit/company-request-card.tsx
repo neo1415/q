@@ -54,23 +54,23 @@ export function CompanyRequestCard({
   return (
     <article
       aria-labelledby={titleId}
-      className="relative flex flex-col gap-3.5 border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 hover:border-(--cq-border)"
+      className="relative flex flex-col gap-3.5 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4 hover:border-(--cq-border)"
       data-company-request={companyId}
     >
       <Link
         href={`/company/${companyId}`}
         aria-label={`Open ${name}'s profile`}
-        className="absolute inset-0 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+        className="absolute inset-0 rounded-[inherit] focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
       />
       <div className="flex items-start gap-3.5">
-        <span className="relative aspect-[9/16] w-[60px] shrink-0 overflow-hidden bg-(--cq-surface-strong)">
+        <span className="relative aspect-[9/16] w-[60px] shrink-0 overflow-hidden rounded-[10px] bg-(--cq-surface-strong)">
           <EntityAvatar
             kind="company"
             name={name}
             companyId={companyId}
             size={60}
             decorative
-            className="absolute inset-0 size-full object-cover"
+            className="absolute inset-0 size-full rounded-none object-cover"
           />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">

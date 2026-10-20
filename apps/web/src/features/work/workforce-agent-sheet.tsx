@@ -229,7 +229,7 @@ function Callout({ node }: { readonly node: AgentNode }) {
       break;
   }
   return (
-    <p className={cx("m-0 px-3.5 py-3 text-[14px]", tone)}>
+    <p className={cx("m-0 rounded-[12px] px-3.5 py-3 text-[14px]", tone)}>
       {lead === null ? null : <b className="font-semibold">{t(lead)} </b>}
       {t(node.now)}
     </p>

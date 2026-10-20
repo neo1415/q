@@ -128,10 +128,10 @@ export function FollowUpStack({
         {queue.length > 1 ? (
           <span
             aria-hidden="true"
-            className="absolute inset-x-3 bottom-1 h-8 border border-(--cq-border-subtle) bg-(--cq-surface)"
+            className="absolute inset-x-3 bottom-1 h-8 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"
           />
         ) : null}
-        <div className="relative flex flex-col gap-3 border border-(--cq-border) bg-(--cq-surface) p-5">
+        <div className="relative flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border) bg-(--cq-surface) p-5">
           <p className="cq-caption flex justify-between gap-2 text-(--cq-text-tertiary)">
             <span>{t(REASON_WORDS[current.reason])}</span>
             {heading ? null : (
@@ -147,7 +147,7 @@ export function FollowUpStack({
             {t(current.question)}
           </h3>
           {current.why === null ? null : (
-            <p className="cq-body-sm bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-secondary)">
+            <p className="cq-body-sm rounded-(--cq-radius-md) bg-(--cq-surface-subtle) px-3 py-2 text-(--cq-text-secondary)">
               <span className="font-semibold text-(--cq-text-primary)">
                 {t("Why Q asks:")}
               </span>{" "}
@@ -162,7 +162,7 @@ export function FollowUpStack({
               {current.readings.map((reading) => (
                 <li
                   key={reading}
-                  className="cq-body-sm border border-(--cq-border) px-3 py-2 text-(--cq-text-primary)"
+                  className="cq-body-sm rounded-(--cq-radius-md) border border-(--cq-border) px-3 py-2 text-(--cq-text-primary)"
                 >
                   {reading}
                 </li>
@@ -194,7 +194,7 @@ export function FollowUpStack({
                         type="button"
                         disabled={pending}
                         onClick={() => answer({ kind: "QUICK", index })}
-                        className="cq-body-sm inline-flex min-h-11 items-center border border-(--cq-border) bg-(--cq-surface-raised) px-4 text-(--cq-text-primary) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
+                        className="cq-body-sm inline-flex min-h-11 items-center rounded-full border border-(--cq-border) bg-(--cq-surface-raised) px-4 text-(--cq-text-primary) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
                       >
                         {t(label)}
                       </button>
@@ -226,12 +226,12 @@ export function FollowUpStack({
                         ? "Or type the number"
                         : "Or say it your way"
                     }
-                    className="cq-body min-h-11 flex-1 border border-(--cq-border) bg-(--cq-canvas) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                    className="cq-body min-h-11 flex-1 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-canvas) px-3 text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
                   />
                   <button
                     type="submit"
                     disabled={pending || typed.trim().length === 0}
-                    className="cq-label inline-flex min-h-11 items-center bg-(--cq-accent) px-4 text-(--cq-text-inverse) disabled:opacity-60"
+                    className="cq-label inline-flex min-h-11 items-center rounded-(--cq-radius-md) bg-(--cq-accent) px-4 text-(--cq-text-inverse) disabled:opacity-60"
                   >
                     {t("Answer")}
                   </button>
@@ -244,7 +244,7 @@ export function FollowUpStack({
               type="button"
               disabled={pending}
               onClick={setAside}
-              className="cq-label inline-flex min-h-11 items-center px-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary) disabled:opacity-60"
+              className="cq-label inline-flex min-h-11 items-center rounded-(--cq-radius-md) px-2 text-(--cq-text-secondary) hover:text-(--cq-text-primary) disabled:opacity-60"
             >
               {t("Skip for now")}
             </button>

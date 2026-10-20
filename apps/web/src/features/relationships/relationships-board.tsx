@@ -298,7 +298,7 @@ export function RelationshipsBoard({
       className="flex flex-col gap-5"
       data-relationships-board
     >
-      <label className="flex min-h-12 items-center gap-2.5 border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 focus-within:outline-2 focus-within:outline-(--cq-focus-ring)">
+      <label className="flex min-h-12 items-center gap-2.5 rounded-xl border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 focus-within:outline-2 focus-within:outline-(--cq-focus-ring)">
         <Search
           size={ICON_SIZE.regular}
           aria-hidden="true"
@@ -372,7 +372,7 @@ export function RelationshipsBoard({
               {t(FILTER_WORDS[key])}{" "}
               <span
                 className={cx(
-                  "cq-caption cq-numeric px-1.5",
+                  "cq-caption cq-numeric rounded-full px-1.5",
                   key === "NEEDS_YOU" && count > 0
                     ? "bg-(--cq-accent) text-(--cq-text-inverse)"
                     : "bg-(--cq-surface-subtle)",
@@ -423,7 +423,7 @@ export function RelationshipsBoard({
               (redesign 2026-10-15). */}
           <ul
             aria-label={t("Relationships")}
-            className="flex flex-col divide-y divide-(--cq-border-subtle) overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
+            className="flex flex-col divide-y divide-(--cq-border-subtle) overflow-hidden rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
             data-relationships-list
             data-qp-anchor="fdr.07.crm.pipeline"
           >

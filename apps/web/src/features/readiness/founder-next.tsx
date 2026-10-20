@@ -51,7 +51,7 @@ export async function FounderNext() {
               {t("Action plan")}
             </Link>
           </div>
-          <ol className="overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
+          <ol className="overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)">
             {next.map((action, index) => (
               <li
                 key={action.key}
@@ -59,7 +59,7 @@ export async function FounderNext() {
               >
                 <span
                   aria-hidden="true"
-                  className="cq-caption grid size-6 place-items-center border border-(--cq-border-strong) text-(--cq-text-secondary)"
+                  className="cq-caption grid size-6 place-items-center rounded-full border border-(--cq-border-strong) text-(--cq-text-secondary)"
                 >
                   {index + 1}
                 </span>

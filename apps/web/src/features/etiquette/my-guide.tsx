@@ -148,7 +148,7 @@ export function MyGuide({
               {guide.fileName === null ? "" : ` · from ${guide.fileName}`}
             </p>
             {/* F13: a guide written in Markdown reads as formatted text. */}
-            <div className="cq-body-sm max-h-64 overflow-y-auto border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-3 text-(--cq-text-primary)">
+            <div className="cq-body-sm max-h-64 overflow-y-auto rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) p-3 text-(--cq-text-primary)">
               <QMarkdown text={guide.text} />
             </div>
             <div className="flex flex-wrap gap-2">

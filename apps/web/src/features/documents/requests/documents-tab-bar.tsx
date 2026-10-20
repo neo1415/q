@@ -114,7 +114,7 @@ export function DocumentsTabBar({
           >
             {t(tab.label)}
             {count === undefined ? null : (
-              <span className="cq-caption bg-(--cq-surface-subtle) px-2 py-px font-medium text-(--cq-text-secondary) tabular-nums">
+              <span className="cq-caption rounded-full bg-(--cq-surface-subtle) px-2 py-px font-medium text-(--cq-text-secondary) tabular-nums">
                 <span className="sr-only">, </span>
                 {t(count)}
               </span>

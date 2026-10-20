@@ -50,7 +50,7 @@ function Block({
       className="flex max-w-[520px] flex-col items-start gap-3 py-7"
       role="status"
     >
-      <span className="grid size-11 place-items-center bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
+      <span className="grid size-11 place-items-center rounded-xl bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
         {icon}
       </span>
       <h2 className="cq-title-sm">{title}</h2>
@@ -124,7 +124,7 @@ export function ExploreState(props: Props) {
         <Link
           key={suggestion}
           href={searchHref(suggestion)}
-          className="inline-flex min-h-9 items-center border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-sm text-(--cq-text-secondary)"
+          className="inline-flex min-h-9 items-center rounded-(--cq-radius-full) border border-(--cq-border) bg-(--cq-surface-raised) px-3.5 text-sm text-(--cq-text-secondary)"
         >
           {suggestion}
         </Link>
@@ -176,7 +176,7 @@ export function ExploreLimitedBanner({
 }) {
   return (
     <div
-      className="flex items-start gap-2.5 border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-3.5 py-3 text-sm text-(--cq-text-secondary)"
+      className="flex items-start gap-2.5 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-3.5 py-3 text-sm text-(--cq-text-secondary)"
       data-explore-limited
     >
       <ShieldCheck

@@ -163,7 +163,7 @@ export default async function AdminPage() {
               <li key={queue.term}>
                 <a
                   href={queue.href}
-                  className="flex min-h-11 flex-col gap-1 border border-(--cq-border-subtle) px-3 py-2 hover:bg-(--cq-surface-subtle)"
+                  className="flex min-h-11 flex-col gap-1 rounded-lg border border-(--cq-border-subtle) px-3 py-2 hover:bg-(--cq-surface-subtle)"
                 >
                   <span className="cq-caption text-(--cq-text-secondary)">
                     {t(queue.term)}

@@ -29,7 +29,7 @@ function Logo({ name }: { readonly name: string }) {
   return (
     <span
       aria-hidden="true"
-      className="grid size-16 place-items-center border border-(--cq-border-subtle) bg-(--cq-surface-subtle) text-[26px] font-semibold text-(--cq-text-primary)"
+      className="grid size-16 place-items-center rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) text-[26px] font-semibold text-(--cq-text-primary)"
     >
       {(name.trim()[0] ?? "?").toUpperCase()}
     </span>
@@ -246,10 +246,10 @@ export function JoinCardSkeleton() {
   return (
     <div className="px-4">
       <div className={CARD} aria-busy="true" data-join-state="loading">
-        <div className={`size-16 ${bar}`} />
+        <div className={`size-16 rounded-2xl ${bar}`} />
         <div className={`h-7 w-[70%] ${bar}`} />
         <div className={`h-4 w-[90%] ${bar}`} />
-        <div className={`h-11 w-full ${bar}`} />
+        <div className={`h-11 w-full rounded-md ${bar}`} />
       </div>
     </div>
   );

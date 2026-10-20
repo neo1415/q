@@ -682,7 +682,7 @@ export function InboxView({
       <div className="gq-listhead">
         <button
           type="button"
-          className="grid size-11 place-items-center text-(--cq-text-tertiary) lg:size-9"
+          className="grid size-11 place-items-center rounded-lg text-(--cq-text-tertiary) lg:size-9"
           role="checkbox"
           aria-checked={allChecked}
           aria-label={t("Select all")}
