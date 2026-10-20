@@ -23,6 +23,12 @@ import {
 } from "@/features/readiness/readiness-section";
 import { ownRelationships } from "@/features/relationships/relationship-data";
 import { RelationshipList } from "@/features/relationships/relationship-list";
+import {
+  NEXT_STEP_WORDS,
+  relationshipHref,
+  STATE_WORDS,
+} from "@/features/relationships/relationship-words";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
 
 import { AskQChips } from "./ask-q-chips";
 import {
@@ -410,9 +416,7 @@ export async function FounderTab({
       );
     case "investors": {
       const relationships = await relationshipsOf(context);
-      return (
-        <RelationshipsPanel relationships={relationships} investor={false} />
-      );
+      return <InvestorsCard relationships={relationships} />;
     }
   }
 }
@@ -439,6 +443,69 @@ function RelationshipsPanel({
         />
       )}
     </PageSection>
+  );
+}
+
+/**
+ * Investors (design 2026-10-20): the investors the founder is talking to,
+ * one row each with where it stands and what is next, opening the record.
+ */
+async function InvestorsCard({
+  relationships,
+}: {
+  readonly relationships: Awaited<ReturnType<typeof ownRelationships>>;
+}) {
+  const t = await serverT();
+  if (relationships === undefined)
+    return (
+      <QuietEmpty sentence="Your relationships couldn't load. Try again in a moment." />
+    );
+  const investors = relationships.filter(
+    (item) => item.counterpart.kind === "INVESTOR_ORGANISATION",
+  );
+  if (investors.length === 0)
+    return (
+      <QuietEmpty sentence="No investor relationships yet. When an investor expresses interest, it appears here." />
+    );
+  return (
+    <ul
+      id="relationships"
+      aria-label={t("Relationships")}
+      className="flex flex-col rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-[18px] py-1"
+    >
+      {investors.map((item) => (
+        <li
+          key={item.relationshipId}
+          className="border-t border-(--cq-border-subtle) first:border-t-0"
+          data-relationship-id={item.relationshipId}
+        >
+          <Link
+            href={relationshipHref(item)}
+            className="grid min-h-14 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 py-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+          >
+            <EntityAvatar
+              kind="investor"
+              name={item.counterpart.name}
+              investorOrganisationId={item.counterpart.id}
+              src={item.counterpart.photoUrl ?? undefined}
+              size={28}
+              decorative
+            />
+            <span className="min-w-0">
+              <b className="block truncate font-semibold text-(--cq-text-primary)">
+                {item.counterpart.name}
+              </b>
+              <span className="block text-xs text-(--cq-text-tertiary)">
+                {t(STATE_WORDS[item.state])}
+              </span>
+            </span>
+            <span className="text-end text-xs text-(--cq-text-tertiary)">
+              {t(NEXT_STEP_WORDS[item.nextStep])}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
