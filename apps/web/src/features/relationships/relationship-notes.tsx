@@ -110,9 +110,11 @@ export function RelationshipNotes({
               </p>
               <div className="cq-caption flex flex-wrap items-center gap-x-2 text-(--cq-text-tertiary)">
                 <span>
-                  {note.authoredByMe
-                    ? t("You")
-                    : t(note.authorName ?? t("A colleague"))}
+                  <span>
+                    {note.authoredByMe
+                      ? t("You")
+                      : t(note.authorName ?? t("A colleague"))}
+                  </span>
                   {", "}
                   <time dateTime={note.createdAt} className="cq-numeric">
                     {t(since(note.createdAt, now))}
