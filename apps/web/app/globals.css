@@ -3491,20 +3491,22 @@
   }
 
   /*
-   * The voice stage (CQ-Q-VOICE-001 rework): one calm inverted field, the
-   * same night in either theme, painted with the stage tokens alone. The
-   * semantic tokens are re-pointed at them inside the stage, so the shared
-   * controls, the composer and Q's presence render on it unchanged and no
-   * component carries a literal colour or alpha.
+   * The voice stage (CQ-Q-VOICE-001 rework): one calm field painted with
+   * the stage tokens alone. It follows the theme (owner 2026-10-20): paper
+   * in light, the night in dark (tokens.css). The semantic tokens are
+   * re-pointed at them inside the stage, so the shared controls, the
+   * composer and Q's presence render on it unchanged and no component
+   * carries a literal colour or alpha. Q's light follows too: ink on paper
+   * (--cq-q-ink: 1), additive light on the night.
    *
-   * On the Q page the desktop sidebar joins the same night (demo audit
-   * 2026-10-03: a light rail beside the dark stage read as two apps).
+   * On the Q page the desktop sidebar joins the same field (demo audit
+   * 2026-10-03: a rail of another colour beside the stage read as two apps).
    */
   .cq-stage,
   .cq-shell:has(.cq-q-home) .cq-shell-sidebar {
     background: var(--cq-stage-canvas);
     color: var(--cq-stage-text);
-    color-scheme: dark;
+    color-scheme: var(--cq-stage-scheme);
     --cq-canvas: var(--cq-stage-canvas);
     --cq-surface: var(--cq-stage-surface);
     --cq-surface-raised: var(--cq-stage-surface);
@@ -3526,8 +3528,36 @@
     --cq-q-core: var(--cq-stage-q-core);
     --cq-q-bloom: var(--cq-stage-q-bloom);
     --cq-q-ember: var(--cq-stage-q-ember);
-    --cq-q-sweep: var(--cq-stage-q-core);
-    --cq-q-ink: 0;
+    --cq-q-sweep: var(--cq-stage-q-sweep);
+    --cq-q-ink: var(--cq-stage-q-ink);
+  }
+  /*
+   * The cinema (owner 2026-10-20): the stage follows the theme, but a
+   * surface that frames a video -- the Discover pitch player, Explore's
+   * tiles and feed, a pitch poster, a video room, a camera tile -- stays
+   * the night in both themes, so a video on a light page sits in its own
+   * dark frame. Declared on the element, so everything inside (the
+   * `.cq-stage` re-pointing above included) reads the night.
+   */
+  .cq-cinema {
+    color-scheme: dark;
+    --cq-stage-canvas: var(--cq-night-canvas);
+    --cq-stage-surface: var(--cq-night-surface);
+    --cq-stage-surface-strong: var(--cq-night-surface-strong);
+    --cq-stage-border: var(--cq-night-border);
+    --cq-stage-text: var(--cq-night-text);
+    --cq-stage-text-muted: var(--cq-night-text-muted);
+    --cq-stage-accent: var(--cq-night-accent);
+    --cq-stage-star: var(--cq-night-star);
+    --cq-stage-star-faint: var(--cq-night-star-faint);
+    --cq-stage-veil: var(--cq-night-veil);
+    --cq-stage-scheme: dark;
+    --cq-stage-q-light: var(--cq-night-q-light);
+    --cq-stage-q-core: var(--cq-night-q-core);
+    --cq-stage-q-bloom: var(--cq-night-q-bloom);
+    --cq-stage-q-ember: var(--cq-night-q-ember);
+    --cq-stage-q-sweep: var(--cq-night-q-core);
+    --cq-stage-q-ink: 0;
   }
   .cq-stage-said {
     text-wrap: balance;

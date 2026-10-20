@@ -753,7 +753,7 @@ export function RehearsalRoom({
           {simulation.headline}
         </span>
       ) : null}
-      <span className="cq-body-sm absolute bottom-3 start-3 max-w-[80%] truncate bg-(--cq-overlay) px-2 py-1 text-(--cq-stage-text)">
+      <span className="cq-body-sm absolute bottom-3 start-3 max-w-[80%] truncate bg-(--cq-stage-veil) px-2 py-1 text-(--cq-stage-text)">
         {name}
         {thinking ? (
           <span className="text-(--cq-stage-text-muted)">
@@ -770,7 +770,7 @@ export function RehearsalRoom({
   const selfView = (compact: boolean) => (
     <div
       ref={selfTile}
-      className={`relative flex items-center justify-center overflow-hidden rounded-(--cq-radius-lg) bg-(--cq-stage-surface-strong) ${
+      className={`cq-cinema relative flex items-center justify-center overflow-hidden rounded-(--cq-radius-lg) bg-(--cq-stage-surface-strong) ${
         compact ? "aspect-video w-32 sm:w-48" : "h-full min-h-40 w-full"
       }`}
       style={{ ["--level" as string]: "0" }}
@@ -796,14 +796,14 @@ export function RehearsalRoom({
         </div>
       )}
       {micOn ? null : (
-        <span className="absolute top-2 end-2 bg-(--cq-overlay) p-1 text-(--cq-stage-text)">
+        <span className="absolute top-2 end-2 bg-(--cq-stage-veil) p-1 text-(--cq-stage-text)">
           <MicOff size={14} aria-label={t("Your microphone is off")} />
         </span>
       )}
       {qSees && camOn ? (
         <span
           role="status"
-          className="cq-caption absolute top-2 start-2 inline-flex items-center gap-1 bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)"
+          className="cq-caption absolute top-2 start-2 inline-flex items-center gap-1 bg-(--cq-stage-veil) px-1.5 py-0.5 text-(--cq-stage-text)"
         >
           <Eye size={12} aria-hidden="true" />
           {name} can see you
@@ -821,7 +821,7 @@ export function RehearsalRoom({
           {name} can&rsquo;t see you &middot; Let Q see you
         </button>
       ) : null}
-      <span className="cq-caption absolute bottom-2 start-2 bg-(--cq-overlay) px-1.5 py-0.5 text-(--cq-stage-text)">
+      <span className="cq-caption absolute bottom-2 start-2 bg-(--cq-stage-veil) px-1.5 py-0.5 text-(--cq-stage-text)">
         You
         {hand ? " · hand raised" : ""}
       </span>
@@ -842,7 +842,7 @@ export function RehearsalRoom({
         <main className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           {sharing ? (
             <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-              <div className="relative min-h-0 flex-1 overflow-hidden rounded-(--cq-radius-lg) bg-(--cq-stage-surface)">
+              <div className="cq-cinema relative min-h-0 flex-1 overflow-hidden rounded-(--cq-radius-lg) bg-(--cq-stage-surface)">
                 <video
                   ref={screenVideo}
                   autoPlay
@@ -850,7 +850,7 @@ export function RehearsalRoom({
                   playsInline
                   className="h-full w-full object-contain"
                 />
-                <span className="cq-caption absolute top-2 start-2 bg-(--cq-overlay) px-2 py-1 text-(--cq-stage-text)">
+                <span className="cq-caption absolute top-2 start-2 bg-(--cq-stage-veil) px-2 py-1 text-(--cq-stage-text)">
                   You’re presenting · {name} can see your screen
                 </span>
               </div>
@@ -876,7 +876,7 @@ export function RehearsalRoom({
               aria-live="polite"
               className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center px-4"
             >
-              <p className="cq-body max-w-3xl rounded-(--cq-radius-md) bg-(--cq-overlay) px-4 py-2 text-(--cq-stage-text)">
+              <p className="cq-body max-w-3xl rounded-(--cq-radius-md) bg-(--cq-stage-veil) px-4 py-2 text-(--cq-stage-text)">
                 <span className="font-medium">{caption.who}: </span>
                 {caption.text.length > 280
                   ? `…${caption.text.slice(-280)}`

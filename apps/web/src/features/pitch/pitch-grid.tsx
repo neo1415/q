@@ -143,7 +143,7 @@ function VideoTile({
             ? "everyone on Capital Q"
             : "investors only"
       }, ${formatDay(video.createdAt)}`}
-      className="group relative block aspect-9/16 w-full overflow-hidden bg-(--cq-stage-canvas) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+      className="cq-cinema group relative block aspect-9/16 w-full overflow-hidden bg-(--cq-stage-canvas) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
       data-pitch-tile={video.mediaAssetId}
     >
       {poster !== null ? (
