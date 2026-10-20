@@ -4958,3 +4958,86 @@
     }
   }
 }
+
+/*
+ * The relationship record (CRM prototypes 2026-10-20: record rail, request
+ * checklist, inbox split, week calendar, terms beside the record). Tokens
+ * only. `.cq-charcoal` is the warm-charcoal option, scoped to the pages
+ * that chose it (Overview with its deal, and Calls): their primary buttons
+ * and dark tiles turn warm charcoal; the accent and everything else stay.
+ */
+@layer components {
+  .cq-charcoal {
+    --cq-primary-action: var(--cq-charcoal);
+    --cq-primary-action-hover: var(--cq-charcoal-hover);
+    --cq-on-primary-action: var(--cq-on-charcoal);
+    --cq-tile: var(--cq-charcoal);
+    --cq-on-tile: var(--cq-on-charcoal);
+  }
+  /* Busy time: hatched and labelled, never a colour alone. */
+  .cq-busy-hatch {
+    background: repeating-linear-gradient(
+      135deg,
+      var(--cq-surface-subtle) 0 6px,
+      var(--cq-surface) 6px 12px
+    );
+  }
+  /* A free hour offers itself only under a pointer (or when focused). */
+  .cq-slot-free {
+    border: 1px dashed transparent;
+    color: transparent;
+  }
+  .cq-slot-free:focus-visible,
+  .cq-slot-free[data-hint] {
+    border-color: var(--cq-border);
+    color: var(--cq-text-secondary);
+    background: var(--cq-surface);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .cq-slot-free:hover {
+      border-color: var(--cq-border-strong);
+      color: var(--cq-text-primary);
+      background: var(--cq-surface);
+    }
+  }
+  /* A view-only page behind the reader's watermark. */
+  .cq-doc-lines {
+    background: repeating-linear-gradient(
+      0deg,
+      var(--cq-surface-raised) 0 22px,
+      var(--cq-surface) 22px 23px
+    );
+  }
+  .cq-arrive {
+    animation: cq-arrive var(--cq-motion-emphasis) var(--cq-ease) both;
+  }
+  .cq-swap {
+    animation: cq-swap var(--cq-motion-emphasis) var(--cq-ease) both;
+  }
+  @keyframes cq-arrive {
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes cq-swap {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-arrive,
+    .cq-swap {
+      animation: none;
+    }
+  }
+}

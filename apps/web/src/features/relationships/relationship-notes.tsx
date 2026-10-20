@@ -86,7 +86,7 @@ export function RelationshipNotes({
 
   return (
     <div className="flex flex-col gap-3" data-relationship-notes>
-      <p className="cq-caption flex items-start gap-1.5 text-(--cq-text-secondary)">
+      <p className="cq-caption flex items-start gap-1.5 text-(--cq-text-tertiary)">
         <Lock
           size={ICON_SIZE.compact}
           aria-hidden="true"
@@ -94,6 +94,54 @@ export function RelationshipNotes({
         />
         {t(`Only ${who} sees these. Never shared with them, never used by Q.`)}
       </p>
+      {notes.length === 0 ? (
+        <p className="cq-body-sm text-(--cq-text-secondary)" data-state="empty">
+          {t("No notes yet.")}
+        </p>
+      ) : (
+        <ul aria-label={t("Notes")} className="flex flex-col gap-2">
+          {notes.map((note) => (
+            <li
+              key={note.id}
+              className="cq-swap flex flex-col gap-0.5 rounded-(--cq-radius-lg) bg-(--cq-surface) px-3 py-2.5"
+            >
+              <p className="cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)">
+                {note.body}
+              </p>
+              <div className="cq-caption flex flex-wrap items-center gap-x-2 text-(--cq-text-tertiary)">
+                <span>
+                  {note.authoredByMe
+                    ? t("You")
+                    : t(note.authorName ?? t("A colleague"))}
+                  {", "}
+                  <time dateTime={note.createdAt} className="cq-numeric">
+                    {t(since(note.createdAt, now))}
+                  </time>
+                </span>
+                {note.supersedesNoteId === null ? null : (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>{t("corrected")}</span>
+                  </>
+                )}
+                {note.authoredByMe ? (
+                  <button
+                    type="button"
+                    className="ms-auto inline-flex min-h-11 items-center px-1 text-(--cq-text-secondary) underline-offset-2 hover:text-(--cq-text-primary) hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+                    onClick={() => {
+                      setCorrecting(note);
+                      setDraft(note.body);
+                      setError(null);
+                    }}
+                  >
+                    {t("Correct")}
+                  </button>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
       <form
         className="flex flex-col gap-2"
         onSubmit={(event) => {
@@ -101,7 +149,7 @@ export function RelationshipNotes({
           save();
         }}
       >
-        <label htmlFor={field} className="cq-body-sm text-(--cq-text-primary)">
+        <label htmlFor={field} className="sr-only">
           {correcting === null ? t("Add a note") : t("Correct this note")}
         </label>
         <textarea
@@ -110,14 +158,18 @@ export function RelationshipNotes({
           onChange={(event) => setDraft(event.target.value)}
           maxLength={RELATIONSHIP_NOTE_MAX_LENGTH}
           rows={3}
-          className="cq-body-sm min-h-24 w-full resize-y rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 py-2 text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-          placeholder={t("What you learned, what to check next")}
+          className="cq-body-sm min-h-[84px] w-full resize-y rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 py-2.5 text-(--cq-text-primary) transition-[border-color,box-shadow] duration-(--cq-motion-fast) placeholder:text-(--cq-text-tertiary) focus-visible:border-(--cq-text-secondary) focus-visible:shadow-[0_0_0_3px_var(--cq-accent-soft)] focus-visible:outline-none"
+          placeholder={
+            correcting === null ? t("Add a note") : t("Correct this note")
+          }
           aria-describedby={error === null ? undefined : `${field}-error`}
         />
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="submit"
-            variant="secondary"
+            // Save turns primary once there is something to save.
+            variant={draft.trim().length === 0 ? "secondary" : "primary"}
+            className="self-start"
             disabled={saving || draft.trim().length === 0}
           >
             {saving
@@ -155,54 +207,6 @@ export function RelationshipNotes({
           </p>
         )}
       </form>
-      {notes.length === 0 ? (
-        <p className="cq-body-sm text-(--cq-text-secondary)" data-state="empty">
-          {t("No notes yet.")}
-        </p>
-      ) : (
-        <ul
-          aria-label={t("Notes")}
-          className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)"
-        >
-          {notes.map((note) => (
-            <li key={note.id} className="flex flex-col gap-1 py-3">
-              <p className="cq-body-sm whitespace-pre-wrap text-(--cq-text-primary)">
-                {note.body}
-              </p>
-              <div className="cq-caption flex flex-wrap items-center gap-x-2 text-(--cq-text-tertiary)">
-                <span>
-                  {note.authoredByMe
-                    ? t("You")
-                    : t(note.authorName ?? t("A colleague"))}
-                </span>
-                <span aria-hidden="true">·</span>
-                <time dateTime={note.createdAt} className="cq-numeric">
-                  {t(since(note.createdAt, now))}
-                </time>
-                {note.supersedesNoteId === null ? null : (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    <span>{t("corrected")}</span>
-                  </>
-                )}
-                {note.authoredByMe ? (
-                  <button
-                    type="button"
-                    className="ms-auto inline-flex min-h-11 items-center px-1 text-(--cq-text-secondary) underline-offset-2 hover:text-(--cq-text-primary) hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-                    onClick={() => {
-                      setCorrecting(note);
-                      setDraft(note.body);
-                      setError(null);
-                    }}
-                  >
-                    {t("Correct")}
-                  </button>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

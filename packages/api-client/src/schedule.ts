@@ -12,6 +12,9 @@ import {
   NotificationListSchema,
   RELATIONSHIP_MEETING_JOIN_PATH,
   RELATIONSHIP_MEETING_SLOTS_PATH,
+  RELATIONSHIP_MEETING_AVAILABILITY_PATH,
+  MeetingAvailabilityResponseSchema,
+  type MeetingAvailabilityRequest,
   RELATIONSHIP_MEETINGS_PATH,
   REMINDER_DISMISS_PATH,
   REMINDERS_PATH,
@@ -78,6 +81,25 @@ export function findMeetingSlots(
     "POST",
     withId(RELATIONSHIP_MEETING_SLOTS_PATH, "relationshipId", relationshipId),
     MeetingSlotsResponseSchema,
+    { body: request },
+  );
+}
+
+/** The CRM week: the person's own busy times on their calendar (intervals only). */
+export function findMeetingAvailability(
+  session: ApiSession,
+  relationshipId: string,
+  request: MeetingAvailabilityRequest,
+) {
+  return call(
+    session,
+    "POST",
+    withId(
+      RELATIONSHIP_MEETING_AVAILABILITY_PATH,
+      "relationshipId",
+      relationshipId,
+    ),
+    MeetingAvailabilityResponseSchema,
     { body: request },
   );
 }

@@ -89,6 +89,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH": cap(
     "tool.find_meeting_times",
   ),
+  // The CRM week: the person's own busy times, the same read as free times.
+  "api/http/schedule.ts POST RELATIONSHIP_MEETING_AVAILABILITY_PATH": cap(
+    "tool.find_meeting_times",
+  ),
   "api/http/schedule.ts GET MEETING_BRIEF_PATH": cap("tool.list_schedule"),
   "api/http/schedule.ts GET REMINDERS_PATH": cap("tool.list_schedule"),
   "api/http/schedule.ts GET NOTIFICATIONS_PATH": exempt(
@@ -1278,6 +1282,7 @@ const HELD_RETRY: ReadonlySet<string> = new Set([
 /** POST routes that only read (a search with a body), mapped to a read tool. */
 const READS_BY_POST: ReadonlySet<string> = new Set([
   "api/http/schedule.ts POST RELATIONSHIP_MEETING_SLOTS_PATH",
+  "api/http/schedule.ts POST RELATIONSHIP_MEETING_AVAILABILITY_PATH",
 ]);
 
 /**

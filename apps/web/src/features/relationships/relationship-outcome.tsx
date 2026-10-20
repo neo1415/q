@@ -47,6 +47,7 @@ function newKey(): string {
 
 export function RelationshipOutcome({
   call = null,
+  only,
   ...props
 }: {
   readonly relationshipId: string;
@@ -55,18 +56,24 @@ export function RelationshipOutcome({
   readonly counterpart: string;
   /** A booked call that has ended on a still-CONNECTED match (no bot). */
   readonly call?: CallToRecord | null | undefined;
+  /**
+   * One half only: the meeting's outcome, where the record's Decision card
+   * carries pausing and not proceeding (record option 3); or the side's.
+   */
+  readonly only?: "meeting" | "side" | undefined;
 }) {
   // The notes notice links here (#outcome): "How did it go?" first.
   return (
     <div id="outcome" className="flex flex-col items-stretch gap-3">
-      {props.state === "MEETING_HELD" ||
-      (props.state === "CONNECTED" && call !== null) ? (
+      {only !== "side" &&
+      (props.state === "MEETING_HELD" ||
+        (props.state === "CONNECTED" && call !== null)) ? (
         <HowDidItGo
           relationshipId={props.relationshipId}
           meetingId={call?.meetingId}
         />
       ) : null}
-      <SideOutcome {...props} />
+      {only === "meeting" ? null : <SideOutcome {...props} />}
     </div>
   );
 }

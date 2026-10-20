@@ -27,8 +27,10 @@ const base =
   "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors duration-(--cq-motion-fast) disabled:pointer-events-none disabled:opacity-50";
 
 const variantClass: Record<ButtonVariant, string> = {
+  // A page scope may re-point the primary action (the CRM record's warm
+  // charcoal); everywhere else it is the accent.
   primary:
-    "bg-(--cq-accent) text-(--cq-text-inverse) hover:bg-(--cq-accent-hover)",
+    "bg-[var(--cq-primary-action,var(--cq-accent))] text-[var(--cq-on-primary-action,var(--cq-text-inverse))] hover:bg-[var(--cq-primary-action-hover,var(--cq-accent-hover))]",
   secondary:
     "border border-(--cq-border) bg-(--cq-surface) text-(--cq-text-primary) hover:bg-(--cq-surface-subtle)",
   quiet:
