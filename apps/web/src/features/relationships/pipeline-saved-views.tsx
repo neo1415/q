@@ -8,12 +8,13 @@ import type {
   SavedRelationshipView,
   SavedRelationshipViewList,
 } from "@capital-q/contracts";
-import { buttonClassName } from "@capital-q/ui/button";
-import { Bookmark, ICON_SIZE } from "@capital-q/ui/icons";
+import { cx } from "@capital-q/ui";
+import { ICON_SIZE, Pencil, Plus } from "@capital-q/ui/icons";
 import type { z } from "zod";
 
 import { useQControl } from "@/features/q/control/q-control";
 
+import { crmButton, CrmSheet, ProgressButton, Segmented } from "./crm-kit";
 import type { PipelineSavedView } from "./pipeline-preferences";
 import {
   deletePipelineViewAction,
@@ -29,16 +30,16 @@ export type AppliedView = {
   readonly columns: readonly PipelineColumn[];
 };
 
-const inputClass =
-  "cq-body-sm min-h-11 rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-(--cq-text-primary)";
+const fieldClass =
+  "min-h-11 w-full rounded-(--cq-radius-md) border border-(--cq-border) bg-(--cq-surface-raised) px-3 text-[15px] text-(--cq-text-primary) placeholder:text-(--cq-text-tertiary) focus-visible:border-(--cq-text-secondary) focus-visible:shadow-[0_0_0_3px_var(--cq-accent-soft)] focus-visible:outline-none";
 
 /**
- * CRM saved views (2026-10-15): the person's own and their workspace's,
- * kept on the server, plus any older views saved on this device before
- * views moved to the server (still readable and removable, never lost).
- * A view is a filter, a layout and columns; opening it runs the reader's
- * own authorised query, so a shared view shows each teammate only what
- * their own access allows.
+ * CRM saved views (design 2026-10-20): pills on top, each saying who sees
+ * it (Mine, My team, or this device for older views saved before views
+ * moved to the server). A view is a filter, a layout and columns; opening
+ * it runs the reader's own authorised query, so a shared view shows each
+ * teammate only what their own access allows. Saving names it and says
+ * who sees it; an editable view can be renamed or deleted.
  */
 export function PipelineSavedViews({
   initial,
@@ -47,6 +48,7 @@ export function PipelineSavedViews({
   current,
   onApply,
   onNotice,
+  canSave = true,
 }: {
   /** Null when the server's views could not be read. */
   readonly initial: SavedRelationshipViewList | null;
@@ -56,21 +58,23 @@ export function PipelineSavedViews({
   /** Applies a view; resolves whether it is now on screen. */
   readonly onApply: (view: AppliedView) => Promise<boolean>;
   readonly onNotice: (message: string) => void;
+  /** The List layout opens views but saves none (a view is Table or Board). */
+  readonly canSave?: boolean;
 }) {
   const t = useT();
 
-  const selectRef = useRef<HTMLSelectElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
   const [views, setViews] = useState<readonly SavedRelationshipView[]>(
     initial?.items ?? [],
   );
   const teamEditable = initial?.teamEditable ?? false;
   const [selectedId, setSelectedId] = useState("");
+  const [sheet, setSheet] = useState<"save" | "edit" | null>(null);
   const [name, setName] = useState("");
   const [share, setShare] = useState<"PERSONAL" | "ORGANISATION">("PERSONAL");
+  const [phase, setPhase] = useState<"idle" | "pending" | "done">("idle");
   const [pending, start] = useTransition();
 
-  const mine = views.filter((view) => view.scope === "PERSONAL");
-  const team = views.filter((view) => view.scope === "ORGANISATION");
   const server = views.find((view) => view.id === selectedId);
   const local = device.find((view) => view.id === selectedId);
 
@@ -89,7 +93,7 @@ export function PipelineSavedViews({
   useQControl({
     id: "filter.pipeline-view",
     kind: "FILTER",
-    ref: selectRef,
+    ref: rowRef,
     onAct: async (intent) => {
       if (typeof intent.value !== "string") return "NOT_APPLICABLE";
       const view = find(intent.value);
@@ -99,6 +103,12 @@ export function PipelineSavedViews({
     },
   });
 
+  function open(id: string) {
+    setSelectedId(id);
+    const view = find(id);
+    if (view !== null) void onApply(view);
+  }
+
   function save() {
     const trimmed = name.trim();
     if (trimmed.length === 0) {
@@ -106,6 +116,7 @@ export function PipelineSavedViews({
       return;
     }
     const id = crypto.randomUUID();
+    setPhase("pending");
     start(async () => {
       const result = await savePipelineViewAction(id, {
         name: trimmed,
@@ -116,9 +127,11 @@ export function PipelineSavedViews({
         expectedVersion: 0,
       });
       if (!result.ok) {
+        setPhase("idle");
         onNotice(result.message);
         return;
       }
+      setPhase("done");
       setViews((list) => [...list, result.value]);
       setSelectedId(result.value.id);
       setName("");
@@ -127,6 +140,10 @@ export function PipelineSavedViews({
           ? `Saved "${result.value.name}" for your team.`
           : `Saved "${result.value.name}".`,
       );
+      setTimeout(() => {
+        setSheet(null);
+        setPhase("idle");
+      }, 600);
     });
   }
 
@@ -143,6 +160,7 @@ export function PipelineSavedViews({
         ),
       );
       setName("");
+      setSheet(null);
       return;
     }
     if (server === undefined) return;
@@ -165,6 +183,7 @@ export function PipelineSavedViews({
         list.map((view) => (view.id === server.id ? result.value : view)),
       );
       setName("");
+      setSheet(null);
     });
   }
 
@@ -172,6 +191,7 @@ export function PipelineSavedViews({
     if (local !== undefined) {
       onDeviceChange(device.filter((view) => view.id !== local.id));
       setSelectedId("");
+      setSheet(null);
       return;
     }
     if (server === undefined) return;
@@ -185,123 +205,173 @@ export function PipelineSavedViews({
       }
       setViews((list) => list.filter((view) => view.id !== server.id));
       setSelectedId("");
+      setSheet(null);
     });
   }
 
   const changeable =
     local !== undefined || (server !== undefined && server.editable);
+  const pill = (on: boolean) =>
+    cx(
+      "cq-crm-press inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-10",
+      on
+        ? "border-(--cq-accent)/60 bg-(--cq-accent-soft) text-(--cq-text-primary)"
+        : "border-(--cq-border) bg-(--cq-surface-raised) text-(--cq-text-secondary) hover:text-(--cq-text-primary)",
+    );
+  const entries = [
+    ...views.map((view) => ({
+      id: view.id,
+      name: view.name,
+      who: view.scope === "ORGANISATION" ? t("My team") : t("Mine"),
+    })),
+    ...device.map((view) => ({
+      id: view.id,
+      name: view.name,
+      who: t("This device"),
+    })),
+  ];
   return (
     <div
-      className="flex flex-wrap items-center gap-2"
-      data-pipeline-views
+      ref={rowRef}
+      role="group"
+      aria-label={t("Saved views")}
       aria-busy={pending}
+      className="-mx-4 flex min-w-0 items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+      data-pipeline-views
     >
-      <select
-        ref={selectRef}
-        aria-label={t("Saved view")}
-        className={inputClass}
-        value={selectedId}
-        onChange={(event) => {
-          setSelectedId(event.target.value);
-          const view = find(event.target.value);
-          if (view !== null) void onApply(view);
-        }}
+      {initial === null ? (
+        <span className="text-[13px] text-(--cq-text-tertiary)">
+          {t("Saved views couldn't load")}
+        </span>
+      ) : null}
+      {entries.map((entry) => (
+        <button
+          key={entry.id}
+          type="button"
+          aria-pressed={entry.id === selectedId}
+          className={pill(entry.id === selectedId)}
+          onClick={() => open(entry.id)}
+          data-saved-view={entry.id}
+        >
+          {entry.name}
+          <span className="text-[11px] font-normal text-(--cq-text-tertiary)">
+            {entry.who}
+          </span>
+        </button>
+      ))}
+      {changeable ? (
+        <button
+          type="button"
+          className={pill(false)}
+          onClick={() => {
+            setName((server ?? local)?.name ?? "");
+            setSheet("edit");
+          }}
+        >
+          <Pencil size={ICON_SIZE.compact} aria-hidden="true" />
+          {t("Edit view")}
+        </button>
+      ) : null}
+      {canSave && initial !== null ? (
+        <button
+          type="button"
+          className={pill(false)}
+          onClick={() => {
+            setName("");
+            setPhase("idle");
+            setSheet("save");
+          }}
+          data-save-view
+        >
+          <Plus size={ICON_SIZE.compact} aria-hidden="true" />
+          {t("Save view")}
+        </button>
+      ) : null}
+
+      <CrmSheet
+        open={sheet === "save"}
+        onOpenChange={(next) => setSheet(next ? "save" : null)}
+        title={t("Save this view")}
+        sub={t("Filters, sort and layout are saved together")}
       >
-        <option value="">
-          {initial === null ? t("Saved views couldn't load") : t("Saved views")}
-        </option>
-        {mine.length === 0 ? null : (
-          <optgroup label={t("Mine")}>
-            {mine.map((view) => (
-              <option key={view.id} value={view.id}>
-                {view.name}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        {team.length === 0 ? null : (
-          <optgroup label={t("Team")}>
-            {team.map((view) => (
-              <option key={view.id} value={view.id}>
-                {view.name}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        {device.length === 0 ? null : (
-          <optgroup label={t("On this device")}>
-            {device.map((view) => (
-              <option key={view.id} value={view.id}>
-                {view.name}
-              </option>
-            ))}
-          </optgroup>
-        )}
-      </select>
-      {/* Naming, sharing and changing a view are occasional: one tap
-          away, so the bar shows only the views themselves. */}
-      <details data-pipeline-view-manage>
-        <summary className="cq-body-sm inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-(--cq-radius-md) px-3 text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
-          <Bookmark size={ICON_SIZE.compact} aria-hidden="true" />
-          {t("Manage views")}
-        </summary>
-        <div className="flex flex-wrap items-center gap-2 pt-2">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-medium text-(--cq-text-secondary)">
+            {t("View name")}
+          </span>
           <input
             aria-label={t("View name")}
-            placeholder={t("View name")}
-            // Shrinks and wraps on a phone instead of widening the page.
-            className={`${inputClass} min-w-0 flex-1 basis-40`}
+            placeholder={t("For example, Health seed deals")}
+            className={fieldClass}
             value={name}
             maxLength={64}
             onChange={(event) => setName(event.target.value)}
           />
-          {teamEditable ? (
-            <select
-              aria-label={t("Who sees this view")}
-              className={inputClass}
+        </label>
+        {teamEditable ? (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[13px] font-medium text-(--cq-text-secondary)">
+              {t("Who sees this view")}
+            </span>
+            <Segmented
+              label={t("Who sees this view")}
               value={share}
-              onChange={(event) =>
-                setShare(
-                  event.target.value === "ORGANISATION"
-                    ? "ORGANISATION"
-                    : "PERSONAL",
-                )
-              }
-            >
-              <option value="PERSONAL">{t("Only me")}</option>
-              <option value="ORGANISATION">{t("My team")}</option>
-            </select>
-          ) : null}
+              onChange={setShare}
+              className="self-start"
+              options={[
+                { key: "PERSONAL", label: t("Only me") },
+                { key: "ORGANISATION", label: t("My team") },
+              ]}
+            />
+            <span className="text-xs text-(--cq-text-tertiary)">
+              {t("Your team sees the view, not your private notes.")}
+            </span>
+          </div>
+        ) : null}
+        <ProgressButton
+          phase={phase}
+          idle={t("Save view")}
+          done={t("Saved")}
+          onClick={save}
+        />
+      </CrmSheet>
+
+      <CrmSheet
+        open={sheet === "edit"}
+        onOpenChange={(next) => setSheet(next ? "edit" : null)}
+        title={t("Edit this view")}
+        sub={(server ?? local)?.name}
+      >
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-medium text-(--cq-text-secondary)">
+            {t("View name")}
+          </span>
+          <input
+            aria-label={t("View name")}
+            className={fieldClass}
+            value={name}
+            maxLength={64}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className={buttonClassName("quiet")}
-            onClick={save}
-            disabled={pending || initial === null}
+            className={crmButton("primary")}
+            onClick={rename}
+            disabled={pending}
           >
-            {t("Save view")}
+            {t("Rename view")}
           </button>
-          {changeable ? (
-            <>
-              <button
-                type="button"
-                className={buttonClassName("quiet")}
-                onClick={rename}
-                disabled={pending}
-              >
-                {t("Rename view")}
-              </button>
-              <button
-                type="button"
-                className={buttonClassName("quiet")}
-                onClick={remove}
-                disabled={pending}
-              >
-                {t("Delete view")}
-              </button>
-            </>
-          ) : null}
+          <button
+            type="button"
+            className={crmButton("quiet")}
+            onClick={remove}
+            disabled={pending}
+          >
+            {t("Delete view")}
+          </button>
         </div>
-      </details>
+      </CrmSheet>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import type {
   RelationshipSummaryDto,
 } from "@capital-q/contracts";
 
-import { money } from "@/features/capital/money";
+import { money, totalsByCurrency } from "@/features/capital/money";
 
 /**
  * The investor's portfolio on the CRM Overview (S4, research 2026-10-15 §2:
@@ -51,4 +51,67 @@ export function commitmentLine(
   const words = STATUS_WORDS[current.status];
   const amount = money(current.amount, current.currencyCode);
   return words === undefined ? amount : `${amount} · ${words}`;
+}
+
+/** Where the current commitment stands, in words; null when nothing to add. */
+export function commitmentStatusWords(
+  read: RelationshipCommitmentsDto | undefined,
+): string | null {
+  const current = read?.current ?? null;
+  return current === null ? null : (STATUS_WORDS[current.status] ?? null);
+}
+
+/**
+ * Invested companies whose amount is not recorded: their commitment read
+ * answered and holds none. A read that failed is not "none" and is left
+ * out (its row says it couldn't be read instead).
+ */
+export function unrecordedInvestments(
+  portfolio: readonly RelationshipSummaryDto[],
+  commitments: ReadonlyMap<string, RelationshipCommitmentsDto | undefined>,
+): readonly RelationshipSummaryDto[] {
+  return portfolio.slice(0, PORTFOLIO_READ_LIMIT).filter((item) => {
+    const read = commitments.get(item.relationshipId);
+    return read !== undefined && read.current === null;
+  });
+}
+
+/**
+ * What the portfolio's known total can say: the recorded amounts by
+ * currency, and how many companies have no amount or were not read here.
+ * Unknown is never counted as zero.
+ */
+export function portfolioTotals(
+  portfolio: readonly RelationshipSummaryDto[],
+  commitments: ReadonlyMap<string, RelationshipCommitmentsDto | undefined>,
+): {
+  readonly known: readonly {
+    readonly amount: string;
+    readonly currency: string;
+  }[];
+  readonly unrecorded: number;
+  readonly unread: number;
+} {
+  const known: { amount: string; currency: string }[] = [];
+  let unrecorded = 0;
+  let unread = 0;
+  portfolio.forEach((item, index) => {
+    const read =
+      index < PORTFOLIO_READ_LIMIT
+        ? commitments.get(item.relationshipId)
+        : undefined;
+    if (read === undefined) {
+      unread += 1;
+      return;
+    }
+    if (read.current === null) {
+      unrecorded += 1;
+      return;
+    }
+    known.push({
+      amount: read.current.amount,
+      currency: read.current.currencyCode,
+    });
+  });
+  return { known: totalsByCurrency(known), unrecorded, unread };
 }

@@ -409,7 +409,77 @@ export type NeedsYouCard = {
   readonly step?: boolean;
   /** A second line for a card about no one relationship (the deck review). */
   readonly detail?: string;
+  /**
+   * An invested company whose amount is not recorded (investor): the card
+   * opens the record sheet in place instead of a link.
+   */
+  readonly record?: {
+    readonly relationshipId: string;
+    readonly name: string;
+    readonly since: string;
+  };
 };
+
+/**
+ * "Later" on a Needs you card (design 2026-10-20): a reminder for tomorrow
+ * morning, marked in its note so the queue knows it. Until it is due the
+ * relationship's step stays off the queue; once due it comes back with
+ * its own action, and doing that action clears the reminder too.
+ */
+export const NEEDS_YOU_LATER = "Later from Needs you";
+
+/** The reminder note for "Later": the marker, and the action to come back to. */
+export function laterNote(action: {
+  readonly label: string;
+  readonly href: string | null;
+}): string {
+  return action.href === null
+    ? NEEDS_YOU_LATER
+    : `${NEEDS_YOU_LATER} · ${action.label} · ${action.href}`;
+}
+
+const LATER_NOTE = new RegExp(
+  `^${NEEDS_YOU_LATER}(?: · ([^·]{1,40}) · (/[^\\s]{1,300}))?$`,
+  "u",
+);
+
+/** The action a "Later" reminder carries; null when it is not one. */
+export function laterAction(
+  reminder: Pick<ReminderDto, "note">,
+): { readonly label: string; readonly href: string | null } | null {
+  const match = reminder.note === null ? null : LATER_NOTE.exec(reminder.note);
+  if (match === null) return null;
+  const label = match[1];
+  const href = match[2];
+  return label === undefined || href === undefined
+    ? { label: "Done", href: null }
+    : { label, href };
+}
+
+/** Relationships put off with "Later" whose reminder is not due yet. */
+export function snoozedRelationships(
+  reminders: readonly ReminderDto[],
+  now: number,
+): ReadonlySet<string> {
+  return new Set(
+    reminders.flatMap((reminder) =>
+      reminder.relationshipId !== null &&
+      reminder.status === "PENDING" &&
+      Date.parse(reminder.dueAt) > now &&
+      laterAction(reminder) !== null
+        ? [reminder.relationshipId]
+        : [],
+    ),
+  );
+}
+
+/** Tomorrow at 09:00 in the reader's own time zone (Later's "morning"). */
+export function tomorrowMorning(now: Date): string {
+  const next = new Date(now);
+  next.setDate(next.getDate() + 1);
+  next.setHours(9, 0, 0, 0);
+  return next.toISOString();
+}
 
 type Family = "reply" | "answer" | "files" | "money" | "other";
 
@@ -596,12 +666,19 @@ export function needsYouCards(input: {
       );
     }
   }
+  const snoozed = snoozedRelationships(input.reminders, input.now);
+  /** Due "Later" reminders by relationship: a step that is back takes them. */
+  const laterDue = new Map<string, string>();
   for (const reminder of input.reminders) {
     const due =
       reminder.status === "DELIVERED" ||
       (reminder.status === "PENDING" &&
         Date.parse(reminder.dueAt) <= input.now);
     if (!due || reminder.meetingId !== null) continue;
+    const later = laterAction(reminder);
+    if (later !== null && reminder.relationshipId !== null) {
+      laterDue.set(reminder.relationshipId, reminder.id);
+    }
     const relationship =
       reminder.relationshipId === null
         ? null
@@ -614,7 +691,7 @@ export function needsYouCards(input: {
       count: 1,
       noticeIds: [],
       reminderId: reminder.id,
-      action: { label: "Done", href: null },
+      action: later ?? { label: "Done", href: null },
     });
     if (relationship !== null) {
       // A due reminder is the relationship's follow-up.
@@ -623,6 +700,7 @@ export function needsYouCards(input: {
   }
   for (const { item, step, at } of input.steps ?? []) {
     if (!isOwnStep(step)) continue;
+    if (snoozed.has(item.relationshipId)) continue;
     const family = stepFamily(step);
     const followUp = step.label === "Follow up";
     if (
@@ -633,6 +711,10 @@ export function needsYouCards(input: {
       continue;
     }
     const key = `${item.relationshipId}|step`;
+    // A "Later" that came due for this relationship: the step is back, so
+    // its reminder card is folded into it and cleared with it.
+    const later = laterDue.get(item.relationshipId);
+    if (later !== undefined) cards.delete(`reminder|${later}`);
     cards.set(key, {
       key,
       title: step.why,
@@ -640,7 +722,7 @@ export function needsYouCards(input: {
       latestAt: at,
       count: 1,
       noticeIds: [],
-      reminderId: null,
+      reminderId: later ?? null,
       action: { label: step.label ?? "Open", href: step.href },
       step: true,
     });

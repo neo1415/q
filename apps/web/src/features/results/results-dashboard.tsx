@@ -59,6 +59,12 @@ export type ResultsDashboardProps = {
   readonly headingLevel?: 1 | 2;
   /** Hub filters do not yet bind report exports; keep them on Results. */
   readonly showReports?: boolean;
+  /**
+   * False: the page draws the period's heading and switch itself (the CRM
+   * Overview, design 2026-10-20). The stat strip stays; everything after
+   * it, with the report links, folds into "More from this period".
+   */
+  readonly header?: boolean;
   readonly range: KnownRange;
   readonly stage: string | null;
   /** Query string for the report downloads (the period asked for). */
@@ -129,9 +135,12 @@ function Tile({
 
   const body = (
     <>
-      <span className="cq-body-sm text-(--cq-text-secondary)">{tr(label)}</span>
+      <span className="text-xs text-(--cq-text-tertiary)">{tr(label)}</span>
       {figure ? (
-        <span className="text-[1.625rem] leading-tight font-semibold tracking-[-0.01em] tabular-nums text-(--cq-text-primary) sm:text-[1.875rem]">
+        <span
+          key={value}
+          className="cq-crm-swap text-[1.625rem] leading-tight font-semibold tracking-[-0.02em] tabular-nums text-(--cq-text-primary)"
+        >
           {tr(value)}
         </span>
       ) : (
@@ -141,7 +150,7 @@ function Tile({
         </span>
       )}
       {note === undefined ? null : (
-        <span className="cq-caption text-(--cq-text-secondary)">{note}</span>
+        <span className="text-xs text-(--cq-text-tertiary)">{note}</span>
       )}
     </>
   );
@@ -149,7 +158,7 @@ function Tile({
   // Hairlines between cells, none around them: two by two on a phone, one
   // row of four from large screens.
   const frame =
-    "flex min-w-0 flex-col gap-1 border-(--cq-border-subtle) p-4 even:border-s sm:p-5 [&:nth-child(n+3)]:border-t lg:border-s lg:first:border-s-0 lg:[&:nth-child(n+3)]:border-t-0";
+    "flex min-w-0 flex-col gap-0.5 border-(--cq-border-subtle) px-[18px] py-4 even:border-s [&:nth-child(n+3)]:border-t lg:border-s lg:first:border-s-0 lg:[&:nth-child(n+3)]:border-t-0";
   return href === undefined ? (
     <div className={frame}>{body}</div>
   ) : (
@@ -175,6 +184,7 @@ function Header({
   const tr = serverTNow();
 
   const Heading = props.headingLevel === 2 ? "h2" : "h1";
+  if (props.header === false) return null;
   return (
     <header className="flex flex-wrap items-end justify-between gap-3">
       <div className="flex min-w-0 flex-col gap-1">
@@ -240,6 +250,53 @@ function Header({
         )}
       </div>
     </header>
+  );
+}
+
+function More({
+  props,
+  name,
+  children,
+}: {
+  readonly props: ResultsDashboardProps;
+  readonly name: string;
+  readonly children: ReactNode;
+}) {
+  const tr = serverTNow();
+  if (props.header !== false) return <>{children}</>;
+  return (
+    <details className="group" data-period-more>
+      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-(--cq-radius-md) px-1 text-[13px] font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
+        <ChevronRight
+          size={ICON_SIZE.compact}
+          aria-hidden="true"
+          className="transition-transform duration-(--cq-motion-fast) group-open:rotate-90"
+        />
+        {tr("More from this period")}
+      </summary>
+      <div className="flex flex-col gap-4 pt-3 sm:gap-5">
+        {props.showReports === false ? null : (
+          <div className="flex flex-wrap items-center gap-2">
+            <OpenPdfButton
+              title={`${tr("Report")} · ${name}`}
+              url={`/results/report?format=pdf&${props.download}`}
+              className={buttonClassName("secondary", "compact")}
+              dataAttribute="data-results-report"
+            >
+              {tr("Open report")}
+            </OpenPdfButton>
+            <a
+              href={`/results/report?format=csv&${props.download}`}
+              className={buttonClassName("quiet", "compact")}
+              download
+            >
+              {tr("Download CSV")}
+            </a>
+          </div>
+        )}
+        {children}
+      </div>
+    </details>
   );
 }
 
@@ -612,7 +669,7 @@ function InvestorDashboard(
     <div className="flex flex-col gap-4 sm:gap-5">
       <Header props={props} name={results.organisationName} />
       <div
-        className="grid grid-cols-2 border border-(--cq-border-subtle) bg-(--cq-surface) lg:grid-cols-4"
+        className="grid grid-cols-2 overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) lg:grid-cols-4"
         data-stat-strip
       >
         <Tile
@@ -622,14 +679,14 @@ function InvestorDashboard(
             interest === undefined
               ? undefined
               : tr(
-                  `${String(interest.accepted)} accepted · ${String(interest.declined)} declined`,
+                  `${String(interest.accepted)} accepted, ${interest.declined === 0 ? "none" : String(interest.declined)} declined`,
                 )
           }
           href={stageHref(props.basePath, props.range, "INTEREST_EXPRESSED")}
         />
         <Tile {...response} />
         <Tile
-          label={tr("Meetings held")}
+          label={tr("Calls held")}
           value={String(results.meetings.held)}
           note={
             results.meetings.upcoming.length === 0
@@ -649,6 +706,7 @@ function InvestorDashboard(
         />
       </div>
 
+      <More props={props} name={results.organisationName}>
       <Activity activity={results.activity} first="Interest sent" />
 
       <div className="grid items-start gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
@@ -765,6 +823,7 @@ function InvestorDashboard(
           )}
         </div>
       </div>
+      </More>
     </div>
   );
 }
@@ -914,7 +973,7 @@ function FounderDashboard(
     <div className="flex flex-col gap-4 sm:gap-5">
       <Header props={props} name={results.organisationName} />
       <div
-        className="grid grid-cols-2 border border-(--cq-border-subtle) bg-(--cq-surface) lg:grid-cols-4"
+        className="grid grid-cols-2 overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) lg:grid-cols-4"
         data-stat-strip
       >
         <Tile
@@ -930,7 +989,7 @@ function FounderDashboard(
           href={stageHref(props.basePath, props.range, null)}
         />
         <Tile
-          label={tr("Meetings held")}
+          label={tr("Calls held")}
           value={String(e.meetingsHeld)}
           note={tr(
             `${plural(e.connections, "new connection", "new connections")}`,
@@ -952,6 +1011,7 @@ function FounderDashboard(
         <Tile {...responseTile("You answer in", results.responseTime)} />
       </div>
 
+      <More props={props} name={results.organisationName}>
       {/* fdr.06.*: the founder track lights these while Q explains them. */}
       <div data-qp-anchor="fdr.06.crm.raise">
         <RaisePanel results={results} />
@@ -1033,6 +1093,7 @@ function FounderDashboard(
           )}
         </div>
       </div>
+      </More>
     </div>
   );
 }
