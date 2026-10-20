@@ -875,3 +875,11 @@ Local validation: 53 package builds; 72 scoring/storage tests, 20 manifest tests
 Existing investor, free-negative and provided Kathryn/Spheros founder API reads pass; the existing founder application remains5bc3daac-046f-4401-9418-38b03ed68e80. Temporary fictional Kestrel feature override expired at08:13UTC and currently correctly returns404; no fresh premium no-mandate acceptance is claimed and original43 customer grants are untouched. The earlier selected-context change was restored through its existing memberships; do not grant access to real customers to hide this proof gap.
 
 Next: exact-head protected237 gates, protected promotion, all affected Railway revisions, fresh Q EXPAND/DONE and grounded answer, real desktop/mobile CTA/browser acceptance. Finish global census/replay after secure Management access is restored; never fabricate production numbers or lower gates.
+
+## Discover A + Q home voice room — 20 October 2026, 06:45 UTC (Claude)
+
+Founder-directed redesign released by pushing `claude/friendly-feynman-q9haun` to `build/int-rc` and `recovery/2026-09-12` (41e31d18d, fast-forward from 692e7cfb1). Contents: Q home voice room (captions, public web source cards, room presence), Discover A desktop stage + dossier (Q's read with coverage bars, Ask Q over the dossier, interest sending/sent + toast, save/pass toasts with Undo and optional pass reason, no-pitch still, end of slate, 1-of-N), Discover A phone (no bottom buttons, swipe right = interest confirm, swipe left = pass, captions toggle), Escape now closes sheets. Dev harness `/dev/discover` (404 in production). No migrations, no contract breaks (pass `reason` optional, UNPASS uses existing path).
+
+CI39379450382 on 41e31d18d: build, types, lint, pgTAP green; test red only on route-capability-parity (new `/dev/discover` unclassified). Fixed forward by classifying it exempt and regenerating `docs/recovery/capability-parity.md`; parity test 11/11 locally. Railway status could NOT be read: the environment `RAILWAY_TOKEN` returns Not Authorized (rotation outstanding). Live web returns 200; deployed revision not yet confirmed per service.
+
+Next: confirm CI on the fix commit and Railway revisions; founder to pick Profile / Data Room / CRM options (prototypes in the session, not in the repo).

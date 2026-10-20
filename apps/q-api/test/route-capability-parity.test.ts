@@ -1004,6 +1004,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/discover": cap("navigate.DISCOVER"),
   "/explore": cap("navigate.DISCOVER"),
   "/dev/explore": exempt("development-only page"),
+  "/dev/discover": exempt("development-only page"),
   "/discover/saved": cap("navigate.SAVED"),
   // Your companies (2026-10-02): reached from Discover's row.
   "/discover/yours": cap("navigate.DISCOVER"),

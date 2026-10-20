@@ -1,5 +1,13 @@
 # Capital Q — Current shared engineering state
 
+## Discover A + Q home voice room — 20 October 2026, 06:45 UTC (Claude)
+
+Founder-directed redesign released by pushing `claude/friendly-feynman-q9haun` to `build/int-rc` and `recovery/2026-09-12` (41e31d18d, fast-forward from 692e7cfb1). Contents: Q home voice room (captions, public web source cards, room presence), Discover A desktop stage + dossier (Q's read with coverage bars, Ask Q over the dossier, interest sending/sent + toast, save/pass toasts with Undo and optional pass reason, no-pitch still, end of slate, 1-of-N), Discover A phone (no bottom buttons, swipe right = interest confirm, swipe left = pass, captions toggle), Escape now closes sheets. Dev harness `/dev/discover` (404 in production). No migrations, no contract breaks (pass `reason` optional, UNPASS uses existing path).
+
+CI39379450382 on 41e31d18d: build, types, lint, pgTAP green; test red only on route-capability-parity (new `/dev/discover` unclassified). Fixed forward by classifying it exempt and regenerating `docs/recovery/capability-parity.md`; parity test 11/11 locally. Railway status could NOT be read: the environment `RAILWAY_TOKEN` returns Not Authorized (rotation outstanding). Live web returns 200; deployed revision not yet confirmed per service.
+
+Next: confirm CI on the fix commit and Railway revisions; founder to pick Profile / Data Room / CRM options (prototypes in the session, not in the repo).
+
 ## Unicorn completion — 18 October 2026, 13:18 UTC
 
 PR233 was normally integrated and released through protected PR236/72679cbec89d9a2d4ed9b139913587ea4b80455f. The current shared production release is PR243/a026a39a727faab0cf52866965c8900be40b53fb; all four Railway services are SUCCESS at that exact SHA. Root preserved and merged the newer integration e05528768; no Q Pitch changes.
