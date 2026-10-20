@@ -6,6 +6,10 @@ import {
   type SpeechReaction,
   type SpeechTone,
 } from "../speech-performance.js";
+import {
+  toneSettings,
+  type ToneSettings,
+} from "../persona-voices/persona-voice.js";
 import { withoutStageDirections } from "../speech.js";
 
 /**
@@ -62,11 +66,24 @@ export type SpeechMarkup = {
   readonly tone?:
     | ((tone: SpeechTone | null, intensity: SpeechIntensity) => string)
     | undefined;
+  /**
+   * REHEARSE: a line's tone as voice settings, on a model without audio
+   * tags (persona-voices toneSettings). Never set where `tone` is.
+   */
+  readonly voiceSettings?:
+    | ((p: SentencePerformance) => ToneSettings | undefined)
+    | undefined;
 };
 
 export const ELEVENLABS_SPEECH_MODELS = [
   "eleven_turbo_v2_5",
   "eleven_v3_conversational",
+  // REHEARSE: the people Q plays (persona-voices). v4 turbo is the default
+  // (~100 ms), flash v2.5 the fast fallback, flash v2 only for a voice
+  // ElevenLabs allows on English-only models.
+  "eleven_v4_turbo",
+  "eleven_flash_v2_5",
+  "eleven_flash_v2",
 ] as const;
 export type ElevenLabsSpeechModel = (typeof ELEVENLABS_SPEECH_MODELS)[number];
 
@@ -121,15 +138,35 @@ const V3_INTENSITY_TAGS: Readonly<Record<SpeechIntensity, string>> = {
   RAISED: "[shouting]",
 };
 
+/**
+ * The turbo and flash models: SSML pauses, pace through `speed`, and a
+ * played person's tone through voice settings. A reaction is never sent
+ * (turbo read `[laughs]` aloud, above).
+ */
+const FAST_MARKUP: SpeechMarkup = {
+  capabilities: { reaction: false, pause: true, pace: true, emphasis: false },
+  reaction: NONE,
+  pause: '<break time="0.6s" />',
+  emphasis: (phrase) => phrase,
+  speed: (pace) => SPEEDS[pace],
+  voiceSettings: toneSettings,
+};
+
 export const SPEECH_MARKUP: Readonly<
   Record<ElevenLabsSpeechModel, SpeechMarkup>
 > = {
-  eleven_turbo_v2_5: {
-    capabilities: { reaction: false, pause: true, pace: true, emphasis: false },
-    reaction: NONE,
-    pause: '<break time="0.6s" />',
-    emphasis: (phrase) => phrase,
-    speed: (pace) => SPEEDS[pace],
+  eleven_turbo_v2_5: FAST_MARKUP,
+  eleven_flash_v2_5: FAST_MARKUP,
+  eleven_flash_v2: FAST_MARKUP,
+  /**
+   * v4 turbo: not yet measured for SSML breaks or tags, so neither is sent
+   * (a pause is the trailing ellipsis every voice reads as a beat); pace
+   * and tone go through voice settings like the other fast models.
+   */
+  eleven_v4_turbo: {
+    ...FAST_MARKUP,
+    pause: "...",
+    pauseStyle: "trailing",
   },
   eleven_v3_conversational: {
     capabilities: {
@@ -211,6 +248,8 @@ export type RenderedSpeech = {
   readonly speed: number | undefined;
   /** REHEARSE: v3 stability for this text, when a cue asks for one. */
   readonly stability?: number | undefined;
+  /** REHEARSE: the line's tone as voice settings, on a model without tags. */
+  readonly voice?: ToneSettings | undefined;
   /** Which cues made it into the audio, for the turn's trace. */
   readonly rendered: readonly (
     "reaction" | "pause" | "pace" | "emphasis" | "tone"
@@ -243,6 +282,7 @@ export function renderSpeech(
   let body = clean;
   let speed: number | undefined;
   let stability: number | undefined;
+  let voice: ToneSettings | undefined;
 
   for (const p of performances) {
     // Anchored on the words that are spoken: a written laugh at its start
@@ -288,6 +328,12 @@ export function renderSpeech(
     if (can.tone === true && markup.stability !== undefined) {
       stability = stability ?? markup.stability(p);
     }
+    // The first sentence's tone sets the line's voice: one request is one
+    // set of voice settings.
+    if (can.tone !== true && markup.voiceSettings !== undefined && isStart) {
+      voice = voice ?? markup.voiceSettings(p);
+      if (voice !== undefined) rendered.add("tone");
+    }
     // A raised voice ends on "!", which v3 delivers harder than ".".
     if (
       can.tone === true &&
@@ -328,6 +374,7 @@ export function renderSpeech(
     text: spoken.length === 0 ? "\u2026" : spoken,
     speed,
     ...(stability === undefined ? {} : { stability }),
+    ...(voice === undefined ? {} : { voice }),
     rendered: [...rendered],
   };
 }
