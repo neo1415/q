@@ -39,6 +39,7 @@ import {
   Landmark,
   LayoutGrid,
   Lock,
+  Maximize2,
   Plus,
   Shield,
   Upload,
@@ -47,7 +48,11 @@ import {
 } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
+import { useGlobalQ } from "@/components/app-shell/global-q";
+
 import { ExpressInterest } from "../../network/express-interest";
+import { useBrief, useRoomRequests } from "../brief/brief-context";
+import { QMark } from "../brief/parts";
 import { stageLabel } from "../declared-labels";
 import { FileViewer, Watermark } from "./file-viewer";
 import {
@@ -59,6 +64,7 @@ import {
   setOutlineAction,
   type OpenedFile,
 } from "./material-actions";
+import { RequestSheet, type RoomRequestTarget } from "./request-sheet";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -348,7 +354,7 @@ export function LockedDataRoom({
         <Step
           state="LATER"
           title={t("The room opens")}
-          detail={t("Its documents appear here")}
+          detail={t("You’ll get a notification")}
         />
       </ol>
       {outline.length === 0 ? null : (
@@ -409,10 +415,149 @@ export function InvestorDataRoom({
 
 /**
  * The connected room as a library (Data room option 1, owner 2026-10-20):
- * folders on the left, the documents in the middle, and on a wide screen
- * the opened document beside them, so the place in the list is kept. A
- * phone opens the document in a sheet over the list.
+ * one next step for the room with its reason, folders on the left, the
+ * documents in the middle with their access in words, and on a wide
+ * screen the opened document beside them, so the place in the list is
+ * kept. A phone opens the document in a sheet over the list.
  */
+type RoomStep = {
+  readonly key: "REQUEST" | "READ" | "ASK";
+  readonly title: string;
+  readonly reason: string;
+  readonly action: string;
+  readonly done: boolean;
+};
+
+const DAY_MS = 86_400_000;
+
+/** Days left on a time-limited share, rounded up; never below zero. */
+function daysLeft(endsAt: string, now: number): number {
+  return Math.max(0, Math.ceil((Date.parse(endsAt) - now) / DAY_MS));
+}
+
+/** The room's three steps, from what is listed to this reader (pure). */
+export function roomSteps(input: {
+  readonly companyName: string;
+  readonly documents: readonly DataRoomInvestorDocument[];
+  readonly now: number;
+}): readonly RoomStep[] {
+  const { companyName: name, documents, now } = input;
+  const requestable = documents.filter((d) => d.access === "REQUESTABLE");
+  const expiring = documents
+    .filter(
+      (d) =>
+        d.access === "OPEN" &&
+        d.accessEndsAt !== null &&
+        Date.parse(d.accessEndsAt) > now,
+    )
+    .sort(
+      (a, b) =>
+        Date.parse(a.accessEndsAt ?? "") - Date.parse(b.accessEndsAt ?? ""),
+    );
+  const unread = expiring.find((d) => d.openedAt === null) ?? expiring[0];
+  const titles = requestable.slice(0, 2).map((d) => d.title);
+  return [
+    {
+      key: "REQUEST",
+      title:
+        requestable.length === 0
+          ? "Nothing left to request"
+          : requestable.length === 1
+            ? `Request ${requestable[0]?.title ?? "the document on request"}`
+            : `Request the ${String(requestable.length)} documents on request`,
+      reason:
+        requestable.length === 0
+          ? "Everything listed to you on request has been asked for."
+          : `${titles.join(" and ")}${requestable.length > 2 ? ` and ${plural(requestable.length - 2, "other")}` : ""} ${requestable.length === 1 ? "is" : "are"} on request. ${name} decides who sees them.`,
+      action:
+        requestable.length === 1
+          ? "Request it"
+          : requestable.length === 2
+            ? "Request both"
+            : "Request all",
+      done: requestable.length === 0,
+    },
+    {
+      key: "READ",
+      title:
+        unread === undefined
+          ? "Nothing shared for a limited time"
+          : `Read ${unread.title} before ${dayMonth(unread.accessEndsAt ?? "")}`,
+      reason:
+        unread === undefined
+          ? "Documents shared with you for a limited time appear here first."
+          : `${name} shared it with you for ${plural(daysLeft(unread.accessEndsAt ?? "", now), "more day")}.`,
+      action: "Open it",
+      done: unread === undefined || unread.openedAt !== null,
+    },
+    {
+      key: "ASK",
+      title: "Ask Q what the room still doesn’t cover",
+      reason:
+        "Q compares what is here with what a diligence at this stage usually needs.",
+      action: "Ask Q",
+      done: false,
+    },
+  ];
+}
+
+function AccessTag({
+  document,
+  companyName,
+  now,
+}: {
+  readonly document: DataRoomInvestorDocument;
+  readonly companyName: string;
+  readonly now: number;
+}) {
+  const t = useT();
+  if (document.access === "REQUESTED")
+    return (
+      <span className="cq-room-tag" data-tone="claim">
+        <History size={12} aria-hidden="true" />
+        Requested, waiting on {companyName}
+      </span>
+    );
+  if (document.access === "REQUESTABLE")
+    return (
+      <span className="cq-room-tag">
+        <Lock size={12} aria-hidden="true" />
+        {t("On request")}
+      </span>
+    );
+  if (document.accessEndsAt !== null) {
+    const left = daysLeft(document.accessEndsAt, now);
+    return (
+      <span className="cq-room-tag" data-tone="gap">
+        <History size={12} aria-hidden="true" />
+        Shared until {dayMonth(document.accessEndsAt)}
+        <span
+          className="cq-room-expiry"
+          role="img"
+          aria-label={`${plural(left, "day")} left`}
+        >
+          <b
+            style={{
+              width: `${String(Math.min(100, Math.round((left / DATA_ROOM_GRANT_DEFAULT_DAYS) * 100)))}%`,
+            }}
+          />
+        </span>
+      </span>
+    );
+  }
+  return document.shownAs === "SHARED" ? (
+    <span className="cq-room-tag" data-tone="positive">
+      <Check size={12} aria-hidden="true" />
+      {t("Shared with you")}
+    </span>
+  ) : (
+    <span className="cq-room-tag" data-tone="positive">
+      <Globe size={12} aria-hidden="true" />
+      {t("Open to you")}
+    </span>
+  );
+}
+
 function ConnectedDataRoom({
   companyId,
   companyName,
@@ -423,33 +568,45 @@ function ConnectedDataRoom({
   readonly view: DataRoomInvestorView;
 }) {
   const t = useT();
+  const brief = useBrief();
+  const { askNow } = useGlobalQ();
   const [measure, wide] = useRoomWide();
   const [shelf, setShelf] = useState<Shelf>("ALL");
-  const [asking, setAsking] = useState<DataRoomInvestorDocument | "ALL" | null>(
-    null,
-  );
-  const [requested, setRequested] = useState<ReadonlySet<string>>(new Set());
+  const [asking, setAsking] = useState<RoomRequestTarget | null>(null);
+  const { requested, markRequested, shared } = useRoomRequests();
+  const [askedNow, setAskedNow] = useState<ReadonlySet<string>>(new Set());
   const [opened, setOpened] = useState<{
     documentId: string;
     title: string;
-    file: OpenedFile;
+    pages: number | null;
+    file: OpenedFile | null;
   } | null>(null);
+  const [readNow, setReadNow] = useState<ReadonlySet<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
+  const [asked, setAsked] = useState(false);
   // One open at a time, by document, never a shared "busy" flag: a slow or
   // failed open disabled every other document's Open (sc, 2026-10-16). A
   // newer click supersedes an older one; the older result is dropped.
   const [opening, setOpening] = useState<string | null>(null);
   const latest = useRef(0);
+  const [now] = useState(() => Date.now());
 
   const documents = useMemo(
     () =>
-      view.documents.map((document) =>
-        requested.has(document.documentId) ||
-        (requested.has("*") && document.access === "REQUESTABLE")
-          ? { ...document, access: "REQUESTED" as const }
-          : document,
-      ),
-    [view.documents, requested],
+      view.documents.map((document) => {
+        const wasAsked =
+          requested.has(document.documentId) ||
+          (requested.has("*") && document.access === "REQUESTABLE");
+        const read = readNow.has(document.documentId);
+        return {
+          ...document,
+          ...(wasAsked ? { access: "REQUESTED" as const } : {}),
+          ...(read && document.openedAt === null
+            ? { openedAt: new Date(now).toISOString() }
+            : {}),
+        };
+      }),
+    [view.documents, requested, readNow, now],
   );
   const shown = documents.filter(
     (document) => shelf === "ALL" || document.folderCode === shelf,
@@ -457,13 +614,16 @@ function ConnectedDataRoom({
   const openCount = documents.filter(
     (document) => document.access === "OPEN",
   ).length;
-  const requestable = documents.filter(
-    (document) => document.access === "REQUESTABLE",
-  );
   const folderLabel = new Map(
     view.folders.map((folder) => [folder.code, folder.label]),
   );
   const updated = newest(documents);
+  const steps = roomSteps({ companyName, documents, now });
+  const at = Math.max(
+    0,
+    steps.findIndex((step) => !step.done && !(step.key === "ASK" && asked)),
+  );
+  const step = steps[at];
 
   if (view.documents.length === 0) {
     return (
@@ -484,21 +644,60 @@ function ConnectedDataRoom({
     const ticket = ++latest.current;
     setOpening(document.documentId);
     setMessage(null);
+    setOpened({
+      documentId: document.documentId,
+      title: document.title,
+      pages: document.pageCount,
+      file: null,
+    });
     try {
       const result = await openDocumentAction(companyId, document.documentId);
       if (ticket !== latest.current) return;
-      if (result.ok)
+      if (result.ok) {
         setOpened({
           documentId: document.documentId,
           title: document.title,
+          pages: document.pageCount,
           file: result.value,
         });
-      else setMessage(result.message);
+        setReadNow((previous) => new Set([...previous, document.documentId]));
+      } else {
+        setOpened(null);
+        setMessage(result.message);
+      }
     } catch {
-      if (ticket === latest.current)
+      if (ticket === latest.current) {
+        setOpened(null);
         setMessage(t("That couldn't be opened. Try again."));
+      }
     } finally {
       if (ticket === latest.current) setOpening(null);
+    }
+  };
+
+  const request = (target: RoomRequestTarget) => {
+    if (shared && brief !== null) brief.requestDocuments(target);
+    else setAsking(target);
+  };
+  const runStep = () => {
+    if (step === undefined) return;
+    if (step.key === "REQUEST") {
+      const only = documents.filter((d) => d.access === "REQUESTABLE");
+      request(only.length === 1 && only[0] !== undefined ? only[0] : "ALL");
+    } else if (step.key === "READ") {
+      const target = documents
+        .filter((d) => d.access === "OPEN" && d.accessEndsAt !== null)
+        .sort(
+          (a, b) =>
+            Date.parse(a.accessEndsAt ?? "") - Date.parse(b.accessEndsAt ?? ""),
+        )
+        .find((d) => d.openedAt === null);
+      if (target !== undefined) void open(target);
+    } else {
+      setAsked(true);
+      askNow(
+        `What does ${companyName}'s data room still not cover that a diligence at this stage usually needs? Use only the documents and titles I can see here, and say what to request or ask for.`,
+      );
     }
   };
 
@@ -527,35 +726,45 @@ function ConnectedDataRoom({
       data-data-room="investor"
       ref={measure}
     >
-      {requestable.length === 0 ? null : (
-        <div className="cq-room-next" data-room-next>
-          <div className="flex min-w-0 flex-col gap-1">
-            <p className="cq-caption font-medium text-(--cq-accent)">
+      {step === undefined ? null : (
+        <div
+          key={step.key}
+          className="cq-brief-ribbon"
+          style={{ marginBottom: 0 }}
+          data-room-next={step.key}
+        >
+          <div className="rb">
+            <p className="rk">
+              <QMark />
               {t("Next step in the data room")}
             </p>
-            <p className="cq-body font-semibold text-(--cq-text-primary)">
-              {requestable.length === 1
-                ? `Request the one document on request`
-                : `Request the ${String(requestable.length)} documents on request`}
-            </p>
-            <p className="cq-body-sm text-(--cq-text-secondary)">
-              {requestable
-                .slice(0, 3)
-                .map((document) => document.title)
-                .join(", ")}
-              {requestable.length > 3
-                ? ` and ${plural(requestable.length - 3, "other")}`
-                : ""}
-              . {companyName} decides what to share.
-            </p>
+            <p className="rt">{step.title}</p>
+            <p className="rw">{step.reason}</p>
+            <span
+              className="cq-brief-steps"
+              role="img"
+              aria-label={`Step ${String(at + 1)} of ${String(steps.length)}`}
+            >
+              {steps.map((one, index) => (
+                <i
+                  key={one.key}
+                  data-step={
+                    index === at ? "now" : one.done || index < at ? "done" : undefined
+                  }
+                />
+              ))}
+            </span>
           </div>
-          <button
-            type="button"
-            className={buttonClassName("primary", "regular", "shrink-0")}
-            onClick={() => setAsking("ALL")}
-          >
-            {requestable.length === 1 ? t("Request it") : t("Request all")}
-          </button>
+          <div className="ra">
+            <button
+              type="button"
+              className={buttonClassName("primary")}
+              onClick={runStep}
+              data-room-step-action={step.key}
+            >
+              {step.action}
+            </button>
+          </div>
         </div>
       )}
       <div className="cq-room-library" data-room-library>
@@ -591,7 +800,7 @@ function ConnectedDataRoom({
               {plural(documents.length, "document")}, {openCount} open to you
             </h3>
             {updated === null ? null : (
-              <p className="cq-caption text-(--cq-text-secondary)">
+              <p className="cq-caption text-(--cq-text-tertiary)">
                 Updated {dayMonth(updated)}
               </p>
             )}
@@ -601,35 +810,44 @@ function ConnectedDataRoom({
               {message}
             </p>
           )}
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col">
             {shown.map((document, index) => (
               <li
-                key={document.documentId}
+                key={`${shelf}-${document.documentId}`}
                 className="cq-room-doc"
                 style={{ animationDelay: `${String(index * 30)}ms` }}
                 data-room-document={document.access}
+                data-flash={askedNow.has(document.documentId) ? "" : undefined}
                 data-selected={
                   opened?.documentId === document.documentId ? "" : undefined
                 }
               >
                 <span className="cq-room-doc-icon" aria-hidden="true">
                   {document.access === "OPEN" ? (
-                    <FileText size={ICON_SIZE.regular} aria-hidden="true" />
+                    <FileText size={ICON_SIZE.compact} aria-hidden="true" />
                   ) : (
-                    <Lock size={ICON_SIZE.regular} aria-hidden="true" />
+                    <Lock size={ICON_SIZE.compact} aria-hidden="true" />
                   )}
                 </span>
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <p className="cq-body font-medium text-(--cq-text-primary)">
+                <div className="min-w-0">
+                  <p className="cq-room-doc-name" title={document.title}>
                     {document.title}
                   </p>
-                  <p className="cq-caption flex flex-wrap items-center gap-x-2 gap-y-1 text-(--cq-text-secondary)">
-                    <LevelChip shownAs={document.shownAs} />
+                  <p className="cq-room-doc-meta">
+                    <AccessTag
+                      document={document}
+                      companyName={companyName}
+                      now={now}
+                    />
                     {[
-                      document.kind,
-                      document.pageCount === null
+                      document.kind === null
                         ? null
-                        : plural(document.pageCount, "page"),
+                        : document.pageCount === null
+                          ? document.kind
+                          : `${document.kind}, ${plural(document.pageCount, "page")}`,
+                      document.kind === null && document.pageCount !== null
+                        ? plural(document.pageCount, "page")
+                        : null,
                       shelf === "ALL"
                         ? (folderLabel.get(document.folderCode) ?? null)
                         : null,
@@ -638,32 +856,25 @@ function ConnectedDataRoom({
                         : `Valid to ${monthYear(document.validUntil)}`,
                     ]
                       .filter((part): part is string => part !== null)
-                      .join(" · ")}
+                      .map((part) => (
+                        <span key={part}>{part}</span>
+                      ))}
+                    {document.openedAt === null ? null : (
+                      <span>
+                        <Eye size={ICON_SIZE.compact} aria-hidden="true" />
+                        {readNow.has(document.documentId) &&
+                        view.documents.find(
+                          (d) => d.documentId === document.documentId,
+                        )?.openedAt === null
+                          ? "You opened it today"
+                          : `You opened it ${dayMonth(document.openedAt)}`}
+                      </span>
+                    )}
                   </p>
-                  {document.openedAt === null &&
-                  document.accessEndsAt === null ? null : (
-                    <p className="cq-caption flex flex-wrap items-center gap-x-3 text-(--cq-text-secondary)">
-                      {document.openedAt === null ? null : (
-                        <span className="inline-flex items-center gap-1">
-                          <Eye size={ICON_SIZE.compact} aria-hidden="true" />{" "}
-                          You opened it {dayMonth(document.openedAt)}
-                        </span>
-                      )}
-                      {document.accessEndsAt === null ? null : (
-                        <span className="inline-flex items-center gap-1">
-                          <History
-                            size={ICON_SIZE.compact}
-                            aria-hidden="true"
-                          />{" "}
-                          Shared until {dayMonth(document.accessEndsAt)}
-                        </span>
-                      )}
-                    </p>
-                  )}
                   {document.declined === undefined ||
                   document.declined === null ? null : (
                     <p
-                      className="cq-caption text-(--cq-text-secondary)"
+                      className="cq-caption pt-1 text-(--cq-text-secondary)"
                       data-room-declined
                     >
                       Declined
@@ -681,16 +892,19 @@ function ConnectedDataRoom({
                     className={buttonClassName(
                       "secondary",
                       "compact",
-                      "min-h-11 shrink-0",
+                      "cq-room-act min-h-11 shrink-0",
                     )}
                     onClick={() => void open(document)}
                   >
                     {opening === document.documentId ? t("Opening") : t("Open")}
                   </button>
                 ) : document.access === "REQUESTED" ? (
-                  <span className="cq-caption inline-flex min-h-11 shrink-0 items-center gap-1 text-(--cq-text-secondary)">
-                    <History size={ICON_SIZE.compact} aria-hidden="true" />{" "}
-                    Requested
+                  <span className="cq-room-act cq-caption inline-flex min-h-11 shrink-0 items-center text-(--cq-text-tertiary)">
+                    {askedNow.has(document.documentId) ||
+                    requested.has(document.documentId) ||
+                    requested.has("*")
+                      ? t("Asked today")
+                      : t("Requested")}
                   </span>
                 ) : (
                   <button
@@ -698,9 +912,9 @@ function ConnectedDataRoom({
                     className={buttonClassName(
                       "secondary",
                       "compact",
-                      "min-h-11 shrink-0",
+                      "cq-room-act min-h-11 shrink-0",
                     )}
-                    onClick={() => setAsking(document)}
+                    onClick={() => request(document)}
                   >
                     {t("Request")}
                   </button>
@@ -711,54 +925,68 @@ function ConnectedDataRoom({
           <p className="cq-room-note cq-caption text-(--cq-text-secondary)">
             <Eye size={ICON_SIZE.compact} aria-hidden="true" />
             <span>
-              {companyName} can see when you open a document. Documents that
-              can&rsquo;t be downloaded show your name on every page.
+              {companyName} can see when you open a document. Documents you
+              can&rsquo;t download show your name on every page.
             </span>
           </p>
         </div>
         {wide ? (
           <div className="cq-room-preview" data-room-preview>
             {opened === null ? (
-              <div className="flex flex-col items-center gap-2 text-center">
+              <div className="flex flex-col items-center gap-2.5 text-center">
                 <FileText
-                  size={ICON_SIZE.regular}
+                  size={ICON_SIZE.prominent}
                   aria-hidden="true"
                   className="text-(--cq-text-tertiary)"
                 />
-                <p className="cq-body-sm text-(--cq-text-primary)">
+                <p className="cq-body-sm text-(--cq-text-tertiary)">
                   {t("Choose a document to preview it here.")}
                 </p>
-                <p className="cq-caption text-(--cq-text-secondary)">
+                <p className="cq-caption text-(--cq-text-tertiary)">
                   {t("Previews keep your place in the list.")}
                 </p>
               </div>
             ) : (
               <InlinePreview
                 key={opened.documentId}
+                companyName={companyName}
                 title={opened.title}
+                pages={opened.pages}
                 file={opened.file}
                 onClose={() => setOpened(null)}
+                onAsk={() =>
+                  askNow(
+                    `About ${companyName}'s "${opened.title}" in their data room: what does it say, and what does it support or contradict in what they claim?`,
+                  )
+                }
               />
             )}
           </div>
         ) : null}
       </div>
-      <RequestSheet
-        companyId={companyId}
-        companyName={companyName}
-        target={asking}
-        onClose={() => setAsking(null)}
-        onSent={(target) => {
-          setRequested(
-            (previous) =>
-              new Set([
-                ...previous,
-                target === "ALL" ? "*" : target.documentId,
-              ]),
-          );
-          setAsking(null);
-        }}
-      />
+      {shared ? null : (
+        <RequestSheet
+          companyId={companyId}
+          companyName={companyName}
+          target={asking}
+          onClose={() => setAsking(null)}
+          onSent={(target) => {
+            markRequested(target);
+            setAskedNow(
+              (previous) =>
+                new Set([
+                  ...previous,
+                  ...(target === "ALL"
+                    ? documents
+                        .filter((d) => d.access === "REQUESTABLE")
+                        .map((d) => d.documentId)
+                    : [target.documentId]),
+                ]),
+            );
+            setAsking(null);
+          }}
+        />
+      )}
       {wide ? null : (
         <FileViewer
           title={opened?.title ?? ""}
@@ -772,163 +1000,112 @@ function ConnectedDataRoom({
 
 /** The opened document beside the library: the bytes go browser <-> storage. */
 function InlinePreview({
+  companyName,
   title,
+  pages,
   file,
   onClose,
+  onAsk,
 }: {
+  readonly companyName: string;
   readonly title: string;
-  readonly file: OpenedFile;
+  readonly pages: number | null;
+  /** Null while the signed link is being fetched: the page shimmers. */
+  readonly file: OpenedFile | null;
   readonly onClose: () => void;
+  readonly onAsk: () => void;
 }) {
   const t = useT();
+  const [ready, setReady] = useState(false);
+  // Full screen keeps the reader's name over the page: the frame, not the file.
+  const page = useRef<HTMLDivElement>(null);
   return (
-    <div className="cq-room-preview-open flex h-full min-h-0 w-full flex-col gap-3">
-      <div className="flex items-start justify-between gap-3">
-        <p className="cq-body font-medium text-(--cq-text-primary)">{title}</p>
+    <div className="cq-room-preview-open flex w-full flex-col gap-3">
+      <div className="flex items-center justify-between gap-2.5">
+        <p
+          className="cq-body min-w-0 truncate font-semibold text-(--cq-text-primary)"
+          title={title}
+        >
+          {title}
+        </p>
+        <span className="cq-caption shrink-0 text-(--cq-text-tertiary)">
+          {pages === null ? null : `Page 1 of ${String(pages)}`}
+        </span>
+      </div>
+      <div
+        ref={page}
+        className="cq-room-page"
+        data-ready={ready && file !== null ? "" : undefined}
+        aria-busy={!ready}
+      >
+        <div className="cq-room-shimmer" aria-hidden="true">
+          {[92, 80, 60, 92, 40, 80, 92, 60, 80, 40].map((width, index) => (
+            <i key={index} style={{ width: `${String(width)}%` }} />
+          ))}
+        </div>
+        {file === null ? null : (
+          <iframe
+            src={
+              file.downloadable ? file.url : `${file.url}#toolbar=0&navpanes=0`
+            }
+            title={title}
+            referrerPolicy="no-referrer"
+            onLoad={() => setReady(true)}
+          />
+        )}
+        {file?.watermark === null || file === null ? null : (
+          <Watermark words={file.watermark} />
+        )}
+      </div>
+      <p className="cq-room-seen">
+        <Eye size={ICON_SIZE.compact} aria-hidden="true" />
+        {companyName} will see you opened this today
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={onClose}
-          className={buttonClassName("quiet", "compact", "min-h-11 shrink-0")}
+          onClick={onAsk}
+          className={buttonClassName("secondary", "compact")}
         >
-          {t("Close")}
+          <QMark />
+          {t("Ask Q about this")}
         </button>
-      </div>
-      <div className="relative min-h-0 flex-1 overflow-hidden border border-(--cq-border-subtle) bg-(--cq-surface)">
-        <iframe
-          src={
-            file.downloadable ? file.url : `${file.url}#toolbar=0&navpanes=0`
-          }
-          title={title}
-          className="h-full min-h-[60vh] w-full"
-          referrerPolicy="no-referrer"
-        />
-        {file.watermark === null ? null : <Watermark words={file.watermark} />}
-      </div>
-      <p className="cq-caption flex items-center gap-1.5 text-(--cq-text-secondary)">
-        {file.downloadable ? (
+        {file?.downloadable === true ? (
           <a
             href={file.downloadUrl ?? file.url}
             download
-            className="inline-flex min-h-11 items-center gap-1.5 underline underline-offset-4"
+            className={buttonClassName("quiet", "compact")}
           >
             <Download size={ICON_SIZE.compact} aria-hidden="true" />{" "}
             {t("Download")}
           </a>
-        ) : (
-          <>
-            <Lock size={ICON_SIZE.compact} aria-hidden="true" />
-            {t("View only. Your name is shown on every page.")}
-          </>
-        )}
-      </p>
-    </div>
-  );
-}
-
-function RequestSheet({
-  companyId,
-  companyName,
-  target,
-  onClose,
-  onSent,
-}: {
-  readonly companyId: string;
-  readonly companyName: string;
-  readonly target: DataRoomInvestorDocument | "ALL" | null;
-  readonly onClose: () => void;
-  readonly onSent: (target: DataRoomInvestorDocument | "ALL") => void;
-}) {
-  const t = useT();
-  const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
-  const send = () =>
-    start(async () => {
-      if (target === null) return;
-      const result = await requestAccessAction({
-        companyId,
-        documentId: target === "ALL" ? null : target.documentId,
-        note,
-        idempotencyKey: await newRequestKey(),
-      });
-      if (result.ok) {
-        setNote("");
-        onSent(target);
-      } else setError(result.message);
-    });
-  return (
-    <SheetRoot
-      open={target !== null}
-      onOpenChange={(open) => (open ? undefined : onClose())}
-    >
-      {target === null ? null : (
-        <SheetContent
-          title={
-            target === "ALL"
-              ? "Request every on-request document"
-              : "Request this document"
+        ) : null}
+        <button
+          type="button"
+          disabled={file === null}
+          onClick={() =>
+            void page.current?.requestFullscreen?.().catch(() => undefined)
           }
-          side="side"
+          className={buttonClassName("quiet", "compact")}
         >
-          <div className="flex flex-col gap-4 px-4 pb-6" data-request-sheet>
-            {target === "ALL" ? (
-              <p className="cq-body-sm text-(--cq-text-secondary)">
-                This asks for the documents {companyName} lists here as
-                available on request. It does not reach anything they
-                haven&rsquo;t listed for you.
-              </p>
-            ) : (
-              <p className="cq-body flex items-center gap-2 text-(--cq-text-primary)">
-                <FileText size={ICON_SIZE.regular} aria-hidden="true" />{" "}
-                {target.title}
-              </p>
-            )}
-            <label className="flex flex-col gap-2">
-              <span className="cq-label text-(--cq-text-primary)">
-                A note to {companyName} (optional)
-              </span>
-              <textarea
-                value={note}
-                maxLength={1000}
-                rows={3}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder={t(
-                  "For example: we're preparing for our investment committee on 20 October.",
-                )}
-                className="cq-body rounded-md border border-(--cq-border) bg-(--cq-surface) p-3 text-(--cq-text-primary)"
-              />
-            </label>
-            <p className="cq-body-sm text-(--cq-text-secondary)">
-              {t(
-                "The founders will see your name, your firm and your note. You’ll get a message here when they answer.",
-              )}
-            </p>
-            {error === null ? null : (
-              <p role="alert" className="cq-body-sm text-(--cq-text-primary)">
-                {error}
-              </p>
-            )}
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={send}
-                className={buttonClassName("primary", "large")}
-              >
-                {t("Send request")}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className={buttonClassName("quiet", "large")}
-              >
-                {t("Cancel")}
-              </button>
-            </div>
-          </div>
-        </SheetContent>
-      )}
-    </SheetRoot>
+          <Maximize2 size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+          {t("Full screen")}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className={buttonClassName("quiet", "compact", "ms-auto")}
+        >
+          {t("Close")}
+        </button>
+      </div>
+      {file !== null && !file.downloadable ? (
+        <p className="cq-caption flex items-center gap-1.5 text-(--cq-text-tertiary)">
+          <Lock size={ICON_SIZE.compact} aria-hidden="true" />
+          {t("View only. Your name is shown on every page.")}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

@@ -9,6 +9,7 @@ import type {
   FounderPersonDto,
 } from "@capital-q/contracts";
 import {
+  Check,
   ChevronRight,
   FileText,
   ICON_SIZE,
@@ -24,6 +25,13 @@ import { VerifiedBadge } from "@/components/verified-badge";
 
 import { EntityAvatar } from "../../entity/entity-avatar";
 import { useT } from "@/features/i18n/language";
+import {
+  BriefCard,
+  BriefGrid,
+  ClaimLine,
+  initials,
+  QReadCard,
+} from "../brief/parts";
 
 /**
  * The Team tab (A1) and a founder as a person (A7). The team is ADR 0041's
@@ -58,12 +66,23 @@ export function memberRole(member: CompanyProfileTeamMember): string {
 
 export function TeamTab({
   companyId,
+  companyName = "The company",
   team,
   fromDeck,
+  founders = [],
+  investor = false,
 }: {
   readonly companyId: string;
+  readonly companyName?: string | undefined;
   readonly team: readonly CompanyProfileTeamMember[];
   readonly fromDeck: readonly DeckFact[];
+  /**
+   * The founders' own pages, by position (1-based order of the founders in
+   * the team), where this reader may open them; null where not.
+   */
+  readonly founders?: readonly (FounderPersonDto | null)[] | undefined;
+  /** Message and the relationship are an investor's. */
+  readonly investor?: boolean | undefined;
 }) {
   const t = useT();
   const [open, setOpen] = useState<number | null>(null);
@@ -72,10 +91,14 @@ export function TeamTab({
   const people = [
     ...team
       .filter((member) => member.isFounder)
-      .map((member, index) => ({ member, founderIndex: index + 1 })),
+      .map((member, index) => ({
+        member,
+        founderIndex: index + 1,
+        person: founders[index] ?? null,
+      })),
     ...team
       .filter((member) => !member.isFounder)
-      .map((member) => ({ member, founderIndex: null })),
+      .map((member) => ({ member, founderIndex: null, person: null })),
   ];
   const chosen = open === null ? undefined : people[open];
   if (team.length === 0 && fromDeck.length === 0) {
@@ -85,54 +108,55 @@ export function TeamTab({
       </p>
     );
   }
-  return (
-    <div className="flex flex-col gap-8" data-team="full">
+  const verified = people.filter((p) => p.person?.identityVerified === true);
+  const others = people.length - verified.length;
+  const main = (
+    <>
       {people.length === 0 ? null : (
-        <section className="flex flex-col gap-2" aria-labelledby="team-title">
-          <div className="flex items-baseline justify-between">
-            <h2
-              id="team-title"
-              className="cq-title-sm text-(--cq-text-primary)"
-            >
+        <section aria-labelledby="team-title">
+          <div className="cq-brief-row" style={{ marginBottom: 4 }}>
+            <h2 id="team-title" className="cq-brief-title m-0">
               {t("Team")}
             </h2>
-            <span className="cq-caption text-(--cq-text-secondary)">
+            <span className="cq-brief-label">
               {people.length} {people.length === 1 ? "person" : "people"}
             </span>
           </div>
-          <ul className="grid grid-cols-1 gap-x-6 md:grid-cols-2">
-            {people.map(({ member }, index) => (
-              <li
-                key={`${member.name}-${String(index)}`}
-                className="border-b border-(--cq-border-subtle)"
-              >
+          <ul className="cq-brief-people m-0 list-none p-0">
+            {people.map(({ member, person }, index) => (
+              <li key={`${member.name}-${String(index)}`}>
                 <button
                   type="button"
-                  onClick={() => {
-                    setOpen(index);
-                  }}
-                  className="flex min-h-11 w-full items-start gap-3 py-4 text-start hover:bg-(--cq-surface-subtle)"
+                  onClick={() => setOpen(index)}
+                  className="cq-brief-person"
                   data-team-member
                 >
-                  {/* A person's photo is theirs alone today: initials. */}
-                  <EntityAvatar kind="person" name={member.name} decorative />
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="cq-body font-medium text-(--cq-text-primary)">
-                      {member.name}
-                    </span>
+                  <span className="cq-brief-av" aria-hidden="true">
+                    {initials(member.name)}
+                  </span>
+                  <span className="pp">
+                    <b>{member.name}</b>
                     <span className="cq-body-sm text-(--cq-text-secondary)">
                       {memberRole(member)}
                     </span>
-                    {member.shortBio === null ? null : (
-                      <span className="cq-body-sm line-clamp-2 text-(--cq-text-primary)">
-                        {member.shortBio}
+                    {member.shortBio === null ? (
+                      <span className="cq-brief-label">
+                        {t("No bio shared yet.")}
                       </span>
+                    ) : (
+                      <span className="pbio">{member.shortBio}</span>
                     )}
+                    <span className="mt-1.5">
+                      <IdentityTag
+                        verified={person?.identityVerified === true}
+                        source={member.source}
+                      />
+                    </span>
                   </span>
                   <ChevronRight
                     size={ICON_SIZE.regular}
                     aria-hidden="true"
-                    className="mt-2 flex-none text-(--cq-text-tertiary)"
+                    className="mt-2 text-(--cq-text-tertiary)"
                   />
                 </button>
               </li>
@@ -140,6 +164,92 @@ export function TeamTab({
           </ul>
         </section>
       )}
+      {fromDeck.length === 0 ? null : (
+        <section className="cq-brief-card" aria-labelledby="deck-team-title">
+          <h2 id="deck-team-title" className="cq-brief-title m-0">
+            {t("What the deck says about the team")}
+          </h2>
+          <div>
+            {fromDeck.map((fact) => (
+              <div
+                key={`${fact.label}-${fact.pages.join(",")}`}
+                className="cq-brief-erow"
+                data-two=""
+              >
+                <span className="ek">
+                  {fact.label}
+                  {fact.value === null ? null : (
+                    <span className="text-(--cq-text-secondary)">
+                      : {fact.value}
+                    </span>
+                  )}
+                </span>
+                <span className="cq-brief-label">
+                  From the deck
+                  {fact.pages.length === 0
+                    ? ""
+                    : `, slide ${String(fact.pages[0])}`}
+                </span>
+              </div>
+            ))}
+          </div>
+          <ClaimLine>{t("Founder’s claims, not verified")}</ClaimLine>
+        </section>
+      )}
+    </>
+  );
+  const rail = (
+    <>
+      <QReadCard>
+        <p data-size="sm">
+          {people.length === 0
+            ? `${companyName} names no one for you yet; the deck describes the team in its own words.`
+            : `${String(people.length)} ${people.length === 1 ? "person" : "people"} named by ${companyName}, ${String(people.filter((p) => p.member.isFounder).length)} of them founders.`}
+        </p>
+        <p className="qual">
+          {verified.length === 0
+            ? "No identity is verified by Capital Q yet. Roles and backgrounds are in their own words."
+            : "Roles and backgrounds are in their own words; only the identities marked are checked."}
+        </p>
+      </QReadCard>
+      <BriefCard title={t("What is verified")}>
+        {verified.map(({ member }) => (
+          <div key={member.name} className="cq-brief-rq">
+            <span className="cq-brief-dot" data-k="ok" />
+            <div>
+              <b>{member.name}’s identity</b>
+              <span className="cq-brief-label">{t("Checked by Capital Q")}</span>
+            </div>
+          </div>
+        ))}
+        {others === 0 ? null : (
+          <div className="cq-brief-rq">
+            <span className="cq-brief-dot" data-k="miss" />
+            <div>
+              <b>
+                {verified.length === 0
+                  ? `${others === 1 ? "The person" : `The ${String(others)} people`} named`
+                  : `The other ${others === 1 ? "person" : `${String(others)} people`}`}
+              </b>
+              <span className="cq-brief-label">
+                Named by {companyName}, not checked
+              </span>
+            </div>
+          </div>
+        )}
+        <div className="cq-brief-rq">
+          <span className="cq-brief-dot" data-k="miss" />
+          <div>
+            <b>{t("Their roles and backgrounds")}</b>
+            <span className="cq-brief-label">{t("In their own words")}</span>
+          </div>
+        </div>
+      </BriefCard>
+    </>
+  );
+  return (
+    <div data-team="full">
+      <BriefGrid main={main} rail={rail} />
       <SheetRoot
         open={chosen !== undefined}
         onOpenChange={(next) => {
@@ -148,76 +258,168 @@ export function TeamTab({
       >
         {chosen === undefined ? null : (
           <SheetContent side="side" title={chosen.member.name}>
-            <div className="flex flex-col gap-4" data-team-member-sheet>
-              <div className="flex items-center gap-3">
-                <EntityAvatar
-                  kind="person"
-                  name={chosen.member.name}
-                  size="lg"
-                  decorative
-                />
-                <p className="cq-body text-(--cq-text-secondary)">
-                  {memberRole(chosen.member)}
-                </p>
-              </div>
-              {chosen.member.shortBio === null ? (
-                <p className="cq-body-sm text-(--cq-text-secondary)">
-                  {t("No bio shared yet.")}
-                </p>
-              ) : (
-                <p className="cq-body text-(--cq-text-primary)">
-                  {chosen.member.shortBio}
-                </p>
-              )}
-              {chosen.founderIndex === null ? null : (
-                <Link
-                  href={`/company/${encodeURIComponent(companyId)}/founder/${String(chosen.founderIndex)}`}
-                  className={buttonClassName("secondary", "regular")}
-                >
-                  {t("Open full profile")}
-                  <ChevronRight size={ICON_SIZE.compact} aria-hidden="true" />
-                </Link>
-              )}
-            </div>
+            <PersonSheet
+              companyId={companyId}
+              companyName={companyName}
+              member={chosen.member}
+              founderIndex={chosen.founderIndex}
+              person={chosen.person}
+              investor={investor}
+            />
           </SheetContent>
         )}
       </SheetRoot>
-      {fromDeck.length === 0 ? null : (
-        <section
-          className="flex flex-col gap-2"
-          aria-labelledby="deck-team-title"
-        >
-          <h2
-            id="deck-team-title"
-            className="cq-title-sm text-(--cq-text-primary)"
-          >
-            {t("What the deck says about the team")}
-          </h2>
-          <ul className="flex flex-col divide-y divide-(--cq-border-subtle)">
-            {fromDeck.map((fact) => (
-              <li
-                key={`${fact.label}-${fact.pages.join(",")}`}
-                className="flex items-baseline justify-between gap-4 py-3"
-              >
-                <span className="cq-body text-(--cq-text-primary)">
-                  {fact.label}
-                  {fact.value === null ? null : (
-                    <span className="text-(--cq-text-secondary)">
-                      : {fact.value}
-                    </span>
-                  )}
-                </span>
-                <span className="cq-caption shrink-0 text-(--cq-text-secondary)">
-                  From the deck
-                  {fact.pages.length === 0
-                    ? ""
-                    : `, slide ${String(fact.pages[0])}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
+    </div>
+  );
+}
+
+function IdentityTag({
+  verified,
+  source,
+}: {
+  readonly verified: boolean;
+  readonly source: CompanyProfileTeamMember["source"];
+}) {
+  const t = useT();
+  if (verified)
+    return (
+      <span className="cq-brief-tag" data-tone="positive">
+        <Check size={ICON_SIZE.compact} aria-hidden="true" />
+        {t("Identity verified by Capital Q")}
+      </span>
+    );
+  return (
+    <span className="cq-brief-tag">
+      {source === "PUBLIC_SOURCE"
+        ? t("From public sources, unconfirmed")
+        : t("Identity not verified yet")}
+    </span>
+  );
+}
+
+/** One person, in a side sheet: what they shared, and what is checked. */
+function PersonSheet({
+  companyId,
+  companyName,
+  member,
+  founderIndex,
+  person,
+  investor,
+}: {
+  readonly companyId: string;
+  readonly companyName: string;
+  readonly member: CompanyProfileTeamMember;
+  readonly founderIndex: number | null;
+  readonly person: FounderPersonDto | null;
+  readonly investor: boolean;
+}) {
+  const t = useT();
+  const first = member.name.split(" ")[0] ?? member.name;
+  const background: readonly (readonly [string, string | null])[] =
+    founderIndex === null
+      ? []
+      : [
+          [
+            "Building since",
+            person?.buildingSince === null || person === null
+              ? null
+              : String(person.buildingSince),
+          ],
+          [
+            "Companies founded",
+            person?.companiesFounded === null || person === null
+              ? null
+              : String(person.companiesFounded),
+          ],
+        ];
+  return (
+    <div className="flex flex-col gap-4 pb-4" data-team-member-sheet>
+      <div className="flex items-center gap-3.5">
+        <span className="cq-brief-av" data-size="lg" aria-hidden="true">
+          {initials(member.name)}
+        </span>
+        <div className="flex flex-col gap-1.5">
+          <span className="cq-body text-(--cq-text-primary)">
+            {memberRole(member)}
+          </span>
+          <span>
+            <IdentityTag
+              verified={person?.identityVerified === true}
+              source={member.source}
+            />
+          </span>
+        </div>
+      </div>
+      {member.shortBio === null ? (
+        <p className="cq-body-sm text-(--cq-text-secondary)">
+          {t("No bio shared yet.")}
+        </p>
+      ) : (
+        <p className="cq-body text-(--cq-text-primary)">{member.shortBio}</p>
       )}
+      {person?.inTheirWords === null || person === null ? null : (
+        <div>
+          <p className="cq-brief-label" style={{ marginBottom: 6 }}>
+            {t("In their words")}
+          </p>
+          <blockquote className="cq-brief-quote">
+            “{person.inTheirWords}”
+          </blockquote>
+        </div>
+      )}
+      {background.length === 0 ? null : (
+        <div>
+          <p className="cq-brief-label" style={{ marginBottom: 6 }}>
+            {t("Background")}
+          </p>
+          <dl className="cq-brief-kv" data-cols="2">
+            {background.map(([term, value]) => (
+              <div key={term}>
+                <dt className="cq-brief-label">{term}</dt>
+                <dd className="m-0">
+                  <b
+                    style={
+                      value === null
+                        ? { fontWeight: 400, color: "var(--cq-text-tertiary)" }
+                        : undefined
+                    }
+                  >
+                    {value ?? "Not shared"}
+                  </b>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+      <ClaimLine>Shared by {companyName}, not verified</ClaimLine>
+      <div className="flex flex-wrap gap-2">
+        {founderIndex === null ? null : (
+          <Link
+            href={`/company/${encodeURIComponent(companyId)}/founder/${String(founderIndex)}`}
+            className={buttonClassName("secondary", "compact")}
+          >
+            {t("Open full profile")}
+            <ChevronRight size={ICON_SIZE.compact} aria-hidden="true" />
+          </Link>
+        )}
+        {investor ? (
+          <Link
+            href={`/relationships/company/${encodeURIComponent(companyId)}/messages`}
+            className={buttonClassName("secondary", "compact")}
+          >
+            <MessageSquare size={ICON_SIZE.compact} aria-hidden="true" />{" "}
+            {t("Message")}
+          </Link>
+        ) : null}
+        <Link
+          href={`/home?ask=${encodeURIComponent(`Tell me about ${member.name} of ${companyName}.`)}`}
+          className={buttonClassName("quiet", "compact")}
+        >
+          <Search size={ICON_SIZE.compact} aria-hidden="true" /> Ask Q about{" "}
+          {first}
+        </Link>
+      </div>
     </div>
   );
 }

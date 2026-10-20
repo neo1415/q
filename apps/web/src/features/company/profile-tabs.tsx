@@ -41,7 +41,23 @@ type TabsContext = {
   readonly visited: ReadonlySet<ProfileTab>;
   readonly hrefFor: (tab: ProfileTab) => string;
   readonly select: (tab: ProfileTab) => void;
+  /** The open panel fading out (120 ms) before the next one fades in. */
+  readonly leaving: ProfileTab | null;
+  /** True once the reader has switched tab here: panels then fade in. */
+  readonly switched: boolean;
 };
+
+/** The cross-fade's out half (profile option 1: out 120 ms, then in). */
+const FADE_OUT_MS = 120;
+
+/** Reduced motion, or no way to ask (a test DOM): switch at once. */
+function reducedMotion(): boolean {
+  return (
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function" ||
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
 
 const Context = createContext<TabsContext | null>(null);
 
@@ -82,18 +98,38 @@ export function ProfileTabs({
     (to: ProfileTab) => profileTabHref(base, to, first, search),
     [base, first, search],
   );
+  const [leaving, setLeaving] = useState<ProfileTab | null>(null);
+  const [switched, setSwitched] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current !== null) clearTimeout(timer.current);
+    },
+    [],
+  );
   const select = useCallback(
     (to: ProfileTab) => {
       if (to === tab) return;
       // A shallow entry: Next.js keeps its tree in the history state, so
       // Back and Forward restore the tab without a request.
-      window.history.pushState(null, "", hrefFor(to));
+      const go = () => {
+        setLeaving(null);
+        setSwitched(true);
+        window.history.pushState(null, "", hrefFor(to));
+      };
+      if (timer.current !== null) clearTimeout(timer.current);
+      if (reducedMotion()) {
+        go();
+        return;
+      }
+      setLeaving(tab);
+      timer.current = setTimeout(go, FADE_OUT_MS);
     },
     [hrefFor, tab],
   );
   const value = useMemo(
-    () => ({ tab, visited, hrefFor, select }),
-    [tab, visited, hrefFor, select],
+    () => ({ tab, visited, hrefFor, select, leaving, switched }),
+    [tab, visited, hrefFor, select, leaving, switched],
   );
   return (
     <Context.Provider value={value}>
@@ -212,7 +248,14 @@ export function ProfileTabPanel({
   }, [open]);
   if (!mounted) return null;
   return (
-    <div ref={ref} hidden={!open} data-profile-panel={tab}>
+    <div
+      ref={ref}
+      hidden={!open}
+      className="cq-brief-panel"
+      data-leaving={context?.leaving === tab ? "" : undefined}
+      data-entered={open && context?.switched === true ? "" : undefined}
+      data-profile-panel={tab}
+    >
       {children}
     </div>
   );

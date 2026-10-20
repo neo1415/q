@@ -257,6 +257,14 @@ function claimedFacts(sections: readonly DeckSection[]): ReadonlySet<DeckFact> {
 export type PitchProfileSection = ReadSection & {
   readonly sectionKey: string;
   readonly provided: boolean;
+  /** The deck's slides it was read from, in order; empty: not from the deck. */
+  readonly pages: readonly number[];
+  /**
+   * A gap's question for the founders, in the profile list's own words
+   * ("Who else is solving this, and how are you different?"); null when
+   * the section is provided or is never asked as a gap.
+   */
+  readonly gapQuestion: string | null;
 };
 
 /** Every section of the Overview, in the list's order, for this reader. */
@@ -447,6 +455,8 @@ export function pitchProfileSections(
       key: spec.key,
       sectionKey: spec.key,
       provided,
+      pages: [...new Set(pages)].sort((a, b) => a - b),
+      gapQuestion: !provided && spec.askable ? spec.question : null,
       label,
       chip: sources.chip ?? label,
       status,

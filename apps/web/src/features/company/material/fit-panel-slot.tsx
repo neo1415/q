@@ -5,6 +5,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import {
   FIT_BAND_LABELS,
   FIT_CONFIDENCE_LABELS,
+  type FitCompanyDto,
   type RelationshipStateV2,
 } from "@capital-q/contracts";
 import { ChevronDown, ICON_SIZE } from "@capital-q/ui/icons";
@@ -32,13 +33,21 @@ const ProfileFit = createContext<CompanyFit>({ status: "NONE" });
 
 export function ProfileFitProvider({
   companyId,
+  initial,
   children,
 }: {
   readonly companyId: string;
+  /** A fit already in hand (design review); undefined reads it once. */
+  readonly initial?: FitCompanyDto | null | undefined;
   readonly children: ReactNode;
 }) {
-  const fit = useCompanyFit(companyId);
+  const fit = useCompanyFit(companyId, { initial });
   return <ProfileFit.Provider value={fit}>{children}</ProfileFit.Provider>;
+}
+
+/** The profile's one fit read (NONE outside a provider). */
+export function useProfileFit(): CompanyFit {
+  return useContext(ProfileFit);
 }
 
 /** "Good fit · Moderate confidence", or null while there is none to show. */
