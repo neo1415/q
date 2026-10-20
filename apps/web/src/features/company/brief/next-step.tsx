@@ -6,7 +6,6 @@ import { useState, useSyncExternalStore } from "react";
 import type {
   DataRoomView,
   InterestDto,
-  MeetingDto,
   RelationshipStateV2,
 } from "@capital-q/contracts";
 import { Button, buttonClassName } from "@capital-q/ui/button";
@@ -46,27 +45,8 @@ function isPhone(): boolean {
   );
 }
 
-export type NextCall = Pick<MeetingDto, "startsAt" | "timeZone" | "hasBrief">;
-
-/** The reader's next scheduled call, from their own meetings read. */
-export function nextCallOf(
-  meetings: readonly MeetingDto[] | null,
-  now: number = Date.now(),
-): NextCall | null {
-  const next = (meetings ?? [])
-    .filter(
-      (meeting) =>
-        meeting.status === "SCHEDULED" && Date.parse(meeting.endsAt) > now,
-    )
-    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))[0];
-  return next === undefined
-    ? null
-    : {
-        startsAt: next.startsAt,
-        timeZone: next.timeZone,
-        hasBrief: next.hasBrief,
-      };
-}
+export { nextCallOf, type NextCall } from "./journey";
+import type { NextCall } from "./journey";
 
 export function NextStepRibbon({
   companyId,

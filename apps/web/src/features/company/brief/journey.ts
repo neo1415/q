@@ -1,4 +1,4 @@
-import type { RelationshipStateV2 } from "@capital-q/contracts";
+import type { MeetingDto, RelationshipStateV2 } from "@capital-q/contracts";
 
 /**
  * The next-step ribbon's journey (profile option 1, owner 2026-10-20): one
@@ -214,4 +214,27 @@ export function journeyFor(
     ),
     now,
   };
+}
+
+// Plain (no "use client"): the profile page, a server component, reads it.
+export type NextCall = Pick<MeetingDto, "startsAt" | "timeZone" | "hasBrief">;
+
+/** The reader's next scheduled call, from their own meetings read. */
+export function nextCallOf(
+  meetings: readonly MeetingDto[] | null,
+  now: number = Date.now(),
+): NextCall | null {
+  const next = (meetings ?? [])
+    .filter(
+      (meeting) =>
+        meeting.status === "SCHEDULED" && Date.parse(meeting.endsAt) > now,
+    )
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))[0];
+  return next === undefined
+    ? null
+    : {
+        startsAt: next.startsAt,
+        timeZone: next.timeZone,
+        hasBrief: next.hasBrief,
+      };
 }
