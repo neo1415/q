@@ -436,6 +436,10 @@ export const SWEEP_AR: Readonly<Record<string, string>> = {
   "I think these are the closest fits. Keep them, or adjust.":
     "أظن أن هذه الأقرب. أبقِها أو عدّلها.",
   "Keep all": "أبقِها كلها",
+  // A line that did not reach Q (onboarding speed 2026-10-20).
+  "Q didn't answer this, so it may not be saved yet.":
+    "لم يردّ Q على هذا، لذا قد لا يكون محفوظاً بعد.",
+  "Send again": "أرسِل مرة أخرى",
   "Say it in a sentence, or search the categories below.":
     "قلها في جملة، أو ابحث في الفئات أدناه.",
   "Search categories": "ابحث في الفئات",

@@ -209,14 +209,19 @@ export function createConversationService(
     qualification: Awaited<ReturnType<IntakeService["qualification"]>>,
   ) => explainQualification(policy, qualification);
 
+  // Reads that depend only on the guest go together (onboarding speed
+  // 2026-10-20): every wait here is a database round trip the applicant
+  // sits through before Q is even asked.
   const stateFor = async (token: string) => {
     const guest = await intake.authorise(token);
-    const policy = await policies.policyByVersionId({
-      gatewayId: guest.application.gatewayId,
-      gatewayVersionId: guest.application.gatewayVersionId,
-    });
+    const [policy, publicGateway] = await Promise.all([
+      policies.policyByVersionId({
+        gatewayId: guest.application.gatewayId,
+        gatewayVersionId: guest.application.gatewayVersionId,
+      }),
+      publicGatewayFor(guest.application.gatewayId),
+    ]);
     if (policy === null) throw new IntakeRefusedError("NOT_FOUND");
-    const publicGateway = await publicGatewayFor(guest.application.gatewayId);
     if (publicGateway === null) throw new IntakeRefusedError("NOT_FOUND");
     return { guest, policy, publicGateway };
   };
@@ -225,14 +230,21 @@ export function createConversationService(
     token: string,
     reply: string,
     deduplicated: boolean,
+    /** The policy this turn already read: its version is fixed per application. */
+    known?: GatewayPolicy,
   ): Promise<ApplicantTurnResult> => {
-    const view = await intake.resume(token);
-    const qualification = await intake.qualification(token);
-    const guest = await intake.authorise(token);
-    const policy = await policies.policyByVersionId({
-      gatewayId: guest.application.gatewayId,
-      gatewayVersionId: guest.application.gatewayVersionId,
-    });
+    const [view, qualification, policy] = await Promise.all([
+      intake.resume(token),
+      intake.qualification(token),
+      known !== undefined
+        ? Promise.resolve(known)
+        : intake.authorise(token).then((guest) =>
+            policies.policyByVersionId({
+              gatewayId: guest.application.gatewayId,
+              gatewayVersionId: guest.application.gatewayVersionId,
+            }),
+          ),
+    ]);
     if (policy === null) throw new IntakeRefusedError("NOT_FOUND");
     return { reply, deduplicated, view, ...explain(policy, qualification) };
   };
@@ -246,28 +258,30 @@ export function createConversationService(
     const { guest, policy, publicGateway } = await stateFor(input.token);
     const applicationId = guest.application.id;
 
-    // A retry is the same turn. Before anything is spent or recorded.
-    if (turns !== undefined) {
-      const exchange = await turns.findExchange(
-        applicationId,
-        input.clientTurnId,
-      );
+    // A retry is the same turn. Before anything is spent or recorded. The
+    // readiness check is asked alongside, and only answered after these.
+    const ready = intake.assertInterviewReady(input.token);
+    ready.catch(() => undefined);
+    const [exchange, last] = await Promise.all([
+      turns === undefined
+        ? Promise.resolve(null)
+        : turns.findExchange(applicationId, input.clientTurnId),
+      turnMemory.lastTurn(guest.sessionId),
+    ]);
+    if (exchange !== null) {
       if (exchange.person !== null && exchange.person.text !== input.message)
         throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
       if (exchange.q !== null) {
-        return resultFor(input.token, exchange.q.text, true);
+        return resultFor(input.token, exchange.q.text, true, policy);
       }
     }
     // The single slot as well: a turn answered just before the
     // transcript store existed is still the same turn on retry.
-    {
-      const last = await turnMemory.lastTurn(guest.sessionId);
-      if (last !== null && last.clientTurnId === input.clientTurnId) {
-        return resultFor(input.token, last.reply, true);
-      }
+    if (last !== null && last.clientTurnId === input.clientTurnId) {
+      return resultFor(input.token, last.reply, true, policy);
     }
 
-    await intake.assertInterviewReady(input.token);
+    await ready;
     if (guest.application.status === "SUBMITTED") {
       throw new IntakeRefusedError("ALREADY_SUBMITTED");
     }
@@ -289,13 +303,24 @@ export function createConversationService(
       );
       if (completed.q === null)
         throw new IntakeRefusedError("NOT_READY_TO_SUBMIT");
-      return resultFor(input.token, completed.q.text, true);
+      return resultFor(input.token, completed.q.text, true, policy);
     }
     try {
-      const qualification = await intake.qualification(input.token);
-      const facts = await intake.factsFor(input.token);
-      const stored =
-        turns === undefined ? [] : await turns.listFor(applicationId);
+      const [qualification, facts, stored, cached, emphasisRead] =
+        await Promise.all([
+          intake.qualification(input.token),
+          intake.factsFor(input.token),
+          turns === undefined ? [] : turns.listFor(applicationId),
+          turns === undefined || claimId === null
+            ? null
+            : turns.readOutcome(applicationId, claimId),
+          investorEmphasisFor === undefined
+            ? []
+            : investorEmphasisFor({
+                tenantId: guest.application.tenantId,
+                gatewayId: guest.application.gatewayId,
+              }).catch(() => []),
+        ]);
       // The interviewer gets this turn as the utterance, not twice.
       const prior = stored.filter(
         (turn) =>
@@ -303,17 +328,7 @@ export function createConversationService(
       );
       const history = historyFrom(prior);
 
-      const cached =
-        turns === undefined || claimId === null
-          ? null
-          : await turns.readOutcome(applicationId, claimId);
-      const emphasis =
-        cached !== null || investorEmphasisFor === undefined
-          ? []
-          : await investorEmphasisFor({
-              tenantId: guest.application.tenantId,
-              gatewayId: guest.application.gatewayId,
-            }).catch(() => []);
+      const emphasis = cached !== null ? [] : emphasisRead;
       const outcome =
         cached === null
           ? await interviewer.turn({
@@ -341,7 +356,9 @@ export function createConversationService(
                 tenantId: guest.application.tenantId,
                 correlationId: input.correlationId,
               },
-              signal: AbortSignal.timeout(120_000),
+              // The person is waiting; the stored turn is retried under
+              // the same id if this runs out (their words are kept).
+              signal: AbortSignal.timeout(40_000),
             })
           : InterviewTurnOutcomeSchema.parse(cached);
       // Stamped from what the model was actually given, never from its
@@ -410,7 +427,7 @@ export function createConversationService(
       // The model's sentence and the applicant's standing come from
       // different places on purpose: a reply that says "looks like you
       // qualify" changes nothing here.
-      return await resultFor(input.token, outcome.reply, false);
+      return await resultFor(input.token, outcome.reply, false, policy);
     } catch (error) {
       if (turns !== undefined && claimId !== null)
         await turns.releaseExchange(applicationId, claimId);

@@ -670,6 +670,45 @@ export function acknowledgeValue(
   return `${vocabulary.stepTitle(stepKey)}: ${trimSentenceEnd(vocabulary.describe(stepKey, value, labels))}. Noted.`;
 }
 
+/** The most one message to Q may carry (SayOnboardingRequestSchema). */
+export const SAY_MAX_CHARS = 2000;
+
+/**
+ * A long message as the messages Q can take, in order, cut at sentence
+ * ends where it can be and at a space where it cannot (onboarding speed
+ * 2026-10-20). A pasted company description over the limit used to fail
+ * validation in the browser's action and vanish; every word now reaches Q.
+ */
+export function splitForQ(
+  text: string,
+  max: number = SAY_MAX_CHARS,
+): readonly string[] {
+  const trimmed = text.trim();
+  if (trimmed.length <= max) {
+    return trimmed.length === 0 ? [] : [trimmed];
+  }
+  const parts: string[] = [];
+  let rest = trimmed;
+  while (rest.length > max) {
+    const window = rest.slice(0, max);
+    const sentenceEnd = Math.max(
+      window.lastIndexOf(". "),
+      window.lastIndexOf("? "),
+      window.lastIndexOf("! "),
+      window.lastIndexOf("\n"),
+    );
+    const space = window.lastIndexOf(" ");
+    const cut =
+      sentenceEnd >= max / 2 ? sentenceEnd + 1 : space > 0 ? space : max;
+    parts.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest.length > 0) {
+    parts.push(rest);
+  }
+  return parts;
+}
+
 /**
  * What the thread shows after a look-up Q ran mid-interview, before the
  * live question shows again: transport copy, not a reading of anything

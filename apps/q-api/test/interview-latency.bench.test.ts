@@ -375,8 +375,10 @@ describe("typed interview turn latency, with fakes", () => {
         clean ? 2 : 3,
       );
       expect(t.apiCalls, `turn ${String(index + 1)}`).toBeLessThanOrEqual(
-        // A fact kept with their notes is one more write.
-        single ? 5 + (spec?.offPath ?? 0) + (spec?.savedByCode ?? 0) : 8,
+        // A fact kept with their notes is one more write. One more for
+        // their words, kept on the thread before the model runs (a write
+        // beside the turn's first reads, not a wait of its own).
+        single ? 6 + (spec?.offPath ?? 0) + (spec?.savedByCode ?? 0) : 9,
       );
     }
     // Wall-clock targets only when benchmarking on purpose: timers on a
