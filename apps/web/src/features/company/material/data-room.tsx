@@ -46,7 +46,6 @@ import {
   UserRound,
   Users,
 } from "@capital-q/ui/icons";
-import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { useGlobalQ } from "@/components/app-shell/global-q";
 
@@ -57,9 +56,7 @@ import { stageLabel } from "../declared-labels";
 import { FileViewer, Watermark } from "./file-viewer";
 import {
   decideRequestAction,
-  newRequestKey,
   openDocumentAction,
-  requestAccessAction,
   setLevelAction,
   setOutlineAction,
   type OpenedFile,
@@ -150,45 +147,6 @@ function FolderHeader({
         className={`text-(--cq-text-tertiary) transition-transform ${open ? "rotate-180" : ""}`}
       />
     </button>
-  );
-}
-
-const SHOWN_AS: Readonly<
-  Record<
-    DataRoomInvestorDocument["shownAs"],
-    { label: string; icon: IconType; tone: string }
-  >
-> = {
-  PUBLIC: {
-    label: "Public",
-    icon: Globe,
-    tone: "border-(--cq-positive) text-(--cq-positive) bg-(--cq-positive-soft)",
-  },
-  ON_REQUEST: {
-    label: "On request",
-    icon: Lock,
-    tone: "border-(--cq-warning) text-(--cq-warning) bg-(--cq-warning-soft)",
-  },
-  SHARED: {
-    label: "Shared with you",
-    icon: Check,
-    tone: "border-(--cq-accent) text-(--cq-accent) bg-(--cq-accent-soft)",
-  },
-};
-
-function LevelChip({
-  shownAs,
-}: {
-  readonly shownAs: DataRoomInvestorDocument["shownAs"];
-}) {
-  const { label, icon: Icon, tone } = SHOWN_AS[shownAs];
-  return (
-    <span
-      className={`cq-caption inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${tone}`}
-    >
-      <Icon size={ICON_SIZE.compact} aria-hidden="true" />
-      {label}
-    </span>
   );
 }
 

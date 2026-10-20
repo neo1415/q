@@ -1,5 +1,11 @@
 import {
   DECK_SECTIONS,
+  type AssumptionBoardDto,
+  type AssumptionDto,
+  type FitCompanyDto,
+  type FitParameterResultDto,
+  type MeetingDto,
+  type QViewDto,
   type CompanyDeckView,
   type CompanyProfileDto,
   type DataRoomInvestorView,
@@ -158,21 +164,21 @@ export function reviewProfile(
             mediaAssetId: id(901),
             aspectRatio: "9:16",
             durationSeconds: 58,
-            captionState: "READY",
+            captionState: "AVAILABLE",
             title: "Elevator pitch",
           },
           {
             mediaAssetId: id(902),
             aspectRatio: "16:9",
             durationSeconds: 134,
-            captionState: "READY",
+            captionState: "AVAILABLE",
             title: "Product demo: filing a claim",
           },
           {
             mediaAssetId: id(903),
             aspectRatio: "9:16",
             durationSeconds: 100,
-            captionState: "READY",
+            captionState: "AVAILABLE",
             title: "Why we started Kora",
           },
           {
@@ -272,7 +278,7 @@ export function reviewInvestorRoom(empty = false): DataRoomInvestorView {
             "kyc_kyb",
             "SHARED",
             "OPEN",
-            { pages: 4 },
+            { pages: 4, ends: "2026-11-12T09:00:00.000Z" },
           ),
           doc(8, "Cap table summary", "cap_table", "ON_REQUEST", "REQUESTED", {
             pages: 1,
@@ -569,7 +575,13 @@ const SECTIONS: DeckSection[] = DECK_SECTIONS.map((code) => {
       return present(
         code,
         "Raising $1.5m on a SAFE: 45% engineering, 35% sales, 20% operations; 20 months of runway.",
-        [claim("Raising", "$1.5m", 13), claim("Runway", "20 months", 13)],
+        [
+          claim("Raising", "$1.5m", 13),
+          { ...claim("Instrument", "SAFE", 13), kind: "TEXT" as const },
+          claim("Valuation cap", "$12m", 13),
+          claim("Minimum cheque", "$50k", 13),
+          claim("Runway", "20 months", 13),
+        ],
         [13],
       );
     case "FOUNDERS":
@@ -755,5 +767,221 @@ export function reviewFounder(full = true): FounderPersonDto {
           },
         ]
       : [],
+  };
+}
+
+// --- the decision brief (profile option 1), fictional --------------------------
+
+const param = (
+  parameter: FitParameterResultDto["parameter"],
+  outcome: FitParameterResultDto["outcome"],
+  reason: string,
+  extra: Partial<FitParameterResultDto> = {},
+): FitParameterResultDto => ({
+  parameter,
+  outcome,
+  reason,
+  evidenceStatus: outcome === "UNKNOWN" ? null : "SELF_REPORTED",
+  stale: false,
+  applicable: true,
+  ...extra,
+});
+
+/** Kora Health's fit with Northbound's fictional mandate, and both scores. */
+export function reviewFit(): FitCompanyDto {
+  const parameters: FitParameterResultDto[] = [
+    param("STAGE", "STRONG", "Seed, inside your seed to Series A range"),
+    param("SECTOR", "STRONG", "Health insurance software is in your sectors"),
+    param("GEOGRAPHY", "STRONG", "Nigeria is in your West Africa focus"),
+    param("CHEQUE_SIZE", "UNKNOWN", "The round isn't formally shared yet", {
+      stated: true,
+    }),
+    param("BUSINESS_MODEL", "STRONG", "A take rate on claims paid, B2B"),
+    param("TRACTION", "PARTIAL", "Revenue stated, no retention figure", {
+      applicable: false,
+    }),
+    param("TEAM", "UNKNOWN", "No preference declared", { applicable: false }),
+    param("THESIS", "PARTIAL", "Claims automation overlaps part of your thesis"),
+    param("ROUND_TERMS", "UNKNOWN", "A SAFE is stated in the pitch", {
+      stated: true,
+    }),
+  ];
+  return {
+    companyId: REVIEW_COMPANY_ID,
+    name: "Kora Health",
+    line: "Gets clinics paid for insurance claims in weeks, not months.",
+    profile: {
+      companyId: REVIEW_COMPANY_ID,
+      configVersion: "fit-review",
+      configLabel: "v1",
+      band: "GOOD_FIT",
+      confidence: "MEDIUM",
+      parameters,
+      topReasons: parameters.slice(0, 3),
+      mainMismatch: null,
+      hardRule: null,
+      computedAt: "2026-10-19T09:00:00.000Z",
+    },
+    scores: {
+      companyId: REVIEW_COMPANY_ID,
+      investability: {
+        status: "SCORED",
+        score: 64,
+        band: "INVESTABLE",
+        confidence: "LOW",
+        cappedByConfidence: false,
+        provisional: false,
+        range: { low: 38, high: 79 },
+        coverage: {
+          areasScored: 5,
+          areasTotal: 8,
+          criteriaScored: 19,
+          criteriaApplicable: 48,
+        },
+        stage: "Seed",
+        up: [
+          { label: "Traction", detail: "Dated revenue in the confirmed deck · self-reported" },
+        ],
+        down: [
+          { label: "Market", detail: "One top-down figure from a 2022 report" },
+        ],
+        missing: ["Retention or cohort figures", "A named lead investor"],
+        methodVersion: "investiq/v1+review",
+        assessedAt: "2026-10-19T09:00:00.000Z",
+      },
+      suitability: {
+        status: "SCORED",
+        score: 82,
+        band: "GOOD_FIT",
+        confidence: "MEDIUM",
+        coverage: { known: 5, applicable: 7 },
+        up: [{ label: "Sector", detail: "Inside your declared sectors" }],
+        down: [],
+        missing: ["Cheque size, once the round is shared", "Round terms"],
+        configVersion: "fit-review",
+      },
+    },
+  };
+}
+
+export function reviewQView(): QViewDto {
+  return {
+    status: "READY",
+    companyId: REVIEW_COMPANY_ID,
+    verdict: "WORTH_A_LOOK",
+    summary:
+      "Seed-stage claims software for Nigerian clinics, raising on a SAFE. The deck states 140 clinics live and monthly revenue of $41k, up from $9k in nine months.",
+    mainRisk:
+      "The pitch and the deck state different raises ($750k and $1.5m), and there is no retention figure yet.",
+    unknowns: [
+      "Does the round still need a lead investor?",
+      "What is clinic retention after twelve months?",
+      "Which HMOs have signed, and on what terms?",
+    ],
+    truthClass: "Q_INFERENCE",
+    configVersion: "q-view-review",
+  };
+}
+
+const assumption = (
+  id: string,
+  sectionLabel: string,
+  label: string,
+  standing: AssumptionDto["standing"],
+  question: string,
+  extra: Partial<AssumptionDto> = {},
+): AssumptionDto => ({
+  id,
+  sectionLabel,
+  label,
+  value: standing === "UNKNOWN" ? null : "Stated",
+  standing,
+  truthClass: standing === "UNKNOWN" ? null : "USER_CLAIM",
+  evidenceStatus: standing === "UNKNOWN" ? null : "SELF_REPORTED",
+  unknownReason: standing === "UNKNOWN" ? "NOT_IN_DECK" : null,
+  source: standing === "UNKNOWN" ? null : "Pitch deck, slide 9",
+  restsOn: [],
+  question,
+  ...extra,
+});
+
+/** Q.07's board as Northbound would see it: three gaps and one asked. */
+export function reviewBoard(): AssumptionBoardDto {
+  const assumptions: AssumptionDto[] = [
+    assumption("THE_ASK:unknown", "The ask", "Lead investor", "UNKNOWN",
+      "Does the round still need a lead investor?"),
+    assumption("TRACTION:unknown", "Traction", "Retention", "UNKNOWN",
+      "What share of clinics are still live after twelve months?"),
+    assumption("MARKET:unknown", "Market", "Market source", "UNKNOWN",
+      "Where does the $1.2bn claims market figure come from?"),
+    assumption("TRACTION:1", "Traction", "Clinics live", "CLAIMED",
+      "How many of the 140 clinics pay every month?", {
+        asked: {
+          questionId: id(801),
+          askedAt: "2026-10-16T10:00:00.000Z",
+          answer: null,
+        },
+      }),
+  ];
+  return {
+    companyId: REVIEW_COMPANY_ID,
+    basis: "CONFIRMED_DECK_READING",
+    readAt: "2026-09-28T11:00:00.000Z",
+    assumptions,
+    counts: { evidenced: 0, claimed: 1, unknown: 3 },
+  };
+}
+
+/** One call booked on the fictional relationship. */
+export function reviewMeetings(): MeetingDto[] {
+  return [
+    {
+      id: id(701),
+      relationshipId: id(700),
+      purpose: "First call with Kora Health",
+      startsAt: "2030-10-21T13:00:00.000Z",
+      endsAt: "2030-10-21T13:30:00.000Z",
+      timeZone: "Africa/Lagos",
+      status: "SCHEDULED",
+      organisedByYou: true,
+      organiserName: "Northbound Capital",
+      meetLink: null,
+      attendees: ["Amara Okafor"],
+      hasBrief: true,
+    },
+  ];
+}
+
+/** The founders' own pages, by position (Amara verified, Tunde not). */
+export function reviewFounders(): (FounderPersonDto | null)[] {
+  return [
+    { ...reviewFounder(true), identityVerified: true },
+    {
+      ...reviewFounder(false),
+      position: 2,
+      name: "Tunde Bello",
+      roleLine: "Co-founder and CTO, Kora Health",
+      buildingSince: 2013,
+    },
+  ];
+}
+
+/** The investor's room before the founders accept (data room option 1). */
+export function reviewLockedRoom(pending: boolean): DataRoomInvestorView {
+  return {
+    viewer: "INVESTOR",
+    companyId: REVIEW_COMPANY_ID,
+    access: "LOCKED",
+    locked: {
+      reason: pending ? "INTEREST_PENDING" : "NOT_CONNECTED",
+      outline: [
+        { code: "fundraising", label: "Fundraising summary", documents: 3 },
+        { code: "corporate", label: "Company and incorporation", documents: 3 },
+        { code: "cap_table", label: "Cap table and equity", documents: 2 },
+        { code: "legal_ip", label: "Legal and IP", documents: 1 },
+      ],
+    },
+    folders: [],
+    documents: [],
   };
 }

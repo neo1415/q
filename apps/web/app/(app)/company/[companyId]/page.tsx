@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Suspense } from "react";
 
 import {
   getCompanyAssumptions,
   getCompanyDataRoom,
   getCompanyDeck,
+  getCompanyFounder,
   getCompanyProfile,
   getDiligence,
   getOwnInterest,
   getRelationshipWithCompany,
   listClaimableCompanies,
+  listRelationshipMeetings,
   listTaxonomyNodes,
 } from "@capital-q/api-client";
 import {
@@ -18,13 +19,10 @@ import {
   RelationshipStateV2Schema,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
-import { EmptyState, Skeleton } from "@capital-q/ui/states";
+import { EmptyState } from "@capital-q/ui/states";
 
 import { PageContainer } from "@/components/app-shell/page-container";
-import {
-  AssumptionsSection,
-  type QuestionsRoute,
-} from "@/features/assumptions/assumptions-section";
+import type { QuestionsRoute } from "@/features/assumptions/assumptions-section";
 import {
   CompanyProfileView,
   profileTabOf,
@@ -32,7 +30,6 @@ import {
 } from "@/features/company/company-profile-view";
 import { apiSession } from "@/features/q/context";
 import { BackLink } from "@/features/company/back-link";
-import { Fold } from "@/features/company/overview-sections";
 import {
   ProfileTabQSection,
   ProfileTabs,
@@ -195,34 +192,41 @@ export default async function CompanyPage({
       : null;
   // Q.07: the investor's assumptions to test, built by the API from what
   // this investor may see (confirmed readings only); never for others.
-  const assumptions =
+  // The next-step ribbon needs the questions board, the data room and the
+  // reader's own calls at once: read side by side, each the API's own
+  // authorisation, each failing to "none".
+  const matched =
+    relationship !== null && isMatchedRelationshipState(relationship.state);
+  const [assumptions, dataRoom, meetings] = await Promise.all([
     investor && profile.overview !== null
       ? getCompanyAssumptions(session, profile.companyId).catch(() => null)
-      : null;
-  const dataRoom =
+      : null,
     profile.overview !== null
-      ? await getCompanyDataRoom(session, profile.companyId).catch(() => null)
-      : null;
+      ? getCompanyDataRoom(session, profile.companyId).catch(() => null)
+      : null,
+    investor && matched
+      ? listRelationshipMeetings(session, relationship.relationshipId)
+          .then((list) => list.items)
+          .catch(() => null)
+      : null,
+  ]);
+  // The founders' own pages (identity checked or not), by position, for the
+  // Team tab: streamed, and only what each founder page allows this reader.
+  const founderCount =
+    profile.overview?.team.filter((member) => member.isFounder).length ?? 0;
+  const founders = Promise.all(
+    Array.from({ length: Math.min(founderCount, 6) }, (_, index) =>
+      getCompanyFounder(session, profile.companyId, index + 1).catch(
+        () => null,
+      ),
+    ),
+  );
   const questionsRoute: QuestionsRoute =
     relationship === null || !isMatchedRelationshipState(relationship.state)
       ? { kind: "NOT_CONNECTED" }
       : inDiligence
         ? { kind: "DILIGENCE", relationshipId: relationship.relationshipId }
         : { kind: "CHAT", relationshipId: relationship.relationshipId };
-
-  // Where "Request a document" can really go: diligence takes a request
-  // in the investor's own words; otherwise only documents the company
-  // lists as on request can be asked for. No link that dead-ends.
-  const documentRequestHref =
-    diligence !== null
-      ? diligence.href
-      : dataRoom !== null &&
-          dataRoom.viewer === "INVESTOR" &&
-          dataRoom.documents.some(
-            (document) => document.access === "REQUESTABLE",
-          )
-        ? `/company/${encodeURIComponent(profile.companyId)}?tab=dataroom`
-        : undefined;
 
   return (
     <PageContainer className="flex flex-col gap-6">
@@ -289,18 +293,14 @@ export default async function CompanyPage({
           dataRoom={dataRoom}
           deck={deck}
           previewAsInvestor={query?.as === "investor"}
-          overviewStreamed={
-            assumptions === null ? null : (
-              <Suspense fallback={<AssumptionsFoldLoading />}>
-                <AssumptionsFold
-                  assumptions={assumptions}
-                  companyName={profile.canonicalName}
-                  route={questionsRoute}
-                  dataRoomHref={documentRequestHref}
-                />
-              </Suspense>
-            )
+          assumptions={assumptions}
+          questionsRoute={questionsRoute}
+          meetings={meetings}
+          met={
+            relationship?.milestones.some((m) => m.state === "MEETING_HELD") ??
+            false
           }
+          founders={founders}
           relationshipState={
             RelationshipStateV2Schema.safeParse(standing?.relationship?.state)
               .data ?? null
@@ -311,54 +311,6 @@ export default async function CompanyPage({
   );
 }
 
-/** Q.07's fold: the investor's questions to investigate, streamed in. */
-async function AssumptionsFold({
-  assumptions,
-  companyName,
-  route,
-  dataRoomHref,
-}: {
-  readonly dataRoomHref: string | undefined;
-  readonly assumptions: Promise<Awaited<
-    ReturnType<typeof getCompanyAssumptions>
-  > | null>;
-  readonly companyName: string;
-  readonly route: QuestionsRoute;
-}) {
-  const t = await serverT();
-  const board = await assumptions;
-  if (board === null) return null;
-  return (
-    <Fold
-      id="company-assumptions"
-      title={t("Questions to investigate")}
-      summary={[
-        `${String(board.assumptions.length)} key ${board.assumptions.length === 1 ? "claim" : "claims"}`,
-        board.counts.unknown > 0
-          ? `${String(board.counts.unknown)} not known yet`
-          : null,
-      ]
-        .filter((part) => part !== null)
-        .join(" · ")}
-    >
-      <AssumptionsSection
-        board={board}
-        companyName={companyName}
-        route={route}
-        dataRoomHref={dataRoomHref}
-      />
-    </Fold>
-  );
-}
-
-function AssumptionsFoldLoading() {
-  return (
-    <div className="border-b border-(--cq-border-subtle) py-4" aria-busy="true">
-      <Skeleton lines={1} className="w-1/3" />
-    </div>
-  );
-}
-
 function BackToDiscover() {
   return (
     <Link
@@ -366,7 +318,7 @@ function BackToDiscover() {
       className={buttonClassName("quiet", "compact", "self-start")}
     >
       <ArrowLeft size={ICON_SIZE.compact} aria-hidden="true" />
-      Back to Discover
+      Discover
     </Link>
   );
 }

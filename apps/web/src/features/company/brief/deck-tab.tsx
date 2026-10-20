@@ -56,7 +56,6 @@ export function DeckBrief({
   readonly investor: boolean;
 }) {
   const t = useT();
-  const brief = useBrief();
   const params = useSearchParams();
   const autoOpen = params?.get("open") === "1";
   const sub = params?.get("sub")?.toLowerCase() ?? null;

@@ -328,7 +328,7 @@ export function ElevatorBrief({
           <div>
             <dt className="cq-brief-label">{t("Captions")}</dt>
             <dd className="m-0">
-              <b>{video.captionState === "READY" ? t("On") : t("Not ready yet")}</b>
+              <b>{video.captionState === "AVAILABLE" ? t("On") : t("Not ready yet")}</b>
             </dd>
           </div>
           <div>
