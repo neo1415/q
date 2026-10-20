@@ -8,6 +8,7 @@ import { ANSWERS_AR } from "./catalog/answers";
 import { ADMIN_AR } from "./catalog/admin";
 import { COMPANY_AR } from "./catalog/company";
 import { CORE_AR } from "./catalog/core";
+import { CRM_RECORD_AR } from "./catalog/crm-record";
 import { DAILY_AR } from "./catalog/daily";
 import { DISCOVER_AR } from "./catalog/discover";
 import { DOCUMENTS_AR } from "./catalog/documents";
@@ -57,6 +58,7 @@ const ARABIC: Readonly<Record<string, string>> = {
   ...SWEEP_AR,
   ...CORE_AR,
   ...RELATIONSHIPS_AR,
+  ...CRM_RECORD_AR,
   ...DOCUMENTS_AR,
   ...GATEQ_AR,
   ...WORK_AR,
