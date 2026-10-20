@@ -1314,6 +1314,9 @@
     .cq-brief-grid {
       display: flex;
       flex-direction: column;
+      /* Stretch, not the grid's start: a start-aligned column grows to its
+         widest content (the sideways section track) past the phone. */
+      align-items: stretch;
       gap: 20px;
     }
     .cq-brief-rail {
