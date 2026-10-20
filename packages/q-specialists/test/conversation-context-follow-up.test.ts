@@ -401,7 +401,9 @@ describe("what earlier turns fetched (owner live 2026-10-17)", () => {
   it("another conversation's fetch (a run not in this history) attaches to nothing", async () => {
     const conversation = randomUUID();
     const s = seam({
-      said: "what was the second one?",
+      // Not a bare "what was the second one?": that name is said by code
+      // (turn-latency.test.ts) and never reaches the recall.
+      said: "what did you say about the second one's team?",
       conversationId: conversation,
       history: liveHistory(conversation),
       fromShown: { turn: 1, reshow: false },
