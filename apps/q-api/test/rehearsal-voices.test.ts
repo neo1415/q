@@ -67,8 +67,13 @@ const SMALL: readonly CatalogVoice[] = [
   // Arabic: verified for English (tier 1), multilingual only (tier 2),
   // and Arabic-only (never for English).
   voice("ArabicTier100001", "ar", "saudi", "male", "middle_aged", ["ar", "en"]),
-  voice("ArabicTier200001", "ar", "modern standard", "male", "middle_aged", ["ar", "fr"]),
-  voice("ArabicOnly000001", "ar", "modern standard", "female", "middle_aged", ["ar"]),
+  voice("ArabicTier200001", "ar", "modern standard", "male", "middle_aged", [
+    "ar",
+    "fr",
+  ]),
+  voice("ArabicOnly000001", "ar", "modern standard", "female", "middle_aged", [
+    "ar",
+  ]),
 ];
 
 describe("where a counterpart is based, as an accent", () => {
@@ -271,7 +276,9 @@ describe("age and patience in the persona's delivery", () => {
       speed: 0.88,
       stability: 0.7,
     });
-    expect(shapeForAge({ speed: 0.95, stability: 0.65 }, "young_adult")).toEqual({
+    expect(
+      shapeForAge({ speed: 0.95, stability: 0.65 }, "young_adult"),
+    ).toEqual({
       speed: 1,
       stability: 0.65,
     });
@@ -344,7 +351,9 @@ describe("emotion on a model without audio tags", () => {
 
   it("sends v3 only the peaks worth its latency", () => {
     expect(
-      expressivePeak([{ reaction: null, intensity: "NORMAL", tone: "SKEPTICAL" }]),
+      expressivePeak([
+        { reaction: null, intensity: "NORMAL", tone: "SKEPTICAL" },
+      ]),
     ).toBe(false);
     expect(
       expressivePeak([{ reaction: "LAUGH", intensity: "NORMAL", tone: null }]),
@@ -415,9 +424,10 @@ describe("telling one ElevenLabs refusal from another", () => {
 type Seen = { voiceId: string; model: string; body: Record<string, unknown> };
 
 /** A fake ElevenLabs: answers each request from `answer`, and records it. */
-function fakeElevenLabs(
-  answer: (seen: Seen) => Response,
-): { fetch: typeof fetch; seen: Seen[] } {
+function fakeElevenLabs(answer: (seen: Seen) => Response): {
+  fetch: typeof fetch;
+  seen: Seen[];
+} {
   const seen: Seen[] = [];
   const fetchFake: typeof fetch = (input, init) => {
     const url = new URL(
@@ -591,7 +601,10 @@ describe("the speak relay for a person Q plays", () => {
   it("speaks in a premade persona voice when the account lacks the catalog voice", async () => {
     const fake = fakeElevenLabs((seen) =>
       seen.voiceId === ARABIC
-        ? refusal(404, "voice_not_found: a voice with that voice_id was not found")
+        ? refusal(
+            404,
+            "voice_not_found: a voice with that voice_id was not found",
+          )
         : pcm(),
     );
     const relay = createElevenLabsSpeechRelay({

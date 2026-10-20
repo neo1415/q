@@ -317,9 +317,7 @@ async function refusalDetail(response: Response): Promise<string> {
  *     rolled out to it): skip that model for a while.
  */
 export type RefusalKind =
-  | "ENGLISH_ONLY"
-  | "VOICE_MISSING"
-  | "MODEL_UNAVAILABLE";
+  "ENGLISH_ONLY" | "VOICE_MISSING" | "MODEL_UNAVAILABLE";
 
 export function refusalKind(
   status: number | undefined,
@@ -614,8 +612,7 @@ export function personaVoiceSettings(
     };
   }
   const tone = speech.voice;
-  const speed =
-    (persona.speed ?? 1) * (tone?.pace ?? 1) * (speech.speed ?? 1);
+  const speed = (persona.speed ?? 1) * (tone?.pace ?? 1) * (speech.speed ?? 1);
   return {
     stability: tone?.stability ?? persona.stability ?? PERSONA_STABILITY,
     similarity_boost: PERSONA_SIMILARITY,
@@ -637,7 +634,8 @@ export function personaModelsFor(
       return ["eleven_flash_v2_5", "eleven_turbo_v2_5"];
     case "eleven_v3_conversational":
       return ["eleven_v3_conversational", "eleven_flash_v2_5"];
-    default:
+    case "eleven_turbo_v2_5":
+    case "eleven_flash_v2":
       return [model];
   }
 }

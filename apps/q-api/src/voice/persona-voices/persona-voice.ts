@@ -78,9 +78,7 @@ const TURNS: Readonly<Record<Patience, TurnTaking>> = {
 };
 
 /** The persona's voice; null only when the catalog has no voice at all. */
-export function personaVoiceFor(
-  input: PersonaVoiceInput,
-): PersonaVoice | null {
+export function personaVoiceFor(input: PersonaVoiceInput): PersonaVoice | null {
   const wanted = accentForPlace(input.basedIn);
   const pick = pickVoice({
     accent: wanted,

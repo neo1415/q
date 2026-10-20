@@ -97,7 +97,9 @@ async function fromApi(apiKey: string): Promise<Raw[]> {
       signal: AbortSignal.timeout(20_000),
     });
     if (!response.ok) {
-      throw new Error(`ElevenLabs refused the voice list (${String(response.status)})`);
+      throw new Error(
+        `ElevenLabs refused the voice list (${String(response.status)})`,
+      );
     }
     const body = (await response.json()) as Raw;
     if (Array.isArray(body.voices)) voices.push(...(body.voices as Raw[]));
@@ -115,8 +117,11 @@ function render(voices: readonly CatalogVoice[], source: string): string {
 // Source: ${source}. Public voice ids and labels only; no secrets.
 import type { CatalogVoice } from "./catalog.js";
 
-export const CATALOG_SOURCE = ${JSON.stringify(source)};
+export const CATALOG_SOURCE =
+  ${JSON.stringify(source)};
 
+// One voice per line, so a re-sync's diff reads voice by voice.
+// prettier-ignore
 export const CATALOG_VOICES: readonly CatalogVoice[] = [
 ${rows}
 ];
@@ -133,12 +138,21 @@ async function main(): Promise<void> {
   if (from !== undefined) {
     raws = JSON.parse(readFileSync(from, "utf8")) as Raw[];
     const sourceIndex = args.indexOf("--source");
-    const label = sourceIndex === -1 ? "exported catalog" : (args[sourceIndex + 1] ?? "exported catalog");
+    const label =
+      sourceIndex === -1
+        ? "exported catalog"
+        : (args[sourceIndex + 1] ?? "exported catalog");
     source = `${label}, ${new Date().toISOString().slice(0, 10)}`;
   } else {
     const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (apiKey === undefined || apiKey.length === 0 || apiKey.startsWith("disabled")) {
-      throw new Error("ELEVENLABS_API_KEY is not set (or is a disabled test value)");
+    if (
+      apiKey === undefined ||
+      apiKey.length === 0 ||
+      apiKey.startsWith("disabled")
+    ) {
+      throw new Error(
+        "ELEVENLABS_API_KEY is not set (or is a disabled test value)",
+      );
     }
     raws = await fromApi(apiKey);
     source = `ElevenLabs account, ${new Date().toISOString().slice(0, 10)}`;

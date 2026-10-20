@@ -71,8 +71,7 @@ export type SpeechMarkup = {
    * tags (persona-voices toneSettings). Never set where `tone` is.
    */
   readonly voiceSettings?:
-    | ((p: SentencePerformance) => ToneSettings | undefined)
-    | undefined;
+    ((p: SentencePerformance) => ToneSettings | undefined) | undefined;
 };
 
 export const ELEVENLABS_SPEECH_MODELS = [

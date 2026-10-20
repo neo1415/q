@@ -2,8 +2,11 @@
 // Source: seed: export of the owner's Kuuza ElevenLabs account (voice_catalog.json); re-sync from Q's own account, 2026-10-20. Public voice ids and labels only; no secrets.
 import type { CatalogVoice } from "./catalog.js";
 
-export const CATALOG_SOURCE = "seed: export of the owner's Kuuza ElevenLabs account (voice_catalog.json); re-sync from Q's own account, 2026-10-20";
+export const CATALOG_SOURCE =
+  "seed: export of the owner's Kuuza ElevenLabs account (voice_catalog.json); re-sync from Q's own account, 2026-10-20";
 
+// One voice per line, so a re-sync's diff reads voice by voice.
+// prettier-ignore
 export const CATALOG_VOICES: readonly CatalogVoice[] = [
   {"id":"2MwRQL53xDBeGyVfcmB0","name":"Ibrahim - Eloquent Arabic","category":"professional","language":"ar","accent":"modern standard","gender":"male","ageGroup":"middle_aged","verifiedLanguages":["ar","cs","de","es","hi","id","it","ko","ms","nl","no","pl","ru","uk","vi"]},
   {"id":"JAFpvTRfGNCbJ2St9kyT","name":"Saber - Clear Arabic Narrator","category":"professional","language":"ar","accent":"modern standard","gender":"male","ageGroup":null,"verifiedLanguages":["ar","cs","da","de","el","es","fr","hi","id","it","ko","ms","nl","no","pt","tr","uk","vi"]},
