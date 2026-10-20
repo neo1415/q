@@ -1,21 +1,11 @@
 "use client";
 
-import {
-  forwardRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { forwardRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { cx } from "@capital-q/ui";
 import { Download, ICON_SIZE, Search } from "@capital-q/ui/icons";
 
-import {
-  crmButton,
-  CrmSheet,
-  ProgressButton,
-  UnknownValue,
-} from "./crm-kit";
+import { crmButton, CrmSheet, ProgressButton, UnknownValue } from "./crm-kit";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -210,9 +200,12 @@ export function PipelineExport({
         }}
         aria-label={selected === 0 ? t("Export filtered CSV") : label}
         data-pipeline-export
+        data-export-href={href ?? undefined}
       >
         <Download size={ICON_SIZE.compact} aria-hidden="true" />
-        <span className={iconOnly ? "hidden lg:inline" : undefined}>{label}</span>
+        <span className={iconOnly ? "hidden lg:inline" : undefined}>
+          {label}
+        </span>
       </button>
       <CrmSheet
         open={open}
@@ -235,9 +228,7 @@ export function PipelineExport({
                     ? t(`1 relationship, ${scope}`)
                     : t(`${String(count)} relationships, ${scope}`)}
             </span>
-            <span>
-              {t("Columns: counterpart, state, since, next step")}
-            </span>
+            <span>{t("Columns: counterpart, state, since, next step")}</span>
             <span className="text-xs text-(--cq-text-tertiary)">
               {t("Your private notes are never exported.")}
             </span>

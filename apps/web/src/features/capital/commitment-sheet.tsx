@@ -67,7 +67,9 @@ function useStep() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const run = (
-    work: () => Promise<CapitalResult | { readonly ok: boolean; readonly message?: string }>,
+    work: () => Promise<
+      CapitalResult | { readonly ok: boolean; readonly message?: string }
+    >,
     done: string,
     close: () => void,
   ) => {
@@ -318,7 +320,9 @@ export function CommitmentStepSheet({
       {item.status === "DETECTED" ? (
         <>
           <p className="text-[15px] text-(--cq-text-primary)">
-            {t("Q heard this in your call. Nothing is recorded until you confirm it.")}
+            {t(
+              "Q heard this in your call. Nothing is recorded until you confirm it.",
+            )}
           </p>
           {item.quote === null ? null : (
             <blockquote className="border-s-2 border-(--cq-border) ps-3 text-sm text-(--cq-text-secondary)">
@@ -443,7 +447,8 @@ export function RecordAmountSheet({
   });
   // One key per sheet: a retry of the same press cannot record twice.
   const [key] = useState(() => `web-commit-${crypto.randomUUID()}`);
-  const ready = /^(?:0|[1-9]\d{0,13})(?:\.\d{1,2})?$/.test(value.amount) &&
+  const ready =
+    /^(?:0|[1-9]\d{0,13})(?:\.\d{1,2})?$/.test(value.amount) &&
     !/^0(?:\.0{1,2})?$/.test(value.amount);
   const amount = ready ? money(value.amount, value.currency) : null;
   return (

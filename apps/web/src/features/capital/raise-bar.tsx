@@ -57,6 +57,15 @@ const PARTS = [
   { key: "stated", label: "Stated", fill: "bg-(--cq-accent)/45" },
 ] as const;
 
+/** Each part's share of the target, in basis points; together never past it. */
+function partWidths(parts: RaiseParts): readonly number[] {
+  return PARTS.reduce<number[]>((out, part) => {
+    const used = out.reduce((sum, width) => sum + width, 0);
+    out.push(Math.min(shareOf(parts[part.key], parts.target), 10000 - used));
+    return out;
+  }, []);
+}
+
 export function RaiseBar({
   parts,
   words,
@@ -65,12 +74,7 @@ export function RaiseBar({
   /** The words, translated by the caller. */
   readonly words: (english: string) => string;
 }) {
-  let left = 10000;
-  const widths = PARTS.map((part) => {
-    const width = Math.min(shareOf(parts[part.key], parts.target), left);
-    left -= width;
-    return width;
-  });
+  const widths = partWidths(parts);
   return (
     <div className="flex flex-col gap-2.5" data-raise-bar>
       <div

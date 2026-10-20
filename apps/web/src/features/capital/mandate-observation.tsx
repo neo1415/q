@@ -1,9 +1,6 @@
 import Link from "next/link";
 
-import {
-  getFitProfiles,
-  listSavedCompanies,
-} from "@capital-q/api-client";
+import { getFitProfiles, listSavedCompanies } from "@capital-q/api-client";
 import {
   FIT_IDS_MAX,
   type FitProfileDto,

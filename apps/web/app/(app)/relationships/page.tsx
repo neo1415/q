@@ -818,20 +818,20 @@ function OverviewQueue({
             },
           }));
   const listed = needsYouCards({
-        notices: needs.notices,
-        reminders: needs.reminders,
-        items: items ?? [],
-        side,
-        now,
-        steps,
-        deckReview:
-          deckReview === null
-            ? null
-            : {
-                pending: deckReview.pending,
-                href: deckReview.href,
-                at: new Date(now).toISOString(),
-              },
+    notices: needs.notices,
+    reminders: needs.reminders,
+    items: items ?? [],
+    side,
+    now,
+    steps,
+    deckReview:
+      deckReview === null
+        ? null
+        : {
+            pending: deckReview.pending,
+            href: deckReview.href,
+            at: new Date(now).toISOString(),
+          },
   });
   // A money gap sorts with the rest by when it happened, newest first.
   const cards = [...listed, ...records].toSorted(

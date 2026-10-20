@@ -1,4 +1,3 @@
-
 import { getCapitalLedger, getMyCommitments } from "@capital-q/api-client";
 import type {
   CapitalLedgerDto,
@@ -13,7 +12,7 @@ import { apiSession } from "@/features/q/context";
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { Check } from "@capital-q/ui/icons";
 import { Tag, UnknownValue } from "@/features/relationships/crm-kit";
-import { serverT } from "@/features/i18n/server";
+import { serverTNow } from "@/features/i18n/server-now";
 
 import { CommitmentLadder, LADDER, ladderStep } from "./commitment-ladder";
 import { CommitmentStepButton, RecordAmountButton } from "./commitment-sheet";
@@ -68,7 +67,6 @@ function groups(items: readonly LedgerCommitmentDto[]) {
     },
   ].filter((group) => group.items.length > 0);
 }
-
 
 /** A round's name from the raise's stage code ("pre_seed" -> "Pre-seed"). */
 function stageName(code: string | null): string {
@@ -271,22 +269,23 @@ const LEVEL_WORDS: Readonly<Record<LedgerCommitmentDto["level"], string>> = {
  * next step. Received is only what the company confirmed; committed money
  * is never added in; an amount not recorded says so and can be recorded.
  */
-export async function InvestorBook({
+export function InvestorBook({
   mine,
   unrecorded = [],
 }: {
   readonly mine: MyCommitmentsDto;
   readonly unrecorded?: readonly UnrecordedInvestment[];
 }) {
-  const t = await serverT();
+  const t = serverTNow();
   const received = mine.totals.filter((total) => !isZero(total.raised));
   const committed = mine.totals
     .map((total) => ({
       currency: total.currencyCode,
-      amount: totalsByCurrency([
-        { amount: total.confirmed, currency: total.currencyCode },
-        { amount: total.pledged, currency: total.currencyCode },
-      ])[0]?.amount ?? "0",
+      amount:
+        totalsByCurrency([
+          { amount: total.confirmed, currency: total.currencyCode },
+          { amount: total.pledged, currency: total.currencyCode },
+        ])[0]?.amount ?? "0",
     }))
     .filter((total) => !isZero(total.amount));
   const open = mine.commitments.filter((item) => item.status !== "RECEIVED");

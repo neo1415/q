@@ -420,7 +420,11 @@ const ToastContext = createContext<ToastApi | null>(null);
  * One toast at a time for a CRM page: dark, short, announced politely.
  * Rises from the bottom on desktop and drops from the top on a phone.
  */
-export function CrmToastProvider({ children }: { readonly children: ReactNode }) {
+export function CrmToastProvider({
+  children,
+}: {
+  readonly children: ReactNode;
+}) {
   const [message, setMessage] = useState<string | null>(null);
   const [shown, setShown] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);

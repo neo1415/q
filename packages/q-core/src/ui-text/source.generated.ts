@@ -3220,6 +3220,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Security overview",
   "See all",
   "See all {n}",
+  "See it in the plan",
   "See it in your applications",
   "See readiness",
   "See the limit",

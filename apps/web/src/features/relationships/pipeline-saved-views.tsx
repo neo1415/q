@@ -253,7 +253,7 @@ export function PipelineSavedViews({
           onClick={() => open(entry.id)}
           data-saved-view={entry.id}
         >
-          {entry.name}
+          {entry.name}{" "}
           <span className="text-[11px] font-normal text-(--cq-text-tertiary)">
             {entry.who}
           </span>

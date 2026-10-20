@@ -80,7 +80,10 @@ export function RaiseSummary({
           Your rounds couldn&apos;t load.
         </p>
         <div>
-          <Link href={capitalTabHref("raise")} className={crmButton("secondary")}>
+          <Link
+            href={capitalTabHref("raise")}
+            className={crmButton("secondary")}
+          >
             {t("Open Raise & rounds")}
           </Link>
         </div>
@@ -124,7 +127,9 @@ export function RaiseSummary({
           id="overview-raise"
           className="text-base font-semibold text-(--cq-text-primary)"
         >
-          {t(`${current.name}, ${money(current.target.amount, current.target.currency)}`)}
+          {t(
+            `${current.name}, ${money(current.target.amount, current.target.currency)}`,
+          )}
         </h2>
         <span className="text-xs text-(--cq-text-tertiary)">{t(terms)}</span>
       </div>
@@ -284,7 +289,9 @@ export function NextSteps({
           </p>
         ) : steps.length === 0 ? (
           <p className="text-sm text-(--cq-text-secondary)">
-            {t("Nothing open. Steps appear here when Q finds a gap worth closing.")}
+            {t(
+              "Nothing open. Steps appear here when Q finds a gap worth closing.",
+            )}
           </p>
         ) : (
           <ol className="grid gap-3 md:grid-cols-3">
@@ -337,7 +344,7 @@ export function NextSteps({
                         className={cx(crmButton(variant), "w-full")}
                       >
                         {step.action.href === null
-                          ? t("Open the action plan")
+                          ? t("See it in the plan")
                           : t("Go there")}
                       </Link>
                     )}
@@ -351,4 +358,3 @@ export function NextSteps({
     </QControl>
   );
 }
-

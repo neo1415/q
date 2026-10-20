@@ -14,6 +14,7 @@ import {
   resolveOwnContext,
   type OwnContext,
 } from "@/features/q/context";
+import { QControl } from "@/features/q/control/q-control";
 import { QSection } from "@/features/q/q-section";
 import { ActionPlanBoard } from "@/features/readiness/action-plan-board";
 import { ownReadiness } from "@/features/readiness/readiness-data";
@@ -227,44 +228,52 @@ export async function CapitalScreen({
             className="grid items-start gap-7 lg:grid-cols-[340px_minmax(0,1fr)]"
             data-capital-investor
           >
-            <aside
-              id="mandate"
-              aria-label={t("Your mandate")}
-              className="flex flex-col gap-3.5 lg:sticky lg:top-4"
-            >
-              <MandateSummary
-                investorOrganisationId={context.investorOrganisationId}
-              />
-              <Suspense fallback={null}>
-                <MandateObservation relationships={relationships} />
-              </Suspense>
-              <Suspense fallback={null}>
-                <SavedCompaniesCard />
-              </Suspense>
-              <AskQChips asks={INVESTOR_ASKS} />
-            </aside>
-            <section
-              id="commitments"
-              aria-labelledby="book-title"
-              className="flex min-w-0 flex-col gap-3"
-            >
-              <div className="flex flex-wrap items-baseline gap-3">
-                <h2
-                  id="book-title"
-                  className="text-xl font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
-                >
-                  {t("Your book")}
-                </h2>
-                <span className="text-xs text-(--cq-text-tertiary)">
-                  {t("Received is confirmed by the company")}
-                </span>
-              </div>
-              {mine === null ? (
-                <QuietEmpty sentence="Your commitments couldn't load." retry />
-              ) : (
-                <InvestorBook mine={mine} unrecorded={unrecorded} />
-              )}
-            </section>
+            <QControl id="section.mandate" kind="SECTION">
+              <aside
+                id="mandate"
+                aria-label={t("Your mandate")}
+                className="flex flex-col gap-3.5 lg:sticky lg:top-4"
+              >
+                <MandateSummary
+                  investorOrganisationId={context.investorOrganisationId}
+                />
+                <Suspense fallback={null}>
+                  <MandateObservation relationships={relationships} />
+                </Suspense>
+                <Suspense fallback={null}>
+                  <SavedCompaniesCard />
+                </Suspense>
+                <AskQChips asks={INVESTOR_ASKS} />
+              </aside>
+            </QControl>
+            {/* Q reaches the book by name, as it reached the old section. */}
+            <QControl id="section.commitments" kind="SECTION">
+              <section
+                id="commitments"
+                aria-labelledby="book-title"
+                className="flex min-w-0 flex-col gap-3"
+              >
+                <div className="flex flex-wrap items-baseline gap-3">
+                  <h2
+                    id="book-title"
+                    className="text-xl font-semibold tracking-[-0.01em] text-(--cq-text-primary)"
+                  >
+                    {t("Your book")}
+                  </h2>
+                  <span className="text-xs text-(--cq-text-tertiary)">
+                    {t("Received is confirmed by the company")}
+                  </span>
+                </div>
+                {mine === null ? (
+                  <QuietEmpty
+                    sentence="Your commitments couldn't load."
+                    retry
+                  />
+                ) : (
+                  <InvestorBook mine={mine} unrecorded={unrecorded} />
+                )}
+              </section>
+            </QControl>
           </div>
         </CrmToastProvider>
       ) : (

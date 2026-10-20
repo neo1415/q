@@ -23,7 +23,6 @@ export { INSTRUMENT_LABELS, instrumentLabel } from "./round-labels";
 
 type Round = CapitalLedgerDto["rounds"][number];
 
-
 const day = (value: string | null) =>
   value === null ? null : formatDay(value.slice(0, 10));
 

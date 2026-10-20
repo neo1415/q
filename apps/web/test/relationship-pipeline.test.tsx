@@ -82,6 +82,9 @@ const data: RelationshipPipelineDto = {
     },
   ],
 };
+/** The Export button's file address (the sheet fetches it). */
+const exportHref = (name: string) =>
+  screen.getByRole("button", { name }).getAttribute("data-export-href");
 const props = {
   data,
   query: {} as RelationshipPipelineQuery,
@@ -115,13 +118,40 @@ describe("real pipeline controls", () => {
     expect(mock.push).toHaveBeenLastCalledWith(
       "/relationships?view=pipeline&layout=table&q=Maji",
     );
-    fireEvent.change(
-      screen.getByRole("combobox", { name: "Relationship state" }),
-      { target: { value: "IN_DILIGENCE" } },
-    );
+    // The state chips (design 2026-10-20) ask the server for the state.
+    fireEvent.click(screen.getByRole("button", { name: "In diligence" }));
     expect(mock.push).toHaveBeenLastCalledWith(
       "/relationships?view=pipeline&layout=table&state=IN_DILIGENCE",
     );
+  });
+  it("counts the whole pipeline on the chips and narrows to Needs you", () => {
+    render(
+      <RelationshipPipeline
+        {...props}
+        overview={{
+          total: 5,
+          counts: { IN_DILIGENCE: 1, CONNECTED: 4 },
+          steps: {
+            "a0000000-0000-4000-8000-000000000002": {
+              label: "Reply",
+              href: "/x",
+              icon: "reply",
+              why: "1 new message",
+              urgent: true,
+            },
+          },
+          activity: {},
+          about: {},
+        }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "All 5" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Connected 4" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Needs you 1" }));
+    expect(screen.queryByRole("link", { name: "Kivu Freight" })).toBeNull();
+    const maji = screen.getByRole("link", { name: "Maji" }).closest("tr");
+    expect(maji?.textContent).toContain("Reply");
+    expect(mock.push).not.toHaveBeenCalled();
   });
   it("preserves selection across pages and clears it on authorized scope change", () => {
     const page = render(<RelationshipPipeline {...props} />);
@@ -138,11 +168,9 @@ describe("real pipeline controls", () => {
         query={{ cursor: "second" }}
       />,
     );
-    expect(
-      screen
-        .getByRole("link", { name: "Export 1 selected" })
-        .getAttribute("href"),
-    ).toContain(data.items.at(0)?.relationshipId);
+    expect(exportHref("Export 1 selected")).toContain(
+      data.items.at(0)?.relationshipId,
+    );
     page.rerender(
       <RelationshipPipeline
         {...props}
@@ -151,7 +179,7 @@ describe("real pipeline controls", () => {
       />,
     );
     expect(
-      screen.queryByRole("link", { name: "Export 1 selected" }),
+      screen.queryByRole("button", { name: "Export 1 selected" }),
     ).toBeNull();
   });
   it("exports exactly filtered scope or selection without a page cursor", () => {
@@ -166,21 +194,15 @@ describe("real pipeline controls", () => {
         }}
       />,
     );
-    expect(
-      screen
-        .getByRole("link", { name: "Export filtered CSV" })
-        .getAttribute("href"),
-    ).toBe(
+    expect(exportHref("Export filtered CSV")).toBe(
       `/relationships/export?scope=${"1".repeat(64)}&q=Kivu&state=IN_DILIGENCE`,
     );
     fireEvent.click(
       screen.getByRole("checkbox", { name: "Select Kivu Freight" }),
     );
-    expect(
-      screen
-        .getByRole("link", { name: "Export 1 selected" })
-        .getAttribute("href"),
-    ).toContain(`selected=${data.items[0]?.relationshipId}`);
+    expect(exportHref("Export 1 selected")).toContain(
+      `selected=${data.items[0]?.relationshipId}`,
+    );
   });
   it("saves, renames, opens and deletes server views without cursor authority", async () => {
     render(
@@ -191,16 +213,18 @@ describe("real pipeline controls", () => {
       />,
     );
     // Only an organisation admin may share with the team.
+    fireEvent.click(screen.getByRole("button", { name: "Save view" }));
     expect(
-      screen.queryByRole("combobox", { name: "Who sees this view" }),
+      screen.queryByRole("radiogroup", { name: "Who sees this view" }),
     ).toBeNull();
     fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
       target: { value: "Connected" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save view" }));
-    const option = await within(
-      screen.getByRole("combobox", { name: "Saved view" }),
-    ).findByRole<HTMLOptionElement>("option", { name: "Connected" });
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Save view" }).at(-1) ??
+        document.body,
+    );
+    const pill = await screen.findByRole("button", { name: "Connected Mine" });
     const [id, body] = (mock.save.mock.calls[0] ?? []) as [string, unknown];
     expect(body).toEqual({
       name: "Connected",
@@ -210,14 +234,14 @@ describe("real pipeline controls", () => {
       scope: "PERSONAL",
       expectedVersion: 0,
     });
-    expect(option.value).toBe(id);
-    expect(option.parentElement?.getAttribute("label")).toBe("Mine");
+    expect(pill.getAttribute("data-saved-view")).toBe(id);
+    fireEvent.click(await screen.findByRole("button", { name: "Edit view" }));
     fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
       target: { value: "Conversations" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Rename view" }));
     expect(
-      await screen.findByRole("option", { name: "Conversations" }),
+      await screen.findByRole("button", { name: "Conversations Mine" }),
     ).toBeDefined();
     expect(
       (mock.save.mock.calls[1] as unknown[] | undefined)?.[1],
@@ -225,16 +249,15 @@ describe("real pipeline controls", () => {
       name: "Conversations",
       expectedVersion: 1,
     });
-    fireEvent.change(screen.getByRole("combobox", { name: "Saved view" }), {
-      target: { value: id },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "Conversations Mine" }));
     expect(mock.push).toHaveBeenLastCalledWith(
       "/relationships?view=pipeline&layout=table&state=CONNECTED",
     );
+    fireEvent.click(screen.getByRole("button", { name: "Edit view" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete view" }));
     await waitFor(() =>
       expect(
-        screen.queryByRole("option", { name: "Conversations" }),
+        screen.queryByRole("button", { name: "Conversations Mine" }),
       ).toBeNull(),
     );
     expect(mock.remove).toHaveBeenCalledWith(id, 2);
@@ -257,13 +280,14 @@ describe("real pipeline controls", () => {
         views={{ items: [team], teamEditable: false }}
       />,
     );
-    fireEvent.change(screen.getByRole("combobox", { name: "Saved view" }), {
-      target: { value: team.id },
-    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Team diligence My team" }),
+    );
     expect(mock.push).toHaveBeenLastCalledWith(
       "/relationships?view=pipeline&layout=board&state=IN_DILIGENCE",
     );
-    expect(screen.queryByRole("button", { name: "Delete view" })).toBeNull();
+    // A member may open a team view but not change it.
+    expect(screen.queryByRole("button", { name: "Edit view" })).toBeNull();
     member.unmount();
     render(
       <RelationshipPipeline
@@ -271,16 +295,21 @@ describe("real pipeline controls", () => {
         views={{ items: [], teamEditable: true }}
       />,
     );
-    fireEvent.change(
-      screen.getByRole("combobox", { name: "Who sees this view" }),
-      { target: { value: "ORGANISATION" } },
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Save view" }));
+    fireEvent.click(screen.getByRole("radio", { name: "My team" }));
     fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
       target: { value: "Shared" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save view" }));
-    const option = await screen.findByRole("option", { name: "Shared" });
-    expect(option.parentElement?.getAttribute("label")).toBe("Team");
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Save view" }).at(-1) ??
+        document.body,
+    );
+    expect(
+      await screen.findByRole("button", { name: "Shared My team" }),
+    ).toBeDefined();
+    expect(
+      (mock.save.mock.calls[0] as unknown[] | undefined)?.[1],
+    ).toMatchObject({ scope: "ORGANISATION" });
   });
   it("says views couldn't load and keeps older device views removable", () => {
     window.localStorage.setItem(
@@ -300,26 +329,20 @@ describe("real pipeline controls", () => {
       }),
     );
     render(<RelationshipPipeline {...props} views={null} />);
-    expect(
-      screen.getByRole("option", { name: "Saved views couldn't load" }),
-    ).toBeDefined();
-    expect(
-      screen
-        .getByRole<HTMLButtonElement>("button", { name: "Save view" })
-        .hasAttribute("disabled"),
-    ).toBe(true);
-    const old = screen.getByRole("option", { name: "Old device view" });
-    expect(old.parentElement?.getAttribute("label")).toBe("On this device");
-    fireEvent.change(screen.getByRole("combobox", { name: "Saved view" }), {
-      target: { value: "e0000000-0000-4000-8000-000000000001" },
-    });
+    expect(screen.getByText("Saved views couldn't load")).toBeDefined();
+    // Nothing can be saved while the server's views are unknown.
+    expect(screen.queryByRole("button", { name: "Save view" })).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Old device view This device" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit view" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete view" }));
     expect(
-      screen.queryByRole("option", { name: "Old device view" }),
+      screen.queryByRole("button", { name: "Old device view This device" }),
     ).toBeNull();
     expect(mock.remove).not.toHaveBeenCalled();
   });
-  it("folds the controls behind a View options summary of the view in use", () => {
+  it("keeps search, layout and export in one bar, with chips and views under it", () => {
     const { container } = render(
       <RelationshipPipeline
         {...props}
@@ -327,26 +350,20 @@ describe("real pipeline controls", () => {
         query={{ state: "CONNECTED", sort: "name" }}
       />,
     );
-    const panel = container.querySelector("[data-pipeline-options]");
-    expect(panel?.tagName).toBe("DETAILS");
-    expect(panel?.querySelector("summary")?.textContent).toBe(
-      "View optionsConnected · Name A–Z · Board",
-    );
-    // Search stays outside the panel; filters, views and layout are inside.
+    expect(container.querySelector("[data-pipeline-options]")).toBeNull();
     expect(
-      panel?.contains(
-        screen.getByRole("textbox", { name: "Search companies" }),
-      ),
-    ).toBe(false);
-    for (const name of [
-      "Relationship state",
-      "Sort relationships",
-      "Saved view",
-    ]) {
-      expect(panel?.contains(screen.getByRole("combobox", { name }))).toBe(
-        true,
-      );
-    }
+      screen.getByRole("group", { name: "Layout" }).getAttribute("class"),
+    ).toContain("rounded-[10px]");
+    expect(
+      screen
+        .getByRole("button", { name: "Connected" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      screen.getByRole<HTMLSelectElement>("combobox", {
+        name: "Sort relationships",
+      }).value,
+    ).toBe("name");
   });
   it("shows Suitability and Investability as table columns, unknown as —, and keeps Suitability the default sort", () => {
     const scores = {
@@ -366,8 +383,9 @@ describe("real pipeline controls", () => {
     const headers = screen
       .getAllByRole("columnheader")
       .map((th) => th.textContent);
-    expect(headers.slice(1, 4)).toEqual([
+    expect(headers.slice(1, 5)).toEqual([
       "Company",
+      "State",
       "Suitability",
       "Investability",
     ]);
@@ -377,15 +395,15 @@ describe("real pipeline controls", () => {
     const cells = [...(kivu?.querySelectorAll("td") ?? [])].map(
       (td) => td.textContent,
     );
-    expect(cells[2]).toBe("74");
-    expect(cells[3]).toBe("—Not known yet");
+    expect(cells[3]).toBe("74/100");
+    expect(cells[4]).toBe("—Not known yet");
     // A company the Q API did not score: both unknown, never 0.
     const maji = screen.getByRole("link", { name: "Maji" }).closest("tr");
     expect(
       [...(maji?.querySelectorAll("td") ?? [])]
-        .slice(2, 4)
+        .slice(3, 5)
         .map((td) => td.textContent),
-    ).toEqual(["—Not known yet", "—Not known yet"]);
+    ).toEqual(["Not enough evidence", "—Not known yet"]);
 
     const sort = screen.getByRole<HTMLSelectElement>("combobox", {
       name: "Sort relationships",
@@ -435,9 +453,23 @@ describe("real pipeline controls", () => {
       />,
     );
     const card = container.querySelector('[data-board-column="CONNECTED"] li');
-    expect(card?.querySelector("[data-pipeline-scores]")?.textContent).toBe(
-      "Suitability55Investability70",
+    // The design's card: Suitability only (the Table has the rest).
+    expect(
+      card?.querySelector('[data-pipeline-score="suitability"]')?.textContent,
+    ).toBe("Suitability 55");
+    // A card without a score says so in words, never 0.
+    expect(
+      container.querySelector('[data-board-column="IN_DILIGENCE"] li')
+        ?.textContent,
+    ).toContain("Not enough evidence");
+  });
+  it("draws board cards less curved than the prototype, with the 6px radius", () => {
+    const { container } = render(
+      <RelationshipPipeline {...props} layout="board" />,
     );
+    expect(
+      container.querySelector("[data-board-card]")?.getAttribute("class"),
+    ).toContain("rounded-(--cq-radius-sm)");
   });
   it("orders Board columns forward path first, every state once", () => {
     expect([...BOARD_STATES].toSorted()).toEqual(
@@ -453,7 +485,14 @@ describe("real pipeline controls", () => {
       [...container.querySelectorAll("[data-board-column]")].map((column) =>
         column.getAttribute("data-board-column"),
       ),
-    ).toEqual(["CONNECTED", "IN_DILIGENCE"]);
+    ).toEqual([
+      "DISCOVERED",
+      "INTEREST_EXPRESSED",
+      "CONNECTED",
+      "MEETING_HELD",
+      "IN_DILIGENCE",
+      "INVESTED",
+    ]);
     expect(
       screen.getByRole("heading", { name: "In diligence 1" }),
     ).toBeDefined();
@@ -490,15 +529,15 @@ describe("real pipeline controls", () => {
     const cols = screen.getByText("Columns").parentElement;
     if (cols === null) throw new Error("Missing columns");
     fireEvent.click(
-      within(cols).getByRole("checkbox", { name: "State changed" }),
+      within(cols).getByRole("checkbox", { name: "Last activity" }),
     );
     expect(
-      screen.queryByRole("columnheader", { name: "State changed" }),
+      screen.queryByRole("columnheader", { name: "Last activity" }),
     ).toBeNull();
     page.unmount();
     render(<RelationshipPipeline {...props} scopeKey="other:user:role" />);
     expect(
-      screen.getByRole("columnheader", { name: "State changed" }),
+      screen.getByRole("columnheader", { name: "Last activity" }),
     ).toBeDefined();
   });
   it("uses the same canonical rows for board, with matching actual Q item order", () => {
@@ -520,11 +559,13 @@ describe("real pipeline controls", () => {
       `/relationships/company/${data.items[0]?.counterpart.id}`,
     );
   });
-  it("opens an actual preview and native record link", () => {
+  it("opens the record peek on a row, and the record on a modified click", () => {
     render(<RelationshipPipeline {...props} />);
-    fireEvent.click(
-      screen.getAllByRole("button", { name: "Preview" })[0] ?? document.body,
-    );
+    const row = screen.getByRole("link", { name: "Kivu Freight" });
+    // A new-tab click follows the link; nothing opens here.
+    fireEvent.click(row, { metaKey: true });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.click(row);
     expect(screen.getByRole("dialog", { name: "Kivu Freight" })).toBeDefined();
     expect(
       screen
@@ -654,8 +695,9 @@ describe("Unicorn Potential in the Pipeline (owner 2026-10-18)", () => {
     const headers = screen
       .getAllByRole("columnheader")
       .map((th) => th.textContent);
-    expect(headers.slice(1, 5)).toEqual([
+    expect(headers.slice(1, 6)).toEqual([
       "Company",
+      "State",
       "Suitability",
       "Investability",
       "Unicorn Potential",
@@ -738,10 +780,11 @@ describe("Unicorn Potential in the Pipeline (owner 2026-10-18)", () => {
         scores={premium}
       />,
     );
-    const exportLink = screen.getByRole("link", {
-      name: "Export filtered CSV",
-    });
-    expect(exportLink.getAttribute("href")).not.toContain("unicorn");
+    expect(
+      screen
+        .getByRole("button", { name: "Export filtered CSV" })
+        .getAttribute("data-export-href"),
+    ).not.toContain("unicorn");
     expect(screen.getByText(/ranked by Unicorn Potential/)).toBeDefined();
     expect(
       screen.getByText(/Insufficient evidence is not a low score/),
@@ -778,25 +821,27 @@ describe("Unicorn Potential in the Pipeline (owner 2026-10-18)", () => {
         views={{ items: [], teamEditable: false }}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Save view" }));
     fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
       target: { value: "Unicorn 40+" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save view" }));
-    const option = await within(
-      screen.getByRole("combobox", { name: "Saved view" }),
-    ).findByRole<HTMLOptionElement>("option", { name: "Unicorn 40+" });
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Save view" }).at(-1) ??
+        document.body,
+    );
+    const pill = await screen.findByRole("button", {
+      name: "Unicorn 40+ Mine",
+    });
     const input = mock.save.mock.calls.at(-1)?.[1] as Record<string, unknown>;
     expect(input["query"]).toEqual({ sort: "unicorn-40" });
     // Opening it again re-runs the same view through the URL.
-    fireEvent.change(screen.getByRole("combobox", { name: "Saved view" }), {
-      target: { value: option.value },
-    });
+    fireEvent.click(pill);
     expect(mock.push).toHaveBeenLastCalledWith(
       "/relationships?view=pipeline&layout=table&sort=unicorn-40",
     );
   });
 
-  it("shows the three scores, labelled, on Board cards", () => {
+  it("keeps Board cards to Suitability, as designed; the Table has all three", () => {
     const { container } = render(
       <RelationshipPipeline
         {...props}
@@ -806,8 +851,9 @@ describe("Unicorn Potential in the Pipeline (owner 2026-10-18)", () => {
       />,
     );
     const card = container.querySelector('[data-board-column="CONNECTED"] li');
-    expect(card?.querySelector("[data-pipeline-scores]")?.textContent).toBe(
-      "Suitability50Investability—Not known yetUnicorn PotentialInsufficient evidence",
-    );
+    expect(
+      card?.querySelector('[data-pipeline-score="suitability"]')?.textContent,
+    ).toBe("Suitability 50");
+    expect(card?.textContent).not.toContain("Unicorn");
   });
 });

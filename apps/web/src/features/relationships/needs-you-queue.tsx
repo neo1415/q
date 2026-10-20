@@ -194,13 +194,17 @@ function Queue({
 
   const card = (item: NeedsYouCard, index: number) => {
     const first = index === 0;
-    const label = item.record !== undefined ? "Record amount" : item.action.label;
+    const label =
+      item.record !== undefined ? "Record amount" : item.action.label;
     const action =
       item.record !== undefined ? (
         <button
           type="button"
           onClick={() => setRecording(item)}
-          className={crmButton(first ? "primary" : "secondary", "flex-1 sm:flex-none")}
+          className={crmButton(
+            first ? "primary" : "secondary",
+            "flex-1 sm:flex-none",
+          )}
         >
           {t(label)}
         </button>
@@ -208,7 +212,10 @@ function Queue({
         <button
           type="button"
           onClick={() => clear(item)}
-          className={crmButton(first ? "primary" : "secondary", "flex-1 sm:flex-none")}
+          className={crmButton(
+            first ? "primary" : "secondary",
+            "flex-1 sm:flex-none",
+          )}
         >
           {t(label)}
         </button>
@@ -220,7 +227,10 @@ function Queue({
             clear(item);
             router.push(item.action.href ?? "/relationships");
           }}
-          className={crmButton(first ? "primary" : "secondary", "flex-1 sm:flex-none")}
+          className={crmButton(
+            first ? "primary" : "secondary",
+            "flex-1 sm:flex-none",
+          )}
         >
           {label === "Upload & share" ? (
             <Upload size={ICON_SIZE.compact} aria-hidden="true" />
@@ -311,14 +321,13 @@ function Queue({
     );
   };
 
-  const heading =
-    unavailable
-      ? t("Needs you")
-      : left.length === 0
-        ? t("Nothing needs you right now")
-        : left.length === 1
-          ? t("1 thing needs you")
-          : t(`${String(left.length)} things need you`);
+  const heading = unavailable
+    ? t("Needs you")
+    : left.length === 0
+      ? t("Nothing needs you right now")
+      : left.length === 1
+        ? t("1 thing needs you")
+        : t(`${String(left.length)} things need you`);
   return (
     <section
       id="needs-you"
@@ -420,7 +429,10 @@ function without(set: ReadonlySet<string>, key: string): ReadonlySet<string> {
   return next;
 }
 
-const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+const DAY = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+});
 
 function shortDay(iso: string): string {
   const at = Date.parse(iso);

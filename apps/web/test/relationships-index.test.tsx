@@ -60,7 +60,8 @@ describe("RelationshipsIndex", () => {
         .getByRole("link", { name: "Kivu Freight" })
         .getAttribute("href"),
     ).toBe("/relationships/company/c0000000-0000-4000-8000-000000000001");
-    expect(card.textContent).toContain("Interest expressed");
+    // The design's word for interest sent and not yet answered.
+    expect(card.textContent).toContain("Awaiting reply");
     expect(card.textContent).toContain("2d");
     expect(card.textContent).toContain("Waiting on them");
     // Search comes before the tabs and the list.
@@ -72,7 +73,7 @@ describe("RelationshipsIndex", () => {
     ).toBeTruthy();
   });
 
-  it("filters with counts, searches by name, and offers the next step as a button", () => {
+  it("filters with counts, searches by name, and opens the next step from the peek", () => {
     const connected: RelationshipSummaryDto = {
       ...ITEM,
       relationshipId: "a0000000-0000-4000-8000-000000000002",
@@ -102,12 +103,20 @@ describe("RelationshipsIndex", () => {
       within(list).queryByRole("article", { name: "Kivu Freight" }),
     ).toBeNull();
     const card = within(list).getByRole("article", { name: "Ledgerfold" });
+    // The row says the step in the accent, flagged as waiting on you.
     expect(
-      within(card).getByRole("link", { name: "Reply" }).getAttribute("href"),
+      card.querySelector('[data-next-step-text="yours"]')?.textContent,
+    ).toBe("Reply");
+    // A row opens the record peek, whose next step is the action.
+    fireEvent.click(within(card).getByRole("link", { name: "Ledgerfold" }));
+    const peek = screen.getByRole("dialog", { name: "Ledgerfold" });
+    expect(
+      within(peek).getByRole("link", { name: "Reply" }).getAttribute("href"),
     ).toBe(
       "/relationships/company/c0000000-0000-4000-8000-000000000002/messages",
     );
-    expect(card.textContent).toContain("2 new messages");
+    expect(peek.textContent).toContain("This is waiting on you.");
+    fireEvent.click(within(peek).getByRole("button", { name: "Close" }));
 
     fireEvent.click(screen.getByRole("button", { name: "All 2" }));
     fireEvent.change(
@@ -122,7 +131,7 @@ describe("RelationshipsIndex", () => {
     expect(screen.getByRole("status").textContent).toContain("Nothing matches");
   });
 
-  it("ranks an investor's list by Suitability by default, unknown last, with labelled scores", () => {
+  it("ranks an investor's list by Suitability by default, unknown last, with the score in the peek", () => {
     const named = (n: number, name: string, stateSince: string) => ({
       ...ITEM,
       relationshipId: `a0000000-0000-4000-8000-00000000001${String(n)}`,
@@ -156,23 +165,20 @@ describe("RelationshipsIndex", () => {
         .map((id) => document.getElementById(id ?? "")?.textContent);
     expect(names()).toEqual(["Best Fit Co", "Middling Co", "Unscored Co"]);
 
-    const bestCard = screen.getByRole("article", { name: "Best Fit Co" });
-    // The phone card's line: labelled numbers, never hidden.
-    const line = bestCard.querySelector("[data-pipeline-scores]");
-    expect(line?.textContent).toContain("Suitability88");
-    expect(line?.textContent).toContain("Investability61");
-    // The desktop columns name themselves to assistive technology.
+    // The peek says the fit (design 2026-10-20: the list row does not).
+    fireEvent.click(screen.getByRole("link", { name: "Best Fit Co" }));
     expect(
-      bestCard.querySelector('span.block[data-pipeline-score="suitability"]')
-        ?.textContent,
-    ).toBe("Suitability 88");
-
-    // Unknown is "—" read as "Not known yet", never 0.
-    const unknown = screen
-      .getByRole("article", { name: "Unscored Co" })
-      .querySelector("[data-pipeline-scores]");
-    expect(unknown?.textContent).toContain("Suitability—Not known yet");
-    expect(unknown?.textContent).not.toMatch(/\b0\b/);
+      screen
+        .getByRole("dialog", { name: "Best Fit Co" })
+        .querySelector('[data-pipeline-score="suitability"]')?.textContent,
+    ).toBe("88/100");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    // Unknown is said in words, never 0.
+    fireEvent.click(screen.getByRole("link", { name: "Unscored Co" }));
+    const unknown = screen.getByRole("dialog", { name: "Unscored Co" });
+    expect(unknown.textContent).toContain("Not enough evidence");
+    expect(unknown.textContent).not.toMatch(/\b0\/100/);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
 
     // The order is the person's to change; the choice goes in the URL.
     const select = screen.getByRole<HTMLSelectElement>("combobox", {

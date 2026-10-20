@@ -57,7 +57,10 @@ export function RelationshipPeek({
   const title =
     step === undefined
       ? t(PIPELINE_NEXT_WORDS[item.nextStep])
-      : t(step.label ?? (step.why === "" ? PIPELINE_NEXT_WORDS[item.nextStep] : step.why));
+      : t(
+          step.label ??
+            (step.why === "" ? PIPELINE_NEXT_WORDS[item.nextStep] : step.why),
+        );
   const why = own
     ? t("This is waiting on you.")
     : item.nextStep === "AWAIT_ANSWER"
@@ -68,7 +71,8 @@ export function RelationshipPeek({
       ? null
       : {
           known: fit.parameters.filter(
-            (parameter) => parameter.applicable && parameter.outcome !== "UNKNOWN",
+            (parameter) =>
+              parameter.applicable && parameter.outcome !== "UNKNOWN",
           ).length,
           of: fit.parameters.filter((parameter) => parameter.applicable).length,
         };
@@ -157,7 +161,9 @@ export function RelationshipPeek({
             <SuitabilityFigure value={scores.suitability} />
             {known === null || known.of === 0 ? null : (
               <span className="text-xs text-(--cq-text-tertiary)">
-                {t(`${String(known.known)} of ${String(known.of)} criteria known`)}
+                {t(
+                  `${String(known.known)} of ${String(known.of)} criteria known`,
+                )}
               </span>
             )}
           </div>
@@ -169,7 +175,10 @@ export function RelationshipPeek({
         </div>
       )}
 
-      <Link href={relationshipHref(item)} className={crmButton("secondary", "w-full")}>
+      <Link
+        href={relationshipHref(item)}
+        className={crmButton("secondary", "w-full")}
+      >
         {t("Open relationship")}
         <ChevronRight size={ICON_SIZE.compact} aria-hidden="true" />
       </Link>

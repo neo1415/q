@@ -174,12 +174,12 @@ export function RelationshipPipeline({
   useEffect(() => {
     const stored = readPipelinePreferences(scopeKey, localStorageOrNull());
     // Synchronize external device preferences after SSR; never canonical data.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
     setPreferences(stored);
   }, [scopeKey]);
   useEffect(() => {
     // Server navigation replaces the form baseline after a verified page load.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
     setSearch(query.q ?? "");
     setPreview(null);
     setLayout(initialLayout);
@@ -187,7 +187,7 @@ export function RelationshipPipeline({
   // Pagination and layout preserve selection; authorization/filter changes do not.
   useEffect(() => {
     // Security boundary change invalidates local selection before any new action.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+
     setSelected([]);
   }, [scopeKey, data.scope]);
   const persist = (next: PipelinePreferences) => {
@@ -374,10 +374,14 @@ export function RelationshipPipeline({
     },
     ...BOARD_STATES.filter(
       (state) =>
-        query.state === state || (stateCount(state) ?? 0) > 0,
+        query.state === state ||
+        // Without the whole pipeline's counts, the states on this page.
+        (stateCount(state) ??
+          (rows.some((row) => row.state === state) ? 1 : 0)) > 0,
     ).map((state) => ({
       key: state,
-      label: state === "INTEREST_EXPRESSED" ? "Awaiting reply" : STATE_WORDS[state],
+      label:
+        state === "INTEREST_EXPRESSED" ? "Awaiting reply" : STATE_WORDS[state],
       count: stateCount(state),
       on: query.state === state && !needsOnly,
       onSelect: () => {
@@ -420,7 +424,9 @@ export function RelationshipPipeline({
       aria-sort={
         sortedBy !== column
           ? undefined
-          : query.sort === "name-desc" || query.sort === "recent" || column === "suitability"
+          : query.sort === "name-desc" ||
+              query.sort === "recent" ||
+              column === "suitability"
             ? "descending"
             : "ascending"
       }
@@ -461,12 +467,10 @@ export function RelationshipPipeline({
     ...forward,
     ...BOARD_STATES.filter(
       (state) =>
-        BOARD_STOPPED.has(state) && shownRows.some((row) => row.state === state),
+        BOARD_STOPPED.has(state) &&
+        shownRows.some((row) => row.state === state),
     ),
-  ].filter(
-    (state) =>
-      query.state === undefined || query.state === state,
-  );
+  ].filter((state) => query.state === undefined || query.state === state);
   return (
     <div
       ref={ref}
@@ -508,7 +512,13 @@ export function RelationshipPipeline({
           />
           <PipelineExport
             href={`/relationships/export?${exports.toString()}`}
-            count={selected.length > 0 ? selected.length : data.totalExact === false ? null : data.total}
+            count={
+              selected.length > 0
+                ? selected.length
+                : data.totalExact === false
+                  ? null
+                  : data.total
+            }
             scope={
               query.state === undefined
                 ? query.q === undefined
@@ -571,7 +581,11 @@ export function RelationshipPipeline({
                   </option>
                 ))}
               </select>
-              <ChevronDown size={ICON_SIZE.compact} aria-hidden="true" className={caret} />
+              <ChevronDown
+                size={ICON_SIZE.compact}
+                aria-hidden="true"
+                className={caret}
+              />
             </span>
           ) : null}
           <span className="relative inline-flex">
@@ -601,11 +615,17 @@ export function RelationshipPipeline({
               <option value="name">{t("Name A–Z")}</option>
               <option value="name-desc">{t("Name Z–A")}</option>
             </select>
-            <ChevronDown size={ICON_SIZE.compact} aria-hidden="true" className={caret} />
+            <ChevronDown
+              size={ICON_SIZE.compact}
+              aria-hidden="true"
+              className={caret}
+            />
           </span>
           {layout === "table" ? (
             <details className="relative text-[13px]">
-              <summary className={`${selectClass} inline-flex cursor-pointer list-none items-center [&::-webkit-details-marker]:hidden`}>
+              <summary
+                className={`${selectClass} inline-flex cursor-pointer list-none items-center [&::-webkit-details-marker]:hidden`}
+              >
                 {t("Columns")}
               </summary>
               <div className="absolute end-0 z-(--cq-z-popover) mt-1 flex min-w-48 flex-col rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-3 py-1 shadow-(--cq-shadow-sm)">
@@ -690,7 +710,9 @@ export function RelationshipPipeline({
                     "Most companies don't have enough evidence for a numerical assessment yet. Every relationship is still in your pipeline.",
                   )
                 : filtered
-                  ? t("Clear the search or the state to see every relationship.")
+                  ? t(
+                      "Clear the search or the state to see every relationship.",
+                    )
                   : side === "INVESTOR"
                     ? t(
                         "A relationship starts when you express interest in a company.",
@@ -816,7 +838,9 @@ export function RelationshipPipeline({
                         <Link
                           className="line-clamp-2 break-words text-(--cq-text-primary) after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-(--cq-focus-ring)"
                           href={href(row)}
-                          onClick={(event) => peekClick(event, () => setPreview(row))}
+                          onClick={(event) =>
+                            peekClick(event, () => setPreview(row))
+                          }
                           data-q-item
                         >
                           {row.counterpart.name}
@@ -897,7 +921,10 @@ export function RelationshipPipeline({
                         )}
                       >
                         <time dateTime={activityOf(row)}>
-                          {t(since(activityOf(row), now) || formatDay(row.stateSince))}
+                          {t(
+                            since(activityOf(row), now) ||
+                              formatDay(row.stateSince),
+                          )}
                         </time>
                       </td>
                     ) : null}
@@ -1013,7 +1040,11 @@ export function RelationshipPipeline({
                         </span>
                         {need ? (
                           <span className="flex items-start gap-1 text-xs font-semibold text-(--cq-accent)">
-                            <Flag size={14} aria-hidden="true" className="mt-px flex-none" />
+                            <Flag
+                              size={14}
+                              aria-hidden="true"
+                              className="mt-px flex-none"
+                            />
                             {nextWords(row)}
                           </span>
                         ) : null}
@@ -1057,7 +1088,9 @@ export function RelationshipPipeline({
         onClose={() => setPreview(null)}
         side={side}
         now={now}
-        step={peekRow === null ? undefined : overview?.steps[peekRow.relationshipId]}
+        step={
+          peekRow === null ? undefined : overview?.steps[peekRow.relationshipId]
+        }
         activity={peekRow === null ? undefined : activityOf(peekRow)}
         scores={
           scores === undefined || peekRow === null
@@ -1065,7 +1098,10 @@ export function RelationshipPipeline({
             : (scoreOf(scores, peekRow) ?? UNKNOWN_SCORES)
         }
         fit={
-          peekRow === null || fits === undefined || peekRow.counterpart.kind !== "COMPANY" || !(peekRow.counterpart.id in fits)
+          peekRow === null ||
+          fits === undefined ||
+          peekRow.counterpart.kind !== "COMPANY" ||
+          !(peekRow.counterpart.id in fits)
             ? undefined
             : (fits[peekRow.counterpart.id] ?? null)
         }

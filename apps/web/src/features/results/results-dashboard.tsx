@@ -707,122 +707,125 @@ function InvestorDashboard(
       </div>
 
       <More props={props} name={results.organisationName}>
-      <Activity activity={results.activity} first="Interest sent" />
+        <Activity activity={results.activity} first="Interest sent" />
 
-      <div className="grid items-start gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
-        <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
-          <Pipeline
-            props={props}
-            side="INVESTOR"
-            byState={byState}
-            rows={rows}
-            unlisted={["DECLINED", "CLOSED"]}
-          />
-          <Panel
-            id="deal-flow"
-            title={tr("Funnel")}
-            description={tr("Companies this period, each counted once.")}
-          >
-            <ol className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-              {funnelSteps(f).map(({ label, value }) => (
-                <li key={label} className="flex flex-col gap-0.5">
-                  <span className="cq-caption text-(--cq-text-secondary)">
-                    {tr(label)}
-                  </span>
-                  {value === null ? (
-                    // Fewer seen than acted on: views are not all recorded
-                    // (interest also comes from search, profiles and Q), so
-                    // the count is unknown, never a 0 beside 10.
-                    <span className="cq-body-sm min-h-7 text-(--cq-text-secondary)">
-                      {tr("Not recorded")}
-                    </span>
-                  ) : (
-                    <span className="cq-title-sm tabular-nums text-(--cq-text-primary)">
-                      {value}
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </Panel>
-        </div>
-        <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
-          <Panel
-            id="commitments"
-            title={tr("Commitments")}
-            action={
-              <Link
-                href="/relationships?view=capital"
-                className={panelLinkClassName}
-              >
-                Open Capital
-              </Link>
-            }
-          >
-            {results.commitments === undefined ? (
-              <p className="cq-body-sm text-(--cq-text-secondary)">
-                {tr("Commitments couldn’t be read just now.")}
-              </p>
-            ) : (
-              <Lines
-                items={commitments.map((line) => ({
-                  label: line.label,
-                  value:
-                    line.count === 0
-                      ? "0"
-                      : `${String(line.count)} · ${line.amounts.join(", ")}`,
-                }))}
-              />
-            )}
-          </Panel>
-          <Panel
-            id="q-work"
-            title={tr("Q’s work")}
-            action={
-              <Link href="/settings/usage" className={panelLinkClassName}>
-                Usage
-              </Link>
-            }
-          >
-            <Lines
-              items={[
-                { label: "Questions answered", value: String(answers) },
-                {
-                  label: "Prepared for your approval",
-                  value: String(prepared),
-                },
-                { label: "Errands done", value: String(results.qWork.errands) },
-                {
-                  label: "Documents prepared",
-                  value: String(results.qWork.documents),
-                },
-                {
-                  label: "Spend this month",
-                  value:
-                    usage === null
-                      ? "Unknown"
-                      : `USD ${Number(usage.totalUsd).toFixed(2)}`,
-                },
-              ]}
+        <div className="grid items-start gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
+          <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+            <Pipeline
+              props={props}
+              side="INVESTOR"
+              byState={byState}
+              rows={rows}
+              unlisted={["DECLINED", "CLOSED"]}
             />
-          </Panel>
-          {results.meetings.upcoming.length === 0 ? null : (
-            <Panel id="upcoming" title={tr("Coming up")}>
+            <Panel
+              id="deal-flow"
+              title={tr("Funnel")}
+              description={tr("Companies this period, each counted once.")}
+            >
+              <ol className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+                {funnelSteps(f).map(({ label, value }) => (
+                  <li key={label} className="flex flex-col gap-0.5">
+                    <span className="cq-caption text-(--cq-text-secondary)">
+                      {tr(label)}
+                    </span>
+                    {value === null ? (
+                      // Fewer seen than acted on: views are not all recorded
+                      // (interest also comes from search, profiles and Q), so
+                      // the count is unknown, never a 0 beside 10.
+                      <span className="cq-body-sm min-h-7 text-(--cq-text-secondary)">
+                        {tr("Not recorded")}
+                      </span>
+                    ) : (
+                      <span className="cq-title-sm tabular-nums text-(--cq-text-primary)">
+                        {value}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </Panel>
+          </div>
+          <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+            <Panel
+              id="commitments"
+              title={tr("Commitments")}
+              action={
+                <Link
+                  href="/relationships?view=capital"
+                  className={panelLinkClassName}
+                >
+                  Open Capital
+                </Link>
+              }
+            >
+              {results.commitments === undefined ? (
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  {tr("Commitments couldn’t be read just now.")}
+                </p>
+              ) : (
+                <Lines
+                  items={commitments.map((line) => ({
+                    label: line.label,
+                    value:
+                      line.count === 0
+                        ? "0"
+                        : `${String(line.count)} · ${line.amounts.join(", ")}`,
+                  }))}
+                />
+              )}
+            </Panel>
+            <Panel
+              id="q-work"
+              title={tr("Q’s work")}
+              action={
+                <Link href="/settings/usage" className={panelLinkClassName}>
+                  Usage
+                </Link>
+              }
+            >
               <Lines
-                items={results.meetings.upcoming.slice(0, 5).map((m) => ({
-                  label: m.companyName,
-                  value: new Date(m.startsAt).toLocaleString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }),
-                }))}
+                items={[
+                  { label: "Questions answered", value: String(answers) },
+                  {
+                    label: "Prepared for your approval",
+                    value: String(prepared),
+                  },
+                  {
+                    label: "Errands done",
+                    value: String(results.qWork.errands),
+                  },
+                  {
+                    label: "Documents prepared",
+                    value: String(results.qWork.documents),
+                  },
+                  {
+                    label: "Spend this month",
+                    value:
+                      usage === null
+                        ? "Unknown"
+                        : `USD ${Number(usage.totalUsd).toFixed(2)}`,
+                  },
+                ]}
               />
             </Panel>
-          )}
+            {results.meetings.upcoming.length === 0 ? null : (
+              <Panel id="upcoming" title={tr("Coming up")}>
+                <Lines
+                  items={results.meetings.upcoming.slice(0, 5).map((m) => ({
+                    label: m.companyName,
+                    value: new Date(m.startsAt).toLocaleString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
+                  }))}
+                />
+              </Panel>
+            )}
+          </div>
         </div>
-      </div>
       </More>
     </div>
   );
@@ -1012,87 +1015,87 @@ function FounderDashboard(
       </div>
 
       <More props={props} name={results.organisationName}>
-      {/* fdr.06.*: the founder track lights these while Q explains them. */}
-      <div data-qp-anchor="fdr.06.crm.raise">
-        <RaisePanel results={results} />
-      </div>
-
-      <div data-qp-anchor="fdr.06.crm.activity">
-        <Activity activity={results.activity} first="Interest received" />
-      </div>
-
-      <div className="grid items-start gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
-        <div className="min-w-0" data-qp-anchor="fdr.06.crm.pipeline">
-          <Pipeline
-            props={props}
-            side="FOUNDER"
-            byState={results.pipeline.byState}
-            rows={rows}
-            unlisted={[]}
-          />
+        {/* fdr.06.*: the founder track lights these while Q explains them. */}
+        <div data-qp-anchor="fdr.06.crm.raise">
+          <RaisePanel results={results} />
         </div>
-        <div
-          className="flex min-w-0 flex-col gap-4 sm:gap-5"
-          data-qp-anchor="fdr.06.crm.seen"
-        >
-          <Panel
-            id="rehearsals"
-            title={tr("Rehearsals")}
-            action={
-              <Link href="/rehearsals" className={panelLinkClassName}>
-                Rehearse
-              </Link>
-            }
+
+        <div data-qp-anchor="fdr.06.crm.activity">
+          <Activity activity={results.activity} first="Interest received" />
+        </div>
+
+        <div className="grid items-start gap-4 sm:gap-5 lg:grid-cols-[3fr_2fr]">
+          <div className="min-w-0" data-qp-anchor="fdr.06.crm.pipeline">
+            <Pipeline
+              props={props}
+              side="FOUNDER"
+              byState={results.pipeline.byState}
+              rows={rows}
+              unlisted={[]}
+            />
+          </div>
+          <div
+            className="flex min-w-0 flex-col gap-4 sm:gap-5"
+            data-qp-anchor="fdr.06.crm.seen"
           >
-            {latest === undefined ? (
-              <p className="cq-body-sm text-(--cq-text-secondary)">
-                {tr("None in this period.")}
-              </p>
-            ) : (
+            <Panel
+              id="rehearsals"
+              title={tr("Rehearsals")}
+              action={
+                <Link href="/rehearsals" className={panelLinkClassName}>
+                  Rehearse
+                </Link>
+              }
+            >
+              {latest === undefined ? (
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  {tr("None in this period.")}
+                </p>
+              ) : (
+                <Lines
+                  items={[
+                    {
+                      label: "Rehearsed",
+                      value: plural(results.rehearsals.length, "time", "times"),
+                    },
+                    {
+                      label: `Latest, with ${latest.counterpart}`,
+                      value: `${String(latest.score)} / 100${
+                        change === null
+                          ? ""
+                          : ` (${change >= 0 ? "+" : ""}${String(change)})`
+                      }`,
+                    },
+                  ]}
+                />
+              )}
+            </Panel>
+            <Panel id="seen" title={tr("Seen by investors")}>
               <Lines
                 items={[
                   {
-                    label: "Rehearsed",
-                    value: plural(results.rehearsals.length, "time", "times"),
+                    label: "Firms that opened your profile",
+                    value: floored(e.profileOpens),
                   },
                   {
-                    label: `Latest, with ${latest.counterpart}`,
-                    value: `${String(latest.score)} / 100${
-                      change === null
-                        ? ""
-                        : ` (${change >= 0 ? "+" : ""}${String(change)})`
-                    }`,
+                    label: "Firms that watched your pitch",
+                    value: floored(e.pitchWatches),
                   },
                 ]}
               />
-            )}
-          </Panel>
-          <Panel id="seen" title={tr("Seen by investors")}>
-            <Lines
-              items={[
-                {
-                  label: "Firms that opened your profile",
-                  value: floored(e.profileOpens),
-                },
-                {
-                  label: "Firms that watched your pitch",
-                  value: floored(e.pitchWatches),
-                },
-              ]}
-            />
-          </Panel>
-          {results.documents.length === 0 ? null : (
-            <Panel id="documents" title={tr("Documents Q made")}>
-              <Lines
-                items={results.documents.map((d) => ({
-                  label: sentenceCase(d.type),
-                  value: String(d.count),
-                }))}
-              />
             </Panel>
-          )}
+            {results.documents.length === 0 ? null : (
+              <Panel id="documents" title={tr("Documents Q made")}>
+                <Lines
+                  items={results.documents.map((d) => ({
+                    label: sentenceCase(d.type),
+                    value: String(d.count),
+                  }))}
+                />
+              </Panel>
+            )}
+          </div>
         </div>
-      </div>
       </More>
     </div>
   );

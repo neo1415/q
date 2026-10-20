@@ -528,7 +528,8 @@ function RelationshipRow({
   const name = item.counterpart.name;
   const own = isOwnStep(step);
   const next = step.label ?? (step.why === "" ? null : step.why);
-  const label = item.state === "INTEREST_EXPRESSED" ? "Awaiting reply" : undefined;
+  const label =
+    item.state === "INTEREST_EXPRESSED" ? "Awaiting reply" : undefined;
   return (
     <article
       aria-labelledby={`relationship-${item.relationshipId}`}
@@ -576,11 +577,7 @@ function RelationshipRow({
           </Link>
         </h2>
         <p className="truncate text-[13px] text-(--cq-text-secondary)">
-          {about === null
-            ? next === null
-              ? null
-              : t(next)
-            : t(about)}
+          {about === null ? (next === null ? null : t(next)) : t(about)}
         </p>
       </div>
       <div className="hidden lg:block">

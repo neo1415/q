@@ -7,7 +7,13 @@ import { cx } from "@capital-q/ui";
  * word under a bar, so the colour only repeats it. Received is only ever
  * the company's own confirmation. An amount not recorded has no step.
  */
-export const LADDER = ["Soft", "Firm", "Confirmed", "Sent", "Received"] as const;
+export const LADDER = [
+  "Soft",
+  "Firm",
+  "Confirmed",
+  "Sent",
+  "Received",
+] as const;
 
 /** The step a commitment reached; null: no amount recorded, so no step. */
 export function ladderStep(

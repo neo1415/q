@@ -104,7 +104,10 @@ export async function MandateSummary({
   const mandate = await activeMandate(investorOrganisationId);
   if (mandate === undefined) {
     return (
-      <div className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5" data-mandate-summary>
+      <div
+        className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+        data-mandate-summary
+      >
         <h3 className="text-[13px] font-medium text-(--cq-text-secondary)">
           {t("Your mandate")}
         </h3>
@@ -116,7 +119,10 @@ export async function MandateSummary({
   }
   if (mandate === null) {
     return (
-      <div className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5" data-mandate-summary>
+      <div
+        className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+        data-mandate-summary
+      >
         <h3 className="text-[13px] font-medium text-(--cq-text-secondary)">
           {t("Your mandate")}
         </h3>
@@ -196,7 +202,10 @@ export async function MandateSummary({
   ];
 
   return (
-    <div className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5" data-mandate-summary>
+    <div
+      className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5"
+      data-mandate-summary
+    >
       <h3 className="text-[13px] font-medium text-(--cq-text-secondary)">
         {t("Your mandate")}
       </h3>

@@ -95,8 +95,7 @@ export const CRM_DESIGN_AR: Readonly<Record<string, string>> = {
   "Stage: {name}": "المرحلة: {name}",
   "This is waiting on you.": "هذا ينتظرك.",
   "Nothing to do until they reply.": "لا شيء لفعله حتى يردّوا.",
-  "Suggested from where the relationship stands.":
-    "مقترح بحسب موقع العلاقة.",
+  "Suggested from where the relationship stands.": "مقترح بحسب موقع العلاقة.",
   "Fit with your mandate": "الملاءمة مع تفويضك",
   "{n} of {n2} criteria known": "{n} من {n2} معايير معروفة",
   "Fit is not interest. It reads their profile against your declared mandate.":
@@ -187,7 +186,8 @@ export const CRM_DESIGN_AR: Readonly<Record<string, string>> = {
   "Check your bank account first. Confirming moves {amount} into Raised, and {name} sees it confirmed.":
     "تحقق من حسابك المصرفي أولاً. التأكيد ينقل {amount} إلى المجموع المجمَّع، وترى {name} أنه مؤكد.",
   "Amount that arrived": "المبلغ الذي وصل",
-  "{amount} from {name} is now in Raised": "أصبح {amount} من {name} ضمن المجموع المجمَّع",
+  "{amount} from {name} is now in Raised":
+    "أصبح {amount} من {name} ضمن المجموع المجمَّع",
   "No round open": "لا جولة مفتوحة",
   "Open one to track what you raise in it.": "افتح جولة لتتبع ما تجمعه فيها.",
   "Open Raise & rounds": "افتح الجمع والجولات",
@@ -198,6 +198,7 @@ export const CRM_DESIGN_AR: Readonly<Record<string, string>> = {
   "Nothing open. Steps appear here when Q finds a gap worth closing.":
     "لا شيء مفتوح. تظهر الخطوات هنا عندما يجد Q فجوة تستحق السد.",
   "Go there": "اذهب إلى هناك",
+  "See it in the plan": "اطّلع عليها في الخطة",
   "Why and how": "لماذا وكيف",
   "Nothing here right now.": "لا شيء هنا الآن.",
   "{n} of {n2} areas are strong or developing.":

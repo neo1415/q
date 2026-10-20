@@ -140,9 +140,7 @@ function PlanCard({
             <dt className="text-(--cq-text-tertiary)">{t("Next")}</dt>
             <dd className="text-(--cq-text-secondary)">{t(action.next)}</dd>
             <dt className="text-(--cq-text-tertiary)">{t("Done when")}</dt>
-            <dd className="text-(--cq-text-secondary)">
-              {t(action.doneWhen)}
-            </dd>
+            <dd className="text-(--cq-text-secondary)">{t(action.doneWhen)}</dd>
           </dl>
         </details>
       )}
@@ -188,7 +186,12 @@ export function ActionPlanBoard({
   const [ticked, setTicked] = useState<Readonly<Record<string, boolean>>>({});
   const actions = readiness.actions.map((action) =>
     action.key in ticked && action.state !== "DONE_BY_EVIDENCE"
-      ? { ...action, state: ticked[action.key] ? ("MARKED_DONE" as const) : ("OPEN" as const) }
+      ? {
+          ...action,
+          state: ticked[action.key]
+            ? ("MARKED_DONE" as const)
+            : ("OPEN" as const),
+        }
       : action,
   );
   const byColumn = (column: Column) =>

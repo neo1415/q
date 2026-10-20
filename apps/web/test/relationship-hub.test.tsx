@@ -38,10 +38,22 @@ const mocks = vi.hoisted(() => ({
   reminders: vi.fn(),
   commitments: vi.fn(),
   steps: vi.fn(),
+  remind: vi.fn(),
+  read: vi.fn(),
+  dismiss: vi.fn(),
+  state: vi.fn(),
+}));
+vi.mock("@/features/schedule/schedule-actions", () => ({
+  createReminderAction: mocks.remind,
+  markNoticesReadAction: mocks.read,
+  dismissReminderAction: mocks.dismiss,
+}));
+vi.mock("@/features/relationships/commitment-actions", () => ({
+  stateCommitmentAction: mocks.state,
 }));
 vi.mock("next/navigation", async (load) => ({
   ...(await load<typeof import("next/navigation")>()),
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 vi.mock("@/features/q/context", () => ({
   resolveOwnContext: mocks.context,
@@ -93,6 +105,11 @@ beforeEach(() => {
   mocks.notices.mockResolvedValue({ items: [] });
   mocks.reminders.mockResolvedValue({ items: [] });
   mocks.steps.mockResolvedValue([]);
+  mocks.remind.mockResolvedValue({ ok: true, value: {} });
+  mocks.read.mockResolvedValue({ ok: true, value: null });
+  mocks.dismiss.mockResolvedValue({ ok: true, value: null });
+  mocks.state.mockResolvedValue({ ok: true, value: {} });
+  window.localStorage.clear();
 });
 
 /**
@@ -122,9 +139,12 @@ async function overview() {
   );
 }
 
-/** Needs you starts folded (owner 2026-10-16); open it to read its rows. */
+/**
+ * Needs you is open from the start now (design 2026-10-20, "Morning
+ * brief"); the old fold is gone, so there is nothing to open.
+ */
 function openNeedsYou() {
-  fireEvent.click(screen.getByRole("button", { name: /^Needs you/u }));
+  expect(screen.queryByRole("button", { name: /^Needs you/u })).toBeNull();
 }
 
 describe("Hub foundation", () => {
@@ -486,6 +506,183 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
     fireEvent.click(within(queue).getByRole("button", { name: "See all 7" }));
     expect(within(queue).getAllByRole("listitem")).toHaveLength(7);
   });
+
+  it("gives the first card the accent edge and the one primary action, and counts down", async () => {
+    mocks.relationships.mockResolvedValue([relationship]);
+    mocks.notices.mockResolvedValue({ items: [notice(1)] });
+    await overview();
+    const queue = screen.getByRole("region", { name: /Needs you/u });
+    expect(within(queue).getByRole("heading").textContent).toBe(
+      "1 thing needs you",
+    );
+    const first = queue.querySelector(
+      '[data-needs-you-card][data-first="true"]',
+    );
+    expect(first).not.toBeNull();
+    expect(
+      within(first as HTMLElement)
+        .getByRole("link", { name: "Reply" })
+        .getAttribute("class"),
+    ).toContain("bg-(--cq-accent)");
+    expect(
+      within(queue).getByRole("img", { name: "0 of 1 done" }),
+    ).toBeDefined();
+  });
+
+  it("moves a card to tomorrow morning as a marked reminder with Later", async () => {
+    mocks.relationships.mockResolvedValue([relationship]);
+    mocks.notices.mockResolvedValue({ items: [notice(1)] });
+    await overview();
+    const queue = screen.getByRole("region", { name: /Needs you/u });
+    await act(async () => {
+      fireEvent.click(within(queue).getByRole("button", { name: "Later" }));
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    const input = mocks.remind.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input["relationshipId"]).toBe(relationship.relationshipId);
+    expect(String(input["note"])).toBe(
+      `Later from Needs you · Reply · /relationships/company/${companyId}/messages`,
+    );
+    const due = new Date(String(input["dueAt"]));
+    expect(due.getTime()).toBeGreaterThan(Date.now());
+    expect(due.getHours()).toBe(9);
+    // The notices it stood for are read; the card has left.
+    expect(mocks.read).toHaveBeenCalledWith([notice(1).id]);
+    expect(within(queue).getByRole("heading").textContent).toBe(
+      "Nothing needs you right now",
+    );
+    expect(
+      within(queue).getByRole("img", { name: "1 of 1 done" }),
+    ).toBeDefined();
+  });
+
+  it("asks to record an invested amount that is not recorded, in place", async () => {
+    const held = {
+      relationshipId: "d0000000-0000-4000-8000-000000000201",
+      counterpart: {
+        kind: "COMPANY" as const,
+        id: "c0000000-0000-4000-8000-000000000201",
+        name: "Northbeam",
+      },
+      state: "INVESTED" as const,
+      stateSince: "2026-10-13T10:00:00.000Z",
+      nextStep: "NONE" as const,
+    };
+    mocks.relationships.mockResolvedValue([held]);
+    mocks.commitments.mockResolvedValue({
+      current: null,
+      history: [],
+      detected: [],
+      connected: true,
+    });
+    await overview();
+    const queue = screen.getByRole("region", { name: /Needs you/u });
+    expect(queue.textContent).toContain(
+      "Record what you invested in Northbeam",
+    );
+    // The portfolio says the amount is not recorded, never zero.
+    const section = screen.getByRole("region", { name: /Portfolio/u });
+    expect(section.textContent).toContain("Amount not recorded");
+    expect(section.textContent).toContain(
+      "One amount is not recorded, so the total is incomplete.",
+    );
+    fireEvent.click(
+      within(queue).getByRole("button", { name: "Record amount" }),
+    );
+    const sheet = screen.getByRole("dialog", {
+      name: "Record what you invested",
+    });
+    fireEvent.change(within(sheet).getByRole("textbox", { name: "Amount" }), {
+      target: { value: "150000" },
+    });
+    // The approval names the exact amount it records.
+    await act(async () => {
+      fireEvent.click(
+        within(sheet).getByRole("button", { name: "Record USD 150,000" }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(mocks.state).toHaveBeenCalledWith(
+      held.relationshipId,
+      { amount: "150000", currencyCode: "USD", level: "INVESTED" },
+      expect.stringMatching(/^web-commit-/u),
+    );
+  });
+
+  it("keeps a step that was put off out of the queue until it is due", async () => {
+    const { nextStepFor } =
+      await import("@/features/relationships/relationships-view");
+    const decide = { ...relationship, nextStep: "DECIDE_NEXT_STEP" as const };
+    const now = Date.now();
+    mocks.relationships.mockResolvedValue([decide]);
+    mocks.steps.mockResolvedValue([
+      {
+        item: decide,
+        step: nextStepFor(decide, undefined, "INVESTOR", now, "/r/a"),
+        at: decide.stateSince,
+      },
+    ]);
+    mocks.reminders.mockResolvedValue({
+      items: [
+        {
+          id: "f0000000-0000-4000-8000-000000000001",
+          relationshipId: decide.relationshipId,
+          meetingId: null,
+          title: "Kivu: After your call",
+          note: "Later from Needs you",
+          dueAt: new Date(now + 86_400_000).toISOString(),
+          channel: "IN_APP",
+          status: "PENDING",
+        },
+      ],
+    });
+    await overview();
+    expect(screen.getByText(/Nothing needs you right now\./u)).toBeDefined();
+  });
+});
+
+describe("the period report (design 2026-10-20)", () => {
+  beforeEach(() => {
+    mocks.results.mockResolvedValue({
+      side: "INVESTOR",
+      organisationName: "Fund",
+      pipelineFit: [],
+    });
+  });
+
+  it("switches between 30 days, 90 days and this year by address", async () => {
+    await overview();
+    const period = screen.getByRole("region", { name: "Last 30 days" });
+    const group = within(period).getByRole("group", { name: "Period" });
+    expect(
+      within(group)
+        .getByRole("link", { name: "30 days" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(
+      within(group).getByRole("link", { name: "90 days" }).getAttribute("href"),
+    ).toBe("/relationships?view=overview&range=90d");
+    expect(
+      within(group)
+        .getByRole("link", { name: "This year" })
+        .getAttribute("href"),
+    ).toBe(
+      `/relationships?view=overview&from=${String(new Date().getUTCFullYear())}-01-01`,
+    );
+    cleanup();
+    await show(
+      await RelationshipsPage({
+        searchParams: Promise.resolve({
+          view: "overview",
+          from: `${String(new Date().getUTCFullYear())}-01-01`,
+        }),
+      }),
+    );
+    expect(screen.getByRole("region", { name: "This year" })).toBeDefined();
+    expect(mocks.results).toHaveBeenLastCalledWith(expect.anything(), {
+      from: `${String(new Date().getUTCFullYear())}-01-01`,
+    });
+  });
 });
 
 describe("S2: the Pipeline is the one record list", () => {
@@ -605,9 +802,14 @@ describe("S4: the investor's portfolio on the Overview", () => {
       expect.stringContaining("Portfolio 2"),
       expect.stringContaining("Portfolio 1"),
     ]);
-    expect(rows[1]?.textContent).toContain("USD 250,000 · received");
+    expect(rows[1]?.textContent).toContain("USD 250,000");
+    // Received money needs no status words beside it.
+    expect(rows[1]?.textContent).not.toContain("received");
     // Unknown stays unknown: a failed read is said, never zero.
-    expect(rows[0]?.textContent).toContain("Commitment couldn't be read");
+    expect(rows[0]?.textContent).toContain("Amount couldn't be read");
+    expect(section.textContent).toContain(
+      "Known total: USD 250,000. Some amounts aren't read here, so the total is incomplete.",
+    );
     expect(rows[0]?.getAttribute("href")).toBe(
       "/relationships/company/c0000000-0000-4000-8000-000000000102",
     );
