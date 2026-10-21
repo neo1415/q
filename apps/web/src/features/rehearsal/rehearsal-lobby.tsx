@@ -92,11 +92,14 @@ export function RehearsalLobby({
   counterpartId,
   meetingId,
   requestedVideo = false,
+  initialDifficulty = "REALISTIC",
 }: {
   readonly kind: RehearsalCounterpartKind;
   readonly counterpartId: string;
   readonly meetingId?: string | undefined;
   readonly requestedVideo?: boolean;
+  /** Chosen on the Rehearsals page's sheet; still changeable here. */
+  readonly initialDifficulty?: RehearsalDifficulty;
 }) {
   const t = useT();
   const router = useRouter();
@@ -107,7 +110,7 @@ export function RehearsalLobby({
   // Off by default: Q sees them only when they say so (founder ask 2026-10-01).
   const [seeYou, setSeeYou] = useState(false);
   const [difficulty, setDifficulty] =
-    useState<RehearsalDifficulty>("REALISTIC");
+    useState<RehearsalDifficulty>(initialDifficulty);
   const [rehearsal, setRehearsal] = useState<QRehearsalDto | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [entitlement, setEntitlement] =

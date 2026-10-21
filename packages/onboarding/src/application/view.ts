@@ -305,6 +305,28 @@ const QUESTION_RANK: Readonly<
 };
 
 /**
+ * The step Q's last turn asked, when the screen should show it instead of
+ * the cursor's (owner 2026-10-21: Q asked the stage and no options showed).
+ * Only another step on their eligible path that is not yet answered.
+ */
+export function openAskedStep(
+  aggregate: Pick<OnboardingSessionAggregate, "session" | "path" | "states">,
+  askedStepKey: string | undefined,
+): OnboardingStepDefinition | undefined {
+  if (
+    askedStepKey === undefined ||
+    askedStepKey === aggregate.session.currentStepKey
+  ) {
+    return undefined;
+  }
+  const asked = aggregate.path.eligible.find(
+    (step) => step.stepKey === askedStepKey,
+  );
+  const status = asked && aggregate.states.get(asked.stepKey)?.status;
+  return status === "COMPLETED" || status === "SKIPPED" ? undefined : asked;
+}
+
+/**
  * The questions a client should still show: on the eligible path, and not
  * overtaken by an answer given to the mapped step after the question was
  * asked. The second condition is belt and braces for the explicit ANSWERED

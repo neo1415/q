@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import {
-  listCompanyRelationships,
+  discoverInvestors,
   listIncomingInterest,
+  type ApiSession,
 } from "@capital-q/api-client";
-import type { RelationshipStateV2 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
 
@@ -13,7 +13,22 @@ import {
   PageContainer,
   PageHeader,
 } from "@/components/app-shell/page-container";
-import { IncomingInterest } from "@/features/network/incoming-interest";
+import { deploymentLabel } from "@/features/investors/investor-labels";
+import {
+  gateFor,
+  investorCards,
+  investorGates,
+  investorProfiles,
+} from "@/features/investors/investor-reads";
+import {
+  dimensionMatches,
+  looksForSentence,
+  publishedMandate,
+} from "@/features/investors/published-focus";
+import {
+  InterestCards,
+  type InterestFacts,
+} from "@/features/network/interest-cards";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
@@ -97,50 +112,94 @@ export default async function InvestorInterestPage() {
     );
   }
 
-  const [incoming, relationships] = await Promise.all([
-    listIncomingInterest(session, context.companyId).catch(() => null),
-    // Where each pair stands now: an accepted interest is history, and the
-    // relationship may have moved on (demo audit 2026-10-03: "Connected"
-    // beside a pair in diligence).
-    listCompanyRelationships(session, context.companyId).catch(() => null),
-  ]);
-  const now = new Map<string, RelationshipStateV2>(
-    (relationships?.items ?? [])
-      .filter((item) => item.counterpart.kind === "INVESTOR_ORGANISATION")
-      .map((item) => [item.counterpart.id, item.state]),
+  const incoming = await listIncomingInterest(session, context.companyId).catch(
+    () => null,
+  );
+  const facts = await interestFacts(
+    session,
+    (incoming?.items ?? []).map((item) => item.investorOrganisationId),
   );
   return (
     <PageContainer>
-      <QSection
-        id="interest"
-        kind="INTEREST_LIST"
-        refs={(incoming?.items ?? []).slice(0, 12).map((item) => ({
-          kind: "INVESTOR_ORGANISATION" as const,
-          id: item.investorOrganisationId,
-        }))}
-        total={incoming?.items.length ?? 0}
-        label={t("investor interest")}
-      >
-        {header}
-        {incoming === null ? (
-          <EmptyState
-            title={t("Investor interest couldn't load.")}
-            description={t(
-              "Nothing is wrong with your company. Capital Q didn't answer just now; try again in a moment.",
-            )}
-            action={
-              <Link
-                href="/company/interest"
-                className={buttonClassName("secondary")}
-              >
-                {t("Try again")}
-              </Link>
-            }
-          />
-        ) : (
-          <IncomingInterest items={incoming.items} currentStates={now} />
-        )}
-      </QSection>
+      <div className="max-w-[820px]">
+        <QSection
+          id="interest"
+          kind="INTEREST_LIST"
+          refs={(incoming?.items ?? []).slice(0, 12).map((item) => ({
+            kind: "INVESTOR_ORGANISATION" as const,
+            id: item.investorOrganisationId,
+          }))}
+          total={incoming?.items.length ?? 0}
+          label={t("investor interest")}
+        >
+          {/* The chosen design (interest, option 1): the title, then its
+            two tabs, then the cards; no line under the title. */}
+          <h1 className="cq-title-xl mb-2.5 text-(--cq-text-primary)">
+            {t("Investor interest")}
+          </h1>
+          {incoming === null ? (
+            <EmptyState
+              title={t("Investor interest couldn't load.")}
+              description={t(
+                "Nothing is wrong with your company. Capital Q didn't answer just now; try again in a moment.",
+              )}
+              action={
+                <Link
+                  href="/company/interest"
+                  className={buttonClassName("secondary")}
+                >
+                  {t("Try again")}
+                </Link>
+              }
+            />
+          ) : (
+            <InterestCards items={incoming.items} facts={facts} />
+          )}
+        </QSection>
+      </div>
     </PageContainer>
+  );
+}
+
+/**
+ * What each interested investor publishes, read as this founder may see
+ * it: their declared deployment, what their Q Card says they look for, and
+ * stage, sector and geography against their published gate and Discover's
+ * public-profile reasons. An investor the founder may not see in Discover
+ * answers nothing here: the card then says "not known yet".
+ */
+async function interestFacts(
+  session: ApiSession,
+  ids: readonly string[],
+): Promise<ReadonlyMap<string, InterestFacts>> {
+  if (ids.length === 0) return new Map();
+  const [profiles, cards, gates, slate] = await Promise.all([
+    investorProfiles(session, ids),
+    investorCards(session, ids),
+    investorGates(session, ids),
+    discoverInvestors(session).catch(() => null),
+  ]);
+  const reasons = new Map(
+    (slate?.items ?? []).map((item) => [
+      item.investorOrganisationId.toLowerCase(),
+      item.reasons,
+    ]),
+  );
+  return new Map(
+    ids.map((id) => {
+      const profile = profiles.get(id) ?? null;
+      return [
+        id,
+        {
+          deployment:
+            profile === null ? null : deploymentLabel(profile.deploymentState),
+          looksFor: looksForSentence(publishedMandate(cards.get(id) ?? null)),
+          matches: dimensionMatches(
+            gateFor(gates, id),
+            reasons.get(id.toLowerCase()) ?? [],
+          ),
+        },
+      ];
+    }),
   );
 }

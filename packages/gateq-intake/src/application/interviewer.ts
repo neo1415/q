@@ -42,8 +42,10 @@ import {
   type QuestionNeed,
 } from "./question-needs.js";
 import { questionAngle } from "./answer-specificity.js";
-import { notRecordedLine, type NotRecorded } from "./not-recorded.js";
-import { amountStatedIn } from "./stated-amount.js";
+import { regionIn } from "./cities.js";
+import { normaliseProposedFact } from "./normalise-fact.js";
+import { readBackLine, readBacksIn, type NotRecorded } from "./not-recorded.js";
+import { affirmsReadBack, amountStatedIn } from "./stated-amount.js";
 
 /**
  * Q interviewing a GateQ applicant (CQ-GATE-002 §4, §5, §36, §39).
@@ -59,8 +61,10 @@ import { amountStatedIn } from "./stated-amount.js";
  *
  *   - Every proposed fact is parsed against the closed intake contract. A
  *     dimension nobody defined, a value of the wrong shape, a provenance
- *     that is not one of the four: dropped, with a count logged. Invalid
- *     model output never becomes database state.
+ *     that is not one of the four: dropped, with a count logged. A value
+ *     the person stated in another shape ("Nigeria", "Series A", "$2m") is
+ *     put into its dimension's canonical shape and saved; one that holds
+ *     nothing of that shape never becomes database state.
  *   - Nothing the model says about qualification is read at all. There is
  *     no field for it in the result schema, and the caller gets GATE-001's
  *     answer instead.
@@ -76,6 +80,57 @@ import { amountStatedIn } from "./stated-amount.js";
  */
 
 export type InterviewChannel = "voice" | "text";
+
+/**
+ * The reply around a read-back: without its closing question (the read-back
+ * is the question now) and without any sentence already stating a figure
+ * being read back, so Q says it once.
+ */
+function aroundReadBack(reply: string, amounts: readonly string[]): string {
+  const trimmed = reply.trim();
+  const sentences = trimmed.match(/[^.!?]+[.!?]*/gu) ?? [trimmed];
+  const kept = sentences.filter(
+    (sentence, index) =>
+      !(index === sentences.length - 1 && sentence.trim().endsWith("?")) &&
+      !amounts.some((amount) => amountStatedIn(amount, sentence)),
+  );
+  return kept.join("").trim();
+}
+
+/**
+ * A contact detail already held: the same address in any case, or a name
+ * whose every word is already in the name on record ("Laura" for "Laura
+ * Mensah"). A different one is a change, recorded with history kept.
+ */
+function sameContact(
+  proposed: NewApplicationFact,
+  onRecord: ApplicationFact | undefined,
+): boolean {
+  if (
+    onRecord === undefined ||
+    proposed.value.kind !== "TEXT" ||
+    onRecord.value.kind !== "TEXT"
+  ) {
+    return false;
+  }
+  const words = (text: string) =>
+    text
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}@._+-]+/u)
+      .filter((word) => word.length > 0);
+  if (proposed.dimension === "contact.email") {
+    return (
+      proposed.value.text.trim().toLowerCase() ===
+      onRecord.value.text.trim().toLowerCase()
+    );
+  }
+  if (proposed.dimension === "contact.name") {
+    const held = new Set(words(onRecord.value.text));
+    const said = words(proposed.value.text);
+    return said.length > 0 && said.every((word) => held.has(word));
+  }
+  return false;
+}
 
 /**
  * One live turn's budget. A public endpoint is somebody else's spending
@@ -402,6 +457,15 @@ export function interviewLanguageOf(
   return read === null || isEnglish(read) ? null : read;
 }
 
+/**
+ * Owner 2026-10-21: confirm like a person, never lecture. A figure Q works
+ * out is said back for a yes, and a region is asked down to a country, in
+ * whatever language the conversation is in. Code holds a worked-out figure
+ * either way; this is how Q words the question outside English.
+ */
+const CONFIRM_NOTE =
+  'If a figure is one you worked out (a sum, product or total of what they said) rather than one they said, do not propose it as their fact: end your reply by checking it in one short question, such as "So that\'s USD 360,000 in revenue, right?". Their yes makes it theirs. If they give a region rather than a country for where the company is, ask which country in it.';
+
 function interviewLanguageNote(
   input: Pick<InterviewTurnInput, "locale" | "utterance" | "recentTurns">,
 ): string {
@@ -524,7 +588,7 @@ export function createGateQInterviewer(
         charter: "Q_SYSTEM_VOICE",
         operatingMode: "ASSESSMENT",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
-        environmentNotes: `You cannot record, decide or send anything yourself; Capital Q validates what you read and its own rules decide whether an application qualifies.${interviewLanguageNote(input)}`,
+        environmentNotes: `You cannot record, decide or send anything yourself; Capital Q validates what you read and its own rules decide whether an application qualifies. ${CONFIRM_NOTE}${interviewLanguageNote(input)}`,
         variables,
       });
 
@@ -584,86 +648,147 @@ export function createGateQInterviewer(
       // to talk Q into something -- is the signal worth seeing in a log,
       // and a diagnostic that reports zero there is a diagnostic lying.
       let rejected = discardedByIntent ? result.facts.length : 0;
-      // Never silently (G4): each refusal the applicant could put right is
-      // named in the reply. Unknown dimensions are the model's own error,
-      // not something they said, and stay counted only.
+      // Every answer they state is saved (owner principle 2026-10-21): a
+      // value in the wrong shape is put into its dimension's shape, and a
+      // contact detail they change is recorded over the old one, whose
+      // history the store keeps. The one refusal left is the truth guard:
+      // an amount they never said. Unknown dimensions are the model's own
+      // error, not something they said, and stay counted only.
       const notRecorded: NotRecorded[] = [];
+      /** A region given for the country: asked down to a country. */
+      let narrowTo: string | null = null;
+      const held = (dimension: ApplicationDimension) =>
+        input.application?.facts.find(
+          (fact) =>
+            fact.dimension === dimension &&
+            fact.supersededAt === null &&
+            fact.value.kind !== "NONE",
+        );
+      const currencyHeld = held("raise.currency")?.value;
+      // Q's last line: a figure it read back there is theirs once they agree.
+      const lastQ = [...input.recentTurns]
+        .reverse()
+        .find((turn) => turn.role === "q")?.text;
       for (const candidate of proposed) {
         if (!DIMENSIONS.has(candidate.dimension)) {
           rejected += 1;
           continue;
         }
         const dimension = candidate.dimension as ApplicationDimension;
-        const parsed = NewApplicationFactSchema.safeParse({
-          dimension: candidate.dimension,
-          value: candidate.value,
-          provenance: candidate.provenance,
-        });
-        if (!parsed.success) {
+        const normalised = normaliseProposedFact(
+          {
+            dimension,
+            value: candidate.value,
+            provenance: candidate.provenance,
+          },
+          {
+            utterance: input.utterance,
+            currencyOnRecord:
+              currencyHeld?.kind === "CODE" ? currencyHeld.code : null,
+          },
+        );
+        if (
+          normalised === null &&
+          dimension === "company.country" &&
+          candidate.value.kind !== "NONE"
+        ) {
+          // A region, not a country ("somewhere in Europe"): Q asks which
+          // country in it, by name, as the turn's question.
+          const region = regionIn(
+            candidate.value.kind === "TEXT"
+              ? candidate.value.text
+              : candidate.value.kind === "CODE"
+                ? candidate.value.code
+                : candidate.value.kind === "PHRASES"
+                  ? candidate.value.phrases.join(", ")
+                  : "",
+          );
+          if (region !== null) narrowTo = region;
+        }
+        if (normalised === null) {
+          // Words with nothing of the shape in them ("somewhere in
+          // Europe" for a country): their sentence stays on the transcript
+          // and the dimension stays open, so Q asks it. Counted, and never
+          // said as a failure.
           rejected += 1;
-          // Only when nothing usable is on the record for it already: a
-          // refused rewrite of a kept value loses nothing they said.
-          if (
-            input.application?.facts.some(
-              (fact) =>
-                fact.dimension === dimension &&
-                fact.supersededAt === null &&
-                fact.value.kind !== "NONE",
-            ) !== true
-          ) {
-            notRecorded.push({ dimension, reason: "UNREADABLE" });
-          }
           continue;
         }
-        // An amount must be one the person said, not one Q worked out
-        // ("two pay $180,000 each" is not "revenue 360000"). Their own
-        // sentence is kept by the phrases it came in; the computed figure
-        // is never recorded as their claim.
+        // An amount must be one the person said, or agreed to when Q said
+        // it back. One Q worked out ("two pay $180,000 each" read as revenue
+        // 360000) is not recorded as their claim yet: Q says it back as a
+        // question and their yes records it next turn.
         if (
-          parsed.data.value.kind === "AMOUNT" &&
-          !amountStatedIn(parsed.data.value.amount, input.utterance)
+          normalised.value.kind === "AMOUNT" &&
+          !amountStatedIn(normalised.value.amount, input.utterance) &&
+          !affirmsReadBack(normalised.value.amount, lastQ, input.utterance)
         ) {
           rejected += 1;
-          notRecorded.push({ dimension, reason: "AMOUNT_NOT_STATED" });
+          notRecorded.push({
+            dimension,
+            reason: "AMOUNT_READ_BACK",
+            amount: normalised.value.amount,
+            currency: normalised.value.currency,
+          });
           continue;
         }
-        // Contact details belong to the contact step the person confirmed:
-        // "I'm Laura" fills a missing name, it never replaces "Laura Mensah".
-        if (
-          (parsed.data.dimension === "contact.name" ||
-            parsed.data.dimension === "contact.email") &&
-          input.application?.facts.some(
-            (fact) =>
-              fact.dimension === parsed.data.dimension &&
-              fact.supersededAt === null &&
-              fact.value.kind !== "NONE",
-          ) === true
-        ) {
-          rejected += 1;
-          notRecorded.push({ dimension, reason: "CONTACT_CONFIRMED" });
-          continue;
-        }
+        // The same contact detail again ("I'm Laura" with "Laura Mensah"
+        // on record) is already held: nothing to write, nothing refused.
+        if (sameContact(normalised, held(dimension))) continue;
         const current = input.application?.facts.find(
           (fact) =>
-            fact.dimension === parsed.data.dimension &&
+            fact.dimension === normalised.dimension &&
             fact.supersededAt === null &&
             fact.provenance === "DOCUMENT_SUPPORTED" &&
-            JSON.stringify(fact.value) === JSON.stringify(parsed.data.value),
+            JSON.stringify(fact.value) === JSON.stringify(normalised.value),
         );
         // A model cannot mint evidence support. New document-derived values
         // need the authorized Evidence confirmation path and exact lineage.
         facts.push(
-          parsed.data.provenance === "DOCUMENT_SUPPORTED" &&
+          normalised.provenance === "DOCUMENT_SUPPORTED" &&
             current === undefined
-            ? { ...parsed.data, provenance: "APPLICANT_PROVIDED" }
-            : parsed.data,
+            ? { ...normalised, provenance: "APPLICANT_PROVIDED" }
+            : normalised,
         );
       }
 
+      // Their yes to the figures Q read back records them, whether or not
+      // the model proposed them again (code reads Q's own read-back line).
+      if (result.intent !== "SABOTAGE") {
+        for (const back of readBacksIn(lastQ ?? "")) {
+          if (
+            facts.some((fact) => fact.dimension === back.dimension) ||
+            !affirmsReadBack(back.amount, lastQ, input.utterance)
+          ) {
+            continue;
+          }
+          const fact = NewApplicationFactSchema.safeParse({
+            dimension: back.dimension,
+            value: {
+              kind: "AMOUNT",
+              amount: back.amount,
+              currency: back.currency,
+            },
+            provenance: "APPLICANT_PROVIDED",
+          });
+          if (fact.success) facts.push(fact.data);
+        }
+      }
+
+      // A worked-out figure is asked about, so the read-back is this
+      // turn's question.
+      const english = interviewLanguageOf(input) === null;
+      const readBack = english
+        ? readBackLine(notRecorded) ||
+          (narrowTo === null
+            ? ""
+            : `Which country in ${narrowTo} is the company based in?`)
+        : "";
       const asking =
-        result.asking !== null && DIMENSIONS.has(result.asking)
-          ? (result.asking as ApplicationDimension)
-          : null;
+        readBack.length > 0
+          ? (notRecorded[0]?.dimension ?? "company.country")
+          : result.asking !== null && DIMENSIONS.has(result.asking)
+            ? (result.asking as ApplicationDimension)
+            : null;
 
       logger?.debug(
         {
@@ -676,16 +801,19 @@ export function createGateQInterviewer(
         "gateq interview turn",
       );
 
-      // A refused item the reply may have acknowledged is said plainly in
-      // English; another language keeps the model's words, and the refused
-      // items show as still needed in the coverage panel.
-      const correction =
-        interviewLanguageOf(input) === null ? notRecordedLine(notRecorded) : "";
+      // The read-back replaces the reply's own closing question, so the
+      // applicant is asked one thing. In another language the model's words
+      // stand and the figure shows as still needed in coverage.
       return {
         reply:
-          correction.length === 0
+          readBack.length === 0
             ? result.reply
-            : `${result.reply} ${correction}`.slice(0, 4_000),
+            : `${aroundReadBack(
+                result.reply,
+                notRecorded.map((item) => item.amount),
+              )} ${readBack}`
+                .trim()
+                .slice(0, 4_000),
         intent: result.intent,
         facts,
         rejectedFacts: rejected,

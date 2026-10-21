@@ -6,6 +6,7 @@ import type {
   QPublicFailure,
   QPublicFinding,
   QRunStatus,
+  QStageAbout,
   QStreamEvent,
   QVisibleStage,
 } from "@capital-q/contracts";
@@ -31,12 +32,26 @@ export type QStreamApprovalState = {
   readonly expiresAt: string | undefined;
 };
 
+export type QStageStep = {
+  readonly sequence: number;
+  readonly stage: QVisibleStage;
+  /** Round 4: what the run said the stage is about, when it said. */
+  readonly about?: QStageAbout | undefined;
+};
+
 export type QStreamState = {
   readonly runId: string | null;
   readonly capability: QCapability | null;
   /** The last durable status the stream reported; null until run.started. */
   readonly runStatus: QRunStatus | null;
   readonly stage: QVisibleStage | null;
+  /**
+   * Every stage this run has reported, by its sequence, oldest first: the
+   * run's real path, for a step list of where Q has been (owner 2026-10-21:
+   * stages shown as they happen, never a timer). Keyed by sequence, so a
+   * replay after a reconnect upserts and never adds a step twice.
+   */
+  readonly stageHistory: readonly QStageStep[];
   /** Durable messages by id, in arrival order. */
   readonly messages: readonly QMessage[];
   /** Live text for a message that has not completed yet. */
@@ -67,6 +82,7 @@ export function createQStreamState(): QStreamState {
     capability: null,
     runStatus: null,
     stage: null,
+    stageHistory: [],
     messages: [],
     partial: null,
     preview: null,
@@ -138,8 +154,28 @@ export function reduceQStream(
         capability: event.data.capability,
         runStatus: event.data.status,
       };
-    case "q.stage.changed":
-      return { ...applySequence(state, event), runId, stage: event.data.stage };
+    case "q.stage.changed": {
+      const step: QStageStep = {
+        sequence: event.sequence,
+        stage: event.data.stage,
+        ...(event.data.about === undefined ? {} : { about: event.data.about }),
+      };
+      const stageHistory = [
+        ...state.stageHistory.filter((one) => one.sequence !== step.sequence),
+        step,
+      ]
+        .sort((a, b) => a.sequence - b.sequence)
+        .slice(-Q_STAGE_HISTORY_MAX);
+      // The current stage is the newest by sequence, not the last to
+      // arrive: a replayed older stage never moves Q backwards.
+      const newest = stageHistory.at(-1)?.stage ?? event.data.stage;
+      return {
+        ...applySequence(state, event),
+        runId,
+        stage: newest,
+        stageHistory,
+      };
+    }
     case "q.message.completed": {
       const message = event.data.message;
       return {
@@ -222,6 +258,31 @@ export function reduceQStream(
         terminal: true,
       };
   }
+}
+
+/** A run reports a handful of stages; this bounds a pathological one. */
+export const Q_STAGE_HISTORY_MAX = 24;
+
+/**
+ * The steps Q has actually taken this run, in order, for a step list: the
+ * run's stage history with a stage repeated back to back said once. The
+ * last one is where Q is now. Nothing here is inferred or timed.
+ */
+export function qStageSteps(
+  history: readonly QStageStep[],
+): readonly QVisibleStage[] {
+  const steps: QVisibleStage[] = [];
+  for (const { stage } of history) {
+    if (steps.at(-1) !== stage) steps.push(stage);
+  }
+  return steps;
+}
+
+/** Where Q is now: the newest step and what it is about; null before any. */
+export function qCurrentStage(
+  history: readonly QStageStep[],
+): QStageStep | null {
+  return history.at(-1) ?? null;
 }
 
 function applySequence(state: QStreamState, event: QStreamEvent): QStreamState {

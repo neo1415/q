@@ -11,9 +11,12 @@ export default async function CompanyRehearsalPage({
   searchParams,
 }: {
   readonly params: Promise<{ readonly companyId: string }>;
-  readonly searchParams: Promise<{ readonly meeting?: string }>;
+  readonly searchParams: Promise<{
+    readonly meeting?: string;
+    readonly difficulty?: string;
+  }>;
 }) {
-  const [{ companyId }, { meeting }] = await Promise.all([
+  const [{ companyId }, { meeting, difficulty }] = await Promise.all([
     params,
     searchParams,
   ]);
@@ -22,6 +25,7 @@ export default async function CompanyRehearsalPage({
       kind="COMPANY"
       counterpartId={companyId}
       meeting={meeting}
+      difficulty={difficulty}
     />
   );
 }

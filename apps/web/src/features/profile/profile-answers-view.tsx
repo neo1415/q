@@ -60,7 +60,7 @@ const REVISABLE: Readonly<Record<ProfileJourney, ReadonlySet<string>>> = {
 };
 
 /** The facts a card edits in place, or null when setup is where they change. */
-function editableOf(
+export function editableOf(
   journey: ProfileJourney,
   group: AnswerGroup,
   state: AnswersState,

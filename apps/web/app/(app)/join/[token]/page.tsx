@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { previewInvitation } from "@capital-q/api-client";
+import { getMyInvitations, previewInvitation } from "@capital-q/api-client";
 import { InvitationTokenSchema } from "@capital-q/contracts";
 
 import { getSessionUser } from "@/auth/session";
@@ -32,10 +32,25 @@ export default async function JoinPage({
     getSessionUser(),
     loadMyOrganisations(),
   ]);
-  const preview =
+  const [preview, mine] =
     !valid.success || session === null
+      ? [null, null]
+      : await Promise.all([
+          previewInvitation(session, valid.data).catch(() => null),
+          // Their own invitations (to their verified email): the same one
+          // there carries its id for Decline, and when it expires.
+          getMyInvitations(session)
+            .then((out) => out.items)
+            .catch(() => null),
+        ]);
+  const own =
+    preview === null || preview.state !== "PENDING"
       ? null
-      : await previewInvitation(session, valid.data).catch(() => null);
+      : (mine?.find(
+          (item) =>
+            item.organisationName === preview.organisationName &&
+            item.role === preview.role,
+        ) ?? null);
   const current =
     organisations.find((organisation) => organisation.active) ?? null;
   return (
@@ -49,6 +64,11 @@ export default async function JoinPage({
         token={valid.success ? valid.data : ""}
         preview={preview}
         signedInAs={user?.email ?? null}
+        invitation={
+          own === null
+            ? null
+            : { invitationId: own.invitationId, expiresAt: own.expiresAt }
+        }
         keeps={current === null ? null : current.name}
         alreadyIn={
           preview !== null &&

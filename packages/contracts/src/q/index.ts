@@ -358,6 +358,11 @@ export {
   Q_VISIBLE_STAGES,
   qVisibleStageLabel,
   QVisibleStageSchema,
+  Q_STAGE_SUBJECTS_MAX,
+  Q_STAGE_TASK_KINDS,
+  QStageAboutSchema,
+  type QStageAbout,
+  type QStageTaskKind,
   type QVisibleStage,
 } from "./stage.js";
 
@@ -941,7 +946,9 @@ export {
   QInterviewTurnResponseSchema,
   Q_INTERVIEW_STREAM_EVENTS,
   QInterviewSentenceSchema,
+  QInterviewStageSchema,
   type QInterviewSentence,
+  type QInterviewStage,
   type QInterviewTurnRequest,
   type QInterviewTurnResponse,
 } from "./interview.js";
@@ -965,14 +972,18 @@ export {
 } from "./profile-findings.js";
 
 export {
+  MEMORY_CORRECT_PATH,
   Q_MEMORY_FORGET_PATH,
   Q_MEMORY_KINDS,
   Q_MEMORY_LEARNING_PATH,
   Q_MEMORY_PATH,
+  QMemoryCorrectionDtoSchema,
+  QMemoryCorrectionRequestSchema,
   QMemoryItemDtoSchema,
   QMemoryListDtoSchema,
   QPreferenceLearningChoiceRequestSchema,
   QPreferenceLearningDtoSchema,
+  type QMemoryCorrectionRequest,
   type QMemoryItemDto,
   type QMemoryListDto,
   type QPreferenceLearningChoiceRequest,
@@ -1095,6 +1106,7 @@ export {
   QWorkListDtoSchema,
   QWorkSlotSchema,
   QWorkStepDtoSchema,
+  Q_WORK_STEP_ACTORS,
   Q_WORK_LANE_REPORT_PATH,
   qWorkLaneReportPath,
   QWorkReportDtoSchema,
@@ -1162,7 +1174,13 @@ export {
   type QWorkSuggestionKind,
   type QWorkSuggestionListDto,
 } from "./work-page.js";
-export { Q_USAGE_PATH, QUsageDtoSchema, type QUsageDto } from "./usage.js";
+export {
+  Q_USAGE_PATH,
+  QUsageDtoSchema,
+  QUsageQuerySchema,
+  type QUsageDto,
+  type QUsageQuery,
+} from "./usage.js";
 // end AUTO block
 
 // DAILY block (The Q Daily, docs/specs/2026-10/daily.md)
@@ -1244,11 +1262,14 @@ export {
   Q_ROOM_PREVIEW_MS,
   QRoomEntrySchema,
   QRoomPreviewSchema,
+  Q_ROOM_STAGES_MAX,
+  QRoomStagesSchema,
   QRoomReadQuerySchema,
   QRoomReadSchema,
   QRoomSourceSchema,
   type QRoomEntry,
   type QRoomPreview,
+  type QRoomStages,
   type QRoomRead,
   type QRoomReadQuery,
   type QRoomSource,

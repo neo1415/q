@@ -759,6 +759,42 @@ describe("levels", () => {
   });
 });
 
+describe("the owner's preview as an investor (ownroom-2, 2026-10-21)", () => {
+  it("is exactly the investor's own projection, opens excepted", async () => {
+    const { service } = world();
+    const own = await service.view(investorOne, COMPANY);
+    const preview = await service.preview(founder, COMPANY, {
+      relationshipId: R1,
+      connection: "CONNECTED",
+    });
+    if (own?.viewer !== "INVESTOR" || preview === null)
+      throw new Error("views");
+    const strip = (view: typeof own) =>
+      view.documents.map(({ openedAt: _opened, ...rest }) => rest);
+    expect(strip(preview)).toEqual(strip(own));
+    expect(preview.access).toBe(own.access);
+    // Never a private or shared-only title the investor would not see.
+    expect(titles(preview)).not.toContain(PRIVATE_DOC.title);
+    expect(titles(preview)).not.toContain(SHARED_ONLY_DOC.title);
+  });
+
+  it("locks the room as anyone not yet connected sees it", async () => {
+    const { service } = world({ outline: true });
+    const preview = await service.preview(founder, COMPANY, null);
+    expect(preview?.access).toBe("LOCKED");
+    expect(preview?.documents).toEqual([]);
+    expect(preview?.locked?.outline).toEqual([
+      { code: "corporate", label: "Company and incorporation", documents: 2 },
+    ]);
+  });
+
+  it("is the owner's alone", async () => {
+    const { service } = world();
+    expect(await service.preview(investorOne, COMPANY, null)).toBeNull();
+    expect(await service.preview(stranger, COMPANY, null)).toBeNull();
+  });
+});
+
 describe("access goes through the relationship (2026-10-08)", () => {
   const R2 = "00000000-0000-4000-8000-000000000502";
 

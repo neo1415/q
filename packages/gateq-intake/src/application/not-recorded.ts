@@ -1,62 +1,74 @@
 import type { ApplicationDimension } from "../contracts/index.js";
 
 import { DIMENSION_LABELS } from "./coverage.js";
+import { amountWords } from "./stated-amount.js";
 
 /**
- * Why a fact the interviewer read from the applicant's words was not kept
- * (onboarding speed 2026-10-20, G4). Q's reply is written before Capital Q
- * validates what it read, so without this the reply could acknowledge a
- * figure that was then refused, and the applicant never knew.
+ * A figure Q worked out rather than heard ("two pay $180,000 each" read as
+ * revenue 360,000). It is not recorded as the applicant's claim until they
+ * agree to it, so Q says it back as a question, the way a person would
+ * ("So that's USD 360,000 for revenue, right?"), and their yes records it
+ * (owner 2026-10-21: confirm it, don't lecture). Every other answer is put
+ * into its shape and saved without asking.
  */
-export type NotRecordedReason =
-  /** An amount they did not say themselves (worked out, not stated). */
-  | "AMOUNT_NOT_STATED"
-  /** Their confirmed contact details stay as confirmed. */
-  | "CONTACT_CONFIRMED"
-  /** A value that could not be kept in the shape this item takes. */
-  | "UNREADABLE";
+export type NotRecordedReason = "AMOUNT_READ_BACK";
 
 export type NotRecorded = {
   readonly dimension: ApplicationDimension;
   readonly reason: NotRecordedReason;
+  /** The worked-out figure, as an exact decimal, and its ISO currency. */
+  readonly amount: string;
+  readonly currency: string;
 };
 
-function joinLabels(labels: readonly string[]): string {
-  const lower = labels.map((label) => label.toLowerCase());
-  if (lower.length <= 1) return lower[0] ?? "";
-  return `${lower.slice(0, -1).join(", ")} and ${lower.at(-1) ?? ""}`;
-}
+/** The words that open Q's read-back; also how the next turn finds it. */
+const READ_BACK_LEAD = "So that's";
 
 /**
- * One plain line saying what was not recorded and why, asking again where
- * the applicant can put it right. Empty when everything read was kept.
+ * One short question saying the worked-out figures back for a yes. Empty
+ * when everything read was kept.
  */
-export function notRecordedLine(items: readonly NotRecorded[]): string {
-  const of = (reason: NotRecordedReason) => [
-    ...new Set(
-      items
-        .filter((item) => item.reason === reason)
-        .map((item) => DIMENSION_LABELS[item.dimension]),
-    ),
-  ];
-  const amounts = of("AMOUNT_NOT_STATED");
-  const unreadable = of("UNREADABLE");
-  const contact = of("CONTACT_CONFIRMED");
-  const lines: string[] = [];
-  if (amounts.length > 0) {
-    lines.push(
-      `I haven't recorded a figure for ${joinLabels(amounts)}: I only keep amounts you say yourself, not ones I work out. What is the figure?`,
+export function readBackLine(items: readonly NotRecorded[]): string {
+  const seen = new Set<ApplicationDimension>();
+  const parts: string[] = [];
+  for (const item of items) {
+    if (seen.has(item.dimension)) continue;
+    seen.add(item.dimension);
+    parts.push(
+      `${amountWords(item.amount, item.currency)} for ${DIMENSION_LABELS[item.dimension].toLowerCase()}`,
     );
   }
-  if (unreadable.length > 0) {
-    lines.push(
-      `I couldn't record what you said about ${joinLabels(unreadable)}. Could you put it another way?`,
-    );
+  if (parts.length === 0) return "";
+  const listed =
+    parts.length === 1
+      ? (parts[0] ?? "")
+      : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1) ?? ""}`;
+  return `${READ_BACK_LEAD} ${listed}, right?`;
+}
+
+const DIMENSION_BY_LABEL = new Map(
+  (Object.entries(DIMENSION_LABELS) as [ApplicationDimension, string][]).map(
+    ([dimension, label]) => [label.toLowerCase(), dimension],
+  ),
+);
+
+/** The figures a read-back line of Q's put to the applicant, if any. */
+export function readBacksIn(qText: string): readonly NotRecorded[] {
+  const at = qText.lastIndexOf(READ_BACK_LEAD);
+  if (at < 0) return [];
+  const line = qText.slice(at + READ_BACK_LEAD.length);
+  const found: NotRecorded[] = [];
+  for (const match of line.matchAll(
+    /([A-Z]{3}) (\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?) for ([a-z ]+?)(?=,| and |$)/gu,
+  )) {
+    const dimension = DIMENSION_BY_LABEL.get((match[3] ?? "").trim());
+    if (dimension === undefined || match[1] === undefined) continue;
+    found.push({
+      dimension,
+      reason: "AMOUNT_READ_BACK",
+      amount: (match[2] ?? "").replace(/,/gu, ""),
+      currency: match[1],
+    });
   }
-  if (contact.length > 0) {
-    lines.push(
-      `Your ${joinLabels(contact)} ${contact.length === 1 ? "stays" : "stay"} as you confirmed on the contact step.`,
-    );
-  }
-  return lines.join(" ");
+  return found;
 }

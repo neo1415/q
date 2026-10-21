@@ -18,7 +18,11 @@ import {
   factSummary,
   INVESTMENT_DIMENSIONS,
 } from "./coverage.js";
-import { amountOfSummary, amountStatedIn } from "./stated-amount.js";
+import {
+  affirmsReadBack,
+  amountOfSummary,
+  amountStatedIn,
+} from "./stated-amount.js";
 
 /**
  * The investor-ready GateQ dossier, built in the submission transaction
@@ -250,9 +254,20 @@ export function withDerivedAmountsMarked<
         if (fact.sourceTurnSeq === null || fact.truthClass === "Q_INFERENCE")
           return fact;
         const value = amountOfSummary(fact.summary);
-        const words = said.get(fact.sourceTurnSeq);
+        const seq = fact.sourceTurnSeq;
+        const words = said.get(seq);
         if (value === null || words === undefined) return fact;
         if (amountStatedIn(value.amount, words)) return fact;
+        // Agreed to when Q read it back ("So that's USD 360,000 for
+        // revenue, right?" "Yes."): their claim, not Q's inference.
+        const readBack = turns
+          .filter((turn) => turn.role !== "PERSON" && turn.seq < seq)
+          .reduce<(typeof turns)[number] | undefined>(
+            (last, turn) =>
+              last === undefined || turn.seq > last.seq ? turn : last,
+            undefined,
+          )?.text;
+        if (affirmsReadBack(value.amount, readBack, words)) return fact;
         const quote = words.length > 400 ? `${words.slice(0, 399)}…` : words;
         return {
           ...fact,

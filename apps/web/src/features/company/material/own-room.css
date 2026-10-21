@@ -1,0 +1,344 @@
+/*
+ * The founder's own data room, "See it as an investor would" (design
+ * ownroom-2, 2026-10-21). Warm charcoal by the .cq-charcoal token scope.
+ * Tokens only; every access level is a word with its icon.
+ */
+@layer components {
+  .cq-ownroom {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+  .cq-ownroom-bar {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .cq-ownroom-bar:empty {
+    display: none;
+  }
+  .cq-ownroom-lens2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+  }
+  @media (min-width: 1024px) {
+    .cq-ownroom-lens2 {
+      grid-template-columns: minmax(0, 1fr) 360px;
+    }
+  }
+  .cq-ownroom-fold {
+    background: var(--cq-surface-raised);
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-lg);
+  }
+  .cq-ownroom-fold + .cq-ownroom-fold {
+    margin-top: 10px;
+  }
+  .cq-ownroom-fh {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--cq-border-subtle);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--cq-text-primary);
+  }
+  .cq-ownroom-count {
+    margin-inline-start: auto;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--cq-text-tertiary);
+  }
+  .cq-ownroom-drow {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    min-height: 60px;
+    padding: 10px 16px;
+    color: var(--cq-text-secondary);
+  }
+  .cq-ownroom-drow + .cq-ownroom-drow {
+    border-top: 1px solid var(--cq-border-subtle);
+  }
+  .cq-ownroom-drow b {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--cq-text-primary);
+  }
+  .cq-ownroom-meta {
+    font-size: 12.5px;
+    color: var(--cq-text-tertiary);
+  }
+  @media (max-width: 639px) {
+    .cq-ownroom-drow {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+    .cq-ownroom-drow > :last-child {
+      grid-column: 2;
+      justify-self: start;
+    }
+  }
+  .cq-ownroom-acc {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 10px 0 12px;
+    border-radius: var(--cq-radius-md);
+    border: 1px solid var(--cq-border);
+    background: var(--cq-surface-raised);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--cq-text-primary);
+    white-space: nowrap;
+    transition: border-color var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-ownroom-acc:hover {
+    border-color: var(--cq-text-tertiary);
+  }
+  .cq-ownroom-acc:focus-visible,
+  .cq-ownroom-seg button:focus-visible,
+  .cq-ownroom-sw:focus-visible,
+  .cq-ownroom-ropt:focus-visible {
+    outline: 2px solid var(--cq-focus-ring, var(--cq-accent));
+    outline-offset: 2px;
+  }
+  .cq-ownroom-empty {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px;
+    background: var(--cq-surface-raised);
+    border: 1px dashed var(--cq-border);
+    border-radius: var(--cq-radius-lg);
+  }
+
+  /* Who is looking: a segmented choice. */
+  .cq-ownroom-seg {
+    display: flex;
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 3px;
+    gap: 2px;
+    border-radius: var(--cq-radius-md);
+    background: var(--cq-surface-strong);
+    scrollbar-width: none;
+  }
+  .cq-ownroom-seg button {
+    flex: 1;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: var(--cq-radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.25;
+    text-align: start;
+    color: var(--cq-text-secondary);
+    transition:
+      background var(--cq-motion-fast) var(--cq-ease),
+      color var(--cq-motion-fast) var(--cq-ease),
+      box-shadow var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-ownroom-seg button[aria-pressed="true"] {
+    background: var(--cq-surface-raised);
+    color: var(--cq-text-primary);
+    box-shadow:
+      var(--cq-shadow-xs),
+      0 0 0 1px var(--cq-border-subtle);
+  }
+  .cq-ownroom-select {
+    min-height: 44px;
+    padding: 0 10px;
+    border-radius: var(--cq-radius-md);
+    border: 1px solid var(--cq-border);
+    background: var(--cq-surface-raised);
+    font-size: 14px;
+    color: var(--cq-text-primary);
+  }
+
+  /* The room, as the chosen investor sees it. */
+  .cq-ownroom-ivw {
+    padding: 16px;
+    background: var(--cq-surface-subtle);
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-xl);
+  }
+  .cq-ownroom-as {
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: var(--cq-text-tertiary);
+  }
+  .cq-ownroom-fh2 {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--cq-border-subtle);
+    font-size: 14px;
+    color: var(--cq-text-primary);
+  }
+  .cq-ownroom-fh2:first-child {
+    border-top: 0;
+  }
+  .cq-ownroom-lockd,
+  .cq-ownroom-open {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    flex: none;
+  }
+  .cq-ownroom-lockd {
+    color: var(--cq-text-tertiary);
+  }
+  .cq-ownroom-open {
+    color: var(--cq-text-primary);
+  }
+  .cq-ownroom-open svg {
+    color: var(--cq-positive);
+  }
+  .cq-ownroom-note {
+    display: block;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--cq-text-tertiary);
+  }
+  .cq-ownroom-sk {
+    display: block;
+    height: 18px;
+    border-radius: var(--cq-radius-xs);
+    background: var(--cq-surface-strong);
+  }
+  .cq-ownroom-ivw[aria-busy="true"] .cq-ownroom-fh2 {
+    opacity: 0.6;
+    transition: opacity var(--cq-motion-fast) var(--cq-ease);
+  }
+
+  /* Show folder names: a labelled switch. */
+  .cq-ownroom-srow {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    padding: 14px 0;
+    border-top: 1px solid var(--cq-border-subtle);
+  }
+  .cq-ownroom-srow b {
+    display: block;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--cq-text-primary);
+  }
+  .cq-ownroom-srow span > span {
+    display: block;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--cq-text-secondary);
+  }
+  .cq-ownroom-sw {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 2px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--cq-text-secondary);
+  }
+  .cq-ownroom-sw i {
+    position: relative;
+    flex: none;
+    width: 40px;
+    height: 24px;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-border);
+    transition: background var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-ownroom-sw i::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    inset-inline-start: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--cq-surface-raised);
+    box-shadow: var(--cq-shadow-xs);
+    transition: transform 200ms var(--cq-ease);
+  }
+  .cq-ownroom-sw[aria-checked="true"] i {
+    background: var(--cq-positive);
+  }
+  .cq-ownroom-sw[aria-checked="true"] i::after {
+    transform: translateX(16px);
+  }
+  [dir="rtl"] .cq-ownroom-sw[aria-checked="true"] i::after {
+    transform: translateX(-16px);
+  }
+  .cq-ownroom-sw[aria-checked="true"] span {
+    color: var(--cq-text-primary);
+  }
+  .cq-ownroom-sw span {
+    min-width: 22px;
+  }
+
+  /* A choice with its consequence. */
+  .cq-ownroom-ropt {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    width: 100%;
+    min-height: 52px;
+    padding: 12px 14px;
+    border: 1px solid var(--cq-border);
+    border-radius: var(--cq-radius-lg);
+    background: var(--cq-surface-raised);
+    text-align: start;
+    transition:
+      border-color var(--cq-motion-fast) var(--cq-ease),
+      box-shadow var(--cq-motion-fast) var(--cq-ease);
+  }
+  .cq-ownroom-ropt + .cq-ownroom-ropt {
+    margin-top: 8px;
+  }
+  .cq-ownroom-ropt b {
+    display: block;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--cq-text-primary);
+  }
+  .cq-ownroom-ropt small {
+    display: block;
+    margin-top: 2px;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--cq-text-secondary);
+  }
+  .cq-ownroom-rdot {
+    position: relative;
+    flex: none;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    border-radius: 50%;
+    border: 1.5px solid var(--cq-border);
+    background: var(--cq-surface-raised);
+  }
+  .cq-ownroom-ropt[aria-checked="true"] {
+    border-color: var(--cq-text-secondary);
+    box-shadow: 0 0 0 3px var(--cq-accent-soft);
+  }
+  .cq-ownroom-ropt[aria-checked="true"] .cq-ownroom-rdot {
+    border-color: var(--cq-tile, var(--cq-text-primary));
+  }
+  .cq-ownroom-ropt[aria-checked="true"] .cq-ownroom-rdot::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: var(--cq-tile, var(--cq-text-primary));
+  }
+}

@@ -96,3 +96,52 @@ describe("Q pictures", () => {
     expect(createPexelsQPictures(undefined)).toBeUndefined();
   });
 });
+
+describe("Q pictures withhold every name the run read", () => {
+  it("drops a company name the person typed, and keeps the thing itself", async () => {
+    const { provider, sent } = fakeProvider();
+    await createQPictures(provider)?.find({
+      // The model echoed the name the person typed.
+      requestedQuery: "Kivu Freight cold-chain warehouse",
+      userText:
+        "What would a cold-chain warehouse like Kivu Freight's look like?",
+      earlierUserText: [],
+      withheld: ["Kivu Freight Ltd"],
+    });
+    expect(sent).toEqual(["cold-chain warehouse"]);
+  });
+
+  it("searches nothing when only the name, or only connectives, would be left", async () => {
+    const { provider, sent } = fakeProvider();
+    const pictures = createQPictures(provider);
+    expect(
+      await pictures?.find({
+        requestedQuery: "Kivu Freight",
+        userText: "show me Kivu Freight",
+        earlierUserText: [],
+        withheld: ["Kivu Freight"],
+      }),
+    ).toBeNull();
+    expect(
+      await pictures?.find({
+        requestedQuery: "the Portside of",
+        userText: "a picture of the Portside office",
+        earlierUserText: [],
+        withheld: ["Portside"],
+      }),
+    ).toBeNull();
+    expect(sent).toEqual([]);
+  });
+
+  it("withholds investors and people the same way", async () => {
+    const { provider, sent } = fakeProvider();
+    await createQPictures(provider)?.find({
+      requestedQuery: "Amara Nwosu Halyard office building",
+      userText:
+        "what does an office building like Halyard's, Amara Nwosu's firm, look like",
+      earlierUserText: [],
+      withheld: ["Halyard Capital", "Amara Nwosu"],
+    });
+    expect(sent).toEqual(["office building"]);
+  });
+});

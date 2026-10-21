@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { QConversationIdSchema, QRunIdSchema } from "./ids.js";
 import { QResponseMessageSchema } from "./message.js";
+import { QStageAboutSchema, QVisibleStageSchema } from "./stage.js";
 import { QArtifactPreviewSchema } from "./stream.js";
 
 /**
@@ -62,6 +63,25 @@ export const QRoomPreviewSchema = z
   .strict();
 export type QRoomPreview = z.infer<typeof QRoomPreviewSchema>;
 
+/**
+ * Owner 2026-10-21 (stages as they happen, voice too): the stages a spoken
+ * turn's run has reported so far, oldest first, so the screen shows where
+ * Q is while it talks. Only the run's real stage events; replaced as each
+ * arrives and dropped when that run's answer lands. Additive.
+ */
+export const Q_ROOM_STAGES_MAX = 24;
+export const QRoomStagesSchema = z
+  .object({
+    /** Shares the entries' sequence, so a held read wakes for it. */
+    sequence: z.number().int().min(1),
+    runId: QRunIdSchema,
+    stages: z.array(QVisibleStageSchema).min(1).max(Q_ROOM_STAGES_MAX),
+    /** Round 4: what the newest stage is about, when the run said. */
+    about: QStageAboutSchema.optional(),
+  })
+  .strict();
+export type QRoomStages = z.infer<typeof QRoomStagesSchema>;
+
 export const QRoomReadQuerySchema = z
   .object({
     after: z.coerce.number().int().min(0).max(1_000_000_000).default(0),
@@ -80,6 +100,8 @@ export const QRoomReadSchema = z
     entries: z.array(QRoomEntrySchema).max(Q_ROOM_KEPT),
     /** The live spoken preview, when one is newer than `after`. */
     preview: QRoomPreviewSchema.optional(),
+    /** The live spoken turn's stages, when newer than `after`. */
+    stages: QRoomStagesSchema.optional(),
   })
   .strict();
 export type QRoomRead = z.infer<typeof QRoomReadSchema>;

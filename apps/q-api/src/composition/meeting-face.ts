@@ -55,11 +55,50 @@ const NO_EMAIL_INVITES = ["no-invites@capitalq.invalid"] as const;
 /** A queued line older than this is stale; it is never said late. */
 const LINE_FRESH_MS = 20_000;
 
+// Tavus shapes the face's expression from what it says and this prompt
+// (no emotion flag exists, docs 2026-10-21). The expression follows Q's
+// words; it never performs a feeling the words do not carry.
 const FACE_PROMPT = [
-  "You are the face and voice of Q, Capital Q's AI meeting assistant, in a video call.",
+  "You are the face and voice of Q, the AI investment analyst inside Capital Q, in a video call.",
   "Say exactly the text you are given and nothing else.",
   "If you are given no text, stay silent.",
+  "Let your face follow the words: warm when welcoming someone or thanking them, interested and attentive while someone is speaking or asking, calm and serious about risks, gaps or anything uncertain, plainly pleased when the words report good news.",
+  "Never exaggerate, and never show a feeling the words do not carry.",
 ].join(" ");
+
+/** Spoken by the provider before the greeting, every call. */
+const FACE_DISCLOSURE = {
+  spoken: "Hello, I'm Q, the AI investment analyst inside Capital Q.",
+  shown: "AI presenter · Capital Q",
+} as const;
+
+const firstName = (name: string) => name.trim().split(/\s+/u)[0] ?? "";
+
+/**
+ * What the face says once it is in the call, after the disclosure (who Q
+ * is): why it is here and for whom, from the booking both sides already
+ * see. Code-written, no model; Q never claims more than the booking says.
+ */
+export function meetingFaceGreeting(booking: {
+  readonly organiserName: string | null;
+  readonly purpose: string | null;
+}): string {
+  const organiser = firstName(
+    (booking.organiserName ?? "").replace(/[^\p{L}\p{M}' .-]/gu, ""),
+  );
+  const purpose = (booking.purpose ?? "")
+    .replace(/[\p{Cc}\p{Cf}]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .replace(/[.!?]+$/u, "");
+  const who =
+    organiser === ""
+      ? "This call was booked on Capital Q, and I've been asked to join"
+      : `${organiser} booked this call on Capital Q and asked me to join`;
+  const about =
+    purpose === "" || purpose.length > 120 ? "" : ` about ${purpose}`;
+  return `${who}${about}. I'll keep notes for both sides and answer questions from what this call shares. Just say "Q" when you need me.`;
+}
 
 export type MeetingFaceEndReason =
   "CALL_ENDED" | "TIME_LIMIT" | "REMOVED" | "PROVIDER_FAILED" | "RESTARTED";
@@ -136,6 +175,9 @@ export type MeetingFaceStore = {
     readonly tenantId: string;
     readonly organiserUserId: string;
     readonly meetLink: string;
+    /** As the booking shows it to both sides; for the face's greeting. */
+    readonly organiserName?: string | null;
+    readonly purpose?: string | null;
   } | null>;
   /**
    * Inserts the meeting's one face row (its reservation is made in the same
@@ -235,7 +277,10 @@ export function createMeetingFace(dependencies: {
   const waitMs = dependencies.answerWaitMs ?? 12_000;
   // The call's words reach the host through the note-taker a moment after
   // the face's own turn ends; this long is given to see an answer begin.
-  const expectGraceMs = dependencies.expectGraceMs ?? 1_500;
+  // 2026-10-21 (live meeting): 1.5 s was shorter than captions plus the
+  // host's hold, so a follow-up's answer missed its turn and waited for
+  // someone to speak again (5-10 s late, or never). Waiting is silent.
+  const expectGraceMs = dependencies.expectGraceMs ?? 5_000;
   const { client, store, logger } = dependencies;
   const faceId = dependencies.faceId;
   const base = dependencies.publicBaseUrl?.replace(/\/+$/u, "") ?? null;
@@ -375,10 +420,7 @@ export function createMeetingFace(dependencies: {
         name: MEETING_FACE_NAME,
         systemPrompt: FACE_PROMPT,
         faceId,
-        disclosure: {
-          spoken: "I'm Q, Capital Q's AI assistant.",
-          shown: "AI presenter · Capital Q",
-        },
+        disclosure: FACE_DISCLOSURE,
         layers: {
           llm: {
             model: "capital-q-meeting",
@@ -403,6 +445,10 @@ export function createMeetingFace(dependencies: {
         name: MEETING_FACE_NAME,
         meetingUrl: meeting.meetLink,
         maxCallSeconds: dependencies.maxSeconds,
+        greeting: meetingFaceGreeting({
+          organiserName: meeting.organiserName ?? null,
+          purpose: meeting.purpose ?? null,
+        }),
       });
       session.conversationId = conversation.conversationId;
       await store.live(id, conversation.conversationId);
@@ -535,12 +581,32 @@ export function createMeetingFace(dependencies: {
       if (session.state !== "LIVE" || now() >= session.endsAt) {
         return { kind: "SILENT" };
       }
-      const pending = freshLines(session);
-      if (pending !== null) return { kind: "LINE", text: pending };
       // Words from the call are data: they only decide whether to wait.
       // Q's name, or the host already answering (a conversation's
       // follow-up never names Q: owner 2026-10-18).
       const expected = () => now() - session.expectedAt <= waitMs;
+      const pending = freshLines(session);
+      if (pending !== null) {
+        if (!addressedToQ(userLines.at(-1) ?? "") && !expected()) {
+          return { kind: "LINE", text: pending };
+        }
+        // 2026-10-21: a line said while nobody was speaking (a greeting,
+        // a late answer) used to take this turn, and the answer to what was
+        // just asked waited for the turn after. Both go in this one turn.
+        session.waiter?.(null, false);
+        closeStream(session);
+        const stream: NonNullable<Session["stream"]> = {
+          parts: [],
+          open: true,
+          wake: null,
+        };
+        session.stream = stream;
+        return {
+          kind: "STREAM",
+          first: pending,
+          rest: restOf(session, stream, signal),
+        };
+      }
       if (!addressedToQ(userLines.at(-1) ?? "") && !expected()) {
         await new Promise<void>((resolve) => {
           const done = () => {
@@ -643,11 +709,17 @@ export function createPostgresMeetingFaceStore(
           tenant_id: string;
           organiser_user_id: string;
           meet_link: string | null;
+          purpose: string | null;
+          organiser_name: string | null;
         }[]
       >`
-        select tenant_id, organiser_user_id, meet_link
-          from communication.meetings
-         where id = ${meetingId} and status = 'SCHEDULED'
+        select m.tenant_id, m.organiser_user_id, m.meet_link, m.purpose,
+               (select p.display_name
+                  from communication.meeting_participants p
+                 where p.meeting_id = m.id and p.user_id = m.organiser_user_id
+                 limit 1) as organiser_name
+          from communication.meetings m
+         where m.id = ${meetingId} and m.status = 'SCHEDULED'
          limit 1`;
       const row = rows[0];
       if (row === undefined || row.meet_link === null) return null;
@@ -655,6 +727,8 @@ export function createPostgresMeetingFaceStore(
         tenantId: row.tenant_id,
         organiserUserId: row.organiser_user_id,
         meetLink: row.meet_link,
+        organiserName: row.organiser_name,
+        purpose: row.purpose,
       };
     },
     claim: async (input) => {

@@ -414,6 +414,13 @@ const OFFERS: readonly QCapability[] = [
     "Joining is the person's own consent, signed in as the invited email, from the invitation's link; Q cannot accept it for them.",
   ),
   offer(
+    "memory_correction",
+    "SETTINGS",
+    "Correct something Q remembers about them, in their own words",
+    "MEMORY",
+    "What Q keeps about the person is theirs to correct; they write the correction themselves on What Q remembers, and the old memory stays in history.",
+  ),
+  offer(
     "q_email_address",
     "SETTINGS",
     "Copy their Q email address, or get a new one so the old one stops receiving",

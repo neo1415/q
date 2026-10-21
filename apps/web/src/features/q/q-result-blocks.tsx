@@ -507,7 +507,7 @@ export function QResultBlocks({
           case "SUMMARY":
             // Artifacts live (L-14): the summary Q speaks over.
             return (
-              <QResultCard key={key} label={t("Summary")}>
+              <QResultCard key={key} label={t("Summary")} title={block.title}>
                 <SummaryBody block={block} />
               </QResultCard>
             );

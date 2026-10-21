@@ -2355,6 +2355,19 @@
     }
   }
 
+  /*
+   * Artifacts live: the line saying where Q is. A new stage fades in
+   * (opacity only, fast) so the words change without a jump; a few times
+   * a turn, so no movement. Kept under reduced motion: a fade is not motion.
+   */
+  .cq-stage-line {
+    opacity: 1;
+    transition: opacity var(--cq-motion-fast) var(--cq-ease);
+    @starting-style {
+      opacity: 0;
+    }
+  }
+
   /* Loading: the feed's own shape (Discover v2), never a sentence. */
   .cq-skeleton {
     position: relative;
@@ -4406,7 +4419,7 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    border-radius: 12px;
+    border-radius: 0; /* Explore video cards stay boxy (founder, 2026-10-21). */
     background: var(--cq-stage-canvas);
     text-align: start;
     -webkit-tap-highlight-color: transparent;
@@ -4527,7 +4540,7 @@
   }
   .cq-explore-skeleton {
     width: 100%;
-    border-radius: 12px;
+    border-radius: 0; /* Explore video cards stay boxy (founder, 2026-10-21). */
     background: var(--cq-surface-strong);
     animation: cq-explore-pulse 1.4s ease-in-out infinite;
   }
@@ -5209,6 +5222,29 @@
  * that chose it (Overview with its deal, and Calls): their primary buttons
  * and dark tiles turn warm charcoal; the accent and everything else stay.
  */
+/*
+ * Settings → Appearance (chosen design 2026-10-21): each theme card shows a
+ * small picture of that theme whatever theme is on now, so its colours are
+ * the light and dark palettes' own values, fixed, kept here as tokens.
+ */
+@layer components {
+  .cq-preview-light {
+    --cq-preview-canvas: oklch(0.985 0.004 92);
+    --cq-preview-surface: oklch(1 0 0);
+    --cq-preview-accent: var(--cq-gold-deep);
+  }
+  .cq-preview-dark {
+    --cq-preview-canvas: oklch(0.16 0.01 258);
+    --cq-preview-surface: oklch(0.22 0.011 258);
+    --cq-preview-accent: var(--cq-gold-mid);
+  }
+  .cq-preview-auto {
+    --cq-preview-canvas: oklch(0.985 0.004 92);
+    --cq-preview-surface: oklch(0.16 0.01 258);
+    --cq-preview-accent: var(--cq-gold-deep);
+  }
+}
+
 @layer components {
   .cq-charcoal {
     --cq-primary-action: var(--cq-charcoal);
@@ -5216,6 +5252,39 @@
     --cq-on-primary-action: var(--cq-on-charcoal);
     --cq-tile: var(--cq-charcoal);
     --cq-on-tile: var(--cq-on-charcoal);
+  }
+  /*
+   * Work's options (2026-10-21): gold (Tasks, How Q is handling it) and
+   * near-black (What Q did). The same re-pointing as .cq-charcoal, plus
+   * the mark of the person's own move (`--cq-move`, `--cq-move-soft`),
+   * which the warm-charcoal pages keep on the accent.
+   */
+  .cq-gold {
+    --cq-primary-action: var(--cq-gold-action);
+    --cq-primary-action-hover: var(--cq-gold-action-hover);
+    --cq-on-primary-action: var(--cq-on-gold-action);
+    --cq-tile: var(--cq-gold-action);
+    --cq-on-tile: var(--cq-on-gold-action);
+    --cq-move: var(--cq-gold-action);
+    --cq-move-soft: var(--cq-gold-action-soft);
+  }
+  .cq-ink {
+    --cq-primary-action: var(--cq-ink-action);
+    --cq-primary-action-hover: var(--cq-ink-action-hover);
+    --cq-on-primary-action: var(--cq-on-ink-action);
+    --cq-tile: var(--cq-ink-action);
+    --cq-on-tile: var(--cq-on-ink-action);
+    --cq-move: var(--cq-ink-action);
+    --cq-move-soft: var(--cq-ink-action-soft);
+  }
+  /* The Q Daily being prepared: a bar that travels, never a made-up percent. */
+  @keyframes cq-daily-indeterminate {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
   }
   /* Busy time: hatched and labelled, never a colour alone. */
   .cq-busy-hatch {
@@ -5283,4 +5352,24 @@
       animation: none;
     }
   }
+}
+
+/*
+ * Onboarding (owner 2026-10-21: answer buttons cut off or hidden). The
+ * onboarding frame has no bottom navigation, so its composer docks at the
+ * bottom edge instead of 60px above it, where it covered the options. Q's
+ * options wrap a long label onto two lines rather than running off a phone
+ * screen. Unlayered on purpose, so it outranks the button's own height and
+ * nowrap utilities.
+ */
+[data-q-onboarding-workspace] {
+  --cq-bottom-nav-height: 0px;
+}
+
+[data-q-quick-controls] button {
+  height: auto;
+  min-height: 44px;
+  white-space: normal;
+  text-align: start;
+  padding-block: 8px;
 }

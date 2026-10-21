@@ -144,6 +144,60 @@ describe("the workforce overview and approval link (J5, J6)", () => {
     });
   });
 
+  it("splits the month day by day and by role, from the same ledger rows", async () => {
+    const { store, writer, reviewer } = await seeded();
+    const page = createWorkforcePage({
+      store,
+      monthCosts: () =>
+        Promise.resolve([
+          { runId: writer, usd: "0.02", day: "2026-10-06" },
+          { runId: reviewer, usd: "0.035", day: "2026-10-06" },
+          { runId: writer, usd: "0.4", day: "2026-10-12" },
+          { runId: reviewer, usd: "0", day: "2026-10-13" },
+        ]),
+      monthlyLimitUsd: () => Promise.resolve(60),
+    });
+    const overview = WorkforceOverviewDtoSchema.parse(
+      await page.overview(OWNER),
+    );
+    // A day that spent nothing is not listed; the days add up to the month.
+    expect(overview.byDay).toEqual([
+      {
+        day: "2026-10-06",
+        usd: "0.055",
+        byRole: [
+          { role: "REVIEWER", usd: "0.035" },
+          { role: "WRITER", usd: "0.02" },
+        ],
+      },
+      {
+        day: "2026-10-12",
+        usd: "0.4",
+        byRole: [{ role: "WRITER", usd: "0.4" }],
+      },
+    ]);
+    expect(overview.spentUsd).toBe("0.455");
+  });
+
+  it("leaves the days unknown when the ledger cannot say which day", async () => {
+    const { store, writer } = await seeded();
+    const undated = createWorkforcePage({
+      store,
+      monthCosts: () => Promise.resolve([{ runId: writer, usd: "0.02" }]),
+    });
+    expect((await undated.overview(OWNER)).byDay).toBeUndefined();
+    const unreadable = createWorkforcePage({
+      store,
+      monthCosts: () => Promise.reject(new Error("ledger down")),
+    });
+    expect((await unreadable.overview(OWNER)).byDay).toBeUndefined();
+    const nothing = createWorkforcePage({
+      store,
+      monthCosts: () => Promise.resolve([]),
+    });
+    expect((await nothing.overview(OWNER)).byDay).toEqual([]);
+  });
+
   it("shows nothing spent when the ledger cannot be read", async () => {
     const { store } = await seeded();
     const page = createWorkforcePage({

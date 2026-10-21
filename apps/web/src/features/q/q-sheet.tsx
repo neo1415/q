@@ -32,6 +32,7 @@ import { homeHref } from "./active-conversation";
 import { failureMessage, recoveryHint } from "./conversation";
 import { useAnchorQuestion } from "./follow-newest";
 import { QAnswer } from "./q-answer";
+import { StageLine, TaskProgress } from "./stage-line";
 import { QNow } from "./q-now";
 import { QCanSee } from "./q-can-see";
 import { viewingOf, type QMoment } from "./q-moment";
@@ -119,6 +120,13 @@ export function QSheetConversation({
             <span className="cq-label text-(--cq-text-primary)" role="status">
               {label}
             </span>
+            {/* Round 4: where Q is (or a durable task's progress), one
+                line held open so the panel never moves as it changes. */}
+            {presence.stage?.about?.task !== undefined ? (
+              <TaskProgress current={presence.stage} compact />
+            ) : (
+              <StageLine current={presence.stage} reserve />
+            )}
             {/* Q room R1: what Q sees of the page behind the dock. */}
             <QCanSee />
           </div>

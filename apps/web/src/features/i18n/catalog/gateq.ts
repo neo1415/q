@@ -1105,4 +1105,118 @@ export const GATEQ_AR: Readonly<Record<string, string>> = {
   "· Submitted": "· قُدِّم",
   "· preferred": "· مفضّل",
   "· required": "· مطلوب",
+
+  // Design gateq-2 (2026-10-21): three panes, the dossier and your gate
+  Qualifies: "مؤهَّل",
+  "Answers disagree.": "الإجابات متعارضة.",
+  "Both are kept until you ask.": "تُحفظ الإجابتان حتى تسأل.",
+  "Doesn't qualify": "غير مؤهَّل",
+  "Doesn't qualify under your published rules: a required rule isn't met.":
+    "غير مؤهَّل وفق قواعدك المنشورة: قاعدة مطلوبة غير مستوفاة.",
+  "Not enough information to decide.": "لا توجد معلومات كافية للحكم.",
+  "Not enough information to decide: {n} rules not answered.":
+    "لا توجد معلومات كافية للحكم: {n} قواعد بلا إجابة.",
+  "Not enough information to decide: {n} rule not answered.":
+    "لا توجد معلومات كافية للحكم: {n} قاعدة بلا إجابة.",
+  "Reply by {date}": "الرد قبل {date}",
+  Round: "الجولة",
+  "Pass with a reason": "اعتذر مع ذكر السبب",
+  "Prepare a pass: {name}": "جهّز اعتذارًا: {name}",
+  "Prepare {n} passes": "جهّز {n} اعتذارات",
+  "Book a call with {name}": "احجز مكالمة مع {name}",
+  "Ask {name} for more": "اطلب المزيد من {name}",
+  "Drafted by Q. Nothing is sent until you approve this exact message.":
+    "صاغها Q. لا يُرسل شيء حتى توافق على هذه الرسالة بنصّها.",
+  "Q drafted the questions from what they sent. Nothing is sent until you approve this exact message.":
+    "صاغ Q الأسئلة مما أرسلوه. لا يُرسل شيء حتى توافق على هذه الرسالة بنصّها.",
+  "Drafted by Q. Nothing is sent until you approve this exact message. Founders always get a reason.":
+    "صاغها Q. لا يُرسل شيء حتى توافق على هذه الرسالة بنصّها. يحصل المؤسسون دائمًا على سبب.",
+  "Passed with a reason. They got your exact message.":
+    "اعتذرت مع ذكر السبب. وصلتهم رسالتك بنصّها.",
+  "{n} passes sent, each with your exact message.":
+    "أُرسلت {n} اعتذارات، كلٌّ برسالتك بنصّها.",
+  "Sent after your approval. They're asked for times for a call.":
+    "أُرسلت بعد موافقتك. طُلب منهم اقتراح مواعيد لمكالمة.",
+  "Sent after your approval: your questions, exactly as shown.":
+    "أُرسلت بعد موافقتك: أسئلتك كما ظهرت تمامًا.",
+  "{n} applications outside your rules are under Outside your rules. ":
+    "{n} طلبات خارج قواعدك موجودة تحت «خارج قواعدك». ",
+  "{n} application outside your rules is under Outside your rules. ":
+    "{n} طلب خارج قواعدك موجود تحت «خارج قواعدك». ",
+  "Your published rules": "قواعدك المنشورة",
+  "No published rules yet, so nothing is checked: founders see no judgement either way. Give Q your mandate and it drafts the rules; you confirm each one.":
+    "لا قواعد منشورة بعد، لذا لا يُفحص شيء: لا يرى المؤسسون أي حكم. أعطِ Q تفويضك وسيصوغ القواعد؛ وتؤكد أنت كل واحدة.",
+  "Edit {label}": "عدّل {label}",
+  "Others see why and can't send.": "يرى الآخرون السبب ولا يمكنهم الإرسال.",
+  "Anyone can send": "يمكن لأي شخص الإرسال",
+  "Founders still see your rules and how they stand.":
+    "يظل المؤسسون يرون قواعدك وموقفهم منها.",
+  "Reply within": "الرد خلال",
+  "No reply promise yet": "لا وعد بالرد بعد",
+  "Reply within {n} working days": "الرد خلال {n} أيام عمل",
+  "Reply within {n} working day": "الرد خلال {n} يوم عمل",
+  "Shown on your gate. Late replies are marked in your inbox.":
+    "يظهر على بوابتك. تُعلَّم الردود المتأخرة في الوارد.",
+  "Copy snippet": "انسخ المقتطف",
+  "Like “climate hardware in East Africa”. Q searches companies on Capital Q you are allowed to see.":
+    "مثل «أجهزة مناخية في شرق أفريقيا». يبحث Q في الشركات على Capital Q المسموح لك برؤيتها.",
+  "{n} companies on Capital Q": "{n} شركات على Capital Q",
+  "{n} company on Capital Q": "{n} شركة على Capital Q",
+
+  // Design gateqf-1: a founder's applications, with how the rules stood
+  "What you sent through investors' gates, and what happened.":
+    "ما أرسلته عبر بوابات المستثمرين، وما حدث.",
+  "When you apply through an investor's gate, it shows here with how their rules stood and what they sent back.":
+    "عندما تتقدّم عبر بوابة مستثمر، يظهر الطلب هنا مع موقف قواعدهم وما أرسلوه.",
+  "Passed with a reason": "اعتذروا مع ذكر السبب",
+  "Passed with a reason: {reason}.": "اعتذروا مع ذكر السبب: {reason}.",
+  "Passed with a reason. They got: “{message}”":
+    "اعتذروا مع ذكر السبب. وصلك: «{message}»",
+  "They replied.": "ردّوا.",
+  "They wrote: “{message}”": "كتبوا: «{message}»",
+  "Sent. They haven't made a reply promise.": "أُرسل. لم يقدّموا وعدًا بالرد.",
+  "Reply promised by {date}": "وعدوا بالرد قبل {date}",
+  "How their rules stood when you sent it": "موقف قواعدهم عندما أرسلته",
+  "They had no published rules then, so nothing was checked.":
+    "لم تكن لديهم قواعد منشورة حينها، لذا لم يُفحص شيء.",
+  "Their published bar, not their private thesis.":
+    "معيارهم المنشور، لا أطروحتهم الخاصة.",
+  "Answer in your messages": "أجب في رسائلك",
+  "Not recorded for this application.": "لم يُسجَّل لهذا الطلب.",
+
+  // Design gatepub-1: the form with live rule standing
+  "{count} short questions, then an optional conversation with Q. You review everything before it goes.":
+    "أسئلة قصيرة ({count})، ثم محادثة اختيارية مع Q. تراجع كل شيء قبل إرساله.",
+  "Five short questions, then an optional conversation with Q. You review everything before it goes.":
+    "خمسة أسئلة قصيرة، ثم محادثة اختيارية مع Q. تراجع كل شيء قبل إرساله.",
+  "Six short questions, then an optional conversation with Q. You review everything before it goes.":
+    "ستة أسئلة قصيرة، ثم محادثة اختيارية مع Q. تراجع كل شيء قبل إرساله.",
+  "How you stand against their rules": "موقفك من قواعدهم",
+  "No published rules yet: nothing is checked, and every founder can apply.":
+    "لا قواعد منشورة بعد: لا يُفحص شيء، ويمكن لكل مؤسس التقدّم.",
+  "Required. Meets": "مطلوبة. مستوفاة",
+  "Preferred. Meets": "مفضّلة. مستوفاة",
+  "Required. Doesn't meet. This one is required":
+    "مطلوبة. غير مستوفاة. هذه القاعدة مطلوبة",
+  "Preferred. Doesn't meet. Preferred only": "مفضّلة. غير مستوفاة. مفضّلة فقط",
+  "Required. Not answered yet. Never counts as a no":
+    "مطلوبة. لم يُجَب عنها بعد. لا تُحسب رفضًا أبدًا",
+  "Preferred. Not answered yet. Never counts as a no":
+    "مفضّلة. لم يُجَب عنها بعد. لا تُحسب رفضًا أبدًا",
+  "Their published bar, not their private thesis. Meeting it is not a promise of interest.":
+    "معيارهم المنشور، لا أطروحتهم الخاصة. استيفاؤه ليس وعدًا بالاهتمام.",
+  "Your email": "بريدك الإلكتروني",
+  "They reply to this email. Nothing goes to them until you submit.":
+    "يردّون على هذا البريد. لا يصلهم شيء حتى ترسل.",
+  "What stage are you at?": "في أي مرحلة أنتم؟",
+  "Where are you based?": "أين مقرّكم؟",
+  "A note to {fund}": "ملاحظة إلى {fund}",
+  '{fund} only takes companies that meet "{label}". That\'s about fit, not quality.':
+    "لا تقبل {fund} إلا الشركات التي تستوفي «{label}». الأمر يتعلق بالملاءمة لا بالجودة.",
+  "Next, a few questions from Q, then you review everything before it goes.":
+    "بعد ذلك، بعض الأسئلة من Q، ثم تراجع كل شيء قبل إرساله.",
+  "{fund} promises a reply within {n} working days. Nothing is sent until you press Submit.":
+    "تعِد {fund} بالرد خلال {n} أيام عمل. لا يُرسل شيء حتى تضغط «أرسل».",
+  "Signed in as": "مسجّل الدخول باسم",
+  "Back to your answers": "عُد إلى إجاباتك",
 };

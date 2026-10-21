@@ -60,6 +60,12 @@ export type EditableProfileProps = {
   readonly provenance: string;
   /** False when the server says this person may view but not edit. */
   readonly editable?: boolean | undefined;
+  /**
+   * "brief": the chosen design's rows (2026-10-21) -- a 180px label column
+   * and hairlines between rows; a section of one field reads as a
+   * paragraph, and its editor opens as soon as the section is in Edit.
+   */
+  readonly variant?: "default" | "brief" | undefined;
 };
 
 function save(
@@ -87,6 +93,7 @@ export function EditableProfile({
   version: initialVersion,
   provenance,
   editable = true,
+  variant = "default",
 }: EditableProfileProps) {
   const t = useT();
   const [values, setValues] = useState(initialValues);
@@ -105,6 +112,15 @@ export function EditableProfile({
     }
   }
   const [editing, setEditing] = useState<string | null>(null);
+  const brief = variant === "brief";
+  const single = brief && fields.length === 1 ? (fields[0] ?? null) : null;
+  // A one-field section opens its editor when the section goes into Edit,
+  // and closes it when the section is done.
+  const [seenEditable, setSeenEditable] = useState(editable);
+  if (editable !== seenEditable) {
+    setSeenEditable(editable);
+    if (single !== null) setEditing(editable ? single.field : null);
+  }
   const [conflict, setConflict] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const router = useRouter();
@@ -129,10 +145,18 @@ export function EditableProfile({
           </Button>
         </div>
       )}
-      <dl className="divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+      <dl
+        className={
+          brief
+            ? "flex flex-col"
+            : "divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)"
+        }
+      >
         {fields.map((spec) => (
           <EditableRow
             key={spec.field}
+            brief={brief}
+            single={single !== null}
             spec={spec}
             value={values[spec.field] ?? null}
             editable={editable}
@@ -182,6 +206,8 @@ export function EditableProfile({
 }
 
 function EditableRow({
+  brief = false,
+  single = false,
   spec,
   value,
   editable,
@@ -190,6 +216,9 @@ function EditableRow({
   onCancel,
   onSave,
 }: {
+  readonly brief?: boolean | undefined;
+  /** The section's only field: no label, the value as a paragraph. */
+  readonly single?: boolean | undefined;
   readonly spec: FieldSpec<string>;
   readonly value: string | null;
   readonly editable: boolean;
@@ -215,9 +244,23 @@ function EditableRow({
     <div
       data-profile-field={spec.field}
       data-state={value === null ? "unknown" : "stated"}
-      className="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:gap-6"
+      className={
+        brief
+          ? single
+            ? "flex flex-col"
+            : "flex flex-col gap-1 border-t border-(--cq-border-subtle) py-2.5 first:border-t-0 sm:grid sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-0"
+          : "flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:gap-6"
+      }
     >
-      <dt className="cq-label shrink-0 text-(--cq-text-secondary) sm:w-40 sm:pt-2.5">
+      <dt
+        className={
+          brief
+            ? single
+              ? "sr-only"
+              : "text-[13px] text-(--cq-text-secondary) sm:pt-2.5"
+            : "cq-label shrink-0 text-(--cq-text-secondary) sm:w-40 sm:pt-2.5"
+        }
+      >
         {t(spec.label)}
       </dt>
       <dd className="min-w-0 flex-1">
@@ -237,7 +280,16 @@ function EditableRow({
           />
         ) : (
           <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-col gap-0.5 sm:pt-2">
+            <div
+              className={cx(
+                "flex min-w-0 flex-col gap-0.5",
+                brief && single ? "" : "sm:pt-2",
+                brief && !single ? "[&_p]:text-sm" : "",
+                brief && single
+                  ? "[&_p]:max-w-[68ch] [&_p]:text-[15px] [&_p]:leading-[1.55]"
+                  : "",
+              )}
+            >
               {shown === null ? (
                 <p className="cq-body text-(--cq-text-tertiary)">
                   {t("Not added")}
@@ -263,13 +315,17 @@ function EditableRow({
                 </p>
               )}
             </div>
-            {editable ? (
+            {editable && !(brief && single) ? (
               <button
                 ref={editButton}
                 type="button"
                 onClick={onEdit}
                 aria-label={`${shown === null ? "Add" : "Edit"} ${spec.label.toLowerCase()}`}
-                className={buttonClassName("quiet", "regular", "shrink-0")}
+                className={
+                  brief
+                    ? "inline-flex min-h-11 shrink-0 items-center rounded-(--cq-radius-md) px-2.5 text-[13px] font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-9"
+                    : buttonClassName("quiet", "regular", "shrink-0")
+                }
               >
                 {shown === null ? "Add" : "Edit"}
               </button>

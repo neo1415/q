@@ -21,6 +21,9 @@ import {
   YourCompaniesPageDtoSchema,
   DISCOVERY_INVESTOR_PHOTO_PATH,
   DiscoveredInvestorPhotoDtoSchema,
+  DISCOVERY_INVESTOR_CARD_PATH,
+  DiscoveredInvestorCardDtoSchema,
+  type PublicCardDto,
   type YourCompanyLabel,
   type YourCompanyPitchItemDto,
   type FeedCompanySummaryDto,
@@ -136,6 +139,15 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
   readonly mayPlay?: YourCompaniesMayPlay | undefined;
   /** Pictures of who a response names. Absent: initials everywhere. */
   readonly namedPhotos?: NamedPhotos | undefined;
+  /**
+   * An investor's live Q Card as a signed-in participant reads it at their
+   * `/@handle` (the public-identity projection, by subject). Asked only
+   * for an investor the discovery service already returned to this
+   * founder. Absent: every investor reads as having no card.
+   */
+  readonly investorCard?:
+    | ((investorOrganisationId: string) => Promise<PublicCardDto | null>)
+    | undefined;
 };
 
 /**
@@ -649,6 +661,40 @@ export function registerDiscoveryRoutes(
         ...investor,
         ...(await imagesOf(investor.investorOrganisationId)),
       });
+    },
+  );
+
+  // The investor's Q Card, by id (founder's investor page): first the same
+  // visibility read as the profile above, so an investor this founder may
+  // not see is the same 404; then only what the card shows a participant.
+  app.get(
+    DISCOVERY_INVESTOR_CARD_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const raw = (request.params as { investorOrganisationId?: unknown })
+        .investorOrganisationId;
+      const investor = await service.findInvestor(
+        getActorContext(request),
+        typeof raw === "string" ? raw : "",
+      );
+      void reply.header("Cache-Control", "no-store");
+      if (investor === null) {
+        const problem = createProblemDetails({
+          code: "RESOURCE_NOT_FOUND",
+          requestId: request.id,
+        });
+        return reply
+          .status(problem.status)
+          .type(PROBLEM_CONTENT_TYPE)
+          .send(problem);
+      }
+      const card =
+        dependencies.investorCard === undefined
+          ? null
+          : await dependencies
+              .investorCard(investor.investorOrganisationId)
+              .catch(() => null);
+      return DiscoveredInvestorCardDtoSchema.parse({ card });
     },
   );
 

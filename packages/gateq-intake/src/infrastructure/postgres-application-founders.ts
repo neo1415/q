@@ -2,6 +2,8 @@ import type { GateqPassReason } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import { ActorContextSchema, type ActorContext } from "@capital-q/security";
 
+import { readQualification, replyPromise } from "../inbox/domain.js";
+
 /**
  * F2: a signed-in founder's own GateQ applications. Linked when they press
  * Send; read back for their GateQ page. What they see of the investor's
@@ -16,6 +18,18 @@ export type FounderApplication = {
   readonly status: "SENT" | "REPLIED" | "PASSED";
   readonly reasonCode: GateqPassReason | null;
   readonly message: string | null;
+  /**
+   * How the gate's published rules stood at submission: the engine's frozen
+   * answer (labels and status only, never a rule's configuration).
+   */
+  readonly rules: readonly {
+    readonly label: string;
+    readonly required: boolean;
+    readonly standing: "MEETS" | "DOES_NOT_MEET" | "NOT_ANSWERED";
+  }[];
+  /** The investor's published reply promise for it; null: none made. */
+  readonly replyBy: string | null;
+  readonly investorOrganisationId: string | null;
 };
 
 export function createPostgresApplicationFounders(options: {
@@ -205,14 +219,20 @@ export function createPostgresApplicationFounders(options: {
           kind: "PASS" | "REPLY" | null;
           reason_code: GateqPassReason | null;
           body: string | null;
+          qualification: unknown;
+          reply_within_days: number | null;
+          investor_organisation_id: string | null;
         }[]
       >`
         select f.application_id, io.display_name as fund, g.name as gateway_name,
-               s.submitted_at as sent_at, m.kind, m.reason_code, m.body
+               s.submitted_at as sent_at, m.kind, m.reason_code, m.body,
+               s.qualification, st.reply_within_days,
+               g.investor_organisation_id
           from gateq.application_founders f
           join gateq.applications a on a.id = f.application_id
           join gateq.application_submissions s on s.application_id = a.id
           join gateq.gateways g on g.id = a.gateway_id
+          left join gateq.inbox_settings st on st.gateway_id = g.id
           left join core.investor_organisations io on io.id = g.investor_organisation_id
           left join lateral (
             select kind, reason_code, body from gateq.inbox_messages im
@@ -223,6 +243,7 @@ export function createPostgresApplicationFounders(options: {
          where f.founder_user_id = ${actor.userId}
          order by s.submitted_at desc
          limit 100`;
+      const now = new Date();
       return rows.map((row) => ({
         applicationId: row.application_id,
         fund: row.fund ?? row.gateway_name,
@@ -236,9 +257,40 @@ export function createPostgresApplicationFounders(options: {
               : "SENT",
         reasonCode: row.reason_code,
         message: row.body,
+        rules: founderRules(row.qualification),
+        // The same working-day promise the investor's inbox counts down.
+        replyBy: replyPromise({
+          submittedAt: new Date(row.sent_at),
+          replyWithinDays: row.reply_within_days,
+          answered: row.kind !== null,
+          now,
+        }).replyBy,
+        investorOrganisationId: row.investor_organisation_id,
       }));
     },
   };
+}
+
+/**
+ * The founder's view of the rules at submission: the engine's frozen status
+ * per published label. A rule that did not apply is left out; a status the
+ * engine could not establish stays "not answered", never a no.
+ */
+export function founderRules(
+  qualification: unknown,
+): FounderApplication["rules"] {
+  return readQualification(qualification)
+    .criteria.filter((c) => c.status !== "NOT_APPLICABLE")
+    .map((c) => ({
+      label: c.label,
+      required: c.required,
+      standing:
+        c.status === "MATCH"
+          ? "MEETS"
+          : c.status === "NO_MATCH"
+            ? "DOES_NOT_MEET"
+            : "NOT_ANSWERED",
+    }));
 }
 
 export type ApplicationFounders = ReturnType<

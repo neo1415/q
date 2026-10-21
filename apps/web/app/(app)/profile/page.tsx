@@ -4,32 +4,35 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cache, Suspense, type ReactNode } from "react";
 
-import type {
-  ProfileFindingSubjectType,
-  ProfileImageSubjectType,
-} from "@capital-q/contracts";
-import { getThesisReading } from "@capital-q/api-client";
-import { buttonClassName } from "@capital-q/ui/button";
+import type { KybDto, ProfileImageSubjectType } from "@capital-q/contracts";
+import { getKyb, getThesisReading } from "@capital-q/api-client";
 
 import { getSessionUser } from "@/auth/session";
-import { PageContainer } from "@/components/app-shell/page-container";
 import { SignOutButton } from "@/features/auth";
+import {
+  AnswersKvSection,
+  type AnswersKvEditable,
+} from "@/features/profile/answers-kv";
 import {
   EditableSection,
   ProfileSectionShell,
 } from "@/features/profile/editable-section";
-import type { ProfileJourney } from "@/features/profile/profile-answers";
-import { ProfileAnswers } from "@/features/profile/profile-answers-view";
+import {
+  FoundSection,
+  type FoundSubject,
+} from "@/features/profile/found-section";
+import type {
+  AnswerLine,
+  ProfileJourney,
+} from "@/features/profile/profile-answers";
+import { editableOf } from "@/features/profile/profile-answers-view";
 import {
   loadProfileAnswers,
   loadProfileFindings,
   loadProfileImages,
   loadProfilePage,
+  type AnswersState,
 } from "@/features/profile/profile-data";
-import {
-  SignalsAndVerification,
-  type VerificationState,
-} from "@/features/profile/profile-enrichment";
 import {
   COMPANY_FIELDS,
   INVESTOR_FIELDS,
@@ -38,8 +41,13 @@ import {
   type FieldSpec,
 } from "@/features/profile/profile-fields";
 import { FounderBackgroundSection } from "@/features/profile/founder-background-section";
-import { ProfileHero } from "@/features/profile/profile-header";
+import { OwnProfileHero } from "@/features/profile/profile-header";
 import { ProfileImageEditor } from "@/features/profile/profile-image-editor";
+import {
+  VerificationSection,
+  type VerificationLine,
+} from "@/features/profile/verification-section";
+import { VisibilityLabel } from "@/features/profile/visibility-label";
 import { QCardSection } from "@/features/q-card/q-card-section";
 import { ProfileTeamSection } from "@/features/team/profile-team";
 import { ThesisSection } from "@/features/investor/thesis-section";
@@ -51,22 +59,25 @@ import {
 import { QPageSubject } from "@/features/q/q-subject";
 import { serverT } from "@/features/i18n/server";
 import { qPitchEnabled } from "@/features/q-pitch/flag";
+import { AccountToastProvider } from "@/features/settings/account-kit";
+import { accountButton } from "@/features/settings/account-styles";
 
 export const metadata: Metadata = { title: "Profile" };
 export const dynamic = "force-dynamic";
 
 /**
- * Profile (BIZ-002), laid out the LinkedIn way (founder directive
- * 2026-09-28): a header block -- cover, the round photo overlapping it,
- * name, headline, location, key facts, actions -- then clean sections
- * (About, Company or Mandate, Team, Traction and raise, Activity and
- * relationships, Documents), each with its own Edit, and a right rail with
- * what Q found and what Capital Q verified, kept apart on ADR-001's axes.
+ * Your profile (BIZ-002; chosen design "One page, edit in place",
+ * 2026-10-21): one column, every section editable where it stands, each
+ * saying who can see it -- only your company or firm, Capital Q members,
+ * or anyone with your link. The mandate is shown as declared and is never
+ * rewritten from what the person watches or saves; what Q found in public
+ * waits for the person's approval, with its source and "Not verified";
+ * how Q reads the thesis is labelled a reading.
  *
  * Every value is the API's answer under the person's own session; every
  * edit goes through the same write path Q's approved actions use. Photos
- * go browser -> storage directly on a signed upload and are shown from
- * short-lived signed URLs.
+ * and logos go browser -> storage directly on a signed upload and are
+ * shown from short-lived signed URLs.
  */
 
 /** The declared values a profile's fields edit, and nothing else of the DTO. */
@@ -101,26 +112,8 @@ function shown<F extends string>(
   return spec === undefined ? value : displayValue(spec.input, value);
 }
 
-function hostOf(url: string | null): string | null {
-  if (url === null) return null;
-  try {
-    return new URL(url).host.replace(/^www\./, "");
-  } catch {
-    return null;
-  }
-}
-
 /** What a declared field is, on the three axes, in words. */
 const DECLARED = "Your statement · self-reported";
-
-function dayOf(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
 
 /** One read of the onboarding answers per request, shared by every section. */
 const pageAnswers = cache(async () => {
@@ -131,6 +124,19 @@ const pageAnswers = cache(async () => {
   return loadProfileAnswers(session, context);
 });
 
+const STANDING_WORDS: Readonly<
+  Record<
+    KybDto["standing"],
+    { readonly words: string; readonly state: VerificationLine["state"] }
+  >
+> = {
+  VERIFIED: { words: "Verified by Capital Q", state: "VERIFIED" },
+  PENDING: { words: "Requested, with Capital Q", state: "WAITING" },
+  NOT_REQUESTED: { words: "Not requested", state: "NONE" },
+  EXPIRED: { words: "Expired, ask again", state: "NONE" },
+  REVOKED: { words: "Declined", state: "NONE" },
+};
+
 export default async function ProfilePage() {
   const t = await serverT();
   const [user, session, context] = await Promise.all([
@@ -138,7 +144,12 @@ export default async function ProfilePage() {
     apiSession(),
     resolveOwnContext(),
   ]);
-  const data = await loadProfilePage(session, context);
+  const [data, kyb] = await Promise.all([
+    loadProfilePage(session, context),
+    session === null || context.kind === "NONE"
+      ? Promise.resolve(null)
+      : getKyb(session).catch(() => null),
+  ]);
   const { person, company, investor } = data;
   const name = person?.displayName ?? null;
   const [personImages, orgImages] = await Promise.all([
@@ -151,6 +162,13 @@ export default async function ProfilePage() {
         ? loadProfileImages(session, "INVESTOR_ORGANISATION", investor.id)
         : Promise.resolve(null),
   ]);
+
+  const journey: ProfileJourney | null =
+    company !== null ? "founder" : investor !== null ? "investor" : null;
+  const side = company !== null ? "company" : "firm";
+  const vis = (scope: "private" | "members" | "link") => (
+    <VisibilityLabel scope={scope} side={side} translate={t} />
+  );
 
   const location =
     company !== null
@@ -167,109 +185,157 @@ export default async function ProfilePage() {
       : investor !== null
         ? shown(INVESTOR_FIELDS, "hqCountry", investor.hqCountry)
         : null;
-
-  const website = company?.websiteUrl ?? investor?.websiteUrl ?? null;
   const facts: ReactNode[] = [
+    company?.canonicalName ?? investor?.displayName ?? null,
+    location,
+    user?.email ?? null,
+  ].filter((fact): fact is string => fact !== null && fact !== "");
+
+  const identityLabel =
+    journey === "investor" ? "Investor identity" : "Founder identity";
+  const identity =
+    kyb === null
+      ? null
+      : {
+          words:
+            kyb.person.standing === "VERIFIED"
+              ? t(`${identityLabel}: verified by Capital Q`)
+              : kyb.person.standing === "PENDING"
+                ? t(`${identityLabel}: with Capital Q`)
+                : t(`${identityLabel}: not verified`),
+          verified: kyb.person.standing === "VERIFIED",
+        };
+  const verificationLines: VerificationLine[] =
+    kyb === null
+      ? []
+      : [
+          {
+            key: "IDENTITY",
+            label: identityLabel,
+            ...STANDING_WORDS[kyb.person.standing],
+          },
+          {
+            key: "ORGANISATION",
+            label: "Organisation",
+            ...STANDING_WORDS[kyb.standing],
+          },
+        ];
+
+  const answers = journey === null ? null : await pageAnswers();
+  const kv = (include: readonly string[]) =>
+    answers === null || journey === null
+      ? { lines: [] as readonly AnswerLine[], editable: null }
+      : answerRows(journey, answers, include);
+
+  const foundSubjects = (
+    subjects: readonly Omit<FoundSubject, "findings">[],
+  ) => (
+    <Suspense
+      fallback={
+        <FoundSection
+          visibility={vis("private")}
+          subjects={subjects.map((subject) => ({
+            ...subject,
+            findings: { status: "LOADING" },
+          }))}
+        />
+      }
+    >
+      <FoundRead subjects={subjects} visibility={vis("private")} />
+    </Suspense>
+  );
+  const subjects: Omit<FoundSubject, "findings">[] = [
     ...(company !== null
       ? [
-          company.canonicalName,
-          shown(COMPANY_FIELDS, "currentStageCode", company.currentStageCode),
+          {
+            subjectType: "COMPANY" as const,
+            subjectId: company.id,
+            label: company.canonicalName,
+            hasWebsite: Boolean(company.websiteUrl),
+            version: company.version,
+          },
         ]
       : investor !== null
         ? [
-            investor.displayName,
-            shown(INVESTOR_FIELDS, "investorType", investor.investorType),
-            shown(INVESTOR_FIELDS, "deploymentState", investor.deploymentState),
+            {
+              subjectType: "INVESTOR_ORGANISATION" as const,
+              subjectId: investor.id,
+              label: investor.displayName,
+              hasWebsite: Boolean(investor.websiteUrl),
+              version: investor.version,
+            },
           ]
         : []),
-  ].filter((fact): fact is string => fact !== null && fact !== undefined);
-  const host = hostOf(website);
-  if (website !== null && host !== null) {
-    facts.push(
-      <a
-        href={website}
-        target="_blank"
-        rel="noopener noreferrer nofollow"
-        className="font-semibold text-(--cq-text-primary) underline decoration-(--cq-border-strong) underline-offset-4 hover:decoration-(--cq-text-primary)"
-      >
-        {host}
-      </a>,
-    );
-  }
+    ...(person === null
+      ? []
+      : [
+          {
+            subjectType: "PERSON" as const,
+            subjectId: person.userId,
+            label: "me",
+            hasWebsite: false,
+            version: person.version,
+          },
+        ]),
+  ];
 
-  const journey: ProfileJourney | null =
-    company !== null ? "founder" : investor !== null ? "investor" : null;
+  const mandate = kv([
+    "mandate",
+    "cheque",
+    "focus",
+    "criteria",
+    "founder_fit",
+    "exclusions",
+    "discovery",
+    "thesis",
+  ]);
+  const traction = kv(["traction", "raise"]);
+  // An investor's role answers; a founder's background has its own rows.
+  const role = journey === "investor" ? kv(["role"]) : kv([]);
 
   return (
-    <PageContainer>
-      {company !== null ? (
-        <QPageSubject
-          subject={{
-            kind: "COMPANY",
-            companyId: company.id,
-            label: company.canonicalName,
-            scope: "organisation_private",
-          }}
-        />
-      ) : investor !== null ? (
-        <QPageSubject
-          subject={{
-            kind: "INVESTOR_ORGANISATION",
-            investorOrganisationId: investor.id,
-            label: investor.displayName,
-            scope: "organisation_private",
-          }}
-        />
-      ) : null}
-
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-10">
-        <div className="flex min-w-0 flex-col gap-8">
-          <ProfileHero
-            name={name ?? user?.email ?? "Your profile"}
-            headline={person?.headline ?? null}
-            location={location}
-            facts={facts}
-            images={{
-              subjectType: "PERSON",
-              subjectId: person?.userId ?? "",
-              avatarUrl: personImages?.avatar?.url ?? null,
-              coverUrl: personImages?.cover?.url ?? null,
-              editable: person !== null,
-              avatarLabel: "profile photo",
+    <AccountToastProvider>
+      <div className="mx-auto w-full max-w-[calc(820px+4rem)] px-4 pt-5 pb-28 sm:px-6 lg:px-8 lg:pt-8">
+        {company !== null ? (
+          <QPageSubject
+            subject={{
+              kind: "COMPANY",
+              companyId: company.id,
+              label: company.canonicalName,
+              scope: "organisation_private",
             }}
-            actions={
-              <>
-                <a href="#you" className={buttonClassName("primary")}>
-                  {t("Edit profile")}
-                </a>
-                {company !== null || investor !== null ? (
-                  <a href="#q-card" className={buttonClassName("secondary")}>
-                    {t("Share Q Card")}
-                  </a>
-                ) : null}
-                {journey === null ? null : (
-                  <Link
-                    href="/company/visibility"
-                    className={buttonClassName("quiet")}
-                  >
-                    {t("Visibility")}
-                  </Link>
-                )}
-              </>
-            }
           />
+        ) : investor !== null ? (
+          <QPageSubject
+            subject={{
+              kind: "INVESTOR_ORGANISATION",
+              investorOrganisationId: investor.id,
+              label: investor.displayName,
+              scope: "organisation_private",
+            }}
+          />
+        ) : null}
 
-          {journey === null ? null : (
-            <Suspense fallback={<StatRowSkeleton />}>
-              <StatRow journey={journey} />
-            </Suspense>
-          )}
+        <OwnProfileHero
+          name={name ?? user?.email ?? t("Your profile")}
+          headline={person?.headline ?? null}
+          facts={facts}
+          identity={identity}
+          photo={{
+            subjectId: person?.userId ?? "",
+            url: personImages?.avatar?.url ?? null,
+            editable: person !== null,
+          }}
+        />
 
+        <div className="flex flex-col gap-3.5">
           {company !== null ? (
             <>
               <EditableSection
                 id="about"
-                title={t("About")}
+                variant="brief"
+                title={t("In your words")}
+                visibility={vis("members")}
                 profile={{
                   kind: "COMPANY",
                   subjectId: company.id,
@@ -284,7 +350,9 @@ export default async function ProfilePage() {
               />
               <EditableSection
                 id="company"
-                title={t("Company")}
+                variant="brief"
+                title={t("Your company")}
+                visibility={vis("members")}
                 profile={{
                   kind: "COMPANY",
                   subjectId: company.id,
@@ -300,25 +368,35 @@ export default async function ProfilePage() {
                 <OrganisationImages
                   subjectType="COMPANY"
                   subjectId={company.id}
+                  name={company.canonicalName}
                   avatarUrl={orgImages?.avatar?.url ?? null}
                   coverUrl={orgImages?.cover?.url ?? null}
                 />
-                <AnswersSlot
-                  journey="founder"
-                  include={["sector"]}
-                  provenance={false}
-                  emptyText="Your sector appears here once you tell Q about it."
-                />
-                <p className="cq-caption text-(--cq-text-tertiary)">
-                  Updated {dayOf(company.updatedAt)}
-                </p>
               </EditableSection>
+              <AnswersKvSection
+                id="traction"
+                title={t("Traction and raise")}
+                journey="founder"
+                lines={traction.lines}
+                editable={traction.editable}
+                setupHref="/onboarding/founder?review=1"
+                visibility={vis("private")}
+                intro={t(
+                  "Your own statements from setup. Nothing here is marked verified until it is checked.",
+                )}
+                saveLabel="Save"
+                savedToast="Saved. Your profile shows it now."
+                emptyText="Traction and your raise appear here once you tell Q about them."
+              />
+              {foundSubjects(subjects)}
             </>
           ) : investor !== null ? (
             <>
               <EditableSection
                 id="about"
-                title={t("About")}
+                variant="brief"
+                title={t("In your words")}
+                visibility={vis("members")}
                 profile={{
                   kind: "INVESTOR_ORGANISATION",
                   subjectId: investor.id,
@@ -328,9 +406,28 @@ export default async function ProfilePage() {
                   provenance: DECLARED,
                 }}
               />
-              <EditableSection
+              <AnswersKvSection
                 id="mandate"
-                title={t("Your organisation")}
+                title={t("Investment mandate")}
+                journey="investor"
+                lines={mandate.lines}
+                editable={mandate.editable}
+                setupHref="/onboarding/investor?review=1"
+                visibility={vis("private")}
+                intro={t(
+                  "This is your mandate as you declared it. Discover works from it, and it is never rewritten from what you watch or save.",
+                )}
+                saveLabel="Save mandate"
+                savedToast="Done. Your mandate is updated, and your feed follows it."
+                saveNote="Your feed follows the saved mandate."
+                emptyText="Your mandate appears here once you tell Q how you invest."
+              />
+              {foundSubjects(subjects)}
+              <EditableSection
+                id="firm"
+                variant="brief"
+                title={t("Your firm")}
+                visibility={vis("members")}
                 profile={{
                   kind: "INVESTOR_ORGANISATION",
                   subjectId: investor.id,
@@ -343,46 +440,27 @@ export default async function ProfilePage() {
                 <OrganisationImages
                   subjectType="INVESTOR_ORGANISATION"
                   subjectId={investor.id}
+                  name={investor.displayName}
                   avatarUrl={orgImages?.avatar?.url ?? null}
                   coverUrl={orgImages?.cover?.url ?? null}
                 />
-                <p className="cq-caption text-(--cq-text-tertiary)">
-                  Updated {dayOf(investor.updatedAt)}
-                </p>
               </EditableSection>
-              {/* The mandate, one card per part, each edited in place (ADR 0024). */}
-              <AnswersSlot
-                journey="investor"
-                bare={false}
-                include={[
-                  "mandate",
-                  "cheque",
-                  "focus",
-                  "criteria",
-                  "founder_fit",
-                  "exclusions",
-                  "discovery",
-                  "thesis",
-                ]}
-              />
-              {/* Q.02: declared vs what they did vs Q's reading, apart. */}
-              <Suspense fallback={null}>
-                <ThesisSlot investorOrganisationId={investor.id} />
-              </Suspense>
             </>
           ) : context.kind === "NONE" && context.unavailable !== true ? (
             <ProfileSectionShell
               id="organisation"
+              variant="brief"
               title={t("Company or investor organisation")}
               description={t(
                 "You haven't set one up yet. Onboarding creates it, and it appears here to edit.",
               )}
             >
-              <div>
-                <Link href="/welcome" className={buttonClassName("secondary")}>
-                  {t("Set up")}
-                </Link>
-              </div>
+              <Link
+                href="/welcome"
+                className={accountButton("secondary", "sm", "self-start")}
+              >
+                {t("Set up")}
+              </Link>
             </ProfileSectionShell>
           ) : context.kind !== "NONE" ? (
             <Unavailable what="your organisation's profile" />
@@ -393,11 +471,9 @@ export default async function ProfilePage() {
           ) : (
             <EditableSection
               id="you"
-              title={
-                journey === "investor"
-                  ? "You and your role"
-                  : "You and your team"
-              }
+              variant="brief"
+              title={t("Education and background")}
+              visibility={vis("members")}
               profile={{
                 kind: "PERSON",
                 fields: PERSON_FIELDS,
@@ -409,19 +485,31 @@ export default async function ProfilePage() {
                 provenance: DECLARED,
               }}
             >
-              {journey === null ? null : (
-                <AnswersSlot
-                  journey={journey}
-                  include={journey === "founder" ? ["team"] : ["role"]}
-                  provenance={false}
-                  emptyText={
-                    journey === "founder"
-                      ? "Your team appears here once you tell Q about it."
-                      : "Your role appears here once you tell Q about it."
-                  }
-                />
+              {role.lines.length === 0 ? null : (
+                <dl className="m-0 flex flex-col border-t border-(--cq-border-subtle)">
+                  {role.lines.map((line) => (
+                    <div
+                      key={line.stepKey}
+                      className="flex flex-col gap-0.5 border-t border-(--cq-border-subtle) py-2.5 first:border-t-0 sm:grid sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-0"
+                    >
+                      <dt className="text-[13px] text-(--cq-text-secondary)">
+                        {t(line.title)}
+                      </dt>
+                      <dd className="m-0 text-sm text-(--cq-text-primary)">
+                        {line.items !== undefined &&
+                        line.items !== null &&
+                        line.items.length > 0
+                          ? line.items.join(", ")
+                          : (line.value ?? (
+                              <span className="text-(--cq-text-tertiary)">
+                                {t("Not added")}
+                              </span>
+                            ))}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
               )}
-              {/* F4: title, previous roles and education, in their words. */}
               {journey === "founder" && company !== null ? (
                 <Suspense fallback={null}>
                   <FounderBackgroundSection companyId={company.id} />
@@ -430,22 +518,30 @@ export default async function ProfilePage() {
             </EditableSection>
           )}
 
-          {journey === "founder" ? (
-            <ProfileSectionShell
-              id="traction"
-              title={t("Traction and raise")}
-              action={
-                <Link
-                  href="/relationships?view=capital"
-                  className={buttonClassName("quiet", "regular", "shrink-0")}
-                >
-                  {t("Open Capital")}
-                </Link>
-              }
-            >
-              <AnswersSlot journey="founder" include={["traction", "raise"]} />
-            </ProfileSectionShell>
+          {investor !== null ? (
+            <Suspense fallback={null}>
+              <ThesisSlot investorOrganisationId={investor.id} />
+            </Suspense>
           ) : null}
+
+          {journey === null ? null : (
+            <VerificationSection
+              lines={verificationLines}
+              href="/verification"
+              translate={t}
+              request={
+                company !== null &&
+                data.verification.status === "READ" &&
+                data.verification.standings.some(
+                  (standing) =>
+                    standing.status === "NOT_REQUESTED" ||
+                    standing.status === "EXPIRED",
+                )
+                  ? { companyId: company.id, requestKey: randomUUID() }
+                  : null
+              }
+            />
+          )}
 
           {/* G2: the company or firm as a team. */}
           <Suspense fallback={null}>
@@ -454,7 +550,12 @@ export default async function ProfilePage() {
 
           {/* The shareable identity (BIZ-004). */}
           {company !== null || investor !== null ? (
-            <ProfileSectionShell id="q-card" title={t("Q Card")}>
+            <ProfileSectionShell
+              id="q-card"
+              variant="brief"
+              title={t("Q Card")}
+              visibility={vis("link")}
+            >
               {company !== null ? (
                 <QCardSection
                   subjectType="COMPANY"
@@ -485,104 +586,104 @@ export default async function ProfilePage() {
             </ProfileSectionShell>
           ) : null}
 
-          {/* Q Pitch lives here, not in the sidebar (owner 2026-10-17). */}
-          {qPitchEnabled() ? (
-            <div className="border-t border-(--cq-border-subtle) pt-6">
+          <div className="flex flex-wrap items-center gap-2.5 border-t border-(--cq-border-subtle) pt-5">
+            {journey === null ? null : (
+              <Link
+                href="/company/visibility"
+                className={accountButton("quiet", "sm")}
+              >
+                {t("Who sees what")}
+              </Link>
+            )}
+            {/* Q Pitch lives here, not in the sidebar (owner 2026-10-17). */}
+            {qPitchEnabled() ? (
               <Link
                 href="/q-pitch"
-                className={buttonClassName("secondary")}
+                className={accountButton("secondary", "sm")}
                 data-profile-q-pitch
               >
                 {t("Q Pitch")}
               </Link>
-            </div>
-          ) : null}
-
-          <div className="border-t border-(--cq-border-subtle) pt-6">
-            <SignOutButton />
+            ) : null}
+            <span className="ms-auto">
+              <SignOutButton />
+            </span>
           </div>
         </div>
-
-        <aside
-          aria-label={t("What else is known")}
-          className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:self-start"
-        >
-          <SignalsSlot
-            subjects={[
-              ...(company !== null
-                ? [
-                    {
-                      subjectType: "COMPANY" as const,
-                      subjectId: company.id,
-                      label: company.canonicalName,
-                      heading: "Your company",
-                      hasWebsite: Boolean(company.websiteUrl),
-                    },
-                  ]
-                : investor !== null
-                  ? [
-                      {
-                        subjectType: "INVESTOR_ORGANISATION" as const,
-                        subjectId: investor.id,
-                        label: investor.displayName,
-                        heading: "Your organisation",
-                        hasWebsite: Boolean(investor.websiteUrl),
-                      },
-                    ]
-                  : []),
-              ...(person === null
-                ? []
-                : [
-                    {
-                      subjectType: "PERSON" as const,
-                      subjectId: person.userId,
-                      label: "me",
-                      heading: "You",
-                      hasWebsite: false,
-                    },
-                  ]),
-            ]}
-            verification={company !== null ? data.verification : null}
-            verificationHref={company !== null ? "/verification" : null}
-            verificationCompanyId={company !== null ? company.id : null}
-            verificationRequestKey={company !== null ? randomUUID() : null}
-          />
-        </aside>
       </div>
-    </PageContainer>
+    </AccountToastProvider>
   );
 }
 
 /**
+ * Setup answers as label-and-value rows for one section: the included
+ * groups' lines in order, and the steps it may edit in place (a completed
+ * setup's revisable steps, ADR 0024), or null when setup is where they
+ * change.
+ */
+function answerRows(
+  journey: ProfileJourney,
+  state: AnswersState,
+  include: readonly string[],
+): {
+  readonly lines: readonly AnswerLine[];
+  readonly editable: AnswersKvEditable | null;
+} {
+  if (state.status !== "READ") return { lines: [], editable: null };
+  const groups = include.flatMap((id) => {
+    const group = state.groups.find((candidate) => candidate.id === id);
+    return group === undefined ? [] : [group];
+  });
+  const lines = groups.flatMap((group) => group.lines);
+  const editables = groups.flatMap((group) => {
+    const editable = editableOf(journey, group, state);
+    return editable === null ? [] : [editable];
+  });
+  const first = editables[0];
+  return {
+    lines,
+    editable:
+      first === undefined
+        ? null
+        : {
+            stepKeys: [
+              ...new Set(editables.flatMap((editable) => editable.stepKeys)),
+            ],
+            responses: first.responses,
+            labels: first.labels,
+          },
+  };
+}
+
+/**
  * The organisation's own logo and cover: what its Q Card shows (through
- * the card's photo and cover settings). Edited here, beside the profile
- * they belong to.
+ * the card's photo and cover settings). Each opens a sheet to upload,
+ * replace or remove it.
  */
 function OrganisationImages({
   subjectType,
   subjectId,
+  name,
   avatarUrl,
   coverUrl,
 }: {
   readonly subjectType: ProfileImageSubjectType;
   readonly subjectId: string;
+  readonly name: string;
   readonly avatarUrl: string | null;
   readonly coverUrl: string | null;
 }) {
   return (
     <div
-      className="flex flex-col gap-3 border-t border-(--cq-border-subtle) pt-4"
+      className="flex flex-col gap-0.5 border-t border-(--cq-border-subtle) py-2.5 sm:grid sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-0"
       data-organisation-images
     >
-      <div className="flex flex-col gap-0.5">
-        <h3 className="cq-label text-(--cq-text-primary)">Logo and cover</h3>
-        <p className="cq-caption text-(--cq-text-secondary)">
-          Shown on your Q Card when its photo and cover are switched on.
-        </p>
-      </div>
+      <span className="text-[13px] text-(--cq-text-secondary) sm:pt-2.5">
+        Logo and cover
+      </span>
       <div className="flex items-center gap-4">
         <div className="relative shrink-0">
-          <div className="size-16 overflow-hidden rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle)">
+          <div className="size-14 overflow-hidden rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle)">
             {avatarUrl === null ? null : (
               // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, browser to storage directly
               <img
@@ -592,17 +693,21 @@ function OrganisationImages({
               />
             )}
           </div>
-          <div className="absolute -right-2 -bottom-2">
+          <div className="absolute -end-1.5 -bottom-1.5">
             <ProfileImageEditor
               subjectType={subjectType}
               subjectId={subjectId}
               kind="AVATAR"
               label="logo"
               hasImage={avatarUrl !== null}
+              previewUrl={avatarUrl}
+              previewName={name}
+              square
+              compact
             />
           </div>
         </div>
-        <div className="relative aspect-[4/1] h-16 min-w-0 overflow-hidden rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-strong)">
+        <div className="relative aspect-[4/1] h-14 min-w-0 overflow-hidden rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-strong)">
           {coverUrl === null ? null : (
             // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, browser to storage directly
             <img src={coverUrl} alt="" className="size-full object-cover" />
@@ -612,8 +717,10 @@ function OrganisationImages({
               subjectType={subjectType}
               subjectId={subjectId}
               kind="COVER"
-              label="company cover"
+              label="cover"
               hasImage={coverUrl !== null}
+              previewUrl={coverUrl}
+              compact
             />
           </div>
         </div>
@@ -622,56 +729,22 @@ function OrganisationImages({
   );
 }
 
-type SignalsSubjectRef = {
-  readonly subjectType: ProfileFindingSubjectType;
-  readonly subjectId: string;
-  readonly label: string;
-  readonly heading: string;
-  readonly hasWebsite: boolean;
-};
-
-type SignalsProps = {
-  readonly subjects: readonly SignalsSubjectRef[];
-  readonly verification: VerificationState | null;
-  readonly verificationHref: string | null;
-  // ADMIN-4 block: the inline "Request verification" button.
-  readonly verificationCompanyId: string | null;
-  readonly verificationRequestKey: string | null;
-};
-
-/**
- * Signals & verification, streamed: the declared profile paints at once
- * and what Q found arrives when the Q API has read it, for every subject
- * in one card (the organisation, then the person).
- */
-function SignalsSlot(props: SignalsProps) {
-  return (
-    <Suspense
-      fallback={
-        <SignalsAndVerification
-          {...props}
-          subjects={props.subjects.map((subject) => ({
-            ...subject,
-            findings: { status: "LOADING" },
-          }))}
-        />
-      }
-    >
-      <SignalsRead {...props} />
-    </Suspense>
-  );
-}
-
-async function SignalsRead(props: SignalsProps) {
+async function FoundRead({
+  subjects,
+  visibility,
+}: {
+  readonly subjects: readonly Omit<FoundSubject, "findings">[];
+  readonly visibility: ReactNode;
+}) {
   const findings = await Promise.all(
-    props.subjects.map((subject) =>
+    subjects.map((subject) =>
       loadProfileFindings(subject.subjectType, subject.subjectId),
     ),
   );
   return (
-    <SignalsAndVerification
-      {...props}
-      subjects={props.subjects.map((subject, at) => ({
+    <FoundSection
+      visibility={visibility}
+      subjects={subjects.map((subject, at) => ({
         ...subject,
         findings: findings[at] ?? { status: "UNAVAILABLE" },
       }))}
@@ -679,158 +752,9 @@ async function SignalsRead(props: SignalsProps) {
   );
 }
 
-/** The hero's key facts, in the person's own answers (founder design). */
-async function StatRow({ journey }: { readonly journey: ProfileJourney }) {
-  const state = await pageAnswers();
-  if (state.status !== "READ") return null;
-  const line = (stepKey: string) =>
-    state.groups
-      .flatMap((group) => group.lines)
-      .find((candidate) => candidate.stepKey === stepKey);
-  const listOf = (stepKey: string, max = 3) => {
-    const found = line(stepKey);
-    const items = found?.items ?? (found?.value == null ? [] : [found.value]);
-    return items.length === 0
-      ? null
-      : items.slice(0, max).join(", ") +
-          (items.length > max ? ` +${String(items.length - max)}` : "");
-  };
-  const stats: readonly {
-    readonly label: string;
-    readonly value: string | null;
-  }[] =
-    journey === "investor"
-      ? [
-          {
-            label: "Typical cheque",
-            value: line("I2.cheque_typical")?.value ?? null,
-          },
-          { label: "Stages", value: listOf("I2.stages") },
-          { label: "Key sectors", value: listOf("I3.sectors") },
-        ]
-      : [
-          { label: "Sector", value: listOf("F1.categories", 2) },
-          { label: "Team", value: line("F4.team_size")?.value ?? null },
-          {
-            label: "Raise",
-            value:
-              line("F6.target_amount")?.value ??
-              line("objective.stage")?.value ??
-              null,
-          },
-        ];
-  return (
-    <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3" data-profile-stats>
-      {stats.map((stat) => (
-        <div
-          key={stat.label}
-          className="flex flex-col gap-1 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3"
-        >
-          <dt className="cq-caption text-(--cq-text-secondary)">
-            {stat.label}
-          </dt>
-          <dd
-            className={
-              stat.value === null
-                ? "cq-body text-(--cq-text-tertiary)"
-                : "cq-title-sm cq-numeric text-(--cq-text-primary)"
-            }
-          >
-            {stat.value ?? "Not added"}
-          </dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function StatRowSkeleton() {
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" aria-busy="true">
-      {[0, 1, 2].map((key) => (
-        <div
-          key={key}
-          className="h-16 animate-pulse rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) motion-reduce:animate-none"
-        />
-      ))}
-    </div>
-  );
-}
-
-/**
- * The onboarding answers (R25) a section shows, streamed: the declared
- * fields paint at once, and the answers arrive when the onboarding session
- * (and its taxonomy labels) have been read -- once per request.
- */
-function AnswersSlot({
-  journey,
-  include,
-  emptyText,
-  provenance,
-  bare = true,
-}: {
-  readonly journey: ProfileJourney;
-  readonly include: readonly string[];
-  readonly emptyText?: string | undefined;
-  readonly provenance?: boolean | undefined;
-  /** Inside a section card (the default); false for free-standing cards. */
-  readonly bare?: boolean | undefined;
-}) {
-  return (
-    <div className="pt-2">
-      <Suspense
-        fallback={
-          <p
-            className="cq-body-sm text-(--cq-text-tertiary)"
-            data-answers="loading"
-          >
-            Reading what you told Q…
-          </p>
-        }
-      >
-        <AnswersRead
-          journey={journey}
-          include={include}
-          emptyText={emptyText}
-          provenance={provenance}
-          bare={bare}
-        />
-      </Suspense>
-    </div>
-  );
-}
-
-async function AnswersRead({
-  journey,
-  include,
-  emptyText,
-  provenance,
-  bare,
-}: {
-  readonly journey: ProfileJourney;
-  readonly include: readonly string[];
-  readonly emptyText?: string | undefined;
-  readonly provenance?: boolean | undefined;
-  readonly bare: boolean;
-}) {
-  const state = await pageAnswers();
-  const t = await serverT();
-  return (
-    <ProfileAnswers
-      translate={t}
-      journey={journey}
-      state={state}
-      include={include}
-      emptyText={emptyText}
-      provenance={provenance}
-      bare={bare}
-    />
-  );
-}
-
 function Unavailable({ what }: { readonly what: string }) {
   return (
-    <p className="cq-body-sm text-(--cq-text-secondary)">
+    <p className="m-0 text-sm text-(--cq-text-secondary)">
       Couldn&apos;t load {what} just now. Nothing is wrong with your account;
       reload in a moment.
     </p>
@@ -839,8 +763,8 @@ function Unavailable({ what }: { readonly what: string }) {
 
 /**
  * Q.02: the investor's own thesis reading, from the Q API (the same read
- * as Q's thesis_reading). Nothing shows when it cannot be read: the rules
- * above stay the source of truth either way.
+ * as Q's thesis_reading). Nothing shows when it cannot be read: the
+ * declared mandate stays the source of truth either way.
  */
 async function ThesisSlot({
   investorOrganisationId,

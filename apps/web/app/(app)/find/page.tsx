@@ -9,7 +9,10 @@ export default async function FindPage({
   const handle = (await searchParams)?.handle;
   redirect(
     typeof handle === "string" && handle.length > 0
-      ? `/search?${new URLSearchParams({ q: handle, tab: "people" }).toString()}`
+      ? `/search?${new URLSearchParams({
+          // A handle, so the palette opens that Q Card.
+          q: handle.startsWith("@") ? handle : `@${handle}`,
+        }).toString()}`
       : "/search",
   );
 }

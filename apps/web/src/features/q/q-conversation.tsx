@@ -66,20 +66,15 @@ import { nextSpokenPiece } from "../voice/spoken-progress";
 import { useQSpeech } from "../voice/use-q-speech";
 import { VoiceMenu } from "../voice/voice-menu";
 import { expectDocument } from "@/features/documents/document-ready";
-import {
-  failureMessage,
-  recoveryHint,
-  workingLabel,
-  type QTurn,
-} from "./conversation";
+import { failureMessage, recoveryHint, type QTurn } from "./conversation";
 import { interceptTyped } from "./typed-intercept";
 import { CardsControls } from "./cards/cards-controls";
 import { announceQGestures } from "@/features/q-swarm/q-gestures";
 import { announceQSaid } from "@/features/q-swarm/q-said";
-import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import { plainFromMarkdown, QMarkdown } from "./markdown";
 import { HideFromQ } from "./hide-from-q";
+import { StageLine } from "./stage-line";
 import { QAnswer } from "./q-answer";
 import { boardTimeline } from "./board-timeline";
 import { QBoardTimeline } from "./q-board-timeline";
@@ -724,7 +719,6 @@ export function QConversationPanel({
     setBoardBump((n) => n + 1);
   }, []);
 
-  const stage = workingLabel(q.state);
   const documentStage =
     q.state.stage === "PREPARING_DOCUMENT" ||
     q.state.stage === "REVISING_DOCUMENT" ||
@@ -1434,11 +1428,42 @@ export function QConversationPanel({
                               mark={false}
                               onAsk={sayOrAsk}
                               onOpenArtifact={showArtifact}
+                              working={
+                                <StageLine
+                                  current={presence.stage}
+                                  size="answer"
+                                  live={false}
+                                  reserve
+                                />
+                              }
                             />
                           )}
                         </li>
                       ),
                     )}
+                    {/* Round 4: Q's answer slot, held from the moment it
+                        starts work, with where it is in the line Q's first
+                        words will take (zero layout shift). */}
+                    {q.working &&
+                    !voice.active &&
+                    thread.at(-1)?.role === "person" ? (
+                      <li
+                        key="q-pending"
+                        className="flex flex-col"
+                        data-q-row="q"
+                        data-q-pending
+                      >
+                        <span className="sr-only">Q: </span>
+                        <div className="cq-q-answer flex w-full max-w-(--cq-layout-reading) flex-col gap-3">
+                          <StageLine
+                            current={presence.stage}
+                            size="answer"
+                            live={false}
+                            reserve
+                          />
+                        </div>
+                      </li>
+                    ) : null}
                     {liveIsPerson ? (
                       <li
                         key={live.id}
@@ -1464,28 +1489,25 @@ export function QConversationPanel({
                 {/* What Q is doing, only while it is doing something: the
                     swarm at work beside it (founder live 2026-09-29), and
                     a document's "one moment" even while talking. */}
-                {voice.active || q.working ? (
-                  <div
-                    className="flex items-center gap-3"
-                    role="status"
-                    data-q-thread-status
-                  >
-                    {q.working ? <QSwarm state="WORKING" pixels={40} /> : null}
-                    <span className="inline-flex items-center gap-2 cq-caption text-(--cq-text-secondary)">
-                      {/* The same dot as the arrival's (owner 2026-10-18). */}
-                      {voice.active ? (
+                {/* A typed answer says where Q is in its own slot above;
+                    on a voice line the state and where Q is sit here, each
+                    one line high so nothing moves as they change. */}
+                {voice.active ? (
+                  <div className="flex items-center gap-3" data-q-thread-status>
+                    <span className="flex min-w-0 flex-col">
+                      <span
+                        className="inline-flex items-center gap-2 cq-caption text-(--cq-text-secondary)"
+                        role="status"
+                      >
+                        {/* The same dot as the arrival's (owner 2026-10-18). */}
                         <span
                           aria-hidden="true"
                           className="size-2 rounded-full bg-(--cq-accent) motion-safe:animate-pulse"
                           data-q-state-dot
                         />
-                      ) : null}
-                      {t(stateLabel ?? "Q")}
-                      {q.working &&
-                      stage !== undefined &&
-                      (!voice.active || documentStage)
-                        ? ` · ${stage}`
-                        : ""}
+                        {t(stateLabel ?? "Q")}
+                      </span>
+                      <StageLine current={presence.stage} reserve />
                     </span>
                   </div>
                 ) : null}
@@ -1575,14 +1597,12 @@ export function QConversationPanel({
                       </ViewTransition>
                     </div>
                   )}
-                  <div
-                    className="flex min-h-6 flex-col items-center gap-1"
-                    role="status"
-                  >
+                  <div className="flex min-h-6 flex-col items-center gap-2">
                     {stateLabel === null ? null : (
                       // A dot and a word ("Listening", "Speaking"), quiet.
                       <span
                         className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
+                        role="status"
                         data-q-state-pill
                       >
                         <span
@@ -1595,11 +1615,9 @@ export function QConversationPanel({
                         {t(stateLabel)}
                       </span>
                     )}
-                    {!voice.active && q.working && stage !== undefined ? (
-                      <span className="cq-caption text-(--cq-text-secondary)">
-                        {stage}
-                      </span>
-                    ) : null}
+                    {/* Round 4: where Q is, one line, its height kept so
+                        the stage never moves as it changes. */}
+                    <StageLine current={presence.stage} reserve />
                   </div>
                 </ArrivalRoom>
 

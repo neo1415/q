@@ -1,0 +1,746 @@
+/*
+ * Work's chosen designs (owner 2026-10-21; prototypes proto-work p-tasks,
+ * p-team, p-cost, p-deleg, p-notices): Tasks as an inbox with its preview,
+ * the plan, cost day by day, the audit trail and the rail by investor.
+ * Tokens only. "Your move" (the gold step, the selected row) reads
+ * --cq-move from the page's option scope (.cq-gold, .cq-ink), else the
+ * accent; dark tiles read --cq-tile. Meaning always has a word beside it.
+ */
+@layer components {
+  .cq-wk {
+    --wk-move: var(--cq-move, var(--cq-accent));
+    --wk-move-soft: var(--cq-move-soft, var(--cq-accent-soft));
+    --wk-move-line: color-mix(
+      in oklab,
+      var(--wk-move) 42%,
+      var(--cq-surface-raised)
+    );
+    --wk-dark: var(--cq-tile, var(--cq-text-primary));
+    --wk-on-dark: var(--cq-on-tile, var(--cq-text-inverse));
+    --wk-amber-line: color-mix(
+      in oklab,
+      var(--cq-warning) 40%,
+      var(--cq-warning-soft)
+    );
+  }
+
+  /* The approval track: Prepared, Recommended, your yes, Sent. */
+  .cq-wk-track {
+    display: flex;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    flex-wrap: wrap;
+  }
+  .cq-wk-track > li {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px 3px 4px;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface-subtle);
+    color: var(--cq-text-tertiary);
+    font-size: 12px;
+    white-space: nowrap;
+    transition:
+      background-color var(--cq-motion-base) var(--cq-ease),
+      color var(--cq-motion-base) var(--cq-ease),
+      border-color var(--cq-motion-base) var(--cq-ease);
+  }
+  .cq-wk-track .cq-wk-tm {
+    display: grid;
+    width: 16px;
+    height: 16px;
+    place-items: center;
+    border: 1.5px solid var(--cq-border);
+    border-radius: var(--cq-radius-circle);
+  }
+  .cq-wk-track .cq-wk-tm > svg {
+    width: 10px;
+    height: 10px;
+  }
+  .cq-wk-track > li[data-step="done"] {
+    color: var(--cq-positive);
+  }
+  .cq-wk-track > li[data-step="done"] .cq-wk-tm {
+    border-color: var(--cq-positive);
+    background: var(--cq-positive);
+    color: var(--cq-text-inverse);
+  }
+  .cq-wk-track > li[data-step="now"] {
+    border-color: var(--wk-move-line);
+    background: var(--wk-move-soft);
+    color: var(--cq-text-primary);
+    font-weight: 600;
+  }
+  .cq-wk-track > li[data-step="now"] .cq-wk-tm {
+    border-color: var(--wk-move);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--wk-move) 18%, transparent);
+  }
+  @media (max-width: 1023px) {
+    .cq-wk-track {
+      flex-wrap: nowrap;
+      gap: 4px;
+    }
+    .cq-wk-track > li {
+      gap: 4px;
+      padding: 2px 7px 2px 3px;
+      font-size: 11px;
+    }
+    .cq-wk-track .cq-wk-tm {
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  /* The prepared message, shown exactly as it will go. */
+  .cq-wk-msg {
+    padding: 12px 14px;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-lg);
+    background: var(--cq-surface-subtle);
+  }
+  .cq-wk-msg > p {
+    margin: 6px 0 0;
+    font-size: 15px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    color: var(--cq-text-primary);
+  }
+  .cq-wk-msg[data-editing] textarea {
+    width: 100%;
+    margin-top: 6px;
+    padding: 4px;
+    border-radius: var(--cq-radius-xs);
+    outline: 2px solid var(--wk-move);
+    outline-offset: 4px;
+    background: var(--cq-surface-raised);
+    color: var(--cq-text-primary);
+    font: inherit;
+    font-size: 15px;
+    line-height: 1.55;
+    resize: vertical;
+  }
+
+  /* A small pill of words with its mark. */
+  .cq-wk-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface-strong);
+    color: var(--cq-text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.45;
+    white-space: nowrap;
+  }
+  .cq-wk-tag > svg {
+    width: 12px;
+    height: 12px;
+    flex: none;
+  }
+  .cq-wk-tag[data-tone="move"] {
+    background: var(--wk-move-soft);
+    color: var(--cq-text-primary);
+  }
+  .cq-wk-tag[data-tone="positive"] {
+    background: var(--cq-positive-soft);
+    color: var(--cq-positive);
+  }
+  .cq-wk-tag[data-tone="gap"] {
+    background: var(--cq-warning-soft);
+    color: var(--cq-warning);
+  }
+  .cq-wk-tag[data-tone="claim"] {
+    background: var(--cq-accent-soft);
+    color: var(--cq-accent);
+  }
+  .cq-wk-hatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    flex: none;
+    border-radius: 2px;
+    background: repeating-linear-gradient(
+      135deg,
+      var(--cq-warning-soft) 0 2px,
+      var(--wk-amber-line) 2px 4px
+    );
+  }
+
+  /* Step marks: a tick, a live ring, an empty ring. Shape, not colour. */
+  .cq-wk-tick {
+    display: grid;
+    width: 20px;
+    height: 20px;
+    flex: none;
+    place-items: center;
+    border-radius: var(--cq-radius-circle);
+    background: var(--cq-positive);
+    color: var(--cq-text-inverse);
+  }
+  .cq-wk-tick > svg {
+    width: 12px;
+    height: 12px;
+  }
+  .cq-wk-ring {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    flex: none;
+    border: 2px solid var(--cq-border);
+    border-radius: var(--cq-radius-circle);
+    background: var(--cq-surface-raised);
+  }
+  .cq-wk-ring[data-now] {
+    border-color: var(--wk-move);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--wk-move) 16%, transparent);
+  }
+  .cq-wk-ring[data-held] {
+    border-style: dashed;
+    border-color: var(--cq-warning);
+  }
+
+  /* The give-Q-a-task input. */
+  .cq-wk-composer {
+    display: flex;
+    min-height: 56px;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px 6px 14px;
+    border: 1px solid var(--cq-border);
+    border-radius: var(--cq-radius-lg);
+    background: var(--cq-surface-raised);
+    transition:
+      border-color var(--cq-motion-fast) ease,
+      box-shadow var(--cq-motion-fast) ease;
+  }
+  .cq-wk-composer:focus-within {
+    border-color: var(--wk-move);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--wk-move) 15%, transparent);
+  }
+  .cq-wk-composer > input {
+    min-width: 0;
+    min-height: 44px;
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: none;
+    color: var(--cq-text-primary);
+    font: inherit;
+    font-size: 15px;
+  }
+  .cq-wk-composer > input::placeholder {
+    color: var(--cq-text-tertiary);
+  }
+
+  /* Option 2 (Tasks): the queue on the left, the decision on the right. */
+  .cq-wk-inbox {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+  @media (min-width: 1024px) {
+    .cq-wk-inbox {
+      grid-template-columns: 360px minmax(0, 1fr);
+    }
+  }
+  .cq-wk-qgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cq-wk-qh {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px 4px;
+    color: var(--cq-text-secondary);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .cq-wk-count {
+    display: inline-grid;
+    min-width: 20px;
+    height: 20px;
+    place-items: center;
+    padding: 0 6px;
+    border-radius: var(--cq-radius-full);
+    background: var(--wk-move-soft);
+    color: var(--cq-text-primary);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+  .cq-wk-qi {
+    display: flex;
+    width: 100%;
+    min-height: 56px;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border-radius: var(--cq-radius-lg);
+    text-align: start;
+    transition:
+      background-color var(--cq-motion-fast) ease,
+      box-shadow var(--cq-motion-fast) ease;
+  }
+  .cq-wk-qi:hover {
+    background: var(--cq-surface-subtle);
+  }
+  .cq-wk-qi[aria-current="true"] {
+    background: var(--cq-surface-raised);
+    box-shadow:
+      inset 0 0 0 1px var(--wk-move-line),
+      inset 3px 0 0 var(--wk-move);
+  }
+  /* On a phone the decision opens in a sheet: no row stays marked. */
+  @media (max-width: 1023px) {
+    .cq-wk-inbox .cq-wk-qi[aria-current="true"] {
+      background: transparent;
+      box-shadow: none;
+    }
+  }
+  .cq-wk-qi > .cq-wk-qbody {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .cq-wk-qi b {
+    color: var(--cq-text-primary);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .cq-wk-qempty {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border: 1px dashed var(--cq-border);
+    border-radius: var(--cq-radius-lg);
+    color: var(--cq-positive);
+    font-size: 13px;
+  }
+  .cq-wk-qdetail {
+    position: sticky;
+    top: 0;
+    display: flex;
+    min-height: 600px;
+    padding: 24px 26px;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-lg);
+    background: var(--cq-surface-raised);
+  }
+  .cq-wk-detail {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .cq-wk-dt {
+    margin: 2px 0 0;
+    color: var(--cq-text-primary);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.25;
+  }
+  @media (max-width: 1023px) {
+    .cq-wk-dt {
+      font-size: 19px;
+    }
+  }
+  .cq-wk-dacts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid var(--cq-border-subtle);
+  }
+  @media (max-width: 1023px) {
+    .cq-wk-dacts > [data-primary] {
+      flex: 1 1 100%;
+    }
+    .cq-wk-dacts > [data-spacer] {
+      display: none;
+    }
+  }
+
+  /* Option 2 (How Q is handling it): the plan. */
+  .cq-wk-tplan {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    align-items: start;
+  }
+  @media (min-width: 1024px) {
+    .cq-wk-tplan {
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 22px;
+    }
+  }
+  .cq-wk-jlist {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .cq-wk-plan-card {
+    padding: 24px 26px;
+    border: 1px solid var(--cq-border-subtle);
+    border-radius: var(--cq-radius-lg);
+    background: var(--cq-surface-raised);
+  }
+  @media (max-width: 1023px) {
+    .cq-wk-plan-card {
+      padding: 18px 16px;
+    }
+  }
+  .cq-wk-pg {
+    max-width: 640px;
+    margin: -8px 0 0;
+    color: var(--cq-text-primary);
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: 1.3;
+  }
+  @media (max-width: 1023px) {
+    .cq-wk-pg {
+      font-size: 19px;
+    }
+  }
+  .cq-wk-contra {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 1px solid var(--wk-amber-line);
+    border-radius: var(--cq-radius-lg);
+    background: var(--cq-warning-soft);
+    color: var(--cq-text-primary);
+  }
+  .cq-wk-contra > svg {
+    flex: none;
+    margin-top: 2px;
+    color: var(--cq-warning);
+  }
+  .cq-wk-contra[data-resolved] {
+    border-color: var(--cq-positive);
+    background: var(--cq-positive-soft);
+  }
+  .cq-wk-contra[data-resolved] > svg {
+    color: var(--cq-positive);
+  }
+  .cq-wk-pplan {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .cq-wk-pplan > li {
+    position: relative;
+    display: flex;
+    gap: 14px;
+    padding: 12px 0;
+  }
+  .cq-wk-pplan > li + li {
+    border-top: 1px solid var(--cq-border-subtle);
+  }
+  .cq-wk-pplan > li[data-step="now"] {
+    margin-inline-start: -10px;
+    padding-inline-start: 10px;
+    border-radius: var(--cq-radius-lg);
+    background: linear-gradient(90deg, var(--wk-move-soft), transparent 70%);
+  }
+  .cq-wk-pplan > li[data-step="next"] .cq-wk-pt {
+    color: var(--cq-text-tertiary);
+    font-weight: 500;
+  }
+  .cq-wk-pt {
+    color: var(--cq-text-primary);
+    font-weight: 600;
+  }
+
+  /* Option 3 (Cost): the days. */
+  .cq-wk-big {
+    color: var(--cq-text-primary);
+    font-size: 34px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .cq-wk-big > small {
+    color: var(--cq-text-tertiary);
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  @media (max-width: 1023px) {
+    .cq-wk-big {
+      font-size: 28px;
+    }
+  }
+  .cq-wk-meter {
+    height: 10px;
+    overflow: hidden;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface-strong);
+  }
+  .cq-wk-meter > i {
+    display: block;
+    height: 100%;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-accent);
+    transition: width 400ms var(--cq-ease);
+  }
+  .cq-wk-meter[data-reached] > i {
+    background: var(--cq-warning);
+  }
+  .cq-wk-days {
+    display: flex;
+    height: 220px;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .cq-wk-dbar {
+    display: flex;
+    height: 100%;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    padding: 4px 0;
+    border-radius: var(--cq-radius-md);
+    transition: background-color var(--cq-motion-fast) ease;
+  }
+  .cq-wk-dbar:hover {
+    background: var(--cq-surface-subtle);
+  }
+  .cq-wk-dbar > i {
+    width: 70%;
+    max-width: 22px;
+    border-radius: 6px 6px 2px 2px;
+    background: color-mix(in oklab, var(--cq-accent) 55%, var(--cq-surface));
+    transition: height 400ms var(--cq-ease);
+  }
+  .cq-wk-dbar[aria-pressed="true"] {
+    background: var(--cq-accent-soft);
+  }
+  .cq-wk-dbar[aria-pressed="true"] > i {
+    background: var(--wk-dark);
+  }
+  .cq-wk-dbar[data-unknown] > i {
+    border: 1px dashed var(--cq-border-strong);
+    background: transparent;
+  }
+  .cq-wk-dbar .cq-wk-dv {
+    color: var(--cq-text-tertiary);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .cq-wk-dbar[aria-pressed="true"] .cq-wk-dv {
+    color: var(--cq-text-primary);
+    font-weight: 600;
+  }
+  .cq-wk-dbar .cq-wk-dd {
+    color: var(--cq-text-tertiary);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (max-width: 1023px) {
+    .cq-wk-days {
+      height: 190px;
+      gap: 1px;
+    }
+    .cq-wk-dbar {
+      position: relative;
+      min-height: 44px;
+    }
+    .cq-wk-dbar .cq-wk-dv {
+      display: none;
+    }
+    .cq-wk-dbar .cq-wk-dd {
+      font-size: 9px;
+    }
+  }
+  .cq-wk-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .cq-wk-br {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 56px;
+    align-items: center;
+    gap: 12px;
+    padding: 2px 0;
+    border-radius: var(--cq-radius-md);
+    font-size: 14px;
+  }
+  .cq-wk-br:hover {
+    background: var(--cq-surface-subtle);
+  }
+  .cq-wk-bt {
+    height: 8px;
+    overflow: hidden;
+    border-radius: var(--cq-radius-full);
+    background: var(--cq-surface-strong);
+  }
+  .cq-wk-bt > i {
+    display: block;
+    height: 100%;
+    border-radius: var(--cq-radius-full);
+    background: color-mix(in oklab, var(--cq-accent) 55%, var(--cq-surface));
+  }
+  @media (max-width: 1023px) {
+    .cq-wk-br {
+      grid-template-columns: minmax(0, 1fr) 56px;
+    }
+    .cq-wk-br > .cq-wk-bt {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+  }
+
+  /* Option 1 (What Q did): every step, newest first. */
+  .cq-wk-audit {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .cq-wk-audit > li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 64px 14px minmax(0, 1fr);
+    gap: 14px;
+    padding: 10px 0;
+  }
+  .cq-wk-audit > li::before {
+    position: absolute;
+    top: 26px;
+    bottom: -14px;
+    inset-inline-start: 84px;
+    width: 2px;
+    background: var(--cq-border-subtle);
+    content: "";
+  }
+  .cq-wk-audit > li:last-child::before {
+    display: none;
+  }
+  .cq-wk-audit .cq-wk-tt {
+    color: var(--cq-text-tertiary);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.4;
+    text-align: end;
+  }
+  .cq-wk-audit .cq-wk-dot {
+    position: relative;
+    z-index: 1;
+    width: 12px;
+    height: 12px;
+    margin-top: 4px;
+    border: 2px solid var(--wk-move-line);
+    border-radius: var(--cq-radius-circle);
+    background: var(--cq-surface-raised);
+  }
+  @media (max-width: 1023px) {
+    .cq-wk-audit > li {
+      grid-template-columns: 46px 12px minmax(0, 1fr);
+      gap: 10px;
+    }
+    .cq-wk-audit > li::before {
+      inset-inline-start: 61px;
+    }
+  }
+
+  /* Option 3 (Notifications): the rail, by investor. */
+  .cq-wk-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .cq-wk-rg {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 4px;
+  }
+  .cq-wk-rg + .cq-wk-rg {
+    border-top: 1px solid var(--cq-border-subtle);
+  }
+  .cq-wk-rn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    color: var(--cq-text-secondary);
+    font-size: 14px;
+    text-align: start;
+  }
+  .cq-wk-rn[data-needs] {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    border-radius: var(--cq-radius-lg);
+    background: var(--wk-dark);
+    color: var(--wk-on-dark);
+    transition: background-color var(--cq-motion-base) var(--cq-ease);
+  }
+  .cq-wk-rn[data-needs] .cq-wk-tag {
+    background: color-mix(in oklab, var(--wk-on-dark) 16%, transparent);
+    color: var(--wk-on-dark);
+  }
+  .cq-wk-rn[data-needs][data-dealt] {
+    background: var(--cq-positive-soft);
+    color: var(--cq-text-primary);
+  }
+  .cq-wk-rn[data-needs][data-dealt] .cq-wk-tag {
+    background: var(--cq-surface-raised);
+    color: var(--cq-positive);
+  }
+
+  /* New content settles in; a finished row leaves to the side. */
+  @keyframes cq-wk-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+  .cq-wk-in {
+    animation: cq-wk-in 280ms var(--cq-ease) both;
+  }
+  .cq-wk-leaving {
+    opacity: 0;
+    transform: translateX(16px);
+    transition:
+      opacity 240ms var(--cq-ease),
+      transform 240ms var(--cq-ease);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-wk-in {
+      animation: none;
+    }
+    .cq-wk-leaving {
+      transition: none;
+    }
+  }
+}

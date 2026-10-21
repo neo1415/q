@@ -393,6 +393,8 @@ describe("person-scoped actions (onboarding)", () => {
       "company.claim.request",
       "company.claim.evidence.upload",
       "company.claim.evidence.complete",
+      // 2026-10-21: the person corrects what Q remembers about them.
+      "memory.correct",
     ]);
     for (const action of PERSON_ACTIONS) {
       // G1/G2: joining a team is the person's own consent, from the
@@ -402,7 +404,10 @@ describe("person-scoped actions (onboarding)", () => {
           ? /^offer\.team_join$/
           : action.area === "gateway"
             ? /^offer\.find_my_startup$/
-            : /^tool\.[a-z_]+$/,
+            : // Their own memory is theirs to correct; Q offers the page.
+              action.area === "memory"
+              ? /^offer\.memory_correction$/
+              : /^tool\.[a-z_]+$/,
       );
     }
   });

@@ -12,11 +12,13 @@ import {
   type ReactNode,
 } from "react";
 
+import { qCurrentStage } from "@capital-q/api-client";
 import type {
   QArtifactPreview,
   QFailureClass,
   QRoomEntry,
   QRoomPreview,
+  QRoomStages,
   QTurnDisposition,
 } from "@capital-q/contracts";
 
@@ -57,6 +59,7 @@ import { QMaterialViewer } from "./material-viewer";
 import { useQSubject, type QSubject } from "./q-subject";
 import { resumableConversation } from "./resume-conversation";
 import { useQRoomFeed } from "./room-feed";
+import type { QWorkingStage } from "./stage-line";
 import { setOpenDocument } from "./screen";
 import { spokenNotYetStored, type SpokenLine } from "./spoken";
 import { useQConversation, type QConversation } from "./use-q-conversation";
@@ -155,6 +158,11 @@ export type QSessionValue = {
     readonly state: QApertureState;
     readonly label: string | undefined;
     readonly detail: string | undefined;
+    /**
+     * Round 4: where Q is now and what it is about (the run's own reads),
+     * for the one live line; null when Q is not working or no stage yet.
+     */
+    readonly stage: QWorkingStage | null;
   };
   /** The page asks for a conversation (null: a new one). */
   readonly open: (conversationId: string | null) => void;
@@ -400,8 +408,19 @@ export function QSessionProvider({
   const onRoomPreview = useCallback((live: QRoomPreview) => {
     setSpokenPreview(live.preview);
   }, []);
+  // The spoken turn's steps, from its run's real stage events.
+  const [roomStages, setRoomStages] = useState<QRoomStages | null>(null);
+  const onRoomStages = useCallback((stages: QRoomStages) => {
+    setRoomStages(stages);
+  }, []);
   const onRoom = useCallback(
     (entries: readonly QRoomEntry[]) => {
+      // The answer has landed: its steps are done.
+      setRoomStages((live) =>
+        live !== null && entries.some((entry) => entry.runId === live.runId)
+          ? null
+          : live,
+      );
       // The answer has landed: its blocks decide what is shown.
       setSpokenPreview((live) =>
         live !== null &&
@@ -426,7 +445,7 @@ export function QSessionProvider({
     },
     [qAbsorb, reread],
   );
-  useQRoomFeed(voice.active, onRoom, undefined, onRoomPreview);
+  useQRoomFeed(voice.active, onRoom, undefined, onRoomPreview, onRoomStages);
 
   const voiceSpeaking = voice.client.state === "Q_SPEAKING";
   const wasSpeaking = useRef(false);
@@ -644,6 +663,28 @@ export function QSessionProvider({
     : !q.working
       ? undefined
       : workingLabel(q.state);
+  const typedSteps = q.state.stageHistory;
+  const current = useMemo<QWorkingStage | null>(() => {
+    if (voice.active) {
+      const last = roomStages?.stages.at(-1);
+      return last === undefined
+        ? null
+        : {
+            stage: last,
+            ...(roomStages?.about === undefined
+              ? {}
+              : { about: roomStages.about }),
+          };
+    }
+    if (!q.working) return null;
+    const now = qCurrentStage(typedSteps);
+    return now === null
+      ? null
+      : {
+          stage: now.stage,
+          ...(now.about === undefined ? {} : { about: now.about }),
+        };
+  }, [voice.active, roomStages, q.working, typedSteps]);
 
   const value = useMemo<QSessionValue>(
     () => ({
@@ -656,7 +697,7 @@ export function QSessionProvider({
       spokenOnly,
       voiceOutcomes,
       spokenPreview,
-      presence: { state, label, detail },
+      presence: { state, label, detail, stage: current },
       open,
       talk,
       act,
@@ -677,6 +718,7 @@ export function QSessionProvider({
       state,
       label,
       detail,
+      current,
       open,
       talk,
       act,
