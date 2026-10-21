@@ -62,6 +62,8 @@ type KeptTurn = {
   text: string;
   channel: string;
   stepKey?: string;
+  stated?: string[];
+  turnRef?: string;
   createdAt: string;
 };
 
@@ -77,6 +79,7 @@ function worldWithThread(prior: readonly KeptTurn[] = []) {
     },
   });
   const thread: KeptTurn[] = [...prior];
+  const readings = new Map<string, string[]>();
   const fetchWithThread: typeof fetch = (input, init) => {
     const url =
       typeof input === "string"
@@ -88,17 +91,37 @@ function worldWithThread(prior: readonly KeptTurn[] = []) {
       if ((init?.method ?? "GET") === "POST") {
         const body = JSON.parse(
           typeof init?.body === "string" ? init.body : "{}",
-        ) as { turns: Omit<KeptTurn, "createdAt">[] };
+        ) as {
+          turnRef: string;
+          turns: Omit<KeptTurn, "createdAt">[];
+          stated?: string[];
+        };
         for (const kept of body.turns) {
-          thread.push({ ...kept, createdAt: new Date().toISOString() });
+          thread.push({
+            ...kept,
+            turnRef: body.turnRef,
+            createdAt: new Date().toISOString(),
+          });
         }
+        if (body.stated !== undefined) readings.set(body.turnRef, body.stated);
         return Promise.resolve(Response.json({ written: true }));
       }
-      return Promise.resolve(Response.json({ items: thread }));
+      // As the API lists it: no reference, a person's line with its reading.
+      return Promise.resolve(
+        Response.json({
+          items: thread.map(({ turnRef, ...kept }) => {
+            const stated =
+              turnRef === undefined ? undefined : readings.get(turnRef);
+            return kept.role === "PERSON" && stated !== undefined
+              ? { ...kept, stated }
+              : kept;
+          }),
+        }),
+      );
     }
     return world.fetch(input, init);
   };
-  return { world: { ...world, fetch: fetchWithThread }, thread };
+  return { world: { ...world, fetch: fetchWithThread }, thread, readings };
 }
 
 const REPLY = {
@@ -196,6 +219,67 @@ describe("onboarding never drops what the person said", () => {
     expect(
       thread.filter((t) => t.role === "PERSON" && t.text === said),
     ).toHaveLength(1);
+  });
+
+  it("keeps what the reading found their words stated, with the exchange (D9)", async () => {
+    const { world, thread, readings } = worldWithThread();
+    const said = "We are fourteen people now.";
+    const agent = createInterviewAgent({
+      gateway: {
+        execute: () => Promise.resolve(REPLY),
+      } as unknown as ModelGateway,
+      firewall,
+      logger,
+      delegation: {
+        read: () => Promise.resolve(reading({ stated: ["F4.team_size"] })),
+      },
+    });
+    await agent.turn({ ...turn(world, said), actor });
+    await settle();
+    const person = thread.find((t) => t.role === "PERSON" && t.text === said);
+    expect(person?.turnRef).toBeDefined();
+    expect(readings.get(person?.turnRef ?? "")).toEqual(["F4.team_size"]);
+  });
+
+  it("after a restart, still records what they said earlier and was never saved (D9)", async () => {
+    // Earlier, before the restart: they gave the website in passing, the
+    // reading noted it, and nothing saved it.
+    const { world } = worldWithThread([
+      {
+        role: "PERSON",
+        text: "Our site is quillmark.health, by the way.",
+        channel: "TEXT",
+        stated: ["F1.website"],
+        createdAt: "2026-10-20T09:00:05.000Z",
+      },
+      {
+        role: "Q",
+        text: "Thanks. How many people work on the company today?",
+        channel: "TEXT",
+        stepKey: "F4.team_size",
+        createdAt: "2026-10-20T09:00:06.000Z",
+      },
+    ]);
+    const prompts: string[] = [];
+    const gateway = {
+      execute: (request: {
+        readonly messages: readonly { readonly content: string }[];
+      }) => {
+        prompts.push(request.messages.map((m) => m.content).join("\n"));
+        return Promise.resolve(REPLY);
+      },
+    } as unknown as ModelGateway;
+    // A fresh agent is a fresh process: nothing held in memory.
+    const agent = createInterviewAgent({
+      gateway,
+      firewall,
+      logger,
+      delegation,
+    });
+    await agent.turn({ ...turn(world, "We are fourteen people."), actor });
+    expect(prompts.join("\n")).toMatch(
+      /already answered these earlier[^\n]*F1\.website \("Our site is quillmark\.health/,
+    );
   });
 
   it("does not press an optional question again after a restart forgot it was asked", async () => {

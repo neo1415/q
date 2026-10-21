@@ -6,6 +6,13 @@ import {
   SAY_MAX_CHARS,
   splitForQ,
 } from "../src/features/onboarding-conversation/conversation";
+import {
+  confirmSent,
+  holdPending,
+  keepTyping,
+  readDraft,
+  unsentAfterReload,
+} from "../src/features/onboarding-conversation/draft-store";
 
 /**
  * Onboarding speed 2026-10-20: a message longer than one turn can carry
@@ -58,5 +65,74 @@ describe("a long message to Q in onboarding", () => {
   it("leaves a short message whole and sends nothing for an empty one", () => {
     expect(splitForQ("  Seed stage.  ")).toEqual(["Seed stage."]);
     expect(splitForQ("   ")).toEqual([]);
+  });
+});
+
+/**
+ * D7: words in the composer, and a message whose reply never came, survive
+ * a closed tab or a dropped connection, per interview, in this browser.
+ */
+describe("onboarding's unsent words are kept in this browser", () => {
+  function memoryStorage() {
+    const items = new Map<string, string>();
+    return {
+      getItem: (key: string) => items.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        items.set(key, value);
+      },
+      removeItem: (key: string) => {
+        items.delete(key);
+      },
+      size: () => items.size,
+    };
+  }
+
+  it("keeps what is typed, per interview", () => {
+    const store = memoryStorage();
+    keepTyping("s1", "We are raising a seed", store);
+    keepTyping("s2", "Angel investor", store);
+    expect(readDraft("s1", store).typing).toBe("We are raising a seed");
+    expect(readDraft("s2", store).typing).toBe("Angel investor");
+  });
+
+  it("holds a sent message until Q's reply confirms it, then forgets it", () => {
+    const store = memoryStorage();
+    holdPending("s1", "Two founders, both full time.", store);
+    expect(readDraft("s1", store).pending).toEqual([
+      "Two founders, both full time.",
+    ]);
+    confirmSent("s1", "Two founders, both full time.", store);
+    expect(readDraft("s1", store).pending).toEqual([]);
+    expect(store.size()).toBe(0);
+  });
+
+  it("offers back after a reload only what never reached Q", () => {
+    expect(
+      unsentAfterReload(
+        ["Seed stage.", "We burn 40k a month."],
+        ["Hello.", "Seed stage."],
+      ),
+    ).toEqual(["We burn 40k a month."]);
+  });
+
+  it("works, without keeping anything, when storage is blocked", () => {
+    const blocked = {
+      getItem: () => {
+        throw new Error("SecurityError");
+      },
+      setItem: () => {
+        throw new Error("QuotaExceededError");
+      },
+      removeItem: () => {
+        throw new Error("SecurityError");
+      },
+    };
+    expect(() => {
+      keepTyping("s1", "text", blocked);
+      holdPending("s1", "text", blocked);
+      confirmSent("s1", "text", blocked);
+    }).not.toThrow();
+    expect(readDraft("s1", blocked)).toEqual({ typing: "", pending: [] });
+    expect(readDraft("s1", null)).toEqual({ typing: "", pending: [] });
   });
 });

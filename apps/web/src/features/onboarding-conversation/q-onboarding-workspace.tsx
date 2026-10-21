@@ -52,6 +52,13 @@ import {
 } from "../onboarding-kit/material-actions";
 import { CONTINUE_LATER_PAUSE_MS } from "../onboarding-kit/components/continue-later";
 import { writeLastMode } from "../onboarding-kit/last-mode";
+import {
+  confirmSent,
+  holdPending,
+  keepTyping,
+  readDraft,
+  unsentAfterReload,
+} from "./draft-store";
 import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { requestMove } from "../q/ui-act-controller";
@@ -447,6 +454,32 @@ export function QOnboardingWorkspace({
     view?.session.version,
   );
   const remaining = view === undefined ? 0 : remainingCount(view);
+  // D7: words left in the composer last time come back with the interview.
+  // Read after mount (storage is the browser's), then the composer starts
+  // from them once; every change is kept again as it is typed.
+  const draftSessionId = view?.session.id;
+  const [typedDraft, setTypedDraft] = useState<{
+    readonly sessionId: string;
+    readonly text: string;
+  } | null>(null);
+  useEffect(() => {
+    if (
+      draftSessionId === undefined ||
+      typedDraft?.sessionId === draftSessionId
+    ) {
+      return;
+    }
+    setTypedDraft({
+      sessionId: draftSessionId,
+      text: readDraft(draftSessionId).typing,
+    });
+  }, [draftSessionId, typedDraft?.sessionId]);
+  const keepDraft = useCallback(
+    (value: string) => {
+      if (draftSessionId !== undefined) keepTyping(draftSessionId, value);
+    },
+    [draftSessionId],
+  );
   const isFinal =
     prompt !== null && vocabulary.finalStepKeys.includes(prompt.stepKey);
   const taxonomy = useMemo(
@@ -619,9 +652,24 @@ export function QOnboardingWorkspace({
           kind: turn.role === "Q" ? ("Q" as const) : ("PERSON" as const),
           text: turn.text,
         }));
-        if (restored.length > 0) {
+        // D7: what they sent last time and Q never confirmed, unless the
+        // thread shows it reached Q; offered back as not answered.
+        const draft = readDraft(sessionId);
+        const keptLines = kept
+          .filter((turn) => turn.role === "PERSON")
+          .map((turn) => turn.text)
+          .slice(-(draft.pending.length + 2));
+        const unsent: Turn[] = unsentAfterReload(draft.pending, keptLines).map(
+          (text) => ({ id: newId(), kind: "PERSON", text, unsent: true }),
+        );
+        for (const text of draft.pending) {
+          if (!unsent.some((line) => line.text === text)) {
+            confirmSent(sessionId, text);
+          }
+        }
+        if (restored.length > 0 || unsent.length > 0) {
           // A turn typed while the thread loaded stays after it.
-          setTurns((current) => [...restored, ...current]);
+          setTurns((current) => [...restored, ...unsent, ...current]);
         }
         // Q is still asking what it last said: that line is the question,
         // and the interview is not opened a second time (see
@@ -852,7 +900,12 @@ export function QOnboardingWorkspace({
         prompt !== null &&
         prompt.control === "text" &&
         trimmed.split(/\s+/).length >= 6;
+      const draftId = view?.session.id;
+      if (draftId !== undefined) holdPending(draftId, trimmed);
       const turn = await actions.say(trimmed, recentTurns());
+      if (turn !== null && draftId !== undefined) {
+        confirmSent(draftId, trimmed);
+      }
       if (turn === null) {
         // Q never answered (a failure, a timeout, a lost connection). The
         // line says so and can be sent again; it is never left looking
@@ -978,6 +1031,7 @@ export function QOnboardingWorkspace({
       voiceConnected,
       voiceSendText,
       journeyName,
+      view?.session.id,
     ],
   );
 
@@ -999,9 +1053,12 @@ export function QOnboardingWorkspace({
         return;
       }
       dropLine(line.id);
+      const draftId = view?.session.id;
+      // Held again as it goes; never twice.
+      if (draftId !== undefined) confirmSent(draftId, line.text);
       void say(line.text, true);
     },
-    [say, dropLine],
+    [say, dropLine, view?.session.id],
   );
 
   /**
@@ -2224,6 +2281,9 @@ export function QOnboardingWorkspace({
 
       <div className="cq-q-composer-dock">
         <QComposer
+          key={typedDraft?.sessionId ?? "draft"}
+          initialValue={typedDraft?.text ?? ""}
+          onValueChange={keepDraft}
           id="onboarding-q"
           contextScope={
             vocabulary.subject === "founder"

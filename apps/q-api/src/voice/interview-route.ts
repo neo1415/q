@@ -3,9 +3,15 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import {
   createProblemDetails,
   PROBLEM_CONTENT_TYPE,
+  Q_INTERVIEW_STREAM_CONTENT_TYPE,
+  QInterviewStreamEventSchema,
+  QInterviewStreamRequestSchema,
   QInterviewTurnRequestSchema,
   QInterviewTurnResponseSchema,
+  type QInterviewStreamEvent,
+  type QInterviewTurnResponse,
 } from "@capital-q/contracts";
+import { getOnboardingSession } from "@capital-q/api-client";
 import { AuthenticationRequiredError } from "@capital-q/security";
 
 import { extractBearerToken } from "@capital-q/security/supabase";
@@ -17,7 +23,10 @@ import {
   type ActorContextDependencies,
 } from "../security/actor-context.js";
 import type { QVoiceRoutesDependencies } from "./routes.js";
-import type { InterviewAgent } from "./interview-agent.js";
+import type {
+  InterviewAgent,
+  InterviewAgentTurnInput,
+} from "./interview-agent.js";
 import type { PresenceTrigger } from "./presence-trigger.js";
 import { signupContextFromToken } from "./interview-steps.js";
 import { AccountPausedError } from "./standing.js";
@@ -63,7 +72,62 @@ export type QInterviewRouteDependencies = ActorContextDependencies & {
    * 2026-09-30: an empty rail for Nixo).
    */
   readonly presence?: PresenceTrigger | undefined;
+  /**
+   * The same turn, streamed sentence by sentence for the typed screen
+   * (onboarding speed L9). Absent: only the whole-turn route exists.
+   */
+  readonly streamPath?: string | undefined;
 };
+
+type TurnOutcome = Awaited<ReturnType<InterviewAgent["turn"]>>;
+
+/** The outcome as the wire carries it, for both routes. */
+function toTurnResponse(outcome: TurnOutcome): QInterviewTurnResponse {
+  return QInterviewTurnResponseSchema.parse({
+    reply: outcome.reply,
+    intent: outcome.intent,
+    asking:
+      outcome.asking === null
+        ? null
+        : {
+            stepKey: outcome.asking.stepKey,
+            kind: outcome.asking.kind,
+            options: outcome.asking.options.map((option) => ({
+              key: option.key,
+              label: option.label,
+              ...(option.description === undefined
+                ? {}
+                : { description: option.description }),
+            })),
+            ...(outcome.asking.maxChoices === undefined
+              ? {}
+              : { maxChoices: outcome.asking.maxChoices }),
+          },
+    recorded: [...outcome.recorded],
+    skipped: [...outcome.skipped],
+    questionForQ: outcome.questionForQ,
+    researching: outcome.researching,
+    navigate: outcome.navigate,
+    handoff: outcome.handoff,
+    degraded: outcome.degraded,
+    askingAbout: [
+      ...(outcome.askingAbout ??
+        (outcome.asking === null ? [] : [outcome.asking.stepKey])),
+    ],
+    pending: {
+      recommendations: [...(outcome.pending?.recommendations ?? [])],
+      held: [...(outcome.pending?.held ?? [])],
+    },
+    ...(outcome.conduct === undefined ? {} : { conduct: outcome.conduct }),
+    ...(outcome.gestures === undefined || outcome.gestures.length === 0
+      ? {}
+      : { gestures: [...outcome.gestures] }),
+    ...(outcome.resumed === true ? { resumed: true } : {}),
+    ...(outcome.confirming === undefined
+      ? {}
+      : { confirming: { kind: outcome.confirming.kind } }),
+  });
+}
 
 export function registerQInterviewRoute(
   app: FastifyInstance,
@@ -135,50 +199,105 @@ export function registerQInterviewRoute(
       // The public look-ups by name, and the questions their findings
       // become, are the onboarding conductor's (inside `agent.turn`).
       void reply.header("Cache-Control", "no-store");
-      return QInterviewTurnResponseSchema.parse({
-        reply: outcome.reply,
-        intent: outcome.intent,
-        asking:
-          outcome.asking === null
-            ? null
-            : {
-                stepKey: outcome.asking.stepKey,
-                kind: outcome.asking.kind,
-                options: outcome.asking.options.map((option) => ({
-                  key: option.key,
-                  label: option.label,
-                  ...(option.description === undefined
-                    ? {}
-                    : { description: option.description }),
-                })),
-                ...(outcome.asking.maxChoices === undefined
-                  ? {}
-                  : { maxChoices: outcome.asking.maxChoices }),
-              },
-        recorded: [...outcome.recorded],
-        skipped: [...outcome.skipped],
-        questionForQ: outcome.questionForQ,
-        researching: outcome.researching,
-        navigate: outcome.navigate,
-        handoff: outcome.handoff,
-        degraded: outcome.degraded,
-        askingAbout: [
-          ...(outcome.askingAbout ??
-            (outcome.asking === null ? [] : [outcome.asking.stepKey])),
-        ],
-        pending: {
-          recommendations: [...(outcome.pending?.recommendations ?? [])],
-          held: [...(outcome.pending?.held ?? [])],
-        },
-        ...(outcome.conduct === undefined ? {} : { conduct: outcome.conduct }),
-        ...(outcome.gestures === undefined || outcome.gestures.length === 0
-          ? {}
-          : { gestures: [...outcome.gestures] }),
-        ...(outcome.resumed === true ? { resumed: true } : {}),
-        ...(outcome.confirming === undefined
-          ? {}
-          : { confirming: { kind: outcome.confirming.kind } }),
+      return toTurnResponse(outcome);
+    },
+  );
+
+  const streamPath = dependencies.streamPath;
+  if (streamPath === undefined) return;
+  /**
+   * The typed turn, streamed (onboarding speed L9): Q's sentences as the
+   * interviewer writes them, then the settled turn and the session. The
+   * journey comes from the session itself, read under the caller's bearer
+   * (the API checks it is theirs), never from the browser.
+   */
+  app.post(
+    streamPath,
+    { onRequest: withContext },
+    async (request: FastifyRequest, reply) => {
+      const header = request.headers.authorization;
+      const accessToken = extractBearerToken(
+        typeof header === "string" ? header : undefined,
+      );
+      if (accessToken === null) {
+        throw new AuthenticationRequiredError();
+      }
+      const actor = getActorContext(request);
+      const input = QInterviewStreamRequestSchema.parse(request.body ?? {});
+      const session = { baseUrl: dependencies.apiBaseUrl, accessToken };
+      // Refused before anything streams: not theirs, or not there.
+      const view = await getOnboardingSession(
+        session,
+        input.onboardingSessionId,
+      );
+
+      reply.hijack();
+      const raw = reply.raw;
+      raw.writeHead(200, {
+        "content-type": Q_INTERVIEW_STREAM_CONTENT_TYPE,
+        "cache-control": "no-store",
+        "x-accel-buffering": "no",
       });
+      const send = (event: QInterviewStreamEvent) => {
+        if (raw.writableEnded) return;
+        raw.write(
+          `${JSON.stringify(QInterviewStreamEventSchema.parse(event))}\n`,
+        );
+      };
+      // The person leaving cancels the turn, as a closed voice line does.
+      const left = new AbortController();
+      raw.on("close", () => {
+        if (!raw.writableEnded) left.abort();
+      });
+      const turnInput: InterviewAgentTurnInput = {
+        actor,
+        session,
+        onboardingSessionId: input.onboardingSessionId,
+        journeyType:
+          view.session.journeyType === "investor" ? "investor" : "founder",
+        channel: "text",
+        attribution: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          correlationId: dependencies.correlation(),
+        },
+        signup: signupContextFromToken(accessToken),
+        utterance: input.utterance,
+        recentTurns: [...input.recentTurns],
+        ...(input.focus === undefined ? {} : { focus: input.focus }),
+        signal: left.signal,
+        onSentence: (sentence) => {
+          const text = sentence.trim();
+          if (text.length > 0)
+            send({ type: "sentence", text: text.slice(0, 4_000) });
+        },
+      };
+      try {
+        const outcome = await dependencies.agent.turn(turnInput);
+        send({
+          type: "done",
+          turn: toTurnResponse(outcome),
+          view: outcome.view,
+        });
+      } catch (error: unknown) {
+        if (error instanceof AccountPausedError) {
+          send({
+            type: "error",
+            code: "PAUSED",
+            message:
+              "Your account is paused. Someone from the Capital Q team will be in touch.",
+          });
+        } else {
+          request.log.warn({ err: error }, "streamed interview turn failed");
+          send({
+            type: "error",
+            code: "UNAVAILABLE",
+            message: "Q couldn't answer that just now. Try again.",
+          });
+        }
+      } finally {
+        raw.end();
+      }
     },
   );
 }

@@ -868,6 +868,36 @@ export function createInterviewAgent(
       statedBySession.delete(oldest);
     }
   };
+  /**
+   * The record above, read back from the kept thread (D9): each person's
+   * line carries what the reading found it stated. The thread is shared by
+   * every instance and survives a restart; entries this process holds that
+   * the thread does not have yet (a write still in flight) are kept after.
+   */
+  const recallStated = (
+    sessionId: string,
+    fromThread: readonly {
+      readonly text: string;
+      readonly stated: readonly string[];
+    }[],
+  ) => {
+    if (fromThread.length === 0) return;
+    const kept = fromThread.map((entry) => ({
+      text: entry.text.slice(0, 4_000),
+      stated: [...entry.stated],
+    }));
+    const texts = new Set(kept.map((entry) => entry.text));
+    const held = (statedBySession.get(sessionId) ?? []).filter(
+      (entry) => !texts.has(entry.text),
+    );
+    statedBySession.delete(sessionId);
+    statedBySession.set(sessionId, [...kept, ...held].slice(-30));
+    while (statedBySession.size > 2_000) {
+      const oldest = statedBySession.keys().next().value;
+      if (oldest === undefined) break;
+      statedBySession.delete(oldest);
+    }
+  };
   // Steps each session's writes were refused for, counted by turn.
   const refusedBySession = new Map<string, Map<string, number>>();
   const rememberRefused = (sessionId: string, stepKeys: readonly string[]) => {
@@ -965,6 +995,14 @@ export function createInterviewAgent(
     // asked-question memory: it is read back from Q's kept lines, so an
     // optional question already put to them is not put again.
     if (kept !== null) {
+      recallStated(
+        input.onboardingSessionId,
+        kept.items.flatMap((t) =>
+          t.role === "PERSON" && t.stated !== undefined && t.stated.length > 0
+            ? [{ text: t.text, stated: t.stated }]
+            : [],
+        ),
+      );
       recallAsked(
         input.onboardingSessionId,
         kept.items.filter((t) => t.role === "Q").map((t) => t.stepKey ?? null),
@@ -1005,13 +1043,16 @@ export function createInterviewAgent(
      * False when the write failed: the exchange is then kept whole at the
      * end, as before. Never for a paused account (refused just above).
      */
+    // One reference for the whole exchange: their words now, Q's line and
+    // the reading of their words at the end.
+    const exchangeRef = randomUUID();
     const personKept: Promise<boolean> = opening
       ? Promise.resolve(false)
       : appendOnboardingInterviewTurns(
           input.session,
           input.onboardingSessionId,
           {
-            turnRef: randomUUID(),
+            turnRef: exchangeRef,
             turns: [
               {
                 role: "PERSON",
@@ -2596,10 +2637,17 @@ export function createInterviewAgent(
           : {}),
       },
     ];
+    // What the reading found their words stated goes with the exchange, so
+    // a restart or another instance still has it (D9).
+    const statedNow = opening ? [] : [...authority.stated].slice(0, 40);
     void appendOnboardingInterviewTurns(
       input.session,
       input.onboardingSessionId,
-      { turnRef: randomUUID(), turns },
+      {
+        turnRef: exchangeRef,
+        turns,
+        ...(statedNow.length === 0 ? {} : { stated: statedNow }),
+      },
     ).catch((error: unknown) => {
       logger.warn(
         { err: error },

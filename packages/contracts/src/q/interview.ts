@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   OnboardingAskingAboutSchema,
   OnboardingJourneyTypeSchema,
+  OnboardingSessionViewSchema,
   OnboardingTurnPendingSchema,
 } from "../http/onboarding.js";
 import { QConductSchema } from "./conduct.js";
@@ -154,3 +155,66 @@ export const QInterviewTurnResponseSchema = z
 export type QInterviewTurnResponse = z.infer<
   typeof QInterviewTurnResponseSchema
 >;
+
+/**
+ * A typed onboarding turn, streamed (onboarding speed 2026-10-20, L9).
+ *
+ * The typed screen used to wait for the whole turn before showing a word,
+ * while a spoken turn heard each sentence as it was written. The stream
+ * carries the same turn: Q's sentences as they are written, then the
+ * settled turn and the session as it now stands. The settled `reply` is
+ * what the thread keeps: the reply guards (no unbacked "saved", never the
+ * last question word for word) may still change what was streamed.
+ *
+ * Newline-delimited JSON, one event per line, over a single response.
+ */
+export const Q_INTERVIEW_TURN_STREAM_SEGMENT = "/turn/stream" as const;
+export const Q_INTERVIEW_STREAM_CONTENT_TYPE = "application/x-ndjson" as const;
+
+export const QInterviewStreamRequestSchema = z
+  .object({
+    onboardingSessionId: z.string().uuid(),
+    /** Their words. A stream carries an answer; an opening uses the turn route. */
+    utterance: z.string().trim().min(1).max(2_000),
+    focus: z
+      .string()
+      .regex(/^[a-z][a-z_]{0,39}$/)
+      .optional(),
+    recentTurns: z
+      .array(
+        z
+          .object({
+            role: z.enum(["person", "q"]),
+            text: z.string().max(1_500),
+          })
+          .strict(),
+      )
+      .max(16)
+      .default([]),
+  })
+  .strict();
+export type QInterviewStreamRequest = z.infer<
+  typeof QInterviewStreamRequestSchema
+>;
+
+export const QInterviewStreamEventSchema = z.discriminatedUnion("type", [
+  z
+    .object({ type: z.literal("sentence"), text: z.string().min(1).max(4_000) })
+    .strict(),
+  z
+    .object({
+      type: z.literal("done"),
+      turn: QInterviewTurnResponseSchema,
+      view: OnboardingSessionViewSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("error"),
+      /** PAUSED: the account is paused; UNAVAILABLE: the turn failed. */
+      code: z.enum(["PAUSED", "UNAVAILABLE"]),
+      message: z.string().max(400),
+    })
+    .strict(),
+]);
+export type QInterviewStreamEvent = z.infer<typeof QInterviewStreamEventSchema>;

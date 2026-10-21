@@ -273,6 +273,8 @@ export type AppendOnboardingInterviewTurnsCommand = SessionScopedQuery & {
     readonly stepKey?: string | undefined;
     readonly channel: OnboardingInterviewTurnChannel;
   }[];
+  /** What the reading found this exchange's PERSON turn stated (D9). */
+  readonly stated?: readonly string[] | undefined;
 };
 
 export type AppendOnboardingInterviewTurnsResult = {
@@ -3250,6 +3252,7 @@ export function createOnboardingUseCases(
             (turns) => new Set(turns.map((t) => t.role)).size === turns.length,
             "each role appears at most once in one exchange",
           ),
+        stated: z.array(OnboardingStepKeySchema).min(1).max(40).optional(),
       })
       .strict()
       .parse(raw);
@@ -3287,6 +3290,18 @@ export function createOnboardingUseCases(
         ) {
           throw new OnboardingMutationConflictError();
         }
+      }
+      // The reading of their words, beside the exchange it read: kept so a
+      // restart or another instance still knows what was said earlier.
+      if (
+        command.stated !== undefined &&
+        (await repo.appendReading(tx, {
+          sessionId: session.id,
+          turnRef: command.turnRef,
+          stated: command.stated,
+        }))
+      ) {
+        written = true;
       }
       if (written) {
         safeLog(runtime, "interview_turns.appended", session, {
@@ -3326,6 +3341,9 @@ export function createOnboardingUseCases(
       role: t.role,
       text: t.text,
       ...(t.stepKey === null ? {} : { stepKey: t.stepKey }),
+      ...(t.stated === null || t.stated === undefined || t.stated.length === 0
+        ? {}
+        : { stated: [...t.stated] }),
       channel: t.channel,
       createdAt: t.createdAt,
     }));

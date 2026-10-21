@@ -42,6 +42,7 @@ import {
   type QuestionNeed,
 } from "./question-needs.js";
 import { questionAngle } from "./answer-specificity.js";
+import { notRecordedLine, type NotRecorded } from "./not-recorded.js";
 import { amountStatedIn } from "./stated-amount.js";
 
 /**
@@ -155,6 +156,11 @@ export type InterviewTurnOutcome = {
   readonly facts: readonly NewApplicationFact[];
   /** Proposals the model made that did not survive. Diagnostics only. */
   readonly rejectedFacts: number;
+  /**
+   * What the applicant said that was read but not kept, and why (G4). The
+   * reply already says so in English; other languages see it in coverage.
+   */
+  readonly notRecorded?: readonly NotRecorded[] | undefined;
   readonly asking: ApplicationDimension | null;
   readonly questionForQ: string | null;
   /** Advisory. GATE-001 decides whether submission is possible. */
@@ -578,11 +584,16 @@ export function createGateQInterviewer(
       // to talk Q into something -- is the signal worth seeing in a log,
       // and a diagnostic that reports zero there is a diagnostic lying.
       let rejected = discardedByIntent ? result.facts.length : 0;
+      // Never silently (G4): each refusal the applicant could put right is
+      // named in the reply. Unknown dimensions are the model's own error,
+      // not something they said, and stay counted only.
+      const notRecorded: NotRecorded[] = [];
       for (const candidate of proposed) {
         if (!DIMENSIONS.has(candidate.dimension)) {
           rejected += 1;
           continue;
         }
+        const dimension = candidate.dimension as ApplicationDimension;
         const parsed = NewApplicationFactSchema.safeParse({
           dimension: candidate.dimension,
           value: candidate.value,
@@ -590,6 +601,18 @@ export function createGateQInterviewer(
         });
         if (!parsed.success) {
           rejected += 1;
+          // Only when nothing usable is on the record for it already: a
+          // refused rewrite of a kept value loses nothing they said.
+          if (
+            input.application?.facts.some(
+              (fact) =>
+                fact.dimension === dimension &&
+                fact.supersededAt === null &&
+                fact.value.kind !== "NONE",
+            ) !== true
+          ) {
+            notRecorded.push({ dimension, reason: "UNREADABLE" });
+          }
           continue;
         }
         // An amount must be one the person said, not one Q worked out
@@ -601,6 +624,7 @@ export function createGateQInterviewer(
           !amountStatedIn(parsed.data.value.amount, input.utterance)
         ) {
           rejected += 1;
+          notRecorded.push({ dimension, reason: "AMOUNT_NOT_STATED" });
           continue;
         }
         // Contact details belong to the contact step the person confirmed:
@@ -616,6 +640,7 @@ export function createGateQInterviewer(
           ) === true
         ) {
           rejected += 1;
+          notRecorded.push({ dimension, reason: "CONTACT_CONFIRMED" });
           continue;
         }
         const current = input.application?.facts.find(
@@ -651,11 +676,20 @@ export function createGateQInterviewer(
         "gateq interview turn",
       );
 
+      // A refused item the reply may have acknowledged is said plainly in
+      // English; another language keeps the model's words, and the refused
+      // items show as still needed in the coverage panel.
+      const correction =
+        interviewLanguageOf(input) === null ? notRecordedLine(notRecorded) : "";
       return {
-        reply: result.reply,
+        reply:
+          correction.length === 0
+            ? result.reply
+            : `${result.reply} ${correction}`.slice(0, 4_000),
         intent: result.intent,
         facts,
         rejectedFacts: rejected,
+        ...(notRecorded.length === 0 ? {} : { notRecorded }),
         asking,
         questionForQ: result.questionForQ,
         // Advisory only. Whether the application may actually be submitted

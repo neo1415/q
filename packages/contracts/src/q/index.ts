@@ -933,6 +933,12 @@ export {
   QInterviewTurnResponseSchema,
   type QInterviewTurnRequest,
   type QInterviewTurnResponse,
+  Q_INTERVIEW_TURN_STREAM_SEGMENT,
+  Q_INTERVIEW_STREAM_CONTENT_TYPE,
+  QInterviewStreamRequestSchema,
+  QInterviewStreamEventSchema,
+  type QInterviewStreamRequest,
+  type QInterviewStreamEvent,
 } from "./interview.js";
 
 export {

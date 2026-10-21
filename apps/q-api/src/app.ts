@@ -26,6 +26,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify";
 import {
   Q_INTERVIEW_PATH,
   Q_INTERVIEW_TURN_SEGMENT,
+  Q_INTERVIEW_TURN_STREAM_SEGMENT,
   Q_VOICE_THINK_PATH,
 } from "@capital-q/contracts";
 import { CONTRACTS_VERSION } from "@capital-q/contracts";
@@ -840,6 +841,7 @@ export function createApp(
         resolver: security.resolver,
         identity: security.identity,
         path: `${Q_INTERVIEW_PATH}${Q_INTERVIEW_TURN_SEGMENT}`,
+        streamPath: `${Q_INTERVIEW_PATH}${Q_INTERVIEW_TURN_STREAM_SEGMENT}`,
         agent: interviewAgent,
         apiBaseUrl: interviewApiBaseUrl,
         correlation: () => randomUUID(),

@@ -136,7 +136,13 @@ describe("what survives validation", () => {
       const outcome = await service.turn(turn());
       expect(outcome.facts).toEqual([]);
       expect(outcome.rejectedFacts).toBe(1);
-      expect(outcome.reply).toBe(RESULT.reply);
+      // Never silently (G4): Q's words stand, and the refused item is
+      // named so the applicant can say it again.
+      expect(outcome.reply.startsWith(RESULT.reply)).toBe(true);
+      expect(outcome.reply).toMatch(/I couldn't record what you said about/);
+      expect(outcome.notRecorded).toEqual([
+        { dimension, reason: "UNREADABLE" },
+      ]);
     },
   );
 

@@ -67,6 +67,11 @@ export type QComposerProps = {
    */
   readonly initialValue?: string | undefined;
   /**
+   * What is in the field, on every change and when a send clears it, so a
+   * surface can keep an unsent draft (onboarding keeps one per interview).
+   */
+  readonly onValueChange?: ((value: string) => void) | undefined;
+  /**
    * False where the surface already shows the scope elsewhere (the Q
    * page's top line): the field carries the words, not a chip.
    */
@@ -100,6 +105,7 @@ export function QComposer({
   attachments = [],
   attachAccept,
   initialValue = "",
+  onValueChange,
   showContext = true,
   actions,
   iconActions,
@@ -135,6 +141,7 @@ export function QComposer({
     try {
       await onSubmit(trimmed);
       setValue("");
+      onValueChange?.("");
       setNotice(null);
       const element = textareaRef.current;
       if (element !== null) {
@@ -195,6 +202,7 @@ export function QComposer({
             autoComplete="off"
             onChange={(event) => {
               setValue(event.target.value);
+              onValueChange?.(event.target.value);
               resize(event.target);
               if (notice !== null) {
                 setNotice(null);

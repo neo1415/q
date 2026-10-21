@@ -1033,6 +1033,11 @@ export const OnboardingInterviewTurnSchema = z
      * a restart, which questions it has already put to the person.
      */
     stepKey: OnboardingStepKeySchema.optional(),
+    /**
+     * A person's line: the steps the independent reading found it stated,
+     * when one was recorded. A reading of words, never a recorded answer.
+     */
+    stated: z.array(OnboardingStepKeySchema).max(40).optional(),
     channel: OnboardingInterviewTurnChannelSchema,
     createdAt: UtcTimestampSchema,
   })
@@ -1092,6 +1097,11 @@ export const AppendOnboardingInterviewTurnsRequestSchema = z
         (turns) => new Set(turns.map((t) => t.role)).size === turns.length,
         "each role appears at most once in one exchange",
       ),
+    /**
+     * What the independent reading found this exchange's PERSON turn
+     * stated, by step key, kept for later turns (onboarding speed D9).
+     */
+    stated: z.array(OnboardingStepKeySchema).min(1).max(40).optional(),
   })
   .strict();
 export type AppendOnboardingInterviewTurnsRequest = z.infer<
