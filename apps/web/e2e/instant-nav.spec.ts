@@ -748,6 +748,27 @@ for (const [name, path] of [
           ),
         )
         .toBe(true);
+      // Opened by the app, not the keyboard: no focus ring on Close.
+      expect(
+        await close.evaluate((element) => element.matches(":focus-visible")),
+      ).toBe(false);
+      // The page behind is held back by the firmer scrim, in both themes.
+      const scrim = await page.evaluate(() => {
+        const backdrop = [...document.querySelectorAll("div")].find((one) =>
+          one.className.includes("bg-(--cq-scrim)"),
+        );
+        return backdrop === undefined
+          ? null
+          : getComputedStyle(backdrop).backgroundColor;
+      });
+      expect(scrim).not.toBeNull();
+      if (info.project.name === "desktop") {
+        // As tall as its three cards, not a full-height panel.
+        const height =
+          (await page.getByRole("dialog").boundingBox())?.height ?? 0;
+        expect(height).toBeGreaterThan(200);
+        expect(height).toBeLessThan(900 - 64 - 100);
+      }
       mkdirSync(EVIDENCE, { recursive: true });
       await page.screenshot({
         path: join(
@@ -755,6 +776,14 @@ for (const [name, path] of [
           `modal-${name}-${scheme}-${info.project.name}.png`,
         ),
       });
+      // The keyboard brings the ring: Tab reaches Close and shows it.
+      await page.keyboard.press("Tab");
+      const ring = await page.evaluate(
+        () =>
+          document.activeElement?.matches("[data-q-close]:focus-visible") ===
+            true || document.activeElement?.closest("[role=dialog]") !== null,
+      );
+      expect(ring).toBe(true);
       // Escape closes it; then the button, then a click outside.
       await page.keyboard.press("Escape");
       await expect(modal).toHaveCount(0);

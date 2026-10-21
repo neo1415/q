@@ -130,7 +130,16 @@ export function QShowModal({ turns }: { readonly turns: readonly QTurn[] }) {
       }}
     >
       {shown === null ? null : (
-        <DialogViewerContent title={title} onSwipeDismiss={closeShown}>
+        <DialogViewerContent
+          title={title}
+          onSwipeDismiss={closeShown}
+          // A few cards are not a full-height panel; the page behind reads
+          // as behind it in both themes; opened by a voice or the app, no
+          // focus ring lands on Close until the keyboard is used.
+          fit="content"
+          scrim="strong"
+          focus="popup"
+        >
           <div
             className="flex min-h-0 flex-1 flex-col"
             data-q-show-modal={shown.key}
