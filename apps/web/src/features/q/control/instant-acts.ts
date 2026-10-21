@@ -6,7 +6,7 @@ import {
   type InstantRequest,
 } from "@capital-q/q-specialists/instant-request";
 
-import { Q_MATERIAL_CLOSE_EVENT } from "../client-actions";
+import { BROWSER_EFFECTS, Q_MATERIAL_CLOSE_EVENT } from "../client-actions";
 import { materialDocumentOpen } from "../screen";
 import { performUiAct } from "../ui-act-controller";
 import {
@@ -37,7 +37,7 @@ import { closeShown } from "./show-store";
 
 export type InstantDone = {
   /** What was done, for the voice line and the timing event. */
-  readonly what: "CLOSE" | InstantPageAct | "PRESS";
+  readonly what: "CLOSE" | InstantPageAct | "PRESS" | "THEME";
 };
 
 function actId(): string {
@@ -288,5 +288,9 @@ export function instantAct(text: string): InstantDone | null {
     }
     case "PRESS":
       return press(request) ? { what: "PRESS" } : null;
+    // The Appearance control's own apply and store.
+    case "THEME":
+      BROWSER_EFFECTS.setTheme(request.theme);
+      return { what: "THEME" };
   }
 }

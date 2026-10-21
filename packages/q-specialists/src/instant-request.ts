@@ -40,7 +40,9 @@ export type InstantRequest =
       readonly kind: "PRESS";
       readonly label: string;
       readonly as: "TAB" | "ANY";
-    };
+    }
+  /** The app's theme, as the Appearance control sets it. */
+  | { readonly kind: "THEME"; readonly theme: "light" | "dark" | "system" };
 
 /** The longest visible name a PRESS carries (registry CONTROL_LABEL_MAX). */
 export const INSTANT_LABEL_MAX = 48;
@@ -97,6 +99,12 @@ const PAGE_ACTS: readonly (readonly [InstantPageAct, RegExp])[] = [
   ],
 ];
 
+const THEME =
+  /^(?:(?:switch|change|turn|go|set|put)(?:\s+(?:it|the\s+(?:theme|app|screen)|me))?\s+(?:to|on(?:\s+to)?|into)?\s*)?(?:the\s+)?(dark|light|system)\s*(?:mode|theme)(?:\s+on)?$|^(?:turn|switch)\s+(?:on|off)\s+(?:the\s+)?dark\s+mode$|^(?:use|follow)\s+(?:the\s+)?(?:system|device)(?:'s)?\s+(?:theme|setting|appearance)$/iu;
+
+const THEME_TO =
+  /^(?:switch|change|set|put)\s+(?:the\s+)?(?:theme|appearance)\s+to\s+(dark|light|system)(?:\s+(?:mode|theme))?$/iu;
+
 const PRESS_VERB =
   /^(?:press|click|tap|hit|push|select|choose)(?:\s+on)?\s+(?:the\s+)?(.+?)(?:\s+(button|tab|link|option|toggle|switch))?$/iu;
 const TAB_VERB =
@@ -120,6 +128,20 @@ export function instantRequestOf(text: string): InstantRequest | null {
   const said = bare(text);
   if (said === null) return null;
   if (CLOSE.test(said)) return { kind: "CLOSE" };
+  const theme = THEME_TO.exec(said) ?? THEME.exec(said);
+  if (theme !== null) {
+    const named = theme[1]?.toLowerCase();
+    if (named === "dark" || named === "light" || named === "system") {
+      return { kind: "THEME", theme: named };
+    }
+    if (/\boff\s+(?:the\s+)?dark/iu.test(said)) {
+      return { kind: "THEME", theme: "light" };
+    }
+    return {
+      kind: "THEME",
+      theme: /\bon\s+(?:the\s+)?dark/iu.test(said) ? "dark" : "system",
+    };
+  }
   for (const [act, pattern] of PAGE_ACTS) {
     if (pattern.test(said)) return { kind: "PAGE_ACT", act };
   }

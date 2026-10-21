@@ -63,7 +63,7 @@ beforeAll(async () => {
 }, 30_000);
 
 let pushed: string[];
-let rect: ReturnType<typeof vi.spyOn>;
+let rect: { readonly mockRestore: () => void };
 
 beforeEach(() => {
   resetFastNavigation();

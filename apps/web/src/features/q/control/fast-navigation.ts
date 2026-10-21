@@ -9,7 +9,10 @@ import {
   cardsIntentOf,
   cardsRequestOf,
 } from "@capital-q/q-specialists/cards-request";
-import { documentAskOf } from "@capital-q/q-specialists/instant-request";
+import {
+  documentAskOf,
+  instantRequestOf,
+} from "@capital-q/q-specialists/instant-request";
 import { tabAskOf } from "@capital-q/q-specialists/tab-request";
 
 import { destinationPath } from "@/features/voice/destinations";
@@ -494,7 +497,8 @@ export function navigationHeardFor(
       ? `${dangling.text} ${text.trim()}`
       : text.trim();
   dangling = null;
-  if (DANGLING_VERB.test(carried)) {
+  // "Take me back" is a whole request (back), never a verb cut off.
+  if (DANGLING_VERB.test(carried) && instantRequestOf(carried) === null) {
     dangling = {
       text: carried.replace(/[\s,.\-\u2014\u2026]+$/u, ""),
       at: Date.now(),

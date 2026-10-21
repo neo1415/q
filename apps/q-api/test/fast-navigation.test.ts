@@ -421,7 +421,9 @@ describe("Lane 7: a document by its name, opened only through the document tools
     ]) {
       const { resolve } = documents({ dataRoom: answer });
       const decided = await resolve(ACTOR, "open the cap table");
-      expect(decided).toEqual({ kind: "LEAVE_TO_Q", ms: expect.any(Number) });
+      // Only the outcome and its time: nothing about the document.
+      expect(decided.kind).toBe("LEAVE_TO_Q");
+      expect(Object.keys(decided).sort()).toEqual(["kind", "ms"]);
       expect(JSON.stringify(decided)).not.toMatch(/Secret|cap table/iu);
     }
   });

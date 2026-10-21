@@ -43,6 +43,12 @@ describe("instantRequestOf", () => {
       "switch to the Activity tab",
       { kind: "PRESS", label: "Activity", as: "TAB" },
     ],
+    ["switch to dark mode", { kind: "THEME", theme: "dark" }],
+    ["dark mode please", { kind: "THEME", theme: "dark" }],
+    ["turn on dark mode", { kind: "THEME", theme: "dark" }],
+    ["turn off dark mode", { kind: "THEME", theme: "light" }],
+    ["change the theme to light", { kind: "THEME", theme: "light" }],
+    ["use the system theme", { kind: "THEME", theme: "system" }],
   ])("%s", (said, expected) => {
     expect(instantRequestOf(said)).toEqual(expected);
   });
@@ -57,6 +63,7 @@ describe("instantRequestOf", () => {
     "click it",
     "scroll through their financials and tell me what's wrong",
     "close the deal with Nixo",
+    "what is dark mode?",
     "",
   ])("%s is not one", (said) => {
     expect(instantRequestOf(said)).toBeNull();

@@ -110,7 +110,7 @@ export function QShowModal({ turns }: { readonly turns: readonly QTurn[] }) {
     if (onQPage) closeShown();
   }, [onQPage]);
 
-  const title = shown?.title === "" ? t("From Q") : (shown?.title ?? "");
+  const title = shown?.title === "" ? t("By Q") : (shown?.title ?? "");
   return (
     <DialogRoot
       open={shown !== null && !onQPage}
