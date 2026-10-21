@@ -31,7 +31,10 @@ export type StoryNarrator = {
     alignment: BeatAlignment,
     signal: AbortSignal,
   ) => Promise<void>;
-  /** Milliseconds into the playing beat, as heard (-1 before it starts). */
+  /**
+   * Milliseconds into the playing beat, as heard: negative during the short
+   * lead before its audio starts, NaN when no beat is playing.
+   */
   readonly clock: () => number;
   /** Freezes the clock (and the audio, where it can be held). */
   readonly pause: () => void;
@@ -93,7 +96,7 @@ export function renderedNarrator(
       }),
     clock: () =>
       startAt < 0
-        ? -1
+        ? Number.NaN
         : Math.round((context.currentTime - startAt - latency()) * 1000),
     pause: () => void context.suspend(),
     resume: () => void context.resume(),
@@ -120,7 +123,7 @@ export function silentNarrator(
   let held = 0;
   let wake: (() => void) | null = null;
   const clock = () => {
-    if (startedAt < 0) return -1;
+    if (startedAt < 0) return Number.NaN;
     const at = pausedAt ?? now();
     return Math.round(at - startedAt - held);
   };
@@ -128,7 +131,8 @@ export function silentNarrator(
     kind: "SILENT",
     resumesInPlace: true,
     play: async (_beat, alignment, signal) => {
-      startedAt = now();
+      // The same lead the rendered audio has, so first cues land on time.
+      startedAt = now() + START_LEAD_S * 1000;
       held = 0;
       pausedAt = null;
       while (!signal.aborted && clock() < alignment.durationMs) {
@@ -231,7 +235,8 @@ export function liveNarrator(
       if (signal.aborted) line.hush(true);
       setTimeout(() => line.hush(false), 1_500);
     },
-    clock: () => (heardAt < 0 ? -1 : Math.round((pausedAt ?? now()) - heardAt)),
+    clock: () =>
+      heardAt < 0 ? Number.NaN : Math.round((pausedAt ?? now()) - heardAt),
     pause: () => {
       pausedAt = now();
     },

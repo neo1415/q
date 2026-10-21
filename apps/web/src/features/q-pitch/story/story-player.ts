@@ -268,7 +268,7 @@ export class StoryPlayer {
     const alignment = this.#alignments.get(this.#snapshot.beat.n);
     if (clock === null || signal === undefined || alignment === undefined)
       return;
-    if (ms < 0) return;
+    if (Number.isNaN(ms)) return;
     const now = this.#scheduler.now();
     for (const cue of clock.due(ms)) {
       this.#verifier.begin(cue, now);

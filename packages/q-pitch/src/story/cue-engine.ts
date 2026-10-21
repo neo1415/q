@@ -22,7 +22,11 @@ export type ScheduledCue = {
   readonly wordIndex: number;
   /** When the word starts, ms into the beat's audio. */
   readonly wordMs: number;
-  /** When the act is run: CUE_LEAD_MS ahead of the word, never before 0. */
+  /**
+   * When the act is run: CUE_LEAD_MS ahead of the word. Negative for a
+   * beat's first words: narrators start their audio a little after the
+   * clock starts, so even the first word's cue lands on it.
+   */
   readonly fireMs: number;
   readonly act: StoryAct;
 };
@@ -40,7 +44,7 @@ export function scheduleBeat(
         beat: beat.n,
         wordIndex: cue.at,
         wordMs,
-        fireMs: Math.max(0, wordMs - leadMs),
+        fireMs: wordMs - leadMs,
         act: cue.act,
       };
     })

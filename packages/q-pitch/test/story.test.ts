@@ -188,23 +188,24 @@ describe("Q Story cue engine", () => {
   const a = fixtureAlignment(b);
   const cues = scheduleBeat(b, a);
 
-  it("fires each cue 120 ms before its word, never before the beat", () => {
+  it("fires each cue 120 ms before its word, the first one before the audio starts", () => {
     expect(cues).toHaveLength(4);
     for (const cue of cues) {
-      expect(cue.fireMs).toBe(Math.max(0, cue.wordMs - CUE_LEAD_MS));
+      expect(cue.fireMs).toBe(cue.wordMs - CUE_LEAD_MS);
     }
-    expect(cues[0]?.fireMs).toBe(0);
+    expect(cues[0]?.fireMs).toBe(-CUE_LEAD_MS);
   });
 
   it("releases cues once, in order, as the clock passes them", () => {
     const clock = new BeatCueClock(cues);
-    expect(clock.due(0).map((c) => c.wordIndex)).toEqual([0]);
+    expect(clock.due(-CUE_LEAD_MS - 1)).toEqual([]);
+    expect(clock.due(-CUE_LEAD_MS).map((c) => c.wordIndex)).toEqual([0]);
     expect(clock.due(0)).toEqual([]);
     const third = cues[2];
     expect(clock.due(third?.fireMs ?? 0).map((c) => c.wordIndex)).toEqual([
       1, 2,
     ]);
-    clock.seek(0);
+    clock.seek(-CUE_LEAD_MS);
     expect(clock.remaining).toBe(4);
     expect(clock.due(a.durationMs)).toHaveLength(4);
   });

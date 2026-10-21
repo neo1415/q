@@ -36,7 +36,7 @@ function harness(
   } = {},
 ) {
   let now = 0;
-  let clockMs = -1;
+  let clockMs = Number.NaN;
   let frames: (() => void)[] = [];
   let finish: (() => void) | null = null;
   const played: number[] = [];
@@ -209,14 +209,16 @@ describe("Q Story player", () => {
       FIXTURE_ALIGNMENTS[0] as BeatAlignment,
       controller.signal,
     );
+    // The audio lead: the clock is negative until the first word is due.
+    expect(narrator.clock()).toBe(-160);
     t = 300;
-    expect(narrator.clock()).toBe(300);
+    expect(narrator.clock()).toBe(140);
     narrator.pause();
     t = 900;
-    expect(narrator.clock()).toBe(300);
+    expect(narrator.clock()).toBe(140);
     narrator.resume();
     t = 1_000;
-    expect(narrator.clock()).toBe(400);
+    expect(narrator.clock()).toBe(240);
     controller.abort();
     await done;
   });

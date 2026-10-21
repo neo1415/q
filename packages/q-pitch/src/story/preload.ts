@@ -50,7 +50,7 @@ export const STORY_SCREENS = [
 ] as const;
 
 export function screenPath(name: (typeof STORY_SCREENS)[number]): string {
-  return `${STORY_ASSET_ROOT}/screens/${name}.webp`;
+  return `${STORY_ASSET_ROOT}/screens/${name}.jpg`;
 }
 
 export function storyManifest(

@@ -188,7 +188,6 @@ const inputs: readonly BeatInput[] = [
     cues: [
       [0, mood("NIGHT")],
       ["11:47", stage("type", 1, "11:47 PM")],
-      ["11:47", stage("photos", 13)],
     ],
   },
   {

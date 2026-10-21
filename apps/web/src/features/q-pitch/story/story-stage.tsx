@@ -65,6 +65,19 @@ function Photo({
   );
 }
 
+/** A full-bleed picture behind the stage's words, credited. */
+function Backdrop({ n }: { readonly n: number }) {
+  const picture = storyPicture(n);
+  if (picture === null) return null;
+  return (
+    <figure className="cq-story-backdrop">
+      {/* eslint-disable-next-line @next/next/no-img-element -- static story files, decoded before playback; an optimiser would refetch them mid-story */}
+      <img src={picture.file} alt="" decoding="async" draggable={false} />
+      <figcaption>Photo: {picture.photographer} / Pexels</figcaption>
+    </figure>
+  );
+}
+
 const INBOX = [
   ["deck.pdf", "Series A deck"],
   ["Intro: a founder you should meet", "Warm introduction"],
@@ -126,14 +139,18 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
       );
     case "type":
       return (
-        <div className="cq-story-centre">
-          <p className="cq-story-type" key={text ?? ""}>
-            {text}
-          </p>
-          {step === 5 ? (
-            <Label>Public market fact, not Capital Q data</Label>
-          ) : null}
-        </div>
+        <>
+          {/* #3: the desk at night, behind the words at a quarter strength. */}
+          {step === 1 ? <Backdrop n={13} /> : null}
+          <div className="cq-story-centre">
+            <p className="cq-story-type" key={text ?? ""}>
+              {text}
+            </p>
+            {step === 5 ? (
+              <Label>Public market fact, not Capital Q data</Label>
+            ) : null}
+          </div>
+        </>
       );
     case "photos":
       return (

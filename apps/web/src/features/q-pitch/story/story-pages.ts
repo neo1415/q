@@ -111,12 +111,16 @@ export function storyPath(route: StoryRoute): string | null {
   }
 }
 
+/** Where each story route goes: the app's pages, or a design harness's. */
+export type StoryPathFor = (route: StoryRoute) => string | null;
+
 /** Whether `pathname` + `search` is where `route` lands (the ack). */
 export function isOnStoryRoute(
   route: StoryRoute,
   location: { readonly pathname: string; readonly search: string },
+  pathFor: StoryPathFor = storyPath,
 ): boolean {
-  const path = storyPath(route);
+  const path = pathFor(route);
   if (path === null) return false;
   const [pathname, query = ""] = path.split("?");
   if (location.pathname.toLowerCase() !== (pathname ?? "").toLowerCase()) {

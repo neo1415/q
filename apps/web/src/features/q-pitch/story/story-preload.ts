@@ -14,7 +14,7 @@ import {
 } from "@capital-q/q-pitch";
 import { z } from "zod";
 
-import { storyPath } from "./story-pages";
+import { storyPath, type StoryPathFor } from "./story-pages";
 
 /**
  * Preload everything on entry (plan §1, "game the system"): the render's
@@ -87,12 +87,13 @@ export async function preloadStory(input: {
   readonly onProgress?: (progress: PreloadProgress) => void;
   readonly signal?: AbortSignal;
   readonly voice?: string;
+  readonly pathFor?: StoryPathFor;
 }): Promise<StoryAssets> {
   const started = performance.now();
   const voice = input.voice ?? STORY_VOICE;
   // Routes first: the prefetch runs beside everything else.
   for (const route of STORY_ROUTES) {
-    const path = storyPath(route);
+    const path = (input.pathFor ?? storyPath)(route);
     if (path !== null) input.prefetch(path);
   }
   const index = await fetch(voiceIndexPath(voice), { cache: "force-cache" })

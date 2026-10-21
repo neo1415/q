@@ -33,8 +33,11 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   transition: opacity var(--cq-motion-slow) var(--cq-ease);
 }
 /* Chrome recedes to about 35%: the scrim is 65%, deeper at night. */
+/* The story's dark acts are night in light mode too: the night tokens are
+   drawn for the night canvas, so they always sit on it. */
 .cq-story-scrim[data-mood="STORY"] {
-  opacity: 0.82;
+  background: var(--cq-night-canvas);
+  opacity: 0.9;
 }
 .cq-story-scrim[data-mood="NIGHT"] {
   background: var(--cq-night-canvas);
@@ -204,6 +207,53 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
 }
 
 /* ── Visuals ─────────────────────────────────────────────────────────── */
+/* On the dark stage, panels are night surfaces, never a white box. */
+.cq-story-stage:is([data-mood="NIGHT"], [data-mood="HUSH"], [data-mood="STORY"])
+  .cq-story-panel {
+  background:
+    linear-gradient(var(--cq-night-surface), var(--cq-night-surface)),
+    var(--cq-night-canvas);
+  border-color: var(--cq-night-border);
+  color: var(--cq-night-text);
+}
+.cq-story-stage:is([data-mood="NIGHT"], [data-mood="HUSH"], [data-mood="STORY"])
+  :is(.cq-story-list, .cq-story-blocks, .cq-story-findings, .cq-story-cards)
+  li {
+  background: var(--cq-night-surface-strong);
+}
+.cq-story-stage:is([data-mood="NIGHT"], [data-mood="HUSH"], [data-mood="STORY"])
+  :is(.cq-story-list, .cq-story-cards, .cq-story-findings)
+  li
+  span {
+  color: var(--cq-night-text-muted);
+}
+.cq-story-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  margin: 0;
+  opacity: 0.25;
+  animation: cq-story-fade var(--cq-motion-slow) var(--cq-ease) both;
+}
+.cq-story-backdrop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cq-story-backdrop figcaption {
+  position: absolute;
+  left: 16px;
+  bottom: 12px;
+  font-size: 0.6875rem;
+}
+@keyframes cq-story-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.25;
+  }
+}
 .cq-story-photo {
   position: relative;
   width: min(760px, 92vw);
@@ -338,6 +388,15 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
 }
 .cq-story-blocks {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+/* #4-5: the inbox stack is there before its items land, one per word. */
+.cq-story-list li:not([data-in]) {
+  opacity: 0.22;
+  transform: none;
+  color: transparent;
+}
+.cq-story-list li:not([data-in]) span {
+  color: transparent;
 }
 .cq-story-bubbles li {
   justify-self: end;
@@ -654,6 +713,17 @@ html[data-story="STORY"] .cq-story-captions {
   color: var(--cq-night-text);
   text-shadow: 0 1px 12px var(--cq-night-canvas);
 }
+/* Over a woken page, the caption carries its own quiet backing. */
+html:is([data-story="WAKE"], [data-story="DAY"]) .cq-story-captions {
+  width: auto;
+  max-width: min(760px, calc(100vw - 32px));
+  padding: 6px 14px;
+  border-radius: var(--cq-radius-lg);
+  background: color-mix(in oklch, var(--cq-surface-raised) 94%, transparent);
+  box-shadow: var(--cq-shadow-sm);
+  text-shadow: none;
+  max-height: none;
+}
 .cq-story-captions[data-top] {
   top: 80px;
   bottom: auto;
@@ -787,8 +857,17 @@ html[data-story="STORY"] .cq-story-captions {
   .cq-story-split {
     grid-template-columns: 1fr;
   }
+  /* One row on a phone: the beat count and the four moves; captions and
+     sound stay in the words ("hide captions", "mute"). */
+  .cq-story-controls {
+    flex-wrap: nowrap;
+    border-radius: var(--cq-radius-xl);
+  }
   .cq-story-controls .cq-story-btn {
     padding: 0 10px;
+  }
+  .cq-story-controls [data-wide] {
+    display: none;
   }
 }
 

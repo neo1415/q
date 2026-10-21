@@ -43,7 +43,12 @@ import {
   silentNarrator,
   type StoryNarrator,
 } from "./story-narrators";
-import { isOnStoryRoute, storyPath, STORY_ANCHORS } from "./story-pages";
+import {
+  isOnStoryRoute,
+  storyPath,
+  STORY_ANCHORS,
+  type StoryPathFor,
+} from "./story-pages";
 import { StoryPlayer, type StorySnapshot } from "./story-player";
 import {
   preloadStory,
@@ -141,15 +146,24 @@ export function StoryHost({
   account,
   role,
   onExit,
+  harness,
 }: {
   readonly account: string;
   readonly role: "INVESTOR" | "FOUNDER";
   readonly onExit: () => void;
+  /**
+   * The design harness (/dev/story, never served in production): the
+   * story over the dev review pages' fictional data, with no account.
+   */
+  readonly harness?: { readonly pathFor: StoryPathFor } | undefined;
 }) {
   const router = useRouter();
+  const pathFor = harness?.pathFor ?? storyPath;
   const actor = useMemo(
-    () => TourActorSchema.safeParse({ role, account }).success,
-    [account, role],
+    () =>
+      harness !== undefined ||
+      TourActorSchema.safeParse({ role, account }).success,
+    [account, role, harness],
   );
   const session = useQSessionOptional();
   const sessionRef = useRef(session);
@@ -168,13 +182,14 @@ export function StoryHost({
     const controller = new AbortController();
     void preloadStory({
       prefetch: (path) => router.prefetch(path),
+      pathFor,
       onProgress: setProgress,
       signal: controller.signal,
     }).then((loaded) => {
       if (!controller.signal.aborted) setAssets(loaded);
     });
     return () => controller.abort();
-  }, [actor, router]);
+  }, [actor, router, pathFor]);
 
   const [player, setPlayer] = useState<StoryPlayer | null>(null);
   const [starting, setStarting] = useState(false);
@@ -210,9 +225,9 @@ export function StoryHost({
         act: Extract<StoryAct, { kind: "navigate" }>,
         signal: AbortSignal,
       ) => {
-        const path = storyPath(act.route);
+        const path = pathFor(act.route);
         if (path === null) return false;
-        const here = () => isOnStoryRoute(act.route, window.location);
+        const here = () => isOnStoryRoute(act.route, window.location, pathFor);
         if (!here()) routerRef.current.push(path);
         const until = performance.now() + ACT_BUDGET_MS.navigate;
         while (!signal.aborted && performance.now() < until) {
@@ -271,7 +286,7 @@ export function StoryHost({
             }
           },
           warm: (route) => {
-            const path = storyPath(route);
+            const path = pathFor(route);
             if (path !== null) routerRef.current.prefetch(path);
           },
           settle: (index) => {
@@ -279,8 +294,11 @@ export function StoryHost({
             stage.set(EMPTY_STAGE);
             mood.set(moodBefore(index));
             const route = routeAtBeat(index) ?? "home";
-            const path = storyPath(route);
-            if (path !== null && !isOnStoryRoute(route, window.location)) {
+            const path = pathFor(route);
+            if (
+              path !== null &&
+              !isOnStoryRoute(route, window.location, pathFor)
+            ) {
               routerRef.current.push(path);
             }
           },
@@ -290,7 +308,7 @@ export function StoryHost({
       setStarting(false);
       next.start(0);
     },
-    [assets, mood, stage],
+    [assets, mood, stage, pathFor],
   );
 
   useEffect(() => {
@@ -638,6 +656,7 @@ function StoryOverlay({
           type="button"
           className="cq-story-btn"
           aria-pressed={captions}
+          data-wide=""
           onClick={() => onCaptions(!captions)}
         >
           Captions
@@ -646,6 +665,7 @@ function StoryOverlay({
           type="button"
           className="cq-story-btn"
           aria-pressed={muted}
+          data-wide=""
           onClick={() => onMuted(!muted)}
         >
           {muted ? "Unmute" : "Mute"}
