@@ -86,7 +86,7 @@ export function WorkPlanView({
   return (
     <div className="cq-wk-tplan" data-work-plan>
       <div
-        className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:hidden"
+        className="relative -mx-4 mb-3 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] lg:hidden"
         role="tablist"
         aria-label={t("Q’s work")}
       >

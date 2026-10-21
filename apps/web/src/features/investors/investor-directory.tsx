@@ -141,7 +141,7 @@ function Directory({
   return (
     <div className="flex flex-col" data-investor-directory>
       <div
-        className="-mx-4 mb-3.5 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:mb-4 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
+        className="relative -mx-4 mb-3.5 flex items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:mb-4 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
         role="group"
         aria-label={t("Filter investors")}
       >

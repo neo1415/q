@@ -5770,7 +5770,6 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "{since} · they declined",
   "{stage}, in your range",
   "{state}, uploaded {date}",
-  "{state}, {who}",
   "{truth} · {evidence}",
   "{what} didn't load",
   "{when} ({zone}). The calendar invite is attached.",

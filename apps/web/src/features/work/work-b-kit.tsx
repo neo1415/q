@@ -184,7 +184,7 @@ export function ApprovalTrack({
   return (
     <ol
       aria-label={t("Where this is")}
-      className="m-0 flex list-none flex-nowrap gap-1 overflow-x-auto p-0 sm:flex-wrap sm:gap-1.5"
+      className="relative m-0 flex list-none flex-nowrap gap-1 overflow-x-auto p-0 sm:flex-wrap sm:gap-1.5"
       data-work-track={String(at)}
     >
       {labels.map((label, index) => {

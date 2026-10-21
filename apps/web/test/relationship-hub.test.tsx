@@ -523,7 +523,7 @@ describe("the Overview's Needs you queue (research 2026-10-15 §3.3)", () => {
       within(first as HTMLElement)
         .getByRole("link", { name: "Reply" })
         .getAttribute("class"),
-    ).toContain("bg-(--cq-accent)");
+    ).toContain("bg-[var(--cq-primary-action,var(--cq-accent))]");
     expect(
       within(queue).getByRole("img", { name: "0 of 1 done" }),
     ).toBeDefined();

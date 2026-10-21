@@ -190,7 +190,6 @@ export const WORK_CHOSEN_AR: Readonly<Record<string, string>> = {
   Processing: "قيد المعالجة",
   "Needs a new file": "يحتاج إلى ملف جديد",
   Deleted: "محذوف",
-  "{state}, {who}": "{state}، {who}",
   "{state}, uploaded {date}": "{state}، رُفع في {date}",
   "Play {name}": "شغّل {name}",
   "Play your pitch": "شغّل عرضك",
