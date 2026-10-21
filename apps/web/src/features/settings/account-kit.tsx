@@ -298,7 +298,7 @@ export function AccountToastProvider({
         {message?.action === undefined ? null : (
           <button
             type="button"
-            className="inline-flex min-h-[34px] items-center rounded-(--cq-radius-md) px-2.5 font-medium text-(--cq-gold-light) hover:bg-(--cq-text-secondary)/30"
+            className="inline-flex min-h-[34px] items-center rounded-(--cq-radius-md) px-2.5 font-medium text-(--cq-canvas) underline underline-offset-2 hover:bg-(--cq-text-secondary)/30"
             onClick={() => {
               message.action?.run();
               setShown(false);

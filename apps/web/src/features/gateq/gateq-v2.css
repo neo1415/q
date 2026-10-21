@@ -443,6 +443,10 @@
 .gq2-acts3 > * {
   min-width: 0;
   padding-inline: 8px;
+  /* A long label ("Pass with a reason") wraps inside its button, never past it. */
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
 }
 @media (max-width: 479px) {
   .gq2-acts3 {
