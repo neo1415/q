@@ -170,6 +170,7 @@ import {
 } from "./named-company-fact.js";
 import { CHAINED_GET_TOOL, chainedCompanyOf } from "./chained-read.js";
 import { outputSplitOf } from "./output-split.js";
+import { createReadCache, type ReadCache } from "./read-cache.js";
 export { outputSplitOf, type OutputSplit } from "./output-split.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
 import {
@@ -1664,6 +1665,11 @@ export type ModelGatewayQAnswerDependencies = {
    */
   readonly deltas?: QLiveDeltaBus | undefined;
   readonly registry?: PromptRegistry | undefined;
+  /**
+   * Reads this person already made under the same authority (read-cache.ts).
+   * Absent: one per seam. A test passes its own to control the clock.
+   */
+  readonly readCache?: ReadCache | undefined;
   readonly context?: QAuthorisedContextPort | undefined;
   /** The Tool Registry's port (CQ-Q-007). Absent: no tool is offered. */
   readonly tools?: QToolPort | undefined;
@@ -2062,6 +2068,7 @@ export function createModelGatewayQAnswer(
   // K4: identical concurrent reads within a run share one call. Which
   // tools are reads is the offer's own declaration, per run.
   const singleFlight = createSingleFlight();
+  const readCache = dependencies.readCache ?? createReadCache();
   const readOnlyByRun = new Map<string, Set<string>>();
   const noteOffer = (
     runId: string,
@@ -2094,6 +2101,20 @@ export function createModelGatewayQAnswer(
           },
         }),
     execute: async (proposal, toolContext) => {
+      const isRead =
+        readOnlyByRun.get(toolContext.runId)?.has(proposal.name) === true;
+      // What Q knows, Q knows (read-cache.ts): the same read under the
+      // same authority within minutes is answered from what was read.
+      const kept = isRead ? readCache.get(proposal, toolContext) : null;
+      if (kept !== null) {
+        logger?.info(
+          { qRunId: toolContext.runId, tool: proposal.name },
+          "q read answered from what this person already read",
+        );
+        runCompanies.note(toolContext.runId, kept);
+        runFits.note(toolContext.runId, kept);
+        return kept;
+      }
       const outcome = await singleFlight.execute(
         toolContext.runId,
         proposal,
@@ -2107,6 +2128,15 @@ export function createModelGatewayQAnswer(
       );
       runCompanies.note(toolContext.runId, outcome);
       runFits.note(toolContext.runId, outcome);
+      if (isRead) readCache.keep(proposal, toolContext, outcome);
+      else if (
+        outcome.status === "SUCCEEDED" &&
+        (outcome.classification === "PREPARE" ||
+          outcome.classification === "SIDE_EFFECT")
+      ) {
+        // Something of theirs changed: what was read for them is not kept.
+        readCache.forget(toolContext);
+      }
       return outcome;
     },
   };
@@ -5667,7 +5697,9 @@ export function createModelGatewayQAnswer(
             },
           };
           took("beforeResearch");
-          sayResearching(call.arguments);
+          if (readCache.get(call, toolContext) === null) {
+            sayResearching(call.arguments);
+          }
           const [outcome] = await Promise.all([
             callTool(call, toolContext),
             stageWrite,
@@ -5704,7 +5736,14 @@ export function createModelGatewayQAnswer(
            */
           const chainedReads = new Map<string, Promise<QToolCallOutcome>>();
           const runCall = (call: ModelToolCall): Promise<QToolCallOutcome> => {
-            if (call.name === PUBLIC_WEB_TOOL) sayResearching(call.arguments);
+            // Said only when the web is really asked (not answered from
+            // what this person already read).
+            if (
+              call.name === PUBLIC_WEB_TOOL &&
+              readCache.get(call, toolContext) === null
+            ) {
+              sayResearching(call.arguments);
+            }
             const companyId = (
               call.arguments as { readonly companyId?: unknown } | null
             )?.companyId;

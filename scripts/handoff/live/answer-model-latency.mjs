@@ -33,7 +33,8 @@ const rendered = renderPrompt(registry, {
   environmentNotes: "",
   variables: {
     capability: "ANSWER",
-    userMessage: "What are the main risks with Northwind Ledger for a seed investor?",
+    userMessage:
+      "What are the main risks with Northwind Ledger for a seed investor?",
     conversation: [],
     authorisedFacts: facts.slice(0, 40),
     subjectDescription: "Northwind Ledger (synthetic)",
@@ -41,15 +42,21 @@ const rendered = renderPrompt(registry, {
   },
 });
 const chars = rendered.messages.reduce((n, m) => n + m.content.length, 0);
-console.log(`prompt: ${rendered.bundle.bundleVersion}, ${String(chars)} characters`);
+console.log(
+  `prompt: ${rendered.bundle.bundleVersion}, ${String(chars)} characters`,
+);
 const google = createGoogleModelProvider({
   apiKey: key,
-  additionalApiKeys: process.env.GEMINI_API_KEY2 ? [process.env.GEMINI_API_KEY2] : [],
+  additionalApiKeys: process.env.GEMINI_API_KEY2
+    ? [process.env.GEMINI_API_KEY2]
+    : [],
 });
 const openaiKey = process.env.OPENAI_API_KEY;
 const openai =
   openaiKey && !openaiKey.startsWith("disabled")
-    ? (await import("../../../packages/model-gateway/dist/providers/openai.js")).createOpenAIModelProvider({ apiKey: openaiKey })
+    ? (
+        await import("../../../packages/model-gateway/dist/providers/openai.js")
+      ).createOpenAIModelProvider({ apiKey: openaiKey })
     : null;
 const targets = [
   [google, "gemini-3.5-flash-lite"],
@@ -60,7 +67,6 @@ for (const [provider, modelCode] of targets) {
   for (let run = 0; run < runs; run += 1) {
     const started = performance.now();
     let first = null;
-    let streamed = 0;
     try {
       const result = await provider.generate(
         {
@@ -77,20 +83,22 @@ for (const [provider, modelCode] of targets) {
           attemptTimeoutMs: 60_000,
           attempt: 1,
           correlationId: `cor_latency_${String(run)}`,
-          onTextDelta: (text) => {
+          onTextDelta: () => {
             first ??= performance.now() - started;
-            streamed += text.length;
           },
         },
       );
       const total = performance.now() - started;
-      const out = result.usage?.outputTokens ?? Math.round(result.text.length / 4);
+      const out =
+        result.usage?.outputTokens ?? Math.round(result.text.length / 4);
       const genMs = total - (first ?? total);
       console.log(
         `${modelCode} run ${String(run + 1)}: first token ${String(Math.round(first ?? -1))} ms, total ${String(Math.round(total))} ms, output ${String(out)} tokens, ${genMs > 0 ? String(Math.round((out / genMs) * 1000)) : "-"} tokens/s, input ${String(result.usage?.inputTokens ?? "?")}`,
       );
     } catch (error) {
-      console.log(`${modelCode} run ${String(run + 1)}: failed ${error?.failureClass ?? ""} ${String(error?.message ?? error).slice(0, 160)}`);
+      console.log(
+        `${modelCode} run ${String(run + 1)}: failed ${error?.failureClass ?? ""} ${String(error?.message ?? error).slice(0, 160)}`,
+      );
     }
   }
 }
