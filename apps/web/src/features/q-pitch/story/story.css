@@ -720,9 +720,19 @@ html[data-story="STORY"] .cq-story-captions {
 html:is([data-story="WAKE"], [data-story="DAY"]) .cq-story-caption-line {
   padding: 2px 14px;
   border-radius: var(--cq-radius-lg);
-  background: color-mix(in oklch, var(--cq-surface-raised) 94%, transparent);
+  border: 1px solid var(--cq-border-subtle);
+  background: var(--cq-surface-raised);
   box-shadow: var(--cq-shadow-sm);
   text-shadow: none;
+}
+html:is([data-story="WAKE"], [data-story="DAY"]) .cq-story-captions span span {
+  opacity: 0.7;
+}
+html:is([data-story="WAKE"], [data-story="DAY"])
+  .cq-story-captions
+  span
+  span[data-said] {
+  opacity: 1;
 }
 .cq-story-captions[data-top] {
   top: 80px;
@@ -762,6 +772,10 @@ html:is([data-story="WAKE"], [data-story="DAY"]) .cq-story-caption-line {
   opacity: 1;
 }
 .cq-story-count {
+  /* Room for "56 / 56", so the bar never moves as the count grows. */
+  min-width: 7ch;
+  white-space: nowrap;
+  text-align: center;
   padding: 0 10px;
   font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;

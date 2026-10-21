@@ -883,6 +883,9 @@ const inputs: readonly BeatInput[] = [
     cues: [
       // The real card's own parts (the company card has these today; a
       // richer card is the owner's call, coordinator 21 Oct).
+      // The card is on the stage from the first word, so a jump to this
+      // beat (go to 49) shows it too; same visual, so nothing remounts.
+      [0, stage("q-card", 1)],
       ["identity", light("qs.card.identity")],
       ["story,", light("qs.card.about")],
       ["numbers,", light("qs.card.more")],
