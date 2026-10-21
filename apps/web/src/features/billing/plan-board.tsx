@@ -92,12 +92,15 @@ export function PlanBoard({
   catalogue,
   side,
   accountName,
+  reviewSheet,
 }: {
   readonly plan: BillingAccountPlanDto;
   readonly catalogue: BillingCatalogueDto | null;
   readonly side: PlanSide;
   /** The company or firm the plan belongs to, for the billing sheet. */
   readonly accountName: string | null;
+  /** Design review only (/dev/account-review): a sheet, open. */
+  readonly reviewSheet?: "billing" | "talk" | undefined;
 }) {
   const t = useT();
   const toast = useAccountToast();
@@ -105,7 +108,13 @@ export function PlanBoard({
     | { readonly kind: "billing" }
     | { readonly kind: "talk"; readonly tier: PlanTier }
     | null
-  >(null);
+  >(
+    reviewSheet === "billing"
+      ? { kind: "billing" }
+      : reviewSheet === "talk"
+        ? { kind: "talk", tier: PLAN_TIERS.tiers[2] }
+        : null,
+  );
   return (
     <>
       <ul

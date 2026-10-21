@@ -65,6 +65,7 @@ export async function QCardSection({
   tagline,
   brand,
   values,
+  given,
 }: {
   readonly subjectType: QCardSubjectType;
   readonly subjectId: string;
@@ -79,9 +80,15 @@ export async function QCardSection({
    * the card.
    */
   readonly values?: Readonly<Record<string, string | null>> | undefined;
+  /**
+   * Design review only (/dev/account-review): the card, given, so nothing
+   * is read (and the public descriptor is left out).
+   */
+  readonly given?: { readonly card: QCardDto | null } | undefined;
 }) {
   const t = await serverT();
-  const card = await loadCard(subjectType, subjectId);
+  const card =
+    given === undefined ? await loadCard(subjectType, subjectId) : given.card;
   if (card === "UNAVAILABLE") {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)">
@@ -118,7 +125,9 @@ export async function QCardSection({
   const handle = card?.handle ?? null;
   const origin = appOrigin();
   const descriptor =
-    handle === null ? null : await publicDescriptor(subjectType, handle);
+    handle === null || given !== undefined
+      ? null
+      : await publicDescriptor(subjectType, handle);
 
   return (
     <QCardPanel

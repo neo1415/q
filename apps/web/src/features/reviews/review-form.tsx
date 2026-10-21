@@ -30,9 +30,21 @@ type Subject = (typeof SUBJECT_OPTIONS)[number]["value"];
 export function ReviewForm({
   subject,
   subjectRef,
+  review,
 }: {
   readonly subject: string;
   readonly subjectRef: string | null;
+  /**
+   * Design review only (/dev/account-review): the reason typed in and the
+   * send's phase or error, given.
+   */
+  readonly review?:
+    | {
+        readonly reason: string;
+        readonly phase: "idle" | "pending" | "done";
+        readonly error?: string | undefined;
+      }
+    | undefined;
 }) {
   const t = useT();
   const toast = useAccountToast();
@@ -41,9 +53,11 @@ export function ReviewForm({
     SUBJECT_OPTIONS.find((option) => option.value === subject)?.value ??
       "Q_ASSESSMENT",
   );
-  const [reason, setReason] = useState("");
-  const [phase, setPhase] = useState<"idle" | "pending" | "done">("idle");
-  const [error, setError] = useState<string | null>(null);
+  const [reason, setReason] = useState(review?.reason ?? "");
+  const [phase, setPhase] = useState<"idle" | "pending" | "done">(
+    review?.phase ?? "idle",
+  );
+  const [error, setError] = useState<string | null>(review?.error ?? null);
   const attempt = useRef<string | null>(null);
   const reasonId = useId();
   const hintId = useId();

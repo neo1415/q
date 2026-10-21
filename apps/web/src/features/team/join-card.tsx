@@ -122,6 +122,7 @@ export function JoinCard({
   keeps,
   alreadyIn,
   invitation = null,
+  reviewPhase = "idle",
 }: {
   readonly token: string;
   readonly preview: InvitationPreviewDto | null;
@@ -137,12 +138,14 @@ export function JoinCard({
     readonly invitationId: string;
     readonly expiresAt: string;
   } | null;
+  /** Design review only (/dev/account-review): after Join was pressed. */
+  readonly reviewPhase?: "idle" | "joined" | undefined;
 }) {
   const t = useT();
   const router = useRouter();
   const [phase, setPhase] = useState<
     "idle" | "joining" | "declining" | "joined" | "declined"
-  >("idle");
+  >(reviewPhase);
   const [error, setError] = useState<string | null>(null);
 
   if (preview === null) {
