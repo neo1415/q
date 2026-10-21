@@ -157,6 +157,26 @@ The round-3 step list was merged in #277 and then rejected in review against `do
   - Taking it to 0 means moving the preview frame out from under the words while they stream, or holding it until the answer settles. That is a product choice for the owner or coordinator, and was not changed here.
 - Paint latency from round 3 still stands; nothing here adds a timer to the UI path (`apps/web/test/stage-line-timing.test.tsx`).
 
+#### Round 5: once per screen, a live cue, zero layout shift (coordinator review of #283, 2026-10-21)
+
+- **Deck progress once per screen.**
+  - The thread's answer slot shows it, with its bar (`QWorkingSlot`).
+  - On the desktop Q page with the Board docked, Now is its own column. It carries the full progress (`QNow showProgress`) and the thread slot says the step alone ("Laying out each page").
+  - Now stacked under the thread (mobile) or in the sheet shows no stage at all.
+  - The dock's compact pill shows only off the Q page and while the sheet is closed.
+- **A live cue tied to real work** (ux-direction §5.1 THINKING).
+  - `WorkingMark` is a 14 px ring whose arc travels round it at the 1.4 s sweep period. It turns only while a stage is being said and is gone when the answer lands.
+  - Under reduced motion the arc stands still (measured: `animation-name` is `cq-working-sweep`, and `none` with `prefers-reduced-motion: reduce`).
+  - Tokens only: no glow, no shimmer, no gradient text.
+- **CLS on the thread: 0.** The coordinator's decision is objects first, words as caption (Stage + Board).
+  - The working line sits at the top of the answer. It keeps its height after the answer lands, in that session only.
+  - Below it is a "never shrink" objects region: the live preview frame, then the table, summary or cards that take its place.
+  - Q's words come below the objects; other blocks (pictures, documents) stay under the words.
+  - The preview TABLE frame now has its card's frame (label and title line) and five skeleton rows, so the real table rarely outgrows it.
+  - The region's floor is the layout height from the ResizeObserver border box. The painted rect read 7 px short while the frame entered, which was the last measured shift.
+- **Measured** (Chromium, production build, a compare turn replayed whole and ending with the real table, layout-shift observer, 3 runs each): **CLS 0 with no shifts** at both 390 px and 1280 px. The progression was 0.0157 (round 4), then 0.019, 0.001, and 0.
+- The 12 screenshots in `docs/ai-handoff/evidence/stage-progress/` were retaken. The desktop deck shot shows Now as its own column.
+
 ## 4. Tests and gates (run 2026-10-20/21, Windows worktree)
 
 New tests:

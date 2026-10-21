@@ -74,7 +74,7 @@ import { announceQSaid } from "@/features/q-swarm/q-said";
 
 import { plainFromMarkdown, QMarkdown } from "./markdown";
 import { HideFromQ } from "./hide-from-q";
-import { StageLine } from "./stage-line";
+import { QWorkingSlot, StageLine } from "./stage-line";
 import { QAnswer } from "./q-answer";
 import { boardTimeline } from "./board-timeline";
 import { QBoardTimeline } from "./q-board-timeline";
@@ -1429,11 +1429,9 @@ export function QConversationPanel({
                               onAsk={sayOrAsk}
                               onOpenArtifact={showArtifact}
                               working={
-                                <StageLine
+                                <QWorkingSlot
                                   current={presence.stage}
-                                  size="answer"
-                                  live={false}
-                                  reserve
+                                  taskElsewhere={boardDocked}
                                 />
                               }
                             />
@@ -1455,11 +1453,9 @@ export function QConversationPanel({
                       >
                         <span className="sr-only">Q: </span>
                         <div className="cq-q-answer flex w-full max-w-(--cq-layout-reading) flex-col gap-3">
-                          <StageLine
+                          <QWorkingSlot
                             current={presence.stage}
-                            size="answer"
-                            live={false}
-                            reserve
+                            taskElsewhere={boardDocked}
                           />
                         </div>
                       </li>
@@ -1799,7 +1795,14 @@ export function QConversationPanel({
               data-q-aside
             >
               <div className="mx-auto w-full max-w-[1180px] px-6 pt-4">
-                <QNow session={session} onAct={sayOrAsk} quietWhenIdle />
+                {/* Its own column: the one place a durable task's
+                    progress shows on this screen (round 5). */}
+                <QNow
+                  session={session}
+                  onAct={sayOrAsk}
+                  quietWhenIdle
+                  showProgress
+                />
               </div>
               <QBoardTimeline
                 conversationId={q.conversationId}
