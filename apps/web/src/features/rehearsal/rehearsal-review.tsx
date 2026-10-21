@@ -154,20 +154,31 @@ function Writing() {
 
 export function RehearsalReview({
   rehearsal,
+  initialNote,
 }: {
   readonly rehearsal: QRehearsalDto;
+  /**
+   * The "what to improve" note shown picked, its line lit (the design
+   * review page); absent: none until the person picks one.
+   */
+  readonly initialNote?: number | undefined;
 }) {
   const t = useT();
   const name = rehearsal.counterpart.name;
   const review = rehearsal.review;
-  const [picked, setPicked] = useState<number | null>(null);
-  const [lit, setLit] = useState<number | null>(null);
-  const lines = useRef(new Map<number, HTMLLIElement>());
-
   const improve = (review?.wentWrong ?? []).map((item) => ({
     ...item,
     line: momentTurn(item.moment, rehearsal.turns),
   }));
+  const [picked, setPicked] = useState<number | null>(
+    initialNote !== undefined && improve[initialNote] !== undefined
+      ? initialNote
+      : null,
+  );
+  const [lit, setLit] = useState<number | null>(
+    initialNote === undefined ? null : (improve[initialNote]?.line ?? null),
+  );
+  const lines = useRef(new Map<number, HTMLLIElement>());
 
   const pick = (index: number, line: number | null) => {
     setPicked(index);

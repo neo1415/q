@@ -40,6 +40,8 @@ export type NoticeState = {
 let state: NoticeState = { items: null, unread: 0, failed: false };
 let loadedAt = 0;
 let inFlight: Promise<void> | null = null;
+/** A design review page's fixed list: never read again while it is shown. */
+let seeded = false;
 const listeners = new Set<() => void>();
 let timer: number | undefined;
 
@@ -50,6 +52,7 @@ function emit(next: NoticeState): void {
 
 /** Reads the list unless a read is running or one just finished. */
 export function refreshNotices(force = false): Promise<void> {
+  if (seeded) return Promise.resolve();
   if (inFlight !== null) return inFlight;
   if (!force && Date.now() - loadedAt < FRESH_MS) return Promise.resolve();
   // A dropped connection is retried with backoff (and waits while the
@@ -86,6 +89,7 @@ export function refreshNotices(force = false): Promise<void> {
  */
 export async function loadOlderNotices(): Promise<void> {
   const before = state.nextBefore;
+  if (seeded) return;
   if (before === undefined || before === null || state.items === null) return;
   const result = await listNoticesAction(before).catch(() => null);
   if (result?.ok !== true) return;
@@ -150,6 +154,21 @@ export function useNotices(): NoticeState {
     () => state,
     () => EMPTY,
   );
+}
+
+/**
+ * The design review pages only (/dev/work-review): show these fictional
+ * notices and read nothing from the server while they are shown. Returns
+ * the undo, which leaves a fresh store behind for the real pages.
+ */
+export function seedNoticesForReview(next: NoticeState): () => void {
+  seeded = true;
+  loadedAt = Date.now();
+  emit(next);
+  return () => {
+    seeded = false;
+    resetNoticeStore();
+  };
 }
 
 /** Tests only: a fresh store. */
