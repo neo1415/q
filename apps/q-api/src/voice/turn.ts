@@ -151,7 +151,8 @@ export type VoiceTurnDependencies = {
    * each name, so the cards are up before the answer lands.
    */
   readonly room?:
-    | (Pick<QRoomFeed, "publish"> & Partial<Pick<QRoomFeed, "preview">>)
+    | (Pick<QRoomFeed, "publish"> &
+        Partial<Pick<QRoomFeed, "preview" | "stage">>)
     | undefined;
   /** Q's first minute with a new person (welcome sessions). */
   readonly welcome?: WelcomeHost | undefined;
@@ -1481,6 +1482,12 @@ export function createVoiceTurnHandler(
             silence.stage = event.data.stage;
             silence.approvalWaiting =
               event.data.stage === "WAITING_FOR_APPROVAL";
+            // Owner 2026-10-21: the screen shows the run's steps while Q
+            // talks, from these same real stage events.
+            dependencies.room?.stage?.(actor, {
+              runId,
+              stage: event.data.stage,
+            });
             break;
           case "q.run.started":
           case "q.finding.available":

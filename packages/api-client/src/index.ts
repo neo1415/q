@@ -201,7 +201,10 @@ export {
 export {
   createQStreamState,
   describeQStage,
+  Q_STAGE_HISTORY_MAX,
+  qStageSteps,
   reduceQStream,
+  type QStageStep,
   type QStreamApprovalState,
   type QStreamPartialMessage,
   type QStreamState,

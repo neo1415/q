@@ -4,8 +4,8 @@ import { buttonClassName } from "@capital-q/ui/button";
 
 import { EmailDraftEditor } from "../integrations/email-draft-editor";
 import { openQuestions } from "./board";
-import { workingLabel } from "./conversation";
 import type { QSessionValue } from "./q-session";
+import { StageProgress } from "./stage-progress";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -39,7 +39,6 @@ export function QNow({
           (candidate) => candidate.proposalId === approval.proposalId,
         );
   const questions = openQuestions(turns);
-  const stage = workingLabel(q.state);
   const nothing = !q.working && approval === null && questions.length === 0;
   if (nothing && quietWhenIdle) return null;
 
@@ -62,11 +61,8 @@ export function QNow({
             <span className="cq-body-sm font-medium text-(--cq-text-primary)">
               {t("Q is working")}
             </span>
-            {stage !== undefined ? (
-              <span className="cq-caption text-(--cq-text-secondary)">
-                {stage}
-              </span>
-            ) : null}
+            {/* Owner 2026-10-21: the run's steps so far, as everywhere. */}
+            <StageProgress steps={session.presence.steps} className="mt-1" />
           </span>
           <button
             type="button"

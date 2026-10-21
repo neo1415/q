@@ -32,6 +32,7 @@ import { homeHref } from "./active-conversation";
 import { failureMessage, recoveryHint } from "./conversation";
 import { useAnchorQuestion } from "./follow-newest";
 import { QAnswer } from "./q-answer";
+import { StageProgress } from "./stage-progress";
 import { QNow } from "./q-now";
 import { QCanSee } from "./q-can-see";
 import { viewingOf, type QMoment } from "./q-moment";
@@ -119,6 +120,9 @@ export function QSheetConversation({
             <span className="cq-label text-(--cq-text-primary)" role="status">
               {label}
             </span>
+            {/* Owner 2026-10-21: the steps Q has taken on this run, from
+                its real stage events. */}
+            <StageProgress steps={presence.steps} />
             {/* Q room R1: what Q sees of the page behind the dock. */}
             <QCanSee />
           </div>

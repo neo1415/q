@@ -274,3 +274,48 @@ describe("reduceQStream: artifacts live", () => {
     expect(state.preview).toBeNull();
   });
 });
+
+describe("the run's stage history (owner 2026-10-21: stages as they happen)", () => {
+  it("keeps every stage the run reported, in order, and the newest is current", async () => {
+    const { qStageSteps } = await import("../src/q-stream-reducer.js");
+    let state = createQStreamState();
+    state = reduceQStream(state, started());
+    for (const [name, seq] of [
+      ["REVIEWING_COMPANY", 2],
+      ["CHECKING_EVIDENCE", 3],
+      ["CHECKING_EVIDENCE", 4],
+      ["COMPARING_OPPORTUNITIES", 5],
+      ["PREPARING_ANALYSIS", 6],
+    ] as const) {
+      state = reduceQStream(state, stage(name, seq));
+    }
+    expect(state.stage).toBe("PREPARING_ANALYSIS");
+    // A stage reported twice back to back is one step.
+    expect(qStageSteps(state.stageHistory)).toEqual([
+      "REVIEWING_COMPANY",
+      "CHECKING_EVIDENCE",
+      "COMPARING_OPPORTUNITIES",
+      "PREPARING_ANALYSIS",
+    ]);
+  });
+
+  it("is replay-safe: a resent stage neither repeats a step nor moves Q backwards", async () => {
+    const { qStageSteps } = await import("../src/q-stream-reducer.js");
+    let state = createQStreamState();
+    state = reduceQStream(state, stage("REVIEWING_COMPANY", 2));
+    state = reduceQStream(state, stage("COMPARING_OPPORTUNITIES", 3));
+    // The reconnect replays from the start.
+    state = reduceQStream(state, stage("REVIEWING_COMPANY", 2));
+    state = reduceQStream(state, stage("COMPARING_OPPORTUNITIES", 3));
+    expect(state.stageHistory).toHaveLength(2);
+    expect(state.stage).toBe("COMPARING_OPPORTUNITIES");
+    expect(qStageSteps(state.stageHistory)).toEqual([
+      "REVIEWING_COMPANY",
+      "COMPARING_OPPORTUNITIES",
+    ]);
+  });
+
+  it("starts empty: no step is shown before the run reports one", () => {
+    expect(createQStreamState().stageHistory).toEqual([]);
+  });
+});

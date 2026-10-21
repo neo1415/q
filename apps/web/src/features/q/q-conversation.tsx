@@ -66,12 +66,7 @@ import { nextSpokenPiece } from "../voice/spoken-progress";
 import { useQSpeech } from "../voice/use-q-speech";
 import { VoiceMenu } from "../voice/voice-menu";
 import { expectDocument } from "@/features/documents/document-ready";
-import {
-  failureMessage,
-  recoveryHint,
-  workingLabel,
-  type QTurn,
-} from "./conversation";
+import { failureMessage, recoveryHint, type QTurn } from "./conversation";
 import { interceptTyped } from "./typed-intercept";
 import { CardsControls } from "./cards/cards-controls";
 import { announceQGestures } from "@/features/q-swarm/q-gestures";
@@ -80,6 +75,7 @@ import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import { plainFromMarkdown, QMarkdown } from "./markdown";
 import { HideFromQ } from "./hide-from-q";
+import { StageProgress } from "./stage-progress";
 import { QAnswer } from "./q-answer";
 import { boardTimeline } from "./board-timeline";
 import { QBoardTimeline } from "./q-board-timeline";
@@ -724,7 +720,6 @@ export function QConversationPanel({
     setBoardBump((n) => n + 1);
   }, []);
 
-  const stage = workingLabel(q.state);
   const documentStage =
     q.state.stage === "PREPARING_DOCUMENT" ||
     q.state.stage === "REVISING_DOCUMENT" ||
@@ -1465,14 +1460,13 @@ export function QConversationPanel({
                     swarm at work beside it (founder live 2026-09-29), and
                     a document's "one moment" even while talking. */}
                 {voice.active || q.working ? (
-                  <div
-                    className="flex items-center gap-3"
-                    role="status"
-                    data-q-thread-status
-                  >
+                  <div className="flex items-start gap-3" data-q-thread-status>
                     {q.working ? <QSwarm state="WORKING" pixels={40} /> : null}
-                    <span className="flex min-w-0 flex-col">
-                      <span className="inline-flex items-center gap-2 cq-caption text-(--cq-text-secondary)">
+                    <span className="flex min-w-0 flex-col gap-1 pt-2">
+                      <span
+                        className="inline-flex items-center gap-2 cq-caption text-(--cq-text-secondary)"
+                        role="status"
+                      >
                         {/* The same dot as the arrival's (owner 2026-10-18). */}
                         {voice.active ? (
                           <span
@@ -1483,21 +1477,11 @@ export function QConversationPanel({
                         ) : null}
                         {t(stateLabel ?? "Q")}
                       </span>
-                      {/* Where Q is, as its own line rather than joined to the
-                        state with a dot; keyed so a new stage fades in
-                        instead of swapping mid-glance (frontend-design,
-                        animate). Same shape as the arrival's. */}
-                      {q.working &&
-                      stage !== undefined &&
-                      (!voice.active || documentStage) ? (
-                        <span
-                          key={stage}
-                          className="cq-stage-line cq-caption text-(--cq-text-secondary)"
-                          data-q-stage-line
-                        >
-                          {stage}
-                        </span>
-                      ) : null}
+                      {/* Owner 2026-10-21: the steps Q has taken on this
+                          run and the one it is on, from its real stage
+                          events (typed or spoken). Same list as the
+                          arrival's and the Q sheet's. */}
+                      <StageProgress steps={presence.steps} />
                     </span>
                   </div>
                 ) : null}
@@ -1587,14 +1571,12 @@ export function QConversationPanel({
                       </ViewTransition>
                     </div>
                   )}
-                  <div
-                    className="flex min-h-6 flex-col items-center gap-1"
-                    role="status"
-                  >
+                  <div className="flex min-h-6 flex-col items-center gap-2">
                     {stateLabel === null ? null : (
                       // A dot and a word ("Listening", "Speaking"), quiet.
                       <span
                         className="inline-flex items-center gap-2 cq-label text-(--cq-text-secondary)"
+                        role="status"
                         data-q-state-pill
                       >
                         <span
@@ -1607,15 +1589,9 @@ export function QConversationPanel({
                         {t(stateLabel)}
                       </span>
                     )}
-                    {!voice.active && q.working && stage !== undefined ? (
-                      <span
-                        key={stage}
-                        className="cq-stage-line cq-caption text-(--cq-text-secondary)"
-                        data-q-stage-line
-                      >
-                        {stage}
-                      </span>
-                    ) : null}
+                    {/* Owner 2026-10-21: where Q has been and is, as a
+                        step list from the run's real stages. */}
+                    <StageProgress steps={presence.steps} />
                   </div>
                 </ArrivalRoom>
 
