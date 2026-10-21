@@ -162,6 +162,7 @@ import {
   createVisibilityCentre,
   systemDisclosureClock,
 } from "@capital-q/permissions";
+import { createScreenActionAudit } from "./http/app-action-audit.js";
 import {
   createInvitationMailer,
   createOrganisationAdminService,
@@ -2799,6 +2800,10 @@ const { app, logger } = createApp(config, security, {
   organisationAdmin: createOrganisationAdminService({
     authorization,
     store: createPostgresOrganisationAdminStore({ sql: database.sql }),
+  }),
+  screenActionAudit: createScreenActionAudit({
+    transactions: database.transactions,
+    audit,
   }),
   // ADR 0050: business etiquette guides (a person's own; the console's).
   etiquette: (() => {

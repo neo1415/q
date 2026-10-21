@@ -1,4 +1,4 @@
-import type { ActivityCursor } from "../domain/activity.js";
+import type { ActivityCursor, ActivitySource } from "../domain/activity.js";
 import type { InvitationStatus } from "../domain/team.js";
 
 /**
@@ -19,14 +19,26 @@ export type ActivityFilter = {
   readonly privatePatterns: readonly string[];
   /** Q lifecycle codes that are shown, as the action they carried out. */
   readonly qExecutedTypes: readonly string[];
+  /** Relationship event types that are stage moves. */
+  readonly stageEventTypes: readonly string[];
   readonly from?: string | undefined;
   readonly to?: string | undefined;
   readonly before?: ActivityCursor | undefined;
   readonly limit: number;
 };
 
+/**
+ * One feed row from the union of three sources, in one order:
+ *   a  audit.material_actions (accountability, including Q under authority)
+ *   e  network.relationship_events a person of this organisation acted in
+ *      (never personal_private), as relationship.stage.change or
+ *      relationship.event.<type>
+ *   n  network.relationship_notes of this organisation's side, as
+ *      relationship.note.add / relationship.note.correct
+ */
 export type ActivityRecord = {
-  /** Internal keyset key (the audit row's storage key), for the cursor only. */
+  readonly source: ActivitySource;
+  /** Internal keyset key within its source, for the cursor only. */
   readonly key: string;
   readonly eventId: string;
   readonly occurredAt: string;
@@ -46,6 +58,9 @@ export type ActivityRecord = {
    */
   readonly roleFrom: string | null;
   readonly roleTo: string | null;
+  /** A stage event's previous stage event type on the same relationship, and its own. */
+  readonly stageFrom: string | null;
+  readonly stageTo: string | null;
 };
 
 export type ActivityPerson = {
@@ -146,6 +161,7 @@ export type OrganisationAdminStore = {
     readonly since: string;
     readonly privatePatterns: readonly string[];
     readonly qExecutedTypes: readonly string[];
+    readonly stageEventTypes: readonly string[];
   }) => Promise<{
     readonly lastActiveAt: string | null;
     readonly counts: readonly {
