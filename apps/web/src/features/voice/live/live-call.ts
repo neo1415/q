@@ -227,6 +227,14 @@ export function fastActLine(): string {
   return "Their screen has already done what they asked (it is done now, confirmed). Say at most two words, or nothing, then carry on; do not describe it and do not ask Q's backend for it.";
 }
 
+/**
+ * Lane 7: the screen could not tell which of two or three they meant and
+ * shows them as one tap each.
+ */
+export function fastChooserLine(): string {
+  return "Their screen now shows two or three things their words could mean, one tap each. Ask them in a few words which one; do not list them and do not ask Q's backend.";
+}
+
 /** A page change is told to the voice once it has settled this long. */
 export const PAGE_NOTE_DEBOUNCE_MS = 1_200;
 
@@ -490,7 +498,10 @@ export async function startLiveCall(
         // has no route receipt: it is done on their screen already.
         if (moved !== null && !moved.route) {
           receipt.stop();
-          return { commentary: fastActLine() };
+          return {
+            commentary:
+              moved.via === "CHOOSER" ? fastChooserLine() : fastActLine(),
+          };
         }
         if (moved !== null) {
           const outcome = await receipt.for(moved.path);

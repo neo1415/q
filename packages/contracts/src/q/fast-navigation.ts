@@ -6,6 +6,7 @@ import {
   QNavigateIntentSchema,
   QOpenRecordPageIntentSchema,
   QOpenSettingsIntentSchema,
+  QRecordPageSchema,
 } from "./ui-intent.js";
 
 /**
@@ -65,4 +66,67 @@ export const QFastNavigationResponseSchema = z.discriminatedUnion("kind", [
 ]);
 export type QFastNavigationResponse = z.infer<
   typeof QFastNavigationResponseSchema
+>;
+
+/**
+ * Lane 7 (owner 2026-10-21: "names must NOT be required"): when the
+ * screen's own reading of "open their deck" / "that one" is torn between
+ * two or three records or documents it was already shown, the Q API picks
+ * one. It keeps only the candidates the person may open (open_page's and
+ * the document tool's own authorize steps, as them), and only then asks
+ * one small, capped model call "which one". NONE: undecided in time; the
+ * screen then takes its own best or offers the choice.
+ *
+ * Labels are the screen's words for things it already showed the person:
+ * data, never instructions, and never shown to the model for a candidate
+ * the person may not open.
+ */
+export const Q_NAVIGATION_CHOOSE_PATH = "/v1/q/navigation/choose" as const;
+export const Q_NAVIGATION_CHOICES_MAX = 3;
+
+export const QNavigationChoiceSchema = z
+  .object({
+    key: z.string().trim().min(1).max(64),
+    page: QRecordPageSchema,
+    id: UuidSchema,
+    companyId: UuidSchema.optional(),
+    label: z.string().trim().min(1).max(120),
+  })
+  .strict();
+export type QNavigationChoice = z.infer<typeof QNavigationChoiceSchema>;
+
+export const QNavigationChooseRequestSchema = z
+  .object({
+    text: z.string().trim().min(1).max(Q_FAST_NAVIGATION_TEXT_MAX),
+    candidates: z
+      .array(QNavigationChoiceSchema)
+      .min(2)
+      .max(Q_NAVIGATION_CHOICES_MAX),
+  })
+  .strict();
+export type QNavigationChooseRequest = z.infer<
+  typeof QNavigationChooseRequestSchema
+>;
+
+export const QNavigationChooseResponseSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("CHOSEN"),
+      key: z.string().trim().min(1).max(64),
+      /** Whether a model was asked (false: only one was theirs to open). */
+      model: z.boolean(),
+      ms: z.number().int().min(0).max(60_000),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("NONE"),
+      /** The keys the person may open, best first as sent. */
+      allowed: z.array(z.string().trim().min(1).max(64)).max(3),
+      ms: z.number().int().min(0).max(60_000),
+    })
+    .strict(),
+]);
+export type QNavigationChooseResponse = z.infer<
+  typeof QNavigationChooseResponseSchema
 >;

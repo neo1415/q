@@ -20,6 +20,17 @@ export type Shown = {
   readonly blocks: readonly QTurnObjectBlock[];
   /** A card Q brought up (the Q room's own card surface, read as them). */
   readonly room?: QShowInQRoomIntent | undefined;
+  /**
+   * Lane 7: "open their deck" when the screen could not tell which of two
+   * or three they meant: one tap each, never a question in prose.
+   */
+  readonly choices?:
+    | readonly {
+        readonly key: string;
+        readonly label: string;
+        readonly choose: () => void;
+      }[]
+    | undefined;
 };
 
 let shown: Shown | null = null;

@@ -13,6 +13,7 @@ import { askedSince } from "../client-actions";
 import type { QTurn, QTurnObjectBlock } from "../conversation";
 import { QMarkdown } from "../markdown";
 import { useRoomDocumentHost } from "../room/document-host";
+import { setConversationTurns } from "./context-set";
 import { closeShown, showInModal, useShown, type Shown } from "./show-store";
 
 /*
@@ -93,6 +94,11 @@ export function QShowModal({ turns }: { readonly turns: readonly QTurn[] }) {
   const seen = useRef<Set<string> | null>(null);
   if (seen.current === null) seen.current = new Set(turns.map((one) => one.id));
 
+  // "Their deck", "that one": read against this conversation (Lane 7).
+  useEffect(() => {
+    setConversationTurns(turns);
+  }, [turns]);
+
   useEffect(() => {
     const known = seen.current;
     if (known === null) return;
@@ -110,7 +116,12 @@ export function QShowModal({ turns }: { readonly turns: readonly QTurn[] }) {
     if (onQPage) closeShown();
   }, [onQPage]);
 
-  const title = shown?.title === "" ? t("By Q") : (shown?.title ?? "");
+  const title =
+    shown?.choices !== undefined
+      ? t("Which one?")
+      : shown?.title === ""
+        ? t("By Q")
+        : (shown?.title ?? "");
   return (
     <DialogRoot
       open={shown !== null && !onQPage}
@@ -146,6 +157,25 @@ export function QShowModal({ turns }: { readonly turns: readonly QTurn[] }) {
               </button>
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+              {shown.choices === undefined ? null : (
+                <ul className="flex flex-col gap-2" data-q-choices>
+                  {shown.choices.map((choice) => (
+                    <li key={choice.key}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeShown();
+                          choice.choose();
+                        }}
+                        className="flex min-h-11 w-full items-center rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-4 text-start text-(--cq-text-primary) hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+                        data-q-choice={choice.key}
+                      >
+                        {choice.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
               {shown.room === undefined && shown.text.trim().length > 0 ? (
                 <div className="cq-body text-(--cq-text-primary)">
                   <QMarkdown text={shown.text} />

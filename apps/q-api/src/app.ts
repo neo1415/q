@@ -44,6 +44,7 @@ import { registerQConversationRoutes } from "./http/q-conversations.js";
 import type { QRoomFeed } from "./room/feed.js";
 import { registerQRoomRoutes } from "./room/routes.js";
 import type { FastNavigationResolver } from "./composition/fast-navigation.js";
+import type { NavigationChooser } from "./composition/navigation-chooser.js";
 import { registerFastNavigationRoutes } from "./http/fast-navigation.js";
 import {
   registerUiActReceiptRoutes,
@@ -287,6 +288,8 @@ export type QApiModules = {
   readonly uiActReceipts?: UiActReceiptLedger | undefined;
   /** RECOVERY-2026-10 (C): the fast path's resolver; absent, no route. */
   readonly fastNavigation?: FastNavigationResolver | undefined;
+  /** Lane 7: the tie-break for a pointing request ("open their deck"). */
+  readonly fastNavigationChoose?: NavigationChooser | undefined;
   /** The Approval Engine (CQ-Q-008); absent means no approval routes. */
   readonly qActions?: QApprovalRoutesDependencies["qActions"] | undefined;
   /** What runs an approved action: resume, or the gate when the run cannot resume. */
@@ -455,6 +458,7 @@ export function createApp(
         resolver: security.resolver,
         identity: security.identity,
         resolve: modules.fastNavigation,
+        choose: modules.fastNavigationChoose,
       });
     }
     if (modules.uiActReceipts !== undefined) {

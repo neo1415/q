@@ -24,6 +24,7 @@ import { carriedApproval, type CarriedApproval } from "./carried-approval";
 import type { PendingTurn } from "./conversation";
 import {
   actedHere,
+  contextAsked,
   documentAsked,
   navigationHeard,
 } from "./control/fast-navigation";
@@ -479,16 +480,17 @@ export function useQConversation(
       setSubmitting(true);
       // RECOVERY-2026-10 (C, "stupid fast"): a typed "open X" moves the
       // screen now, beside the run; the answer does not move it again.
-      // Lane 7: a document by its name is resolved first (bounded): one
-      // the fast path opened needs no turn of Q's either.
-      if (documentAsked(text)) {
+      // Lane 7: a document by its name, or words that point ("open their
+      // deck", "that one"), are resolved first (bounded): what the screen
+      // opened by itself needs no turn of Q's either.
+      if (documentAsked(text) || contextAsked(text)) {
         const opened = await Promise.race([
           navigationHeard(text),
           new Promise<null>((resolve) =>
             setTimeout(() => resolve(null), DOCUMENT_WAIT_MS),
           ),
         ]);
-        if (opened?.path === "#document") {
+        if (opened?.handled === true) {
           setSubmitting(false);
           return;
         }

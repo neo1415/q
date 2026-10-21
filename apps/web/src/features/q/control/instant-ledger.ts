@@ -26,3 +26,63 @@ export function doneByScreen(key: string): boolean {
 export function resetInstantLedger(): void {
   done = null;
 }
+
+/**
+ * Lane 7 ("names must NOT be required"): what was opened last, by the
+ * fast path or by Q's answer, newest first: "it" and "the other one" are
+ * read from it (context-set.ts). Ids the person was already shown only.
+ */
+export type OpenedSubject = {
+  readonly kind: "COMPANY" | "INVESTOR";
+  readonly id: string;
+  readonly name: string | null;
+};
+export type OpenedDocument =
+  | {
+      readonly kind: "MATERIAL";
+      readonly companyId: string;
+      readonly documentId: string;
+      readonly title: string | null;
+    }
+  | { readonly kind: "ARTIFACT"; readonly artifactId: string };
+export type Opened = {
+  readonly subject?: OpenedSubject | undefined;
+  readonly document?: OpenedDocument | undefined;
+  readonly label: string | null;
+  readonly at: number;
+};
+
+const opened: Opened[] = [];
+const OPENED_MAX = 8;
+
+export function noteOpened(entry: Omit<Opened, "at">): void {
+  opened.unshift({ ...entry, at: Date.now() });
+  opened.length = Math.min(opened.length, OPENED_MAX);
+}
+
+export function openedRecently(): readonly Opened[] {
+  return opened;
+}
+
+/** Tests. */
+export function resetOpened(): void {
+  opened.length = 0;
+}
+
+/**
+ * The record a record page's intent shows (its subject), for the ledger;
+ * null for a page that is not one record's.
+ */
+export function subjectOfPage(
+  page: string,
+  id: string,
+): OpenedSubject | null {
+  if (page === "DOCUMENT" || page === "DATA_ROOM_DOCUMENT") return null;
+  if (page.startsWith("COMPANY") || page.startsWith("RELATIONSHIP_COMPANY")) {
+    return { kind: "COMPANY", id: id.toLowerCase(), name: null };
+  }
+  if (page === "INVESTOR" || page.startsWith("RELATIONSHIP_INVESTOR")) {
+    return { kind: "INVESTOR", id: id.toLowerCase(), name: null };
+  }
+  return null;
+}
