@@ -127,9 +127,9 @@ export const FOUNDER_QA_ENTRIES: readonly QaEntry[] = [
     side: "FOUNDER",
     question: "Why did Q pitch Capital Q instead of my company?",
     paraphrases: [
-      "why was capital q the example company",
-      "is capital q itself on the platform",
-      "why present capital q in the founder tour",
+      "why was the presenting company used as the example",
+      "is the company presenting itself listed on the platform",
+      "why present your own company in the founder tour",
     ],
     answer:
       "Because the subject everyone in the room knows is Capital Q itself. Q presented it on the same fourteen-section template every founder's overview uses, under the same rules: pre-seed and bootstrapping, the raise shown as the founders' own claim, and nothing invented about traction or team.",

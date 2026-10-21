@@ -351,7 +351,7 @@ _Sources: docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_D
 ## Live, roadmap, business and the company (12)
 
 **Q: What is live today and what is still planned?**
-A: Everything in this presentation ran on the live product and was verified step by step: matching, Discover, profiles, diligence, documents, the CRM and pipeline, GateQ, Q's work and the Q Daily. Not yet certified: the spoken version of this presentation, live video rehearsals, and the full live-meeting journey. The rehearsal you saw was a prepared exchange.
+A: Each part of the product is marked in our certification record as live or not yet, and I describe it only that way. Recorded as live and verified on the product: matching, Discover, company profiles, diligence, documents, the CRM and pipeline, GateQ, my work for you and the Q Daily. Not yet certified: the spoken presentation, live video rehearsals and the full live-meeting journey. Illustrative moments in a story are illustrations, not product claims, and a rehearsal shown in a tour is a prepared exchange.
 _Sources: docs/specs/q-pitch/CERTIFICATION_MANIFEST.md Q Pitch v6 certification; docs/specs/q-pitch/CERTIFICATION_MANIFEST.md Short of the v6 definition of done. Bank id `qa.whats-live`._
 
 **Q: Are these real companies?**

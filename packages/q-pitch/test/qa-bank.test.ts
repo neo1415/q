@@ -20,6 +20,14 @@ describe("the Q&A bank (v6)", () => {
     }
   });
 
+  it("answers shared questions with their own entry on the founder side too", () => {
+    for (const entry of QA_BANK.filter((e) => e.side === "BOTH")) {
+      for (const asked of [entry.question, ...entry.paraphrases]) {
+        expect(founder.answer(asked)?.id, asked).toBe(entry.id);
+      }
+    }
+  });
+
   it("answers by meaning, not only by the stored wording", () => {
     expect(investor.answer("Could a competitor just copy you?")?.id).toBe(
       "qa.moat",

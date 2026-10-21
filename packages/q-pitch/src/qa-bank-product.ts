@@ -918,7 +918,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
       "what is still to come",
     ],
     answer:
-      "Everything in this presentation ran on the live product and was verified step by step: matching, Discover, profiles, diligence, documents, the CRM and pipeline, GateQ, Q's work and the Q Daily. Not yet certified: the spoken version of this presentation, live video rehearsals, and the full live-meeting journey. The rehearsal you saw was a prepared exchange.",
+      "Each part of the product is marked in our certification record as live or not yet, and I describe it only that way. Recorded as live and verified on the product: matching, Discover, company profiles, diligence, documents, the CRM and pipeline, GateQ, my work for you and the Q Daily. Not yet certified: the spoken presentation, live video rehearsals and the full live-meeting journey. Illustrative moments in a story are illustrations, not product claims, and a rehearsal shown in a tour is a prepared exchange.",
     sources: [
       `${CERT} Q Pitch v6 certification`,
       `${CERT} Short of the v6 definition of done`,
