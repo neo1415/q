@@ -577,6 +577,73 @@ export function investorsTableBlock(
   };
 }
 
+/** "SERIES_A" -> "Series A"; a code is reference data, shown as words. */
+function stageWords(code: string | null): string {
+  if (code === null || code.trim().length === 0) return "";
+  return code
+    .trim()
+    .toLowerCase()
+    .split(/[_\s]+/u)
+    .map((word) => `${word.slice(0, 1).toUpperCase()}${word.slice(1)}`)
+    .join(" ");
+}
+
+/**
+ * Artifacts live (audit 2026-10-15 §4: a company table was only ever
+ * side-by-side cards): the run's companies side by side, for either role.
+ * Each column is a company an authorised read of this run returned and
+ * opens its profile; each row is what the company states about itself,
+ * from a complete profile read. An unread fact is an empty cell ("not
+ * known"), never a guess, and a row nobody has anything for is left out.
+ */
+export function companiesTableBlock(read: RunRead): QResultBlock | null {
+  const ids = [
+    ...read.companyFacts.keys(),
+    ...[...read.companyNames.keys()].filter((id) => !read.companyFacts.has(id)),
+  ].slice(0, 8);
+  if (ids.length < 2) return null;
+  const fact = (id: string) => read.companyFacts.get(id);
+  const place = (id: string) => {
+    const facts = fact(id);
+    const country = facts?.country ?? read.countries.get(id) ?? null;
+    return [facts?.city ?? null, country]
+      .filter((part) => part !== null && part.trim().length > 0)
+      .join(", ");
+  };
+  const candidates = [
+    {
+      label: "What they do",
+      cells: ids.map((id) => (fact(id)?.about ?? "").slice(0, 500)),
+    },
+    {
+      label: "Stage",
+      cells: ids.map((id) => stageWords(fact(id)?.stageCode ?? null)),
+    },
+    { label: "Based in", cells: ids.map(place) },
+    {
+      label: "Founded",
+      cells: ids.map((id) => (fact(id)?.founded ?? "").slice(0, 4)),
+    },
+    {
+      label: "Website",
+      cells: ids.map((id) => (fact(id)?.website ?? "").slice(0, 200)),
+    },
+  ];
+  const rows = candidates.filter((row) =>
+    row.cells.some((cell) => cell.length > 0),
+  );
+  if (rows.length === 0) return null;
+  return {
+    kind: "TABLE",
+    title: "Side by side, as each company states it",
+    columns: ids.map((companyId) => ({
+      label: (read.companyNames.get(companyId) ?? "Company").slice(0, 80),
+      subject: { kind: "COMPANY", companyId },
+    })),
+    rows,
+  };
+}
+
 /** Events in time order, oldest first; undated events are not placed. */
 export function timelineBlock(input: {
   readonly title: string;
@@ -658,7 +725,13 @@ function visualBlock(
       companiesMapBlock(read)
     );
   }
-  if (hint === "TABLE") return investorsTableBlock(investorsOf(read));
+  if (hint === "TABLE") {
+    return (
+      investorsTableBlock(investorsOf(read)) ??
+      // Companies when the run read fewer than two investors (either role).
+      companiesTableBlock(read)
+    );
+  }
   if (hint === "TIMELINE" && read.relationships.size === 1) {
     const relationship = [...read.relationships.values()][0];
     if (relationship === undefined || relationship.relationship === null)

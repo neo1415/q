@@ -346,6 +346,7 @@ import {
   withSuspendedIdentity,
   withSuspension,
 } from "./security/suspension.js";
+import { createSiteLogoFinder } from "@capital-q/q-research/site-logo";
 
 // Configuration is validated once here at the composition root. Invalid
 // configuration fails startup rather than surfacing as a runtime error later.
@@ -2211,6 +2212,9 @@ const profileImages = createProfileImageService({
   processor: storage === undefined ? undefined : createSharpImageProcessor(),
 });
 
+// Artifacts live: one finder for the process, so its per-site memory is shared.
+const companySiteLogo = createSiteLogoFinder();
+
 // The pictures of who a list names (founder decision 2026-10-04): a photo
 // or logo has its name's scope, so a route that names someone signs their
 // picture with the name, one batch per response.
@@ -2537,6 +2541,9 @@ const { app, logger } = createApp(config, security, {
         null
       );
     },
+    // Artifacts live: the logo on the company's own website, read through
+    // the vetted public-web client and remembered per site.
+    siteLogo: companySiteLogo,
     // The header's logo (the name's scope) and cover (the card's own
     // `cover` scope for a signed-in participant).
     images: async (company) => {

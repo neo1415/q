@@ -112,7 +112,13 @@ describe("QVisibleStage", () => {
     expect(qVisibleStageLabel("UNDERSTANDING_REQUEST")).toBe(
       "Understanding your request",
     );
-    expect(qVisibleStageLabel("CHECKING_EVIDENCE")).toBe("Checking evidence");
+    // Owner 2026-10-20 (artifacts live): the deck and document reads.
+    expect(qVisibleStageLabel("CHECKING_EVIDENCE")).toBe(
+      "Reading their deck and documents",
+    );
+    expect(qVisibleStageLabel("SEARCHING_PUBLIC_SOURCES")).toBe(
+      "Checking the web",
+    );
     expect(qVisibleStageLabel("WAITING_FOR_APPROVAL")).toBe(
       "Waiting for your approval",
     );

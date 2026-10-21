@@ -267,7 +267,7 @@ describe("POST /v1/onboarding/sessions/:id/say", () => {
     expect(sayCalls.count).toBe(0);
   });
 
-  it("refuses a stale session version before anything is said to Q", async () => {
+  it("refuses an opening on a stale session version before anything is said to Q", async () => {
     let called = 0;
     globalThis.fetch = () => {
       called += 1;
@@ -277,10 +277,48 @@ describe("POST /v1/onboarding/sessions/:id/say", () => {
     const app = buildApp({ runtime, qApiUrl: "http://q.test" });
     const response = await app.inject({
       ...SAY,
-      payload: { text: "I'm an angel investor.", expectedSessionVersion: 2 },
+      payload: { text: "", expectedSessionVersion: 2 },
     });
     expect(response.statusCode).toBe(409);
     expect(called).toBe(0);
+  });
+
+  it("carries a typed answer to Q even when the session moved since the screen read it (no silent drop)", async () => {
+    // Onboarding speed 2026-10-20: a document reading bumped the version
+    // between turns, /say answered 409, and the browser never retries a
+    // conflict, so the person's answer was lost without a word.
+    const seen: Record<string, unknown>[] = [];
+    globalThis.fetch = (_input: RequestInfo | URL, init?: RequestInit) => {
+      seen.push(
+        JSON.parse(typeof init?.body === "string" ? init.body : "{}") as Record<
+          string,
+          unknown
+        >,
+      );
+      return Promise.resolve(
+        Response.json({
+          reply: "Angel investor, noted. Which firm do you invest through?",
+          intent: "ANSWER",
+          asking: null,
+          recorded: ["I0.investor_type"],
+          skipped: [],
+          questionForQ: null,
+          researching: null,
+          navigate: null,
+          handoff: null,
+          degraded: false,
+        }),
+      );
+    };
+    const { runtime } = fakeRuntime();
+    const app = buildApp({ runtime, qApiUrl: "http://q.test" });
+    const response = await app.inject({
+      ...SAY,
+      payload: { text: "I'm an angel investor.", expectedSessionVersion: 2 },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ utterance: "I'm an angel investor." });
   });
 
   it("still requires an Idempotency-Key", async () => {

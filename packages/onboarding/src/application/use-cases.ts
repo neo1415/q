@@ -3325,6 +3325,7 @@ export function createOnboardingUseCases(
     return turns.map((t) => ({
       role: t.role,
       text: t.text,
+      ...(t.stepKey === null ? {} : { stepKey: t.stepKey }),
       channel: t.channel,
       createdAt: t.createdAt,
     }));

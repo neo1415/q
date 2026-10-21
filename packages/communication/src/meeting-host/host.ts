@@ -720,6 +720,22 @@ export type MeetingHost = {
   readonly handle: (event: HostEvent) => HostAction[];
   /** The runtime's composed answer, queued to be said when it is quiet. */
   readonly reply: (text: string, why?: SayReason) => void;
+  /**
+   * 2026-10-20 (meetings speed): the first sentence of an answer the model
+   * is still writing, queued now so it is said while the rest is written.
+   * Q stays composing; `reply` brings the rest (or nothing). False when the
+   * answer is already stale (a newer question came): nothing is queued.
+   */
+  readonly replyPart: (text: string) => boolean;
+  /**
+   * 2026-10-20: the next time a timed decision is due (a line to Q whose
+   * words stopped, a bare "hey Q", a queued line the room is now quiet
+   * enough for, a question waiting behind an answer). The runtime wakes
+   * then instead of polling; null when nothing is waiting on the clock.
+   * The coarse rules (waits, the hard cap, the recap offer) stay on the
+   * runtime's slow heartbeat.
+   */
+  readonly nextWakeAt: () => number | null;
   /** A guest's own introduction, read by the runtime (unknowns null). */
   readonly guestIntroduced: (
     participantId: string,
@@ -864,6 +880,11 @@ export function createMeetingHost(
   let introduced = false;
   let offeredRecap = false;
   let composing = false;
+  /**
+   * An answer whose first part was queued before the model finished; cut
+   * when someone talked over it, so its rest is never said afterwards.
+   */
+  let streamed: { cut: boolean } | null = null;
   /** Whom Q's next answer is for, and how long they can keep talking to Q. */
   let replyTo: string | null = null;
   let conversing: { participantId: string; until: number } | null = null;
@@ -1189,6 +1210,7 @@ export function createMeetingHost(
   function interrupt(at: number): HostAction[] {
     if (at >= busyUntil || at - sayingSince < INTERRUPT_GRACE_MS) return [];
     busyUntil = at;
+    if (streamed !== null) streamed.cut = true;
     const keep = outbox.filter((line) => line.why === "LEAVING");
     outbox.splice(0, outbox.length, ...keep);
     return [{ kind: "STOP_SPEAKING" }];
@@ -1206,6 +1228,7 @@ export function createMeetingHost(
     }
     calls += 1;
     composing = true;
+    streamed = null;
     ackLatest = skipped > 0;
     skipped = 0;
     return [
@@ -1710,17 +1733,62 @@ export function createMeetingHost(
     handle,
     reply: (text, why = "REPLY") => {
       composing = false;
+      const part = streamed;
+      streamed = null;
       // A newer question came while this was composed: this answer is
       // stale and goes unsaid; the newer one is composed on the next tick.
       if (pending !== null && why === "REPLY") {
-        if (pending.revision !== true) skipped += 1;
+        if (pending.revision !== true && part === null) skipped += 1;
         return;
       }
+      // Its first part was talked over: the rest is not said after it.
+      if (part?.cut === true && why === "REPLY") return;
       const line = text.trim();
       if (line.length === 0) return;
       const said = ackLatest ? `${HOST_TAKING_LATEST} ${line}` : line;
       ackLatest = false;
       queue(said.slice(0, 900), why);
+    },
+    replyPart: (text) => {
+      if (!composing || pending !== null || streamed?.cut === true) {
+        return false;
+      }
+      const line = text.trim();
+      if (line.length === 0) return false;
+      streamed ??= { cut: false };
+      const said = ackLatest ? `${HOST_TAKING_LATEST} ${line}` : line;
+      ackLatest = false;
+      queue(said.slice(0, 900), "REPLY");
+      return true;
+    },
+    nextWakeAt: () => {
+      if (left) return null;
+      let due = Number.POSITIVE_INFINITY;
+      for (const line of forming.values()) {
+        due = Math.min(due, line.at + partialGapMs);
+      }
+      if (called !== null && !forming.has(called.participantId)) {
+        due = Math.min(
+          due,
+          Math.max(called.at + BARE_CALL_WAIT_MS, lastWordsAt + wordsGapMs),
+        );
+      }
+      if (!composing && pending !== null) due = Math.min(due, clock);
+      const head = outbox[0];
+      if (head !== undefined) {
+        const reply = answers(head.why);
+        const quietAt =
+          speaking.size === 0
+            ? lastSpeechAt +
+              (reply ? Math.min(replyQuietMs, limits.quietMs) : limits.quietMs)
+            : Number.POSITIVE_INFINITY;
+        const heldAt = Math.max(
+          head.readyAt + (reply ? replyHoldMs : lineHoldMs),
+          lastWordsAt + wordsGapMs,
+        );
+        due = Math.min(due, Math.max(busyUntil, Math.min(quietAt, heldAt)));
+      }
+      return Number.isFinite(due) ? due : null;
     },
     guestIntroduced: (participantId, intro) => {
       const entry = present.get(participantId);
@@ -1764,6 +1832,7 @@ export function createMeetingHost(
     },
     leaveRequested: (byName, byUserId) => {
       composing = false;
+      streamed = null;
       queue(HOST_STAYS, "REPLY");
       return [
         { kind: "LEAVE_REQUESTED", byName: byName.slice(0, 200), byUserId },
@@ -1788,6 +1857,7 @@ export function createMeetingHost(
     },
     quiet: () => {
       composing = false;
+      streamed = null;
       quiet = true;
       // Lines still waiting that nobody asked for are dropped.
       for (let i = outbox.length - 1; i >= 0; i -= 1) {

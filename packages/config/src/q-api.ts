@@ -76,6 +76,22 @@ const qApiEnvSchema = z.object({
   Q_VOICE_TTS_MODEL: z
     .enum(["eleven_turbo_v2_5", "eleven_v3_conversational"])
     .optional(),
+  // REHEARSE: the ElevenLabs model the person Q plays speaks with (never
+  // Q's own voice). Unset means eleven_v4_turbo (~100 ms); flash v2.5 and
+  // turbo v2.5 stand behind it per line, and a model the account does not
+  // have is skipped. Pinning one of them is the rollback.
+  Q_REHEARSAL_TTS_MODEL: z
+    .enum([
+      "eleven_v4_turbo",
+      "eleven_flash_v2_5",
+      "eleven_turbo_v2_5",
+      "eleven_v3_conversational",
+    ])
+    .optional(),
+  // REHEARSE: "peaks" (default) voices only a laugh, a sigh, crying or a
+  // raised voice on v3 conversational, whose audio tags carry them; "off"
+  // keeps every line on the fast model.
+  Q_REHEARSAL_TTS_PEAKS: z.enum(["peaks", "off"]).optional(),
   // Q as an MCP server (doc 12 §34.2): a constrained façade over the tools
   // the registry offers the authenticated person. Off unless a deployment
   // says otherwise; nothing about Q's own behaviour depends on it.
@@ -128,6 +144,14 @@ export type QApiVoiceConfig = {
   readonly expressive: boolean;
   /** The ElevenLabs model behind the speak relay and one-way speech. */
   readonly ttsModel: "eleven_turbo_v2_5" | "eleven_v3_conversational";
+  /** REHEARSE: the model the person Q plays speaks with. */
+  readonly rehearsalTtsModel:
+    | "eleven_v4_turbo"
+    | "eleven_flash_v2_5"
+    | "eleven_turbo_v2_5"
+    | "eleven_v3_conversational";
+  /** REHEARSE: whether emotional peaks are voiced on v3 conversational. */
+  readonly rehearsalExpressivePeaks: boolean;
   /** The transport that carries the voice, resolved from keys and preference; absent means no voice. */
   readonly provider: VoiceProviderCode | undefined;
   /** This server's public origin as the speech provider reaches it (the tunnel in development). */
@@ -188,6 +212,8 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
       personality: parsed.Q_PERSONALITY ?? "UPBEAT",
       expressive: parsed.Q_VOICE_EXPRESSIVE === "true",
       ttsModel: parsed.Q_VOICE_TTS_MODEL ?? "eleven_v3_conversational",
+      rehearsalTtsModel: parsed.Q_REHEARSAL_TTS_MODEL ?? "eleven_v4_turbo",
+      rehearsalExpressivePeaks: parsed.Q_REHEARSAL_TTS_PEAKS !== "off",
       provider: resolveVoiceProvider(
         toSpeechProviderSecrets(parsed),
         toSpeechEngineIds(parsed),

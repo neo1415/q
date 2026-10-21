@@ -223,7 +223,17 @@ export function registerOnboardingRoutes(
           : "";
 
       const before = await runtime.getSession({ actor, sessionId });
-      if (before.session.version !== input.expectedSessionVersion) {
+      // Only an opening is refused on a moved session: it asks Q what to
+      // ask, and the screen re-reads instead. Words the person typed are
+      // never refused for it (onboarding speed 2026-10-20): a document
+      // reading or a held save bumps the version between turns, and the
+      // browser drops a conflicted turn rather than retry it, so their
+      // answer was silently lost. The interviewer writes through the
+      // ordinary submit path, which re-reads the version for every write.
+      if (
+        input.text.length === 0 &&
+        before.session.version !== input.expectedSessionVersion
+      ) {
         throw new OnboardingSessionVersionConflictError();
       }
 

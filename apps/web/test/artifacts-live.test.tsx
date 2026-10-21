@@ -1,0 +1,296 @@
+// @vitest-environment jsdom
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { QMessageIdSchema, type QArtifactPreview } from "@capital-q/contracts";
+
+import { demoTop } from "../src/features/q/answer-canvas-fixtures";
+import type { QTurn } from "../src/features/q/conversation";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/discover",
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}));
+
+const { QPresenceStage } = await import("../src/features/q/q-presence-stage");
+const { livePreviewOf, shownItems, stageOf } =
+  await import("../src/features/q/shown");
+const { LivePreview } = await import("../src/features/q/live-preview");
+const { EntityAvatar, entityImageSources, companyLogoPath, companyPhotoPath } =
+  await import("../src/features/entity/entity-avatar");
+const { clearResultShelf } = await import("../src/features/q/result-shelf");
+const store = await import("../src/features/q/cards/card-visibility-store");
+const { AnswerChipFor } = await import("../src/features/q/answer-chip");
+const { turnsFrom } = await import("../src/features/q/conversation");
+const { createQStreamState, reduceQStream } =
+  await import("@capital-q/api-client");
+
+/**
+ * Artifacts live (owner 2026-10-20): as Q talks, the card for what it is
+ * saying comes up at that moment, with a real picture or initials (never
+ * a broken image or a blank), and is filled when the answer lands. The
+ * Board's and the chip's show/hide is the one controller's.
+ */
+
+afterEach(() => {
+  cleanup();
+  clearResultShelf();
+  store.resetCards();
+  window.sessionStorage.clear();
+});
+
+const BARIDI = "a0000000-0000-4000-8000-00000000000a";
+const MEDTRAIL = "b0000000-0000-4000-8000-00000000000b";
+const RUN = "0198f8b2-9c1a-7a3e-8f2b-1c2d3e4f5a6b";
+const MSG = "123e4567-e89b-12d3-a456-426614174000";
+
+const preview = (
+  layout: QArtifactPreview["layout"],
+  ...names: readonly (readonly [string, string])[]
+): QArtifactPreview => ({
+  messageId: QMessageIdSchema.parse(MSG),
+  subjects: names.map(([companyId, name]) => ({
+    subject: { kind: "COMPANY", companyId },
+    name,
+  })),
+  layout,
+});
+
+const person = (id: string, text: string): QTurn => ({
+  kind: "PERSON",
+  id,
+  text,
+  unconfirmed: false,
+});
+
+function answer(
+  id: string,
+  text: string,
+  extra: Partial<Extract<QTurn, { kind: "Q" }>> = {},
+): QTurn {
+  return {
+    kind: "Q",
+    id,
+    runId: `run-${id}`,
+    text,
+    streaming: false,
+    sourceCount: 0,
+    publicSources: [],
+    findings: [],
+    uncertainties: [],
+    blocks: [],
+    ...extra,
+  };
+}
+
+function stage(turns: readonly QTurn[]) {
+  return (
+    <QPresenceStage
+      presence={(compact) => (
+        <div data-testid="aperture" data-compact={String(compact)} />
+      )}
+      turns={turns}
+      captions={false}
+      caption={null}
+    />
+  );
+}
+
+describe("the card comes up with the sentence that names it", () => {
+  it("puts the named subject's card frame on the stage while Q is still talking", () => {
+    const turns = [
+      person("p1", "Tell me about Baridi"),
+      answer(MSG, "Baridi Health is a clinic network.", {
+        streaming: true,
+        preview: preview("CARD", [BARIDI, "Baridi Health"]),
+      }),
+    ];
+    const { container } = render(stage(turns));
+    const frame = container.querySelector(`[data-q-preview="${MSG}"]`);
+    expect(frame).not.toBeNull();
+    expect(frame?.getAttribute("aria-busy")).toBe("true");
+    expect(screen.getByText("Baridi Health")).toBeTruthy();
+    // The presence steps aside to compact, as for any object shown.
+    expect(screen.getByTestId("aperture").dataset.compact).toBe("true");
+  });
+
+  it("lays a comparison out as a table frame, one column per company, in the order named", () => {
+    const { container } = render(
+      <LivePreview
+        preview={preview(
+          "TABLE",
+          [MEDTRAIL, "MedTrail"],
+          [BARIDI, "Baridi Health"],
+        )}
+      />,
+    );
+    const columns = [
+      ...container.querySelectorAll("[data-q-preview-column]"),
+    ].map((one) => one.getAttribute("data-q-preview-column"));
+    expect(columns).toEqual([MEDTRAIL, BARIDI]);
+  });
+
+  it("goes when the answer settles: the answer's own blocks decide", () => {
+    const turns = [
+      person("p1", "Top three?"),
+      answer(MSG, "Three stand out.", {
+        streaming: false,
+        preview: preview("CARD", [BARIDI, "Baridi Health"]),
+        blocks: [demoTop(3)],
+      }),
+    ];
+    expect(livePreviewOf(turns, null)).toBeNull();
+    expect(stageOf(shownItems(turns), turns).item?.id).toBe(MSG);
+  });
+
+  it("keeps the set on screen when Q is naming a card already in it", () => {
+    const top = demoTop(3);
+    const turns = [
+      person("p1", "Top three?"),
+      answer("a1", "Three stand out.", { blocks: [top] }),
+      person("p2", "Tell me about the second one"),
+      answer(MSG, "Kestrel Heat ...", {
+        streaming: true,
+        preview: preview("CARD", [MEDTRAIL, top.cards[1]?.name ?? ""]),
+      }),
+    ];
+    const shown = stageOf(shownItems(turns), turns).item;
+    expect(shown).not.toBeNull();
+    expect(livePreviewOf(turns, shown)).toBeNull();
+  });
+
+  it("carries the stream's preview onto the live turn, and drops it with the persisted message", () => {
+    const event = (type: string, data: unknown, sequence: number) =>
+      ({
+        contractVersion: 1,
+        eventId: `0000000${String(sequence)}-0000-4000-8000-000000000000`,
+        runId: RUN,
+        sequence,
+        occurredAt: "2026-10-20T10:00:00.000Z",
+        type,
+        data,
+      }) as never;
+    let state = createQStreamState();
+    state = reduceQStream(
+      state,
+      event("q.run.started", { capability: "ANSWER", status: "RUNNING" }, 1),
+    );
+    state = reduceQStream(
+      state,
+      event(
+        "q.artifact.preview",
+        preview("CARD", [BARIDI, "Baridi Health"]),
+        1,
+      ),
+    );
+    state = reduceQStream(
+      state,
+      event("q.message.delta", { messageId: MSG, text: "Baridi leads. " }, 1),
+    );
+    const live = turnsFrom(state, []).at(-1);
+    expect(live?.kind === "Q" ? live.preview?.subjects[0]?.name : null).toBe(
+      "Baridi Health",
+    );
+  });
+});
+
+describe("pictures: a real logo or photo, else initials, never broken or blank", () => {
+  it("tries the photo, then the website's logo, for a company in Q's artifacts", () => {
+    expect(
+      entityImageSources({
+        kind: "company",
+        companyId: BARIDI,
+        siteLogo: true,
+      }),
+    ).toEqual([companyPhotoPath(BARIDI), companyLogoPath(BARIDI)]);
+    // Elsewhere nothing changes: the photo alone.
+    expect(entityImageSources({ kind: "company", companyId: BARIDI })).toEqual([
+      companyPhotoPath(BARIDI),
+    ]);
+  });
+
+  it("falls through a failed photo to the logo, and a failed logo to initials", () => {
+    const { container } = render(
+      <EntityAvatar
+        kind="company"
+        name="Baridi Health"
+        companyId={BARIDI}
+        fallback="initials"
+        siteLogo
+      />,
+    );
+    const avatar = () =>
+      container.querySelector("[data-entity-avatar]") as HTMLElement;
+    const img = () => avatar().querySelector("img");
+    // Initials are drawn underneath from the first frame: never blank.
+    expect(avatar().textContent).toContain("BH");
+    expect(img()?.getAttribute("src")).toBe(companyPhotoPath(BARIDI));
+    act(() => {
+      fireEvent.error(img() as HTMLImageElement);
+    });
+    expect(img()?.getAttribute("src")).toBe(companyLogoPath(BARIDI));
+    act(() => {
+      fireEvent.load(img() as HTMLImageElement);
+    });
+    expect(avatar().dataset.entityAvatarState).toBe("logo");
+    act(() => {
+      fireEvent.error(img() as HTMLImageElement);
+    });
+    // Out of pictures: no <img> left to break, the initials stay.
+    expect(img()).toBeNull();
+    expect(avatar().dataset.entityAvatarState).toBe("fallback");
+    expect(avatar().textContent).toContain("BH");
+  });
+
+  it("keeps the plain company mark by default (founder 2026-10-02)", () => {
+    const { container } = render(
+      <EntityAvatar kind="company" name="Baridi Health" src={null} />,
+    );
+    expect(container.textContent).not.toContain("BH");
+    expect(container.querySelector("svg")).not.toBeNull();
+  });
+});
+
+describe("one presentation controller (audit 2026-10-15 §4)", () => {
+  it("keeps the Board's pins and removals with the other show/hide state, across a reload", () => {
+    store.setBoardMarks("conv-1", { pinned: ["a1"], dismissed: ["a2"] });
+    const saved = window.sessionStorage.getItem(store.CARDS_STORAGE_KEY);
+    expect(saved).toContain("conv-1");
+    expect(store.boardMarksOf(store.cardsState(), "conv-1")).toEqual({
+      pinned: ["a1"],
+      dismissed: ["a2"],
+    });
+    expect(store.boardMarksOf(store.cardsState(), "other")).toBe(
+      store.EMPTY_BOARD_MARKS,
+    );
+  });
+
+  it("puts a dismissed chip away for every page, not just this one", () => {
+    const turns = [
+      person("p1", "Top three?"),
+      answer("a1", "Three stand out.", { blocks: [demoTop(3)] }),
+    ];
+    const chip = (path: string, shownTurns: readonly QTurn[]) => (
+      <AnswerChipFor
+        pathname={path}
+        turns={shownTurns}
+        loading={false}
+        conversationId="conv-1"
+      />
+    );
+    // The answer lands while the person is on Discover.
+    const { container, rerender } = render(chip("/discover", []));
+    rerender(chip("/discover", turns));
+    const dismiss = container.querySelector(".chip-x");
+    expect(dismiss).not.toBeNull();
+    fireEvent.click(dismiss as Element);
+    expect(container.querySelector("[data-answer-chip]")).toBeNull();
+    expect(store.cardsState().keys).toContain("chip:a1");
+  });
+});

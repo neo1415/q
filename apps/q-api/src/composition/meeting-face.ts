@@ -70,8 +70,14 @@ export type MeetingFacePort = {
   readonly start: (meetingId: string) => void;
   /** The face has a room in the call: Q's lines go to it. */
   readonly live: (meetingId: string) => boolean;
-  /** One of Q's lines, already decided by the host. */
-  readonly say: (meetingId: string, text: string) => void;
+  /**
+   * One of Q's lines, already decided by the host. `more` (2026-10-20): the
+   * first sentence of an answer still being written; the face starts saying
+   * it, and the rest follows in the same turn (`say` again, or `finish`).
+   */
+  readonly say: (meetingId: string, text: string, more?: boolean) => void;
+  /** The answer whose first sentence was said with `more` has no more. */
+  readonly finish?: (meetingId: string) => void;
   readonly end: (meetingId: string, reason: MeetingFaceEndReason) => void;
   /** The face is still being sent: Q's voice waits for it rather than doubling. */
   readonly starting?: (meetingId: string) => boolean;
@@ -90,7 +96,7 @@ export type MeetingFaceService = MeetingFacePort & {
     bearer: string,
     messages: readonly BridgeMessage[],
     signal: AbortSignal,
-  ) => Promise<BridgeResult>;
+  ) => Promise<MeetingBridgeResult>;
   /**
    * Ends rooms this process does not hold: every open one at boot (the
    * sessions lived in the process that stopped), else only those past
@@ -99,6 +105,21 @@ export type MeetingFaceService = MeetingFacePort & {
   readonly sweep: (options?: { readonly atBoot?: boolean }) => Promise<void>;
   readonly settled: (meetingId: string) => Promise<void>;
 };
+
+/**
+ * The bridge's answer to one of the face's turns. STREAM (2026-10-20): the
+ * first sentence now, the rest of the same answer as it is decided.
+ */
+export type MeetingBridgeResult =
+  | BridgeResult
+  | {
+      readonly kind: "STREAM";
+      readonly first: string;
+      readonly rest: AsyncIterable<string>;
+    };
+
+/** The longest the face's turn waits for the rest of a streamed answer. */
+const STREAM_REST_WAIT_MS = 10_000;
 
 export type MeetingFaceRow = {
   readonly id: string;
@@ -156,7 +177,13 @@ type Session = {
   palId: string | null;
   conversationId: string | null;
   lines: { readonly text: string; readonly at: number }[];
-  waiter: ((text: string | null) => void) | null;
+  waiter: ((text: string | null, more: boolean) => void) | null;
+  /** An answer being said in parts: what is left, and whether more comes. */
+  stream: {
+    readonly parts: string[];
+    open: boolean;
+    wake: (() => void) | null;
+  } | null;
   /** When the host last began an answer; a turn waits for it. */
   expectedAt: number;
   /** Wakes a turn waiting to learn whether the host is answering. */
@@ -225,10 +252,58 @@ export function createMeetingFace(dependencies: {
 
   function forget(session: Session): void {
     if (session.timer !== null) clearTimeout(session.timer);
-    session.waiter?.(null);
+    session.waiter?.(null, false);
     session.waiter = null;
+    closeStream(session);
     byMeeting.delete(session.meetingId);
     byId.delete(session.id);
+  }
+
+  /** A streamed answer is complete (or abandoned): its turn ends. */
+  function closeStream(session: Session): void {
+    const stream = session.stream;
+    if (stream === null) return;
+    stream.open = false;
+    stream.wake?.();
+  }
+
+  /** The rest of a streamed answer, part by part, as the host decides it. */
+  async function* restOf(
+    session: Session,
+    stream: NonNullable<Session["stream"]>,
+    signal: AbortSignal,
+  ): AsyncGenerator<string> {
+    try {
+      for (;;) {
+        const part = stream.parts.shift();
+        if (part !== undefined) {
+          yield part;
+          continue;
+        }
+        if (!stream.open || signal.aborted) return;
+        const woke = await new Promise<boolean>((resolve) => {
+          const timer = setTimeout(() => resolve(false), STREAM_REST_WAIT_MS);
+          timer.unref();
+          stream.wake = () => {
+            clearTimeout(timer);
+            resolve(true);
+          };
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timer);
+              resolve(false);
+            },
+            { once: true },
+          );
+        });
+        stream.wake = null;
+        if (!woke && stream.parts.length === 0) return;
+      }
+    } finally {
+      stream.open = false;
+      if (session.stream === stream) session.stream = null;
+    }
   }
 
   /** Provider clean-up: best effort, the provider's own cap is the backstop. */
@@ -286,6 +361,7 @@ export function createMeetingFace(dependencies: {
       conversationId: null,
       lines: [],
       waiter: null,
+      stream: null,
       expectedAt: Number.NEGATIVE_INFINITY,
       expecting: null,
       timer: null,
@@ -413,18 +489,29 @@ export function createMeetingFace(dependencies: {
       session.expectedAt = now();
       session.expecting?.();
     },
-    say: (meetingId, text) => {
+    say: (meetingId, text, more = false) => {
       const session = byMeeting.get(meetingId);
       if (session?.state !== "LIVE") return;
+      // The rest of an answer whose first sentence the face is saying.
+      if (session.stream?.open === true) {
+        session.stream.parts.push(text);
+        if (!more) session.stream.open = false;
+        session.stream.wake?.();
+        return;
+      }
       if (session.waiter !== null) {
         const waiter = session.waiter;
         session.waiter = null;
-        waiter(text);
+        waiter(text, more);
         return;
       }
       session.lines.push({ text, at: now() });
       if (session.lines.length > 4) session.lines.shift();
       session.expecting?.();
+    },
+    finish: (meetingId) => {
+      const session = byMeeting.get(meetingId);
+      if (session !== undefined) closeStream(session);
     },
     end,
     settled: async (meetingId) => {
@@ -471,15 +558,22 @@ export function createMeetingFace(dependencies: {
         if (arrived !== null) return { kind: "LINE", text: arrived };
         if (!expected()) return { kind: "SILENT" };
       }
-      session.waiter?.(null);
+      session.waiter?.(null, false);
+      // A streamed answer from an earlier turn is over: this turn is new.
+      closeStream(session);
+      let streaming = false;
       const text = await new Promise<string | null>((resolve) => {
         const timer = setTimeout(() => {
           if (session.waiter === settle) session.waiter = null;
           resolve(null);
         }, waitMs);
         timer.unref();
-        const settle = (value: string | null) => {
+        const settle = (value: string | null, more = false) => {
           clearTimeout(timer);
+          if (value !== null && more) {
+            streaming = true;
+            session.stream = { parts: [], open: true, wake: null };
+          }
           resolve(value);
         };
         session.waiter = settle;
@@ -495,8 +589,17 @@ export function createMeetingFace(dependencies: {
       if (text === null) return { kind: "SILENT" };
       if (signal.aborted) {
         // Cut off before it was said: kept for the next turn, if fresh.
+        if (streaming) closeStream(session);
         session.lines.push({ text, at: now() });
         return { kind: "SILENT" };
+      }
+      const stream = session.stream;
+      if (streaming && stream !== null) {
+        return {
+          kind: "STREAM",
+          first: text,
+          rest: restOf(session, stream, signal),
+        };
       }
       return { kind: "LINE", text };
     },

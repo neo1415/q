@@ -42,6 +42,17 @@ export function investorPhotoPath(investorOrganisationId: string): string {
   return `/api/investor-photo/${encodeURIComponent(investorOrganisationId)}`;
 }
 
+/**
+ * Artifacts live (owner 2026-10-20): the logo from the company's own
+ * website, for a company with no photo. A redirect the API answers only
+ * where this reader may see the company, to a public image on the site
+ * already on the company's record; anything else is a 404 and the
+ * avatar falls back.
+ */
+export function companyLogoPath(companyId: string): string {
+  return `/api/company-logo/${encodeURIComponent(companyId)}`;
+}
+
 export const ENTITY_AVATAR_SIZES = {
   /** Dense rows: chat bubbles, attendee chips, notices. */
   xs: 24,
@@ -90,6 +101,31 @@ export function entityImageSource(input: {
   return null;
 }
 
+/**
+ * Every picture to try, in order, before the fallback (artifacts live):
+ * the given URL; or, for a company known by id, its photo and then, where
+ * asked for, its website's logo; or an investor organisation's photo.
+ */
+export function entityImageSources(input: {
+  readonly kind: EntityKind;
+  readonly src?: string | null | undefined;
+  readonly companyId?: string | undefined;
+  readonly investorOrganisationId?: string | undefined;
+  readonly siteLogo?: boolean | undefined;
+}): readonly string[] {
+  const first = entityImageSource(input);
+  if (first === null) return [];
+  if (
+    input.src === undefined &&
+    input.siteLogo === true &&
+    input.kind === "company" &&
+    input.companyId !== undefined
+  ) {
+    return [first, companyLogoPath(input.companyId)];
+  }
+  return [first];
+}
+
 export function EntityAvatar({
   kind,
   name,
@@ -99,6 +135,8 @@ export function EntityAvatar({
   size = "md",
   decorative = false,
   className,
+  fallback = "mark",
+  siteLogo = false,
 }: {
   readonly kind: EntityKind;
   readonly name: string;
@@ -112,21 +150,41 @@ export function EntityAvatar({
   /** True when the name is printed right beside it: not announced twice. */
   readonly decorative?: boolean | undefined;
   readonly className?: string | undefined;
+  /**
+   * What a company without a picture shows: its plain building mark
+   * (founder 2026-10-02, the default), or its initials (owner 2026-10-20,
+   * for Q's artifacts, where several companies sit side by side and a
+   * row of identical marks tells them apart by nothing).
+   */
+  readonly fallback?: "mark" | "initials" | undefined;
+  /** Try the company's website logo after its photo (Q's artifacts). */
+  readonly siteLogo?: boolean | undefined;
 }) {
   const px = typeof size === "number" ? size : ENTITY_AVATAR_SIZES[size];
-  const source = entityImageSource({
+  const sources = entityImageSources({
     kind,
     src,
     companyId,
     investorOrganisationId,
+    siteLogo,
   });
-  // Keyed by source, so a new URL gets a fresh load and a fresh failure.
+  const chain = sources.join(" ");
+  // Keyed by the whole chain, so new sources get a fresh try. `at` is the
+  // source being tried; past the last, the fallback stays.
   const [state, setState] = useState<{
-    readonly source: string | null;
-    readonly status: "loading" | "loaded" | "failed";
-  }>({ source, status: "loading" });
-  const current = state.source === source ? state.status : ("loading" as const);
-  const showImage = source !== null && current !== "failed";
+    readonly chain: string;
+    readonly at: number;
+    readonly loaded: boolean;
+  }>({ chain, at: 0, loaded: false });
+  const current =
+    state.chain === chain ? state : { chain, at: 0, loaded: false };
+  const source = sources[current.at] ?? null;
+  const showImage = source !== null;
+  // A site's logo is drawn whole on the plain surface, never cropped.
+  const isLogo =
+    source !== null &&
+    companyId !== undefined &&
+    source === companyLogoPath(companyId);
   // People are round; organisations are a rounded square, as on their
   // profile. A company keeps the round frame Discover already uses.
   const shape = kind === "investor" ? "rounded-md" : "rounded-full";
@@ -143,10 +201,10 @@ export function EntityAvatar({
       style={{ width: px, height: px }}
       data-entity-avatar={kind}
       data-entity-avatar-state={
-        showImage && current === "loaded" ? "image" : "fallback"
+        showImage && current.loaded ? (isLogo ? "logo" : "image") : "fallback"
       }
     >
-      {kind === "company" ? (
+      {kind === "company" && fallback === "mark" ? (
         // Founder request 2026-10-02: a company without a photo keeps a
         // plain building mark, never letters dressed up as a logo.
         <Building2
@@ -171,11 +229,13 @@ export function EntityAvatar({
           height={px}
           loading="lazy"
           decoding="async"
-          onLoad={() => setState({ source, status: "loaded" })}
-          onError={() => setState({ source, status: "failed" })}
-          className={`absolute inset-0 size-full object-cover transition-opacity duration-200 motion-reduce:transition-none ${
-            current === "loaded" ? "opacity-100" : "opacity-0"
-          }`}
+          onLoad={() => setState({ chain, at: current.at, loaded: true })}
+          onError={() => setState({ chain, at: current.at + 1, loaded: false })}
+          className={`absolute inset-0 size-full transition-opacity duration-200 motion-reduce:transition-none ${
+            isLogo
+              ? "bg-(--cq-surface-raised) object-contain p-[12%]"
+              : "object-cover"
+          } ${current.loaded ? "opacity-100" : "opacity-0"}`}
         />
       ) : null}
     </span>

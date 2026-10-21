@@ -394,6 +394,13 @@ export function createOnboardingPort(input: {
    * leaves it false: the next read goes back to the service.
    */
   let trusted = false;
+  /**
+   * When `latest` is a plain read with no write of this port's since: a
+   * state read within READ_REUSE_MS uses it rather than reading the same
+   * view again (onboarding speed 2026-10-20: every turn read the session
+   * twice, a few hundred milliseconds apart, before the first round).
+   */
+  let readAt: number | null = null;
   const written: string[] = [];
   const userId = input.ownerUserId as UserId;
   const store = input.recommendations;
@@ -465,9 +472,14 @@ export function createOnboardingPort(input: {
   };
 
   const fresh = async (): Promise<OnboardingSessionView> => {
-    latest = await settle(
-      await getOnboardingSession(input.session, input.onboardingSessionId),
+    const view = await getOnboardingSession(
+      input.session,
+      input.onboardingSessionId,
     );
+    const settled = await settle(view);
+    latest = settled;
+    // A view the preselection just wrote is not a plain read.
+    readAt = settled === view ? Date.now() : null;
     return latest;
   };
   const current = async (): Promise<OnboardingSessionView> =>
@@ -491,7 +503,11 @@ export function createOnboardingPort(input: {
           const known = nodeNames.get(id);
           if (known !== undefined) return known;
           try {
-            return (await getTaxonomyNode(input.session, id)).displayName;
+            // Kept for the rest of the turn: the state is read several
+            // times a turn, and each read named every node again.
+            const name = (await getTaxonomyNode(input.session, id)).displayName;
+            nodeNames.set(id, name);
+            return name;
           } catch {
             // A name that cannot be read is left out, never guessed.
             return null;
@@ -522,12 +538,18 @@ export function createOnboardingPort(input: {
   };
 
   const state = async (): Promise<OnboardingState> => {
-    const view = trusted && latest !== null ? latest : await fresh();
-    const pendingList = await pendingNow().catch(() => []);
-    const heldSteps =
+    // Three independent reads, together rather than one after another
+    // (onboarding speed 2026-10-20): this runs several times a turn.
+    const [view, pendingList, heldSteps] = await Promise.all([
+      latest !== null &&
+      (trusted || (readAt !== null && Date.now() - readAt < READ_REUSE_MS))
+        ? latest
+        : fresh(),
+      pendingNow().catch(() => []),
       input.held === undefined
         ? new Set<string>()
-        : await input.held.pendingSteps().catch(() => new Set<string>());
+        : input.held.pendingSteps().catch(() => new Set<string>()),
+    ]);
     // The canonical coverage picture (lane ob1): the same projection the
     // form reads, so Q never re-asks what is known, saved or held.
     const coverage = deriveOnboardingCoverage({
@@ -543,94 +565,103 @@ export function createOnboardingPort(input: {
       now: new Date(),
     });
     const coverageOf = new Map(coverage.fields.map((f) => [f.fieldKey, f]));
-    const rows: OnboardingStepState[] = [];
-    for (const eligible of view.progress.eligibleSteps) {
-      const step = steps.get(eligible.stepKey);
-      if (step === undefined) continue;
-      // A reference to a platform record (the mandate being defined) is
-      // the journey's to settle, never something to discuss with the
-      // person, resolved or not (live 2026-10-16: "your main investment
-      // strategy, or a different one?" asked, and unrecordable).
-      if (isPlatformReference(step)) {
-        continue;
-      }
-      const open = toOpenStep(step, view);
-      const stored = view.responses.find((r) => r.stepKey === step.stepKey);
-      const kind =
-        open === null
-          ? "TEXT"
-          : open.kind === "SHORT_TEXT" || open.kind === "LONG_TEXT"
-            ? "TEXT"
-            : open.kind;
-      rows.push({
-        stepKey: step.stepKey,
-        question: (
-          SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
-        ).slice(0, 400),
-        kind,
-        required: step.required,
-        status:
-          eligible.status === "COMPLETED"
-            ? "ANSWERED"
-            : eligible.status === "SKIPPED"
-              ? "SET_ASIDE"
-              : "OPEN",
-        value:
-          stored === undefined
-            ? null
-            : // Their own words where the options could not hold them.
-              (stored.value.type === "SINGLE_SELECT" &&
-              stored.value.optionKey === "other" &&
-              stored.note !== null &&
-              stored.note.length > 0
-                ? `${stored.note} (in their words)`
-                : await spoken(step, stored.value, view)
-              ).slice(0, 600) || null,
-        ...(open?.options === undefined || open.options.length === 0
-          ? {}
-          : {
-              options: open.options
-                .slice(0, 50)
-                .map((o) => ({ key: o.key, label: o.label })),
-            }),
-        ...(open?.maxChoices === undefined
-          ? {}
-          : { maxChoices: open.maxChoices }),
-        ...(() => {
-          const field = coverageOf.get(step.stepKey);
-          if (field === undefined) return {};
-          const offer = field.proposals.find(
-            (p) => p.source === "DOCUMENT" || p.source === "PUBLIC_RESEARCH",
-          );
+    // Every row at once (onboarding speed 2026-10-20): a row naming
+    // categories reads their names, and the rows used to wait on each other.
+    const built = await Promise.all(
+      view.progress.eligibleSteps.map(
+        async (eligible): Promise<OnboardingStepState | null> => {
+          const step = steps.get(eligible.stepKey);
+          if (step === undefined) return null;
+          // A reference to a platform record (the mandate being defined) is
+          // the journey's to settle, never something to discuss with the
+          // person, resolved or not (live 2026-10-16: "your main investment
+          // strategy, or a different one?" asked, and unrecordable).
+          if (isPlatformReference(step)) {
+            return null;
+          }
+          const open = toOpenStep(step, view);
+          const stored = view.responses.find((r) => r.stepKey === step.stepKey);
+          const kind =
+            open === null
+              ? "TEXT"
+              : open.kind === "SHORT_TEXT" || open.kind === "LONG_TEXT"
+                ? "TEXT"
+                : open.kind;
           return {
-            coverage: field.state,
-            priority: field.priority,
-            ...(field.savePending ? { savePending: true } : {}),
-            ...(offer === undefined
+            stepKey: step.stepKey,
+            question: (
+              SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
+            ).slice(0, 400),
+            kind,
+            required: step.required,
+            status:
+              eligible.status === "COMPLETED"
+                ? "ANSWERED"
+                : eligible.status === "SKIPPED"
+                  ? "SET_ASIDE"
+                  : "OPEN",
+            value:
+              stored === undefined
+                ? null
+                : // Their own words where the options could not hold them.
+                  (stored.value.type === "SINGLE_SELECT" &&
+                  stored.value.optionKey === "other" &&
+                  stored.note !== null &&
+                  stored.note.length > 0
+                    ? `${stored.note} (in their words)`
+                    : await spoken(step, stored.value, view)
+                  ).slice(0, 600) || null,
+            ...(open?.options === undefined || open.options.length === 0
               ? {}
               : {
-                  offered: `${offer.display} (${
-                    offer.source === "DOCUMENT"
-                      ? "from their document"
-                      : "from a public page, not verified"
-                  })`.slice(0, 600),
+                  options: open.options
+                    .slice(0, 50)
+                    .map((o) => ({ key: o.key, label: o.label })),
                 }),
+            ...(open?.maxChoices === undefined
+              ? {}
+              : { maxChoices: open.maxChoices }),
+            ...(() => {
+              const field = coverageOf.get(step.stepKey);
+              if (field === undefined) return {};
+              const offer = field.proposals.find(
+                (p) =>
+                  p.source === "DOCUMENT" || p.source === "PUBLIC_RESEARCH",
+              );
+              return {
+                coverage: field.state,
+                priority: field.priority,
+                ...(field.savePending ? { savePending: true } : {}),
+                ...(offer === undefined
+                  ? {}
+                  : {
+                      offered: `${offer.display} (${
+                        offer.source === "DOCUMENT"
+                          ? "from their document"
+                          : "from a public page, not verified"
+                      })`.slice(0, 600),
+                    }),
+              };
+            })(),
+            ...(await (async () => {
+              const held = pendingList.find((r) => r.stepKey === step.stepKey);
+              if (held === undefined) return {};
+              const heardIt = (await heard).some((r) => r.id === held.id);
+              return {
+                pendingRecommendation:
+                  `${await spoken(step, held.value, view)}${held.rationale === null ? "" : ` (because ${held.rationale})`}${heardIt ? "" : " (not yet said to them)"}`.slice(
+                    0,
+                    600,
+                  ),
+              };
+            })()),
           };
-        })(),
-        ...(await (async () => {
-          const held = pendingList.find((r) => r.stepKey === step.stepKey);
-          if (held === undefined) return {};
-          const heardIt = (await heard).some((r) => r.id === held.id);
-          return {
-            pendingRecommendation:
-              `${await spoken(step, held.value, view)}${held.rationale === null ? "" : ` (because ${held.rationale})`}${heardIt ? "" : " (not yet said to them)"}`.slice(
-                0,
-                600,
-              ),
-          };
-        })()),
-      });
-    }
+        },
+      ),
+    );
+    const rows = built.filter(
+      (row): row is OnboardingStepState => row !== null,
+    );
     return {
       journey: input.journeyType,
       currentStepKey: view.currentStep?.stepKey ?? null,
@@ -712,6 +743,7 @@ export function createOnboardingPort(input: {
     note?: string,
   ): Promise<void> => {
     trusted = false;
+    readAt = null;
     latest = await settle(
       await onFreshVersion((version) =>
         submitOnboardingResponse(
@@ -1040,6 +1072,7 @@ export function createOnboardingPort(input: {
   const withdraw = async (stepKey: string): Promise<void> => {
     const view = await current();
     trusted = false;
+    readAt = null;
     latest = await settle(
       await withdrawOnboardingResponse(
         input.session,
@@ -1646,6 +1679,7 @@ export function createOnboardingPort(input: {
         }
         if (view.progress.canComplete) {
           trusted = false;
+          readAt = null;
           latest = await completeOnboardingSession(
             input.session,
             input.onboardingSessionId,
@@ -2019,6 +2053,7 @@ export function createOnboardingPort(input: {
     const settled: OnboardingRecordResult[] = [];
     if (ready.length > 0) {
       trusted = false;
+      readAt = null;
       try {
         const out = await onFreshVersion((version) =>
           submitOnboardingResponses(
@@ -2406,6 +2441,7 @@ export function createOnboardingPort(input: {
         try {
           const view = await current();
           trusted = false;
+          readAt = null;
           latest = await settle(
             await resolveOnboardingSuggestion(
               input.session,
@@ -2591,6 +2627,7 @@ export function createOnboardingPort(input: {
             await withdraw(step.stepKey);
           } else {
             trusted = false;
+            readAt = null;
             latest = await settle(
               await skipOnboardingStep(
                 input.session,
@@ -2692,6 +2729,7 @@ export function createOnboardingPort(input: {
         }
         try {
           trusted = false;
+          readAt = null;
           latest = await settle(
             await skipOnboardingStep(
               input.session,
@@ -2746,6 +2784,7 @@ export function createOnboardingPort(input: {
       }
       try {
         trusted = false;
+        readAt = null;
         latest = await completeOnboardingSession(
           input.session,
           input.onboardingSessionId,
@@ -2960,6 +2999,7 @@ export function createOnboardingPort(input: {
             channel: "CONVERSATION" as const,
           };
           trusted = false;
+          readAt = null;
           latest = await settle(
             await onFreshVersion((version) =>
               submitOnboardingResponse(
@@ -3078,6 +3118,8 @@ export function shortWordIn(quote: string, said: string): boolean {
 
 /** A sentence that asks rather than states: by its mark or how it opens. */
 /** Steps whose answer is a narrative Q may summarise for their yes. */
+/** How long a plain read of the session stands in for another (see readAt). */
+const READ_REUSE_MS = 1_500;
 const PARAPHRASABLE: ReadonlySet<string> = new Set(["long_text", "voice_text"]);
 
 const ASKING =

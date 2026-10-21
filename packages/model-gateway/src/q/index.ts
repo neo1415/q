@@ -118,6 +118,7 @@ import { createPartialAnswerReader } from "../policy/partial-answer.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk, withoutStatusTalk } from "./action-talk.js";
+import { createSubjectAnnouncer } from "./artifact-preview.js";
 import {
   createRunCompanies,
   containsCompanyName,
@@ -4008,6 +4009,23 @@ export function createModelGatewayQAnswer(
         if (gate === null) deltas?.publish(delta);
         else gate.emit(() => deltas?.publish(delta));
       };
+      // Artifacts live: a sentence that names a subject this run read puts
+      // that subject's card up as the sentence goes out, not after the
+      // whole answer (the preview rides ahead of the sentence's own text).
+      const announcer = createSubjectAnnouncer({
+        read: () => runCompanies.read(request.runId),
+        question: latest.content,
+      });
+      const sendSaid = (text: string): void => {
+        const preview = announcer.sentence(text);
+        send({
+          runId: request.runId,
+          tenantId: request.tenantId,
+          messageId,
+          text,
+          ...(preview === null ? {} : { preview }),
+        });
+      };
       /** Code's opening lines, once, before anything else is said. */
       const sayLeadLines = (): void => {
         if (firstPublishedMs !== null || leadLines === undefined) return;
@@ -4016,12 +4034,7 @@ export function createModelGatewayQAnswer(
           const said = line.trim();
           if (said.length === 0) continue;
           streamedText += `${said} `;
-          send({
-            runId: request.runId,
-            tenantId: request.tenantId,
-            messageId,
-            text: `${said} `,
-          });
+          sendSaid(`${said} `);
         }
       };
       const publish = (text: string): void => {
@@ -4032,12 +4045,7 @@ export function createModelGatewayQAnswer(
         sayLeadLines();
         firstPublishedMs ??= Date.now() - startedAt;
         streamedText += `${text} `;
-        send({
-          runId: request.runId,
-          tenantId: request.tenantId,
-          messageId,
-          text: `${text} `,
-        });
+        sendSaid(`${text} `);
       };
       // Backed only by a screen move a tool of this run authorised.
       // Or by cards that will render: the model's own card set begun in

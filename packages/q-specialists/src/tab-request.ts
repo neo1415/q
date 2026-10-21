@@ -6,7 +6,7 @@ import type {
   QScreenContext,
 } from "@capital-q/contracts";
 
-import { plausibleName } from "./named-record-request.js";
+import { plausibleName } from "./plausible-name.js";
 import { selfCorrected, withoutLeadIn } from "./page-request.js";
 
 /**
@@ -288,8 +288,28 @@ export function tabAskOf(text: string): TabAsk | null {
     const found = fromObject(object);
     if (found !== null) return found;
   }
+  // Owner 2026-10-17/20: "now the pitch deck", "and the data room" -- one
+  // short sentence that is only a tab of the record on screen, with no
+  // verb. Read by code, so the move needs no turn reading (it was read as
+  // "make a deck", and every reading cost ~1.2 s before the tab moved).
+  // Only the record's own tabs, never a name: whose tab is the screen's.
+  if (sentences.length === 1) {
+    const bare = BARE_TAB.exec(sentences[0] ?? "");
+    const tab = bare === null ? null : tabOf(bare[1] ?? "");
+    if (tab !== null) {
+      return { tab, subTab: null, name: null, viewer: tab === "deck" };
+    }
+  }
   return null;
 }
+
+/**
+ * A bare tab: "the pitch deck", "their data room", "the team tab". Not
+ * messages or calls ("the conversation", "the call" are topics), and never
+ * with an article that makes it a new thing ("a deck").
+ */
+const BARE_TAB =
+  /^(?:the|their|its)\s+(data\s*room|diligence\s+room|(?:pitch\s+)?deck|elevator(?:\s+pitch)?|team|diligence|overview)(?:\s+tab)?(?:\s+(?:please|again))?$/iu;
 
 const COMPANY_TAB_PAGE: Readonly<
   Record<"overview" | "elevator" | "dataroom" | "deck" | "team", QRecordPage>

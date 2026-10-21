@@ -49,6 +49,7 @@ import {
   voiceTokenFingerprint,
 } from "./session-token.js";
 import type { RealtimeVoiceProvider } from "./provider.js";
+import type { TurnTaking } from "./persona-voices/persona-voice.js";
 import { bounded, speakable } from "./speech.js";
 
 /**
@@ -153,6 +154,22 @@ export type QVoiceRoutesDependencies = ActorContextDependencies & {
         /** The persona's voice id for the speak relay, if it has one. */
         readonly voiceIdFor?:
           | ((voice: QVoiceChoice, seed: string) => string | undefined)
+          | undefined;
+        /**
+         * The persona's own voice, chosen from what Q prepared about them
+         * (persona-voices): the relay's voice spec and how quickly they
+         * take their turn. Read beside the opening; preferred over
+         * `voiceIdFor` when it answers.
+         */
+        readonly voiceFor?:
+          | ((
+              actor: ActorContext,
+              rehearsalId: string,
+              voice: QVoiceChoice,
+            ) => Promise<{
+              readonly spec: string;
+              readonly turnTaking: TurnTaking;
+            } | null>)
           | undefined;
         /** How the opening line sounds (its mood), on this voice session. */
         readonly performOpening?:
@@ -756,13 +773,26 @@ export function registerQVoiceRoutes(
       // REHEARSE: a rehearsal line opens with the other person's own line.
       let rehearsalName: string | null = null;
       let rehearsalSeed: string | null = null;
+      let personaVoice: {
+        readonly spec: string;
+        readonly turnTaking: TurnTaking;
+      } | null = null;
       if (input.rehearsal !== undefined) {
-        const opening =
+        const rehearsalId = input.rehearsal.rehearsalId;
+        // The persona's voice is read beside the opening, not after it.
+        const [opening, chosenVoice] = await Promise.all([
           dependencies.rehearsals === undefined
             ? null
-            : await dependencies.rehearsals
-                .opening(actor, input.rehearsal.rehearsalId)
-                .catch(() => null);
+            : dependencies.rehearsals
+                .opening(actor, rehearsalId)
+                .catch(() => null),
+          dependencies.rehearsals?.voiceFor === undefined
+            ? null
+            : dependencies.rehearsals
+                .voiceFor(actor, rehearsalId, voice)
+                .catch(() => null),
+        ]);
+        personaVoice = chosenVoice;
         if (opening === null) {
           return reply.code(404).send({
             type: "about:blank",
@@ -917,7 +947,8 @@ export function registerQVoiceRoutes(
       const speakerVoiceId =
         rehearsalSeed === null
           ? undefined
-          : dependencies.rehearsals?.voiceIdFor?.(voice, rehearsalSeed);
+          : (personaVoice?.spec ??
+            dependencies.rehearsals?.voiceIdFor?.(voice, rehearsalSeed));
       if (input.rehearsal !== undefined && !resume) {
         await dependencies.rehearsals
           ?.performOpening?.(actor, input.rehearsal.rehearsalId, voiceSessionId)
@@ -989,6 +1020,9 @@ export function registerQVoiceRoutes(
             greeting: firstMessage,
             thinkToken,
             ...(input.locale === undefined ? {} : { locale: input.locale }),
+            ...(personaVoice === null
+              ? {}
+              : { turnTaking: personaVoice.turnTaking }),
             // The organisation they typed at sign-up: the one name in this
             // conversation the recogniser could not know.
             terms: [

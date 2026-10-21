@@ -296,7 +296,10 @@ import {
   createRehearsalService,
   type Sourced,
 } from "./composition/rehearsals.js";
-import { createMeetingNotesComposer } from "./composition/meeting-notes.js";
+import {
+  createMeetingNotesComposer,
+  createRollingMeetingNotes,
+} from "./composition/meeting-notes.js";
 import { createPostgresMeetingEventStore } from "./composition/meeting-events.js";
 import { createMeetingSnapshotBuilder } from "./composition/meeting-snapshot.js";
 import { createWorkingSnapshots } from "./composition/working-snapshot.js";
@@ -652,6 +655,10 @@ import {
 } from "./voice/providers/elevenlabs-speak.js";
 import { createElevenLabsVoiceProvider } from "./voice/providers/elevenlabs.js";
 import { Q_VOICE_SPEAK_RELAY_PATH } from "./voice/routes.js";
+import {
+  personaVoiceFor,
+  personaVoiceSpec,
+} from "./voice/persona-voices/persona-voice.js";
 import { createSpeechPerformanceBoard } from "./voice/speech-performance.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
 import { createRunSubjects } from "./voice/run-subjects.js";
@@ -4632,7 +4639,18 @@ setInterval(() => {
     logger.warn({ err: error }, "meeting face sweep failed");
   });
 }, 60_000).unref();
+// 2026-10-20 (meetings speed): the meeting record is drafted while the call
+// is live and finished when it ends, so its notes are ready seconds after.
+const meetingNotes = createRollingMeetingNotes(
+  createMeetingNotesComposer({
+    gateway: modelGateway,
+    dataPosture: demoDataPosture,
+    logger,
+  }),
+  { logger },
+);
 const meetingHost = createMeetingHostRuntime({
+  notes: meetingNotes,
   face: meetingFace,
   seesScreens: meetingScreensOn,
   seesCameras: meetingCamerasOn,
@@ -4782,11 +4800,7 @@ const meetingAssistant = createMeetingAssistantService({
       html: message.html,
     });
   },
-  composer: createMeetingNotesComposer({
-    gateway: modelGateway,
-    dataPosture: demoDataPosture,
-    logger,
-  }),
+  composer: meetingNotes,
   // ADR 0027: the call is marked on the relationship's history once its
   // record exists, through Network's own appender.
   onHeld: async (held) => {
@@ -5561,6 +5575,7 @@ const rehearsals = createRehearsalService({
           name,
           profile,
           relationshipId: relationship?.relationshipId ?? null,
+          basedIn: seen?.hqCountry ?? null,
         };
       }
       const companyId = CompanyIdSchema.safeParse(id);
@@ -5597,6 +5612,12 @@ const rehearsals = createRehearsalService({
         .filter((line): line is string => line !== null)
         .join("\n");
       return {
+        basedIn:
+          company.headquartersCountry === null
+            ? null
+            : [company.headquartersCity, company.headquartersCountry]
+                .filter((part) => part !== null && part.length > 0)
+                .join(", "),
         name: company.canonicalName,
         profile,
         relationshipId: relationship?.relationshipId ?? null,
@@ -5862,6 +5883,12 @@ const elevenLabsSpeech =
         relay: createElevenLabsSpeechRelay({
           apiKey: speechSecrets.elevenLabs.reveal(),
           model: config.voice.ttsModel,
+          // REHEARSE: the people Q plays, never Q: v4 turbo first, v3 only
+          // for a laugh, a sigh, crying or a raised voice.
+          persona: {
+            model: config.voice.rehearsalTtsModel,
+            expressivePeaks: config.voice.rehearsalExpressivePeaks,
+          },
           performance: speechPerformance,
           timings: voiceTimings,
           ...(speechSecrets.deepgram === undefined
@@ -6901,6 +6928,28 @@ const { app, logger: appLogger } = createApp(
               opening: rehearsals.opening,
               // The person Q plays speaks in a voice of their own, never Q's.
               voiceIdFor: personaVoiceId,
+              // ...chosen from what Q prepared about them: where they are
+              // based, the voice picked in the lobby, their patience.
+              voiceFor: async (actor, rehearsalId, voice) => {
+                const profile = await rehearsals.voiceProfile(
+                  actor,
+                  rehearsalId,
+                );
+                if (profile === null) return null;
+                const chosen = personaVoiceFor({
+                  seed: profile.seed,
+                  voice,
+                  basedIn: profile.basedIn,
+                  ageGroup: null,
+                  patience: profile.patience,
+                });
+                return chosen === null
+                  ? null
+                  : {
+                      spec: personaVoiceSpec(chosen),
+                      turnTaking: chosen.turnTaking,
+                    };
+              },
               performOpening: async (actor, rehearsalId, voiceSessionId) => {
                 const opening = await rehearsals.opening(actor, rehearsalId);
                 if (opening === null) return;

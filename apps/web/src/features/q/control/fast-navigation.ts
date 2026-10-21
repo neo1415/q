@@ -9,6 +9,7 @@ import {
   cardsIntentOf,
   cardsRequestOf,
 } from "@capital-q/q-specialists/cards-request";
+import { tabAskOf } from "@capital-q/q-specialists/tab-request";
 
 import { destinationPath } from "@/features/voice/destinations";
 
@@ -22,6 +23,8 @@ import {
 } from "../client-actions";
 import { applyCardsIntent } from "../cards/card-visibility-store";
 import { navigationInFlight } from "../ui-act-controller";
+import { performOnControl } from "./perform";
+import { controlOf, type ControlEntry } from "./registry";
 
 /**
  * RECOVERY-2026-10 (C, founder 2026-10-09: "stupid fast"): the screen moves
@@ -153,6 +156,30 @@ export type FastNavigationTiming = {
   readonly pushMs: number;
 };
 
+/**
+ * The page's own tab the words name ("open the data room", "now the pitch
+ * deck"), when this page registered it; null otherwise. A tab of another
+ * record ("Nixo's team tab") or a deck/profile section is left to Q.
+ */
+function tabHere(
+  text: string,
+): { readonly id: string; readonly entry: ControlEntry } | null {
+  const said = text.trim();
+  if (said.length === 0 || said.length > 160 || takenBack(said)) return null;
+  const ask = tabAskOf(said);
+  if (
+    ask === null ||
+    ask.name !== null ||
+    ask.subTab !== null ||
+    ask.section !== undefined
+  ) {
+    return null;
+  }
+  const id = `tab.${ask.tab}`;
+  const entry = controlOf(id);
+  return entry === undefined ? null : { id, entry };
+}
+
 /** Within this, a move to where the fast path just went is not repeated. */
 const SAME_MOVE_MS = 10_000;
 
@@ -175,6 +202,31 @@ export async function navigationHeard(
     return null;
   }
   const started = performance.now();
+  // Owner 2026-10-17/20 ("open the data room", "now the pitch deck" took
+  // 1.6-2 s, after a turn reading): a tab of the page on screen, named
+  // with no record, is that page's own registered control, selected here
+  // in this task. Presentation only -- the page already authorised itself;
+  // Q's answer selects the same tab again, which changes nothing.
+  const tab = tabHere(text);
+  if (tab !== null) {
+    void performOnControl(tab.entry, {
+      kind: "UI_ACT",
+      actId: `uia_fast_${Date.now().toString(36)}`,
+      act: "SELECT_TAB",
+      target: tab.id,
+    }).catch(() => undefined);
+    const timing = {
+      path: `#${tab.id}`,
+      ms: Math.round(performance.now() - started),
+      pushMs: 0,
+    };
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent(FAST_NAVIGATION_EVENT, { detail: timing }),
+      );
+    }
+    return timing;
+  }
   // A page read here moves in this same task: no await, so nothing the
   // send queued (a React render, the run's request) goes first.
   const here = readHere(text);

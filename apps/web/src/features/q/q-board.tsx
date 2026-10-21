@@ -13,6 +13,14 @@ import { ViewTransition } from "@/components/view-transition";
 import { artifactTypeLabel } from "./artifact-type";
 import { ArtifactCard } from "./artifact-card";
 import {
+  boardMarksOf,
+  cardsState,
+  EMPTY_BOARD_MARKS,
+  setBoardMarks,
+  subscribeCards,
+  type BoardMarks,
+} from "./cards/card-visibility";
+import {
   SlidePictures,
   slidePicturesOf,
   type SlidePicture,
@@ -39,62 +47,25 @@ import { useT } from "@/features/i18n/language";
  * stage uses. Cards are legitimate here: each one is a discrete object.
  *
  * Pinned and dismissed are this tab's arrangement of the board, kept per
- * conversation in sessionStorage; they change what is shown, never what
- * was said.
+ * conversation by the one presentation controller; they change what is
+ * shown, never what was said.
  */
 
-type Marks = { readonly pinned: string[]; readonly dismissed: string[] };
-const EMPTY: Marks = { pinned: [], dismissed: [] };
-const MARKS_KEY = "cq.q.board.v1";
-const MARKS_CHANGED = "cq:q-board-marks";
+type Marks = BoardMarks;
+const EMPTY: Marks = EMPTY_BOARD_MARKS;
 
-function readAllMarks(): Record<string, Marks> {
-  try {
-    const raw = window.sessionStorage.getItem(MARKS_KEY);
-    if (raw === null) return {};
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) return {};
-    const out: Record<string, Marks> = {};
-    for (const [id, value] of Object.entries(parsed)) {
-      const pinned: unknown = Reflect.get(Object(value), "pinned");
-      const dismissed: unknown = Reflect.get(Object(value), "dismissed");
-      const strings = (list: unknown) =>
-        Array.isArray(list)
-          ? list.filter((item): item is string => typeof item === "string")
-          : [];
-      out[id] = { pinned: strings(pinned), dismissed: strings(dismissed) };
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-const cached = new Map<string, Marks>();
+// Artifacts live (audit 2026-10-15 §4): the Board's arrangement lives in
+// the one presentation controller (cards/card-visibility-store), held
+// across pages and a reload with every other show/hide.
 function readMarks(conversation: string): Marks {
-  const marks = readAllMarks()[conversation] ?? EMPTY;
-  const key = `${conversation}:${JSON.stringify(marks)}`;
-  const known = cached.get(key);
-  if (known !== undefined) return known;
-  cached.set(key, marks);
-  return marks;
+  return boardMarksOf(cardsState(), conversation);
 }
 
 function writeMarks(conversation: string, marks: Marks): void {
-  try {
-    const all = readAllMarks();
-    all[conversation] = marks;
-    window.sessionStorage.setItem(MARKS_KEY, JSON.stringify(all));
-  } catch {
-    // Arranged for this page only.
-  }
-  window.dispatchEvent(new CustomEvent(MARKS_CHANGED));
+  setBoardMarks(conversation, marks);
 }
 
-function subscribeMarks(onChange: () => void): () => void {
-  window.addEventListener(MARKS_CHANGED, onChange);
-  return () => window.removeEventListener(MARKS_CHANGED, onChange);
-}
+const subscribeMarks = subscribeCards;
 
 const LABELS: Readonly<Record<BoardObject["kind"], string>> = {
   NOTE: "Answer",

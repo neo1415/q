@@ -201,6 +201,7 @@ describe("POST /v1/q/rehearsals", () => {
       externalLine: notUnderTest,
       recordLive: notUnderTest,
       finish: notUnderTest,
+      voiceProfile: notUnderTest,
       opening: notUnderTest,
     };
     const server = Fastify();

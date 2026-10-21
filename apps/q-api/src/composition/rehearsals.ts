@@ -143,6 +143,12 @@ export type RehearsalMaterial = {
     readonly name: string;
     readonly profile: string;
     readonly relationshipId: string | null;
+    /**
+     * Where they are based (HQ city and country) as this viewer may see
+     * it; absent or null when not declared. Used only to choose how the
+     * person Q plays sounds.
+     */
+    readonly basedIn?: string | null | undefined;
   } | null>;
   /** What their side wrote to this viewer, oldest first. */
   readonly theirMessages: (
@@ -910,6 +916,21 @@ export type RehearsalService = {
       readonly at: number;
     }[],
   ) => Promise<number | null>;
+  /**
+   * What chooses the persona's voice (persona-voices): steady seed, the
+   * voice the person picked in the lobby, where the counterpart is based
+   * as this viewer may see it, and their patience from the persona's
+   * conduct. Null unless this is the person's own ACTIVE rehearsal.
+   */
+  readonly voiceProfile: (
+    actor: ActorContext,
+    rehearsalId: string,
+  ) => Promise<{
+    readonly seed: string;
+    readonly voice: "FEMALE" | "MALE";
+    readonly basedIn: string | null;
+    readonly patience: "SHORT" | "TYPICAL" | "LONG" | null;
+  } | null>;
   /** The latest line the other person said, for a voice line's opening. */
   readonly opening: (
     actor: ActorContext,
@@ -2881,6 +2902,43 @@ export function createRehearsalService(dependencies: {
         ended: false,
       });
       return saved === null ? null : added.length;
+    },
+
+    voiceProfile: async (actor, rehearsalId) => {
+      const row = await store.own(actor, rehearsalId);
+      if (row === null || row.status !== "ACTIVE" || row.endedAt !== null) {
+        return null;
+      }
+      const persona = personaOf(row.persona);
+      // Read as this viewer may see the counterpart, like everything else
+      // the persona rests on. A failed read is an unknown place: neutral.
+      //
+      // A researched real person keeps a neutral voice: where someone lives
+      // is not their nationality, and their persona is told never to put
+      // on an accent (external-persona.ts). An organisation's HQ is a
+      // place, not a person, so it does choose the accent.
+      const researched =
+        row.counterpartKind === "EXTERNAL_PERSON" && external !== undefined
+          ? await external.subjects
+              .latest(actor, row.counterpartId)
+              .catch(() => null)
+          : null;
+      const basedIn =
+        row.counterpartKind === "EXTERNAL_PERSON"
+          ? researched === null || researched.subject.entityKind === "PERSON"
+            ? null
+            : researched.subject.location
+          : ((
+              await material
+                .counterpart(actor, row.counterpartKind, row.counterpartId)
+                .catch(() => null)
+            )?.basedIn ?? null);
+      return {
+        seed: `${row.counterpartKind}:${row.counterpartId}`,
+        voice: row.voice ?? "MALE",
+        basedIn,
+        patience: persona === null ? null : conductOf(persona).patience,
+      };
     },
 
     opening: async (actor, rehearsalId) => {

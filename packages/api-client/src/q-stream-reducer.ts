@@ -1,5 +1,6 @@
 import type {
   QActionProposal,
+  QArtifactPreview,
   QCapability,
   QMessage,
   QPublicFailure,
@@ -40,6 +41,12 @@ export type QStreamState = {
   readonly messages: readonly QMessage[];
   /** Live text for a message that has not completed yet. */
   readonly partial: QStreamPartialMessage | null;
+  /**
+   * Artifacts live: the subjects the live message has named so far, for
+   * a card skeleton while Q talks. Ephemeral like `partial`, and dropped
+   * the moment that message is persisted (its blocks win).
+   */
+  readonly preview: QArtifactPreview | null;
   readonly findings: readonly QPublicFinding[];
   readonly proposals: readonly QActionProposal[];
   readonly approval: QStreamApprovalState | null;
@@ -62,6 +69,7 @@ export function createQStreamState(): QStreamState {
     stage: null,
     messages: [],
     partial: null,
+    preview: null,
     findings: [],
     proposals: [],
     approval: null,
@@ -113,6 +121,16 @@ export function reduceQStream(
           : { messageId: event.data.messageId, text: event.data.text };
       return { ...state, runId, partial };
     }
+    case "q.artifact.preview": {
+      // Ephemeral, like a delta: never once the run is over or its
+      // message is persisted. Each preview carries every subject named so
+      // far, so the newest replaces the last.
+      if (state.terminal) return state;
+      if (state.messages.some((m) => m.messageId === event.data.messageId)) {
+        return state;
+      }
+      return { ...state, runId, preview: event.data };
+    }
     case "q.run.started":
       return {
         ...applySequence(state, event),
@@ -130,6 +148,8 @@ export function reduceQStream(
         messages: upsert(state.messages, message, (m) => m.messageId),
         partial:
           state.partial?.messageId === message.messageId ? null : state.partial,
+        preview:
+          state.preview?.messageId === message.messageId ? null : state.preview,
       };
     }
     case "q.finding.available":
@@ -181,6 +201,7 @@ export function reduceQStream(
         runStatus: "COMPLETED",
         stage: null,
         partial: null,
+        preview: null,
         approval: null,
         clarification: null,
         completedAt: event.data.completedAt,
@@ -194,6 +215,7 @@ export function reduceQStream(
         stage: null,
         // A cancelled or failed run has no half-written answer to keep.
         partial: null,
+        preview: null,
         approval: null,
         clarification: null,
         failure: event.data.failure,
@@ -220,19 +242,19 @@ export function describeQStage(stage: QVisibleStage | null): string | null {
     case "UNDERSTANDING_REQUEST":
       return "Understanding your request";
     case "REVIEWING_COMPANY":
-      return "Reviewing the company";
+      return "Looking at the company";
     case "CHECKING_EVIDENCE":
-      return "Checking the evidence";
+      return "Reading their deck and documents";
     case "SEARCHING_PUBLIC_SOURCES":
-      return "Looking into it";
+      return "Checking the web";
     case "REVIEWING_INVESTOR_CRITERIA":
-      return "Reviewing investor criteria";
+      return "Reading the investor's mandate";
     case "COMPARING_OPPORTUNITIES":
-      return "Comparing opportunities";
+      return "Comparing them side by side";
     case "REVIEWING_RELATIONSHIP":
-      return "Reviewing the relationship";
+      return "Checking where things stand";
     case "PREPARING_ANALYSIS":
-      return "Preparing the analysis";
+      return "Pulling it together";
     case "PREPARING_DOCUMENT":
       return "Writing your document. This takes a moment.";
     case "REVISING_DOCUMENT":

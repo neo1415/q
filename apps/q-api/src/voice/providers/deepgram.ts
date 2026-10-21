@@ -4,6 +4,7 @@ import {
   type VoiceListenPlan,
 } from "@capital-q/q-core/language";
 
+import type { TurnTaking } from "../persona-voices/persona-voice.js";
 import { ASR_KEYWORDS } from "../vocabulary.js";
 import type { ElevenLabsSpeechRelay } from "./elevenlabs-speak.js";
 
@@ -85,7 +86,25 @@ export type DeepgramVoiceProvider = {
      * words).
      */
     readonly locale?: string | undefined;
+    /**
+     * REHEARSE: how quickly the person Q plays takes their turn, from
+     * their patience (persona-voices). Absent is Q's own tuning below.
+     */
+    readonly turnTaking?: TurnTaking | undefined;
   }) => DeepgramAgentSettings;
+};
+
+/**
+ * End of turn by how eager the speaker is to take theirs (Kuuza's
+ * turn_eagerness, carried to Flux). NORMAL is Q's own measured tuning
+ * (see the listen settings); the others move one step either way.
+ */
+const END_OF_TURN: Readonly<
+  Record<TurnTaking, { readonly threshold: number; readonly timeoutMs: number }>
+> = {
+  EAGER: { threshold: 0.8, timeoutMs: 3_000 },
+  NORMAL: { threshold: 0.85, timeoutMs: 4_000 },
+  PATIENT: { threshold: 0.9, timeoutMs: 5_000 },
 };
 
 export type DeepgramVoiceProviderOptions = {
@@ -211,7 +230,15 @@ export function createDeepgramVoiceProvider(
       }
       return body.access_token;
     },
-    settingsFor: ({ voice, greeting, thinkToken, terms, locale }) => {
+    settingsFor: ({
+      voice,
+      greeting,
+      thinkToken,
+      terms,
+      locale,
+      turnTaking,
+    }) => {
+      const endOfTurn = END_OF_TURN[turnTaking ?? "NORMAL"];
       const multilingual = speaksBeyondEnglish(locale);
       const recogniser = recogniserFor(locale);
       const speakCode =
@@ -272,8 +299,12 @@ export function createDeepgramVoiceProvider(
                     // sentence (end of speech to end of turn 0.9 s -> 1.3 s). 0.9
                     // split no less and cost another 0.4 s. What the recogniser
                     // still ends open is held by the turn (turn.ts, unfinished).
-                    eot_threshold: 0.85,
-                    eot_timeout_ms: 4_000,
+                    //
+                    // REHEARSE: an impatient person Q plays comes in a
+                    // beat sooner, a patient one waits longer
+                    // (END_OF_TURN); Q itself keeps 0.85 / 4 s.
+                    eot_threshold: endOfTurn.threshold,
+                    eot_timeout_ms: endOfTurn.timeoutMs,
                   },
           },
           think: {

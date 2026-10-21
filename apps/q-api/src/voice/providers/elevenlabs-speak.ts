@@ -4,7 +4,18 @@ import {
   type QVoiceChoice,
 } from "@capital-q/contracts";
 
-import type { SpeechPerformanceBoard } from "../speech-performance.js";
+import { CATALOG_VOICE_IDS } from "../persona-voices/catalog.js";
+import {
+  expressivePeak,
+  parsePersonaVoiceSpec,
+  PERSONA_SIMILARITY,
+  PERSONA_STABILITY,
+  type ParsedPersonaVoice,
+} from "../persona-voices/persona-voice.js";
+import type {
+  SentencePerformance,
+  SpeechPerformanceBoard,
+} from "../speech-performance.js";
 import {
   SpeechSynthesisError,
   type SpeechSynthesisPort,
@@ -17,6 +28,7 @@ import {
   AURA_MARKUP,
   renderSpeech,
   SPEECH_MARKUP,
+  type RenderedSpeech,
   withoutMarkup,
   type ElevenLabsSpeechModel,
   type SpeechMarkup,
@@ -104,6 +116,8 @@ const ALL_VOICE_IDS: ReadonlySet<string> = new Set([
   ...Object.values(VOICE_IDS),
   ...PERSONA_VOICE_IDS.MALE,
   ...PERSONA_VOICE_IDS.FEMALE,
+  // REHEARSE: the persona voice catalog, synced from the account.
+  ...CATALOG_VOICE_IDS,
 ]);
 
 const API_ORIGIN = "https://api.elevenlabs.io";
@@ -179,7 +193,20 @@ export type ElevenLabsSpeechOptions = {
   readonly firstAudioDeadlineMs?: number | undefined;
 };
 
+/**
+ * REHEARSE: how the person Q plays is voiced, never Q itself. Absent keeps
+ * persona lines on Q's own model chain (the behaviour before the catalog).
+ */
+export type PersonaSpeechOptions = {
+  /** First choice for a persona line; v4 turbo unless configured. */
+  readonly model: ElevenLabsSpeechModel;
+  /** A laugh, a sigh, crying or a raised voice goes to v3's audio tags. */
+  readonly expressivePeaks: boolean;
+};
+
 export type ElevenLabsSpeechRelayOptions = ElevenLabsSpeechOptions & {
+  /** REHEARSE: persona voices; see PersonaSpeechOptions. */
+  readonly persona?: PersonaSpeechOptions | undefined;
   /** Where the delivery cues for each session's sentences wait. */
   readonly performance?: SpeechPerformanceBoard | undefined;
   /** Where each turn's speech request and first audio byte are noted. */
@@ -263,7 +290,69 @@ type Attempt =
       readonly ok: false;
       readonly status: number | undefined;
       readonly reason: "REFUSED" | "UNREACHABLE" | "SLOW" | "EMPTY";
+      /** A refusal's own words (bounded, lowercased), to tell its kind. */
+      readonly detail?: string | undefined;
     };
+
+/** At most this much of a refusal's body is read to classify it. */
+const REFUSAL_DETAIL_MAX = 2_000;
+
+async function refusalDetail(response: Response): Promise<string> {
+  if (response.status < 400 || response.status >= 500) {
+    await response.body?.cancel().catch(() => undefined);
+    return "";
+  }
+  const text = await response.text().catch(() => "");
+  return text.slice(0, REFUSAL_DETAIL_MAX).toLowerCase();
+}
+
+/**
+ * What kind of refusal a 4xx was, from ElevenLabs' own words. Each kind has
+ * its own remedy and none of them is an outage:
+ *   - ENGLISH_ONLY: the voice only works on English-only models (Kuuza's
+ *     `can_only_use_with_monolingual_models`): retry on flash v2;
+ *   - VOICE_MISSING: a catalog voice not added to this account: retry on a
+ *     premade voice every account has;
+ *   - MODEL_UNAVAILABLE: the account cannot use this model (v4 turbo not
+ *     rolled out to it): skip that model for a while.
+ */
+export type RefusalKind =
+  "ENGLISH_ONLY" | "VOICE_MISSING" | "MODEL_UNAVAILABLE";
+
+export function refusalKind(
+  status: number | undefined,
+  detail: string | undefined,
+): RefusalKind | null {
+  if (status === undefined || status < 400 || status >= 500) return null;
+  const text = detail ?? "";
+  if (
+    text.includes("monolingual") ||
+    text.includes("english-only") ||
+    text.includes("english only") ||
+    (text.includes("english") &&
+      (text.includes("turbo") || text.includes("flash")) &&
+      text.includes("voice"))
+  ) {
+    return "ENGLISH_ONLY";
+  }
+  if (
+    text.includes("voice_not_found") ||
+    /voice[^.]{0,80}(?:not found|does not exist)/u.test(text)
+  ) {
+    return "VOICE_MISSING";
+  }
+  if (
+    text.includes("model_not_found") ||
+    text.includes("invalid_model") ||
+    text.includes("model_access") ||
+    /model[^.]{0,80}(?:not found|does not exist|not available|not supported|no access|invalid)/u.test(
+      text,
+    )
+  ) {
+    return "MODEL_UNAVAILABLE";
+  }
+  return null;
+}
 
 /**
  * Ask one engine and wait, at most `deadlineMs` when given, for its first
@@ -294,8 +383,13 @@ async function firstAudio(
       return { ok: false, status: undefined, reason: "UNREACHABLE" };
     }
     if (!response.ok || response.body === null) {
-      await response.body?.cancel().catch(() => undefined);
-      return { ok: false, status: response.status, reason: "REFUSED" };
+      const detail = await refusalDetail(response);
+      return {
+        ok: false,
+        status: response.status,
+        reason: "REFUSED",
+        ...(detail.length === 0 ? {} : { detail }),
+      };
     }
     const reader: ReadableStreamDefaultReader<Uint8Array> =
       response.body.getReader();
@@ -454,7 +548,10 @@ export type ElevenLabsSpeechRelay = {
      * never selects anything the binding did not.
      */
     readonly session?: string | undefined;
-    /** REHEARSE: a persona's own voice (PERSONA_VOICE_IDS), from the binding. */
+    /**
+     * REHEARSE: the persona's voice from the binding: a persona-voices spec
+     * ("<voiceId>;<speed>;<stability>") or a bare legacy id.
+     */
     readonly voiceId?: string | undefined;
   }) => Promise<Response>;
 };
@@ -492,11 +589,59 @@ type Engine = {
     readonly voiceId?: string | undefined;
     readonly format: string;
     readonly text: string;
-    readonly speed: number | undefined;
-    readonly stability?: number | undefined;
+    readonly speech: RenderedSpeech;
     readonly signal: AbortSignal;
   }) => Promise<Response>;
 };
+
+/** The persona's own voice settings for one line on one model. */
+export function personaVoiceSettings(
+  model: ElevenLabsSpeechModel,
+  persona: ParsedPersonaVoice,
+  speech: Pick<RenderedSpeech, "speed" | "stability" | "voice">,
+): Record<string, number | boolean> {
+  if (model === "eleven_v3_conversational") {
+    // v3 takes three stabilities (Creative 0, Natural 0.5, Robust 1) and
+    // ignores speed; its tone travels in the audio tags.
+    const creative = speech.stability === 0;
+    return {
+      stability: creative ? 0 : 0.5,
+      similarity_boost: PERSONA_SIMILARITY,
+      style: creative ? 0.6 : 0,
+      use_speaker_boost: true,
+    };
+  }
+  const tone = speech.voice;
+  const speed = (persona.speed ?? 1) * (tone?.pace ?? 1) * (speech.speed ?? 1);
+  return {
+    stability: tone?.stability ?? persona.stability ?? PERSONA_STABILITY,
+    similarity_boost: PERSONA_SIMILARITY,
+    style: tone?.style ?? 0,
+    use_speaker_boost: true,
+    // The vendor's range; a shade, never a different voice.
+    speed: Math.round(Math.min(1.2, Math.max(0.7, speed)) * 100) / 100,
+  };
+}
+
+/** The persona model chain, best first, for a configured first choice. */
+export function personaModelsFor(
+  model: ElevenLabsSpeechModel,
+): ElevenLabsSpeechModel[] {
+  switch (model) {
+    case "eleven_v4_turbo":
+      return ["eleven_v4_turbo", "eleven_flash_v2_5"];
+    case "eleven_flash_v2_5":
+      return ["eleven_flash_v2_5", "eleven_turbo_v2_5"];
+    case "eleven_v3_conversational":
+      return ["eleven_v3_conversational", "eleven_flash_v2_5"];
+    case "eleven_turbo_v2_5":
+    case "eleven_flash_v2":
+      return [model];
+  }
+}
+
+/** A model the account refused is skipped for this long, then tried again. */
+const MODEL_UNAVAILABLE_MS = 10 * 60_000;
 
 export function createElevenLabsSpeechRelay(
   options: ElevenLabsSpeechRelayOptions,
@@ -504,25 +649,43 @@ export function createElevenLabsSpeechRelay(
   const doFetch = options.fetch ?? fetch;
   const now = options.now ?? Date.now;
   const deadline = options.firstAudioDeadlineMs ?? FIRST_AUDIO_DEADLINE_MS;
-  const elevenLabsEngines: Engine[] = modelsFor(
-    options.model ?? DEFAULT_MODEL,
-  ).map((model) => ({
+  const engineFor = (
+    model: ElevenLabsSpeechModel,
+    persona: ParsedPersonaVoice | undefined,
+  ): Engine => ({
     name: model,
     markup: SPEECH_MARKUP[model],
     elevenLabs: true,
-    request: ({ voice, voiceId, format, text, speed, stability, signal }) =>
+    request: ({ voice, voiceId, format, text, speech, signal }) =>
       doFetch(
         streamUrl(voice, format, voiceId),
-        elevenLabsRequest(
-          options.apiKey,
-          model,
-          text,
-          speed,
-          signal,
-          stability,
-        ),
+        persona === undefined
+          ? elevenLabsRequest(
+              options.apiKey,
+              model,
+              text,
+              speech.speed,
+              signal,
+              speech.stability,
+            )
+          : {
+              method: "POST",
+              headers: {
+                "xi-api-key": options.apiKey,
+                "content-type": "application/json",
+              },
+              body: JSON.stringify({
+                text,
+                model_id: model,
+                voice_settings: personaVoiceSettings(model, persona, speech),
+              }),
+              signal,
+            },
       ),
-  }));
+  });
+  const elevenLabsEngines: Engine[] = modelsFor(
+    options.model ?? DEFAULT_MODEL,
+  ).map((model) => engineFor(model, undefined));
   const auraStream = options.aura;
   const aura: Engine | undefined =
     auraStream === undefined
@@ -537,6 +700,33 @@ export function createElevenLabsSpeechRelay(
   /** ElevenLabs is skipped until then, when Aura-2 is there to speak. */
   let restingUntil = 0;
   let failuresRunning = 0;
+  /** REHEARSE: what this account refused, remembered so it is not asked again. */
+  const unavailableUntil = new Map<ElevenLabsSpeechModel, number>();
+  const englishOnlyVoices = new Set<string>();
+  const missingVoices = new Set<string>();
+
+  /** The ElevenLabs models for one persona line, best first. */
+  const personaModels = (
+    voiceId: string,
+    cues: readonly SentencePerformance[],
+  ): ElevenLabsSpeechModel[] => {
+    if (englishOnlyVoices.has(voiceId)) return ["eleven_flash_v2"];
+    const config = options.persona;
+    const chain =
+      config === undefined
+        ? modelsFor(options.model ?? DEFAULT_MODEL)
+        : personaModelsFor(config.model);
+    const peak =
+      config?.expressivePeaks === true && expressivePeak(cues)
+        ? (["eleven_v3_conversational"] as const)
+        : [];
+    const available = [...new Set([...peak, ...chain])].filter(
+      (model) => (unavailableUntil.get(model) ?? 0) <= now(),
+    );
+    // Every model refused lately: try the configured chain anyway rather
+    // than say nothing.
+    return available.length > 0 ? available : chain;
+  };
 
   return {
     stream: async ({ voice, text, outputFormat, signal, session, voiceId }) => {
@@ -559,13 +749,34 @@ export function createElevenLabsSpeechRelay(
           ? undefined
           : options.timings?.speech(session, text.length);
 
+      // REHEARSE: the binding's persona voice (a spec, persona-voices), or
+      // Q's own voice when absent.
+      const persona =
+        voiceId === undefined ? undefined : parsePersonaVoiceSpec(voiceId);
+      let speakerId = persona?.voiceId;
+      // A voice gone from the catalog or the account speaks as a premade
+      // persona voice, never as Q.
+      if (
+        speakerId !== undefined &&
+        (missingVoices.has(speakerId) || !ALL_VOICE_IDS.has(speakerId))
+      ) {
+        speakerId = personaVoiceId(voice, speakerId);
+      }
       const resting = aura !== undefined && now() < restingUntil;
-      const engines = [
-        ...(resting ? [] : elevenLabsEngines),
+      const engines: Engine[] = [
+        ...(resting
+          ? []
+          : persona === undefined || speakerId === undefined
+            ? elevenLabsEngines
+            : personaModels(speakerId, cues).map((model) =>
+                engineFor(model, persona),
+              )),
         ...(aura === undefined ? [] : [aura]),
       ];
       let last: Attempt | undefined;
-      for (const [index, engine] of engines.entries()) {
+      for (let index = 0; index < engines.length; index += 1) {
+        const engine = engines[index];
+        if (engine === undefined) break;
         const speech = renderSpeech(text, cues, engine.markup);
         // Only a first choice with a same-vendor voice behind it is held to
         // the deadline. A last resort is waited for.
@@ -574,13 +785,10 @@ export function createElevenLabsSpeechRelay(
           (s) =>
             engine.request({
               voice,
-              voiceId,
+              voiceId: speakerId,
               format,
               text: speech.text,
-              speed: speech.speed,
-              ...(speech.stability === undefined
-                ? {}
-                : { stability: speech.stability }),
+              speech,
               signal: s,
             }),
           signal,
@@ -600,17 +808,39 @@ export function createElevenLabsSpeechRelay(
           return resumed(attempt);
         }
         last = attempt;
-        if (engine.elevenLabs) {
-          const refusedKey = attempt.status === 401 || attempt.status === 403;
-          const lastElevenLabs = !nextIsElevenLabs;
-          if (lastElevenLabs) failuresRunning += 1;
-          if (
-            refusedKey ||
-            failuresRunning >= ELEVENLABS_FAILURES_BEFORE_REST
-          ) {
-            restingUntil = now() + ELEVENLABS_REST_MS;
-            failuresRunning = 0;
+        if (!engine.elevenLabs) continue;
+        // REHEARSE: a refusal about this voice or model, not an outage.
+        const kind =
+          persona === undefined || engine.name === "aura-2"
+            ? null
+            : refusalKind(attempt.status, attempt.detail);
+        if (kind === "ENGLISH_ONLY" && speakerId !== undefined) {
+          englishOnlyVoices.add(speakerId);
+          if (engine.name !== "eleven_flash_v2") {
+            engines.splice(index + 1, 0, engineFor("eleven_flash_v2", persona));
           }
+          continue;
+        }
+        if (kind === "VOICE_MISSING" && speakerId !== undefined) {
+          const missing = speakerId;
+          missingVoices.add(missing);
+          const premade = personaVoiceId(voice, missing);
+          if (premade !== missing) {
+            speakerId = premade;
+            engines.splice(index + 1, 0, engine);
+          }
+          continue;
+        }
+        if (kind === "MODEL_UNAVAILABLE" && engine.name !== "aura-2") {
+          unavailableUntil.set(engine.name, now() + MODEL_UNAVAILABLE_MS);
+          continue;
+        }
+        const refusedKey = attempt.status === 401 || attempt.status === 403;
+        const lastElevenLabs = !nextIsElevenLabs;
+        if (lastElevenLabs) failuresRunning += 1;
+        if (refusedKey || failuresRunning >= ELEVENLABS_FAILURES_BEFORE_REST) {
+          restingUntil = now() + ELEVENLABS_REST_MS;
+          failuresRunning = 0;
         }
       }
       // Nothing could voice it. The route tells the agent the audio did not

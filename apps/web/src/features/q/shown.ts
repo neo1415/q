@@ -550,3 +550,40 @@ export function shownRecently(
 ): readonly ShownItem[] {
   return items.slice(-SHOWN_RECENTLY_MAX).reverse();
 }
+
+// ------------------------------------------------------------ live --
+
+type LivePreviewOf = NonNullable<Extract<QTurn, { kind: "Q" }>["preview"]>;
+
+/**
+ * Artifacts live (owner 2026-10-20): what is put up while Q is still
+ * talking. The answer still arriving names subjects (the stream's
+ * preview); their cards go up as they are named, over whatever was there,
+ * unless every one of them is already on the stage (Q talking about the
+ * second card of the set on screen keeps the set, and its card is
+ * spotlit as before).
+ *
+ * Only the latest turn, only while it streams: a settled answer's blocks
+ * decide, through `stageOf`, and the preview is gone.
+ */
+export function livePreviewOf(
+  turns: readonly QTurn[],
+  shown: Pick<ShownItem, "blocks"> | null,
+): LivePreviewOf | null {
+  const latest = turns.at(-1);
+  if (latest?.kind !== "Q" || !latest.streaming) return null;
+  const preview = latest.preview;
+  if (preview === undefined || preview.subjects.length === 0) return null;
+  if (shown !== null) {
+    const there = subjectOf(shown);
+    const covered = preview.subjects.every((one) => {
+      const id = subjectId(one.subject);
+      return (
+        (id !== null && there.ids.has(id)) ||
+        there.names.includes(folded(one.name))
+      );
+    });
+    if (covered) return null;
+  }
+  return preview;
+}
