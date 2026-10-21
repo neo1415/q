@@ -5,7 +5,10 @@ import {
   COMPANIES_PATH,
   COMPANY_ASSUMPTIONS_SEGMENT,
   COMPANY_DATA_ROOM_OPEN_SEGMENT,
+  COMPANY_DATA_ROOM_PREVIEW_SEGMENT,
   COMPANY_DATA_ROOM_SEGMENT,
+  DataRoomPreviewDtoSchema,
+  DataRoomPreviewQuerySchema,
   COMPANY_DECK_OPEN_SEGMENT,
   COMPANY_DECK_SEGMENT,
   COMPANY_FOUNDER_SEGMENT,
@@ -76,10 +79,11 @@ export type CompanyMaterialRoutesDependencies = ActorContextDependencies & {
     | undefined;
   /** Founder documents (2026-10-08). Absent: those reads do not register. */
   readonly founderRequests?:
-    | Pick<
+    | (Pick<
         FounderRequestsService,
         "inbox" | "documentAccess" | "folderAccess" | "investorQuestions"
-      >
+      > &
+        Partial<Pick<FounderRequestsService, "dataRoomPreview">>)
     | undefined;
 };
 
@@ -245,6 +249,29 @@ export function registerCompanyMaterialRoutes(
         return FolderAccessDtoSchema.parse(access);
       },
     );
+    // ownroom-2: the room as one investor sees it, for its owner only.
+    const dataRoomPreview = requests.dataRoomPreview;
+    if (dataRoomPreview !== undefined) {
+      app.get(
+        `${base}${COMPANY_DATA_ROOM_PREVIEW_SEGMENT}`,
+        { onRequest: withContext },
+        async (request, reply) => {
+          const query = parseContract(
+            DataRoomPreviewQuerySchema,
+            request.query ?? {},
+            "The preview request is not valid.",
+          );
+          const preview = await dataRoomPreview(
+            getActorContext(request),
+            uuidParam(request, "companyId"),
+            query.relationship ?? null,
+          );
+          if (preview === null) throw new DocumentNotFoundError();
+          void reply.header("Cache-Control", "no-store");
+          return DataRoomPreviewDtoSchema.parse(preview);
+        },
+      );
+    }
   }
 
   const founderPerson = dependencies.founderPerson;

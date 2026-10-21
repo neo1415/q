@@ -11,6 +11,7 @@ import {
   type AccessHistoryEntry,
   type CorrelationId,
   type DataRoomLevel,
+  type DataRoomPreviewDto,
   type DocumentAccessDto,
   type DocumentAccessLevel,
   type DocumentRequestItem,
@@ -126,7 +127,8 @@ export type FounderRequestsDependencies = {
     | "requestCompany"
     | "insertDecision"
   >;
-  readonly dataRoom: Pick<DataRoomService, "setLevel" | "decide">;
+  readonly dataRoom: Pick<DataRoomService, "setLevel" | "decide"> &
+    Partial<Pick<DataRoomService, "preview">>;
   readonly diligenceRequests: Pick<
     DiligenceRequestRepository,
     "listForCompany" | "find" | "fulfil" | "decline"
@@ -952,6 +954,61 @@ export function createFounderRequestsService(
         investors: investors.filter((investor) => investor.documents > 0),
         candidates,
         awaitingConnection,
+      };
+    },
+
+    /**
+     * Design ownroom-2: the data room as one of this company's investor
+     * relationships sees it, or (null) as any investor not yet connected.
+     * The relationship must be the company's own; anything else is the same
+     * not-found. The projection is the data room's own, never a copy here.
+     */
+    dataRoomPreview: async (
+      actor: ActorContext,
+      companyId: string,
+      relationshipId: string | null,
+    ): Promise<DataRoomPreviewDto | null> => {
+      const preview = dependencies.dataRoom.preview;
+      if (preview === undefined) return null;
+      const company = await ownCompany(actor, companyId);
+      if (company === null) return null;
+      const relationships = await quietly(
+        dependencies.relationshipsOf(company.id),
+        [],
+      );
+      const chosen =
+        relationshipId === null
+          ? null
+          : (relationships.find((r) => r.relationshipId === relationshipId) ??
+            undefined);
+      if (chosen === undefined) return null;
+      const view = await preview(
+        actor,
+        company.id,
+        chosen === null
+          ? null
+          : {
+              relationshipId: chosen.relationshipId,
+              connection: chosen.connection,
+            },
+      );
+      if (view === null) return null;
+      return {
+        companyId: company.id,
+        as: {
+          relationshipId: chosen?.relationshipId ?? null,
+          investorOrganisationName: chosen?.investorOrganisationName ?? null,
+          connection: chosen?.connection ?? "NOT_CONNECTED",
+        },
+        view,
+        investors: relationships
+          .filter((r) => r.connection !== "NOT_CONNECTED")
+          .slice(0, 200)
+          .map((r) => ({
+            relationshipId: r.relationshipId,
+            investorOrganisationName: r.investorOrganisationName.slice(0, 200),
+            connection: r.connection,
+          })),
       };
     },
 
