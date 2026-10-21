@@ -381,15 +381,14 @@ export function QSessionProvider({
   useEffect(() => {
     shownConversation.current = conversationId;
   }, [conversationId]);
-  const [spokenPreview, setSpokenPreview] = useState<QArtifactPreview | null>(
+  const [roomPreview, setSpokenPreview] = useState<QArtifactPreview | null>(
     null,
   );
+  // Only while a line is open: the room is not read otherwise.
+  const spokenPreview = voice.active ? roomPreview : null;
   const onRoomPreview = useCallback((live: QRoomPreview) => {
     setSpokenPreview(live.preview);
   }, []);
-  useEffect(() => {
-    if (!voice.active) setSpokenPreview(null);
-  }, [voice.active]);
   const onRoom = useCallback(
     (entries: readonly QRoomEntry[]) => {
       // The answer has landed: its blocks decide what is shown.

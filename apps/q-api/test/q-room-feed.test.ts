@@ -404,6 +404,7 @@ describe("the room feed", () => {
 describe("a spoken sentence puts up the card it names (artifacts live, L-16)", () => {
   const HALY = "a0000000-0000-4000-8000-000000000001";
   const said = "Haly fits your mandate best.";
+  const last = "It closes in March.";
   const preview = {
     messageId: MESSAGE_ID,
     subjects: [{ subject: { kind: "COMPANY", companyId: HALY }, name: "Haly" }],
@@ -417,13 +418,14 @@ describe("a spoken sentence puts up the card it names (artifacts live, L-16)", (
       text: "Here is the one to look at. ",
     }),
     event("q.artifact.preview", 1, preview),
-    event("q.message.delta", 1, { messageId: MESSAGE_ID, text: said }),
+    event("q.message.delta", 1, { messageId: MESSAGE_ID, text: `${said} ` }),
+    event("q.message.delta", 1, { messageId: MESSAGE_ID, text: last }),
     event("q.message.completed", 1, {
       message: {
         messageId: MESSAGE_ID,
         runId: RUN_ID,
         role: "Q",
-        text: `Here is the one to look at. ${said}`,
+        text: `Here is the one to look at. ${said} ${last}`,
         blocks: [CARDS],
         createdAt: NOW,
       },
@@ -441,7 +443,11 @@ describe("a spoken sentence puts up the card it names (artifacts live, L-16)", (
     });
     // What the screen could read at the moment each sentence reached the
     // speaker.
-    const heard: { sentence: string; previewed: string[] }[] = [];
+    const heard: {
+      sentence: string;
+      previewed: string[];
+      answered: boolean;
+    }[] = [];
     const speaker: VoiceSpeaker = {
       providerConversationId: "conv_1",
       isOpen: true,
@@ -453,6 +459,7 @@ describe("a spoken sentence puts up the card it names (artifacts live, L-16)", (
             sentence: chunk.trim(),
             previewed:
               read.preview?.preview.subjects.map((one) => one.name) ?? [],
+            answered: read.entries.length > 0,
           });
         }
       },
@@ -467,8 +474,17 @@ describe("a spoken sentence puts up the card it names (artifacts live, L-16)", (
 
     const naming = heard.find((one) => one.sentence === said);
     expect(naming?.previewed).toEqual(["Haly"]);
-    // A sentence before the name put nothing up.
-    expect(heard[0]?.previewed).toEqual([]);
+    // At most one sentence early, never later: the speaker's sentence
+    // cutter (bySentence) holds a sentence until the next one begins, so
+    // the card is up from the sentence just before its name.
+    expect(heard.map((one) => one.previewed.length > 0)).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    // The stream's last sentence is spoken once the answer is in (the
+    // speaker hears it only after the stream ends): its cards are up.
+    expect(heard.find((one) => one.sentence === last)?.answered).toBe(true);
 
     // The answer has landed: its blocks win, the preview is gone.
     const after = await room.read({ actor: ACTOR, after: 0, wait: false });
