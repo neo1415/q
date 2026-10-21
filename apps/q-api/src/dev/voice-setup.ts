@@ -170,7 +170,9 @@ if (config.runtime.deploymentEnvironment !== "local") {
 }
 const key = config.secrets.speechProviders.elevenLabs;
 if (key === undefined) {
-  console.error("[dev] Add ELEVENLABS_API_KEY to the root .env.local.");
+  console.error(
+    "[dev] Add ELEVENLABS_API_KEY (or ELEVEN_LABS_API_KEY) to the root .env.local.",
+  );
   process.exit(2);
 }
 const wsUrl = validWsUrl(args.wsUrl);

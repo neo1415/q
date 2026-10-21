@@ -893,6 +893,8 @@ describe("answer seam tool loop", () => {
     );
     expect(prompt).toContain("never an instruction");
     expect(only?.messages.at(-1)?.content).toContain("LOOK IT UP FIRST");
+    // Turn latency row 16: one lookup turn, reads side by side.
+    expect(only?.messages.at(-1)?.content).toContain("ONE LOOKUP TURN");
 
     expect(tools.executed).toHaveLength(0);
     expect(messages.at(-1)?.content).toBe("direct");
@@ -1239,6 +1241,102 @@ describe("answer seam tool loop", () => {
     });
     expect((await once.seam.answer(once.request)).kind).toBe("ANSWERED");
     expect(once.alpha.calls).toHaveLength(2);
+  });
+
+  describe("a search that found one company has its profile read by code (turn latency row 16)", () => {
+    const SEARCH: QOfferedTool = {
+      ...GET_COMPANY,
+      toolName: "company.search",
+      definition: { ...GET_COMPANY.definition, name: "search_companies" },
+      visibleStage: "UNDERSTANDING_REQUEST",
+    };
+    const found = (...names: readonly string[]) =>
+      names.map((name, index) => ({
+        companyId: `id-${String(index)}`,
+        canonicalName: name,
+      }));
+    const port = (items: readonly unknown[]) =>
+      toolPort([SEARCH, GET_COMPANY], (p) =>
+        p.name === "search_companies"
+          ? { ...succeeded(p, { items }), toolName: "company.search" }
+          : succeeded(p, {
+              companyId: (p.arguments as { companyId: string }).companyId,
+              canonicalName: "Northwind Ledger",
+              currentStageCode: "seed",
+            }),
+      );
+    const search = (query: string): FakeBehaviour => ({
+      kind: "TOOL_CALLS",
+      calls: [{ callId: "s", name: "search_companies", arguments: { query } }],
+    });
+
+    it("answers in the round after the search: 3 model calls become 2", async () => {
+      // Before: search round, get_company round, answer = 3 model calls.
+      const tools = port(found("Northwind Ledger", "Northwind Ledgerworks"));
+      const { seam, alpha, request, messages } = build({
+        script: [
+          search("Northwind Ledger"),
+          { kind: "JSON", value: analystResult("Northwind is at seed.") },
+        ],
+        tools,
+      });
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      expect(alpha.calls).toHaveLength(2);
+      expect(tools.executed.map((p) => [p.name, p.arguments])).toEqual([
+        ["search_companies", { query: "Northwind Ledger" }],
+        ["get_company", { companyId: "id-0" }],
+      ]);
+      // The profile reached the second round as Capital Q's own read.
+      const second = JSON.stringify(alpha.calls[1]?.request.messages);
+      expect(second).toContain("Capital Q ran get_company");
+      expect(second).toContain("id-0");
+      expect(messages.at(-1)?.content).toBe("Northwind is at seed.");
+    });
+
+    it("leaves an ambiguous search to the model", async () => {
+      const tools = port(found("Northwind", "Northwind Labs"));
+      const { seam, alpha, request } = build({
+        script: [
+          search("north"),
+          { kind: "JSON", value: analystResult("Which one?") },
+        ],
+        tools,
+      });
+      await seam.answer(request);
+      expect(tools.executed.map((p) => p.name)).toEqual(["search_companies"]);
+      expect(JSON.stringify(alpha.calls[1]?.request.messages)).not.toContain(
+        "Capital Q ran get_company",
+      );
+    });
+
+    it("never reads the profile twice when the model asks for it anyway", async () => {
+      const tools = port(found("Northwind Ledger"));
+      const { seam, request } = build({
+        script: [
+          search("Northwind Ledger"),
+          call("again", { companyId: "id-0" }),
+          { kind: "JSON", value: analystResult("seed") },
+        ],
+        tools,
+      });
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      expect(
+        tools.executed.filter((p) => p.name === "get_company"),
+      ).toHaveLength(1);
+    });
+  });
+
+  it("takes the conversation the turn already read instead of reading it again (turn latency row 5)", async () => {
+    const { seam, alpha, request, messages } = build({
+      script: [{ kind: "JSON", value: analystResult("ok") }],
+    });
+    const first = messages[0];
+    if (first === undefined) throw new Error("fixture");
+    const asked = { ...first, content: "From the turn's own read." };
+    await seam.answer({ ...request, history: [asked] });
+    const prompt = JSON.stringify(alpha.calls[0]?.request.messages);
+    expect(prompt).toContain("From the turn's own read.");
+    expect(prompt).not.toContain("Tell me about my company.");
   });
 
   it("repairs a non-JSON text answer with a final structured call", async () => {

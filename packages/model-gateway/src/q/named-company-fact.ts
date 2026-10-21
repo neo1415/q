@@ -103,12 +103,15 @@ export function companyFactAskOf(text: string): CompanyFactAsk | null {
 const SEARCH_TOOL = "search_companies";
 const GET_TOOL = "get_company";
 
-const nameKey = (name: string): string =>
+export const nameKey = (name: string): string =>
   name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
 
 type Found = { readonly companyId: string; readonly canonicalName: string };
 
-function itemsOf(outcome: QToolCallOutcome | null): readonly Found[] | null {
+/** A `search_companies` outcome's items; null when not one. */
+export function itemsOf(
+  outcome: QToolCallOutcome | null,
+): readonly Found[] | null {
   if (outcome === null || !outcome.result.ok) return null;
   const data: unknown = outcome.result.data;
   if (typeof data !== "object" || data === null) return null;

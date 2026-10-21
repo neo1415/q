@@ -25,6 +25,40 @@ export const SPEECH_PROVIDER_ENV_NAMES = [
   "DEEPGRAM_API_KEY",
 ] as const;
 
+/**
+ * The other spelling of the ElevenLabs key. Some environments (the founder's
+ * `.env.local`, possibly Railway) carry `ELEVEN_LABS_API_KEY`; the owner
+ * decided both are accepted, the canonical name winning when both are set,
+ * so a disabled test value under the canonical name can never be overridden
+ * by a real key under the alias.
+ */
+export const ELEVENLABS_API_KEY_ALIAS = "ELEVEN_LABS_API_KEY";
+
+/**
+ * The one place the ElevenLabs key's name is resolved. Empty or blank
+ * values count as unset, so an empty canonical variable falls through to
+ * the alias rather than switching voice off.
+ */
+export function resolveElevenLabsApiKey(
+  env: Readonly<Record<string, string | undefined>>,
+): string | undefined {
+  for (const name of ["ELEVENLABS_API_KEY", ELEVENLABS_API_KEY_ALIAS]) {
+    const value = env[name];
+    if (value !== undefined && value.trim().length > 0) return value;
+  }
+  return undefined;
+}
+
+/** `env` with the ElevenLabs key under its canonical name, alias resolved. */
+export function withElevenLabsApiKey<
+  T extends Readonly<Record<string, string | undefined>>,
+>(env: T): T {
+  const key = resolveElevenLabsApiKey(env);
+  return key === undefined || key === env.ELEVENLABS_API_KEY
+    ? env
+    : { ...env, ELEVENLABS_API_KEY: key };
+}
+
 export const VOICE_PROVIDER_CODES = ["deepgram", "elevenlabs"] as const;
 export type VoiceProviderCode = (typeof VOICE_PROVIDER_CODES)[number];
 

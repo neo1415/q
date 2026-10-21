@@ -22,6 +22,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveElevenLabsApiKey } from "@capital-q/config/q-api";
+
 import type { CatalogVoice } from "../voice/persona-voices/catalog.js";
 
 const OUT = resolve(
@@ -144,14 +146,14 @@ async function main(): Promise<void> {
         : (args[sourceIndex + 1] ?? "exported catalog");
     source = `${label}, ${new Date().toISOString().slice(0, 10)}`;
   } else {
-    const apiKey = process.env.ELEVENLABS_API_KEY;
+    const apiKey = resolveElevenLabsApiKey(process.env);
     if (
       apiKey === undefined ||
       apiKey.length === 0 ||
       apiKey.startsWith("disabled")
     ) {
       throw new Error(
-        "ELEVENLABS_API_KEY is not set (or is a disabled test value)",
+        "ELEVENLABS_API_KEY (or ELEVEN_LABS_API_KEY) is not set (or is a disabled test value)",
       );
     }
     raws = await fromApi(apiKey);
