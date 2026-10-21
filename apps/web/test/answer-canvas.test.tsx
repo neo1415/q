@@ -424,9 +424,12 @@ describe("the Board's timeline (C7)", () => {
     });
     expect(entries[1]?.kind).toBe("Research, 3 parts");
     expect(entries[0]?.sources[0]?.title).toBe("2 records on Capital Q");
-    expect(groupByDay(entries, new Date("2026-10-05T23:00:00Z"))[0]?.day).toBe(
-      "Today",
-    );
+    // "Now" a minute after the entry: the same local day in any time zone
+    // (23:00Z was the next day east of UTC).
+    expect(
+      groupByDay(entries, new Date(Date.parse("2026-10-05T21:05:00.000Z")))[0]
+        ?.day,
+    ).toBe("Today");
   });
 });
 

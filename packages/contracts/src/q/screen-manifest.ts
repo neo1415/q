@@ -194,6 +194,8 @@ export const Q_MANIFEST_DRAWN_KINDS = [
   "TIMELINE",
   "ARTIFACT_REFERENCE",
   "CLARIFICATION_REQUEST",
+  // Artifacts live (L-14).
+  "SUMMARY",
 ] as const;
 export const QManifestDrawnKindSchema = z.enum(Q_MANIFEST_DRAWN_KINDS);
 export type QManifestDrawnKind = z.infer<typeof QManifestDrawnKindSchema>;

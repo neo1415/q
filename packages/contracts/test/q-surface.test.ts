@@ -385,6 +385,7 @@ describe("type-level guarantees", () => {
         case "CHART":
         case "MAP":
         case "TIMELINE":
+        case "SUMMARY":
           return block.title;
         case "ATTENTION":
           return block.report.readAt;

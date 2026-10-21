@@ -117,7 +117,7 @@ describe("QVisibleStage", () => {
       "Reading their deck and documents",
     );
     expect(qVisibleStageLabel("SEARCHING_PUBLIC_SOURCES")).toBe(
-      "Checking the web",
+      "Looking into it",
     );
     expect(qVisibleStageLabel("WAITING_FOR_APPROVAL")).toBe(
       "Waiting for your approval",

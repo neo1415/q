@@ -4575,6 +4575,33 @@ export function createModelGatewayQAnswer(
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         const personStarted = Date.now();
+        // Artifacts live (L-15): the identity's card frame goes up as soon
+        // as the name is known, while the public lookup runs (seconds),
+        // with initials until the card lands. Only a name in the person's
+        // own words, never one a model wrote.
+        const askedName = request.personSearch.name.trim().slice(0, 80);
+        if (
+          askedName.length > 0 &&
+          containsCompanyName(latest.content, askedName)
+        ) {
+          const ahead = announcer.ahead({
+            subject: null,
+            name: askedName,
+            kind:
+              request.personSearch.entityKind === "PERSON"
+                ? "PERSON"
+                : "ORGANISATION",
+          });
+          if (ahead !== null) {
+            send({
+              runId: request.runId,
+              tenantId: request.tenantId,
+              messageId,
+              text: "",
+              preview: ahead,
+            });
+          }
+        }
         const found = await personFor(request.personSearch);
         if (found !== null) {
           for (const source of found.sources) {
@@ -6168,6 +6195,7 @@ export function createModelGatewayQAnswer(
             : [];
         const modelBlocks = analystResultBlocks({
           result: withConversationFindings(analyst),
+          question: latest.content,
           // Screen focus is not the target of a question naming another
           // company. Its reference must come from an exact name and a
           // successful authorised profile read, never a model-written id.

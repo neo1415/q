@@ -246,7 +246,7 @@ export function describeQStage(stage: QVisibleStage | null): string | null {
     case "CHECKING_EVIDENCE":
       return "Reading their deck and documents";
     case "SEARCHING_PUBLIC_SOURCES":
-      return "Checking the web";
+      return "Looking into it";
     case "REVIEWING_INVESTOR_CRITERIA":
       return "Reading the investor's mandate";
     case "COMPARING_OPPORTUNITIES":

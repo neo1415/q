@@ -124,6 +124,13 @@ export type VoiceSessionEvents = {
   readonly onLine?: ((line: VoiceTranscriptLine) => void) | undefined;
   /** Q was interrupted by the person (D §46 INTERRUPTED). */
   readonly onInterrupted?: (() => void) | undefined;
+  /**
+   * Artifacts live (owner 2026-10-20): the "where I am" line Q is saying
+   * while it works (a silence-ladder stage line, composed by code from
+   * the run's real stage), so the screen shows what is heard. Never a
+   * line of the conversation.
+   */
+  readonly onWorking?: ((line: string) => void) | undefined;
   /** The session ended, cleanly or not. */
   readonly onEnded?:
     ((reason: "ended" | "error" | "dropped") => void) | undefined;

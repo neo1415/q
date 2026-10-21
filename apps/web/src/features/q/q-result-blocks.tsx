@@ -27,6 +27,7 @@ import {
 import { roomCardHref } from "./room/room-card-view";
 import type { QTurnObjectBlock } from "./conversation";
 import { AttentionBody } from "./blocks/attention-block";
+import { SummaryBody } from "./blocks/summary-block";
 import {
   ChartBody,
   MapBody,
@@ -500,6 +501,13 @@ export function QResultBlocks({
             return (
               <QResultCard key={key} label={t("Timeline")} title={block.title}>
                 <TimelineBody block={block} />
+              </QResultCard>
+            );
+          case "SUMMARY":
+            // Artifacts live (L-14): the summary Q speaks over.
+            return (
+              <QResultCard key={key} label={t("Summary")}>
+                <SummaryBody block={block} />
               </QResultCard>
             );
 

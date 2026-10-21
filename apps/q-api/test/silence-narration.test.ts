@@ -200,3 +200,44 @@ describe("the silence ladder on a voice turn (ADR 0062)", () => {
     ).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("only the 'where I am' lines while Q works (owner 2026-10-20)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("says stage and progress lines, never a hum or a thread", async () => {
+    const answer = slowAnswer(["Ready."]);
+    const heard: string[] = [];
+    const done = collect(
+      withSilenceLadder(answer.source, {
+        live: { stage: "CHECKING_EVIDENCE", approvalWaiting: false },
+        focus: () => Promise.resolve({ name: "Baridi", thing: "deck" }),
+        thread: () =>
+          Promise.resolve({
+            memoryItemId: "11111111-1111-4111-8111-111111111111",
+            followUp: "how was the trip?",
+          }),
+        only: new Set(["STAGE_LINE", "PROGRESS_LINE"]),
+        seed: 3,
+        now: () => Date.now(),
+      }),
+      heard,
+    );
+    await vi.advanceTimersByTimeAsync(30_000);
+    answer.release();
+    await vi.advanceTimersByTimeAsync(20);
+    await done;
+    expect(heard.at(-1)).toBe("Ready.");
+    const working = heard.slice(0, -1);
+    expect(working.length).toBeGreaterThan(0);
+    expect(working[0]).toMatch(/Baridi's deck/u);
+    for (const line of working) {
+      expect(line).not.toMatch(/^(?:m+|hm+)/iu);
+      expect(line).not.toMatch(/trip/u);
+    }
+  });
+});

@@ -175,8 +175,12 @@ function harness(
           ),
         }),
   };
+  const working: string[] = [];
   const events = {
     onState: vi.fn<DuplexLineEvents["onState"]>(),
+    onWorking: (text: string) => {
+      working.push(text);
+    },
     onLine: vi.fn<DuplexLineEvents["onLine"]>(),
     onInterrupted: vi.fn<DuplexLineEvents["onInterrupted"]>(),
     onFallback: vi.fn<DuplexLineEvents["onFallback"]>(),
@@ -195,7 +199,17 @@ function harness(
     if (peer.channel === null) throw new Error("no channel");
     return peer.channel;
   };
-  return { line, peer, channel, audio, track, relays, events, fetchCalls };
+  return {
+    line,
+    peer,
+    channel,
+    audio,
+    track,
+    relays,
+    events,
+    fetchCalls,
+    working,
+  };
 }
 
 /** Let promise chains (the relay, the answer) settle. */
@@ -413,10 +427,10 @@ describe("tool calls and usage", () => {
     });
   });
 
-  it("never polls or voices the silence ladder while ask_q works (founder 2026-10-09)", async () => {
+  it("says where it is once while ask_q works, shows it, and never after the answer (owner 2026-10-20)", async () => {
     let finish: () => void = () => undefined;
-    // A relay with beats ready: none of them may be said, however long Q
-    // works (no stage lines, no tones, no hums).
+    // A relay with beats ready: the stage line is said (once) and shown;
+    // a tone is never voiced.
     const narration = vi.fn<NonNullable<DuplexRelays["narration"]>>(() =>
       Promise.resolve({
         beats: [
@@ -450,20 +464,33 @@ describe("tool calls and usage", () => {
     });
     await vi.advanceTimersByTimeAsync(20_000);
     await settle();
-    expect(SPOKEN_WHILE_WORKING).toBe(false);
-    expect(narration).not.toHaveBeenCalled();
-    expect(h.channel().types()).not.toContain("response.create");
+    expect(SPOKEN_WHILE_WORKING).toBe(true);
+    expect(narration).toHaveBeenCalled();
+    const bridgesNow = h
+      .channel()
+      .sent.filter((event) => JSON.stringify(event).includes("Looking at the deck"));
+    // One bridge for the turn, with the stage line's exact words.
+    expect(bridgesNow).toHaveLength(1);
+    expect(h.working).toEqual(["Looking at the deck…"]);
     finish();
     await settle();
-    const creates = h
+    const answers = h
       .channel()
       .sent.filter(
-        (event) => (event as { type?: string }).type === "response.create",
+        (event) =>
+          (event as { type?: string }).type === "response.create" &&
+          JSON.stringify(event).includes("Say this to the person"),
       );
-    expect(creates).toHaveLength(1);
-    expect(JSON.stringify(creates[0])).toContain("Say this to the person");
-    expect(JSON.stringify(creates[0])).not.toContain("Looking at the deck");
-    expect(narration).not.toHaveBeenCalled();
+    expect(answers).toHaveLength(1);
+    expect(JSON.stringify(answers[0])).not.toContain("Looking at the deck");
+    // Nothing more is said about the work once the answer is in.
+    expect(
+      h
+        .channel()
+        .sent.filter((event) =>
+          JSON.stringify(event).includes("Looking at the deck"),
+        ),
+    ).toHaveLength(1);
   });
 
   it("does not speak a tool result the person talked over", async () => {

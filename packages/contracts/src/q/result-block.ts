@@ -62,6 +62,8 @@ export const Q_RESULT_BLOCK_KINDS = [
   "TIMELINE",
   // RECOVERY-2026-10 (G-R4): what needs the person, item by item.
   "ATTENTION",
+  // Artifacts live (owner 2026-10-20): a summary Q speaks over.
+  "SUMMARY",
 ] as const;
 
 export type QResultBlockKind = (typeof Q_RESULT_BLOCK_KINDS)[number];
@@ -473,6 +475,36 @@ export const QAttentionBlockSchema = z
   .object({ kind: z.literal("ATTENTION"), report: QAttentionReportSchema })
   .strict();
 
+/**
+ * Artifacts live (owner 2026-10-20): the answer's key points as one object
+ * on screen, which Q speaks over (each point lights as Q says it). Built by
+ * code from the answer's own findings, each keeping its truth class and
+ * evidence status, so an inference never reads as a fact; what is missing
+ * is listed as missing, never filled in.
+ */
+export const Q_SUMMARY_POINTS_MAX = 6;
+export const QSummaryBlockSchema = z
+  .object({
+    kind: z.literal("SUMMARY"),
+    title: z.string().trim().min(1).max(120),
+    points: z
+      .array(
+        z
+          .object({
+            text: z.string().trim().min(1).max(300),
+            truthClass: TruthClassSchema,
+            evidenceStatus: EvidenceStatusSchema,
+          })
+          .strict(),
+      )
+      .min(2)
+      .max(Q_SUMMARY_POINTS_MAX),
+    /** What would settle it: evidence not on file. Empty: nothing listed. */
+    missing: z.array(z.string().trim().min(1).max(200)).max(3),
+  })
+  .strict();
+export type QSummaryBlock = z.infer<typeof QSummaryBlockSchema>;
+
 export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QTextBlockSchema,
   QCompanyReferenceBlockSchema,
@@ -493,6 +525,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QMapBlockSchema,
   QTimelineBlockSchema,
   QAttentionBlockSchema,
+  QSummaryBlockSchema,
 ]);
 
 export type QResultBlock = z.infer<typeof QResultBlockSchema>;

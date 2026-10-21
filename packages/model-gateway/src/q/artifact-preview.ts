@@ -66,7 +66,35 @@ function candidatesOf(read: RunRead): readonly Candidate[] {
       },
     });
   }
+  // Researched people and organisations (W2): no record, so no subject;
+  // their attached image (licensed, credited) when the record has one.
+  for (const external of read.externals.values()) {
+    out.push({
+      id: `external:${external.externalPersonId}`,
+      name: external.name,
+      subject: null,
+      kind: external.kind,
+      ...(external.image === null ? {} : { image: external.image }),
+    });
+  }
   return out.filter((one) => one.name.trim().length > 0);
+}
+
+/** One key per subject, for "named before". */
+export function previewKeyOf(one: QArtifactPreviewSubject): string {
+  const subject = one.subject;
+  if (subject?.kind === "COMPANY") return subject.companyId;
+  if (subject?.kind === "INVESTOR_ORGANISATION") {
+    return subject.investorOrganisationId;
+  }
+  return `${one.kind ?? "SUBJECT"}:${one.name.toLowerCase()}`;
+}
+
+/** The person asked for a summary (L-14): the answer is laid out as one. */
+export function asksForSummary(question: string): boolean {
+  return /\b(summar(?:y|ise|ize|ising|izing)|sum (?:it|this|that|them|everything)? ?up|recap|overview|tl;?dr|key points|main points|in short|bottom line|brief me)\b/iu.test(
+    question,
+  );
 }
 
 /** What the person asked for, as the shape the answer will take. */
@@ -74,6 +102,7 @@ export function previewLayoutFor(
   question: string,
   named: number,
 ): QArtifactPreviewLayout | null {
+  if (asksForSummary(question)) return "SUMMARY";
   if (
     /\b(compare|comparison|versus|vs\.?|side[ -]by[ -]side|table|tabulate|line (?:them|those) up)\b/iu.test(
       question,
@@ -99,7 +128,15 @@ export function subjectsNamedIn(
     .map((one) => ({ one, at: firstAt(text, one.name) }))
     .filter((hit) => hit.at >= 0)
     .sort((a, b) => a.at - b.at)
-    .map(({ one }) => ({ subject: one.subject, name: one.name }));
+    .map(({ one }) => {
+      const subject: QArtifactPreviewSubject = {
+        subject: one.subject,
+        name: one.name,
+        ...(one.kind === undefined ? {} : { kind: one.kind }),
+        ...(one.image === undefined ? {} : { image: one.image }),
+      };
+      return subject;
+    });
 }
 
 export type SubjectAnnouncer = {
@@ -109,6 +146,14 @@ export type SubjectAnnouncer = {
    */
   readonly sentence: (
     sentence: string,
+  ) => Pick<QArtifactPreview, "subjects" | "layout"> | null;
+  /**
+   * A subject named before Q has said anything, by code (a researched
+   * identity the person asked about, while the lookup runs). Null when it
+   * was already named.
+   */
+  readonly ahead: (
+    one: QArtifactPreviewSubject,
   ) => Pick<QArtifactPreview, "subjects" | "layout"> | null;
 };
 
@@ -120,12 +165,6 @@ export function createSubjectAnnouncer(input: {
 }): SubjectAnnouncer {
   const named: QArtifactPreviewSubject[] = [];
   const seen = new Set<string>();
-  const idOf = (subject: QArtifactPreviewSubject["subject"]): string =>
-    subject.kind === "COMPANY"
-      ? subject.companyId
-      : subject.kind === "INVESTOR_ORGANISATION"
-        ? subject.investorOrganisationId
-        : "";
   let seeded = false;
   return {
     sentence: (sentence) => {
@@ -136,10 +175,13 @@ export function createSubjectAnnouncer(input: {
       // frame is there before Q reaches the second name.
       if (!seeded) {
         seeded = true;
+        // A summary the person asked for: its frame goes up with Q's first
+        // words, before it has named anything.
+        if (asksForSummary(input.question)) fresh = true;
         const asked = subjectsNamedIn(input.question, read);
         if (previewLayoutFor(input.question, asked.length) === "TABLE") {
           for (const one of asked) {
-            const id = idOf(one.subject);
+            const id = previewKeyOf(one);
             if (seen.has(id)) continue;
             seen.add(id);
             named.push(one);
@@ -149,17 +191,27 @@ export function createSubjectAnnouncer(input: {
       }
       for (const one of subjectsNamedIn(sentence, read)) {
         if (named.length >= Q_ARTIFACT_PREVIEW_SUBJECTS_MAX) break;
-        const id = idOf(one.subject);
+        const id = previewKeyOf(one);
         if (seen.has(id)) continue;
         seen.add(id);
         named.push(one);
         fresh = true;
       }
-      if (!fresh || named.length === 0) return null;
+      if (!fresh) return null;
+      if (named.length === 0 && !asksForSummary(input.question)) return null;
       return {
         subjects: [...named],
         layout: previewLayoutFor(input.question, named.length),
       };
+    },
+    ahead: (one) => {
+      const id = previewKeyOf(one);
+      if (seen.has(id) || named.length >= Q_ARTIFACT_PREVIEW_SUBJECTS_MAX) {
+        return null;
+      }
+      seen.add(id);
+      named.push(one);
+      return { subjects: [...named], layout: "CARD" };
     },
   };
 }

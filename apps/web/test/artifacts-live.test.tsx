@@ -294,3 +294,129 @@ describe("one presentation controller (audit 2026-10-15 §4)", () => {
     expect(store.cardsState().keys).toContain("chip:a1");
   });
 });
+
+describe("artifacts live, round 2", () => {
+  it("lights the summary point Q is saying, and labels what is not a verified fact", async () => {
+    const { SummaryBody } = await import(
+      "../src/features/q/blocks/summary-block"
+    );
+    const { announceQSaid } = await import("../src/features/q-swarm/q-said");
+    vi.useFakeTimers();
+    try {
+      const { container } = render(
+        <SummaryBody
+          block={{
+            kind: "SUMMARY",
+            title: "Summary",
+            points: [
+              {
+                text: "Revenue is thirty eight thousand pounds a month.",
+                truthClass: "USER_CLAIM",
+                evidenceStatus: "DOCUMENT_SUPPORTED",
+              },
+              {
+                text: "The round should close before the new year.",
+                truthClass: "Q_INFERENCE",
+                evidenceStatus: "NO_EVIDENCE",
+              },
+            ],
+            missing: ["Audited accounts"],
+          }}
+        />,
+      );
+      expect(container.textContent).toContain("Their claim");
+      expect(container.textContent).toContain("Q's inference");
+      expect(container.textContent).toContain("Audited accounts");
+      act(() => {
+        announceQSaid("The round should close before the new year.");
+      });
+      act(() => {
+        vi.advanceTimersByTime(10);
+      });
+      const current = container.querySelector("[data-q-summary-current]");
+      expect(current?.getAttribute("data-q-summary-point")).toBe("1");
+      expect(current?.getAttribute("aria-current")).toBe("true");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("puts a summary frame up before anything is named", () => {
+    const { container } = render(
+      <LivePreview
+        preview={{
+          messageId: QMessageIdSchema.parse(MSG),
+          subjects: [],
+          layout: "SUMMARY",
+        }}
+      />,
+    );
+    expect(container.querySelector("[data-q-preview-summary]")).not.toBeNull();
+  });
+
+  it("shows a researched identity by name with its credited image, or initials", () => {
+    const { container } = render(
+      <LivePreview
+        preview={{
+          messageId: QMessageIdSchema.parse(MSG),
+          subjects: [
+            {
+              subject: null,
+              name: "Shadi Qishta",
+              kind: "PERSON",
+              image: {
+                url: "https://images.example/shadi.jpg",
+                attribution: "Example News",
+              },
+            },
+            { subject: null, name: "Halima Bello", kind: "PERSON" },
+          ],
+          layout: "CARDS",
+        }}
+      />,
+    );
+    const imgs = [...container.querySelectorAll("img")].map((one) =>
+      one.getAttribute("src"),
+    );
+    expect(imgs).toEqual(["https://images.example/shadi.jpg"]);
+    expect(container.textContent).toContain("Photo: Example News");
+    // No image: initials, never a broken picture.
+    expect(container.textContent).toContain("HB");
+  });
+
+  it("opens the live turn for a card that goes up before Q's first word", () => {
+    const event = (type: string, data: unknown, sequence: number) =>
+      ({
+        contractVersion: 1,
+        eventId: `0000000${String(sequence)}-0000-4000-8000-000000000000`,
+        runId: RUN,
+        sequence,
+        occurredAt: "2026-10-20T10:00:00.000Z",
+        type,
+        data,
+      }) as never;
+    let state = createQStreamState();
+    state = reduceQStream(
+      state,
+      event("q.run.started", { capability: "ANSWER", status: "RUNNING" }, 1),
+    );
+    state = reduceQStream(
+      state,
+      event(
+        "q.artifact.preview",
+        {
+          messageId: MSG,
+          subjects: [{ subject: null, name: "Shadi Qishta", kind: "PERSON" }],
+          layout: "CARD",
+        },
+        1,
+      ),
+    );
+    const live = turnsFrom(state, []).at(-1);
+    expect(live?.kind).toBe("Q");
+    expect(live?.kind === "Q" ? live.streaming : false).toBe(true);
+    expect(live?.kind === "Q" ? live.preview?.subjects[0]?.name : null).toBe(
+      "Shadi Qishta",
+    );
+  });
+});

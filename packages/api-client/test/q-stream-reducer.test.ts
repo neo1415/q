@@ -204,12 +204,12 @@ describe("reduceQStream", () => {
       "Q is waiting for your approval.",
     );
     // Owner 2026-10-20: Q says where it is ("reading their deck",
-    // "checking the web", "comparing the two").
+    // "comparing the two"); web research stays neutral (R38).
     expect(describeQStage("REVIEWING_COMPANY")).toBe("Looking at the company");
     expect(describeQStage("CHECKING_EVIDENCE")).toBe(
       "Reading their deck and documents",
     );
-    expect(describeQStage("SEARCHING_PUBLIC_SOURCES")).toBe("Checking the web");
+    expect(describeQStage("SEARCHING_PUBLIC_SOURCES")).toBe("Looking into it");
     expect(describeQStage("COMPARING_OPPORTUNITIES")).toBe(
       "Comparing them side by side",
     );

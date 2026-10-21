@@ -1,9 +1,13 @@
 import { answerCardsBlock, type ModelAnswerCardsLike } from "./answer-cards.js";
 import { randomUUID } from "node:crypto";
 
+import { asksForSummary } from "./artifact-preview.js";
 import { RunRead, type ReadInvestor } from "./card-subjects.js";
 import {
+  EvidenceStatusSchema,
+  Q_SUMMARY_POINTS_MAX,
   QFindingIdSchema,
+  TruthClassSchema,
   chartableSeries,
   parseQResultBlocks,
   type QResultBlockDrop,
@@ -373,6 +377,8 @@ export function analystResultBlocks(input: {
     ((dropped: readonly QResultBlockDrop[]) => void) | undefined;
   /** Overridable so a test can pin the ids it asserts on. */
   readonly findingId?: ((index: number) => string) | undefined;
+  /** The person's question: a summary asked for is laid out as one (L-14). */
+  readonly question?: string | undefined;
 }): QResultBlock[] | undefined {
   const idFor = input.findingId ?? (() => randomUUID());
   const blocks: QResultBlock[] = [];
@@ -470,6 +476,15 @@ export function analystResultBlocks(input: {
   }
 
   blocks.push(...subjectBlocks(input.subjects));
+
+  // L-14: the summary the person asked for, from the answer's findings.
+  if (input.question !== undefined) {
+    const summary = summaryBlock({
+      result: input.result,
+      question: input.question,
+    });
+    if (summary !== null) blocks.push(summary);
+  }
 
   // E4: what the model asked to be laid out, built only from this run's
   // own reads (never its words). Nothing read, nothing drawn.
@@ -574,6 +589,50 @@ export function investorsTableBlock(
       },
     })),
     rows,
+  };
+}
+
+/**
+ * Artifacts live (L-14): the summary the person asked for, as one object
+ * Q speaks over. Its points are the answer's own findings, in order, each
+ * keeping its truth class and evidence status (an inference stays labelled
+ * as one); what is missing is listed as missing. Fewer than two findings:
+ * no summary, the words say it.
+ */
+export function summaryBlock(input: {
+  readonly result: AnalystResultLike;
+  readonly question: string;
+}): QResultBlock | null {
+  if (!asksForSummary(input.question)) return null;
+  const points = (input.result.findings ?? [])
+    .map((finding) => ({
+      text: finding.statement.trim().slice(0, 300),
+      truthClass: TruthClassSchema.safeParse(finding.truthClass),
+      evidenceStatus: EvidenceStatusSchema.safeParse(finding.evidenceStatus),
+    }))
+    .flatMap((point) =>
+      point.text.length > 0 &&
+      point.truthClass.success &&
+      point.evidenceStatus.success
+        ? [
+            {
+              text: point.text,
+              truthClass: point.truthClass.data,
+              evidenceStatus: point.evidenceStatus.data,
+            },
+          ]
+        : [],
+    )
+    .slice(0, Q_SUMMARY_POINTS_MAX);
+  if (points.length < 2) return null;
+  return {
+    kind: "SUMMARY",
+    title: "Summary",
+    points,
+    missing: (input.result.missingEvidence ?? [])
+      .map((gap) => gap.trim().slice(0, 200))
+      .filter((gap) => gap.length > 0)
+      .slice(0, 3),
   };
 }
 

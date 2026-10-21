@@ -191,6 +191,7 @@ export function useDuplexVoiceSession(
             storeListeningPreference(level);
           },
           onInterrupted: () => eventsRef.current.onInterrupted?.(),
+          onWorking: (line) => eventsRef.current.onWorking?.(line),
           // The arrival briefing's card in focus is decided on the page,
           // by the same code its buttons use (line-cards.ts).
           cardInFocus,

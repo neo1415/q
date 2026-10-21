@@ -472,7 +472,11 @@ export function useDeepgramVoiceSession(
         // W4b: the silence ladder's beats are voiced while Q works, never a
         // line of the conversation (nor of the saved transcript).
         if (role === "q") {
+          const heard = content;
           content = wire.stripSilenceBeats(content);
+          // What was stripped is the "where I am" line: shown, not kept.
+          const working = heard.slice(0, heard.length - content.length).trim();
+          if (working.length > 0) eventsRef.current.onWorking?.(working);
           if (content.length === 0) {
             expectSpeech();
             return;

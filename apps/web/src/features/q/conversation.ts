@@ -109,7 +109,9 @@ export type QTurnObjectBlock = Extract<
       | "MAP"
       | "TIMELINE"
       // G-R4: what needs the person, as one report.
-      | "ATTENTION";
+      | "ATTENTION"
+      // Artifacts live (L-14): a summary Q speaks over.
+      | "SUMMARY";
   }
 >;
 
@@ -155,6 +157,7 @@ function objectBlocksOf(
       case "MAP":
       case "TIMELINE":
       case "ATTENTION":
+      case "SUMMARY":
         return true;
       case "UI_INTENT":
         // SHOW_EVIDENCE carries the same references an evidence block
@@ -351,7 +354,29 @@ export function turnsFrom(
   // The reducer already drops deltas for a completed message, so reaching
   // here means the answer is genuinely still arriving — and it is always
   // the most recent thing in the conversation.
-  if (state.partial !== null && state.partial.text.length > 0) {
+  // Artifacts live (L-15): a card can go up before Q's first word (a
+  // researched identity named in the question while the lookup runs), so
+  // a preview alone opens the live turn, with no text yet.
+  const early =
+    state.preview !== null &&
+    (state.partial === null ||
+      state.partial.messageId !== state.preview.messageId) &&
+    !state.messages.some((m) => m.messageId === state.preview?.messageId);
+  if (early && state.preview !== null) {
+    turns.push({
+      kind: "Q",
+      id: state.preview.messageId,
+      ...(state.runId === null ? {} : { runId: state.runId }),
+      text: "",
+      streaming: true,
+      sourceCount: 0,
+      publicSources: [],
+      findings: [],
+      uncertainties: [],
+      blocks: [],
+      preview: state.preview,
+    });
+  } else if (state.partial !== null && state.partial.text.length > 0) {
     turns.push({
       kind: "Q",
       id: state.partial.messageId,

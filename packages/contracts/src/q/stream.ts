@@ -158,29 +158,61 @@ export const QMessageDeltaEventSchema = event("q.message.delta", {
  * the answer's cards are built from), never a name a model wrote.
  * `layout` is the shape code expects the answer to take, or null.
  */
-export const Q_ARTIFACT_PREVIEW_LAYOUTS = ["CARD", "CARDS", "TABLE"] as const;
+export const Q_ARTIFACT_PREVIEW_LAYOUTS = [
+  "CARD",
+  "CARDS",
+  "TABLE",
+  // A summary the person asked for: its frame, before any subject.
+  "SUMMARY",
+] as const;
 export const QArtifactPreviewLayoutSchema = z.enum(Q_ARTIFACT_PREVIEW_LAYOUTS);
 export type QArtifactPreviewLayout = z.infer<
   typeof QArtifactPreviewLayoutSchema
 >;
 export const Q_ARTIFACT_PREVIEW_SUBJECTS_MAX = 10;
+/**
+ * A researched person or organisation (W2 identity) has no Capital Q
+ * record: its subject is null and `kind` says what it is. Its name is the
+ * research result's, or the person's own words naming who to look up.
+ */
+export const Q_ARTIFACT_PREVIEW_EXTERNAL_KINDS = [
+  "PERSON",
+  "ORGANISATION",
+] as const;
 export const QArtifactPreviewSubjectSchema = z
   .object({
-    subject: QSubjectRefSchema,
+    subject: QSubjectRefSchema.nullable(),
     /** The name as the authorised read returned it. */
     name: z.string().trim().min(1).max(80),
+    kind: z.enum(Q_ARTIFACT_PREVIEW_EXTERNAL_KINDS).optional(),
+    /**
+     * A researched identity's attached image (licensed, attributed), as
+     * its record holds it; the credit is shown with it.
+     */
+    image: z
+      .object({
+        url: z.string().url().max(2048).startsWith("https://"),
+        attribution: z.string().trim().min(1).max(300),
+      })
+      .strict()
+      .optional(),
   })
-  .strict();
+  .strict()
+  .refine((one) => one.subject !== null || one.kind !== undefined, {
+    message: "a subject without a record says what kind it is",
+  });
 export type QArtifactPreviewSubject = z.infer<
   typeof QArtifactPreviewSubjectSchema
 >;
 export const QArtifactPreviewSchema = z
   .object({
     messageId: QMessageIdSchema,
-    /** Every subject named so far, in the order Q named them. */
+    /**
+     * Every subject named so far, in the order Q named them. Empty only
+     * for a SUMMARY frame (the producer's rule).
+     */
     subjects: z
       .array(QArtifactPreviewSubjectSchema)
-      .min(1)
       .max(Q_ARTIFACT_PREVIEW_SUBJECTS_MAX),
     layout: QArtifactPreviewLayoutSchema.nullable(),
   })

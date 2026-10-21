@@ -47,6 +47,12 @@ export type SilenceLadderOptions = {
   /** False: this turn gets no ladder (a look-up, an interview step). */
   readonly enabled?: boolean | undefined;
   /**
+   * Owner 2026-10-20: which beats may be said. Only "where I am" lines
+   * (STAGE_LINE, PROGRESS_LINE): never a hum, breathing or a remembered
+   * thread (founder 2026-10-09 still holds for those). Absent: all.
+   */
+  readonly only?: ReadonlySet<QSilenceBeat["kind"]> | undefined;
+  /**
    * The answer's text is not heard as it streams (a deferred speaker):
    * the ladder runs until the source ends, not until its first part.
    */
@@ -126,7 +132,11 @@ export async function* withSilenceLadder(
     });
     state = step.state;
     const beat = step.beat;
-    if (beat !== null && beat.kind !== "TONE") {
+    if (
+      beat !== null &&
+      beat.kind !== "TONE" &&
+      (options.only === undefined || options.only.has(beat.kind))
+    ) {
       if (beat.kind === "THREAD") options.onThread?.(beat.memoryItemId);
       if (options.narrate !== undefined) options.narrate(beat);
       else yield beat.text;

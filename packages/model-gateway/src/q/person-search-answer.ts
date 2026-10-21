@@ -74,6 +74,26 @@ function firstName(name: string): string {
 }
 
 /** The identity card as Q shows it, from a stored or searched card. */
+/**
+ * Artifacts live: a researched identity's attached image (licensed and
+ * attributed on its record), as an https URL with its credit; otherwise
+ * none, and the card shows initials.
+ */
+export function externalImageOf(subject: IdentityCard["subject"]):
+  | { readonly url: string; readonly attribution: string }
+  | undefined {
+  const image = subject.image;
+  if (
+    image.status !== "ATTACHED" ||
+    image.assetUrl === null ||
+    image.attribution === null ||
+    !image.assetUrl.startsWith("https://")
+  ) {
+    return undefined;
+  }
+  return { url: image.assetUrl, attribution: image.attribution.slice(0, 300) };
+}
+
 export function identityCardBlock(
   card: IdentityCard,
   others: readonly IdentityCandidate[] = [],
@@ -164,6 +184,10 @@ function cardBlock(
             ? {}
             : { investorOrganisationId: s.investorOrganisationId }),
           sources: sourceLinks(card),
+          // Artifacts live: the record's attached image, with its credit.
+          ...(externalImageOf(s) === undefined
+            ? {}
+            : { image: externalImageOf(s) }),
         },
       },
       // The other people the search could not rule out are cards too.
