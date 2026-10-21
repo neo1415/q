@@ -883,6 +883,8 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/recommendation-explanations.ts GET DISCOVERY_EXPLANATION_PATH":
     cap("tool.recommendation_explanation"),
   "q-api/voice/interview-route.ts POST dependencies.path": Q_TRANSPORT,
+  // L9: the same interview turn, streamed to the typed screen.
+  "q-api/voice/interview-route.ts POST streamPath": Q_TRANSPORT,
   "q-api/voice/routes.ts GET Q_VOICE_TURN_PATH": Q_TRANSPORT,
   "q-api/voice/routes.ts POST Q_VOICE_SCREEN_PATH": Q_TRANSPORT,
   "q-api/voice/routes.ts POST Q_VOICE_SPEECH_PATH": Q_TRANSPORT,
@@ -1239,6 +1241,10 @@ const GATEQ_GUEST_NOT_ACTIONS: ReadonlySet<string> = new Set([
 ]);
 
 const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
+  // Onboarding speed L9: the interview turn streamed sentence by sentence.
+  // The same turn as the interview route, carried differently; it adds no
+  // action (every write still goes through the onboarding tools).
+  "q-api/voice/interview-route.ts POST streamPath",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_TOOL_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_USAGE_PATH",
   "q-api/voice/duplex/routes.ts POST Q_VOICE_DUPLEX_END_PATH",
