@@ -79,6 +79,17 @@ const FIGURE = /^[^\p{L}\s]?\s?\d/u;
 export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
   const t = useT();
   const { ref, overflows } = useOverflows<HTMLDivElement>();
+  // On a narrow screen the row labels stay in view while the companies
+  // scroll under them: sticky on the card's own surface (a positioned cell
+  // paints over the others without a z-index), with a divider only while
+  // the table actually scrolls.
+  // (An inset shadow, because a collapsed table's borders do not travel
+  // with a sticky cell.)
+  const sticky = `sticky start-0 bg-(--cq-surface-raised) ${
+    overflows
+      ? "shadow-[inset_-1px_0_0_var(--cq-border-subtle)] rtl:shadow-[inset_1px_0_0_var(--cq-border-subtle)]"
+      : ""
+  }`;
   return (
     <div
       ref={ref}
@@ -95,7 +106,7 @@ export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
       <table className="w-full border-collapse text-start">
         <thead>
           <tr>
-            <th className="px-0 py-2 pe-4">
+            <th className={`px-0 py-2 pe-4 ${sticky}`}>
               <span className="sr-only">{t("Attribute")}</span>
             </th>
             {block.columns.map((column, index) => (
@@ -120,7 +131,7 @@ export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
             >
               <th
                 scope="row"
-                className="cq-body-sm min-w-28 px-0 py-2.5 pe-4 text-start align-top font-normal text-(--cq-text-secondary)"
+                className={`cq-body-sm min-w-28 px-0 py-2.5 pe-4 text-start align-top font-normal text-(--cq-text-secondary) ${sticky}`}
               >
                 {row.label}
               </th>

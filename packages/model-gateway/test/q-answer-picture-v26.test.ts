@@ -211,6 +211,8 @@ describe("COMPANY_ANALYST v26 pictures through the answer seam", () => {
     expect(asked?.requestedQuery).toBe("baobab tree");
     expect(asked?.userText).toBe(ASKED);
     expect(asked?.earlierUserText).toEqual([EARLIER]);
+    // The names this run read go along to be withheld (none were read here).
+    expect(asked?.withheld).toEqual([]);
     expect(JSON.stringify(asked)).not.toContain("Kivu");
     expect(JSON.stringify(asked)).not.toContain("2.4m");
 

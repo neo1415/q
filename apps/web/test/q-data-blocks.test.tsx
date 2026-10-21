@@ -331,3 +331,58 @@ describe("the TABLE block (design pass, round 3)", () => {
     }
   });
 });
+
+describe("round 3 polish in the thread", () => {
+  it("shows a summary's own title, not only its kind", () => {
+    render(
+      <QResultBlocks
+        blocks={[
+          {
+            kind: "SUMMARY",
+            title: "Kivu Freight in brief",
+            points: [
+              {
+                text: "Cold-chain trucking between Kigali and Goma.",
+                truthClass: "VERIFIED",
+                evidenceStatus: "PLATFORM_VERIFIED",
+              },
+              {
+                text: "Revenue is thirty-eight thousand dollars a month.",
+                truthClass: "USER_CLAIM",
+                evidenceStatus: "DOCUMENT_SUPPORTED",
+              },
+            ],
+            missing: [],
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Summary")).toBeTruthy();
+    expect(screen.getByText("Kivu Freight in brief")).toBeTruthy();
+  });
+
+  it("keeps the TABLE's row labels in view while the columns scroll", () => {
+    const { container } = render(
+      <QResultBlocks
+        blocks={[
+          {
+            kind: "TABLE",
+            title: "Side by side",
+            columns: [
+              { label: "Portside", subject: null },
+              { label: "Souqsheet", subject: null },
+            ],
+            rows: [{ label: "Stage", cells: ["Seed", "Pre-seed"] }],
+          },
+        ]}
+      />,
+    );
+    const label = container.querySelector("tbody th[scope='row']");
+    expect(label?.className).toContain("sticky");
+    expect(label?.className).toContain("start-0");
+    // Words keep proportional spacing; only figures get tabular numerals.
+    expect(container.querySelector("td")?.className).not.toContain(
+      "cq-numeric",
+    );
+  });
+});

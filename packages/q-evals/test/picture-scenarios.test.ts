@@ -71,17 +71,18 @@ describe("v26 picture scenarios (scripted analyst, real pictureBlock)", () => {
         earlierUserText: [],
       }),
     ).toBe("cold-chain warehouse");
-    // A name the person typed is theirs to the egress composer, so the
-    // prompt's "no names" is what keeps it out: graded on the model.
+    // A name the person typed reaches the egress composer as theirs, but
+    // every name the run read is withheld: the model's slip is graded, and
+    // the name still never leaves.
     const named = scenario("pic-no-company-name");
     const grade = await gradePicture(named, {
       ...named.scripted,
       pictureQuery: "Kivu Freight warehouse",
     });
-    expect(grade.sent).toBe("kivu warehouse");
+    expect(grade.sent).toBe("warehouse");
     expect(
       grade.checks.filter((check) => !check.ok).map((check) => check.name),
-    ).toEqual(["no names in the words", "no name leaves"]);
+    ).toEqual(["no names in the words"]);
   });
 
   it("scores a bad answer low: picture as evidence, names and figures in the words, picture for figures", async () => {
