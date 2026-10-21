@@ -41,7 +41,9 @@ function subjectIds(one: QArtifactPreviewSubject): {
 export function previewKey(one: QArtifactPreviewSubject): string {
   const ids = subjectIds(one);
   return (
-    ids.companyId ?? ids.investorOrganisationId ?? `${one.kind ?? ""}:${one.name}`
+    ids.companyId ??
+    ids.investorOrganisationId ??
+    `${one.kind ?? ""}:${one.name}`
   );
 }
 
@@ -90,7 +92,7 @@ function Bar({ width }: { readonly width: string }) {
 function PreviewCard({ one }: { readonly one: QArtifactPreviewSubject }) {
   return (
     <li
-      className="flex min-w-0 flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+      className="cq-preview-in flex min-w-0 flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
       data-q-preview-card={previewKey(one)}
     >
       <div className="flex min-w-0 items-center gap-3">
@@ -101,7 +103,7 @@ function PreviewCard({ one }: { readonly one: QArtifactPreviewSubject }) {
           </span>
           {one.image === undefined ? null : (
             <span
-              className="cq-caption min-w-0 truncate text-(--cq-text-tertiary)"
+              className="cq-caption min-w-0 truncate text-(--cq-text-secondary)"
               data-q-preview-credit
             >
               {`Photo: ${one.image.attribution}`}
@@ -138,7 +140,7 @@ function PreviewTable({
               <th
                 key={previewKey(one)}
                 scope="col"
-                className="p-3 text-start"
+                className="cq-preview-in p-3 text-start"
                 data-q-preview-column={previewKey(one)}
               >
                 <span className="flex min-w-0 items-center gap-2">
@@ -178,7 +180,7 @@ function PreviewSummary({
 }) {
   return (
     <div
-      className="flex w-full flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+      className="cq-preview-in flex w-full flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
       data-q-preview-summary
     >
       <span className="cq-label text-(--cq-text-tertiary)">Summary</span>
@@ -187,7 +189,7 @@ function PreviewSummary({
           {subjects.map((one) => (
             <li
               key={previewKey(one)}
-              className="flex min-w-0 items-center gap-2"
+              className="cq-preview-in flex min-w-0 items-center gap-2"
               data-q-preview-card={previewKey(one)}
             >
               <Avatar one={one} size={24} />

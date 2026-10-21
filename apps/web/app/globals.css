@@ -2326,6 +2326,35 @@
     transform: translateX(18px);
   }
 
+  /*
+   * Artifacts live: a subject's card frame arriving as Q names it. Once
+   * per subject per answer, so a plain entrance: fade and a short rise on
+   * the codebase's ease, under 300 ms. Each frame arrives when its name is
+   * said, which staggers them naturally. Reduced motion keeps the fade
+   * only; a transition rather than keyframes, so a quick re-render
+   * retargets instead of restarting.
+   */
+  .cq-preview-in {
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity var(--cq-motion-base) var(--cq-ease),
+      transform var(--cq-motion-base) var(--cq-ease);
+    @starting-style {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-preview-in {
+      transition: opacity var(--cq-motion-base) var(--cq-ease);
+      @starting-style {
+        opacity: 0;
+        transform: none;
+      }
+    }
+  }
+
   /* Loading: the feed's own shape (Discover v2), never a sentence. */
   .cq-skeleton {
     position: relative;

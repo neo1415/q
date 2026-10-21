@@ -76,7 +76,9 @@ export function SummaryBody({ block }: { readonly block: QSummaryBlock }) {
   const spoken = useSpokenPoint(texts);
   return (
     <div className="flex flex-col gap-3" data-q-summary>
-      <ol className="m-0 flex list-none flex-col gap-2 p-0">
+      {/* The points are not a sequence: no numbers. The rail at each
+          point's edge is what lights when Q says it (frontend-design). */}
+      <ul className="m-0 flex list-none flex-col gap-2 p-0">
         {block.points.map((point, index) => {
           const current = spoken === index;
           const truth =
@@ -89,20 +91,17 @@ export function SummaryBody({ block }: { readonly block: QSummaryBlock }) {
               aria-current={current ? "true" : undefined}
               data-q-summary-point={index}
               data-q-summary-current={current ? "" : undefined}
-              className={`flex gap-3 rounded-md border-s-2 px-3 py-2 transition-colors duration-200 motion-reduce:transition-none ${
+              className={`flex rounded-md border-s-2 px-3 py-2 transition-[background-color,border-color] duration-(--cq-motion-base) ease-(--cq-ease) ${
                 current
                   ? "border-(--cq-text-primary) bg-(--cq-surface-subtle)"
                   : "border-(--cq-border-subtle)"
               }`}
             >
-              <span
-                aria-hidden="true"
-                className="cq-label shrink-0 text-(--cq-text-tertiary)"
-              >
-                {index + 1}
-              </span>
               <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="cq-body text-(--cq-text-primary)">
+                {/* Lit by weight as well as colour: never colour alone. */}
+                <span
+                  className={`cq-body text-(--cq-text-primary) ${current ? "font-medium" : ""}`}
+                >
                   {point.text}
                 </span>
                 {truth === null ? null : (
@@ -114,7 +113,7 @@ export function SummaryBody({ block }: { readonly block: QSummaryBlock }) {
             </li>
           );
         })}
-      </ol>
+      </ul>
       {block.missing.length === 0 ? null : (
         <div className="flex flex-col gap-1">
           <span className="cq-label text-(--cq-text-tertiary)">
