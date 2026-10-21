@@ -2355,6 +2355,19 @@
     }
   }
 
+  /*
+   * Artifacts live: the line saying where Q is. A new stage fades in
+   * (opacity only, fast) so the words change without a jump; a few times
+   * a turn, so no movement. Kept under reduced motion: a fade is not motion.
+   */
+  .cq-stage-line {
+    opacity: 1;
+    transition: opacity var(--cq-motion-fast) var(--cq-ease);
+    @starting-style {
+      opacity: 0;
+    }
+  }
+
   /* Loading: the feed's own shape (Discover v2), never a sentence. */
   .cq-skeleton {
     position: relative;

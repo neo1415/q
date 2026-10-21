@@ -144,6 +144,11 @@ const CONNECTIVES = new Set([
 const FIGURE_LIKE =
   /^(?:[$£€]|usd|gbp|eur|ngn|kes|zar)?\d[\d.,]*(?:k|m|mn|bn|b|%)?$/i;
 
+/** A joining word ("the", "of"): never a search on its own. */
+export function isConnective(token: string): boolean {
+  return CONNECTIVES.has(token);
+}
+
 export function tokenise(text: string): readonly string[] {
   return text
     .toLowerCase()

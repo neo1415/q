@@ -69,3 +69,17 @@ export {
   type WorkforceCheck,
   type WorkforceGrade,
 } from "./workforce/grade.js";
+// L-13: COMPANY_ANALYST v26 picture scenarios (scripted offline; a live
+// model's v26 answer is graded by the same code).
+export {
+  PEXELS_FIXTURE,
+  PICTURE_SCENARIOS,
+  type PictureExpectation,
+  type PictureScenario,
+} from "./pictures/scenarios.js";
+export {
+  gradePicture,
+  outbound,
+  type PictureCheck,
+  type PictureGrade,
+} from "./pictures/grade.js";

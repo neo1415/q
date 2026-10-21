@@ -523,3 +523,89 @@ describe("a spoken sentence puts up the card it names (artifacts live, L-16)", (
     ).toBeUndefined();
   });
 });
+
+describe("a spoken turn's stages reach the screen (owner 2026-10-21)", () => {
+  const SPOKEN_WITH_STAGES: readonly QStreamEvent[] = [
+    event("q.stage.changed", 1, { stage: "REVIEWING_COMPANY" }),
+    event("q.stage.changed", 2, { stage: "REVIEWING_COMPANY" }),
+    event("q.stage.changed", 3, { stage: "COMPARING_OPPORTUNITIES" }),
+    event("q.message.delta", 3, {
+      messageId: MESSAGE_ID,
+      text: "Souqsheet is the closer fit. ",
+    }),
+    event("q.message.delta", 3, {
+      messageId: MESSAGE_ID,
+      text: "Portside leads on its business model.",
+    }),
+    event("q.message.completed", 4, {
+      message: {
+        messageId: MESSAGE_ID,
+        runId: RUN_ID,
+        role: "Q",
+        text: "Souqsheet is the closer fit. Portside leads on its business model.",
+        blocks: [CARDS],
+        createdAt: NOW,
+      },
+    }),
+    event("q.run.completed", 5, { status: "COMPLETED", completedAt: NOW }),
+  ];
+
+  it("has the run's real steps in the room while Q speaks, said once each, gone when the answer lands", async () => {
+    const room = createQRoomFeed();
+    const handle = createVoiceTurnHandler({
+      qRuntime: runtime(),
+      qStream: stream(SPOKEN_WITH_STAGES),
+      room,
+      logger,
+    });
+    const seen: (readonly string[])[] = [];
+    const speaker: VoiceSpeaker = {
+      providerConversationId: "conv_1",
+      isOpen: true,
+      speak: async (response) => {
+        const chunks = typeof response === "string" ? [response] : response;
+        for await (const _chunk of chunks) {
+          const read = await room.read({ actor: ACTOR, after: 0, wait: false });
+          seen.push(read.stages?.stages ?? []);
+        }
+      },
+      close: () => undefined,
+    };
+    await handle(
+      binding(),
+      [{ role: "user", content: "Compare Portside and Souqsheet" }],
+      new AbortController().signal,
+      speaker,
+    );
+    expect(seen[0]).toEqual(["REVIEWING_COMPANY", "COMPARING_OPPORTUNITIES"]);
+    const after = await room.read({ actor: ACTOR, after: 0, wait: false });
+    expect(after.stages).toBeUndefined();
+    expect(QRoomReadSchema.safeParse(after).success).toBe(true);
+  });
+
+  it("wakes a held read for a stage, starts a new list for a new run, and is only this person's", async () => {
+    const room = createQRoomFeed();
+    const held = room.read({
+      actor: ACTOR,
+      after: 0,
+      wait: true,
+      holdMs: 5_000,
+    });
+    room.stage(ACTOR, { runId: RUN_ID, stage: "REVIEWING_COMPANY" });
+    const read = await held;
+    expect(read.stages).toEqual({
+      sequence: read.cursor,
+      runId: RUN_ID,
+      stages: ["REVIEWING_COMPANY"],
+    });
+    expect(QRoomReadSchema.parse(read).stages?.stages).toHaveLength(1);
+    const other = "0198f8b2-9c1a-7a3e-8f2b-1c2d3e4f5a99";
+    room.stage(ACTOR, { runId: other, stage: "PREPARING_ANALYSIS" });
+    expect(
+      (await room.read({ actor: ACTOR, after: 0, wait: false })).stages?.stages,
+    ).toEqual(["PREPARING_ANALYSIS"]);
+    expect(
+      (await room.read({ actor: STRANGER, after: 0, wait: false })).stages,
+    ).toBeUndefined();
+  });
+});
