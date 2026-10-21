@@ -143,6 +143,7 @@ import {
   loadAggregate,
   pendingQuestionViews,
   toSessionView,
+  toStepView,
   type OnboardingSessionAggregate,
   presentationOf,
 } from "./view.js";
@@ -262,6 +263,11 @@ export type SayOnboardingOutcome = {
 export type SessionScopedQuery = {
   readonly actor: OnboardingActor;
   readonly sessionId: OnboardingSessionId;
+};
+
+/** A session read that also shows the step Q just asked, if eligible. */
+export type GetSessionQuery = SessionScopedQuery & {
+  readonly askedStepKey?: string | undefined;
 };
 
 /** One exchange of the interview thread (CQ-QX-006), appended after it happened. */
@@ -818,6 +824,7 @@ export function createOnboardingUseCases(
     actor: OnboardingActor,
     session: OnboardingSession,
     changes?: OnboardingPathChanges,
+    askedStepKey?: string,
   ) => {
     const aggregate = await aggregateOf(runtime, executor, session);
     const current =
@@ -849,7 +856,29 @@ export function createOnboardingUseCases(
         currentResponses: aggregate.currentResponses,
       });
     }
-    return toSessionView(aggregate, changes, context);
+    const sessionView = toSessionView(aggregate, changes, context);
+    // The step Q asked, with its options, when it is another eligible step
+    // still open. Steps whose view needs server context are left to the
+    // cursor (their context provider runs for the current step only).
+    const asked =
+      askedStepKey === undefined || askedStepKey === session.currentStepKey
+        ? undefined
+        : aggregate.path.eligible.find((step) => step.stepKey === askedStepKey);
+    if (
+      asked === undefined ||
+      ("contextKey" in asked.configuration &&
+        asked.configuration.contextKey !== undefined) ||
+      aggregate.states.get(asked.stepKey)?.status === "COMPLETED"
+    ) {
+      return sessionView;
+    }
+    return {
+      ...sessionView,
+      askedStep: toStepView(
+        asked,
+        aggregate.currentResponses.get(asked.stepKey),
+      ),
+    };
   };
 
   const publishedForJourney = async (journeyType: OnboardingJourneyType) => {
@@ -1030,7 +1059,7 @@ export function createOnboardingUseCases(
   };
 
   const getSession = async (
-    query: SessionScopedQuery,
+    query: GetSessionQuery,
   ): Promise<OnboardingSessionView> => {
     const session = await ownedSession(
       runtime,
@@ -1038,7 +1067,7 @@ export function createOnboardingUseCases(
       query.actor,
       OnboardingSessionIdSchema.parse(query.sessionId),
     );
-    return view(sql, query.actor, session);
+    return view(sql, query.actor, session, undefined, query.askedStepKey);
   };
 
   const bindSessionContext = async (

@@ -158,6 +158,22 @@ export function VoiceStage({
     asking !== null &&
     asking.options.length > 0 &&
     client.state !== "CONNECTING";
+  // Q's options are brought into view when they arrive: they sit below
+  // Q's presence and were left under the fold (owner 2026-10-21).
+  const optionsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const options = optionsRef.current;
+    // Absent in a DOM without layout (tests); there is nothing to scroll.
+    if (!showOptions || options === null || !("scrollIntoView" in options)) {
+      return;
+    }
+    options.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth",
+      block: "nearest",
+    });
+  }, [showOptions, stepKey]);
   const multi = asking?.kind === "MANY_OF";
   const done = progress.reduce((n, line) => n + line.done, 0);
   const total = progress.reduce((n, line) => n + line.total, 0);
@@ -324,7 +340,8 @@ export function VoiceStage({
 
           {showOptions && asking !== null ? (
             <div
-              className="flex w-full max-w-2xl flex-col items-center gap-3"
+              ref={optionsRef}
+              className="flex w-full max-w-2xl scroll-mb-6 flex-col items-center gap-3"
               data-q-stage-options
             >
               <div

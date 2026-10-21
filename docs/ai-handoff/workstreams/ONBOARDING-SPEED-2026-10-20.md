@@ -212,3 +212,29 @@ Gates (cloud, Linux):
 - Not run: pgTAP (no migration change), e2e, full `pnpm check`. Not deployed or live-verified.
 
 Shared files: none. No contract, migration, RLS, authorization or model-routing change.
+
+### Round 3, second pass (owner follow-ups, 2026-10-21)
+
+- **Worked-out figures are read back, not refused.** "Two pay $180,000 each" read as revenue 360,000 now gets "So that's USD 360,000 for revenue, right?" as Q's one question. Their "yes" records it as their claim: code reads Q's own read-back line, so it saves even if the model proposes nothing. A "no" or a different figure records nothing read back. The dossier keeps a confirmed figure as USER_CLAIM, not Q_INFERENCE. Files: `not-recorded.ts` (`readBackLine`, `readBacksIn`), `stated-amount.ts` (`affirmsReadBack`), `interviewer.ts`, `dossier.ts`.
+- **Cities and regions (GateQ).** `cities.ts`: "We're in Lagos" saves NG, "based out of Cape Town" saves ZA, "London and Lagos" saves GB. For "somewhere in Europe", Q asks "Which country in Europe is the company based in?" as its question.
+- **Options always under Q's question (onboarding).** Root cause: the typed screen drew chips from the form cursor (`view.currentStep`), not from the step Q asked. The fixes:
+  - New optional `askedStep` on `OnboardingSessionViewSchema`. This is an additive contract change.
+  - `getSession({ askedStepKey })` fills `askedStep` (`packages/onboarding` use-cases).
+  - api `/say` passes Q's `askingAbout[0]` through.
+  - The web derives the prompt with `promptStepOf(view, askedStep)`.
+  - q-api: when code adds the next question to a reply that asked nothing, `asking` and `askingAbout` now name that step, so voice gets its options too.
+- **Options no longer cut off.**
+  - Onboarding has no bottom nav, so the composer docks at the bottom edge (`--cq-bottom-nav-height: 0` on the workspace).
+  - The thread scrolls to just below the options, clear of the composer.
+  - Long option labels wrap.
+  - The voice stage scrolls its options into view.
+- **Long answers.** Already in place: long-text answers are summarised in one or two sentences, said back word for word, and saved on their yes (`holdParaphrase`, prompt rule in `interview-agent.ts`). No change was needed.
+- **Tests:**
+  - GateQ: read-back, yes and no; cities; region question; dossier keeps a confirmed figure.
+  - Web: `promptStepOf`.
+  - q-api: a code-added question carries its step. This fails on the old code.
+  - Broad run: 116 files, 1,280 tests pass. Root `tsc` exit 0; q-api, api and web `tsc` clean; eslint and prettier clean.
+- **Still open:**
+  - The read-back and region question are worded in English only. In other languages the model's words stand.
+  - A step whose view needs server context (review confirmations, mandate references) still shows the cursor's controls.
+  - Not browser-tested end to end, not deployed.

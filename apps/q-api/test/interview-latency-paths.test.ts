@@ -344,6 +344,35 @@ describe("an exact answer is recorded and replied to by code, no model call (202
     expect(outcome.reply.trim().endsWith("?")).toBe(true);
   });
 
+  it("a question code adds carries its step, so its options show", async () => {
+    const world = founderWorld();
+    const gateway = {
+      execute: () =>
+        Promise.resolve({
+          output: {
+            kind: "TEXT",
+            text: JSON.stringify({ reply: "Thanks for that.", asking: null }),
+          },
+        }),
+    } as unknown as ModelGateway;
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({})),
+    }).turn({
+      ...turn(
+        world,
+        "We build scheduling and billing software for small clinics in the region, and it is going well.",
+      ),
+      actor,
+    });
+    // Code added the next question; the screen gets that step and options.
+    expect(outcome.reply).not.toBe("Thanks for that.");
+    expect(outcome.askingAbout).toHaveLength(1);
+    expect(outcome.asking?.stepKey).toBe(outcome.askingAbout?.[0]);
+  });
+
   it("without the code reply composed, the model still writes it", async () => {
     const world = founderWorld();
     const model = askingModel();

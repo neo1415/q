@@ -2565,7 +2565,7 @@ export function createInterviewAgent(
         "a look-up was read but the turn was small talk; not run",
       );
     }
-    const askedOpen =
+    let askedOpen =
       askedStep === undefined ||
       covered.has(askedStep.stepKey) ||
       handingOver ||
@@ -2605,11 +2605,12 @@ export function createInterviewAgent(
         }),
       );
     }
-    const stillOpen =
-      askedOpen !== null &&
+    const askedKey = askedOpen?.stepKey;
+    let stillOpen =
+      askedKey !== undefined &&
       view.progress.eligibleSteps.some(
         (e) =>
-          e.stepKey === askedOpen.stepKey &&
+          e.stepKey === askedKey &&
           e.status !== "COMPLETED" &&
           e.status !== "SKIPPED",
       );
@@ -2627,15 +2628,16 @@ export function createInterviewAgent(
       // with the next question; an English one is never appended.
       replyLanguage.kind !== "THEIRS"
     ) {
+      const nextFlow = onboardingFlowFor({
+        journey: input.journeyType,
+        opening: false,
+        state: stateAfter,
+        firstName: null,
+        knownName: null,
+      });
       const backed = withNextQuestion(
         withoutAnsweredQuestions(reply, stateAfter, SPOKEN_QUESTIONS),
-        onboardingFlowFor({
-          journey: input.journeyType,
-          opening: false,
-          state: stateAfter,
-          firstName: null,
-          knownName: null,
-        }),
+        nextFlow,
         stateAfter.completed,
       );
       if (backed !== reply) {
@@ -2644,6 +2646,19 @@ export function createInterviewAgent(
           "interview reply asked nothing; the next question was added",
         );
         reply = backed;
+        // The question code added is the one asked: its options go with it
+        // (owner 2026-10-21: Q asked the stage and no choices showed).
+        const added =
+          nextFlow.next === null ? undefined : steps.get(nextFlow.next.stepKey);
+        if (added !== undefined && !covered.has(added.stepKey)) {
+          askedOpen = toOpenStep(added, view);
+          stillOpen = view.progress.eligibleSteps.some(
+            (e) =>
+              e.stepKey === added.stepKey &&
+              e.status !== "COMPLETED" &&
+              e.status !== "SKIPPED",
+          );
+        }
       }
     }
 
@@ -2755,17 +2770,19 @@ export function createInterviewAgent(
     // asked, kept to the closed set and to this reply (spec §5).
     const gestures =
       result === undefined ? [] : gesturesForReply(reply, result.gestures);
+    const askedManifest =
+      askedOpen === null ? undefined : steps.get(askedOpen.stepKey);
     return {
       reply,
       intent: opening ? "OPENING" : "ANSWER",
       ...(gestures.length === 0 ? {} : { gestures }),
       ...(pausing ? { pausing: true } : {}),
       asking:
-        stillOpen && askedOpen !== null && askedStep !== undefined
+        stillOpen && askedOpen !== null && askedManifest !== undefined
           ? {
               stepKey: askedOpen.stepKey,
               kind: askedOpen.kind,
-              options: [...(askedOpen.options ?? optionsOf(askedStep))],
+              options: [...(askedOpen.options ?? optionsOf(askedManifest))],
               maxChoices: askedOpen.maxChoices,
             }
           : null,

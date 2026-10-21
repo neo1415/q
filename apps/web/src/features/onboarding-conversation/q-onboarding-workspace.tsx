@@ -21,6 +21,7 @@ import {
   Q_VISIBLE_STAGE_LABELS,
   QConversationIdSchema,
   type OnboardingResponseValue,
+  type OnboardingStepView,
   type OnboardingUnderstanding,
   QVoiceDestinationSchema,
 } from "@capital-q/contracts";
@@ -81,6 +82,7 @@ import {
   publicSourceOf,
   progressLines,
   promptFor,
+  promptStepOf,
   remainingCount,
   reviewLines,
   stillNeeded,
@@ -294,6 +296,12 @@ export function QOnboardingWorkspace({
    * until Q has spoken.
    */
   const [qAsking, setQAsking] = useState<readonly string[] | null>(null);
+  /**
+   * The step Q's last turn asked, with its options, when it is not the
+   * form cursor's step (owner 2026-10-21): Q asked the stage and no choices
+   * showed, because the chips followed the cursor. Null: the cursor's.
+   */
+  const [qAskedStep, setQAskedStep] = useState<OnboardingStepView | null>(null);
   const [reading, setReading] = useState(false);
   const [readingPolls, setReadingPolls] = useState(0);
   const [askingQ, setAskingQ] = useState(false);
@@ -318,6 +326,8 @@ export function QOnboardingWorkspace({
     Readonly<Record<string, readonly string[]>>
   >({});
   const endRef = useRef<HTMLDivElement>(null);
+  /** Just below Q's options, clear of the docked composer. */
+  const controlsEndRef = useRef<HTMLDivElement>(null);
   /** The Q conversation a tangent continues in, so follow-ups keep their thread (§23). */
   const qConversationId = useRef<string | undefined>(undefined);
   const streamAbort = useRef<AbortController | null>(null);
@@ -385,13 +395,11 @@ export function QOnboardingWorkspace({
   const voiceConnected = voice.client.connected;
   const voiceSendText = voice.client.sendText;
 
-  const prompt: QPrompt | null = useMemo(
-    () =>
-      view === undefined || view.currentStep === null
-        ? null
-        : promptFor(view.currentStep, vocabulary),
-    [view, vocabulary],
-  );
+  const prompt: QPrompt | null = useMemo(() => {
+    if (view === undefined) return null;
+    const step = promptStepOf(view, qAskedStep);
+    return step === null ? null : promptFor(step, vocabulary);
+  }, [view, vocabulary, qAskedStep]);
   /**
    * Q's last sentence, waiting for the session to settle on the step it
    * was about. `say` resolves once the view has been re-read, so the
@@ -565,7 +573,9 @@ export function QOnboardingWorkspace({
   );
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({
+    // Down to Q's options when they show, so they are never left below the
+    // fold under the composer (owner 2026-10-21); else to the last line.
+    (controlsEndRef.current ?? endRef.current)?.scrollIntoView({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? "auto"
         : "smooth",
@@ -577,6 +587,7 @@ export function QOnboardingWorkspace({
     gaps.length,
     qStream?.partial?.text,
     replyStream,
+    prompt?.stepKey,
   ]);
 
   // While Q is reading a free-text turn, re-read the session on a timer
@@ -708,7 +719,10 @@ export function QOnboardingWorkspace({
             focus,
           )
           .then((turn) => {
-            if (turn !== null) setQAsking(turn.askingAbout ?? null);
+            if (turn !== null) {
+              setQAsking(turn.askingAbout ?? null);
+              setQAskedStep(turn.askedStep ?? null);
+            }
             return turn?.reply ?? null;
           });
       })
@@ -942,6 +956,7 @@ export function QOnboardingWorkspace({
         return;
       }
       setQAsking(turn.askingAbout ?? null);
+      setQAskedStep(turn.askedStep ?? null);
       // Q's own words, as Q wrote them. The reply carries both the
       // acknowledgement and the next question, so it also becomes the
       // live question under the composer until the step moves on.
@@ -2179,6 +2194,12 @@ export function QOnboardingWorkspace({
               </Button>
             ) : null}
           </div>
+          {/* Scrolled to so the options sit clear of the docked composer. */}
+          <div
+            ref={controlsEndRef}
+            className="scroll-mb-40"
+            aria-hidden="true"
+          />
         </div>
       ) : null}
 

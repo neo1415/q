@@ -1,4 +1,8 @@
-import type { QConduct, QSentenceGesture } from "@capital-q/contracts";
+import type {
+  OnboardingStepView,
+  QConduct,
+  QSentenceGesture,
+} from "@capital-q/contracts";
 /**
  * The frontend-facing port for an onboarding journey, generic over the
  * journey's presentation view and composite responses. Screens and the
@@ -95,6 +99,8 @@ export type OnboardingClient<TView, TResponse> = {
         readonly researching: string | null;
         /** The steps Q's reply asks about (not the form's step cursor). */
         readonly askingAbout?: readonly string[] | undefined;
+        /** That step with its options, when it is not the cursor's step. */
+        readonly askedStep?: OnboardingStepView | undefined;
         /** Q's patience after the turn (founder direction 2026-09-30). */
         readonly conduct?: QConduct | undefined;
         /** PRESENCE: what Q's particles form for which sentence. */

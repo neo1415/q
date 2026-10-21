@@ -5284,3 +5284,23 @@
     }
   }
 }
+
+/*
+ * Onboarding (owner 2026-10-21: answer buttons cut off or hidden). The
+ * onboarding frame has no bottom navigation, so its composer docks at the
+ * bottom edge instead of 60px above it, where it covered the options. Q's
+ * options wrap a long label onto two lines rather than running off a phone
+ * screen. Unlayered on purpose, so it outranks the button's own height and
+ * nowrap utilities.
+ */
+[data-q-onboarding-workspace] {
+  --cq-bottom-nav-height: 0px;
+}
+
+[data-q-quick-controls] button {
+  height: auto;
+  min-height: 44px;
+  white-space: normal;
+  text-align: start;
+  padding-block: 8px;
+}
