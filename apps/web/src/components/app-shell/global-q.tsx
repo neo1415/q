@@ -372,8 +372,12 @@ export function GlobalQTrigger({
   // Round 4 (§6.1 compact pill): a durable task Q is running (a deck, a
   // memo) shows its name, real step count and bar beside the dock, on
   // every page, so the person can see it progress while they work.
+  // Round 5: only while the person is not looking at it already: the
+  // Q page (/home, its own branch above) and the open Q sheet show it.
   const task =
-    variant === "sidebar" && session?.presence.stage?.about?.task !== undefined
+    variant === "sidebar" &&
+    !open &&
+    session?.presence.stage?.about?.task !== undefined
       ? session.presence.stage
       : null;
   const trigger = (

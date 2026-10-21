@@ -20,7 +20,22 @@ describe("WorkingLine", () => {
     render(<WorkingLine label="Saving your round size" />);
     const line = screen.getByRole("status");
     expect(line.textContent).toBe("Saving your round size");
-    expect(line.className).toContain("truncate");
+    // One line high: the words truncate, never wrap.
+    expect(line.querySelector("span")?.className).toContain("truncate");
+    // No live mark unless real work is said to be running.
+    expect(line.querySelector("[data-working-mark]")).toBeNull();
+  });
+
+  it("turns the live mark beside the words only while real work runs", () => {
+    const { container, rerender } = render(
+      <WorkingLine label="Looking at Nixo" active />,
+    );
+    const mark = container.querySelector("[data-working-mark]");
+    expect(mark?.getAttribute("aria-hidden")).toBe("true");
+    expect(mark?.querySelector(".cq-working-sweep")).not.toBeNull();
+    // Nothing to say: no mark, even if active.
+    rerender(<WorkingLine label={null} active reserve />);
+    expect(container.querySelector("[data-working-mark]")).toBeNull();
   });
 
   it("holds its line with nothing to say when reserved, and is gone otherwise", () => {
