@@ -425,6 +425,10 @@ export type Timing = {
   readonly modelCalls: number;
   readonly calls: readonly string[];
   readonly stages: readonly string[];
+  /** What was stored as Q's answer. */
+  readonly stored: readonly string[];
+  /** The first words streamed. */
+  readonly firstText: string | null;
 };
 
 const question = (kind: string, text: string) => ({
@@ -482,6 +486,20 @@ export const JOURNEYS: readonly Journey[] = [
     answerShare: 0.29,
     reading: {
       ...question("FACTUAL", "latest public news on Northwind Ledger"),
+      kind: "RESEARCH_REQUEST",
+    },
+  },
+  {
+    // Not on Capital Q: no record to open from, so Q says what it is
+    // checking as the web search starts (streamed, never stored).
+    name: "public web search, company not on Capital Q",
+    said: "What is the latest public news on Acme Robotics?",
+    spoken: false,
+    needs: { companies: [], web: true, cards: false },
+    answerTokens: 900,
+    answerShare: 0.29,
+    reading: {
+      ...question("FACTUAL", "latest public news on Acme Robotics"),
       kind: "RESEARCH_REQUEST",
     },
   },
@@ -546,6 +564,7 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
   const at = (): number => (performance.now() - started) / SCALE;
   let firstVisibleMs: number | null = null;
   let firstWordsMs: number | null = null;
+  let firstText: string | null = null;
   /** The last streamed sentence: the voice has the whole answer to say. */
   let lastWordsMs: number | null = null;
   /** The first finding shown live (q.finding.available). */
@@ -632,7 +651,10 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
       if (delta.preview !== undefined) firstVisibleMs ??= at();
       if (delta.text.trim().length > 0) {
         lastWordsMs = at();
-        if (firstWordsMs === null) trace("first words");
+        if (firstWordsMs === null) {
+          trace("first words");
+          firstText = delta.text;
+        }
         firstWordsMs ??= at();
         firstVisibleMs ??= at();
       }
@@ -788,6 +810,8 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
     modelCalls: calls.length,
     calls,
     stages: [...stages, ...traced],
+    stored: stored.map((message) => message.content),
+    firstText,
   };
 }
 
@@ -826,6 +850,24 @@ describe("turn timing harness", () => {
     for (const one of rows) {
       expect(one.stages.some((stage) => /^[A-Z_]+@/u.test(stage))).toBe(true);
     }
+    // Owner 2026-10-21 (time to the first word): about 2 s where the work
+    // allows. A named company opens from its record as the model is asked,
+    // a web question too, before the web (before: 7.1 s).
+    for (const name of [
+      "typed question about",
+      "typed question, company named",
+      "comparison",
+      "public web",
+      "spoken follow-up",
+    ]) {
+      expect(row(name).firstWordsMs ?? Infinity).toBeLessThan(2_000);
+    }
+    // Not on Capital Q: what Q is checking, said as the search starts
+    // (after the round that composes it), and never stored with the answer.
+    const unknown = row("public web search, company not");
+    expect(unknown.firstText).toContain("I'm checking what's public on");
+    expect(unknown.firstWordsMs ?? Infinity).toBeLessThan(4_000);
+    expect(unknown.stored.join(" ")).not.toContain("I'm checking");
     // Progressive findings (round 5): the first one is on screen well
     // before the whole object is written.
     for (const name of ["typed question about", "comparison"]) {
