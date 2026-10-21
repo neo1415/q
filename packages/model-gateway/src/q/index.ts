@@ -3455,6 +3455,8 @@ export function createModelGatewayQAnswer(
    * ever read.
    */
   const warming = new Map<string, Promise<PreparedTurn>>();
+  /** A stage a warmed turn already showed, so its answer does not repeat it. */
+  const stagedEarly = new Map<string, QVisibleStage>();
   const WARMING_MAX = 64;
 
   return {
@@ -3474,14 +3476,31 @@ export function createModelGatewayQAnswer(
        * the readers: the same memoised read, the same tools and plan, read
        * only; a turn answered by code simply never uses them.
        */
-      if (request.plan.screen?.manifest?.focus !== undefined) {
-        started.then((prepared) => prepared?.wide()).catch(() => undefined);
-      }
+      // Owner 2026-10-21 (no serial wait that can run beside another): a
+      // message that names a company has that company read while the turn
+      // is still being read, not after; the same memoised, read-only reads.
+      started
+        .then((prepared) => {
+          if (prepared === null) return undefined;
+          const names =
+            companyNameCandidates(prepared.latest.content).length > 0;
+          if (!names && request.plan.screen?.manifest?.focus === undefined) {
+            return undefined;
+          }
+          // Its stage goes out as the read starts (visible stages).
+          if (names && request.speculation === undefined) {
+            stagedEarly.set(request.runId, "REVIEWING_COMPANY");
+            void showStage(request, "REVIEWING_COMPANY");
+          }
+          return prepared.wide();
+        })
+        .catch(() => undefined);
       warming.set(request.runId, started);
       while (warming.size > WARMING_MAX) {
         const oldest = warming.keys().next().value;
         if (oldest === undefined) break;
         warming.delete(oldest);
+        stagedEarly.delete(oldest);
       }
     },
     answer: async (request: QAnswerRequest): Promise<QAnswerOutcome> => {
@@ -3520,6 +3539,26 @@ export function createModelGatewayQAnswer(
       // A speculative answer leaves the warmed reads where they are: if it
       // is cancelled, the turn's own answer takes them up (they only read).
       const gate = speculationGate(request.speculation);
+      /**
+       * Owner 2026-10-21 (visible stages): each step's stage goes out as
+       * the step starts, in order, and never holds the step up. Writes are
+       * queued (one after another, so they are stored in the order they
+       * happened) and a stage already showing is not written again. While
+       * the answer is speculative the stage waits with its text.
+       */
+      let stageNow: QVisibleStage | undefined = stagedEarly.get(request.runId);
+      stagedEarly.delete(request.runId);
+      let stageQueue: Promise<void> = Promise.resolve();
+      const stageOnce = (stage: QVisibleStage): Promise<void> => {
+        if (stage === stageNow) return stageQueue;
+        stageNow = stage;
+        stageQueue = stageQueue.then(() =>
+          gate === null
+            ? showStage(request, stage)
+            : gate.emit(() => showStage(request, stage)),
+        );
+        return stageQueue;
+      };
       if (gate === null) warming.delete(request.runId);
       else
         void request.speculation?.decided.then(
@@ -3754,6 +3793,13 @@ export function createModelGatewayQAnswer(
           (request.turnKind === undefined ||
             request.turnKind === "QUESTION_TO_Q") &&
           asksWhatNeedsThem(latest.content));
+      // Visible stages: the companies a message names are read here.
+      if (
+        !withoutWideReads &&
+        companyNameCandidates(latest.content).length > 0
+      ) {
+        void stageOnce("REVIEWING_COMPANY");
+      }
       let wideReads: WideReads = withoutWideReads
         ? NO_WIDE_READS
         : await prepared.wide();
@@ -3816,11 +3862,6 @@ export function createModelGatewayQAnswer(
           await gate.ready();
         }
         return tools.execute(proposal, context);
-      };
-      /** A visible stage: held with the answer's text while speculative. */
-      const stageShown = async (stage: QVisibleStage): Promise<void> => {
-        if (gate === null) await showStage(request, stage);
-        else gate.emit(() => showStage(request, stage));
       };
       /**
        * A setup reminder (founder directive 2026-09-27), only at a natural
@@ -5418,11 +5459,65 @@ export function createModelGatewayQAnswer(
           sayLeadLines();
         }
 
+        /**
+         * The public web read by code (see below), once per turn: the
+         * stage, the call under this run's tool context, and its result in
+         * front of the model as Capital Q's own read.
+         */
+        const researchHop = async (
+          researchTool: QOfferedTool,
+        ): Promise<void> => {
+          // The stage goes out as the search starts, beside it.
+          const stageWrite =
+            researchTool.visibleStage === undefined ||
+            researchTool.visibleStage === null
+              ? null
+              : stageOnce(researchTool.visibleStage);
+          const followUp = publicResearchFollowUp({
+            history: earlier,
+            question: latest.content,
+            aboutNamedOther: request.aboutNamedOther === true,
+            selected: selectedForResearch(),
+          });
+          const call = {
+            callId: "q-research",
+            name: "research_public_web",
+            // The service plans further phrasings from the person's words.
+            arguments: {
+              ...(followUp ?? { query: latest.content.trim().slice(0, 200) }),
+              // Enough pages to answer from, not only to compare.
+              maxSources: prospectsThin ? 5 : 4,
+            },
+          };
+          took("beforeResearch");
+          const [outcome] = await Promise.all([
+            callTool(call, toolContext),
+            stageWrite,
+          ]);
+          took("research");
+          toolCalls.push({
+            toolName: outcome.toolName,
+            providerName: call.name,
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          });
+          collectSources(outcome);
+          messages = [
+            ...messages,
+            fetchedForYouMessage(call.name, outcome),
+            ...(prospectsThin && outcome.result.ok
+              ? [PROSPECT_RESEARCH_NOTE]
+              : []),
+          ];
+        };
+        const writingStage: QVisibleStage =
+          request.writingDocument === true
+            ? "PREPARING_DOCUMENT"
+            : "PREPARING_ANALYSIS";
         if (offered.length > 0) {
           took("prepare");
           let rounds = 0;
-          /** The stage last written this turn, so a repeat is not written again. */
-          let lastStageShown: QVisibleStage | undefined;
           let calls = 0;
           /**
            * Profiles code read after a search resolved to one company
@@ -5490,6 +5585,8 @@ export function createModelGatewayQAnswer(
             calls < Q_TOOL_LOOP_MAX_CALLS
           ) {
             modelCalls += 1;
+            // Visible stages: the model is now working on the answer.
+            if (rounds === 0) void stageOnce(writingStage);
             let result: Awaited<
               ReturnType<typeof gateway.execute<CompanyAnalystV26Result>>
             >;
@@ -5786,11 +5883,7 @@ export function createModelGatewayQAnswer(
               // changes (eight fit.profile reads wrote it eight times, one
               // after another), and beside the read rather than before it.
               const stage = tool?.visibleStage ?? null;
-              let stageWrite: Promise<void> | null = null;
-              if (stage !== null && stage !== lastStageShown) {
-                stageWrite = stageShown(stage);
-                lastStageShown = stage;
-              }
+              const stageWrite = stage === null ? null : stageOnce(stage);
               const settled = await early?.[index];
               if (settled !== undefined && !settled.ok) {
                 await stageWrite;
@@ -5925,12 +6018,7 @@ export function createModelGatewayQAnswer(
             if (chainedThisRound.length > 0) {
               const stage = offeredByName.get(CHAINED_GET_TOOL)?.visibleStage;
               const stageWrite =
-                stage !== undefined &&
-                stage !== null &&
-                stage !== lastStageShown
-                  ? stageShown(stage)
-                  : null;
-              if (stage !== undefined && stage !== null) lastStageShown = stage;
+                stage === undefined || stage === null ? null : stageOnce(stage);
               const [read] = await Promise.all([
                 Promise.allSettled(chainedThisRound),
                 stageWrite,
@@ -6012,46 +6100,7 @@ export function createModelGatewayQAnswer(
           researchTool !== undefined &&
           researchHopDue()
         ) {
-          if (
-            researchTool.visibleStage !== undefined &&
-            researchTool.visibleStage !== null
-          ) {
-            await stageShown(researchTool.visibleStage);
-          }
-          const followUp = publicResearchFollowUp({
-            history: earlier,
-            question: latest.content,
-            aboutNamedOther: request.aboutNamedOther === true,
-            selected: selectedForResearch(),
-          });
-          const call = {
-            callId: "q-research",
-            name: "research_public_web",
-            // The service plans further phrasings from the person's words.
-            arguments: {
-              ...(followUp ?? { query: latest.content.trim().slice(0, 200) }),
-              // Enough pages to answer from, not only to compare.
-              maxSources: prospectsThin ? 5 : 4,
-            },
-          };
-          took("beforeResearch");
-          const outcome = await callTool(call, toolContext);
-          took("research");
-          toolCalls.push({
-            toolName: outcome.toolName,
-            providerName: call.name,
-            status: outcome.status,
-            failureCode: outcome.failureCode,
-            latencyMs: outcome.latencyMs,
-          });
-          collectSources(outcome);
-          messages = [
-            ...messages,
-            fetchedForYouMessage(call.name, outcome),
-            ...(prospectsThin && outcome.result.ok
-              ? [PROSPECT_RESEARCH_NOTE]
-              : []),
-          ];
+          await researchHop(researchTool);
           if (request.signal?.aborted === true) {
             return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
           }
@@ -6068,6 +6117,7 @@ export function createModelGatewayQAnswer(
         }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
+          void stageOnce(writingStage);
           final = await gateway.execute<CompanyAnalystV26Result>(
             { ...base, messages, output: rendered.output },
             options,

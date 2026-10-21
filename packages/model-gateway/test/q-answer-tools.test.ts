@@ -937,7 +937,7 @@ describe("answer seam tool loop", () => {
     expect(toolTurn?.role).toBe("TOOL");
     expect(toolTurn?.content).toContain('"ok":true');
     expect(toolTurn?.content).toContain("Northwind (synthetic)");
-    expect(stages).toEqual(["REVIEWING_COMPANY"]);
+    expect(stages).toEqual(["PREPARING_ANALYSIS", "REVIEWING_COMPANY"]);
     expect(messages.at(-1)?.content).toBe("with tool");
     const observation = seam.lastObservation();
     expect(observation?.modelCalls).toBe(2);
