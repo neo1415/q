@@ -254,6 +254,7 @@ export {
   type CameraWatch,
   type CameraWatchLimits,
   frameFingerprint,
+  thumbDifference,
   type ScreenFrame,
   type ScreenLook,
   type ScreenWatch,
@@ -271,6 +272,10 @@ export {
   type BrainInput,
   type BrainRoute,
 } from "./meeting-host/brain.js";
+export {
+  readIntroduction,
+  type Introduction,
+} from "./meeting-host/introduction.js";
 export {
   affirms,
   attributeSpeaker,

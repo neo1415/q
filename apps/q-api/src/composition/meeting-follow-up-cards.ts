@@ -584,61 +584,68 @@ export function createMeetingFollowUpCards(dependencies: {
       readonly agreements: readonly string[];
       readonly nextSteps: readonly MeetingNextStepNote[];
     }): Promise<Map<string, number>> => {
-      const people = await peopleOf(held.meetingId, held.relationshipId);
-      const deckId = await deckOf(held.relationshipId);
+      // 2026-10-20: who was on the call and the deck are read together, and
+      // each person's cards are prepared alongside the others' (each in
+      // their own conversation, in order), not one person after another.
+      const [people, deckId] = await Promise.all([
+        peopleOf(held.meetingId, held.relationshipId),
+        deckOf(held.relationshipId),
+      ]);
       const proposed = new Map<string, number>();
-      for (const person of people) {
-        if (person.side === null) continue;
-        const cards = followUpCards({
-          person: {
-            userId: person.user_id,
-            side: person.side,
-            organiser: person.organiser,
-          },
-          meetingId: held.meetingId,
-          relationshipId: held.relationshipId,
-          purpose: held.purpose,
-          startsAt: held.startsAt,
-          counterpartName: person.counterpart,
-          agreements: held.agreements,
-          nextSteps: held.nextSteps,
-          deckDocumentId: deckId,
-          now: now(),
-        });
-        if (cards.length === 0) continue;
-        const actor = await actorOf(person);
-        if (actor === null) continue;
-        let conversationId: string | null = null;
-        let count = 0;
-        for (const proposed of cards) {
-          try {
-            const graded = await reviewed(
-              actor,
-              proposed,
-              held.meetingId,
-              person.counterpart,
-              held.agreements,
-              person.name,
-            );
-            if (graded === null) continue;
-            const { card } = graded;
-            const filed = await propose(actor, card, conversationId);
-            conversationId = filed.conversationId;
-            await graded.settle?.(filed.actionId);
-            count += 1;
-          } catch (error: unknown) {
-            logger?.warn(
-              {
-                err: error,
-                meetingId: held.meetingId,
-                action: proposed.actionType,
-              },
-              "meeting follow-up card not prepared",
-            );
+      await Promise.all(
+        people.map(async (person) => {
+          if (person.side === null) return;
+          const cards = followUpCards({
+            person: {
+              userId: person.user_id,
+              side: person.side,
+              organiser: person.organiser,
+            },
+            meetingId: held.meetingId,
+            relationshipId: held.relationshipId,
+            purpose: held.purpose,
+            startsAt: held.startsAt,
+            counterpartName: person.counterpart,
+            agreements: held.agreements,
+            nextSteps: held.nextSteps,
+            deckDocumentId: deckId,
+            now: now(),
+          });
+          if (cards.length === 0) return;
+          const actor = await actorOf(person);
+          if (actor === null) return;
+          let conversationId: string | null = null;
+          let count = 0;
+          for (const proposed of cards) {
+            try {
+              const graded = await reviewed(
+                actor,
+                proposed,
+                held.meetingId,
+                person.counterpart,
+                held.agreements,
+                person.name,
+              );
+              if (graded === null) continue;
+              const { card } = graded;
+              const filed = await propose(actor, card, conversationId);
+              conversationId = filed.conversationId;
+              await graded.settle?.(filed.actionId);
+              count += 1;
+            } catch (error: unknown) {
+              logger?.warn(
+                {
+                  err: error,
+                  meetingId: held.meetingId,
+                  action: proposed.actionType,
+                },
+                "meeting follow-up card not prepared",
+              );
+            }
           }
-        }
-        proposed.set(person.user_id, count);
-      }
+          proposed.set(person.user_id, count);
+        }),
+      );
       return proposed;
     },
   };

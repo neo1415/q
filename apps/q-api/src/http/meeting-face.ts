@@ -116,6 +116,16 @@ export function registerMeetingFaceRoutes(
             ),
           );
         }
+      } else if (result.kind === "STREAM") {
+        // 2026-10-20: the first sentence now, the rest as the host decides
+        // it, in the same turn (the face starts speaking at once).
+        raw.write(chunk(id, { content: result.first }, null, model));
+        for await (const part of result.rest) {
+          if (controller.signal.aborted || raw.destroyed) break;
+          raw.write(chunk(id, { content: ` ${part}` }, null, model));
+        }
+        // Spoken over meanwhile: the provider has already gone.
+        if (raw.destroyed) return reply;
       }
       raw.write(chunk(id, {}, "stop", model));
       raw.write("data: [DONE]\n\n");

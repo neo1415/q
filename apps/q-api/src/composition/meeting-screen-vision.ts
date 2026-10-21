@@ -29,6 +29,7 @@ import {
   meetingHostToken,
   verifyMeetingHostToken,
 } from "./meeting-host-runtime.js";
+import { frameThumb } from "./png-thumb.js";
 
 /**
  * P5 (founder brief 2026-10-06): Q sees screens shared in a call it
@@ -392,6 +393,8 @@ export function createMeetingScreenVision(dependencies: {
         type: frame.type,
         pngBase64: frame.buffer,
         at,
+        // 2026-10-20: decoded only if the watch asks (changed as people see it).
+        thumb: () => frameThumb(frame.buffer),
       } as const;
       const seen =
         frame.type === "screenshare"
