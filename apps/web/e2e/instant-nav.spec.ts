@@ -771,3 +771,421 @@ for (const [name, path] of [
     });
   }
 }
+
+// ---------------------------------------------------------------------------
+// Context (owner 2026-10-21, binding: "names must NOT be required").
+// ---------------------------------------------------------------------------
+
+const HALYARD = "5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70";
+const ACORN = "1a1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f75";
+const INVESTOR_PAGE = `/dev/instant-nav/investors/${ACORN}`;
+
+const said = (id: string) => ({
+  kind: "UI_INTENT",
+  intent: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id },
+});
+const cardsOf = (...items: readonly (readonly [string, string])[]) => ({
+  kind: "ANSWER_CARDS",
+  cards: items.map(([name, id], index) => ({
+    rank: index + 1,
+    name,
+    subject: { kind: "COMPANY", companyId: id },
+  })),
+});
+const MEMO_MADE = {
+  kind: "ARTIFACT_REFERENCE",
+  artifactId: BRIEF,
+  type: "INVESTMENT_BRIEF",
+  status: "READY",
+  title: "Investment memo: Nixo",
+};
+
+/** Conversation states: what Q's answers carried, oldest first. */
+const STATES = {
+  none: [] as unknown[][],
+  aboutNixo: [[said(NIXO)]],
+  threeCards: [
+    [
+      cardsOf(
+        ["Northwind Robotics", COMPANY],
+        ["Nixo", NIXO],
+        ["Halyard", HALYARD],
+      ),
+    ],
+  ],
+  oneCard: [[cardsOf(["Halyard", HALYARD])]],
+  compared: [[cardsOf(["Northwind Robotics", COMPANY], ["Halyard", HALYARD])]],
+  memoMade: [[said(NIXO)], [MEMO_MADE]],
+  torn: [[said(NIXO), said(HALYARD)]],
+} as const;
+
+type Choose = "NONE" | "HANG" | "CHOOSE_HALYARD" | "ONLY_NIXO";
+
+type ContextCase = {
+  readonly id: number;
+  readonly said: string;
+  readonly page: string;
+  readonly channel: "typed" | "spoken";
+  readonly state: keyof typeof STATES;
+  readonly choose?: Choose | undefined;
+  readonly setup?: ((page: Page) => Promise<void>) | undefined;
+  /** A path, "#document", "#chooser", "#close", or "Q" (left to Q). */
+  readonly expect: string;
+};
+
+const deck = (id: string) => `/company/${id}?tab=deck`;
+const CONTEXT_CASES: readonly ContextCase[] = [
+  {
+    id: 101,
+    said: "open their deck",
+    page: FEED,
+    channel: "typed",
+    state: "aboutNixo",
+    expect: deck(NIXO),
+  },
+  {
+    id: 102,
+    said: "show me their data room",
+    page: WORK,
+    channel: "spoken",
+    state: "aboutNixo",
+    expect: `/company/${NIXO}?tab=dataroom`,
+  },
+  {
+    id: 103,
+    said: "open their team",
+    page: FEED,
+    channel: "typed",
+    state: "aboutNixo",
+    expect: `/company/${NIXO}?tab=team`,
+  },
+  {
+    id: 104,
+    said: "open their chat",
+    page: WORK,
+    channel: "typed",
+    state: "aboutNixo",
+    expect: `/relationships/company/${NIXO}/messages`,
+  },
+  {
+    id: 105,
+    said: "uh, open their deck",
+    page: FEED,
+    channel: "spoken",
+    state: "aboutNixo",
+    expect: deck(NIXO),
+  },
+  {
+    id: 106,
+    said: "open its data room",
+    page: WORK,
+    channel: "spoken",
+    state: "aboutNixo",
+    expect: `/company/${NIXO}?tab=dataroom`,
+  },
+  {
+    id: 107,
+    said: "show me the financials",
+    page: FEED,
+    channel: "typed",
+    state: "aboutNixo",
+    expect: `/company/${NIXO}?tab=dataroom`,
+  },
+  {
+    id: 108,
+    said: "show me that",
+    page: FEED,
+    channel: "typed",
+    state: "oneCard",
+    expect: `/company/${HALYARD}`,
+  },
+  {
+    id: 109,
+    said: "open that one",
+    page: WORK,
+    channel: "spoken",
+    state: "oneCard",
+    expect: `/company/${HALYARD}`,
+  },
+  {
+    id: 110,
+    said: "pull up that deck",
+    page: FEED,
+    channel: "typed",
+    state: "oneCard",
+    expect: deck(HALYARD),
+  },
+  {
+    id: 111,
+    said: "show me that",
+    page: COMPANY_PAGE,
+    channel: "typed",
+    state: "oneCard",
+    expect: `/company/${HALYARD}`,
+  },
+  {
+    id: 112,
+    said: "open the second one",
+    page: FEED,
+    channel: "typed",
+    state: "threeCards",
+    expect: `/company/${NIXO}`,
+  },
+  {
+    id: 113,
+    said: "show me the last one",
+    page: WORK,
+    channel: "spoken",
+    state: "threeCards",
+    expect: `/company/${HALYARD}`,
+  },
+  {
+    id: 114,
+    said: "open the first one's deck",
+    page: FEED,
+    channel: "typed",
+    state: "threeCards",
+    expect: deck(COMPANY),
+  },
+  {
+    id: 115,
+    said: "go back to the other one",
+    page: COMPANY_PAGE,
+    channel: "typed",
+    state: "compared",
+    expect: `/company/${HALYARD}`,
+  },
+  {
+    id: 116,
+    said: "take me to the other one's deck",
+    page: COMPANY_PAGE,
+    channel: "spoken",
+    state: "compared",
+    expect: deck(HALYARD),
+  },
+  {
+    id: 117,
+    said: "open their stuff",
+    page: INVESTOR_PAGE,
+    channel: "typed",
+    state: "none",
+    expect: `/relationships/investor/${ACORN}`,
+  },
+  {
+    id: 118,
+    said: "open their chat",
+    page: INVESTOR_PAGE,
+    channel: "spoken",
+    state: "none",
+    expect: `/relationships/investor/${ACORN}/messages`,
+  },
+  {
+    id: 119,
+    said: "open this one",
+    page: INVESTOR_PAGE,
+    channel: "typed",
+    state: "aboutNixo",
+    expect: `/relationships/investor/${ACORN}`,
+  },
+  {
+    id: 120,
+    said: "open their stuff",
+    page: FEED,
+    channel: "typed",
+    state: "aboutNixo",
+    expect: deck(NIXO),
+  },
+  {
+    id: 121,
+    said: "open the memo",
+    page: FEED,
+    channel: "typed",
+    state: "memoMade",
+    expect: "#document",
+  },
+  {
+    id: 122,
+    said: "show me that",
+    page: WORK,
+    channel: "spoken",
+    state: "memoMade",
+    expect: "#document",
+  },
+  {
+    id: 123,
+    said: "open the doc",
+    page: COMPANY_PAGE,
+    channel: "typed",
+    state: "memoMade",
+    expect: "#document",
+  },
+  {
+    id: 124,
+    said: "open it",
+    page: FEED,
+    channel: "typed",
+    state: "none",
+    // Q's answer opened a document a moment ago, and they closed it.
+    setup: async (page) => {
+      await page.evaluate((id) => {
+        (
+          window as Window & { cqHarnessPerform?: (a: unknown) => void }
+        ).cqHarnessPerform?.({
+          kind: "OPEN_RECORD_PAGE",
+          page: "DOCUMENT",
+          id,
+        });
+      }, BRIEF);
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    },
+    expect: "#document",
+  },
+  {
+    id: 125,
+    said: "open their deck",
+    page: FEED,
+    channel: "typed",
+    state: "torn",
+    choose: "CHOOSE_HALYARD",
+    expect: deck(HALYARD),
+  },
+  {
+    id: 126,
+    said: "open their deck",
+    page: WORK,
+    channel: "spoken",
+    state: "torn",
+    choose: "HANG",
+    expect: "#chooser",
+  },
+  {
+    id: 127,
+    said: "open their deck",
+    page: FEED,
+    channel: "typed",
+    state: "torn",
+    choose: "ONLY_NIXO",
+    expect: deck(NIXO),
+  },
+  {
+    id: 128,
+    said: "open their deck",
+    page: FEED,
+    channel: "typed",
+    state: "none",
+    expect: "Q",
+  },
+  {
+    id: 129,
+    said: "open the second one",
+    page: WORK,
+    channel: "typed",
+    state: "none",
+    expect: "Q",
+  },
+];
+
+for (const one of CONTEXT_CASES) {
+  test(`context #${String(one.id)} ${one.channel}: "${one.said}" (${one.state}) on ${one.page.replace("/dev/instant-nav", "") || "/feed"}`, async ({
+    page,
+  }, info) => {
+    let chooseCalls = 0;
+    let model = false;
+    await page.route("**/api/q-choose", async (route) => {
+      chooseCalls += 1;
+      const body = route.request().postDataJSON() as {
+        candidates: { key: string; id: string }[];
+      };
+      if (one.choose === "HANG") {
+        await new Promise((resolve) => setTimeout(resolve, 3_000));
+        await route.fulfill({ json: { kind: "NONE", allowed: [], ms: 3000 } });
+        return;
+      }
+      // A capped FAST_CLASSIFICATION call takes a few hundred ms hosted.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      if (one.choose === "CHOOSE_HALYARD") {
+        model = true;
+        const key = body.candidates.find((c) => c.id === HALYARD)?.key ?? "c1";
+        await route.fulfill({
+          json: { kind: "CHOSEN", key, model: true, ms: 300 },
+        });
+        return;
+      }
+      const allowed =
+        one.choose === "ONLY_NIXO"
+          ? body.candidates.filter((c) => c.id === NIXO).map((c) => c.key)
+          : body.candidates.map((c) => c.key);
+      await route.fulfill({ json: { kind: "NONE", allowed, ms: 300 } });
+    });
+    const counts = await harness(page, one.page);
+    await page.evaluate(
+      (answers) => {
+        (
+          window as Window & {
+            cqHarnessConversation?: (a: readonly unknown[][]) => void;
+          }
+        ).cqHarnessConversation?.(answers);
+      },
+      STATES[one.state] as unknown as unknown[][],
+    );
+    if (one.setup !== undefined) await one.setup(page);
+    await say(page, one.channel, one.said);
+    let ms: number | null = null;
+    let landed: string | null;
+    if (one.expect === "Q") {
+      await page.waitForTimeout(900);
+      landed = await stored(page, "cq-fast-path");
+      expect(landed).toBeNull();
+    } else {
+      await expect
+        .poll(() => stored(page, "cq-fast-ms"), { timeout: 5_000 })
+        .not.toBeNull();
+      ms = Number(await stored(page, "cq-fast-ms"));
+      landed = await stored(page, "cq-fast-path");
+      expect(landed).toBe(one.expect);
+      if (one.expect === "#chooser") {
+        await expect(page.locator("[data-q-choice]")).toHaveCount(2);
+      }
+      if (one.expect === "#document") {
+        await expect(page.getByRole("dialog")).toBeVisible();
+      }
+    }
+    await page.waitForTimeout(500);
+    const moves = Number((await stored(page, "cq-fast-count")) ?? "0");
+    expect(moves).toBeLessThanOrEqual(1);
+    if (one.channel === "typed") {
+      // What the screen did by itself needs no Q run.
+      expect(counts.asks).toBe(one.expect === "Q" ? 1 : 0);
+    }
+    if (info.project.name === "desktop") {
+      mkdirSync(join(EVIDENCE, "rows"), { recursive: true });
+      writeFileSync(
+        join(EVIDENCE, "rows", `${String(one.id)}.json`),
+        `${JSON.stringify({
+          id: one.id,
+          said: one.said,
+          page: one.page.replace("/dev/instant-nav", "") || "/feed",
+          channel: one.channel,
+          state: one.state,
+          expect: one.expect,
+          landed,
+          correct: one.expect === "Q" ? landed === null : landed === one.expect,
+          via:
+            one.expect === "Q"
+              ? "left to Q"
+              : landed === "#chooser"
+                ? "chooser"
+                : model
+                  ? "small model"
+                  : "code",
+          chooseCalls,
+          ms,
+          runs: counts.asks,
+          moves,
+        })}\n`,
+      );
+    }
+  });
+}

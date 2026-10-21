@@ -17,6 +17,10 @@
       "types": "./dist/cards-request.d.ts",
       "default": "./dist/cards-request.js"
     },
+    "./context-request": {
+      "types": "./dist/context-request.d.ts",
+      "default": "./dist/context-request.js"
+    },
     "./instant-request": {
       "types": "./dist/instant-request.d.ts",
       "default": "./dist/instant-request.js"

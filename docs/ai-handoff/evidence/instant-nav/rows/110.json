@@ -1,0 +1,15 @@
+{
+  "id": 110,
+  "said": "pull up that deck",
+  "page": "/feed",
+  "channel": "typed",
+  "state": "oneCard",
+  "expect": "/company/5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70?tab=deck",
+  "landed": "/company/5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70?tab=deck",
+  "correct": true,
+  "via": "code",
+  "chooseCalls": 0,
+  "ms": 55,
+  "runs": 0,
+  "moves": 1
+}

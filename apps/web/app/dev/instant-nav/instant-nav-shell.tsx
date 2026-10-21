@@ -6,7 +6,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import { GlobalQProvider } from "@/components/app-shell/global-q";
 import { DocumentReadyCenter } from "@/features/documents/document-ready-center";
 import { demoTop } from "@/features/q/answer-canvas-fixtures";
+import { performClientAction } from "@/features/q/client-actions";
+import { setConversationTurns } from "@/features/q/control/context-set";
 import { navigationHeardFor } from "@/features/q/control/fast-navigation";
+import type { QTurn } from "@/features/q/conversation";
 import { QControlRuntime } from "@/features/q/control/q-control-runtime";
 import { showInModal } from "@/features/q/control/show-store";
 import { NO_SUBJECT } from "@/features/q/q-subject";
@@ -24,6 +27,29 @@ function Strip() {
     const own = window as Window & {
       cqHarnessShowCards?: (title: string) => void;
       cqHarnessHeard?: (text: string) => void;
+      cqHarnessConversation?: (answers: readonly unknown[][]) => void;
+      cqHarnessPerform?: (action: unknown) => void;
+    };
+    // What Q's answers in this conversation carried, oldest first (a
+    // stand-in for a recorded conversation; blocks as the API sends them).
+    own.cqHarnessConversation = (answers) => {
+      setConversationTurns(
+        answers.map((blocks, index): QTurn => ({
+          kind: "Q",
+          id: `harness-answer-${String(index)}`,
+          text: "",
+          streaming: false,
+          sourceCount: 0,
+          publicSources: [],
+          findings: [],
+          uncertainties: [],
+          blocks: blocks as Extract<QTurn, { kind: "Q" }>["blocks"],
+        })),
+      );
+    };
+    // An action Q's answer carried, performed as the session performs it.
+    own.cqHarnessPerform = (action) => {
+      performClientAction(action);
     };
     // A voice line's final transcript, as every voice line hands it over.
     own.cqHarnessHeard = (said) => {
@@ -54,6 +80,12 @@ function Strip() {
         </Link>
         <Link href="/dev/instant-nav/work" data-harness-link="work">
           Work page
+        </Link>
+        <Link
+          href="/dev/instant-nav/investors/1a1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f75"
+          data-harness-link="investor"
+        >
+          Investor page
         </Link>
       </nav>
       <form

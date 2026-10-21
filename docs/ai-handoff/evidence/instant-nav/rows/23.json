@@ -4,7 +4,7 @@
   "page": "/feed",
   "channel": "typed",
   "kind": "scroll",
-  "ms": 52,
+  "ms": 42,
   "runs": 0,
   "reads": 0,
   "moves": 1,

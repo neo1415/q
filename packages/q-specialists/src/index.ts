@@ -397,6 +397,12 @@ export {
   type InstantRequest,
 } from "./instant-request.js";
 export {
+  contextAskOf,
+  type ContextAsk,
+  type ContextPart,
+  type ContextPointer,
+} from "./context-request.js";
+export {
   PROFILE_SECTION_WORDS,
   screenTabTarget,
   tabAskOf,

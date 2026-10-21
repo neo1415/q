@@ -1,4 +1,10 @@
-import type { QFastNavigationResponse, QUiIntent } from "@capital-q/contracts";
+import type {
+  QFastNavigationResponse,
+  QNavigationChooseRequest,
+  QNavigationChooseResponse,
+  QUiIntent,
+} from "@capital-q/contracts";
+import { contextAskOf } from "@capital-q/q-specialists/context-request";
 import {
   asksToGo,
   pageRequestOf,
@@ -29,7 +35,10 @@ import {
 } from "../client-actions";
 import { applyCardsIntent } from "../cards/card-visibility-store";
 import { navigationInFlight } from "../ui-act-controller";
+import { resolveContext, type ContextTarget, type Scored } from "./context-set";
 import { instantAct } from "./instant-acts";
+import { noteOpened, subjectOfPage } from "./instant-ledger";
+import { showInModal } from "./show-store";
 import { performOnControl } from "./perform";
 import { controlOf, type ControlEntry } from "./registry";
 
@@ -72,6 +81,29 @@ export const fetchNavigation: FastNavigationTransport = async (body) => {
 };
 
 let transport: FastNavigationTransport = fetchNavigation;
+
+/** Lane 7: the tie-break for a pointing request, through /api/q-choose. */
+export type ChoiceTransport = (
+  body: QNavigationChooseRequest,
+) => Promise<QNavigationChooseResponse>;
+export const Q_CHOOSE_ROUTE = "/api/q-choose";
+
+export const fetchChoice: ChoiceTransport = async (body) => {
+  const response = await fetch(Q_CHOOSE_ROUTE, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    credentials: "same-origin",
+  });
+  if (!response.ok) return { kind: "NONE", allowed: [], ms: 0 };
+  return (await response.json()) as QNavigationChooseResponse;
+};
+
+let chooseTransport: ChoiceTransport = fetchChoice;
+/** Tests replace the network; the page never does. */
+export function setChoiceTransport(next: ChoiceTransport): void {
+  chooseTransport = next;
+}
 /** Tests replace the network; the page never does. */
 export function setNavigationTransport(next: FastNavigationTransport): void {
   transport = next;
@@ -233,6 +265,13 @@ export type FastNavigationTiming = {
   readonly ms: number;
   /** The push's own synchronous work (the router, not the reader). */
   readonly pushMs: number;
+  /**
+   * Lane 7: the screen did all the sentence asked (an act, a document, a
+   * pointing request resolved): it needs no turn of Q's.
+   */
+  readonly handled?: boolean | undefined;
+  /** Lane 7: how a pointing request was resolved. */
+  readonly via?: "CODE" | "MODEL" | "CHOOSER" | undefined;
 };
 
 /**
@@ -312,6 +351,26 @@ export async function navigationHeard(
   // A page read here moves in this same task: no await, so nothing the
   // send queued (a React render, the run's request) goes first.
   const here = readHere(text);
+  // Lane 7: "open their deck", "that one", "the other one": read against
+  // the screen and the conversation, by code, before any server read.
+  const pointed =
+    here === "ASK_SERVER" || here.path === null
+      ? await pointedTarget(text)
+      : null;
+  if (pointed !== null) {
+    if (pointed.kind === "CHOOSER") {
+      return announce({
+        path: "#chooser",
+        route: false,
+        ms: Math.round(performance.now() - started),
+        pushMs: 0,
+        handled: true,
+        via: "CHOOSER",
+      });
+    }
+    const done = performPointed(pointed.target, started);
+    return done === null ? null : { ...done, via: pointed.via };
+  }
   const target =
     here === "ASK_SERVER"
       ? await resolve(text, true)
@@ -328,6 +387,7 @@ export async function navigationHeard(
       route: false,
       ms: Math.round(performance.now() - started),
       pushMs: 0,
+      handled: true,
     });
   }
   const path = target.path;
@@ -357,6 +417,142 @@ export async function navigationHeard(
   });
 }
 
+/** A code candidate this good is taken when the tie-break has no answer. */
+export const DECENT_SCORE = 4;
+/** The tie-break's whole budget, as the screen waits for it. */
+export const CHOOSE_WAIT_MS = 800;
+
+type Pointed =
+  | {
+      readonly kind: "TARGET";
+      readonly target: ContextTarget;
+      readonly via: "CODE" | "MODEL";
+    }
+  | { readonly kind: "CHOOSER" };
+
+/**
+ * Lane 7 (owner: "names must NOT be required"): what a pointing request
+ * means here. A clear winner by code acts at once; when code is torn, the
+ * Q API keeps only what the person may open and asks one capped model
+ * call; with no answer in time, the best by code if it is good enough,
+ * else a one-tap chooser over the page. Null: not a pointing request, or
+ * nothing in context fits (Q's answer reads it).
+ */
+async function pointedTarget(text: string): Promise<Pointed | null> {
+  const ask = contextAskOf(text);
+  if (ask === null || typeof window === "undefined") return null;
+  const decision = resolveContext(ask, window.location.pathname);
+  if (decision === null) return null;
+  if (decision.kind === "ONE") {
+    return { kind: "TARGET", target: decision.target, via: "CODE" };
+  }
+  const candidates = decision.candidates;
+  const keyed = candidates.map((one, index) => ({
+    key: `c${String(index + 1)}`,
+    one,
+  }));
+  const answer = await Promise.race([
+    chooseTransport({
+      text: text.trim().slice(0, 300),
+      candidates: keyed.map(({ key, one }) => ({
+        key,
+        page: one.target.ref.page,
+        id: one.target.ref.id,
+        ...(one.target.ref.companyId === undefined
+          ? {}
+          : { companyId: one.target.ref.companyId }),
+        label: one.target.label.slice(0, 120),
+      })),
+    }).catch(() => null),
+    new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), CHOOSE_WAIT_MS),
+    ),
+  ]);
+  if (answer?.kind === "CHOSEN") {
+    const chosen = keyed.find(({ key }) => key === answer.key);
+    if (chosen !== undefined) {
+      return {
+        kind: "TARGET",
+        target: chosen.one.target,
+        via: answer.model ? "MODEL" : "CODE",
+      };
+    }
+  }
+  // The Q API answered: only what they may open stays in play.
+  const left: readonly Scored[] =
+    answer?.kind === "NONE"
+      ? keyed
+          .filter(({ key }) => answer.allowed.includes(key))
+          .map(({ one }) => one)
+      : candidates;
+  const best = left[0];
+  if (best === undefined) return null;
+  if (left.length === 1 || best.score >= DECENT_SCORE) {
+    return { kind: "TARGET", target: best.target, via: "CODE" };
+  }
+  showInModal({
+    key: `choose-${String(Date.now())}`,
+    title: "",
+    text: "",
+    blocks: [],
+    choices: left.map((one, index) => ({
+      key: `c${String(index + 1)}`,
+      label: one.target.label,
+      choose: () => {
+        noteAsked();
+        performPointed(one.target, performance.now());
+      },
+    })),
+  });
+  return { kind: "CHOOSER" };
+}
+
+/** Opens what a pointing request landed on: a page, or a document. */
+function performPointed(
+  target: ContextTarget,
+  started: number,
+): FastNavigationTiming | null {
+  if (target.kind === "DOCUMENT") {
+    openDocumentEarly(target.document);
+    return announce({
+      path: "#document",
+      route: false,
+      ms: Math.round(performance.now() - started),
+      pushMs: 0,
+      handled: true,
+    });
+  }
+  const subject = subjectOfPage(target.ref.page, target.ref.id);
+  if (subject !== null) noteOpened({ subject, label: target.label });
+  const path = target.path;
+  if (`${window.location.pathname}${window.location.search}` === path) {
+    return {
+      path,
+      route: true,
+      ms: Math.round(performance.now() - started),
+      pushMs: 0,
+      handled: true,
+    };
+  }
+  const pushing = performance.now();
+  moveEarly(path);
+  return announce({
+    path,
+    route: true,
+    ms: Math.round(pushing - started),
+    pushMs: Math.round(performance.now() - pushing),
+    handled: true,
+  });
+}
+
+/**
+ * Lane 7: the words point instead of naming ("open their deck", "that
+ * one"); the typed line waits for the screen's reading of them, briefly.
+ */
+export function contextAsked(text: string): boolean {
+  return contextAskOf(text) !== null;
+}
+
 function announce(timing: FastNavigationTiming): FastNavigationTiming {
   if (typeof window !== "undefined") {
     window.dispatchEvent(
@@ -380,6 +576,7 @@ function actedNow(text: string): FastNavigationTiming | null {
     route: false,
     ms: Math.round(performance.now() - started),
     pushMs: 0,
+    handled: true,
   });
 }
 
@@ -418,6 +615,20 @@ export function navigationHearing(key: string, text: string): void {
     key,
     setTimeout(() => {
       hearing.delete(key);
+      // Lane 7: "open their…" warms what it points at, so the final word
+      // opens it at once. Never moves.
+      const ask = contextAskOf(text);
+      if (ask !== null && typeof window !== "undefined") {
+        const decision = resolveContext(ask, window.location.pathname);
+        const best =
+          decision?.kind === "ONE"
+            ? decision.target
+            : decision?.kind === "TORN"
+              ? decision.candidates[0]?.target
+              : undefined;
+        if (best?.kind === "PATH") prefetchPath(best.path);
+        return;
+      }
       void resolve(text, false).then((target) => {
         if (target?.kind === "PATH") prefetchPath(target.path);
       });
@@ -516,4 +727,5 @@ export function resetFastNavigation(): void {
   for (const timer of hearing.values()) clearTimeout(timer);
   hearing.clear();
   transport = fetchNavigation;
+  chooseTransport = fetchChoice;
 }

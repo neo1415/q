@@ -20,7 +20,11 @@ import {
   lastNavigationTo,
 } from "./control/navigation-lifecycle";
 import { currentRoute } from "./control/route-state";
-import { doneByScreen } from "./control/instant-ledger";
+import {
+  doneByScreen,
+  noteOpened,
+  subjectOfPage,
+} from "./control/instant-ledger";
 import { performUiAct, requestMove } from "./ui-act-controller";
 import { announceLanguage } from "@/features/i18n/language";
 import { openDocumentViewer } from "@/features/documents/document-ready";
@@ -470,6 +474,10 @@ export function openDocumentEarly(
   effects: ClientActionEffects = BROWSER_EFFECTS,
 ): void {
   earlyDocument = { id: documentKey(document), at: Date.now() };
+  noteOpened({
+    document,
+    label: document.kind === "MATERIAL" ? document.title : null,
+  });
   if (document.kind === "MATERIAL") {
     effects.openMaterial({
       companyId: document.companyId,
@@ -483,6 +491,33 @@ export function openDocumentEarly(
   } else {
     effects.goTo(recordPagePath("DOCUMENT", document.artifactId));
   }
+}
+
+/** Lane 7: the record or document a record-page intent opens, noted. */
+export function noteOpenedPage(
+  intent: Extract<QClientActionIntent, { kind: "OPEN_RECORD_PAGE" }>,
+): void {
+  if (intent.page === "DATA_ROOM_DOCUMENT" && intent.companyId !== undefined) {
+    noteOpened({
+      document: {
+        kind: "MATERIAL",
+        companyId: intent.companyId,
+        documentId: intent.id,
+        title: intent.title ?? null,
+      },
+      label: intent.title ?? null,
+    });
+    return;
+  }
+  if (intent.page === "DOCUMENT") {
+    noteOpened({
+      document: { kind: "ARTIFACT", artifactId: intent.id },
+      label: null,
+    });
+    return;
+  }
+  const subject = subjectOfPage(intent.page, intent.id);
+  if (subject !== null) noteOpened({ subject, label: null });
 }
 
 /** Whether the fast path already opened this one (consumed once). */
@@ -676,6 +711,8 @@ function performChecked(
       effects.signOut();
       return true;
     case "OPEN_RECORD_PAGE":
+      // Lane 7: what Q opened is what "it" and "the other one" mean next.
+      noteOpenedPage(action);
       // Lane 7: opened already for this sentence by the fast path.
       if (
         (action.page === "DATA_ROOM_DOCUMENT" || action.page === "DOCUMENT") &&

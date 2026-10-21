@@ -3,12 +3,16 @@ import type { FastifyInstance } from "fastify";
 import {
   parseContract,
   Q_FAST_NAVIGATION_PATH,
+  Q_NAVIGATION_CHOOSE_PATH,
   QFastNavigationRequestSchema,
   QFastNavigationResponseSchema,
+  QNavigationChooseRequestSchema,
+  QNavigationChooseResponseSchema,
 } from "@capital-q/contracts";
 import type { ApplicationIdentityLookup } from "@capital-q/security/postgres";
 
 import type { FastNavigationResolver } from "../composition/fast-navigation.js";
+import type { NavigationChooser } from "../composition/navigation-chooser.js";
 import {
   getActorContext,
   requireActorContextHook,
@@ -28,6 +32,7 @@ export function registerFastNavigationRoutes(
   dependencies: ActorContextDependencies & {
     readonly identity?: ApplicationIdentityLookup | undefined;
     readonly resolve: FastNavigationResolver;
+    readonly choose?: NavigationChooser | undefined;
   },
 ): void {
   const identity = dependencies.identity;
@@ -54,6 +59,26 @@ export function registerFastNavigationRoutes(
         .code(200)
         .header("Cache-Control", "no-store")
         .send(QFastNavigationResponseSchema.parse(decided));
+    },
+  );
+
+  // Lane 7: the tie-break for a pointing request. Reads only (as above).
+  const choose = dependencies.choose;
+  if (choose === undefined) return;
+  app.post(
+    Q_NAVIGATION_CHOOSE_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const body = parseContract(
+        QNavigationChooseRequestSchema,
+        request.body ?? {},
+        "That choice request is not valid.",
+      );
+      const decided = await choose(getActorContext(request), body);
+      return reply
+        .code(200)
+        .header("Cache-Control", "no-store")
+        .send(QNavigationChooseResponseSchema.parse(decided));
     },
   );
 }
