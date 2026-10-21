@@ -28,6 +28,7 @@ import { roomCardHref } from "./room/room-card-view";
 import type { QTurnObjectBlock } from "./conversation";
 import { AttentionBody } from "./blocks/attention-block";
 import { SummaryBody } from "./blocks/summary-block";
+import { PictureBody } from "./blocks/picture-block";
 import {
   ChartBody,
   MapBody,
@@ -508,6 +509,14 @@ export function QResultBlocks({
             return (
               <QResultCard key={key} label={t("Summary")}>
                 <SummaryBody block={block} />
+              </QResultCard>
+            );
+
+          case "PICTURE":
+            // L-13: illustration, credited on its own frame.
+            return (
+              <QResultCard key={key} label={t("Picture")}>
+                <PictureBody block={block} />
               </QResultCard>
             );
 

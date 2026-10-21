@@ -64,6 +64,8 @@ export const Q_RESULT_BLOCK_KINDS = [
   "ATTENTION",
   // Artifacts live (owner 2026-10-20): a summary Q speaks over.
   "SUMMARY",
+  // L-13 (2026-10-20): a picture of something visual, credited.
+  "PICTURE",
 ] as const;
 
 export type QResultBlockKind = (typeof Q_RESULT_BLOCK_KINDS)[number];
@@ -505,6 +507,71 @@ export const QSummaryBlockSchema = z
   .strict();
 export type QSummaryBlock = z.infer<typeof QSummaryBlockSchema>;
 
+/**
+ * L-13 (owner ask 2026-10-20): a picture of the thing Q is talking about,
+ * from an authorised picture source, with its credit. A picture is
+ * illustration, never evidence: it carries no claim about any subject, and
+ * an answer is complete without one.
+ *
+ * The source is a closed set and each source has its own image host, so a
+ * block can never point a browser at an arbitrary address (a tracking
+ * pixel, a private bucket). The credit and the picture's page travel with
+ * it because the source's licence asks for attribution.
+ */
+export const Q_PICTURE_SOURCES = ["PEXELS"] as const;
+export type QPictureSource = (typeof Q_PICTURE_SOURCES)[number];
+/** Where each source serves its images, and its pages. */
+export const Q_PICTURE_HOSTS: Readonly<
+  Record<QPictureSource, { readonly image: string; readonly page: string }>
+> = {
+  PEXELS: { image: "images.pexels.com", page: "www.pexels.com" },
+};
+
+function isHttpsOn(value: string, host: string | null): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && (host === null || url.host === host);
+  } catch {
+    return false;
+  }
+}
+
+const PictureHttpsUrlSchema = z
+  .string()
+  .max(2048)
+  .refine((value) => isHttpsOn(value, null), {
+    message: "expected an https address",
+  });
+
+export const QPictureBlockSchema = z
+  .object({
+    kind: z.literal("PICTURE"),
+    url: PictureHttpsUrlSchema,
+    alt: z.string().trim().min(1).max(200),
+    credit: z
+      .object({
+        name: z.string().trim().min(1).max(120),
+        /** The photographer's page, when the source gives one. */
+        url: PictureHttpsUrlSchema.nullable(),
+      })
+      .strict(),
+    source: z.enum(Q_PICTURE_SOURCES),
+    /** The picture's own page at the source. */
+    pageUrl: PictureHttpsUrlSchema,
+  })
+  .strict()
+  .refine(
+    (block) => isHttpsOn(block.url, Q_PICTURE_HOSTS[block.source].image),
+    {
+      message: "the picture is served by its source",
+      path: ["url"],
+    },
+  )
+  .refine(
+    (block) => isHttpsOn(block.pageUrl, Q_PICTURE_HOSTS[block.source].page),
+    { message: "the picture's page is at its source", path: ["pageUrl"] },
+  );
+
 export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QTextBlockSchema,
   QCompanyReferenceBlockSchema,
@@ -526,6 +593,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QTimelineBlockSchema,
   QAttentionBlockSchema,
   QSummaryBlockSchema,
+  QPictureBlockSchema,
 ]);
 
 export type QResultBlock = z.infer<typeof QResultBlockSchema>;

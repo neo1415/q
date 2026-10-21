@@ -504,6 +504,11 @@ export {
   Q_SUMMARY_POINTS_MAX,
   QSummaryBlockSchema,
   type QSummaryBlock,
+  // L-13
+  Q_PICTURE_HOSTS,
+  Q_PICTURE_SOURCES,
+  QPictureBlockSchema,
+  type QPictureSource,
   chartableSeries,
   parseQResultBlocks,
   type QResultBlockDrop,

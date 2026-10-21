@@ -111,7 +111,9 @@ export type QTurnObjectBlock = Extract<
       // G-R4: what needs the person, as one report.
       | "ATTENTION"
       // Artifacts live (L-14): a summary Q speaks over.
-      | "SUMMARY";
+      | "SUMMARY"
+      // L-13: a credited picture of something visual.
+      | "PICTURE";
   }
 >;
 
@@ -158,6 +160,7 @@ function objectBlocksOf(
       case "TIMELINE":
       case "ATTENTION":
       case "SUMMARY":
+      case "PICTURE":
         return true;
       case "UI_INTENT":
         // SHOW_EVIDENCE carries the same references an evidence block

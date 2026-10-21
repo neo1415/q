@@ -69,8 +69,8 @@ import {
   publicSourceBlockFields,
   type AuthorisedFact,
   type PublicSourceLike,
-  type CompanyAnalystV22Result,
-  CompanyAnalystV22ResultSchema,
+  type CompanyAnalystV26Result,
+  CompanyAnalystV26ResultSchema,
   gesturesForReply,
   DisplayNameRequestSchema,
   NOTHING_REMEMBERED,
@@ -305,7 +305,9 @@ import {
   analystResultBlocks,
   askedSubjects,
   ownInvestorOrganisationIn,
+  pictureBlock,
   withConversationFindings,
+  type QPicturePort,
 } from "./result-blocks.js";
 
 export {
@@ -315,6 +317,10 @@ export {
   provenanceLine,
   withoutContradictedGaps,
   type AnalystResultLike,
+  PICTURE_WAIT_MS,
+  pictureBlock,
+  type QPictureBlock,
+  type QPicturePort,
 } from "./result-blocks.js";
 export {
   createDiligenceDocumentSummariser,
@@ -429,7 +435,7 @@ const LanguageCarrierSchema = z
  *   run → Context Firewall plan → authorised facts (port) → tools offered
  *   for this plan (port) → resolve bundle → render charter + task with
  *   untrusted fences → bounded tool loop through the gateway → validated
- *   CompanyAnalystV22Result → Q message + bundle version on the run
+ *   CompanyAnalystV26Result → Q message + bundle version on the run
  *
  * The tool loop: while tools are offered, the model is asked with a TEXT
  * output and may either propose tool calls or answer with the JSON the
@@ -777,11 +783,11 @@ const CONVERSATION_FINDINGS_NOTE: ModelMessage = {
  */
 /**
  * The schema the analyst's answer is checked against: the one the prompt in
- * use writes to (COMPANY_ANALYST v23, schema v22). Pinned by a test, because a lag here
+ * use writes to (COMPANY_ANALYST v26, schema v26). Pinned by a test, because a lag here
  * refuses every answer carrying a newer field and re-runs it (live
  * 2026-10-09: 10-15 s on every turn).
  */
-export const ANALYST_RESULT_SCHEMA = CompanyAnalystV22ResultSchema;
+export const ANALYST_RESULT_SCHEMA = CompanyAnalystV26ResultSchema;
 
 export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "actionTalk",
@@ -791,6 +797,8 @@ export const ANALYST_LENIENT_FIELDS: readonly string[] = [
   "comparisonCards",
   // COMPANY_ANALYST v22 (E's request): an unknown visual loses the visual.
   "visual",
+  // v26 (L-13): a malformed search loses the picture, never the answer.
+  "pictureQuery",
 ];
 
 /**
@@ -1634,6 +1642,12 @@ export type ModelGatewayQAnswerDependencies = {
   /** The Tool Registry's port (CQ-Q-007). Absent: no tool is offered. */
   readonly tools?: QToolPort | undefined;
   /**
+   * L-13: a credited picture when the analyst asks for one. Its search
+   * words are composed from the person's own (egress allowlist) inside
+   * the port. Absent: answers go without pictures.
+   */
+  readonly pictures?: QPicturePort | undefined;
+  /**
    * RECOVERY-2026-10 (C's request): what came of Q's recent screen acts,
    * from the receipts the person's browser reported (C's `receiptFacts`:
    * code's words over control ids and closed statuses). Absent: none.
@@ -1797,7 +1811,7 @@ export type QToolCallObservation = {
 };
 
 export type QAnswerObservation = {
-  readonly result: CompanyAnalystV22Result;
+  readonly result: CompanyAnalystV26Result;
   readonly providerCode: string;
   readonly modelCode: string;
   readonly promptBundleVersion: string;
@@ -4187,9 +4201,9 @@ export function createModelGatewayQAnswer(
         releaseLastSentence();
       };
 
-      const options: ModelGatewayExecuteOptions<CompanyAnalystV22Result> = {
+      const options: ModelGatewayExecuteOptions<CompanyAnalystV26Result> = {
         signal: request.signal,
-        // The schema the prompt in use (COMPANY_ANALYST v23, schema v22) writes to: live
+        // The schema the prompt in use (COMPANY_ANALYST v26, schema v26) writes to: live
         // 2026-10-09, v17 refused every answer carrying v22's `visual` as an
         // unknown key, and each refusal re-ran the answer (10-15 s a turn).
         schema: ANALYST_RESULT_SCHEMA,
@@ -5180,12 +5194,12 @@ export function createModelGatewayQAnswer(
       if (screenActs !== null) messages = [...messages, screenActs];
 
       type AnswerResult = Awaited<
-        ReturnType<typeof gateway.execute<CompanyAnalystV22Result>>
+        ReturnType<typeof gateway.execute<CompanyAnalystV26Result>>
       >;
 
       try {
         let final: AnswerResult | undefined;
-        let analyst: CompanyAnalystV22Result | undefined;
+        let analyst: CompanyAnalystV26Result | undefined;
         // Lead 2026-10-16: the early grounded line is said now, as the
         // model is asked, not after its tool round (first text 6-8 s).
         if (earlyLead !== null && leadLines === undefined) {
@@ -5242,10 +5256,10 @@ export function createModelGatewayQAnswer(
           ) {
             modelCalls += 1;
             let result: Awaited<
-              ReturnType<typeof gateway.execute<CompanyAnalystV22Result>>
+              ReturnType<typeof gateway.execute<CompanyAnalystV26Result>>
             >;
             try {
-              result = await gateway.execute<CompanyAnalystV22Result>(
+              result = await gateway.execute<CompanyAnalystV26Result>(
                 {
                   ...base,
                   messages,
@@ -5314,7 +5328,7 @@ export function createModelGatewayQAnswer(
              * is not a gap.
              */
             const saidInsteadOfDone = (
-              value: CompanyAnalystV22Result,
+              value: CompanyAnalystV26Result,
               dropped: readonly string[] | undefined,
             ): boolean =>
               (value.actionTalk.length > 0 ||
@@ -5347,7 +5361,7 @@ export function createModelGatewayQAnswer(
              */
             const screenNote = screenSubjectNote(plan.screen);
             const askedWhatScreenShows = (
-              value: CompanyAnalystV22Result,
+              value: CompanyAnalystV26Result,
             ): boolean =>
               screenNote !== null &&
               value.clarifyingQuestions.length > 0 &&
@@ -5764,7 +5778,7 @@ export function createModelGatewayQAnswer(
         }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
-          final = await gateway.execute<CompanyAnalystV22Result>(
+          final = await gateway.execute<CompanyAnalystV26Result>(
             { ...base, messages, output: rendered.output },
             options,
           );
@@ -6264,10 +6278,24 @@ export function createModelGatewayQAnswer(
             "answer cards built from this run's fits",
           );
         }
+        // L-13: a picture only when the analyst asked for one, searched
+        // with words composed from the person's own (never sent as the
+        // model wrote them), and bounded so it cannot hold the turn.
+        const picture = await pictureBlock({
+          result: analyst,
+          pictures: dependencies.pictures,
+          userText: toolContext.conversation?.latestUserText ?? "",
+          earlierUserText: toolContext.conversation?.earlierUserText ?? [],
+          signal: request.signal,
+        });
+        const codeBlocks = [
+          ...(builtCards === null ? [] : [builtCards]),
+          ...(picture === null ? [] : [picture]),
+        ];
         const analystBlocks =
-          builtCards === null
+          codeBlocks.length === 0
             ? modelBlocks
-            : [...(modelBlocks ?? []), builtCards];
+            : [...(modelBlocks ?? []), ...codeBlocks];
         // An answer that was nothing but talk about acting leaves Capital
         // Q's own lines — the revision below, the action's own narration —
         // to say what happened. Alone, it is acknowledged and no more.

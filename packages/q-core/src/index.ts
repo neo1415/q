@@ -920,6 +920,11 @@ export {
   CompanyAnalystV22ResultSchema,
   ANALYST_VISUALS,
   type CompanyAnalystV22Result,
+  ANALYST_PICTURE_QUERY_MAX_LENGTH,
+  ANALYST_VISUALS_V26,
+  COMPANY_ANALYST_V26_SCHEMA_VERSION,
+  CompanyAnalystV26ResultSchema,
+  type CompanyAnalystV26Result,
   ArtifactRequestV3Schema,
   ARTIFACT_REQUEST_TYPES_V3,
   type CompanyAnalystV19Result,
@@ -1667,3 +1672,8 @@ export {
   COMPANY_ANALYST_V25,
   V25_RESULT_GUIDANCE,
 } from "./prompts/tasks/company-analyst.v25.js";
+export {
+  COMPANY_ANALYST_V26,
+  V26_ALLOWED_ROOT_KEYS,
+  V26_VISUAL_LINE,
+} from "./prompts/tasks/company-analyst.v26.js";

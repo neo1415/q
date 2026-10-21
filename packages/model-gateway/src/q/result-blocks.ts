@@ -97,6 +97,8 @@ export type AnalystResultLike = {
    * kind is the model's choice; the content never is.
    */
   readonly visual?: string | null | undefined;
+  /** v26 (L-13): the model's search words for a PICTURE; a proposal only. */
+  readonly pictureQuery?: string | null | undefined;
 };
 
 const FINDING_TYPES = new Set<string>([
@@ -824,4 +826,76 @@ function visualBlock(
   // CHART still requires a typed read of evidenced figures. No numbers
   // are extracted from model prose to fill a visual.
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// L-13 (owner ask 2026-10-20): a picture of something visual, credited.
+
+export type QPictureBlock = Extract<QResultBlock, { readonly kind: "PICTURE" }>;
+
+/**
+ * Finds one picture for an answer. The model's words are a proposal: the
+ * port composes what may leave Capital Q from the person's own words
+ * (q-research egress allowlist) and refuses when nothing safe survives.
+ * Null is "no picture": a refusal, a miss, a timeout, a failure.
+ */
+export type QPicturePort = {
+  readonly find: (input: {
+    readonly requestedQuery: string;
+    readonly userText: string;
+    readonly earlierUserText: readonly string[];
+    readonly signal?: AbortSignal | undefined;
+  }) => Promise<QPictureBlock | null>;
+};
+
+/**
+ * How long a picture may hold the finished answer. The answer's words have
+ * already been said by then; a slow picture search is no picture rather
+ * than a slower turn.
+ */
+export const PICTURE_WAIT_MS = 2_000;
+
+/** The picture the model asked for, or null; never throws. */
+export async function pictureBlock(input: {
+  readonly result: Pick<AnalystResultLike, "visual" | "pictureQuery">;
+  readonly pictures: QPicturePort | undefined;
+  readonly userText: string;
+  readonly earlierUserText: readonly string[];
+  readonly signal?: AbortSignal | undefined;
+  readonly waitMs?: number | undefined;
+}): Promise<QPictureBlock | null> {
+  const query = input.result.pictureQuery?.trim() ?? "";
+  if (
+    input.result.visual !== "PICTURE" ||
+    query.length === 0 ||
+    input.pictures === undefined
+  ) {
+    return null;
+  }
+  const timeout = AbortSignal.timeout(input.waitMs ?? PICTURE_WAIT_MS);
+  const signal =
+    input.signal === undefined
+      ? timeout
+      : AbortSignal.any([input.signal, timeout]);
+  const aborted = new Promise<null>((resolve) => {
+    if (signal.aborted) resolve(null);
+    signal.addEventListener("abort", () => resolve(null), { once: true });
+  });
+  try {
+    const found = await Promise.race([
+      input.pictures.find({
+        requestedQuery: query,
+        userText: input.userText,
+        earlierUserText: input.earlierUserText,
+        signal,
+      }),
+      aborted,
+    ]);
+    if (found === null) return null;
+    // Parsed, not trusted: a port that returns another host is refused.
+    const parsed = parseQResultBlocks([found]).blocks[0];
+    return parsed?.kind === "PICTURE" ? parsed : null;
+  } catch {
+    return null;
+  }
 }

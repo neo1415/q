@@ -224,6 +224,7 @@ const STAGE_DISPLAYS: ReadonlySet<string> = new Set([
   "CHART",
   "MAP",
   "TIMELINE",
+  "PICTURE",
   "ARTIFACT_REFERENCE",
 ]);
 

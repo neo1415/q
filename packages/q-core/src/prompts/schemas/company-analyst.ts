@@ -538,6 +538,31 @@ export type CompanyAnalystV22Result = z.infer<
 >;
 export const COMPANY_ANALYST_V22_SCHEMA_VERSION = 22;
 
+/**
+ * v26 (L-13, owner ask 2026-10-20): a picture of the thing talked about.
+ * The model names PICTURE and a few plain search words; Capital Q composes
+ * what may leave from the person's own words (q-research egress), searches
+ * an authorised picture source and shows the credit. The words are a
+ * proposal, never sent as written.
+ */
+export const ANALYST_VISUALS_V26 = [...ANALYST_VISUALS, "PICTURE"] as const;
+export const ANALYST_PICTURE_QUERY_MAX_LENGTH = 120;
+export const CompanyAnalystV26ResultSchema =
+  CompanyAnalystV22ResultSchema.extend({
+    visual: z.enum(ANALYST_VISUALS_V26).nullable().default(null),
+    pictureQuery: z
+      .string()
+      .trim()
+      .min(1)
+      .max(ANALYST_PICTURE_QUERY_MAX_LENGTH)
+      .nullable()
+      .default(null),
+  }).strict();
+export type CompanyAnalystV26Result = z.infer<
+  typeof CompanyAnalystV26ResultSchema
+>;
+export const COMPANY_ANALYST_V26_SCHEMA_VERSION = 26;
+
 export const NOTHING_REMEMBERED =
   "Nothing is remembered about this person yet.";
 

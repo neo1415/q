@@ -86,6 +86,7 @@ export function drawnArtifacts(
       case "UI_INTENT":
       case "PUBLIC_SOURCE":
       case "ATTENTION":
+      case "PICTURE":
         break;
     }
   }
