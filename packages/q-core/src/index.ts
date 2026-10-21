@@ -518,6 +518,7 @@ export { MEETING_SCREEN_NOTE_V1 } from "./prompts/tasks/meeting-screen-note.v1.j
 export { MEETING_HOST_TURN_V3 } from "./prompts/tasks/meeting-host-turn.v3.js";
 export { MEETING_HOST_TURN_V4 } from "./prompts/tasks/meeting-host-turn.v4.js";
 export { MEETING_HOST_TURN_V5 } from "./prompts/tasks/meeting-host-turn.v5.js";
+export { MEETING_HOST_TURN_V6 } from "./prompts/tasks/meeting-host-turn.v6.js";
 export { MEETING_CAMERA_NOTE_V1 } from "./prompts/tasks/meeting-camera-note.v1.js";
 export {
   MEETING_SCREEN_NOTE_SCHEMA_NAME,
