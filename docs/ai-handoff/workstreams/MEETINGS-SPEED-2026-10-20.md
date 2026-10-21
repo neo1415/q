@@ -160,3 +160,33 @@ with fake model/voice/clock (local timing, no provider reached).
 - Change thresholds (6 / 16) are first estimates; tune from live logs.
 - Rolling notes live in the hosting q-api process: if the provider webhook
   lands on another instance, notes are composed whole (old behaviour).
+
+## 4. Round 4 (2026-10-21, branch `speed/voices-meetings-r3`) — live Zino ↔ TensorGate: answers 5–10 s, some never came
+
+The live call ran on `recovery/2026-09-12` (`2d64e770`), which had **none** of
+the round-1 meeting speed work (no streaming, no exact wakes). The main cause
+of "late / never came" was the face bridge's 1.5 s grace (lane 6, fixed in
+#280: 5 s, one streamed turn). This round removes what was left on the host side.
+
+| #   | Row                                                         | Status                                                                                                                                                                                                                                                                                           | Evidence                                                                   |
+| --- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| R1  | Skip HOST_INTRO when the face is live                       | DONE: `host.faceTakesTurns(on)`; the welcome is "Hi X, welcome." plus the screen/camera disclosure (kept); the face's own greeting says who Q is                                                                                                                                                 | host test "the welcome leaves who Q is…", runtime test updated             |
+| R2  | Snapshot ready before the first question                    | DONE: already built when the bot is created and on Q's first event (A6); now **one retry** on a failed build, and an answer without it logs `meeting answer without its context snapshot` (late/missing) and rebuilds for the next question                                                      | `meeting-speed.test.ts` "retries a failed snapshot build once"             |
+| R3  | Snapshot intent hazard ("what do you do" → founder company) | DONE: COMPANY no longer matches you/your/yourself/Q                                                                                                                                                                                                                                              | `meeting-brain.test.ts` (Q, what do you do? → null; the company → company) |
+| R4a | Hold timers on the face path                                | DONE: through the face, answers (and the rest of a streamed answer) are released at once; Tavus takes the turn at the end of the person's turn, so replyQuiet 400 / replyHold 1 200 / wordsGap 700 / busyUntil guarded nothing there. The bot-voice path keeps them (it would talk over someone) | host tests "goes to the face at once…", "without the face… still waits"    |
+| R4b | The model held behind a joining face                        | DONE: lines wait for a joining face on their own ordered queue (`faceWait`), so the model starts at once; streaming no longer off while the face joins                                                                                                                                           | timeline "face still joining": started 1 500 → 300 ms                      |
+| R4c | Kept (guard real things)                                    | partialGap 900 (an unfinished question), the final caption on an open mic, the snapshot cap 2 s (0 normally), FACE_START_WAIT 20 s (one Q in the call; no longer blocks the model)                                                                                                               | —                                                                          |
+| R5  | No question dropped silently                                | DONE: a dropped stale answer is counted (`stats().droppedAnswers`) and logged `meeting host answer dropped unsaid`; on the face path answers are no longer held, so they cannot go stale in the host                                                                                             | host test "counted when dropped"                                           |
+
+**Timeline** (`apps/q-api/test/meeting-answer-timeline.test.ts`, real runtime + host, fakes replaying: Recall partials every 300 ms / 300 ms behind, final caption +1 000 ms, Meet flag off +300 ms or never; model first token 600 ms, whole reply 1 800 ms; face live, or joining until 1.5 s after the question). ms after the question's last word; "first words" = handed to the face (or the bot's voice), not Tavus speaking. 1 model call in every row.
+
+| Scenario                   | Deployed `2d64e770`: started / first words | `speed/q-oct20` `50c7303c` | This branch                           |
+| -------------------------- | ------------------------------------------ | -------------------------- | ------------------------------------- |
+| Face live, Meet flag drops | 300 / 2 100                                | 300 / 1 450                | 300 / 1 350                           |
+| Face live, open microphone | 1 000 / 2 800                              | 1 000 / 2 250              | 1 000 / 2 050                         |
+| Face still joining         | 1 500 / 3 300                              | 1 500 / 2 550              | 300 / 1 500 (the face is in at 1 500) |
+| Bot voice, flag drops      | 300 / 2 100                                | 300 / 1 450                | 300 / 1 450                           |
+| Bot voice, open microphone | 1 000 / 2 800                              | 1 000 / 2 250              | 1 000 / 2 250                         |
+
+Not in the harness: the bridge wait inside the face (lane 6's file) and
+Tavus's own TTS. Live confirmation needs a real call (no paid rooms here).

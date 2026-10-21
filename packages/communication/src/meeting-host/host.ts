@@ -705,6 +705,8 @@ export type HostStats = {
   waitAsks: number;
   rescheduleAsks: number;
   answered: number;
+  /** Answers dropped unsaid because nobody paused within replyStaleMs. */
+  droppedAnswers: number;
 };
 
 type Present = {
@@ -727,6 +729,13 @@ export type MeetingHost = {
    * answer is already stale (a newer question came): nothing is queued.
    */
   readonly replyPart: (text: string) => boolean;
+  /**
+   * 2026-10-21: whether Q's video face is in the call. While it is, the
+   * face takes the turn (it speaks when the person's turn ends), so Q's
+   * answers go to it at once, and the greeting leaves who Q is to the
+   * face's own greeting.
+   */
+  readonly faceTakesTurns: (on: boolean) => void;
   /**
    * 2026-10-20: the next time a timed decision is due (a line to Q whose
    * words stopped, a bare "hey Q", a queued line the room is now quiet
@@ -820,7 +829,15 @@ export function createMeetingHost(
     waitAsks: 0,
     rescheduleAsks: 0,
     answered: 0,
+    droppedAnswers: 0,
   };
+  /**
+   * 2026-10-21: Q speaks through its video face, which takes its own turn
+   * (Tavus asks for Q's line only when the person's turn has ended). Q's
+   * answers then go to the face at once: holding them for Meet's quiet
+   * flag as well only delayed them (live Zino <> TensorGate, 5-10 s).
+   */
+  let faceTurns = false;
   const present = new Map<string, Present>();
   const speaking = new Set<string>();
   const outbox: { text: string; why: SayReason; readyAt: number }[] = [];
@@ -951,20 +968,26 @@ export function createMeetingHost(
         : line.why === "OFFER_RECAP"
           ? 2 * lineStaleMs
           : lineStaleMs;
-      if (at - line.readyAt > limit) outbox.splice(i, 1);
+      if (at - line.readyAt > limit) {
+        outbox.splice(i, 1);
+        if (line.why === "REPLY") stats.droppedAnswers += 1;
+      }
     }
   }
 
   function release(at: number): HostAction[] {
     dropStale(at);
     const head = outbox[0];
-    if (head === undefined || at < busyUntil) return [];
+    if (head === undefined) return [];
+    const toFace = faceTurns && answers(head.why);
+    if (at < busyUntil && !toFace) return [];
     const roomQuiet =
-      speaking.size === 0 &&
-      at - lastSpeechAt >=
-        (answers(head.why)
-          ? Math.min(replyQuietMs, limits.quietMs)
-          : limits.quietMs);
+      toFace ||
+      (speaking.size === 0 &&
+        at - lastSpeechAt >=
+          (answers(head.why)
+            ? Math.min(replyQuietMs, limits.quietMs)
+            : limits.quietMs));
     // Meet's speaking flag is a hint, not the truth: past the hold, the
     // end of a turn is the words stopping.
     const heldLongEnough =
@@ -1048,7 +1071,11 @@ export function createMeetingHost(
     const name =
       entry.party === null ? entry.participant.name : entry.party.name;
     queue(
-      `Hi ${firstName(name)}, welcome. ${HOST_INTRO}${seesLine(context)}`,
+      // Through the face, its own greeting at join already says who Q is
+      // and why it is here; what Q sees is still said (a disclosure).
+      faceTurns
+        ? `Hi ${firstName(name)}, welcome.${seesLine(context)}`
+        : `Hi ${firstName(name)}, welcome. ${HOST_INTRO}${seesLine(context)}`,
       "GREET",
     );
   }
@@ -1749,6 +1776,9 @@ export function createMeetingHost(
       ackLatest = false;
       queue(said.slice(0, 900), why);
     },
+    faceTakesTurns: (on) => {
+      faceTurns = on;
+    },
     replyPart: (text) => {
       if (!composing || pending !== null || streamed?.cut === true) {
         return false;
@@ -1775,7 +1805,9 @@ export function createMeetingHost(
       }
       if (!composing && pending !== null) due = Math.min(due, clock);
       const head = outbox[0];
-      if (head !== undefined) {
+      if (head !== undefined && faceTurns && answers(head.why)) {
+        due = Math.min(due, clock);
+      } else if (head !== undefined) {
         const reply = answers(head.why);
         const quietAt =
           speaking.size === 0

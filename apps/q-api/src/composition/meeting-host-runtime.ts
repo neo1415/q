@@ -386,6 +386,8 @@ type Session = {
   /** P3: the prepared meeting context, null until built (or when none). */
   snapshot: MeetingContextSnapshot | null;
   snapshotReady: Promise<void>;
+  /** The snapshot build finished (built, or failed and logged). */
+  snapshotTried: boolean;
   /** P3: the append-only meeting record and its working summary. */
   readonly memory: MeetingMemory;
   eventsChain: Promise<void>;
@@ -398,6 +400,8 @@ type Session = {
   audioEndsAt: number;
   /** Q's lines reach the call in the order they were said. */
   voiceTail: Promise<void>;
+  /** Lines waiting, in order, for a face still being sent (never rejects). */
+  faceWait: Promise<void>;
   /**
    * 2026-10-20: an answer is being written and its first sentence may be
    * said meanwhile: lines released now go to the call at once rather than
@@ -610,17 +614,28 @@ export function createMeetingHostRuntime(dependencies: {
     if (build === undefined || read === undefined) return Promise.resolve(null);
     let held = prepared.get(meetingId);
     if (held === undefined) {
-      held = (async () => {
+      const attempt = async () => {
         const context = await read(meetingId);
         return context === null ? null : await build(context);
-      })().catch((error: unknown) => {
-        logger?.warn(
-          { err: error, meetingId, stage: "snapshot" },
-          "meeting context snapshot not built",
-        );
-        prepared.delete(meetingId);
-        return null;
-      });
+      };
+      // 2026-10-21: one retry. A failed build used to leave the whole call
+      // without its context ("couldn't find" in the live Zino call).
+      held = attempt()
+        .catch((error: unknown) => {
+          logger?.warn(
+            { err: error, meetingId, stage: "snapshot", attempt: 1 },
+            "meeting context snapshot not built; retrying once",
+          );
+          return attempt();
+        })
+        .catch((error: unknown) => {
+          logger?.warn(
+            { err: error, meetingId, stage: "snapshot" },
+            "meeting context snapshot not built",
+          );
+          prepared.delete(meetingId);
+          return null;
+        });
       prepared.set(meetingId, held);
       if (prepared.size > 100) {
         const oldest = prepared.keys().next().value;
@@ -700,6 +715,7 @@ export function createMeetingHostRuntime(dependencies: {
           lineTags: [],
           snapshot: null,
           snapshotReady: Promise.resolve(),
+          snapshotTried: false,
           memory,
           eventsChain: Promise.resolve(),
           closed: false,
@@ -708,6 +724,7 @@ export function createMeetingHostRuntime(dependencies: {
           wake: null,
           audioEndsAt: 0,
           voiceTail: Promise.resolve(),
+          faceWait: Promise.resolve(),
           cut: cutSignal(),
           streaming: false,
           facePart: null,
@@ -727,6 +744,7 @@ export function createMeetingHostRuntime(dependencies: {
         const ready = session;
         ready.snapshotReady = snapshotting.then((snapshot) => {
           ready.snapshot = snapshot;
+          ready.snapshotTried = true;
         });
         // Q joins minutes before people do: read what every answer needs now.
         void composer.warm?.(attribution(session)).catch((error: unknown) => {
@@ -751,7 +769,7 @@ export function createMeetingHostRuntime(dependencies: {
             void saveHeard(session, false);
             void carryOut(
               session,
-              session.host.handle({ kind: "TICK", at: now() }),
+              hostHandle(session, { kind: "TICK", at: now() }),
             );
             schedule(session);
           }, every);
@@ -783,7 +801,7 @@ export function createMeetingHostRuntime(dependencies: {
       if (!sessions.has(session.meetingId)) return;
       void carryOut(
         session,
-        session.host.handle({ kind: "TICK", at: now() }),
+        hostHandle(session, { kind: "TICK", at: now() }),
       ).then(() => {
         schedule(session);
       });
@@ -967,6 +985,32 @@ export function createMeetingHostRuntime(dependencies: {
       : new Promise<void>((done) => setTimeout(done, ms).unref());
 
   /**
+   * The host's decision, told first whether Q's face is in the call: while
+   * it is, the face takes the turn and Q's answers go to it at once.
+   */
+  function hostHandle(session: Session, event: HostEvent): HostAction[] {
+    session.host.faceTakesTurns(
+      dependencies.face?.live(session.meetingId) === true,
+    );
+    const dropped = session.host.stats().droppedAnswers;
+    const actions = session.host.handle(event);
+    const nowDropped = session.host.stats().droppedAnswers;
+    if (nowDropped > dropped) {
+      // Never silently: nobody paused long enough for it to be said.
+      logger?.warn(
+        {
+          meetingId: session.meetingId,
+          stage: "answer_dropped",
+          dropped: nowDropped - dropped,
+          droppedInCall: nowDropped,
+        },
+        "meeting host answer dropped unsaid: nobody paused in time",
+      );
+    }
+    return actions;
+  }
+
+  /**
    * Until the audio Q already handed to the call has played, or Q was cut
    * off meanwhile (then at once). Bounded by real time, never a poll.
    */
@@ -993,13 +1037,38 @@ export function createMeetingHostRuntime(dependencies: {
     const face = dependencies.face;
     // One Q in the call (owner 2026-10-18, live ef8a7091: the note-taker
     // greeted in its own voice seconds before the face greeted again).
-    // While the face is still being sent, Q's line waits for it.
+    // While the face is still being sent, Q's line waits for it -- on its
+    // own ordered queue (2026-10-21), so the call's next step (the model
+    // writing an answer) is not held behind a face that is still joining.
     if (face?.starting?.(session.meetingId) === true) {
-      await Promise.race([
-        face.settled?.(session.meetingId) ?? Promise.resolve(),
-        wait(FACE_START_WAIT_MS),
-      ]);
+      const settled = session.faceWait.then(() =>
+        Promise.race([
+          face.settled?.(session.meetingId) ?? Promise.resolve(),
+          wait(FACE_START_WAIT_MS),
+        ]),
+      );
+      session.faceWait = settled
+        .then(() => sayNow(session, text, why))
+        .catch((error: unknown) => {
+          logger?.warn(
+            { err: error, meetingId: session.meetingId },
+            "meeting host line failed",
+          );
+        });
+      return;
     }
+    // Lines still waiting for the face go first.
+    await session.faceWait;
+    await sayNow(session, text, why);
+  }
+
+  /** speak(), once the face (if any) has settled. */
+  async function sayNow(
+    session: Session,
+    text: string,
+    why: string,
+  ): Promise<void> {
+    const face = dependencies.face;
     if (face?.live(session.meetingId) === true) {
       // The first sentence of an answer still being written: the face
       // keeps its turn open for the rest.
@@ -1017,6 +1086,10 @@ export function createMeetingHostRuntime(dependencies: {
         "meeting host spoke through its face",
       );
       return;
+    }
+    // The face never came: its open turn is not waiting for this line.
+    if (session.facePart !== null && text.endsWith(session.facePart)) {
+      session.facePart = null;
     }
     const epoch = session.epoch;
     const prior = session.voiceTail;
@@ -1275,7 +1348,10 @@ export function createMeetingHostRuntime(dependencies: {
           await wait(dependencies.leaveDelayMs);
         } else {
           const leaving = session.epoch;
-          await Promise.race([session.voiceTail, wait(LEAVE_WAIT_MAX_MS)]);
+          await Promise.race([
+            session.faceWait.then(() => session.voiceTail),
+            wait(LEAVE_WAIT_MAX_MS),
+          ]);
           await untilQuiet(session, leaving);
           await wait(LEAVE_AFTER_AUDIO_MS);
         }
@@ -1319,6 +1395,28 @@ export function createMeetingHostRuntime(dependencies: {
         // P3: the snapshot is normally ready long before a question; a short
         // wait only when Q is asked within moments of joining.
         await Promise.race([session.snapshotReady, wait(2_000)]);
+        if (session.snapshot === null && dependencies.snapshots !== undefined) {
+          // Answered from the booking alone this time (said so in the log);
+          // a build that failed is started again for the next question.
+          logger?.warn(
+            {
+              meetingId: session.meetingId,
+              stage: "snapshot",
+              reason: session.snapshotTried ? "missing" : "late",
+            },
+            "meeting answer without its context snapshot",
+          );
+          if (session.snapshotTried) {
+            session.snapshotTried = false;
+            const again = session;
+            again.snapshotReady = prepareSnapshot(session.meetingId).then(
+              (snapshot) => {
+                again.snapshot = snapshot;
+                again.snapshotTried = true;
+              },
+            );
+          }
+        }
         const asker = speakerOf(session, action.speaker);
         const lineRef = `line:${String(session.utterances)}`;
         const route = routeMeetingTurn({
@@ -1360,22 +1458,27 @@ export function createMeetingHostRuntime(dependencies: {
           // 2026-10-20: the first sentence is said as soon as it is written
           // (through the bot's voice, or the face's open turn).
           const face = dependencies.face;
-          const streaming =
-            dependencies.streamAnswers !== false &&
-            face?.starting?.(session.meetingId) !== true;
+          // 2026-10-21: streamed while the face is still being sent too;
+          // the first sentence waits for the face in speak(), and the
+          // face keeps its turn open for the rest (live: the first answers
+          // after a slow face join were slow as well).
+          const streaming = dependencies.streamAnswers !== false;
           const stream = streaming
             ? {
                 onFirstPiece: (piece: string) => {
                   if (!session.host.replyPart(piece)) return;
                   streamed.piece = piece;
-                  if (face?.live(session.meetingId) === true) {
+                  if (
+                    face?.live(session.meetingId) === true ||
+                    face?.starting?.(session.meetingId) === true
+                  ) {
                     session.facePart = piece;
                   }
                   answer.streamed = true;
                   answer.composedAt = now();
                   void carryOut(
                     session,
-                    session.host.handle({ kind: "TICK", at: now() }),
+                    hostHandle(session, { kind: "TICK", at: now() }),
                   );
                   schedule(session);
                 },
@@ -1530,7 +1633,7 @@ export function createMeetingHostRuntime(dependencies: {
         );
         // Inside the chain already: run what is released now, in place
         // (queueing onto the chain from inside it would wait on itself).
-        for (const next of session.host.handle({ kind: "TICK", at: now() })) {
+        for (const next of hostHandle(session, { kind: "TICK", at: now() })) {
           await perform(session, next);
         }
         return;
@@ -1659,7 +1762,7 @@ export function createMeetingHostRuntime(dependencies: {
           }
         }
         const before = session.host.stats();
-        const actions = session.host.handle(event);
+        const actions = hostHandle(session, event);
         const after = session.host.stats();
         logger?.info?.(
           {
@@ -1686,7 +1789,7 @@ export function createMeetingHostRuntime(dependencies: {
         await carryOut(session, actions);
         return;
       }
-      const actions = session.host.handle(event);
+      const actions = hostHandle(session, event);
       schedule(session);
       await carryOut(session, actions);
     },
@@ -1694,7 +1797,7 @@ export function createMeetingHostRuntime(dependencies: {
       const session = sessions.get(meetingId);
       if (session === undefined) return;
       await saveHeard(session, false);
-      await carryOut(session, session.host.handle({ kind: "TICK", at: now() }));
+      await carryOut(session, hostHandle(session, { kind: "TICK", at: now() }));
     },
     flush: async (meetingId) => {
       const session = sessions.get(meetingId);

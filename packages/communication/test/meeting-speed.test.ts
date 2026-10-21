@@ -296,3 +296,96 @@ describe("screens and cameras are looked at when the picture changed", () => {
     expect(thumbDifference(grey(1), new Uint8Array(3))).toBe(255);
   });
 });
+
+describe("through Q's face, the face takes the turn (2026-10-21, live 5-10 s)", () => {
+  it("an answer goes to the face at once, though Meet's flag says someone is still speaking", () => {
+    const { host, at } = hostInCall();
+    host.faceTakesTurns(true);
+    // An open microphone: Bayo's flag never drops.
+    host.handle({ kind: "SPEECH_ON", participantId: BAYO.id, at: at + 500 });
+    host.handle({
+      kind: "UTTERANCE",
+      participant: ADA,
+      text: "Q, what is the round size?",
+      at: at + 1_000,
+    });
+    expect(host.replyPart("The deck says the round is two million.")).toBe(
+      true,
+    );
+    expect(host.nextWakeAt()).toBeLessThanOrEqual(at + 1_000);
+    const said = host.handle({ kind: "TICK", at: at + 1_050 });
+    expect(said).toContainEqual({
+      kind: "SAY",
+      text: "The deck says the round is two million.",
+      why: "REPLY",
+    });
+    // The rest follows at once too: the face keeps its turn open for it.
+    host.reply("It closes in March.");
+    expect(host.handle({ kind: "TICK", at: at + 1_100 })).toContainEqual({
+      kind: "SAY",
+      text: "It closes in March.",
+      why: "REPLY",
+    });
+  });
+
+  it("without the face the same answer still waits for the room (the bot's voice would talk over someone)", () => {
+    const { host, at } = hostInCall();
+    host.handle({ kind: "SPEECH_ON", participantId: BAYO.id, at: at + 500 });
+    host.handle({
+      kind: "UTTERANCE",
+      participant: ADA,
+      text: "Q, what is the round size?",
+      at: at + 1_000,
+    });
+    host.replyPart("The deck says the round is two million.");
+    expect(
+      host
+        .handle({ kind: "TICK", at: at + 1_050 })
+        .filter((a) => a.kind === "SAY"),
+    ).toEqual([]);
+  });
+
+  it("the welcome leaves who Q is to the face's own greeting, but still says what Q sees", () => {
+    const host = createMeetingHost({
+      ...CONTEXT,
+      seesScreens: true,
+    });
+    host.faceTakesTurns(true);
+    let said: string[] = host
+      .handle({ kind: "JOIN", participant: ADA, at: START })
+      .flatMap((a) => (a.kind === "SAY" ? [a.text] : []));
+    for (let at = START; at < START + 20_000; at += 500) {
+      said = said.concat(
+        host
+          .handle({ kind: "TICK", at })
+          .flatMap((a) => (a.kind === "SAY" ? [a.text] : [])),
+      );
+    }
+    expect(said[0]).toMatch(/^Hi Adaeze, welcome\. /u);
+    expect(said[0]).not.toContain("I'm Q");
+    expect(said[0]).toContain("screen");
+  });
+
+  it("an answer nobody paused for is counted when dropped, never lost silently", () => {
+    const { host, at } = hostInCall();
+    host.handle({ kind: "SPEECH_ON", participantId: BAYO.id, at: at + 500 });
+    host.handle({
+      kind: "UTTERANCE",
+      participant: ADA,
+      text: "Q, what is the round size?",
+      at: at + 1_000,
+    });
+    host.reply("Two million.");
+    // Words keep arriving with no gap for longer than replyStaleMs.
+    for (let t = at + 1_200; t < at + 20_000; t += 300) {
+      host.handle({
+        kind: "PARTIAL",
+        participant: BAYO,
+        text: "and so on and so on",
+        at: t,
+      });
+      host.handle({ kind: "TICK", at: t });
+    }
+    expect(host.stats().droppedAnswers).toBe(1);
+  });
+});

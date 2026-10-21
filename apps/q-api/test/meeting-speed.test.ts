@@ -723,3 +723,65 @@ describe("after a restart the snapshot is rebuilt alongside the opening reads (A
     );
   });
 });
+
+describe("the meeting's context is there for the answer (2026-10-21, live 'couldn't find')", () => {
+  it("retries a failed snapshot build once, and says so in the log", async () => {
+    let builds = 0;
+    const warnings: string[] = [];
+    const contexts: unknown[] = [];
+    const runtime = createMeetingHostRuntime({
+      enabled: true,
+      publicBase: "https://q-api.example",
+      secret: SECRET,
+      store: {
+        context: () =>
+          Promise.resolve({
+            ...CONTEXT,
+            botId: BOT,
+            tenantId: "t-1",
+            organiserUserId: "u-i",
+            declined: false,
+          }),
+        snapshotContext: () => Promise.resolve({ meetingId: MEETING } as never),
+        roster: () => Promise.resolve(),
+        removedBy: () => Promise.resolve(),
+        note: () => Promise.resolve(),
+      },
+      snapshots: (context) => {
+        builds += 1;
+        contexts.push(context);
+        return Promise.reject(new Error(`build ${String(builds)} failed`));
+      },
+      composer: {
+        turn: () =>
+          Promise.resolve({
+            kind: "ANSWER",
+            line: "Fine.",
+            proposal: null,
+            guest: null,
+          }),
+      },
+      voice: {
+        speak: () => Promise.resolve(new Uint8Array([1])),
+        play: () => Promise.resolve(),
+        leave: () => Promise.resolve(),
+      },
+      logger: {
+        info: () => undefined,
+        warn: (_fields: unknown, message: string) => {
+          warnings.push(message);
+        },
+      },
+      now: () => START,
+      tickEveryMs: null,
+      leaveDelayMs: 0,
+    });
+    await runtime.prepare(MEETING);
+    // The first build and its one retry.
+    expect(builds).toBe(2);
+    expect(warnings).toContain(
+      "meeting context snapshot not built; retrying once",
+    );
+    expect(warnings).toContain("meeting context snapshot not built");
+  });
+});

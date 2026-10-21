@@ -221,6 +221,15 @@ describe("prepared answers read nothing extra", () => {
     ).toContain("cross-border");
     expect(reads).toBe(before);
     expect(answerFromSnapshot(s, room, "will it rain tomorrow")).toBeNull();
+    // 2026-10-21 (lane 6, live): a line to Q saying "you" is about Q, never
+    // the founder's company.
+    expect(answerFromSnapshot(s, room, "Q, what do you do?")).toBeNull();
+    expect(
+      answerFromSnapshot(s, room, "what does your company do, Q?"),
+    ).toBeNull();
+    expect(
+      answerFromSnapshot(s, room, "what does the company do?")?.line,
+    ).toContain("cross-border");
   });
 });
 

@@ -340,9 +340,11 @@ describe("meeting host with Q's face (owner decision 35)", () => {
       ),
     );
     expect(face.started).toEqual([MEETING]);
-    // Same decisions, same words: only the mouth changed.
+    // Same decisions; only the mouth changed. 2026-10-21: the face's own
+    // greeting at join says who Q is, so the welcome does not repeat it.
     expect(asked).toHaveLength(1);
-    expect(face.said[0]).toContain(`Hi Adaeze, welcome. ${HOST_INTRO}`);
+    expect(face.said[0]).toContain("Hi Adaeze, welcome.");
+    expect(face.said[0]).not.toContain(HOST_INTRO);
     expect(face.said.at(-1)).toBe(
       "We're here to talk about Nixo's seed round.",
     );

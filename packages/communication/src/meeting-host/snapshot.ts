@@ -293,7 +293,9 @@ const INTENTS: readonly Intent[] = [
   },
   {
     topic: "COMPANY",
-    test: /\b(what (?:does|do) (?:the |your )?(?:company|they|you|\w+) do|tell (?:me|us) about (?:the |your )?(?:company|business)|company (?:summary|overview)|about (?:the )?company)\b/i,
+    // 2026-10-21: "you"/"your" here is Q (the line is addressed to Q):
+    // "Q, what do you do?" is about Q, never the founder's company.
+    test: /\b(what (?:does|do) (?:the )?(?!(?:you|your|yourself|q)\b)(?:company|they|\w+) do|tell (?:me|us) about (?:the )?(?:company|business)|company (?:summary|overview)|about (?:the )?company)\b/i,
     lead: "",
   },
   {
