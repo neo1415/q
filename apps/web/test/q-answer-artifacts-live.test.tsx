@@ -120,3 +120,78 @@ describe("L-11: what the thread has drawn", () => {
     expect(renderedObject()).toBeNull();
   });
 });
+
+describe("round 5: objects first, words as caption", () => {
+  const PICTURE = {
+    kind: "PICTURE" as const,
+    url: "https://images.pexels.com/photos/1/p.jpeg",
+    alt: "A baobab tree",
+    credit: { name: "Ada Obi", url: null },
+    source: "PEXELS" as const,
+    pageUrl: "https://www.pexels.com/photo/baobab-1/",
+  };
+  const before = (a: Element | null, b: Element | null) =>
+    a !== null &&
+    b !== null &&
+    (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+  it("puts the live preview above Q's streaming words, and the working line above both", () => {
+    const { container } = render(
+      <QAnswer
+        turn={turn({
+          streaming: true,
+          preview: PREVIEW,
+          text: "Souqsheet is the closer fit.",
+        })}
+        mark={false}
+        working={<p data-working-slot>Comparing Portside and Souqsheet</p>}
+      />,
+    );
+    const slot = container.querySelector("[data-working-slot]");
+    const frame = container.querySelector("[data-q-preview]");
+    const words = container.querySelector("[data-q-markdown]");
+    expect(before(slot, frame)).toBe(true);
+    expect(before(frame, words)).toBe(true);
+  });
+
+  it("keeps the table above the words when settled, and other blocks below", () => {
+    const { container } = render(
+      <QAnswer turn={turn({ blocks: [TABLE, PICTURE] })} mark={false} />,
+    );
+    const table = container.querySelector("[data-q-table]");
+    const words = container.querySelector("[data-q-markdown]");
+    const picture = container.querySelector("[data-q-picture]");
+    expect(before(table, words)).toBe(true);
+    expect(before(words, picture)).toBe(true);
+  });
+
+  it("keeps the working line's place after an answer that streamed here lands", () => {
+    const working = <p data-working-slot>{" "}</p>;
+    const { container, rerender } = render(
+      <QAnswer
+        turn={turn({ streaming: true, text: "" })}
+        mark={false}
+        working={working}
+      />,
+    );
+    expect(container.querySelector("[data-working-slot]")).not.toBeNull();
+    rerender(
+      <QAnswer
+        turn={turn({ streaming: false })}
+        mark={false}
+        working={working}
+      />,
+    );
+    expect(container.querySelector("[data-working-slot]")).not.toBeNull();
+    // An answer that arrived settled never had one.
+    cleanup();
+    const fresh = render(
+      <QAnswer
+        turn={turn({ streaming: false })}
+        mark={false}
+        working={working}
+      />,
+    );
+    expect(fresh.container.querySelector("[data-working-slot]")).toBeNull();
+  });
+});

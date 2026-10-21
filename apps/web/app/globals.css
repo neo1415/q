@@ -2368,6 +2368,26 @@
     }
   }
 
+  /*
+   * Round 5 (ux-direction §5.1): the working mark's arc travels round its
+   * ring at the THINKING sweep period while real work runs (constant
+   * motion, so linear). Reduced motion: the arc stands still.
+   */
+  .cq-working-sweep {
+    transform-origin: 8px 8px;
+    animation: cq-working-sweep 1.4s linear infinite;
+  }
+  @keyframes cq-working-sweep {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-working-sweep {
+      animation: none;
+    }
+  }
+
   /* Loading: the feed's own shape (Discover v2), never a sentence. */
   .cq-skeleton {
     position: relative;

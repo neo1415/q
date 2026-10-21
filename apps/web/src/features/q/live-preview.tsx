@@ -6,6 +6,7 @@ import type {
 } from "@capital-q/contracts";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
+import { useT } from "@/features/i18n/language";
 
 /**
  * Artifacts live (owner 2026-10-20): the card for what Q is saying, up the
@@ -117,58 +118,77 @@ function PreviewCard({ one }: { readonly one: QArtifactPreviewSubject }) {
   );
 }
 
-/** Rows a comparison usually carries; placeholders only, never labels. */
-const TABLE_ROWS = 4;
+/**
+ * Rows held for a comparison: the most a company table carries (about,
+ * stage, based in, founded, website), so the real table that takes the
+ * frame's place is rarely taller and the words under it do not move
+ * (round 5). Placeholders only, never labels.
+ */
+const TABLE_ROWS = 5;
 
 function PreviewTable({
   subjects,
 }: {
   readonly subjects: readonly QArtifactPreviewSubject[];
 }) {
+  const t = useT();
+  // Round 5: the frame of the card the real table arrives in (its label
+  // and title line), so the swap keeps the same footprint.
   return (
-    <div
-      className="relative w-full overflow-x-auto rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
+    <section
+      className="flex w-full flex-col gap-3 rounded-lg border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
       data-q-preview-table
     >
-      <table className="w-full border-collapse">
-        <thead>
-          <tr>
-            <th scope="col" className="w-1/4 p-3">
-              <span className="sr-only">Measure</span>
-            </th>
-            {subjects.map((one) => (
-              <th
-                key={previewKey(one)}
-                scope="col"
-                className="cq-preview-in p-3 text-start"
-                data-q-preview-column={previewKey(one)}
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <Avatar one={one} size={32} />
-                  <span className="cq-label min-w-0 truncate text-(--cq-text-primary)">
-                    {one.name}
-                  </span>
-                </span>
+      <div aria-hidden="true" className="flex flex-col gap-1">
+        <span className="cq-label text-(--cq-text-tertiary)">
+          {t("Side by side")}
+        </span>
+        <p className="cq-body m-0 flex items-center">
+          <span className="invisible w-0">x</span>
+          <Bar width="45%" />
+        </p>
+      </div>
+      <div className="relative w-full overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th scope="col" className="w-1/4 p-3">
+                <span className="sr-only">Measure</span>
               </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody aria-hidden="true">
-          {Array.from({ length: TABLE_ROWS }, (_, row) => (
-            <tr key={row} className="border-t border-(--cq-border-subtle)">
-              <td className="p-3">
-                <Bar width="70%" />
-              </td>
               {subjects.map((one) => (
-                <td key={previewKey(one)} className="p-3">
-                  <Bar width={row % 2 === 0 ? "80%" : "55%"} />
-                </td>
+                <th
+                  key={previewKey(one)}
+                  scope="col"
+                  className="cq-preview-in p-3 text-start"
+                  data-q-preview-column={previewKey(one)}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Avatar one={one} size={32} />
+                    <span className="cq-label min-w-0 truncate text-(--cq-text-primary)">
+                      {one.name}
+                    </span>
+                  </span>
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody aria-hidden="true">
+            {Array.from({ length: TABLE_ROWS }, (_, row) => (
+              <tr key={row} className="border-t border-(--cq-border-subtle)">
+                <td className="p-3">
+                  <Bar width="70%" />
+                </td>
+                {subjects.map((one) => (
+                  <td key={previewKey(one)} className="p-3">
+                    <Bar width={row % 2 === 0 ? "80%" : "55%"} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
