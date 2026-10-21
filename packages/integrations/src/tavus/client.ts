@@ -258,6 +258,18 @@ export type TavusClient = {
      */
     readonly greeting?: string | null | undefined;
   }) => Promise<TavusConversation>;
+  /**
+   * 2026-10-21 (one participant in the call): a private Tavus room for Q's
+   * meeting face, which Capital Q's page shows as the note-taker's camera.
+   * Same bound as `joinMeeting`; only the returned token joins.
+   */
+  readonly createMeetingRoom: (input: {
+    readonly palId: string;
+    readonly faceId: string;
+    readonly name: string;
+    readonly maxCallSeconds: number;
+    readonly greeting?: string | null | undefined;
+  }) => Promise<TavusCreatedConversation>;
   /** Recovery only, on this same account; unrelated rooms never escape. */
   readonly findConversationsForPal: (
     palId: string,
@@ -445,10 +457,47 @@ export function createTavusClient(dependencies: {
           // The provider's own backstop: the face cannot outlive this.
           max_call_duration: input.maxCallSeconds,
           participant_left_timeout: 30,
-          participant_absent_timeout: 120,
+          // 2026-10-21: the face is sent before people arrive and must be
+          // admitted; 120 s alone could end it before anyone came.
+          participant_absent_timeout: Math.min(600, input.maxCallSeconds),
         },
       });
       return conversationOf(raw);
+    },
+    createMeetingRoom: async (input) => {
+      if (
+        !Number.isInteger(input.maxCallSeconds) ||
+        input.maxCallSeconds < 60 ||
+        input.maxCallSeconds > MEETING_MAX_SECONDS
+      ) {
+        throw new TavusError("meeting duration", 400);
+      }
+      const raw = await call(
+        "create meeting room",
+        "POST",
+        "/v2/conversations",
+        {
+          pal_id: input.palId,
+          face_id: input.faceId,
+          conversation_name: input.name,
+          ...(input.greeting === null || input.greeting === undefined
+            ? {}
+            : { custom_greeting: input.greeting.slice(0, 1_000) }),
+          // Only Capital Q's page joins: the face and that page, no one else.
+          require_auth: true,
+          max_participants: 2,
+          properties: {
+            max_call_duration: input.maxCallSeconds,
+            participant_left_timeout: 60,
+            participant_absent_timeout: Math.min(600, input.maxCallSeconds),
+          },
+        },
+      );
+      const created = ConversationCreatedSchema.parse(raw);
+      return {
+        ...conversationOf(created),
+        meetingToken: created.meeting_token ?? null,
+      };
     },
     findConversationsForPal: async (palId) => {
       const schema = z.object({

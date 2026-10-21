@@ -143,7 +143,32 @@ export type MeetingFaceService = MeetingFacePort & {
    */
   readonly sweep: (options?: { readonly atBoot?: boolean }) => Promise<void>;
   readonly settled: (meetingId: string) => Promise<void>;
+  /**
+   * CAMERA mode: the face's private room, for the note-taker's camera page
+   * only, while the face is live; null otherwise.
+   */
+  readonly room: (meetingId: string) => MeetingFaceRoom | null;
 };
+
+export type MeetingFaceRoom = {
+  readonly url: string;
+  readonly token: string;
+};
+
+/**
+ * MEET: the face joins Google Meet as its own participant (Tavus
+ * `meeting_url`). CAMERA (owner decision 2026-10-21): the face lives in a
+ * private Tavus room that the Recall note-taker shows as its camera, so
+ * the call has one Q, under Capital Q's own signed-in name.
+ */
+export type MeetingFaceMode = "MEET" | "CAMERA";
+
+export function meetingFaceModeFrom(raw: string | undefined): MeetingFaceMode {
+  return raw?.trim().toLowerCase() === "camera" ? "CAMERA" : "MEET";
+}
+
+/** The face is sent this long before the call starts, not earlier. */
+export const MEETING_FACE_LEAD_MS = 60_000;
 
 /**
  * The bridge's answer to one of the face's turns. STREAM (2026-10-20): the
@@ -178,6 +203,7 @@ export type MeetingFaceStore = {
     /** As the booking shows it to both sides; for the face's greeting. */
     readonly organiserName?: string | null;
     readonly purpose?: string | null;
+    readonly startsAt?: Date | null;
   } | null>;
   /**
    * Inserts the meeting's one face row (its reservation is made in the same
@@ -231,6 +257,7 @@ type Session = {
   /** Wakes a turn waiting to learn whether the host is answering. */
   expecting: (() => void) | null;
   timer: ReturnType<typeof setTimeout> | null;
+  room: MeetingFaceRoom | null;
 };
 
 /**
@@ -271,6 +298,7 @@ export function createMeetingFace(dependencies: {
   /** How long the bridge waits for the host's answer to a line aimed at Q. */
   readonly answerWaitMs?: number;
   readonly expectGraceMs?: number;
+  readonly mode?: MeetingFaceMode;
   readonly logger?: Logger;
 }): MeetingFaceService {
   const now = dependencies.now ?? (() => Date.now());
@@ -294,6 +322,9 @@ export function createMeetingFace(dependencies: {
   const byMeeting = new Map<string, Session>();
   const byId = new Map<string, Session>();
   const starting = new Map<string, Promise<void>>();
+  const mode = dependencies.mode ?? "MEET";
+  /** A start waiting for the call's time: called to go now, or to drop it. */
+  const early = new Map<string, (go: boolean) => void>();
 
   function forget(session: Session): void {
     if (session.timer !== null) clearTimeout(session.timer);
@@ -369,6 +400,23 @@ export function createMeetingFace(dependencies: {
     if (!on || client === null || faceId === null || base === null) return;
     const meeting = await store.meeting(meetingId);
     if (meeting === null) return;
+    // 2026-10-21: Q's note-taker joins minutes early; the face (paid time,
+    // and a bounded length) is sent a minute before the start, or at once
+    // when start is called again (someone is already in the call).
+    const wait =
+      (meeting.startsAt?.getTime() ?? 0) - MEETING_FACE_LEAD_MS - now();
+    if (wait > 0) {
+      const go = await new Promise<boolean>((resolve) => {
+        const timer = setTimeout(() => resolve(true), wait);
+        timer.unref();
+        early.set(meetingId, (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        });
+      });
+      early.delete(meetingId);
+      if (!go) return;
+    }
     const id = randomUUID();
     const token = randomBytes(32).toString("base64url");
     const createdAt = now();
@@ -404,6 +452,7 @@ export function createMeetingFace(dependencies: {
       state: "STARTING",
       palId: null,
       conversationId: null,
+      room: null,
       lines: [],
       waiter: null,
       stream: null,
@@ -430,26 +479,49 @@ export function createMeetingFace(dependencies: {
           },
           perception: { perception_model: "off" },
         },
-        conferencing: {
-          username: `cq-q-${randomBytes(6).toString("hex")}`,
-          allowlist: NO_EMAIL_INVITES,
-        },
+        // A meeting identity only when the face joins Meet itself.
+        ...(mode === "MEET"
+          ? {
+              conferencing: {
+                username: `cq-q-${randomBytes(6).toString("hex")}`,
+                allowlist: NO_EMAIL_INVITES,
+              },
+            }
+          : {}),
       });
       session.palId = palId;
       // Recorded before the paid call: from here the time counts.
       await store.requested(id, palId, new Date(now()));
       if (ended()) throw new TavusError("ended", 499);
-      const conversation = await client.joinMeeting({
-        palId,
-        faceId,
-        name: MEETING_FACE_NAME,
-        meetingUrl: meeting.meetLink,
-        maxCallSeconds: dependencies.maxSeconds,
-        greeting: meetingFaceGreeting({
-          organiserName: meeting.organiserName ?? null,
-          purpose: meeting.purpose ?? null,
-        }),
+      const greeting = meetingFaceGreeting({
+        organiserName: meeting.organiserName ?? null,
+        purpose: meeting.purpose ?? null,
       });
+      let conversation: { readonly conversationId: string };
+      if (mode === "CAMERA") {
+        const room = await client.createMeetingRoom({
+          palId,
+          faceId,
+          name: MEETING_FACE_NAME,
+          maxCallSeconds: dependencies.maxSeconds,
+          greeting,
+        });
+        session.conversationId = room.conversationId;
+        if (room.conversationUrl === null || room.meetingToken === null) {
+          throw new TavusError("meeting room", 502);
+        }
+        session.room = { url: room.conversationUrl, token: room.meetingToken };
+        conversation = room;
+      } else {
+        conversation = await client.joinMeeting({
+          palId,
+          faceId,
+          name: MEETING_FACE_NAME,
+          meetingUrl: meeting.meetLink,
+          maxCallSeconds: dependencies.maxSeconds,
+          greeting,
+        });
+      }
       session.conversationId = conversation.conversationId;
       await store.live(id, conversation.conversationId);
       if (ended()) {
@@ -487,6 +559,8 @@ export function createMeetingFace(dependencies: {
   }
 
   function end(meetingId: string, reason: MeetingFaceEndReason): void {
+    // The call ended before the face was sent: it never is.
+    early.get(meetingId)?.(false);
     const session = byMeeting.get(meetingId);
     if (session === undefined || session.state === "ENDING") return;
     const wasLive = session.state === "LIVE";
@@ -518,6 +592,8 @@ export function createMeetingFace(dependencies: {
 
   return {
     start: (meetingId) => {
+      // Started again while waiting for the call's time: someone is here.
+      early.get(meetingId)?.(true);
       if (!on || byMeeting.has(meetingId) || starting.has(meetingId)) return;
       const run = begin(meetingId)
         .catch((error: unknown) => {
@@ -527,8 +603,11 @@ export function createMeetingFace(dependencies: {
       starting.set(meetingId, run);
     },
     live: (meetingId) => byMeeting.get(meetingId)?.state === "LIVE",
+    // Waiting for the call's time is not "being sent": Q's voice does not
+    // hold its lines for a face that will come only at the start.
     starting: (meetingId) =>
-      starting.has(meetingId) || byMeeting.get(meetingId)?.state === "STARTING",
+      (starting.has(meetingId) && !early.has(meetingId)) ||
+      byMeeting.get(meetingId)?.state === "STARTING",
     expect: (meetingId) => {
       const session = byMeeting.get(meetingId);
       if (session?.state !== "LIVE") return;
@@ -562,6 +641,10 @@ export function createMeetingFace(dependencies: {
     end,
     settled: async (meetingId) => {
       await starting.get(meetingId);
+    },
+    room: (meetingId) => {
+      const session = byMeeting.get(meetingId);
+      return session?.state === "LIVE" ? session.room : null;
     },
     bridge: async (sessionId, bearer, messages, signal) => {
       const session = byId.get(sessionId);
@@ -711,9 +794,11 @@ export function createPostgresMeetingFaceStore(
           meet_link: string | null;
           purpose: string | null;
           organiser_name: string | null;
+          starts_at: Date | null;
         }[]
       >`
         select m.tenant_id, m.organiser_user_id, m.meet_link, m.purpose,
+               m.starts_at,
                (select p.display_name
                   from communication.meeting_participants p
                  where p.meeting_id = m.id and p.user_id = m.organiser_user_id
@@ -729,6 +814,7 @@ export function createPostgresMeetingFaceStore(
         meetLink: row.meet_link,
         organiserName: row.organiser_name,
         purpose: row.purpose,
+        startsAt: row.starts_at,
       };
     },
     claim: async (input) => {
