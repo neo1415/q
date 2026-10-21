@@ -183,6 +183,83 @@ describe("the inbox's words (pure)", () => {
   });
 });
 
+describe("gateq-2's saved views and dossier words (pure)", () => {
+  const me = id(901);
+  const ROWS = [
+    item(1, {}),
+    item(2, { replyState: "OVERDUE", daysLeft: -2 }),
+    item(3, { replyState: "DUE_SOON", daysLeft: 0 }),
+    item(4, {
+      fit: "NOT_A_FIT",
+      assignee: { userId: me, name: "Daniel Reyes", initials: "DR" },
+    }),
+    item(5, { fit: "PARTIAL", rules: { met: 2, total: 4, unknown: 2 } }),
+    item(6, { rules: { met: 0, total: 0, unknown: 0 } }),
+    item(7, { folder: "ARCHIVED" }),
+  ];
+
+  it("counts each view by the server's own rules, inbox folder only", () => {
+    expect(model.paneCounts(ROWS, me)).toEqual({
+      ALL: 6,
+      FIRST: 3,
+      TODAY: 2,
+      MINE: 1,
+      OUTSIDE: 1,
+    });
+    // F28: no published rules is never "look at first".
+    expect(model.inPane(ROWS[5]!, "FIRST", me)).toBe(false);
+    expect(model.inPane(ROWS[6]!, "ALL", me)).toBe(false);
+  });
+
+  it("says why and when in words, and never invents a promise", () => {
+    expect(model.paneWhy(ROWS[0]!)).toBe("Meets every rule of your gate.");
+    expect(model.paneWhy(ROWS[1]!)).toMatch(/reply promise is close/);
+    expect(model.paneWhy(ROWS[4]!)).toBe(
+      "Not enough information to decide: 2 rules not answered.",
+    );
+    expect(model.qualifiesOf(ROWS[5]!)).toBe("NO_RULES");
+    expect(model.dueWords(ROWS[1]!)).toEqual({
+      text: "Reply overdue",
+      late: true,
+    });
+    expect(model.dueWords(ROWS[2]!)?.text).toBe("Reply today");
+    expect(
+      model.dueWords({
+        replyState: "ON_TRACK",
+        daysLeft: 4,
+        folder: "INBOX",
+        replyBy: "2026-10-24",
+      })?.text,
+    ).toBe("Reply by 24 Oct");
+    expect(model.dueWords(ROWS[0]!)).toBeNull();
+  });
+
+  it("keeps a group they did not cover as not covered, never a zero", () => {
+    const rows = model.onePageSummary(
+      { companyName: "Mosaic", raise: { amount: "1500000", currency: "USD" } },
+      null,
+    );
+    expect(rows.map((row) => row.label)).toEqual([
+      "Company",
+      "Round",
+      "Traction",
+      "Market",
+    ]);
+    expect(rows[1]?.value).toBe("$1,500,000. Founder stated");
+    expect(rows[2]?.value).toBeNull();
+    expect(model.openQuestions(null)).toEqual([]);
+    expect(
+      model.draftAsk({
+        founderName: "Ada Obi",
+        fund: "Northbound",
+        questions: ["What is retention across the paid contracts?"],
+      }),
+    ).toMatch(/^Hi Ada,[\s\S]*- What is retention/);
+    expect(model.monogram("Tessellate Labs")).toBe("TL");
+    expect(model.monogram("quillwork")).toBe("QU");
+  });
+});
+
 describe("the inbox, driven like an investor", () => {
   const render3 = (canDecide = true) =>
     render(
@@ -248,7 +325,7 @@ describe("the inbox, driven like an investor", () => {
     press("j");
     press("j");
     press("#");
-    const send = screen.getByRole("button", { name: "Send and pass" });
+    const send = screen.getByRole("button", { name: "Approve and send pass" });
     // The draft is there; a reason is pre-chosen from the rules and can be changed.
     expect(screen.getByLabelText(/Message to the founder/)).toBeTruthy();
     expect(send.hasAttribute("disabled")).toBe(false);
@@ -257,24 +334,74 @@ describe("the inbox, driven like an investor", () => {
     });
     expect(
       screen
-        .getByRole("button", { name: "Send and pass" })
+        .getByRole("button", { name: "Approve and send pass" })
         .hasAttribute("disabled"),
     ).toBe(true);
   });
 
-  it("gives a member no way to pass or reply for the firm", () => {
+  it("gives a member no way to pass, book or ask for the firm", () => {
     render3(false);
-    expect(
-      screen
-        .getAllByRole("button", { name: "Pass" })
-        .every((b) => b.hasAttribute("disabled")),
-    ).toBe(true);
+    for (const name of ["Pass with a reason", "Book a call", "Ask for more"]) {
+      expect(
+        screen
+          .getAllByRole("button", { name })
+          .every((b) => b.hasAttribute("disabled")),
+      ).toBe(true);
+    }
     press("#");
-    expect(screen.queryByRole("button", { name: "Send and pass" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Approve and send pass" }),
+    ).toBeNull();
     expect(
       screen.getByText(
         /you can read applications, add notes and download packs/,
       ),
     ).toBeTruthy();
+  });
+
+  it("narrows to a saved view at once, with its count", () => {
+    render(
+      <InboxView
+        inbox={inbox([
+          ...ITEMS,
+          item(4, {
+            companyName: "Quillwork",
+            replyState: "OVERDUE",
+            daysLeft: -1,
+          }),
+        ])}
+        state="full"
+        initialDetail={null}
+        gateLink="https://capitalq.app/g/x"
+        fund="Northbound Capital"
+        demo={{ details: {} }}
+      />,
+    );
+    const views = screen.getByRole("navigation", { name: "Views" });
+    const today = within(views).getByRole("button", { name: /Reply today/ });
+    expect(today.textContent).toContain("1");
+    fireEvent.click(today);
+    expect(today.getAttribute("aria-pressed")).toBe("true");
+    const list = screen.getByRole("listbox", { name: "Applications" });
+    expect(within(list).getAllByRole("option")).toHaveLength(1);
+    expect(within(list).getByText("Quillwork")).toBeTruthy();
+    // Overdue is said in words, not colour alone.
+    expect(within(list).getByText("Reply overdue")).toBeTruthy();
+    fireEvent.click(
+      within(views).getByRole("button", { name: /Outside your rules/ }),
+    );
+    expect(within(list).getByText("Mosaic")).toBeTruthy();
+    expect(within(list).getByText("Doesn't qualify")).toBeTruthy();
+  });
+
+  it("prepares a call for approval; nothing is sent from the dossier", () => {
+    render3();
+    fireEvent.click(screen.getByRole("button", { name: "Book a call" }));
+    const message = screen.getByLabelText(/Message to the founder/);
+    expect((message as HTMLTextAreaElement).value).toMatch(/30-minute call/);
+    expect(
+      screen.getByText(/Nothing is sent until you approve this exact message/),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Approve and send" })).toBeTruthy();
   });
 });

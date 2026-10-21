@@ -29,6 +29,7 @@ import {
   type GateqTab,
 } from "@/features/gateq/page/gateq-chrome";
 import { CopyLink, InboxView } from "@/features/gateq/page/inbox-view";
+import { PANE_VIEWS } from "@/features/gateq/page/inbox-model";
 import {
   FindView,
   GateEmpty,
@@ -320,6 +321,9 @@ export default async function GateqPage({ searchParams }: Props) {
                 : "full"
           }
           initialDetail={detail}
+          initialPane={
+            PANE_VIEWS.find(([key]) => key === one(params["pane"]))?.[0]
+          }
           missingItem={missingItem}
           gateLink={link}
           fund={context.label ?? "your firm"}

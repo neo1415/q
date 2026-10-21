@@ -352,3 +352,244 @@ export const MISSING_WORDS: Readonly<
 export function speakerWords(role: "PERSON" | "Q"): string {
   return role === "Q" ? "Q" : "Founder";
 }
+
+// ---------------------------------------------------------------------------
+// Design gateq-2 (2026-10-21): three panes, saved views, list, dossier
+// ---------------------------------------------------------------------------
+
+/**
+ * The saved views of the inbox folder. Each is read from the engine's band
+ * at submission and the firm's own reply promise: the same rules as the
+ * server's views (FITS, ASSIGNED_TO_ME, NOT_A_FIT), so a count here is the
+ * count there. Nothing ranks by activity.
+ */
+export const PANE_VIEWS = [
+  ["ALL", "All"],
+  ["FIRST", "Look at first"],
+  ["TODAY", "Reply today"],
+  ["MINE", "Assigned to me"],
+  ["OUTSIDE", "Outside your rules"],
+] as const;
+export type PaneView = (typeof PANE_VIEWS)[number][0];
+
+export function inPane(
+  item: GateqInboxItemDto,
+  pane: PaneView,
+  viewerUserId: string,
+): boolean {
+  if (item.folder !== "INBOX") return false;
+  switch (pane) {
+    case "ALL":
+      return true;
+    case "FIRST":
+      // F28: a gate with no rules checked nothing; nothing is "first".
+      return item.fit === "FITS" && item.rules.total > 0;
+    case "TODAY":
+      return (
+        item.replyState === "OVERDUE" ||
+        ((item.replyState === "DUE_SOON" || item.replyState === "ON_TRACK") &&
+          item.daysLeft !== null &&
+          item.daysLeft <= 0)
+      );
+    case "MINE":
+      return item.assignee?.userId === viewerUserId;
+    case "OUTSIDE":
+      return item.fit === "NOT_A_FIT";
+  }
+}
+
+export function paneCounts(
+  items: readonly GateqInboxItemDto[],
+  viewerUserId: string,
+): Readonly<Record<PaneView, number>> {
+  const count = (pane: PaneView) =>
+    items.filter((item) => inPane(item, pane, viewerUserId)).length;
+  return {
+    ALL: count("ALL"),
+    FIRST: count("FIRST"),
+    TODAY: count("TODAY"),
+    MINE: count("MINE"),
+    OUTSIDE: count("OUTSIDE"),
+  };
+}
+
+/** Two letters for a tile: the first two words' initials, or the name's first two. */
+export function monogram(name: string): string {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter((word) => word !== "");
+  const letters =
+    words.length >= 2
+      ? `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}`
+      : (words[0] ?? "").slice(0, 2);
+  return letters.toUpperCase() || "?";
+}
+
+export type Qualifies = "YES" | "NO" | "UNKNOWN" | "NO_RULES";
+
+/** Qualifies under the published rules, in the engine's own terms. */
+export function qualifiesOf(
+  item: Pick<GateqInboxItemDto, "fit" | "rules">,
+): Qualifies {
+  if (noRulesChecked(item)) return "NO_RULES";
+  if (item.fit === "FITS") return "YES";
+  if (item.fit === "NOT_A_FIT") return "NO";
+  return "UNKNOWN";
+}
+
+export const QUALIFIES_WORDS: Readonly<Record<Qualifies, string>> = {
+  YES: "Qualifies",
+  NO: "Doesn't qualify",
+  UNKNOWN: "Not enough information",
+  NO_RULES: "No rules yet",
+};
+
+/** One line of why, from the band, the rule counts and the promise alone. */
+export function paneWhy(item: GateqInboxItemDto): string {
+  switch (qualifiesOf(item)) {
+    case "NO_RULES":
+      return "No published rules yet, so nothing was checked.";
+    case "NO":
+      return "Doesn't qualify under your published rules: a required rule isn't met.";
+    case "UNKNOWN": {
+      const n = item.rules.unknown;
+      return n === 0
+        ? "Not enough information to decide."
+        : `Not enough information to decide: ${String(n)} rule${n === 1 ? "" : "s"} not answered.`;
+    }
+    case "YES":
+      return item.replyState === "DUE_SOON" || item.replyState === "OVERDUE"
+        ? "Meets every rule of your gate, and your reply promise is close."
+        : "Meets every rule of your gate.";
+  }
+}
+
+/** "Reply today", "Reply overdue", "Reply by 24 Oct": the firm's own promise. */
+export function dueWords(
+  item: Pick<GateqInboxItemDto, "replyState" | "daysLeft" | "folder" | "replyBy">,
+): { readonly text: string; readonly late: boolean } | null {
+  switch (item.replyState) {
+    case "NONE":
+      return null;
+    case "ANSWERED":
+      return {
+        text: item.folder === "PASSED" ? "Passed" : "Replied",
+        late: false,
+      };
+    case "OVERDUE":
+      return { text: "Reply overdue", late: true };
+    case "DUE_SOON":
+    case "ON_TRACK":
+      if (item.daysLeft !== null && item.daysLeft <= 0)
+        return { text: "Reply today", late: false };
+      if (item.replyBy === null) return null;
+      return {
+        text: `Reply by ${new Date(`${item.replyBy}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}`,
+        late: false,
+      };
+  }
+}
+
+/** "18 Oct": the frozen submission's date. */
+export function submittedWords(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+export type SummaryRow = {
+  readonly label: string;
+  /** Null: not covered in what they sent; shown as such, never guessed. */
+  readonly value: string | null;
+};
+
+const SUMMARY_GROUPS: readonly (readonly [
+  GateqDossierV1["dimensions"][number]["group"],
+  string,
+])[] = [
+  ["FUNDRAISING", "Round"],
+  ["TRACTION", "Traction"],
+  ["MARKET", "Market"],
+];
+
+/**
+ * The dossier's one-page summary: the company, then the round, traction
+ * and market as the founder sent them, each with where it came from. A
+ * group they did not cover is "Not covered", never an empty zero.
+ */
+export function onePageSummary(
+  item: Pick<GateqInboxItemDto, "companyName" | "raise">,
+  dossier: GateqDossierV1 | null | undefined,
+): readonly SummaryRow[] {
+  const rows: SummaryRow[] = [
+    { label: "Company", value: dossier?.company.name ?? item.companyName },
+  ];
+  for (const [group, label] of SUMMARY_GROUPS) {
+    const facts =
+      dossier?.dimensions
+        .filter((dimension) => dimension.group === group)
+        .flatMap((dimension) => dimension.facts)
+        .filter((fact) => fact.truthClass !== "UNKNOWN") ?? [];
+    // An older submission has no dossier: its raise is still their claim.
+    const legacyRaise =
+      group === "FUNDRAISING" && facts.length === 0 && item.raise !== null
+        ? `${item.raise.currency === "USD" ? "$" : `${item.raise.currency} `}${Number(item.raise.amount).toLocaleString("en-US")}. Founder stated`
+        : null;
+    rows.push({
+      label,
+      value:
+        facts.length === 0
+          ? legacyRaise
+          : facts
+              .slice(0, 2)
+              .map(
+                (fact) =>
+                  `${fact.summary.replace(/\.\s*$/, "")}. ${factProvenanceWords(fact)}`,
+              )
+              .join(" "),
+    });
+  }
+  return rows;
+}
+
+/** The dossier's own diligence questions, a few, in the order it holds them. */
+export function openQuestions(
+  dossier: GateqDossierV1 | null | undefined,
+  max = 3,
+): readonly string[] {
+  return (dossier?.diligenceQuestions ?? [])
+    .map((question) => question.question)
+    .slice(0, max);
+}
+
+/** "Book a call": a first draft that asks for times; sent only as approved. */
+export function draftCall(input: {
+  readonly founderName: string | null;
+  readonly fund: string;
+}): string {
+  const hello =
+    input.founderName === null
+      ? "Hi,"
+      : `Hi ${input.founderName.split(/\s+/)[0] ?? ""},`;
+  return `${hello} thank you for applying to ${input.fund}. We'd like to talk. Could you send two or three times that suit you for a 30-minute call next week?`;
+}
+
+/** "Ask for more": the dossier's open questions, drafted; sent only as approved. */
+export function draftAsk(input: {
+  readonly founderName: string | null;
+  readonly fund: string;
+  readonly questions: readonly string[];
+}): string {
+  const hello =
+    input.founderName === null
+      ? "Hi,"
+      : `Hi ${input.founderName.split(/\s+/)[0] ?? ""},`;
+  const asks =
+    input.questions.length === 0
+      ? "Could you tell us a little more about your traction and your round?"
+      : input.questions.map((question) => `- ${question}`).join("\n");
+  return `${hello} thank you for applying to ${input.fund}. Before we go further, could you help us with a few questions?\n${asks}`;
+}

@@ -23,19 +23,17 @@ import type {
 import { Button, buttonClassName } from "@capital-q/ui/button";
 import {
   Archive,
-  ChevronDown,
-  ChevronLeft,
+  Check,
+  CircleAlert,
+  CircleHelp,
   Clock,
   Download,
   FileText,
-  Filter,
   ICON_SIZE,
   ICON_STROKE,
   Inbox,
   Link as LinkIcon,
   Lock,
-  MessageSquare,
-  MoreHorizontal,
   Search,
   Send,
   Square,
@@ -74,18 +72,27 @@ import {
 } from "./gateq-actions";
 import { ErrorBlock, Skeleton, StateBlock } from "./gateq-chrome";
 import {
-  chipsFor,
+  draftAsk,
+  draftCall,
   draftPass,
   draftReply,
-  fitGlyphFor,
-  fitWordsFor,
+  dueWords,
+  inPane,
   matchesSearch,
+  monogram,
+  onePageSummary,
+  openQuestions,
+  PANE_VIEWS,
+  paneCounts,
+  paneWhy,
   PASS_REASONS,
+  qualifiesOf,
+  QUALIFIES_WORDS,
   qView,
   receivedWords,
-  replyWords,
-  rulesWords,
   shortcutFor,
+  submittedWords,
+  type PaneView,
 } from "./inbox-model";
 import { useT } from "@/features/i18n/language";
 
@@ -130,12 +137,21 @@ export type InboxViewProps = {
   readonly fund: string;
   /** Where a view chip goes; the view's name is appended. */
   readonly viewBase?: string;
+  /** The saved view the inbox opens on (design gateq-2). */
+  readonly initialPane?: PaneView | undefined;
   readonly demo?: InboxDemo;
 };
 
+/** What a reply is for: a plain reply, a call, or more information. */
+type ReplyDraft = "REPLY" | "CALL" | "ASK";
+
 type Sheet =
   | { readonly kind: "pass"; readonly ids: readonly string[] }
-  | { readonly kind: "reply"; readonly id: string }
+  | {
+      readonly kind: "reply";
+      readonly id: string;
+      readonly draft?: ReplyDraft | undefined;
+    }
   | { readonly kind: "pack"; readonly id: string }
   | { readonly kind: "assign"; readonly ids: readonly string[] }
   | { readonly kind: "label"; readonly ids: readonly string[] }
@@ -179,6 +195,7 @@ export function InboxView({
   gateLink,
   fund,
   viewBase = "/gateq?tab=inbox&view=",
+  initialPane = "ALL",
   demo,
 }: InboxViewProps) {
   const t = useT();
@@ -220,6 +237,7 @@ export function InboxView({
     return null;
   });
   const [search, setSearch] = useState("");
+  const [pane, setPane] = useState<PaneView>(initialPane);
   const [searching, setSearching] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const storedShortcuts = useSyncExternalStore(
@@ -244,9 +262,16 @@ export function InboxView({
   const gatewayId = inbox?.gateway.id ?? "";
   const canDecide = inbox?.viewer.canDecide ?? false;
   const solo = inbox?.viewer.solo ?? true;
+  const onInboxFolder = (inbox?.view ?? "INBOX") === "INBOX";
+  const viewerUserId = inbox?.viewer.userId ?? "";
   const visible = useMemo(
-    () => items.filter((item) => matchesSearch(item, search)),
-    [items, search],
+    () =>
+      items.filter(
+        (item) =>
+          matchesSearch(item, search) &&
+          (!onInboxFolder || inPane(item, pane, viewerUserId)),
+      ),
+    [items, search, onInboxFolder, pane, viewerUserId],
   );
   const current =
     visible.find((item) => item.applicationId === selected) ??
@@ -456,64 +481,107 @@ export function InboxView({
   ]);
 
   // ------------------------------------------------------------------------
+  // Design gateq-2 (2026-10-21): three panes. Saved views, the applications,
+  // and the open dossier; on a phone the views are chips and the dossier is
+  // a sheet.
 
-  const chips = (
-    <div className="gq-chips" role="navigation" aria-label={t("Views")}>
-      {chipsFor(solo).map(([view, label]) => {
-        const count = inbox?.counts[view] ?? 0;
-        return (
-          <Link
-            key={view}
-            href={viewHref(view)}
-            className="gq-chip"
-            aria-current={inbox?.view === view ? "page" : undefined}
+  const viewerId = inbox?.viewer.userId ?? "";
+  const onInbox = (inbox?.view ?? "INBOX") === "INBOX";
+  const counts = onInbox ? paneCounts(items, viewerId) : null;
+  const serverCounts: Readonly<Record<PaneView, number | null>> = {
+    ALL: inbox?.counts.INBOX ?? 0,
+    FIRST: inbox?.counts.FITS ?? 0,
+    TODAY: null,
+    MINE: inbox?.counts.ASSIGNED_TO_ME ?? 0,
+    OUTSIDE: inbox?.counts.NOT_A_FIT ?? 0,
+  };
+  // Assigned-to-me only means something in a firm of more than one.
+  const panes = PANE_VIEWS.filter(([key]) => !(solo && key === "MINE"));
+
+  const views = (variant: "pane" | "chips") => (
+    <nav
+      className={variant === "pane" ? "gq2-views" : "gq2-chips"}
+      aria-label={t("Views")}
+    >
+      {panes.map(([key, label]) => {
+        const n = counts?.[key] ?? serverCounts[key];
+        const count =
+          variant === "pane" && n !== null ? (
+            <span className="gq2-n">{n}</span>
+          ) : null;
+        return onInbox ? (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={pane === key}
+            onClick={() => {
+              setPane(key);
+              setChecked(new Set());
+            }}
           >
-            {t(label)}
-            {count > 0 && view !== "PASSED" && view !== "ARCHIVED" ? (
-              <span className="gq-count">{count}</span>
-            ) : null}
+            <span>{t(label)}</span>
+            {count}
+          </button>
+        ) : (
+          <Link key={key} href={`${viewHref("INBOX")}&pane=${key}`}>
+            <span>{t(label)}</span>
+            {count}
           </Link>
         );
       })}
-    </div>
+      {variant === "pane" ? <span className="gq2-sep" aria-hidden /> : null}
+      {FOLDER_VIEWS.map(([view, label]) => (
+        <Link
+          key={view}
+          href={viewHref(view)}
+          aria-current={inbox?.view === view ? "page" : undefined}
+        >
+          <span>{t(label)}</span>
+          {variant === "pane" &&
+          view === "STARRED" &&
+          (inbox?.counts.STARRED ?? 0) > 0 ? (
+            <span className="gq2-n">{inbox?.counts.STARRED}</span>
+          ) : null}
+        </Link>
+      ))}
+    </nav>
   );
 
   if (state === "loading") {
     return (
-      <>
-        {chips}
-        <div className="gq-ibx" aria-busy="true">
-          <div className="gq-list">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <div
-                key={n}
-                className="flex gap-2.5 border-b border-(--cq-border-subtle) px-3 py-3.5"
-              >
-                <Skeleton width="24px" height={24} />
-                <div className="flex flex-1 flex-col gap-1.5">
-                  <Skeleton width="50%" height={15} />
-                  <Skeleton width="80%" height={12} />
-                  <Skeleton width="60%" height={18} />
-                </div>
+      <div className="gq2-panes" aria-busy="true">
+        <div className="gq2-views">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <Skeleton key={n} width="100%" height={36} />
+          ))}
+        </div>
+        <div className="gq2-list">
+          {[1, 2, 3, 4].map((n) => (
+            <div key={n} className="gq2-row">
+              <Skeleton width="36px" height={36} />
+              <div className="flex flex-col gap-1.5">
+                <Skeleton width="50%" height={15} />
+                <Skeleton width="80%" height={12} />
+                <Skeleton width="100%" height={20} />
               </div>
-            ))}
-          </div>
-          <div className="gq-detail" data-content-pane>
-            <div className="gq-dt">
-              <Skeleton width="60%" height={28} />
-              <Skeleton width="100%" height={40} />
-              <Skeleton width="100%" height={200} />
             </div>
+          ))}
+        </div>
+        <div className="gq2-dossier" data-content-pane>
+          <div className="gq2-dos">
+            <Skeleton width="60%" height={22} />
+            <Skeleton width="100%" height={160} />
+            <Skeleton width="100%" height={44} />
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   if (state === "error") {
     return (
       <>
-        {chips}
+        {views("chips")}
         <ErrorBlock
           t={t}
           what="Your GateQ inbox"
@@ -526,7 +594,7 @@ export function InboxView({
   if (state === "empty" || inbox === null || items.length === 0) {
     return (
       <>
-        {chips}
+        {inbox === null ? null : views("chips")}
         <div
           className="grid items-start gap-6"
           style={{ gridTemplateColumns: "repeat(auto-fit,minmax(300px,1fr))" }}
@@ -667,139 +735,98 @@ export function InboxView({
       </div>
     );
 
-  const allChecked =
-    visible.length > 0 &&
-    visible.every((item) => checked.has(item.applicationId));
-
   const list = (
     <div
-      className="gq-list"
+      className="gq2-list"
       ref={listRef}
       role="listbox"
       aria-label={t("Applications")}
       aria-multiselectable="true"
     >
-      <div className="gq-listhead">
-        <button
-          type="button"
-          className="grid size-11 place-items-center rounded-lg text-(--cq-text-tertiary) lg:size-9"
-          role="checkbox"
-          aria-checked={allChecked}
-          aria-label={t("Select all")}
-          onClick={() =>
-            setChecked(
-              allChecked
-                ? new Set()
-                : new Set(visible.map((item) => item.applicationId)),
-            )
-          }
-        >
-          {allChecked ? (
-            <SquareCheck {...icon} size={18} />
-          ) : (
-            <Square {...icon} size={18} />
-          )}
-        </button>
-        {searching ? (
-          <label className="gq-search flex-1">
-            <span className="sr-only">{t("Search applications")}</span>
-            <Search {...icon} />
-            <input
-              ref={searchRef}
-              className="gq-input"
-              style={{ minHeight: 36 }}
-              value={search}
-              placeholder={t("Search")}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  setSearch("");
-                  setSearching(false);
-                }
-              }}
-            />
-          </label>
-        ) : (
-          <>
-            <Button
-              variant="quiet"
-              size="compact"
-              onClick={() => setSearching(true)}
-            >
-              <Filter {...icon} />
-              {t("Filter")}
-            </Button>
-            <Button
-              variant="quiet"
-              size="compact"
-              className="gq-hide-s"
-              aria-label={t("Sorted by reply-by date")}
-            >
-              {t("Reply-by date")}
-              <ChevronDown {...icon} />
-            </Button>
-          </>
-        )}
-        <span className="flex-1" />
-        <Button
-          variant="quiet"
-          size="compact"
-          title={t(
-            "Q proposes what to look at first, what to ask for and which to prepare a pass for. You approve.",
-          )}
-          onClick={() => setSheet({ kind: "triage" })}
-        >
-          <QNavIcon size={16} strokeWidth={ICON_STROKE} aria-hidden />
-          {t("Triage")}
-        </Button>
-      </div>
-      {visible.map((item) => (
-        <Row
-          key={item.applicationId}
-          item={item}
-          selected={item.applicationId === current?.applicationId}
-          checked={checked.has(item.applicationId)}
-          onOpen={() => open(item.applicationId)}
-          onCheck={() =>
-            setChecked((all) => {
-              const next = new Set(all);
-              if (next.has(item.applicationId)) next.delete(item.applicationId);
-              else next.add(item.applicationId);
-              return next;
-            })
-          }
-          onStar={() => star([item.applicationId], !item.starred)}
-        />
-      ))}
-      <p className="cq-caption gq-t3 px-3 py-3.5">
-        {inbox.counts.NOT_A_FIT > 0
-          ? t(
-              `${inbox.counts.NOT_A_FIT} application${inbox.counts.NOT_A_FIT === 1 ? "" : "s"} outside your rules ${inbox.counts.NOT_A_FIT === 1 ? "is" : "are"} under Not a fit. `,
-            )
-          : ""}
-        {t("Q never passes on your behalf.")}
-      </p>
+      {searching ? (
+        <label className="gq-search gq2-search">
+          <span className="sr-only">{t("Search applications")}</span>
+          <Search {...icon} />
+          <input
+            ref={searchRef}
+            className="gq-input"
+            style={{ minHeight: 40 }}
+            value={search}
+            placeholder={t("Search")}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setSearch("");
+                setSearching(false);
+              }
+            }}
+          />
+        </label>
+      ) : null}
+      {visible.length === 0 ? (
+        <p className="cq-body-sm gq-t2 gq2-none">
+          {t("Nothing in this view right now.")}
+        </p>
+      ) : (
+        visible.map((item) => (
+          <Row
+            key={item.applicationId}
+            item={item}
+            selected={item.applicationId === current?.applicationId}
+            checked={checked.has(item.applicationId)}
+            picking={checked.size > 0}
+            onOpen={() => open(item.applicationId)}
+            onCheck={() =>
+              setChecked((all) => {
+                const next = new Set(all);
+                if (next.has(item.applicationId))
+                  next.delete(item.applicationId);
+                else next.add(item.applicationId);
+                return next;
+              })
+            }
+            onStar={() => star([item.applicationId], !item.starred)}
+          />
+        ))
+      )}
     </div>
   );
 
-  const detailPane =
+  const founderOf = (id: string) =>
+    details[id]?.dossier?.contact?.name ?? details[id]?.contact.name ?? null;
+
+  const dossierPane =
     current === null ? null : (
-      <Detail
+      <Dossier
         item={current}
         detail={detail}
         canDecide={canDecide}
         solo={solo}
         fund={fund}
-        onReply={() => setSheet({ kind: "reply", id: current.applicationId })}
-        onPass={() => setSheet({ kind: "pass", ids: [current.applicationId] })}
+        onBook={() => {
+          setPhoneOpen(false);
+          setSheet({ kind: "reply", id: current.applicationId, draft: "CALL" });
+        }}
+        onAsk={() => {
+          setPhoneOpen(false);
+          setSheet({ kind: "reply", id: current.applicationId, draft: "ASK" });
+        }}
+        onPass={() => {
+          setPhoneOpen(false);
+          setSheet({ kind: "pass", ids: [current.applicationId] });
+        }}
         onAssign={() =>
           setSheet({ kind: "assign", ids: [current.applicationId] })
         }
-        onPack={() => setSheet({ kind: "pack", id: current.applicationId })}
+        onPack={() => {
+          setPhoneOpen(false);
+          setSheet({ kind: "pack", id: current.applicationId });
+        }}
         onLabel={() =>
           setSheet({ kind: "label", ids: [current.applicationId] })
         }
         onArchive={() => archive([current.applicationId])}
+        onStar={() => star([current.applicationId], !current.starred)}
         onNote={(body) =>
           run(
             () =>
@@ -824,7 +851,6 @@ export function InboxView({
           label={t("Submitted GateQ application")}
         />
       )}
-      {chips}
       {selectedRefs.length === 0 ? (
         bulk
       ) : (
@@ -855,14 +881,24 @@ export function InboxView({
         }))}
         label={t("GateQ inbox")}
       >
-        <div className="gq-ibx">
+        {desktop ? null : views("chips")}
+        <div className="gq2-panes">
+          {desktop ? views("pane") : null}
           {list}
-          <div className="gq-detail" aria-live="polite" data-content-pane>
-            {detailPane}
-          </div>
+          {desktop ? (
+            <div className="gq2-dossier" aria-live="polite" data-content-pane>
+              {dossierPane}
+            </div>
+          ) : null}
         </div>
       </QSection>
-      <p className="cq-caption gq-t3">
+      <p className="cq-caption gq-t3 mt-3">
+        {inbox.counts.NOT_A_FIT > 0 && onInbox && pane !== "OUTSIDE"
+          ? t(
+              `${inbox.counts.NOT_A_FIT} application${inbox.counts.NOT_A_FIT === 1 ? "" : "s"} outside your rules ${inbox.counts.NOT_A_FIT === 1 ? "is" : "are"} under Outside your rules. `,
+            )
+          : ""}
+        {t("Q never passes on your behalf.")}{" "}
         {shortcutsOn ? (
           <>
             {t("Keys:")} <span className="gq-kbd">j</span>{" "}
@@ -893,89 +929,22 @@ export function InboxView({
         </button>
       </p>
 
-      {phoneOpen && !desktop && current !== null ? (
-        <div
-          className="gq-phonedetail"
-          role="dialog"
-          aria-modal="true"
-          aria-label={current.companyName}
-        >
-          <header className="gq-mhead">
-            <button
-              type="button"
-              className="grid size-11 place-items-center"
-              aria-label={t("Back to inbox")}
-              onClick={() => setPhoneOpen(false)}
-            >
-              <ChevronLeft
-                size={ICON_SIZE.prominent}
-                strokeWidth={ICON_STROKE}
-                aria-hidden
-              />
-            </button>
-            <span className="gq-title">{current.companyName}</span>
-            <button
-              type="button"
-              className="grid size-11 place-items-center"
-              aria-label={current.starred ? t("Unstar") : t("Star")}
-              aria-pressed={current.starred}
-              onClick={() => star([current.applicationId], !current.starred)}
-            >
-              <Star
-                {...icon}
-                size={18}
-                fill={current.starred ? "currentColor" : "none"}
-                className={current.starred ? "text-(--cq-warning)" : undefined}
-              />
-            </button>
-            <button
-              type="button"
-              className="grid size-11 place-items-center"
-              aria-label={t("Archive")}
-              onClick={() => archive([current.applicationId])}
-            >
-              <Archive {...icon} size={18} />
-            </button>
-            <button
-              type="button"
-              className="grid size-11 place-items-center"
-              aria-label={t("Download pack")}
-              onClick={() =>
-                setSheet({ kind: "pack", id: current.applicationId })
-              }
-            >
-              <MoreHorizontal {...icon} size={18} />
-            </button>
-          </header>
-          {detailPane}
-          <div className="gq-pbar">
-            <Button
-              disabled={!canDecide}
-              onClick={() =>
-                setSheet({ kind: "pass", ids: [current.applicationId] })
-              }
-            >
-              {t("Pass")}
-            </Button>
-            <Button
-              onClick={() =>
-                setSheet({ kind: "pack", id: current.applicationId })
-              }
-            >
-              {t("Pack")}
-            </Button>
-            <Button
-              variant="primary"
-              disabled={!canDecide}
-              onClick={() =>
-                setSheet({ kind: "reply", id: current.applicationId })
-              }
-            >
-              {t("Reply")}
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      {/* On a phone the dossier opens as a sheet (design gateq-2). */}
+      <SheetRoot
+        open={phoneOpen && !desktop && current !== null}
+        onOpenChange={(next) => (next ? undefined : setPhoneOpen(false))}
+      >
+        {phoneOpen && !desktop && current !== null ? (
+          <SheetContent
+            title={current.companyName}
+            description={current.oneLiner ?? undefined}
+            side="bottom"
+            className="cq-charcoal"
+          >
+            <div className="gq2-sheet">{dossierPane}</div>
+          </SheetContent>
+        ) : null}
+      </SheetRoot>
 
       <Sheets
         sheet={sheet}
@@ -985,6 +954,7 @@ export function InboxView({
         inbox={inbox}
         fund={fund}
         demo={demo !== undefined}
+        founderOf={founderOf}
         onPassed={(ids, reasonCode, messages) => {
           setSheet(null);
           setItems((all) =>
@@ -1005,11 +975,11 @@ export function InboxView({
               return { ok: true, value: null };
             },
             ids.length === 1
-              ? "Sent. Moved to Passed."
-              : `${ids.length} passes sent.`,
+              ? "Passed with a reason. They got your exact message."
+              : `${ids.length} passes sent, each with your exact message.`,
           );
         }}
-        onReplied={(id, message) => {
+        onReplied={(id, message, draft) => {
           setSheet(null);
           run(
             () =>
@@ -1017,7 +987,11 @@ export function InboxView({
                 message,
                 clientRequestId: key("reply"),
               }),
-            "Reply sent.",
+            draft === "CALL"
+              ? "Sent after your approval. They're asked for times for a call."
+              : draft === "ASK"
+                ? "Sent after your approval: your questions, exactly as shown."
+                : "Reply sent.",
           );
         }}
         onAssigned={(ids, userId) => {
@@ -1057,10 +1031,34 @@ export function InboxView({
 
 // ---------------------------------------------------------------------------
 
+const FOLDER_VIEWS = [
+  ["STARRED", "Starred"],
+  ["PASSED", "Passed"],
+  ["ARCHIVED", "Archived"],
+] as const;
+
+function QualifiesTag({ item }: { readonly item: GateqInboxItemDto }) {
+  const t = useT();
+  const q = qualifiesOf(item);
+  return (
+    <span className={`gq2-tag gq2-q-${q.toLowerCase()}`}>
+      {q === "YES" ? (
+        <Check {...icon} size={12} />
+      ) : q === "NO" ? (
+        <X {...icon} size={12} />
+      ) : (
+        <CircleHelp {...icon} size={12} />
+      )}
+      {t(QUALIFIES_WORDS[q])}
+    </span>
+  );
+}
+
 function Row({
   item,
   selected,
   checked,
+  picking,
   onOpen,
   onCheck,
   onStar,
@@ -1068,18 +1066,20 @@ function Row({
   readonly item: GateqInboxItemDto;
   readonly selected: boolean;
   readonly checked: boolean;
+  /** Something is selected: every row shows its checkbox. */
+  readonly picking: boolean;
   readonly onOpen: () => void;
   readonly onCheck: () => void;
   readonly onStar: () => void;
 }) {
   const t = useT();
 
-  const reply = replyWords(item);
+  const due = dueWords(item);
   return (
     <div
       data-id={item.applicationId}
       {...qRef("GATEQ_APPLICATION", item.applicationId)}
-      className={`gq-row${item.unread ? " gq-unread" : ""}`}
+      className={`gq2-row${item.unread ? " gq2-unread" : ""}${picking ? " gq2-picking" : ""}`}
       role="option"
       aria-selected={selected}
       tabIndex={selected ? 0 : -1}
@@ -1091,26 +1091,56 @@ function Row({
         }
       }}
     >
-      <button
-        type="button"
-        className="gq-ck"
-        role="checkbox"
-        aria-checked={checked}
-        aria-label={t(`Select ${item.companyName}`)}
-        onClick={(event) => {
-          event.stopPropagation();
-          onCheck();
-        }}
-      >
-        {checked ? (
-          <SquareCheck {...icon} size={18} />
-        ) : (
-          <Square {...icon} size={18} />
+      <span className="gq2-lead">
+        <span className="gq2-mono" aria-hidden>
+          {monogram(item.companyName)}
+        </span>
+        <button
+          type="button"
+          className="gq2-ck"
+          role="checkbox"
+          aria-checked={checked}
+          aria-label={t(`Select ${item.companyName}`)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onCheck();
+          }}
+        >
+          {checked ? (
+            <SquareCheck {...icon} size={18} />
+          ) : (
+            <Square {...icon} size={18} />
+          )}
+        </button>
+      </span>
+      <span className="gq2-main">
+        <b>
+          {item.companyName}
+          {item.unread ? (
+            <span className="sr-only"> {t("(unread)")}</span>
+          ) : null}
+        </b>
+        {item.oneLiner === null ? null : (
+          <span className="gq2-s">{t(item.oneLiner)}</span>
         )}
-      </button>
+        <span className="gq2-w">{t(paneWhy(item))}</span>
+      </span>
+      <QualifiesTag item={item} />
+      <span className={`gq2-due${due?.late === true ? " gq2-late" : ""}`}>
+        {due?.late === true ? <Clock {...icon} size={14} /> : null}
+        {due === null ? null : t(due.text)}
+        {item.assignee === null ? null : (
+          <span
+            className="gq-ini ms-auto"
+            title={t(`Assigned to ${item.assignee.name}`)}
+          >
+            {item.assignee.initials}
+          </span>
+        )}
+      </span>
       <button
         type="button"
-        className="gq-st"
+        className="gq2-st"
         aria-pressed={item.starred}
         aria-label={t(
           `${item.starred ? "Unstar" : "Star"} ${item.companyName}`,
@@ -1122,64 +1152,31 @@ function Row({
       >
         <Star {...icon} fill={item.starred ? "currentColor" : "none"} />
       </button>
-      <div className="gq-main">
-        <span className="gq-nm">
-          {item.companyName}
-          {item.unread ? (
-            <span className="sr-only"> {t("(unread)")}</span>
-          ) : null}
-        </span>
-        {item.oneLiner === null ? null : (
-          <span className="gq-ln">{t(item.oneLiner)}</span>
-        )}
-        <span className="gq-tags">
-          <span className="gq-mini">
-            <FitGlyph kind={fitGlyphFor(item)} size={12} />
-            {t(fitWordsFor(item))}
-          </span>
-          <span className="gq-mini">{t(rulesWords(item.rules))}</span>
-          {item.labels.map((label) => (
-            <span key={label} className="gq-lbl">
-              {t(label)}
-            </span>
-          ))}
-        </span>
-      </div>
-      <div className="gq-right">
-        <span className="cq-caption gq-t3">
-          {t(receivedWords(item.submittedAt))}
-        </span>
-        {item.assignee === null ? null : (
-          <span
-            className="gq-ini"
-            title={t(`Assigned to ${item.assignee.name}`)}
-          >
-            {item.assignee.initials}
-          </span>
-        )}
-        {reply === null ? null : (
-          <span className={`gq-sla${reply.warn ? " gq-warn" : ""}`}>
-            {reply.warn ? <Clock {...icon} size={13} /> : null}
-            {reply.text}
-          </span>
-        )}
-      </div>
     </div>
   );
 }
 
-function Detail({
+/**
+ * The open application (design gateq-2): whether it qualifies and when it
+ * was frozen, the one-page summary with where each part came from, answers
+ * that disagree (both kept), the dossier's open questions, and the three
+ * decisions, each prepared for the investor's approval. Below: the full
+ * submission, the team's notes and what has happened.
+ */
+function Dossier({
   item,
   detail,
   canDecide,
   solo,
   fund,
-  onReply,
+  onBook,
+  onAsk,
   onPass,
   onAssign,
   onPack,
   onLabel,
   onArchive,
+  onStar,
   onNote,
 }: {
   readonly item: GateqInboxItemDto;
@@ -1187,129 +1184,31 @@ function Detail({
   readonly canDecide: boolean;
   readonly solo: boolean;
   readonly fund: string;
-  readonly onReply: () => void;
+  readonly onBook: () => void;
+  readonly onAsk: () => void;
   readonly onPass: () => void;
   readonly onAssign: () => void;
   readonly onPack: () => void;
   readonly onLabel: () => void;
   readonly onArchive: () => void;
+  readonly onStar: () => void;
   readonly onNote: (body: string) => void;
 }) {
   const t = useT();
 
   const [note, setNote] = useState("");
-  const [more, setMore] = useState(false);
-  const view = qView(item);
   const passed = detail?.messages.find((message) => message.kind === "PASS");
-  const contactEmail =
-    detail?.dossier?.contact?.email ?? detail?.contact.email ?? null;
+  const dossier = detail?.dossier ?? null;
+  const summary = onePageSummary(item, dossier);
+  const questions = openQuestions(dossier);
   return (
-    <div className="gq-dt">
-      <div className="flex items-start gap-3.5">
-        <span
-          className="gq-logo"
-          style={{ width: 56, height: 56, fontSize: 22 }}
-        >
-          {t(item.companyName.slice(0, 1).toUpperCase())}
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="cq-title-lg">{item.companyName}</h2>
-          {item.oneLiner === null ? null : (
-            <p className="cq-body">{t(item.oneLiner)}</p>
+    <div className="gq2-dos">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <QualifiesTag item={item} />
+        <span className="cq-caption gq-t3">
+          {t(
+            `Submitted ${submittedWords(item.submittedAt)}. Frozen at submission.`,
           )}
-          <p className="cq-caption gq-t2">
-            {t(
-              [item.stage, item.sector, item.country]
-                .filter((part) => part !== null)
-                .join(" · "),
-            )}
-            {item.raise === null
-              ? ""
-              : t(
-                  ` · Raising ${item.raise.currency === "USD" ? "$" : `${item.raise.currency} `}${Number(item.raise.amount).toLocaleString("en-US")}`,
-                )}
-            {t(` · Applied ${receivedWords(item.submittedAt)}`)}
-          </p>
-        </div>
-      </div>
-
-      <div className="gq-acts">
-        <Button
-          variant="primary"
-          size="compact"
-          disabled={!canDecide}
-          onClick={onReply}
-        >
-          <MessageSquare {...icon} />
-          {t("Reply")}
-        </Button>
-        {contactEmail !== null ? (
-          <a
-            className={buttonClassName("secondary", "compact")}
-            href={`mailto:${contactEmail}?subject=${encodeURIComponent(`${fund} and ${item.companyName}: a call`)}`}
-            aria-disabled={!canDecide}
-          >
-            {t("Book a call")}
-          </a>
-        ) : null}
-        <Button
-          size="compact"
-          disabled={!canDecide || passed !== undefined}
-          onClick={onPass}
-        >
-          {t("Pass")}
-        </Button>
-        <span className="flex-1" />
-        {solo ? null : (
-          <Button
-            variant="quiet"
-            size="compact"
-            disabled={!canDecide}
-            onClick={onAssign}
-          >
-            <UserPlus {...icon} />
-            {t("Assign")}
-          </Button>
-        )}
-        <Button variant="quiet" size="compact" onClick={onPack}>
-          <Download {...icon} />
-          {t("Download pack")}
-        </Button>
-        <span className="relative">
-          <Button
-            variant="quiet"
-            size="compact"
-            aria-label={t("More: label, archive")}
-            aria-expanded={more}
-            onClick={() => setMore(!more)}
-          >
-            <MoreHorizontal {...icon} />
-          </Button>
-          {more ? (
-            <span
-              className="gq-card absolute end-0 z-10 mt-1 flex min-w-40 flex-col p-1"
-              role="menu"
-            >
-              <Button
-                variant="quiet"
-                size="compact"
-                role="menuitem"
-                onClick={() => (setMore(false), onLabel())}
-              >
-                <Tag {...icon} />
-                {t("Label")}
-              </Button>
-              <Button
-                variant="quiet"
-                size="compact"
-                role="menuitem"
-                onClick={() => (setMore(false), onArchive())}
-              >
-                <Archive {...icon} />
-                {t("Archive")}
-              </Button>
-            </span>
-          ) : null}
         </span>
       </div>
 
@@ -1335,20 +1234,94 @@ function Detail({
         </div>
       )}
 
-      {detail?.dossier == null ? (
-        <div className="gq-qview">
-          <span className="text-(--cq-q-light)">
-            <QNavIcon size={22} strokeWidth={2} aria-hidden />
-          </span>
-          <div className="flex flex-col gap-0.5">
-            <p className="gq-who">{t("Q's view, not a verified fact")}</p>
-            <p className="cq-body">
-              <b>{t(view.lead)}.</b>{" "}
-              <span className="gq-t2">{t(view.why)}</span>
-            </p>
-          </div>
+      <section className="gq2-sec">
+        <h3 className="gq2-h3">{t("One-page summary")}</h3>
+        <div>
+          {summary.map((row) => (
+            <div key={row.label} className="gq2-fact">
+              <span>{t(row.label)}</span>
+              <span>
+                {row.value === null ? (
+                  <span className="gq2-unk">{t("Not covered")}</span>
+                ) : (
+                  t(row.value)
+                )}
+              </span>
+            </div>
+          ))}
         </div>
-      ) : null}
+      </section>
+
+      {(dossier?.contradictions ?? []).map((line) => (
+        <div key={line} className="gq2-disagree" role="note">
+          <span className="gq2-warn-ic">
+            <CircleAlert {...icon} />
+          </span>
+          <span>
+            <b>{t("Answers disagree.")}</b> {t(line)}{" "}
+            {t("Both are kept until you ask.")}
+          </span>
+        </div>
+      ))}
+
+      {questions.length === 0 ? null : (
+        <section className="gq2-sec">
+          <h3 className="gq2-h3">{t("Open questions")}</h3>
+          <p className="cq-body-sm text-(--cq-text-primary)">
+            {questions.map((question) => t(question)).join(" ")}
+          </p>
+        </section>
+      )}
+
+      <div className="gq2-acts3">
+        <Button variant="primary" disabled={!canDecide} onClick={onBook}>
+          {t("Book a call")}
+        </Button>
+        <Button disabled={!canDecide} onClick={onAsk}>
+          {t("Ask for more")}
+        </Button>
+        <Button
+          disabled={!canDecide || passed !== undefined}
+          onClick={onPass}
+        >
+          {t("Pass with a reason")}
+        </Button>
+      </div>
+      <div className="flex flex-wrap items-center gap-1">
+        <Button variant="quiet" size="compact" onClick={onPack}>
+          <Download {...icon} />
+          {t("Download pack")}
+        </Button>
+        <span className="flex-1" />
+        <Button
+          variant="quiet"
+          size="compact"
+          aria-pressed={item.starred}
+          onClick={onStar}
+        >
+          <Star {...icon} fill={item.starred ? "currentColor" : "none"} />
+          {item.starred ? t("Starred") : t("Star")}
+        </Button>
+        {solo ? null : (
+          <Button
+            variant="quiet"
+            size="compact"
+            disabled={!canDecide}
+            onClick={onAssign}
+          >
+            <UserPlus {...icon} />
+            {t("Assign")}
+          </Button>
+        )}
+        <Button variant="quiet" size="compact" onClick={onLabel}>
+          <Tag {...icon} />
+          {t("Label")}
+        </Button>
+        <Button variant="quiet" size="compact" onClick={onArchive}>
+          <Archive {...icon} />
+          {t("Archive")}
+        </Button>
+      </div>
 
       {detail === null ? (
         <div className="flex flex-col gap-3">
@@ -1356,106 +1329,86 @@ function Detail({
           <Skeleton width="100%" height={120} />
         </div>
       ) : (
-        <>
-          {detail.dossier == null ? (
+        <div className="gq2-more">
+          {dossier === null ? (
             <>
-              <div
-                className="grid gap-5"
-                style={{
-                  gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))",
-                }}
-              >
-                <section className="gq-sect">
-                  <h3 className="cq-title-sm">{t("Your gate's rules")}</h3>
-                  <div>
-                    {detail.rules.length === 0 ? (
-                      <p className="cq-body-sm gq-t2">
-                        {t("No published rules yet, so nothing was checked.")}
-                      </p>
-                    ) : (
-                      detail.rules.map((rule) => (
-                        <div
-                          key={rule.label}
-                          className="gq-check"
-                          style={{ fontSize: 14 }}
-                        >
-                          <FitGlyph
-                            kind={
-                              rule.standing === "MEETS"
-                                ? "fit"
-                                : rule.standing === "DOES_NOT_MEET"
-                                  ? "no"
-                                  : "unk"
-                            }
-                          />
-                          <span>{t(rule.label)}</span>
-                          <span className="gq-status">
-                            {rule.standing === "MEETS"
-                              ? t("Meets")
-                              : rule.standing === "DOES_NOT_MEET"
-                                ? t("Doesn't meet")
-                                : t("Needs clarification")}
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </section>
-                <section className="gq-sect">
-                  <h3 className="cq-title-sm">{t("Their answers")}</h3>
-                  <ul className="flex flex-col">
-                    {detail.answers.map((answer) => (
-                      <li
-                        key={answer.label}
-                        className="flex min-h-7 items-center gap-2 text-sm"
+              <section className="gq2-sec">
+                <h3 className="gq2-h3">{t("Your gate's rules")}</h3>
+                <div>
+                  {detail.rules.length === 0 ? (
+                    <p className="cq-body-sm gq-t2">
+                      {t("No published rules yet, so nothing was checked.")}
+                    </p>
+                  ) : (
+                    detail.rules.map((rule) => (
+                      <div
+                        key={rule.label}
+                        className="gq-check"
+                        style={{ fontSize: 14 }}
                       >
-                        <span className="flex-1 gq-t2">{t(answer.label)}</span>
-                        <span>{t(answer.value)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="cq-caption gq-t3">
-                    {t("Their own claims, not verified.")}
-                  </p>
-                </section>
-              </div>
-
-              <section className="gq-sect">
-                <h3 className="cq-title-sm">{t("Their note")}</h3>
-                <p className="cq-body" style={{ maxWidth: "62ch" }}>
+                        <FitGlyph
+                          kind={
+                            rule.standing === "MEETS"
+                              ? "fit"
+                              : rule.standing === "DOES_NOT_MEET"
+                                ? "no"
+                                : "unk"
+                          }
+                        />
+                        <span>{t(rule.label)}</span>
+                        <span className="gq-status">
+                          {rule.standing === "MEETS"
+                            ? t("Meets")
+                            : rule.standing === "DOES_NOT_MEET"
+                              ? t("Doesn't meet")
+                              : t("Needs clarification")}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+              <section className="gq2-sec">
+                <h3 className="gq2-h3">{t("Their answers")}</h3>
+                <div>
+                  {detail.answers.map((answer) => (
+                    <div key={answer.label} className="gq2-fact">
+                      <span>{t(answer.label)}</span>
+                      <span>{t(answer.value)}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="cq-caption gq-t3">
+                  {t("Their own claims, not verified.")}
+                </p>
+              </section>
+              <section className="gq2-sec">
+                <h3 className="gq2-h3">{t("Their note")}</h3>
+                <p className="cq-body-sm" style={{ maxWidth: "62ch" }}>
                   {detail.note === null ? (
                     <span className="gq-t2">{t("No note.")}</span>
                   ) : (
                     t(`“${detail.note}”`)
                   )}
                 </p>
-                {detail.contact.name || detail.contact.email ? (
-                  <p className="cq-caption gq-t2">
-                    {t(
-                      [detail.contact.name, detail.contact.email]
-                        .filter((part) => part !== null)
-                        .join(" · "),
-                    )}
-                  </p>
-                ) : null}
               </section>
             </>
           ) : (
             <SubmittedBrief
-              dossier={detail.dossier}
+              dossier={dossier}
               synthesis={detail.synthesis ?? null}
             />
           )}
           <GateqUnicornAssessment value={detail.unicornPotential} />
-          {detail.transcript != null || detail.dossier != null ? (
+          {detail.transcript != null || dossier !== null ? (
             <SubmittedTranscript
               turns={detail.transcript}
-              recordedTurnCount={detail.dossier?.transcript.turnCount}
+              recordedTurnCount={dossier?.transcript.turnCount}
             />
           ) : null}
 
-          <section className="gq-sect" data-gateq-shared>
-            <h3 className="cq-title-sm">{t("What they shared")}</h3>
+          <section className="gq2-sec" data-gateq-shared>
+            <h3 className="gq2-h3">{t("What they shared")}</h3>
             {detail.shared.length === 0 ? (
               <p className="cq-body-sm gq-t2">
                 {t("No documents were attached to this submission.")}
@@ -1482,9 +1435,9 @@ function Detail({
             )}
           </section>
 
-          <section className="gq-sect">
+          <section className="gq2-sec">
             <div className="gq-sect-h">
-              <h3 className="cq-title-sm">{t("Team notes")}</h3>
+              <h3 className="gq2-h3">{t("Team notes")}</h3>
               <span className="cq-caption gq-t3">
                 {t(`Only ${fund} sees these`)}
               </span>
@@ -1525,8 +1478,8 @@ function Detail({
             </form>
           </section>
 
-          <section className="gq-sect">
-            <h3 className="cq-title-sm">{t("What's happened")}</h3>
+          <section className="gq2-sec">
+            <h3 className="gq2-h3">{t("What's happened")}</h3>
             <ul className="gq-tl">
               {detail.activity.map((entry, index) => (
                 <li key={`${entry.at}-${index}`}>
@@ -1536,7 +1489,7 @@ function Detail({
               ))}
             </ul>
           </section>
-        </>
+        </div>
       )}
     </div>
   );
@@ -1550,6 +1503,7 @@ function Sheets({
   inbox,
   fund,
   demo,
+  founderOf,
   onPassed,
   onReplied,
   onAssigned,
@@ -1563,12 +1517,17 @@ function Sheets({
   readonly inbox: GateqInboxDto;
   readonly fund: string;
   readonly demo: boolean;
+  readonly founderOf: (id: string) => string | null;
   readonly onPassed: (
     ids: readonly string[],
     reason: GateqPassReason,
     messages: Readonly<Record<string, string>>,
   ) => void;
-  readonly onReplied: (id: string, message: string) => void;
+  readonly onReplied: (
+    id: string,
+    message: string,
+    draft: ReplyDraft,
+  ) => void;
   readonly onAssigned: (ids: readonly string[], userId: string | null) => void;
   readonly onLabelled: (ids: readonly string[], label: string) => void;
   readonly onPreparePasses: (ids: readonly string[]) => void;
@@ -1583,10 +1542,14 @@ function Sheets({
       ? ""
       : sheet.kind === "pass"
         ? sheet.ids.length === 1
-          ? `Pass on ${nameOf(sheet.ids[0] ?? "")}`
-          : `Pass on ${sheet.ids.length} applications`
+          ? `Prepare a pass: ${nameOf(sheet.ids[0] ?? "")}`
+          : `Prepare ${sheet.ids.length} passes`
         : sheet.kind === "reply"
-          ? `Reply to ${nameOf(sheet.id)}`
+          ? sheet.draft === "CALL"
+            ? `Book a call with ${nameOf(sheet.id)}`
+            : sheet.draft === "ASK"
+              ? `Ask ${nameOf(sheet.id)} for more`
+              : `Reply to ${nameOf(sheet.id)}`
           : sheet.kind === "pack"
             ? "Download pack"
             : sheet.kind === "assign"
@@ -1607,6 +1570,7 @@ function Sheets({
         <SheetContent
           title={t(title)}
           side={sheet.kind === "compare" ? "full" : "side"}
+          className="cq-charcoal"
         >
           {sheet.kind === "compare" ? (
             <ApplicationComparison
@@ -1632,14 +1596,34 @@ function Sheets({
             />
           ) : sheet.kind === "reply" ? (
             <ReplySheet
-              initial={draftReply({
-                founderName:
-                  details[sheet.id]?.dossier?.contact?.name ??
-                  details[sheet.id]?.contact.name ??
-                  null,
-                fund,
-              })}
-              onSend={(message) => onReplied(sheet.id, message)}
+              initial={
+                sheet.draft === "CALL"
+                  ? draftCall({ founderName: founderOf(sheet.id), fund })
+                  : sheet.draft === "ASK"
+                    ? draftAsk({
+                        founderName: founderOf(sheet.id),
+                        fund,
+                        questions: openQuestions(details[sheet.id]?.dossier),
+                      })
+                    : draftReply({ founderName: founderOf(sheet.id), fund })
+              }
+              note={
+                sheet.draft === "CALL"
+                  ? "Drafted by Q. Nothing is sent until you approve this exact message."
+                  : sheet.draft === "ASK"
+                    ? "Q drafted the questions from what they sent. Nothing is sent until you approve this exact message."
+                    : "Sent only when you press Send, exactly as shown."
+              }
+              sendLabel={
+                sheet.draft === "CALL"
+                  ? "Approve and send"
+                  : sheet.draft === "ASK"
+                    ? "Approve and send"
+                    : "Send"
+              }
+              onSend={(message) =>
+                onReplied(sheet.id, message, sheet.draft ?? "REPLY")
+              }
               onCancel={onClose}
             />
           ) : sheet.kind === "pack" ? (
@@ -1809,7 +1793,7 @@ function PassSheet({
       ))}
       <p className="cq-caption gq-t3">
         {t(
-          "Sent only when you press the button, exactly as shown. Founders always get a reason.",
+          "Drafted by Q. Nothing is sent until you approve this exact message. Founders always get a reason.",
         )}
       </p>
       <div className="flex gap-2">
@@ -1824,8 +1808,8 @@ function PassSheet({
           }}
         >
           {ids.length === 1
-            ? t("Send and pass")
-            : t(`Send ${ids.length} and pass`)}
+            ? t("Approve and send pass")
+            : t(`Approve and send ${ids.length} passes`)}
         </Button>
         <Button variant="quiet" onClick={onCancel}>
           {t("Cancel")}
@@ -1892,10 +1876,14 @@ function TriageSheet({
 
 function ReplySheet({
   initial,
+  note,
+  sendLabel,
   onSend,
   onCancel,
 }: {
   readonly initial: string;
+  readonly note: string;
+  readonly sendLabel: string;
   readonly onSend: (message: string) => void;
   readonly onCancel: () => void;
 }) {
@@ -1921,16 +1909,14 @@ function ReplySheet({
           onChange={(e) => setMessage(e.target.value)}
         />
       </div>
-      <p className="cq-caption gq-t3">
-        {t("Sent only when you press Send, exactly as shown.")}
-      </p>
+      <p className="cq-caption gq-t3">{t(note)}</p>
       <div className="flex gap-2">
         <Button
           variant="primary"
           disabled={message.trim() === ""}
           onClick={() => onSend(message.trim())}
         >
-          {t("Send")}
+          {t(sendLabel)}
         </Button>
         <Button variant="quiet" onClick={onCancel}>
           {t("Cancel")}

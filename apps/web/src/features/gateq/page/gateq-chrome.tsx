@@ -12,6 +12,7 @@ import {
 import { QControl } from "@/features/q/control/q-control";
 
 import "../gateq.css";
+import "../gateq-v2.css";
 import { HubNavigation } from "@/features/relationships/hub-navigation";
 
 /**
@@ -70,7 +71,9 @@ export function GateqChrome({
   const tabs = role === "FOUNDER" ? FOUNDER_TABS : INVESTOR_TABS;
   return (
     <div
-      className="gq-wrap"
+      // Design gateq-2 chose warm charcoal for the investor's GateQ: its
+      // primary buttons and tiles, by token, on this page only.
+      className={role === "INVESTOR" ? "gq-wrap cq-charcoal" : "gq-wrap"}
       style={maxWidth === undefined ? undefined : { maxWidth }}
     >
       {/* GateQ is a CRM tab (owner 2026-10-17): the CRM's tabs lead. */}
@@ -80,10 +83,20 @@ export function GateqChrome({
           view={role === "FOUNDER" ? "applications" : "gateq"}
         />
       </div>
-      <div className="gq-sect-h items-center flex-wrap">
-        <h1 className="cq-title-lg">GateQ</h1>
-        {action}
-      </div>
+      {role === "FOUNDER" ? (
+        // Design gateqf-1: the page's own title and what it is for.
+        <div className="gqf-head">
+          <h1>GateQ</h1>
+          {active === "applications" ? (
+            <p>{t("What you sent through investors' gates, and what happened.")}</p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="gq2-head">
+          <h1>GateQ</h1>
+          <span className="hidden sm:inline-flex">{action}</span>
+        </div>
+      )}
       <nav className="gq-tabs" aria-label="GateQ">
         {tabs.map(([tab, label]) => (
           <QControl key={tab} id={Q_GATEQ_TABS[tab]} kind="TAB">
@@ -93,7 +106,7 @@ export function GateqChrome({
             >
               {t(label)}
               {tab === "inbox" && unread !== undefined && unread > 0 ? (
-                <span className="gq-n">{unread}</span>
+                <span className="gq2-cnt">{unread}</span>
               ) : null}
             </Link>
           </QControl>

@@ -13,7 +13,6 @@ import {
   Copy,
   ICON_SIZE,
   ICON_STROKE,
-  LayoutGrid,
   Lock,
   Search,
   Shield,
@@ -30,6 +29,7 @@ import {
 } from "./gateq-actions";
 import { ErrorBlock, Skeleton, StateBlock } from "./gateq-chrome";
 import { CopyLink } from "./inbox-view";
+import { monogram } from "./inbox-model";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -86,18 +86,49 @@ export function FindView({
 
   return (
     <>
-      <div className="gq-card gq-findbox">
-        <label className="gq-label" htmlFor="gq-find">
-          {t("Describe the company you're looking for")}
+      {/* Design gateq-2: one line to describe it, and Find beside it. */}
+      <form
+        className="gq2-findq"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!pending && text.trim().length >= 3) find();
+        }}
+      >
+        <label className="gq2-sbar">
+          <Search {...icon} size={18} />
+          <span className="sr-only">
+            {t("Describe the company you're looking for")}
+          </span>
+          <input
+            id="gq-find"
+            value={text}
+            maxLength={500}
+            placeholder={t("Describe the company you're looking for")}
+            onChange={(e) => setText(e.target.value)}
+          />
         </label>
-        <textarea
-          id="gq-find"
-          className="gq-input"
-          value={text}
-          maxLength={500}
-          placeholder={t("Seed fintech in Nigeria or Ghana, raising under $2M")}
-          onChange={(e) => setText(e.target.value)}
-        />
+        <Button
+          variant="primary"
+          type="submit"
+          disabled={pending || text.trim().length < 3}
+        >
+          {t("Find")}
+        </Button>
+      </form>
+      <div className="flex flex-col gap-3">
+        {results === null && !pending ? (
+          <p className="cq-body-sm gq-t2">
+            {t("Like")}{" "}
+            <button
+              type="button"
+              className="underline underline-offset-4"
+              onClick={() => setText("Climate hardware in East Africa")}
+            >
+              {t("“climate hardware in East Africa”")}
+            </button>
+            {t(". Q searches companies on Capital Q you are allowed to see.")}
+          </p>
+        ) : null}
         {query.chips.length === 0 ? null : (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="cq-caption gq-t2">{t("Q understood:")}</span>
@@ -120,22 +151,6 @@ export function FindView({
             ))}
           </div>
         )}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="primary"
-            onClick={find}
-            disabled={pending || text.trim().length < 3}
-          >
-            <Search {...icon} />
-            {t("Find")}
-          </Button>
-          <Button
-            variant="quiet"
-            onClick={() => setText("Climate hardware in East Africa")}
-          >
-            {t("Try: “climate hardware in East Africa”")}
-          </Button>
-        </div>
       </div>
       {limited ? (
         <div className="gq-banner">
@@ -201,12 +216,12 @@ export function FindView({
         </StateBlock>
       ) : results === null ? null : (
         <>
-          <div className="gq-sect-h">
-            <h2 className="cq-label gq-t2">
+          <div className="gq-sect-h mt-2">
+            <h2 className="gq2-h3">
               {t(
                 results.length === 1
-                  ? "1 company matches"
-                  : `${String(results.length)} companies match`,
+                  ? "1 company on Capital Q"
+                  : `${String(results.length)} companies on Capital Q`,
               )}
             </h2>
             <Button
@@ -229,15 +244,15 @@ export function FindView({
               {t("Save as alert")}
             </Button>
           </div>
-          <div>
+          <div className="flex flex-col gap-2">
             {results.map((company) => (
               <Link
                 key={company.companyId}
-                className="gq-resrow"
+                className="gq2-found"
                 href={`/company/${company.companyId}`}
               >
-                <span className="gq-logo" style={{ width: 48, height: 48 }}>
-                  {t(company.name.slice(0, 1).toUpperCase())}
+                <span className="gq2-mono" aria-hidden>
+                  {monogram(company.name)}
                 </span>
                 <span className="min-w-0">
                   <b className="font-semibold">{company.name}</b>
@@ -259,7 +274,7 @@ export function FindView({
                     )}
                   </span>
                 </span>
-                <span className="gq-mini">{t("In your Discover")}</span>
+                <span className="gq2-tag gq2-q-no">{t("In your Discover")}</span>
               </Link>
             ))}
           </div>
@@ -294,10 +309,14 @@ const DIMENSION_WORDS: Readonly<Record<string, string>> = {
   CHEQUE_COMPATIBILITY: "Cheque size",
 };
 
-const MODE_WORDS: readonly (readonly [string, string])[] = [
-  ["CLOSED", "Closed"],
-  ["QUALIFIED", "Only companies that meet my rules"],
-  ["OPEN", "Anyone"],
+/** How strict the gate is: the policy's inbound mode, with its consequence. */
+const STRICT: readonly (readonly [string, string, string])[] = [
+  [
+    "QUALIFIED",
+    "Only companies that meet my rules",
+    "Others see why and can't send.",
+  ],
+  ["OPEN", "Anyone can send", "Founders still see your rules and how they stand."],
 ];
 
 export function GateView({
@@ -328,8 +347,11 @@ export function GateView({
     replyWithinDays === null ? "" : String(replyWithinDays),
   );
   const [saved, setSaved] = useState<string | null>(null);
+  const [promise, setPromise] = useState<number | null>(replyWithinDays);
+  const [changingPromise, setChangingPromise] = useState(false);
   const [editing, setEditing] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [showSnippet, setShowSnippet] = useState(false);
   const [pending, startTransition] = useTransition();
   if (state === "loading") {
     return (
@@ -344,193 +366,253 @@ export function GateView({
   const mode =
     state === "empty" ? "CLOSED" : (policy?.version.inboundMode ?? "QUALIFIED");
   const rules = policy?.criteria ?? [];
+  const openEditor = () => {
+    setEditing(true);
+    window.setTimeout(
+      () =>
+        document
+          .getElementById("gq2-editor")
+          ?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
+      0,
+    );
+  };
+  const savePromise = () => {
+    const value = days.trim() === "" ? null : Number(days);
+    if (value !== null && (!Number.isInteger(value) || value < 1 || value > 60)) {
+      setSaved("Use a number of working days from 1 to 60.");
+      return;
+    }
+    startTransition(async () => {
+      const done = await replyPromiseAction(gatewayId, {
+        replyWithinDays: value,
+      });
+      if (done.ok) {
+        setPromise(value);
+        setChangingPromise(false);
+      }
+      setSaved(
+        done.ok
+          ? value === null
+            ? "No promise shown."
+            : "Saved. Founders see it before they apply."
+          : done.message,
+      );
+    });
+  };
+  // Design gateq-2, "Your gate": the published rules on the left; how
+  // strict, the promise to founders and the link beside them.
   return (
-    <>
-      {canDecide ? null : (
-        <div className="gq-banner">
-          <Lock {...icon} />
-          <span>
-            {t(
-              "Only admins of your firm can change the gate. You can copy and share the link.",
-            )}
-          </span>
-        </div>
-      )}
-      <section className="gq-card flex flex-col gap-3 p-[18px]">
-        <h2 className="cq-title-sm">{t("Who can apply")}</h2>
-        <div
-          className="gq-seg"
-          role="radiogroup"
-          aria-label={t("Who can apply")}
-        >
-          {MODE_WORDS.map(([value, label]) => (
-            <Button
-              key={value}
-              size="compact"
-              variant={value === mode ? "secondary" : "quiet"}
-              role="radio"
-              aria-checked={value === mode}
-              disabled={!canDecide}
-              onClick={() => setEditing(true)}
-            >
-              {t(label)}
-            </Button>
-          ))}
-        </div>
-        <p className="cq-body-sm gq-t2">
-          {mode === "CLOSED"
-            ? t(
-                "Your gate is closed. Founders see that you're not taking applications right now.",
-              )
-            : mode === "OPEN"
-              ? t(
-                  "Anyone can send. Founders still see your rules and how they stand.",
-                )
-              : t(
-                  "Founders who don't meet a rule see why, and can't send. Unanswered questions never count as a no.",
-                )}
-        </p>
-      </section>
-      <section className="gq-sect">
-        <div className="gq-sect-h">
-          <h2 className="cq-title-sm">{t("Your rules")}</h2>
-          <Button
-            variant="quiet"
-            size="compact"
-            disabled={!canDecide}
-            onClick={() => setEditing(!editing)}
-          >
-            {editing ? t("Done") : t("Edit")}
-          </Button>
+    <div className="gq2-cols">
+      <div className="flex min-w-0 flex-col">
+        {canDecide ? null : (
+          <div className="gq-banner mb-3.5">
+            <Lock {...icon} />
+            <span>
+              {t(
+                "Only admins of your firm can change the gate. You can copy and share the link.",
+              )}
+            </span>
+          </div>
+        )}
+        <div className="mb-3 flex flex-wrap items-baseline gap-2.5">
+          <h2 className="gq2-h3">{t("Your published rules")}</h2>
+          {editing ? (
+            <span className="cq-caption gq-t3 ms-auto">
+              {t(
+                "Nothing is live until you publish. Remove anything Q read wrong.",
+              )}
+            </span>
+          ) : null}
         </div>
         {rules.length === 0 ? (
           <div className="flex flex-col items-start gap-3">
-            <p className="cq-body gq-t2">
+            <p className="cq-body-sm gq-t2">
               {t(
-                "No published criteria yet, so nothing is checked: founders see no judgement either way. Give Q your mandate and it drafts the criteria; you confirm each one.",
+                "No published rules yet, so nothing is checked: founders see no judgement either way. Give Q your mandate and it drafts the rules; you confirm each one.",
               )}
             </p>
             {canDecide && editor !== undefined && !editing ? (
-              <Button variant="primary" onClick={() => setEditing(true)}>
+              <Button variant="primary" onClick={openEditor}>
                 {t("Draft criteria from your mandate")}
               </Button>
             ) : null}
           </div>
         ) : (
-          <ul className="gq-hair">
+          <div>
             {rules.map((rule) => (
-              <li
-                key={rule.id}
-                className="flex min-h-12 items-center justify-between gap-3"
-              >
-                <span className="gq-t2">
-                  {t(DIMENSION_WORDS[rule.config.type] ?? rule.config.type)}
+              <div key={rule.id} className="gq2-rule">
+                <span className="min-w-0">
+                  <b>{t(rule.label)}</b>
+                  <small>
+                    {t(DIMENSION_WORDS[rule.config.type] ?? "Rule")}
+                  </small>
                 </span>
-                <span className="text-end">
-                  {t(rule.label)}
-                  {rule.requiredness === "REQUIRED" ? (
-                    ""
-                  ) : (
-                    <span className="gq-t3"> {t("· preferred")}</span>
-                  )}
+                <span className="gq2-lvl">
+                  {rule.requiredness === "REQUIRED"
+                    ? t("Required")
+                    : t("Preferred")}
                 </span>
-              </li>
+                <Button
+                  variant="quiet"
+                  size="compact"
+                  disabled={!canDecide || editor === undefined}
+                  onClick={openEditor}
+                  aria-label={t(`Edit ${rule.label}`)}
+                >
+                  {t("Edit")}
+                </Button>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
-        {editing && canDecide ? editor : null}
-      </section>
-      <section className="gq-sect">
-        <h2 className="cq-title-sm">{t("Promise to founders")}</h2>
-        {canDecide ? (
-          <form
-            className="flex flex-wrap items-center gap-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const value = days.trim() === "" ? null : Number(days);
-              if (
-                value !== null &&
-                (!Number.isInteger(value) || value < 1 || value > 60)
-              ) {
-                setSaved("Use a number of working days from 1 to 60.");
-                return;
-              }
-              startTransition(async () => {
-                const done = await replyPromiseAction(gatewayId, {
-                  replyWithinDays: value,
-                });
-                setSaved(
-                  done.ok
-                    ? value === null
-                      ? "No promise shown."
-                      : "Saved. Founders see it before they apply."
-                    : done.message,
-                );
-              });
-            }}
-          >
-            <span className="cq-body">
-              {t("We reply to every qualified application within")}
-            </span>
-            <input
-              className="gq-input"
-              style={{ width: 72 }}
-              inputMode="numeric"
-              aria-label={t("Working days")}
-              value={days}
-              onChange={(e) => setDays(e.target.value)}
-            />
-            <span className="cq-body">{t("working days.")}</span>
-            <Button size="compact" type="submit" disabled={pending}>
-              {t("Save")}
+        {editing && canDecide ? (
+          <div id="gq2-editor" className="mt-4 flex flex-col gap-3">
+            {editor}
+            <Button
+              variant="quiet"
+              size="compact"
+              className="self-start"
+              onClick={() => setEditing(false)}
+            >
+              {t("Done")}
             </Button>
-          </form>
-        ) : (
-          <p className="cq-body">
-            {replyWithinDays === null ? (
-              t("No reply promise yet.")
-            ) : (
-              <>
-                {t("We reply to every qualified application within")}{" "}
-                <b>
-                  {replyWithinDays} {t("working days")}
-                </b>
-                .
-              </>
-            )}
+          </div>
+        ) : null}
+      </div>
+
+      <aside className="flex min-w-0 flex-col gap-3.5">
+        <section className="gq2-card" aria-labelledby="gq2-strict">
+          <h3 id="gq2-strict">{t("How strict")}</h3>
+          <div role="radiogroup" aria-labelledby="gq2-strict">
+            {STRICT.map(([value, label, hint]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={mode === value}
+                className="gq2-ropt"
+                disabled={!canDecide || editor === undefined}
+                onClick={() => (mode === value ? undefined : openEditor())}
+              >
+                <span className="gq2-rdot" aria-hidden />
+                <span>
+                  <b>{t(label)}</b>
+                  <small>{t(hint)}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+          {mode === "CLOSED" ? (
+            <p className="cq-caption gq-t2">
+              {t(
+                "Your gate is closed. Founders see that you're not taking applications right now.",
+              )}
+            </p>
+          ) : null}
+        </section>
+
+        <section className="gq2-card" aria-labelledby="gq2-promise">
+          <h3 id="gq2-promise">{t("Promise to founders")}</h3>
+          {changingPromise && canDecide ? (
+            <form
+              className="flex flex-wrap items-center gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                savePromise();
+              }}
+            >
+              <span className="cq-body-sm">{t("Reply within")}</span>
+              <input
+                className="gq-input"
+                style={{ width: 72 }}
+                inputMode="numeric"
+                aria-label={t("Working days")}
+                value={days}
+                onChange={(e) => setDays(e.target.value)}
+              />
+              <span className="cq-body-sm">{t("working days")}</span>
+              <Button size="compact" type="submit" disabled={pending}>
+                {t("Save")}
+              </Button>
+            </form>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <p className="cq-body text-(--cq-text-primary)">
+                {promise === null
+                  ? t("No reply promise yet")
+                  : t(
+                      `Reply within ${String(promise)} working day${promise === 1 ? "" : "s"}`,
+                    )}
+              </p>
+              {canDecide ? (
+                <Button
+                  variant="quiet"
+                  size="compact"
+                  onClick={() => setChangingPromise(true)}
+                >
+                  {t("Change")}
+                </Button>
+              ) : null}
+            </div>
+          )}
+          <p className="cq-caption gq-t3">
+            {t("Shown on your gate. Late replies are marked in your inbox.")}
           </p>
-        )}
-        {saved === null ? null : (
-          <p className="cq-caption gq-t2" role="status">
-            {t(saved)}
+          {saved === null ? null : (
+            <p className="cq-caption gq-t2" role="status">
+              {t(saved)}
+            </p>
+          )}
+        </section>
+
+        <section className="gq2-card" aria-labelledby="gq2-link">
+          <h3 id="gq2-link">{t("Your gate link")}</h3>
+          <CopyLink text={link} />
+          <p className="cq-caption gq-t3">
+            {t("Also as a")}{" "}
+            <button
+              type="button"
+              className="underline underline-offset-4"
+              onClick={() => setShowQr(true)}
+            >
+              {t("QR code")}
+            </button>{" "}
+            {t("and a")}{" "}
+            <button
+              type="button"
+              className="underline underline-offset-4"
+              onClick={() => setShowSnippet(!showSnippet)}
+              aria-expanded={showSnippet}
+            >
+              {t("snippet for your website")}
+            </button>
+            .
           </p>
-        )}
-      </section>
-      <section className="gq-sect">
-        <h2 className="cq-title-sm">{t("Share")}</h2>
-        <div className="flex flex-wrap gap-2">
-          <CopyLink text={link} label={t("Copy link")} />
-          <Button size="compact" onClick={() => setShowQr(true)}>
-            <LayoutGrid {...icon} />
-            {t("QR code")}
-          </Button>
-          <CopyLink text={snippet} label={t("Website snippet")} />
+          {showSnippet ? (
+            <div className="flex flex-col gap-2">
+              <code className="cq-caption block break-all rounded-(--cq-radius-md) bg-(--cq-surface-subtle) p-3">
+                <Copy {...icon} className="me-1.5 inline" />
+                {snippet}
+              </code>
+              <CopyLink text={snippet} label={t("Copy snippet")} />
+            </div>
+          ) : null}
           <Link
             href={link.replace(/^https?:\/\/[^/]+/, "")}
-            className={buttonClassName("quiet", "compact")}
+            className={buttonClassName("quiet", "compact", "self-start")}
             target="_blank"
           >
             {t("Preview the form")}
           </Link>
-        </div>
-        <code className="cq-caption block break-all rounded-xl bg-(--cq-surface-subtle) p-3">
-          <Copy {...icon} className="me-1.5 inline" />
-          {snippet}
-        </code>
-      </section>
+        </section>
+      </aside>
       <SheetRoot open={showQr} onOpenChange={setShowQr}>
         {showQr ? (
-          <SheetContent title={t("Your gate's QR code")} side="side">
+          <SheetContent
+            title={t("Your gate's QR code")}
+            side="side"
+            className="cq-charcoal"
+          >
             <div
               className="mx-auto size-56 rounded-2xl bg-(--cq-surface) p-3 text-(--cq-text-primary)"
               role="img"
@@ -541,7 +623,7 @@ export function GateView({
           </SheetContent>
         ) : null}
       </SheetRoot>
-    </>
+    </div>
   );
 }
 
