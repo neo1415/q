@@ -70,7 +70,7 @@ function Rank({ n }: { readonly n: number }) {
 
 function Best({ of }: { readonly of: number }) {
   return (
-    <span className="ms-auto inline-flex shrink-0 items-center gap-1 border border-(--cq-border) px-[7px] py-px text-[11.5px] whitespace-nowrap text-(--cq-text-secondary)">
+    <span className="ms-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-(--cq-border) px-[7px] py-px text-[11.5px] whitespace-nowrap text-(--cq-text-secondary)">
       <Check size={11} aria-hidden="true" />
       {of > 3 ? "Best" : `Best${of === 3 ? " of 3" : ""}`}
     </span>
@@ -192,7 +192,7 @@ export function FitComparisonView({
   return (
     <div data-fit-comparison={n}>
       {/* Desktop: one table, rows aligned across columns. */}
-      <div className="relative hidden overflow-x-auto border border-(--cq-border-subtle) bg-(--cq-surface-raised) lg:block">
+      <div className="relative hidden overflow-x-auto rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) lg:block">
         <div
           role="table"
           aria-label={`Top ${String(n)} side by side`}
