@@ -588,12 +588,6 @@ export function createMeetingHostRuntime(dependencies: {
   readonly wakeTimers?: boolean;
   /** 2026-10-20: say an answer's first sentence while the rest is written. */
   readonly streamAnswers?: boolean;
-  /**
-   * Sleeps on the same clock as `now` (default: real timers). A test that
-   * injects `now` injects this too: waits measured on its clock but slept
-   * on real time made the result depend on the machine's speed.
-   */
-  readonly sleep?: ((ms: number) => Promise<void>) | undefined;
 }): MeetingHostRuntime {
   const sessions = new Map<string, Session>();
   const opening = new Map<string, Promise<Session | null>>();
@@ -967,10 +961,10 @@ export function createMeetingHostRuntime(dependencies: {
     session.heardDirty = true;
   }
 
-  const sleep =
-    dependencies.sleep ??
-    ((ms: number) => new Promise<void>((done) => setTimeout(done, ms).unref()));
-  const wait = (ms: number) => (ms <= 0 ? Promise.resolve() : sleep(ms));
+  const wait = (ms: number) =>
+    ms <= 0
+      ? Promise.resolve()
+      : new Promise<void>((done) => setTimeout(done, ms).unref());
 
   /**
    * Until the audio Q already handed to the call has played, or Q was cut
