@@ -9,6 +9,7 @@ import {
   type MaterialActionAuditWriter,
 } from "@capital-q/audit";
 import type {
+  PublicCardDto,
   CorrelationId,
   PublicHandleResponse,
   QCardDto,
@@ -128,6 +129,17 @@ export type PublicIdentityService = {
     readonly handle: string;
     readonly audience: CardAudience;
   }) => Promise<PublicHandleResponse | null>;
+  /**
+   * A subject's live card for one audience, exactly as `/@handle` would
+   * show it to that audience: the same projection, by subject instead of
+   * by handle. Null when the subject has no active handle or no active
+   * card. Deciding whether the reader may know of the subject at all is
+   * the caller's (a founder's discovery read of an investor, ADR 0023).
+   */
+  readonly cardForSubject: (input: {
+    readonly subject: QCardSubject;
+    readonly audience: CardAudience;
+  }) => Promise<PublicCardDto | null>;
   /** A QR short code: where it points, counted once (aggregate only). */
   readonly resolveCode: (
     code: string,
@@ -225,6 +237,85 @@ export function createPublicIdentityService(
     if (card === null) return null;
     const active = await repository.findActiveForSubject(sql, subject);
     return toDto(card, active?.handle ?? null);
+  };
+
+  const resolveHandle = async ({
+    handle: raw,
+    audience,
+  }: {
+    readonly handle: string;
+    readonly audience: CardAudience;
+  }): Promise<PublicHandleResponse | null> => {
+    const reading = normaliseHandle(raw);
+    if (!reading.ok) return null;
+    const live = await repository.findLive(sql, reading.handle);
+    if (live === null) return null;
+    const subject: QCardSubject = {
+      subjectType: live.subjectType,
+      subjectId: live.subjectId,
+    };
+    if (live.status !== "ACTIVE") {
+      // Held (within its hold) or retired: send the reader to where the
+      // subject is now. An expired hold is not a redirect any more.
+      if (
+        live.status === "HELD" &&
+        (live.holdUntil === null || live.holdUntil.getTime() <= now().getTime())
+      ) {
+        return null;
+      }
+      const current = await repository.findActiveForSubject(sql, subject);
+      return current === null
+        ? null
+        : { kind: "REDIRECT", handle: current.handle };
+    }
+    const card = await repository.findCard(sql, subject);
+    if (card === null || card.status !== "ACTIVE") return null;
+    const facts = await subjects.find(subject);
+    if (facts === null) return null;
+    const scopes = readStoredScopes(subject.subjectType, card.fieldScopes);
+    // Images are signed only when the card shows them at all; the scope
+    // then decides the audience exactly as for any other field.
+    const images =
+      dependencies.cardImages !== undefined &&
+      (scopes.photo !== undefined || scopes.cover !== undefined)
+        ? await dependencies.cardImages(subject).catch(() => null)
+        : null;
+    return {
+      kind: "CARD",
+      handle: live.handle,
+      subjectType: subject.subjectType,
+      name: facts.name.slice(0, 200),
+      fields: projectCardFields(
+        subject.subjectType,
+        scopes,
+        {
+          ...facts.facts,
+          photo: images?.photo ?? null,
+          cover: images?.cover ?? null,
+        },
+        audience,
+      ),
+      verified: [
+        ...(facts.verified.organisation
+          ? (["ORGANISATION_VERIFIED"] as const)
+          : []),
+        ...(facts.verified.founderIdentity
+          ? (["FOUNDER_IDENTITY_VERIFIED"] as const)
+          : []),
+      ],
+      demoAttested: [
+        ...(facts.verified.organisation &&
+        facts.verified.demoAttested?.organisation === true
+          ? (["ORGANISATION_VERIFIED"] as const)
+          : []),
+        ...(facts.verified.founderIdentity &&
+        facts.verified.demoAttested?.founderIdentity === true
+          ? (["FOUNDER_IDENTITY_VERIFIED"] as const)
+          : []),
+      ],
+      audience,
+      indexable: card.indexable,
+    };
   };
 
   return {
@@ -397,78 +488,13 @@ export function createPublicIdentityService(
       );
     },
 
-    resolveHandle: async ({ handle: raw, audience }) => {
-      const reading = normaliseHandle(raw);
-      if (!reading.ok) return null;
-      const live = await repository.findLive(sql, reading.handle);
-      if (live === null) return null;
-      const subject: QCardSubject = {
-        subjectType: live.subjectType,
-        subjectId: live.subjectId,
-      };
-      if (live.status !== "ACTIVE") {
-        // Held (within its hold) or retired: send the reader to where the
-        // subject is now. An expired hold is not a redirect any more.
-        if (
-          live.status === "HELD" &&
-          (live.holdUntil === null ||
-            live.holdUntil.getTime() <= now().getTime())
-        ) {
-          return null;
-        }
-        const current = await repository.findActiveForSubject(sql, subject);
-        return current === null
-          ? null
-          : { kind: "REDIRECT", handle: current.handle };
-      }
-      const card = await repository.findCard(sql, subject);
-      if (card === null || card.status !== "ACTIVE") return null;
-      const facts = await subjects.find(subject);
-      if (facts === null) return null;
-      const scopes = readStoredScopes(subject.subjectType, card.fieldScopes);
-      // Images are signed only when the card shows them at all; the scope
-      // then decides the audience exactly as for any other field.
-      const images =
-        dependencies.cardImages !== undefined &&
-        (scopes.photo !== undefined || scopes.cover !== undefined)
-          ? await dependencies.cardImages(subject).catch(() => null)
-          : null;
-      return {
-        kind: "CARD",
-        handle: live.handle,
-        subjectType: subject.subjectType,
-        name: facts.name.slice(0, 200),
-        fields: projectCardFields(
-          subject.subjectType,
-          scopes,
-          {
-            ...facts.facts,
-            photo: images?.photo ?? null,
-            cover: images?.cover ?? null,
-          },
-          audience,
-        ),
-        verified: [
-          ...(facts.verified.organisation
-            ? (["ORGANISATION_VERIFIED"] as const)
-            : []),
-          ...(facts.verified.founderIdentity
-            ? (["FOUNDER_IDENTITY_VERIFIED"] as const)
-            : []),
-        ],
-        demoAttested: [
-          ...(facts.verified.organisation &&
-          facts.verified.demoAttested?.organisation === true
-            ? (["ORGANISATION_VERIFIED"] as const)
-            : []),
-          ...(facts.verified.founderIdentity &&
-          facts.verified.demoAttested?.founderIdentity === true
-            ? (["FOUNDER_IDENTITY_VERIFIED"] as const)
-            : []),
-        ],
-        audience,
-        indexable: card.indexable,
-      };
+    resolveHandle: (input) => resolveHandle(input),
+
+    cardForSubject: async ({ subject, audience }) => {
+      const active = await repository.findActiveForSubject(sql, subject);
+      if (active === null) return null;
+      const found = await resolveHandle({ handle: active.handle, audience });
+      return found !== null && found.kind === "CARD" ? found : null;
     },
 
     resolveCode: async (code) => {

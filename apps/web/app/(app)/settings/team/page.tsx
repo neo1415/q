@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 
 import { getTeam, listCompanyClaims } from "@capital-q/api-client";
 
-import { PageContainer } from "@/components/app-shell/page-container";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
+import { AccountColumn, AccountHead } from "@/features/settings/account-layout";
 import { CompanyClaims } from "@/features/team/company-claims";
-import { SettingsNav, TeamError } from "@/features/team/settings-nav";
+import { TeamError } from "@/features/team/settings-nav";
 import { TeamPage } from "@/features/team/team-page";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
@@ -14,9 +14,10 @@ export const metadata: Metadata = { title: "Team" };
 export const dynamic = "force-dynamic";
 
 /**
- * Settings → Team (G1/G2): the person's company (founders) or firm
- * (investors) as a team, read under their own session from the API, which
- * answers for their ACTIVE organisation and decides what they may do.
+ * Settings → Team (G1/G2; chosen design "Invite first", 2026-10-21): the
+ * person's company (founders) or firm (investors) as a team, read under
+ * their own session from the API, which answers for their ACTIVE
+ * organisation and decides what they may do.
  */
 export default async function TeamSettingsPage() {
   const t = await serverT();
@@ -34,19 +35,23 @@ export default async function TeamSettingsPage() {
                 .catch(() => [])
             : Promise.resolve([]),
         ]);
+  // Only a company's admins see its claims, so only they see "nobody".
+  const claimsFor =
+    context.kind === "FOUNDER" && team !== null && team.you.can.invite
+      ? team.organisation.name
+      : null;
   return (
-    <PageContainer>
+    <AccountColumn>
       <QSection id="team" kind="TEAM" label={t("your team")}>
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-10">
-          <SettingsNav current="team" />
-          <div className="max-w-[52rem] min-w-0">
-            {team === null ? <TeamError /> : <TeamPage initial={team} />}
-            <div className="pt-6">
-              <CompanyClaims initial={claims} />
-            </div>
-          </div>
+        <AccountHead
+          title={t("Team")}
+          back={{ href: "/settings", label: t("Settings") }}
+        />
+        {team === null ? <TeamError /> : <TeamPage initial={team} />}
+        <div className="pt-3.5">
+          <CompanyClaims initial={claims} companyName={claimsFor} />
         </div>
       </QSection>
-    </PageContainer>
+    </AccountColumn>
   );
 }

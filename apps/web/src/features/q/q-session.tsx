@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { qStageSteps } from "@capital-q/api-client";
+import { qCurrentStage } from "@capital-q/api-client";
 import type {
   QArtifactPreview,
   QFailureClass,
@@ -20,7 +20,6 @@ import type {
   QRoomPreview,
   QRoomStages,
   QTurnDisposition,
-  QVisibleStage,
 } from "@capital-q/contracts";
 
 import { voiceBriefing } from "@/features/briefing/arrival-voice";
@@ -60,6 +59,7 @@ import { QMaterialViewer } from "./material-viewer";
 import { useQSubject, type QSubject } from "./q-subject";
 import { resumableConversation } from "./resume-conversation";
 import { useQRoomFeed } from "./room-feed";
+import type { QWorkingStage } from "./stage-line";
 import { setOpenDocument } from "./screen";
 import { spokenNotYetStored, type SpokenLine } from "./spoken";
 import { useQConversation, type QConversation } from "./use-q-conversation";
@@ -159,12 +159,10 @@ export type QSessionValue = {
     readonly label: string | undefined;
     readonly detail: string | undefined;
     /**
-     * Owner 2026-10-21: the steps Q has taken on the run it is working on
-     * now, oldest first, the last being where it is; empty when Q is not
-     * working or no stage has been reported. Only real stage events: the
-     * typed run's stream, or a spoken turn's run through the room feed.
+     * Round 4: where Q is now and what it is about (the run's own reads),
+     * for the one live line; null when Q is not working or no stage yet.
      */
-    readonly steps: readonly QVisibleStage[];
+    readonly stage: QWorkingStage | null;
   };
   /** The page asks for a conversation (null: a new one). */
   readonly open: (conversationId: string | null) => void;
@@ -666,17 +664,27 @@ export function QSessionProvider({
       ? undefined
       : workingLabel(q.state);
   const typedSteps = q.state.stageHistory;
-  const steps = useMemo<readonly QVisibleStage[]>(
-    () =>
-      voice.active
-        ? // A spoken turn: shown while Q works on it (its line is up, or
-          // the room still has its steps); gone once its answer lands.
-          (roomStages?.stages ?? [])
-        : q.working
-          ? qStageSteps(typedSteps)
-          : [],
-    [voice.active, roomStages, q.working, typedSteps],
-  );
+  const current = useMemo<QWorkingStage | null>(() => {
+    if (voice.active) {
+      const last = roomStages?.stages.at(-1);
+      return last === undefined
+        ? null
+        : {
+            stage: last,
+            ...(roomStages?.about === undefined
+              ? {}
+              : { about: roomStages.about }),
+          };
+    }
+    if (!q.working) return null;
+    const now = qCurrentStage(typedSteps);
+    return now === null
+      ? null
+      : {
+          stage: now.stage,
+          ...(now.about === undefined ? {} : { about: now.about }),
+        };
+  }, [voice.active, roomStages, q.working, typedSteps]);
 
   const value = useMemo<QSessionValue>(
     () => ({
@@ -689,7 +697,7 @@ export function QSessionProvider({
       spokenOnly,
       voiceOutcomes,
       spokenPreview,
-      presence: { state, label, detail, steps },
+      presence: { state, label, detail, stage: current },
       open,
       talk,
       act,
@@ -710,7 +718,7 @@ export function QSessionProvider({
       state,
       label,
       detail,
-      steps,
+      current,
       open,
       talk,
       act,

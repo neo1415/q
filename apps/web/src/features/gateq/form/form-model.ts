@@ -36,21 +36,28 @@ export type FormStep =
   | "review"
   | "sent";
 
-/** The progress bar's segments, in order. "check" sits on "note". */
+/**
+ * Design gatepub-1 (2026-10-21): the questions are one page with the
+ * founder's standing beside them, then the contact is confirmed, then the
+ * interview with Q, then the review. The page holds what were the four
+ * form steps and the check, so a saved step from before still opens it.
+ */
 export const FLOW_PROGRESS = [
-  "contact",
   "company",
-  "round",
-  "share",
-  "note",
+  "contact",
   "interview",
   "review",
 ] as const;
 
+/** Every step the one page of questions stands for. */
+export function onQuestionsPage(step: FormStep): boolean {
+  return (FORM_STEPS as readonly FormStep[]).includes(step) || step === "check";
+}
+
 export function progressFor(step: FormStep): number {
   if (step === "sent") return FLOW_PROGRESS.length;
-  if (step === "check") return FLOW_PROGRESS.indexOf("note") + 1;
-  return FLOW_PROGRESS.indexOf(step) + 1;
+  if (onQuestionsPage(step)) return 1;
+  return (FLOW_PROGRESS as readonly string[]).indexOf(step) + 1;
 }
 
 export type Choice = { readonly value: string; readonly label: string };
@@ -351,6 +358,83 @@ export function requestFor(
   return {};
 }
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Everything on the one page of questions, as the API's bounded request.
+ * Only what can be read is sent: a blank field is left out (unknown),
+ * never sent as empty, so the engine's check stays honest as they type.
+ */
+export function pageRequest(answers: FormAnswers): ApplicationAnswersRequest {
+  const { companyName, ...company } = requestFor("company", answers);
+  const round = requestFor("round", answers);
+  const email = answers.contactEmail.trim();
+  const name = answers.contactName.trim();
+  const note = answers.note.trim();
+  return {
+    ...(companyName === undefined || companyName === "" ? {} : { companyName }),
+    ...company,
+    ...round,
+    ...(EMAIL.test(email) ? { contactEmail: email } : {}),
+    ...(name === "" ? {} : { contactName: name.slice(0, 200) }),
+    ...(note === "" ? {} : { note: note.slice(0, GATEQ_NOTE_MAX_CHARS) }),
+  };
+}
+
+/** What blocks "Continue to interview". Unknown is always allowed. */
+export function validatePage(answers: FormAnswers): StepErrors {
+  const errors: StepErrors = {
+    ...validateStep("company", answers, { anonymous: false }),
+  };
+  if (answers.band !== DECLINED && answers.amount.trim() !== "") {
+    if (normaliseAmount(answers.amount) === null) {
+      errors.amount = "Use numbers only, like 1,200,000.";
+    }
+  }
+  const email = answers.contactEmail.trim();
+  if (email === "") errors.contactEmail = "Add an email so they can reply.";
+  else if (!EMAIL.test(email))
+    errors.contactEmail = "That email doesn't look right.";
+  if (answers.note.length > GATEQ_NOTE_MAX_CHARS) {
+    errors.note = `Keep it to ${GATEQ_NOTE_MAX_CHARS} characters.`;
+  }
+  return errors;
+}
+
+/**
+ * How one published rule stands, in words (design gatepub-1). Not answered
+ * is never a no; a preferred rule never blocks.
+ */
+export function standingWords(
+  line: Pick<RuleLine, "required" | "standing">,
+): string {
+  const level = line.required ? "Required" : "Preferred";
+  if (line.standing === "MEETS") return `${level}. Meets`;
+  if (line.standing === "DOES_NOT_MEET") {
+    return line.required
+      ? `${level}. Doesn't meet. This one is required`
+      : `${level}. Doesn't meet. Preferred only`;
+  }
+  return `${level}. Not answered yet. Never counts as a no`;
+}
+
+const COUNT_WORDS = [
+  "No",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+] as const;
+
+/** "Five short questions": the page's own count, in words. */
+export function questionCountWords(count: number): string {
+  return COUNT_WORDS[count] ?? String(count);
+}
+
 /** A first note from the profile: the founder's to change, never sent unseen. */
 export function draftNote(fund: string, answers: FormAnswers): string {
   const parts = [`Hi ${fund} team,`];
@@ -523,7 +607,6 @@ export function contactFromProfile(
 
 export type ContactErrors = Partial<Record<keyof ContactAnswers, string>>;
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE = /^\+?[0-9 ().-]{6,32}$/;
 
 export function validateContact(contact: ContactAnswers): ContactErrors {

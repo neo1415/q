@@ -65,6 +65,7 @@ import {
   type QResultBlock,
   type QRunId,
   type QUiIntent,
+  type QStageAbout,
   type QVisibleStage,
 } from "@capital-q/contracts";
 import {
@@ -1324,6 +1325,7 @@ export function createSpecialistQAnswer(
   async function showStage(
     request: QAnswerRequest,
     stage: QVisibleStage,
+    about?: QStageAbout,
   ): Promise<void> {
     try {
       await transactions.run((tx) =>
@@ -1331,7 +1333,10 @@ export function createSpecialistQAnswer(
           repositories,
           tx,
           { id: request.runId, tenantId: request.tenantId },
-          { type: "q.stage.changed", data: { stage } },
+          {
+            type: "q.stage.changed",
+            data: about === undefined ? { stage } : { stage, about },
+          },
         ),
       );
     } catch (error: unknown) {
@@ -1551,7 +1556,7 @@ export function createSpecialistQAnswer(
       company: subject,
       companyName: name,
       saidVerbatim: said,
-      showStage: (stage) => showStage(request, stage),
+      showStage: (stage, about) => showStage(request, stage, about),
       // The reading decided this is a request to prepare; a model's own
       // field (which may be empty for an impatient "just do it") does not
       // get to overrule it. How it should look is still the model's read.
@@ -5146,7 +5151,7 @@ export function createSpecialistQAnswer(
             saidVerbatim: latest.content,
             result,
             history,
-            showStage: (stage) => showStage(request, stage),
+            showStage: (stage, about) => showStage(request, stage, about),
             ...(logger === undefined ? {} : { logger }),
           });
     const prepared =

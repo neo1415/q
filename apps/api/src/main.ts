@@ -8,6 +8,11 @@ import type { ActorContext } from "@capital-q/security";
  * and handed to the application. Domain routes arrive with their packets and
  * import business logic from domain packages rather than defining it here.
  */
+import {
+  createMemoryCorrection,
+  createMemoryService,
+  createPostgresMemoryRepository,
+} from "@capital-q/q-knowledge";
 
 import { createOnboardingCoverageReader } from "./onboarding-coverage.js";
 import {
@@ -2389,9 +2394,21 @@ const gatewayCounts = async (organisationId: string | undefined) => ({
 const ORGANISATION_ADMIN = CapabilitySchema.parse("organisation.admin");
 // end BILLING block
 
+// What Q remembers (ADR 0012): the person's own correction goes through
+// the memory service's Write Gate, over the same q_knowledge.memory_items
+// the Q API reads; recall and learning stay in the Q API.
+const memoryCorrection = createMemoryCorrection(
+  createMemoryService({
+    sql: database.sql,
+    transactions: database.transactions,
+    repository: createPostgresMemoryRepository(),
+  }),
+);
+
 const { app, logger } = createApp(config, security, {
   // RECOVERY F4 (A-04): readiness answers 503 when the database is down.
   healthProbes: { database: () => checkDatabaseReadiness(database.sql) },
+  memoryCorrection,
   organisations,
   companies,
   investors,

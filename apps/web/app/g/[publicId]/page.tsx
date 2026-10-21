@@ -32,17 +32,32 @@ export default async function GatewayPage({ params }: Props) {
   const gateway = await publicGateway((await params).publicId);
   if (gateway === null) notFound();
   const founder = await founderFormContext();
+  const signedInAs = founder.prefill?.contactName ?? null;
+  // Design gatepub-1: Capital Q's bar, who is signed in, then the form.
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-6 px-4 py-10">
-      <GateQForm
-        gateway={gateway}
-        prefill={founder.prefill}
-        needsCompany={founder.needsCompany}
-        materials={founder.materials}
-      />
-      <p className="cq-caption text-(--cq-text-tertiary)">
-        {t("Powered by Capital Q")}
-      </p>
-    </main>
+    <div className="min-h-dvh bg-(--cq-canvas)">
+      <header className="sticky top-0 z-(--cq-z-sticky) flex h-14 items-center gap-3 border-b border-(--cq-border-subtle) bg-(--cq-canvas) px-4 sm:h-16 sm:px-8">
+        <span className="text-lg font-semibold tracking-tight text-(--cq-text-primary)">
+          Capital Q
+        </span>
+        <span className="flex-1" />
+        {signedInAs === null ? null : (
+          <span className="cq-caption text-(--cq-text-tertiary)">
+            {t("Signed in as")} {signedInAs}
+          </span>
+        )}
+      </header>
+      <main className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 px-4 pt-5 pb-16 sm:px-10 sm:pt-8">
+        <GateQForm
+          gateway={gateway}
+          prefill={founder.prefill}
+          needsCompany={founder.needsCompany}
+          materials={founder.materials}
+        />
+        <p className="cq-caption text-(--cq-text-tertiary)">
+          {t("Powered by Capital Q")}
+        </p>
+      </main>
+    </div>
   );
 }

@@ -21,14 +21,40 @@ const METHOD_WORDS = {
 
 export function CompanyClaims({
   initial,
+  companyName = null,
 }: {
   readonly initial: readonly PendingClaimDto[];
+  /**
+   * The company whose claims these are, when the reader is its admin:
+   * with none waiting, the card says so instead of disappearing.
+   */
+  readonly companyName?: string | null | undefined;
 }) {
   const t = useT();
   const [claims, setClaims] = useState(initial);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  if (claims.length === 0 && message === null) return null;
+  if (claims.length === 0 && message === null) {
+    return companyName === null ? null : (
+      <section
+        aria-labelledby="company-claims-title"
+        className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-5 py-[18px]"
+        data-company-claims="none"
+      >
+        <h2
+          id="company-claims-title"
+          className="m-0 text-[13px] font-medium text-(--cq-text-secondary)"
+        >
+          {t("Asked to claim your company")}
+        </h2>
+        <p className="m-0 text-sm text-(--cq-text-secondary)">
+          {t(
+            `Nobody has asked to join ${companyName} from a deck, a colleague or public records.`,
+          )}
+        </p>
+      </section>
+    );
+  }
   const decide = (claim: PendingClaimDto, approve: boolean) => {
     start(async () => {
       const out = await decideCompanyClaimAction(
@@ -51,16 +77,16 @@ export function CompanyClaims({
   return (
     <section
       aria-labelledby="company-claims-title"
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-5 py-[18px]"
       data-company-claims
     >
       <h2
         id="company-claims-title"
-        className="cq-title-sm text-(--cq-text-primary)"
+        className="m-0 text-[13px] font-medium text-(--cq-text-secondary)"
       >
         {t("Asked to claim your company")}
       </h2>
-      <ul className="flex flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)">
+      <ul className="m-0 flex list-none flex-col divide-y divide-(--cq-border-subtle) p-0">
         {claims.map((claim) => (
           <li
             key={claim.requestId}

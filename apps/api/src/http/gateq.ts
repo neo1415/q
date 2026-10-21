@@ -387,6 +387,10 @@ export function registerGateQRoutes(
             status: row.status,
             reasonCode: row.reasonCode,
             message: row.message,
+            // gateqf-1: the published rules as they stood at submission.
+            rules: row.rules,
+            replyBy: row.replyBy,
+            investorOrganisationId: row.investorOrganisationId,
           })),
         });
       },

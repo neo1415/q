@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { QConversationIdSchema, QRunIdSchema } from "./ids.js";
 import { QResponseMessageSchema } from "./message.js";
-import { QVisibleStageSchema } from "./stage.js";
+import { QStageAboutSchema, QVisibleStageSchema } from "./stage.js";
 import { QArtifactPreviewSchema } from "./stream.js";
 
 /**
@@ -76,6 +76,8 @@ export const QRoomStagesSchema = z
     sequence: z.number().int().min(1),
     runId: QRunIdSchema,
     stages: z.array(QVisibleStageSchema).min(1).max(Q_ROOM_STAGES_MAX),
+    /** Round 4: what the newest stage is about, when the run said. */
+    about: QStageAboutSchema.optional(),
   })
   .strict();
 export type QRoomStages = z.infer<typeof QRoomStagesSchema>;

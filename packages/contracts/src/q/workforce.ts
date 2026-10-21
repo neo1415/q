@@ -395,6 +395,30 @@ export const WorkforceOverviewDtoSchema = z
         needsYou: z.number().int().min(0),
       })
       .strict(),
+    /**
+     * This month's spend day by day (UTC days, oldest first), each split by
+     * agent role, from the same usage ledger as `spentUsd`. Only days with
+     * spend are listed; a day not listed spent nothing. Absent from an
+     * older server (unknown, never zero).
+     */
+    byDay: z
+      .array(
+        z
+          .object({
+            day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+            usd: UsdSchema,
+            byRole: z
+              .array(
+                z
+                  .object({ role: WorkforceAgentRoleSchema, usd: UsdSchema })
+                  .strict(),
+              )
+              .max(WORKFORCE_AGENT_ROLES.length),
+          })
+          .strict(),
+      )
+      .max(31)
+      .optional(),
     /** Live standing instructions. Absent from an older server. */
     instructions: z.array(WorkforceInstructionDtoSchema).max(20).optional(),
   })

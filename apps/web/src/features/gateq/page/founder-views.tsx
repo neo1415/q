@@ -14,6 +14,7 @@ import {
   Check,
   ChevronRight,
   CircleAlert,
+  CircleHelp,
   Clock,
   DoorOpen,
   FileText,
@@ -21,6 +22,7 @@ import {
   ICON_STROKE,
   Lock,
   Mail,
+  MessageSquare,
   Search,
   Upload,
   Users,
@@ -38,6 +40,7 @@ import {
   searchClaimableAction,
 } from "./gateq-actions";
 import { ErrorBlock, Skeleton, StateBlock } from "./gateq-chrome";
+import { monogram } from "./inbox-model";
 import { GateqUnicornAssessment } from "./unicorn-assessment";
 import { useT } from "@/features/i18n/language";
 
@@ -77,12 +80,13 @@ export function FounderApplications({
   readonly limited?: boolean;
 }) {
   const t = useT();
+  const [open, setOpen] = useState<string | null>(null);
 
   if (state === "loading") {
     return (
       <div className="flex flex-col gap-3" aria-busy="true">
         {[1, 2, 3].map((n) => (
-          <Skeleton key={n} width="100%" height={64} />
+          <Skeleton key={n} width="100%" height={74} />
         ))}
       </div>
     );
@@ -95,34 +99,58 @@ export function FounderApplications({
         retryHref="/gateq?tab=applications"
       />
     );
-  if (state === "empty" || applications.length === 0) {
-    return (
-      <StateBlock
-        icon={
-          <DoorOpen
-            size={ICON_SIZE.prominent}
-            strokeWidth={ICON_STROKE}
-            aria-hidden
-          />
-        }
-        title={t("No applications yet")}
-        body={t(
+  const findCard = (
+    <section className="gq2-card mt-4" aria-labelledby="gqf-find">
+      <h3 id="gqf-find">{t("Find investors who fit")}</h3>
+      <p
+        className="cq-body-sm text-(--cq-text-primary)"
+        style={{ maxWidth: "68ch" }}
+      >
+        {t(
           "Many investors have a gate: a short form that tells you at once if you fit what they look for. Open one from an investor's profile or a link they shared.",
         )}
+      </p>
+      <Link
+        href="/discover?tab=investors"
+        className={buttonClassName(
+          state === "empty" || applications.length === 0
+            ? "primary"
+            : "secondary",
+          "compact",
+          "self-start",
+        )}
       >
-        <Link
-          href="/discover?tab=investors"
-          className={buttonClassName("primary")}
-        >
-          {t("Find investors")}
-        </Link>
-      </StateBlock>
+        {t("Find investors")}
+      </Link>
+    </section>
+  );
+  if (state === "empty" || applications.length === 0) {
+    return (
+      <>
+        <StateBlock
+          icon={
+            <DoorOpen
+              size={ICON_SIZE.prominent}
+              strokeWidth={ICON_STROKE}
+              aria-hidden
+            />
+          }
+          title={t("No applications yet")}
+          body={t(
+            "When you apply through an investor's gate, it shows here with how their rules stood and what they sent back.",
+          )}
+        />
+        {findCard}
+      </>
     );
   }
+  const current =
+    applications.find((application) => application.applicationId === open) ??
+    null;
   return (
     <>
       {limited ? (
-        <div className="gq-banner">
+        <div className="gq-banner mb-3">
           <Lock {...icon} />
           <span>
             {t(
@@ -131,6 +159,32 @@ export function FounderApplications({
           </span>
         </div>
       ) : null}
+      <div role="list" aria-label={t("Your applications")}>
+        {applications.map((application) => (
+          <div role="listitem" key={application.applicationId}>
+            <button
+              type="button"
+              className="gqf-row"
+              onClick={() => setOpen(application.applicationId)}
+            >
+              <span className="gqf-mono" aria-hidden>
+                {monogram(application.fund)}
+              </span>
+              <span className="min-w-0">
+                <b>{t(application.fund)}</b>
+                <span className="gqf-s line-clamp-2">
+                  {t(founderDetailWords(application))}
+                </span>
+                <span className="gqf-when">
+                  {t(sentWords(application.sentAt))}
+                </span>
+              </span>
+              <StatusTag application={application} />
+            </button>
+          </div>
+        ))}
+      </div>
+      {findCard}
       {Array.from(
         new Map(
           applications.flatMap((application) =>
@@ -151,59 +205,158 @@ export function FounderApplications({
           audience="FOUNDER"
         />
       ))}
-      <section className="gq-sect">
-        <h2 className="cq-title-sm">{t("Your applications")}</h2>
-        <ul className="gq-hair">
-          {applications.map((application) => (
-            <li
-              key={application.applicationId}
-              className="grid items-center gap-x-3 gap-y-0.5 py-3.5"
-              style={{ gridTemplateColumns: "44px 1fr auto" }}
-            >
-              <span
-                className="gq-logo"
-                style={{ width: 44, height: 44, borderRadius: "50%" }}
-              >
-                {t(application.fund.slice(0, 1).toUpperCase())}
-              </span>
-              <span className="min-w-0">
-                <b className="font-medium">{t(application.fund)}</b>
-                <span className="cq-caption gq-t2 block">
-                  {t(sentWords(application.sentAt))}
-                </span>
-              </span>
-              <span className="gq-status">
-                {application.status === "PASSED" ? (
-                  <>
-                    <X {...icon} />
-                    {t("Passed:")}{" "}
-                    {t(REASON_WORDS[application.reasonCode ?? "OTHER"] ?? "")}
-                  </>
-                ) : application.status === "REPLIED" ? (
-                  <>
-                    <Check {...icon} />
-                    {t("They replied")}
-                  </>
-                ) : (
-                  <>
-                    <Clock {...icon} />
-                    {t("Sent")}
-                  </>
-                )}
-              </span>
-              {application.message === null ? null : (
-                <p
-                  className="cq-body-sm gq-t2 col-start-2 col-end-4 mt-1.5"
-                  style={{ maxWidth: "62ch" }}
-                >
-                  &ldquo;{t(application.message)}&rdquo;
-                </p>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <SheetRoot
+        open={current !== null}
+        onOpenChange={(next) => (next ? undefined : setOpen(null))}
+      >
+        {current === null ? null : (
+          <SheetContent
+            title={t(current.fund)}
+            description={t(
+              `${sentWords(current.sentAt)}. Frozen at submission`,
+            )}
+            side="side"
+          >
+            <FounderApplicationDetail application={current} />
+          </SheetContent>
+        )}
+      </SheetRoot>
     </>
+  );
+}
+
+/** What happened, in words: the investor's own reply, never paraphrased. */
+export function founderDetailWords(application: FounderApplicationDto): string {
+  if (application.status === "PASSED") {
+    return application.message === null
+      ? `Passed with a reason: ${REASON_WORDS[application.reasonCode ?? "OTHER"] ?? "they gave a reason"}.`
+      : `Passed with a reason. They got: “${application.message}”`;
+  }
+  if (application.status === "REPLIED") {
+    return application.message === null
+      ? "They replied."
+      : `They wrote: “${application.message}”`;
+  }
+  return application.replyBy == null
+    ? "Sent. They haven't made a reply promise."
+    : `Reply promised by ${new Date(`${application.replyBy}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}`;
+}
+
+function StatusTag({
+  application,
+  wide = false,
+}: {
+  readonly application: FounderApplicationDto;
+  readonly wide?: boolean;
+}) {
+  const t = useT();
+  const kind = application.status.toLowerCase();
+  return (
+    <span className={`gqf-st gqf-st-${kind}${wide ? " gqf-st-wide" : ""}`}>
+      {application.status === "PASSED" ? (
+        <X {...icon} size={12} />
+      ) : application.status === "REPLIED" ? (
+        <MessageSquare {...icon} size={12} />
+      ) : (
+        <Clock {...icon} size={12} />
+      )}
+      {application.status === "PASSED"
+        ? t("Passed with a reason")
+        : application.status === "REPLIED"
+          ? t("They replied")
+          : t("Waiting on them")}
+    </span>
+  );
+}
+
+const STOOD_WORDS = {
+  MEETS: "Met",
+  DOES_NOT_MEET_REQUIRED: "Not met, required",
+  DOES_NOT_MEET_PREFERRED: "Not met, preferred",
+  NOT_ANSWERED: "Not answered",
+} as const;
+
+/** How one published rule stood when it was sent, in words. */
+export function stoodWords(rule: {
+  readonly required: boolean;
+  readonly standing: "MEETS" | "DOES_NOT_MEET" | "NOT_ANSWERED";
+}): string {
+  if (rule.standing === "MEETS") return STOOD_WORDS.MEETS;
+  if (rule.standing === "NOT_ANSWERED") return STOOD_WORDS.NOT_ANSWERED;
+  return rule.required
+    ? STOOD_WORDS.DOES_NOT_MEET_REQUIRED
+    : STOOD_WORDS.DOES_NOT_MEET_PREFERRED;
+}
+
+function FounderApplicationDetail({
+  application,
+}: {
+  readonly application: FounderApplicationDto;
+}) {
+  const t = useT();
+  const relationship =
+    application.investorOrganisationId == null
+      ? null
+      : `/relationships/investor/${encodeURIComponent(application.investorOrganisationId)}`;
+  return (
+    <div className="flex flex-col gap-4 px-4 pb-4">
+      <StatusTag application={application} wide />
+      <p className="cq-body text-(--cq-text-primary)">
+        {t(founderDetailWords(application))}
+      </p>
+      <section className="gq2-card" aria-labelledby="gqf-stood">
+        <h3 id="gqf-stood">{t("How their rules stood when you sent it")}</h3>
+        {application.rules === undefined ? (
+          <p className="cq-body-sm gq-t2">
+            {t("Not recorded for this application.")}
+          </p>
+        ) : application.rules.length === 0 ? (
+          <p className="cq-body-sm gq-t2">
+            {t("They had no published rules then, so nothing was checked.")}
+          </p>
+        ) : (
+          <div>
+            {application.rules.map((rule) => (
+              <div key={rule.label} className="gqf-stood">
+                <span>{t(rule.label)}</span>
+                <span className="gqf-word">
+                  {rule.standing === "MEETS" ? (
+                    <span className="gq-tick">
+                      <Check {...icon} size={12} strokeWidth={2.4} />
+                    </span>
+                  ) : rule.standing === "NOT_ANSWERED" ? (
+                    <span className="gq-unk-ic">
+                      <CircleHelp {...icon} />
+                    </span>
+                  ) : (
+                    <span className="gq-unk-ic">
+                      <X {...icon} />
+                    </span>
+                  )}
+                  {t(stoodWords(rule))}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="cq-caption gq-t3">
+          {t("Their published bar, not their private thesis.")}
+        </p>
+      </section>
+      {application.status === "REPLIED" && relationship !== null ? (
+        <Link
+          href={`${relationship}/messages`}
+          className={buttonClassName("primary")}
+        >
+          {t("Answer in your messages")}
+        </Link>
+      ) : null}
+      {relationship === null ? null : (
+        <Link href={relationship} className={buttonClassName("quiet")}>
+          {t("Open the relationship")}
+        </Link>
+      )}
+    </div>
   );
 }
 

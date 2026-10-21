@@ -48,6 +48,7 @@ import {
   type QResponseMessage,
   type QScreenContext,
   type QSubjectRef,
+  type QStageAbout,
   type QVisibleStage,
   type TenantModelPolicy,
   type CompanyEditableField,
@@ -126,6 +127,7 @@ import {
   namedCompanySubjects,
   withCardSubjects,
 } from "./card-subjects.js";
+import { stageAbout, stageKey } from "./stage-subjects.js";
 import {
   createRunFits,
   fitAnswerCardsBlock,
@@ -2101,10 +2103,14 @@ export function createModelGatewayQAnswer(
   async function showStage(
     request: QAnswerRequest,
     stage: QVisibleStage,
+    about?: QStageAbout,
   ): Promise<void> {
     try {
       const run = { id: request.runId, tenantId: request.tenantId };
-      const input = { type: "q.stage.changed", data: { stage } } as const;
+      const input = {
+        type: "q.stage.changed",
+        data: about === undefined ? { stage } : { stage, about },
+      } as const;
       // One statement on the request client where the store offers it
       // (S2); otherwise a transaction, as before.
       const done = await appendRunEventAtomic(repositories, sql, run, input);
@@ -3476,7 +3482,7 @@ export function createModelGatewayQAnswer(
    */
   const runStages = new Map<
     string,
-    { now: QVisibleStage | undefined; queue: Promise<void> }
+    { now: string | undefined; queue: Promise<void> }
   >();
   const stagesOf = (runId: string) => {
     let stages = runStages.get(runId);
@@ -3495,8 +3501,9 @@ export function createModelGatewayQAnswer(
   const stepStarts = (request: QAnswerRequest, stage: QVisibleStage): void => {
     if (request.speculation !== undefined) return;
     const stages = stagesOf(request.runId);
-    if (stages.now === stage) return;
-    stages.now = stage;
+    const key = stageKey(stage, undefined);
+    if (stages.now === key) return;
+    stages.now = key;
     stages.queue = stages.queue.then(() => showStage(request, stage));
   };
   const WARMING_MAX = 64;
@@ -3587,16 +3594,20 @@ export function createModelGatewayQAnswer(
         gate === null
           ? stagesOf(request.runId)
           : {
-              now: undefined as QVisibleStage | undefined,
+              now: undefined as string | undefined,
               queue: Promise.resolve(),
             };
-      const stageOnce = (stage: QVisibleStage): Promise<void> => {
-        if (stage === stages.now) return stages.queue;
-        stages.now = stage;
+      const stageOnce = (
+        stage: QVisibleStage,
+        about?: QStageAbout,
+      ): Promise<void> => {
+        const key = stageKey(stage, about);
+        if (key === stages.now) return stages.queue;
+        stages.now = key;
         stages.queue = stages.queue.then(() =>
           gate === null
-            ? showStage(request, stage)
-            : gate.emit(() => showStage(request, stage)),
+            ? showStage(request, stage, about)
+            : gate.emit(() => showStage(request, stage, about)),
         );
         return stages.queue;
       };
@@ -5917,7 +5928,19 @@ export function createModelGatewayQAnswer(
               // changes (eight fit.profile reads wrote it eight times, one
               // after another), and beside the read rather than before it.
               const stage = tool?.visibleStage ?? null;
-              const stageWrite = stage === null ? null : stageOnce(stage);
+              const about =
+                stage === null
+                  ? undefined
+                  : stageAbout({
+                      stage,
+                      args: call.arguments,
+                      read: runCompanies.read(request.runId),
+                    });
+              // Round 4: the stage names what it is about when this run has
+              // read it ("Looking at Nixo"); written again only when the
+              // stage or its names change.
+              const stageWrite =
+                stage === null ? null : stageOnce(stage, about);
               const settled = await early?.[index];
               if (settled !== undefined && !settled.ok) {
                 await stageWrite;

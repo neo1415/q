@@ -28,6 +28,7 @@ import {
 import { ArrivalDock } from "@/features/briefing/arrival-dock";
 import { AnswerChip } from "@/features/q/answer-chip";
 import { setScreenFocusSource } from "@/features/q/screen";
+import { TaskProgress } from "@/features/q/stage-line";
 import { QSessionProvider, useQSessionOptional } from "@/features/q/q-session";
 import {
   QSubjectProvider,
@@ -368,7 +369,14 @@ export function GlobalQTrigger({
       </Link>
     );
   }
-  return (
+  // Round 4 (§6.1 compact pill): a durable task Q is running (a deck, a
+  // memo) shows its name, real step count and bar beside the dock, on
+  // every page, so the person can see it progress while they work.
+  const task =
+    variant === "sidebar" && session?.presence.stage?.about?.task !== undefined
+      ? session.presence.stage
+      : null;
+  const trigger = (
     <button
       type="button"
       aria-label={t("Ask Q")}
@@ -387,6 +395,18 @@ export function GlobalQTrigger({
       {presence}
       {variant === "sidebar" ? t("Ask Q") : null}
     </button>
+  );
+  if (task === null) return trigger;
+  return (
+    <div className="flex w-full flex-col gap-2">
+      {trigger}
+      <div
+        className="rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-3 py-2"
+        data-q-dock-task
+      >
+        <TaskProgress current={task} compact />
+      </div>
+    </div>
   );
 }
 

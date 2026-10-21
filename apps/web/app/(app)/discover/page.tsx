@@ -14,6 +14,7 @@ import {
 import {
   GATEQ_INVESTOR_GATES_MAX,
   type InvestorGateFitDto,
+  type PublicCardDto,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { EmptyState } from "@capital-q/ui/states";
@@ -26,6 +27,7 @@ import { DiscoverInvestors } from "@/features/discover/discover-screen";
 import { tabFromQuery } from "@/features/discover/discover-tab-query";
 import { DiscoverTabs } from "@/features/discover/discover-tabs";
 import { InvestorFeedScreen } from "@/features/discover/investor-feed-screen";
+import { investorCards } from "@/features/investors/investor-reads";
 import { NetworkVideos } from "@/features/discover/network/network-videos";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QControl } from "@/features/q/control/q-control";
@@ -269,21 +271,31 @@ export default async function DiscoverPage({
   }
 
   const slate = await discoverInvestors(session).catch(() => null);
+  const ids = (slate?.items ?? []).map((item) => item.investorOrganisationId);
   // Q.05: the gates these investors publish, checked against the founder's
-  // own company (the API resolves it). No gates read is no gate shown.
-  const gates =
-    slate === null || slate.items.length === 0
-      ? new Map<string, InvestorGateFitDto>()
-      : new Map(
-          (
-            await getInvestorGates(
-              session,
-              slate.items
-                .slice(0, GATEQ_INVESTOR_GATES_MAX)
-                .map((item) => item.investorOrganisationId),
-            ).catch(() => ({ items: [] }))
-          ).items.map((gate) => [gate.investorOrganisationId, gate]),
-        );
+  // own company (the API resolves it). No gates read is no gate shown. And
+  // each investor's Q Card as a participant reads it: the focus they chose
+  // to publish. Side by side; either failing shows "not published".
+  const [gates, cards] =
+    ids.length === 0
+      ? [
+          new Map<string, InvestorGateFitDto>(),
+          new Map<string, PublicCardDto | null>(),
+        ]
+      : await Promise.all([
+          getInvestorGates(session, ids.slice(0, GATEQ_INVESTOR_GATES_MAX))
+            .catch(() => ({ items: [] }))
+            .then(
+              (found) =>
+                new Map(
+                  found.items.map((gate) => [
+                    gate.investorOrganisationId,
+                    gate,
+                  ]),
+                ),
+            ),
+          investorCards(session, ids),
+        ]);
   return (
     <PageContainer className="flex flex-col gap-6">
       <PageHeader title={t("Discover")} />
@@ -313,6 +325,7 @@ export default async function DiscoverPage({
               items={slate.items}
               notes={slate.notes}
               gates={gates}
+              cards={cards}
             />
           </QControl>
         </>

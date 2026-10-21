@@ -8,6 +8,7 @@ import { DOCUMENT_ACTIONS } from "./actions/documents.js";
 import { DOCUMENT_MANAGE_ACTIONS } from "./actions/document-manage.js";
 import { INTEREST_ACTIONS } from "./actions/interest.js";
 import { MANDATE_ACTIONS } from "./actions/mandate.js";
+import { MEMORY_PERSON_ACTIONS } from "./actions/memory.js";
 import { ME_ACTIONS } from "./actions/me.js";
 import { MEDIA_ACTIONS } from "./actions/media.js";
 import { ONBOARDING_ACTIONS } from "./actions/onboarding.js";
@@ -93,4 +94,6 @@ export const PERSON_ACTIONS: readonly AnyPersonAction[] = Object.freeze([
   // any organisation of their own.
   ...TEAM_PERSON_ACTIONS,
   ...GATEQ_FIND_PERSON_ACTIONS,
+  // 2026-10-21: correcting what Q remembers, in the person's own words.
+  ...MEMORY_PERSON_ACTIONS,
 ]);

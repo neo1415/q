@@ -12,6 +12,7 @@ import {
   type QRoomEntry,
   type QRoomPreview,
   type QRoomStages,
+  type QStageAbout,
   type QVisibleStage,
   type QRoomRead,
   type QRoomSource,
@@ -70,7 +71,11 @@ export type QRoomFeed = {
    */
   readonly stage: (
     actor: ActorContext,
-    input: { readonly runId: string; readonly stage: QVisibleStage },
+    input: {
+      readonly runId: string;
+      readonly stage: QVisibleStage;
+      readonly about?: QStageAbout | undefined;
+    },
   ) => void;
   /** Entries after `after`; held up to `holdMs` for the next when none. */
   readonly read: (input: {
@@ -220,15 +225,24 @@ export function createQRoomFeed(
     const room = roomOf(actor);
     if (room.entries.some((one) => one.runId === runId.data)) return;
     // A new run starts its own list; the same stage twice running is one.
-    const before =
-      room.stages?.stages.runId === runId.data ? room.stages.stages.stages : [];
-    if (before.at(-1) === input.stage) return;
+    const same = room.stages?.stages.runId === runId.data;
+    const before = same && room.stages !== null ? room.stages.stages : null;
+    const steps = before?.stages ?? [];
+    const sameStep =
+      steps.at(-1) === input.stage &&
+      JSON.stringify(before?.about ?? null) ===
+        JSON.stringify(input.about ?? null);
+    if (sameStep) return;
     room.sequence += 1;
     room.stages = {
       stages: {
         sequence: room.sequence,
         runId: runId.data,
-        stages: [...before, input.stage].slice(-Q_ROOM_STAGES_MAX),
+        stages:
+          steps.at(-1) === input.stage
+            ? [...steps]
+            : [...steps, input.stage].slice(-Q_ROOM_STAGES_MAX),
+        ...(input.about === undefined ? {} : { about: input.about }),
       },
       at: now(),
     };

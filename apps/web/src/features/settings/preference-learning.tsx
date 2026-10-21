@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import type { QPreferenceLearningDto } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 
+import { useAccountToast, WordSwitch } from "./account-kit";
 import {
   choosePreferenceLearningAction,
   preferenceLearningAction,
@@ -104,52 +105,94 @@ export function PreferenceLearningAsk({
   );
 }
 
+/**
+ * The switch in What Q remembers (a card at the top) and in Settings ->
+ * Privacy (a row). It says On or Off in words; the change is the person's
+ * own decision, saved for their current workspace, and a toast says what
+ * it now means.
+ */
 export function PreferenceLearningSwitch({
   initial,
+  layout = "card",
 }: {
   readonly initial: QPreferenceLearningDto | null;
+  readonly layout?: "card" | "row" | undefined;
 }) {
   const t = useT();
+  const toast = useAccountToast();
   const [state, setState] = useState(initial);
   const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
   if (state === null) return null;
   const on = state.status === "GRANTED";
-  return (
-    <div className="flex flex-col gap-2" data-q-learning-switch>
-      <label className="flex min-h-11 items-center gap-3">
-        <input
-          type="checkbox"
-          role="switch"
-          checked={on}
-          disabled={pending}
-          aria-checked={on}
-          className="size-5"
-          onChange={() =>
-            startTransition(async () => {
-              const saved = await choosePreferenceLearningAction({
-                choice: on ? "TURN_OFF" : "ALLOW",
-                via: "SETTINGS",
-              });
-              setFailed(saved === null);
-              if (saved !== null) setState(saved);
-            })
-          }
-        />
-        <span className="cq-body text-(--cq-text-primary)">
-          {t("Let Q learn how I like to work")}
-        </span>
-      </label>
-      <p className="cq-body-sm text-(--cq-text-secondary)">
-        {on
-          ? "Q learns from your conversations in this workspace. What it has learned is listed below; forget anything."
-          : "Off: Q learns nothing new about how you like to work. What you tell it directly is still kept."}
-      </p>
+  const control = (
+    <WordSwitch
+      on={on}
+      disabled={pending}
+      label={t("Let Q learn how I like to work")}
+      onWord={t("On")}
+      offWord={t("Off")}
+      data-q-learning-toggle
+      onChange={(next) =>
+        startTransition(async () => {
+          const saved = await choosePreferenceLearningAction({
+            choice: next ? "ALLOW" : "TURN_OFF",
+            via: "SETTINGS",
+          });
+          setFailed(saved === null);
+          if (saved === null) return;
+          setState(saved);
+          toast(
+            next
+              ? t("Thanks. I’ll learn how you like to work.")
+              : t("Off. Q learns nothing new about how you like to work."),
+          );
+        })
+      }
+    />
+  );
+  const words = (
+    <>
+      <b className="block text-[15px] font-medium text-(--cq-text-primary)">
+        {t("Let Q learn how I like to work")}
+      </b>
+      <span className="text-[13px] leading-[1.45] text-(--cq-text-secondary)">
+        {layout === "card"
+          ? t(
+              "From our conversations, like how brief to be. Off: Q learns nothing new about how you like to work. What you tell it directly is still kept.",
+            )
+          : t(
+              "Like how brief to be. Off: Q learns nothing new. What you tell it directly is still kept.",
+            )}
+      </span>
       {failed ? (
-        <p role="alert" className="cq-body-sm text-(--cq-text-primary)">
+        <span
+          role="alert"
+          className="mt-1 block text-[13px] text-(--cq-text-primary)"
+        >
           {t("That didn't save. Try again.")}
-        </p>
+        </span>
       ) : null}
+    </>
+  );
+  return layout === "card" ? (
+    <div
+      className="flex flex-wrap items-center gap-4 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-[18px] py-4 sm:flex-nowrap"
+      data-q-learning-switch
+    >
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">{words}</div>
+      {control}
+    </div>
+  ) : (
+    <div
+      className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-(--cq-border-subtle) py-3.5 first:border-t-0 sm:flex-nowrap"
+      data-q-learning-switch
+      data-srow
+    >
+      <div className="flex min-w-[58%] flex-1 flex-col gap-0.5 sm:min-w-0">
+        {words}
+      </div>
+      {control}
     </div>
   );
 }

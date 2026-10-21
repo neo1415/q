@@ -20,6 +20,7 @@ import { loadVerifyNudge } from "@/features/verification/verify-nudge-loader";
 import { adminContext } from "@/features/admin/admin-context";
 import { BrandStyle, loadBrandStyle } from "@/features/brand-theme/brand-style";
 import { InstallPrompt } from "@/pwa/install-prompt";
+import { SearchPalette } from "@/features/search/search-palette";
 import { loadMyOrganisations } from "@/features/team/load-organisations";
 import { PitchWarmup } from "@/features/discover/player/pitch-warmup-trigger";
 import { qPitchEnabled } from "@/features/q-pitch/flag";
@@ -137,6 +138,9 @@ export default async function ApplicationLayout({
         <BrandStyle css={brandCss} />
         {children}
         <InstallPrompt />
+        {/* Search as a palette (app prototype "search", option 2): / from
+            any page opens it over what the person is doing. */}
+        <SearchPalette viewer={user.authUserId} />
         {/* An investor's first pitches, cached before Discover opens (ADR 0064). */}
         {context.kind === "INVESTOR" && unfinished === null ? (
           <PitchWarmup />

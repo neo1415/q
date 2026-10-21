@@ -202,6 +202,7 @@ export {
   createQStreamState,
   describeQStage,
   Q_STAGE_HISTORY_MAX,
+  qCurrentStage,
   qStageSteps,
   reduceQStream,
   type QStageStep,
@@ -216,6 +217,7 @@ export {
   discoverInvestors,
   getDiscoveredInvestor,
   getDiscoveredInvestorPhoto,
+  getDiscoveredInvestorCard,
   listNetworkPitches,
   getRecommendationExplanation,
   listSavedCompanies,
@@ -308,6 +310,7 @@ export {
 } from "./schedule.js";
 
 export {
+  correctQMemory,
   forgetQMemory,
   getQPreferenceLearning,
   listQMemory,
@@ -504,6 +507,7 @@ export {
   readDeckAgain,
   reviewDeckSection,
   getCompanyDataRoom,
+  getDataRoomPreview,
   getCompanyDeck,
   getCompanyFounder,
   openCompanyDeck,

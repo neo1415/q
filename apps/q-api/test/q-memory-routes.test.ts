@@ -36,9 +36,12 @@ const ITEM = {
   id: OWN,
   subject: null,
   memoryType: "correction",
+  memoryKey: "company.name",
+  structuredValue: {},
   content: "Their company is Yamfield Agro.",
   quote: "my company is Yamfield Agro",
   createdAt: "2026-09-29T08:00:00.000Z",
+  validTo: null,
 } as unknown as MemoryItem;
 
 function buildApp(signedIn = true) {
@@ -90,6 +93,8 @@ describe("Q memory routes", () => {
           quote: "my company is Yamfield Agro",
           about: "YOU",
           learnedAt: "2026-09-29T08:00:00.000Z",
+          origin: "CORRECTED",
+          forgetsAt: null,
         },
       ],
     });

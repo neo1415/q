@@ -503,6 +503,7 @@ export function defineAppActionFamily<ToolIn>(definition: {
  * By port, in the person's words.
  */
 const FEATURES: Readonly<Partial<Record<keyof AppActionPorts, string>>> = {
+  memoryCorrection: "Correcting what Q remembers",
   capital: "Your raise",
   capitalRounds: "Rounds",
   commitments: "Commitments",

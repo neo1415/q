@@ -72,3 +72,51 @@ export const Q_VISIBLE_STAGE_LABELS: Readonly<Record<QVisibleStage, string>> = {
 export function qVisibleStageLabel(stage: QVisibleStage): string {
   return Q_VISIBLE_STAGE_LABELS[stage];
 }
+
+/**
+ * Round 4 (owner 2026-10-21, ux-direction §5.1 and §6.1): what a stage is
+ * about, so the one live line can say "Looking at Nixo" rather than "the
+ * company", and a durable task can say "Deck for Nixo · 2 of 4".
+ *
+ * `subjects` are display names from this run's own authorised reads (never
+ * a model's words, never a person's typed text), at most three. `task` is
+ * set only by a durable pipeline whose steps are fixed, so `step` of `of`
+ * is that pipeline's real count, never an estimate. Both optional; a stage
+ * without them reads its approved label. Web research is never "about"
+ * anything (R38): it says "Looking into it".
+ */
+export const Q_STAGE_SUBJECTS_MAX = 3;
+export const Q_STAGE_TASK_KINDS = [
+  "INVESTMENT_BRIEF",
+  "PITCH_DECK",
+  "ONE_PAGER",
+  "MEMO",
+] as const;
+export type QStageTaskKind = (typeof Q_STAGE_TASK_KINDS)[number];
+
+export const QStageAboutSchema = z
+  .object({
+    subjects: z
+      .array(z.string().trim().min(1).max(80))
+      .min(1)
+      .max(Q_STAGE_SUBJECTS_MAX)
+      .optional(),
+    task: z
+      .object({
+        kind: z.enum(Q_STAGE_TASK_KINDS),
+        step: z.number().int().min(1).max(12).optional(),
+        of: z.number().int().min(1).max(12).optional(),
+      })
+      .strict()
+      .refine(
+        (task) =>
+          (task.step === undefined) === (task.of === undefined) &&
+          (task.step === undefined ||
+            task.of === undefined ||
+            task.step <= task.of),
+        { message: "a step needs its total, and is never past it" },
+      )
+      .optional(),
+  })
+  .strict();
+export type QStageAbout = z.infer<typeof QStageAboutSchema>;

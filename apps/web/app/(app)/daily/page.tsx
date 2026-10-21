@@ -1,17 +1,35 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
-import { getQDaily } from "@capital-q/api-client";
+import {
+  getQDaily,
+  getQDailyEdition,
+  type ApiSession,
+} from "@capital-q/api-client";
+import type { QDailyEdition, QDailyEditionSummary } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { PageContainer } from "@/components/app-shell/page-container";
-import { formatDayTime } from "@/components/date-format";
 import { DailyArchive } from "@/features/daily/archive";
-import { Newspaper } from "@/features/daily/newspaper";
+import { DailyCalendar } from "@/features/daily/daily-calendar";
 import {
-  PrepareEditionButton,
-  PreparingNotice,
-} from "@/features/daily/prepare-edition";
+  dayTitle,
+  editionsByDate,
+  isDate,
+  isMonth,
+  monthEnd,
+  monthOf,
+  shiftMonth,
+  todayOf,
+} from "@/features/daily/daily-calendar-model";
+import { DailyPaper } from "@/features/daily/daily-paper";
+import {
+  DailyNoneThatDay,
+  DailyNoneToday,
+  DailyOff,
+  DailyPreparing,
+} from "@/features/daily/daily-states";
 import { qApiSession, resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
@@ -23,10 +41,31 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export const dynamic = "force-dynamic";
 
+/** One month of the archive: two pages cover a month of daily editions. */
+async function monthEditions(
+  session: ApiSession,
+  month: string,
+): Promise<readonly QDailyEditionSummary[] | null> {
+  try {
+    const first = await getQDaily(session, monthEnd(month));
+    const start = `${month}-01`;
+    if (first.nextCursor === null || first.nextCursor < start) {
+      return first.archive;
+    }
+    const second = await getQDaily(session, first.nextCursor).catch(() => null);
+    return [...first.archive, ...(second?.archive ?? [])];
+  } catch {
+    return null;
+  }
+}
+
 /**
- * The Q Daily (DAILY spec §3): the person's latest edition as a newspaper,
- * their archive, and the states around it (first edition still to come,
- * being prepared, turned off, unavailable). Read under their own session.
+ * The Q Daily (DAILY spec §3; chosen design 2026-10-21: option 1's
+ * newspaper as the main column, option 3's calendar as a right rail, a
+ * strip on a phone). Picking a day with an edition opens it; a day without
+ * one says so. Today shows its edition, or the state it is in: being
+ * prepared, none today, the first still to come, turned off. Read under
+ * the person's own session; `?before=` keeps the plain archive list.
  */
 export default async function DailyPage({
   searchParams,
@@ -35,11 +74,17 @@ export default async function DailyPage({
 }) {
   const t = await serverT();
 
-  const raw = (await searchParams)["before"];
-  const before =
-    typeof raw === "string" && /^\d{4}-\d{2}-\d{2}$/.test(raw)
-      ? raw
-      : undefined;
+  const params = await searchParams;
+  const before = isDate(params["before"]) ? params["before"] : undefined;
+  const picked = isDate(params["date"]) ? params["date"] : null;
+  const today = todayOf(new Date());
+  const month =
+    picked !== null
+      ? monthOf(picked)
+      : isMonth(params["month"])
+        ? params["month"]
+        : monthOf(today);
+
   const [session, context] = await Promise.all([
     qApiSession(),
     // The shell already read this for the request; React's cache shares it.
@@ -47,13 +92,11 @@ export default async function DailyPage({
   ]);
   const side = workSideOf(context);
   const home =
-    session === null
-      ? null
-      : await getQDaily(session, before).catch(() => null);
+    session === null ? null : await getQDaily(session).catch(() => null);
 
-  if (home === null) {
+  if (home === null || session === null) {
     return (
-      <PageContainer width="reading" className="flex flex-col gap-4">
+      <PageContainer className="flex flex-col gap-4">
         <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
           <WorkHeader view="daily" side={side} />
           <p
@@ -74,6 +117,7 @@ export default async function DailyPage({
   }
 
   if (before !== undefined) {
+    const older = await getQDaily(session, before).catch(() => null);
     return (
       <PageContainer width="reading" className="flex flex-col gap-6">
         <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
@@ -82,7 +126,10 @@ export default async function DailyPage({
             side={side}
             description={t("Earlier editions.")}
           />
-          <DailyArchive items={home.archive} nextCursor={home.nextCursor} />
+          <DailyArchive
+            items={older?.archive ?? []}
+            nextCursor={older?.nextCursor ?? null}
+          />
           <Link
             href="/daily"
             className={buttonClassName("quiet", "compact", "self-start")}
@@ -94,68 +141,101 @@ export default async function DailyPage({
     );
   }
 
+  const listed = await monthEditions(session, month);
+  const days = editionsByDate(listed ?? [], month);
   const latest = home.latest;
-  if (latest !== null) {
-    return (
-      <PageContainer width="content" className="flex flex-col gap-10">
-        <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
-          <WorkHeader view="daily" side={side} />
-          {home.preparing ? <PreparingNotice /> : null}
-          <div data-qp-anchor="fdr.15.daily.paper">
-            <Newspaper edition={latest} />
-          </div>
-          <DailyArchive
-            items={home.archive.filter((item) => item.id !== latest.id)}
-            nextCursor={home.nextCursor}
-          />
-        </QSection>
-      </PageContainer>
-    );
+  const latestSummary =
+    latest === null
+      ? null
+      : {
+          href: `/daily?date=${latest.editionDate}`,
+          day: dayTitle(latest.editionDate),
+        };
+
+  // The main column: a picked day's edition, today's, or today's state.
+  let edition: QDailyEdition | null = null;
+  let main: ReactNode = null;
+  if (picked !== null) {
+    const summary = days.get(picked);
+    if (latest !== null && latest.editionDate === picked) {
+      edition = latest;
+    } else if (summary !== undefined) {
+      edition = await getQDailyEdition(session, summary.id).catch(() => null);
+    }
+    if (edition === null) {
+      main =
+        summary === undefined ? (
+          <DailyNoneThatDay day={dayTitle(picked)} nearest={latestSummary} />
+        ) : (
+          <p
+            className="cq-body text-(--cq-text-secondary)"
+            data-state="unavailable"
+          >
+            {t("This edition couldn't load. Reload in a moment.")}
+          </p>
+        );
+    }
+  } else if (latest !== null && latest.editionDate === today) {
+    edition = latest;
+  } else {
+    const preferences = home.preferences;
+    main =
+      preferences.frequency === "OFF" ? (
+        <DailyOff />
+      ) : home.preparing ? (
+        <DailyPreparing latestHref={latestSummary?.href ?? null} />
+      ) : (
+        <DailyNoneToday
+          nextDueAt={preferences.nextDueAt}
+          latest={latestSummary}
+          first={latest === null}
+        />
+      );
   }
 
-  const preferences = home.preferences;
+  const earlier = { href: `/daily?month=${shiftMonth(month, -1)}` };
+  // Under today's state, the latest edition stays readable.
+  const below =
+    picked === null && edition === null && latest !== null ? latest : null;
+
   return (
-    <PageContainer width="reading" className="flex flex-col gap-5">
+    <PageContainer className="flex flex-col">
       <QSection id="daily" kind="DAILY" label={t("The Q Daily")}>
-        <WorkHeader
-          view="daily"
-          side={side}
-          description={t("Your news, every story sourced.")}
-        />
-        {preferences.frequency === "OFF" ? (
-          <div
-            className="flex flex-col gap-3"
-            data-state="off"
-            data-qp-anchor="fdr.15.daily.paper"
-          >
-            <p className="cq-body text-(--cq-text-secondary)">
-              {t("The Q Daily is off.")}
-            </p>
-            <Link
-              href="/settings#q-daily"
-              className={buttonClassName("primary", "regular", "self-start")}
-            >
-              {t("Turn it on")}
-            </Link>
+        <WorkHeader view="daily" side={side} />
+        <div className="cq-ink grid max-w-[1240px] items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-[22px]">
+          <div className="flex min-w-0 flex-col gap-4">
+            {edition === null ? (
+              main
+            ) : (
+              <div data-qp-anchor="fdr.15.daily.paper">
+                <DailyPaper edition={edition} onEarlier={earlier} />
+              </div>
+            )}
+            {below === null ? null : (
+              <div className="flex flex-col gap-2">
+                <p className="m-0 text-xs text-(--cq-text-tertiary)">
+                  {t(`Your latest edition, ${dayTitle(below.editionDate)}`)}
+                </p>
+                <DailyPaper edition={below} onEarlier={earlier} />
+              </div>
+            )}
           </div>
-        ) : home.preparing ? (
-          <div data-qp-anchor="fdr.15.daily.paper">
-            <PreparingNotice />
+          <div className="order-first lg:sticky lg:top-4 lg:order-none">
+            <DailyCalendar
+              month={month}
+              today={today}
+              selected={picked}
+              editions={[...days.values()].map((summary) => ({
+                date: summary.editionDate,
+                number: summary.number,
+                headline: summary.headline,
+              }))}
+              frequency={home.preferences.frequency}
+              loaded={listed !== null}
+              startOpen={picked !== null || isMonth(params["month"])}
+            />
           </div>
-        ) : (
-          <div
-            className="flex flex-col gap-3"
-            data-state="empty"
-            data-qp-anchor="fdr.15.daily.paper"
-          >
-            <p className="cq-body text-(--cq-text-primary)">
-              {preferences.nextDueAt === null
-                ? t("First edition on its way")
-                : t(`First edition: ${formatDayTime(preferences.nextDueAt)}`)}
-            </p>
-            <PrepareEditionButton label={t("Get it now")} />
-          </div>
-        )}
+        </div>
       </QSection>
     </PageContainer>
   );

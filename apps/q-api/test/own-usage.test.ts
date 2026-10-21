@@ -100,6 +100,32 @@ describe("the person's own usage", () => {
     expect(dto.plan?.features.map((f) => f.key)).toEqual(["q.delegations"]);
   });
 
+  it("reads last calendar month on request, without this month's plan standing", async () => {
+    const asked: string[] = [];
+    const usage = createOwnUsage({
+      ownMonth: (_who, at) => {
+        asked.push(at.toISOString());
+        return Promise.resolve({
+          totalUsd: "0",
+          calls: 0,
+          unpricedCalls: 0,
+          failedCalls: 0,
+          byPurpose: [],
+          byInstruction: [],
+        });
+      },
+      instructions: () => Promise.resolve([]),
+      plan: () => Promise.resolve({ name: "Launch", features: [] }),
+      now: () => new Date("2026-01-05T09:00:00Z"),
+    });
+    const dto = QUsageDtoSchema.parse(
+      await usage(actor, { month: "previous" }),
+    );
+    expect(dto.month).toBe("2025-12");
+    expect(asked).toEqual(["2025-12-15T00:00:00.000Z"]);
+    expect(dto.plan).toBeNull();
+  });
+
   it("a plan that cannot be read leaves the usage", async () => {
     const usage = createOwnUsage({
       ownMonth: () =>

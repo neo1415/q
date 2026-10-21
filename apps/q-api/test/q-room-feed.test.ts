@@ -609,3 +609,50 @@ describe("a spoken turn's stages reach the screen (owner 2026-10-21)", () => {
     ).toBeUndefined();
   });
 });
+
+describe("a spoken turn's stage says what it is about (round 4)", () => {
+  it("carries the newest stage's subjects and task, and a change of subject is a new read", async () => {
+    const room = createQRoomFeed();
+    room.stage(ACTOR, {
+      runId: RUN_ID,
+      stage: "DESIGNING_DOCUMENT",
+      about: {
+        subjects: ["Nixo"],
+        task: { kind: "PITCH_DECK", step: 2, of: 4 },
+      },
+    });
+    const first = await room.read({ actor: ACTOR, after: 0, wait: false });
+    expect(first.stages?.about?.task).toEqual({
+      kind: "PITCH_DECK",
+      step: 2,
+      of: 4,
+    });
+    expect(QRoomReadSchema.safeParse(first).success).toBe(true);
+    // The same stage about the same things is not news.
+    room.stage(ACTOR, {
+      runId: RUN_ID,
+      stage: "DESIGNING_DOCUMENT",
+      about: {
+        subjects: ["Nixo"],
+        task: { kind: "PITCH_DECK", step: 2, of: 4 },
+      },
+    });
+    expect(
+      (await room.read({ actor: ACTOR, after: first.cursor, wait: false }))
+        .stages,
+    ).toBeUndefined();
+    // The same stage about something new is, and the step list stays one.
+    room.stage(ACTOR, {
+      runId: RUN_ID,
+      stage: "DESIGNING_DOCUMENT",
+      about: { subjects: ["Halyard"] },
+    });
+    const next = await room.read({
+      actor: ACTOR,
+      after: first.cursor,
+      wait: false,
+    });
+    expect(next.stages?.about?.subjects).toEqual(["Halyard"]);
+    expect(next.stages?.stages).toEqual(["DESIGNING_DOCUMENT"]);
+  });
+});
