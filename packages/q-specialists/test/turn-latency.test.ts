@@ -143,6 +143,7 @@ function seam(input: {
   );
   const calls = { reader: 0, skim: 0, recall: 0, answer: 0 };
   const stored: string[] = [];
+  let historyReads = 0;
   const turns: QTurnReader = {
     read: () => {
       calls.reader += 1;
@@ -182,8 +183,10 @@ function seam(input: {
     },
     repositories: {
       messages: {
-        listRecentForConversationOfRun: () =>
-          Promise.resolve([...input.history, latest]),
+        listRecentForConversationOfRun: () => {
+          historyReads += 1;
+          return Promise.resolve([...input.history, latest]);
+        },
         mark: () => Promise.resolve(),
         insert: (
           _tx: unknown,
@@ -225,7 +228,7 @@ function seam(input: {
     // Whatever the early read started has had its chance to run.
     await new Promise((resolve) => setTimeout(resolve, 0));
     const modelCalls = calls.reader + calls.skim + calls.recall + calls.answer;
-    return { calls, modelCalls, stored };
+    return { calls, modelCalls, stored, historyReads };
   };
   return { run };
 }
@@ -353,5 +356,17 @@ describe("a tab by its name is read by code", () => {
     const { calls } = await s.run();
     expect(calls.skim).toBe(0);
     expect(calls.reader).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("the conversation is read once per run (row 5)", () => {
+  it("the early read's history is the answer's: one read, not two", async () => {
+    const s = seam({
+      said: "why does Halyard fit my mandate so well?",
+      history: afterTopThree(randomUUID()),
+    });
+    const { historyReads, calls } = await s.run();
+    expect(historyReads).toBe(1);
+    expect(calls.answer).toBe(1);
   });
 });

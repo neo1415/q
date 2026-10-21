@@ -62,6 +62,7 @@ import {
   materialUploadTargetAction,
 } from "../onboarding-kit/material-actions";
 import { QAperture, QLumen, useStageApertureSize } from "../q-aperture";
+import { nextSpokenPiece } from "../voice/spoken-progress";
 import { useQSpeech } from "../voice/use-q-speech";
 import { VoiceMenu } from "../voice/voice-menu";
 import { expectDocument } from "@/features/documents/document-ready";
@@ -504,11 +505,15 @@ export function QConversationPanel({
   // same (one-way speech, no microphone): answers on this page are heard.
   const speech = useQSpeech();
   const say = speech.say;
+  const queueSpeech = speech.queue;
   const stopSpeech = speech.stop;
   const heard = useRef<Set<string> | null>(null);
+  /** Turn latency row 18: how much of each answer was handed to speech. */
+  const spokenSoFar = useRef(new Map<string, number>());
   useEffect(() => {
     if (q.loading) {
       heard.current = null;
+      spokenSoFar.current.clear();
       return;
     }
     if (heard.current === null) {
@@ -519,28 +524,41 @@ export function QConversationPanel({
     if (
       latest === undefined ||
       latest.kind !== "Q" ||
-      latest.streaming ||
       heard.current.has(latest.id)
     ) {
       return;
     }
-    heard.current.add(latest.id);
+    const final = !latest.streaming;
+    if (final) heard.current.add(latest.id);
     // Voice announces its own lines as they are spoken.
     if (voice.active) return;
-    announceQSaid(plainFromMarkdown(latest.text).slice(0, 400));
+    // Said as words: the answer's Markdown is structure on screen, never
+    // asterisks and pipes read aloud.
+    const plain = plainFromMarkdown(latest.text);
+    const spoken = spokenSoFar.current.get(latest.id) ?? 0;
+    // Row 18: each finished sentence is said as it arrives; the rest of
+    // the answer when it settles. An answer that arrives whole is one line.
+    const next = nextSpokenPiece({
+      text: plain,
+      spoken,
+      final,
+      limit: Q_SPEECH_MAX_CHARS,
+    });
+    if (next !== null) {
+      spokenSoFar.current.set(latest.id, next.spoken);
+      if (spoken === 0 && final) void say(next.piece, voice.voice);
+      else queueSpeech(next.piece, voice.voice);
+    }
+    if (!final) return;
+    spokenSoFar.current.delete(latest.id);
+    announceQSaid(plain.slice(0, 400));
     // PRESENCE: the answer's own gestures, one after another as it lands.
     announceQGestures({
       answerId: latest.id,
       gestures: latest.gestures ?? [],
       spoken: false,
     });
-    // Said as words: the answer's Markdown is structure on screen, never
-    // asterisks and pipes read aloud.
-    void say(
-      plainFromMarkdown(latest.text).slice(0, Q_SPEECH_MAX_CHARS),
-      voice.voice,
-    );
-  }, [turns, q.loading, voice.active, voice.voice, say]);
+  }, [turns, q.loading, voice.active, voice.voice, say, queueSpeech]);
   useEffect(() => {
     if (voice.active) stopSpeech();
   }, [voice.active, stopSpeech]);

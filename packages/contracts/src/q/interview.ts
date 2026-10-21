@@ -154,3 +154,22 @@ export const QInterviewTurnResponseSchema = z
 export type QInterviewTurnResponse = z.infer<
   typeof QInterviewTurnResponseSchema
 >;
+
+/**
+ * Turn latency 2026-10-21 (onboarding L9): a typed interview turn, streamed.
+ * A caller that sends `Accept: text/event-stream` gets Q's reply one
+ * finished sentence at a time (`sentence`), then the whole turn exactly as
+ * the JSON route returns it (`result`), or one `problem` that stands for
+ * the problem document the JSON route would have sent. A sentence is
+ * display only: what was recorded is read from `result`, never from them.
+ */
+export const Q_INTERVIEW_STREAM_EVENTS = {
+  SENTENCE: "sentence",
+  RESULT: "result",
+  PROBLEM: "problem",
+} as const;
+
+export const QInterviewSentenceSchema = z
+  .object({ text: z.string().min(1).max(2_000) })
+  .strict();
+export type QInterviewSentence = z.infer<typeof QInterviewSentenceSchema>;

@@ -993,6 +993,46 @@ describe("answer seam tool loop", () => {
     ]);
   });
 
+  it("writes a round's stage once, beside its reads, not once per read before each (turn latency row 16)", async () => {
+    let reading = 0;
+    let stageWhileReading = false;
+    const tools: QToolPort = {
+      offer: () => Promise.resolve([GET_COMPANY]),
+      execute: async (proposal) => {
+        reading += 1;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        reading -= 1;
+        return succeeded(proposal, { canonicalName: `Co ${proposal.callId}` });
+      },
+    };
+    const { seam, request, stages } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: ["a", "b", "c"].map((id) => ({
+            callId: id,
+            name: "get_company",
+            arguments: { companyId: id },
+          })),
+        },
+        call("d"),
+        { kind: "TEXT", text: JSON.stringify(analystResult("Four.")) },
+      ],
+      tools,
+    });
+    const watched = stages.push.bind(stages);
+    stages.push = (...items: string[]) => {
+      if (reading > 0) stageWhileReading = true;
+      return watched(...items);
+    };
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    // Four reads over two rounds, one stage: it never changed (was 4 writes).
+    expect(stages.filter((s) => s === "REVIEWING_COMPANY")).toHaveLength(1);
+    // The write did not hold the reads back: they were already running.
+    expect(stageWhileReading).toBe(true);
+  });
+
   it.each([
     ["a list", ["I need to retrieve your companies first."]],
     // The shape a model actually wrote live: one string, not a list.

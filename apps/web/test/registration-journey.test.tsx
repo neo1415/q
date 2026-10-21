@@ -31,6 +31,7 @@ vi.mock("../src/features/voice/use-q-speech", () => ({
     status: "idle",
     muted: false,
     say: () => Promise.resolve(),
+    queue: () => undefined,
     stop: () => undefined,
     play: () => undefined,
     toggleMuted: () => undefined,

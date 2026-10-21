@@ -110,6 +110,8 @@ export type QOnboardingWorkspaceActions = {
       readonly text: string;
     }[],
     focus?: string,
+    /** Turn latency L9: Q's reply, a finished sentence at a time. */
+    onSentence?: (text: string) => void,
   ) => Promise<OnboardingTurn | null>;
   readonly skip: () => Promise<void>;
   /** A tapped option, as the value it stands for (CQ-Q-VOICE-001 B §17). */
@@ -279,6 +281,8 @@ export function QOnboardingWorkspace({
   const [readingPolls, setReadingPolls] = useState(0);
   const [askingQ, setAskingQ] = useState(false);
   const [qStream, setQStream] = useState<QStreamState | null>(null);
+  /** Turn latency L9: Q's typed reply, as far as Q has written it. */
+  const [replyStream, setReplyStream] = useState<string | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [showGaps, setShowGaps] = useState(false);
   /** After an ambiguous answer, only the options that fit are offered. */
@@ -852,7 +856,16 @@ export function QOnboardingWorkspace({
         prompt !== null &&
         prompt.control === "text" &&
         trimmed.split(/\s+/).length >= 6;
-      const turn = await actions.say(trimmed, recentTurns());
+      // Turn latency L9: Q's reply shows a sentence at a time while the turn
+      // runs; the finished turn below then takes its place, as before.
+      setReplyStream(null);
+      const turn = await actions
+        .say(trimmed, recentTurns(), undefined, (sentence) => {
+          setReplyStream((so) => (so === null ? sentence : `${so} ${sentence}`));
+        })
+        .finally(() => {
+          setReplyStream(null);
+        });
       if (turn === null) {
         // Q never answered (a failure, a timeout, a lost connection). The
         // line says so and can be sent again; it is never left looking
@@ -1711,6 +1724,9 @@ export function QOnboardingWorkspace({
             }
           />
         ))}
+        {replyStream === null ? null : (
+          <QLine id="q-reply-streaming" kind="Q" text={replyStream} streaming />
+        )}
         {qStream?.partial !== null && qStream?.partial !== undefined ? (
           <QLine
             id="q-streaming"

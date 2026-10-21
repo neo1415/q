@@ -1,10 +1,12 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 
 import {
   createProblemDetails,
   PROBLEM_CONTENT_TYPE,
   QInterviewTurnRequestSchema,
   QInterviewTurnResponseSchema,
+  Q_INTERVIEW_STREAM_EVENTS,
+  Q_SSE_CONTENT_TYPE,
 } from "@capital-q/contracts";
 import { AuthenticationRequiredError } from "@capital-q/security";
 
@@ -21,6 +23,7 @@ import type { InterviewAgent } from "./interview-agent.js";
 import type { PresenceTrigger } from "./presence-trigger.js";
 import { signupContextFromToken } from "./interview-steps.js";
 import { AccountPausedError } from "./standing.js";
+import { formatSseFrame } from "../http/sse.js";
 
 /**
  * One turn of the Q interview, over HTTP (QX-004 core gate: one Q).
@@ -88,9 +91,16 @@ export function registerQInterviewRoute(
 
       const actor = getActorContext(request);
       const input = QInterviewTurnRequestSchema.parse(request.body ?? {});
+      // Turn latency 2026-10-21 (onboarding L9): asked for a stream, the
+      // reply goes out a finished sentence at a time while the turn runs;
+      // the whole turn still ends it, exactly as the JSON body would be.
+      const stream = wantsStream(request.headers.accept)
+        ? openSentenceStream(reply)
+        : null;
       const outcome = await dependencies.agent
         .turn({
           actor,
+          ...(stream === null ? {} : { onSentence: stream.sentence }),
           session: { baseUrl: dependencies.apiBaseUrl, accessToken },
           onboardingSessionId: input.onboardingSessionId,
           journeyType:
@@ -114,8 +124,25 @@ export function registerQInterviewRoute(
         })
         .catch((error: unknown) => {
           if (error instanceof AccountPausedError) return null;
+          // Sentences already went out: the status line is sent, so the
+          // failure is the stream's last event rather than an error reply.
+          if (stream?.started() === true) {
+            request.log.warn(
+              { err: error },
+              "streamed interview turn failed after its first sentence",
+            );
+            stream.end(
+              Q_INTERVIEW_STREAM_EVENTS.PROBLEM,
+              createProblemDetails({
+                code: "INTERNAL_SERVER_ERROR",
+                requestId: request.id,
+              }),
+            );
+            return "ENDED" as const;
+          }
           throw error;
         });
+      if (outcome === "ENDED") return reply;
       if (outcome === null) {
         // Founder direction 2026-09-30: a paused account is refused here,
         // whatever the screen shows; the screen reads the code.
@@ -125,6 +152,13 @@ export function registerQInterviewRoute(
           detail:
             "Your account is paused. Someone from the Capital Q team will be in touch.",
         });
+        if (stream?.started() === true) {
+          stream.end(Q_INTERVIEW_STREAM_EVENTS.PROBLEM, {
+            ...problem,
+            paused: true,
+          });
+          return reply;
+        }
         return reply
           .status(problem.status)
           .type(PROBLEM_CONTENT_TYPE)
@@ -134,8 +168,7 @@ export function registerQInterviewRoute(
 
       // The public look-ups by name, and the questions their findings
       // become, are the onboarding conductor's (inside `agent.turn`).
-      void reply.header("Cache-Control", "no-store");
-      return QInterviewTurnResponseSchema.parse({
+      const response = QInterviewTurnResponseSchema.parse({
         reply: outcome.reply,
         intent: outcome.intent,
         asking:
@@ -179,6 +212,68 @@ export function registerQInterviewRoute(
           ? {}
           : { confirming: { kind: outcome.confirming.kind } }),
       });
+      if (stream !== null) {
+        stream.end(Q_INTERVIEW_STREAM_EVENTS.RESULT, response);
+        return reply;
+      }
+      void reply.header("Cache-Control", "no-store");
+      return response;
     },
   );
+}
+
+/** Whether the caller asked for the streamed form of the turn. */
+export function wantsStream(accept: string | undefined): boolean {
+  return (
+    typeof accept === "string" &&
+    accept.toLowerCase().includes(Q_SSE_CONTENT_TYPE)
+  );
+}
+
+/**
+ * The streamed form of one turn. The response opens at the first sentence,
+ * not before: a turn that fails before saying anything still gets the
+ * route's ordinary problem reply and status. A closed connection stops the
+ * writing, never the turn -- what the person said is still saved.
+ */
+export function openSentenceStream(reply: FastifyReply): {
+  readonly sentence: (text: string) => void;
+  readonly started: () => boolean;
+  readonly end: (event: string, data: unknown) => void;
+} {
+  let open = false;
+  let ended = false;
+  const start = () => {
+    if (open) return;
+    open = true;
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "content-type": Q_SSE_CONTENT_TYPE,
+      "cache-control": "no-store, no-transform",
+      connection: "keep-alive",
+      "x-accel-buffering": "no",
+    });
+  };
+  const write = (event: string, data: unknown) => {
+    if (reply.raw.destroyed) return;
+    reply.raw.write(formatSseFrame({ event, data: JSON.stringify(data) }));
+  };
+  return {
+    sentence: (text) => {
+      const said = text.trim();
+      if (ended || said.length === 0) return;
+      start();
+      write(Q_INTERVIEW_STREAM_EVENTS.SENTENCE, {
+        text: said.slice(0, 2_000),
+      });
+    },
+    started: () => open,
+    end: (event, data) => {
+      if (ended) return;
+      ended = true;
+      start();
+      write(event, data);
+      reply.raw.end();
+    },
+  };
 }

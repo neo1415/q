@@ -23,6 +23,7 @@ import {
   materialUploadTargetAction,
 } from "./material-actions";
 import { OnboardingClientError } from "./client";
+import { sayStreamed } from "./say-stream";
 import type { RuntimePort } from "./runtime-port";
 
 export const API_ADAPTER_NAME = "OnboardingApiClient";
@@ -71,7 +72,16 @@ export function createApiRuntimePort(input: {
       through(onboardingAnswerQuestionAction(request)),
     dismissQuestion: (request) =>
       through(onboardingDismissQuestionAction(request)),
-    say: (request) => through(onboardingSayAction(request)),
+    // Turn latency L9: with a listener, the turn is streamed and Q's reply
+    // shows a sentence at a time; a stream that never opened falls back to
+    // the server action (no turn ran, so nothing is done twice).
+    say: async ({ onSentence, ...request }) => {
+      if (onSentence !== undefined) {
+        const streamed = await sayStreamed(request, onSentence);
+        if (streamed !== null) return streamed;
+      }
+      return through(onboardingSayAction(request));
+    },
 
     /**
      * The real Evidence upload, in the three steps the API actually has

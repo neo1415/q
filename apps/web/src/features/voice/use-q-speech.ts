@@ -49,6 +49,13 @@ export type QSpeech = {
   readonly muted: boolean;
   /** Synthesise and play, unless muted. Never throws, never blocks a caller. */
   readonly say: (text: string, voice?: QVoiceChoice) => Promise<void>;
+  /**
+   * Turn latency row 18: one more piece of the same answer, said after
+   * whatever is playing or still being fetched. Its audio is fetched at
+   * once, so the next sentence is ready when the last one ends. `say`
+   * and `stop` clear what is queued.
+   */
+  readonly queue: (text: string, voice?: QVoiceChoice) => void;
   /** Play what was already fetched. Call from a real user gesture. */
   readonly play: () => void;
   readonly stop: () => void;
@@ -76,6 +83,11 @@ export function useQSpeech(): QSpeech {
   const [muted, setMuted] = useState(false);
   const audio = useRef<HTMLAudioElement | null>(null);
   const objectUrl = useRef<string | null>(null);
+  /** Pieces fetched or being fetched, in the order they are said. */
+  const pending = useRef<Promise<Blob | null>[]>([]);
+  /** A new say/stop/mute makes every older queued piece stale. */
+  const generation = useRef(0);
+  const playing = useRef(false);
 
   useEffect(() => {
     // A per-viewer preference, read after mount so the server and the
@@ -87,6 +99,9 @@ export function useQSpeech(): QSpeech {
   }, []);
 
   const release = useCallback(() => {
+    generation.current += 1;
+    pending.current = [];
+    playing.current = false;
     audio.current?.pause();
     audio.current = null;
     if (objectUrl.current !== null) {
@@ -108,6 +123,76 @@ export function useQSpeech(): QSpeech {
       },
     );
   }, []);
+
+  const fetchLine = useCallback(
+    async (line: string, voice: QVoiceChoice): Promise<Blob | null> => {
+      try {
+        const response = await fetch("/api/q-speech", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text: line, voice }),
+        });
+        if (!response.ok) return null;
+        const blob = await response.blob();
+        return blob.size === 0 ? null : blob;
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+
+  /** Plays the queue's next piece once it has arrived; stops when empty. */
+  const playNext = useCallback(async () => {
+    const mine = generation.current;
+    const next = pending.current.shift();
+    if (next === undefined) {
+      playing.current = false;
+      setStatus((was) => (was === "blocked" ? was : "idle"));
+      return;
+    }
+    playing.current = true;
+    const blob = await next;
+    if (mine !== generation.current) return;
+    if (blob === null) {
+      // One piece without audio: the next one is still said.
+      void playNext();
+      return;
+    }
+    if (objectUrl.current !== null) URL.revokeObjectURL(objectUrl.current);
+    const url = URL.createObjectURL(blob);
+    objectUrl.current = url;
+    const element = new Audio(url);
+    element.onended = () => {
+      if (mine === generation.current) void playNext();
+    };
+    element.onerror = () => {
+      if (mine === generation.current) void playNext();
+    };
+    audio.current = element;
+    setStatus("speaking");
+    element.play().then(
+      () => undefined,
+      () => {
+        // The autoplay rule: the rest waits for the person's gesture.
+        if (mine === generation.current) setStatus("blocked");
+      },
+    );
+  }, []);
+
+  const queue = useCallback(
+    (text: string, voice: QVoiceChoice = "FEMALE") => {
+      const line = text.trim();
+      if (line.length === 0 || line.length > Q_SPEECH_MAX_CHARS) return;
+      if (readMuted()) return;
+      pending.current.push(fetchLine(line, voice));
+      if (!playing.current) {
+        setStatus("loading");
+        void playNext();
+      }
+    },
+    [fetchLine, playNext],
+  );
 
   const say = useCallback(
     async (text: string, voice: QVoiceChoice = "FEMALE") => {
@@ -185,5 +270,5 @@ export function useQSpeech(): QSpeech {
     }
   }, [release]);
 
-  return { status, muted, say, play, stop, toggleMuted };
+  return { status, muted, say, queue, play, stop, toggleMuted };
 }

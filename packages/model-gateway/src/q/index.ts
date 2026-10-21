@@ -5197,6 +5197,8 @@ export function createModelGatewayQAnswer(
         if (offered.length > 0) {
           took("prepare");
           let rounds = 0;
+          /** The stage last written this turn, so a repeat is not written again. */
+          let lastStageShown: QVisibleStage | undefined;
           let calls = 0;
           // One more round, once, when every call of a round was refused
           // or failed: the model picked the wrong tool and has no way to
@@ -5537,25 +5539,34 @@ export function createModelGatewayQAnswer(
               }
               calls += 1;
               const tool = offeredByName.get(call.name);
-              if (
+              // Turn latency row 16: the stage is written once when it
+              // changes (eight fit.profile reads wrote it eight times, one
+              // after another), and beside the read rather than before it.
+              const stageWrite =
                 tool?.visibleStage !== undefined &&
-                tool.visibleStage !== null
-              ) {
-                await stageShown(tool.visibleStage);
-              }
+                tool.visibleStage !== null &&
+                tool.visibleStage !== lastStageShown
+                  ? stageShown(tool.visibleStage)
+                  : null;
+              if (stageWrite !== null) lastStageShown = tool?.visibleStage;
               const settled = await early?.[index];
-              if (settled !== undefined && !settled.ok) throw settled.error;
-              const outcome =
+              if (settled !== undefined && !settled.ok) {
+                await stageWrite;
+                throw settled.error;
+              }
+              const [outcome] = await Promise.all([
                 settled !== undefined
-                  ? settled.outcome
-                  : await callTool(
+                  ? Promise.resolve(settled.outcome)
+                  : callTool(
                       {
                         callId: call.callId,
                         name: call.name,
                         arguments: call.arguments,
                       },
                       toolContext,
-                    );
+                    ),
+                stageWrite,
+              ]);
               toolCalls.push({
                 toolName: outcome.toolName,
                 providerName: call.name,
