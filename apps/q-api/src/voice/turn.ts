@@ -147,8 +147,12 @@ export type VoiceTurnDependencies = {
    * which runs this same handler -- is published to the person's Q room
    * the moment the run completes it, so the screen renders its cards from
    * the server, never from what the voice model or a transcript carried.
+   * Artifacts live (L-16): the run's previews go there too, as Q says
+   * each name, so the cards are up before the answer lands.
    */
-  readonly room?: Pick<QRoomFeed, "publish"> | undefined;
+  readonly room?:
+    | (Pick<QRoomFeed, "publish"> & Partial<Pick<QRoomFeed, "preview">>)
+    | undefined;
   /** Q's first minute with a new person (welcome sessions). */
   readonly welcome?: WelcomeHost | undefined;
   /** Applies a pronunciation the person corrected. */
@@ -1255,6 +1259,18 @@ export function createVoiceTurnHandler(
         }
         const event = item.event;
         switch (event.type) {
+          case "q.artifact.preview": {
+            // Artifacts live (L-16): the stream sends this frame ahead of
+            // the sentence that names the subject, so it reaches the
+            // person's screen before that sentence is handed to the
+            // speaker. Its subjects are the run's own authorised reads
+            // (model-gateway createSubjectAnnouncer), never a model's.
+            dependencies.room?.preview?.(actor, {
+              runId,
+              preview: event.data,
+            });
+            break;
+          }
           case "q.message.delta": {
             // A delta is a whole sentence that has already been through
             // the answer's guards, so `speakable` can do its work on it:

@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 
-import type { QAnswerCardsBlock } from "@capital-q/contracts";
+import type { QAnswerCardsBlock, QArtifactPreview } from "@capital-q/contracts";
 import { splitSentences } from "@capital-q/q-core/speech";
 
 import { History, ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
@@ -143,6 +143,7 @@ export function QPresenceStage({
   onShowingChange,
   onCardsShowingChange,
   live = false,
+  spokenPreview = null,
   onBoardLanded,
   onPin,
   loadRoomCard,
@@ -151,6 +152,8 @@ export function QPresenceStage({
 }: {
   /** A live voice line is open: Q's own lines drive which card is open. */
   readonly live?: boolean | undefined;
+  /** L-16: what Q is naming aloud, from the room feed (useQSession). */
+  readonly spokenPreview?: QArtifactPreview | null | undefined;
   /** An answer flew into the Board (C4): the Board button counts it. */
   readonly onBoardLanded?: (() => void) | undefined;
   /** Pin an answer to the Board. */
@@ -211,7 +214,7 @@ export function QPresenceStage({
   );
   const shown = visible[0] ?? null;
   // Artifacts live: the cards for what Q is naming, up while it talks.
-  const livePreview = livePreviewOf(turns, shown);
+  const livePreview = livePreviewOf(turns, shown, spokenPreview);
   const previewing = livePreview !== null;
   const note = stageNoteOf(items, turns, pick, (item) =>
     isHiddenIn(cards, stageCardRef(item)),

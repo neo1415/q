@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { QConversationIdSchema, QRunIdSchema } from "./ids.js";
 import { QResponseMessageSchema } from "./message.js";
+import { QArtifactPreviewSchema } from "./stream.js";
 
 /**
  * The person's Q room feed (voice-cards, founder 2026-10-08): every Q run
@@ -40,6 +41,27 @@ export const QRoomEntrySchema = z
   .strict();
 export type QRoomEntry = z.infer<typeof QRoomEntrySchema>;
 
+/** A spoken preview older than this is not handed to a reader. */
+export const Q_ROOM_PREVIEW_MS = 60_000;
+
+/**
+ * Artifacts live on a voice line: the run stream's `q.artifact.preview`
+ * for the answer Q is saying now, so the screen puts each card up as Q
+ * says the name (a typed turn gets the same frame over its own stream).
+ * Ephemeral like the frame: only the newest is kept, it is dropped once
+ * that run's answer lands, and the answer's blocks always win. Its
+ * subjects are the run's own authorised reads, never a model's names.
+ */
+export const QRoomPreviewSchema = z
+  .object({
+    /** Shares the entries' sequence, so a held read wakes for it. */
+    sequence: z.number().int().min(1),
+    runId: QRunIdSchema,
+    preview: QArtifactPreviewSchema,
+  })
+  .strict();
+export type QRoomPreview = z.infer<typeof QRoomPreviewSchema>;
+
 export const QRoomReadQuerySchema = z
   .object({
     after: z.coerce.number().int().min(0).max(1_000_000_000).default(0),
@@ -56,6 +78,8 @@ export const QRoomReadSchema = z
     /** The newest sequence this read covers; the next read is `after` it. */
     cursor: z.number().int().min(0),
     entries: z.array(QRoomEntrySchema).max(Q_ROOM_KEPT),
+    /** The live spoken preview, when one is newer than `after`. */
+    preview: QRoomPreviewSchema.optional(),
   })
   .strict();
 export type QRoomRead = z.infer<typeof QRoomReadSchema>;
