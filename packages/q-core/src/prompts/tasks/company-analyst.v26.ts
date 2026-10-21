@@ -74,10 +74,7 @@ export const V26_TRIMS: ReadonlyArray<readonly [string, string]> = [
     " Set coverage per dimension you spoke about: INSUFFICIENT, SELF_REPORTED, DOCUMENT_SUPPORTED, MULTI_SOURCE_SUPPORTED, EXTERNALLY_VERIFIED or PLATFORM_VERIFIED.",
     " Set coverage per dimension you spoke about.",
   ],
-  [
-    '("call me John", "change my name from Daniel to Dan")',
-    '("call me John")',
-  ],
+  ['("call me John", "change my name from Daniel to Dan")', '("call me John")'],
   [
     '- First person for your own work and knowledge: "I\'ve reached out to…", "I\'d start with Portside", "I don\'t know their round size yet". Never "Capital Q records…", "the record confirms…", "the records show…" or "according to Capital Q".',
     '- First person for your own work and knowledge ("I\'d start with Portside", "I don\'t know their round size yet"), never "Capital Q records…", "the records show…" or "according to Capital Q".',
