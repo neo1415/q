@@ -953,6 +953,13 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/work": exempt("development-only page"),
   "/dev/briefing": exempt("development-only page"),
   "/dev/q-nav": exempt("development-only page"),
+  "/dev/instant-nav": exempt("development-only page (instant-nav harness)"),
+  "/dev/instant-nav/company/[id]": exempt(
+    "development-only page (instant-nav harness)",
+  ),
+  "/dev/instant-nav/work": exempt(
+    "development-only page (instant-nav harness)",
+  ),
   "/dev/voice-preview": exempt("development-only page (local env + flag)"),
   "/dev/q-nav/work": exempt("development-only page"),
   "/dev/workforce": exempt("development-only page"),
