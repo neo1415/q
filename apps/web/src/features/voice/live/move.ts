@@ -42,16 +42,20 @@ export type LiveMove = {
 /**
  * The route the screen lands on for a run's move: its last route-moving
  * action (performed after the destination), else its destination. Null
- * when it has no route (a data-room document opens in the viewer; an
+ * when it has no route (a document opens in the viewer; an
  * interview or form destination is a handoff), so no receipt is awaited.
  */
 export function movePath(move: LiveMove): string | null {
   const action = move.action;
   // Only route moves get a receipt; every other action leaves the route.
+  // A document opens in the viewer over the page (Lane 7): no route.
   if (
     action?.kind === "OPEN_RECORD_PAGE" &&
-    action.page !== "DATA_ROOM_DOCUMENT"
+    (action.page === "DATA_ROOM_DOCUMENT" || action.page === "DOCUMENT")
   ) {
+    return null;
+  }
+  if (action?.kind === "OPEN_RECORD_PAGE") {
     return recordIntentPath(action);
   }
   if (action?.kind === "OPEN_SETUP") return setupPath(action.journey);

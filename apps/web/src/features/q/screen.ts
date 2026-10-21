@@ -90,6 +90,11 @@ let materialDocument: {
   readonly page: number | null;
 } | null = null;
 
+/** Lane 7: whether a data-room document is open (for "close it"). */
+export function materialDocumentOpen(): boolean {
+  return materialDocument !== null;
+}
+
 export function setMaterialDocument(
   document: { readonly companyId: string; readonly documentId: string } | null,
   page?: number,

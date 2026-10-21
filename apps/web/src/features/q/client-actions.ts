@@ -22,6 +22,7 @@ import {
 import { currentRoute } from "./control/route-state";
 import { performUiAct, requestMove } from "./ui-act-controller";
 import { announceLanguage } from "@/features/i18n/language";
+import { openDocumentViewer } from "@/features/documents/document-ready";
 
 /**
  * What the browser does when Q's answer carries a client action (R20/R33;
@@ -57,6 +58,11 @@ export type ClientActionEffects = {
    * viewer asks the API for a signed read as them; this only names it.
    */
   readonly openMaterial: (document: QMaterialDocumentRef) => void;
+  /**
+   * Lane 7: one of their own documents (Q made it), opened in the viewer
+   * over the page they are on. Absent: its page (/documents?open=).
+   */
+  readonly openDocument?: ((artifactId: string) => void) | undefined;
 };
 
 /** A data-room document Q opened on screen (R0). */
@@ -440,6 +446,54 @@ export function moveEarly(path: string): void {
   requestMove({ path });
 }
 
+/**
+ * Lane 7: a document the fast path opened for the latest sentence. Q's
+ * answer naming the same document seconds later does not open it again
+ * (a reload of the viewer, or a reopen after they closed it).
+ */
+export type EarlyDocument =
+  | ({ readonly kind: "MATERIAL" } & QMaterialDocumentRef)
+  | { readonly kind: "ARTIFACT"; readonly artifactId: string };
+
+let earlyDocument: { readonly id: string; readonly at: number } | null = null;
+
+function documentKey(document: EarlyDocument): string {
+  return (
+    document.kind === "MATERIAL" ? document.documentId : document.artifactId
+  ).toLowerCase();
+}
+
+/** The fast path's open: in the viewer over this page, at once. */
+export function openDocumentEarly(
+  document: EarlyDocument,
+  effects: ClientActionEffects = BROWSER_EFFECTS,
+): void {
+  earlyDocument = { id: documentKey(document), at: Date.now() };
+  if (document.kind === "MATERIAL") {
+    effects.openMaterial({
+      companyId: document.companyId,
+      documentId: document.documentId,
+      title: document.title,
+    });
+    return;
+  }
+  if (effects.openDocument !== undefined) {
+    effects.openDocument(document.artifactId);
+  } else {
+    effects.goTo(recordPagePath("DOCUMENT", document.artifactId));
+  }
+}
+
+/** Whether the fast path already opened this one (consumed once). */
+export function openedEarly(id: string): boolean {
+  if (earlyDocument === null || Date.now() - earlyDocument.at > EARLY_MOVE_MS) {
+    return false;
+  }
+  if (earlyDocument.id !== id.toLowerCase()) return false;
+  earlyDocument = null;
+  return true;
+}
+
 /** Q's moves on Discover's feed, heard by the feed itself. */
 export const Q_FEED_EVENT = "cq:q-feed";
 
@@ -528,6 +582,9 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
     answerMove(path);
   },
   screen: screenAct,
+  openDocument: (artifactId) => {
+    openDocumentViewer(artifactId);
+  },
   openMaterial: (document) => {
     window.dispatchEvent(
       new CustomEvent<QMaterialDocumentRef>(Q_MATERIAL_OPEN_EVENT, {
@@ -608,6 +665,17 @@ function performChecked(
       effects.signOut();
       return true;
     case "OPEN_RECORD_PAGE":
+      // Lane 7: opened already for this sentence by the fast path.
+      if (
+        (action.page === "DATA_ROOM_DOCUMENT" || action.page === "DOCUMENT") &&
+        openedEarly(action.id)
+      ) {
+        return true;
+      }
+      if (action.page === "DOCUMENT" && effects.openDocument !== undefined) {
+        effects.openDocument(action.id);
+        return true;
+      }
       if (action.page === "DATA_ROOM_DOCUMENT") {
         if (action.companyId === undefined) return false;
         effects.openMaterial({

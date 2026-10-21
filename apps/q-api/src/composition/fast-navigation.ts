@@ -17,8 +17,10 @@ import { ownInvestorOrganisationIn } from "@capital-q/model-gateway/q";
 import type { Logger } from "@capital-q/observability";
 import type { ContextFirewallPort, QToolPort } from "@capital-q/q-runtime";
 import {
+  documentAskOf,
   namedRecordRequestOf,
   resolveFastNavigation,
+  type DocumentAsk,
   type OpenRecordIntent,
 } from "@capital-q/q-specialists";
 import type { ActorContext } from "@capital-q/security";
@@ -35,6 +37,8 @@ import type { ActorContext } from "@capital-q/security";
 export type FastNavigationResolver = (
   actor: ActorContext,
   text: string,
+  /** Lane 7: what the screen shows, as input (never proof). */
+  screen?: { readonly companyId?: string | undefined },
 ) => Promise<QFastNavigationResponse>;
 
 type OwnRelationships = {
@@ -138,12 +142,84 @@ export function createFastNavigation(dependencies: {
     return Number.isFinite(until) && until <= clock() ? null : plan;
   };
 
-  return async (actor, text) => {
+  /** One tool's client action for this person, or null (refused, none, several). */
+  const openWith = async (
+    context: Prepared,
+    actor: ActorContext,
+    tool: string,
+    args: Record<string, unknown>,
+  ): Promise<OpenRecordIntent | null> => {
+    const granted = await planNow(context);
+    if (granted === null) return null;
+    const outcome = await dependencies.tools.execute(
+      { callId: `q-fast-${tool}`, name: tool, arguments: args },
+      {
+        actor,
+        runId: context.runId,
+        correlationId: context.correlationId,
+        capability: "ANSWER",
+        plan: granted,
+        focus: { areas: [], tools: [tool] },
+      },
+    );
+    if (!outcome.result.ok) return null;
+    // Anything but an opened document (NONE, WHICH_ONE, ON_REQUEST) is
+    // not this path's to say: the screen gets nothing, not even a name.
+    const read = QClientActionToolResultSchema.safeParse(outcome.result.data);
+    return read.success && read.data.clientAction.kind === "OPEN_RECORD_PAGE"
+      ? read.data.clientAction
+      : null;
+  };
+
+  /**
+   * Lane 7: a document by its name, among those the person may open: one
+   * Q made for them (open_page DOCUMENT) and the company's data room
+   * (open_company_document), both through their own authorize steps.
+   * Exactly one match opens; one in each is Q's to ask about.
+   */
+  const documentOpener =
+    (context: Prepared, actor: ActorContext, companyId: string | undefined) =>
+    async (ask: DocumentAsk): Promise<OpenRecordIntent | null> => {
+      const key = `DOC:${ask.company ?? companyId ?? ""}:${ask.document.toLowerCase()}`;
+      const known = context.opened.get(key);
+      if (known !== undefined) return known;
+      const opening = (async () => {
+        const [made, dataRoom] = await Promise.all([
+          ask.company === null
+            ? openWith(context, actor, "open_page", {
+                page: "DOCUMENT",
+                name: ask.document,
+              }).catch(() => null)
+            : Promise.resolve(null),
+          openWith(context, actor, "open_company_document", {
+            document: ask.document,
+            ...(ask.company !== null
+              ? { company: ask.company }
+              : companyId === undefined
+                ? {}
+                : { companyId }),
+          }).catch(() => null),
+        ]);
+        if (made !== null && dataRoom !== null) return null;
+        return made ?? dataRoom;
+      })().catch(() => null);
+      context.opened.set(key, opening);
+      while (context.opened.size > OPENED_MAX) {
+        const oldest = context.opened.keys().next().value;
+        if (oldest === undefined) break;
+        context.opened.delete(oldest);
+      }
+      return opening;
+    };
+
+  return async (actor, text, screen = {}) => {
     const started = now();
     const ms = () => Math.max(0, Math.round(now() - started));
     const counter = createRoundTripCounter();
     return withRoundTripCounter(counter, async () => {
-      const asksForRecord = namedRecordRequestOf(text) !== null;
+      const asksForDocument = documentAskOf(text) !== null;
+      const asksForRecord =
+        asksForDocument || namedRecordRequestOf(text) !== null;
       // A page by name needs no plan and no reads at all.
       const known = prepared.get(keyOf(actor));
       const reused = known !== undefined && fresh(known);
@@ -158,6 +234,9 @@ export function createFastNavigation(dependencies: {
       const decided = await resolveFastNavigation({
         text,
         side,
+        ...(context === null
+          ? {}
+          : { openDocument: documentOpener(context, actor, screen.companyId) }),
         counterpartNames: async () =>
           ((context === null ? null : await context.own)?.items ?? []).map(
             (item) => item.counterpart.name,
@@ -211,6 +290,7 @@ export function createFastNavigation(dependencies: {
         {
           outcome: decided.kind,
           record: asksForRecord,
+          document: asksForDocument,
           candidates,
           prepared: asksForRecord && reused,
           dbRoundTrips: counter.count,

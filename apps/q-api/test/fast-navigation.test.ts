@@ -311,3 +311,142 @@ describe(`POST ${Q_FAST_NAVIGATION_PATH}`, () => {
     await app.close();
   });
 });
+
+describe("Lane 7: a document by its name, opened only through the document tools", () => {
+  const CERT = "6a1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f71";
+  const COMPANY = "7b1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f72";
+  const BRIEF = "8c1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f73";
+
+  function documents(answers: {
+    readonly dataRoom?: unknown;
+    readonly made?: unknown;
+    readonly denied?: boolean;
+  }) {
+    const calls: { name: string; arguments: unknown }[] = [];
+    const firewall: ContextFirewallPort = {
+      plan: (request) =>
+        Promise.resolve(
+          answers.denied === true
+            ? { outcome: "DENIED", reason: "NO_AUTHORISED_CONTEXT", denied: [] }
+            : { outcome: "AUTHORISED", plan: planFor(request.runId) },
+        ),
+    };
+    const tools: QToolPort = {
+      offer: () => Promise.resolve([]),
+      execute: (proposal) => {
+        calls.push({ name: proposal.name, arguments: proposal.arguments });
+        const data =
+          proposal.name === "open_company_document"
+            ? answers.dataRoom
+            : answers.made;
+        return Promise.resolve(
+          data === undefined ? outcome(null, false) : outcome(data, true),
+        );
+      },
+    };
+    const resolve = createFastNavigation({
+      firewall,
+      tools,
+      ownRelationships: () => Promise.resolve({ items: [] }),
+    });
+    return { resolve, calls };
+  }
+
+  const certificate = {
+    status: "SCREEN_WILL_DO_IT",
+    clientAction: {
+      kind: "OPEN_RECORD_PAGE",
+      page: "DATA_ROOM_DOCUMENT",
+      id: CERT,
+      companyId: COMPANY,
+      title: "Certificate of incorporation",
+    },
+  };
+
+  it("opens the one data-room document that matches, with the screen's company as input", async () => {
+    const { resolve, calls } = documents({ dataRoom: certificate });
+    const decided = await resolve(
+      ACTOR,
+      "open the certificate of incorporation",
+      { companyId: COMPANY },
+    );
+    expect(decided).toMatchObject({
+      kind: "NAVIGATE",
+      intent: { page: "DATA_ROOM_DOCUMENT", id: CERT, companyId: COMPANY },
+    });
+    expect(calls).toContainEqual({
+      name: "open_company_document",
+      arguments: {
+        document: "certificate of incorporation",
+        companyId: COMPANY,
+      },
+    });
+  });
+
+  it("opens a document Q made by its title (open_page DOCUMENT)", async () => {
+    const { resolve } = documents({
+      made: {
+        status: "SCREEN_WILL_DO_IT",
+        clientAction: { kind: "OPEN_RECORD_PAGE", page: "DOCUMENT", id: BRIEF },
+      },
+    });
+    expect(await resolve(ACTOR, "open the investor brief")).toMatchObject({
+      kind: "NAVIGATE",
+      intent: { page: "DOCUMENT", id: BRIEF },
+    });
+  });
+
+  it("a company named in the words goes to the tool as said, never its page", async () => {
+    const { resolve, calls } = documents({ dataRoom: certificate });
+    const decided = await resolve(ACTOR, "show me Halyard's term sheet");
+    expect(decided).toMatchObject({ intent: { page: "DATA_ROOM_DOCUMENT" } });
+    expect(calls.map((call) => call.name)).toEqual(["open_company_document"]);
+    expect(calls[0]?.arguments).toEqual({
+      document: "term sheet",
+      company: "Halyard",
+    });
+  });
+
+  it("a document they may not open never opens and its name never leaves", async () => {
+    // The tool's own answers for "on request" and "several": data for Q's
+    // answer, never a screen action.
+    for (const answer of [
+      {
+        status: "ON_REQUEST",
+        candidates: [{ documentId: CERT, title: "Secret cap table" }],
+        say: "listed on request",
+      },
+      { status: "WHICH_ONE", candidates: [], say: "several" },
+      undefined,
+    ]) {
+      const { resolve } = documents({ dataRoom: answer });
+      const decided = await resolve(ACTOR, "open the cap table");
+      expect(decided).toEqual({ kind: "LEAVE_TO_Q", ms: expect.any(Number) });
+      expect(JSON.stringify(decided)).not.toMatch(/Secret|cap table/iu);
+    }
+  });
+
+  it("nothing opens when the firewall refuses the person", async () => {
+    const { resolve, calls } = documents({
+      dataRoom: certificate,
+      denied: true,
+    });
+    expect(
+      await resolve(ACTOR, "open the certificate of incorporation"),
+    ).toMatchObject({ kind: "LEAVE_TO_Q" });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("one match in each place is Q's to ask about, never a guess", async () => {
+    const { resolve } = documents({
+      dataRoom: certificate,
+      made: {
+        status: "SCREEN_WILL_DO_IT",
+        clientAction: { kind: "OPEN_RECORD_PAGE", page: "DOCUMENT", id: BRIEF },
+      },
+    });
+    expect(await resolve(ACTOR, "open the financial model")).toMatchObject({
+      kind: "LEAVE_TO_Q",
+    });
+  });
+});
