@@ -17,10 +17,8 @@ export default async function InvestorRehearsalPage({
     readonly difficulty?: string;
   }>;
 }) {
-  const [{ investorOrganisationId }, { meeting, video, difficulty }] = await Promise.all([
-    params,
-    searchParams,
-  ]);
+  const [{ investorOrganisationId }, { meeting, video, difficulty }] =
+    await Promise.all([params, searchParams]);
   return (
     <RehearsalLobbyPage
       kind="INVESTOR_ORGANISATION"

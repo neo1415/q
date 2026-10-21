@@ -108,11 +108,7 @@ export function withDifficulty(
  * person answered anything, which has nothing to review.
  */
 export type PastState =
-  | "IN_PROGRESS"
-  | "NOTHING_TO_REVIEW"
-  | "WRITING"
-  | "FIRST_NOTES"
-  | "READY";
+  "IN_PROGRESS" | "NOTHING_TO_REVIEW" | "WRITING" | "FIRST_NOTES" | "READY";
 
 export function pastState(item: QRehearsalSummaryDto): PastState {
   if (item.status === "ACTIVE") return "IN_PROGRESS";
@@ -246,7 +242,10 @@ export function RehearsalsHome({
       key: `call-${call.meetingId}`,
       ...counterpartPick(call.counterpart),
       line: call.purpose.length > 0 ? call.purpose : "Your booked call",
-      tag: { tone: "accent" as const, words: `Call ${callTime(call.startsAt)}` },
+      tag: {
+        tone: "accent" as const,
+        words: `Call ${callTime(call.startsAt)}`,
+      },
       href: lobbyHref(call.counterpart, call.meetingId),
       call: callTime(call.startsAt),
     })),
@@ -440,7 +439,10 @@ export function RehearsalsHome({
           </span>
         </div>
         {names.size < 2 ? null : (
-          <nav aria-label={t("Filter by person")} className="flex flex-wrap gap-2">
+          <nav
+            aria-label={t("Filter by person")}
+            className="flex flex-wrap gap-2"
+          >
             {[[null, "Everyone"] as const, ...[...names.entries()]].map(
               ([id, name]) => {
                 const on = filter === id;
@@ -619,7 +621,9 @@ export function RehearsalsHome({
             </div>
             <span className="text-xs text-(--cq-text-tertiary)">
               {allowance === null
-                ? t("By voice, until a natural close. You can end it at any time.")
+                ? t(
+                    "By voice, until a natural close. You can end it at any time.",
+                  )
                 : t(
                     `${allowance.words} By voice, until a natural close. You can end it at any time.`,
                   )}
@@ -735,10 +739,16 @@ function PastReview({ item }: { readonly item: QRehearsalSummaryDto }) {
           {state === "IN_PROGRESS"
             ? t("It is still open. Rejoin to carry on, or end it there.")
             : state === "NOTHING_TO_REVIEW"
-              ? t("You left before answering anything, so there’s nothing to review.")
+              ? t(
+                  "You left before answering anything, so there’s nothing to review.",
+                )
               : state === "FIRST_NOTES"
-                ? t("Q has written first notes from the transcript and is finishing the full review.")
-                : t("Q is writing your review. It appears here when it’s ready.")}
+                ? t(
+                    "Q has written first notes from the transcript and is finishing the full review.",
+                  )
+                : t(
+                    "Q is writing your review. It appears here when it’s ready.",
+                  )}
         </p>
       )}
     </div>

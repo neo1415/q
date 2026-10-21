@@ -15,7 +15,7 @@ import {
   ICON_SIZE,
 } from "@capital-q/ui/icons";
 
-import { useT } from "@/features/i18n/language";
+import { useT, useUiLanguage } from "@/features/i18n/language";
 
 import { monthDays, monthTitle, shiftMonth } from "./daily-calendar-model";
 
@@ -33,16 +33,25 @@ export type CalendarEdition = {
   readonly headline: string | null;
 };
 
-const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"] as const;
-const WEEKDAY_NAMES = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-] as const;
+/** Monday to Sunday in the reader's language: 1 January 2024 was a Monday. */
+function weekdays(language: string): readonly {
+  readonly narrow: string;
+  readonly long: string;
+}[] {
+  return Array.from({ length: 7 }, (_, index) => {
+    const day = new Date(Date.UTC(2024, 0, 1 + index));
+    return {
+      narrow: day.toLocaleDateString(language, {
+        weekday: "narrow",
+        timeZone: "UTC",
+      }),
+      long: day.toLocaleDateString(language, {
+        weekday: "long",
+        timeZone: "UTC",
+      }),
+    };
+  });
+}
 
 function footnote(frequency: QDailyFrequency): string {
   switch (frequency) {
@@ -71,20 +80,23 @@ function Month({
   readonly loaded: boolean;
 }) {
   const t = useT();
+  const language = useUiLanguage();
   const byDate = new Map(editions.map((edition) => [edition.date, edition]));
   const days = monthDays(month);
-  const title = monthTitle(month);
+  const title = monthTitle(month, language);
   const later = shiftMonth(month, 1) <= today.slice(0, 7);
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-1">
         <h3 className="m-0 flex-1 text-[15px] font-semibold text-(--cq-text-primary)">
-          {t(title)}
+          {title}
         </h3>
         <Link
           href={`/daily?month=${shiftMonth(month, -1)}`}
           scroll={false}
-          aria-label={t(`Earlier: ${monthTitle(shiftMonth(month, -1))}`)}
+          aria-label={t(
+            `Earlier: ${monthTitle(shiftMonth(month, -1), language)}`,
+          )}
           className="grid size-11 place-items-center rounded-(--cq-radius-md) text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) lg:size-9"
           data-calendar-prev
         >
@@ -98,7 +110,9 @@ function Month({
           <Link
             href={`/daily?month=${shiftMonth(month, 1)}`}
             scroll={false}
-            aria-label={t(`Later: ${monthTitle(shiftMonth(month, 1))}`)}
+            aria-label={t(
+              `Later: ${monthTitle(shiftMonth(month, 1), language)}`,
+            )}
             className="grid size-11 place-items-center rounded-(--cq-radius-md) text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) lg:size-9"
             data-calendar-next
           >
@@ -118,14 +132,14 @@ function Month({
         className="grid grid-cols-7 gap-1 text-center"
       >
         <div role="row" className="contents">
-          {WEEKDAYS.map((day, index) => (
+          {weekdays(language).map((day) => (
             <span
-              key={WEEKDAY_NAMES[index]}
+              key={day.long}
               role="columnheader"
-              aria-label={t(WEEKDAY_NAMES[index] ?? "")}
+              aria-label={day.long}
               className="pb-1 text-[11px] text-(--cq-text-tertiary)"
             >
-              {t(day)}
+              {day.narrow}
             </span>
           ))}
         </div>
@@ -193,7 +207,8 @@ function Month({
                 className={cx(
                   base,
                   "text-(--cq-text-tertiary)",
-                  isPicked && "bg-(--cq-surface-strong) text-(--cq-text-primary)",
+                  isPicked &&
+                    "bg-(--cq-surface-strong) text-(--cq-text-primary)",
                   future && "opacity-60",
                 )}
                 data-day={cell.date}
@@ -207,7 +222,9 @@ function Month({
       <p className="m-0 text-xs text-(--cq-text-tertiary)">
         {loaded
           ? t(footnote(frequency))
-          : t("This month's editions couldn't load. The days show without them.")}
+          : t(
+              "This month's editions couldn't load. The days show without them.",
+            )}
       </p>
     </div>
   );
@@ -224,6 +241,7 @@ export function DailyCalendar(props: {
   readonly startOpen: boolean;
 }) {
   const t = useT();
+  const language = useUiLanguage();
   const [open, setOpen] = useState(props.startOpen);
   const month = {
     month: props.month,
@@ -259,7 +277,7 @@ export function DailyCalendar(props: {
             className="text-(--cq-text-secondary)"
           />
           <span className="flex-1">
-            {t("Editions")} · {t(monthTitle(props.month))}
+            {t("Editions")} · {monthTitle(props.month, language)}
           </span>
           <ChevronDown
             size={ICON_SIZE.regular}

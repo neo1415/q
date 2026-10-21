@@ -47,11 +47,19 @@ export function sectionsOf(
   readonly sectionKey: string;
   readonly label: string;
   readonly at: number;
-  readonly facts: readonly { readonly label: string; readonly value: string; readonly at: number }[];
+  readonly facts: readonly {
+    readonly label: string;
+    readonly value: string;
+    readonly at: number;
+  }[];
 }[] {
   const groups = new Map<
     string,
-    { label: string; at: number; facts: { label: string; value: string; at: number }[] }
+    {
+      label: string;
+      at: number;
+      facts: { label: string; value: string; at: number }[];
+    }
   >();
   for (const fact of facts) {
     if (fact.pitchId !== pitchId) continue;
@@ -113,9 +121,12 @@ export function chapterAt(
 }
 
 /** The video the tab leads with: the newest ready one, else the newest. */
-export function mainPitch(
-  videos: readonly MediaAssetDto[],
-): MediaAssetDto | null {
+export function mainPitch<
+  V extends Pick<
+    MediaAssetDto,
+    "live" | "purpose" | "status" | "createdAt" | "mediaAssetId"
+  >,
+>(videos: readonly V[]): V | null {
   const live = videos.filter(
     (video) => video.live && video.purpose === "FOUNDER_PITCH",
   );
@@ -127,7 +138,7 @@ export function mainPitch(
 
 /** Why a pitch has no chapters, in words; null when it has some. */
 export function noChaptersReason(
-  video: MediaAssetDto,
+  video: Pick<MediaAssetDto, "status" | "transcriptState">,
   read: boolean,
 ): string {
   if (video.status !== "READY") {
@@ -158,7 +169,10 @@ export type HeardState =
  */
 export function heardState(
   sectionKey: string,
-  session: OnboardingSessionView | null,
+  session: Pick<
+    OnboardingSessionView,
+    "pendingSuggestions" | "responses"
+  > | null,
 ): HeardState {
   if (session === null) return { kind: "SAID" };
   const pending = session.pendingSuggestions.find(

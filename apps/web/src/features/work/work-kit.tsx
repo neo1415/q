@@ -66,12 +66,7 @@ export function workButton(
 }
 
 export type WorkTagTone =
-  | "positive"
-  | "accent"
-  | "stone"
-  | "warning"
-  | "dash"
-  | "brass";
+  "positive" | "accent" | "stone" | "warning" | "dash" | "brass";
 
 const TAG_TONE: Readonly<Record<WorkTagTone, string>> = {
   positive: "bg-(--cq-positive-soft) text-(--cq-positive)",

@@ -37,7 +37,9 @@ export function paperColumns(edition: QDailyEdition): {
   return {
     brief: [
       ...sections
-        .filter((section) => section.code !== "DEALS" && section.code !== "PEOPLE")
+        .filter(
+          (section) => section.code !== "DEALS" && section.code !== "PEOPLE",
+        )
         .flatMap((section) => section.stories),
       ...edition.briefs,
     ],
@@ -84,7 +86,11 @@ function Source({ story }: { readonly story: QDailyStory }) {
   );
 }
 
-function Take({ paragraphs }: { readonly paragraphs: readonly string[] | null }) {
+function Take({
+  paragraphs,
+}: {
+  readonly paragraphs: readonly string[] | null;
+}) {
   const t = useT();
   if (paragraphs === null) {
     return (
@@ -98,10 +104,7 @@ function Take({ paragraphs }: { readonly paragraphs: readonly string[] | null })
       className="flex flex-col items-start gap-1.5 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-3.5 py-3"
       data-daily-take
     >
-      <WorkTag
-        tone="stone"
-        icon={<QRing className="size-3.5 text-[8px]" />}
-      >
+      <WorkTag tone="stone" icon={<QRing className="size-3.5 text-[8px]" />}>
         {t("Q’s take, Q’s inference")}
       </WorkTag>
       {paragraphs.map((paragraph) => (
@@ -310,7 +313,9 @@ export function DailyPaper({
       </div>
 
       <p className="m-0 text-xs text-(--cq-text-tertiary)">
-        {t("Every story names its source. Q’s take is Q’s inference, not reporting.")}
+        {t(
+          "Every story names its source. Q’s take is Q’s inference, not reporting.",
+        )}
       </p>
       <div className="flex flex-wrap gap-2">
         <OpenPdfButton

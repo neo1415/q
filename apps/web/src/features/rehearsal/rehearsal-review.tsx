@@ -22,7 +22,12 @@ import {
 import { QRing } from "@/features/relationships/crm-kit";
 import { WorkEmpty, workButton } from "@/features/work/work-kit";
 
-import { DIMENSION_WORDS, OUTCOME_WORDS, RATING_WORDS, lengthWords } from "./meet";
+import {
+  DIMENSION_WORDS,
+  OUTCOME_WORDS,
+  RATING_WORDS,
+  lengthWords,
+} from "./meet";
 import { momentTurn } from "./review-moments";
 import { ReviewRefresh } from "./review-refresh";
 import { useT } from "@/features/i18n/language";

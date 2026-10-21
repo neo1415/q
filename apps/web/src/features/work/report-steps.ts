@@ -61,7 +61,9 @@ function inline(point: string): string {
 export function draftFor(step: ReportStep, report: QWorkReportDto): string {
   switch (step) {
     case "CALL": {
-      const open = report.concerns.slice(0, 2).map((item) => inline(item.point));
+      const open = report.concerns
+        .slice(0, 2)
+        .map((item) => inline(item.point));
       const topic =
         open.length === 0
           ? "a few points"

@@ -23,6 +23,7 @@ import { SHELL_AR } from "./catalog/shell";
 import { SWEEP_AR } from "./catalog/sweep";
 import { TAXONOMY_AR } from "./catalog/taxonomy";
 import { WORK_AR } from "./catalog/work";
+import { WORK_CHOSEN_AR } from "./catalog/work-chosen";
 import { indexPatterns, localiseDate, matchPattern } from "./patterns";
 
 /**
@@ -55,7 +56,9 @@ export type UiLanguage = string;
  */
 const ARABIC: Readonly<Record<string, string>> = {
   // First: what the live check of 2026-10-16 found; an area's own entry
-  // for the same words wins.
+  // for the same words wins. The Work designs' short words ("Save",
+  // "Share") only fill gaps.
+  ...WORK_CHOSEN_AR,
   ...CRM_DESIGN_AR,
   ...SWEEP_AR,
   ...CORE_AR,

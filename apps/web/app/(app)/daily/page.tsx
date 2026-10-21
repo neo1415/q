@@ -7,10 +7,7 @@ import {
   getQDailyEdition,
   type ApiSession,
 } from "@capital-q/api-client";
-import type {
-  QDailyEdition,
-  QDailyEditionSummary,
-} from "@capital-q/contracts";
+import type { QDailyEdition, QDailyEditionSummary } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { PageContainer } from "@/components/app-shell/page-container";
@@ -55,9 +52,7 @@ async function monthEditions(
     if (first.nextCursor === null || first.nextCursor < start) {
       return first.archive;
     }
-    const second = await getQDaily(session, first.nextCursor).catch(
-      () => null,
-    );
+    const second = await getQDaily(session, first.nextCursor).catch(() => null);
     return [...first.archive, ...(second?.archive ?? [])];
   } catch {
     return null;
@@ -83,11 +78,12 @@ export default async function DailyPage({
   const before = isDate(params["before"]) ? params["before"] : undefined;
   const picked = isDate(params["date"]) ? params["date"] : null;
   const today = todayOf(new Date());
-  const month = picked !== null
-    ? monthOf(picked)
-    : isMonth(params["month"])
-      ? params["month"]
-      : monthOf(today);
+  const month =
+    picked !== null
+      ? monthOf(picked)
+      : isMonth(params["month"])
+        ? params["month"]
+        : monthOf(today);
 
   const [session, context] = await Promise.all([
     qApiSession(),

@@ -12,7 +12,7 @@ import { ChatMessageBodySchema } from "@capital-q/contracts";
 
 import { apiSession, qApiSession } from "@/features/q/context";
 
-import { stepBlocked, type ReportStep } from "./report-steps";
+import { stepBlocked } from "./report-steps";
 
 /**
  * Sends one of the first-stage report's prepared next steps on the
@@ -52,13 +52,15 @@ export async function sendReportStepAction(
   if (q === null || api === null) {
     return { ok: false, message: "Your session ended. Sign in again." };
   }
-  const report = await getQWorkReport(q, input.delegationId, input.laneId).catch(
-    () => null,
-  );
+  const report = await getQWorkReport(
+    q,
+    input.delegationId,
+    input.laneId,
+  ).catch(() => null);
   if (report === null) {
     return { ok: false, message: "This report isn't available any more." };
   }
-  const blocked = stepBlocked(input.step as ReportStep, report);
+  const blocked = stepBlocked(input.step, report);
   if (blocked !== null || report.relationshipId === null) {
     return { ok: false, message: blocked ?? "Nothing can be sent yet." };
   }

@@ -11,7 +11,10 @@ import { formatDayTime } from "@/components/date-format";
 import { workButton } from "@/features/work/work-kit";
 import { useT } from "@/features/i18n/language";
 
-import { requestDailyEditionAction, setDailyPreferencesAction } from "./daily-actions";
+import {
+  requestDailyEditionAction,
+  setDailyPreferencesAction,
+} from "./daily-actions";
 
 /**
  * The Q Daily's states (chosen design 2026-10-21, option 3's states in
@@ -66,7 +69,11 @@ function StateCard({
 }
 
 /** Being prepared: the page reads itself again until it arrives. */
-export function DailyPreparing({ latestHref }: { readonly latestHref: string | null }) {
+export function DailyPreparing({
+  latestHref,
+}: {
+  readonly latestHref: string | null;
+}) {
   const t = useT();
   const router = useRouter();
   const [gaveUp, setGaveUp] = useState(false);
@@ -252,7 +259,9 @@ export function DailyNoneToday({
     <StateCard
       state={first ? "empty" : "none-today"}
       icon={<Newspaper size={26} aria-hidden="true" />}
-      title={first ? t("Your first edition is on its way") : t("No edition today")}
+      title={
+        first ? t("Your first edition is on its way") : t("No edition today")
+      }
       action={
         <>
           {latest === null ? null : (

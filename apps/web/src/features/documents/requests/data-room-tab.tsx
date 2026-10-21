@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import type {
   DataRoomOwnerView,
@@ -78,10 +78,16 @@ function FolderAccessTag({ card }: { readonly card: FolderCard }) {
   return (
     <WorkTag
       tone={tone}
-      icon={card.access.kind === "EMPTY" ? undefined : <AccessIcon tone={tone} />}
+      icon={
+        card.access.kind === "EMPTY" ? undefined : <AccessIcon tone={tone} />
+      }
       className="mt-auto whitespace-normal"
     >
-      {t(accessWords(card.access))}
+      {card.access.kind === "MIXED"
+        ? `${t("Mixed")}: ${card.access.levels
+            .map((level) => t(LEVEL_WORDS[level]))
+            .join(", ")}`
+        : t(accessWords(card.access))}
     </WorkTag>
   );
 }
@@ -209,11 +215,6 @@ export function DataRoomTab({
   );
 
   const ids = card?.documents.map((document) => document.documentId) ?? [];
-  const idsKey = ids.join(",");
-  useEffect(() => {
-    if (openCode === null) return;
-    void load(openCode, idsKey === "" ? [] : idsKey.split(","));
-  }, [openCode, idsKey, load]);
 
   if (view === null) {
     return (
@@ -304,6 +305,10 @@ export function DataRoomTab({
                   setLoaded(null);
                   setSaid(null);
                   setOpenCode(entry.code);
+                  void load(
+                    entry.code,
+                    entry.documents.map((document) => document.documentId),
+                  );
                 }}
                 className="cq-crm-press cq-crm-lift flex h-full min-h-[140px] w-full flex-col items-start gap-1.5 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-3.5 text-start hover:border-(--cq-border) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) md:min-h-[150px] md:p-[18px]"
                 data-folder={entry.code}
@@ -406,7 +411,9 @@ export function DataRoomTab({
                       >
                         <WorkTag
                           tone={LEVEL_TONE[document.level]}
-                          icon={<AccessIcon tone={LEVEL_TONE[document.level]} />}
+                          icon={
+                            <AccessIcon tone={LEVEL_TONE[document.level]} />
+                          }
                         >
                           {t(LEVEL_WORDS[document.level])}
                         </WorkTag>
@@ -428,7 +435,10 @@ export function DataRoomTab({
               {t("Who can open it")}
             </span>
             {loadError !== null ? (
-              <p role="alert" className="m-0 text-sm text-(--cq-text-secondary)">
+              <p
+                role="alert"
+                className="m-0 text-sm text-(--cq-text-secondary)"
+              >
                 {t(loadError)}
               </p>
             ) : loaded === null ? (

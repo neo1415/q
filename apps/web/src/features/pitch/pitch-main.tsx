@@ -170,7 +170,9 @@ function Poster({
     <span
       className={cx(
         "cq-cinema relative flex aspect-video w-full flex-none flex-col justify-end overflow-hidden bg-(--cq-stage-canvas) text-(--cq-stage-text)",
-        big ? "rounded-(--cq-radius-lg) px-4 py-3.5" : "rounded-(--cq-radius-md) px-2 py-1.5",
+        big
+          ? "rounded-(--cq-radius-lg) px-4 py-3.5"
+          : "rounded-(--cq-radius-md) px-2 py-1.5",
       )}
     >
       {poster === null ? null : (
@@ -216,9 +218,7 @@ function Poster({
             {video.title ?? t("Pitch")}
           </span>
           <span className="text-xs text-(--cq-stage-text-muted)">
-            {ready
-              ? (companyName ?? "")
-              : t(videoState(video))}
+            {ready ? (companyName ?? "") : t(videoState(video))}
           </span>
         </span>
       ) : null}
@@ -502,7 +502,9 @@ export function PitchMain({
             >
               <UnknownMark />
               <span>
-                <b className="text-(--cq-text-primary)">{t("No chapters yet.")}</b>{" "}
+                <b className="text-(--cq-text-primary)">
+                  {t("No chapters yet.")}
+                </b>{" "}
                 {t(noChaptersReason(main, heard.length > 0))}
               </span>
             </p>
@@ -579,8 +581,9 @@ export function PitchMain({
                 <span className="text-xs text-(--cq-text-tertiary)">
                   {t(
                     `${videoState(video)}, ${
-                      SHARING.find((option) => option.value === sharingOf(video))
-                        ?.label ?? ""
+                      SHARING.find(
+                        (option) => option.value === sharingOf(video),
+                      )?.label ?? ""
                     }`,
                   )}
                 </span>
@@ -662,7 +665,9 @@ export function PitchMain({
                       <button
                         type="button"
                         disabled={busy || fixText.trim().length === 0}
-                        onClick={() => resolve(section.sectionKey, state, "EDIT")}
+                        onClick={() =>
+                          resolve(section.sectionKey, state, "EDIT")
+                        }
                         className={workButton("gold", undefined, "small")}
                       >
                         {t("Save")}
@@ -708,10 +713,7 @@ export function PitchMain({
                     </>
                   )
                 ) : (
-                  <WorkTag
-                    tone="brass"
-                    icon={<UserRound aria-hidden="true" />}
-                  >
+                  <WorkTag tone="brass" icon={<UserRound aria-hidden="true" />}>
                     {state.kind === "CONFIRMED"
                       ? t("Your claim, confirmed")
                       : t("Your claim, said in the pitch")}
@@ -738,7 +740,9 @@ export function PitchMain({
         sub={
           sheetVideo === null
             ? undefined
-            : t(`${videoState(sheetVideo)}, uploaded ${formatDay(sheetVideo.createdAt)}`)
+            : t(
+                `${videoState(sheetVideo)}, uploaded ${formatDay(sheetVideo.createdAt)}`,
+              )
         }
         footer={
           sheetVideo === null ? null : (

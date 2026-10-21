@@ -415,7 +415,9 @@ export function FirstStageReport({
               </button>
               <button
                 type="button"
-                onClick={() => setPhase(phase === "editing" ? "draft" : "editing")}
+                onClick={() =>
+                  setPhase(phase === "editing" ? "draft" : "editing")
+                }
                 disabled={phase === "sending"}
                 aria-pressed={phase === "editing"}
                 className={workButton("secondary")}
