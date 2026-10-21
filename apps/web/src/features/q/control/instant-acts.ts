@@ -20,6 +20,7 @@ import {
   type ControlEntry,
 } from "./registry";
 import { routeTrail } from "./route-state";
+import { noteInstantAct } from "./instant-ledger";
 import { closeShown } from "./show-store";
 
 /**
@@ -262,6 +263,7 @@ function press(request: Extract<InstantRequest, { kind: "PRESS" }>): boolean {
     act,
     target: one.entry.id,
   };
+  noteInstantAct(`control:${one.entry.id}`);
   void performUiAct(intent).catch(() => undefined);
   return true;
 }
@@ -279,6 +281,7 @@ export function instantAct(text: string): InstantDone | null {
       return closeTopmost() ? { what: "CLOSE" } : null;
     case "PAGE_ACT": {
       if (!pageActPossible(request.act)) return null;
+      noteInstantAct(request.act);
       void performUiAct({
         kind: "UI_ACT",
         actId: actId(),
@@ -291,6 +294,7 @@ export function instantAct(text: string): InstantDone | null {
     // The Appearance control's own apply and store.
     case "THEME":
       BROWSER_EFFECTS.setTheme(request.theme);
+      noteInstantAct(`theme:${request.theme}`);
       return { what: "THEME" };
   }
 }

@@ -385,3 +385,45 @@ describe("what Q shows, over the page", () => {
     expect(shownOf({ ...base, streaming: true, blocks: [cards] })).toBeNull();
   });
 });
+
+describe("a voice line that also routes the words to Q (duplex)", () => {
+  it("Q's answer carrying the same act does not do it again", () => {
+    const area = document.documentElement;
+    Object.defineProperty(area, "scrollHeight", {
+      value: 3000,
+      configurable: true,
+    });
+    Object.defineProperty(area, "clientHeight", {
+      value: 800,
+      configurable: true,
+    });
+    const scrolls: number[] = [];
+    area.scrollBy = ((options: ScrollToOptions) =>
+      scrolls.push(options.top ?? 0)) as typeof area.scrollBy;
+    expect(actedHere("scroll down")).toBe(true);
+    // Q's routed answer: the code lane's PAGE_DOWN.
+    performClientAction({ kind: "SCREEN_ACT", act: "PAGE_DOWN" });
+    performClientAction({ kind: "SCREEN_ACT", act: "PAGE_DOWN" });
+    // The second is a new request of Q's, done.
+    return vi.waitFor(() => expect(scrolls).toHaveLength(2));
+  });
+
+  it("a press is not toggled back by Q's same act", async () => {
+    let pressed = 0;
+    const element = button("Readiness", () => (pressed += 1));
+    registerControl({
+      id: "button.readiness",
+      kind: "BUTTON",
+      element: () => element,
+    });
+    expect(actedHere("press Readiness")).toBe(true);
+    performClientAction({
+      kind: "UI_ACT",
+      actId: "uia_answer_1",
+      act: "ACTIVATE",
+      target: "button.readiness",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(pressed).toBe(1);
+  });
+});

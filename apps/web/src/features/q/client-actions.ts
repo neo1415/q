@@ -20,6 +20,7 @@ import {
   lastNavigationTo,
 } from "./control/navigation-lifecycle";
 import { currentRoute } from "./control/route-state";
+import { doneByScreen } from "./control/instant-ledger";
 import { performUiAct, requestMove } from "./ui-act-controller";
 import { announceLanguage } from "@/features/i18n/language";
 import { openDocumentViewer } from "@/features/documents/document-ready";
@@ -494,6 +495,15 @@ export function openedEarly(id: string): boolean {
   return true;
 }
 
+/** Q's screen acts that the screen's own instant acts already cover. */
+const SCREEN_ACT_DONE: Partial<Record<QScreenActIntent["act"], string>> = {
+  PAGE_DOWN: "SCROLL_DOWN",
+  PAGE_UP: "SCROLL_UP",
+  SCROLL_TOP: "SCROLL_TOP",
+  SCROLL_BOTTOM: "SCROLL_BOTTOM",
+  GO_BACK: "BACK",
+};
+
 /** Q's moves on Discover's feed, heard by the feed itself. */
 export const Q_FEED_EVENT = "cq:q-feed";
 
@@ -643,6 +653,7 @@ function performChecked(
   const action: QClientActionIntent = parsed.data;
   switch (action.kind) {
     case "SET_THEME":
+      if (doneByScreen(`theme:${action.theme}`)) return true;
       effects.setTheme(action.theme);
       return true;
     case "RELOAD_PAGE":
@@ -693,9 +704,14 @@ function performChecked(
     case "SET_DISCOVER_FILTERS":
       effects.setDiscoverFilters(action);
       return true;
-    case "SCREEN_ACT":
+    case "SCREEN_ACT": {
+      // Lane 7: already done by the screen for this sentence (a voice line
+      // that also routed it to Q): never scrolled or moved back twice.
+      const same = SCREEN_ACT_DONE[action.act];
+      if (same !== undefined && doneByScreen(same)) return true;
       effects.screen(action);
       return true;
+    }
     case "OPEN_SETTINGS":
       effects.goTo(settingsPath(action.section));
       return true;
@@ -717,6 +733,13 @@ function performChecked(
       return applyCardsIntent(action);
     // RECOVERY-2026-10: a registered control on the page, with a receipt.
     case "UI_ACT":
+      if (
+        doneByScreen(
+          action.target === undefined ? action.act : `control:${action.target}`,
+        )
+      ) {
+        return true;
+      }
       void performUiAct(action);
       return true;
   }
