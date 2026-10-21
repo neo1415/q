@@ -92,7 +92,9 @@ export function contextAskOf(text: string): ContextAsk | null {
     .replace(/^(?:(?:hey|ok|okay)\s+q\b[,\s]*)/iu, "")
     .replace(/[\s,]+(?:please|for\s+me|now|again|then|too)(?=[\s,]*$)/giu, "")
     .trim();
-  const object = VERB.exec(words)?.[1]?.trim().replace(/\s+tab$/iu, "");
+  const object = VERB.exec(words)?.[1]
+    ?.trim()
+    .replace(/\s+tab$/iu, "");
   if (object === undefined || object.length === 0) return null;
 
   // "it", "this", "that", "this one", "that one", "the one I'm on".
@@ -117,7 +119,11 @@ export function contextAskOf(text: string): ContextAsk | null {
     const position = ORDINALS[(ordinal[1] ?? "").toLowerCase()];
     const part = partOf(ordinal[2] ?? "");
     if (position === undefined || part === undefined) return null;
-    return { pointer: { kind: "ORDINAL", position }, owned: part !== null, part };
+    return {
+      pointer: { kind: "ORDINAL", position },
+      owned: part !== null,
+      part,
+    };
   }
 
   // "their deck", "its data room", "this company's team", "that deck",

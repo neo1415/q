@@ -145,7 +145,10 @@ function subjectsOfBlock(block: QTurnObjectBlock): Subject[] {
     case "UI_INTENT": {
       const intent = block.intent;
       if (intent.kind !== "OPEN_RECORD_PAGE") return [];
-      if (intent.page.startsWith("COMPANY") || intent.page.endsWith("COMPANY")) {
+      if (
+        intent.page.startsWith("COMPANY") ||
+        intent.page.endsWith("COMPANY")
+      ) {
         return [{ kind: "COMPANY", id: intent.id, name: null }];
       }
       if (
@@ -156,7 +159,18 @@ function subjectsOfBlock(block: QTurnObjectBlock): Subject[] {
       }
       return [];
     }
-    default:
+    case "COMPARISON_CARDS":
+    case "CLARIFICATION_REQUEST":
+    case "ACTION_PROPOSAL":
+    case "ARTIFACT_REFERENCE":
+    case "TABLE":
+    case "CHART":
+    case "MAP":
+    case "TIMELINE":
+    case "ATTENTION":
+    case "SUMMARY":
+    case "PICTURE":
+      // Names without a record (comparison cards), or no record at all.
       return [];
   }
 }
@@ -172,7 +186,8 @@ function listsShown(): Subject[][] {
   for (const turn of [...turns].reverse()) {
     if (turn.kind !== "Q") continue;
     for (const block of turn.blocks) {
-      if (block.kind !== "ANSWER_CARDS" && block.kind !== "COMPARISON") continue;
+      if (block.kind !== "ANSWER_CARDS" && block.kind !== "COMPARISON")
+        continue;
       const items = subjectsOfBlock(block);
       if (items.length > 0) lists.push(items);
     }
@@ -191,7 +206,8 @@ type MadeDocument = {
 // Scoring.
 // ---------------------------------------------------------------------------
 
-const keyOf = (subject: Subject) => `${subject.kind}:${subject.id.toLowerCase()}`;
+const keyOf = (subject: Subject) =>
+  `${subject.kind}:${subject.id.toLowerCase()}`;
 
 type Weights = {
   readonly screen: number;
@@ -398,7 +414,8 @@ export function resolveContext(
 
   // "The other one": of the pair in play, the one not in front of them.
   if (ask.pointer?.kind === "OTHER") {
-    const current = screen ?? scoredSubjects(pathname, THAT_WEIGHTS)[0]?.subject;
+    const current =
+      screen ?? scoredSubjects(pathname, THAT_WEIGHTS)[0]?.subject;
     const pool: Subject[] = [];
     for (const list of listsShown()) {
       if (list.length === 2) pool.push(...list);
@@ -437,10 +454,20 @@ export function resolveContext(
   }
   // Q's own document: strongest when the words name only a kind of
   // document ("the memo") or point at what was just made ("open that").
+  const newestAnswer = [...turns].reverse().find((turn) => turn.kind === "Q");
+  const inNewest = (one: MadeDocument) =>
+    newestAnswer?.kind === "Q" &&
+    newestAnswer.blocks.some(
+      (block) =>
+        block.kind === "ARTIFACT_REFERENCE" &&
+        block.artifactId.toLowerCase() === one.artifactId,
+    );
   for (const [index, one] of madeOfKind.entries()) {
+    // The one Q made in its latest answer is what "the doc" means, even
+    // on a record's page; "their memo" leans to the record's own.
     scored.push({
       target: documentTarget(one),
-      score: (ask.owned ? 2 : 6) - index,
+      score: ask.owned ? 2 - index : inNewest(one) ? 8 : 6 - index,
     });
   }
   if (ask.part === null && ask.pointer?.kind === "THAT") {
@@ -487,9 +514,7 @@ export function resolveContext(
   const best = new Map<string, Scored>();
   for (const one of scored) {
     const key =
-      one.target.kind === "PATH"
-        ? one.target.path
-        : `doc:${one.target.ref.id}`;
+      one.target.kind === "PATH" ? one.target.path : `doc:${one.target.ref.id}`;
     const known = best.get(key);
     if (known === undefined || known.score < one.score) best.set(key, one);
   }

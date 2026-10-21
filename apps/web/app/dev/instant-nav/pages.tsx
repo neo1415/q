@@ -133,3 +133,12 @@ export function InstantNavWork() {
     </section>
   );
 }
+
+export function InstantNavInvestor() {
+  return (
+    <section className="flex flex-col gap-4 p-4" data-harness-page="investor">
+      <h1 className="cq-title-md">Acorn Ventures</h1>
+      <Rows count={12} />
+    </section>
+  );
+}

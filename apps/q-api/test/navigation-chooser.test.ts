@@ -117,7 +117,8 @@ function tools(may: readonly string[]): QToolPort {
   };
 }
 
-function gateway(answer: string | null | "HANG") {
+/** A listed key, null, or "HANG" (never answers). */
+function gateway(answer: string | null) {
   const asked: string[] = [];
   const fake = {
     execute: (

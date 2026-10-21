@@ -73,10 +73,7 @@ export function resetOpened(): void {
  * The record a record page's intent shows (its subject), for the ledger;
  * null for a page that is not one record's.
  */
-export function subjectOfPage(
-  page: string,
-  id: string,
-): OpenedSubject | null {
+export function subjectOfPage(page: string, id: string): OpenedSubject | null {
   if (page === "DOCUMENT" || page === "DATA_ROOM_DOCUMENT") return null;
   if (page.startsWith("COMPANY") || page.startsWith("RELATIONSHIP_COMPANY")) {
     return { kind: "COMPANY", id: id.toLowerCase(), name: null };

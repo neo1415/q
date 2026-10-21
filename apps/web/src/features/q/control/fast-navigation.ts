@@ -35,11 +35,7 @@ import {
 } from "../client-actions";
 import { applyCardsIntent } from "../cards/card-visibility-store";
 import { navigationInFlight } from "../ui-act-controller";
-import {
-  resolveContext,
-  type ContextTarget,
-  type Scored,
-} from "./context-set";
+import { resolveContext, type ContextTarget, type Scored } from "./context-set";
 import { instantAct } from "./instant-acts";
 import { noteOpened, subjectOfPage } from "./instant-ledger";
 import { showInModal } from "./show-store";
@@ -468,7 +464,9 @@ async function pointedTarget(text: string): Promise<Pointed | null> {
         label: one.target.label.slice(0, 120),
       })),
     }).catch(() => null),
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), CHOOSE_WAIT_MS)),
+    new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), CHOOSE_WAIT_MS),
+    ),
   ]);
   if (answer?.kind === "CHOSEN") {
     const chosen = keyed.find(({ key }) => key === answer.key);

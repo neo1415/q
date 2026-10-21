@@ -271,3 +271,25 @@ describe("torn: the Q API's tie-break, then the chooser", () => {
     expect(shownNow()).toBeNull();
   });
 });
+
+describe("a document Q just made", () => {
+  it('"open the doc" on a company page is the memo Q just made, not the page\'s data room', async () => {
+    window.history.replaceState(null, "", `/company/${NORTHWIND}`);
+    noteRoute(`/company/${NORTHWIND}`);
+    setConversationTurns([
+      answer("a1", [opened("COMPANY", NIXO)]),
+      answer("a2", [
+        {
+          kind: "ARTIFACT_REFERENCE",
+          artifactId: MEMO,
+          type: "INVESTMENT_BRIEF",
+          status: "READY",
+          title: "Investment memo: Nixo",
+        },
+      ]),
+    ]);
+    await navigationHeard("open the doc");
+    expect(viewingDocumentNow()).toBe(MEMO);
+    expect(pushed).toEqual([]);
+  });
+});
