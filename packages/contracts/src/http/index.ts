@@ -1122,8 +1122,11 @@ export {
 } from "./visibility.js";
 
 export {
+  CardDetailSchema,
+  CardMetricSchema,
   ClaimHandleRequestSchema,
   COMPANY_CARD_FIELDS,
+  COMPANY_SECTION_CARD_FIELDS,
   HANDLE_HOLD_DAYS,
   HANDLE_MAX_LENGTH,
   HANDLE_MIN_LENGTH,
@@ -1151,6 +1154,9 @@ export {
   UpdateQCardRequestSchema,
   type ClaimHandleRequest,
   type Handle,
+  type CardDetail,
+  type CardMetric,
+  type CompanySectionCardField,
   type PublicCardCodeDto,
   type PublicCardDto,
   type PublicCardField,

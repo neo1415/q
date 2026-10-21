@@ -40,7 +40,33 @@ const IMAGE_LABELS: Readonly<Partial<Record<QCardField, string>>> = {
   mandateCustomerTypes: "Customer types",
   mandateGeographies: "Geographies",
   mandateLookFor: "What they look for",
+  // The card's richer sections (Q Story S6).
+  tractionMetrics: "Numbers",
+  currentRaise: "The raise",
+  investabilitySummary: "Q's reading",
+  relationshipSummary: "Investor conversations",
+  team: "Team",
+  documentsOnRequest: "Documents on request",
 };
+
+/**
+ * What each section puts on the card, said to the owner choosing its
+ * audience: the content is assembled from the profile, so there is no one
+ * value to preview.
+ */
+export const CARD_SECTION_HINTS: Readonly<Partial<Record<QCardField, string>>> =
+  {
+    tractionMetrics:
+      "Your latest metrics, each with how it's supported (self-reported, document-supported or verified).",
+    currentRaise: "Your open round: amount, instrument and use of funds.",
+    investabilitySummary:
+      "Q's reading of your readiness and investability, in words, labelled as Q's.",
+    relationshipSummary:
+      "How many investor conversations are at each stage. Never who.",
+    team: "Names and roles of the people on your team.",
+    documentsOnRequest:
+      "Titles of data room documents investors can request. Never the files.",
+  };
 
 /** Mandate facts that are lists; their value is "; "-separated names. */
 export const CARD_LIST_FIELDS: ReadonlySet<QCardField> = new Set([

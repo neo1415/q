@@ -1,4 +1,5 @@
 import {
+  type CardDetail,
   COMPANY_CARD_FIELDS,
   INVESTOR_CARD_FIELDS,
   QCardFieldScopesSchema,
@@ -121,13 +122,16 @@ export type CardAudience = "PUBLIC" | "PARTICIPANT";
  * PUBLIC (anyone with the link) sees public_external fields only. A
  * PARTICIPANT (a signed-in Capital Q person) additionally sees
  * network_visible ones. A field with no value is left out -- unknown is
- * not shown as blank on a public page, and never as zero.
+ * not shown as blank on a public page, and never as zero. A section's
+ * structured detail travels only beside its own field, under that field's
+ * scope: a detail with no field never reaches anyone.
  */
 export function projectCardFields(
   subjectType: QCardSubjectType,
   scopes: QCardFieldScopes,
   facts: Readonly<Record<string, string | null | undefined>>,
   audience: CardAudience,
+  details: Readonly<Record<string, CardDetail | null | undefined>> = {},
 ): PublicCardField[] {
   const fields: PublicCardField[] = [];
   const name = NAME_FIELD[subjectType];
@@ -137,7 +141,13 @@ export function projectCardFields(
       if (key === name || scopes[key] !== wanted) continue;
       const value = facts[key];
       if (typeof value !== "string" || value.trim().length === 0) continue;
-      fields.push({ key, value: value.slice(0, 2048), scope: wanted });
+      const detail = details[key];
+      fields.push({
+        key,
+        value: value.slice(0, 2048),
+        scope: wanted,
+        ...(detail === null || detail === undefined ? {} : { detail }),
+      });
     }
   }
   return fields;
