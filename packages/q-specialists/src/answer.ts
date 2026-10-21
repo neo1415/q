@@ -358,6 +358,7 @@ import {
   tabPlace,
   type TabAsk,
 } from "./tab-request.js";
+import { instantRequestOf, type InstantPageAct } from "./instant-request.js";
 import { movePhaseLine } from "@capital-q/q-core/speech";
 import {
   namedRecordRequestOf,
@@ -2716,7 +2717,7 @@ export function createSpecialistQAnswer(
    */
   const codeAnswersWords = (text: string): boolean =>
     (pageRequestOf(text) !== null && !takenBack(text)) ||
-    screenActOf(text) !== null ||
+    screenActOfTurn(text) !== null ||
     cardsLaneOf(text) !== null ||
     fitRankingLaneOf(text) !== null ||
     // Owner 2026-10-20: a tab by its name ("open the data room", "now the
@@ -3546,7 +3547,7 @@ export function createSpecialistQAnswer(
     // of the screen (founder 2026-10-06: Q said it could not scroll
     // because it could not see the page). Anything more than the command
     // goes to the normal path.
-    const screenAct = screenActOf(latest.content);
+    const screenAct = screenActOfTurn(latest.content);
     if (screenAct !== null) {
       logger?.info(
         { qRunId: request.runId, act: screenAct.act },
@@ -5367,6 +5368,34 @@ export function screenActOf(text: string): {
     return { act: "GO_BACK", said: "Going back." };
   }
   return null;
+}
+
+/**
+ * Lane 7 (instant nav): the page acts the browser now does by code are
+ * done here too when a turn still reaches Q (the duplex line routes the
+ * words as well), with the same screen act and words: 0 model calls, and
+ * the browser drops a repeat of an act it just did. Only acts with a
+ * screen-act equivalent: close, a press by name and the theme need a
+ * control resolved or a tool's authorize step, so they keep the normal
+ * path (and its early reading).
+ */
+const INSTANT_SCREEN_ACTS: Readonly<
+  Partial<Record<InstantPageAct, NonNullable<ReturnType<typeof screenActOf>>>>
+> = {
+  BACK: { act: "GO_BACK", said: "Going back." },
+  SCROLL_DOWN: { act: "PAGE_DOWN", said: "Scrolling down." },
+  SCROLL_UP: { act: "PAGE_UP", said: "Scrolling up." },
+  SCROLL_TOP: { act: "SCROLL_TOP", said: "Back to the top." },
+  SCROLL_BOTTOM: { act: "SCROLL_BOTTOM", said: "To the bottom." },
+};
+
+export function screenActOfTurn(text: string): ReturnType<typeof screenActOf> {
+  const direct = screenActOf(text);
+  if (direct !== null) return direct;
+  const instant = instantRequestOf(text);
+  return instant?.kind === "PAGE_ACT"
+    ? (INSTANT_SCREEN_ACTS[instant.act] ?? null)
+    : null;
 }
 
 /** Whether Q's last answer put cards on screen ("the first one" means a card then). */

@@ -15,7 +15,11 @@ import type {
 import { ActorContextSchema } from "@capital-q/security";
 import type { QTurnReader, QTurnSkimmer } from "@capital-q/model-gateway/q";
 
-import { createSpecialistQAnswer, ordinalRecallLine } from "../src/answer.js";
+import {
+  createSpecialistQAnswer,
+  ordinalRecallLine,
+  screenActOfTurn,
+} from "../src/answer.js";
 import { tabAskOf } from "../src/tab-request.js";
 
 /**
@@ -375,4 +379,23 @@ describe("the conversation is read once per run (row 5)", () => {
       "why does Halyard fit my mandate so well?",
     );
   });
+});
+
+describe("lane 7's page acts reach Q on the duplex line: done by code, 0 model calls", () => {
+  it.each([
+    ["take me back", "Going back."],
+    ["scroll to the bottom of the page", "To the bottom."],
+  ])("%s", async (said, line) => {
+    const s = seam({ said, history: [] });
+    const { modelCalls, stored } = await s.run();
+    expect(modelCalls).toBe(0);
+    expect(stored).toEqual([line]);
+  });
+
+  it.each(["close it", "press Filters", "switch to dark mode"])(
+    "%s keeps the normal path (a control or a tool's authorize step)",
+    (said) => {
+      expect(screenActOfTurn(said)).toBeNull();
+    },
+  );
 });
