@@ -54,6 +54,24 @@ describe("the streamed interview turn", () => {
     await server.close();
   });
 
+  it("sends each stage as it happens, before any sentence (owner 2026-10-21)", async () => {
+    const server = app((stream) => {
+      stream.stage({ stage: "READING", label: "Reading what you said" });
+      stream.sentence("Seed, noted.");
+      stream.end("result", { reply: "Seed, noted." });
+      stream.stage({ stage: "WRITING", label: "never after the end" });
+    });
+    const response = await server.inject({ method: "POST", url: "/turn" });
+    expect(response.body).toBe(
+      [
+        'event: stage\ndata: {"stage":"READING","label":"Reading what you said"}\n\n',
+        'event: sentence\ndata: {"text":"Seed, noted."}\n\n',
+        'event: result\ndata: {"reply":"Seed, noted."}\n\n',
+      ].join(""),
+    );
+    await server.close();
+  });
+
   it("opens nothing before the first sentence: a failure is the ordinary reply", async () => {
     const server = app(() => undefined);
     const response = await server.inject({ method: "POST", url: "/turn" });

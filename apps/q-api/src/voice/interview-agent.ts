@@ -11,6 +11,7 @@ import {
   QRunIdSchema,
   type ModelMessage,
   type OnboardingSessionView,
+  type QInterviewStage,
 } from "@capital-q/contracts";
 import {
   COUNTRY_OPTIONS_V5,
@@ -95,6 +96,7 @@ import {
   acknowledgementIn,
   acknowledgementParts,
   quickAcknowledgement,
+  quickReceipt,
   RESEARCH_NOTHING_LINE,
   RESEARCH_STARTED_LINE,
   type ChoicesOf,
@@ -282,6 +284,12 @@ export type InterviewAgentTurnInput = InterviewTurnInput & {
    * The returned outcome still carries the whole reply.
    */
   readonly onSentence?: ((sentence: string) => void) | undefined;
+  /**
+   * Each stage of the turn as it happens (owner 2026-10-21: show what Q is
+   * doing, from real events, never a timer): their words received, their
+   * answers being saved, a look-up started, the reply being written.
+   */
+  readonly onStage?: ((stage: QInterviewStage) => void) | undefined;
 };
 
 export type InterviewAgentDependencies = {
@@ -941,6 +949,22 @@ export function createInterviewAgent(
     const startedAt = now();
     const utterance = input.utterance.trim();
     const opening = utterance.length === 0;
+    // Each stage once a turn, as it happens; a listener that throws never
+    // costs the turn.
+    const stagesSaid = new Set<QInterviewStage["stage"]>();
+    const stage = (key: QInterviewStage["stage"], label: string): void => {
+      if (input.onStage === undefined || stagesSaid.has(key)) return;
+      stagesSaid.add(key);
+      try {
+        input.onStage({ stage: key, label: label.slice(0, 200) });
+      } catch {
+        // Display only.
+      }
+    };
+    stage(
+      "READING",
+      opening ? "Getting your setup ready" : "Reading what you said",
+    );
     const runId = QRunIdSchema.parse(randomUUID());
     const correlationId = CorrelationIdSchema.safeParse(
       input.attribution.correlationId,
@@ -1257,6 +1281,29 @@ export function createInterviewAgent(
         ? dependencies.investorResearch
         : dependencies.founderResearch;
     const considerResearch = (
+      view: OnboardingSessionView | null,
+      links?: {
+        readonly websiteUrl: string | null;
+        readonly profileUrls: readonly string[];
+      },
+    ): boolean => {
+      const started = startResearch(view, links);
+      if (started) {
+        const name =
+          input.journeyType === "investor"
+            ? firmNameOf(view, input.signup?.organisationName ?? null)
+            : textAnswerOf(view, FOUNDER_STEPS.companyName) ||
+              (input.signup?.organisationName?.trim() ?? "");
+        stage(
+          "LOOKING_UP",
+          name.length > 0
+            ? `Looking up ${name.slice(0, 120)}`
+            : "Looking up public sources",
+        );
+      }
+      return started;
+    };
+    const startResearch = (
       view: OnboardingSessionView | null,
       links?: {
         readonly websiteUrl: string | null;
@@ -1751,6 +1798,8 @@ export function createInterviewAgent(
     // A reply code wrote from committed results: every field it names is
     // on the record by construction.
     let writtenByCode = false;
+    /** A receipt code said as the reply's first sentence, if any. */
+    let leadSaid: string | null = null;
     let rounds = 0;
     let calls = 0;
     let timedOut = false;
@@ -1900,7 +1949,11 @@ export function createInterviewAgent(
         }
         if (
           actions.length === 0 ||
-          actions.some((action) => action.tool !== "record_answers")
+          actions.some(
+            (action) =>
+              action.tool !== "record_answers" &&
+              action.tool !== "already_said",
+          )
         ) {
           return null;
         }
@@ -1972,9 +2025,21 @@ export function createInterviewAgent(
             latestByStep.set(result.stepKey, result);
           }
         }
-        const results = [...latestByStep.values()];
+        const results = [...latestByStep.values()].filter(
+          (item) => !receiptSaid.has(item.stepKey),
+        );
         const flow = flowFor(state);
         if (flow.next === null || flow.next.confirming) return null;
+        // Everything new was in the receipt already said: only the question.
+        if (leadSaid !== null && results.length === 0) {
+          if (language !== null) return null;
+          const question = flow.next.question.trim();
+          const asked = InterviewAgentV16ResultSchema.safeParse({
+            reply: `${leadSaid} ${question.endsWith("?") ? question : `${question}?`}`,
+            asking: flow.next.stepKey,
+          });
+          return asked.success ? asked.data : null;
+        }
         const profile = coverageProfileFor(input.journeyType);
         const acknowledgement = {
           results,
@@ -1999,7 +2064,7 @@ export function createInterviewAgent(
               );
         if (reply === null) return null;
         const parsed = InterviewAgentV16ResultSchema.safeParse({
-          reply,
+          reply: withLead(reply),
           asking: flow.next.stepKey,
         });
         return parsed.success ? parsed.data : null;
@@ -2153,6 +2218,59 @@ export function createInterviewAgent(
         "stated answers completed by code",
       );
     };
+    /** Step keys the receipt already said, so code never says them twice. */
+    const receiptSaid = new Set<string>();
+    /**
+     * What committed so far, said by code now as the reply's first
+     * sentence, while a model round writes the rest (owner 2026-10-21:
+     * Q's first words within 2-3 s). English only, like every code line;
+     * the model is told it was said, so it never says it twice. Once a
+     * turn, and only before a second model round or the reply call.
+     */
+    const sayReceiptNow = (): void => {
+      if (!codeSpeaksEnglish || input.onSentence === undefined) return;
+      if (leadSaid !== null) return;
+      const latest = new Map<string, OnboardingRecordResult>();
+      for (const action of actions) {
+        if (action.tool !== "record_answers") continue;
+        const parsed = RecordedResultsSchema.safeParse(action.result);
+        if (!parsed.success) continue;
+        for (const item of parsed.data.results) {
+          latest.delete(item.stepKey);
+          latest.set(item.stepKey, item);
+        }
+      }
+      const profile = coverageProfileFor(input.journeyType);
+      const results = [...latest.values()];
+      const receipt = quickReceipt({
+        results,
+        labelOf: (stepKey: string) => profile.fields[stepKey]?.label,
+        turnIndex: Math.floor(thread.length / 2),
+      });
+      if (receipt === null) return;
+      leadSaid = receipt;
+      for (const item of results) {
+        if (item.outcome === "COMMITTED") receiptSaid.add(item.stepKey);
+      }
+      try {
+        input.onSentence(receipt);
+      } catch {
+        // Display only.
+      }
+      actions.push({
+        tool: "already_said",
+        input: { by: "code" },
+        result: {
+          said: receipt,
+          note: "Already said to them, word for word, as the start of your reply. Continue straight on from it; never repeat or rephrase it.",
+        },
+      });
+    };
+    /** The reply as they saw it: the receipt said first, then the rest. */
+    const withLead = (reply: string): string =>
+      leadSaid === null || reply.startsWith(leadSaid)
+        ? reply
+        : `${leadSaid} ${reply}`;
     try {
       // Their words are kept before the first round's model sees them
       // (already settled where the reader waited on it).
@@ -2190,6 +2308,7 @@ export function createInterviewAgent(
       ) {
         const said = utterance.trim().replace(/[.!]+$/u, "");
         const answers = [{ stepKey: exactStep, value: said, quote: said }];
+        stage("SAVING", "Saving your answer");
         const results = await port
           .record(
             answers.map((answer) => ({
@@ -2223,6 +2342,7 @@ export function createInterviewAgent(
         remaining() > REPLY_RESERVE_MS
       ) {
         rounds += 1;
+        if (rounds > 1) sayReceiptNow();
         const unread = reading === null;
         if (reading !== null) {
           const before = actions.length;
@@ -2271,12 +2391,25 @@ export function createInterviewAgent(
             written,
             InterviewAgentV16ResultSchema,
           );
-          if (accepted.ok) result = accepted.value;
+          if (accepted.ok) {
+            result = {
+              ...accepted.value,
+              reply: withLead(accepted.value.reply),
+            };
+          }
           break;
         }
         if (response.output.kind !== "TOOL_CALLS") break;
         const proposals = response.output.calls.slice(0, MAX_CALLS - calls);
         const roundStart = actions.length;
+        if (
+          proposals.some(
+            (call) =>
+              call.name === "record_answers" || call.name === "correct_answer",
+          )
+        ) {
+          stage("SAVING", "Saving your answers");
+        }
         for (const call of proposals) {
           calls += 1;
           const outcome = await tools.execute(
@@ -2332,7 +2465,11 @@ export function createInterviewAgent(
         }
       }
       if (result === undefined && remaining() > MIN_REPLY_MS) {
-        // The reply, written after every result so far, with no tools left.
+        // The reply, written after every result so far, with no tools left;
+        // streamed, so its first sentence is shown and spoken while the rest
+        // is written (owner 2026-10-21: first words within 2-3 s).
+        stage("WRITING", "Writing a reply");
+        sayReceiptNow();
         const rendered = render();
         const response = await gateway.execute<InterviewAgentV16Result>(
           {
@@ -2344,12 +2481,15 @@ export function createInterviewAgent(
             schema: InterviewAgentV16ResultSchema,
             firstAttemptTimeoutMs: FIRST_ATTEMPT_MS,
             signal,
+            ...(stream === undefined ? {} : { onTextDelta: stream.push }),
           },
         );
         if (response.output.kind === "STRUCTURED") {
           result = (
             response.output as { readonly value: InterviewAgentV16Result }
           ).value;
+          // The receipt already said is the reply's opening, as they saw it.
+          result = { ...result, reply: withLead(result.reply) };
         }
       }
     } catch (error: unknown) {

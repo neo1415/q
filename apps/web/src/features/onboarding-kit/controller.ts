@@ -143,6 +143,11 @@ export type OnboardingActions<TResponse> = {
     focus?: string,
     /** Turn latency L9: Q's reply, a finished sentence at a time. */
     onSentence?: (text: string) => void,
+    /** What Q is doing now, from real events in the turn. */
+    onStage?: (stage: {
+      readonly stage: string;
+      readonly label: string;
+    }) => void,
   ) => Promise<OnboardingTurn | null>;
   /** Re-read the session from the runtime (Q's reading may have landed). */
   readonly refresh: () => Promise<void>;
@@ -373,7 +378,7 @@ export function useOnboardingJourney<
       }
       return run(() => submit(input), true);
     },
-    say: async (text, recentTurns, focus, onSentence) => {
+    say: async (text, recentTurns, focus, onSentence, onStage) => {
       const say = requireClient().say;
       if (say === undefined) {
         return null;
@@ -422,6 +427,7 @@ export function useOnboardingJourney<
           recentTurns,
           ...(focus === undefined ? {} : { focus }),
           ...(onSentence === undefined ? {} : { onSentence }),
+          ...(onStage === undefined ? {} : { onStage }),
         });
         turn = {
           understood: outcome.understood,

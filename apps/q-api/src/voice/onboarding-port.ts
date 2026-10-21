@@ -426,8 +426,7 @@ export function createOnboardingPort(input: {
   const unsaid = (stepKey: string): OnboardingRecordResult => ({
     stepKey: stepKey.slice(0, 80),
     outcome: "REJECTED",
-    reason:
-      "That quote is not in anything the person said here, so nothing was recorded. Only their own words can put an answer on the record.",
+    reason: UNSAID_REASON,
   });
 
   /**
@@ -1590,10 +1589,7 @@ export function createOnboardingPort(input: {
     return {
       stepKey: stepKey.slice(0, 80),
       outcome: "REJECTED",
-      reason:
-        authority === null
-          ? "What they just said could not be confirmed, so nothing was recorded. Ask them to say it again."
-          : "Their latest words do not state this about themselves, so nothing was recorded. A question, advice or a mention is never their answer; ask them if you want to know.",
+      reason: authority === null ? UNCONFIRMED_REASON : NOT_STATED_REASON,
     };
   };
 
@@ -3120,6 +3116,14 @@ export function shortWordIn(quote: string, said: string): boolean {
 /** Steps whose answer is a narrative Q may summarise for their yes. */
 /** How long a plain read of the session stands in for another (see readAt). */
 const READ_REUSE_MS = 1_500;
+/** Why a write is refused when its quote is not in their words. */
+const UNSAID_REASON =
+  "That quote is not in anything the person said here, so nothing was recorded. Only their own words can put an answer on the record.";
+const UNCONFIRMED_REASON =
+  "What they just said could not be confirmed, so nothing was recorded. Ask them to say it again.";
+const NOT_STATED_REASON =
+  "Their latest words do not state this about themselves, so nothing was recorded. A question, advice or a mention is never their answer; ask them if you want to know.";
+
 const PARAPHRASABLE: ReadonlySet<string> = new Set(["long_text", "voice_text"]);
 
 const ASKING =

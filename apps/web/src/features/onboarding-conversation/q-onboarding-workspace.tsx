@@ -128,6 +128,11 @@ export type QOnboardingWorkspaceActions = {
     focus?: string,
     /** Turn latency L9: Q's reply, a finished sentence at a time. */
     onSentence?: (text: string) => void,
+    /** What Q is doing now, from real events in the turn. */
+    onStage?: (stage: {
+      readonly stage: string;
+      readonly label: string;
+    }) => void,
   ) => Promise<OnboardingTurn | null>;
   readonly skip: () => Promise<void>;
   /** A tapped option, as the value it stands for (CQ-Q-VOICE-001 B §17). */
@@ -308,6 +313,12 @@ export function QOnboardingWorkspace({
   const [qStream, setQStream] = useState<QStreamState | null>(null);
   /** Turn latency L9: Q's typed reply, as far as Q has written it. */
   const [replyStream, setReplyStream] = useState<string | null>(null);
+  /**
+   * What Q is doing during a typed turn, as the turn reports it ("Reading
+   * what you said", "Saving your answers", "Looking up Nixo", "Writing a
+   * reply"): real events, never a timer (owner 2026-10-21).
+   */
+  const [turnStage, setTurnStage] = useState<string | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [showGaps, setShowGaps] = useState(false);
   /** After an ambiguous answer, only the options that fit are offered. */
@@ -936,14 +947,24 @@ export function QOnboardingWorkspace({
       // Turn latency L9: Q's reply shows a sentence at a time while the turn
       // runs; the finished turn below then takes its place, as before.
       setReplyStream(null);
+      setTurnStage(null);
       const turn = await actions
-        .say(trimmed, recentTurns(), undefined, (sentence) => {
-          setReplyStream((so) =>
-            so === null ? sentence : `${so} ${sentence}`,
-          );
-        })
+        .say(
+          trimmed,
+          recentTurns(),
+          undefined,
+          (sentence) => {
+            setReplyStream((so) =>
+              so === null ? sentence : `${so} ${sentence}`,
+            );
+          },
+          (stage) => {
+            setTurnStage(stage.label);
+          },
+        )
         .finally(() => {
           setReplyStream(null);
+          setTurnStage(null);
         });
       if (turn !== null && draftId !== undefined) {
         confirmSent(draftId, trimmed);
@@ -1544,13 +1565,22 @@ export function QOnboardingWorkspace({
       const startedAt = Date.now();
       let ready = false;
       while (Date.now() - startedAt < 120_000) {
-        await new Promise((resolve) => setTimeout(resolve, 3_000));
+        // Every second while a deck is usually read, then every three: Q
+        // takes it up as soon as it lands, not up to 3 s after (owner
+        // 2026-10-21: answers within 5 s).
+        await new Promise((resolve) =>
+          setTimeout(resolve, Date.now() - startedAt < 15_000 ? 1_000 : 3_000),
+        );
         const listed = await materialListAction(companyIdForUpload);
         if (!listed.ok) break;
         const item = listed.value.find((f) => f.id === done.value.documentId);
         if (item !== undefined && item.state === "ready") {
           ready = true;
           break;
+        }
+        // The reading's own stage as the server reports it, not a timer.
+        if (item !== undefined && item.stateLabel.length > 0) {
+          setUploadNote(`${file.name}: ${item.stateLabel}`);
         }
         if (item !== undefined && item.state === "unreadable") {
           setUploadNote(item.stateLabel);
@@ -1939,6 +1969,8 @@ export function QOnboardingWorkspace({
 
       {askingQ ? (
         <QStateIndicator state="WORKING" detail={qStageLabel} />
+      ) : turnStage !== null && replyStream === null ? (
+        <QStateIndicator state="WORKING" detail={turnStage} />
       ) : reading && !readingLanded && !readingTimedOut ? (
         <QStateIndicator state="WORKING" detail="Reading what you said" />
       ) : null}

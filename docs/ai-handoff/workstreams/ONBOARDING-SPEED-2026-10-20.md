@@ -242,3 +242,66 @@ Shared files: none. No contract, migration, RLS, authorization or model-routing 
   - Merge PR #275 (coordinator), then CI on the integration push.
   - pgTAP 984, then apply migration `20261228210000` before deploying.
   - Live browser verification on phone and desktop, typed and voice. There is no Supabase/Docker in this sandbox, so `packages/onboarding` database tests and e2e were not run.
+
+## Round 3, speed pass (owner 2026-10-21: lightning fast, never by cutting real work)
+
+### Timing per journey (harness `apps/q-api/test/onboarding-journeys.bench.test.ts`)
+
+**What runs for real:** the interview agent, onboarding port, tools, reply guards and code paths.
+
+**What is faked, with assumed latencies:**
+
+- API round trip: 150 ms
+- database read: 40 ms
+- independent reading: 1.5 s
+- model tool round: 1.8 s
+- model reply round: 1.6 s
+- first streamed token: 700 ms
+- text-to-speech first audio: 300 ms
+
+The latencies come from the production traces recorded in `interview-latency.bench.test.ts` (hosted rounds about 2 s, 2026-09-30) and the providers' first-token and first-audio figures. No provider was called; cost $0.
+
+"Before" is the same harness run on the code at this lane's start (`337046f`); "After" is this branch. All values are in ms. Before, nothing showed until Q's first words.
+
+| Journey                                           | Before complete | After complete | Before first visible | After first visible | Before first words | After first words | Model calls (before → after) |
+| ------------------------------------------------- | --------------: | -------------: | -------------------: | ------------------: | -----------------: | ----------------: | ---------------------------- |
+| Opening / resume                                  |           2,412 |          2,506 |                1,620 |                   8 |              1,620 |             1,714 | 1 → 1                        |
+| Typed exact answer ("Seed.")                      |           2,232 |            797 |                1,679 |                   0 |              1,679 |               707 | 1 → 0                        |
+| Typed answer, clean save                          |           2,684 |          2,618 |                2,596 |                   0 |              2,596 |             2,530 | 2 → 2                        |
+| Typed answer needing Q's judgement                |           4,320 |          4,287 |                3,545 |                   0 |              3,545 |             2,532 | 3 → 3                        |
+| Typed answer, refused (nothing of theirs to save) |           4,048 |          4,052 |                3,955 |                   0 |              3,955 |             3,502 | 3 → 3                        |
+| Spoken answer, clean save                         |           2,595 |          2,602 |                2,506 |                   0 |              2,806 |             2,813 | 2 → 2                        |
+| Answer naming the company (research by name)      |           2,597 |          2,598 |                2,505 |                   0 |              2,505 |             2,509 | 2 → 2                        |
+
+Model calls include the independent reading, which runs alongside the first round. Research and document reading run in the background: the turn never waits on them, and the screen shows their stage.
+
+### What changed
+
+- **Stages, from real events.** The turn reports READING ("Reading what you said" / "Getting your setup ready"), SAVING ("Saving your answers"), LOOKING_UP ("Looking up <company>") and WRITING ("Writing a reply"). They travel as an SSE `stage` event from q-api to api to the web route to `say-stream.ts`, and the workspace shows them in the working indicator.
+  - Contract: `QInterviewStageSchema` and `Q_INTERVIEW_STREAM_EVENTS.STAGE`, both additive.
+- **Exact answers take no model call.** A one-word answer or a bare figure for the step just asked is saved by code and replied to by code (708 ms instead of 1.7 s for the first words).
+- **What was saved is said first.** When a turn needs Q's judgement, code says what saved the moment the save commits ("stage: Seed; country: Kenya.") while the model writes the rest. The model is told it was said, so it never repeats it. English only, like every code line. First words: 3.5 s → 2.5 s.
+- **The final reply streams.** Its first sentence shows while the rest is written.
+- **Uploads.** The reading is checked every 1 s for the first 15 s (was every 3 s), and the reader's own stage label is shown ("deck.pdf: <stage>").
+- **Kept, deliberately:**
+  - the independent reading;
+  - a second recording round where one is needed;
+  - every guard, the Context Firewall and the evidence axes;
+  - research and document reading, in full.
+- **Reverted after the owner's correction:**
+  - a 5 s cap on tool rounds, because it could skip saving an answer;
+  - code re-asking a question when nothing of the person's could be saved, because it could ignore what they asked. It also broke two existing guard tests, which pass again.
+
+### Still slower, and why
+
+The refused case ("Our gross margin is decent", with the model offering a figure they never said) has its first words at 3.5 s. It needs one model round to read the turn and one to word a reply, and neither can be dropped without cutting the guard or the reply's quality. Its stages show from 0 ms.
+
+### Gates
+
+- vitest: 135 files, 1,432 tests pass (q-api interview/onboarding/voice, api gateq, onboarding and interview, onboarding, gateq-intake, q-evals, contracts, web onboarding, voice and gateq).
+- New tests:
+  - stages in order, and the receipt said first and never twice (`interview-latency-paths.test.ts`);
+  - stage frames (`interview-stream.test.ts`, `interview-client-stream.test.ts`, `onboarding-say-stream.test.ts`);
+  - the journey harness.
+- Root `tsc` 0; q-api, api and web `tsc` clean; eslint and prettier clean.
+- Not live-verified. No provider calls.

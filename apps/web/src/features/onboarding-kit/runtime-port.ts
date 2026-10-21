@@ -101,6 +101,13 @@ export type RuntimePort = {
         readonly focus?: string | undefined;
         /** Turn latency L9: each finished sentence of Q's reply, as it is written. */
         readonly onSentence?: ((text: string) => void) | undefined;
+        /** What Q is doing now, from real events in the turn. */
+        readonly onStage?:
+          | ((stage: {
+              readonly stage: string;
+              readonly label: string;
+            }) => void)
+          | undefined;
       }) => Promise<SayOnboardingResponse>)
     | undefined;
   /**
@@ -508,6 +515,12 @@ export function createRuntimeClient<
             }[];
             readonly focus?: string | undefined;
             readonly onSentence?: ((text: string) => void) | undefined;
+            readonly onStage?:
+              | ((stage: {
+                  readonly stage: string;
+                  readonly label: string;
+                }) => void)
+              | undefined;
           }) =>
             guarded(async () => {
               const say = port.say;
@@ -528,6 +541,9 @@ export function createRuntimeClient<
                 ...(input.onSentence === undefined
                   ? {}
                   : { onSentence: input.onSentence }),
+                ...(input.onStage === undefined
+                  ? {}
+                  : { onStage: input.onStage }),
               });
               return {
                 view: await present(remember(outcome.view)),
