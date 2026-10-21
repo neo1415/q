@@ -972,6 +972,7 @@ export function QOnboardingWorkspace({
       settleReading,
       askQ,
       handleUnderstanding,
+      markUnsent,
       actions,
       voiceActive,
       voiceConnected,

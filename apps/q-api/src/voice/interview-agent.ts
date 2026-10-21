@@ -1133,7 +1133,7 @@ export function createInterviewAgent(
       // just asked: code reads that, with no model call (owner 2026-10-16).
       const decided =
         dependencies.readingByCodeWhereExact === true
-          ? await (async () => {
+          ? (() => {
               const view = stateForReading;
               const open = new Set(
                 view?.steps
