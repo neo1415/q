@@ -80,7 +80,11 @@ function Strip() {
   );
 }
 
-export function InstantNavShell({ children }: { readonly children: ReactNode }) {
+export function InstantNavShell({
+  children,
+}: {
+  readonly children: ReactNode;
+}) {
   return (
     <GlobalQProvider subject={NO_SUBJECT} connected={false}>
       <QControlRuntime />

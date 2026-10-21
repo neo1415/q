@@ -1,1 +1,12 @@
-{"id":36,"said":"switch to dark mode","page":"/feed","channel":"typed","kind":"theme","ms":137,"runs":0,"reads":0,"moves":1,"outcome":"done on screen"}
+{
+  "id": 36,
+  "said": "switch to dark mode",
+  "page": "/feed",
+  "channel": "typed",
+  "kind": "theme",
+  "ms": 137,
+  "runs": 0,
+  "reads": 0,
+  "moves": 1,
+  "outcome": "done on screen"
+}
