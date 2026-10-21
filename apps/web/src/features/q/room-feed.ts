@@ -2,7 +2,12 @@
 
 import { useEffect, useRef } from "react";
 
-import type { QRoomEntry, QRoomPreview, QRoomRead } from "@capital-q/contracts";
+import type {
+  QRoomEntry,
+  QRoomPreview,
+  QRoomRead,
+  QRoomStages,
+} from "@capital-q/contracts";
 
 /**
  * voice-cards: the person's Q room feed, read in the browser.
@@ -42,6 +47,8 @@ export function startRoomFeed(options: {
    * answer lands. Never for an answer already handed over.
    */
   readonly onPreview?: ((preview: QRoomPreview) => void) | undefined;
+  /** Owner 2026-10-21: the spoken turn's real stages so far. */
+  readonly onStages?: ((stages: QRoomStages) => void) | undefined;
   readonly now?: (() => number) | undefined;
   readonly wait?:
     ((ms: number, signal: AbortSignal) => Promise<void>) | undefined;
@@ -114,6 +121,7 @@ export function startRoomFeed(options: {
       if (live !== undefined && !seen.has(live.preview.messageId)) {
         options.onPreview?.(live);
       }
+      if (read.stages !== undefined) options.onStages?.(read.stages);
     }
   })();
 
@@ -166,13 +174,16 @@ export function useQRoomFeed(
   onEntries: (entries: readonly QRoomEntry[]) => void,
   read: RoomRead = fetchRoomRead,
   onPreview?: (preview: QRoomPreview) => void,
+  onStages?: (stages: QRoomStages) => void,
 ): void {
   const handler = useRef(onEntries);
   const previewHandler = useRef(onPreview);
+  const stagesHandler = useRef(onStages);
   useEffect(() => {
     handler.current = onEntries;
     previewHandler.current = onPreview;
-  }, [onEntries, onPreview]);
+    stagesHandler.current = onStages;
+  }, [onEntries, onPreview, onStages]);
   const seen = useRef(new Set<string>());
   useEffect(() => {
     if (!active) return;
@@ -181,6 +192,7 @@ export function useQRoomFeed(
       seen: seen.current,
       onEntries: (entries) => handler.current(entries),
       onPreview: (preview) => previewHandler.current?.(preview),
+      onStages: (stages) => stagesHandler.current?.(stages),
     });
     return () => reader.stop();
   }, [active, read]);

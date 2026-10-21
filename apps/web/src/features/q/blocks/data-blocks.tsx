@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import type { QMapSpec, QResultBlock } from "@capital-q/contracts";
 
@@ -42,27 +42,78 @@ function ColumnHead({
   return href === null ? (
     <>{label}</>
   ) : (
-    <Link href={href} className={LINK}>
+    // A full 44 px target in the header row (accessibility).
+    <Link href={href} className={`inline-flex min-h-11 items-center ${LINK}`}>
       {label}
     </Link>
   );
 }
 
+/**
+ * True when the table is wider than its frame: the frame then scrolls, and
+ * a keyboard must be able to reach it (WCAG 2.1.1). Not a tab stop when
+ * everything fits.
+ */
+function useOverflows<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const element = ref.current;
+    if (element === null || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      setOverflows(element.scrollWidth > element.clientWidth + 1);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+  return { ref, overflows };
+}
+
+/** A cell that is a figure: starts with a digit, or a currency then a digit. */
+const FIGURE = /^[^\p{L}\s]?\s?\d/u;
+
 export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
   const t = useT();
+  const { ref, overflows } = useOverflows<HTMLDivElement>();
+  // On a narrow screen the row labels stay in view while the companies
+  // scroll under them: sticky on the card's own surface (a positioned cell
+  // paints over the others without a z-index), with a divider only while
+  // the table actually scrolls.
+  // (An inset shadow, because a collapsed table's borders do not travel
+  // with a sticky cell.)
+  const sticky = `sticky start-0 bg-(--cq-surface-raised) ${
+    overflows
+      ? "shadow-[inset_-1px_0_0_var(--cq-border-subtle)] rtl:shadow-[inset_1px_0_0_var(--cq-border-subtle)]"
+      : ""
+  }`;
   return (
-    <div className="relative overflow-x-auto" data-q-table>
+    <div
+      ref={ref}
+      className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)"
+      data-q-table
+      {...(overflows
+        ? {
+            tabIndex: 0,
+            role: "region",
+            "aria-label": t("Comparison table, scrolls sideways"),
+          }
+        : {})}
+    >
       <table className="w-full border-collapse text-start">
         <thead>
           <tr>
-            <th className="px-0 py-2 pe-4">
+            <th className={`px-0 py-2 pe-4 ${sticky}`}>
               <span className="sr-only">{t("Attribute")}</span>
             </th>
             {block.columns.map((column, index) => (
               <th
                 key={`${column.label}-${String(index)}`}
                 scope="col"
-                className="cq-label px-4 py-2 text-(--cq-text-primary)"
+                className="cq-label min-w-32 px-4 py-1 text-start align-bottom text-(--cq-text-primary)"
               >
                 <ColumnHead
                   label={column.label}
@@ -80,16 +131,21 @@ export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
             >
               <th
                 scope="row"
-                className="cq-body-sm px-0 py-2 pe-4 font-normal text-(--cq-text-secondary)"
+                className={`cq-body-sm min-w-28 px-0 py-2.5 pe-4 text-start align-top font-normal text-(--cq-text-secondary) ${sticky}`}
               >
                 {row.label}
               </th>
               {row.cells.map((cell, index) => (
                 <td
                   key={`${row.label}-${String(index)}`}
-                  className="cq-body-sm px-4 py-2 align-top text-(--cq-text-primary)"
+                  // Figures line up down a column (tabular numerals); words
+                  // keep proportional spacing ("Pre-seed").
+                  className={`cq-body-sm px-4 py-2.5 align-top text-(--cq-text-primary) ${
+                    FIGURE.test(cell) ? "cq-numeric" : ""
+                  }`}
                 >
                   {cell === "" ? (
+                    // Unknown stays unknown, said in words, never a dash.
                     <span className="text-(--cq-text-tertiary)">
                       {t("Not known")}
                     </span>

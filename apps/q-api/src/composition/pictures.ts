@@ -3,7 +3,11 @@ import {
   type StockPictureProvider,
 } from "@capital-q/model-gateway/images/stock";
 import type { QPicturePort } from "@capital-q/model-gateway/q";
-import { composeEgressQuery } from "@capital-q/q-research";
+import {
+  composeEgressQuery,
+  isConnective,
+  tokenise,
+} from "@capital-q/q-research";
 
 /**
  * L-13 (owner ask 2026-10-20): pictures for Q's answers, from Pexels (the
@@ -12,9 +16,10 @@ import { composeEgressQuery } from "@capital-q/q-research";
  * The search words pass q-research's outbound Context Firewall exactly as
  * a web search does: only words the person wrote this turn or earlier, and
  * connectives, survive from the model's proposal; figures never leave. No
- * subject identity is supplied, so a company's name is never sent to a
- * picture library, and when nothing of the person's survives there is no
- * search at all.
+ * subject identity is supplied, and every word of a name this run read
+ * (`withheld`) is dropped even when the person typed it, so a company's,
+ * investor's or person's name never reaches a picture library. When
+ * nothing survives there is no search at all.
  */
 export function createQPictures(
   provider: StockPictureProvider | undefined,
@@ -29,12 +34,25 @@ export function createQPictures(
         publicIdentity: [],
       });
       if (!egress.ok) return null;
-      const found = await provider.search(egress.query, {
+      const withheld = new Set(
+        (input.withheld ?? []).flatMap((name) => tokenise(name).map(bare)),
+      );
+      const kept = tokenise(egress.query).filter(
+        (token) => !withheld.has(bare(token)),
+      );
+      // Joining words alone ("the of") are no search.
+      if (kept.every((token) => isConnective(token))) return null;
+      const found = await provider.search(kept.join(" "), {
         signal: input.signal,
       });
       return found[0] ?? null;
     },
   };
+}
+
+/** "freight's" and "freight" are the same word to withhold. */
+function bare(token: string): string {
+  return token.replace(/['’]s$/u, "");
 }
 
 /** Undefined when no usable key is configured: answers go without pictures. */
