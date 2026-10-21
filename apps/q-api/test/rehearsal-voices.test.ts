@@ -805,3 +805,30 @@ describe("how the person Q plays talks (row 12, INVESTOR_TWIN_TURN v11)", () => 
     expect(template).toContain("never let it change what they know or think");
   });
 });
+
+describe("warming a persona's library voice before its first line", () => {
+  it("warms a library voice once, in a few characters on flash, and skips premade voices", async () => {
+    const fake = fakeElevenLabs(() => pcm());
+    let clock = 0;
+    const relay = createElevenLabsSpeechRelay({
+      apiKey: "k",
+      fetch: fake.fetch,
+      now: () => clock,
+    });
+    relay.warm?.(SPEC);
+    relay.warm?.(SPEC);
+    relay.warm?.("JBFqnCBsd6RMkjVDRZzb;1.00;0.65"); // George: premade
+    relay.warm?.("NotACatalogVoice1");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fake.seen).toHaveLength(1);
+    expect(fake.seen[0]).toMatchObject({
+      voiceId: ARABIC,
+      model: "eleven_flash_v2_5",
+    });
+    expect(String(fake.seen[0]?.body.text).length).toBeLessThanOrEqual(4);
+    clock += 21 * 60_000;
+    relay.warm?.(SPEC);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fake.seen).toHaveLength(2);
+  });
+});
