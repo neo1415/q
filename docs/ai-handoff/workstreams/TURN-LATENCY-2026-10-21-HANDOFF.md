@@ -15,3 +15,9 @@ Branch `claude/turn-latency-6a96d1`, [PR #271](https://github.com/neo1415/q/pull
 | Model-planned lookup rounds (row 16, the 3.8–4.5 s part)                                                                                                                        | NOT STARTED                                                                | Needs answer-prompt and tool-order work with live ledger measurement.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Local app type checks failed only on stale package `dist` from the other lanes (`api-client`, `q-research`, `communication`, `config`), none in these files; they need a full package build first.
+
+## Overlap with the onboarding lane (PR #272)
+
+- Onboarding built its own typed stream in #272 (NDJSON `/v1/q/interview/turn/stream` and a web `/api/onboarding-say`) before this one landed. Both sessions agreed this branch's SSE stream is the one kept, so whoever merges removes #272's stream (same web route path: keep this branch's `app/api/onboarding-say/[sessionId]/route.ts`).
+- Requirement, already met here: a closed browser connection never aborts `agent.turn`. q-api passes no request abort to the turn and only stops writing (`openSentenceStream`); api's `turnStream` to q-api is bounded by its own deadline, not by the browser socket. Keep it that way when merging.
+- When merging, check the onboarding workspace's `sayOne` (#272's D7 `holdPending` / `confirmSent` around `actions.say`) against this branch's `replyStream` wrapper around the same call, and keep both.
