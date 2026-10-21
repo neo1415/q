@@ -81,6 +81,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   type PromptRegistry,
   renderPrompt,
+  bundleVersionOf,
   isEmptyPromise,
   stripEmptyPromises,
   withoutRecommendationClaims,
@@ -2011,6 +2012,14 @@ function phased<T>(label: string, work: () => Promise<T>): Promise<T> {
   return withRoundTripPhase(`answer.${label}`, work);
 }
 
+/** Arrival row 22: what the early arrival answer needs, from the turn's own reads. */
+type EarlyArrival = {
+  readonly reply: ArrivalReply;
+  readonly conversationId: QConversationMessage["conversationId"];
+  readonly latest: QConversationMessage;
+  readonly earlier: readonly QConversationMessage[];
+};
+
 export function createModelGatewayQAnswer(
   dependencies: ModelGatewayQAnswerDependencies,
 ): ModelGatewayQAnswer {
@@ -2174,7 +2183,39 @@ export function createModelGatewayQAnswer(
     arrival: null,
   };
 
-  async function prepareTurn(request: QAnswerRequest) {
+  /**
+   * Arrival row 22: an arrival follow-up code can answer from the snapshot,
+   * offered as soon as it is known, so the answer does not wait for the
+   * rest of the turn's preparation (assemble, profile, readiness, prompt).
+   * Keyed by run; taken once by that run's answer.
+   */
+  const arrivalEarly = new Map<string, Promise<EarlyArrival | null>>();
+  function prepareTurn(request: QAnswerRequest) {
+    let offerEarly: (early: EarlyArrival | null) => void = () => undefined;
+    arrivalEarly.set(
+      request.runId,
+      new Promise<EarlyArrival | null>((resolve) => {
+        offerEarly = resolve;
+      }),
+    );
+    while (arrivalEarly.size > 64) {
+      const oldest = arrivalEarly.keys().next().value;
+      if (oldest === undefined) break;
+      arrivalEarly.delete(oldest);
+    }
+    const preparing = prepareTurnReads(request, offerEarly);
+    // Whatever happens to the reads, the early offer settles (null: none).
+    preparing.then(
+      () => offerEarly(null),
+      () => offerEarly(null),
+    );
+    return preparing;
+  }
+
+  async function prepareTurnReads(
+    request: QAnswerRequest,
+    offerEarly: (early: EarlyArrival | null) => void,
+  ) {
     const plan: PermittedContextPlan = request.plan;
     /**
      * Everything recently said in this CONVERSATION, not in this run.
@@ -2376,6 +2417,22 @@ export function createModelGatewayQAnswer(
       return null;
     };
     const arrivalDecision = decideArrival().catch(() => null);
+    // Arrival row 22. Only the code answers ahead of the arrival follow-up
+    // in answer() could take this turn (what needs them, their own
+    // mandate); their words are kept off the early path, so the answer is
+    // the one the full path would give.
+    if (
+      arrivalByCode &&
+      conversationId !== undefined &&
+      !asksWhatNeedsThem(latest.content) &&
+      !asksForOwnMandate(latest.content)
+    ) {
+      void arrivalDecision.then((reply) => {
+        if (reply !== null) {
+          offerEarly({ reply, conversationId, latest, earlier });
+        }
+      });
+    }
     const offerRead = timed(
       "offer",
       phased("offer", () => tools.offer(toolContext)),
@@ -3276,6 +3333,121 @@ export function createModelGatewayQAnswer(
     };
   }
   type PreparedTurn = Awaited<ReturnType<typeof prepareTurn>>;
+
+  /**
+   * Arrival row 22: the arrival follow-up answered before the rest of the
+   * turn is prepared. The same words, blocks and stored message as the
+   * full path's W1 answer (`persistCodeAnswer` there): no tool ran and no
+   * public page was read, so only the screen-move and miss-line rules of
+   * `persistAnswer` apply, and they are applied here the same way.
+   */
+  async function answerArrivalEarly(
+    request: QAnswerRequest,
+    early: EarlyArrival,
+    leadLines: string | undefined,
+    startedAt: number,
+  ): Promise<QAnswerOutcome> {
+    const { reply, conversationId, latest, earlier } = early;
+    const open = reply.open;
+    const given: QResultBlock[] =
+      open === undefined
+        ? []
+        : [
+            {
+              kind: "UI_INTENT",
+              intent: {
+                kind: "OPEN_RECORD_PAGE",
+                page: open.page,
+                id: open.id,
+                ...(open.anchor === undefined ? {} : { anchor: open.anchor }),
+              },
+            },
+          ];
+    let content =
+      leadLines === undefined ? reply.text : `${leadLines}\n\n${reply.text}`;
+    const localise = dependencies.localiseWords;
+    if (localise !== undefined) {
+      const said = await localise(
+        {
+          tenantId: request.tenantId,
+          userId: request.actorUserId,
+          runId: request.runId,
+        },
+        [content],
+      ).catch(() => null);
+      const prose = said?.[0];
+      if (prose !== null && prose !== undefined) content = prose;
+    }
+    const carried = withoutUnaskedMoves(
+      withFitIntegrity(given, {
+        asked: latest.content,
+        previous: previousCardCompanyIds(earlier),
+      }),
+      latest.content,
+    );
+    const blocks = carried.length === 0 ? undefined : carried;
+    const missed = screenActMissLine(
+      dependencies.uiActReceipts?.(request.actor) ?? [],
+      [...earlier].reverse().find((message) => message.role === "Q")?.content ??
+        null,
+    );
+    if (missed !== null && !content.includes("didn't go through")) {
+      const rest = withoutLandedClaims(content);
+      content = (rest.length === 0 ? missed : `${missed}\n\n${rest}`).slice(
+        0,
+        ANSWER_LIMIT_CHARS,
+      );
+    }
+    const messageId = QMessageIdSchema.parse(randomUUID());
+    const message = await transactions.run(async (tx) => {
+      const stored = await repositories.messages.insert(tx, {
+        id: messageId,
+        tenantId: request.tenantId,
+        conversationId,
+        runId: request.runId,
+        role: "Q",
+        content,
+        ...(blocks === undefined ? {} : { blocks }),
+      });
+      await appendRunEvent(
+        repositories,
+        tx,
+        { id: request.runId, tenantId: request.tenantId },
+        {
+          type: "q.message.completed",
+          data: {
+            message: {
+              ...(toQMessage(stored) as QResponseMessage),
+              ...(blocks === undefined ? {} : { blocks }),
+            },
+          },
+        },
+      );
+      return stored;
+    });
+    logger?.info(
+      {
+        qRunId: request.runId,
+        itemKey: reply.itemKey,
+        modelCalls: 0,
+        toolCalls: 0,
+        early: true,
+        totalMs: Date.now() - startedAt,
+      },
+      "q answered an arrival follow-up from the arrival snapshot",
+    );
+    return {
+      kind: "ANSWERED",
+      messageId: message.id,
+      modelPolicyVersion: "none",
+      // No prompt was rendered for this answer; the bundle it would have
+      // been rendered from is named, as the full path's code answers do.
+      promptBundleVersion: bundleVersionOf(
+        registry.getActive("Q_SYSTEM").versionId,
+        registry.getActive("COMPANY_ANALYST").versionId,
+      ),
+    };
+  }
   /**
    * Turns being prepared while they are read (speed sweep 2026-10-01: the
    * turn reader's ~1 s and these reads' ~0.5 s ran one after the other).
@@ -3358,7 +3530,25 @@ export function createModelGatewayQAnswer(
           },
           () => undefined,
         );
-      const prepared = await (warmed ?? prepareTurn(request));
+      const preparing = warmed ?? prepareTurn(request);
+      // Arrival row 22: a snapshot answer by code goes out as soon as it
+      // is known. Never for a speculative answer, which stores nothing
+      // until it is adopted.
+      const early = gate === null ? arrivalEarly.get(request.runId) : undefined;
+      if (gate === null) arrivalEarly.delete(request.runId);
+      if (early !== undefined) {
+        const first = await Promise.race([
+          preparing.then(
+            () => null,
+            () => null,
+          ),
+          early,
+        ]);
+        if (first !== null) {
+          return answerArrivalEarly(request, first, leadLines, startedAt);
+        }
+      }
+      const prepared = await preparing;
       if (prepared === null) {
         return { kind: "FAILED", diagnosticCode: "INTERNAL_ERROR" };
       }
