@@ -35,6 +35,23 @@ describe("the Q&A bank (v6)", () => {
     );
   });
 
+  it("answers the product questions investors ask after the story", () => {
+    for (const [asked, id] of [
+      ["Is my data used to train ChatGPT?", "qa.training"],
+      ["Can founders game the scoring?", "qa.founder-score-gaming"],
+      ["How is this different from PitchBook?", "qa.vs-databases"],
+      ["Are you SOC 2 compliant?", "qa.certification"],
+      ["Can Q predict the winners?", "qa.prediction"],
+      ["Are these companies real?", "qa.demo-data"],
+      ["Do you take a success fee?", "qa.success-fee"],
+      ["Why wouldn't I just use ChatGPT?", "qa.vs-chatgpt"],
+      ["Is the score biased against some founders?", "qa.bias"],
+      ["Can I export my data if I leave?", "qa.data-ownership"],
+    ] as const) {
+      expect(investor.answer(asked)?.id, asked).toBe(id);
+    }
+  });
+
   it("leaves to normal Q what it does not hold", () => {
     for (const asked of [
       "What's the weather in Lagos tomorrow?",
@@ -53,6 +70,14 @@ describe("the Q&A bank (v6)", () => {
       /\b\d[\d,.]*\s*(?:k|m|million)?\s*(?:customers|clients|users|investors|employees|people|staff)\b|\b(?:arr|mrr)\b|\brevenue of\b|\bteam of \d|\bwe have (?:signed|raised)\b/iu;
     for (const entry of QA_BANK) {
       expect(invented.test(entry.answer), entry.id).toBe(false);
+    }
+  });
+
+  it("speaks plainly: no engineering vocabulary in a spoken answer", () => {
+    const jargon =
+      /\b(?:rls|row[- ]level|pgvector|bm25|llms?|embeddings?|vectors?|apis?|sql|postgres(?:ql)?|supabase|railway|zod|schemas?|tenants?|rag|langgraph|openai|gpt[\w.-]*|tavus|deterministic|canonical|provenance|gateway model|model gateway|context firewall|write gate|json|endpoints?|backend|frontend|servers?|databases?|tokens?|prompts?|repos(?:itory)?|migrations?|webhooks?|latency)\b/iu;
+    for (const entry of QA_BANK) {
+      expect(entry.answer, entry.id).not.toMatch(jargon);
     }
   });
 

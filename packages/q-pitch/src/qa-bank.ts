@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { FOUNDER_QA_ENTRIES } from "./qa-bank-founder.js";
+import { PRODUCT_QA_ENTRIES } from "./qa-bank-product.js";
 
 /**
  * Q Pitch v6: the Q&A bank (owner, 16 Oct). Questions people are likely to
@@ -139,7 +140,7 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
       "security of the platform",
     ],
     answer:
-      "Every piece of information carries a visibility scope, and it is enforced on the server and in the database, not just hidden in the interface. Founder-private material never reaches an investor, and never quietly changes how an investor ranks or sees a company. What Q knows is not the same as what you may see: Q filters by permission before it reasons, and a data room opens only when the founder shares it.",
+      "Every piece of information carries a setting for who may see it, and that is enforced on our side at every layer, not just hidden on screen. Founder-private material never reaches an investor, and never quietly changes how an investor ranks or sees a company. What Q knows is not the same as what you may see: Q filters by permission before it reasons, and a data room opens only when the founder shares it.",
     sources: [
       `${SECURITY} context firewall`,
       `${PADL} Q knowledge vs data room`,
@@ -172,7 +173,7 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
       "what is proprietary here",
     ],
     answer:
-      "The defensibility is in the trusted structure, not the model: a canonical record per company and investor, evidence and provenance on every fact, a proprietary assessment framework, and relationship history that compounds with use. Generic AI tools can summarise a deck; they cannot hold a permissioned, comparable, evidence-labelled record that both sides trust.",
+      "The defensibility is in the trusted structure, not the model: one trusted record per company and investor, evidence and its origin on every fact, a proprietary assessment framework, and relationship history that compounds with use. Generic AI tools can summarise a deck; they cannot hold a permissioned, comparable, evidence-labelled record that both sides trust.",
     sources: [`${PADL} Decision #85`, `${LANDING} LP-25`],
   },
   {
@@ -245,12 +246,11 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
     paraphrases: [
       "how are you different from a crm",
       "how are you different from a deal flow tool",
-      "what about chatgpt",
       "why not use a document storage tool",
       "competitive landscape",
     ],
     answer:
-      "Capital Q is deliberately not a CRM, a marketplace, a directory or a document store, and those are where the incumbents are. Generic AI assistants can summarise, but they hold no canonical, permissioned record and no evidence status. Capital Q's category is investment intelligence: one trusted, comparable view of each opportunity, built for both sides.",
+      "Capital Q is deliberately not a CRM, a marketplace, a directory or a document store, and those are where the incumbents are. Generic AI assistants can summarise, but they hold no single trusted record with permissions, and no label for how well each fact is supported. Capital Q's category is investment intelligence: one trusted, comparable view of each opportunity, built for both sides.",
     sources: [`${PADL} Decision #001`, `${SPEC} 3.1`],
   },
   {
@@ -264,7 +264,7 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
       "why did i see this company",
     ],
     answer:
-      "The feed is deterministic and explainable: eligibility from your declared rules first, then fit against your mandate, evidence and freshness, then a little diversity. No model decides the order, nothing is optimised for watch time, and no company can pay to rank. Every card can tell you why it is there.",
+      "The feed follows fixed, explainable rules: eligibility from your declared rules first, then fit against your mandate, evidence and freshness, then a little diversity. No model decides the order, nothing is optimised for watch time, and no company can pay to rank. Every card can tell you why it is there.",
     sources: [`${RECS} ranking order`, "CLAUDE.md Recommendations"],
   },
   {
@@ -334,12 +334,14 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
       "how does this help me raise",
       "what do i get as a founder",
       "how will this help my fundraising",
+      "what does capital q offer a founder",
     ],
     answer:
       "Q works first: upload what you already have and it builds your company record, tells you what may stop you from raising and what to improve next, and shows you the investors whose mandates you actually match. You can apply through their gateways, rehearse with an investor persona, and keep every conversation in one place.",
     sources: [`${LANDING} LP-15, LP-16`, `${SPEC} founder onboarding`],
   },
   ...FOUNDER_QA_ENTRIES,
+  ...PRODUCT_QA_ENTRIES,
 ]);
 
 const STOP = new Set(
