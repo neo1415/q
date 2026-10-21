@@ -132,6 +132,30 @@ Branch `claude/artifacts-live-e4a145`, PR #270 (draft) into `speed/q-oct20`. Rou
 - New tests: `apps/web/test/q-answer-artifacts-live.test.tsx` covers L-3 (the live preview in the thread, and its hand-over to the settled blocks) and L-11 (a settled answer reports its drawn kinds, a streaming one does not, and the report clears on unmount). `q-data-blocks.test.tsx` covers the summary title and the sticky labels.
 - Screenshots: `docs/design/2026-10-21/artifacts-r3/`, from a local production build with fictional data. The spoken summary highlight was confirmed lit in a real browser (Chromium, production build).
 
+#### Round 3: stage progress (owner requirement 2026-10-21, via the coordinator)
+
+The owner's correction: make it as fast as can be done properly, and never weaken real work to hit a number. Times below are evidence, not a gate.
+
+- **(a) Stage progress, DONE.** `apps/web/src/features/q/stage-progress.tsx` is a determinate step list: a check for each step done, a ring for the current one, `aria-current="step"`, one polite status line, and an opacity fade only. It has no percentage, no guessed next step and no spinner or shimmer.
+  - Driven only by real `q.stage.changed` events. The api-client reducer keeps `stageHistory`, keyed by sequence so it is replay-safe, and `qStageSteps` derives the list.
+  - Shown from `presence.steps` on Home (arrival and thread), the chat thread, the Q sheet and Now.
+  - Voice turns get their run's stages through the room feed. Additive contract: `QRoomStagesSchema`, `QRoomRead.stages`. The q-api `feed.stage` is called by the voice turn on each `q.stage.changed`.
+  - Labels are the approved ones. Web research stays "Looking into it" (R38, `no-search-theatre`), not "Checking the web".
+- **(b) Document jobs, DONE.** The document pipeline already emits a visible stage at each real step boundary (`prepare-artifact.ts` `visibleStageOf`): writing, laying out each page, finding pictures and drawing charts, checking every page. The same list shows them until the file card lands. No contract change was needed.
+- **(c) Measured.**
+  - `apps/web/test/stage-progress-timing.test.tsx` replays a compare turn through the real path (reducer → `turnsFrom` → `QAnswer` + `StageProgress`) at three stated latency profiles. It asserts that each element is in the DOM the moment its event arrives, with no timer or debounce in the UI path, and that the preview is painted before the full answer.
+  - Real Chromium, production build, 5 runs per row: time from an event's arrival to the frame that shows it (the median, then the worst run).
+
+| Element       | Desktop        | CPU slowed 4×   |
+| ------------- | -------------- | --------------- |
+| First stage   | 25.6 ms (26.2) | 38.5 ms (132.4) |
+| Preview frame | 20.9 ms (31.5) | 50.6 ms (59.8)  |
+| First words   | 23.6 ms (37.8) | 50.1 ms (73.9)  |
+| Full answer   | 23.4 ms (24.1) | 27.2 ms (39.3)  |
+
+- With the typical profile (first stage at 250 ms, preview at 1.5 s), the first step painted at a median of 276 ms after send and the preview at 1,523 ms. The UI adds about 1–2 frames on top of the server.
+- Screenshots: `docs/design/2026-10-21/artifacts-r3/progress-{light,dark}.png` (mid-turn: steps, first words, preview frame).
+
 ## 4. Tests and gates (run 2026-10-20/21, Windows worktree)
 
 New tests:
