@@ -104,3 +104,70 @@ export function groupNotices(
   }
   return { needsYou, days };
 }
+
+/** One organisation's notices on the rail: what needs the person, then updates. */
+export type RailGroup = {
+  readonly key: string;
+  /** The organisation the notices name; null: Q's own notices. */
+  readonly named: NonNullable<NotificationDto["named"]> | null;
+  /** Their name, from the person's own relationships; null: not known here. */
+  readonly name: string | null;
+  readonly needsYou: readonly NoticeGroup[];
+  readonly updates: readonly NoticeGroup[];
+};
+
+type RailEntry = {
+  key: string;
+  named: NonNullable<NotificationDto["named"]> | null;
+  name: string | null;
+  needsYou: NoticeGroup[];
+  updates: NoticeGroup[];
+  latest: string;
+};
+
+/**
+ * The notification rail (owner 2026-10-21, option 3): grouped by who each
+ * notice is about, each organisation once, those with something that
+ * needs the person first, then by their newest notice. Notices that name
+ * no one are Q's own and come last, under one group.
+ */
+export function railGroups(
+  items: readonly NotificationDto[],
+  names: Readonly<Record<string, string>>,
+  now: Date = new Date(),
+): readonly RailGroup[] {
+  const { needsYou, days } = groupNotices(items, now);
+  const entries = new Map<string, RailEntry>();
+  const add = (group: NoticeGroup, needs: boolean) => {
+    const named = group.notice.named ?? null;
+    const key = named === null ? "q" : `${named.kind}:${named.id}`;
+    const entry: RailEntry = entries.get(key) ?? {
+      key,
+      named,
+      name: named === null ? null : (names[named.id] ?? null),
+      needsYou: [],
+      updates: [],
+      latest: group.notice.createdAt,
+    };
+    (needs ? entry.needsYou : entry.updates).push(group);
+    if (group.notice.createdAt > entry.latest) {
+      entry.latest = group.notice.createdAt;
+    }
+    entries.set(key, entry);
+  };
+  for (const group of needsYou) add(group, true);
+  for (const day of days) {
+    for (const group of day.groups) add(group, false);
+  }
+  const rank = (one: RailEntry) =>
+    one.key === "q" ? 2 : one.needsYou.length > 0 ? 0 : 1;
+  return [...entries.values()]
+    .sort((a, b) => rank(a) - rank(b) || b.latest.localeCompare(a.latest))
+    .map((one) => ({
+      key: one.key,
+      named: one.named,
+      name: one.name,
+      needsYou: one.needsYou,
+      updates: one.updates,
+    }));
+}

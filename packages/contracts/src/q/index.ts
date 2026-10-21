@@ -1075,6 +1075,7 @@ export {
   QWorkListDtoSchema,
   QWorkSlotSchema,
   QWorkStepDtoSchema,
+  Q_WORK_STEP_ACTORS,
   Q_WORK_LANE_REPORT_PATH,
   qWorkLaneReportPath,
   QWorkReportDtoSchema,

@@ -312,9 +312,23 @@ export function createPostgresWorkStore(sql: DatabaseExecutor) {
     steps: async (
       owner: Owner,
       delegationId: string,
-    ): Promise<readonly { words: string; created_at: Date }[]> =>
-      sql<{ words: string; created_at: Date }[]>`
-        select words, created_at from q_runtime.delegation_steps
+    ): Promise<
+      readonly {
+        words: string;
+        created_at: Date;
+        step_key: string;
+        lane_id: string | null;
+      }[]
+    > =>
+      sql<
+        {
+          words: string;
+          created_at: Date;
+          step_key: string;
+          lane_id: string | null;
+        }[]
+      >`
+        select words, created_at, step_key, lane_id from q_runtime.delegation_steps
          where delegation_id = ${delegationId} and user_id = ${owner.userId}
            and tenant_id = ${owner.tenantId}
          order by created_at desc
