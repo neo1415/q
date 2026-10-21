@@ -333,3 +333,93 @@ describe("PRESENCE: an answer's gestures reach the turn", () => {
     ]);
   });
 });
+
+describe("progressive findings · shown as each validates, settled without moving", () => {
+  const COMPANY = "f0000000-0000-4000-8000-0000000000c1";
+  function finding(n: number, statement: string) {
+    return {
+      findingId: `f0000000-0000-4000-8000-00000000f00${String(n)}`,
+      type: "FACT",
+      statement,
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "DOCUMENT_SUPPORTED",
+      confidence: "MODERATE",
+      evidenceRefs: [],
+      subjects: [{ kind: "COMPANY", companyId: COMPANY }],
+    };
+  }
+  const found = (n: number, statement: string) =>
+    durable("q.finding.available", { finding: finding(n, statement) });
+  const statements = (state: QStreamState) => {
+    const last = turnsFrom(state, []).at(-1);
+    return last?.kind === "Q" ? last.findings.map((f) => f.statement) : [];
+  };
+
+  it("adds each finding to the live answer as it arrives, in arrival order", () => {
+    let state = apply([userTurn, delta(Q_MESSAGE, "Northstar")]);
+    expect(statements(state)).toEqual([]);
+    state = apply([found(1, "Revenue is recurring.")], state);
+    expect(statements(state)).toEqual(["Revenue is recurring."]);
+    state = apply([found(2, "Two customers make up most of it.")], state);
+    expect(statements(state)).toEqual([
+      "Revenue is recurring.",
+      "Two customers make up most of it.",
+    ]);
+    const last = turnsFrom(state, []).at(-1);
+    expect(last).toMatchObject({ kind: "Q", streaming: true });
+  });
+
+  it("keeps the live order when the completed message lists them differently, and only removes or merges", () => {
+    const live = apply([
+      userTurn,
+      delta(Q_MESSAGE, "Northstar"),
+      found(1, "Revenue is recurring."),
+      found(2, "Two customers make up most of it."),
+      found(3, "Dropped after checking."),
+    ]);
+    const settled = apply(
+      [
+        durable("q.message.completed", {
+          message: {
+            messageId: Q_MESSAGE,
+            runId: RUN,
+            role: "Q",
+            text: "Northstar sells B2B infrastructure software.",
+            createdAt: NOW,
+            blocks: [
+              // The message's own order, a reworded copy, a duplicate
+              // statement under another id, and one only it has.
+              { kind: "FINDING", finding: finding(4, "Churn is unknown.") },
+              {
+                kind: "FINDING",
+                finding: finding(2, "Two customers make up most of revenue."),
+              },
+              {
+                kind: "FINDING",
+                finding: finding(1, "Revenue is recurring."),
+              },
+              {
+                kind: "FINDING",
+                finding: finding(5, "  revenue is   RECURRING. "),
+              },
+            ],
+          },
+        }),
+      ],
+      live,
+    );
+    expect(statements(settled)).toEqual([
+      "Revenue is recurring.",
+      "Two customers make up most of revenue.",
+      "Churn is unknown.",
+    ]);
+    expect(turnsFrom(settled, []).at(-1)).toMatchObject({ streaming: false });
+  });
+
+  it("an answer from another run is not given this run's findings", () => {
+    const state = apply([userTurn, qTurn, found(1, "Revenue is recurring.")]);
+    const other = { ...state, runId: "f0000000-0000-4000-8000-0000000000ff" };
+    const last = turnsFrom(other, []).at(-1);
+    expect(last?.kind === "Q" ? last.findings : null).toEqual([]);
+  });
+});

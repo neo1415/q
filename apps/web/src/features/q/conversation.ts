@@ -3,6 +3,7 @@ import type {
   QConfidenceLevel,
   QFindingType,
   QMessage,
+  QPublicFinding,
   QResultBlock,
   QSentenceGesture,
 } from "@capital-q/contracts";
@@ -193,25 +194,70 @@ export type QTurnUncertainty = {
   readonly missing: readonly string[];
 };
 
+function turnFinding(finding: QPublicFinding): QTurnFinding {
+  return {
+    id: finding.findingId,
+    type: finding.type,
+    statement: finding.statement,
+    confidence: finding.confidence,
+    sourceCount: finding.evidenceRefs.length,
+  };
+}
+
+/** The same statement however it was spaced or cased. */
+function said(statement: string): string {
+  return statement.trim().replace(/\s+/gu, " ").toLowerCase();
+}
+
+/**
+ * One row per finding across the whole set: the first of an id or of a
+ * statement keeps its place, a later copy is dropped (set-wide dedupe).
+ */
+function dedupeFindings(
+  findings: readonly QTurnFinding[],
+): readonly QTurnFinding[] {
+  const ids = new Set<string>();
+  const statements = new Set<string>();
+  return findings.filter((finding) => {
+    const statement = said(finding.statement);
+    if (ids.has(finding.id) || statements.has(statement)) return false;
+    ids.add(finding.id);
+    statements.add(statement);
+    return true;
+  });
+}
+
 function findingsOf(
   blocks: readonly QResultBlock[] | undefined,
 ): readonly QTurnFinding[] {
   if (blocks === undefined) {
     return [];
   }
-  return blocks.flatMap((block) =>
-    block.kind === "FINDING"
-      ? [
-          {
-            id: block.finding.findingId,
-            type: block.finding.type,
-            statement: block.finding.statement,
-            confidence: block.finding.confidence,
-            sourceCount: block.finding.evidenceRefs.length,
-          },
-        ]
-      : [],
+  return dedupeFindings(
+    blocks.flatMap((block) =>
+      block.kind === "FINDING" ? [turnFinding(block.finding)] : [],
+    ),
   );
+}
+
+/**
+ * Progressive findings (lane 4 emits `q.finding.available` as each one
+ * validates): the completed message is the authority, but it may only
+ * remove or merge what was already shown, never move it. A finding shown
+ * live keeps its place (with the message's wording), one the message
+ * dropped goes, and one only the message has comes after the rest.
+ */
+export function settledFindings(
+  persisted: readonly QTurnFinding[],
+  live: readonly QTurnFinding[],
+): readonly QTurnFinding[] {
+  if (live.length === 0) return persisted;
+  const byId = new Map(persisted.map((finding) => [finding.id, finding]));
+  const kept = live.flatMap((finding) => {
+    const settled = byId.get(finding.id);
+    return settled === undefined ? [] : [settled];
+  });
+  return dedupeFindings([...kept, ...persisted]);
 }
 
 function uncertaintiesOf(
@@ -285,6 +331,8 @@ export function turnsFrom(
   const dated: { readonly at: string; readonly turn: QTurn }[] = [];
   // Every confirmed turn of the person, by text, with when it was recorded.
   const confirmed = new Map<string, string[]>();
+  // What this run has found so far, in the order it was found.
+  const liveFindings = dedupeFindings(state.findings.map(turnFinding));
 
   for (const message of state.messages) {
     const text = textOf(message);
@@ -316,7 +364,10 @@ export function turnsFrom(
         streaming: false,
         sourceCount: sourceCountOf(message.blocks),
         publicSources: publicSourcesOf(message.blocks),
-        findings: findingsOf(message.blocks),
+        findings:
+          message.runId === state.runId
+            ? settledFindings(findingsOf(message.blocks), liveFindings)
+            : findingsOf(message.blocks),
         uncertainties: uncertaintiesOf(message.blocks),
         blocks: objectBlocksOf(message.blocks),
         ...(message.gestures === undefined
@@ -374,7 +425,7 @@ export function turnsFrom(
       streaming: true,
       sourceCount: 0,
       publicSources: [],
-      findings: [],
+      findings: liveFindings,
       uncertainties: [],
       blocks: [],
       preview: state.preview,
@@ -389,7 +440,7 @@ export function turnsFrom(
       streaming: true,
       sourceCount: 0,
       publicSources: [],
-      findings: [],
+      findings: liveFindings,
       uncertainties: [],
       // A partial answer has no blocks: they arrive with the persisted
       // message. What it carries instead is the preview (artifacts live):
