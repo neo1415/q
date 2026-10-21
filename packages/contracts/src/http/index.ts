@@ -1181,8 +1181,11 @@ export {
 
 export {
   COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT,
+  COMPANY_PROFILE_LOGO_SEGMENT,
   COMPANY_PROFILE_PHOTO_SEGMENT,
   COMPANY_PROFILE_SEGMENT,
+  CompanyProfileLogoDtoSchema,
+  type CompanyProfileLogoDto,
   CompanyProfilePhotoDtoSchema,
   type CompanyProfilePhotoDto,
   COMPANY_TEAM_BIO_MAX,

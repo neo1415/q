@@ -203,7 +203,16 @@ describe("reduceQStream", () => {
     expect(describeQStage("WAITING_FOR_APPROVAL")).toBe(
       "Q is waiting for your approval.",
     );
-    expect(describeQStage("REVIEWING_COMPANY")).toBe("Reviewing the company");
+    // Owner 2026-10-20: Q says where it is ("reading their deck",
+    // "checking the web", "comparing the two").
+    expect(describeQStage("REVIEWING_COMPANY")).toBe("Looking at the company");
+    expect(describeQStage("CHECKING_EVIDENCE")).toBe(
+      "Reading their deck and documents",
+    );
+    expect(describeQStage("SEARCHING_PUBLIC_SOURCES")).toBe("Checking the web");
+    expect(describeQStage("COMPARING_OPPORTUNITIES")).toBe(
+      "Comparing them side by side",
+    );
     expect(describeQStage(null)).toBeNull();
     for (const stageName of [
       "UNDERSTANDING_REQUEST",
@@ -212,5 +221,56 @@ describe("reduceQStream", () => {
     ] as const) {
       expect(describeQStage(stageName)).not.toContain("_");
     }
+  });
+});
+
+describe("reduceQStream: artifacts live", () => {
+  const COMPANY = "a0000000-0000-4000-8000-00000000000a";
+  const preview = (messageId = MSG) =>
+    event(
+      "q.artifact.preview",
+      {
+        messageId,
+        subjects: [
+          { subject: { kind: "COMPANY", companyId: COMPANY }, name: "Baridi" },
+        ],
+        layout: "CARD",
+      },
+      3,
+    );
+
+  it("holds the live message's preview until that message is persisted", () => {
+    let state = reduceQStream(createQStreamState(), started());
+    state = reduceQStream(state, preview());
+    state = reduceQStream(state, delta("Baridi leads. "));
+    expect(state.preview?.subjects[0]?.name).toBe("Baridi");
+    // Ephemeral: the durable cursor does not move.
+    expect(state.lastSequence).toBe(1);
+    state = reduceQStream(state, completed("Baridi leads.", 4));
+    expect(state.preview).toBeNull();
+    // A late preview for a persisted message is ignored.
+    expect(reduceQStream(state, preview()).preview).toBeNull();
+  });
+
+  it("drops the preview when the run ends without an answer", () => {
+    let state = reduceQStream(createQStreamState(), started());
+    state = reduceQStream(state, preview());
+    state = reduceQStream(
+      state,
+      event(
+        "q.run.failed",
+        {
+          status: "CANCELLED",
+          failure: {
+            code: "CANCELLED",
+            message: "This request was cancelled.",
+            retryable: false,
+            runId: RUN,
+          },
+        },
+        5,
+      ),
+    );
+    expect(state.preview).toBeNull();
   });
 });

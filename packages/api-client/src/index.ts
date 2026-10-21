@@ -45,6 +45,7 @@ export {
   downloadCompanyDeck,
   getCompanyNetworkPreview,
   getCompanyProfile,
+  getCompanyProfileLogo,
   getCompanyProfilePhoto,
   getMarketplaceReadiness,
   setCompanyVisibility,

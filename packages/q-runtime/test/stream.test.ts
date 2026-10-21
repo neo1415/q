@@ -361,6 +361,74 @@ describe("createQRunStreamService", () => {
     expect(sequences(items)).toEqual([1, 2]);
   });
 
+  it("sends a subject preview as its own ephemeral frame, ahead of the sentence it rides with (artifacts live)", async () => {
+    const { s, service, deltas, notify } = world();
+    started(s);
+    const controller = new AbortController();
+    const iterator = service.open({
+      run: s.current,
+      afterSequence: 0,
+      signal: controller.signal,
+    });
+    const items: QRunStreamItem[] = [];
+    const messageId = randomUUID();
+    const companyId = randomUUID();
+    let published = false;
+    for await (const item of iterator) {
+      items.push(item);
+      if (item.kind === "durable" && item.event.sequence === 1 && !published) {
+        published = true;
+        deltas.publish({
+          runId: RUN_ID as never,
+          tenantId: TENANT as never,
+          messageId: messageId as never,
+          text: "Baridi Health leads. ",
+          preview: {
+            subjects: [
+              {
+                subject: { kind: "COMPANY", companyId },
+                name: "Baridi Health",
+              },
+            ],
+            layout: "CARD",
+          },
+        });
+        // A preview whose subject the contract refuses is never sent.
+        deltas.publish({
+          runId: RUN_ID as never,
+          tenantId: TENANT as never,
+          messageId: messageId as never,
+          text: "",
+          preview: {
+            subjects: [
+              {
+                subject: { kind: "COMPANY", companyId: "not-a-uuid" },
+                name: "X",
+              },
+            ] as never,
+            layout: null,
+          },
+        });
+      }
+      if (items.filter((i) => i.kind === "delta").length === 2) {
+        notify(completed(s));
+      }
+      if (item.kind === "end") break;
+    }
+    const live = items.flatMap((i) => (i.kind === "delta" ? [i.event] : []));
+    expect(live.map((event) => event.type)).toEqual([
+      "q.artifact.preview",
+      "q.message.delta",
+    ]);
+    expect(live[0]?.data).toEqual({
+      messageId,
+      subjects: [
+        { subject: { kind: "COMPANY", companyId }, name: "Baridi Health" },
+      ],
+      layout: "CARD",
+    });
+  });
+
   it("stops at the replay cap instead of loading a run's history without bound", async () => {
     const { s, service } = world(run(), {
       replayMaxEvents: 5,
@@ -491,5 +559,20 @@ describe("coalesceDeltas", () => {
 
   it("returns nothing for nothing", () => {
     expect(coalesceDeltas([])).toEqual([]);
+  });
+
+  it("never merges a subject preview into the text around it (artifacts live)", () => {
+    const preview = { subjects: [], layout: null } as never;
+    expect(
+      coalesceDeltas([
+        delta("m1", "A "),
+        { ...delta("m1", "B "), preview },
+        delta("m1", "C"),
+      ]).map((d) => [d.text, d.preview === undefined]),
+    ).toEqual([
+      ["A ", true],
+      ["B ", false],
+      ["C", true],
+    ]);
   });
 });

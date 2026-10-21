@@ -51,7 +51,21 @@ export type CardsState = {
    * new answer's cards are never born hidden.
    */
   readonly hiddenAt: Readonly<Record<string, number>>;
+  /**
+   * Artifacts live (audit 2026-10-15 §4): the Board's arrangement per
+   * conversation (pinned and removed objects), in this one controller
+   * rather than a store of its own. Presentation only, like the rest.
+   */
+  readonly board: Readonly<Record<string, BoardMarks>>;
 };
+
+export type BoardMarks = {
+  readonly pinned: readonly string[];
+  readonly dismissed: readonly string[];
+};
+
+export const EMPTY_BOARD_MARKS: BoardMarks = { pinned: [], dismissed: [] };
+const BOARDS_MAX = 40;
 
 export const EMPTY: CardsState = {
   tick: 0,
@@ -65,6 +79,7 @@ export const EMPTY: CardsState = {
   shownKeys: [],
   reopened: null,
   hiddenAt: {},
+  board: {},
 };
 
 // v2 (2026-10-17): v1 hid every later answer that reused a title or a name
@@ -86,8 +101,21 @@ function load(): CardsState {
         : [];
     const reopened: unknown = loaded.reopened;
     const marks: unknown = loaded.hiddenAt;
+    const boards: unknown = loaded.board;
     return {
       ...loaded,
+      board:
+        typeof boards === "object" && boards !== null
+          ? Object.fromEntries(
+              Object.entries(boards).map(([id, value]: [string, unknown]) => [
+                id,
+                {
+                  pinned: strings(Reflect.get(Object(value), "pinned")),
+                  dismissed: strings(Reflect.get(Object(value), "dismissed")),
+                },
+              ]),
+            )
+          : {},
       hiddenAt:
         typeof marks === "object" && marks !== null
           ? Object.fromEntries(
@@ -368,6 +396,31 @@ export function applyCardsIntent(intent: QCardsIntent): boolean {
   }
   last = { signature, at: now };
   return true;
+}
+
+/** This conversation's Board arrangement (a stable object between changes). */
+export function boardMarksOf(s: CardsState, conversation: string): BoardMarks {
+  return s.board[conversation] ?? EMPTY_BOARD_MARKS;
+}
+
+/** Set this conversation's Board arrangement; the oldest boards are forgotten. */
+export function setBoardMarks(conversation: string, marks: BoardMarks): void {
+  const rest = Object.entries(state.board).filter(
+    ([id]) => id !== conversation,
+  );
+  commit({
+    ...state,
+    board: Object.fromEntries([
+      ...rest.slice(-(BOARDS_MAX - 1)),
+      [
+        conversation,
+        {
+          pinned: [...new Set(marks.pinned)].slice(-KEYS_MAX),
+          dismissed: [...new Set(marks.dismissed)].slice(-KEYS_MAX),
+        },
+      ],
+    ]),
+  });
 }
 
 /** Tests: a clean controller and a forgotten "just applied". */

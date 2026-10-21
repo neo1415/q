@@ -12,8 +12,10 @@ import {
 import {
   COMPANIES_PATH,
   COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT,
+  COMPANY_PROFILE_LOGO_SEGMENT,
   COMPANY_PROFILE_PHOTO_SEGMENT,
   COMPANY_PROFILE_SEGMENT,
+  CompanyProfileLogoDtoSchema,
   CompanyProfilePhotoDtoSchema,
   CompanyProfileDeckDownloadDtoSchema,
   CompanyProfileDtoSchema,
@@ -116,6 +118,12 @@ export type CompanyProfilePorts = {
   ) => Promise<boolean>;
   /** The Q Card photo for signed-in participants, or null. */
   readonly photo: (company: CompanyProfileFacts) => Promise<string | null>;
+  /**
+   * Artifacts live: the logo on the website already on the company's
+   * record (a public https image URL), or null. Absent: none is looked for.
+   */
+  readonly siteLogo?:
+    ((websiteUrl: string) => Promise<string | null>) | undefined;
   /**
    * The Q Card photo and cover for signed-in participants, each under its
    * own scope, signed in one read. Absent: the profile asks `photo` alone.
@@ -491,6 +499,25 @@ export function registerCompanyProfileRoutes(
       const photoUrl = await quietly(profile.photo(company), null);
       void reply.header("Cache-Control", "no-store");
       return CompanyProfilePhotoDtoSchema.parse({ photoUrl });
+    },
+  );
+
+  // Artifacts live: the website's logo, for an avatar with no photo. The
+  // same visibility as the profile; the website is the record's own, as
+  // the network projection shows it to this reader.
+  app.get(
+    `${base}${COMPANY_PROFILE_LOGO_SEGMENT}`,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const company = await companyFor(actor, companyIdParam(request));
+      const website = projectCompanyForNetwork(company).websiteUrl;
+      const logoUrl =
+        website === null || profile.siteLogo === undefined
+          ? null
+          : await quietly(profile.siteLogo(website), null);
+      void reply.header("Cache-Control", "no-store");
+      return CompanyProfileLogoDtoSchema.parse({ logoUrl });
     },
   );
 

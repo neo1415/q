@@ -41,6 +41,14 @@
       "types": "./dist/providers/cached.d.ts",
       "default": "./dist/providers/cached.js"
     },
+    "./vetted-http": {
+      "types": "./dist/vetted-http.d.ts",
+      "default": "./dist/vetted-http.js"
+    },
+    "./site-logo": {
+      "types": "./dist/site-logo.d.ts",
+      "default": "./dist/site-logo.js"
+    },
     "./testing": {
       "types": "./dist/providers/fake.d.ts",
       "default": "./dist/providers/fake.js"

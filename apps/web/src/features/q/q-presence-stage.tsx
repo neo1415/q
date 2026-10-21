@@ -45,9 +45,11 @@ import {
   useVisibleCards,
   type CardRef,
 } from "./cards/card-visibility";
+import { LivePreview } from "./live-preview";
 import { rememberResults, useResultShelf } from "./result-shelf";
 import {
   latestAnswerRun,
+  livePreviewOf,
   shownItems,
   shownRecently,
   stageNoteOf,
@@ -208,6 +210,9 @@ export function QPresenceStage({
     stageCardRef,
   );
   const shown = visible[0] ?? null;
+  // Artifacts live: the cards for what Q is naming, up while it talks.
+  const livePreview = livePreviewOf(turns, shown);
+  const previewing = livePreview !== null;
   const note = stageNoteOf(items, turns, pick, (item) =>
     isHiddenIn(cards, stageCardRef(item)),
   );
@@ -291,8 +296,17 @@ export function QPresenceStage({
     readonly block: QAnswerCardsBlock;
   } | null>(null);
   const canvasId = canvas?.item.id ?? null;
+  // The answer whose preview replaced the set on screen: its own cards
+  // take the preview's place, and the set it replaced has already gone,
+  // so nothing flies to the Board on top of the new cards.
+  const [previewedId, setPreviewedId] = useState<string | null>(null);
+  if (livePreview !== null && previewedId !== livePreview.messageId) {
+    setPreviewedId(livePreview.messageId);
+  }
   if ((onStageCanvas?.id ?? null) !== canvasId) {
-    if (onStageCanvas !== null) setLeaving(onStageCanvas);
+    if (onStageCanvas !== null && canvasId !== previewedId) {
+      setLeaving(onStageCanvas);
+    }
     setOnStageCanvas(
       canvas === null ? null : { id: canvas.item.id, block: canvas.block },
     );
@@ -340,7 +354,10 @@ export function QPresenceStage({
   // Q room W3: a data-room document open in the room's centre panel.
   const documentOpen = useRoomDocumentOpen();
   const showing =
-    (shown !== null && !putAway) || roomOpen !== null || documentOpen;
+    (shown !== null && !putAway) ||
+    previewing ||
+    roomOpen !== null ||
+    documentOpen;
   useEffect(() => {
     onShowingChange?.(showing);
   }, [showing, onShowingChange]);
@@ -391,7 +408,7 @@ export function QPresenceStage({
     >
       {/* The presence stays on screen: small while an object is shown,
           full again once it is dismissed (reduced motion: no scale). */}
-      {canvas !== null || leaving !== null ? null : (
+      {(canvas !== null && !previewing) || leaving !== null ? null : (
         <div
           key={showing ? "compact" : "full"}
           className="cq-presence-in flex w-full flex-col items-center"
@@ -425,7 +442,11 @@ export function QPresenceStage({
         </div>
       )}
 
-      {canvas === null || leaving !== null ? null : (
+      {livePreview === null || leaving !== null ? null : (
+        <LivePreview preview={livePreview} />
+      )}
+
+      {canvas === null || leaving !== null || previewing ? null : (
         <Suspense fallback={presence(true)}>
           <StageCanvas
             key={canvas.item.id}

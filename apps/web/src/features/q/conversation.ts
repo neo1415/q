@@ -1,4 +1,5 @@
 import type {
+  QArtifactPreview,
   QConfidenceLevel,
   QFindingType,
   QMessage,
@@ -72,6 +73,12 @@ export type QTurn =
        * into the browser's model of the conversation.
        */
       readonly blocks: readonly QTurnObjectBlock[];
+      /**
+       * Artifacts live: while the answer streams, the subjects its words
+       * have named so far (the run's authorised reads), so their cards
+       * can be put up as Q says them. Never on a settled answer.
+       */
+      readonly preview?: QArtifactPreview | undefined;
       /** PRESENCE: what Q's particles form for which sentence (closed set). */
       readonly gestures?: readonly QSentenceGesture[] | undefined;
     };
@@ -357,9 +364,14 @@ export function turnsFrom(
       findings: [],
       uncertainties: [],
       // A partial answer has no blocks: they arrive with the persisted
-      // message, and a card that appears then rearranges is worse than a
-      // card that arrives once.
+      // message. What it carries instead is the preview (artifacts live):
+      // the subjects named so far, drawn as card frames in the same places
+      // the answer's cards then fill, so nothing rearranges.
       blocks: [],
+      ...(state.preview !== null &&
+      state.preview.messageId === state.partial.messageId
+        ? { preview: state.preview }
+        : {}),
     });
   }
 

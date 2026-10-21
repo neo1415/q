@@ -11,11 +11,14 @@ import { ICON_SIZE, ICON_STROKE, PanelRight, X } from "@capital-q/ui/icons";
 import { QAperture } from "@/features/q-aperture";
 
 import { answerChipFor, type AnswerChipContent } from "./answer-canvas-logic";
+import { hideKey, useCardsState } from "./cards/card-visibility";
 import type { QTurn } from "./conversation";
 import { useQSessionOptional } from "./q-session";
 import { useT } from "@/features/i18n/language";
 
 const Q_PAGE = "/home";
+/** The controller's key for a chip put away: one answer, every page. */
+const CHIP_KEY = "chip:";
 
 /**
  * On any page but Q's, a new answer with cards shows as one compact chip
@@ -58,8 +61,18 @@ export function AnswerChipFor({
   // the conversation has been read: taken while it loads, an empty list
   // made the newest old answer with cards look new (P10).
   const [before, setBefore] = useState<ReadonlySet<string> | null>(null);
-  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(
-    () => new Set(),
+  // Artifacts live (audit 2026-10-15 §4): dismissed through the one
+  // presentation controller, so a chip put away stays away on the next
+  // page and after a reload, rather than per page.
+  const cards = useCardsState();
+  const dismissed = useMemo(
+    () =>
+      new Set(
+        cards.keys
+          .filter((key) => key.startsWith(CHIP_KEY))
+          .map((key) => key.slice(CHIP_KEY.length)),
+      ),
+    [cards.keys],
   );
   const [seenPath, setSeenPath] = useState(pathname);
   if (!loading && (before === null || seenPath !== pathname)) {
@@ -80,9 +93,7 @@ export function AnswerChipFor({
     <AnswerChipView
       chip={chip}
       home={home}
-      onDismiss={() =>
-        setDismissed((current) => new Set([...current, chip.answerId]))
-      }
+      onDismiss={() => hideKey(`${CHIP_KEY}${chip.answerId}`)}
     />
   );
 }

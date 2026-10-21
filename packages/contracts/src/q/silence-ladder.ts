@@ -190,17 +190,18 @@ function phraseFor(
       };
     case "CHECKING_EVIDENCE":
       return {
-        verbs: ["checking", "going over", "looking at"],
+        // The deck, data room and document reads show this stage (owner
+        // 2026-10-20: "reading their deck").
+        verbs: ["reading", "going through", "looking through"],
         object:
-          name === undefined ? "the evidence" : `the evidence behind ${name}`,
+          name === undefined
+            ? "their deck and documents"
+            : `${possessive(name)} ${thing ?? "deck and documents"}`,
       };
     case "SEARCHING_PUBLIC_SOURCES":
       return {
-        verbs: ["looking up", "checking", "reading up on"],
-        object:
-          name === undefined
-            ? "what's public on this"
-            : `what's public on ${name}`,
+        verbs: ["checking", "looking on", "searching"],
+        object: name === undefined ? "the web" : `the web for ${name}`,
       };
     case "REVIEWING_INVESTOR_CRITERIA":
       return {

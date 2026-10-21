@@ -9,6 +9,7 @@ import {
   QRunIdSchema,
   QStreamEventSchema,
   type CorrelationId,
+  type QArtifactPreview,
   type QMessageId,
   type QRunId,
   type QStreamEvent,
@@ -112,6 +113,12 @@ export type QLiveDelta = {
   readonly tenantId: TenantId;
   readonly messageId: QMessageId;
   readonly text: string;
+  /**
+   * Artifacts live: the subjects named so far, sent as their own
+   * `q.artifact.preview` frame ahead of this delta's text (which may then
+   * be empty). Never merged with another delta.
+   */
+  readonly preview?: Pick<QArtifactPreview, "subjects" | "layout"> | undefined;
 };
 
 export type QLiveDeltaListener = (delta: QLiveDelta) => void;
@@ -130,6 +137,8 @@ export function coalesceDeltas(
     const last = out[out.length - 1];
     if (
       last !== undefined &&
+      last.preview === undefined &&
+      delta.preview === undefined &&
       last.runId === delta.runId &&
       last.tenantId === delta.tenantId &&
       last.messageId === delta.messageId
@@ -295,6 +304,24 @@ export function createQRunStreamService(
     // A frame is bounded by the contract; a longer fragment is several
     // frames. The sequence names the durable boundary the text follows.
     const events: QStreamEvent[] = [];
+    if (delta.preview !== undefined) {
+      // Parsed into the closed contract like every frame: a subject the
+      // contract refuses is not sent at all, never sent half-checked.
+      const parsed = QStreamEventSchema.safeParse({
+        contractVersion: 1,
+        eventId: randomUUID(),
+        runId: delta.runId,
+        sequence: Math.max(cursor, 1),
+        occurredAt: new Date().toISOString(),
+        type: "q.artifact.preview",
+        data: {
+          messageId: delta.messageId,
+          subjects: delta.preview.subjects,
+          layout: delta.preview.layout,
+        },
+      });
+      if (parsed.success) events.push(parsed.data);
+    }
     for (let i = 0; i < delta.text.length; i += Q_STREAM_DELTA_MAX_LENGTH) {
       const text = delta.text.slice(i, i + Q_STREAM_DELTA_MAX_LENGTH);
       const parsed = QStreamEventSchema.safeParse({
