@@ -72,9 +72,13 @@ import {
   type QRoomRead,
   Q_UI_ACT_RECEIPTS_PATH,
   Q_FAST_NAVIGATION_PATH,
+  Q_NAVIGATION_CHOOSE_PATH,
   QFastNavigationResponseSchema,
+  QNavigationChooseResponseSchema,
   type QFastNavigationRequest,
+  type QNavigationChooseRequest,
   type QFastNavigationResponse,
+  type QNavigationChooseResponse,
   QUiActReceiptsResponseSchema,
   type QUiActReceiptsRequest,
   type QUiActReceiptsResponse,
@@ -407,6 +411,23 @@ export function resolveQNavigation(
     "POST",
     Q_FAST_NAVIGATION_PATH,
     QFastNavigationResponseSchema,
+    { body: input },
+  );
+}
+
+/**
+ * Lane 7: the tie-break for a pointing request ("open their deck"), among
+ * candidates the Q API checks the person may open first.
+ */
+export function chooseQNavigation(
+  session: ApiSession,
+  input: QNavigationChooseRequest,
+): Promise<QNavigationChooseResponse> {
+  return call(
+    session,
+    "POST",
+    Q_NAVIGATION_CHOOSE_PATH,
+    QNavigationChooseResponseSchema,
     { body: input },
   );
 }

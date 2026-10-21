@@ -357,6 +357,146 @@ export function companyNameCandidates(text: string, max = 2): string[] {
   return found;
 }
 
+/** Words after which a lowercase name is looked for ("risks with x"). */
+const LOWER_ANCHORS = new Set([
+  "about",
+  "with",
+  "on",
+  "of",
+  "for",
+  "from",
+  "at",
+  "is",
+  "does",
+  "did",
+  "has",
+  "was",
+  "compare",
+  "versus",
+  "vs",
+  "between",
+  "and",
+  "regarding",
+]);
+
+/** Words that end or are never part of a lowercase name. */
+const LOWER_STOPS = new Set([
+  ...NOT_COMPANY_WORDS,
+  "a",
+  "an",
+  "my",
+  "our",
+  "your",
+  "their",
+  "his",
+  "her",
+  "its",
+  "this",
+  "that",
+  "these",
+  "those",
+  "it",
+  "them",
+  "they",
+  "me",
+  "us",
+  "we",
+  "you",
+  "now",
+  "today",
+  "tomorrow",
+  "yesterday",
+  "next",
+  "there",
+  "here",
+  "more",
+  "most",
+  "all",
+  "any",
+  "some",
+  "in",
+  "to",
+  "or",
+  "but",
+  "then",
+  "if",
+  "vs",
+  "versus",
+  "please",
+  "again",
+  "too",
+  "also",
+  "doing",
+  "going",
+  "up",
+  "out",
+  "one",
+  "ones",
+  "company",
+  "companies",
+  "startup",
+  "startups",
+  "investor",
+  "investors",
+  "fund",
+  "funds",
+  "deal",
+  "deals",
+  "mandate",
+  "profile",
+  "deck",
+  "pitch",
+  "round",
+  "stage",
+  "team",
+  "market",
+  "news",
+  "risks",
+  "risk",
+  "traction",
+  "revenue",
+  "growth",
+]);
+
+/**
+ * Turn latency round 5: a company typed in lowercase ("risks with
+ * northwind ledger") as candidates, when no capitalised name was found.
+ * The phrase after a word such as "with", "about" or "compare", cut at
+ * punctuation and common words, at most four words. Like the capitalised
+ * candidates it is only a search term: nothing is read unless the search,
+ * under the plan, returns exactly one visible company of exactly that
+ * name, so a phrase that names no company costs one search and no more.
+ */
+export function lowercaseNameCandidates(text: string, max = 2): string[] {
+  if (companyNameCandidates(text, max).length > 0) return [];
+  const found: string[] = [];
+  const words = text
+    .replace(/[’]/gu, "'")
+    .toLowerCase()
+    .split(/(\s+|[,.;:!?()"]+)/u)
+    .map((word) => word.trim())
+    .filter((word) => word.length > 0);
+  for (let at = 0; at < words.length && found.length < max; at += 1) {
+    if (!LOWER_ANCHORS.has(words[at] ?? "")) continue;
+    const name: string[] = [];
+    for (let next = at + 1; next < words.length; next += 1) {
+      const word = (words[next] ?? "").replace(/'s$/u, "");
+      if (!/^[\p{L}\p{N}][\p{L}\p{N}&'-]*$/u.test(word)) break;
+      if (LOWER_STOPS.has(word) || LOWER_ANCHORS.has(word)) {
+        if (name.length === 0 && LOWER_STOPS.has(word)) continue;
+        break;
+      }
+      name.push(word);
+      if (name.length > 4) break;
+    }
+    if (name.length === 0 || name.length > 4) continue;
+    const candidate = name.join(" ");
+    if (candidate.length < 3 || found.includes(candidate)) continue;
+    found.push(candidate);
+  }
+  return found;
+}
+
 /**
  * The visible company exactly named, by search then profile, through the
  * tool port; null for none, several, excluded ids or a profile not admitted.
@@ -368,6 +508,8 @@ export async function readNamedVisibleCompany(input: {
   readonly context: QToolExecutionContext;
   readonly available: ReadonlySet<string>;
   readonly callIndex: number;
+  /** Called once a company matched, as its profile read starts. */
+  readonly onFound?: (() => void) | undefined;
 }): Promise<{
   readonly companyId: string;
   readonly data: unknown;
@@ -400,6 +542,7 @@ export async function readNamedVisibleCompany(input: {
   if (exact.size !== 1) return null;
   const [companyId] = [...exact];
   if (companyId === undefined || input.exclude.has(companyId)) return null;
+  input.onFound?.();
   const got = await tools
     .execute(
       {

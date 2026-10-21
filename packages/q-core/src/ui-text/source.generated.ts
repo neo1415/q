@@ -4995,6 +4995,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Where you're based",
   "Whether you can send a request couldn't be checked just now. Reload to try again.",
   "Which investor",
+  "Which one?",
   "Who",
   "Who acted, under whose authority, on what. Q always acts under a person's authority; admin actions show the role held.",
   "Who can apply",

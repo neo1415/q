@@ -175,6 +175,8 @@ type Needs = {
 function timedModel(
   needs: Needs,
   answerTokens: number,
+  /** The answer text's share of the object (scripts/handoff/answer-output-split.mjs). */
+  answerShare: number,
   calls: string[],
   trace?: (what: string) => void,
 ): ModelProvider {
@@ -241,17 +243,30 @@ function timedModel(
       const sentence =
         "Northwind Ledger declares a seed stage and steady revenue growth. ";
       const answer = sentence
-        .repeat(Math.max(1, Math.round((answerTokens * 4 * 0.7) / 66)))
+        .repeat(Math.max(1, Math.round((answerTokens * 4 * answerShare) / 66)))
         .trim();
       const value = {
         answer,
         responseShape: "ANALYTICAL",
-        findings: [
+        // The rest of the object as findings of a realistic size (about
+        // 400 characters each, inside the statement limit), each valid.
+        findings: Array.from(
           {
-            statement: "x".repeat(Math.round(answerTokens * 4 * 0.3)),
-            truthClass: "USER_CLAIM",
+            length: Math.max(
+              2,
+              Math.round((answerTokens * 4 * (1 - answerShare)) / 520),
+            ),
           },
-        ],
+          (_, index) => ({
+            type: ["FACT", "RISK", "STRENGTH", "GAP"][index % 4] ?? "FACT",
+            statement:
+              `Point ${String(index + 1)}: ${"evidence ".repeat(44)}`.trim(),
+            truthClass: "USER_CLAIM",
+            evidenceStatus: "SELF_REPORTED",
+            confidence: "MODERATE",
+            basis: [],
+          }),
+        ),
         missingEvidence: [],
         contradictions: [],
         insufficientEvidence: false,
@@ -338,7 +353,11 @@ function toolPort(onRead?: (what: string) => void): QToolPort {
       }
       await wait(LATENCY.readMs);
       if (proposal.name === "search_companies") {
-        const name = String(args["query"]);
+        // Case-insensitive, as the real search is.
+        const query = String(args["query"]).toLowerCase();
+        const name =
+          Object.keys(COMPANIES).find((key) => key.toLowerCase() === query) ??
+          String(args["query"]);
         return outcome(proposal, {
           items: [{ companyId: COMPANIES[name], canonicalName: name }],
         });
@@ -379,6 +398,14 @@ type Journey = {
   readonly needs: Needs;
   /** Output tokens of the answer object, as measured (row 15). */
   readonly answerTokens: number;
+  /**
+   * The answer text's share of those tokens, estimated by
+   * scripts/handoff/answer-output-split.mjs (o200k_base, representative
+   * objects): typed 29%, comparison 21%, spoken 14%; a written document is
+   * nearly all text. The answer streams first; findings, cards and the
+   * rest follow it.
+   */
+  readonly answerShare: number;
   readonly reading: Record<string, unknown>;
   /** What the early skim says (production: FIT for a fit ask). */
   readonly skim?: string;
@@ -393,6 +420,7 @@ export type Timing = {
   readonly firstVisibleMs: number | null;
   readonly firstWordsMs: number | null;
   readonly lastWordsMs: number | null;
+  readonly firstFindingMs: number | null;
   readonly completeMs: number;
   readonly modelCalls: number;
   readonly calls: readonly string[];
@@ -415,6 +443,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: false,
     needs: { companies: ["Northwind Ledger"], web: false, cards: false },
     answerTokens: 1_100,
+    answerShare: 0.29,
     reading: question("ANALYSIS", "What are the risks with Northwind Ledger?"),
   },
   {
@@ -425,6 +454,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: false,
     needs: { companies: ["Northwind Ledger"], web: false, cards: false },
     answerTokens: 1_100,
+    answerShare: 0.29,
     reading: question("ANALYSIS", "what are the risks with northwind ledger?"),
   },
   {
@@ -437,6 +467,7 @@ export const JOURNEYS: readonly Journey[] = [
       cards: false,
     },
     answerTokens: 2_280,
+    answerShare: 0.21,
     reading: question(
       "COMPARISON",
       "Compare Northwind Ledger and Halyard Health",
@@ -448,6 +479,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: false,
     needs: { companies: [], web: true, cards: false },
     answerTokens: 900,
+    answerShare: 0.29,
     reading: {
       ...question("FACTUAL", "latest public news on Northwind Ledger"),
       kind: "RESEARCH_REQUEST",
@@ -459,6 +491,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: true,
     needs: { companies: [], web: false, cards: false },
     answerTokens: 250,
+    answerShare: 0.14,
     reading: {
       ...question("ANALYSIS", "why does that matter for a seed investor"),
       aboutNamedOther: false,
@@ -471,6 +504,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: true,
     needs: { companies: [], web: false, cards: true },
     answerTokens: 350,
+    answerShare: 0.14,
     reading: {
       ...question("FIT", "show me the companies that fit my mandate best"),
       aboutNamedOther: false,
@@ -483,6 +517,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: false,
     needs: { companies: ["Northwind Ledger"], web: false, cards: false },
     answerTokens: 2_000,
+    answerShare: 0.9,
     reading: {
       kind: "TOOL_REQUEST",
       confidence: "HIGH",
@@ -513,6 +548,8 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
   let firstWordsMs: number | null = null;
   /** The last streamed sentence: the voice has the whole answer to say. */
   let lastWordsMs: number | null = null;
+  /** The first finding shown live (q.finding.available). */
+  let firstFindingMs: number | null = null;
   const stages: string[] = [];
   const traced: string[] = [];
   const trace = (what: string): void => {
@@ -579,6 +616,9 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
         input: { eventType?: string; visibleStage?: string | null },
       ) => {
         await wait(LATENCY.dbMs);
+        if (input.eventType === "q.finding.available") {
+          firstFindingMs ??= at();
+        }
         if (input.visibleStage !== null && input.visibleStage !== undefined) {
           stages.push(`${input.visibleStage}@${String(Math.round(at()))}`);
           firstVisibleMs ??= at();
@@ -603,7 +643,13 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
   const gateway = createModelGateway({
     catalog: createStaticModelCatalog(catalog()),
     registry: createModelProviderRegistry([
-      timedModel(journey.needs, journey.answerTokens, calls, trace),
+      timedModel(
+        journey.needs,
+        journey.answerTokens,
+        journey.answerShare,
+        calls,
+        trace,
+      ),
     ]),
     usage: createInMemoryModelUsageRepository(),
     sleep: () => Promise.resolve(),
@@ -737,6 +783,7 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
     firstVisibleMs,
     firstWordsMs,
     lastWordsMs,
+    firstFindingMs,
     completeMs,
     modelCalls: calls.length,
     calls,
@@ -755,11 +802,11 @@ describe("turn timing harness", () => {
     const rows: Timing[] = [];
     for (const journey of JOURNEYS) rows.push(await timeJourney(journey));
     const table = [
-      "| journey | first visible | first words | answer words all out | complete | model calls | calls |",
-      "| --- | --- | --- | --- | --- | --- | --- |",
+      "| journey | first visible | first words | answer words all out | first finding | complete | model calls | calls |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- |",
       ...rows.map(
         (row) =>
-          `| ${row.journey} | ${ms(row.firstVisibleMs)} | ${ms(row.firstWordsMs)} | ${ms(row.lastWordsMs)} | ${ms(row.completeMs)} | ${String(row.modelCalls)} | ${row.calls.join(", ")} |`,
+          `| ${row.journey} | ${ms(row.firstVisibleMs)} | ${ms(row.firstWordsMs)} | ${ms(row.lastWordsMs)} | ${ms(row.firstFindingMs)} | ${ms(row.completeMs)} | ${String(row.modelCalls)} | ${row.calls.join(", ")} |`,
       ),
     ].join("\n");
     console.log(`\n${table}\n`);
@@ -779,12 +826,19 @@ describe("turn timing harness", () => {
     for (const one of rows) {
       expect(one.stages.some((stage) => /^[A-Z_]+@/u.test(stage))).toBe(true);
     }
-    // Row 16: a company the model had to search for is read by code in the
-    // same round, so one lookup round, not two.
+    // Progressive findings (round 5): the first one is on screen well
+    // before the whole object is written.
+    for (const name of ["typed question about", "comparison"]) {
+      const one = row(name);
+      expect(one.firstFindingMs ?? Infinity).toBeLessThan(
+        one.completeMs * 0.75,
+      );
+    }
+    // Round 5: a company typed in lowercase is read by code, as a
+    // capitalised one is: no lookup round at all (before: two, then one).
     expect(row("typed question, company named").calls).toEqual([
       "skim",
       "reader",
-      "tools:search_companies",
       "answer:1100",
     ]);
   }, 600_000);

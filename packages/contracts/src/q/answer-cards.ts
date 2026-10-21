@@ -55,7 +55,10 @@ export const Q_ANSWER_CARD_REASONS_MAX = 3;
  */
 export const Q_ANSWER_CARD_MEASURES_MAX = FIT_PARAMETERS.length;
 export const Q_ANSWER_CARD_FOLLOW_UPS_MAX = 3;
-/** Identity colours: `--cq-card-hue-1` .. `--cq-card-hue-7`. */
+/**
+ * A card's identity slot (1..7). Kept for the contract; since round 5 the
+ * web draws every slot in one neutral tone (no colour by rank).
+ */
 export const Q_ANSWER_CARD_HUES = 7;
 
 export const QAnswerCardMeasureSchema = z

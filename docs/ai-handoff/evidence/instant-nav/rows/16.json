@@ -1,0 +1,12 @@
+{
+  "id": 16,
+  "said": "close that",
+  "page": "/company/7b1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f72",
+  "channel": "typed",
+  "kind": "close",
+  "ms": 58,
+  "runs": 0,
+  "reads": 0,
+  "moves": 1,
+  "outcome": "done on screen"
+}

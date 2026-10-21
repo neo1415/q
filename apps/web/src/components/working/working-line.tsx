@@ -18,16 +18,54 @@
 
 export type WorkingSize = "answer" | "caption";
 
+/**
+ * Round 5 (ux-direction §5.1 THINKING: the aperture "focuses"): a small
+ * ring whose bright arc travels round it while real work runs, so a long
+ * step never reads as stuck. Shown only while `active` (the caller's real
+ * working state) and gone when the answer lands. Under reduced motion the
+ * arc stands still: a static "working" glyph. Tokens only; no glow.
+ */
+export function WorkingMark({ className }: { readonly className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 16 16"
+      className={`cq-working-mark size-3.5 shrink-0 ${className ?? ""}`}
+      data-working-mark
+    >
+      <circle
+        cx="8"
+        cy="8"
+        r="6"
+        fill="none"
+        stroke="var(--cq-border-strong)"
+        strokeWidth="2"
+      />
+      <path
+        className="cq-working-sweep"
+        d="M8 2 A6 6 0 0 1 14 8"
+        fill="none"
+        stroke="var(--cq-accent)"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function WorkingLine({
   label,
   size = "caption",
   reserve = false,
   live = true,
+  active = false,
   className,
   ...data
 }: {
   /** The words to show, already translated; null when there are none. */
   readonly label: string | null;
+  /** Real work is running: the WorkingMark turns beside the words. */
+  readonly active?: boolean | undefined;
   /** "answer": the size of an answer's first line; "caption": under a label. */
   readonly size?: WorkingSize | undefined;
   /** Keep the line's height when there is nothing to say (no shift). */
@@ -43,17 +81,22 @@ export function WorkingLine({
     <p
       // One polite update per change; the line is the live region.
       role={live ? "status" : undefined}
-      className={`m-0 min-w-0 truncate ${
+      className={`m-0 flex min-w-0 items-center gap-2 ${
         size === "answer" ? "cq-body" : "cq-caption"
       } text-(--cq-text-secondary) ${className ?? ""}`}
       {...data}
     >
+      {active && label !== null ? <WorkingMark /> : null}
       {label === null ? (
         // A non-breaking space holds exactly one line.
         " "
       ) : (
         // Keyed by its words: a new line fades in where the old one was.
-        <span key={label} className="cq-stage-line" title={label}>
+        <span
+          key={label}
+          className="cq-stage-line min-w-0 truncate"
+          title={label}
+        >
           {label}
         </span>
       )}
@@ -67,6 +110,7 @@ export function WorkingProgress({
   progress,
   progressText,
   compact = false,
+  active = false,
   className,
   ...data
 }: {
@@ -80,6 +124,8 @@ export function WorkingProgress({
   /** What a screen reader hears for the bar: "2 of 4: Laying out each page". */
   readonly progressText?: string | undefined;
   readonly compact?: boolean | undefined;
+  /** Real work is running: the WorkingMark turns beside the title. */
+  readonly active?: boolean | undefined;
   readonly className?: string | undefined;
   readonly [key: `data-${string}`]: string | undefined;
 }) {
@@ -90,14 +136,17 @@ export function WorkingProgress({
     >
       <p
         role="status"
-        className={`m-0 min-w-0 truncate ${
+        className={`m-0 flex min-w-0 items-center gap-2 ${
           compact ? "cq-caption" : "cq-body-sm"
         } text-(--cq-text-primary)`}
       >
-        <span className="font-medium">{title}</span>
-        {detail.length > 0 ? (
-          <span className="text-(--cq-text-secondary)">{` · ${detail.join(" · ")}`}</span>
-        ) : null}
+        {active ? <WorkingMark /> : null}
+        <span className="min-w-0 truncate">
+          <span className="font-medium">{title}</span>
+          {detail.length > 0 ? (
+            <span className="text-(--cq-text-secondary)">{` · ${detail.join(" · ")}`}</span>
+          ) : null}
+        </span>
       </p>
       {progress === undefined ? null : (
         <div

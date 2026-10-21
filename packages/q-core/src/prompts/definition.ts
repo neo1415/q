@@ -89,6 +89,8 @@ export const PROMPT_IDS = [
   "APP_ACTION_ARGUMENTS",
   /** HARDEN 2026-10-03: which one declared app action a request asks for. */
   "APP_ACTION_ROUTER",
+  /** Lane 7 2026-10-21: which one of a few candidates "their deck" means. */
+  "NAVIGATION_CHOOSER",
   /** 2026-10-04: Q's one line on a document shared in diligence. */
   "DILIGENCE_DOCUMENT_SUMMARY",
   /** Founder brief J1-J9 2026-10-06: Q's workforce of agents. */
@@ -148,6 +150,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   PROFILE_GAP_READER: "profile-gap-reader",
   APP_ACTION_ARGUMENTS: "app-action-arguments",
   APP_ACTION_ROUTER: "app-action-router",
+  NAVIGATION_CHOOSER: "navigation-chooser",
   GATEQ_INTERVIEWER: "gateq-interviewer",
   GATEQ_DOSSIER_SYNTHESIS: "gateq-dossier-synthesis",
   ARTIFACT_REVISION: "artifact-revision",

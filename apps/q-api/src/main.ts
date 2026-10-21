@@ -637,6 +637,7 @@ import {
   recentUiActReceipts,
 } from "./http/ui-act-receipts.js";
 import { createFastNavigation } from "./composition/fast-navigation.js";
+import { createNavigationChooser } from "./composition/navigation-chooser.js";
 import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
 import { createDeepgramVoiceProvider } from "./voice/providers/deepgram.js";
@@ -6932,6 +6933,15 @@ const { app, logger: appLogger } = createApp(
       firewall: baseFirewall,
       tools: qTools.port,
       ownRelationships: errandRelationships.ownRelationships,
+      logger,
+    }),
+    // Lane 7: "open their deck" when the screen is torn between two or
+    // three things it showed: the ones they may open, one capped call.
+    fastNavigationChoose: createNavigationChooser({
+      firewall: baseFirewall,
+      tools: qTools.port,
+      gateway: modelGateway,
+      dataPosture: demoDataPosture,
       logger,
     }),
     // Q as an MCP server, only where a deployment turned it on. The same

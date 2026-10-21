@@ -181,6 +181,7 @@ export {
   readQRoom,
   reportQUiActs,
   resolveQNavigation,
+  chooseQNavigation,
   rejoinQVoiceDuplex,
   endQVoiceDuplex,
   getQApproval,

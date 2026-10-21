@@ -106,6 +106,8 @@ describe("registry", () => {
         // HARDEN 2026-10-02 (ADR 0040): one app action's inputs from their words.
         "APP_ACTION_ARGUMENTS",
         "APP_ACTION_ROUTER",
+        // Lane 7 2026-10-21: which one of a few candidates a pointer means.
+        "NAVIGATION_CHOOSER",
         // 2026-10-04: Q's one line on a document shared in diligence.
         "DILIGENCE_DOCUMENT_SUMMARY",
         // Overnight A5 2026-10-06: a pitch deck into twelve sections.

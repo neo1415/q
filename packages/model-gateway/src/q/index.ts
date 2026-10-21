@@ -94,6 +94,7 @@ import {
   statesSomething,
   fenceUntrusted,
   dailyFollowUpKind,
+  ModelFindingSchema,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
 import {
@@ -117,6 +118,7 @@ import {
 
 import { isModelGatewayError } from "../errors.js";
 import { createPartialAnswerReader } from "../policy/partial-answer.js";
+import { createPartialFindingsReader } from "../policy/partial-findings.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk, withoutStatusTalk } from "./action-talk.js";
@@ -156,6 +158,7 @@ import {
 import {
   companyFactAskOf,
   companyNameCandidates,
+  lowercaseNameCandidates,
   namesOnlyCompany,
   profileOf,
   readNamedVisibleCompany,
@@ -164,6 +167,8 @@ import {
   type CompanyFactAsk,
 } from "./named-company-fact.js";
 import { CHAINED_GET_TOOL, chainedCompanyOf } from "./chained-read.js";
+import { outputSplitOf } from "./output-split.js";
+export { outputSplitOf, type OutputSplit } from "./output-split.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
 import {
   runInvestorDiscovery,
@@ -308,6 +313,7 @@ import {
 import {
   analystResultBlocks,
   askedSubjects,
+  findingBlockOf,
   namesReadByRun,
   ownInvestorOrganisationIn,
   pictureBlock,
@@ -759,7 +765,7 @@ export function diagnosticCodeFor(
 const TOOLS_FIRST_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
-    'TAKE THEM THERE. If the person asks to be taken to, shown or to open a page, screen, tab or profile ("take me to relationships", "open Discover", "show me Clearwater"), call open_page for it in this same turn, even when the message also asks a question; then answer the question too. Scrolling or working the page on screen is control_screen. You can always do both; never say you cannot navigate or scroll. SHOW CARDS. When they ask for the top, best, most promising, a shortlist, a ranking, a list or a comparison of companies, investors or relationships ("top three", "which of these make the most sense", "list the people asking to connect"), fill answerCards with one card per company in the answer, as well as the spoken answer. LOOK IT UP FIRST. If the message names a company, organisation or person you have no authorised facts about, look it up now with the tools (search_companies with the name as given; when it finds exactly one company, Capital Q reads its profile for you, otherwise call get_company with the right companyId). ONE LOOKUP TURN. Call every lookup the answer needs in the same turn, side by side: they run at the same time, and each further lookup turn keeps the person waiting seconds longer. If the person asks for public, current, external or web information, or asks you to check or compare what the public web says, call research_public_web now with a short public query (a few words: the subject as named plus what to look for; never a figure, a customer name or an identifier), up to three other phrasings in alsoSearch, and entityName when they named one company or person (a name is enough; no website needed). What is current or specific (an accelerator batch, recent funding, news, a named company, fund or person) is looked up, never answered from memory. Call the tool through the function-calling interface and write nothing else in that turn. THEN ANSWER IN THE SAME TURN. When nothing needs looking up, or once results are in front of you, write the JSON object and nothing else: at minimum {"answer": "...", "responseShape": "CONCISE" or "ANALYTICAL", "insufficientEvidence": true or false}, plus any other field of the schema that applies. Leave out every field you are not certain of the exact shape of: a field in the wrong shape (null for a list, a string where the schema has an object, a renamed key) loses the whole answer, and an absent one costs nothing. Never reply with prose outside the object, and never reply that you are about to answer.',
+    'TAKE THEM THERE. If the person asks to be taken to, shown or to open a page, screen, tab or profile ("take me to relationships", "open Discover", "show me Clearwater"), call open_page for it in this same turn, even when the message also asks a question; then answer the question too. Scrolling or working the page on screen is control_screen. You can always do both; never say you cannot navigate or scroll. SHOW CARDS. When they ask for the top, best, most promising, a shortlist, a ranking, a list or a comparison of companies, investors or relationships ("top three", "which of these make the most sense", "list the people asking to connect"), fill answerCards with one card per company in the answer, as well as the spoken answer. LOOK IT UP FIRST. If the message names a company, organisation or person you have no authorised facts about, look it up now with the tools (search_companies with the name as given; when it finds exactly one company, Capital Q reads its profile for you, otherwise call get_company with the right companyId). ONE LOOKUP TURN. Call every lookup the answer needs in the same turn, side by side: they run at the same time, and each further lookup turn keeps the person waiting seconds longer. If the person asks for public, current, external or web information, or asks you to check or compare what the public web says, call research_public_web now with a short public query (a few words: the subject as named plus what to look for; never a figure, a customer name or an identifier), up to three other phrasings in alsoSearch, and entityName when they named one company or person (a name is enough; no website needed). What is current or specific (an accelerator batch, recent funding, news, a named company, fund or person) is looked up, never answered from memory. Call the tool through the function-calling interface and write nothing else in that turn. THEN ANSWER IN THE SAME TURN. When nothing needs looking up, or once results are in front of you, write the JSON object and nothing else: at minimum {"answer": "...", "responseShape": "CONCISE" or "ANALYTICAL", "insufficientEvidence": true or false}, plus any other field of the schema that applies. Leave out every field you are not certain of the exact shape of: a field in the wrong shape (null for a list, a string where the schema has an object, a renamed key) loses the whole answer, and an absent one costs nothing. Leave out, too, every field that would only be empty, null or false (an empty list, no recommendation, no visual, false): Capital Q fills those in, and each one written keeps the person waiting. Findings with evidence are never left out for that reason. Never reply with prose outside the object, and never reply that you are about to answer.',
 };
 
 /**
@@ -2099,6 +2105,28 @@ export function createModelGatewayQAnswer(
   let last: QAnswerObservation | undefined;
 
   /** Approved progress only; best effort, never a reason to fail the answer. */
+  /** A finding the answer finished, shown before the whole answer is. */
+  async function showFinding(
+    request: QAnswerRequest,
+    finding: Extract<QResultBlock, { kind: "FINDING" }>["finding"],
+  ): Promise<void> {
+    try {
+      const run = { id: request.runId, tenantId: request.tenantId };
+      const input = { type: "q.finding.available", data: { finding } } as const;
+      const done = await appendRunEventAtomic(repositories, sql, run, input);
+      if (done === "UNSUPPORTED") {
+        await transactions.run((tx) =>
+          appendRunEvent(repositories, tx, run, input),
+        );
+      }
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "q live finding not recorded",
+      );
+    }
+  }
+
   async function showStage(
     request: QAnswerRequest,
     stage: QVisibleStage,
@@ -2952,6 +2980,7 @@ export function createModelGatewayQAnswer(
         knownCompaniesOf(standing.result.data),
       ).filter((company) => company.companyId !== onScreen);
       for (const company of named) namedIds.add(company.companyId);
+      if (named.length > 0) stepStarts(request, "REVIEWING_COMPANY");
       await Promise.all(
         named.map(async (company, index) => {
           const call = {
@@ -2988,7 +3017,10 @@ export function createModelGatewayQAnswer(
      */
     const visibleNamedRead = async (own: Promise<void>): Promise<void> => {
       if (counterparty !== undefined) return;
-      const names = companyNameCandidates(latest.content);
+      const names = [
+        ...companyNameCandidates(latest.content),
+        ...lowercaseNameCandidates(latest.content),
+      ];
       if (names.length === 0) return;
       const found = await Promise.all(
         names.map((name, index) =>
@@ -2999,6 +3031,10 @@ export function createModelGatewayQAnswer(
             context: toolContext,
             available: prefetchTools,
             callIndex: index,
+            // Its stage goes out once a company matched, as its read starts.
+            onFound: () => {
+              stepStarts(request, "REVIEWING_COMPANY");
+            },
           }).catch(() => null),
         ),
       );
@@ -3463,8 +3499,40 @@ export function createModelGatewayQAnswer(
    * ever read.
    */
   const warming = new Map<string, Promise<PreparedTurn>>();
-  /** A stage a warmed turn already showed, so its answer does not repeat it. */
-  const stagedEarly = new Map<string, QVisibleStage>();
+  /**
+   * Owner 2026-10-21 (visible stages): each step's stage goes out as the
+   * step starts, in order, and never holds the step up. One tracker per
+   * run, shared by the reads prepared for it and its answer: writes are
+   * queued (stored in the order they happened) and a stage already showing
+   * is not written again. A speculative answer keeps its own (its stages
+   * wait with its text and vanish if it is cancelled).
+   */
+  const runStages = new Map<
+    string,
+    { now: string | undefined; queue: Promise<void> }
+  >();
+  const stagesOf = (runId: string) => {
+    let stages = runStages.get(runId);
+    if (stages === undefined) {
+      stages = { now: undefined, queue: Promise.resolve() };
+      runStages.set(runId, stages);
+      while (runStages.size > WARMING_MAX) {
+        const oldest = runStages.keys().next().value;
+        if (oldest === undefined) break;
+        runStages.delete(oldest);
+      }
+    }
+    return stages;
+  };
+  /** A real step of this run (never a speculative answer's) begins. */
+  const stepStarts = (request: QAnswerRequest, stage: QVisibleStage): void => {
+    if (request.speculation !== undefined) return;
+    const stages = stagesOf(request.runId);
+    const key = stageKey(stage, undefined);
+    if (stages.now === key) return;
+    stages.now = key;
+    stages.queue = stages.queue.then(() => showStage(request, stage));
+  };
   const WARMING_MAX = 64;
 
   return {
@@ -3491,14 +3559,10 @@ export function createModelGatewayQAnswer(
         .then((prepared) => {
           if (prepared === null) return undefined;
           const names =
-            companyNameCandidates(prepared.latest.content).length > 0;
+            companyNameCandidates(prepared.latest.content).length > 0 ||
+            lowercaseNameCandidates(prepared.latest.content).length > 0;
           if (!names && request.plan.screen?.manifest?.focus === undefined) {
             return undefined;
-          }
-          // Its stage goes out as the read starts (visible stages).
-          if (names && request.speculation === undefined) {
-            stagedEarly.set(request.runId, "REVIEWING_COMPANY");
-            void showStage(request, "REVIEWING_COMPANY");
           }
           return prepared.wide();
         })
@@ -3508,7 +3572,6 @@ export function createModelGatewayQAnswer(
         const oldest = warming.keys().next().value;
         if (oldest === undefined) break;
         warming.delete(oldest);
-        stagedEarly.delete(oldest);
       }
     },
     answer: async (request: QAnswerRequest): Promise<QAnswerOutcome> => {
@@ -3554,25 +3617,26 @@ export function createModelGatewayQAnswer(
        * happened) and a stage already showing is not written again. While
        * the answer is speculative the stage waits with its text.
        */
-      let stageNow: QVisibleStage | undefined = stagedEarly.get(request.runId);
-      stagedEarly.delete(request.runId);
-      let stageQueue: Promise<void> = Promise.resolve();
-      let stageKeyNow: string | undefined =
-        stageNow === undefined ? undefined : stageKey(stageNow, undefined);
+      const stages =
+        gate === null
+          ? stagesOf(request.runId)
+          : {
+              now: undefined as string | undefined,
+              queue: Promise.resolve(),
+            };
       const stageOnce = (
         stage: QVisibleStage,
         about?: QStageAbout,
       ): Promise<void> => {
         const key = stageKey(stage, about);
-        if (stage === stageNow && key === stageKeyNow) return stageQueue;
-        stageNow = stage;
-        stageKeyNow = key;
-        stageQueue = stageQueue.then(() =>
+        if (key === stages.now) return stages.queue;
+        stages.now = key;
+        stages.queue = stages.queue.then(() =>
           gate === null
             ? showStage(request, stage, about)
             : gate.emit(() => showStage(request, stage, about)),
         );
-        return stageQueue;
+        return stages.queue;
       };
       if (gate === null) warming.delete(request.runId);
       else
@@ -3808,13 +3872,6 @@ export function createModelGatewayQAnswer(
           (request.turnKind === undefined ||
             request.turnKind === "QUESTION_TO_Q") &&
           asksWhatNeedsThem(latest.content));
-      // Visible stages: the companies a message names are read here.
-      if (
-        !withoutWideReads &&
-        companyNameCandidates(latest.content).length > 0
-      ) {
-        void stageOnce("REVIEWING_COMPANY");
-      }
       let wideReads: WideReads = withoutWideReads
         ? NO_WIDE_READS
         : await prepared.wide();
@@ -4279,6 +4336,41 @@ export function createModelGatewayQAnswer(
        * durable form and the one that decides what was said.
        */
       const partial = createPartialAnswerReader();
+      /**
+       * Progressive findings (round 5, with lane 3): each finding the
+       * answer finishes is shown at once as `q.finding.available`, under
+       * the id the completed message's FINDING block then carries. It is
+       * the same block the message builds (`findingBlockOf`, the same
+       * schema); the completed message stays authoritative and its
+       * set-wide checks only remove or merge. Keyed by statement, since an
+       * invalid item dropped from the final list shifts every place.
+       */
+      const liveFindings = createPartialFindingsReader();
+      const liveFindingIds = new Map<string, string>();
+      const findingKey = (statement: string): string =>
+        statement.trim().replace(/\s+/gu, " ").toLowerCase();
+      const showLive = (raw: unknown): void => {
+        const parsed = ModelFindingSchema.safeParse(raw);
+        if (!parsed.success) return;
+        const key = findingKey(parsed.data.statement);
+        if (liveFindingIds.has(key)) return;
+        const id = randomUUID();
+        const block = findingBlockOf(
+          parsed.data,
+          // A named other's subjects are settled with the message.
+          request.aboutNamedOther === true
+            ? []
+            : askedSubjects(request.subjects, plan),
+          id,
+        );
+        if (block === null) return;
+        liveFindingIds.set(key, id);
+        stages.queue = stages.queue.then(() =>
+          gate === null
+            ? showFinding(request, block.finding)
+            : gate.emit(() => showFinding(request, block.finding)),
+        );
+      };
       const cutter = createSentenceCutter();
       let streamedText = "";
       let seenText = "";
@@ -4457,6 +4549,7 @@ export function createModelGatewayQAnswer(
       };
       const onTextDelta = (fragment: string): void => {
         seenText += fragment;
+        for (const raw of liveFindings.push(seenText)) showLive(raw);
         const fresh = partial.push(seenText);
         if (fresh.length > 0) {
           seenAnswer += fresh;
@@ -4657,6 +4750,9 @@ export function createModelGatewayQAnswer(
         }
         // Nothing of a speculative answer is stored until it is adopted.
         if (gate !== null) await gate.ready();
+        // The stages and live findings already queued are stored first, so
+        // the completed message is the last word (lane 3 reconciles on it).
+        await stages.queue;
         return transactions.run(async (tx) => {
           const stored = await repositories.messages.insert(tx, {
             id: messageId,
@@ -6607,6 +6703,9 @@ export function createModelGatewayQAnswer(
         const modelBlocks = analystResultBlocks({
           result: withConversationFindings(analyst),
           question: latest.content,
+          // A finding already shown live keeps the id it was shown under.
+          findingId: (_index, statement) =>
+            liveFindingIds.get(findingKey(statement)) ?? randomUUID(),
           // Screen focus is not the target of a question naming another
           // company. Its reference must come from an exact name and a
           // successful authorised profile read, never a model-written id.
@@ -6790,6 +6889,9 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
             // model wrote its object in an order this cannot read.
             streamedCharacters: streamedText.length,
             firstPublishedMs,
+            // Round 5: the answer's output, and which parts it went to.
+            outputTokens: final.usage.outputTokens,
+            outputSplit: outputSplitOf(analyst),
           },
           "q answer produced",
         );

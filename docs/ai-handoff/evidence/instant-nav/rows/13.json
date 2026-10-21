@@ -1,0 +1,12 @@
+{
+  "id": 13,
+  "said": "open the Saved tab",
+  "page": "/feed",
+  "channel": "typed",
+  "kind": "tab by name",
+  "ms": 48,
+  "runs": 0,
+  "reads": 0,
+  "moves": 1,
+  "outcome": "done on screen"
+}

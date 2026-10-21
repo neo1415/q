@@ -20,8 +20,14 @@ import {
   lastNavigationTo,
 } from "./control/navigation-lifecycle";
 import { currentRoute } from "./control/route-state";
+import {
+  doneByScreen,
+  noteOpened,
+  subjectOfPage,
+} from "./control/instant-ledger";
 import { performUiAct, requestMove } from "./ui-act-controller";
 import { announceLanguage } from "@/features/i18n/language";
+import { openDocumentViewer } from "@/features/documents/document-ready";
 
 /**
  * What the browser does when Q's answer carries a client action (R20/R33;
@@ -57,6 +63,11 @@ export type ClientActionEffects = {
    * viewer asks the API for a signed read as them; this only names it.
    */
   readonly openMaterial: (document: QMaterialDocumentRef) => void;
+  /**
+   * Lane 7: one of their own documents (Q made it), opened in the viewer
+   * over the page they are on. Absent: its page (/documents?open=).
+   */
+  readonly openDocument?: ((artifactId: string) => void) | undefined;
 };
 
 /** A data-room document Q opened on screen (R0). */
@@ -440,6 +451,94 @@ export function moveEarly(path: string): void {
   requestMove({ path });
 }
 
+/**
+ * Lane 7: a document the fast path opened for the latest sentence. Q's
+ * answer naming the same document seconds later does not open it again
+ * (a reload of the viewer, or a reopen after they closed it).
+ */
+export type EarlyDocument =
+  | ({ readonly kind: "MATERIAL" } & QMaterialDocumentRef)
+  | { readonly kind: "ARTIFACT"; readonly artifactId: string };
+
+let earlyDocument: { readonly id: string; readonly at: number } | null = null;
+
+function documentKey(document: EarlyDocument): string {
+  return (
+    document.kind === "MATERIAL" ? document.documentId : document.artifactId
+  ).toLowerCase();
+}
+
+/** The fast path's open: in the viewer over this page, at once. */
+export function openDocumentEarly(
+  document: EarlyDocument,
+  effects: ClientActionEffects = BROWSER_EFFECTS,
+): void {
+  earlyDocument = { id: documentKey(document), at: Date.now() };
+  noteOpened({
+    document,
+    label: document.kind === "MATERIAL" ? document.title : null,
+  });
+  if (document.kind === "MATERIAL") {
+    effects.openMaterial({
+      companyId: document.companyId,
+      documentId: document.documentId,
+      title: document.title,
+    });
+    return;
+  }
+  if (effects.openDocument !== undefined) {
+    effects.openDocument(document.artifactId);
+  } else {
+    effects.goTo(recordPagePath("DOCUMENT", document.artifactId));
+  }
+}
+
+/** Lane 7: the record or document a record-page intent opens, noted. */
+export function noteOpenedPage(
+  intent: Extract<QClientActionIntent, { kind: "OPEN_RECORD_PAGE" }>,
+): void {
+  if (intent.page === "DATA_ROOM_DOCUMENT" && intent.companyId !== undefined) {
+    noteOpened({
+      document: {
+        kind: "MATERIAL",
+        companyId: intent.companyId,
+        documentId: intent.id,
+        title: intent.title ?? null,
+      },
+      label: intent.title ?? null,
+    });
+    return;
+  }
+  if (intent.page === "DOCUMENT") {
+    noteOpened({
+      document: { kind: "ARTIFACT", artifactId: intent.id },
+      label: null,
+    });
+    return;
+  }
+  const subject = subjectOfPage(intent.page, intent.id);
+  if (subject !== null) noteOpened({ subject, label: null });
+}
+
+/** Whether the fast path already opened this one (consumed once). */
+export function openedEarly(id: string): boolean {
+  if (earlyDocument === null || Date.now() - earlyDocument.at > EARLY_MOVE_MS) {
+    return false;
+  }
+  if (earlyDocument.id !== id.toLowerCase()) return false;
+  earlyDocument = null;
+  return true;
+}
+
+/** Q's screen acts that the screen's own instant acts already cover. */
+const SCREEN_ACT_DONE: Partial<Record<QScreenActIntent["act"], string>> = {
+  PAGE_DOWN: "SCROLL_DOWN",
+  PAGE_UP: "SCROLL_UP",
+  SCROLL_TOP: "SCROLL_TOP",
+  SCROLL_BOTTOM: "SCROLL_BOTTOM",
+  GO_BACK: "BACK",
+};
+
 /** Q's moves on Discover's feed, heard by the feed itself. */
 export const Q_FEED_EVENT = "cq:q-feed";
 
@@ -528,6 +627,9 @@ export const BROWSER_EFFECTS: ClientActionEffects = {
     answerMove(path);
   },
   screen: screenAct,
+  openDocument: (artifactId) => {
+    openDocumentViewer(artifactId);
+  },
   openMaterial: (document) => {
     window.dispatchEvent(
       new CustomEvent<QMaterialDocumentRef>(Q_MATERIAL_OPEN_EVENT, {
@@ -586,6 +688,7 @@ function performChecked(
   const action: QClientActionIntent = parsed.data;
   switch (action.kind) {
     case "SET_THEME":
+      if (doneByScreen(`theme:${action.theme}`)) return true;
       effects.setTheme(action.theme);
       return true;
     case "RELOAD_PAGE":
@@ -608,6 +711,19 @@ function performChecked(
       effects.signOut();
       return true;
     case "OPEN_RECORD_PAGE":
+      // Lane 7: what Q opened is what "it" and "the other one" mean next.
+      noteOpenedPage(action);
+      // Lane 7: opened already for this sentence by the fast path.
+      if (
+        (action.page === "DATA_ROOM_DOCUMENT" || action.page === "DOCUMENT") &&
+        openedEarly(action.id)
+      ) {
+        return true;
+      }
+      if (action.page === "DOCUMENT" && effects.openDocument !== undefined) {
+        effects.openDocument(action.id);
+        return true;
+      }
       if (action.page === "DATA_ROOM_DOCUMENT") {
         if (action.companyId === undefined) return false;
         effects.openMaterial({
@@ -625,9 +741,14 @@ function performChecked(
     case "SET_DISCOVER_FILTERS":
       effects.setDiscoverFilters(action);
       return true;
-    case "SCREEN_ACT":
+    case "SCREEN_ACT": {
+      // Lane 7: already done by the screen for this sentence (a voice line
+      // that also routed it to Q): never scrolled or moved back twice.
+      const same = SCREEN_ACT_DONE[action.act];
+      if (same !== undefined && doneByScreen(same)) return true;
       effects.screen(action);
       return true;
+    }
     case "OPEN_SETTINGS":
       effects.goTo(settingsPath(action.section));
       return true;
@@ -649,6 +770,13 @@ function performChecked(
       return applyCardsIntent(action);
     // RECOVERY-2026-10: a registered control on the page, with a receipt.
     case "UI_ACT":
+      if (
+        doneByScreen(
+          action.target === undefined ? action.act : `control:${action.target}`,
+        )
+      ) {
+        return true;
+      }
       void performUiAct(action);
       return true;
   }

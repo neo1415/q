@@ -5,7 +5,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { EmailDraftEditor } from "../integrations/email-draft-editor";
 import { openQuestions } from "./board";
 import type { QSessionValue } from "./q-session";
-import { StageLine, TaskProgress } from "./stage-line";
+import { TaskProgress } from "./stage-line";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -19,8 +19,15 @@ export function QNow({
   session,
   onAct,
   quietWhenIdle = false,
+  showProgress = false,
 }: {
   readonly session: QSessionValue;
+  /**
+   * Round 5: Now is its own column here (the desktop Q page with the
+   * Board docked), so a durable task's progress shows here and only here.
+   * Stacked under the thread, the thread's answer slot already shows it.
+   */
+  readonly showProgress?: boolean | undefined;
   /**
    * On the stage, an idle "Now" says nothing worth the space (R23): it
    * renders only when something runs, waits or asks.
@@ -61,13 +68,11 @@ export function QNow({
             <span className="cq-body-sm font-medium text-(--cq-text-primary)">
               {t("Q is working")}
             </span>
-            {/* Round 4 (§7.1 Now): a durable task's name, real step count
-                and bar; otherwise where Q is, in one line. */}
-            {session.presence.stage?.about?.task !== undefined ? (
+            {/* §7.1 Now, as its own column only: a durable task's name,
+                real step count and bar. Elsewhere the thread shows it. */}
+            {showProgress ? (
               <TaskProgress current={session.presence.stage} className="mt-1" />
-            ) : (
-              <StageLine current={session.presence.stage} />
-            )}
+            ) : null}
           </span>
           <button
             type="button"

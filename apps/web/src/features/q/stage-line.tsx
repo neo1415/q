@@ -156,10 +156,16 @@ export function StageLine({
   size = "caption",
   reserve = false,
   live = true,
+  plain = false,
   className,
 }: {
   readonly current: QWorkingStage | null;
   readonly size?: WorkingSize | undefined;
+  /**
+   * Round 5: say the step only, not the durable task's name and count,
+   * because they are shown elsewhere on this screen (the Now column).
+   */
+  readonly plain?: boolean | undefined;
   /** False inside a region that already announces (the thread). */
   readonly live?: boolean | undefined;
   /** Keep the line's height when there is nothing to say (no shift). */
@@ -168,16 +174,27 @@ export function StageLine({
 }) {
   const t = useT();
   const labels = useWire()?.Q_VISIBLE_STAGE_LABELS;
+  const said =
+    current === null || !plain || current.about?.task === undefined
+      ? current
+      : {
+          stage: current.stage,
+          ...(current.about.subjects === undefined
+            ? {}
+            : { about: { subjects: current.about.subjects } }),
+        };
   const text =
-    current === null || labels === undefined
+    said === null || labels === undefined
       ? null
-      : t(stageLineText(current, labels));
+      : t(stageLineText(said, labels));
   return (
     <WorkingLine
       label={text}
       size={size}
       reserve={reserve}
       live={live}
+      // Real work is running while there is a stage to say (round 5).
+      active={said !== null}
       className={className}
       data-q-stage-line={current?.stage ?? ""}
       data-q-stage-about={current?.about?.subjects?.join(", ")}
@@ -223,8 +240,38 @@ export function TaskProgress({
           : `${t(fill("{n} of {n2}", { n: String(progress.step), n2: String(progress.of) }))}: ${rest.at(-1) ?? ""}`
       }
       compact={compact}
+      active
       className={className}
       data-q-task-progress={task.kind}
+    />
+  );
+}
+
+/**
+ * Round 5: the answer slot's working content. A durable task shows its
+ * progress (name, real count, bar) here, unless the Now column already
+ * shows it on this screen (`taskElsewhere`), when the slot says the step
+ * alone; any other stage is the one live line.
+ */
+export function QWorkingSlot({
+  current,
+  taskElsewhere = false,
+  live = false,
+}: {
+  readonly current: QWorkingStage | null;
+  readonly taskElsewhere?: boolean | undefined;
+  readonly live?: boolean | undefined;
+}) {
+  if (current?.about?.task !== undefined && !taskElsewhere) {
+    return <TaskProgress current={current} />;
+  }
+  return (
+    <StageLine
+      current={current}
+      size="answer"
+      live={live}
+      plain={taskElsewhere}
+      reserve
     />
   );
 }

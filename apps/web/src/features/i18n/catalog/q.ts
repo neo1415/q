@@ -14,6 +14,7 @@ export const Q_AR: Readonly<Record<string, string>> = {
   "Ask Q": "اسأل Q",
   "Ask about this": "اسأل عن هذا",
   "Ask next": "اسأل بعد ذلك",
+  "Which one?": "أيّها؟",
   Attribute: "السمة",
   "Comparison table, scrolls sideways": "جدول مقارنة، يُمرَّر أفقياً",
   "Looking at {name}": "يطّلع على {name}",

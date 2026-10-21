@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { QMessage, QResultBlock } from "@capital-q/contracts";
-import type { QStreamState } from "@capital-q/api-client";
+import { createQStreamState, type QStreamState } from "@capital-q/api-client";
 
 import { turnsFrom } from "../src/features/q/conversation";
 
@@ -20,16 +20,7 @@ const COMPANY = "c0000000-0000-4000-8000-000000000001";
 const DOCUMENT = "a0000000-0000-4000-8000-00000000000b";
 
 function state(message: QMessage): QStreamState {
-  return {
-    messages: [message],
-    partial: null,
-    preview: null,
-    runId: null,
-    stage: null,
-    failure: null,
-    approval: null,
-    proposals: [],
-  } as unknown as QStreamState;
+  return { ...createQStreamState(), messages: [message] };
 }
 
 function answer(blocks: readonly QResultBlock[]): QMessage {

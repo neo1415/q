@@ -22,7 +22,12 @@ import {
 } from "./actions";
 import { carriedApproval, type CarriedApproval } from "./carried-approval";
 import type { PendingTurn } from "./conversation";
-import { navigationHeard } from "./control/fast-navigation";
+import {
+  actedHere,
+  contextAsked,
+  documentAsked,
+  navigationHeard,
+} from "./control/fast-navigation";
 import { askQ } from "./ask-route";
 import { noteLiveRun, noteTypedRun } from "./follow-navigation";
 import { loadWire } from "./wire";
@@ -59,6 +64,11 @@ import {
 
 /** Where the browser reaches the Q event stream. Same origin, cookie-authenticated. */
 const STREAM_BASE_URL = "/api/q-stream";
+/**
+ * Lane 7: how long a typed document request waits for the fast path
+ * before Q's run starts anyway (hosted cold reads take ~2 s).
+ */
+const DOCUMENT_WAIT_MS = 2_500;
 
 /** Something changed in this person's conversations: the list should be read again. */
 export const Q_CONVERSATIONS_CHANGED_EVENT = "cq:q-conversations-changed";
@@ -462,11 +472,31 @@ export function useQConversation(
       if (text.length === 0 || submitting || (streaming && !awaitingPerson)) {
         return;
       }
+      // Lane 7 (owner 2026-10-21): "close it", "go back", "scroll down",
+      // "press Filters" -- done by the screen itself, now, with no turn
+      // and no model: the screen is the confirmation.
+      if (actedHere(text)) return;
       setNotice(null);
       setSubmitting(true);
       // RECOVERY-2026-10 (C, "stupid fast"): a typed "open X" moves the
       // screen now, beside the run; the answer does not move it again.
-      void navigationHeard(text);
+      // Lane 7: a document by its name, or words that point ("open their
+      // deck", "that one"), are resolved first (bounded): what the screen
+      // opened by itself needs no turn of Q's either.
+      if (documentAsked(text) || contextAsked(text)) {
+        const opened = await Promise.race([
+          navigationHeard(text),
+          new Promise<null>((resolve) =>
+            setTimeout(() => resolve(null), DOCUMENT_WAIT_MS),
+          ),
+        ]);
+        if (opened?.handled === true) {
+          setSubmitting(false);
+          return;
+        }
+      } else {
+        void navigationHeard(text);
+      }
       const placeholder: PendingTurn = {
         id: crypto.randomUUID(),
         text,

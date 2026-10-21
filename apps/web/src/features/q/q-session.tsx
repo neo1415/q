@@ -55,6 +55,7 @@ import {
 } from "./client-actions";
 import { navigationInFlight } from "./ui-act-controller";
 import { followOfThread, seenAtOpen } from "./follow-navigation";
+import { QShowModal } from "./control/q-show-modal";
 import { QMaterialViewer } from "./material-viewer";
 import { useQSubject, type QSubject } from "./q-subject";
 import { resumableConversation } from "./resume-conversation";
@@ -731,6 +732,7 @@ export function QSessionProvider({
     <QSessionContext.Provider value={value}>
       {children}
       <QMaterialViewer turns={turns} />
+      <QShowModal turns={turns} />
     </QSessionContext.Provider>
   );
 }

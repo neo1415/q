@@ -13,60 +13,26 @@
  */
 
 :root {
-  --cq-card-hue-1: #2a78d6;
-  --cq-card-hue-2: #d95926;
-  --cq-card-hue-3: #199e70;
-  --cq-card-hue-4: #c98500;
-  --cq-card-hue-5: #d55181;
-  --cq-card-hue-6: #008300;
-  --cq-card-hue-7: #4a3aa7;
-  --cq-card-rank-text: #ffffff;
+  /*
+   * Round 5 (coordinator review 2026-10-21): cards carry no colour by
+   * rank. Blue / red-orange / green read as good / warning / fine to an
+   * investor, and meaning never rides on colour (CLAUDE.md; Pass is
+   * neutral). Rank is the number badge and the name; every card shares
+   * one neutral identity tone, and the one quiet accent is the card Q is
+   * on (focused or spoken). Semantic tokens only, both themes.
+   */
+  --cq-card-identity: var(--cq-text-tertiary);
+  --cq-card-rank-text: var(--cq-text-inverse);
   --cq-ac-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --cq-card-hue-1: #3987e5;
-    --cq-card-hue-2: #e0703f;
-    --cq-card-hue-3: #27b583;
-    --cq-card-hue-4: #e0a100;
-    --cq-card-hue-5: #e06a96;
-    --cq-card-hue-6: #3fae3f;
-    --cq-card-hue-7: #9085e9;
-    --cq-card-rank-text: #0b0c10;
-  }
-}
-:root[data-theme="dark"] {
-  --cq-card-hue-1: #3987e5;
-  --cq-card-hue-2: #e0703f;
-  --cq-card-hue-3: #27b583;
-  --cq-card-hue-4: #e0a100;
-  --cq-card-hue-5: #e06a96;
-  --cq-card-hue-6: #3fae3f;
-  --cq-card-hue-7: #9085e9;
-  --cq-card-rank-text: #0b0c10;
-}
 
-/* A card's identity colour, by its hue number. */
-[data-hue="1"] {
-  --hue: var(--cq-card-hue-1);
+/* Every card, whatever its number: the one neutral identity tone. */
+[data-hue] {
+  --hue: var(--cq-card-identity);
 }
-[data-hue="2"] {
-  --hue: var(--cq-card-hue-2);
-}
-[data-hue="3"] {
-  --hue: var(--cq-card-hue-3);
-}
-[data-hue="4"] {
-  --hue: var(--cq-card-hue-4);
-}
-[data-hue="5"] {
-  --hue: var(--cq-card-hue-5);
-}
-[data-hue="6"] {
-  --hue: var(--cq-card-hue-6);
-}
-[data-hue="7"] {
-  --hue: var(--cq-card-hue-7);
+/* The card Q is on: the one quiet accent. */
+.cq-ac-card[data-state="focus"] {
+  --hue: var(--cq-accent);
 }
 
 /* ---------- The canvas ---------- */

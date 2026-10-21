@@ -880,6 +880,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH": Q_TRANSPORT,
   // RECOVERY-2026-10 (C): where a finished sentence goes, read by code.
   "q-api/http/fast-navigation.ts POST Q_FAST_NAVIGATION_PATH": Q_TRANSPORT,
+  // Lane 7: the context tie-break; reads which candidates the person may
+  // open and picks one. Changes nothing.
+  "q-api/http/fast-navigation.ts POST Q_NAVIGATION_CHOOSE_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST Q_RUNS_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts GET runPath": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_MESSAGES_SUFFIX}`": Q_TRANSPORT,
@@ -953,6 +956,16 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/work": exempt("development-only page"),
   "/dev/briefing": exempt("development-only page"),
   "/dev/q-nav": exempt("development-only page"),
+  "/dev/instant-nav": exempt("development-only page (instant-nav harness)"),
+  "/dev/instant-nav/company/[id]": exempt(
+    "development-only page (instant-nav harness)",
+  ),
+  "/dev/instant-nav/work": exempt(
+    "development-only page (instant-nav harness)",
+  ),
+  "/dev/instant-nav/investors/[id]": exempt(
+    "development-only page (instant-nav harness)",
+  ),
   "/dev/voice-preview": exempt("development-only page (local env + flag)"),
   "/dev/q-nav/work": exempt("development-only page"),
   "/dev/workforce": exempt("development-only page"),
@@ -1280,6 +1293,9 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   "q-api/http/ui-act-receipts.ts POST Q_UI_ACT_RECEIPTS_PATH",
   // RECOVERY-2026-10 (C): a read by code of where the words go; changes nothing.
   "q-api/http/fast-navigation.ts POST Q_FAST_NAVIGATION_PATH",
+  // Lane 7: which of the person's own authorised candidates their words
+  // mean ("open that"); reads, changes nothing.
+  "q-api/http/fast-navigation.ts POST Q_NAVIGATION_CHOOSE_PATH",
 ]);
 
 /**

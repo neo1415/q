@@ -1,0 +1,12 @@
+{
+  "id": 28,
+  "said": "tap the notifications button",
+  "page": "/feed",
+  "channel": "spoken",
+  "kind": "button",
+  "ms": 77,
+  "runs": 0,
+  "reads": 0,
+  "moves": 1,
+  "outcome": "done on screen"
+}

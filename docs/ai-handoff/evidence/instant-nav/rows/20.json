@@ -1,0 +1,12 @@
+{
+  "id": 20,
+  "said": "take me back",
+  "page": "/feed",
+  "channel": "spoken",
+  "kind": "back",
+  "ms": 69,
+  "runs": 0,
+  "reads": 0,
+  "moves": 1,
+  "outcome": "done on screen"
+}

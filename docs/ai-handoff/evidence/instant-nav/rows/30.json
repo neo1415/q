@@ -1,0 +1,12 @@
+{
+  "id": 30,
+  "said": "press approve",
+  "page": "/feed",
+  "channel": "spoken",
+  "kind": "consequential (never by code)",
+  "ms": null,
+  "runs": 0,
+  "reads": 0,
+  "moves": 0,
+  "outcome": "left to Q"
+}

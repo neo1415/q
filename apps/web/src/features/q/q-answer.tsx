@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 
 import { ChevronDown, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { QMark } from "@capital-q/ui/q-mark";
@@ -81,6 +81,47 @@ export function replyParts(
   return { inline, companies, investors };
 }
 
+/**
+ * Round 5 (coordinator decision, Stage + Board: objects first, words as
+ * caption): the kinds a live preview frame stands in for. They sit above
+ * Q's words, so words streaming in below push nothing down; every other
+ * block stays under the words, where it lands without moving anything.
+ */
+const LEADING_KINDS: ReadonlySet<QTurnObjectBlock["kind"]> = new Set([
+  "TABLE",
+  "SUMMARY",
+  "COMPARISON_CARDS",
+  "ANSWER_CARDS",
+]);
+
+/**
+ * The objects region of an answer that streamed here: it never gets
+ * shorter while it stays mounted, so the preview frame giving way to the
+ * real block (or to cards drawn on the stage instead) never pulls the
+ * words up. An answer that arrived settled is not held.
+ */
+function useNeverShrink(hold: boolean) {
+  const [element, setElement] = useState<HTMLDivElement | null>(null);
+  const [floor, setFloor] = useState(0);
+  useEffect(() => {
+    if (!hold || element === null || typeof ResizeObserver === "undefined") {
+      return;
+    }
+    // The layout height (border box), not the painted rect: an entering
+    // frame's transform would read a few pixels short (round 5, measured).
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      const height = entry?.borderBoxSize[0]?.blockSize ?? element.offsetHeight;
+      setFloor((current) => (height > current ? height : current));
+    });
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, [hold, element]);
+  return [setElement, hold && floor > 0 ? floor : undefined] as const;
+}
+
 function counted(one: string, many: string, n: number): string {
   return `${n === 1 ? one : many} · ${String(n)}`;
 }
@@ -102,8 +143,8 @@ export function QAnswer({
   /** The dock has no separate answer stage. */
   readonly cardsInline?: boolean | undefined;
   /**
-   * Round 4: where Q is, shown in the answer's own first line until Q's
-   * first words take its place (same line, same height: nothing moves).
+   * Where Q is while it works (round 4/5): one line at the top of the
+   * answer, held at its height once the answer lands, so nothing moves.
    */
   readonly working?: ReactNode | undefined;
 }) {
@@ -111,6 +152,14 @@ export function QAnswer({
   const id = useId();
   const [open, setOpen] = useState<Panel | null>(null);
   const { inline, companies, investors } = replyParts(turn.blocks, cardsInline);
+  const leading = inline.filter((block) => LEADING_KINDS.has(block.kind));
+  const trailing = inline.filter((block) => !LEADING_KINDS.has(block.kind));
+  // Streamed here in this mount: its working line keeps its height once it
+  // has nothing to say, and its objects region does not shrink (round 5).
+  const [streamedHere, setStreamedHere] = useState(turn.streaming);
+  if (turn.streaming && !streamedHere) setStreamedHere(true);
+  const [objectsRef, objectsFloor] = useNeverShrink(streamedHere);
+  const preview = turn.streaming ? turn.preview : undefined;
   const sources = evidenceSummary(turn, false);
   // R3: "Opening X…" until this tab's browser VERIFIED the move.
   const text = useMoveLine(turn.text, turn.blocks);
@@ -143,24 +192,44 @@ export function QAnswer({
       {mark ? (
         <QMark size="sm" state={turn.streaming ? "WORKING" : "IDLE"} />
       ) : null}
+      {/* Round 5: where Q is, on top while it works (the live mark turns
+          beside it); its line keeps its height once the answer lands. */}
+      {working !== undefined && (turn.streaming || streamedHere)
+        ? working
+        : null}
+      {/* Objects first (round 5, Stage + Board): the cards for what Q is
+          naming go up while it talks (artifacts live, in the thread too),
+          and the answer's own table, summary or cards take their place. */}
+      {preview !== undefined || leading.length > 0 || streamedHere ? (
+        <div
+          ref={objectsRef}
+          className="flex flex-col gap-3"
+          style={
+            objectsFloor === undefined ? undefined : { minHeight: objectsFloor }
+          }
+          data-q-answer-objects
+        >
+          {preview !== undefined ? (
+            <LivePreview preview={preview} />
+          ) : leading.length > 0 ? (
+            <QResultBlocks
+              blocks={leading}
+              onAsk={onAsk}
+              onOpenArtifact={onOpenArtifact}
+            />
+          ) : null}
+        </div>
+      ) : null}
       {text.length > 0 ? (
         <QMarkdown
           text={text}
           streaming={turn.streaming}
           className="cq-body text-(--cq-text-primary)"
         />
-      ) : turn.streaming && working !== undefined ? (
-        working
       ) : null}
-      {/* Artifacts live: in the thread too (Chat view, the Q sheet), the
-          cards for what Q is naming go up while it talks; the answer's
-          own blocks take their place when it settles. */}
-      {turn.streaming && turn.preview !== undefined ? (
-        <LivePreview preview={turn.preview} />
-      ) : null}
-      {inline.length > 0 ? (
+      {trailing.length > 0 ? (
         <QResultBlocks
-          blocks={inline}
+          blocks={trailing}
           onAsk={onAsk}
           onOpenArtifact={onOpenArtifact}
         />
