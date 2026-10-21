@@ -95,6 +95,7 @@ export const ACTIVITY_ACTION_CODES = [
   "relationship.deal_terms_recorded",
   "relationship.deal.change",
   "relationship.note.add",
+  "relationship.note.correct",
   "relationship.stage.change",
   "message.send",
   "email.send",

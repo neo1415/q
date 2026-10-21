@@ -238,8 +238,25 @@ describe("activity vocabulary (pure)", () => {
   });
 
   it("cursor round-trips and rejects tampering", () => {
-    const c = { at: "2026-10-20T10:00:00.123456Z", key: "42" };
+    const c = {
+      at: "2026-10-20T10:00:00.123456Z",
+      source: "a" as const,
+      key: "00000000000000000042",
+    };
     expect(decodeActivityCursor(encodeActivityCursor(c))).toEqual(c);
+    const n = {
+      at: "2026-10-20T10:00:00.123456Z",
+      source: "n" as const,
+      key: "00000000-0000-4000-8000-0000000000e1",
+    };
+    expect(decodeActivityCursor(encodeActivityCursor(n))).toEqual(n);
+    expect(
+      decodeActivityCursor(
+        Buffer.from("2026-10-20T10:00:00Z|z|00000000000000000001").toString(
+          "base64url",
+        ),
+      ),
+    ).toBeNull();
     expect(decodeActivityCursor("not-a-cursor")).toBeNull();
     expect(
       decodeActivityCursor(Buffer.from("x|1").toString("base64url")),
@@ -487,6 +504,299 @@ describe("organisation activity", () => {
     });
     const page = await service.activity(actor(ADMIN), {});
     expect(page.items[0]?.resource.label).toBe("Relationship with Kora Health");
+  });
+});
+
+describe("direct person actions in the feed (notes, events, screen actions)", () => {
+  const REL = "00000000-0000-4000-8000-0000000000e1";
+  const REL_B = "00000000-0000-4000-8000-0000000000e2";
+  const COMPANY = "00000000-0000-4000-8000-0000000000c1";
+  const INVESTOR = "00000000-0000-4000-8000-0000000000c2";
+  const NOTE_1 = "00000000-0000-4000-8000-0000000000a1";
+  const NOTE_2 = "00000000-0000-4000-8000-0000000000a2";
+
+  function withRelationships() {
+    const w = world();
+    // ORG is the investor side of REL; ORG_B is the company behind it.
+    w.db.relationships.push(
+      {
+        id: REL,
+        companyId: COMPANY,
+        investorOrganisationId: INVESTOR,
+        companyOrganisationId: ORG_B,
+        investorOrgOrganisationId: ORG,
+        companyName: "Kora Health",
+        investorName: "Northbound Capital",
+      },
+      {
+        // Not ORG's relationship at all.
+        id: REL_B,
+        companyId: "00000000-0000-4000-8000-0000000000c3",
+        investorOrganisationId: "00000000-0000-4000-8000-0000000000c4",
+        companyOrganisationId: ORG_B,
+        investorOrgOrganisationId: "00000000-0000-4000-8000-0000000000b9",
+        companyName: "Kora Health",
+        investorName: "Elsewhere Partners",
+      },
+    );
+    return w;
+  }
+
+  const event = (
+    over: Partial<
+      (typeof MemoryOrganisationAdminDb.prototype.events)[number]
+    > & {
+      id: string;
+      sequence: number;
+      eventType: string;
+      occurredAt: string;
+    },
+  ) => ({
+    relationshipId: REL,
+    actorType: "HUMAN" as const,
+    actorId: MEMBER,
+    visibility: "relationship_shared",
+    correlationId: `cor_${over.id}`,
+    ...over,
+  });
+
+  it("a member's note and its correction appear with before -> after", async () => {
+    const { db, service } = withRelationships();
+    db.notes.push(
+      {
+        id: NOTE_1,
+        tenantId: TENANT,
+        organisationId: ORG,
+        relationshipId: REL,
+        authorUserId: MEMBER,
+        body: "Runway is 14 months",
+        supersedesNoteId: null,
+        createdAt: "2026-10-20T09:00:00.000000Z",
+      },
+      {
+        id: NOTE_2,
+        tenantId: TENANT,
+        organisationId: ORG,
+        relationshipId: REL,
+        authorUserId: MEMBER,
+        body: "Runway is 11 months",
+        supersedesNoteId: NOTE_1,
+        createdAt: "2026-10-20T10:00:00.000000Z",
+      },
+      {
+        // The counterpart's own note: never ours to read.
+        id: "00000000-0000-4000-8000-0000000000a3",
+        tenantId: TENANT_B,
+        organisationId: ORG_B,
+        relationshipId: REL,
+        authorUserId: OTHER,
+        body: "their private note",
+        supersedesNoteId: null,
+        createdAt: "2026-10-20T11:00:00.000000Z",
+      },
+    );
+    const page = await service.activity(actor(ADMIN), {});
+    expect(page.items.map((i) => i.action.code)).toEqual([
+      "relationship.note.correct",
+      "relationship.note.add",
+    ]);
+    const [correction, added] = page.items;
+    expect(correction?.actor).toEqual({
+      type: "PERSON",
+      userId: MEMBER,
+      display: "James Okoro",
+    });
+    expect(correction?.change).toEqual({
+      before: "Runway is 14 months",
+      after: "Runway is 11 months",
+    });
+    expect(correction?.resource.label).toBe("Relationship with Kora Health");
+    expect(added?.change).toBeNull();
+    expect(JSON.stringify(page)).not.toContain("their private note");
+  });
+
+  it("a member's stage change appears with before -> after; never personal_private or another org's", async () => {
+    const { db, service } = withRelationships();
+    db.events.push(
+      event({
+        id: "00000000-0000-4000-8000-0000000000f1",
+        sequence: 1,
+        eventType: "discovered",
+        visibility: "personal_private",
+        occurredAt: "2026-10-18T09:00:00.000000Z",
+      }),
+      event({
+        id: "00000000-0000-4000-8000-0000000000f2",
+        sequence: 2,
+        eventType: "interest_expressed",
+        occurredAt: "2026-10-19T09:00:00.000000Z",
+      }),
+      event({
+        id: "00000000-0000-4000-8000-0000000000f3",
+        sequence: 3,
+        eventType: "diligence_started",
+        occurredAt: "2026-10-20T09:00:00.000000Z",
+      }),
+      // The founder (another organisation's person) acting on the same
+      // relationship: their action, not our member's.
+      event({
+        id: "00000000-0000-4000-8000-0000000000f4",
+        sequence: 4,
+        eventType: "relationship_paused",
+        actorId: OTHER,
+        occurredAt: "2026-10-20T10:00:00.000000Z",
+      }),
+      // Another organisation's relationship entirely.
+      event({
+        id: "00000000-0000-4000-8000-0000000000f5",
+        relationshipId: REL_B,
+        sequence: 1,
+        eventType: "interest_expressed",
+        occurredAt: "2026-10-20T11:00:00.000000Z",
+      }),
+    );
+    const page = await service.activity(actor(ADMIN), {});
+    expect(page.items.map((i) => i.id)).toEqual([
+      "00000000-0000-4000-8000-0000000000f3",
+      "00000000-0000-4000-8000-0000000000f2",
+    ]);
+    expect(page.items[0]?.action.code).toBe("relationship.stage.change");
+    expect(page.items[0]?.change).toEqual({
+      before: "Interest expressed",
+      after: "In diligence",
+    });
+    // The personal_private discovery is not "before" either.
+    expect(page.items[1]?.change).toEqual({
+      before: null,
+      after: "Interest expressed",
+    });
+    expect(page.items[0]?.actor.display).toBe("James Okoro");
+  });
+
+  it("one act is one line: an event wins over its audit row, a service row over its app row", async () => {
+    const { db, service } = withRelationships();
+    const corr = "00000000-0000-4000-8000-00000000cc01";
+    db.events.push(
+      event({
+        id: "00000000-0000-4000-8000-0000000000f2",
+        sequence: 1,
+        eventType: "interest_expressed",
+        correlationId: `cor_${corr}`,
+        occurredAt: "2026-10-19T09:00:00.000000Z",
+      }),
+    );
+    audit(db, {
+      actionType: "relationship.interest.express",
+      occurredAt: "2026-10-19T09:00:00.000000Z",
+      actorId: MEMBER,
+      authorityUserId: MEMBER,
+      correlationId: corr,
+    });
+    const corr2 = "00000000-0000-4000-8000-00000000cc02";
+    audit(db, {
+      actionType: "team.membership.role_changed",
+      occurredAt: "2026-10-20T09:00:00.000000Z",
+      metadata: { from: "MEMBER", to: "ADMIN" },
+      correlationId: corr2,
+    });
+    audit(db, {
+      actionType: "app.team.member.role.set",
+      occurredAt: "2026-10-20T09:00:00.000100Z",
+      correlationId: corr2,
+    });
+    const page = await service.activity(actor(OWNER), {});
+    expect(page.items.map((i) => i.action.code)).toEqual([
+      "team.membership.role_changed",
+      "relationship.stage.change",
+    ]);
+  });
+
+  it("a member's screen action (app.*) appears as the person, without a service row", async () => {
+    const { db, service } = withRelationships();
+    audit(db, {
+      actionType: "app.capital.objective.change",
+      occurredAt: "2026-10-20T09:00:00.000000Z",
+      actorId: MEMBER,
+      authorityUserId: MEMBER,
+      resourceType: "capital_objective",
+      resourceId: "00000000-0000-4000-8000-0000000000d9",
+      metadata: { surface: "SCREEN" },
+      correlationId: "00000000-0000-4000-8000-00000000cc03",
+    });
+    const page = await service.activity(actor(ADMIN), { member: MEMBER });
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).toMatchObject({
+      actor: { type: "PERSON", userId: MEMBER, display: "James Okoro" },
+      action: { code: "capital.objective.change", kind: "CAPITAL" },
+      resource: { kind: "capital_objective", label: "a raise", link: null },
+    });
+  });
+
+  it("the cursor is total across the union, ties included", async () => {
+    const { db, service } = withRelationships();
+    const at = "2026-10-20T09:00:00.000000Z";
+    audit(db, { actionType: "team.invitation.sent", occurredAt: at });
+    audit(db, { actionType: "team.invitation.resent", occurredAt: at });
+    db.events.push(
+      event({
+        id: "00000000-0000-4000-8000-0000000000f2",
+        sequence: 1,
+        eventType: "interest_expressed",
+        occurredAt: at,
+      }),
+    );
+    for (const id of [NOTE_1, NOTE_2]) {
+      db.notes.push({
+        id,
+        tenantId: TENANT,
+        organisationId: ORG,
+        relationshipId: REL,
+        authorUserId: MEMBER,
+        body: "note",
+        supersedesNoteId: null,
+        createdAt: at,
+      });
+    }
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (let n = 0; n < 10; n += 1) {
+      const page = await service.activity(actor(ADMIN), {
+        limit: 2,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      seen.push(...page.items.map((i) => i.id));
+      if (page.nextCursor === null) break;
+      cursor = page.nextCursor;
+    }
+    expect(seen).toHaveLength(5);
+    expect(new Set(seen).size).toBe(5);
+  });
+
+  it("the member summary counts notes and events too", async () => {
+    const { db, service } = withRelationships();
+    db.notes.push({
+      id: NOTE_1,
+      tenantId: TENANT,
+      organisationId: ORG,
+      relationshipId: REL,
+      authorUserId: MEMBER,
+      body: "note",
+      supersedesNoteId: null,
+      createdAt: "2026-10-19T09:00:00.000000Z",
+    });
+    db.events.push(
+      event({
+        id: "00000000-0000-4000-8000-0000000000f2",
+        sequence: 1,
+        eventType: "interest_expressed",
+        occurredAt: "2026-10-19T10:00:00.000000Z",
+      }),
+    );
+    const out = await service.memberSummary(actor(ADMIN), MEMBER);
+    expect(out.lastActiveAt).toBe("2026-10-19T10:00:00.000000Z");
+    expect(out.last30Days.counts).toEqual([
+      { kind: "RELATIONSHIPS", count: 2 },
+    ]);
   });
 });
 

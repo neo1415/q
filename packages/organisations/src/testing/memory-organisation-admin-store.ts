@@ -11,10 +11,11 @@ import {
 } from "../application/organisation-admin-ports.js";
 
 /**
- * An in-memory OrganisationAdminStore for tests, with the same filtering
- * semantics as the Postgres store: organisation and tenant scoping,
- * privacy patterns over the effective action type, kind patterns and a
- * keyset cursor over (occurredAt desc, key desc). No database, no network.
+ * An in-memory OrganisationAdminStore for tests, with the same semantics as
+ * the Postgres store: the union of audit rows, relationship events and
+ * notes (with the same dedupe), organisation and tenant scoping, privacy
+ * patterns over the effective action type, kind patterns and a keyset
+ * cursor over (occurredAt desc, source desc, key desc). No database.
  */
 
 export type MemoryAuditRow = {
@@ -31,6 +32,50 @@ export type MemoryAuditRow = {
   readonly resourceId: string;
   readonly outcome: ActivityRecord["outcome"];
   readonly metadata: Readonly<Record<string, unknown>>;
+  readonly correlationId?: string | null | undefined;
+};
+
+export type MemoryRelationship = {
+  readonly id: string;
+  readonly companyId: string;
+  readonly investorOrganisationId: string;
+  /** The organisations behind each side. */
+  readonly companyOrganisationId: string;
+  readonly investorOrgOrganisationId: string;
+  readonly companyName: string;
+  readonly investorName: string;
+};
+
+export type MemoryRelationshipEvent = {
+  readonly id: string;
+  readonly relationshipId: string;
+  readonly sequence: number;
+  readonly eventType: string;
+  readonly actorType: "HUMAN" | "Q" | "SYSTEM" | "CONNECTED_SYSTEM";
+  readonly actorId: string;
+  readonly visibility: string;
+  readonly occurredAt: string;
+  /** `cor_<uuid>`, as the table stores it. */
+  readonly correlationId: string;
+};
+
+export type MemoryRelationshipNote = {
+  readonly id: string;
+  readonly tenantId: string;
+  readonly organisationId: string;
+  readonly relationshipId: string;
+  readonly authorUserId: string;
+  readonly body: string;
+  readonly supersedesNoteId: string | null;
+  readonly createdAt: string;
+};
+
+type FeedRow = ActivityRecord & { readonly at: number };
+
+type MineEntry = {
+  readonly r: MemoryRelationship;
+  readonly side: "COMPANY" | "INVESTOR";
+  readonly counterpart: string;
 };
 
 export type MemoryAdminMembership = {
@@ -75,6 +120,9 @@ export class MemoryOrganisationAdminDb {
     { readonly resolved: ResolvedResource; readonly relationship: boolean }
   >();
   readonly touched = new Map<string, TouchedRelationship[]>();
+  readonly relationships: MemoryRelationship[] = [];
+  readonly events: MemoryRelationshipEvent[] = [];
+  readonly notes: MemoryRelationshipNote[] = [];
   /** Every organisation id any store call was scoped to. */
   readonly scopedTo: string[] = [];
 
@@ -87,13 +135,168 @@ export class MemoryOrganisationAdminDb {
       : row.actionType;
   }
 
-  private shown(
-    row: MemoryAuditRow,
-    effective: string,
+  /** The relationships this organisation is a party to, with its side. */
+  private mine(organisationId: string): MineEntry[] {
+    return this.relationships.flatMap((r): MineEntry[] => {
+      if (r.companyOrganisationId === organisationId)
+        return [{ r, side: "COMPANY", counterpart: r.investorName }];
+      if (r.investorOrgOrganisationId === organisationId)
+        return [{ r, side: "INVESTOR", counterpart: r.companyName }];
+      return [];
+    });
+  }
+
+  /** The same union, dedupe and shape as the Postgres feedRows. */
+  private feed(scope: {
+    readonly tenantId: string;
+    readonly organisationId: string;
+    readonly qExecutedTypes: readonly string[];
+    readonly stageEventTypes: readonly string[];
+    readonly privatePatterns: readonly string[];
+  }): FeedRow[] {
+    const mine = new Map(
+      this.mine(scope.organisationId).map((m) => [m.r.id, m]),
+    );
+    const members = new Set(
+      this.memberships
+        .filter((m) => m.organisationId === scope.organisationId)
+        .map((m) => m.userId),
+    );
+    const stage = (t: string) => scope.stageEventTypes.includes(t);
+    const audit = this.audit
+      .filter(
+        (row) =>
+          row.organisationId === scope.organisationId &&
+          row.tenantId === scope.tenantId,
+      )
+      .filter((row) => {
+        const corr = row.correlationId ?? null;
+        if (row.actorType !== "human" || corr === null) return true;
+        const byEvent = this.events.some(
+          (e) =>
+            e.correlationId === `cor_${corr}` &&
+            e.actorType === "HUMAN" &&
+            e.actorId === row.actorId &&
+            e.visibility !== "personal_private",
+        );
+        const byService =
+          row.actionType.startsWith("app.") &&
+          this.audit.some(
+            (other) =>
+              other.key !== row.key &&
+              other.organisationId === row.organisationId &&
+              other.correlationId === corr &&
+              !other.actionType.startsWith("app."),
+          );
+        return !byEvent && !byService;
+      })
+      .map((row): FeedRow => ({
+        source: "a",
+        key: String(row.key).padStart(20, "0"),
+        at: Date.parse(row.occurredAt),
+        eventId: row.eventId,
+        occurredAt: row.occurredAt,
+        actorType: row.actorType,
+        actorId: row.actorId,
+        authorityUserId: row.authorityUserId,
+        actionType: row.actionType,
+        effectiveActionType: this.effective(row, scope.qExecutedTypes),
+        resourceType: row.resourceType,
+        resourceId: row.resourceId,
+        outcome: row.outcome,
+        roleFrom:
+          row.actionType === "team.membership.role_changed" &&
+          typeof row.metadata["from"] === "string"
+            ? row.metadata["from"]
+            : null,
+        roleTo:
+          row.actionType === "team.membership.role_changed" &&
+          typeof row.metadata["to"] === "string"
+            ? row.metadata["to"]
+            : null,
+        stageFrom: null,
+        stageTo: null,
+      }));
+    const events = this.events
+      .filter(
+        (e) =>
+          e.actorType === "HUMAN" &&
+          e.visibility !== "personal_private" &&
+          mine.has(e.relationshipId) &&
+          members.has(e.actorId),
+      )
+      .map((e): FeedRow => {
+        const previous = this.events
+          .filter(
+            (p) =>
+              p.relationshipId === e.relationshipId &&
+              p.sequence < e.sequence &&
+              stage(p.eventType) &&
+              p.visibility !== "personal_private",
+          )
+          .sort((a, b) => b.sequence - a.sequence)[0];
+        return {
+          source: "e",
+          key: e.id,
+          at: Date.parse(e.occurredAt),
+          eventId: e.id,
+          occurredAt: e.occurredAt,
+          actorType: "human",
+          actorId: e.actorId,
+          authorityUserId: e.actorId,
+          actionType: "relationship.event",
+          effectiveActionType: stage(e.eventType)
+            ? "relationship.stage.change"
+            : `relationship.event.${e.eventType}`,
+          resourceType: "relationship",
+          resourceId: e.relationshipId,
+          outcome: "SUCCEEDED",
+          roleFrom: null,
+          roleTo: null,
+          stageFrom: stage(e.eventType) ? (previous?.eventType ?? null) : null,
+          stageTo: stage(e.eventType) ? e.eventType : null,
+        };
+      });
+    const notes = this.notes
+      .filter(
+        (n) =>
+          n.organisationId === scope.organisationId &&
+          n.tenantId === scope.tenantId,
+      )
+      .map((n): FeedRow => ({
+        source: "n",
+        key: n.id,
+        at: Date.parse(n.createdAt),
+        eventId: n.id,
+        occurredAt: n.createdAt,
+        actorType: "human",
+        actorId: n.authorUserId,
+        authorityUserId: n.authorUserId,
+        actionType: "relationship.note",
+        effectiveActionType:
+          n.supersedesNoteId === null
+            ? "relationship.note.add"
+            : "relationship.note.correct",
+        resourceType: "relationship_note",
+        resourceId: n.id,
+        outcome: "SUCCEEDED",
+        roleFrom: null,
+        roleTo: null,
+        stageFrom: null,
+        stageTo: null,
+      }));
+    return [...audit, ...events, ...notes].filter((row) =>
+      this.shownRow(row, scope.privatePatterns, scope.qExecutedTypes),
+    );
+  }
+
+  private shownRow(
+    row: ActivityRecord,
     privatePatterns: readonly string[],
     qExecuted: readonly string[],
   ) {
-    if (privatePatterns.some((p) => likeMatches(effective, p))) return false;
+    if (privatePatterns.some((p) => likeMatches(row.effectiveActionType, p)))
+      return false;
     return (
       qExecuted.includes(row.actionType) ||
       !privatePatterns.some((p) => likeMatches(row.actionType, p))
@@ -104,12 +307,8 @@ export class MemoryOrganisationAdminDb {
     return {
       activity: (filter) => {
         this.scopedTo.push(filter.organisationId);
-        const rows = this.audit
-          .filter(
-            (row) =>
-              row.organisationId === filter.organisationId &&
-              row.tenantId === filter.tenantId,
-          )
+        const before = filter.before;
+        const rows = this.feed(filter)
           .filter(
             (row) =>
               filter.userId === undefined ||
@@ -119,64 +318,37 @@ export class MemoryOrganisationAdminDb {
           .filter(
             (row) =>
               (filter.from === undefined ||
-                Date.parse(row.occurredAt) >= Date.parse(filter.from)) &&
-              (filter.to === undefined ||
-                Date.parse(row.occurredAt) < Date.parse(filter.to)),
+                row.at >= Date.parse(filter.from)) &&
+              (filter.to === undefined || row.at < Date.parse(filter.to)),
           )
           .filter((row) => {
-            const before = filter.before;
             if (before === undefined) return true;
-            const at = Date.parse(row.occurredAt);
             const cut = Date.parse(before.at);
-            return at < cut || (at === cut && row.key < Number(before.key));
+            return (
+              row.at < cut ||
+              (row.at === cut &&
+                (row.source < before.source ||
+                  (row.source === before.source && row.key < before.key)))
+            );
           })
-          .map((row) => ({
-            row,
-            effective: this.effective(row, filter.qExecutedTypes),
-          }))
-          .filter(({ row, effective }) =>
-            this.shown(
-              row,
-              effective,
-              filter.privatePatterns,
-              filter.qExecutedTypes,
-            ),
-          )
           .filter(
-            ({ effective }) =>
+            (row) =>
               (filter.include.length === 0 ||
-                filter.include.some((p) => likeMatches(effective, p))) &&
-              !filter.exclude.some((p) => likeMatches(effective, p)),
+                filter.include.some((p) =>
+                  likeMatches(row.effectiveActionType, p),
+                )) &&
+              !filter.exclude.some((p) =>
+                likeMatches(row.effectiveActionType, p),
+              ),
           )
           .sort(
             (a, b) =>
-              Date.parse(b.row.occurredAt) - Date.parse(a.row.occurredAt) ||
-              b.row.key - a.row.key,
+              b.at - a.at ||
+              (a.source === b.source ? 0 : a.source < b.source ? 1 : -1) ||
+              (a.key === b.key ? 0 : a.key < b.key ? 1 : -1),
           )
           .slice(0, filter.limit)
-          .map(({ row, effective }): ActivityRecord => ({
-            key: String(row.key),
-            eventId: row.eventId,
-            occurredAt: row.occurredAt,
-            actorType: row.actorType,
-            actorId: row.actorId,
-            authorityUserId: row.authorityUserId,
-            actionType: row.actionType,
-            effectiveActionType: effective,
-            resourceType: row.resourceType,
-            resourceId: row.resourceId,
-            outcome: row.outcome,
-            roleFrom:
-              row.actionType === "team.membership.role_changed" &&
-              typeof row.metadata["from"] === "string"
-                ? row.metadata["from"]
-                : null,
-            roleTo:
-              row.actionType === "team.membership.role_changed" &&
-              typeof row.metadata["to"] === "string"
-                ? row.metadata["to"]
-                : null,
-          }));
+          .map(({ at: _at, ...record }): ActivityRecord => record);
         return Promise.resolve(rows);
       },
 
@@ -198,6 +370,44 @@ export class MemoryOrganisationAdminDb {
       resources: ({ organisationId, refs, relationshipsVisible }) => {
         this.scopedTo.push(organisationId);
         const out = new Map<string, ResolvedResource>();
+        const mine = new Map(this.mine(organisationId).map((m) => [m.r.id, m]));
+        const placed = (relationshipId: string) => {
+          const m = mine.get(relationshipId);
+          if (m === undefined) return null;
+          return {
+            label: `Relationship with ${m.counterpart}`,
+            link:
+              m.side === "COMPANY"
+                ? `/relationships/investor/${m.r.investorOrganisationId}`
+                : `/relationships/company/${m.r.companyId}`,
+          };
+        };
+        for (const ref of refs) {
+          if (!relationshipsVisible) break;
+          if (ref.type === "relationship") {
+            const at = placed(ref.id);
+            if (at !== null) out.set(resourceKey(ref), { ...at, change: null });
+          }
+          if (ref.type === "relationship_note") {
+            const note = this.notes.find(
+              (n) => n.id === ref.id && n.organisationId === organisationId,
+            );
+            const at = note === undefined ? null : placed(note.relationshipId);
+            if (note === undefined || at === null) continue;
+            const previous = this.notes.find(
+              (n) =>
+                n.id === note.supersedesNoteId &&
+                n.organisationId === note.organisationId,
+            );
+            out.set(resourceKey(ref), {
+              ...at,
+              change:
+                previous === undefined
+                  ? null
+                  : { before: previous.body, after: note.body },
+            });
+          }
+        }
         for (const ref of refs) {
           const key = `${organisationId}|${resourceKey(ref)}`;
           const entry = this.labels.get(key);
@@ -251,37 +461,23 @@ export class MemoryOrganisationAdminDb {
 
       memberActivity: (input) => {
         this.scopedTo.push(input.organisationId);
-        const visible = this.audit
-          .filter(
-            (row) =>
-              row.organisationId === input.organisationId &&
-              row.tenantId === input.tenantId &&
-              (row.actorId === input.userId ||
-                row.authorityUserId === input.userId),
-          )
-          .map((row) => ({
-            row,
-            effective: this.effective(row, input.qExecutedTypes),
-          }))
-          .filter(({ row, effective }) =>
-            this.shown(
-              row,
-              effective,
-              input.privatePatterns,
-              input.qExecutedTypes,
-            ),
-          );
+        const visible = this.feed(input).filter(
+          (row) =>
+            row.actorId === input.userId ||
+            row.authorityUserId === input.userId,
+        );
         const counts = new Map<string, number>();
-        for (const { row, effective } of visible) {
-          if (Date.parse(row.occurredAt) >= Date.parse(input.since)) {
-            counts.set(effective, (counts.get(effective) ?? 0) + 1);
+        for (const row of visible) {
+          if (row.at >= Date.parse(input.since)) {
+            counts.set(
+              row.effectiveActionType,
+              (counts.get(row.effectiveActionType) ?? 0) + 1,
+            );
           }
         }
-        const last = visible
-          .map(({ row }) => row.occurredAt)
-          .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+        const last = [...visible].sort((a, b) => b.at - a.at)[0];
         return Promise.resolve({
-          lastActiveAt: last ?? null,
+          lastActiveAt: last?.occurredAt ?? null,
           counts: [...counts.entries()].map(([effectiveActionType, count]) => ({
             effectiveActionType,
             count,
