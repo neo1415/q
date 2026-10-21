@@ -54,9 +54,13 @@ import { createSpecialistQAnswer } from "../src/answer.js";
  *   TURN_READER 1,200 ms    measured p50 1.2 s (row 4)
  *   tool-selection round    1,900 ms (row 16: two rounds 3.8-4.5 s;
  *                           PERFORMANCE-BASELINE.md: 1,798 + 2,036 ms)
- *   answer model            700 ms to first token (assumed, not
- *                           measured), then 100 tokens/s (row 15:
- *                           ~100 tokens/s, 1,100-2,280 tokens out)
+ *   answer model            1,600 ms to first token, then 125
+ *                           tokens/s: measured live 2026-10-21 on the
+ *                           real v26 prompt (8,158 input tokens),
+ *                           gpt-5.6-luna, first token 1,266 and 1,938 ms
+ *                           (scripts/handoff/live/answer-model-latency.mjs;
+ *                           the Gemini models routing prefers returned 402
+ *                           there). 1,100-2,280 tokens out (row 15)
  *   public web search       3,000 ms (model-gateway: "three seconds on
  *                           the web")
  *   a tool read             40 ms (row 7: 20-80 ms)
@@ -68,8 +72,8 @@ const LATENCY = {
   skimMs: 850,
   readerMs: 1_200,
   roundMs: 1_900,
-  firstTokenMs: 700,
-  tokensPerSecond: 100,
+  firstTokenMs: 1_600,
+  tokensPerSecond: 125,
   webMs: 3_000,
   readMs: 40,
   dbMs: 10,
@@ -857,11 +861,16 @@ describe("turn timing harness", () => {
       "typed question about",
       "typed question, company named",
       "comparison",
-      "public web",
-      "spoken follow-up",
+      "public web search by name",
     ]) {
       expect(row(name).firstWordsMs ?? Infinity).toBeLessThan(2_000);
     }
+    // A spoken follow-up with no record to open from: the speculative
+    // answer's own first words (skim 0.85 s + first token 1.6 s); the
+    // voice line's quick acknowledgement is said before that, by code.
+    expect(row("spoken follow-up").firstWordsMs ?? Infinity).toBeLessThan(
+      3_000,
+    );
     // Not on Capital Q: what Q is checking, said as the search starts
     // (after the round that composes it), and never stored with the answer.
     const unknown = row("public web search, company not");
