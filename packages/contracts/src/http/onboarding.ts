@@ -897,6 +897,12 @@ export const OnboardingSessionViewSchema = z.object({
   pendingQuestions: z.array(OnboardingInterviewQuestionViewSchema).optional(),
   /** Present after a mutation that changed the eligible path. */
   pathChanges: OnboardingPathChangesSchema.optional(),
+  /**
+   * The step Q's last turn asked, when it is not the current step (owner
+   * 2026-10-21): the screen shows that question's options under Q's words,
+   * not the form cursor's. Present only on a reply to a turn with Q.
+   */
+  askedStep: OnboardingStepViewSchema.optional(),
 });
 export type OnboardingSessionView = z.infer<typeof OnboardingSessionViewSchema>;
 

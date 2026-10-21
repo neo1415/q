@@ -303,6 +303,145 @@ describe("the reply after a clean save is written by code", () => {
   });
 });
 
+describe("faster answers, with their stages shown (owner 2026-10-21)", () => {
+  const said = "Seed stage, based in Kenya.";
+  const answers = [
+    { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
+    { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
+  ];
+
+  it("reports each stage once, in order, from the turn's own events", async () => {
+    const world = founderWorld();
+    const model = recordingModel(answers);
+    const stages: string[] = [];
+    await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({ stated: ["F1.stage", "F1.country"] })),
+      replyByCodeAfterCleanSave: true,
+    }).turn({
+      ...turn(world, said),
+      actor,
+      onStage: (stage) => stages.push(stage.stage),
+    });
+    expect(stages).toEqual(["READING", "SAVING"]);
+  });
+
+  it("says what saved first, while the model writes the rest, and never twice", async () => {
+    const world = founderWorld();
+    const model = recordingModel([
+      ...answers,
+      { stepKey: "F4.team_size", value: 14, quote: "fourteen people" },
+    ]);
+    const sentences: string[] = [];
+    const outcome = await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({ stated: ["F1.stage", "F1.country"] })),
+      replyByCodeAfterCleanSave: true,
+    }).turn({
+      ...turn(world, said),
+      actor,
+      onSentence: (sentence) => sentences.push(sentence),
+    });
+    // The receipt is the first thing said, and the reply opens with it.
+    expect(sentences[0]).toMatch(/stage: Seed/);
+    expect(sentences[0]).toMatch(/country: Kenya/);
+    expect(outcome.reply.startsWith(sentences[0] ?? "-")).toBe(true);
+    expect(outcome.reply).toContain("The model's own reply.");
+    expect(outcome.reply.split("stage: Seed")).toHaveLength(2);
+  });
+});
+
+describe("an exact answer is recorded and replied to by code, no model call (2026-10-21)", () => {
+  /** Turn one: the model asks the stage. Every later call is counted. */
+  function askingModel() {
+    let calls = 0;
+    const gateway = {
+      execute: () => {
+        calls += 1;
+        return Promise.resolve({
+          output: {
+            kind: "TEXT",
+            text: JSON.stringify({
+              reply: "What stage is Quillmark at?",
+              asking: "F1.stage",
+            }),
+          },
+        });
+      },
+    } as unknown as ModelGateway;
+    return { gateway, calls: () => calls };
+  }
+
+  it("'Seed' after Q asked the stage: saved, then the next question, zero model calls", async () => {
+    const world = founderWorld();
+    const model = askingModel();
+    const agent = createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({})),
+      replyByCodeAfterCleanSave: true,
+      readingByCodeWhereExact: true,
+    });
+    await agent.turn({ ...turn(world, "Hi, where do we start?"), actor });
+    const before = model.calls();
+    const outcome = await agent.turn({ ...turn(world, "Seed."), actor });
+    expect(model.calls()).toBe(before);
+    expect(world.recordedValue("F1.stage")).toBeDefined();
+    expect(outcome.reply).toContain("Seed");
+    expect(outcome.reply.trim().endsWith("?")).toBe(true);
+  });
+
+  it("a question code adds carries its step, so its options show", async () => {
+    const world = founderWorld();
+    const gateway = {
+      execute: () =>
+        Promise.resolve({
+          output: {
+            kind: "TEXT",
+            text: JSON.stringify({ reply: "Thanks for that.", asking: null }),
+          },
+        }),
+    } as unknown as ModelGateway;
+    const outcome = await createInterviewAgent({
+      gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({})),
+    }).turn({
+      ...turn(
+        world,
+        "We build scheduling and billing software for small clinics in the region, and it is going well.",
+      ),
+      actor,
+    });
+    // Code added the next question; the screen gets that step and options.
+    expect(outcome.reply).not.toBe("Thanks for that.");
+    expect(outcome.askingAbout).toHaveLength(1);
+    expect(outcome.asking?.stepKey).toBe(outcome.askingAbout?.[0]);
+  });
+
+  it("without the code reply composed, the model still writes it", async () => {
+    const world = founderWorld();
+    const model = askingModel();
+    const agent = createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({})),
+      readingByCodeWhereExact: true,
+    });
+    await agent.turn({ ...turn(world, "Hi, where do we start?"), actor });
+    const before = model.calls();
+    await agent.turn({ ...turn(world, "Seed."), actor });
+    expect(model.calls()).toBeGreaterThan(before);
+  });
+});
+
 describe("no closing reply while a stated fact is unsaved (live AF 2026-10-16)", () => {
   it("a step the reading found stated, not yet written, gets another model round", async () => {
     const world = founderWorld();

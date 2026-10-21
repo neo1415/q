@@ -88,6 +88,25 @@ describe("the api's streamed interview turn", () => {
     expect(turn.reply).toBe(TURN.reply);
   });
 
+  it("passes each stage on as it arrives, before the sentences (owner 2026-10-21)", async () => {
+    const seen: string[] = [];
+    const { interview } = client(() =>
+      streamed(
+        frame("stage", { stage: "READING", label: "Reading what you said" }) +
+          frame("stage", { stage: "UNKNOWN", label: "dropped" }) +
+          frame("sentence", { text: "Who pays?" }) +
+          frame("result", TURN),
+      ),
+    );
+    await interview.turnStream({
+      accessToken: "t",
+      request: REQUEST,
+      onSentence: (text) => seen.push(`sentence:${text}`),
+      onStage: (stage) => seen.push(`stage:${stage.stage}`),
+    });
+    expect(seen).toEqual(["stage:READING", "sentence:Who pays?"]);
+  });
+
   it("an interviewer that answers JSON is read as before", async () => {
     const { interview } = client(
       () =>

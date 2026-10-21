@@ -851,6 +851,14 @@ export function spokenUrl(text: string): string {
   return host.length === 0 ? text.trim() : `https://${host}`;
 }
 
+/** Text cut to `max` characters at the last word boundary that fits. */
+export function fitted(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return (space > max * 0.6 ? cut.slice(0, space) : cut).trimEnd();
+}
+
 /** A model reading → the step's own value, or null when it does not fit. */
 export function toResponseValue(
   step: OnboardingStepManifest,
@@ -928,9 +936,11 @@ export function toResponseValue(
             : "";
       // A website said aloud is words; the profile wants an address.
       const text = /\.website$/.test(step.stepKey) ? spokenUrl(spoken) : spoken;
-      const max = c.stepType === "short_text" ? c.maxLength : c.maxLength;
-      if (text.length === 0 || text.length > max) return null;
-      return { type: "TEXT", text };
+      if (text.length === 0) return null;
+      // Longer than the step holds: kept up to its limit, cut at a word,
+      // rather than refused (owner principle 2026-10-21: a long answer was
+      // "not recorded" and asked again).
+      return { type: "TEXT", text: fitted(text, c.maxLength) };
     }
     case "confirmation":
       if (typeof raw === "boolean") {
