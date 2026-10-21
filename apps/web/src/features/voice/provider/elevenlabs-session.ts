@@ -162,10 +162,14 @@ export function useElevenLabsVoiceSession(
           onMessage: ({ message, source }) => {
             // W4b: the silence ladder's beats are voiced while Q works,
             // never a line of the conversation (nor of the saved transcript).
-            addLine(
-              source === "user" ? "user" : "q",
-              source === "user" ? message : stripSilenceBeats(message),
-            );
+            const said =
+              source === "user" ? message : stripSilenceBeats(message);
+            // What was stripped is the "where I am" line: shown, not kept.
+            const working = message.slice(0, message.length - said.length).trim();
+            if (source !== "user" && working.length > 0) {
+              eventsRef.current.onWorking?.(working);
+            }
+            addLine(source === "user" ? "user" : "q", said);
             if (source === "user") {
               setState("THINKING");
             }

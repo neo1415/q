@@ -45,6 +45,8 @@ const SHOWABLE: ReadonlySet<QTurnObjectBlock["kind"]> = new Set([
   "CHART",
   "MAP",
   "TIMELINE",
+  // Artifacts live (L-14): the summary Q speaks over.
+  "SUMMARY",
 ]);
 
 export type ShownItem = {
@@ -67,6 +69,7 @@ function titleOf(blocks: readonly QTurnObjectBlock[]): string {
       case "CHART":
       case "MAP":
       case "TIMELINE":
+      case "SUMMARY":
         return block.title;
       case "COMPARISON_CARDS":
         if (block.title !== null && block.title.length > 0) return block.title;
@@ -178,6 +181,7 @@ const KIND_WORDS: Readonly<
   CHART: ["chart", "graph", "bars"],
   MAP: ["map", "where they are", "where they re", "based"],
   TIMELINE: ["timeline", "history", "dates"],
+  SUMMARY: ["summary", "recap", "key points", "main points"],
   ARTIFACT_REFERENCE: [
     "brief",
     "document",
@@ -289,6 +293,10 @@ export function subjectOf(item: Pick<ShownItem, "blocks">): ItemSubject {
       case "ACTION_PROPOSAL":
       case "UI_INTENT":
       case "ATTENTION":
+        break;
+      case "SUMMARY":
+        // Its points are the answer's words: it is talked about as "the
+        // summary", not by a name.
         break;
     }
   }
@@ -585,7 +593,11 @@ export function livePreviewOf(
           turns.some((turn) => turn.id === spoken.messageId)
         ? undefined
         : spoken;
-  if (preview === undefined || preview.subjects.length === 0) return null;
+  if (preview === undefined) return null;
+  // A summary the person asked for is its own object: its frame goes up
+  // even before it names anyone, and over whatever was there.
+  if (preview.layout === "SUMMARY") return preview;
+  if (preview.subjects.length === 0) return null;
   if (shown !== null) {
     const there = subjectOf(shown);
     const covered = preview.subjects.every((one) => {

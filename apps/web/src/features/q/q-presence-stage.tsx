@@ -307,7 +307,12 @@ export function QPresenceStage({
     setPreviewedId(livePreview.messageId);
   }
   if ((onStageCanvas?.id ?? null) !== canvasId) {
-    if (onStageCanvas !== null && canvasId !== previewedId) {
+    // Only the answer that a preview stood in for skips the flight; a set
+    // leaving for nothing (a new topic) still flies to the Board.
+    if (
+      onStageCanvas !== null &&
+      (canvasId === null || canvasId !== previewedId)
+    ) {
       setLeaving(onStageCanvas);
     }
     setOnStageCanvas(

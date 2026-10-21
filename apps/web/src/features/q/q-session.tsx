@@ -301,8 +301,18 @@ export function QSessionProvider({
   const [voiceOutcomes, setVoiceOutcomes] = useState<
     readonly VoiceOutcomeRow[]
   >([]);
+  // Artifacts live (owner 2026-10-20): on a voice turn, the "where I am"
+  // line Q is saying while it works, shown under the presence as it is
+  // heard; gone once Q's answer (or the turn's end) arrives.
+  const [voiceWorking, setVoiceWorking] = useState<string | null>(null);
   const voice = useVoice({
+    onWorking: (line) => {
+      setVoiceWorking(line);
+    },
     onLine: (line) => {
+      if (line.role === "q" && line.text.trim().length > 0) {
+        setVoiceWorking(null);
+      }
       setSpoken((current) =>
         upsertLine(current, {
           id: line.id,
@@ -314,6 +324,7 @@ export function QSessionProvider({
       );
     },
     onTurnOutcome: (outcome) => {
+      setVoiceWorking(null);
       setVoiceOutcomes((current) => {
         const seq = (current.at(-1)?.seq ?? 0) + 1;
         const row: VoiceOutcomeRow = {
@@ -626,7 +637,13 @@ export function QSessionProvider({
           : settled
             ? "Done"
             : undefined;
-  const detail = voice.active || !q.working ? undefined : workingLabel(q.state);
+  // Typed: the run's real stage, as the stream reports it. Voice: the
+  // stage line Q is saying (the same approved stage, in Q's words).
+  const detail = voice.active
+    ? (voiceWorking ?? undefined)
+    : !q.working
+      ? undefined
+      : workingLabel(q.state);
 
   const value = useMemo<QSessionValue>(
     () => ({

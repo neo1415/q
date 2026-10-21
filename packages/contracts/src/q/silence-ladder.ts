@@ -200,8 +200,11 @@ function phraseFor(
       };
     case "SEARCHING_PUBLIC_SOURCES":
       return {
-        verbs: ["checking", "looking on", "searching"],
-        object: name === undefined ? "the web" : `the web for ${name}`,
+        verbs: ["looking up", "checking", "reading up on"],
+        object:
+          name === undefined
+            ? "what's public on this"
+            : `what's public on ${name}`,
       };
     case "REVIEWING_INVESTOR_CRITERIA":
       return {

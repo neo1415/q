@@ -150,3 +150,118 @@ describe("companiesTableBlock (either role)", () => {
     expect(companiesTableBlock(two)).toBeNull();
   });
 });
+
+describe("artifacts live, round 2", () => {
+  it("lays a summary the person asked for out as one, from the answer's findings, keeping each one's truth class", async () => {
+    const { summaryBlock } = await import("../src/q/result-blocks.js");
+    const block = summaryBlock({
+      question: "Can you summarise where Baridi stands?",
+      result: {
+        findings: [
+          {
+            statement: "Revenue is GBP 38k a month.",
+            truthClass: "USER_CLAIM",
+            evidenceStatus: "DOCUMENT_SUPPORTED",
+          },
+          {
+            statement: "The round is likely to close by Q1.",
+            truthClass: "Q_INFERENCE",
+            evidenceStatus: "NO_EVIDENCE",
+          },
+        ],
+        missingEvidence: ["Audited accounts"],
+      },
+    });
+    expect(block).toEqual({
+      kind: "SUMMARY",
+      title: "Summary",
+      points: [
+        {
+          text: "Revenue is GBP 38k a month.",
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "DOCUMENT_SUPPORTED",
+        },
+        {
+          text: "The round is likely to close by Q1.",
+          truthClass: "Q_INFERENCE",
+          evidenceStatus: "NO_EVIDENCE",
+        },
+      ],
+      missing: ["Audited accounts"],
+    });
+  });
+
+  it("draws no summary unless asked, or with fewer than two findings", async () => {
+    const { summaryBlock } = await import("../src/q/result-blocks.js");
+    const findings = [
+      {
+        statement: "A.",
+        truthClass: "VERIFIED",
+        evidenceStatus: "PLATFORM_VERIFIED",
+      },
+      {
+        statement: "B.",
+        truthClass: "VERIFIED",
+        evidenceStatus: "PLATFORM_VERIFIED",
+      },
+    ];
+    expect(
+      summaryBlock({ question: "How is Baridi doing?", result: { findings } }),
+    ).toBeNull();
+    expect(
+      summaryBlock({
+        question: "sum it up",
+        result: { findings: findings.slice(0, 1) },
+      }),
+    ).toBeNull();
+  });
+
+  it("puts a summary's frame up with Q's first words, before anything is named", () => {
+    const announcer = createSubjectAnnouncer({
+      read: () => new RunRead(),
+      question: "Give me a quick recap",
+    });
+    expect(announcer.sentence("Here is where things stand.")).toEqual({
+      subjects: [],
+      layout: "SUMMARY",
+    });
+    expect(announcer.sentence("Nothing new.")).toBeNull();
+  });
+
+  it("announces a researched identity by name, ahead of the lookup, once", () => {
+    const announcer = createSubjectAnnouncer({
+      read,
+      question: "Who is Shadi Qishta?",
+    });
+    const one = {
+      subject: null,
+      name: "Shadi Qishta",
+      kind: "PERSON" as const,
+    };
+    expect(announcer.ahead(one)).toEqual({ subjects: [one], layout: "CARD" });
+    expect(announcer.ahead(one)).toBeNull();
+    // Saying the name later announces nothing new.
+    expect(announcer.sentence("Shadi Qishta is a finance director.")).toBeNull();
+  });
+
+  it("previews an identity a lookup tool of this run returned, with its credited image", () => {
+    const known = new RunRead();
+    known.externals.set("shadiqishta", {
+      name: "Shadi Qishta",
+      kind: "PERSON",
+      externalPersonId: "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
+      image: { url: "https://images.example/shadi.jpg", attribution: "Wiki Commons" },
+    });
+    expect(subjectsNamedIn("I found Shadi Qishta in Doha.", known)).toEqual([
+      {
+        subject: null,
+        name: "Shadi Qishta",
+        kind: "PERSON",
+        image: {
+          url: "https://images.example/shadi.jpg",
+          attribution: "Wiki Commons",
+        },
+      },
+    ]);
+  });
+});

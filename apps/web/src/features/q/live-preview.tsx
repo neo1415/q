@@ -27,12 +27,12 @@ function subjectIds(one: QArtifactPreviewSubject): {
   readonly companyId?: string;
   readonly investorOrganisationId?: string;
 } {
-  // The server previews only companies and investors; any other subject
-  // has no picture route and shows its initials.
-  if (one.subject.kind === "COMPANY") {
+  // Companies and investors have picture routes; a researched identity
+  // (no record) brings its own credited image, or shows initials.
+  if (one.subject?.kind === "COMPANY") {
     return { companyId: one.subject.companyId };
   }
-  if (one.subject.kind === "INVESTOR_ORGANISATION") {
+  if (one.subject?.kind === "INVESTOR_ORGANISATION") {
     return { investorOrganisationId: one.subject.investorOrganisationId };
   }
   return {};
@@ -40,7 +40,11 @@ function subjectIds(one: QArtifactPreviewSubject): {
 
 export function previewKey(one: QArtifactPreviewSubject): string {
   const ids = subjectIds(one);
-  return ids.companyId ?? ids.investorOrganisationId ?? one.name;
+  return (
+    ids.companyId ??
+    ids.investorOrganisationId ??
+    `${one.kind ?? ""}:${one.name}`
+  );
 }
 
 function Avatar({
@@ -51,6 +55,17 @@ function Avatar({
   readonly size: number;
 }) {
   const ids = subjectIds(one);
+  if (one.subject === null) {
+    return (
+      <EntityAvatar
+        kind={one.kind === "PERSON" ? "person" : "investor"}
+        name={one.name}
+        src={one.image?.url ?? null}
+        size={size}
+        decorative
+      />
+    );
+  }
   return (
     <EntityAvatar
       kind={ids.investorOrganisationId === undefined ? "company" : "investor"}
@@ -77,13 +92,23 @@ function Bar({ width }: { readonly width: string }) {
 function PreviewCard({ one }: { readonly one: QArtifactPreviewSubject }) {
   return (
     <li
-      className="flex min-w-0 flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+      className="cq-preview-in flex min-w-0 flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
       data-q-preview-card={previewKey(one)}
     >
       <div className="flex min-w-0 items-center gap-3">
         <Avatar one={one} size={40} />
-        <span className="cq-title-sm min-w-0 truncate text-(--cq-text-primary)">
-          {one.name}
+        <span className="flex min-w-0 flex-col">
+          <span className="cq-title-sm min-w-0 truncate text-(--cq-text-primary)">
+            {one.name}
+          </span>
+          {one.image === undefined ? null : (
+            <span
+              className="cq-caption min-w-0 truncate text-(--cq-text-secondary)"
+              data-q-preview-credit
+            >
+              {`Photo: ${one.image.attribution}`}
+            </span>
+          )}
         </span>
       </div>
       <Bar width="85%" />
@@ -115,7 +140,7 @@ function PreviewTable({
               <th
                 key={previewKey(one)}
                 scope="col"
-                className="p-3 text-start"
+                className="cq-preview-in p-3 text-start"
                 data-q-preview-column={previewKey(one)}
               >
                 <span className="flex min-w-0 items-center gap-2">
@@ -147,13 +172,56 @@ function PreviewTable({
   );
 }
 
+/** A summary's frame: its title and the points' places, as Q starts. */
+function PreviewSummary({
+  subjects,
+}: {
+  readonly subjects: readonly QArtifactPreviewSubject[];
+}) {
+  return (
+    <div
+      className="cq-preview-in flex w-full flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
+      data-q-preview-summary
+    >
+      <span className="cq-label text-(--cq-text-tertiary)">Summary</span>
+      {subjects.length === 0 ? null : (
+        <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+          {subjects.map((one) => (
+            <li
+              key={previewKey(one)}
+              className="cq-preview-in flex min-w-0 items-center gap-2"
+              data-q-preview-card={previewKey(one)}
+            >
+              <Avatar one={one} size={24} />
+              <span className="cq-label min-w-0 truncate text-(--cq-text-primary)">
+                {one.name}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <ol aria-hidden="true" className="m-0 flex list-none flex-col gap-3 p-0">
+        {["90%", "75%", "82%"].map((width) => (
+          <li key={width} className="flex items-center gap-3">
+            <span className="block h-3 w-3 shrink-0 rounded-full bg-(--cq-surface-subtle)" />
+            <Bar width={width} />
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 export function LivePreview({
   preview,
 }: {
   readonly preview: QArtifactPreview;
 }) {
   const { subjects } = preview;
-  const names = subjects.map((one) => one.name).join(", ");
+  const names =
+    subjects.length === 0
+      ? "Summary"
+      : subjects.map((one) => one.name).join(", ");
   return (
     <section
       className="flex w-full flex-col gap-3"
@@ -162,7 +230,9 @@ export function LivePreview({
       data-q-preview={preview.messageId}
       data-q-preview-layout={preview.layout ?? "CARD"}
     >
-      {preview.layout === "TABLE" && subjects.length >= 2 ? (
+      {preview.layout === "SUMMARY" ? (
+        <PreviewSummary subjects={subjects} />
+      ) : preview.layout === "TABLE" && subjects.length >= 2 ? (
         <PreviewTable subjects={subjects} />
       ) : (
         <ul

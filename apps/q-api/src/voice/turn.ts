@@ -419,11 +419,15 @@ const WRITTEN_LAUGH =
 
 /** The share of questions back that open on a rising "Hm?". */
 /**
- * Founder 2026-10-09: nothing is said or sounded while Q works. The
- * silence ladder (ADR 0062) stays in code, off, until a decision to
- * bring any of it back.
+ * Owner 2026-10-20 (artifacts live): "while Q is working, it shows and
+ * says where it is". The ladder is back for its "where I am" lines only,
+ * from the run's real stage; founder 2026-10-09 still holds for the rest:
+ * no hums, no breathing, no small-talk thread.
  */
-export const SPOKEN_SILENCE_LADDER = false;
+export const SPOKEN_SILENCE_LADDER = true;
+export const SPOKEN_WHILE_WORKING_BEATS: ReadonlySet<
+  "STAGE_LINE" | "PROGRESS_LINE" | "HUM" | "THREAD"
+> = new Set(["STAGE_LINE", "PROGRESS_LINE"]);
 /**
  * The utterance the turn in hand is about, until the one run that answers
  * the person's words takes it. A look-up Q starts on its own is not the
@@ -1526,7 +1530,6 @@ export function createVoiceTurnHandler(
         // (the tap sits inside, on the answer's own sentences).
         const used = smallTalkUsed.get(binding) ?? new Set<string>();
         smallTalkUsed.set(binding, used);
-        const smallTalk = dependencies.smallTalk;
         const silenceFocus = dependencies.silenceFocus;
         await speaker.speak(
           withSilenceLadder(
@@ -1540,21 +1543,17 @@ export function createVoiceTurnHandler(
                 silenceFocus === undefined
                   ? undefined
                   : () => silenceFocus(binding, runId),
-              thread:
-                smallTalk === undefined
-                  ? undefined
-                  : () => smallTalk(binding.actor, used),
+              // No remembered small-talk thread while Q works (founder
+              // 2026-10-09); only "where I am" lines are said.
+              thread: undefined,
               onThread: (id) => used.add(id),
               narrate: speaker.narrate,
               untilDone:
                 speaker.deferred === true && speaker.narrate !== undefined,
               seed: Math.floor(Math.random() * 0x7fffffff),
               signal,
-              // Founder 2026-10-09: no sound at all while Q works -- no
-              // stage lines ("let me put that up"), no hums, no breathing.
-              // The ladder is off on every line; the answer is the first
-              // thing heard.
               enabled: SPOKEN_SILENCE_LADDER,
+              only: SPOKEN_WHILE_WORKING_BEATS,
             },
           ),
         );

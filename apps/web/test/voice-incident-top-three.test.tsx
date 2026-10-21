@@ -120,7 +120,7 @@ afterEach(() => {
 });
 
 describe("INC-1: the lost 'top three' turn, replayed", () => {
-  it("no bridge, one disposition per turn, no stale said, nothing ANSWERED without confirmation", async () => {
+  it("at most one bridge per turn and none once the answer is in, one disposition per turn, no stale said, nothing ANSWERED without confirmation", async () => {
     const peer = new FakePeer();
     const stream = {
       getTracks: () => [{ enabled: true, stop: () => undefined }],
@@ -222,11 +222,11 @@ describe("INC-1: the lost 'top three' turn, replayed", () => {
     // 19:14:50 heard: the top three.
     ask("item_1", "Give me the top three companies for my mandate.");
     await settle();
-    // Founder 2026-10-09: nothing is said while Q works, though the
-    // ladder offers lines; the answer lands at 3 s.
+    // Owner 2026-10-20: Q says where it is while it works, once per turn
+    // at most (INC-1); the answer lands at 3 s.
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(bridges()).toHaveLength(0);
-    expect(narration).not.toHaveBeenCalled();
+    expect(bridges().length).toBeLessThanOrEqual(1);
+    const beforeAnswer = bridges().length;
     await vi.advanceTimersByTimeAsync(1_100);
     await settle();
     // The answer is handed over once: the call, its output, one response.
@@ -237,15 +237,21 @@ describe("INC-1: the lost 'top three' turn, replayed", () => {
         !JSON.stringify(event).includes('"conversation":"none"'),
     );
     expect(answerCreates).toHaveLength(1);
-    // The answer is the first response asked for this turn.
+    // The answer is the first response asked for this turn in the
+    // conversation (a bridge line is out of band, conversation "none").
     expect(
-      channel.sent.filter((event) => event.type === "response.create"),
+      channel.sent.filter(
+        (event) =>
+          event.type === "response.create" &&
+          !JSON.stringify(event).includes('"conversation":"none"'),
+      ),
     ).toHaveLength(1);
     // The voice starts a response for the answer, then says nothing.
     channel.emit({ type: "response.created", response: { id: "resp_1" } });
-    // Narration keeps offering lines after the answer (production #2, #3).
+    // Narration keeps offering lines after the answer (production #2, #3):
+    // none of them is said.
     await vi.advanceTimersByTimeAsync(5_000);
-    expect(bridges()).toHaveLength(0);
+    expect(bridges()).toHaveLength(beforeAnswer);
     // Not ANSWERED: nothing was confirmed said.
     expect(outcomes).toEqual([]);
 
@@ -272,9 +278,12 @@ describe("INC-1: the lost 'top three' turn, replayed", () => {
     line.close();
     await settle();
 
-    // No bridge line for the whole exchange, and no narration poll.
-    expect(bridges()).toHaveLength(0);
-    expect(narration).not.toHaveBeenCalled();
+    // At most one bridge line per turn for the whole exchange (three
+    // turns), and never the ones offered after turn 1's answer.
+    expect(bridges().length).toBeLessThanOrEqual(3);
+    expect(
+      bridges().filter((event) => JSON.stringify(event).includes("Bridge 2")),
+    ).toHaveLength(0);
     // The stale reply was cut, never shown and never relayed as said.
     expect(channel.sent).toContainEqual(
       expect.objectContaining({

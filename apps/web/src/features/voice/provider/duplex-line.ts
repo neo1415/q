@@ -175,11 +175,12 @@ export const ANSWER_SPOKEN_WATCHDOG_MS = 90_000;
 /** INC-1: at most this many bridge lines per turn, and none once ready. */
 export const BRIDGES_PER_TURN = 1;
 /**
- * Founder 2026-10-09: nothing is said or sounded while Q works. Narration
- * and bridges are off on the duplex line; the answer is the first thing
- * heard.
+ * Owner 2026-10-20 (artifacts live): Q says where it is while it works.
+ * The server sends only "where I am" lines (no hum, breathing or
+ * small-talk: founder 2026-10-09 still holds for those), at most
+ * BRIDGES_PER_TURN of them, never after the answer.
  */
-export const SPOKEN_WHILE_WORKING = false;
+export const SPOKEN_WHILE_WORKING = true;
 /** How long a blip over Q waits for its words before it is let go (C-11). */
 const BLIP_WORDS_WAIT_MS = 2_500;
 /** Sounds that are not words: a blip of only these is let go. */
@@ -343,6 +344,8 @@ export type DuplexLineEvents = {
    * null when it is fine again. Never a reason to switch voices.
    */
   readonly onLinkStatus?: ((status: string | null) => void) | undefined;
+  /** Artifacts live: a "where I am" line, shown as it is said. */
+  readonly onWorking?: ((line: string) => void) | undefined;
   /** BACKCHANNEL: the person changed the level by voice. */
   readonly onListening?: ((level: QVoiceListeningLevel) => void) | undefined;
   /**
@@ -2803,7 +2806,11 @@ export class DuplexLine {
         for (const { sequence, beat } of result.beats) {
           if (sequence <= after) continue;
           after = sequence;
-          if (live() && this.#sayBeat(beat)) turn.bridges += 1;
+          if (!live()) continue;
+          if (beat.kind === "STAGE_LINE" || beat.kind === "PROGRESS_LINE") {
+            this.#events.onWorking?.(beat.text);
+          }
+          if (this.#sayBeat(beat)) turn.bridges += 1;
         }
         if (result.idle) return;
       }

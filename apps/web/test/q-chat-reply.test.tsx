@@ -192,6 +192,9 @@ describe("answer cards beside Discover", () => {
     ],
   };
   it("shows the canonical card and its open control when the reply has no separate stage", async () => {
+    // The canvas is a lazy chunk; loaded first, so the assertion is about
+    // what it draws, not how fast a busy machine transforms it.
+    await import("../src/features/q/answer-canvas");
     render(<QAnswer turn={turn({ blocks: [block] })} cardsInline />);
     expect(
       await screen.findByRole("button", { name: "Open Authorized company" }),

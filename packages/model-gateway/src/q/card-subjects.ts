@@ -1,9 +1,10 @@
-import type {
-  QAnswerCard,
-  QAnswerCardsBlock,
-  QMapPlace,
-  QMapSpec,
-  QSubjectRef,
+import {
+  PersonSearchResultSchema,
+  type QAnswerCard,
+  type QAnswerCardsBlock,
+  type QMapPlace,
+  type QMapSpec,
+  type QSubjectRef,
 } from "@capital-q/contracts";
 import type { QToolCallOutcome } from "@capital-q/q-runtime";
 import {
@@ -207,6 +208,41 @@ export class RunRead extends Map<string, string> {
    * table. Only from get_company's own authorised output.
    */
   readonly companyFacts = new Map<string, ReadCompanyFacts>();
+  /**
+   * Artifacts live: researched identities (W2) a public lookup of this
+   * run identified, by name key. No Capital Q record: shown by name, with
+   * the record's attached image or initials.
+   */
+  readonly externals = new Map<string, ReadExternal>();
+}
+
+/** A researched person or organisation, as a lookup tool returned it. */
+export type ReadExternal = {
+  readonly name: string;
+  readonly kind: "PERSON" | "ORGANISATION";
+  readonly externalPersonId: string;
+  readonly image: { readonly url: string; readonly attribution: string } | null;
+};
+
+/** The identity a tool's output names, when it is a person-search result. */
+function externalOf(data: unknown): ReadExternal | null {
+  const parsed = PersonSearchResultSchema.safeParse(data);
+  const card = parsed.success ? parsed.data.card : null;
+  if (card === null) return null;
+  const subject = card.subject;
+  const image = subject.image;
+  return {
+    name: subject.displayName.slice(0, 80),
+    kind: subject.entityKind === "PERSON" ? "PERSON" : "ORGANISATION",
+    externalPersonId: subject.externalPersonId,
+    image:
+      image.status === "ATTACHED" &&
+      image.assetUrl !== null &&
+      image.attribution !== null &&
+      image.assetUrl.startsWith("https://")
+        ? { url: image.assetUrl, attribution: image.attribution.slice(0, 300) }
+        : null,
+  };
 }
 
 /** A company's own declared profile facts, as get_company returned them. */
@@ -249,10 +285,14 @@ export function createRunCompanies(limit = 200) {
         outcome.result.ok
           ? GetRelationshipOutputSchema.safeParse(outcome.result.data)
           : null;
+      const external = outcome.result.ok
+        ? externalOf(outcome.result.data)
+        : null;
       if (
         found.companies.length === 0 &&
         found.investors.length === 0 &&
-        !relationship?.success
+        !relationship?.success &&
+        external === null
       )
         return;
       let known = runs.get(runId);
@@ -263,6 +303,10 @@ export function createRunCompanies(limit = 200) {
           const oldest = runs.keys().next().value;
           if (oldest !== undefined) runs.delete(oldest);
         }
+      }
+      if (external !== null) {
+        const key = nameKey(external.name);
+        if (key.length > 0) known.externals.set(key, external);
       }
       if (profile?.success) {
         known.profiles.set(profile.data.companyId, profile.data.canonicalName);

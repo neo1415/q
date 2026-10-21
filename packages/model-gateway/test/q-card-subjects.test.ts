@@ -191,3 +191,76 @@ describe("explicit company finding attribution", () => {
     }
   });
 });
+
+describe("artifacts live: researched identities in the run's reads", () => {
+  it("keeps the identity a person-search result names, with its attached image only when credited and https", async () => {
+    const { createRunCompanies } = await import("../src/q/card-subjects.js");
+    const runs = createRunCompanies();
+    const subject = {
+      externalPersonId: "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
+      entityKind: "PERSON",
+      researchStatus: "RESEARCHED",
+      requiresRefresh: false,
+      image: {
+        status: "ATTACHED",
+        assetUrl: "https://images.example/shadi.jpg",
+        attribution: "Photo: Example News",
+        licenseNote: "Editorial use",
+      },
+      quotes: [],
+      displayName: "Shadi Qishta",
+      nameVariants: ["Shadi Qishta"],
+      profileUrl: null,
+      role: "Finance Director",
+      organization: null,
+      location: null,
+      evidenceBundleId: null,
+      briefVersion: 0,
+      confidence: "STRONG",
+    };
+    runs.note("run-1", {
+      status: "SUCCEEDED",
+      result: {
+        ok: true,
+        data: {
+          outcome: "MATCHED",
+          candidates: [],
+          clarifyingQuestion: null,
+          elapsedMs: 10,
+          card: {
+            entityKind: "PERSON",
+            subject,
+            sources: [
+              {
+                id: null,
+                description: null,
+                evidenceClass: null,
+                url: "https://example.org/shadi",
+                domain: "example.org",
+                title: null,
+                publishedAt: null,
+                retrievedAt: "2026-10-20T00:00:00Z",
+                provider: "tavily",
+              },
+            ],
+            uncertainty: [],
+            attributionLine: null,
+            enriching: false,
+            actions: [],
+          },
+        },
+      },
+    } as never);
+    expect([...runs.read("run-1").externals.values()]).toEqual([
+      {
+        name: "Shadi Qishta",
+        kind: "PERSON",
+        externalPersonId: "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
+        image: {
+          url: "https://images.example/shadi.jpg",
+          attribution: "Photo: Example News",
+        },
+      },
+    ]);
+  });
+});

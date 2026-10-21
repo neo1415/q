@@ -184,6 +184,17 @@ export const QAnswerCardSchema = z
          * organisation; Rehearse then opens the investor rehearsal.
          */
         investorOrganisationId: z.string().uuid().nullable().optional(),
+        /**
+         * Artifacts live: the identity's attached image (licensed and
+         * attributed on its record); drawn with its credit. Absent: none.
+         */
+        image: z
+          .object({
+            url: z.string().url().max(2048).startsWith("https://"),
+            attribution: z.string().trim().min(1).max(300),
+          })
+          .strict()
+          .optional(),
         /** The public sources the card rests on, to open (https only). */
         sources: z
           .array(

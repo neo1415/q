@@ -4,7 +4,11 @@ import { join } from "node:path";
 import ts from "typescript";
 import { describe, expect, it, vi } from "vitest";
 
-import { Q_VISIBLE_STAGES, type QStreamEvent } from "@capital-q/contracts";
+import {
+  Q_VISIBLE_STAGES,
+  stripSilenceBeats,
+  type QStreamEvent,
+} from "@capital-q/contracts";
 import { createLogger } from "@capital-q/observability";
 import type {
   QRunRecord,
@@ -23,6 +27,7 @@ import type { VoiceSpeaker } from "../src/voice/provider.js";
 import {
   createVoiceTurnHandler,
   SPOKEN_SILENCE_LADDER,
+  SPOKEN_WHILE_WORKING_BEATS,
 } from "../src/voice/turn.js";
 
 /**
@@ -205,12 +210,16 @@ function slowStream(
   };
 }
 
-describe("no sound at all while Q works (founder 2026-10-09)", () => {
-  it("the silence ladder is off on every line", () => {
-    expect(SPOKEN_SILENCE_LADDER).toBe(false);
+describe("while Q works it says where it is, and nothing else (owner 2026-10-20; founder 2026-10-09 for the rest)", () => {
+  it("the ladder is on for its 'where I am' lines only", () => {
+    expect(SPOKEN_SILENCE_LADDER).toBe(true);
+    expect([...SPOKEN_WHILE_WORKING_BEATS].sort()).toEqual([
+      "PROGRESS_LINE",
+      "STAGE_LINE",
+    ]);
   });
 
-  it("a run that takes over half a minute says nothing until its answer: no stage line, no tone, no hum", async () => {
+  it("a run that takes over half a minute says where it is, never a hum or a small-talk thread, then the answer", async () => {
     vi.useFakeTimers({
       toFake: [
         "setTimeout",
@@ -255,7 +264,20 @@ describe("no sound at all while Q works (founder 2026-10-09)", () => {
       // Every stage, each two seconds apart: well past any ladder rung.
       await vi.advanceTimersByTimeAsync((Q_VISIBLE_STAGES.length + 4) * 2_000);
       await turn;
-      expect(voice.spoken.filter((line) => line.length > 0)).toEqual([answer]);
+      const said = voice.spoken.filter((line) => line.length > 0);
+      // The answer is said once, last, whole.
+      expect(said.at(-1)).toBe(answer);
+      expect(said.filter((line) => line === answer)).toHaveLength(1);
+      const working = said.slice(0, -1);
+      // It said where it was, from the run's real stages ...
+      expect(working.length).toBeGreaterThan(0);
+      for (const line of working) {
+        // ... as a ladder line (stripped from any transcript) ...
+        expect(stripSilenceBeats(line), line).toBe("");
+        // ... and never a hum or a remembered thread.
+        expect(line, line).not.toMatch(/^(?:m+|hm+|mm-)/iu);
+        expect(line, line).not.toMatch(/by the way|before I forget|meanwhile|while that runs/iu);
+      }
     } finally {
       vi.useRealTimers();
     }

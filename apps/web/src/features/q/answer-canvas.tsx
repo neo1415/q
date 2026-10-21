@@ -360,6 +360,12 @@ function AnswerCard({
           {card.line === null ? null : (
             <p className="cq-ac-line">{card.line}</p>
           )}
+          {card.external?.image === undefined ? null : (
+            // The image's credit, as its licence asks (artifacts live).
+            <p className="cq-ac-line" data-ac-photo-credit>
+              {`Photo: ${card.external.image.attribution}`}
+            </p>
+          )}
           {provenance === null ? null : (
             // G-D17: how the mandate fit was made, on the card's face.
             <p className="cq-ac-line" data-ac-fit-provenance>
@@ -828,13 +834,16 @@ export function CardAvatar({
       />
     );
   }
+  const image = card.external?.image;
   return (
     <EntityAvatar
       kind={investorId !== undefined ? "investor" : "person"}
       name={card.name}
-      {...(investorId === undefined
-        ? { src: null }
-        : { investorOrganisationId: investorId })}
+      {...(image !== undefined
+        ? { src: image.url }
+        : investorId === undefined
+          ? { src: null }
+          : { investorOrganisationId: investorId })}
       size={size}
       decorative
       className="cq-ac-avatar"
