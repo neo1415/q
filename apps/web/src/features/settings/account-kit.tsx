@@ -247,6 +247,8 @@ type ToastMessage = {
   readonly text: string;
   readonly action?:
     { readonly label: string; readonly run: () => void } | undefined;
+  /** Design review only (/dev/account-review): stays until replaced. */
+  readonly stay?: boolean | undefined;
 };
 type ToastApi = (message: string | ToastMessage) => void;
 const ToastContext = createContext<ToastApi | null>(null);
@@ -269,6 +271,7 @@ export function AccountToastProvider({
     setMessage(value);
     setShown(true);
     if (timer.current !== null) clearTimeout(timer.current);
+    if (value.stay === true) return;
     timer.current = setTimeout(
       () => setShown(false),
       value.action === undefined ? 2800 : 5000,

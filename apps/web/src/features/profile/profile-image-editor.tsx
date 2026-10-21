@@ -84,6 +84,8 @@ export type ProfileImageEditorProps = {
   readonly compact?: boolean | undefined;
   /** An organisation's logo: a rounded square rather than a circle. */
   readonly square?: boolean | undefined;
+  /** Design review only (/dev/account-review): opens with the sheet showing. */
+  readonly initiallyOpen?: boolean | undefined;
 };
 
 type Phase =
@@ -97,7 +99,11 @@ export function ProfileImageEditor(props: ProfileImageEditorProps) {
   const t = useT();
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
-  const [phase, setPhase] = useState<Phase>({ step: "IDLE" });
+  const [phase, setPhase] = useState<Phase>(
+    props.initiallyOpen === true && props.previewUrl !== undefined
+      ? { step: "SHEET" }
+      : { step: "IDLE" },
+  );
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const subject = {
