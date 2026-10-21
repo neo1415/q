@@ -3,14 +3,15 @@ import { describe, expect, it } from "vitest";
 import { environmentNoteParts, SPOKEN_TURN_NOTE } from "../src/q/index.js";
 
 /**
- * Turn latency (row 15, spoken): a voice turn finishes when its whole
- * answer object is written, findings included, so the spoken note keeps
- * the object short as well as the words.
+ * Turn latency (row 15, spoken): the words are short; the findings keep
+ * their evidence (owner 2026-10-21: nothing important cut for speed).
+ * The voice speaks the answer as it streams, so findings written after it
+ * never hold the audio.
  */
 describe("the spoken turn note", () => {
-  it("bounds the spoken words and the findings written after them", () => {
+  it("bounds the spoken words and keeps three findings", () => {
     expect(SPOKEN_TURN_NOTE).toContain("about 60 words");
-    expect(SPOKEN_TURN_NOTE).toContain("At most two findings");
+    expect(SPOKEN_TURN_NOTE).toContain("At most three findings.");
   });
 
   it("is given to a spoken turn only", () => {
