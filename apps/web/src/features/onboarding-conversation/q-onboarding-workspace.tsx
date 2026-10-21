@@ -1,7 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import {
   createQStreamState,
@@ -117,6 +124,8 @@ export type QOnboardingWorkspaceActions = {
       readonly text: string;
     }[],
     focus?: string,
+    /** Q's sentences as they are written (L9). */
+    onSentence?: (sentence: string) => void,
   ) => Promise<OnboardingTurn | null>;
   readonly skip: () => Promise<void>;
   /** A tapped option, as the value it stands for (CQ-Q-VOICE-001 B §17). */
@@ -216,6 +225,9 @@ const EMPTY_STEP_DRAFT: StepDraft = {
   taxonomyQuery: "",
   taxonomyResults: EMPTY_RESULTS,
 };
+
+/** Nothing to subscribe to: the value only changes once, on hydration. */
+const subscribeNever = () => () => undefined;
 
 function newId(): string {
   return crypto.randomUUID();
@@ -457,25 +469,22 @@ export function QOnboardingWorkspace({
   );
   const remaining = view === undefined ? 0 : remainingCount(view);
   // D7: words left in the composer last time come back with the interview.
-  // Read after mount (storage is the browser's), then the composer starts
-  // from them once; every change is kept again as it is typed.
+  // Storage is the browser's: read once hydrated (the server renders an
+  // empty composer), and the composer starts from it once per interview;
+  // every change is kept again as it is typed.
   const draftSessionId = view?.session.id;
-  const [typedDraft, setTypedDraft] = useState<{
-    readonly sessionId: string;
-    readonly text: string;
-  } | null>(null);
-  useEffect(() => {
-    if (
-      draftSessionId === undefined ||
-      typedDraft?.sessionId === draftSessionId
-    ) {
-      return;
-    }
-    setTypedDraft({
-      sessionId: draftSessionId,
-      text: readDraft(draftSessionId).typing,
-    });
-  }, [draftSessionId, typedDraft?.sessionId]);
+  const hydrated = useSyncExternalStore(
+    subscribeNever,
+    () => true,
+    () => false,
+  );
+  const typedDraft = useMemo(
+    () =>
+      hydrated && draftSessionId !== undefined
+        ? { sessionId: draftSessionId, text: readDraft(draftSessionId).typing }
+        : null,
+    [hydrated, draftSessionId],
+  );
   const keepDraft = useCallback(
     (value: string) => {
       if (draftSessionId !== undefined) keepTyping(draftSessionId, value);
