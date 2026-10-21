@@ -118,6 +118,33 @@ Gates run locally on Windows (this machine is slow: a full package build took 47
 - Three tests hit the default 10 s timeout once, while two suites ran in parallel on this machine: `i18n-catalogue-coverage`, `voice-no-filler` and `voice-live-trial`. Re-run alone, all pass. These are not regressions.
 - Not run: `pnpm test:e2e`, pgTAP (no migration) and the full `pnpm check`. CI runs these on the integration branch.
 
+### Round 2 tests and gates (local)
+
+New tests. Each fails on the code before round 2 (checked by swapping in the pre-round-2 files) and passes now:
+
+- `apps/q-api/test/onboarding-no-drop.test.ts`: D9, the reading is kept with the exchange, and after a restart Q still prompts for what was said earlier and never saved.
+- `packages/gateq-intake/test/not-recorded.test.ts`: G4, a worked-out figure is named and asked for again. In another language, the refusal is still returned.
+- `apps/web/test/onboarding-no-drop.test.ts`: D7, the draft is kept per interview, cleared on confirmation, offered back only if it never reached Q, and the screen works with storage blocked.
+- `apps/web/test/onboarding-say-stream.test.ts` and `apps/q-api/test/interview-stream-route.test.ts`: L9.
+  - Sentences arrive in order and the turn settles.
+  - A stream that ends early is a failure, not a half-reply.
+  - The journey comes from the session.
+  - An empty utterance is refused.
+- `supabase/tests/database/rls/984_onboarding_interview_readings.test.sql` (pgTAP, 13 assertions): append-only, idempotent, constrained, server-only. Runs in CI; there is no local database on this machine.
+
+One existing assertion changed on purpose: `interviewer.test.ts`, "rejects proposals that would erase qualification data". The refused item is now named in the reply (G4). It was silent before.
+
+Gates:
+
+- Package build: 53/53.
+- Root `tsc` exit 0; q-api, api and web `tsc` clean.
+- eslint on changed files: clean, after replacing one effect that set state.
+- Prettier: clean.
+- vitest:
+  - round-2 targeted run: 36 files, 349 tests;
+  - broad run (q-api interview, onboarding and voice, plus web onboarding and i18n): 66 files, 639 tests;
+  - all pass.
+
 ## Shared code touched (for the conversation-latency lane)
 
 - `packages/contracts/src/http/onboarding.ts`: optional `stepKey` on `OnboardingInterviewTurnSchema`. Additive.
