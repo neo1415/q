@@ -128,3 +128,20 @@ Samples (outside git, for listening): `C:\Users\Dell\Desktop\rehearsal-voice-sam
 v4 samples carry the tone as voice settings (as the relay sends them). v3 samples carry the audio tag (`[skeptical]`, `[warmly]`, `[frustrated]`, `[firmly]`).
 
 Still open: whether v4 turbo honours `<break>` and audio tags. Today neither is sent to it, so nothing can be read aloud.
+
+## 6. Hand-over to the cloud (2026-10-21)
+
+Branch `claude/rehearsal-voices-7cf96d`, PR #269 → `speed/q-oct20` (round 1 merged via #264).
+
+| Row | Status | Exact next step |
+| --- | --- | --- |
+| 1–10, 15–17 | DONE (round 1, merged in #264) | none |
+| 11 slow-turn filler | DONE, unit-tested | none |
+| 12 idiom prompt v11 | DONE; `prompts.lock.json` updated; q-core prompt tests not re-run after the lock update | run `vitest packages/q-core/test/prompts.test.ts packages/q-core/test/rehearsal-lenient.test.ts` (CI) |
+| 13 researched people on the standard line | DONE (web `live: false`) | web `tsc`/eslint in CI; one live rehearsal with a researched person to hear the voice |
+| 14 Tavus persona voice | DONE behind `CQ_REHEARSAL_VIDEO_PERSONA_VOICE`, **UNVERIFIED LIVE** | one paid test room with the flag on, when the owner allows |
+| 18 live samples / latency + voice warm-up | DONE (section 5); `warm()` added after the measurement | CI runs `rehearsal-voices.test.ts` (warm test added last, not run locally) |
+| Gates | Round-2 code: q-api route tests passed alone; prettier clean; root `tsc` exit 0 before the warm-up commit; eslint/vitest on the final commit stopped (laptop overloaded) | full gates in GitHub CI on PR #269; fix whatever it reports |
+| Key name | `.env.local` has `ELEVEN_LABS_API_KEY`, code reads `ELEVENLABS_API_KEY` | owner: check Railway q-api's variable name |
+
+Sample audio is **local only** (not in git): `C:\Users\Dell\Desktop\rehearsal-voice-samples-2026-10-21\` (8 mp3 + results.json).
