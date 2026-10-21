@@ -95,6 +95,7 @@ import { threadInOrder, type SpokenLine } from "./spoken";
 import { Q_SPEECH_MAX_CHARS } from "./wire-constants";
 import { readTypedDraft } from "./control/fast-navigation";
 import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
+import { usePresenceSignals } from "@/features/q-swarm/use-presence-signals";
 import { useT } from "@/features/i18n/language";
 
 /*
@@ -645,6 +646,34 @@ export function QConversationPanel({
   );
   const chooseView = writeStageView;
   const latestAnswer = turns.findLast((turn) => turn.kind === "Q");
+  // Q Story S4: the presence forms what the run's own signals name -- a
+  // comparison, a chart, a map, a document, a meeting -- for a moment.
+  usePresenceSignals({
+    stage: presence.stage?.stage ?? null,
+    task: presence.stage?.about?.task?.kind ?? null,
+    answer:
+      latestAnswer?.kind === "Q"
+        ? {
+            id: latestAnswer.id,
+            blocks: latestAnswer.blocks.map((block) => ({
+              kind: block.kind,
+              actionType:
+                block.kind === "ACTION_PROPOSAL"
+                  ? block.proposal.actionType
+                  : undefined,
+              intentKind:
+                block.kind === "UI_INTENT" ? block.intent.kind : undefined,
+            })),
+            preview:
+              latestAnswer.preview === undefined
+                ? null
+                : {
+                    layout: latestAnswer.preview.layout,
+                    subjects: latestAnswer.preview.subjects.length,
+                  },
+          }
+        : null,
+  });
   // Owner 2026-10-17: cards on the presence stage (kept or brought back
   // by a later answer too) get the same wide layout as fresh ones.
   const [stageCards, setStageCards] = useState(false);
