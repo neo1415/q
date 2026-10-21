@@ -2,6 +2,11 @@
 
 import type { QStageAbout, QVisibleStage } from "@capital-q/contracts";
 
+import {
+  WorkingLine,
+  WorkingProgress,
+  type WorkingSize,
+} from "@/components/working/working-line";
 import { useT } from "@/features/i18n/language";
 
 import { useWire } from "./use-wire";
@@ -154,7 +159,7 @@ export function StageLine({
   className,
 }: {
   readonly current: QWorkingStage | null;
-  readonly size?: "answer" | "caption" | undefined;
+  readonly size?: WorkingSize | undefined;
   /** False inside a region that already announces (the thread). */
   readonly live?: boolean | undefined;
   /** Keep the line's height when there is nothing to say (no shift). */
@@ -167,27 +172,16 @@ export function StageLine({
     current === null || labels === undefined
       ? null
       : t(stageLineText(current, labels));
-  if (text === null && !reserve) return null;
   return (
-    <p
-      // One polite update per change; the line is the live region.
-      role={live ? "status" : undefined}
-      className={`m-0 min-w-0 truncate ${
-        size === "answer" ? "cq-body" : "cq-caption"
-      } text-(--cq-text-secondary) ${className ?? ""}`}
+    <WorkingLine
+      label={text}
+      size={size}
+      reserve={reserve}
+      live={live}
+      className={className}
       data-q-stage-line={current?.stage ?? ""}
       data-q-stage-about={current?.about?.subjects?.join(", ")}
-    >
-      {text === null ? (
-        // A non-breaking space holds exactly one line.
-        " "
-      ) : (
-        // Keyed by its words: a new line fades in where the old one was.
-        <span key={text} className="cq-stage-line" title={text}>
-          {text}
-        </span>
-      )}
-    </p>
+    />
   );
 }
 
@@ -211,58 +205,26 @@ export function TaskProgress({
   if (current === null || task === undefined || labels === undefined) {
     return null;
   }
-  const [title, ...rest] = taskLineText(current, labels).map((part) => t(part));
-  const counted = task.step !== undefined && task.of !== undefined;
-  const step = rest.at(-1) ?? "";
+  const [title = "", ...rest] = taskLineText(current, labels).map((part) =>
+    t(part),
+  );
+  const progress =
+    task.step !== undefined && task.of !== undefined
+      ? { step: task.step, of: task.of }
+      : undefined;
   return (
-    <div
-      className={`flex min-w-0 flex-col gap-1.5 ${className ?? ""}`}
+    <WorkingProgress
+      title={title}
+      detail={rest}
+      progress={progress}
+      progressText={
+        progress === undefined
+          ? undefined
+          : `${t(fill("{n} of {n2}", { n: String(progress.step), n2: String(progress.of) }))}: ${rest.at(-1) ?? ""}`
+      }
+      compact={compact}
+      className={className}
       data-q-task-progress={task.kind}
-    >
-      <p
-        role="status"
-        className={`m-0 min-w-0 truncate ${
-          compact ? "cq-caption" : "cq-body-sm"
-        } text-(--cq-text-primary)`}
-      >
-        <span className="font-medium">{title}</span>
-        {rest.length > 0 ? (
-          <span className="text-(--cq-text-secondary)">{` · ${rest.join(" · ")}`}</span>
-        ) : null}
-      </p>
-      {counted ? (
-        <div
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={task.of}
-          aria-valuenow={task.step}
-          aria-valuetext={`${t(fill("{n} of {n2}", { n: String(task.step), n2: String(task.of) }))}: ${step}`}
-          aria-label={title}
-          className="flex gap-1"
-          data-q-task-step={task.step}
-          data-q-task-of={task.of}
-        >
-          {Array.from({ length: task.of ?? 0 }, (_, index) => {
-            const done = index < (task.step ?? 0) - 1;
-            const now = index === (task.step ?? 0) - 1;
-            return (
-              <span
-                key={index}
-                aria-hidden="true"
-                // Done, current and to come differ in fill and in height,
-                // never colour alone; no glow, no shimmer.
-                className={`block flex-1 rounded-full transition-[background-color] duration-(--cq-motion-base) ease-(--cq-ease) ${
-                  now ? "h-1.5" : "h-1 self-center"
-                } ${
-                  done || now
-                    ? "bg-(--cq-text-primary)"
-                    : "bg-(--cq-border-subtle)"
-                }`}
-              />
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
+    />
   );
 }
