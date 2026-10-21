@@ -4377,7 +4377,7 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    border-radius: 12px;
+    border-radius: 0; /* Explore video cards stay boxy (founder, 2026-10-21). */
     background: var(--cq-stage-canvas);
     text-align: start;
     -webkit-tap-highlight-color: transparent;
@@ -4498,7 +4498,7 @@
   }
   .cq-explore-skeleton {
     width: 100%;
-    border-radius: 12px;
+    border-radius: 0; /* Explore video cards stay boxy (founder, 2026-10-21). */
     background: var(--cq-surface-strong);
     animation: cq-explore-pulse 1.4s ease-in-out infinite;
   }
