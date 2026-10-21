@@ -154,6 +154,7 @@ function world() {
     },
   };
 
+  const previews: { companyId: string; as: unknown }[] = [];
   const service = createFounderRequestsService({
     sql: {} as DatabaseExecutor,
     transactions,
@@ -173,6 +174,20 @@ function world() {
       insertDecision: () => Promise.resolve(true),
     },
     dataRoom: {
+      // ownroom-2: the data room's own projection, recorded here.
+      preview: (_actor, companyId, as) => {
+        previews.push({ companyId, as });
+        return Promise.resolve({
+          viewer: "INVESTOR" as const,
+          companyId,
+          access: as === null ? ("LOCKED" as const) : ("CONNECTED" as const),
+          ...(as === null
+            ? { locked: { reason: "NOT_CONNECTED" as const, outline: null } }
+            : {}),
+          folders: [],
+          documents: [],
+        });
+      },
       setLevel: (command) => {
         const index = documents.findIndex(
           (d) => d.documentId === command.documentId,
@@ -411,6 +426,7 @@ function world() {
   });
   return {
     service,
+    previews,
     documents,
     policies,
     notices,
@@ -892,6 +908,46 @@ describe("founder shares go only to connected investors (2026-10-08)", () => {
       }),
     ).toEqual({ outcome: "REFUSED", code: "NOT_CONNECTED" });
     expect(policies).toEqual([]);
+  });
+});
+
+describe("the room as an investor sees it (ownroom-2, 2026-10-21)", () => {
+  it("previews as one of the company's own relationships, with its real connection", async () => {
+    const { service, previews } = world();
+    const asZino = await service.dataRoomPreview(founder, COMPANY, R1);
+    expect(previews).toEqual([
+      {
+        companyId: COMPANY,
+        as: { relationshipId: R1, connection: "CONNECTED" },
+      },
+    ]);
+    expect(asZino?.as).toEqual({
+      relationshipId: R1,
+      investorOrganisationName: "Zino Capital",
+      connection: "CONNECTED",
+    });
+    expect(asZino?.investors.map((i) => i.relationshipId)).toEqual([
+      R1,
+      R_PENDING,
+    ]);
+    const pending = await service.dataRoomPreview(founder, COMPANY, R_PENDING);
+    expect(pending?.as.connection).toBe("INTEREST_PENDING");
+    const anyone = await service.dataRoomPreview(founder, COMPANY, null);
+    expect(anyone?.as.relationshipId).toBeNull();
+    expect(anyone?.view.access).toBe("LOCKED");
+  });
+
+  it("is one not-found for another company's relationship, an investor, and another team", async () => {
+    const { service, previews } = world();
+    expect(await service.dataRoomPreview(founder, COMPANY, R_OTHER)).toBeNull();
+    expect(await service.dataRoomPreview(investor, COMPANY, R1)).toBeNull();
+    expect(
+      await service.dataRoomPreview(founder, OTHER_COMPANY, null),
+    ).toBeNull();
+    expect(
+      await service.dataRoomPreview(teammateWithoutRole, COMPANY, null),
+    ).toBeNull();
+    expect(previews).toEqual([]);
   });
 });
 

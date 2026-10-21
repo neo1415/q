@@ -344,4 +344,51 @@ export const COMPANY_AR: Readonly<Record<string, string>> = {
   "Your relationship": "علاقتك",
   "Your requests": "طلباتك",
   "You’ll get a notification": "سيصلك إشعار",
+
+  // Design ownroom-2 (2026-10-21): your room, seen as an investor would
+  "{kind}, {n} pages": "{kind}، {n} صفحات",
+  "{kind}, {n} page": "{kind}، {n} صفحة",
+  "Investors you accept": "المستثمرون الذين تقبلهم",
+  "Only those you share with": "فقط من تشاركهم",
+  "Saved. {level} from now on.": "حُفظ. {level} من الآن.",
+  "Who can see {title}: {level}": "من يرى {title}: {level}",
+  "See it as an investor would": "شاهِدها كما يراها المستثمر",
+  "Who is looking": "من ينظر",
+  "A connected investor": "مستثمر متصل",
+  "Requested a document": "طلب مستندًا",
+  "Which investor": "أي مستثمر",
+  "To investors not yet connected.": "للمستثمرين غير المتصلين بعد.",
+  "Folder names": "أسماء المجلدات",
+  "Investors don't see it, or that it exists.":
+    "لا يراه المستثمرون، ولا يعرفون بوجوده.",
+  "Every investor whose interest you accepted can open it, view only.":
+    "يمكن لكل مستثمر قبلتَ اهتمامه فتحه، للعرض فقط.",
+  "Investors see the title and can ask; you decide each time.":
+    "يرى المستثمرون العنوان ويمكنهم الطلب؛ وتقرر أنت في كل مرة.",
+  "Nobody sees it, not even its title, unless you share it with them.":
+    "لا يراه أحد، ولا حتى عنوانه، ما لم تشاركه معه.",
+  "View only. Their name is shown on every page they open.":
+    "للعرض فقط. يظهر اسمهم على كل صفحة يفتحونها.",
+  "No investor is connected yet. When you accept an investor's interest, you can see here exactly what they would.":
+    "لا يوجد مستثمر متصل بعد. عندما تقبل اهتمام مستثمر، سترى هنا ما سيراه تمامًا.",
+  "No investor has asked for a document yet. When one does, you can see here exactly what they would.":
+    "لم يطلب أي مستثمر مستندًا بعد. عندما يفعل، سترى هنا ما سيراه تمامًا.",
+  "As a connected investor sees it: {name}, interest accepted":
+    "كما يراها مستثمر متصل: {name}، اهتمام مقبول",
+  "As not yet connected sees it: Any investor who can find you":
+    "كما يراها غير المتصلين بعد: أي مستثمر يمكنه العثور عليك",
+  "As requested a document sees it: {name}": "كما يراها من طلب مستندًا: {name}",
+  "That view didn't load. Try again.": "لم يُحمَّل هذا العرض. حاول مرة أخرى.",
+  "Documents marked Only your team never appear here, not even as a title.":
+    "المستندات المعلَّمة «فريقك فقط» لا تظهر هنا أبدًا، ولا حتى كعنوان.",
+  "Their interest is waiting for you. Your data room opens once you accept it.":
+    "اهتمامهم بانتظارك. تُفتح غرفة بياناتك بمجرد قبوله.",
+  "Your data room opens once you accept their interest.":
+    "تُفتح غرفة بياناتك بمجرد قبول اهتمامهم.",
+  "{n} hidden": "{n} مخفية",
+  "Nothing in your room is open or listed to them yet.":
+    "لا شيء في غرفتك مفتوح أو معروض لهم بعد.",
+  "Can open": "يمكنه الفتح",
+  "Asked, waiting for you": "طلبه، بانتظارك",
+  "Can request": "يمكنه الطلب",
 };

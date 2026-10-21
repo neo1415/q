@@ -145,7 +145,7 @@ const instruction = QWorkDtoSchema.parse({
   spend: { spentUsdMonth: "1.84", budgetUsdMonth: "5.00" },
 });
 
-describe("Work (WORK-58)", () => {
+describe("Work, Tasks as an inbox with its preview (option 2, 2026-10-21)", () => {
   it("lists what the Work count counts: a notice that needs them (founder 2026-10-05)", () => {
     noticeItems.current = [
       {
@@ -167,15 +167,18 @@ describe("Work (WORK-58)", () => {
         done={{ items: [], thisWeek: 0, nextCursor: null }}
       />,
     );
-    expect(screen.getByRole("heading", { name: /Needs you/ })).toBeTruthy();
     expect(
-      screen.getByText("Q is waiting to be let in: Introductory call"),
+      screen.getByRole("heading", { name: /Needs your yes\s*1/u }),
     ).toBeTruthy();
-    expect(screen.queryByText("Nothing running yet.")).toBeNull();
+    // In the queue, and open in the preview beside it.
+    expect(
+      screen.getAllByText("Q is waiting to be let in: Introductory call"),
+    ).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "Open" })).toBeTruthy();
     noticeItems.current = [];
   });
 
-  it("a new person sees the input and what Q suggests, nothing else", () => {
+  it("a new person sees the input, what Q suggests, and honest empty states", () => {
     render(
       <WorkPage
         suggestions={[stalled]}
@@ -187,17 +190,20 @@ describe("Work (WORK-58)", () => {
     expect(screen.getByLabelText("Give Q a task")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Talk to Q" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Q suggests" })).toBeTruthy();
-    // Empty states say what happens next (2026-10-08).
     expect(
-      screen.getByText(/Nothing waits on you\. When Q drafts a reply/u),
+      screen.getByText(
+        "Nothing waits for you. Q will ask when something does.",
+      ),
     ).toBeTruthy();
-    expect(screen.getByText(/Nothing done yet\./u)).toBeTruthy();
+    expect(screen.getByText("Nothing yet this week.")).toBeTruthy();
     expect(
       screen.getByText(/Nothing running\. Give Q a task above/u),
     ).toBeTruthy();
+    // Nothing waits: the preview says so plainly.
+    expect(screen.getByText("You’re clear")).toBeTruthy();
   });
 
-  it("a tapped card asks Q once to prepare it, then shows the plan and approves that card", async () => {
+  it("a picked suggestion asks Q once to prepare it, then approves that exact card", async () => {
     ask.mockResolvedValue({
       ok: true,
       value: { runId: RUN, conversationId: null },
@@ -214,24 +220,31 @@ describe("Work (WORK-58)", () => {
     render(
       <WorkPage suggestions={[stalled]} approvals={[]} work={[]} done={null} />,
     );
-    const card = screen.getByRole("button", { name: /Kazikit hasn’t replied/ });
-    fireEvent.click(card);
+    fireEvent.click(
+      screen.getByRole("button", { name: /Kazikit hasn’t replied/ }),
+    );
+    // Nothing is asked of Q until the person says prepare it.
+    expect(ask).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Prepare it" }));
     await settle();
     expect(ask).toHaveBeenCalledTimes(1);
     expect(ask).toHaveBeenCalledWith(stalled.prompt);
     expect(screen.getByText("Send Ama a short follow-up")).toBeTruthy();
     expect(screen.getByText("Hi Ama, following up on Kazikit.")).toBeTruthy();
-    // Closing and reopening never asks Q again.
-    fireEvent.click(card);
-    fireEvent.click(card);
-    await settle();
-    expect(ask).toHaveBeenCalledTimes(1);
+    // The track says where it is: the yes is the step now.
+    const track = screen.getByRole("list", { name: "Where this is" });
+    expect(
+      within(track).getByText("Your yes").closest("li")?.dataset["step"],
+    ).toBe("now");
     fireEvent.click(screen.getByRole("button", { name: "Approve" }));
     await settle();
     expect(approve).toHaveBeenCalledWith(APPROVAL);
+    expect(
+      within(track).getByText("Your yes").closest("li")?.dataset["step"],
+    ).toBe("done");
   });
 
-  it("'Not now' declines what was prepared for the card and sets it aside", async () => {
+  it("dismissing what was prepared declines it and sets the suggestion aside", async () => {
     ask.mockResolvedValue({
       ok: true,
       value: { runId: RUN, conversationId: null },
@@ -247,15 +260,17 @@ describe("Work (WORK-58)", () => {
       <WorkPage suggestions={[stalled]} approvals={[]} work={[]} done={null} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /Kazikit/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Prepare it" }));
     await settle();
-    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     await settle();
     expect(reject).toHaveBeenCalledWith(APPROVAL);
     expect(dismiss).toHaveBeenCalledWith(stalled.key);
     expect(screen.queryByRole("button", { name: /Kazikit/ })).toBeNull();
+    expect(approve).not.toHaveBeenCalled();
   });
 
-  it("lists what needs them with a count, each card showing its exact content", async () => {
+  it("opens the first decision beside the queue with its exact content", async () => {
     read.mockResolvedValue({ ok: true, value: view("Hi Ngozi") });
     render(
       <WorkPage
@@ -274,15 +289,19 @@ describe("Work (WORK-58)", () => {
         done={null}
       />,
     );
-    const section = screen
-      .getByRole("heading", { name: /Needs you\s*1/u })
-      .closest("section");
-    expect(section).not.toBeNull();
-    await settle();
-    // No "Review" tap: the card is open in the queue.
-    expect(within(section as HTMLElement).getByText("Hi Ngozi")).toBeTruthy();
     expect(
-      within(section as HTMLElement).getByRole("button", { name: "Approve" }),
+      screen.getByRole("heading", { name: /Needs your yes\s*1/u }),
+    ).toBeTruthy();
+    await settle();
+    const detail = document.querySelector("[data-work-detail]");
+    expect(detail).not.toBeNull();
+    // No "Review" tap: the decision is open in the preview.
+    expect(within(detail as HTMLElement).getByText("Hi Ngozi")).toBeTruthy();
+    expect(
+      within(detail as HTMLElement).getByRole("button", { name: "Approve" }),
+    ).toBeTruthy();
+    expect(
+      within(detail as HTMLElement).getByRole("button", { name: "Dismiss" }),
     ).toBeTruthy();
   });
 
@@ -336,7 +355,7 @@ describe("Work (WORK-58)", () => {
     ).toBeNull();
   });
 
-  it("shows running work in one line with its spend, and pauses it behind a tap", async () => {
+  it("lists running work as one line, and pauses it from its preview", async () => {
     paused.mockResolvedValue({ ok: true, value: null });
     render(
       <WorkPage
@@ -346,32 +365,24 @@ describe("Work (WORK-58)", () => {
         done={{ items: [], thisWeek: 9, nextCursor: null }}
       />,
     );
-    expect(
-      screen.getByRole("heading", { name: /In progress\s*1/u }),
-    ).toBeTruthy();
-    expect(screen.getByText("Working")).toBeTruthy();
-    expect(screen.getByText("$1.84")).toBeTruthy();
-    expect(screen.getByText("$1.84 this month")).toBeTruthy();
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Options for Keep my founder conversations moving",
-      }),
-    );
-    await settle();
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Pause" }));
+    const row = screen.getByRole("button", {
+      name: /Keep my founder conversations moving/u,
+    });
+    expect(within(row).getByText("Replied to Tallyloom")).toBeTruthy();
+    fireEvent.click(row);
+    expect(screen.getByText("$1.84 of $5.00 this month")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
     await settle();
     expect(paused).toHaveBeenCalledWith(instruction.id, true);
-    expect(screen.getByText("Paused")).toBeTruthy();
-    // One page, in order: what needs them, what was done, what runs.
+    expect(screen.getByText("Paused by you")).toBeTruthy();
+    // The queue, in order: needs your yes, running, done this week.
     const headings = screen
       .getAllByRole("heading", { level: 2 })
       .map((one) => one.textContent ?? "");
-    expect(
-      headings.findIndex((one) => one.startsWith("Needs you")),
-    ).toBeLessThan(headings.findIndex((one) => one.startsWith("Done for you")));
-    expect(
-      headings.findIndex((one) => one.startsWith("Done for you")),
-    ).toBeLessThan(headings.findIndex((one) => one.startsWith("In progress")));
+    const at = (prefix: string) =>
+      headings.findIndex((one) => one.startsWith(prefix));
+    expect(at("Needs your yes")).toBeLessThan(at("Running"));
+    expect(at("Running")).toBeLessThan(at("Done this week"));
   });
 
   it("lays a grant out as what Q does alone and what it asks, keeping the full text", () => {
@@ -383,17 +394,29 @@ describe("Work (WORK-58)", () => {
     expect(plan.rest).toContain("Budget: $5.00 a month");
     expect(readPlan("Hi Ama").quote).toBe("Hi Ama");
   });
+
+  it("wears each option's tone: gold for Tasks and the plan, warm charcoal for Cost", async () => {
+    const { workforceFixtures } = await import("../app/dev/workforce/fixtures");
+    const fixtures = workforceFixtures(Date.now());
+    const { container } = render(
+      <WorkPage
+        suggestions={[]}
+        approvals={[]}
+        work={[]}
+        done={null}
+        workforce={{ overview: fixtures.overview, jobs: fixtures.jobs }}
+      />,
+    );
+    const page = container.querySelector("[data-work-page]");
+    expect(page?.classList.contains("cq-gold")).toBe(true);
+    fireEvent.click(screen.getByRole("radio", { name: /^Cost/u }));
+    expect(page?.classList.contains("cq-charcoal")).toBe(true);
+    expect(page?.classList.contains("cq-gold")).toBe(false);
+  });
 });
 
-describe("Work's team map and cost, secondary (P7, 2026-10-08)", () => {
-  it("shows Q's team as a map with every specialist, and the month's cost", async () => {
-    globalThis.ResizeObserver ??= class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    } as unknown as typeof ResizeObserver;
-    // jsdom does no layout; a tab scrolls itself into view in a browser.
-    Element.prototype.scrollIntoView = () => undefined;
+describe("How Q is handling it and Cost (options 2 and 3, 2026-10-21)", () => {
+  it("shows each piece of Q's work as its plan, and the month day by day", async () => {
     const { workforceFixtures } = await import("../app/dev/workforce/fixtures");
     const fixtures = workforceFixtures(Date.now());
     render(
@@ -405,28 +428,30 @@ describe("Work's team map and cost, secondary (P7, 2026-10-08)", () => {
         workforce={{ overview: fixtures.overview, jobs: fixtures.jobs }}
       />,
     );
-    // The decision queue comes first; the map is one tap away.
-    expect(document.querySelectorAll("[data-agent]").length).toBe(0);
-    const team = screen.getByRole("button", { name: "Team map" });
+    // The decision queue comes first; the plan is one tap away.
+    expect(document.querySelector("[data-work-plan]")).toBeNull();
+    const team = screen.getByRole("radio", { name: "How Q is handling it" });
     fireEvent.click(team);
-    expect(team.getAttribute("aria-pressed")).toBe("true");
-    expect(document.querySelectorAll("[data-agent]").length).toBe(9);
-    expect(
-      screen
-        .getAllByRole("status")
-        .some((one) => /Live/u.test(one.textContent ?? "")),
-    ).toBe(true);
+    expect(team.getAttribute("aria-checked")).toBe("true");
+    expect(document.querySelector("[data-work-plan]")).not.toBeNull();
+    expect(screen.getByText("Working towards")).toBeTruthy();
+    // Every job the team is on, and every standing instruction, is listed.
+    expect(document.querySelectorAll("[data-plan-entry]").length).toBe(
+      fixtures.jobs.length + (fixtures.overview.instructions?.length ?? 0),
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: /^Cost/u }));
-    expect(screen.getByRole("heading", { name: "By specialist" })).toBeTruthy();
-    expect(screen.getByRole("meter", { name: /monthly limit/u })).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: /^Cost/u }));
+    expect(screen.getByRole("heading", { name: "Each day" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "By job" })).toBeTruthy();
     // Nothing read from the server during the test.
     expect(loadWorkforce).not.toHaveBeenCalled();
   });
 
-  it("leaves the team map and cost out where the page has no team", () => {
+  it("leaves the switch out where the page has no team", () => {
     render(<WorkPage suggestions={[]} approvals={[]} work={[]} done={null} />);
-    expect(screen.queryByRole("button", { name: "Team map" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Cost/u })).toBeNull();
+    expect(
+      screen.queryByRole("radio", { name: "How Q is handling it" }),
+    ).toBeNull();
+    expect(screen.queryByRole("radio", { name: /^Cost/u })).toBeNull();
   });
 });

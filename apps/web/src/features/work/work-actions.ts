@@ -27,7 +27,12 @@ import {
   type QWorkDto,
 } from "@capital-q/contracts";
 
-import { apiSession, qApiSession } from "@/features/q/context";
+import {
+  apiSession,
+  qApiSession,
+  resolveOwnContext,
+} from "@/features/q/context";
+import { ownRelationships } from "@/features/relationships/relationship-data";
 
 /**
  * Q's delegated work, notices and pushes, server side (AUTO, ADR 0030).
@@ -248,4 +253,30 @@ export async function saveNoticeSettingsAction(settings: {
       }),
     "That didn't save. Try again.",
   );
+}
+
+/**
+ * Who the person's notices name, by the named organisation's id
+ * (notification rail, owner 2026-10-21: "grouped by who it is about").
+ * A notice names only the other side of the person's own relationship
+ * (its link is that relationship's page), so the names come from the
+ * person's own relationship list, as the API authorises it; an id that
+ * is not one of theirs simply has no name here.
+ */
+export async function noticeNamesAction(): Promise<
+  WorkResult<Readonly<Record<string, string>>>
+> {
+  const context = await resolveOwnContext().catch(() => null);
+  if (context === null)
+    return { ok: false, message: "Sign in again to continue." };
+  const own = await ownRelationships(context).catch(() => undefined);
+  if (own === undefined) {
+    return { ok: false, message: "Names couldn't load." };
+  }
+  return {
+    ok: true,
+    value: Object.fromEntries(
+      own.map((item) => [item.counterpart.id, item.counterpart.name]),
+    ),
+  };
 }

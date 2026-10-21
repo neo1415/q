@@ -2,9 +2,23 @@ import Link from "next/link";
 
 import { closestMatches } from "@/features/q-pitch/founder/matches";
 import "@/features/q-pitch/founder/founder-tour.css";
-import { InvestorCards } from "@/features/investors/investor-cards";
-
-import { GateFit } from "./gate-fit";
+import { countryLabel } from "@/features/company/declared-labels";
+import {
+  InvestorDirectory,
+  type DirectoryEntry,
+} from "@/features/investors/investor-directory";
+import {
+  deploymentLabel,
+  investorTypeLabel,
+} from "@/features/investors/investor-labels";
+import {
+  dimensionMatches,
+  focusLine,
+  gateHref,
+  looksForSentence,
+  publishedMandate,
+  reachOf,
+} from "@/features/investors/published-focus";
 
 import type {
   DiscoveredCompanyDto,
@@ -12,6 +26,7 @@ import type {
   DiscoveryNoteDto,
   DiscoveryReasonDto,
   InvestorGateFitDto,
+  PublicCardDto,
 } from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { Building2, Globe, ICON_SIZE, Info } from "@capital-q/ui/icons";
@@ -182,6 +197,7 @@ export function DiscoverInvestors({
   items,
   notes,
   gates = new Map(),
+  cards = new Map(),
   translate,
 }: {
   /** The reader's language, from the page. */
@@ -190,6 +206,8 @@ export function DiscoverInvestors({
   readonly notes: readonly DiscoveryNoteDto[];
   /** Q.05: published gates checked for the founder's own company. */
   readonly gates?: ReadonlyMap<string, InvestorGateFitDto>;
+  /** Each investor's Q Card as a participant reads it (what they publish). */
+  readonly cards?: ReadonlyMap<string, PublicCardDto | null>;
 }) {
   // Q Pitch v6 (founder track): the three closest matches on what each
   // investor publishes, marked so the tour can light them in turn.
@@ -197,38 +215,42 @@ export function DiscoverInvestors({
     items.map((item) => item.investorOrganisationId),
     gates,
   );
+  // ADR 0023: each card opens a sheet with what they look for and the one
+  // way to reach them. Order is the server's; nothing here ranks.
+  const entries: DirectoryEntry[] = items.map((item) => {
+    const gate = gates.get(item.investorOrganisationId) ?? null;
+    const mandate = publishedMandate(
+      cards.get(item.investorOrganisationId) ?? null,
+    );
+    const where =
+      mandate.geographies.length > 0
+        ? mandate.geographies.join(", ")
+        : countryLabel(item.hqCountry);
+    return {
+      investorOrganisationId: item.investorOrganisationId,
+      name: item.displayName,
+      photoUrl: item.photoUrl ?? null,
+      type: investorTypeLabel(item.investorType),
+      deployment: deploymentLabel(item.deploymentState),
+      focus: focusLine(mandate),
+      looksFor: looksForSentence(mandate),
+      cheque: mandate.cheque,
+      matches: dimensionMatches(gate, item.reasons),
+      reach: reachOf(item.inboundPreference, gate),
+      gateHref: gateHref(gate),
+      where,
+      anchor: matches.get(item.investorOrganisationId),
+    };
+  });
   return (
-    <div className="flex flex-col gap-6" data-qp-anchor="fdr.03.discover.list">
+    <div className="flex flex-col gap-4" data-qp-anchor="fdr.03.discover.list">
+      <p className="cq-body text-(--cq-text-secondary)">
+        {(translate ?? ((english: string) => english))(
+          "Investors who chose to be discoverable. Open one to see what they look for and how to reach them.",
+        )}
+      </p>
       <Notes notes={notes} t={translate} />
-      {items.length === 0 ? (
-        <EmptyState
-          title="No investors are discoverable yet."
-          description="An investor appears here when they choose to be found. Nothing about their mandate is shown, now or later, unless they publish it."
-          action={
-            <Link href="/home" className={buttonClassName("secondary")}>
-              Ask Q
-            </Link>
-          }
-        />
-      ) : (
-        // ADR 0023: each card opens the investor's page, where a request
-        // is sent. Order is the server's; the reasons say why each is here.
-        <InvestorCards
-          items={items}
-          anchorOf={(item) => matches.get(item.investorOrganisationId)}
-          footer={(item) => {
-            const gate = gates.get(item.investorOrganisationId);
-            return (
-              <div className="flex flex-col gap-3">
-                <Reasons reasons={item.reasons} t={translate} />
-                {gate === undefined ? null : (
-                  <GateFit gate={gate} apply={false} compact />
-                )}
-              </div>
-            );
-          }}
-        />
-      )}
+      <InvestorDirectory entries={entries} />
     </div>
   );
 }

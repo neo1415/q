@@ -58,6 +58,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
   "auth/update-password/page.tsx": AUTH,
   "connected/google/page.tsx": CALLBACK,
   "settings/reconnect/google/page.tsx": CALLBACK,
+  "settings/billing/page.tsx":
+    "an old address: it redirects to Plan and billing, which registers its own section",
   "g/[publicId]/page.tsx": PUBLIC,
   "g/[publicId]/embed/page.tsx": PUBLIC,
   "u/[handle]/page.tsx": PUBLIC,

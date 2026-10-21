@@ -183,6 +183,7 @@ export {
 export { createStartupAlerts, type StartupAlerts } from "./find/alerts.js";
 export {
   createPostgresApplicationFounders,
+  founderRules,
   type ApplicationFounders,
   type FounderApplication,
 } from "./infrastructure/postgres-application-founders.js";
