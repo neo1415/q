@@ -140,11 +140,29 @@ export function DialogViewerContent({
   children,
   className,
   onSwipeDismiss,
+  fit = "viewport",
+  scrim = "overlay",
+  focus = "first",
 }: {
   readonly title: string;
   readonly children: ReactNode;
   readonly className?: string | undefined;
   readonly onSwipeDismiss?: (() => void) | undefined;
+  /**
+   * "content": on a large screen, as tall as what it holds, up to the
+   * viewport, scrolling inside (a few cards are not a full-height panel).
+   * A phone keeps the whole-screen sheet either way.
+   */
+  readonly fit?: "viewport" | "content" | undefined;
+  /** "strong": the firmer `--cq-scrim`, for a modal over any page. */
+  readonly scrim?: "overlay" | "strong" | undefined;
+  /**
+   * "popup": opened by anything but the keyboard (a voice, a pointer, the
+   * app itself), focus lands on the dialog, not on its first control, so
+   * no focus ring appears on Close until the keyboard is used. Opened by
+   * the keyboard, the first control takes focus as before.
+   */
+  readonly focus?: "first" | "popup" | undefined;
 }) {
   const popupRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{
@@ -208,16 +226,30 @@ export function DialogViewerContent({
   return (
     <OverlayLayerContext.Provider value="modal">
       <BaseDialog.Portal>
-        <BaseDialog.Backdrop className="fixed inset-0 z-(--cq-z-modal) bg-(--cq-overlay) transition-opacity duration-(--cq-motion-base) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+        <BaseDialog.Backdrop
+          className={cx(
+            "fixed inset-0 z-(--cq-z-modal) transition-opacity duration-(--cq-motion-base) data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+            scrim === "strong" ? "bg-(--cq-scrim)" : "bg-(--cq-overlay)",
+          )}
+        />
         <BaseDialog.Popup
           ref={popupRef}
           {...swipe}
+          {...(focus === "popup"
+            ? {
+                initialFocus: (type: string) =>
+                  type === "keyboard" ? true : popupRef.current,
+              }
+            : {})}
           className={cx(
             // Phone: the whole screen, rising from the bottom edge it can be
             // pulled back down to.
             "fixed inset-0 z-(--cq-z-modal) flex flex-col overflow-hidden bg-(--cq-surface-raised) outline-none transition-[opacity,transform,translate,scale] duration-(--cq-motion-emphasis) ease-(--cq-ease) data-[ending-style]:translate-y-full data-[starting-style]:translate-y-full",
             // Larger screens: a centred reading modal.
-            "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-[calc(100dvh-64px)] sm:w-[calc(100vw-64px)] sm:max-w-5xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:shadow-(--cq-shadow-overlay) sm:duration-(--cq-motion-base) sm:data-[ending-style]:-translate-y-1/2 sm:data-[ending-style]:scale-[0.98] sm:data-[ending-style]:opacity-0 sm:data-[starting-style]:-translate-y-1/2 sm:data-[starting-style]:scale-[0.98] sm:data-[starting-style]:opacity-0",
+            fit === "content"
+              ? "sm:h-auto sm:max-h-[calc(100dvh-64px)] sm:max-w-3xl sm:rounded-(--cq-radius-lg) sm:border sm:border-(--cq-border-subtle)"
+              : "sm:h-[calc(100dvh-64px)] sm:max-w-5xl",
+            "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:w-[calc(100vw-64px)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:shadow-(--cq-shadow-overlay) sm:duration-(--cq-motion-base) sm:data-[ending-style]:-translate-y-1/2 sm:data-[ending-style]:scale-[0.98] sm:data-[ending-style]:opacity-0 sm:data-[starting-style]:-translate-y-1/2 sm:data-[starting-style]:scale-[0.98] sm:data-[starting-style]:opacity-0",
             className,
           )}
         >

@@ -191,6 +191,13 @@ The person says "open their deck", "open this one", "show me that", "their stuff
   - a tab, act or document done by the screen is reported as done at once (`fastActLine`);
   - before, a tab waited the full 6 s for a route receipt and the voice said it was "still loading" after the screen had already moved.
 
+## Modal fixes (coordinator, from the screenshots)
+
+- **Desktop modal sizes to its content.** It is as tall as what it holds, scrolls inside up to the viewport, and is 3xl wide (`DialogViewerContent fit="content"`). A phone keeps the whole-screen sheet.
+- **No focus ring on Close unless the keyboard is used.** When opened by a voice, a pointer or the app, focus lands on the dialog itself (`focus="popup"`). Opened by the keyboard, or after Tab, Close gets focus and shows its `:focus-visible` ring. The focus trap and focus return are unchanged.
+- **The page behind is clearly held back in dark mode.** A new `--cq-scrim` token (light: 0.55 alpha; dark: 0.82 alpha over near-black, no blur) is used only for this modal (`scrim="strong"`). Other dialogs keep `--cq-overlay`.
+- **The e2e asserts all three:** height below the viewport minus 164 px on desktop, no `:focus-visible` on Close at open, and the scrim present. Screenshots are regenerated.
+
 ## Not done here / needs others
 
 - **Duplex voice line, routed turns:** the turn still goes to Q's server run after the screen has acted. Scroll and back are code lanes there (0 model). "Close it", "press X" and documents may still call a model, and the answer acts once more on something already done (a no-op). A code lane in `packages/q-specialists/src/answer.ts` for `instantRequestOf` / `documentAskOf` would end that; that file is Lane 4's, and the change has been proposed to them.
