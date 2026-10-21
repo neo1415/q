@@ -102,7 +102,7 @@ function PreviewTable({
 }) {
   return (
     <div
-      className="w-full overflow-x-auto rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
+      className="relative w-full overflow-x-auto rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised)"
       data-q-preview-table
     >
       <table className="w-full border-collapse">
