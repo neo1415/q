@@ -144,6 +144,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     exempt(
       "the avatar's image: a redirect to a short-lived signed photo URL, bytes browser <-> storage; Q names the company instead",
     ),
+  "api/http/company-profile.ts GET `${base}${COMPANY_PROFILE_LOGO_SEGMENT}`":
+    exempt(
+      "the avatar's logo when there is no photo: the image URL from the company's own website; Q names the company instead",
+    ),
   "api/http/company-profile.ts GET `${base}${COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT}`":
     DOWNLOAD,
 

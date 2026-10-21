@@ -231,6 +231,9 @@ async function main(): Promise<void> {
             case "q.finding.available":
               console.log(`[Q] Finding: ${event.data.finding.statement}`);
               break;
+            case "q.artifact.preview":
+              console.log("[Q] Preview shown");
+              break;
             case "q.run.completed":
               console.log("[Q] Complete");
               break;
