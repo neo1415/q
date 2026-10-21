@@ -156,20 +156,150 @@ No migration. No change to RLS, authorization, the firewall or model routing.
 
 ## Left open
 
-- The 1.5 s first-words target for a clean typed save: its reply is written by code straight after one model round (modelled about 1.8 s), so the stream cannot start earlier than that round ends.
+- The 1.5 s first-words target for a clean typed save: round 3 removes the model round entirely when code reads the whole turn exactly (one choice, a bare figure, a short title, a web address); those turns reply by code with no model call. A free-form answer still needs one model round (modelled about 1.8 s) before its first words.
 - D9 needs migration `20261228210000_onboarding_interview_readings` applied (after pgTAP passes in CI) before the code that writes readings is deployed. Until then the reading write fails and is logged; the turn and the thread are unaffected.
-- G4 in languages other than English relies on the coverage panel.
+- G4 round 3: only the invented-amount refusal is still said; its line is English, and in another language the model's words stand and the amount shows as still needed in coverage.
 - Not live-verified: nothing here is deployed.
 
 ## Handoff status (2026-10-21, work moving to the cloud)
 
 Branch `claude/onboarding-speed-878301`, PR [neo1415/q#272](https://github.com/neo1415/q/pull/272) into `speed/q-oct20`.
 
-| Item                                                                                                                                           | Status                 | Exact next step                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1–D6, D8, L2–L6, L10, L11 (round 1)                                                                                                           | DONE (merged via #266) | none                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| D7 composer draft                                                                                                                              | DONE (in #272)         | none                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| D9 readings persisted (`onboarding.interview_readings`)                                                                                        | DONE (in #272)         | Let pgTAP 984 run in CI, then apply migration `20261228210000` before deploying.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| G4 GateQ refusals said                                                                                                                         | DONE (in #272)         | none                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| **Public `stepKey` on listed turns** (CI on #267: `packages/contracts/test/onboarding-interview-turns.test.ts` "carries no step, id or owner") | NOT STARTED            | Revert the optional `stepKey` and `stated` on `OnboardingInterviewTurnSchema` (the browser-facing list item) so it stays strict, and leave that test unchanged. Add a separate internal list, e.g. `GET /sessions/:id/turns?internal` or a q-api-only response schema `OnboardingInterviewTurnInternalSchema` carrying `stepKey` and `stated`. `listInterviewTurns` returns them only to that caller. Point q-api's `listOnboardingInterviewTurns` (interview-agent `recallAsked` / `recallStated`) at the internal shape. Re-run `onboarding-no-drop.test.ts` and the contracts test.                                                                                                                                                                                                                                                                                                                                                                                  |
-| **L9 typed streaming: two implementations**                                                                                                    | DECISION NEEDED        | Turn-latency built the same thing on `claude/turn-latency-6a96d1`: SSE via `Accept: text/event-stream` on `/v1/q/interview/turn` and api `/say`, web route `app/api/onboarding-say/[sessionId]`, `sayStreamed` with a server-action fallback. Mine (#272) is NDJSON on `/v1/q/interview/turn/stream` plus `/api/onboarding-say`. Keep one, per the coordinator's instruction ("wire onboarding to turn-latency's"): remove my L9 from #272, i.e. q-api `streamPath` route and `QInterviewStream*` contracts, `apps/web/app/api/onboarding-say/route.ts`, `onboarding-kit/say-stream.ts`, `onSentence` threading, `typedPartial` in the workspace, its two tests, and the parity entries. Keep D7 (draft hold/confirm in `sayOne`) when resolving the workspace merge with theirs. One requirement to carry over into theirs: a closed connection must **not** abort the interview turn, because aborting drops what was just sent. My route deliberately never aborted. |
+| Item                                                           | Status                                  | Exact next step                                                                                                                                       |
+| -------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1–D6, D8, L2–L6, L10, L11 (round 1)                           | DONE (merged via #266)                  | none                                                                                                                                                  |
+| D7 composer draft                                              | DONE (in #272)                          | none                                                                                                                                                  |
+| D9 readings persisted (`onboarding.interview_readings`)        | DONE (in #272)                          | Let pgTAP 984 run in CI, then apply migration `20261228210000` before deploying.                                                                      |
+| G4 GateQ: every stated answer saved (round 3, owner principle) | DONE (`speed/onboarding-r3`)            | none. See "Round 3" below.                                                                                                                            |
+| Public `stepKey` on listed turns                               | DONE (coordinator, `337046f`)           | none: `OnboardingInterviewTurnSchema` is strict again; q-api reads `GET .../turns/steps` (`listOnboardingInterviewTurnSteps`).                        |
+| L9 typed streaming                                             | DONE (coordinator kept #271's SSE path) | none: `interview-route.ts` `openSentenceStream`, web `say-stream.ts`, `app/api/onboarding-say/[sessionId]/route.ts`. #272's NDJSON route was dropped. |
+| L9 first words for an exact answer (round 3)                   | DONE (`speed/onboarding-r3`)            | none. See "Round 3" below.                                                                                                                            |
+| Long text answer refused for length (round 3)                  | DONE (`speed/onboarding-r3`)            | none. See "Round 3" below.                                                                                                                            |
+| D9 migration `20261228210000` + pgTAP 984                      | IN BRANCH, not applied                  | Let pgTAP 984 run in CI on the integration push; then apply `20261228210000` before deploying code that writes readings. Unchanged in round 3.        |
+
+## Round 3 (2026-10-21, branch `speed/onboarding-r3`)
+
+Owner principle: make it work instead of explaining the failure. Every answer the person states is saved.
+
+**G4 redone (GateQ).** `packages/gateq-intake/src/application/normalise-fact.ts` puts what the model read into the dimension's canonical shape instead of refusing it:
+
+- country: "Kenya", "ke", "Nairobi, Kenya", "the UK", "NGA" → ISO alpha-2 (the platform's own region names, plus common aliases);
+- stage: "Series A" → `series_a`, "Pre-Seed" → `pre_seed`, "Series D" → `series_c_plus`;
+- sectors: "climate, logistics and fintech" → phrases;
+- raise amount: "$1.5M", "1500000 USD" → AMOUNT, currency from the words, their sentence, or the raise currency on record;
+- currency: "US dollars", "usd", "€" → ISO code (checked against the runtime's currency list);
+- email lower-cased and pulled out of "mailto:…"; a bare website gets `https://`.
+
+A changed contact name or email is recorded over the old one (the store supersedes, so history is kept); the same detail again ("Laura" with "Laura Mensah" on record, an email in another case) writes nothing. The `UNREADABLE` and `CONTACT_CONFIRMED` reasons and their "I couldn't record…" lines are gone. The **only** refusal left is the truth guard: an amount the person never said (`AMOUNT_NOT_STATED`). Amounts said in words with a scale ("two million five hundred thousand", "half a million") now count as said (`stated-amount.ts`). Words with nothing of the shape in them ("somewhere in Europe" for a country) are counted, never said as a failure; the dimension stays open, so Q asks it.
+
+**Onboarding.** `interview-steps.ts` `toResponseValue`: a text answer longer than its step's limit was refused ("That does not fit what this step records") and asked again; it is now kept up to the limit, cut at a word. The port's remaining `REJECTED` paths were reviewed: they are approval/authority guards (unapproved recommendations, delegation not handed, a quote not in the person's words, an option or figure they never stated). Those are the same truth guard as the GateQ amount rule and stay; out-of-range figures and off-path facts were already kept in their words.
+
+**Speed (fewer model calls).** `interview-agent.ts`: when code reads the whole turn exactly (`codeReading`: one choice of the step just asked, a bare figure, a short title, a web address), code now records it through the same guarded port and, when the save is clean, writes the reply too. Zero model calls for that turn (it used to wait a full tool round, about 1.8 s modelled). Anything less than a clean save goes to the model with the result in hand, as before. Only when `replyByCodeAfterCleanSave` is composed (on in `main.ts`).
+
+Tests (each new one fails on the old code; the fast-path one was checked by disabling the change):
+
+- `packages/gateq-intake/test/interviewer.test.ts`: 14 previously refused shapes now saved in canonical shape; an amount said in words saved; **negative**: an amount never said is still refused with the plain line; shapeless words never produce "couldn't record"; a changed name and email are recorded. The old "rejects … proposals that would erase usable qualification data" assertion was replaced on purpose (owner principle).
+- `apps/q-api/test/interview-option-meaning.test.ts`: a text answer over its step's limit is kept, cut at a word.
+- `not-recorded.test.ts`: one reason left. `stated-amount.test.ts`: word amounts, and a bare count is not an amount.
+- `apps/q-api/test/interview-latency-paths.test.ts`: "Seed." after Q asked the stage is saved and replied to with zero model calls; without the code reply composed the model still writes it.
+
+Gates (cloud, Linux):
+
+- `pnpm install --frozen-lockfile`; `pnpm exec turbo run build --filter=./packages/*`: 53/53.
+- vitest: `packages/gateq-intake/test` 18 files, 226 tests; q-api interview/onboarding/voice (64 files) + `apps/api/test/gateq*` + `onboarding-one-q` + `packages/onboarding`: 86 files, 976 tests. All pass.
+- Root `tsc --noEmit -p tsconfig.json`: exit 0. `apps/q-api` and `apps/api` `tsc --noEmit`: clean.
+- eslint and prettier on changed files: clean.
+- Not run: pgTAP (no migration change), e2e, full `pnpm check`. Not deployed or live-verified.
+
+Shared files: none. No contract, migration, RLS, authorization or model-routing change.
+
+### Round 3, second pass (owner follow-ups, 2026-10-21)
+
+- **Worked-out figures are read back, not refused.** "Two pay $180,000 each" read as revenue 360,000 now gets "So that's USD 360,000 for revenue, right?" as Q's one question. Their "yes" records it as their claim: code reads Q's own read-back line, so it saves even if the model proposes nothing. A "no" or a different figure records nothing read back. The dossier keeps a confirmed figure as USER_CLAIM, not Q_INFERENCE. Files: `not-recorded.ts` (`readBackLine`, `readBacksIn`), `stated-amount.ts` (`affirmsReadBack`), `interviewer.ts`, `dossier.ts`.
+- **Cities and regions (GateQ).** `cities.ts`: "We're in Lagos" saves NG, "based out of Cape Town" saves ZA, "London and Lagos" saves GB. For "somewhere in Europe", Q asks "Which country in Europe is the company based in?" as its question.
+- **Options always under Q's question (onboarding).** Root cause: the typed screen drew chips from the form cursor (`view.currentStep`), not from the step Q asked. The fixes:
+  - New optional `askedStep` on `OnboardingSessionViewSchema`. This is an additive contract change.
+  - `getSession({ askedStepKey })` fills `askedStep` (`packages/onboarding` use-cases).
+  - api `/say` passes Q's `askingAbout[0]` through.
+  - The web derives the prompt with `promptStepOf(view, askedStep)`.
+  - q-api: when code adds the next question to a reply that asked nothing, `asking` and `askingAbout` now name that step, so voice gets its options too.
+- **Options no longer cut off.**
+  - Onboarding has no bottom nav, so the composer docks at the bottom edge (`--cq-bottom-nav-height: 0` on the workspace).
+  - The thread scrolls to just below the options, clear of the composer.
+  - Long option labels wrap.
+  - The voice stage scrolls its options into view.
+- **Long answers.** Already in place: long-text answers are summarised in one or two sentences, said back word for word, and saved on their yes (`holdParaphrase`, prompt rule in `interview-agent.ts`). No change was needed.
+- **Tests:**
+  - GateQ: read-back, yes and no; cities; region question; dossier keeps a confirmed figure.
+  - Web: `promptStepOf`.
+  - q-api: a code-added question carries its step. This fails on the old code.
+  - Broad run: 116 files, 1,280 tests pass. Root `tsc` exit 0; q-api, api and web `tsc` clean; eslint and prettier clean.
+- **Third pass (same day):**
+  - **Review and mandate steps.** When Q asks one of these, its options show too: the server context is loaded for the asked step as for the cursor's (`openAskedStep` in `view.ts`; tested in `asked-step.test.ts`).
+  - **Any language.** The GateQ prompt now tells Q to check a worked-out figure with one short question, and to ask which country a region means, in the conversation's language (`CONFIRM_NOTE`). Code recognises "yes" in many languages ("oui", "sí", "ja", "نعم", "ndiyo", …) and thousands written with spaces ("360 000"). So a French "Oui" to "Donc 360 000 USD de revenus, c'est bien ça ?" saves the figure as theirs.
+  - **Gates:** 132 files, 1,418 tests pass (q-api interview/onboarding/voice, api gateq and onboarding, onboarding, gateq-intake, q-evals, contracts, web onboarding, voice and gateq). Root `tsc` 0; q-api, api and web `tsc` clean; eslint and prettier clean.
+- **Still open (not this lane's to do):**
+  - Merge PR #275 (coordinator), then CI on the integration push.
+  - pgTAP 984, then apply migration `20261228210000` before deploying.
+  - Live browser verification on phone and desktop, typed and voice. There is no Supabase/Docker in this sandbox, so `packages/onboarding` database tests and e2e were not run.
+
+## Round 3, speed pass (owner 2026-10-21: lightning fast, never by cutting real work)
+
+### Timing per journey (harness `apps/q-api/test/onboarding-journeys.bench.test.ts`)
+
+**What runs for real:** the interview agent, onboarding port, tools, reply guards and code paths.
+
+**What is faked, with assumed latencies:**
+
+- API round trip: 150 ms
+- database read: 40 ms
+- independent reading: 1.5 s
+- model tool round: 1.8 s
+- model reply round: 1.6 s
+- first streamed token: 700 ms
+- text-to-speech first audio: 300 ms
+
+The latencies come from the production traces recorded in `interview-latency.bench.test.ts` (hosted rounds about 2 s, 2026-09-30) and the providers' first-token and first-audio figures. No provider was called; cost $0.
+
+"Before" is the same harness run on the code at this lane's start (`337046f`); "After" is this branch. All values are in ms. Before, nothing showed until Q's first words. "After first visible" is Q's working presence, shown in the browser on send, before any server work.
+
+| Journey                                           | Before complete | After complete | Before first visible | After first visible | Before first words | After first words | Model calls (before → after) |
+| ------------------------------------------------- | --------------: | -------------: | -------------------: | ------------------: | -----------------: | ----------------: | ---------------------------- |
+| Opening / resume                                  |           2,412 |          2,506 |                1,620 |                   8 |              1,620 |             1,714 | 1 → 1                        |
+| Typed exact answer ("Seed.")                      |           2,232 |            797 |                1,679 |                   0 |              1,679 |               707 | 1 → 0                        |
+| Typed answer, clean save                          |           2,684 |          2,618 |                2,596 |                   0 |              2,596 |             2,530 | 2 → 2                        |
+| Typed answer needing Q's judgement                |           4,320 |          4,287 |                3,545 |                   0 |              3,545 |             2,532 | 3 → 3                        |
+| Typed answer, refused (nothing of theirs to save) |           4,048 |          4,052 |                3,955 |                   0 |              3,955 |             3,502 | 3 → 3                        |
+| Spoken answer, clean save                         |           2,595 |          2,602 |                2,506 |                   0 |              2,806 |             2,813 | 2 → 2                        |
+| Answer naming the company (research by name)      |           2,597 |          2,598 |                2,505 |                   0 |              2,505 |             2,509 | 2 → 2                        |
+
+Model calls include the independent reading, which runs alongside the first round. Research and document reading run in the background: the turn never waits on them, and the screen shows their stage.
+
+### What changed
+
+- **Q's presence, not a narration.** From the moment the person sends, the screen shows Q's mark with its working dots until Q's first words. An earlier version of this pass showed stage words ("Saving your answers", "Writing a reply"); the owner rejected that on 2026-10-21 as Q narrating its own plumbing. The `stage` stream event and contract were removed with it, so there is no contract change for this.
+- **Exact answers take no model call.** A one-word answer or a bare figure for the step just asked is saved by code and replied to by code (708 ms instead of 1.7 s for the first words).
+- **What was saved is said first.** When a turn needs Q's judgement, code says what saved the moment the save commits ("stage: Seed; country: Kenya.") while the model writes the rest. The model is told it was said, so it never repeats it. English only, like every code line. First words: 3.5 s → 2.5 s.
+- **The final reply streams.** Its first sentence shows while the rest is written.
+- **Uploads.** The reading is checked every 1 s for the first 15 s (was every 3 s); the screen still says "Reading deck.pdf", which the person started and is waiting on.
+- **Kept, deliberately:**
+  - the independent reading;
+  - a second recording round where one is needed;
+  - every guard, the Context Firewall and the evidence axes;
+  - research and document reading, in full.
+- **Reverted after the owner's correction:**
+  - a 5 s cap on tool rounds, because it could skip saving an answer;
+  - code re-asking a question when nothing of the person's could be saved, because it could ignore what they asked. It also broke two existing guard tests, which pass again.
+
+### Still slower, and why
+
+The refused case ("Our gross margin is decent", with the model offering a figure they never said) has its first words at 3.5 s. It needs one model round to read the turn and one to word a reply, and neither can be dropped without cutting the guard or the reply's quality. Q's presence shows from the moment they send.
+
+### Gates
+
+- vitest: 135 files, 1,432 tests pass (q-api interview/onboarding/voice, api gateq, onboarding and interview, onboarding, gateq-intake, q-evals, contracts, web onboarding, voice and gateq).
+- New tests:
+  - the receipt said first and never twice (`interview-latency-paths.test.ts`);
+  - the journey harness.
+- Root `tsc` 0; q-api, api and web `tsc` clean; eslint and prettier clean.
+- Not live-verified. No provider calls.

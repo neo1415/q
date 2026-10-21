@@ -536,6 +536,7 @@ export function createRuntimeClient<
                 navigate: outcome.navigate,
                 researching: outcome.researching,
                 askingAbout: outcome.askingAbout,
+                askedStep: outcome.view.askedStep,
                 conduct: outcome.conduct,
                 gestures: outcome.gestures,
               };

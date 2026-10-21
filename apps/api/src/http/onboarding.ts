@@ -255,8 +255,13 @@ export function registerOnboardingRoutes(
         turn: Awaited<ReturnType<QInterviewClient["turn"]>>,
       ) => {
         // What was recorded is read back from the session, never from the
-        // prose: the reply is Q's words and is not evidence of a write.
-        const after = await runtime.getSession({ actor, sessionId });
+        // prose: the reply is Q's words and is not evidence of a write. The
+        // step Q asked comes with it, so its options show under Q's words.
+        const after = await runtime.getSession({
+          actor,
+          sessionId,
+          askedStepKey: turn.askingAbout?.[0],
+        });
         return SayOnboardingResponseSchema.parse({
           view: after,
           understood: null,

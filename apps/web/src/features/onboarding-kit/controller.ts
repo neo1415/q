@@ -1,6 +1,10 @@
 "use client";
 
-import type { QConduct, QSentenceGesture } from "@capital-q/contracts";
+import type {
+  OnboardingStepView,
+  QConduct,
+  QSentenceGesture,
+} from "@capital-q/contracts";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
@@ -53,6 +57,8 @@ export type OnboardingTurn = {
   readonly researching: string | null;
   /** The steps Q's reply asks about; absent when not known. */
   readonly askingAbout?: readonly string[] | undefined;
+  /** The step Q asked, with its options, when it is not the cursor's. */
+  readonly askedStep?: OnboardingStepView | undefined;
   /** Q's patience after the turn (founder direction 2026-09-30). */
   readonly conduct?: QConduct | undefined;
   /** PRESENCE: what Q's particles form for which sentence. */
@@ -400,6 +406,7 @@ export function useOnboardingJourney<
             navigate: outcome.navigate,
             researching: outcome.researching,
             askingAbout: outcome.askingAbout,
+            askedStep: outcome.askedStep,
             conduct: outcome.conduct,
             gestures: outcome.gestures,
           };
@@ -422,6 +429,7 @@ export function useOnboardingJourney<
           navigate: outcome.navigate,
           researching: outcome.researching,
           askingAbout: outcome.askingAbout,
+          askedStep: outcome.askedStep,
           conduct: outcome.conduct,
           gestures: outcome.gestures,
         };
