@@ -21,7 +21,13 @@ import type {
 } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
 import { Button } from "@capital-q/ui/button";
-import { ChevronDown, ICON_SIZE, ICON_STROKE, Mic, Send } from "@capital-q/ui/icons";
+import {
+  ChevronDown,
+  ICON_SIZE,
+  ICON_STROKE,
+  Mic,
+  Send,
+} from "@capital-q/ui/icons";
 import { Skeleton } from "@capital-q/ui/states";
 
 import {
@@ -257,7 +263,11 @@ function TeamUnavailable({ onRetry }: { readonly onRetry: () => void }) {
       <p className="cq-body-sm m-0 text-(--cq-text-secondary)">
         {t("Q’s team couldn’t load. It keeps working; this view catches up.")}
       </p>
-      <button type="button" className={workButton("secondary")} onClick={onRetry}>
+      <button
+        type="button"
+        className={workButton("secondary")}
+        onClick={onRetry}
+      >
         {t("Try again")}
       </button>
     </div>

@@ -35,11 +35,7 @@ import {
 } from "@/features/q/actions";
 import { QControl } from "@/features/q/control/q-control";
 import { useQSessionOptional } from "@/features/q/q-session";
-import {
-  CrmSheet,
-  QRing,
-  useCrmToast,
-} from "@/features/relationships/crm-kit";
+import { CrmSheet, QRing, useCrmToast } from "@/features/relationships/crm-kit";
 import { useT } from "@/features/i18n/language";
 
 import { dismissHeld } from "./decision-queue";
@@ -56,7 +52,11 @@ import { noticesRead, refreshNotices } from "./notice-store";
 import type { NoticeGroup } from "./notice-groups";
 import { readPlan } from "./plan-words";
 import { usePrepared } from "./use-prepared";
-import { answerWorkAction, markReadAction, stopWorkAction } from "./work-actions";
+import {
+  answerWorkAction,
+  markReadAction,
+  stopWorkAction,
+} from "./work-actions";
 import {
   dismissSuggestionAction,
   setPausedAction,
@@ -103,7 +103,11 @@ type Need =
       readonly group: DecisionGroup;
     }
   | { readonly kind: "TIMES"; readonly key: string; readonly lane: TimeLane }
-  | { readonly kind: "NOTICE"; readonly key: string; readonly group: NoticeGroup };
+  | {
+      readonly kind: "NOTICE";
+      readonly key: string;
+      readonly group: NoticeGroup;
+    };
 
 type Row =
   | Need
@@ -131,21 +135,24 @@ export function needRows(input: {
   readonly notices: readonly NoticeGroup[];
 }): readonly Need[] {
   const decisions = input.groups.flatMap((group) =>
-    group.items.map(
-      (item): Need =>
-        item.kind === "APPROVAL"
-          ? { kind: "APPROVAL", key: item.approvalId, item, group }
-          : { kind: "HELD", key: item.draftId, item, group },
+    group.items.map((item): Need =>
+      item.kind === "APPROVAL"
+        ? { kind: "APPROVAL", key: item.approvalId, item, group }
+        : { kind: "HELD", key: item.draftId, item, group },
     ),
   );
   return [
     ...decisions,
-    ...input.lanes.map(
-      (lane): Need => ({ kind: "TIMES", key: lane.lane.id, lane }),
-    ),
-    ...input.notices.map(
-      (group): Need => ({ kind: "NOTICE", key: group.key, group }),
-    ),
+    ...input.lanes.map((lane): Need => ({
+      kind: "TIMES",
+      key: lane.lane.id,
+      lane,
+    })),
+    ...input.notices.map((group): Need => ({
+      kind: "NOTICE",
+      key: group.key,
+      group,
+    })),
   ];
 }
 
@@ -272,18 +279,22 @@ export function WorkInbox({
   const rows: readonly Row[] = useMemo(
     () => [
       ...needs,
-      ...cards.map(
-        (item): Row => ({ kind: "SUGGESTION", key: `s:${item.key}`, item }),
-      ),
+      ...cards.map((item): Row => ({
+        kind: "SUGGESTION",
+        key: `s:${item.key}`,
+        item,
+      })),
       ...running
         .filter((item) => !stopped.has(item.id))
         .map((item): Row => ({ kind: "RUNNING", key: `r:${item.id}`, item })),
       ...tasks
         .filter((one) => !stopped.has(one.job.id))
         .map((item): Row => ({ kind: "JOB", key: `j:${item.job.id}`, item })),
-      ...(done?.items ?? []).map(
-        (item): Row => ({ kind: "DONE", key: `d:${item.id}`, item }),
-      ),
+      ...(done?.items ?? []).map((item): Row => ({
+        kind: "DONE",
+        key: `d:${item.id}`,
+        item,
+      })),
     ],
     [needs, cards, running, tasks, stopped, done],
   );
@@ -293,8 +304,7 @@ export function WorkInbox({
   const [sheet, setSheet] = useState<string | null>(null);
   // The open decision: the one picked while it is still here, else the
   // first that needs a yes (approving one opens the next).
-  const selected =
-    rows.find((row) => row.key === picked) ?? needs[0] ?? null;
+  const selected = rows.find((row) => row.key === picked) ?? needs[0] ?? null;
   const sheetRow = rows.find((row) => row.key === sheet) ?? null;
 
   const pick = (key: string) => {
@@ -302,6 +312,7 @@ export function WorkInbox({
     // On a phone the decision opens over the queue.
     if (
       typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
       !window.matchMedia("(min-width: 1024px)").matches
     ) {
       setSheet(key);
@@ -360,11 +371,17 @@ export function WorkInbox({
                   )}
                 </p>
               ) : null}
-              <QControl id="list.work-decisions" kind="LIST" count={needs.length}>
+              <QControl
+                id="list.work-decisions"
+                kind="LIST"
+                count={needs.length}
+              >
                 {needs.length === 0 && !approvalsFailed ? (
                   <div className="cq-wk-qempty">
                     <Check size={16} aria-hidden="true" />
-                    {t("Nothing waits for you. Q will ask when something does.")}
+                    {t(
+                      "Nothing waits for you. Q will ask when something does.",
+                    )}
                   </div>
                 ) : (
                   needs.map((need) =>
@@ -460,49 +477,59 @@ export function WorkInbox({
                 ) : rows.some(
                     (row) => row.kind === "RUNNING" || row.kind === "JOB",
                   ) ? (
-                  rows.flatMap((row) =>
-                    row.kind === "RUNNING"
-                      ? [
-                          rowButton(
-                            row,
-                            <>
-                              <span className="mx-1">
-                                <StepMark
-                                  state={
-                                    row.item.run?.state === "PAUSED"
-                                      ? "next"
-                                      : "now"
-                                  }
-                                />
-                              </span>
-                              <span className="cq-wk-qbody">
-                                <b>{t(runningGoal(row.item))}</b>
-                                <span className="cq-label font-normal text-(--cq-text-tertiary)">
-                                  {t(runningLine(row.item))}
-                                </span>
-                              </span>
-                            </>,
-                          ),
-                        ]
-                      : row.kind === "JOB"
+                  <QControl
+                    id="list.work-jobs"
+                    kind="LIST"
+                    count={
+                      rows.filter(
+                        (row) => row.kind === "RUNNING" || row.kind === "JOB",
+                      ).length
+                    }
+                  >
+                    {rows.flatMap((row) =>
+                      row.kind === "RUNNING"
                         ? [
                             rowButton(
                               row,
                               <>
                                 <span className="mx-1">
-                                  <StepMark state="now" />
+                                  <StepMark
+                                    state={
+                                      row.item.run?.state === "PAUSED"
+                                        ? "next"
+                                        : "now"
+                                    }
+                                  />
                                 </span>
                                 <span className="cq-wk-qbody">
-                                  <b>{t(row.item.job.goal)}</b>
+                                  <b>{t(runningGoal(row.item))}</b>
                                   <span className="cq-label font-normal text-(--cq-text-tertiary)">
-                                    {t(jobLine(row.item.job).state)}
+                                    {t(runningLine(row.item))}
                                   </span>
                                 </span>
                               </>,
                             ),
                           ]
-                        : [],
-                  )
+                        : row.kind === "JOB"
+                          ? [
+                              rowButton(
+                                row,
+                                <>
+                                  <span className="mx-1">
+                                    <StepMark state="now" />
+                                  </span>
+                                  <span className="cq-wk-qbody">
+                                    <b>{t(row.item.job.goal)}</b>
+                                    <span className="cq-label font-normal text-(--cq-text-tertiary)">
+                                      {t(jobLine(row.item.job).state)}
+                                    </span>
+                                  </span>
+                                </>,
+                              ),
+                            ]
+                          : [],
+                    )}
+                  </QControl>
                 ) : (
                   <p className="m-0 px-2.5 cq-label font-normal text-(--cq-text-tertiary)">
                     {t(
@@ -617,7 +644,10 @@ function rowTitle(row: Row): string {
       return row.item.job.goal;
     case "DONE":
       return row.item.words;
-    default:
+    case "APPROVAL":
+    case "HELD":
+    case "TIMES":
+    case "NOTICE":
       return needTitle(row);
   }
 }
@@ -696,7 +726,11 @@ function RowDetail({
       );
     case "TIMES":
       return (
-        <TimesDetail lane={row.lane} onFinished={onFinished} inSheet={inSheet} />
+        <TimesDetail
+          lane={row.lane}
+          onFinished={onFinished}
+          inSheet={inSheet}
+        />
       );
     case "NOTICE":
       return (
@@ -731,7 +765,11 @@ function RowDetail({
       );
     case "RUNNING":
       return (
-        <RunningDetail item={row.item} onFinished={onFinished} inSheet={inSheet} />
+        <RunningDetail
+          item={row.item}
+          onFinished={onFinished}
+          inSheet={inSheet}
+        />
       );
     case "JOB":
       return (
@@ -825,6 +863,7 @@ export function ApprovalDetail({
   relationshipId,
   drafts,
   onFinished,
+  onDismissed,
   inSheet = false,
   doneWord = "Sent",
 }: {
@@ -835,6 +874,8 @@ export function ApprovalDetail({
   readonly relationshipId: string | null;
   readonly drafts: Decision["drafts"];
   readonly onFinished: () => void;
+  /** Declined rather than approved; else `onFinished` either way. */
+  readonly onDismissed?: (() => void) | undefined;
   readonly inSheet?: boolean;
   readonly doneWord?: string;
 }) {
@@ -868,7 +909,9 @@ export function ApprovalDetail({
   if (failed) {
     return (
       <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-        {t("This couldn’t load. Nothing was sent; it still waits for your yes.")}
+        {t(
+          "This couldn’t load. Nothing was sent; it still waits for your yes.",
+        )}
       </p>
     );
   }
@@ -904,7 +947,9 @@ export function ApprovalDetail({
         leaving.current = window.setTimeout(onFinished, 1100);
       } else {
         setPhase("idle");
-        setStatus(result?.message ?? "That didn't go through. Nothing was sent.");
+        setStatus(
+          result?.message ?? "That didn't go through. Nothing was sent.",
+        );
       }
     });
   const dismiss = () =>
@@ -913,7 +958,7 @@ export function ApprovalDetail({
       const result = await rejectQApprovalAction(approvalId).catch(() => null);
       if (result?.ok === true) {
         toast(t("Dismissed. Nothing was sent."));
-        onFinished();
+        (onDismissed ?? onFinished)();
       } else setStatus("That didn't go through. Try again.");
     });
 
@@ -935,9 +980,7 @@ export function ApprovalDetail({
     >
       <DetailHead
         label={
-          who === null
-            ? actionKind(view)
-            : `${actionKind(view)}, to ${who}`
+          who === null ? actionKind(view) : `${actionKind(view)}, to ${who}`
         }
         title={view.action.summary}
         mark={<Mark name={who ?? "Q"} named={named} />}
@@ -976,7 +1019,9 @@ export function ApprovalDetail({
             {plan.alone === null ? null : (
               <>
                 <dt className="text-(--cq-text-tertiary)">{t("On its own")}</dt>
-                <dd className="m-0 text-(--cq-text-primary)">{t(plan.alone)}</dd>
+                <dd className="m-0 text-(--cq-text-primary)">
+                  {t(plan.alone)}
+                </dd>
               </>
             )}
             {plan.asks === null ? null : (
@@ -1008,12 +1053,16 @@ export function ApprovalDetail({
             ? t(
                 `Q’s reviewer passed it: ${outOfTen(grade.score)} against your bar of ${outOfTen(grade.threshold)}.`,
               )
-            : t("Q’s reviewer held it below your bar. Read it before you decide.")}
+            : t(
+                "Q’s reviewer held it below your bar. Read it before you decide.",
+              )}
         </CheckLine>
       )}
       {view.canDecide || phase !== "idle" ? null : (
         <p className="m-0 cq-body-sm text-(--cq-text-secondary)" role="status">
-          {t("Already decided or expired. Nothing more is sent from this card.")}
+          {t(
+            "Already decided or expired. Nothing more is sent from this card.",
+          )}
         </p>
       )}
       {status === null ? null : (
@@ -1122,7 +1171,6 @@ function EditOwnReply({
           maxLength={4000}
           spellCheck={false}
           // The person chose Edit: the words they will send take focus.
-          // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
         />
       </MessageBox>
@@ -1220,7 +1268,9 @@ function HeldDetail({
         inSheet={inSheet}
       />
       <Track at={2} labels={["Prepared", "Held by Q", "Your call", "Sent"]} />
-      <p className="m-0 cq-body-sm text-(--cq-text-secondary)">{t(item.reason)}</p>
+      <p className="m-0 cq-body-sm text-(--cq-text-secondary)">
+        {t(item.reason)}
+      </p>
       {mode === "EDIT" && relationshipId !== null ? (
         <EditOwnReply
           initial={item.body}
@@ -1247,7 +1297,10 @@ function HeldDetail({
             {t("Nothing is sent until you say yes. It goes exactly as shown.")}
           </CheckLine>
           {status === null ? null : (
-            <p className="m-0 cq-body-sm text-(--cq-text-secondary)" role="status">
+            <p
+              className="m-0 cq-body-sm text-(--cq-text-secondary)"
+              role="status"
+            >
               {t(status)}
             </p>
           )}
@@ -1328,7 +1381,9 @@ function TimesDetail({
   const [phase, setPhase] = useState<"idle" | "pending" | "done">("idle");
   const [status, setStatus] = useState<string | null>(null);
   const answer = (
-    value: { readonly kind: "BOOK_AT"; readonly at: string } | { readonly kind: "PASS" },
+    value:
+      | { readonly kind: "BOOK_AT"; readonly at: string }
+      | { readonly kind: "PASS" },
   ) => {
     setStatus(null);
     setPhase("pending");
@@ -1371,7 +1426,11 @@ function TimesDetail({
         </p>
       )}
       <MessageBox label="The times on offer">
-        <div className="mt-2.5 flex flex-wrap gap-2" role="radiogroup" aria-label={t("Times")}>
+        <div
+          className="mt-2.5 flex flex-wrap gap-2"
+          role="radiogroup"
+          aria-label={t("Times")}
+        >
           {offered.map((slot) => (
             <button
               key={slot.start}
@@ -1461,7 +1520,9 @@ function NoticeDetail({
         inSheet={inSheet}
       />
       {notice.body === null ? null : (
-        <p className="m-0 cq-body text-(--cq-text-secondary)">{t(notice.body)}</p>
+        <p className="m-0 cq-body text-(--cq-text-secondary)">
+          {t(notice.body)}
+        </p>
       )}
       {group.count > 1 ? (
         <p className="m-0 cq-label font-normal text-(--cq-text-tertiary)">
@@ -1546,7 +1607,10 @@ function SuggestionDetail({
     );
   }
   return (
-    <div className={cx("cq-wk-detail", inSheet ? "" : "cq-wk-in")} data-suggestion={item.kind}>
+    <div
+      className={cx("cq-wk-detail", inSheet ? "" : "cq-wk-in")}
+      data-suggestion={item.kind}
+    >
       <DetailHead
         label="Q suggests, from your own account"
         title={item.subject}
@@ -1614,7 +1678,10 @@ function PreparedDetail({
   onNotNow,
   inSheet,
 }: {
-  readonly asked: { readonly runId: string; readonly conversationId: string | null };
+  readonly asked: {
+    readonly runId: string;
+    readonly conversationId: string | null;
+  };
   readonly onFinished: () => void;
   readonly onNotNow: (approvalId: string | null) => void;
   readonly inSheet: boolean;
@@ -1645,6 +1712,8 @@ function PreparedDetail({
         relationshipId={null}
         drafts={[]}
         onFinished={onFinished}
+        // Declined: the card is set aside, as Not now would.
+        onDismissed={() => onNotNow(null)}
         inSheet={inSheet}
       />
     );
@@ -1719,7 +1788,10 @@ function RunningDetail({
     });
   const spent = item.spend;
   return (
-    <div className={cx("cq-wk-detail", inSheet ? "" : "cq-wk-in")} data-work-running-detail>
+    <div
+      className={cx("cq-wk-detail", inSheet ? "" : "cq-wk-in")}
+      data-work-running-detail
+    >
       <DetailHead
         label={KIND_WORDS[item.kind]}
         title={runningGoal(item)}
@@ -1751,7 +1823,9 @@ function RunningDetail({
         </WorkTag>
         {spent === null ? null : (
           <span className="cq-label font-normal cq-numeric text-(--cq-text-tertiary)">
-            {t(`$${spent.spentUsdMonth} of $${spent.budgetUsdMonth} this month`)}
+            {t(
+              `$${spent.spentUsdMonth} of $${spent.budgetUsdMonth} this month`,
+            )}
           </span>
         )}
       </div>
@@ -1864,7 +1938,10 @@ function JobDetail({
     });
   const plan = item.plan;
   return (
-    <div className={cx("cq-wk-detail", inSheet ? "" : "cq-wk-in")} data-work-job={item.job.id}>
+    <div
+      className={cx("cq-wk-detail", inSheet ? "" : "cq-wk-in")}
+      data-work-job={item.job.id}
+    >
       <DetailHead
         label="A task you gave Q"
         title={item.job.goal}
@@ -1886,7 +1963,9 @@ function JobDetail({
         )}
       </div>
       {line.why === null ? null : (
-        <p className="m-0 cq-body-sm text-(--cq-text-secondary)">{t(line.why)}</p>
+        <p className="m-0 cq-body-sm text-(--cq-text-secondary)">
+          {t(line.why)}
+        </p>
       )}
       {plan?.outcome == null ? null : (
         <MessageBox label="Working towards">
@@ -1926,7 +2005,10 @@ function DoneDetail({
   const t = useT();
   const name = item.counterpartName ?? null;
   return (
-    <div className={cx("cq-wk-detail", inSheet ? "" : "cq-wk-in")} data-work-done-detail>
+    <div
+      className={cx("cq-wk-detail", inSheet ? "" : "cq-wk-in")}
+      data-work-done-detail
+    >
       <DetailHead
         label={
           name === null

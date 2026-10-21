@@ -224,7 +224,10 @@ export function WorkCostDays({
             {t("Each day")}
           </h3>
           {days === null ? (
-            <p className="m-0 cq-body-sm text-(--cq-text-secondary)" data-cost-days-unknown>
+            <p
+              className="m-0 cq-body-sm text-(--cq-text-secondary)"
+              data-cost-days-unknown
+            >
               {t(
                 "Spending by day isn’t available yet. The month’s total above is from the same ledger.",
               )}
@@ -237,7 +240,9 @@ export function WorkCostDays({
                   type="button"
                   className="cq-wk-dbar"
                   aria-pressed={day?.day === one.day}
-                  aria-label={t(`${String(one.day)} ${monthName}, ${usdWords(one.usd)}`)}
+                  aria-label={t(
+                    `${String(one.day)} ${monthName}, ${usdWords(one.usd)}`,
+                  )}
                   onClick={() => setPicked(one.day)}
                   data-cost-day={one.day}
                 >
@@ -273,9 +278,14 @@ export function WorkCostDays({
               {day.usd > 0 ? (
                 <div className="mt-2 flex flex-col gap-1.5">
                   {day.steps.map((step) => (
-                    <div key={step.name} className="flex items-center gap-3 text-sm">
+                    <div
+                      key={step.name}
+                      className="flex items-center gap-3 text-sm"
+                    >
                       <span className="flex-1">{t(step.name)}</span>
-                      <span className="cq-numeric">{t(usdWords(step.usd))}</span>
+                      <span className="cq-numeric">
+                        {t(usdWords(step.usd))}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -311,7 +321,9 @@ export function WorkCostDays({
                     }}
                   />
                 </span>
-                <span className="cq-numeric text-end">{t(usdWords(row.usd))}</span>
+                <span className="cq-numeric text-end">
+                  {t(usdWords(row.usd))}
+                </span>
               </div>
             ))}
           </div>

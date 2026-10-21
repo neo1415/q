@@ -139,7 +139,7 @@ export default async function WorkRoute({
   // The shell already read this for the request; React's cache shares it.
   const context = await resolveOwnContext().catch(() => null);
   return (
-    <PageContainer>
+    <PageContainer width="wide">
       <WorkHeader view="tasks" side={workSideOf(context)} />
       <Suspense fallback={<Skeleton lines={6} />}>
         <WorkLists view={view} />

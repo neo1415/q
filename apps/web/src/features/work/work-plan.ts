@@ -205,10 +205,18 @@ export function jobPlan(detail: WorkforceJobDetailDto): PlanEntry {
     // While a yes is waiting, nothing else is "now".
     const before = steps
       .slice(0, at)
-      .map((step) => (step.state === "now" ? { ...step, state: "next" as const, at: null } : step));
+      .map((step) =>
+        step.state === "now"
+          ? { ...step, state: "next" as const, at: null }
+          : step,
+      );
     const after = steps
       .slice(at)
-      .map((step) => (step.state === "now" ? { ...step, state: "next" as const, at: null } : step));
+      .map((step) =>
+        step.state === "now"
+          ? { ...step, state: "next" as const, at: null }
+          : step,
+      );
     steps.splice(0, steps.length, ...before, ...yes, ...after);
   }
   const plan = detail.plan;
@@ -217,7 +225,10 @@ export function jobPlan(detail: WorkforceJobDetailDto): PlanEntry {
       .filter((one) => one.status !== "MET")
       .map((one) => ({
         what: one.what,
-        status: one.status === "MISSING" ? ("MISSING" as const) : ("UNKNOWN" as const),
+        status:
+          one.status === "MISSING"
+            ? ("MISSING" as const)
+            : ("UNKNOWN" as const),
         words: one.blocking ? "Needed for the outcome" : "Not needed to go on",
       })),
     ...(plan?.signals ?? [])
@@ -233,7 +244,10 @@ export function jobPlan(detail: WorkforceJobDetailDto): PlanEntry {
     kind: "JOB",
     title: jobTitle(detail.job.goal),
     goal: plan?.outcome ?? detail.job.goal,
-    state: waiting.length > 0 ? "Waiting for your yes" : JOB_STATE[detail.job.status],
+    state:
+      waiting.length > 0
+        ? "Waiting for your yes"
+        : JOB_STATE[detail.job.status],
     waiting: waiting.length > 0 || detail.job.status === "HELD",
     forWords: FOR_WORDS[detail.job.source],
     spentUsd: detail.job.costUsd,
@@ -336,5 +350,8 @@ export function planEntries(input: {
     ...input.jobs.map(jobPlan),
     ...input.instructions.map(instructionPlan),
   ];
-  return [...all.filter((one) => one.waiting), ...all.filter((one) => !one.waiting)];
+  return [
+    ...all.filter((one) => one.waiting),
+    ...all.filter((one) => !one.waiting),
+  ];
 }

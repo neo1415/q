@@ -1,20 +1,36 @@
 "use client";
 
+import "./work.css";
+
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { buttonClassName, IconButton } from "@capital-q/ui/button";
-import { Bell, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
-import { SheetContent, SheetRoot, SheetTrigger } from "@capital-q/ui/sheet";
+import { IconButton } from "@capital-q/ui/button";
+import {
+  Bell,
+  Check,
+  Clock,
+  ICON_SIZE,
+  ICON_STROKE,
+  X,
+} from "@capital-q/ui/icons";
+import {
+  SheetClose,
+  SheetContent,
+  SheetRoot,
+  SheetTrigger,
+} from "@capital-q/ui/sheet";
 import { EmptyState, ErrorState, Skeleton } from "@capital-q/ui/states";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { useQControl } from "@/features/q/control/q-control";
 import { effectShown } from "@/features/q/control/perform";
+import { QRing } from "@/features/relationships/crm-kit";
 
-import { groupNotices, type NoticeGroup } from "./notice-groups";
+import { railGroups, type NoticeGroup, type RailGroup } from "./notice-groups";
 import { PushSetting } from "./push-setting";
-import { markReadAction } from "./work-actions";
+import { markReadAction, noticeNamesAction } from "./work-actions";
+import { WorkTag } from "./work-kit";
 import {
   loadOlderNotices,
   noticesRead,
@@ -24,13 +40,16 @@ import {
 import { useT } from "@/features/i18n/language";
 
 /**
- * The notification centre (AUTO; spec auto.md §3.5): one bell with the
+ * The notification centre (AUTO; spec auto.md §3.5; owner 2026-10-21,
+ * option 3, the side rail by investor, warm charcoal): one bell with the
  * unread count in words for assistive tech and as a number on screen
- * (never colour alone). "Needs you" first, then updates, each a tap to
- * where it is acted on. Opening marks the updates shown as read; a "Needs
- * you" notice is read only when it is resolved or opened from its row, so
- * it leaves "Needs you" once dealt with, never merely by being seen.
- * Refreshes every minute while the page is visible, and on focus.
+ * (never colour alone). The rail groups notices by who they are about,
+ * each organisation once, what needs the person first on a dark tile.
+ * Opening marks the updates shown as read; a "Needs you" notice is read
+ * only when it is opened or dealt with from its tile, and then says
+ * "Dealt with" in place, so it leaves "Needs you" once dealt with, never
+ * merely by being seen. Refreshes every minute while the page is visible,
+ * and on focus.
  */
 
 function when(iso: string): string {
@@ -43,99 +62,189 @@ function when(iso: string): string {
   }).format(at);
 }
 
-function NoticeRow({
+/** Names read once per page view: the rail names only the person's own. */
+let namesRead: Promise<Readonly<Record<string, string>>> | null = null;
+
+function readNames(): Promise<Readonly<Record<string, string>>> {
+  namesRead ??= noticeNamesAction()
+    .then((result) => (result.ok ? result.value : {}))
+    .catch(() => ({}));
+  return namesRead;
+}
+
+const NAMED_KIND = {
+  PERSON: "person",
+  COMPANY: "company",
+  INVESTOR_ORGANISATION: "investor",
+} as const;
+
+function linked(path: string | null): path is string {
+  return path !== null && /^\/(?!\/)/.test(path);
+}
+
+function Count({ group }: { readonly group: NoticeGroup }) {
+  const t = useT();
+  if (group.count <= 1) return null;
+  return (
+    <>
+      <span aria-hidden="true"> ×{group.count}</span>
+      <span className="sr-only">
+        {t(`, latest of ${String(group.count)} like this`)}
+      </span>
+    </>
+  );
+}
+
+function NeedTile({
+  group,
+  dealt,
+  onDeal,
+}: {
+  readonly group: NoticeGroup;
+  readonly dealt: boolean;
+  readonly onDeal: () => void;
+}) {
+  const t = useT();
+  const { notice } = group;
+  const body = (
+    <>
+      {dealt ? (
+        <WorkTag icon={<Check aria-hidden="true" />}>{t("Dealt with")}</WorkTag>
+      ) : (
+        <WorkTag icon={<Clock aria-hidden="true" />}>{t("Needs you")}</WorkTag>
+      )}
+      <span>
+        {t(notice.title)}
+        <Count group={group} />
+      </span>
+    </>
+  );
+  const className = "cq-wk-rn";
+  return linked(notice.linkPath) ? (
+    <Link
+      href={notice.linkPath}
+      onClick={onDeal}
+      className={className}
+      data-needs
+      data-dealt={dealt ? true : undefined}
+      data-notice={notice.kind}
+      data-notice-count={group.count}
+    >
+      {body}
+    </Link>
+  ) : (
+    <button
+      type="button"
+      onClick={onDeal}
+      disabled={dealt}
+      className={className}
+      data-needs
+      data-dealt={dealt ? true : undefined}
+      data-notice={notice.kind}
+      data-notice-count={group.count}
+    >
+      {body}
+    </button>
+  );
+}
+
+function UpdateLine({
   group,
   onOpen,
-  needsYou = false,
 }: {
   readonly group: NoticeGroup;
   readonly onOpen: () => void;
-  readonly needsYou?: boolean;
 }) {
   const t = useT();
-
-  const { notice, count, unread } = group;
-  const linked = notice.linkPath !== null && /^\/(?!\/)/.test(notice.linkPath);
-  // One line per notice on a phone (design-48 v2): the title and its time.
-  // The body is on the page the row opens, never repeated here.
-  const named = notice.named ?? null;
-  const body = (
-    <span className="flex min-w-0 flex-1 items-baseline gap-3">
-      {named === null || named.photoUrl === null ? null : (
-        // Who the notice names, as the server signed it for this reader
-        // (the name's scope). No picture: the row stays text only.
-        <EntityAvatar
-          kind={
-            named.kind === "COMPANY"
-              ? "company"
-              : named.kind === "PERSON"
-                ? "person"
-                : "investor"
-          }
-          name=""
-          src={named.photoUrl}
-          size="xs"
-          decorative
-          className="self-center"
-        />
-      )}
-      <span
-        className={`cq-body-sm min-w-0 flex-1 line-clamp-2 text-(--cq-text-primary) ${unread ? "font-medium" : ""}`}
-      >
-        {unread ? <span className="sr-only">{t("New:")} </span> : null}
-        {t(notice.title)}
-      </span>
-      <span className="cq-caption cq-numeric shrink-0 text-(--cq-text-tertiary)">
+  const { notice } = group;
+  const inner = (
+    <>
+      <span className="cq-label font-normal text-(--cq-text-tertiary)">
         <time dateTime={notice.createdAt} suppressHydrationWarning>
           {t(when(notice.createdAt))}
         </time>
-        {count > 1 ? (
-          <>
-            <span aria-hidden="true"> ×{count}</span>
-            <span className="sr-only">
-              {t(`, latest of ${String(count)} like this`)}
-            </span>
-          </>
-        ) : null}
+        {group.unread ? <span className="sr-only">{t(", new")}</span> : null}
       </span>
-    </span>
+      <span
+        className={group.unread ? "font-medium text-(--cq-text-primary)" : ""}
+      >
+        {t(notice.title)}
+        <Count group={group} />
+      </span>
+    </>
   );
-  return (
-    <li
-      className="border-b border-(--cq-border-subtle) last:border-b-0"
+  return linked(notice.linkPath) ? (
+    <Link
+      href={notice.linkPath}
+      onClick={onOpen}
+      className="cq-wk-rn min-h-11 rounded-(--cq-radius-md) hover:text-(--cq-text-primary)"
       data-notice={notice.kind}
-      data-notice-count={count}
+      data-notice-count={group.count}
     >
-      {linked ? (
-        <Link
-          href={notice.linkPath ?? "/"}
-          onClick={onOpen}
-          className="flex min-h-12 items-center gap-3 rounded-sm py-2 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
-        >
-          <span
-            aria-hidden="true"
-            className={`size-1.5 shrink-0 rounded-full ${unread ? "bg-(--cq-accent)" : "bg-transparent"}`}
-          />
-          {body}
-          {needsYou ? (
-            <span
-              aria-hidden="true"
-              className={buttonClassName("secondary", "compact")}
-            >
-              {t("Open")}
-            </span>
-          ) : null}
-        </Link>
+      {inner}
+    </Link>
+  ) : (
+    <div
+      className="cq-wk-rn"
+      data-notice={notice.kind}
+      data-notice-count={group.count}
+    >
+      {inner}
+    </div>
+  );
+}
+
+function RailRow({
+  group,
+  dealt,
+  onDeal,
+  onOpen,
+}: {
+  readonly group: RailGroup;
+  readonly dealt: ReadonlySet<string>;
+  readonly onDeal: (one: NoticeGroup) => void;
+  readonly onOpen: () => void;
+}) {
+  const t = useT();
+  const name = group.name;
+  return (
+    <section
+      className="cq-wk-rg"
+      aria-label={name === null ? t("From Q") : name}
+      data-rail-group={group.key}
+    >
+      {group.named === null ? (
+        <span className="mt-0.5 grid size-7 shrink-0 place-items-center text-(--cq-accent)">
+          <QRing />
+        </span>
       ) : (
-        <div className="flex min-h-12 items-center gap-3 py-2">
-          <span
-            aria-hidden="true"
-            className={`size-1.5 shrink-0 rounded-full ${unread ? "bg-(--cq-accent)" : "bg-transparent"}`}
-          />
-          {body}
-        </div>
+        <EntityAvatar
+          kind={NAMED_KIND[group.named.kind]}
+          name={name ?? ""}
+          src={group.named.photoUrl}
+          size={28}
+          decorative
+        />
       )}
-    </li>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <b className="font-semibold text-(--cq-text-primary)">
+          {group.named === null
+            ? t("From Q")
+            : (name ?? t("Someone in your relationships"))}
+        </b>
+        {group.needsYou.map((one) => (
+          <NeedTile
+            key={one.key}
+            group={one}
+            dealt={dealt.has(one.key)}
+            onDeal={() => onDeal(one)}
+          />
+        ))}
+        {group.updates.map((one) => (
+          <UpdateLine key={one.key} group={one} onOpen={onOpen} />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -143,6 +252,8 @@ export function NotificationCenter() {
   const t = useT();
 
   const [open, setOpen] = useState(false);
+  const [names, setNames] = useState<Readonly<Record<string, string>>>({});
+  const [dealt, setDealt] = useState<ReadonlySet<string>>(new Set());
   // Q Pitch (premiere v5) and Q's own UI acts: open or close this panel
   // deterministically, DONE once it shows. Reading is not consequential.
   const rootRef = useRef<HTMLSpanElement>(null);
@@ -180,15 +291,33 @@ export function NotificationCenter() {
       if (result.ok) noticesRead(ids.length);
     });
   }, [open, items]);
+  // Who each notice is about, once the rail is first opened.
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void readNames().then((value) => {
+      if (live) setNames(value);
+    });
+    return () => {
+      live = false;
+    };
+  }, [open]);
 
-  const { needsYou, days } = groupNotices(items ?? []);
+  const groups = railGroups(items ?? [], names);
+  const waiting = groups.reduce(
+    (sum, group) =>
+      sum + group.needsYou.filter((one) => !dealt.has(one.key)).length,
+    0,
+  );
   const close = () => setOpen(false);
-  // Opening a "Needs you" row is dealing with it: it is read, and leaves.
-  const openNeed = (ids: readonly string[]) => () => {
-    close();
-    void markReadAction(ids.slice(0, 50)).then((result) => {
+  // Opening a "Needs you" tile is dealing with it: it is read, says so in
+  // place, and leaves "Needs you" on the next read.
+  const deal = (group: NoticeGroup) => {
+    setDealt((was) => new Set([...was, group.key]));
+    if (linked(group.notice.linkPath)) close();
+    void markReadAction(group.ids.slice(0, 50)).then((result) => {
       if (!result.ok) return;
-      noticesRead(ids.length);
+      noticesRead(group.ids.length);
       void refreshNotices(true);
     });
   };
@@ -222,8 +351,30 @@ export function NotificationCenter() {
             )}
           </IconButton>
         </SheetTrigger>
-        <SheetContent title={t("Notifications")} side="side">
-          <div className="flex flex-col gap-5 pt-1">
+        <SheetContent
+          title={t("Notifications")}
+          side="side"
+          bare
+          className="cq-wk cq-charcoal rounded-t-2xl lg:w-[400px] lg:rounded-none [&>div:first-child]:lg:hidden"
+        >
+          <div className="cq-wk-rail" data-notification-rail>
+            <div className="mb-1 flex items-center justify-between gap-3 border-b border-(--cq-border-subtle) px-1 pb-2">
+              <b className="text-base font-semibold">{t("For you")}</b>
+              <span className="ms-auto cq-label font-normal text-(--cq-text-tertiary)">
+                {waiting === 1
+                  ? t("1 needs you")
+                  : t(`${String(waiting)} need you`)}
+              </span>
+              <SheetClose>
+                <IconButton
+                  aria-label={t("Close")}
+                  variant="quiet"
+                  size="compact"
+                >
+                  <X aria-hidden="true" size={ICON_SIZE.regular} />
+                </IconButton>
+              </SheetClose>
+            </div>
             {items === null && !failed ? (
               <Skeleton lines={4} />
             ) : failed && items === null ? (
@@ -241,67 +392,34 @@ export function NotificationCenter() {
                 }
                 compact
               />
-            ) : (items ?? []).length === 0 ? (
+            ) : groups.length === 0 ? (
               <EmptyState
                 title={t("You're up to date")}
                 description={t("What needs you shows first.")}
                 compact
               />
             ) : (
-              <>
-                {needsYou.length === 0 ? null : (
-                  <section aria-labelledby="notices-needs-you">
-                    <h3
-                      id="notices-needs-you"
-                      className="cq-title-sm text-(--cq-text-primary)"
-                    >
-                      {t("Needs you")}
-                    </h3>
-                    <ul>
-                      {needsYou.map((group) => (
-                        <NoticeRow
-                          key={group.key}
-                          group={group}
-                          onOpen={openNeed(group.ids)}
-                          needsYou
-                        />
-                      ))}
-                    </ul>
-                  </section>
-                )}
-                {days.map((day) => (
-                  <section
-                    key={day.label}
-                    aria-label={t(`Updates, ${day.label}`)}
-                    data-notice-day={day.label}
-                  >
-                    <h3 className="cq-label text-(--cq-text-secondary)">
-                      {t(day.label)}
-                    </h3>
-                    <ul>
-                      {day.groups.map((group) => (
-                        <NoticeRow
-                          key={group.key}
-                          group={group}
-                          onOpen={close}
-                        />
-                      ))}
-                    </ul>
-                  </section>
-                ))}
-                {nextBefore === undefined || nextBefore === null ? null : (
-                  <button
-                    type="button"
-                    className="cq-body-sm inline-flex min-h-11 items-center self-start text-(--cq-text-secondary) underline underline-offset-4"
-                    onClick={() => void loadOlderNotices()}
-                    data-notices-older
-                  >
-                    {t("Show older")}
-                  </button>
-                )}
-              </>
+              groups.map((group) => (
+                <RailRow
+                  key={group.key}
+                  group={group}
+                  dealt={dealt}
+                  onDeal={deal}
+                  onOpen={close}
+                />
+              ))
             )}
-            <div className="border-t border-(--cq-border-subtle) pt-4">
+            {nextBefore === undefined || nextBefore === null ? null : (
+              <button
+                type="button"
+                className="cq-body-sm inline-flex min-h-11 items-center self-start px-1 text-(--cq-text-secondary) underline underline-offset-4"
+                onClick={() => void loadOlderNotices()}
+                data-notices-older
+              >
+                {t("Show older")}
+              </button>
+            )}
+            <div className="mt-2 border-t border-(--cq-border-subtle) px-1 pt-4">
               <PushSetting compact />
               <Link
                 href="/work"

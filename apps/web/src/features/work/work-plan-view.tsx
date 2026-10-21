@@ -13,7 +13,10 @@ import { useT } from "@/features/i18n/language";
 import { ApprovalDetail } from "./work-inbox";
 import { StepMark, UnknownTag, WorkTag, workButton } from "./work-kit";
 import { planEntries, type PlanEntry } from "./work-plan";
-import { moreWorkforceJobsAction, type WorkforceView } from "./workforce-actions";
+import {
+  moreWorkforceJobsAction,
+  type WorkforceView,
+} from "./workforce-actions";
 import { dollars } from "./workforce-view";
 
 /**
@@ -201,11 +204,13 @@ function Plan({
           <div>
             <b>{t("Two figures disagree")}</b>
             <p className="m-0 mt-1 mb-2.5 text-(--cq-text-secondary)">
-              {t(note)}{" "}
-              {t("Both are kept until you confirm which is current.")}
+              {t(note)} {t("Both are kept until you confirm which is current.")}
             </p>
             {asked.has(note) ? (
-              <p className="m-0 cq-body-sm text-(--cq-text-secondary)" role="status">
+              <p
+                className="m-0 cq-body-sm text-(--cq-text-secondary)"
+                role="status"
+              >
                 {t(
                   "Asked Q. Tell it which is current in the Q panel; the other stays in history.",
                 )}
@@ -213,7 +218,10 @@ function Plan({
             ) : session === null ? null : (
               <button
                 type="button"
-                className={workButton("secondary", "h-auto min-h-11 lg:min-h-9")}
+                className={workButton(
+                  "secondary",
+                  "h-auto min-h-11 lg:min-h-9",
+                )}
                 onClick={() => {
                   void session.q.ask(
                     `Two figures disagree in "${entry.title}": ${note} Which is current? Show me where each comes from so I can confirm one.`,
@@ -301,7 +309,10 @@ function Plan({
               {one.status === "UNKNOWN" ? (
                 <UnknownTag />
               ) : (
-                <WorkTag tone="gap" icon={<i className="cq-wk-hatch" aria-hidden="true" />}>
+                <WorkTag
+                  tone="gap"
+                  icon={<i className="cq-wk-hatch" aria-hidden="true" />}
+                >
                   {t("Missing")}
                 </WorkTag>
               )}
