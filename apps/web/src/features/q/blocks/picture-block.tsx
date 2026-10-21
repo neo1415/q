@@ -11,6 +11,9 @@ const SOURCE_NAMES: Readonly<Record<PictureBlock["source"], string>> = {
   PEXELS: "Pexels",
 };
 
+const CREDIT_LINK =
+  "inline-flex min-h-11 items-center underline decoration-(--cq-border-strong) underline-offset-2 hover:text-(--cq-text-primary) hover:decoration-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring)";
+
 /**
  * L-13 (owner ask 2026-10-20): a picture of what Q is talking about,
  * credited on the picture's own frame. It is illustration, never evidence,
@@ -34,26 +37,31 @@ export function PictureBody({ block }: { readonly block: PictureBlock }) {
         referrerPolicy="no-referrer"
         className="aspect-[3/2] w-full rounded-(--cq-radius-md) bg-(--cq-surface-sunken) object-cover"
       />
-      <figcaption className="cq-caption mt-1.5 text-(--cq-text-secondary)">
-        {t("Photo by")}{" "}
+      {/* The credit is a line of text, but each link is a full 44 px
+          target (min-h-11) so it can be tapped beside the picture; the
+          line keeps its height either way (accessibility). */}
+      <figcaption className="cq-caption flex flex-wrap items-center gap-x-1 text-(--cq-text-secondary)">
+        <span>{t("Photo by")}</span>{" "}
         {block.credit.url === null ? (
-          <span>{block.credit.name}</span>
+          <span className="inline-flex min-h-11 items-center">
+            {block.credit.name}
+          </span>
         ) : (
           <a
             href={block.credit.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="underline underline-offset-2"
+            className={CREDIT_LINK}
           >
             {block.credit.name}
           </a>
         )}{" "}
-        {t("on")}{" "}
+        <span>{t("on")}</span>{" "}
         <a
           href={block.pageUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="underline underline-offset-2"
+          className={CREDIT_LINK}
         >
           {source}
         </a>

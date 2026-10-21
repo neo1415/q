@@ -7,6 +7,7 @@ import {
   createDefaultPromptRegistry,
   V22_VISUAL_LINE,
   V26_ALLOWED_ROOT_KEYS,
+  V26_TRIMS,
   V26_VISUAL_LINE,
 } from "../src/index.js";
 
@@ -24,7 +25,7 @@ const answer = {
 };
 
 describe("COMPANY_ANALYST v26", () => {
-  it("is active, keeps v25 for its runs, and changes only two lines", () => {
+  it("is active, keeps v25 for its runs, and changes two lines plus listed trims", () => {
     const registry = createDefaultPromptRegistry();
     expect(registry.getActive("COMPANY_ANALYST").definition.version).toBe(26);
     expect(registry.get("COMPANY_ANALYST", 25)?.definition.status).toBe(
@@ -34,11 +35,17 @@ describe("COMPANY_ANALYST v26", () => {
     expect(template).toContain(V26_VISUAL_LINE);
     expect(template).not.toContain(`${V22_VISUAL_LINE}\n`);
     expect(template).toContain(V26_ALLOWED_ROOT_KEYS.join(", "));
+    // Every other difference is a listed trim, each applied exactly once.
+    const untrimmed = V26_TRIMS.reduce((text, [from, to]) => {
+      expect(text.split(to)).toHaveLength(2);
+      return text.replace(to, from);
+    }, template);
     expect(
-      template
+      untrimmed
         .replace(V26_VISUAL_LINE, V22_VISUAL_LINE)
         .replace(", pictureQuery", ""),
     ).toBe(COMPANY_ANALYST_V25.template);
+    expect(template.length).toBeLessThan(COMPANY_ANALYST_V25.template.length);
     expect(COMPANY_ANALYST_V26.output.kind === "STRUCTURED").toBe(true);
   });
 

@@ -66,6 +66,7 @@ export {
 export {
   composeEgressQuery,
   containsAny,
+  isConnective,
   searchPhrase,
   tokenise,
   type EgressInput,

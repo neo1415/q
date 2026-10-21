@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createPexelsPictureProvider } from "../src/images/stock.js";
 import {
+  namesReadByRun,
   pictureBlock,
   type QPictureBlock,
   type QPicturePort,
@@ -58,6 +59,8 @@ describe("pictureBlock", () => {
     expect(asked[0]?.requestedQuery).toBe("baobab tree");
     expect(asked[0]?.userText).toBe(PERSON.userText);
     expect(asked[0]?.earlierUserText).toEqual(PERSON.earlierUserText);
+    // No names given: nothing withheld, but always a list for the port.
+    expect(asked[0]?.withheld).toEqual([]);
     expect(asked[0]?.signal).toBeInstanceOf(AbortSignal);
   });
 
@@ -195,5 +198,37 @@ describe("Pexels pictures", () => {
       () => Promise.reject(new Error("offline")),
     );
     expect(await provider?.search("x", {})).toEqual([]);
+  });
+});
+
+describe("names a run read are withheld from picture searches", () => {
+  it("hands every company, investor, person and counterpart name to the port", async () => {
+    const { port, asked } = fakePort(() => Promise.resolve(PICTURE));
+    const withheld = namesReadByRun({
+      companyNames: new Map([["c1", "Kivu Freight"]]),
+      profiles: new Map([
+        ["c1", "Kivu Freight"],
+        ["c2", "Portside"],
+      ]),
+      investors: new Map([["i1", { name: "Halyard Capital" }]]),
+      externals: new Map([["amara", { name: "Amara Nwosu" }]]),
+      relationships: new Map([["r1", { counterpart: { name: "Souqsheet" } }]]),
+    });
+    expect([...withheld].sort()).toEqual(
+      [
+        "Amara Nwosu",
+        "Halyard Capital",
+        "Kivu Freight",
+        "Portside",
+        "Souqsheet",
+      ].sort(),
+    );
+    await pictureBlock({
+      result: { visual: "PICTURE", pictureQuery: "warehouse" },
+      pictures: port,
+      ...PERSON,
+      withheld,
+    });
+    expect(asked[0]?.withheld).toEqual(withheld);
   });
 });

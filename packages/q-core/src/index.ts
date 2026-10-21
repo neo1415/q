@@ -1676,5 +1676,6 @@ export {
 export {
   COMPANY_ANALYST_V26,
   V26_ALLOWED_ROOT_KEYS,
+  V26_TRIMS,
   V26_VISUAL_LINE,
 } from "./prompts/tasks/company-analyst.v26.js";
