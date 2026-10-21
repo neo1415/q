@@ -5,7 +5,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 import { EmailDraftEditor } from "../integrations/email-draft-editor";
 import { openQuestions } from "./board";
 import type { QSessionValue } from "./q-session";
-import { StageProgress } from "./stage-progress";
+import { StageLine, TaskProgress } from "./stage-line";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -57,12 +57,17 @@ export function QNow({
 
       {q.working ? (
         <div className="cq-q-now-item" data-q-now-task>
-          <span className="flex min-w-0 flex-col">
+          <span className="flex min-w-0 flex-1 flex-col">
             <span className="cq-body-sm font-medium text-(--cq-text-primary)">
               {t("Q is working")}
             </span>
-            {/* Owner 2026-10-21: the run's steps so far, as everywhere. */}
-            <StageProgress steps={session.presence.steps} className="mt-1" />
+            {/* Round 4 (§7.1 Now): a durable task's name, real step count
+                and bar; otherwise where Q is, in one line. */}
+            {session.presence.stage?.about?.task !== undefined ? (
+              <TaskProgress current={session.presence.stage} className="mt-1" />
+            ) : (
+              <StageLine current={session.presence.stage} />
+            )}
           </span>
           <button
             type="button"

@@ -358,6 +358,11 @@ export {
   Q_VISIBLE_STAGES,
   qVisibleStageLabel,
   QVisibleStageSchema,
+  Q_STAGE_SUBJECTS_MAX,
+  Q_STAGE_TASK_KINDS,
+  QStageAboutSchema,
+  type QStageAbout,
+  type QStageTaskKind,
   type QVisibleStage,
 } from "./stage.js";
 

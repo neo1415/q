@@ -1,9 +1,12 @@
-import type {
-  QArtifactSummary,
-  QDocumentPipelineStage,
-  QResultBlock,
-  QVisibleStage,
-  QSubjectRef,
+import {
+  Q_STAGE_TASK_KINDS,
+  type QArtifactSummary,
+  type QDocumentPipelineStage,
+  type QResultBlock,
+  type QStageAbout,
+  type QStageTaskKind,
+  type QVisibleStage,
+  type QSubjectRef,
 } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import type { QAnswerRequest } from "@capital-q/q-runtime";
@@ -51,6 +54,53 @@ export function visibleStageOf(
     case "FAILED":
       return null;
   }
+}
+
+/**
+ * Round 4 (ux-direction §5.1 WORKING, §6.1 compact pill): a document made
+ * through the pipeline has four fixed visible steps, so its progress is
+ * that real count ("Deck for Nixo · 2 of 4"), never an estimate. A brief,
+ * written without the pipeline, has one step and no count.
+ */
+export const DOCUMENT_PIPELINE_STEPS: Readonly<
+  Partial<Record<QVisibleStage, number>>
+> = {
+  PREPARING_DOCUMENT: 1,
+  DESIGNING_DOCUMENT: 2,
+  FINDING_DOCUMENT_IMAGES: 3,
+  CHECKING_DOCUMENT: 4,
+};
+export const DOCUMENT_PIPELINE_TOTAL = 4;
+
+/** What a document stage is about: its kind, its subject and its step. */
+export function documentStageAbout(input: {
+  readonly stage: QVisibleStage;
+  readonly artifactType: string;
+  readonly companyName: string;
+  readonly pipelined: boolean;
+}): QStageAbout {
+  const kind = (Q_STAGE_TASK_KINDS as readonly string[]).includes(
+    input.artifactType,
+  )
+    ? (input.artifactType as QStageTaskKind)
+    : null;
+  const step = input.pipelined
+    ? DOCUMENT_PIPELINE_STEPS[input.stage]
+    : undefined;
+  const name = input.companyName.trim().slice(0, 80);
+  return {
+    ...(name.length === 0 ? {} : { subjects: [name] }),
+    ...(kind === null
+      ? {}
+      : {
+          task: {
+            kind,
+            ...(step === undefined
+              ? {}
+              : { step, of: DOCUMENT_PIPELINE_TOTAL }),
+          },
+        }),
+  };
 }
 
 /**
@@ -212,7 +262,8 @@ export async function prepareOrReviseArtifact(input: {
   readonly history: HistoryLike;
   readonly logger?: Logger | undefined;
   /** Tells the person Q is writing or editing, while it does. */
-  readonly showStage?: ((stage: QVisibleStage) => Promise<void>) | undefined;
+  readonly showStage?:
+    ((stage: QVisibleStage, about?: QStageAbout) => Promise<void>) | undefined;
 }): Promise<ArtifactPreparationOutcome> {
   const { artifacts, request, company, result, history, logger } = input;
   const ask = result.artifactRequest;
@@ -354,7 +405,23 @@ export async function prepareOrReviseArtifact(input: {
     );
     return { kind: "THIN_RECORD", artifactType: ask.artifactType };
   }
-  await input.showStage?.("PREPARING_DOCUMENT");
+  // The pipeline makes decks, one-pagers and memos; a brief is written here.
+  const pipelined =
+    artifacts.pipeline !== undefined &&
+    (ask.artifactType === "PITCH_DECK" ||
+      ask.artifactType === "ONE_PAGER" ||
+      ask.artifactType === "MEMO");
+  const aboutStage = (stage: QVisibleStage) =>
+    documentStageAbout({
+      stage,
+      artifactType: ask.artifactType,
+      companyName,
+      pipelined,
+    });
+  await input.showStage?.(
+    "PREPARING_DOCUMENT",
+    aboutStage("PREPARING_DOCUMENT"),
+  );
   try {
     const studio = artifacts.studio;
     // DOCS: the studio's steps. The brand and the sector's design apply
@@ -409,7 +476,9 @@ export async function prepareOrReviseArtifact(input: {
     const pipeline = artifacts.pipeline;
     const said = async (stage: QDocumentPipelineStage) => {
       const visible = visibleStageOf(stage);
-      if (visible !== null) await input.showStage?.(visible);
+      if (visible !== null) {
+        await input.showStage?.(visible, aboutStage(visible));
+      }
     };
     if (kind !== null && pipeline?.mode === "JOB") {
       // Q room W5: the worker makes it; the run follows its stages for a

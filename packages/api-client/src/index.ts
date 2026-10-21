@@ -202,6 +202,7 @@ export {
   createQStreamState,
   describeQStage,
   Q_STAGE_HISTORY_MAX,
+  qCurrentStage,
   qStageSteps,
   reduceQStream,
   type QStageStep,

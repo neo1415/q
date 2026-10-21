@@ -48,6 +48,7 @@ import {
   type QResponseMessage,
   type QScreenContext,
   type QSubjectRef,
+  type QStageAbout,
   type QVisibleStage,
   type TenantModelPolicy,
   type CompanyEditableField,
@@ -125,6 +126,7 @@ import {
   namedCompanySubjects,
   withCardSubjects,
 } from "./card-subjects.js";
+import { stageAbout, stageKey } from "./stage-subjects.js";
 import {
   createRunFits,
   fitAnswerCardsBlock,
@@ -2091,10 +2093,14 @@ export function createModelGatewayQAnswer(
   async function showStage(
     request: QAnswerRequest,
     stage: QVisibleStage,
+    about?: QStageAbout,
   ): Promise<void> {
     try {
       const run = { id: request.runId, tenantId: request.tenantId };
-      const input = { type: "q.stage.changed", data: { stage } } as const;
+      const input = {
+        type: "q.stage.changed",
+        data: about === undefined ? { stage } : { stage, about },
+      } as const;
       // One statement on the request client where the store offers it
       // (S2); otherwise a transaction, as before.
       const done = await appendRunEventAtomic(repositories, sql, run, input);
@@ -3630,9 +3636,12 @@ export function createModelGatewayQAnswer(
         return tools.execute(proposal, context);
       };
       /** A visible stage: held with the answer's text while speculative. */
-      const stageShown = async (stage: QVisibleStage): Promise<void> => {
-        if (gate === null) await showStage(request, stage);
-        else gate.emit(() => showStage(request, stage));
+      const stageShown = async (
+        stage: QVisibleStage,
+        about?: QStageAbout,
+      ): Promise<void> => {
+        if (gate === null) await showStage(request, stage, about);
+        else gate.emit(() => showStage(request, stage, about));
       };
       /**
        * A setup reminder (founder directive 2026-09-27), only at a natural
@@ -5235,6 +5244,7 @@ export function createModelGatewayQAnswer(
           let rounds = 0;
           /** The stage last written this turn, so a repeat is not written again. */
           let lastStageShown: QVisibleStage | undefined;
+          let lastStageKey: string | null = null;
           let calls = 0;
           /**
            * Profiles code read after a search resolved to one company
@@ -5599,9 +5609,22 @@ export function createModelGatewayQAnswer(
               // after another), and beside the read rather than before it.
               const stage = tool?.visibleStage ?? null;
               let stageWrite: Promise<void> | null = null;
-              if (stage !== null && stage !== lastStageShown) {
-                stageWrite = stageShown(stage);
+              // Round 4: the stage names what it is about when this run has
+              // read it ("Looking at Nixo"); written again only when the
+              // stage or its names change.
+              const about =
+                stage === null
+                  ? undefined
+                  : stageAbout({
+                      stage,
+                      args: call.arguments,
+                      read: runCompanies.read(request.runId),
+                    });
+              const key = stage === null ? null : stageKey(stage, about);
+              if (stage !== null && key !== lastStageKey) {
+                stageWrite = stageShown(stage, about);
                 lastStageShown = stage;
+                lastStageKey = key;
               }
               const settled = await early?.[index];
               if (settled !== undefined && !settled.ok) {
@@ -5742,7 +5765,10 @@ export function createModelGatewayQAnswer(
                 stage !== lastStageShown
                   ? stageShown(stage)
                   : null;
-              if (stage !== undefined && stage !== null) lastStageShown = stage;
+              if (stage !== undefined && stage !== null) {
+                lastStageShown = stage;
+                lastStageKey = stageKey(stage, undefined);
+              }
               const [read] = await Promise.all([
                 Promise.allSettled(chainedThisRound),
                 stageWrite,
