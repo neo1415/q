@@ -282,7 +282,7 @@ Model calls include the independent reading, which runs alongside the first roun
   - "Looking up Quillmark Health", with the name taken from their record or sign-up, never from model output ("Looking into it" when there is none);
   - "Reading deck.pdf", for an upload.
 
-  "Reading what you said" and "Writing a reply" are no longer emitted. From send to Q's first words the screen shows one line at fixed height, replaced in place: Q's working mark, plus the stage when it names something. Lane 3's shared `WorkingLine` (PR #283) replaces that line once it lands. Stage labels are English (a follow-up for other languages).
+  "Reading what you said" and "Writing a reply" are no longer emitted. From send to Q's first words the screen shows one line at fixed height, replaced in place: Q's working mark, plus the stage when it names something. The line is lane 3's shared `WorkingLine` beside Q's working mark, and an upload's "Reading deck.pdf" shows on it too. Stage labels are English (a follow-up for other languages).
   - Contract: `QInterviewStageSchema` and `Q_INTERVIEW_STREAM_EVENTS.STAGE`, both additive.
 
 - **Exact answers take no model call.** A one-word answer or a bare figure for the step just asked is saved by code and replied to by code (708 ms instead of 1.7 s for the first words).
