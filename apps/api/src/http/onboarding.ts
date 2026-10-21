@@ -292,9 +292,6 @@ export function registerOnboardingRoutes(
             onSentence: (text) => {
               stream.write(Q_INTERVIEW_STREAM_EVENTS.SENTENCE, { text });
             },
-            onStage: (stage) => {
-              stream.write(Q_INTERVIEW_STREAM_EVENTS.STAGE, stage);
-            },
           });
           stream.end(Q_INTERVIEW_STREAM_EVENTS.RESULT, await respond(turn));
           return reply;

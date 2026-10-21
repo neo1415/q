@@ -11,7 +11,6 @@ import {
   QRunIdSchema,
   type ModelMessage,
   type OnboardingSessionView,
-  type QInterviewStage,
 } from "@capital-q/contracts";
 import {
   COUNTRY_OPTIONS_V5,
@@ -284,12 +283,6 @@ export type InterviewAgentTurnInput = InterviewTurnInput & {
    * The returned outcome still carries the whole reply.
    */
   readonly onSentence?: ((sentence: string) => void) | undefined;
-  /**
-   * Each stage of the turn as it happens (owner 2026-10-21: show what Q is
-   * doing, from real events, never a timer): their words received, their
-   * answers being saved, a look-up started, the reply being written.
-   */
-  readonly onStage?: ((stage: QInterviewStage) => void) | undefined;
 };
 
 export type InterviewAgentDependencies = {
@@ -949,22 +942,6 @@ export function createInterviewAgent(
     const startedAt = now();
     const utterance = input.utterance.trim();
     const opening = utterance.length === 0;
-    // Each stage once a turn, as it happens; a listener that throws never
-    // costs the turn.
-    const stagesSaid = new Set<QInterviewStage["stage"]>();
-    const stage = (key: QInterviewStage["stage"], label: string): void => {
-      if (input.onStage === undefined || stagesSaid.has(key)) return;
-      stagesSaid.add(key);
-      try {
-        input.onStage({ stage: key, label: label.slice(0, 200) });
-      } catch {
-        // Display only.
-      }
-    };
-    stage(
-      "READING",
-      opening ? "Getting your setup ready" : "Reading what you said",
-    );
     const runId = QRunIdSchema.parse(randomUUID());
     const correlationId = CorrelationIdSchema.safeParse(
       input.attribution.correlationId,
@@ -1281,29 +1258,6 @@ export function createInterviewAgent(
         ? dependencies.investorResearch
         : dependencies.founderResearch;
     const considerResearch = (
-      view: OnboardingSessionView | null,
-      links?: {
-        readonly websiteUrl: string | null;
-        readonly profileUrls: readonly string[];
-      },
-    ): boolean => {
-      const started = startResearch(view, links);
-      if (started) {
-        const name =
-          input.journeyType === "investor"
-            ? firmNameOf(view, input.signup?.organisationName ?? null)
-            : textAnswerOf(view, FOUNDER_STEPS.companyName) ||
-              (input.signup?.organisationName?.trim() ?? "");
-        stage(
-          "LOOKING_UP",
-          name.length > 0
-            ? `Looking up ${name.slice(0, 120)}`
-            : "Looking up public sources",
-        );
-      }
-      return started;
-    };
-    const startResearch = (
       view: OnboardingSessionView | null,
       links?: {
         readonly websiteUrl: string | null;
@@ -2308,7 +2262,6 @@ export function createInterviewAgent(
       ) {
         const said = utterance.trim().replace(/[.!]+$/u, "");
         const answers = [{ stepKey: exactStep, value: said, quote: said }];
-        stage("SAVING", "Saving your answer");
         const results = await port
           .record(
             answers.map((answer) => ({
@@ -2402,14 +2355,6 @@ export function createInterviewAgent(
         if (response.output.kind !== "TOOL_CALLS") break;
         const proposals = response.output.calls.slice(0, MAX_CALLS - calls);
         const roundStart = actions.length;
-        if (
-          proposals.some(
-            (call) =>
-              call.name === "record_answers" || call.name === "correct_answer",
-          )
-        ) {
-          stage("SAVING", "Saving your answers");
-        }
         for (const call of proposals) {
           calls += 1;
           const outcome = await tools.execute(
@@ -2468,7 +2413,6 @@ export function createInterviewAgent(
         // The reply, written after every result so far, with no tools left;
         // streamed, so its first sentence is shown and spoken while the rest
         // is written (owner 2026-10-21: first words within 2-3 s).
-        stage("WRITING", "Writing a reply");
         sayReceiptNow();
         const rendered = render();
         const response = await gateway.execute<InterviewAgentV16Result>(

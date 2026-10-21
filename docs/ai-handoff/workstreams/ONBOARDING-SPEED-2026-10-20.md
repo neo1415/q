@@ -261,7 +261,7 @@ Shared files: none. No contract, migration, RLS, authorization or model-routing 
 
 The latencies come from the production traces recorded in `interview-latency.bench.test.ts` (hosted rounds about 2 s, 2026-09-30) and the providers' first-token and first-audio figures. No provider was called; cost $0.
 
-"Before" is the same harness run on the code at this lane's start (`337046f`); "After" is this branch. All values are in ms. Before, nothing showed until Q's first words.
+"Before" is the same harness run on the code at this lane's start (`337046f`); "After" is this branch. All values are in ms. Before, nothing showed until Q's first words. "After first visible" is Q's working presence, shown in the browser on send, before any server work.
 
 | Journey                                           | Before complete | After complete | Before first visible | After first visible | Before first words | After first words | Model calls (before → after) |
 | ------------------------------------------------- | --------------: | -------------: | -------------------: | ------------------: | -----------------: | ----------------: | ---------------------------- |
@@ -277,12 +277,11 @@ Model calls include the independent reading, which runs alongside the first roun
 
 ### What changed
 
-- **Stages, from real events.** The turn reports READING ("Reading what you said" / "Getting your setup ready"), SAVING ("Saving your answers"), LOOKING_UP ("Looking up <company>") and WRITING ("Writing a reply"). They travel as an SSE `stage` event from q-api to api to the web route to `say-stream.ts`, and the workspace shows them in the working indicator.
-  - Contract: `QInterviewStageSchema` and `Q_INTERVIEW_STREAM_EVENTS.STAGE`, both additive.
+- **Q's presence, not a narration.** From the moment the person sends, the screen shows Q's mark with its working dots until Q's first words. An earlier version of this pass showed stage words ("Saving your answers", "Writing a reply"); the owner rejected that on 2026-10-21 as Q narrating its own plumbing. The `stage` stream event and contract were removed with it, so there is no contract change for this.
 - **Exact answers take no model call.** A one-word answer or a bare figure for the step just asked is saved by code and replied to by code (708 ms instead of 1.7 s for the first words).
 - **What was saved is said first.** When a turn needs Q's judgement, code says what saved the moment the save commits ("stage: Seed; country: Kenya.") while the model writes the rest. The model is told it was said, so it never repeats it. English only, like every code line. First words: 3.5 s → 2.5 s.
 - **The final reply streams.** Its first sentence shows while the rest is written.
-- **Uploads.** The reading is checked every 1 s for the first 15 s (was every 3 s), and the reader's own stage label is shown ("deck.pdf: <stage>").
+- **Uploads.** The reading is checked every 1 s for the first 15 s (was every 3 s); the screen still says "Reading deck.pdf", which the person started and is waiting on.
 - **Kept, deliberately:**
   - the independent reading;
   - a second recording round where one is needed;
@@ -294,14 +293,13 @@ Model calls include the independent reading, which runs alongside the first roun
 
 ### Still slower, and why
 
-The refused case ("Our gross margin is decent", with the model offering a figure they never said) has its first words at 3.5 s. It needs one model round to read the turn and one to word a reply, and neither can be dropped without cutting the guard or the reply's quality. Its stages show from 0 ms.
+The refused case ("Our gross margin is decent", with the model offering a figure they never said) has its first words at 3.5 s. It needs one model round to read the turn and one to word a reply, and neither can be dropped without cutting the guard or the reply's quality. Q's presence shows from the moment they send.
 
 ### Gates
 
 - vitest: 135 files, 1,432 tests pass (q-api interview/onboarding/voice, api gateq, onboarding and interview, onboarding, gateq-intake, q-evals, contracts, web onboarding, voice and gateq).
 - New tests:
-  - stages in order, and the receipt said first and never twice (`interview-latency-paths.test.ts`);
-  - stage frames (`interview-stream.test.ts`, `interview-client-stream.test.ts`, `onboarding-say-stream.test.ts`);
+  - the receipt said first and never twice (`interview-latency-paths.test.ts`);
   - the journey harness.
 - Root `tsc` 0; q-api, api and web `tsc` clean; eslint and prettier clean.
 - Not live-verified. No provider calls.

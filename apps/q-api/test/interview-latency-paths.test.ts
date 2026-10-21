@@ -303,30 +303,12 @@ describe("the reply after a clean save is written by code", () => {
   });
 });
 
-describe("faster answers, with their stages shown (owner 2026-10-21)", () => {
+describe("faster first words (owner 2026-10-21)", () => {
   const said = "Seed stage, based in Kenya.";
   const answers = [
     { stepKey: "F1.stage", value: "seed", quote: "Seed stage" },
     { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
   ];
-
-  it("reports each stage once, in order, from the turn's own events", async () => {
-    const world = founderWorld();
-    const model = recordingModel(answers);
-    const stages: string[] = [];
-    await createInterviewAgent({
-      gateway: model.gateway,
-      firewall,
-      logger,
-      delegation: readerOf(reading({ stated: ["F1.stage", "F1.country"] })),
-      replyByCodeAfterCleanSave: true,
-    }).turn({
-      ...turn(world, said),
-      actor,
-      onStage: (stage) => stages.push(stage.stage),
-    });
-    expect(stages).toEqual(["READING", "SAVING"]);
-  });
 
   it("says what saved first, while the model writes the rest, and never twice", async () => {
     const world = founderWorld();

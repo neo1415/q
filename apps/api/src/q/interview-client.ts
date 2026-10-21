@@ -1,12 +1,10 @@
 import {
   QInterviewSentenceSchema,
-  QInterviewStageSchema,
   QInterviewTurnResponseSchema,
   Q_INTERVIEW_STREAM_EVENTS,
   Q_SSE_CONTENT_TYPE,
   Q_INTERVIEW_PATH,
   Q_INTERVIEW_TURN_SEGMENT,
-  type QInterviewStage,
   type QInterviewTurnRequest,
   type QInterviewTurnResponse,
 } from "@capital-q/contracts";
@@ -43,8 +41,6 @@ export type QInterviewClient = {
     readonly accessToken: string;
     readonly request: QInterviewTurnRequest;
     readonly onSentence: (text: string) => void;
-    /** Each stage of the turn as q-api reports it (owner 2026-10-21). */
-    readonly onStage?: ((stage: QInterviewStage) => void) | undefined;
   }) => Promise<QInterviewTurnResponse>;
 };
 
@@ -149,7 +145,7 @@ export function createQInterviewClient(options: {
       return parsedTurn(body);
     },
 
-    turnStream: async ({ accessToken, request, onSentence, onStage }) => {
+    turnStream: async ({ accessToken, request, onSentence }) => {
       // The whole stream is bounded by the same deadline, not only its
       // first byte: a model that stalls mid-reply still lets go.
       const limit = deadline();
@@ -175,9 +171,6 @@ export function createQInterviewClient(options: {
           if (frame.event === Q_INTERVIEW_STREAM_EVENTS.SENTENCE) {
             const sentence = QInterviewSentenceSchema.safeParse(data);
             if (sentence.success) onSentence(sentence.data.text);
-          } else if (frame.event === Q_INTERVIEW_STREAM_EVENTS.STAGE) {
-            const stage = QInterviewStageSchema.safeParse(data);
-            if (stage.success) onStage?.(stage.data);
           } else if (frame.event === Q_INTERVIEW_STREAM_EVENTS.RESULT) {
             result = parsedTurn(data);
           } else if (frame.event === Q_INTERVIEW_STREAM_EVENTS.PROBLEM) {

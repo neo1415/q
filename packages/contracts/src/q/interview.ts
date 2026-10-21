@@ -165,25 +165,9 @@ export type QInterviewTurnResponse = z.infer<
  */
 export const Q_INTERVIEW_STREAM_EVENTS = {
   SENTENCE: "sentence",
-  /** What Q is doing now, from a real event in the turn (owner 2026-10-21). */
-  STAGE: "stage",
   RESULT: "result",
   PROBLEM: "problem",
 } as const;
-
-/**
- * One stage of an interview turn, said as it happens: their words received
- * (READING), answers being saved (SAVING), a public look-up started
- * (LOOKING_UP), the reply being written (WRITING). Display only; never a
- * timer and never evidence that anything was saved.
- */
-export const QInterviewStageSchema = z
-  .object({
-    stage: z.enum(["READING", "SAVING", "LOOKING_UP", "WRITING"]),
-    label: z.string().min(1).max(200),
-  })
-  .strict();
-export type QInterviewStage = z.infer<typeof QInterviewStageSchema>;
 
 export const QInterviewSentenceSchema = z
   .object({ text: z.string().min(1).max(2_000) })
