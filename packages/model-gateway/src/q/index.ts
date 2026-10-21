@@ -154,6 +154,7 @@ import {
 import {
   companyFactAskOf,
   companyNameCandidates,
+  lowercaseNameCandidates,
   namesOnlyCompany,
   profileOf,
   readNamedVisibleCompany,
@@ -2946,6 +2947,7 @@ export function createModelGatewayQAnswer(
         knownCompaniesOf(standing.result.data),
       ).filter((company) => company.companyId !== onScreen);
       for (const company of named) namedIds.add(company.companyId);
+      if (named.length > 0) stepStarts(request, "REVIEWING_COMPANY");
       await Promise.all(
         named.map(async (company, index) => {
           const call = {
@@ -2982,7 +2984,10 @@ export function createModelGatewayQAnswer(
      */
     const visibleNamedRead = async (own: Promise<void>): Promise<void> => {
       if (counterparty !== undefined) return;
-      const names = companyNameCandidates(latest.content);
+      const names = [
+        ...companyNameCandidates(latest.content),
+        ...lowercaseNameCandidates(latest.content),
+      ];
       if (names.length === 0) return;
       const found = await Promise.all(
         names.map((name, index) =>
@@ -2993,6 +2998,10 @@ export function createModelGatewayQAnswer(
             context: toolContext,
             available: prefetchTools,
             callIndex: index,
+            // Its stage goes out once a company matched, as its read starts.
+            onFound: () => {
+              stepStarts(request, "REVIEWING_COMPANY");
+            },
           }).catch(() => null),
         ),
       );
@@ -3457,8 +3466,39 @@ export function createModelGatewayQAnswer(
    * ever read.
    */
   const warming = new Map<string, Promise<PreparedTurn>>();
-  /** A stage a warmed turn already showed, so its answer does not repeat it. */
-  const stagedEarly = new Map<string, QVisibleStage>();
+  /**
+   * Owner 2026-10-21 (visible stages): each step's stage goes out as the
+   * step starts, in order, and never holds the step up. One tracker per
+   * run, shared by the reads prepared for it and its answer: writes are
+   * queued (stored in the order they happened) and a stage already showing
+   * is not written again. A speculative answer keeps its own (its stages
+   * wait with its text and vanish if it is cancelled).
+   */
+  const runStages = new Map<
+    string,
+    { now: QVisibleStage | undefined; queue: Promise<void> }
+  >();
+  const stagesOf = (runId: string) => {
+    let stages = runStages.get(runId);
+    if (stages === undefined) {
+      stages = { now: undefined, queue: Promise.resolve() };
+      runStages.set(runId, stages);
+      while (runStages.size > WARMING_MAX) {
+        const oldest = runStages.keys().next().value;
+        if (oldest === undefined) break;
+        runStages.delete(oldest);
+      }
+    }
+    return stages;
+  };
+  /** A real step of this run (never a speculative answer's) begins. */
+  const stepStarts = (request: QAnswerRequest, stage: QVisibleStage): void => {
+    if (request.speculation !== undefined) return;
+    const stages = stagesOf(request.runId);
+    if (stages.now === stage) return;
+    stages.now = stage;
+    stages.queue = stages.queue.then(() => showStage(request, stage));
+  };
   const WARMING_MAX = 64;
 
   return {
@@ -3485,14 +3525,10 @@ export function createModelGatewayQAnswer(
         .then((prepared) => {
           if (prepared === null) return undefined;
           const names =
-            companyNameCandidates(prepared.latest.content).length > 0;
+            companyNameCandidates(prepared.latest.content).length > 0 ||
+            lowercaseNameCandidates(prepared.latest.content).length > 0;
           if (!names && request.plan.screen?.manifest?.focus === undefined) {
             return undefined;
-          }
-          // Its stage goes out as the read starts (visible stages).
-          if (names && request.speculation === undefined) {
-            stagedEarly.set(request.runId, "REVIEWING_COMPANY");
-            void showStage(request, "REVIEWING_COMPANY");
           }
           return prepared.wide();
         })
@@ -3502,7 +3538,6 @@ export function createModelGatewayQAnswer(
         const oldest = warming.keys().next().value;
         if (oldest === undefined) break;
         warming.delete(oldest);
-        stagedEarly.delete(oldest);
       }
     },
     answer: async (request: QAnswerRequest): Promise<QAnswerOutcome> => {
@@ -3548,18 +3583,22 @@ export function createModelGatewayQAnswer(
        * happened) and a stage already showing is not written again. While
        * the answer is speculative the stage waits with its text.
        */
-      let stageNow: QVisibleStage | undefined = stagedEarly.get(request.runId);
-      stagedEarly.delete(request.runId);
-      let stageQueue: Promise<void> = Promise.resolve();
+      const stages =
+        gate === null
+          ? stagesOf(request.runId)
+          : {
+              now: undefined as QVisibleStage | undefined,
+              queue: Promise.resolve(),
+            };
       const stageOnce = (stage: QVisibleStage): Promise<void> => {
-        if (stage === stageNow) return stageQueue;
-        stageNow = stage;
-        stageQueue = stageQueue.then(() =>
+        if (stage === stages.now) return stages.queue;
+        stages.now = stage;
+        stages.queue = stages.queue.then(() =>
           gate === null
             ? showStage(request, stage)
             : gate.emit(() => showStage(request, stage)),
         );
-        return stageQueue;
+        return stages.queue;
       };
       if (gate === null) warming.delete(request.runId);
       else
@@ -3795,13 +3834,6 @@ export function createModelGatewayQAnswer(
           (request.turnKind === undefined ||
             request.turnKind === "QUESTION_TO_Q") &&
           asksWhatNeedsThem(latest.content));
-      // Visible stages: the companies a message names are read here.
-      if (
-        !withoutWideReads &&
-        companyNameCandidates(latest.content).length > 0
-      ) {
-        void stageOnce("REVIEWING_COMPANY");
-      }
       let wideReads: WideReads = withoutWideReads
         ? NO_WIDE_READS
         : await prepared.wide();
