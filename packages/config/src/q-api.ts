@@ -29,6 +29,7 @@ import {
   type SpeechProviderSecrets,
   resolveVoiceProvider,
   type VoiceProviderCode,
+  withElevenLabsApiKey,
 } from "./speech-providers.js";
 import {
   supabaseAuthEnvShape,
@@ -190,7 +191,7 @@ export type QApiConfig = {
 };
 
 export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
-  const parsed = parseConfig("q-api", qApiEnvSchema, env);
+  const parsed = parseConfig("q-api", qApiEnvSchema, withElevenLabsApiKey(env));
   const runtime = toRuntimeConfig(parsed);
 
   return {
@@ -241,3 +242,8 @@ export function parseQApiConfig(env: EnvironmentInput): QApiConfig {
 export function loadQApiConfig(): QApiConfig {
   return parseQApiConfig(process.env);
 }
+
+export {
+  ELEVENLABS_API_KEY_ALIAS,
+  resolveElevenLabsApiKey,
+} from "./speech-providers.js";
