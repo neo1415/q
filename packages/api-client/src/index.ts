@@ -211,6 +211,7 @@ export {
   discoverInvestors,
   getDiscoveredInvestor,
   getDiscoveredInvestorPhoto,
+  getDiscoveredInvestorCard,
   listNetworkPitches,
   getRecommendationExplanation,
   listSavedCompanies,

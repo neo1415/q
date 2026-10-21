@@ -570,6 +570,11 @@ export function createApp(
       yourCompanies: modules.discovery.yourCompanies,
       mayPlay: modules.discovery.mayPlay,
       namedPhotos: modules.namedPhotos,
+      ...(modules.publicIdentity === undefined
+        ? {}
+        : {
+            investorCard: investorCardReader(modules.publicIdentity),
+          }),
     });
     if (modules.discovery.explore !== undefined) {
       registerExploreRoutes(app, {
@@ -1102,4 +1107,20 @@ export function createApp(
   }
 
   return { app, logger };
+}
+
+/** A founder-side read of an investor's Q Card, as a participant sees it. */
+function investorCardReader(
+  publicIdentity: QCardRoutesDependencies["publicIdentity"],
+): (
+  investorOrganisationId: string,
+) => ReturnType<QCardRoutesDependencies["publicIdentity"]["cardForSubject"]> {
+  return (investorOrganisationId) =>
+    publicIdentity.cardForSubject({
+      subject: {
+        subjectType: "INVESTOR_ORGANISATION",
+        subjectId: investorOrganisationId,
+      },
+      audience: "PARTICIPANT",
+    });
 }
