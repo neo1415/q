@@ -409,6 +409,8 @@ export type ApiModules = {
   /** Profile photos and covers. Absent: no image routes register. */
   readonly profileImages?:
     ProfileImageRoutesDependencies["profileImages"] | undefined;
+  /** What Q remembers: the person's own correction (ADR 0012). */
+  readonly memoryCorrection?: AppActionPorts["memoryCorrection"] | undefined;
   /** WORK-58: pause/resume their own instruction, set a suggestion aside. */
   readonly qWork?: QWorkPagePort | undefined;
   /** Recovery D6: stop one of Q's approved jobs. */
@@ -693,6 +695,9 @@ export function createApp(
       ...(modules.profileImages === undefined
         ? {}
         : { profileImages: modules.profileImages }),
+      ...(modules.memoryCorrection === undefined
+        ? {}
+        : { memoryCorrection: modules.memoryCorrection }),
       ...(push === undefined
         ? {}
         : {

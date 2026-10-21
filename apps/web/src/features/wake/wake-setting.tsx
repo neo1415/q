@@ -30,9 +30,11 @@ function noSubscription(): () => void {
 const PHRASES = WAKE_PHRASES.map((phrase) => `“${phrase.label}”`);
 const PHRASE_LIST = `${PHRASES.slice(0, -1).join(", ")} or ${PHRASES.at(-1) ?? ""}`;
 
-export function WakeSetting() {
-  const t = useT();
-  const id = useId();
+/**
+ * The switch's state and its two moves, for Settings' own row: turning it
+ * on asks for the microphone from the tap first. Shared with WakeSetting.
+ */
+export function useWakeControl() {
   const on = useWakePreference();
   const status = useWakeStatus();
   const supported = useSyncExternalStore(
@@ -66,6 +68,21 @@ export function WakeSetting() {
 
   const shown: Notice =
     notice ?? (on && status.kind === "BLOCKED" ? "BLOCKED" : null);
+  return {
+    on,
+    supported,
+    asking,
+    notice: shown === null ? null : NOTICE_TEXT[shown],
+    turnOn,
+    turnOff: () => storeWakePreference(false),
+  } as const;
+}
+
+export function WakeSetting() {
+  const t = useT();
+  const id = useId();
+  const { on, supported, asking, notice, turnOn, turnOff } = useWakeControl();
+  const shown = notice;
 
   return (
     <div className="flex flex-col gap-1.5" data-wake-setting>
@@ -84,7 +101,7 @@ export function WakeSetting() {
           aria-describedby={`${id}-help`}
           disabled={!supported || asking}
           onClick={() => {
-            if (on) storeWakePreference(false);
+            if (on) turnOff();
             else void turnOn();
           }}
           className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
@@ -104,7 +121,7 @@ export function WakeSetting() {
       </p>
       {shown === null ? null : (
         <p role="alert" className="cq-caption text-(--cq-text-primary)">
-          {t(NOTICE_TEXT[shown])}
+          {t(shown)}
         </p>
       )}
     </div>

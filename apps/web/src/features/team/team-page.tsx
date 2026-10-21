@@ -25,11 +25,7 @@ import {
   ICON_SIZE,
   ICON_STROKE,
   Lock,
-  LogOut,
-  Mail,
-  MoreHorizontal,
   Search,
-  UserPlus,
 } from "@capital-q/ui/icons";
 import { SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
@@ -45,10 +41,19 @@ import {
   revokeAction,
 } from "./team-actions";
 import { splitEmailInput, teamWords, timeAgo } from "./team-words";
+import {
+  accountButton,
+  Field,
+  fieldClassName,
+  Pending,
+  RadioList,
+} from "@/features/settings/account-kit";
 import { useT } from "@/features/i18n/language";
 
 /**
- * Settings → Team (G2), built to docs/design/2026-10-06/a/orgs.html.
+ * Settings → Team (G2; chosen design "Invite first", 2026-10-21): the
+ * invite on one line at the top, with what the role can do under it; then
+ * the people and the invitations still open, each with what may be done.
  *
  * What the person may do comes from the server (`team.you.can`, decided
  * from their role there); the controls follow it, and every change still
@@ -59,7 +64,6 @@ import { useT } from "@/features/i18n/language";
  */
 
 type Sheet =
-  | { readonly kind: "invite" }
   | { readonly kind: "role"; readonly member: TeamMemberDto }
   | { readonly kind: "remove"; readonly member: TeamMemberDto }
   | { readonly kind: "leave" }
@@ -139,292 +143,33 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
     });
   };
 
-  const head = (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-      <div className="flex min-w-0 flex-col gap-1">
-        <h1 className="cq-title-lg text-(--cq-text-primary)">{t("Team")}</h1>
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          People who work on{" "}
-          {solo && team.organisation.kind === "FIRM" ? "your investing" : name}{" "}
-          with you. Everyone here acts for the {words.word}.
-        </p>
-      </div>
+  const pendingInvites = can.invite ? team.invitations : [];
+  const peopleNote = [
+    `${String(team.members.length)} ${team.members.length === 1 ? "person" : "people"}`,
+    pendingInvites.length === 0
+      ? null
+      : `${String(pendingInvites.length)} ${pendingInvites.length === 1 ? "invitation" : "invitations"}`,
+  ]
+    .filter((part) => part !== null)
+    .join(", ");
+
+  const body = (
+    <>
       {can.invite ? (
-        <button
-          type="button"
-          className={buttonClassName(
-            "primary",
-            "regular",
-            "shrink-0 self-start",
-          )}
-          onClick={() => {
-            setSheet({ kind: "invite" });
-          }}
-          data-team-invite
-        >
-          <UserPlus
-            aria-hidden="true"
-            size={ICON_SIZE.regular}
-            strokeWidth={ICON_STROKE}
-          />
-          {t("Invite people")}
-        </button>
-      ) : null}
-    </div>
-  );
-
-  const body = solo ? (
-    <>
-      {head}
-      <section className="cq-panel flex flex-col gap-3.5 p-5" data-team-solo>
-        <div className="flex items-center gap-3">
-          <Avatar name={me?.name ?? "You"} size="lg" />
-          <span className="flex min-w-0 flex-col">
-            <span className="cq-body font-medium text-(--cq-text-primary)">
-              {me?.name ?? "You"}{" "}
-              <span className="cq-caption font-normal text-(--cq-text-tertiary)">
-                {t("You")}
-              </span>
-            </span>
-            <span className="cq-caption text-(--cq-text-secondary)">
-              {t(ROLE_WORD[team.you.role])}
-            </span>
-          </span>
-        </div>
-        <h2 className="cq-title-sm text-(--cq-text-primary)">
-          {t("Just you, for now")}
-        </h2>
-        <p className="max-w-[56ch] cq-body-sm text-(--cq-text-secondary)">
-          {words.soloLine(name)}
-        </p>
-        {can.invite ? (
-          <div>
-            <button
-              type="button"
-              className={buttonClassName("primary")}
-              onClick={() => {
-                setSheet({ kind: "invite" });
-              }}
-            >
-              <UserPlus
-                aria-hidden="true"
-                size={ICON_SIZE.regular}
-                strokeWidth={ICON_STROKE}
-              />
-              {t("Invite someone")}
-            </button>
-          </div>
-        ) : null}
-      </section>
-      <RolesHelp words={words} />
-    </>
-  ) : (
-    <>
-      {head}
-      {can.invite ? null : (
-        <p
-          className="flex items-start gap-2.5 rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-3.5 py-3 cq-body-sm text-(--cq-text-secondary)"
-          data-team-limited
-        >
-          <Lock
-            aria-hidden="true"
-            size={ICON_SIZE.regular}
-            strokeWidth={ICON_STROKE}
-            className="mt-0.5 shrink-0"
-          />
-          <span>
-            You&apos;re a{" "}
-            <b className="font-medium text-(--cq-text-primary)">
-              {t(ROLE_WORD[team.you.role])}
-            </b>
-            . Admins invite people and change roles. <AskAnAdmin team={team} />
-          </span>
-        </p>
-      )}
-
-      <WaitingForYou team={team} pending={pending} change={change} />
-
-      <section className="flex flex-col gap-2" aria-labelledby="team-people">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="team-people" className="cq-title-sm text-(--cq-text-primary)">
-            {team.members.length}{" "}
-            {team.members.length === 1 ? "person" : "people"}
-          </h2>
-          {team.members.length > 5 ? (
-            <label className="flex min-h-10 w-full items-center gap-2 rounded-full bg-(--cq-surface-subtle) px-3.5 text-(--cq-text-tertiary) sm:w-56">
-              <span className="sr-only">{t("Search people")}</span>
-              <Search
-                aria-hidden="true"
-                size={ICON_SIZE.regular}
-                strokeWidth={ICON_STROKE}
-              />
-              <input
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                }}
-                placeholder={t("Search")}
-                className="min-w-0 flex-1 bg-transparent cq-body text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary)"
-              />
-            </label>
-          ) : null}
-        </div>
-        <ul>
-          {shown.map((member) => (
-            <MemberRow
-              key={member.membershipId}
-              member={member}
-              team={team}
-              onRole={() => {
-                setSheet({ kind: "role", member });
-              }}
-              onMore={() => {
-                setSheet(
-                  member.isYou ? { kind: "leave" } : { kind: "remove", member },
-                );
-              }}
-            />
-          ))}
-        </ul>
-        {shown.length === 0 ? (
-          <p className="py-3 cq-body-sm text-(--cq-text-secondary)">
-            {t("Nobody matches that.")}
-          </p>
-        ) : null}
-      </section>
-
-      {can.invite && team.invitations.length > 0 ? (
-        <section className="flex flex-col gap-2" aria-labelledby="team-invited">
-          <h2
-            id="team-invited"
-            className="cq-title-sm text-(--cq-text-primary)"
-          >
-            {t("Invited")}
-          </h2>
-          <ul>
-            {team.invitations.map((invitation) => (
-              <li
-                key={invitation.invitationId}
-                className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-(--cq-border-subtle) py-3"
-                data-team-invitation
-              >
-                <span className="grid size-11 place-items-center rounded-full bg-(--cq-surface-subtle) text-(--cq-text-tertiary)">
-                  <Mail
-                    aria-hidden="true"
-                    size={ICON_SIZE.prominent}
-                    strokeWidth={ICON_STROKE}
-                  />
-                </span>
-                <span className="flex min-w-0 flex-col">
-                  <span className="truncate cq-body font-medium text-(--cq-text-primary)">
-                    {invitation.email}
-                  </span>
-                  <span className="cq-caption text-(--cq-text-secondary)">
-                    {ROLE_WORD[invitation.role]} ·{" "}
-                    {invitation.state === "EXPIRED"
-                      ? `Expired · sent ${timeAgo(invitation.sentAt)}`
-                      : `Sent ${timeAgo(invitation.sentAt)}`}
-                  </span>
-                </span>
-                <span className="flex gap-1">
-                  <button
-                    type="button"
-                    disabled={pending}
-                    className={buttonClassName("quiet", "compact")}
-                    onClick={() => {
-                      change(
-                        () => resendAction(invitation.invitationId),
-                        `Sent again to ${invitation.email}.`,
-                      );
-                    }}
-                  >
-                    {t("Resend")}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={pending}
-                    className={buttonClassName("quiet", "compact")}
-                    onClick={() => {
-                      change(
-                        () => revokeAction(invitation.invitationId),
-                        "Invitation cancelled.",
-                      );
-                    }}
-                  >
-                    {t("Cancel")}
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <RolesHelp words={words} />
-
-      <section className="flex flex-col gap-2.5" aria-labelledby="team-leave">
-        <h2 id="team-leave" className="cq-title-sm text-(--cq-text-primary)">
-          Leave {name}
-        </h2>
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          You&apos;ll lose access to its relationships, notes and Q&apos;s
-          memory for the {words.word}.
-        </p>
-        <div>
-          <button
-            type="button"
-            className={buttonClassName("secondary")}
-            onClick={() => {
-              setSheet({ kind: "leave" });
-            }}
-            data-team-leave
-          >
-            <LogOut
-              aria-hidden="true"
-              size={ICON_SIZE.regular}
-              strokeWidth={ICON_STROKE}
-            />
-            Leave {name}
-          </button>
-        </div>
-      </section>
-    </>
-  );
-
-  const close = () => {
-    setSheet(null);
-  };
-  const lastOwner = team.you.role === "OWNER" && team.ownerCount <= 1;
-
-  return (
-    <div className="flex flex-col gap-6" data-team-page>
-      <UnsentInvites
-        items={unsent}
-        onDismiss={() => {
-          setUnsent([]);
-        }}
-      />
-      {body}
-
-      <SheetRoot
-        open={sheet !== null}
-        onOpenChange={(open) => {
-          if (!open) close();
-        }}
-      >
-        {sheet?.kind === "invite" ? (
-          <InviteSheet
-            name={name}
-            pending={pending}
-            onSend={(emails, role, message) => {
+        <InviteCard
+          words={words}
+          pending={pending}
+          domain={emailDomain(me?.email ?? null)}
+          onSend={(emails, role) =>
+            new Promise<boolean>((resolve) => {
               startTransition(async () => {
-                const out = await inviteAction(emails, role, message);
+                const out = await inviteAction(emails, role, "");
                 if (!out.ok) {
                   setToast(out.message);
+                  resolve(false);
                   return;
                 }
                 setTeam(out.value.team);
-                setSheet(null);
                 setUnsent(
                   out.value.invited.flatMap((i) =>
                     !i.emailed && i.link !== undefined
@@ -445,25 +190,201 @@ export function TeamPage({ initial }: { readonly initial: TeamDto }) {
                       : "Nobody new to invite."
                     : notEmailed > 0
                       ? "Couldn't send the email. Copy the invite link."
-                      : `${String(sent)} ${sent === 1 ? "invitation" : "invitations"} sent. They expire in 7 days.`,
+                      : sent === 1
+                        ? `Invitation sent to ${out.value.invited[0]?.email ?? "them"}. It expires in 7 days.`
+                        : `${String(sent)} invitations sent. They expire in 7 days.`,
                 );
+                resolve(sent > 0);
               });
-            }}
+            })
+          }
+        />
+      ) : (
+        <p
+          className="m-0 flex items-start gap-2.5 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-3.5 py-3 text-sm text-(--cq-text-secondary)"
+          data-team-limited
+        >
+          <Lock
+            aria-hidden="true"
+            size={ICON_SIZE.regular}
+            strokeWidth={ICON_STROKE}
+            className="mt-0.5 shrink-0"
           />
-        ) : sheet?.kind === "role" ? (
+          <span>
+            You&apos;re a{" "}
+            <b className="font-medium text-(--cq-text-primary)">
+              {t(ROLE_WORD[team.you.role])}
+            </b>
+            . Admins invite people and change roles. <AskAnAdmin team={team} />
+          </span>
+        </p>
+      )}
+
+      <WaitingForYou team={team} pending={pending} change={change} />
+
+      <section aria-labelledby="team-people">
+        <div className="mt-2 mb-3 flex flex-wrap items-baseline gap-2.5">
+          <h2
+            id="team-people"
+            className="m-0 text-[15px] font-semibold text-(--cq-text-primary)"
+          >
+            {t("People")}
+          </h2>
+          <span className="ms-auto text-xs text-(--cq-text-tertiary)">
+            {t(peopleNote)}
+          </span>
+        </div>
+        {team.members.length > 5 ? (
+          <label className="mb-3 flex min-h-11 w-full items-center gap-2 rounded-full bg-(--cq-surface-subtle) px-3.5 text-(--cq-text-tertiary) sm:w-64">
+            <span className="sr-only">{t("Search people")}</span>
+            <Search
+              aria-hidden="true"
+              size={ICON_SIZE.regular}
+              strokeWidth={ICON_STROKE}
+            />
+            <input
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+              }}
+              placeholder={t("Search")}
+              className="min-w-0 flex-1 bg-transparent text-[15px] text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary)"
+            />
+          </label>
+        ) : null}
+        <ul className="m-0 flex list-none flex-col rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-5 py-1">
+          {shown.map((member) => (
+            <MemberRow
+              key={member.membershipId}
+              member={member}
+              team={team}
+              onRole={() => {
+                setSheet({ kind: "role", member });
+              }}
+              onMore={() => {
+                setSheet(
+                  member.isYou ? { kind: "leave" } : { kind: "remove", member },
+                );
+              }}
+            />
+          ))}
+          {shown.length === 0 ? (
+            <li className="py-3 text-sm text-(--cq-text-secondary)">
+              {t("Nobody matches that.")}
+            </li>
+          ) : null}
+          {pendingInvites.map((invitation) => (
+            <li
+              key={invitation.invitationId}
+              className="cq-crm-swap grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 border-t border-(--cq-border-subtle) py-3"
+              data-team-invitation
+            >
+              <span
+                aria-hidden="true"
+                className="grid size-10 place-items-center rounded-full border border-(--cq-border) bg-(--cq-surface-subtle) text-sm font-semibold text-(--cq-text-secondary)"
+              >
+                ?
+              </span>
+              <span className="min-w-0">
+                <b className="block truncate text-[15px] font-semibold text-(--cq-text-primary)">
+                  {invitation.email}
+                </b>
+                <span className="text-[13px] text-(--cq-text-secondary)">
+                  {t(ROLE_WORD[invitation.role])}.{" "}
+                  {invitation.state === "EXPIRED"
+                    ? t(`Expired. Sent ${timeAgo(invitation.sentAt)}`)
+                    : `${t(`Invited ${timeAgo(invitation.sentAt)}`)}. ${t(expiresIn(invitation.expiresAt))}.`}
+                </span>
+              </span>
+              <span className="flex gap-1">
+                {invitation.state === "EXPIRED" ? (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    className={accountButton("quiet", "sm")}
+                    onClick={() => {
+                      change(
+                        () => resendAction(invitation.invitationId),
+                        `Sent again to ${invitation.email}.`,
+                      );
+                    }}
+                  >
+                    {t("Resend")}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={pending}
+                  className={accountButton("quiet", "sm")}
+                  onClick={() => {
+                    change(
+                      () => revokeAction(invitation.invitationId),
+                      "Invitation cancelled.",
+                    );
+                  }}
+                  data-team-cancel-invitation
+                >
+                  {t("Cancel")}
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+        {solo ? (
+          <p
+            className="mt-3 max-w-[60ch] text-sm text-(--cq-text-secondary)"
+            data-team-solo
+          >
+            {t(words.soloLine(name))}
+          </p>
+        ) : null}
+      </section>
+    </>
+  );
+
+  const close = () => {
+    setSheet(null);
+  };
+  const lastOwner = team.you.role === "OWNER" && team.ownerCount <= 1;
+
+  return (
+    <div className="flex flex-col gap-4" data-team-page>
+      <UnsentInvites
+        items={unsent}
+        onDismiss={() => {
+          setUnsent([]);
+        }}
+      />
+      {body}
+
+      <SheetRoot
+        open={sheet !== null}
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
+      >
+        {sheet?.kind === "role" ? (
           <RoleSheet
             member={sheet.member}
+            words={words}
             canOwn={can.own}
             pending={pending}
             onSave={(role) => {
               change(
                 () => changeRoleAction(sheet.member.membershipId, role),
-                `${sheet.member.name} is now ${role === "ADMIN" ? "an Admin" : "a Member"}.`,
+                `${sheet.member.name} is now ${role === "ADMIN" ? "an Admin" : "a Member"}. It applies from their next action.`,
               );
             }}
             onOwner={() => {
               setSheet({ kind: "transfer", member: sheet.member });
             }}
+            onRemove={
+              can.removeMembers && (sheet.member.role !== "OWNER" || can.own)
+                ? () => {
+                    setSheet({ kind: "remove", member: sheet.member });
+                  }
+                : null
+            }
           />
         ) : sheet?.kind === "remove" ? (
           <RemoveSheet
@@ -631,32 +552,29 @@ function MemberRow({
   const roleButton =
     can.changeRoles && member.role !== "OWNER" && !member.isYou;
   // Yourself: leave. Someone else: remove (an owner only by an owner).
-  const more =
-    member.isYou || (can.removeMembers && (member.role !== "OWNER" || can.own));
+  const removable =
+    !member.isYou && can.removeMembers && (member.role !== "OWNER" || can.own);
   return (
     <li
-      className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-(--cq-border-subtle) py-3"
+      className="grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 border-t border-(--cq-border-subtle) py-3 first:border-t-0"
       data-team-member
     >
       <Avatar
         name={member.name}
         size="md"
-        className="size-11!"
+        className="size-10!"
         src={member.avatarUrl ?? undefined}
       />
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate cq-body font-medium text-(--cq-text-primary)">
+      <span className="min-w-0">
+        <b className="block truncate text-[15px] font-semibold text-(--cq-text-primary)">
           {member.name}
-          {member.isYou ? (
-            <span className="ms-1.5 cq-caption font-normal text-(--cq-text-tertiary)">
-              {t("You")}
-            </span>
-          ) : null}
-        </span>
-        <span className="truncate cq-caption text-(--cq-text-secondary)">
-          {[member.title, member.email]
-            .filter((part) => part !== null && part !== "")
-            .join(" · ")}
+        </b>
+        <span className="block truncate text-[13px] text-(--cq-text-secondary)">
+          {t(ROLE_WORD[member.role])}.{" "}
+          {member.isYou ? t("You") : t(`Joined ${joinedOn(member.joinedAt)}`)}
+          {member.title === null || member.title === ""
+            ? null
+            : ` · ${member.title}`}
         </span>
       </span>
       <span className="flex items-center gap-1">
@@ -664,39 +582,31 @@ function MemberRow({
           <button
             type="button"
             aria-label={`Role for ${member.name}: ${ROLE_WORD[member.role]}. Change`}
-            className="inline-flex min-h-11 items-center gap-1.5 border border-(--cq-border) bg-(--cq-surface-raised) pe-2.5 ps-3 cq-body-sm whitespace-nowrap text-(--cq-text-primary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle) lg:min-h-10"
+            className={accountButton("quiet", "sm")}
             onClick={onRole}
+            data-team-change-role
           >
-            {t(ROLE_WORD[member.role])}
-            <ChevronDown
-              aria-hidden="true"
-              size={ICON_SIZE.compact}
-              strokeWidth={ICON_STROKE}
-            />
+            {t("Change role")}
           </button>
-        ) : (
-          <span className="px-1 cq-body-sm text-(--cq-text-secondary)">
-            {t(ROLE_WORD[member.role])}
-          </span>
-        )}
-        {more ? (
+        ) : removable ? (
           <button
             type="button"
-            aria-label={
-              member.isYou ? "More for you" : `More for ${member.name}`
-            }
-            className="grid size-11 place-items-center rounded-full text-(--cq-text-secondary) transition-colors duration-(--cq-motion-fast) hover:bg-(--cq-surface-subtle)"
+            className={accountButton("quiet", "sm")}
             onClick={onMore}
+            aria-label={`Remove ${member.name}`}
           >
-            <MoreHorizontal
-              aria-hidden="true"
-              size={ICON_SIZE.prominent}
-              strokeWidth={ICON_STROKE}
-            />
+            {t("Remove")}
           </button>
-        ) : (
-          <span aria-hidden="true" className="w-11" />
-        )}
+        ) : member.isYou ? (
+          <button
+            type="button"
+            className={accountButton("quiet", "sm")}
+            onClick={onMore}
+            data-team-leave
+          >
+            {t("Leave")}
+          </button>
+        ) : null}
       </span>
     </li>
   );
@@ -859,171 +769,162 @@ function Waiting({
   );
 }
 
-function RolesHelp({
-  words,
-}: {
-  readonly words: ReturnType<typeof teamWords>;
-}) {
-  const t = useT();
-  return (
-    <section className="flex flex-col gap-2" aria-labelledby="team-roles">
-      <h2 id="team-roles" className="cq-title-sm text-(--cq-text-primary)">
-        {t("What each role can do")}
-      </h2>
-      <dl>
-        {(
-          [
-            [
-              "Owner",
-              `Everything an admin can do, plus billing, handing over ownership and closing the ${words.word}. There's always at least one.`,
-            ],
-            ["Admin", words.admin],
-            ["Member", words.member],
-          ] as const
-        ).map(([role, does]) => (
-          <div
-            key={role}
-            className="grid grid-cols-[90px_minmax(0,1fr)] gap-2.5 border-t border-(--cq-border-subtle) py-2.5 cq-body-sm"
-          >
-            <dt className="font-medium text-(--cq-text-primary)">{role}</dt>
-            <dd className="text-(--cq-text-secondary)">{does}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
+/** "2 Sept": when someone joined. */
+function joinedOn(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
 }
 
-function InviteSheet({
-  name,
+/** "Expires in 5 days", "Expires today": an invitation's time left. */
+export function expiresIn(iso: string, now: Date = new Date()): string {
+  const days = Math.ceil(
+    (new Date(iso).getTime() - now.getTime()) / 86_400_000,
+  );
+  if (!Number.isFinite(days) || days <= 0) return "Expires today";
+  if (days === 1) return "Expires tomorrow";
+  return `Expires in ${String(days)} days`;
+}
+
+/** The person's own email domain, for the invite field's example. */
+function emailDomain(email: string | null): string | null {
+  const at = email?.lastIndexOf("@") ?? -1;
+  return email === null || at < 0 ? null : email.slice(at + 1);
+}
+
+/**
+ * Invite first (chosen design "Invite first", 2026-10-21): their work
+ * email and a role on one line, with what that role can do written
+ * underneath, and Send. The new invitation joins the list at once, with
+ * its expiry; the API decides again who may invite.
+ */
+function InviteCard({
+  words,
   pending,
+  domain,
   onSend,
 }: {
-  readonly name: string;
+  readonly words: ReturnType<typeof teamWords>;
   readonly pending: boolean;
+  readonly domain: string | null;
   readonly onSend: (
     emails: readonly string[],
     role: InvitableRole,
-    message: string,
-  ) => void;
+  ) => Promise<boolean>;
 }) {
   const t = useT();
   const [raw, setRaw] = useState("");
   const [role, setRole] = useState<InvitableRole>("MEMBER");
-  const [message, setMessage] = useState("");
+  const [phase, setPhase] = useState<"idle" | "pending" | "done">("idle");
   const emails = splitEmailInput(raw);
-  const count = emails.length;
+  const looksRight = emails.length > 0 && emails.every((e) => e.includes("@"));
   return (
-    <SheetContent side="side" title={`Invite people to ${name}`}>
-      <form
-        className="flex flex-col gap-4"
-        data-team-sheet="invite"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (count > 0) onSend(emails, role, message);
-        }}
-      >
-        <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="team-emails"
-            className="cq-label text-(--cq-text-primary)"
-          >
-            {t("Email addresses")}
-          </label>
-          <textarea
-            id="team-emails"
-            rows={3}
+    <form
+      className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-5 py-[18px]"
+      data-team-invite
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!looksRight || phase !== "idle") return;
+        setPhase("pending");
+        void onSend(emails, role).then((sent) => {
+          if (!sent) {
+            setPhase("idle");
+            return;
+          }
+          setPhase("done");
+          setRaw("");
+          setTimeout(() => setPhase("idle"), 1600);
+        });
+      }}
+    >
+      <h2 className="m-0 flex items-center gap-2 text-[13px] font-medium text-(--cq-text-secondary)">
+        {t("Invite a colleague")}
+      </h2>
+      <div className="grid grid-cols-1 items-end gap-2.5 sm:grid-cols-[minmax(0,1fr)_180px_auto]">
+        <Field label={t("Work email")} htmlFor="team-invite-email">
+          <input
+            id="team-invite-email"
+            type="text"
+            inputMode="email"
+            autoComplete="off"
             value={raw}
             onChange={(event) => {
               setRaw(event.target.value);
             }}
-            placeholder={t("One or more, separated by commas")}
-            className="w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3.5 py-3 cq-body leading-normal text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) focus-visible:border-(--cq-accent)"
+            placeholder={
+              domain === null ? "name@company.com" : `name@${domain}`
+            }
+            className={fieldClassName}
           />
-          <span className="cq-caption text-(--cq-text-tertiary)">
-            {t("Personal emails are fine.")}
+        </Field>
+        <Field label={t("Role")} htmlFor="team-invite-role">
+          <span className="relative block">
+            <select
+              id="team-invite-role"
+              value={role}
+              onChange={(event) => {
+                setRole(event.target.value === "ADMIN" ? "ADMIN" : "MEMBER");
+              }}
+              className={cx(fieldClassName, "appearance-none pe-9")}
+            >
+              <option value="MEMBER">{t("Member")}</option>
+              <option value="ADMIN">{t("Admin")}</option>
+            </select>
+            <ChevronDown
+              aria-hidden="true"
+              size={ICON_SIZE.compact}
+              strokeWidth={ICON_STROKE}
+              className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-(--cq-text-secondary)"
+            />
           </span>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <span
-            id="team-role-label"
-            className="cq-label text-(--cq-text-primary)"
-          >
-            {t("Role")}
-          </span>
-          <div
-            role="radiogroup"
-            aria-labelledby="team-role-label"
-            className="flex gap-0.5 rounded-[10px] bg-(--cq-surface-subtle) p-[3px]"
-          >
-            {(["MEMBER", "ADMIN"] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                role="radio"
-                aria-checked={role === option}
-                onClick={() => {
-                  setRole(option);
-                }}
-                className={cx(
-                  "min-h-10 flex-1 rounded-lg cq-body-sm font-medium transition-colors duration-(--cq-motion-fast)",
-                  role === option
-                    ? "border border-(--cq-border) bg-(--cq-surface-raised) text-(--cq-text-primary)"
-                    : "text-(--cq-text-secondary)",
-                )}
-              >
-                {t(ROLE_WORD[option])}
-              </button>
-            ))}
-          </div>
-          <span className="cq-caption text-(--cq-text-secondary)">
-            {t(
-              "Members work day to day. Admins can also invite people and approve what Q sends.",
-            )}
-          </span>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="team-message"
-            className="cq-label text-(--cq-text-primary)"
-          >
-            Message (optional)
-          </label>
-          <input
-            id="team-message"
-            value={message}
-            maxLength={500}
-            onChange={(event) => {
-              setMessage(event.target.value);
-            }}
-            placeholder={t("Welcome aboard!")}
-            className="min-h-11 w-full rounded-md border border-(--cq-border) bg-(--cq-surface) px-3.5 cq-body text-(--cq-text-primary) outline-none placeholder:text-(--cq-text-tertiary) focus-visible:border-(--cq-accent)"
-          />
-        </div>
+        </Field>
         <button
           type="submit"
-          disabled={pending || count === 0}
-          className={buttonClassName("primary", "regular", "w-full")}
+          disabled={pending || phase !== "idle" || !looksRight}
+          aria-busy={phase === "pending"}
+          className={accountButton(phase === "done" ? "done" : "primary")}
+          data-team-invite-send
         >
-          {count <= 1 ? "Send invitation" : `Send ${String(count)} invitations`}
+          {phase === "pending" ? (
+            <Pending>{t("Sending…")}</Pending>
+          ) : phase === "done" ? (
+            <>
+              <Check size={14} aria-hidden="true" />
+              {t("Sent")}
+            </>
+          ) : (
+            t("Send invitation")
+          )}
         </button>
-      </form>
-    </SheetContent>
+      </div>
+      <span className="text-xs text-(--cq-text-tertiary)" data-team-role-says>
+        {t(
+          `${ROLE_WORD[role]}: ${(role === "ADMIN" ? words.admin : words.member).replace(/^./u, (c) => c.toLowerCase())}`,
+        )}
+      </span>
+    </form>
   );
 }
 
 function RoleSheet({
   member,
+  words,
   canOwn,
   pending,
   onSave,
   onOwner,
+  onRemove,
 }: {
   readonly member: TeamMemberDto;
+  readonly words: ReturnType<typeof teamWords>;
   readonly canOwn: boolean;
   readonly pending: boolean;
   readonly onSave: (role: InvitableRole) => void;
   readonly onOwner: () => void;
+  /** Null when the person may not remove them. */
+  readonly onRemove: (() => void) | null;
 }) {
   const t = useT();
   const [role, setRole] = useState<InvitableRole>(
@@ -1032,59 +933,56 @@ function RoleSheet({
   return (
     <SheetContent side="side" title={`${member.name}'s role`}>
       <div className="flex flex-col gap-3" data-team-sheet="role">
-        <div className="flex flex-col">
-          {(
-            [
-              [
-                "ADMIN",
-                "Invites people, changes settings, approves what Q sends.",
-              ],
-              ["MEMBER", "Works day to day; suggests, doesn't approve."],
-            ] as const
-          ).map(([option, does]) => (
-            <label
-              key={option}
-              className="flex cursor-pointer gap-3 border-b border-(--cq-border-subtle) py-3.5"
-            >
-              <input
-                type="radio"
-                name="team-role"
-                checked={role === option}
-                onChange={() => {
-                  setRole(option);
-                }}
-                className="mt-0.5 size-5 accent-(--cq-accent)"
-              />
-              <span className="flex flex-col">
-                <span className="cq-body font-medium text-(--cq-text-primary)">
-                  {t(ROLE_WORD[option])}
-                </span>
-                <span className="cq-body-sm text-(--cq-text-secondary)">
-                  {does}
-                </span>
-              </span>
-            </label>
-          ))}
-        </div>
+        {member.email === null ? null : (
+          <span className="text-xs text-(--cq-text-tertiary)">
+            {member.email}
+          </span>
+        )}
+        <RadioList
+          name="team-role"
+          label={t("Role")}
+          value={role}
+          onChange={setRole}
+          choices={[
+            { key: "ADMIN", title: t("Admin"), description: t(words.admin) },
+            {
+              key: "MEMBER",
+              title: t("Member"),
+              description: t(words.member),
+            },
+          ]}
+        />
         <button
           type="button"
           disabled={pending}
-          className={buttonClassName("primary", "regular", "w-full")}
+          aria-busy={pending}
+          className={accountButton("primary", "regular", "w-full")}
           onClick={() => {
             onSave(role);
           }}
+          data-team-role-save
         >
-          {t("Save")}
+          {pending ? <Pending>{t("Saving…")}</Pending> : t("Save role")}
         </button>
         {canOwn ? (
           <button
             type="button"
-            className={buttonClassName("quiet", "regular", "w-full")}
+            className={accountButton("quiet", "regular", "w-full")}
             onClick={onOwner}
           >
             Make {firstName(member.name)} an owner…
           </button>
         ) : null}
+        {onRemove === null ? null : (
+          <button
+            type="button"
+            className={accountButton("quiet", "regular", "w-full")}
+            onClick={onRemove}
+            data-team-remove
+          >
+            {t("Remove from team")}
+          </button>
+        )}
       </div>
     </SheetContent>
   );

@@ -1,8 +1,9 @@
 import {
-  Q_MEMORY_CORRECT_PATH,
+  MEMORY_CORRECT_PATH,
   Q_MEMORY_FORGET_PATH,
   Q_MEMORY_LEARNING_PATH,
   Q_MEMORY_PATH,
+  QMemoryCorrectionDtoSchema,
   QMemoryListDtoSchema,
   QPreferenceLearningDtoSchema,
   type QMemoryCorrectionRequest,
@@ -41,32 +42,25 @@ export async function forgetQMemory(
 }
 
 /**
- * `204`: replaces one memory with the caller's own words. The old one is
- * kept in history, marked superseded. Not theirs, or not live: a 404.
+ * Replaces one memory with the caller's own words (an API session: a
+ * declared person action, ADR 0040). The old one is kept in history,
+ * marked superseded. Not theirs, or not live: a 404.
  */
-export async function correctQMemory(
+export function correctQMemory(
   session: ApiSession,
   memoryItemId: string,
   request: QMemoryCorrectionRequest,
-): Promise<void> {
-  const doFetch = session.fetch ?? fetch;
-  const response = await doFetch(
-    `${session.baseUrl.replace(/\/$/, "")}${Q_MEMORY_CORRECT_PATH.replace(
+) {
+  return call(
+    session,
+    "POST",
+    MEMORY_CORRECT_PATH.replace(
       ":memoryItemId",
       encodeURIComponent(memoryItemId),
-    )}`,
-    {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-        authorization: `Bearer ${session.accessToken}`,
-      },
-      body: JSON.stringify(request),
-      cache: "no-store",
-    },
+    ),
+    QMemoryCorrectionDtoSchema,
+    { body: request },
   );
-  if (!response.ok) throw await readProblemResponse(response);
 }
 
 /** Whether Q may learn how the caller likes to work (lane ob1). A Q API session. */

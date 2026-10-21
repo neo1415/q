@@ -5180,6 +5180,29 @@
  * that chose it (Overview with its deal, and Calls): their primary buttons
  * and dark tiles turn warm charcoal; the accent and everything else stay.
  */
+/*
+ * Settings → Appearance (chosen design 2026-10-21): each theme card shows a
+ * small picture of that theme whatever theme is on now, so its colours are
+ * the light and dark palettes' own values, fixed, kept here as tokens.
+ */
+@layer components {
+  .cq-preview-light {
+    --cq-preview-canvas: oklch(0.985 0.004 92);
+    --cq-preview-surface: oklch(1 0 0);
+    --cq-preview-accent: var(--cq-gold-deep);
+  }
+  .cq-preview-dark {
+    --cq-preview-canvas: oklch(0.16 0.01 258);
+    --cq-preview-surface: oklch(0.22 0.011 258);
+    --cq-preview-accent: var(--cq-gold-mid);
+  }
+  .cq-preview-auto {
+    --cq-preview-canvas: oklch(0.985 0.004 92);
+    --cq-preview-surface: oklch(0.16 0.01 258);
+    --cq-preview-accent: var(--cq-gold-deep);
+  }
+}
+
 @layer components {
   .cq-charcoal {
     --cq-primary-action: var(--cq-charcoal);

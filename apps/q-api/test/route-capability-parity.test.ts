@@ -789,9 +789,6 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/memory.ts GET Q_MEMORY_PATH": exempt(
     "the person's own view of what Q remembers; Q reads memory on every run, not as a tool",
   ),
-  "q-api/http/memory.ts POST Q_MEMORY_CORRECT_PATH": exempt(
-    "the person correcting Q's memory of them in their own words; never a Q action",
-  ),
   "q-api/http/memory.ts POST Q_MEMORY_FORGET_PATH": exempt(
     "the person correcting Q's memory of them; never a Q action",
   ),

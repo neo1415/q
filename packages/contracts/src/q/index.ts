@@ -945,11 +945,12 @@ export {
 } from "./profile-findings.js";
 
 export {
-  Q_MEMORY_CORRECT_PATH,
+  MEMORY_CORRECT_PATH,
   Q_MEMORY_FORGET_PATH,
   Q_MEMORY_KINDS,
   Q_MEMORY_LEARNING_PATH,
   Q_MEMORY_PATH,
+  QMemoryCorrectionDtoSchema,
   QMemoryCorrectionRequestSchema,
   QMemoryItemDtoSchema,
   QMemoryListDtoSchema,

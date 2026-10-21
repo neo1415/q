@@ -8,6 +8,7 @@ import { ANSWERS_AR } from "./catalog/answers";
 import { ADMIN_AR } from "./catalog/admin";
 import { COMPANY_AR } from "./catalog/company";
 import { CORE_AR } from "./catalog/core";
+import { ACCOUNT_AR } from "./catalog/account";
 import { CRM_DESIGN_AR } from "./catalog/crm-design";
 import { CRM_RECORD_AR } from "./catalog/crm-record";
 import { DAILY_AR } from "./catalog/daily";
@@ -56,6 +57,7 @@ export type UiLanguage = string;
 const ARABIC: Readonly<Record<string, string>> = {
   // First: what the live check of 2026-10-16 found; an area's own entry
   // for the same words wins.
+  ...ACCOUNT_AR,
   ...CRM_DESIGN_AR,
   ...SWEEP_AR,
   ...CORE_AR,

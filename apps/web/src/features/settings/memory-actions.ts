@@ -16,6 +16,7 @@ import {
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { getSessionAccessToken } from "@/auth/session";
+import { apiSession } from "@/features/q/context";
 
 /**
  * Forget one thing Q remembered about the person (ADR 0012). The id is
@@ -56,7 +57,8 @@ export async function correctMemoryAction(
       message: "Say what Q should remember, in a few words.",
     };
   }
-  const session = await qSession();
+  // A declared person action (ADR 0040): the application API serves it.
+  const session = await apiSession();
   if (session === null)
     return { ok: false, message: "Sign in again to continue." };
   try {
@@ -66,7 +68,10 @@ export async function correctMemoryAction(
     return {
       ok: false,
       message:
-        error instanceof ApiProblemError && error.status === 422
+        error instanceof ApiProblemError &&
+        error.status >= 400 &&
+        error.status < 500 &&
+        error.status !== 404
           ? error.message
           : "That correction didn't save. Try again in a moment.",
     };

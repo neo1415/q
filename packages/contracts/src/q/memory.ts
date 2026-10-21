@@ -11,10 +11,11 @@ import { UtcTimestampSchema } from "../common/time.js";
  *   `GET  /v1/q/memory` — the person's own live memory items.
  *   `POST /v1/q/memory/:memoryItemId/forget` — forget one. Idempotent: an
  *   item already forgotten, or not theirs, is the same 404.
- *   `POST /v1/q/memory/:memoryItemId/correct` — replace one with the
- *   person's own words. It goes through the memory Write Gate like any
- *   remembered fact: the corrected item supersedes the old one, which stays
- *   in history marked superseded. Not theirs, or not live: 404.
+ *   `POST /v1/me/memory/:memoryItemId/correct` (the API, a declared
+ *   person action, ADR 0040) — replace one with the person's own words.
+ *   It goes through the memory Write Gate like any remembered fact: the
+ *   corrected item supersedes the old one, which stays in history marked
+ *   superseded. Not theirs, or not live: 404.
  *
  * Only the actor's own memory: the owner is resolved from the session,
  * never from the request.
@@ -22,8 +23,8 @@ import { UtcTimestampSchema } from "../common/time.js";
 export const Q_MEMORY_PATH = "/v1/q/memory" as const;
 export const Q_MEMORY_FORGET_PATH =
   "/v1/q/memory/:memoryItemId/forget" as const;
-export const Q_MEMORY_CORRECT_PATH =
-  "/v1/q/memory/:memoryItemId/correct" as const;
+export const MEMORY_CORRECT_PATH =
+  "/v1/me/memory/:memoryItemId/correct" as const;
 
 export const Q_MEMORY_KINDS = [
   "fact",
@@ -64,6 +65,10 @@ export const QMemoryCorrectionRequestSchema = z
 export type QMemoryCorrectionRequest = z.infer<
   typeof QMemoryCorrectionRequestSchema
 >;
+
+export const QMemoryCorrectionDtoSchema = z
+  .object({ corrected: z.literal(true) })
+  .strict();
 
 export const QMemoryListDtoSchema = z
   .object({ items: z.array(QMemoryItemDtoSchema).max(200) })
