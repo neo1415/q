@@ -916,7 +916,10 @@ describe("the room as an investor sees it (ownroom-2, 2026-10-21)", () => {
     const { service, previews } = world();
     const asZino = await service.dataRoomPreview(founder, COMPANY, R1);
     expect(previews).toEqual([
-      { companyId: COMPANY, as: { relationshipId: R1, connection: "CONNECTED" } },
+      {
+        companyId: COMPANY,
+        as: { relationshipId: R1, connection: "CONNECTED" },
+      },
     ]);
     expect(asZino?.as).toEqual({
       relationshipId: R1,

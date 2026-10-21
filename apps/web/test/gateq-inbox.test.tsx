@@ -183,6 +183,12 @@ describe("the inbox's words (pure)", () => {
   });
 });
 
+function pick<T>(list: readonly T[], index: number): T {
+  const value = list[index];
+  if (value === undefined) throw new Error(`no row ${String(index)}`);
+  return value;
+}
+
 describe("gateq-2's saved views and dossier words (pure)", () => {
   const me = id(901);
   const ROWS = [
@@ -207,22 +213,22 @@ describe("gateq-2's saved views and dossier words (pure)", () => {
       OUTSIDE: 1,
     });
     // F28: no published rules is never "look at first".
-    expect(model.inPane(ROWS[5]!, "FIRST", me)).toBe(false);
-    expect(model.inPane(ROWS[6]!, "ALL", me)).toBe(false);
+    expect(model.inPane(pick(ROWS, 5), "FIRST", me)).toBe(false);
+    expect(model.inPane(pick(ROWS, 6), "ALL", me)).toBe(false);
   });
 
   it("says why and when in words, and never invents a promise", () => {
-    expect(model.paneWhy(ROWS[0]!)).toBe("Meets every rule of your gate.");
-    expect(model.paneWhy(ROWS[1]!)).toMatch(/reply promise is close/);
-    expect(model.paneWhy(ROWS[4]!)).toBe(
+    expect(model.paneWhy(pick(ROWS, 0))).toBe("Meets every rule of your gate.");
+    expect(model.paneWhy(pick(ROWS, 1))).toMatch(/reply promise is close/);
+    expect(model.paneWhy(pick(ROWS, 4))).toBe(
       "Not enough information to decide: 2 rules not answered.",
     );
-    expect(model.qualifiesOf(ROWS[5]!)).toBe("NO_RULES");
-    expect(model.dueWords(ROWS[1]!)).toEqual({
+    expect(model.qualifiesOf(pick(ROWS, 5))).toBe("NO_RULES");
+    expect(model.dueWords(pick(ROWS, 1))).toEqual({
       text: "Reply overdue",
       late: true,
     });
-    expect(model.dueWords(ROWS[2]!)?.text).toBe("Reply today");
+    expect(model.dueWords(pick(ROWS, 2))?.text).toBe("Reply today");
     expect(
       model.dueWords({
         replyState: "ON_TRACK",
@@ -231,7 +237,7 @@ describe("gateq-2's saved views and dossier words (pure)", () => {
         replyBy: "2026-10-24",
       })?.text,
     ).toBe("Reply by 24 Oct");
-    expect(model.dueWords(ROWS[0]!)).toBeNull();
+    expect(model.dueWords(pick(ROWS, 0))).toBeNull();
   });
 
   it("keeps a group they did not cover as not covered, never a zero", () => {
@@ -402,6 +408,8 @@ describe("the inbox, driven like an investor", () => {
     expect(
       screen.getByText(/Nothing is sent until you approve this exact message/),
     ).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Approve and send" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Approve and send" }),
+    ).toBeTruthy();
   });
 });

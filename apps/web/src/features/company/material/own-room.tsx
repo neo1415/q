@@ -199,8 +199,8 @@ export function OwnRoom({
     lens === "NOT_YET"
       ? null
       : (candidates.find((c) => c.relationshipId === chosen[lens]) ??
-          candidates[0] ??
-          null);
+        candidates[0] ??
+        null);
 
   const load = (relationshipId: string | null) => {
     const mine = seq.current + 1;
@@ -274,7 +274,9 @@ export function OwnRoom({
             : d,
         ),
       );
-      setMessage(`Saved. ${accessWords({ level, sharedWith: document.sharedWith })} from now on.`);
+      setMessage(
+        `Saved. ${accessWords({ level, sharedWith: document.sharedWith })} from now on.`,
+      );
       setRevision((n) => n + 1);
     });
   };
@@ -308,7 +310,11 @@ export function OwnRoom({
         </h2>
         <Link
           href="/documents"
-          className={buttonClassName("secondary", "compact", "hidden sm:inline-flex")}
+          className={buttonClassName(
+            "secondary",
+            "compact",
+            "hidden sm:inline-flex",
+          )}
         >
           <Upload {...icon} />
           {t("Upload files")}
@@ -319,7 +325,9 @@ export function OwnRoom({
           {folders.length === 0 ? (
             <div className="cq-ownroom-empty">
               <p className="cq-body text-(--cq-text-primary)">
-                {t("Nothing here yet. Upload anything; you decide who sees it.")}
+                {t(
+                  "Nothing here yet. Upload anything; you decide who sees it.",
+                )}
               </p>
               <Link
                 href="/documents"
@@ -379,13 +387,19 @@ export function OwnRoom({
             ))
           )}
           {message === null ? null : (
-            <p role="status" className="cq-body-sm mt-3 text-(--cq-text-secondary)">
+            <p
+              role="status"
+              className="cq-body-sm mt-3 text-(--cq-text-secondary)"
+            >
               {t(message)}
             </p>
           )}
         </div>
 
-        <aside className="flex min-w-0 flex-col gap-3.5" aria-label={t("See it as an investor would")}>
+        <aside
+          className="flex min-w-0 flex-col gap-3.5"
+          aria-label={t("See it as an investor would")}
+        >
           <div
             className="cq-ownroom-seg"
             role="group"
@@ -413,7 +427,10 @@ export function OwnRoom({
                 }
               >
                 {candidates.map((candidate) => (
-                  <option key={candidate.relationshipId} value={candidate.relationshipId}>
+                  <option
+                    key={candidate.relationshipId}
+                    value={candidate.relationshipId}
+                  >
                     {candidate.name}
                   </option>
                 ))}

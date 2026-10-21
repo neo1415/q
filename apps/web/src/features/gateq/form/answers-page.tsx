@@ -160,7 +160,10 @@ function Pills({
   decline = true,
 }: {
   readonly label: string;
-  readonly options: readonly { readonly value: string; readonly label: string }[];
+  readonly options: readonly {
+    readonly value: string;
+    readonly label: string;
+  }[];
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly error?: string | undefined;
@@ -263,11 +266,7 @@ export function AnswersPage({
           noValidate
         >
           <div className="gqp-q">
-            <h2
-              ref={headingRef}
-              tabIndex={-1}
-              className="gqp-qt outline-none"
-            >
+            <h2 ref={headingRef} tabIndex={-1} className="gqp-qt outline-none">
               {t("Your company")}
             </h2>
             <div className="gqp-row2">
@@ -528,7 +527,9 @@ export function AnswersPage({
             <div className="gqp-q">
               <span className="gqp-qt">{t("What to share")}</span>
               <p className="cq-body-sm gq-t2">
-                {t(`Pick what ${fund} should see. They only get what you tick.`)}
+                {t(
+                  `Pick what ${fund} should see. They only get what you tick.`,
+                )}
               </p>
               <ul className="gq-hair">
                 {materials.map((material) => (

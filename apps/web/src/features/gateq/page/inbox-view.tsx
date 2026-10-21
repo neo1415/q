@@ -34,6 +34,7 @@ import {
   Inbox,
   Link as LinkIcon,
   Lock,
+  MessageSquare,
   Search,
   Send,
   Square,
@@ -807,6 +808,10 @@ export function InboxView({
           setPhoneOpen(false);
           setSheet({ kind: "reply", id: current.applicationId, draft: "CALL" });
         }}
+        onReply={() => {
+          setPhoneOpen(false);
+          setSheet({ kind: "reply", id: current.applicationId });
+        }}
         onAsk={() => {
           setPhoneOpen(false);
           setSheet({ kind: "reply", id: current.applicationId, draft: "ASK" });
@@ -1170,6 +1175,7 @@ function Dossier({
   solo,
   fund,
   onBook,
+  onReply,
   onAsk,
   onPass,
   onAssign,
@@ -1185,6 +1191,7 @@ function Dossier({
   readonly solo: boolean;
   readonly fund: string;
   readonly onBook: () => void;
+  readonly onReply: () => void;
   readonly onAsk: () => void;
   readonly onPass: () => void;
   readonly onAssign: () => void;
@@ -1280,10 +1287,7 @@ function Dossier({
         <Button disabled={!canDecide} onClick={onAsk}>
           {t("Ask for more")}
         </Button>
-        <Button
-          disabled={!canDecide || passed !== undefined}
-          onClick={onPass}
-        >
+        <Button disabled={!canDecide || passed !== undefined} onClick={onPass}>
           {t("Pass with a reason")}
         </Button>
       </div>
@@ -1291,6 +1295,15 @@ function Dossier({
         <Button variant="quiet" size="compact" onClick={onPack}>
           <Download {...icon} />
           {t("Download pack")}
+        </Button>
+        <Button
+          variant="quiet"
+          size="compact"
+          disabled={!canDecide}
+          onClick={onReply}
+        >
+          <MessageSquare {...icon} />
+          {t("Reply")}
         </Button>
         <span className="flex-1" />
         <Button
@@ -1523,11 +1536,7 @@ function Sheets({
     reason: GateqPassReason,
     messages: Readonly<Record<string, string>>,
   ) => void;
-  readonly onReplied: (
-    id: string,
-    message: string,
-    draft: ReplyDraft,
-  ) => void;
+  readonly onReplied: (id: string, message: string, draft: ReplyDraft) => void;
   readonly onAssigned: (ids: readonly string[], userId: string | null) => void;
   readonly onLabelled: (ids: readonly string[], label: string) => void;
   readonly onPreparePasses: (ids: readonly string[]) => void;

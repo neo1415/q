@@ -352,7 +352,14 @@ describe("the inbox detail", () => {
       screen.getByRole("heading", { name: "Submitted investment brief" }),
     ).toBeTruthy();
     expect(screen.getByText(/Interview transcript ·/)).toBeTruthy();
-    for (const name of ["Reply", "Pass", "Assign", "Download pack"]) {
+    for (const name of [
+      "Reply",
+      "Book a call",
+      "Ask for more",
+      "Pass with a reason",
+      "Assign",
+      "Download pack",
+    ]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
     }
     expect(

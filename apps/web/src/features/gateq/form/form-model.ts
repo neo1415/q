@@ -51,9 +51,7 @@ export const FLOW_PROGRESS = [
 
 /** Every step the one page of questions stands for. */
 export function onQuestionsPage(step: FormStep): boolean {
-  return (
-    (FORM_STEPS as readonly FormStep[]).includes(step) || step === "check"
-  );
+  return (FORM_STEPS as readonly FormStep[]).includes(step) || step === "check";
 }
 
 export function progressFor(step: FormStep): number {
@@ -374,9 +372,7 @@ export function pageRequest(answers: FormAnswers): ApplicationAnswersRequest {
   const name = answers.contactName.trim();
   const note = answers.note.trim();
   return {
-    ...(companyName === undefined || companyName === ""
-      ? {}
-      : { companyName }),
+    ...(companyName === undefined || companyName === "" ? {} : { companyName }),
     ...company,
     ...round,
     ...(EMAIL.test(email) ? { contactEmail: email } : {}),
@@ -387,7 +383,9 @@ export function pageRequest(answers: FormAnswers): ApplicationAnswersRequest {
 
 /** What blocks "Continue to interview". Unknown is always allowed. */
 export function validatePage(answers: FormAnswers): StepErrors {
-  const errors: StepErrors = { ...validateStep("company", answers, { anonymous: false }) };
+  const errors: StepErrors = {
+    ...validateStep("company", answers, { anonymous: false }),
+  };
   if (answers.band !== DECLINED && answers.amount.trim() !== "") {
     if (normaliseAmount(answers.amount) === null) {
       errors.amount = "Use numbers only, like 1,200,000.";

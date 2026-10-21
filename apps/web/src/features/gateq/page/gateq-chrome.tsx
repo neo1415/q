@@ -88,7 +88,9 @@ export function GateqChrome({
         <div className="gqf-head">
           <h1>GateQ</h1>
           {active === "applications" ? (
-            <p>{t("What you sent through investors' gates, and what happened.")}</p>
+            <p>
+              {t("What you sent through investors' gates, and what happened.")}
+            </p>
           ) : null}
         </div>
       ) : (

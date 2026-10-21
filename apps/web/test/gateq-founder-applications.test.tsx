@@ -62,18 +62,24 @@ const APPS = [
   }),
 ];
 
+function pick<T>(list: readonly T[], index: number): T {
+  const value = list[index];
+  if (value === undefined) throw new Error(`no row ${String(index)}`);
+  return value;
+}
+
 describe("a founder's GateQ applications", () => {
   it("says what happened, in their exact words, never paraphrased", () => {
-    expect(views.founderDetailWords(APPS[0]!)).toBe(
+    expect(views.founderDetailWords(pick(APPS, 0))).toBe(
       "They wrote: “Could you share your retention by cohort?”",
     );
-    expect(views.founderDetailWords(APPS[1]!)).toBe(
+    expect(views.founderDetailWords(pick(APPS, 1))).toBe(
       "Reply promised by 24 Oct",
     );
     expect(views.founderDetailWords(app(4, {}))).toBe(
       "Sent. They haven't made a reply promise.",
     );
-    expect(views.founderDetailWords(APPS[2]!)).toBe(
+    expect(views.founderDetailWords(pick(APPS, 2))).toBe(
       "Passed with a reason. They got: “Too early for our Series A focus.”",
     );
     expect(
@@ -116,8 +122,6 @@ describe("a founder's GateQ applications", () => {
     cleanup();
     render(<views.FounderApplications state="full" applications={APPS} />);
     fireEvent.click(screen.getByRole("button", { name: /Arcbridge Ventures/ }));
-    expect(
-      screen.getByText("Not recorded for this application."),
-    ).toBeTruthy();
+    expect(screen.getByText("Not recorded for this application.")).toBeTruthy();
   });
 });

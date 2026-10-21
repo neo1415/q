@@ -129,7 +129,11 @@ function previewFor(relationshipId: string | null): DataRoomPreviewDto {
           locked: {
             reason: "NOT_CONNECTED",
             outline: [
-              { code: "fundraising", label: "Fundraising summary", documents: 1 },
+              {
+                code: "fundraising",
+                label: "Fundraising summary",
+                documents: 1,
+              },
             ],
           },
           folders: [],
@@ -142,7 +146,9 @@ function previewFor(relationshipId: string | null): DataRoomPreviewDto {
         as: {
           relationshipId,
           investorOrganisationName:
-            relationshipId === NORTHBOUND ? "Northbound Capital" : "Meridian Seed",
+            relationshipId === NORTHBOUND
+              ? "Northbound Capital"
+              : "Meridian Seed",
           connection: "CONNECTED",
         },
         view: {
@@ -225,10 +231,10 @@ describe("the founder's room, seen as an investor would", () => {
       relationshipId: NORTHBOUND,
     });
     const lens = document.querySelector('[data-lens="CONNECTED"]');
-    expect(lens?.textContent).toContain("Northbound Capital, interest accepted");
-    expect(
-      within(lens as HTMLElement).getByText("Can open"),
-    ).toBeTruthy();
+    expect(lens?.textContent).toContain(
+      "Northbound Capital, interest accepted",
+    );
+    expect(within(lens as HTMLElement).getByText("Can open")).toBeTruthy();
     // Two connected investors: the founder picks whose view.
     fireEvent.change(screen.getByLabelText("Which investor"), {
       target: { value: MERIDIAN },
@@ -253,7 +259,9 @@ describe("the founder's room, seen as an investor would", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /Who can see Cap table/ }),
     );
-    fireEvent.click(screen.getByRole("radio", { name: /Investors you accept/ }));
+    fireEvent.click(
+      screen.getByRole("radio", { name: /Investors you accept/ }),
+    );
     const calls = actions.preview.mock.calls.length;
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await settle();

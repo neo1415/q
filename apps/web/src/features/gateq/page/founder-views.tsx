@@ -102,7 +102,10 @@ export function FounderApplications({
   const findCard = (
     <section className="gq2-card mt-4" aria-labelledby="gqf-find">
       <h3 id="gqf-find">{t("Find investors who fit")}</h3>
-      <p className="cq-body-sm text-(--cq-text-primary)" style={{ maxWidth: "68ch" }}>
+      <p
+        className="cq-body-sm text-(--cq-text-primary)"
+        style={{ maxWidth: "68ch" }}
+      >
         {t(
           "Many investors have a gate: a short form that tells you at once if you fit what they look for. Open one from an investor's profile or a link they shared.",
         )}
@@ -209,7 +212,9 @@ export function FounderApplications({
         {current === null ? null : (
           <SheetContent
             title={t(current.fund)}
-            description={t(`${sentWords(current.sentAt)}. Frozen at submission`)}
+            description={t(
+              `${sentWords(current.sentAt)}. Frozen at submission`,
+            )}
             side="side"
           >
             <FounderApplicationDetail application={current} />

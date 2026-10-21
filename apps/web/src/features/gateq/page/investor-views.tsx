@@ -118,15 +118,9 @@ export function FindView({
       <div className="flex flex-col gap-3">
         {results === null && !pending ? (
           <p className="cq-body-sm gq-t2">
-            {t("Like")}{" "}
-            <button
-              type="button"
-              className="underline underline-offset-4"
-              onClick={() => setText("Climate hardware in East Africa")}
-            >
-              {t("“climate hardware in East Africa”")}
-            </button>
-            {t(". Q searches companies on Capital Q you are allowed to see.")}
+            {t(
+              "Like “climate hardware in East Africa”. Q searches companies on Capital Q you are allowed to see.",
+            )}
           </p>
         ) : null}
         {query.chips.length === 0 ? null : (
@@ -274,7 +268,9 @@ export function FindView({
                     )}
                   </span>
                 </span>
-                <span className="gq2-tag gq2-q-no">{t("In your Discover")}</span>
+                <span className="gq2-tag gq2-q-no">
+                  {t("In your Discover")}
+                </span>
               </Link>
             ))}
           </div>
@@ -316,7 +312,11 @@ const STRICT: readonly (readonly [string, string, string])[] = [
     "Only companies that meet my rules",
     "Others see why and can't send.",
   ],
-  ["OPEN", "Anyone can send", "Founders still see your rules and how they stand."],
+  [
+    "OPEN",
+    "Anyone can send",
+    "Founders still see your rules and how they stand.",
+  ],
 ];
 
 export function GateView({
@@ -378,7 +378,10 @@ export function GateView({
   };
   const savePromise = () => {
     const value = days.trim() === "" ? null : Number(days);
-    if (value !== null && (!Number.isInteger(value) || value < 1 || value > 60)) {
+    if (
+      value !== null &&
+      (!Number.isInteger(value) || value < 1 || value > 60)
+    ) {
       setSaved("Use a number of working days from 1 to 60.");
       return;
     }
@@ -569,25 +572,25 @@ export function GateView({
           <h3 id="gq2-link">{t("Your gate link")}</h3>
           <CopyLink text={link} />
           <p className="cq-caption gq-t3">
-            {t("Also as a")}{" "}
-            <button
-              type="button"
-              className="underline underline-offset-4"
+            {t("Also as a QR code and a snippet for your website.")}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            <Button
+              variant="quiet"
+              size="compact"
               onClick={() => setShowQr(true)}
             >
               {t("QR code")}
-            </button>{" "}
-            {t("and a")}{" "}
-            <button
-              type="button"
-              className="underline underline-offset-4"
-              onClick={() => setShowSnippet(!showSnippet)}
+            </Button>
+            <Button
+              variant="quiet"
+              size="compact"
               aria-expanded={showSnippet}
+              onClick={() => setShowSnippet(!showSnippet)}
             >
-              {t("snippet for your website")}
-            </button>
-            .
-          </p>
+              {t("Website snippet")}
+            </Button>
+          </div>
           {showSnippet ? (
             <div className="flex flex-col gap-2">
               <code className="cq-caption block break-all rounded-(--cq-radius-md) bg-(--cq-surface-subtle) p-3">

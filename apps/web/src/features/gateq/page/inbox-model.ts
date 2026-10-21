@@ -467,7 +467,10 @@ export function paneWhy(item: GateqInboxItemDto): string {
 
 /** "Reply today", "Reply overdue", "Reply by 24 Oct": the firm's own promise. */
 export function dueWords(
-  item: Pick<GateqInboxItemDto, "replyState" | "daysLeft" | "folder" | "replyBy">,
+  item: Pick<
+    GateqInboxItemDto,
+    "replyState" | "daysLeft" | "folder" | "replyBy"
+  >,
 ): { readonly text: string; readonly late: boolean } | null {
   switch (item.replyState) {
     case "NONE":

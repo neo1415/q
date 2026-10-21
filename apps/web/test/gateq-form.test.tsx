@@ -827,9 +827,7 @@ describe("the form, driven like a founder", () => {
     expect(
       screen.getByLabelText<HTMLInputElement>("Best way to reach you").value,
     ).toBe("amara@kora.ng");
-    expect(
-      screen.getByText(/Filled in from your profile/),
-    ).toBeTruthy();
+    expect(screen.getByText(/Filled in from your profile/)).toBeTruthy();
     expect(
       screen.getByRole<HTMLInputElement>("checkbox", { name: /Pitch deck v3/ })
         .checked,

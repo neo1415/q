@@ -174,6 +174,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "api/http/company-material.ts GET DOCUMENT_ACCESS_PATH": cap("tool.read_my"),
   "api/http/company-material.ts GET FOLDER_ACCESS_PATH": cap("tool.read_my"),
+  // ownroom-2 (2026-10-21): the owner's room as one investor sees it, a
+  // read_my kind like who can see each document.
+  "api/http/company-material.ts GET `${base}${COMPANY_DATA_ROOM_PREVIEW_SEGMENT}`":
+    cap("tool.read_my"),
   "api/http/gateq.ts GET GATEQ_INVESTOR_GATES_PATH": cap(
     "tool.find_prospective_investors",
   ),
