@@ -234,18 +234,32 @@ export function createPostgresUsageReader(sql: DatabaseExecutor) {
     workforceMonth: async (
       who: { readonly userId: string; readonly tenantId: string },
       at: Date,
-    ): Promise<readonly { readonly runId: string; readonly usd: string }[]> => {
+    ): Promise<
+      readonly {
+        readonly runId: string;
+        readonly usd: string;
+        /** The UTC day the spend happened on, YYYY-MM-DD. */
+        readonly day: string;
+      }[]
+    > => {
       const { start, end } = monthOf(at);
-      const rows = await sql<{ run_id: string | null; usd: string }[]>`
+      // One row per run and UTC day, so the month can also be read day by
+      // day; summing the rows still gives the month (the limit's read).
+      const rows = await sql<
+        { run_id: string | null; usd: string; day: string }[]
+      >`
         select substring(u.correlation_id from ${WORKFORCE_RUN_SQL}) as run_id,
+               to_char(u.occurred_at at time zone 'UTC', 'YYYY-MM-DD') as day,
                round(coalesce(sum(u.cost_usd), 0), 6)::text as usd
           from ai_ops.model_usage u
          where u.user_id = ${who.userId} and u.tenant_id = ${who.tenantId}
            and u.correlation_id like 'cor\\_job\\_%'
            and u.occurred_at >= ${start} and u.occurred_at < ${end}
-         group by 1`;
+         group by 1, 2`;
       return rows.flatMap((row) =>
-        row.run_id === null ? [] : [{ runId: row.run_id, usd: row.usd }],
+        row.run_id === null
+          ? []
+          : [{ runId: row.run_id, usd: row.usd, day: row.day }],
       );
     },
 

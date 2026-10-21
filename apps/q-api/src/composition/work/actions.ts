@@ -458,6 +458,8 @@ function instructionWorkDto(row: InstructionRow): QWorkDto | null {
             words: row.last_step_words.slice(0, 500),
             at: row.last_step_at.toISOString(),
             doneForYou: row.last_step_words.startsWith("Done for you:"),
+            by: "Q",
+            laneId: null,
             undo: null,
           },
     // Money stays a decimal string end to end (never a float on the wire).
@@ -484,6 +486,22 @@ function instructionWorkDto(row: InstructionRow): QWorkDto | null {
  * own under the person's delegation, and, for a message sent so, the
  * chat's own unsend while it is still fresh.
  */
+/**
+ * Who took a delegation step, from the step's own key (written by the
+ * work graph per kind of happening): the other side accepting, the person
+ * coming back or going away, and otherwise Q acting under the approved
+ * grant. Code decides; an unknown kind is Q's, as only Q writes steps.
+ */
+const THEIR_STEPS = new Set(["accepted"]);
+const YOUR_STEPS = new Set(["away", "handback"]);
+
+export function stepActor(key: string): "Q" | "YOU" | "THEM" {
+  const kind = key.split(":", 1)[0] ?? "";
+  if (THEIR_STEPS.has(kind)) return "THEM";
+  if (YOUR_STEPS.has(kind)) return "YOU";
+  return "Q";
+}
+
 export function instructionStepDto(
   step: Pick<
     InstructionStepRow,
@@ -498,6 +516,9 @@ export function instructionStepDto(
   return {
     words: step.words,
     at: step.created_at.toISOString(),
+    // A standing instruction's steps are Q's, under the person's grant.
+    by: "Q",
+    laneId: null,
     doneForYou,
     undo:
       doneForYou &&
@@ -552,6 +573,8 @@ export function latestLaneStep(
         at: lane.updatedAt,
         doneForYou: false,
         undo: null,
+        by: null,
+        laneId: lane.id,
       };
     }
   }
@@ -745,6 +768,8 @@ export function createWorkPort(dependencies: {
           at: step.created_at.toISOString(),
           doneForYou: false,
           undo: null,
+          by: stepActor(step.step_key),
+          laneId: step.lane_id,
         })),
       };
     },

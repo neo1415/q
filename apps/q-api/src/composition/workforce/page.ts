@@ -53,7 +53,16 @@ export type WorkforceCosts = (
 export type WorkforceMonthCosts = (
   owner: Owner,
   at: Date,
-) => Promise<readonly { readonly runId: string; readonly usd: string }[]>;
+) => Promise<
+  readonly {
+    readonly runId: string;
+    readonly usd: string;
+    /** The UTC day (YYYY-MM-DD); absent from an older reader. */
+    readonly day?: string | undefined;
+  }[]
+>;
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/u;
 
 const ZERO = "0";
 const APPROVAL_STATUSES = [
@@ -583,9 +592,9 @@ export function createWorkforcePage(dependencies: {
       const today = new Date(
         Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate()),
       );
-      const [month, limit, team, jobs, instructions] = await Promise.all([
-        (dependencies.monthCosts?.(owner, at) ?? Promise.resolve([])).catch(
-          () => [],
+      const [read, limit, team, jobs, instructions] = await Promise.all([
+        (dependencies.monthCosts?.(owner, at) ?? Promise.resolve(null)).catch(
+          () => null,
         ),
         (dependencies.monthlyLimitUsd?.(owner) ?? Promise.resolve(null)).catch(
           () => null,
@@ -598,12 +607,19 @@ export function createWorkforcePage(dependencies: {
           Promise.resolve([])
         ).catch(() => []),
       ]);
+      // A ledger that cannot be read shows nothing spent (as before), but
+      // its days stay unknown rather than reading as a month of zeros.
+      const month = read ?? [];
       const roles = await store.runRoles(
         owner,
         month.map((row) => row.runId),
       );
       // Summed in micro-dollars: the ledger's numeric, never a float sum.
-      const byRole = new Map<(typeof WORKFORCE_AGENT_ROLES)[number], number>();
+      type Role = (typeof WORKFORCE_AGENT_ROLES)[number];
+      const byRole = new Map<Role, number>();
+      // Day by day (UTC), each split by role: the same ledger rows.
+      const byDay = new Map<string, Map<Role, number>>();
+      let dated = read !== null;
       let total = 0;
       for (const row of month) {
         const micros = Math.round(Number(row.usd) * 1_000_000);
@@ -615,6 +631,13 @@ export function createWorkforcePage(dependencies: {
           "AD_HOC",
         );
         byRole.set(role, (byRole.get(role) ?? 0) + micros);
+        if (row.day === undefined || !DAY.test(row.day)) {
+          dated = false;
+          continue;
+        }
+        const day = byDay.get(row.day) ?? new Map<Role, number>();
+        day.set(role, (day.get(role) ?? 0) + micros);
+        byDay.set(row.day, day);
       }
       const dollars = (micros: number) => usd(micros / 1_000_000);
       const limitMicros = limit === null ? null : Math.round(limit * 1_000_000);
@@ -627,6 +650,34 @@ export function createWorkforcePage(dependencies: {
           .filter(([, micros]) => micros > 0)
           .sort((a, b) => b[1] - a[1])
           .map(([role, micros]) => ({ role, usd: dollars(micros) })),
+        // A ledger without days (an older reader) leaves the days unknown.
+        ...(dated
+          ? {
+              byDay: [...byDay.entries()]
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .slice(-31)
+                .flatMap(([day, roleMicros]) => {
+                  const sum = [...roleMicros.values()].reduce(
+                    (one, two) => one + two,
+                    0,
+                  );
+                  if (sum <= 0) return [];
+                  return [
+                    {
+                      day,
+                      usd: dollars(sum),
+                      byRole: [...roleMicros.entries()]
+                        .filter(([, micros]) => micros > 0)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([role, micros]) => ({
+                          role,
+                          usd: dollars(micros),
+                        })),
+                    },
+                  ];
+                }),
+            }
+          : {}),
         team: team.map((row) => ({
           role: oneOf(WORKFORCE_AGENT_ROLES, row.role, "AD_HOC"),
           state: oneOf(
