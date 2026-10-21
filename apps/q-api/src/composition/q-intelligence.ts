@@ -264,6 +264,8 @@ export type QIntelligenceDependencies = {
    * (CQ-QACT-001). Absent: such a turn is answered like any other.
    */
   readonly visibility?: QVisibilityNotebook | undefined;
+  /** L-13: credited pictures for answers; absent, none are shown. */
+  readonly pictures?: ModelGatewayQAnswerDependencies["pictures"];
   readonly logger?: Logger | undefined;
 };
 
@@ -372,6 +374,9 @@ export function composeQIntelligence(
     sql,
     transactions,
     tools,
+    ...(dependencies.pictures === undefined
+      ? {}
+      : { pictures: dependencies.pictures }),
     // K Part 4: their own mandate read, kept per actor (Tier A) while D's
     // version for it is current; F's scope key, epoch read per request.
     ownMandateReads: createOwnMandateReads({

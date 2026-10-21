@@ -218,6 +218,14 @@ const completedRun = {
       },
     },
     {
+      kind: "PICTURE",
+      url: "https://images.pexels.com/photos/1/pexels-photo-1.jpeg",
+      alt: "A busy market street in Lagos",
+      credit: { name: "Ada Obi", url: "https://www.pexels.com/@ada-obi" },
+      source: "PEXELS",
+      pageUrl: "https://www.pexels.com/photo/market-street-1/",
+    },
+    {
       kind: "TIMELINE",
       title: "Your relationship",
       events: [
@@ -388,6 +396,8 @@ describe("type-level guarantees", () => {
           return block.title;
         case "ATTENTION":
           return block.report.readAt;
+        case "PICTURE":
+          return block.credit.name;
         default: {
           const unreachable: never = block;
           return unreachable;

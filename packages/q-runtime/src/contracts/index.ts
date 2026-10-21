@@ -292,6 +292,7 @@ function disclosable(
       case "ACTION_PROPOSAL":
       case "ARTIFACT_REFERENCE":
       case "PUBLIC_SOURCE":
+      case "PICTURE": // L-13: a stock picture's public fields, no record
         return true;
       default: {
         // A new kind fails typecheck here instead of silently vanishing.

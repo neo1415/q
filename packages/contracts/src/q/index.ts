@@ -501,6 +501,11 @@ export {
   QTableBlockSchema,
   QTimelineBlockSchema,
   QAttentionBlockSchema,
+  // L-13
+  Q_PICTURE_HOSTS,
+  Q_PICTURE_SOURCES,
+  QPictureBlockSchema,
+  type QPictureSource,
   chartableSeries,
   parseQResultBlocks,
   type QResultBlockDrop,

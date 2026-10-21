@@ -173,6 +173,14 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
       { label: "Apex Capital", countryCode: "GB", subject: null, note: null },
     ],
   },
+  PICTURE: {
+    kind: "PICTURE",
+    url: "https://images.pexels.com/photos/1/pexels-photo-1.jpeg",
+    alt: "A busy market street in Lagos",
+    credit: { name: "Ada Obi", url: "https://www.pexels.com/@ada-obi" },
+    source: "PEXELS",
+    pageUrl: "https://www.pexels.com/photo/market-street-1/",
+  },
   ATTENTION: {
     kind: "ATTENTION",
     report: {
@@ -243,6 +251,29 @@ describe("QResultBlock", () => {
       QResultBlockSchema.safeParse({ kind: "TEXT", text: "x", format: "html" })
         .success,
     ).toBe(false);
+  });
+
+  it("shows a picture only from its source's own hosts, over https, credited", () => {
+    const picture = BLOCK_FIXTURES["PICTURE"] as Record<string, unknown>;
+    const parses = (change: Record<string, unknown>) =>
+      QResultBlockSchema.safeParse({ ...picture, ...change }).success;
+    expect(parses({})).toBe(true);
+    // Not an arbitrary address: no tracking pixel, no other host.
+    expect(parses({ url: "https://tracker.example.com/p.gif" })).toBe(false);
+    expect(parses({ url: "http://images.pexels.com/photos/1/a.jpeg" })).toBe(
+      false,
+    );
+    expect(parses({ url: "javascript:alert(1)" })).toBe(false);
+    expect(parses({ pageUrl: "https://example.com/photo/1" })).toBe(false);
+    expect(parses({ source: "UNSPLASH" })).toBe(false);
+    // The credit is required; its link is optional but https when present.
+    expect(parses({ credit: undefined })).toBe(false);
+    expect(parses({ credit: { name: "Ada Obi", url: null } })).toBe(true);
+    expect(
+      parses({ credit: { name: "Ada Obi", url: "http://www.pexels.com/@a" } }),
+    ).toBe(false);
+    expect(parses({ alt: " " })).toBe(false);
+    expect(parses({ caption: "a claim" })).toBe(false);
   });
 
   it("treats script-looking text as text, with no executable kind", () => {

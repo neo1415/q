@@ -18,6 +18,8 @@ export const Q_AR: Readonly<Record<string, string>> = {
   Board: "اللوحة",
   Captions: "الترجمة النصية",
   Chart: "رسم بياني",
+  Picture: "صورة",
+  "Photo by": "صورة بواسطة",
   Chats: "المحادثات",
   Checks: "الفحوصات",
   "Close the Board": "إغلاق اللوحة",

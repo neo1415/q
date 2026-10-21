@@ -300,7 +300,7 @@ describe("renderer", () => {
     expect(rendered.messages[0]?.content).toContain("You are Q");
     expect(rendered.messages[0]?.content).toContain("OPERATING MODE: DEBRIEF");
     expect(rendered.bundle.bundleVersion).toBe(
-      "q-system.v2_company-analyst.v25_comm.v1",
+      "q-system.v2_company-analyst.v26_comm.v1",
     );
     expect(rendered.bundle.bundleVersion).toMatch(
       /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/,
@@ -423,7 +423,8 @@ describe("renderer", () => {
       22,
     );
     expect(historical.characters / 4).toBeLessThan(4_500);
-    expect(rendered.bundle.task).toBe("company-analyst/v25");
+    // v26 (L-13): ~40 tokens for PICTURE and pictureQuery, under the same cap.
+    expect(rendered.bundle.task).toBe("company-analyst/v26");
     expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS);
     expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });

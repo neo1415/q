@@ -108,6 +108,7 @@ import {
   INVESTOR_REVISABLE_STEPS,
 } from "@capital-q/investor-onboarding";
 import { createPexelsPhotos } from "./composition/stock-photos.js";
+import { createPexelsQPictures } from "./composition/pictures.js";
 import {
   createOwnPictureReader,
   createSupabaseObjectReader,
@@ -4086,6 +4087,10 @@ const arrivalSnapshots = createArrivalSnapshots({
   daily: (actor) => dailyStore.latest(actor.userId, actor.tenantId),
 });
 const qIntelligence = composeQIntelligence({
+  // L-13: credited pictures for answers, from the deck-photo key.
+  pictures: createPexelsQPictures(
+    process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
+  ),
   arrivalSnapshot: (actor) => arrivalSnapshots.forActor(actor),
   // RECOVERY (C's request): what came of Q's recent screen acts, from the
   // receipts ledger (composed further down; read only once turns run).

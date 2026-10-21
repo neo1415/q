@@ -45,6 +45,8 @@ const SHOWABLE: ReadonlySet<QTurnObjectBlock["kind"]> = new Set([
   "CHART",
   "MAP",
   "TIMELINE",
+  // L-13: a picture of what Q is talking about, credited on the stage too.
+  "PICTURE",
 ]);
 
 export type ShownItem = {
@@ -75,6 +77,8 @@ function titleOf(blocks: readonly QTurnObjectBlock[]): string {
         return "Comparison";
       case "CLARIFICATION_REQUEST":
         return block.question;
+      case "PICTURE":
+        return block.alt;
       case "COMPANY_REFERENCE":
       case "INVESTOR_REFERENCE":
       case "ACTION_PROPOSAL":
@@ -289,6 +293,7 @@ export function subjectOf(item: Pick<ShownItem, "blocks">): ItemSubject {
       case "ACTION_PROPOSAL":
       case "UI_INTENT":
       case "ATTENTION":
+      case "PICTURE": // names no subject to point back at
         break;
     }
   }

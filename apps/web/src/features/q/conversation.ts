@@ -109,7 +109,9 @@ export type QTurnObjectBlock = Extract<
       | "MAP"
       | "TIMELINE"
       // G-R4: what needs the person, as one report.
-      | "ATTENTION";
+      | "ATTENTION"
+      // L-13: a credited picture of something visual.
+      | "PICTURE";
   }
 >;
 
@@ -155,6 +157,7 @@ function objectBlocksOf(
       case "MAP":
       case "TIMELINE":
       case "ATTENTION":
+      case "PICTURE":
         return true;
       case "UI_INTENT":
         // SHOW_EVIDENCE carries the same references an evidence block
