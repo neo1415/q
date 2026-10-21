@@ -658,6 +658,7 @@ import { Q_VOICE_SPEAK_RELAY_PATH } from "./voice/routes.js";
 import {
   personaVoiceFor,
   personaVoiceSpec,
+  tavusTtsLayer,
 } from "./voice/persona-voices/persona-voice.js";
 import { createSpeechPerformanceBoard } from "./voice/speech-performance.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
@@ -6422,6 +6423,29 @@ const rehearsalVideo = createRehearsalVideoService({
   publicBaseUrl: process.env.Q_API_PUBLIC_URL?.trim() || null,
   bridgePath: qRehearsalVideoBridgeBasePath,
   eventsPath: qRehearsalVideoEventsBasePath,
+  // REHEARSE: the face speaks in the persona's ElevenLabs voice, matched
+  // to the face's gender. Off unless "on" (UNVERIFIED LIVE: no paid room
+  // has run with it yet).
+  ...(process.env.CQ_REHEARSAL_VIDEO_PERSONA_VOICE === "on"
+    ? {
+        ttsVoice: async (
+          actor: ActorContext,
+          rehearsalId: string,
+          voice: "MALE" | "FEMALE",
+        ) => {
+          const profile = await rehearsals.voiceProfile(actor, rehearsalId);
+          if (profile === null) return null;
+          const chosen = personaVoiceFor({
+            seed: profile.seed,
+            voice,
+            basedIn: profile.basedIn,
+            ageGroup: null,
+            patience: profile.patience,
+          });
+          return chosen === null ? null : tavusTtsLayer(chosen);
+        },
+      }
+    : {}),
   enabledInterviewers: enabledInterviewersFrom(
     process.env.CQ_REHEARSAL_VIDEO_INTERVIEWERS,
   ),

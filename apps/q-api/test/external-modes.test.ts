@@ -219,14 +219,15 @@ describe("the Qatar five are five different rehearsals", () => {
     ).toBe("GENERIC_PERSON");
   });
 
-  it("no mode's prompt claims identity or carries an accent instruction", () => {
+  it("no mode's prompt claims identity, imitates an accent or caricatures (owner 2026-10-21: idiom yes, caricature no)", () => {
     built.forEach((b, i) => {
       const text = externalLiveInstructions({
         subject: FIVE[i]?.s as ExternalPersonSubject,
         built: b,
         founder,
       });
-      expect(text).toMatch(/never put on an accent/);
+      expect(text).toMatch(/Never imitate or spell out an accent/);
+      expect(text).toMatch(/never caricature or stereotype/);
       expect(text).toMatch(/Never put words in the real person's mouth/);
       expect(
         claimsToBeRealPerson(b.persona.summary, [FIVE[i]?.s.displayName ?? ""]),

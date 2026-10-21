@@ -140,6 +140,37 @@ export function isCatalogVoice(id: string): boolean {
   return CATALOG_VOICE_IDS.has(id);
 }
 
+/**
+ * REHEARSE video: the model the Tavus face speaks the persona voice with.
+ * Flash v2.5 is in Tavus's documented ElevenLabs list; v4 turbo is not
+ * yet, so it is not asked for there.
+ */
+export const TAVUS_TTS_MODEL = "eleven_flash_v2_5";
+
+/**
+ * The Tavus TTS layer for a persona voice: a public ElevenLabs voice id and
+ * its settings, never a provider key (so a private voice cannot be used).
+ * UNVERIFIED LIVE: built and unit-tested, no paid room has run with it.
+ */
+export function tavusTtsLayer(voice: PersonaVoice): {
+  readonly tts_engine: "elevenlabs";
+  readonly external_voice_id: string;
+  readonly tts_model_name: string;
+  readonly voice_settings: Readonly<Record<string, number | boolean>>;
+} {
+  return {
+    tts_engine: "elevenlabs",
+    external_voice_id: voice.voiceId,
+    tts_model_name: TAVUS_TTS_MODEL,
+    voice_settings: {
+      stability: voice.stability,
+      similarity_boost: PERSONA_SIMILARITY,
+      speed: voice.speed,
+      use_speaker_boost: true,
+    },
+  };
+}
+
 /** Voice settings for one line on a model without audio tags. */
 export type ToneSettings = {
   readonly stability?: number | undefined;
