@@ -2551,6 +2551,44 @@ export function createSpecialistQAnswer(
   const PREREADS_MAX = 64;
 
   /**
+   * Turn latency row 5: the conversation the early read loaded beside the
+   * firewall, taken once by the same run's answer instead of read again.
+   * Same tenant and run only, and only while fresh; taken means gone, so
+   * any later read in the run (a turn heard again) reads anew.
+   */
+  const preloaded = new Map<
+    string,
+    {
+      readonly at: number;
+      readonly tenantId: string;
+      readonly history: Promise<readonly QConversationMessage[]>;
+    }
+  >();
+  const PRELOADED_FRESH_MS = 5_000;
+  const readHistory = (tenantId: string, runId: string) =>
+    repositories.messages.listRecentForConversationOfRun(
+      sql,
+      tenantId,
+      runId,
+      64,
+    );
+  const historyOfRun = (
+    tenantId: string,
+    runId: string,
+  ): Promise<readonly QConversationMessage[]> => {
+    const kept = preloaded.get(runId);
+    preloaded.delete(runId);
+    if (
+      kept === undefined ||
+      kept.tenantId !== tenantId ||
+      Date.now() - kept.at >= PRELOADED_FRESH_MS
+    ) {
+      return readHistory(tenantId, runId);
+    }
+    return kept.history.catch(() => readHistory(tenantId, runId));
+  };
+
+  /**
    * The turn is about someone across a relationship: a company subject on
    * an investor's run (their own organisation bound in the plan), or a
    * request to act that names one of their relationships' counterparts,
@@ -2710,14 +2748,20 @@ export function createSpecialistQAnswer(
     if (turns === undefined || prereads.has(input.runId)) return;
     const started = (async (): Promise<EarlyReading | null> => {
       // The run's own conversation, read as its owner: the same read the
-      // answer makes, under the actor preflight has just checked.
-      const history =
-        await repositories.messages.listRecentForConversationOfRun(
-          sql,
-          input.tenantId,
-          input.runId,
-          64,
-        );
+      // answer makes, under the actor preflight has just checked -- and
+      // kept for that answer (row 5), so it is made once per run.
+      const loading = readHistory(input.tenantId, input.runId);
+      preloaded.set(input.runId, {
+        at: Date.now(),
+        tenantId: input.tenantId,
+        history: loading,
+      });
+      while (preloaded.size > PREREADS_MAX) {
+        const oldest = preloaded.keys().next().value;
+        if (oldest === undefined) break;
+        preloaded.delete(oldest);
+      }
+      const history = await loading;
       const conversationId = history[0]?.conversationId;
       const latest = [...history].reverse().find((m) => m.role === "USER");
       if (conversationId === undefined || latest === undefined) return null;
@@ -3011,12 +3055,7 @@ export function createSpecialistQAnswer(
     // reading's ~1 s and those reads' ~0.5-1 s ran one after the other).
     // RECOVERY B5: started once the conversation is read (one short DB
     // read later), so a pure pleasantry never pays for them.
-    const history = await repositories.messages.listRecentForConversationOfRun(
-      sql,
-      request.tenantId,
-      request.runId,
-      64,
-    );
+    const history = await historyOfRun(request.tenantId, request.runId);
     const conversationId = history[0]?.conversationId;
     const latest = [...history].reverse().find((m) => m.role === "USER");
     // RECOVERY B5 (audit B-05): "hi Q", "thanks", "how are you?" -- a turn
