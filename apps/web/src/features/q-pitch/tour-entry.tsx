@@ -9,9 +9,12 @@ import { markQPitchRunning } from "./tour-presence";
 import type { TourSubject } from "./subject-model";
 import type { TourChoice } from "./tour-host";
 
-type Start = { readonly tour: TourChoice; readonly chapter: string | null };
-function choiceOf(value: string | null): TourChoice | null {
-  return value === "pilot" ||
+/** v7: the story track (`?qpitch=story`) has its own host. */
+type EntryChoice = TourChoice | "story";
+type Start = { readonly tour: EntryChoice; readonly chapter: string | null };
+function choiceOf(value: string | null): EntryChoice | null {
+  return value === "story" ||
+    value === "pilot" ||
     value === "premiere" ||
     value === "short" ||
     value === "atlas" ||
@@ -76,6 +79,11 @@ const QPitchHost = dynamic(
   { ssr: false },
 );
 
+const StoryHost = dynamic(
+  () => import("./story/story-host").then((m) => m.StoryHost),
+  { ssr: false },
+);
+
 const noSubscription = () => () => undefined;
 
 export function QPitchEntry({
@@ -117,6 +125,17 @@ export function QPitchEntry({
     return () => markQPitchRunning(false);
   }, [holding]);
   if (started === null || ended) return null;
+  const exit = () => {
+    try {
+      window.sessionStorage.removeItem(RESUME_KEY);
+    } catch {
+      // Nothing kept, nothing to clear.
+    }
+    setEnded(true);
+  };
+  if (started.tour === "story") {
+    return <StoryHost account={account} role={role} onExit={exit} />;
+  }
   return (
     <QPitchHost
       account={account}
@@ -124,14 +143,7 @@ export function QPitchEntry({
       tour={started.tour}
       chapter={started.chapter}
       subject={subject}
-      onExit={() => {
-        try {
-          window.sessionStorage.removeItem(RESUME_KEY);
-        } catch {
-          // Nothing kept, nothing to clear.
-        }
-        setEnded(true);
-      }}
+      onExit={exit}
     />
   );
 }

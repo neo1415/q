@@ -172,7 +172,10 @@ const HALTED: ReadonlySet<string> = new Set([
 ]);
 
 /** A bank answer in Q's standard voice, or its reading time without one. */
-async function answerAloud(text: string, signal: AbortSignal): Promise<void> {
+export async function answerAloud(
+  text: string,
+  signal: AbortSignal,
+): Promise<void> {
   const started = Date.now();
   const spoken = await standardVoiceLine(
     spokenPart(text),

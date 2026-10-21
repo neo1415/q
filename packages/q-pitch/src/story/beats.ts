@@ -139,7 +139,8 @@ type BeatInput = {
   readonly lines: readonly string[];
   readonly pace: StoryPace;
   readonly delivery: string;
-  readonly tags?: readonly (readonly [On | "$end", StoryAudioTag])[];
+  /** `on` is a word (see wordIndex), or "$end" for after the last word. */
+  readonly tags?: readonly (readonly [On, StoryAudioTag])[];
   readonly cues?: readonly (readonly [On, StoryAct])[];
   readonly silenceAfterMs?: number;
 };
@@ -957,6 +958,7 @@ const inputs: readonly BeatInput[] = [
       ["trillions", stage("type", 5, "Trillions of dollars")],
       ["What", stage("none")],
       ["HOME)", go("home")],
+      ["HOME)", mood("WAKE")],
     ],
   },
   {

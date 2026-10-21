@@ -3,6 +3,7 @@ import {
   ATLAS_SCRIPT,
   PREMIERE_SCRIPT,
   SHORT_SCRIPT,
+  STORY_BEATS,
   certifyTour,
   type TourScript,
 } from "@capital-q/q-pitch";
@@ -22,7 +23,7 @@ export type AtlasChapter = {
 };
 
 export type TourOption = {
-  readonly key: "premiere" | "short";
+  readonly key: "story" | "premiere" | "short";
   readonly title: string;
   readonly length: string;
   readonly href: string;
@@ -54,6 +55,15 @@ export function tourOptions(now: string): readonly TourOption[] {
     scenes: script.scenes.length,
   });
   return [
+    {
+      // v7: the owner's story, told by Q over the real app.
+      key: "story",
+      title: "Q tells the Capital Q story",
+      length: "About 7 minutes",
+      href: "/home?qpitch=story&new=1",
+      certifiedScenes: 0,
+      scenes: STORY_BEATS.length,
+    },
     option(
       "premiere",
       "Investor premiere",
