@@ -277,8 +277,14 @@ Model calls include the independent reading, which runs alongside the first roun
 
 ### What changed
 
-- **Stages, from real events.** The turn reports READING ("Reading what you said" / "Getting your setup ready"), SAVING ("Saving your answers"), LOOKING_UP ("Looking up <company>") and WRITING ("Writing a reply"). They travel as an SSE `stage` event from q-api to api to the web route to `say-stream.ts`, and the workspace shows them in the working indicator.
+- **Stages, from real events.** They travel as an SSE `stage` event from q-api to api to the web route to `say-stream.ts`. Follow-up `speed/onboarding-r3-stages` (owner review 2026-10-21) narrowed what is shown to stages that name something:
+  - "Saving your round size", from the journey's own labels for the steps being written;
+  - "Looking up Quillmark Health", with the name taken from their record or sign-up, never from model output ("Looking into it" when there is none);
+  - "Reading deck.pdf", for an upload.
+
+  "Reading what you said" and "Writing a reply" are no longer emitted. From send to Q's first words the screen shows one line at fixed height, replaced in place: Q's working mark, plus the stage when it names something. The line is lane 3's shared `WorkingLine` beside Q's working mark, and an upload's "Reading deck.pdf" shows on it too. Stage labels are English (a follow-up for other languages).
   - Contract: `QInterviewStageSchema` and `Q_INTERVIEW_STREAM_EVENTS.STAGE`, both additive.
+
 - **Exact answers take no model call.** A one-word answer or a bare figure for the step just asked is saved by code and replied to by code (708 ms instead of 1.7 s for the first words).
 - **What was saved is said first.** When a turn needs Q's judgement, code says what saved the moment the save commits ("stage: Seed; country: Kenya.") while the model writes the rest. The model is told it was said, so it never repeats it. English only, like every code line. First words: 3.5 s → 2.5 s.
 - **The final reply streams.** Its first sentence shows while the rest is written.

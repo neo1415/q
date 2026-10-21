@@ -416,10 +416,10 @@ describe("answer seam: Q decides to research", () => {
       query: question,
       maxSources: 4,
     });
-    // Each step's stage as it starts (owner 2026-10-21): the named company
-    // read by code, the model at work, its lookup, the web, the writing.
+    // Each step's stage as it starts (owner 2026-10-21): the model at
+    // work, its lookup, the web, the writing. Code's own read of the named
+    // company found no match here, so it shows no stage of its own.
     expect(stages).toEqual([
-      "REVIEWING_COMPANY",
       "PREPARING_ANALYSIS",
       "REVIEWING_COMPANY",
       "SEARCHING_PUBLIC_SOURCES",
