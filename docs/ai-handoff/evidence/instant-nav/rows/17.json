@@ -1,1 +1,12 @@
-{"id":17,"said":"okay, dismiss this","page":"/work","channel":"spoken","kind":"close","ms":52,"runs":0,"reads":0,"moves":1,"outcome":"done on screen"}
+{
+  "id": 17,
+  "said": "okay, dismiss this",
+  "page": "/work",
+  "channel": "spoken",
+  "kind": "close",
+  "ms": 52,
+  "runs": 0,
+  "reads": 0,
+  "moves": 1,
+  "outcome": "done on screen"
+}
