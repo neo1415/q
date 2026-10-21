@@ -32,20 +32,29 @@ function Strip() {
     };
     // What Q's answers in this conversation carried, oldest first (a
     // stand-in for a recorded conversation; blocks as the API sends them).
+    // The real session's turns replace the context whenever they change
+    // (QShowModal); the stand-in is applied again for a while after, so a
+    // late refresh of the session never empties it mid-test.
+    let keep: ReturnType<typeof setInterval> | null = null;
     own.cqHarnessConversation = (answers) => {
-      setConversationTurns(
-        answers.map((blocks, index): QTurn => ({
-          kind: "Q",
-          id: `harness-answer-${String(index)}`,
-          text: "",
-          streaming: false,
-          sourceCount: 0,
-          publicSources: [],
-          findings: [],
-          uncertainties: [],
-          blocks: blocks as Extract<QTurn, { kind: "Q" }>["blocks"],
-        })),
-      );
+      const turns = answers.map((blocks, index): QTurn => ({
+        kind: "Q",
+        id: `harness-answer-${String(index)}`,
+        text: "",
+        streaming: false,
+        sourceCount: 0,
+        publicSources: [],
+        findings: [],
+        uncertainties: [],
+        blocks: blocks as Extract<QTurn, { kind: "Q" }>["blocks"],
+      }));
+      setConversationTurns(turns);
+      if (keep !== null) clearInterval(keep);
+      const until = Date.now() + 15_000;
+      keep = setInterval(() => {
+        setConversationTurns(turns);
+        if (Date.now() > until && keep !== null) clearInterval(keep);
+      }, 20);
     };
     // An action Q's answer carried, performed as the session performs it.
     own.cqHarnessPerform = (action) => {
