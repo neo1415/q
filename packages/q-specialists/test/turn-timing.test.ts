@@ -392,6 +392,7 @@ export type Timing = {
   readonly journey: string;
   readonly firstVisibleMs: number | null;
   readonly firstWordsMs: number | null;
+  readonly lastWordsMs: number | null;
   readonly completeMs: number;
   readonly modelCalls: number;
   readonly calls: readonly string[];
@@ -510,6 +511,8 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
   const at = (): number => (performance.now() - started) / SCALE;
   let firstVisibleMs: number | null = null;
   let firstWordsMs: number | null = null;
+  /** The last streamed sentence: the voice has the whole answer to say. */
+  let lastWordsMs: number | null = null;
   const stages: string[] = [];
   const traced: string[] = [];
   const trace = (what: string): void => {
@@ -588,6 +591,7 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
     publish: (delta: QLiveDelta) => {
       if (delta.preview !== undefined) firstVisibleMs ??= at();
       if (delta.text.trim().length > 0) {
+        lastWordsMs = at();
         if (firstWordsMs === null) trace("first words");
         firstWordsMs ??= at();
         firstVisibleMs ??= at();
@@ -732,6 +736,7 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
     journey: journey.name,
     firstVisibleMs,
     firstWordsMs,
+    lastWordsMs,
     completeMs,
     modelCalls: calls.length,
     calls,
@@ -750,11 +755,11 @@ describe("turn timing harness", () => {
     const rows: Timing[] = [];
     for (const journey of JOURNEYS) rows.push(await timeJourney(journey));
     const table = [
-      "| journey | first visible | first words | complete | model calls | calls |",
-      "| --- | --- | --- | --- | --- | --- |",
+      "| journey | first visible | first words | answer words all out | complete | model calls | calls |",
+      "| --- | --- | --- | --- | --- | --- | --- |",
       ...rows.map(
         (row) =>
-          `| ${row.journey} | ${ms(row.firstVisibleMs)} | ${ms(row.firstWordsMs)} | ${ms(row.completeMs)} | ${String(row.modelCalls)} | ${row.calls.join(", ")} |`,
+          `| ${row.journey} | ${ms(row.firstVisibleMs)} | ${ms(row.firstWordsMs)} | ${ms(row.lastWordsMs)} | ${ms(row.completeMs)} | ${String(row.modelCalls)} | ${row.calls.join(", ")} |`,
       ),
     ].join("\n");
     console.log(`\n${table}\n`);

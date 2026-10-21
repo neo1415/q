@@ -1247,7 +1247,7 @@ export const TURN_UNREAD_NOTE =
  * detail on screen: fewer words to write is also the faster answer.
  */
 export const SPOKEN_TURN_NOTE =
-  "SPOKEN TURN: this answer is said aloud on a live call. answer: at most three short spoken sentences (about 60 words), first person, the direct answer to what they asked first, contractions, no lists, headings or markdown. A list, scores or a comparison go in answerCards; the words give the gist and the best one or two by name, then say they're on screen. At most two findings, one short sentence each: every word is written before the call can go on. Never read a list aloud.";
+  "SPOKEN TURN: this answer is said aloud on a live call. answer: at most three short spoken sentences (about 60 words), first person, the direct answer to what they asked first, contractions, no lists, headings or markdown. A list, scores or a comparison go in answerCards; the words give the gist and the best one or two by name, then say they're on screen. At most three findings. Never read a list aloud.";
 
 export const WRITING_DOCUMENT_NOTE =
   "THEY ASKED FOR THIS AS A DOCUMENT. Your answer IS the document's text: write the piece itself, in full, with a short heading line (# Title) and section headings where they help. Capital Q files your answer as their document with a PDF download right after you finish and shows its card, so never say you cannot make a PDF or document, never describe the document instead of writing it, and never say it is already attached.";
