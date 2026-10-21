@@ -931,6 +931,9 @@ export {
   QInterviewAskingSchema,
   QInterviewTurnRequestSchema,
   QInterviewTurnResponseSchema,
+  Q_INTERVIEW_STREAM_EVENTS,
+  QInterviewSentenceSchema,
+  type QInterviewSentence,
   type QInterviewTurnRequest,
   type QInterviewTurnResponse,
 } from "./interview.js";

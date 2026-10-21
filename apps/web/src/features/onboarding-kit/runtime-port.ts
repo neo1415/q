@@ -99,6 +99,8 @@ export type RuntimePort = {
         }[];
         /** The founder profile section they came to fill (Overview link). */
         readonly focus?: string | undefined;
+        /** Turn latency L9: each finished sentence of Q's reply, as it is written. */
+        readonly onSentence?: ((text: string) => void) | undefined;
       }) => Promise<SayOnboardingResponse>)
     | undefined;
   /**
@@ -505,6 +507,7 @@ export function createRuntimeClient<
               readonly text: string;
             }[];
             readonly focus?: string | undefined;
+            readonly onSentence?: ((text: string) => void) | undefined;
           }) =>
             guarded(async () => {
               const say = port.say;
@@ -522,6 +525,9 @@ export function createRuntimeClient<
                 idempotencyKey: crypto.randomUUID(),
                 recentTurns: input.recentTurns,
                 ...(input.focus === undefined ? {} : { focus: input.focus }),
+                ...(input.onSentence === undefined
+                  ? {}
+                  : { onSentence: input.onSentence }),
               });
               return {
                 view: await present(remember(outcome.view)),

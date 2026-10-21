@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   AppendOnboardingInterviewTurnsRequestSchema,
   GetOnboardingCoverageResponseSchema,
@@ -25,6 +25,9 @@ import {
   ONBOARDING_NUDGE_SEGMENT,
   ONBOARDING_NUDGE_BRIEFING_SEGMENT,
   OnboardingBriefingNudgeResponseSchema,
+  createProblemDetails,
+  Q_INTERVIEW_STREAM_EVENTS,
+  Q_SSE_CONTENT_TYPE,
   type CorrelationId,
 } from "@capital-q/contracts";
 import {
@@ -38,6 +41,7 @@ import {
 import { createCorrelationId } from "@capital-q/observability";
 import type { OnboardingCoverageReader } from "../onboarding-coverage.js";
 import {
+  QAccountPausedError,
   QInterviewUnavailableError,
   type QInterviewClient,
 } from "../q/interview-client.js";
@@ -237,34 +241,86 @@ export function registerOnboardingRoutes(
         throw new OnboardingSessionVersionConflictError();
       }
 
+      const turnRequest = {
+        onboardingSessionId: sessionId,
+        journeyType: before.session.journeyType,
+        utterance: input.text,
+        channel: "text" as const,
+        recentTurns: input.recentTurns,
+        ...(input.focus === undefined ? {} : { focus: input.focus }),
+      };
+      const respond = async (
+        turn: Awaited<ReturnType<QInterviewClient["turn"]>>,
+      ) => {
+        // What was recorded is read back from the session, never from the
+        // prose: the reply is Q's words and is not evidence of a write.
+        const after = await runtime.getSession({ actor, sessionId });
+        return SayOnboardingResponseSchema.parse({
+          view: after,
+          understood: null,
+          reply: turn.reply,
+          navigate: turn.navigate,
+          researching: turn.researching,
+          degraded: turn.degraded,
+          askingAbout: turn.askingAbout,
+          pending: turn.pending,
+          ...(turn.conduct === undefined ? {} : { conduct: turn.conduct }),
+          ...(turn.gestures === undefined ? {} : { gestures: turn.gestures }),
+        });
+      };
+
+      // Turn latency 2026-10-21 (onboarding L9): asked for a stream, Q's
+      // reply goes on to the browser a sentence at a time as q-api writes
+      // it, then the same response the JSON form returns, as `result`.
+      const accept = request.headers.accept;
+      if (
+        typeof accept === "string" &&
+        accept.toLowerCase().includes(Q_SSE_CONTENT_TYPE)
+      ) {
+        const stream = lazySseStream(reply);
+        try {
+          const turn = await interviewer.turnStream({
+            accessToken,
+            request: turnRequest,
+            onSentence: (text) => {
+              stream.write(Q_INTERVIEW_STREAM_EVENTS.SENTENCE, { text });
+            },
+          });
+          stream.end(Q_INTERVIEW_STREAM_EVENTS.RESULT, await respond(turn));
+          return reply;
+        } catch (error) {
+          // Nothing sent yet: the ordinary problem reply, status and all.
+          if (!stream.started()) throw error;
+          request.log.warn(
+            { err: error },
+            "streamed onboarding turn failed after its first sentence",
+          );
+          stream.end(
+            Q_INTERVIEW_STREAM_EVENTS.PROBLEM,
+            error instanceof QAccountPausedError
+              ? {
+                  ...createProblemDetails({
+                    code: "PERMISSION_DENIED",
+                    requestId: request.id,
+                    detail: error.message,
+                  }),
+                  paused: true,
+                }
+              : createProblemDetails({
+                  code: "PROVIDER_UNAVAILABLE",
+                  requestId: request.id,
+                }),
+          );
+          return reply;
+        }
+      }
+
       const turn = await interviewer.turn({
         accessToken,
-        request: {
-          onboardingSessionId: sessionId,
-          journeyType: before.session.journeyType,
-          utterance: input.text,
-          channel: "text",
-          recentTurns: input.recentTurns,
-          ...(input.focus === undefined ? {} : { focus: input.focus }),
-        },
+        request: turnRequest,
       });
-
-      // What was recorded is read back from the session, never from the
-      // prose: the reply is Q's words and is not evidence of a write.
-      const after = await runtime.getSession({ actor, sessionId });
       void reply.header("Cache-Control", "no-store");
-      return SayOnboardingResponseSchema.parse({
-        view: after,
-        understood: null,
-        reply: turn.reply,
-        navigate: turn.navigate,
-        researching: turn.researching,
-        degraded: turn.degraded,
-        askingAbout: turn.askingAbout,
-        pending: turn.pending,
-        ...(turn.conduct === undefined ? {} : { conduct: turn.conduct }),
-        ...(turn.gestures === undefined ? {} : { gestures: turn.gestures }),
-      });
+      return respond(turn);
     },
   );
 
@@ -374,4 +430,47 @@ export function registerOnboardingRoutes(
       },
     );
   }
+}
+
+/**
+ * One SSE response, opened at its first write: until then the route can
+ * still fail with its ordinary problem reply. A closed connection stops
+ * the writing, never the turn.
+ */
+function lazySseStream(reply: FastifyReply): {
+  readonly write: (event: string, data: unknown) => void;
+  readonly started: () => boolean;
+  readonly end: (event: string, data: unknown) => void;
+} {
+  let open = false;
+  let ended = false;
+  const start = () => {
+    if (open) return;
+    open = true;
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "content-type": Q_SSE_CONTENT_TYPE,
+      "cache-control": "no-store, no-transform",
+      connection: "keep-alive",
+      "x-accel-buffering": "no",
+    });
+  };
+  const frame = (event: string, data: unknown) => {
+    start();
+    if (reply.raw.destroyed) return;
+    // JSON has no raw line breaks, so one `data:` line carries it whole.
+    reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+  return {
+    write: (event, data) => {
+      if (!ended) frame(event, data);
+    },
+    started: () => open,
+    end: (event, data) => {
+      if (ended) return;
+      ended = true;
+      frame(event, data);
+      reply.raw.end();
+    },
+  };
 }

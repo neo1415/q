@@ -81,6 +81,8 @@ export type OnboardingClient<TView, TResponse> = {
         }[];
         /** The founder profile section they came to fill (Overview link). */
         readonly focus?: string | undefined;
+        /** Turn latency L9: each finished sentence of Q's reply, as it is written. */
+        readonly onSentence?: ((text: string) => void) | undefined;
       }) => Promise<{
         readonly view: TView;
         /** Null when the one Q interviewer answered; `reply` is then Q's words. */

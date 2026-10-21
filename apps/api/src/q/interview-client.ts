@@ -1,10 +1,15 @@
 import {
+  QInterviewSentenceSchema,
   QInterviewTurnResponseSchema,
+  Q_INTERVIEW_STREAM_EVENTS,
+  Q_SSE_CONTENT_TYPE,
   Q_INTERVIEW_PATH,
   Q_INTERVIEW_TURN_SEGMENT,
   type QInterviewTurnRequest,
   type QInterviewTurnResponse,
 } from "@capital-q/contracts";
+
+import { sseFrames } from "./sse-frames.js";
 
 /**
  * The typed way this service reaches the one Q interviewer (QX-004 core
@@ -26,6 +31,16 @@ export type QInterviewClient = {
   turn: (input: {
     readonly accessToken: string;
     readonly request: QInterviewTurnRequest;
+  }) => Promise<QInterviewTurnResponse>;
+  /**
+   * The same turn, streamed (onboarding L9): `onSentence` hears each of
+   * Q's finished sentences as q-api sends it; the promise resolves to the
+   * whole turn, exactly as `turn` would, and fails the same ways.
+   */
+  turnStream: (input: {
+    readonly accessToken: string;
+    readonly request: QInterviewTurnRequest;
+    readonly onSentence: (text: string) => void;
   }) => Promise<QInterviewTurnResponse>;
 };
 
@@ -67,61 +82,150 @@ export function createQInterviewClient(options: {
   const call: typeof globalThis.fetch =
     options.fetch ?? ((input, init) => globalThis.fetch(input, init));
 
+  /** One POST to the interviewer, its status already judged. */
+  const post = async (
+    accessToken: string,
+    request: QInterviewTurnRequest,
+    signal: AbortSignal,
+    accept?: string,
+  ): Promise<Response> => {
+    let response: Response;
+    try {
+      response = await call(
+        `${base}${Q_INTERVIEW_PATH}${Q_INTERVIEW_TURN_SEGMENT}`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            "content-type": "application/json",
+            ...(accept === undefined ? {} : { accept }),
+          },
+          body: JSON.stringify(request),
+          signal,
+        },
+      );
+    } catch (error) {
+      throw new QInterviewUnavailableError(
+        error instanceof Error ? error.message : "unreachable",
+      );
+    }
+    if (response.status === 403) {
+      const refusal: unknown = await response.json().catch(() => null);
+      if (pausedRefusal(refusal)) throw new QAccountPausedError();
+    }
+    if (!response.ok) {
+      throw new QInterviewUnavailableError(
+        `the interviewer answered ${String(response.status)}`,
+      );
+    }
+    return response;
+  };
+
+  /** A deadline for one call; never a reason to hold the loop open. */
+  const deadline = () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+    timer.unref?.();
+    return { signal: controller.signal, clear: () => clearTimeout(timer) };
+  };
+
   return {
     turn: async ({ accessToken, request }) => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => {
-        controller.abort();
-      }, timeoutMs);
-      // Never a reason to hold the loop open on its own.
-      timer.unref?.();
+      const limit = deadline();
       let response: Response;
       try {
-        response = await call(
-          `${base}${Q_INTERVIEW_PATH}${Q_INTERVIEW_TURN_SEGMENT}`,
-          {
-            method: "POST",
-            headers: {
-              authorization: `Bearer ${accessToken}`,
-              "content-type": "application/json",
-            },
-            body: JSON.stringify(request),
-            signal: controller.signal,
-          },
-        );
-      } catch (error) {
-        throw new QInterviewUnavailableError(
-          error instanceof Error ? error.message : "unreachable",
-        );
+        response = await post(accessToken, request, limit.signal);
       } finally {
-        clearTimeout(timer);
-      }
-
-      if (response.status === 403) {
-        const refusal: unknown = await response.json().catch(() => null);
-        if (
-          typeof refusal === "object" &&
-          refusal !== null &&
-          "paused" in refusal &&
-          refusal.paused === true
-        ) {
-          throw new QAccountPausedError();
-        }
-      }
-      if (!response.ok) {
-        throw new QInterviewUnavailableError(
-          `the interviewer answered ${String(response.status)}`,
-        );
+        limit.clear();
       }
       // Another service's body is external data: unknown until parsed.
       const body: unknown = await response.json();
-      const parsed = QInterviewTurnResponseSchema.safeParse(body);
-      if (!parsed.success) {
-        throw new QInterviewUnavailableError(
-          "the interviewer answered in a shape this service does not accept",
+      return parsedTurn(body);
+    },
+
+    turnStream: async ({ accessToken, request, onSentence }) => {
+      // The whole stream is bounded by the same deadline, not only its
+      // first byte: a model that stalls mid-reply still lets go.
+      const limit = deadline();
+      try {
+        const response = await post(
+          accessToken,
+          request,
+          limit.signal,
+          Q_SSE_CONTENT_TYPE,
         );
+        const type = response.headers.get("content-type") ?? "";
+        if (!type.includes(Q_SSE_CONTENT_TYPE)) {
+          // An interviewer without the streamed form answers as before.
+          const body: unknown = await response.json();
+          return parsedTurn(body);
+        }
+        if (response.body === null) {
+          throw new QInterviewUnavailableError("the interviewer sent no body");
+        }
+        let result: QInterviewTurnResponse | null = null;
+        for await (const frame of sseFrames(response.body)) {
+          const data = jsonOrNull(frame.data);
+          if (frame.event === Q_INTERVIEW_STREAM_EVENTS.SENTENCE) {
+            const sentence = QInterviewSentenceSchema.safeParse(data);
+            if (sentence.success) onSentence(sentence.data.text);
+          } else if (frame.event === Q_INTERVIEW_STREAM_EVENTS.RESULT) {
+            result = parsedTurn(data);
+          } else if (frame.event === Q_INTERVIEW_STREAM_EVENTS.PROBLEM) {
+            if (pausedRefusal(data)) throw new QAccountPausedError();
+            throw new QInterviewUnavailableError(
+              "the interviewer could not finish the turn",
+            );
+          }
+        }
+        if (result === null) {
+          throw new QInterviewUnavailableError(
+            "the interviewer's stream ended without a turn",
+          );
+        }
+        return result;
+      } catch (error) {
+        if (
+          error instanceof QAccountPausedError ||
+          error instanceof QInterviewUnavailableError
+        ) {
+          throw error;
+        }
+        throw new QInterviewUnavailableError(
+          error instanceof Error ? error.message : "the stream failed",
+        );
+      } finally {
+        limit.clear();
       }
-      return parsed.data;
     },
   };
+}
+
+function pausedRefusal(refusal: unknown): boolean {
+  return (
+    typeof refusal === "object" &&
+    refusal !== null &&
+    "paused" in refusal &&
+    refusal.paused === true
+  );
+}
+
+function jsonOrNull(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function parsedTurn(body: unknown): QInterviewTurnResponse {
+  const parsed = QInterviewTurnResponseSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new QInterviewUnavailableError(
+      "the interviewer answered in a shape this service does not accept",
+    );
+  }
+  return parsed.data;
 }
