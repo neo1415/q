@@ -4,7 +4,7 @@ import {
   type QVoiceChoice,
 } from "@capital-q/contracts";
 
-import { CATALOG_VOICE_IDS } from "../persona-voices/catalog.js";
+import { CATALOG_VOICE_IDS, catalogVoice } from "../persona-voices/catalog.js";
 import {
   expressivePeak,
   parsePersonaVoiceSpec,
@@ -554,7 +554,23 @@ export type ElevenLabsSpeechRelay = {
      */
     readonly voiceId?: string | undefined;
   }) => Promise<Response>;
+  /**
+   * REHEARSE: get a persona's library voice ready before its first line.
+   * Measured on Q's account 2026-10-21: the first request in a library
+   * voice took 10.5-12.7 s to its first byte on any model (v4 turbo,
+   * flash v2.5), then 0.26-0.92 s; premade voices had no such start.
+   * Fire-and-forget, a few characters, at most once per voice per
+   * VOICE_WARM_MS; premade and unknown voices are skipped.
+   */
+  readonly warm?: ((voiceSpec: string) => void) | undefined;
 };
+
+/** A warmed voice is not warmed again for this long. */
+const VOICE_WARM_MS = 20 * 60_000;
+/** The warm-up's own text: a few characters, never heard by anyone. */
+const VOICE_WARM_TEXT = "Hm.";
+/** A warm-up that has not finished by now is abandoned. */
+const VOICE_WARM_TIMEOUT_MS = 30_000;
 
 /**
  * What the agent is played when it asks for no format.
@@ -700,6 +716,8 @@ export function createElevenLabsSpeechRelay(
   /** ElevenLabs is skipped until then, when Aura-2 is there to speak. */
   let restingUntil = 0;
   let failuresRunning = 0;
+  /** REHEARSE: voices warmed lately (voice id → until). */
+  const warmedUntil = new Map<string, number>();
   /** REHEARSE: what this account refused, remembered so it is not asked again. */
   const unavailableUntil = new Map<ElevenLabsSpeechModel, number>();
   const englishOnlyVoices = new Set<string>();
@@ -728,7 +746,42 @@ export function createElevenLabsSpeechRelay(
     return available.length > 0 ? available : chain;
   };
 
+  const warm = (voiceSpec: string): void => {
+    const { voiceId } = parsePersonaVoiceSpec(voiceSpec);
+    const entry = catalogVoice(voiceId);
+    if (entry === undefined || entry.category === "premade") return;
+    if ((warmedUntil.get(voiceId) ?? 0) > now()) return;
+    warmedUntil.set(voiceId, now() + VOICE_WARM_MS);
+    if (warmedUntil.size > 1_000) {
+      const oldest = warmedUntil.keys().next().value;
+      if (oldest !== undefined) warmedUntil.delete(oldest);
+    }
+    const url = new URL(`/v1/text-to-speech/${voiceId}/stream`, API_ORIGIN);
+    url.searchParams.set("output_format", "mp3_22050_32");
+    void doFetch(url, {
+      method: "POST",
+      headers: {
+        "xi-api-key": options.apiKey,
+        "content-type": "application/json",
+      },
+      // Flash: the cheapest model, and the start is the voice's, not the
+      // model's, so it warms v4 turbo too.
+      body: JSON.stringify({
+        text: VOICE_WARM_TEXT,
+        model_id: "eleven_flash_v2_5",
+      }),
+      signal: AbortSignal.timeout(VOICE_WARM_TIMEOUT_MS),
+    })
+      .then((response) => response.arrayBuffer())
+      .catch(() => {
+        // A failed warm-up only means the first line is slow; try again
+        // next time.
+        warmedUntil.delete(voiceId);
+      });
+  };
+
   return {
+    warm,
     stream: async ({ voice, text, outputFormat, signal, session, voiceId }) => {
       // An allow-list rather than a passthrough: the query string arrives
       // from outside this server, and a vendor URL is not the place to

@@ -350,10 +350,12 @@ export function buildExternalPersona(input: {
 
   const persona: CounterpartPersonaStored = {
     summary: plain(summary, 600),
-    // No accent, mannerism or temperament is inferred from the name or
-    // nationality; the style is the same neutral professional every time.
+    // Nothing about temperament is inferred from the name or nationality.
+    // How they talk (idiom) follows where they are based, added to the turn
+    // as "Speaks like" (INVESTOR_TWIN_TURN v11, owner decision 2026-10-21);
+    // the accent is the voice's, never written.
     style: plain(
-      `Professional, courteous, direct. Standard natural English. A simulation informed by public sources, not the real person.${quirk === undefined ? "" : ` Habit: ${quirk.label}.`}`,
+      `Professional, courteous, direct. Natural spoken English. A simulation informed by public sources, not the real person.${quirk === undefined ? "" : ` Habit: ${quirk.label}.`}`,
       300,
     ),
     temperament: {
@@ -497,7 +499,7 @@ export function externalLiveInstructions(input: {
         ? "Public evidence is thin. Play a neutral, professional counterpart for the role only. Invent no personality, history, opinions or past deals."
         : "Shape your questions around the sourced themes below. Themes marked Reportedly are publicly reported but unconfirmed: if you refer to one, say it is reported or that you understand it to be a focus, never as established fact. Do not state any of them as things the real person said, and never quote anyone; you only ask about the themes. Add no personal history, opinions or past deals that are not listed."
     }`,
-    `Voice and manner: ${spoken !== null ? `natural, clear ${spoken} in the standard register professionals use at work, because the founder chose it (follow them if they switch to English; keep names, figures, currencies and investment terms such as ARR or SAFE as they say them)` : "natural, standard English"}, measured pace, short sentences, contractions. Use the same neutral professional manner whatever the name, nationality or location suggests: never put on an accent, dialect or mannerism. One question at a time.`,
+    `Voice and manner: ${spoken !== null ? `natural, clear ${spoken} in the standard register professionals use at work, because the founder chose it (follow them if they switch to English; keep names, figures, currencies and investment terms such as ARR or SAFE as they say them)` : "natural spoken English"}, measured pace, short sentences, contractions.${subject.location === null ? "" : ` Talk the way a professional based in ${JSON.stringify(plain(subject.location, 120))} talks at work: their natural idiom and register, and a word of the local language where they naturally would.`} Never imitate or spell out an accent, never caricature or stereotype where someone is from, and never let it change what you know or think. One question at a time.`,
     `Opening: after that sentence, open on ${scenario.openingThemes.map((t) => JSON.stringify(t)).join(", then, if it is covered, ")}. Do not read a list of questions. Weave the angles below into a natural conversation, one at a time, in your own words, reacting to what the founder actually says.`,
     `Angles to probe (not a script; ask them naturally, skip any the founder has already covered well):\n${quote(scenario.directions.map((d) => `${d.label}: press on ${d.pressure}`))}`,
     ...(scenario.quirk === undefined

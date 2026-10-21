@@ -1,4 +1,14 @@
+import { createDefaultPromptRegistry } from "@capital-q/q-core";
 import { describe, expect, it } from "vitest";
+
+import type { RehearsalService } from "../src/composition/rehearsals.js";
+import type { VoiceSessionBinding } from "../src/voice/bindings.js";
+import type { VoiceSpeaker } from "../src/voice/provider.js";
+import {
+  createRehearsalAwareTurn,
+  PERSONA_FILLER_AFTER_MS,
+  PERSONA_FILLERS,
+} from "../src/voice/rehearsal-turn.js";
 
 import {
   accentForPlace,
@@ -12,6 +22,7 @@ import {
   parsePersonaVoiceSpec,
   personaVoiceFor,
   personaVoiceSpec,
+  tavusTtsLayer,
   toneSettings,
 } from "../src/voice/persona-voices/persona-voice.js";
 import { createDeepgramVoiceProvider } from "../src/voice/providers/deepgram.js";
@@ -686,5 +697,138 @@ describe("turn-taking on the standard line", () => {
     expect(settings()).toMatchObject(eot(0.85, 4_000));
     expect(settings("EAGER")).toMatchObject(eot(0.8, 3_000));
     expect(settings("PATIENT")).toMatchObject(eot(0.9, 5_000));
+  });
+});
+
+describe("a slow persona reply (row 11: soft-timeout filler)", () => {
+  type Say = RehearsalService["say"];
+  const line = (text: string) =>
+    ({
+      kind: "OK",
+      rehearsal: {
+        turns: [{ from: "THEM", text, at: "2026-10-21T10:00:00.000Z" }],
+      },
+    }) as unknown as Awaited<ReturnType<Say>>;
+  const run = async (delayMs: number, deferred = false): Promise<string[]> => {
+    const spoken: string[] = [];
+    const say: Say = () =>
+      new Promise((resolve) =>
+        setTimeout(() => resolve(line("What is your churn?")), delayMs),
+      );
+    const turn = createRehearsalAwareTurn({
+      rehearsals: { say } as unknown as RehearsalService,
+      fallback: () => Promise.resolve({ kind: "NOTHING" }),
+      fillerAfterMs: 20,
+    });
+    const speaker: VoiceSpeaker = {
+      providerConversationId: "dg_x",
+      isOpen: true,
+      deferred,
+      speak: (text) => {
+        if (typeof text === "string") spoken.push(text);
+        return Promise.resolve();
+      },
+      close: () => undefined,
+    };
+    await turn(
+      {
+        voiceSessionId: `v-${String(delayMs)}-${String(deferred)}`,
+        actor: {},
+        thread: { rehearsal: { rehearsalId: "r1" } },
+      } as unknown as VoiceSessionBinding,
+      [{ role: "user", content: "We grow fast." }],
+      new AbortController().signal,
+      speaker,
+    );
+    return spoken;
+  };
+
+  it("says nothing extra when the reply is quick", async () => {
+    expect(await run(0)).toEqual(["What is your churn?"]);
+  });
+
+  it("fills a long wait with a few in-character words, then the line", async () => {
+    const spoken = await run(80);
+    expect(spoken).toHaveLength(2);
+    expect(PERSONA_FILLERS as readonly string[]).toContain(spoken[0]);
+    expect(spoken[1]).toBe("What is your churn?");
+  });
+
+  it("never adds a filler on a line that says everything at once", async () => {
+    expect(await run(80, true)).toEqual(["What is your churn?"]);
+  });
+
+  it("waits about three seconds by default, as Kuuza's soft timeout", () => {
+    expect(PERSONA_FILLER_AFTER_MS).toBe(3_000);
+  });
+});
+
+describe("the Tavus face's persona voice (row 14, UNVERIFIED LIVE)", () => {
+  it("names a public ElevenLabs voice and its settings, never a key", () => {
+    const chosen = personaVoiceFor({
+      seed: "COMPANY:1",
+      voice: "FEMALE",
+      basedIn: "Lagos, Nigeria",
+      ageGroup: null,
+      patience: "TYPICAL",
+    });
+    expect(chosen).not.toBeNull();
+    if (chosen === null) return;
+    const layer = tavusTtsLayer(chosen);
+    expect(layer).toMatchObject({
+      tts_engine: "elevenlabs",
+      external_voice_id: chosen.voiceId,
+      tts_model_name: "eleven_flash_v2_5",
+      voice_settings: { similarity_boost: 0.85 },
+    });
+    expect(JSON.stringify(layer)).not.toMatch(/api_key/u);
+  });
+});
+
+describe("how the person Q plays talks (row 12, INVESTOR_TWIN_TURN v11)", () => {
+  const template =
+    createDefaultPromptRegistry().getActive("INVESTOR_TWIN_TURN").definition
+      .template;
+
+  it("is the active turn prompt, and asks for idiom from the Speaks like line", () => {
+    expect(
+      createDefaultPromptRegistry().getActive("INVESTOR_TWIN_TURN").definition
+        .version,
+    ).toBe(11);
+    expect(template).toContain('"Speaks like" line');
+    expect(template).toContain("code-switch");
+  });
+
+  it("forbids caricature, stereotype and spelled-out accents", () => {
+    expect(template).toContain("never spell an accent out");
+    expect(template).toContain("never caricature, stereotype or exaggerate");
+    expect(template).toContain("never let it change what they know or think");
+  });
+});
+
+describe("warming a persona's library voice before its first line", () => {
+  it("warms a library voice once, in a few characters on flash, and skips premade voices", async () => {
+    const fake = fakeElevenLabs(() => pcm());
+    let clock = 0;
+    const relay = createElevenLabsSpeechRelay({
+      apiKey: "k",
+      fetch: fake.fetch,
+      now: () => clock,
+    });
+    relay.warm?.(SPEC);
+    relay.warm?.(SPEC);
+    relay.warm?.("JBFqnCBsd6RMkjVDRZzb;1.00;0.65"); // George: premade
+    relay.warm?.("NotACatalogVoice1");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fake.seen).toHaveLength(1);
+    expect(fake.seen[0]).toMatchObject({
+      voiceId: ARABIC,
+      model: "eleven_flash_v2_5",
+    });
+    expect(String(fake.seen[0]?.body.text).length).toBeLessThanOrEqual(4);
+    clock += 21 * 60_000;
+    relay.warm?.(SPEC);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(fake.seen).toHaveLength(2);
   });
 });

@@ -214,7 +214,8 @@ describe("GPT-Live instructions", () => {
     expect(text).toContain("AI rehearsal informed by public sources");
     expect(text).toMatch(/NOT Shadi Qishta/);
     expect(text).toMatch(/no tools and cannot search/);
-    expect(text).toMatch(/never put on an accent/);
+    expect(text).toMatch(/Never imitate or spell out an accent/);
+    expect(text).toMatch(/never caricature or stereotype/);
     expect(text).toMatch(/stop the moment the founder speaks over you/);
     expect(text).toContain("logistics software in the Gulf");
     expect(text).toContain("Acme Freight");

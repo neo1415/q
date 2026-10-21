@@ -346,11 +346,12 @@ export function RehearsalRoom({
         dropped();
       },
     },
-    // A rehearsal speaks only as the person Q plays. GPT-Live is used only
-    // for a researched external person, from the persona prepared before
-    // the call (no tools, no search); any other rehearsal stays on the
-    // standard line.
-    { live: initial.counterpart.kind === "EXTERNAL_PERSON" },
+    // A rehearsal speaks only as the person Q plays, in their own
+    // ElevenLabs voice on the standard line: GPT-Live would speak in Q's
+    // own voice (owner decision 2026-10-21, researched people included,
+    // ~1-2 s more per turn). A live-trial account, which has only GPT-Live,
+    // is still answered there by the server.
+    { live: false },
   );
 
   // The line as it really is: LIVE only while it can carry a turn. A line

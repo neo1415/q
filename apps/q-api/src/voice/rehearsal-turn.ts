@@ -35,6 +35,21 @@ const DID_NOT_CATCH = [
 const ALREADY_OVER =
   "I think we've covered it for today. Thanks for your time.";
 
+/**
+ * A persona turn is one bounded model call (rehearsals TURN_BUDGET: up to
+ * two attempts of 8 s), so a reply can take longer than a person reads as
+ * "they're thinking". Past this, the person Q plays fills the gap the way
+ * a person would, in a couple of words, before the line itself (Kuuza's
+ * soft timeout, 3 s). Nothing about the reply is guessed in it.
+ */
+export const PERSONA_FILLER_AFTER_MS = 3_000;
+export const PERSONA_FILLERS = [
+  "Hmm, let me think about that.",
+  "Right. Give me a second.",
+  "Okay, hang on.",
+  "Mm. Let me think.",
+] as const;
+
 /** A turn's mood as a voice tone; NEUTRAL is the voice as it is. */
 export function toneOf(mood: QRehearsalTurnDto["mood"]): SpeechTone | null {
   return mood !== null && (SPEECH_TONES as readonly string[]).includes(mood)
@@ -62,7 +77,11 @@ export function createRehearsalAwareTurn(dependencies: {
   readonly rehearsals: RehearsalService;
   readonly fallback: VoiceTurnHandler;
   readonly performance?: SpeechPerformanceBoard | undefined;
+  /** Absent means PERSONA_FILLER_AFTER_MS; for tests. */
+  readonly fillerAfterMs?: number | undefined;
 }): VoiceTurnHandler {
+  const fillerAfterMs = dependencies.fillerAfterMs ?? PERSONA_FILLER_AFTER_MS;
+  let fillers = 0;
   let misses = 0;
   /** The last played line spoken on each voice line, never said twice. */
   const spokenAt = new Map<string, string>();
@@ -73,12 +92,36 @@ export function createRehearsalAwareTurn(dependencies: {
     }
     const latest = lastUserWords(transcript);
     if (latest === null) return { kind: "NOTHING" };
-    const result = await dependencies.rehearsals.say(
+    const saying = dependencies.rehearsals.say(
       binding.actor,
       rehearsal.rehearsalId,
       { text: latest },
       signal,
     );
+    // A slow reply gets a filler first, on a line that is heard as it is
+    // spoken; a deferred line (GPT-Live) says everything at once, so a
+    // filler there would only become part of the answer.
+    let filled = false;
+    if (speaker.deferred !== true && fillerAfterMs > 0) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const late = await Promise.race([
+        saying.then(
+          () => false,
+          () => false,
+        ),
+        new Promise<boolean>((resolve) => {
+          timer = setTimeout(() => resolve(true), fillerAfterMs);
+        }),
+      ]);
+      if (timer !== undefined) clearTimeout(timer);
+      if (late && !signal.aborted) {
+        filled = true;
+        await speaker.speak(
+          PERSONA_FILLERS[fillers++ % PERSONA_FILLERS.length] ?? "",
+        );
+      }
+    }
+    const result = await saying;
     if (signal.aborted) {
       return { kind: "INTERRUPTED", path: "Q" } satisfies VoiceTurnOutcome;
     }
@@ -92,7 +135,7 @@ export function createRehearsalAwareTurn(dependencies: {
         line === undefined ||
         spokenAt.get(binding.voiceSessionId) === line.at
       ) {
-        return { kind: "NOTHING" };
+        return filled ? { kind: "SPOKEN", path: "Q" } : { kind: "NOTHING" };
       }
       spokenAt.set(binding.voiceSessionId, line.at);
       if (spokenAt.size > 500) {

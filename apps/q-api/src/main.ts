@@ -658,6 +658,7 @@ import { Q_VOICE_SPEAK_RELAY_PATH } from "./voice/routes.js";
 import {
   personaVoiceFor,
   personaVoiceSpec,
+  tavusTtsLayer,
 } from "./voice/persona-voices/persona-voice.js";
 import { createSpeechPerformanceBoard } from "./voice/speech-performance.js";
 import { createVoiceTurnHandler } from "./voice/turn.js";
@@ -6422,6 +6423,29 @@ const rehearsalVideo = createRehearsalVideoService({
   publicBaseUrl: process.env.Q_API_PUBLIC_URL?.trim() || null,
   bridgePath: qRehearsalVideoBridgeBasePath,
   eventsPath: qRehearsalVideoEventsBasePath,
+  // REHEARSE: the face speaks in the persona's ElevenLabs voice, matched
+  // to the face's gender. Off unless "on" (UNVERIFIED LIVE: no paid room
+  // has run with it yet).
+  ...(process.env.CQ_REHEARSAL_VIDEO_PERSONA_VOICE === "on"
+    ? {
+        ttsVoice: async (
+          actor: ActorContext,
+          rehearsalId: string,
+          voice: "MALE" | "FEMALE",
+        ) => {
+          const profile = await rehearsals.voiceProfile(actor, rehearsalId);
+          if (profile === null) return null;
+          const chosen = personaVoiceFor({
+            seed: profile.seed,
+            voice,
+            basedIn: profile.basedIn,
+            ageGroup: null,
+            patience: profile.patience,
+          });
+          return chosen === null ? null : tavusTtsLayer(chosen);
+        },
+      }
+    : {}),
   enabledInterviewers: enabledInterviewersFrom(
     process.env.CQ_REHEARSAL_VIDEO_INTERVIEWERS,
   ),
@@ -6442,6 +6466,47 @@ setInterval(() => {
     logger.warn({ err: error }, "rehearsal video sweep failed");
   });
 }, 30_000).unref();
+
+/**
+ * REHEARSE: the persona's voice for one rehearsal, from what Q prepared
+ * about them (persona-voices), warmed on the speak relay so a library
+ * voice's first line is not its ~11 s cold start.
+ */
+const rehearsalPersonaVoice = async (
+  actor: ActorContext,
+  rehearsalId: string,
+  voice: "MALE" | "FEMALE" | undefined,
+) => {
+  const profile = await rehearsals.voiceProfile(actor, rehearsalId);
+  if (profile === null) return null;
+  const chosen = personaVoiceFor({
+    seed: profile.seed,
+    voice: voice ?? profile.voice,
+    basedIn: profile.basedIn,
+    ageGroup: null,
+    patience: profile.patience,
+  });
+  if (chosen === null) return null;
+  const spec = personaVoiceSpec(chosen);
+  elevenLabsSpeech?.relay.warm?.(spec);
+  return { spec, turnTaking: chosen.turnTaking };
+};
+/**
+ * The rehearsal routes' service: starting a rehearsal also warms the
+ * persona's voice, seconds before the room opens its voice line.
+ */
+const rehearsalsWarmingVoices: typeof rehearsals = {
+  ...rehearsals,
+  start: async (actor, input) => {
+    const started = await rehearsals.start(actor, input);
+    if (started.kind === "OK") {
+      void rehearsalPersonaVoice(actor, started.rehearsal.id, undefined).catch(
+        () => undefined,
+      );
+    }
+    return started;
+  },
+};
 
 // REHEARSE: a rehearsal's voice line speaks only as the person Q plays.
 const rehearsalVoiceTurn = createRehearsalAwareTurn({
@@ -6823,7 +6888,7 @@ const { app, logger: appLogger } = createApp(
         return { name: summary.plan.name, features: summary.features };
       },
     }),
-    rehearsals,
+    rehearsals: rehearsalsWarmingVoices,
     rehearsalVideo,
     // BILLING block (ADR 0034)
     rehearsalEntitlements: entitlements,
@@ -6930,26 +6995,8 @@ const { app, logger: appLogger } = createApp(
               voiceIdFor: personaVoiceId,
               // ...chosen from what Q prepared about them: where they are
               // based, the voice picked in the lobby, their patience.
-              voiceFor: async (actor, rehearsalId, voice) => {
-                const profile = await rehearsals.voiceProfile(
-                  actor,
-                  rehearsalId,
-                );
-                if (profile === null) return null;
-                const chosen = personaVoiceFor({
-                  seed: profile.seed,
-                  voice,
-                  basedIn: profile.basedIn,
-                  ageGroup: null,
-                  patience: profile.patience,
-                });
-                return chosen === null
-                  ? null
-                  : {
-                      spec: personaVoiceSpec(chosen),
-                      turnTaking: chosen.turnTaking,
-                    };
-              },
+              voiceFor: (actor, rehearsalId, voice) =>
+                rehearsalPersonaVoice(actor, rehearsalId, voice),
               performOpening: async (actor, rehearsalId, voiceSessionId) => {
                 const opening = await rehearsals.opening(actor, rehearsalId);
                 if (opening === null) return;

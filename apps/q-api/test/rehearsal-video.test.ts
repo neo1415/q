@@ -407,6 +407,7 @@ function setup(
     testMode?: boolean;
     paidUserIds?: ReadonlySet<string>;
     allAccounts?: boolean;
+    ttsVoice?: Parameters<typeof createRehearsalVideoService>[0]["ttsVoice"];
   } = {},
 ) {
   let clock = T0.getTime();
@@ -418,6 +419,7 @@ function setup(
   const service = createRehearsalVideoService({
     stillAllowed,
     store,
+    ...(options.ttsVoice === undefined ? {} : { ttsVoice: options.ttsVoice }),
     testMode: options.testMode,
     allAccounts: options.allAccounts,
     paidUserIds: options.paidUserIds ?? new Set([FOUNDER.userId]),
@@ -556,6 +558,43 @@ describe("starting a video rehearsal", () => {
     expect(harness.tavus.calls.conversations[0]?.input.name).toBe(
       `cq-rehearsal-${session.id}`,
     );
+  });
+
+  it("keeps the face's own voice unless the persona-voice flag composed one", async () => {
+    const harness = setup();
+    await startVideo(harness);
+    expect(harness.tavus.calls.pals[0]?.input.layers.tts).toBeUndefined();
+  });
+
+  it("gives the face the persona's ElevenLabs voice, matched to the face's gender (UNVERIFIED LIVE)", async () => {
+    const layer = {
+      tts_engine: "elevenlabs" as const,
+      external_voice_id: "JBFqnCBsd6RMkjVDRZzb",
+      tts_model_name: "eleven_flash_v2_5",
+      voice_settings: { stability: 0.65, similarity_boost: 0.85, speed: 1 },
+    };
+    const ttsVoice = vi.fn(() => Promise.resolve(layer));
+    const harness = setup({ ttsVoice });
+    await startVideo(harness);
+    // Steve, the default face, is a man.
+    expect(ttsVoice).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(String),
+      "MALE",
+    );
+    const pal = harness.tavus.calls.pals[0]?.input;
+    expect(pal?.layers.tts).toEqual(layer);
+    // No provider key travels to Tavus with the voice.
+    expect(JSON.stringify(pal?.layers.tts)).not.toMatch(/api_key/u);
+  });
+
+  it("opens the room in the face's own voice when the persona voice cannot be read", async () => {
+    const harness = setup({
+      ttsVoice: () => Promise.reject(new Error("read failed")),
+    });
+    const session = await startVideo(harness);
+    expect(session.joinUrl).not.toBeNull();
+    expect(harness.tavus.calls.pals[0]?.input.layers.tts).toBeUndefined();
   });
 
   it("opens a private, three-minute room whose brain is Q's bridge", async () => {

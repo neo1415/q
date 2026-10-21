@@ -30,7 +30,7 @@ import {
   TavusKeysExhaustedError,
   type TavusKeyPool,
 } from "./tavus/key-pool.js";
-import { TavusError } from "./tavus/client.js";
+import { TavusError, type TavusPalLayers } from "./tavus/client.js";
 
 /**
  * Video rehearsals (ADR 0066): Tavus is the face, voice and turn-taking;
@@ -61,6 +61,8 @@ export type RehearsalInterviewer = {
   readonly style: string;
   /** A Tavus stock face (never a likeness of the real counterpart). */
   readonly faceId: string;
+  /** The face's presented gender, so a persona voice matches the face. */
+  readonly voice: "MALE" | "FEMALE";
 };
 
 /**
@@ -76,24 +78,28 @@ export const REHEARSAL_INTERVIEWERS: readonly RehearsalInterviewer[] = [
     name: "Steve",
     style: "Calm and professional; lets you finish, then follows up.",
     faceId: "rdd4c86e5e1a",
+    voice: "MALE",
   },
   {
     id: "analyst-julia",
     name: "Julia",
     style: "Brisk and precise; comes back to the numbers.",
     faceId: "rd27826c12a6",
+    voice: "FEMALE",
   },
   {
     id: "partner-raj",
     name: "Raj",
     style: "Direct; presses on the market and the thesis.",
     faceId: "re6220ec0195",
+    voice: "MALE",
   },
   {
     id: "partner-mary",
     name: "Mary",
     style: "Warm but thorough; asks about the team and why now.",
     faceId: "r55e6793f10f",
+    voice: "FEMALE",
   },
 ];
 
@@ -675,6 +681,20 @@ export function createRehearsalVideoService(dependencies: {
   readonly eventsPath: (sessionId: string) => string;
   readonly enabledInterviewers: ReadonlySet<string>;
   /**
+   * REHEARSE: the face speaks in the persona's ElevenLabs voice (Tavus TTS
+   * layer) instead of the face's stock voice. Composed only behind
+   * CQ_REHEARSAL_VIDEO_PERSONA_VOICE; absent keeps the stock voice. The
+   * gender is the face's, so the voice matches what the founder sees.
+   * UNVERIFIED LIVE: no paid room has run with it.
+   */
+  readonly ttsVoice?:
+    | ((
+        actor: ActorContext,
+        rehearsalId: string,
+        voice: "MALE" | "FEMALE",
+      ) => Promise<NonNullable<TavusPalLayers["tts"]> | null>)
+    | undefined;
+  /**
    * Any language: the founder's chosen language for Q. The room runs in it
    * first when Tavus lists it (`languages`); the lines themselves come from
    * Q, already in their language.
@@ -1156,6 +1176,14 @@ export function createRehearsalVideoService(dependencies: {
       const bridgeUrl = `${publicBase}${dependencies.bridgePath(row.id)}`;
       const eventsUrl = `${publicBase}${dependencies.eventsPath(row.id)}/${encodeURIComponent(eventsToken)}`;
       const disclosure = disclosureFor(rehearsal);
+      // Read before the room is asked for; a failed read keeps the face's
+      // own voice rather than holding the room.
+      const tts =
+        dependencies.ttsVoice === undefined
+          ? null
+          : await dependencies
+              .ttsVoice(actor, rehearsal.id, interviewer.voice)
+              .catch(() => null);
       try {
         const { value, keyIndex } = await pool.withHealthyKey(
           async (client, providerKeyIndex) => {
@@ -1183,6 +1211,7 @@ export function createRehearsalVideoService(dependencies: {
                   // real rehearsal turn, never a speculative one.
                   speculative_inference: false,
                 },
+                ...(tts === null ? {} : { tts }),
                 perception: { perception_model: "off" },
                 conversational_flow: {
                   turn_detection_model: "sparrow-2",

@@ -117,7 +117,21 @@ export type TavusPalLayers = {
     readonly headers?: Readonly<Record<string, string>> | undefined;
     readonly speculative_inference?: boolean | undefined;
   };
-  readonly tts?: { readonly voice_id?: string | undefined } | undefined;
+  readonly tts?:
+    | {
+        readonly voice_id?: string | undefined;
+        /**
+         * REHEARSE: a third-party voice for the face (Tavus TTS layer).
+         * Public ElevenLabs voice ids only: no provider key is ever sent,
+         * so a private (cloned) voice cannot be used here.
+         */
+        readonly tts_engine?: "elevenlabs" | undefined;
+        readonly external_voice_id?: string | undefined;
+        readonly tts_model_name?: string | undefined;
+        readonly voice_settings?:
+          Readonly<Record<string, number | boolean>> | undefined;
+      }
+    | undefined;
   readonly perception?:
     { readonly perception_model: "raven-1" | "off" } | undefined;
   readonly conversational_flow?:

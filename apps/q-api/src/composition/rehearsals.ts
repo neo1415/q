@@ -76,6 +76,7 @@ import {
   externalOpeningLine,
   identityOf,
   NOT_THE_REAL_PERSON_LINE,
+  plain,
 } from "./external-persona.js";
 import { externalEvaluationBasis } from "./external-evaluation.js";
 import { externalSimulation } from "./external-presentation.js";
@@ -1981,6 +1982,46 @@ export function createRehearsalService(dependencies: {
     }, delay).unref();
   }
 
+  /**
+   * Where the counterpart is based, as this viewer may see it: an
+   * investor's or company's HQ, a researched person's or organisation's
+   * public location. It chooses how the person Q plays sounds (voice) and
+   * talks (idiom), never what they know. Kept briefly per viewer and
+   * counterpart so a spoken turn does not read it again; a failed read is
+   * an unknown place (neutral voice, plain English).
+   */
+  const places = new Map<string, { at: number; place: string | null }>();
+  const PLACE_KEPT_MS = 30 * 60_000;
+  async function placeOf(
+    actor: ActorContext,
+    kind: RehearsalCounterpartKind,
+    id: string,
+  ): Promise<string | null> {
+    const key = `${actor.tenantId}:${actor.userId}:${kind}:${id}`;
+    const kept = places.get(key);
+    if (kept !== undefined && now().getTime() - kept.at < PLACE_KEPT_MS) {
+      return kept.place;
+    }
+    const raw =
+      kind === "EXTERNAL_PERSON"
+        ? external === undefined
+          ? null
+          : ((await external.subjects.latest(actor, id).catch(() => null))
+              ?.subject.location ?? null)
+        : ((await material.counterpart(actor, kind, id).catch(() => null))
+            ?.basedIn ?? null);
+    // Third-party text is data: one short line, no control characters.
+    const place =
+      raw === null ? null : plain(raw, 120).replace(/[{}<>[\]]/gu, "");
+    const value = place === null || place.length === 0 ? null : place;
+    places.set(key, { at: now().getTime(), place: value });
+    if (places.size > 2_000) {
+      const oldest = places.keys().next().value;
+      if (oldest !== undefined) places.delete(oldest);
+    }
+    return value;
+  }
+
   /** One background rebuild after a degraded persona, per subject. */
   const rebuilding = new Set<string>();
   function rebuildLater(
@@ -2123,17 +2164,26 @@ export function createRehearsalService(dependencies: {
     // needs one, and a gap in answering one costs (QA e22ea609).
     const questionOpen = questionOpenIn(turns);
     const theyAsked = cue === "NONE" && theyAskedIn(turns);
+    const [material_, place] = await Promise.all([
+      meetingMaterial(actor, row),
+      placeOf(actor, row.counterpartKind, row.counterpartId),
+    ]);
     const variables = {
       viewerRole: row.userRole,
       viewerOrganisation: viewerOrganisation.slice(0, 200),
       counterpartName: row.counterpartName,
       counterpartRole: counterpartRoleOf(row.counterpartKind),
       persona:
-        personaText(persona).slice(0, closingSoon ? 9_700 : 10_000) +
+        personaText(persona).slice(0, closingSoon ? 9_550 : 9_850) +
+        // INVESTOR_TWIN_TURN v11: how this person talks, from where they
+        // are based; the voice carries the accent.
+        (place === null
+          ? ""
+          : `\nSpeaks like: someone who lives and works in ${place}.`) +
         (closingSoon
           ? "\nMeeting time is almost over. In character, courteously acknowledge that you need to leave shortly. Close naturally in one or two sentences, without another question."
           : ""),
-      meetingMaterial: (await meetingMaterial(actor, row)).slice(0, 16_000),
+      meetingMaterial: material_.slice(0, 16_000),
       rehearsal: transcriptOf(turns, row.counterpartName, row.userRole),
       turnsSoFar: Math.min(turns.length, 400),
       minutesElapsed: Math.max(0, Math.min(minutes, 600)),
@@ -2911,28 +2961,14 @@ export function createRehearsalService(dependencies: {
       }
       const persona = personaOf(row.persona);
       // Read as this viewer may see the counterpart, like everything else
-      // the persona rests on. A failed read is an unknown place: neutral.
-      //
-      // A researched real person keeps a neutral voice: where someone lives
-      // is not their nationality, and their persona is told never to put
-      // on an accent (external-persona.ts). An organisation's HQ is a
-      // place, not a person, so it does choose the accent.
-      const researched =
-        row.counterpartKind === "EXTERNAL_PERSON" && external !== undefined
-          ? await external.subjects
-              .latest(actor, row.counterpartId)
-              .catch(() => null)
-          : null;
-      const basedIn =
-        row.counterpartKind === "EXTERNAL_PERSON"
-          ? researched === null || researched.subject.entityKind === "PERSON"
-            ? null
-            : researched.subject.location
-          : ((
-              await material
-                .counterpart(actor, row.counterpartKind, row.counterpartId)
-                .catch(() => null)
-            )?.basedIn ?? null);
+      // the persona rests on. Researched real people included (owner
+      // decision 2026-10-21): the accent comes from where they are based,
+      // never from a guessed nationality, and an unknown place is neutral.
+      const basedIn = await placeOf(
+        actor,
+        row.counterpartKind,
+        row.counterpartId,
+      );
       return {
         seed: `${row.counterpartKind}:${row.counterpartId}`,
         voice: row.voice ?? "MALE",
