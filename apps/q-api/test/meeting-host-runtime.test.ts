@@ -339,7 +339,9 @@ describe("meeting host with Q's face (owner decision 35)", () => {
         "Q, can you share the agenda?",
       ),
     );
-    expect(face.started).toEqual([MEETING]);
+    // Q in the call, then each person's arrival (2026-10-21, lane 6 #295:
+    // a person already there sends a face that would wait for T-1 min).
+    expect(face.started).toEqual([MEETING, MEETING, MEETING]);
     // Same decisions; only the mouth changed. 2026-10-21: the face's own
     // greeting at join says who Q is, so the welcome does not repeat it.
     expect(asked).toHaveLength(1);
@@ -351,10 +353,20 @@ describe("meeting host with Q's face (owner decision 35)", () => {
     expect(said).toEqual([]);
   });
 
+  it("a person joining starts the face; Q's own bot or face joining does not", async () => {
+    const { send, face } = setup({ face: { live: false } });
+    await send(event("participant_events.join", 9, "Q (Capital Q notes)"));
+    await send(event("participant_events.join", 8, "Capital Q"));
+    // Opening Q's session starts it once; neither of Q's joins adds one.
+    expect(face.started).toEqual([MEETING]);
+    await send(event("participant_events.join", 1, "Adaeze Okafor"));
+    expect(face.started).toEqual([MEETING, MEETING]);
+  });
+
   it("keeps the bot's own voice when the face is not live (refused, failed or off)", async () => {
     const { said, send, face } = setup({ face: { live: false } });
     await send(event("participant_events.join", 1, "Adaeze Okafor"));
-    expect(face.started).toEqual([MEETING]);
+    expect(face.started).toEqual([MEETING, MEETING]);
     expect(face.said).toEqual([]);
     expect(said[0]).toContain(`Hi Adaeze, welcome. ${HOST_INTRO}`);
   });

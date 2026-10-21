@@ -360,3 +360,105 @@ describe("the Recall meeting bot", () => {
     });
   });
 });
+
+describe("owner decision 2026-10-21: one Q in the call (the note-taker shows the face page)", () => {
+  const hosting = {
+    realtimeUrl: "https://q.example/v1/recall/realtime",
+    aloneLeaveMs: 600_000,
+    maxCallMs: 5_400_000,
+    metadata: { meeting_id: "m-1" },
+  };
+  const input = {
+    meetingUrl: "https://meet.google.com/abc-defg-hij",
+    joinAt: null,
+    botName: "Capital Q",
+    hosting,
+  };
+
+  it("shows the page as its camera, signed in, on the 4-core bot, with no automatic audio", () => {
+    const body = botRequest({
+      ...input,
+      camera: {
+        pageUrl: "https://q.example/v1/q/meetings/face/page/m-1?k=key",
+        googleLoginGroupId: "group-1",
+      },
+    });
+    expect(body).toMatchObject({
+      bot_name: "Capital Q",
+      output_media: {
+        camera: {
+          kind: "webpage",
+          config: {
+            url: "https://q.example/v1/q/meetings/face/page/m-1?k=key",
+          },
+        },
+      },
+      variant: { google_meet: "web_4_core" },
+      google_meet: { google_login_group_id: "group-1", login_required: true },
+      metadata: { meeting_id: "m-1", q_face_camera: "1" },
+    });
+    // Recall: output media and automatic audio output are exclusive.
+    expect(body).not.toHaveProperty("automatic_audio_output");
+  });
+
+  it("keeps today's bot when there is no camera, and never puts a page on a silent note-taker", () => {
+    const today = botRequest(input);
+    expect(today).toHaveProperty("automatic_audio_output");
+    expect(today).not.toHaveProperty("output_media");
+    expect(today).not.toHaveProperty("google_meet");
+    expect(
+      botRequest({
+        meetingUrl: input.meetingUrl,
+        joinAt: null,
+        botName: "Capital Q",
+        camera: { pageUrl: "https://q.example/p" },
+      }),
+    ).not.toHaveProperty("output_media");
+  });
+
+  it("speaks through the page, never Recall's output audio, also after a restart", async () => {
+    const said: { meetingId: string; kind: string }[] = [];
+    const camera = {
+      pageUrl: (meetingId: string) => `https://q.example/p/${meetingId}`,
+      speak: (meetingId: string, voice: { readonly kind: string }) => {
+        said.push({ meetingId, kind: voice.kind });
+        return true;
+      },
+    };
+    const { doFetch, calls } = fakeFetch({
+      [`POST ${BASE}/bot/`]: { id: "bot-1" },
+      [`GET ${BASE}/bot/bot-2/`]: {
+        id: "bot-2",
+        metadata: { meeting_id: "m-2", q_face_camera: "1" },
+      },
+      [`GET ${BASE}/bot/bot-3/`]: {
+        id: "bot-3",
+        metadata: { meeting_id: "m-3" },
+      },
+      [`POST ${BASE}/bot/bot-3/output_audio/`]: {},
+    });
+    const bots = createRecallBots({
+      apiKey: KEY,
+      region: "eu-central-1",
+      fetch: doFetch,
+      camera,
+    });
+    await bots?.create(input);
+    await bots?.say?.("bot-1", "bXAz");
+    await bots?.stopSpeaking?.("bot-1");
+    // A bot this process did not create: its own metadata says so.
+    await bots?.say?.("bot-2", "bXAz");
+    // A bot made before the page existed keeps Recall's output audio.
+    await bots?.say?.("bot-3", "bXAz");
+    expect(said).toEqual([
+      { meetingId: "m-1", kind: "AUDIO" },
+      { meetingId: "m-1", kind: "STOP" },
+      { meetingId: "m-2", kind: "AUDIO" },
+    ]);
+    expect(
+      calls
+        .filter((call) => call.url.endsWith("/output_audio/"))
+        .map((c) => c.url),
+    ).toEqual([`${BASE}/bot/bot-3/output_audio/`]);
+  });
+});

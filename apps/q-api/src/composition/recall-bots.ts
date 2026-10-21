@@ -190,6 +190,26 @@ export const PARTIAL_EVENTS = ["transcript.partial_data"] as const;
  */
 export const SCREEN_EVENTS = ["video_separate_png.data"] as const;
 
+/**
+ * One Q in the call (owner decision 2026-10-21, CQ_MEETING_FACE_MODE=camera):
+ * the hosted note-taker shows Capital Q's face page as its camera, and its
+ * voice goes through that page (Recall plays no output audio beside a
+ * page). Signed in to Google Meet when a login group is configured
+ * (RECALL_GOOGLE_LOGIN_GROUP_ID), so it joins under the account's own name
+ * ("Capital Q") rather than as an anonymous guest.
+ */
+export type RecallCamera = {
+  readonly pageUrl: (meetingId: string) => string;
+  /** A line for the page to play; false when no page is open. */
+  readonly speak: (
+    meetingId: string,
+    voice:
+      | { readonly kind: "AUDIO"; readonly mp3Base64: string }
+      | { readonly kind: "STOP" },
+  ) => boolean;
+  readonly googleLoginGroupId?: string | null | undefined;
+};
+
 /** The create-bot body (Recall v1). Exported for tests; no I/O. */
 export function botRequest(input: {
   readonly meetingUrl: string;
@@ -197,8 +217,15 @@ export function botRequest(input: {
   readonly botName: string;
   readonly hosting?: MeetingBotHosting;
   readonly transcriber?: RecallTranscriber;
+  readonly camera?: {
+    readonly pageUrl: string;
+    readonly googleLoginGroupId?: string | null | undefined;
+  };
 }): Record<string, unknown> {
   const hosting = input.hosting;
+  // The page only for a bot Q hosts (a silent note-taker shows nothing).
+  const camera = hosting === undefined ? undefined : input.camera;
+  const loginGroup = camera?.googleLoginGroupId?.trim() ?? "";
   const seconds = (ms: number) => Math.max(30, Math.round(ms / 1_000));
   return {
     meeting_url: input.meetingUrl,
@@ -246,8 +273,9 @@ export function botRequest(input: {
             video_separate_png: {},
           }),
     },
-    // Recall: separate video per participant needs the 4-core bot.
-    ...(hosting?.visionUrl === undefined
+    // Recall: separate video per participant, or a page as the camera,
+    // needs the 4-core bot.
+    ...(hosting?.visionUrl === undefined && camera === undefined
       ? {}
       : {
           variant: {
@@ -259,7 +287,12 @@ export function botRequest(input: {
     ...(hosting === undefined
       ? {}
       : {
-          metadata: hosting.metadata,
+          // CAMERA: marked, so its voice still reaches its page after a
+          // restart of this process.
+          metadata:
+            camera === undefined
+              ? hosting.metadata
+              : { ...hosting.metadata, q_face_camera: "1" },
           // Joining early must not burn hours: alone or unadmitted this long
           // and Q leaves; however the call goes, never past the hard cap.
           automatic_leave: {
@@ -269,8 +302,27 @@ export function botRequest(input: {
             in_call_recording_timeout: seconds(hosting.maxCallMs),
             in_call_not_recording_timeout: seconds(hosting.aloneLeaveMs),
           },
-          automatic_audio_output: {
-            in_call_recording: { data: { kind: "mp3", b64_data: SILENT_MP3 } },
+          // Output media and automatic audio output are exclusive (Recall).
+          ...(camera === undefined
+            ? {
+                automatic_audio_output: {
+                  in_call_recording: {
+                    data: { kind: "mp3", b64_data: SILENT_MP3 },
+                  },
+                },
+              }
+            : {
+                output_media: {
+                  camera: { kind: "webpage", config: { url: camera.pageUrl } },
+                },
+              }),
+        }),
+    ...(loginGroup === ""
+      ? {}
+      : {
+          google_meet: {
+            google_login_group_id: loginGroup,
+            login_required: true,
           },
         }),
   };
@@ -282,6 +334,7 @@ export function createRecallBots(options: {
   readonly region: string;
   readonly transcriber?: RecallTranscriber;
   readonly fetch?: typeof fetch;
+  readonly camera?: RecallCamera | undefined;
 }): MeetingBotProvider | undefined {
   const key = options.apiKey;
   if (key === undefined || key.length < 20 || key.startsWith("disabled")) {
@@ -315,20 +368,65 @@ export function createRecallBots(options: {
     return body;
   };
 
+  const camera = options.camera;
+  /** CAMERA: which meeting each bot is in, to reach that meeting's page. */
+  const meetingOf = new Map<string, string>();
+  const meetingOfBot = async (botId: string): Promise<string | null> => {
+    const known = meetingOf.get(botId);
+    if (known !== undefined) return known;
+    // After a restart: the bot carries its meeting in its own metadata.
+    const bot = z
+      .object({
+        metadata: z.record(z.string(), z.unknown()).nullish(),
+      })
+      .passthrough()
+      .parse(
+        await request(`/bot/${encodeURIComponent(botId)}/`, { method: "GET" }),
+      );
+    const meetingId = bot.metadata?.meeting_id;
+    if (typeof meetingId !== "string" || bot.metadata?.q_face_camera !== "1")
+      return null;
+    meetingOf.set(botId, meetingId);
+    return meetingId;
+  };
+
   return {
     create: async (input) => {
+      const meetingId = input.hosting?.metadata.meeting_id;
       const created = BotSchema.parse(
         await request("/bot/", {
           method: "POST",
           body: botRequest({
             ...input,
             transcriber: options.transcriber ?? "meeting_captions",
+            ...(camera === undefined || meetingId === undefined
+              ? {}
+              : {
+                  camera: {
+                    pageUrl: camera.pageUrl(meetingId),
+                    googleLoginGroupId: camera.googleLoginGroupId,
+                  },
+                }),
           }),
         }),
       );
+      if (camera !== undefined && meetingId !== undefined) {
+        meetingOf.set(created.id, meetingId);
+        if (meetingOf.size > 500) {
+          const oldest = meetingOf.keys().next().value;
+          if (oldest !== undefined) meetingOf.delete(oldest);
+        }
+      }
       return { botId: created.id };
     },
     say: async (botId, mp3Base64) => {
+      if (camera !== undefined) {
+        const meetingId = await meetingOfBot(botId);
+        if (meetingId !== null) {
+          camera.speak(meetingId, { kind: "AUDIO", mp3Base64 });
+          return;
+        }
+      }
       await request(`/bot/${encodeURIComponent(botId)}/output_audio/`, {
         method: "POST",
         body: { kind: "mp3", b64_data: mp3Base64 },
@@ -336,6 +434,13 @@ export function createRecallBots(options: {
     },
     // meet-47: someone talked over Q; its line stops at once.
     stopSpeaking: async (botId) => {
+      if (camera !== undefined) {
+        const meetingId = await meetingOfBot(botId);
+        if (meetingId !== null) {
+          camera.speak(meetingId, { kind: "STOP" });
+          return;
+        }
+      }
       await request(`/bot/${encodeURIComponent(botId)}/output_audio/`, {
         method: "DELETE",
       });

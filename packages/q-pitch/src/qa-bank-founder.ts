@@ -103,7 +103,7 @@ export const FOUNDER_QA_ENTRIES: readonly QaEntry[] = [
       "why can i only watch other founders' pitches",
     ],
     answer:
-      "Expressing interest is an investor action on the one canonical relationship between a company and an investor. As a founder, Explore lets you watch other founders' pitches and learn from them; your own way forward with investors is a Connection Request or a GateQ application.",
+      "Expressing interest is an investor action on the one shared relationship between a company and an investor. As a founder, Explore lets you watch other founders' pitches and learn from them; your own way forward with investors is a Connection Request or a GateQ application.",
     sources: [
       "docs/adr/0023-founder-connection-requests.md",
       `${PADL} bilateral discovery`,
@@ -127,9 +127,9 @@ export const FOUNDER_QA_ENTRIES: readonly QaEntry[] = [
     side: "FOUNDER",
     question: "Why did Q pitch Capital Q instead of my company?",
     paraphrases: [
-      "why was capital q the example company",
-      "is capital q itself on the platform",
-      "why present capital q in the founder tour",
+      "why was the presenting company used as the example",
+      "is the company presenting itself listed on the platform",
+      "why present your own company in the founder tour",
     ],
     answer:
       "Because the subject everyone in the room knows is Capital Q itself. Q presented it on the same fourteen-section template every founder's overview uses, under the same rules: pre-seed and bootstrapping, the raise shown as the founders' own claim, and nothing invented about traction or team.",

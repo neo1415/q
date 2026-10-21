@@ -10,6 +10,12 @@ import {
   type FigureKind,
 } from "./presence-kit";
 import { buildShape } from "./presence-shapes";
+import {
+  isPictogram,
+  PICTOGRAM_KINDS,
+  pictogramPolylines,
+  type PictogramKind,
+} from "./figure-library";
 
 export {
   createFigureFrame,
@@ -51,6 +57,7 @@ export const FIGURE_KINDS: readonly FigureKind[] = [
   "CHART_UP",
   "CLAP",
   "HANDS",
+  ...PICTOGRAM_KINDS,
 ];
 
 /** Figures that show Q's hands. */
@@ -695,9 +702,24 @@ function handsFigure(count: number): Figure {
   };
 }
 
+/**
+ * A pictogram (figure-library.ts): its strokes sampled evenly by length,
+ * thin enough to read as a drawn line, laid out once per count.
+ */
+function pictogramPoints(
+  kind: PictogramKind,
+  count: number,
+  random: () => number,
+): RawPoint[] {
+  return strokes(pictogramPolylines(kind), count, random, 0.014);
+}
+
 /** Builds a figure, with exactly `count` points. */
 export function buildFigure(kind: FigureKind, count: number): Figure {
   const random = seeded(kind.length * 131 + count);
+  if (isPictogram(kind)) {
+    return glyphFigure(kind, pictogramPoints(kind, count, random), count);
+  }
   switch (kind) {
     case "CLOUD":
       return cloudFigure(count);

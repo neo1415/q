@@ -734,9 +734,14 @@ import { createTavusClient } from "./composition/tavus/client.js";
 import {
   createMeetingFace,
   createPostgresMeetingFaceStore,
+  meetingFaceModeFrom,
   meetingFaceSecondsFrom,
 } from "./composition/meeting-face.js";
-import { qMeetingFaceBridgeBasePath } from "./http/meeting-face.js";
+import { createMeetingFacePageHub } from "./composition/meeting-face-page.js";
+import {
+  qMeetingFaceBridgeBasePath,
+  qMeetingFacePagePath,
+} from "./http/meeting-face.js";
 import { ownRecordTerms } from "./voice/vocabulary.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
@@ -4591,10 +4596,36 @@ const meetingCommitments = createCommitmentService({
 // CQ_MEETING_HOST=off, or when Recall, ElevenLabs or the public URL is
 // missing: then the bot is ADR 0027's silent note-taker.
 const recallKey = process.env.RECALL_API_KEY ?? process.env.RECALL_API;
+// Owner decision 2026-10-21: one Q in the call. CQ_MEETING_FACE_MODE=camera
+// with CQ_MEETING_FACE_PAGE_SECRET (32+ chars) makes the note-taker show
+// the face page as its camera; RECALL_GOOGLE_LOGIN_GROUP_ID signs it in.
+const meetingFaceMode = meetingFaceModeFrom(process.env.CQ_MEETING_FACE_MODE);
+const meetingFacePageSecret =
+  process.env.CQ_MEETING_FACE_PAGE_SECRET?.trim() ?? "";
+const meetingFacePublicUrl = process.env.Q_API_PUBLIC_URL?.trim() ?? "";
+const meetingFacePage =
+  meetingFaceMode === "CAMERA" &&
+  process.env.CQ_MEETING_FACE === "on" &&
+  meetingFacePageSecret.length >= 32 &&
+  meetingFacePublicUrl.startsWith("https://")
+    ? createMeetingFacePageHub({
+        secret: meetingFacePageSecret,
+        publicBaseUrl: meetingFacePublicUrl,
+        pagePath: qMeetingFacePagePath,
+      })
+    : undefined;
 const recallBots = createRecallBots({
   apiKey: recallKey,
   region: process.env.RECALL_REGION ?? "eu-central-1",
   transcriber: transcriberOf(process.env.RECALL_TRANSCRIBER),
+  camera:
+    meetingFacePage === undefined
+      ? undefined
+      : {
+          pageUrl: meetingFacePage.pageUrl,
+          speak: meetingFacePage.speak,
+          googleLoginGroupId: process.env.RECALL_GOOGLE_LOGIN_GROUP_ID,
+        },
 });
 const meetingFollowUpCards = createMeetingFollowUpCards({
   review: outwardReview,
@@ -4633,6 +4664,8 @@ const meetingFace = createMeetingFace({
       : createTavusClient({ apiKey: meetingFaceKey }),
   faceId: process.env.CQ_MEETING_FACE_ID?.trim() || null,
   maxSeconds: meetingFaceSecondsFrom(process.env.CQ_MEETING_FACE_MAX_SECONDS),
+  // Camera only when its page exists; otherwise the face joins Meet itself.
+  mode: meetingFacePage === undefined ? "MEET" : "CAMERA",
   publicBaseUrl: process.env.Q_API_PUBLIC_URL?.trim() || null,
   bridgePath: qMeetingFaceBridgeBasePath,
   store: createPostgresMeetingFaceStore(database.sql),
@@ -6776,6 +6809,7 @@ const { app, logger: appLogger } = createApp(
     // MEET-HOST block (ADR 0037)
     meetingHost,
     meetingFace,
+    meetingFacePage,
     meetingScreens,
     recallStatus: createRecallStatusWebhook({
       secret: process.env.RECALL_WEBHOOK_SECRET,

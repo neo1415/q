@@ -1,0 +1,116 @@
+{
+  "renderer": {
+    "dark": "3d",
+    "light": "3d"
+  },
+  "perFigure": {
+    "WAVE": {
+      "frames": 141,
+      "mean": 0.49,
+      "p50": 0.2,
+      "p95": 1.1
+    },
+    "CLOCK": {
+      "frames": 171,
+      "mean": 0.45,
+      "p50": 0.3,
+      "p95": 1.2
+    },
+    "INBOX": {
+      "frames": 186,
+      "mean": 0.35,
+      "p50": 0.2,
+      "p95": 0.8
+    },
+    "MAGNIFIER": {
+      "frames": 174,
+      "mean": 0.32,
+      "p50": 0.3,
+      "p95": 1
+    },
+    "PLANE": {
+      "frames": 162,
+      "mean": 0.5,
+      "p50": 0.3,
+      "p95": 0.9
+    },
+    "ENVELOPE": {
+      "frames": 165,
+      "mean": 0.44,
+      "p50": 0.3,
+      "p95": 1.1
+    },
+    "PEN": {
+      "frames": 165,
+      "mean": 0.32,
+      "p50": 0.2,
+      "p95": 0.8
+    },
+    "CHART_DIP": {
+      "frames": 174,
+      "mean": 0.31,
+      "p50": 0.3,
+      "p95": 0.9
+    },
+    "CHART_BARS": {
+      "frames": 168,
+      "mean": 0.32,
+      "p50": 0.2,
+      "p95": 0.8
+    },
+    "SCALE": {
+      "frames": 150,
+      "mean": 0.37,
+      "p50": 0.3,
+      "p95": 0.9
+    },
+    "HOUSE": {
+      "frames": 192,
+      "mean": 0.25,
+      "p50": 0.2,
+      "p95": 0.7
+    },
+    "CALENDAR": {
+      "frames": 174,
+      "mean": 0.34,
+      "p50": 0.2,
+      "p95": 0.9
+    },
+    "MAP_PIN": {
+      "frames": 147,
+      "mean": 0.5,
+      "p50": 0.3,
+      "p95": 1.3
+    },
+    "COMPARE": {
+      "frames": 153,
+      "mean": 0.42,
+      "p50": 0.3,
+      "p95": 1.1
+    },
+    "DOCUMENT": {
+      "frames": 150,
+      "mean": 0.46,
+      "p50": 0.3,
+      "p95": 1
+    },
+    "HANDSHAKE": {
+      "frames": 165,
+      "mean": 0.39,
+      "p50": 0.3,
+      "p95": 1
+    },
+    "LETTER_Q": {
+      "frames": 150,
+      "mean": 0.42,
+      "p50": 0.3,
+      "p95": 1.1
+    }
+  },
+  "still-dark-CLOCK": 2,
+  "still-dark-HOUSE": 2,
+  "still-dark-LETTER_Q": 2,
+  "still-light-CLOCK": 2,
+  "still-light-HOUSE": 2,
+  "still-light-LETTER_Q": 2
+}

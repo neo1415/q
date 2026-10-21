@@ -1,6 +1,7 @@
 import type { QApertureState } from "../q-aperture/aperture-state";
 import type { QMotion } from "../q-aperture/aperture-frame";
 import type { FigureKind } from "./presence-figures";
+import { isPictogram } from "./figure-library";
 
 /**
  * What the 3D renderer is told each frame (ADR 0049), as a pure function
@@ -86,7 +87,10 @@ export function presenceUniforms(input: UniformInput): PresenceUniforms {
   // Glyphs turn half as far as the cloud, so they stay legible; the Q
   // mark less still.
   const cloud = CLOUD_FIGURES.has(input.figure);
-  const turn = cloud ? 1 : MARK_FIGURES.has(input.figure) ? 0.3 : 0.55;
+  // Pictograms turn as little as the mark: a clock read at an angle is
+  // no longer a clock.
+  const flat = MARK_FIGURES.has(input.figure) || isPictogram(input.figure);
+  const turn = cloud ? 1 : flat ? 0.3 : 0.55;
   return {
     yaw: (STILL_YAW + swayYaw) * turn + leanX * LEAN_YAW,
     // Listening tips the top towards the person.

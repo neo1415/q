@@ -12,6 +12,11 @@ import {
 } from "./presence-budget";
 import { drawPresence, type Rgb } from "./presence-gl";
 import { presenceUniforms, stepLean, type Lean } from "./presence-uniforms";
+import {
+  FIGURE_MIN_PIXELS,
+  type PresenceCue,
+  type PresenceFigureId,
+} from "./presence-cue";
 
 /**
  * Q room W7: the presence's frame loop, apart from React. Nothing here
@@ -96,6 +101,12 @@ export type PresenceLoop = {
   readonly redraw: () => void;
   /** Form the letter Q at the next eligible frame (the dev harness). */
   readonly formQ: () => void;
+  /**
+   * Q Story S4 (presence-cue.ts): form a figure over the state's and hold
+   * it, or release it. Ignored below FIGURE_MIN_PIXELS. Returns whether
+   * this presence took it.
+   */
+  readonly cue: (cue: PresenceCue) => boolean;
   readonly dispose: () => void;
 };
 
@@ -151,6 +162,9 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
   let core = 1;
   let stepped = 0;
   const moment = createQMoment({ landing: host.landing ?? (() => false) });
+  /** The cued figure and when (host.now(), ms) it lets go; null for none. */
+  let cued: { figure: PresenceFigureId; until: number } | null = null;
+  const legible = pixels >= FIGURE_MIN_PIXELS;
 
   const frame = (now: number) => {
     raf = 0;
@@ -172,7 +186,8 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
     // The Q moment lays the letter over a resting presence now and then;
     // the state's own figure is untouched and flows back in after it.
     // The room is already the letter: no Q moment over it.
-    const shown =
+    if (cued !== null && host.now() >= cued.until) cued = null;
+    const momentary =
       inputs.room !== true &&
       moment.at(
         clock,
@@ -183,6 +198,8 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
       )
         ? "LETTER_Q"
         : view.figure;
+    // A cue lays its figure over everything else, for as long as it holds.
+    const shown = cued?.figure ?? momentary;
     if (moving) {
       sim.setFigure(shown);
       // The swarm's own clock advances by the step it integrates, so a
@@ -325,6 +342,15 @@ export function startPresenceLoop(host: PresenceLoopHost): PresenceLoop | null {
     },
     redraw,
     formQ: moment.ask,
+    cue: (next) => {
+      if (!legible) return false;
+      cued =
+        next.kind === "FORM"
+          ? { figure: next.figure, until: host.now() + next.holdMs }
+          : null;
+      redraw();
+      return true;
+    },
     dispose: () => {
       disposed = true;
       cancelBegin();
