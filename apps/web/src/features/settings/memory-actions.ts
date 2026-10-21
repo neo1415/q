@@ -3,11 +3,16 @@
 import { z } from "zod";
 
 import {
+  ApiProblemError,
+  correctQMemory,
   forgetQMemory,
   getQPreferenceLearning,
   setQPreferenceLearning,
 } from "@capital-q/api-client";
-import type { QPreferenceLearningDto } from "@capital-q/contracts";
+import {
+  QMemoryCorrectionRequestSchema,
+  type QPreferenceLearningDto,
+} from "@capital-q/contracts";
 import { loadWebServerConfig } from "@capital-q/config/web";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -29,6 +34,42 @@ export async function forgetMemoryAction(
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+/**
+ * Replace one thing Q remembered with the person's own words. The Q API
+ * puts it through the memory Write Gate; the old memory stays in history,
+ * marked superseded. The message is safe to show.
+ */
+export async function correctMemoryAction(
+  memoryItemId: string,
+  content: string,
+): Promise<
+  { readonly ok: true } | { readonly ok: false; readonly message: string }
+> {
+  const id = z.string().uuid().safeParse(memoryItemId);
+  const words = QMemoryCorrectionRequestSchema.safeParse({ content });
+  if (!id.success || !words.success) {
+    return {
+      ok: false,
+      message: "Say what Q should remember, in a few words.",
+    };
+  }
+  const session = await qSession();
+  if (session === null)
+    return { ok: false, message: "Sign in again to continue." };
+  try {
+    await correctQMemory(session, id.data, words.data);
+    return { ok: true };
+  } catch (error: unknown) {
+    return {
+      ok: false,
+      message:
+        error instanceof ApiProblemError && error.status === 422
+          ? error.message
+          : "That correction didn't save. Try again in a moment.",
+    };
   }
 }
 

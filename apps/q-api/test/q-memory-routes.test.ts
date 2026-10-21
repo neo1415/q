@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { parseQApiConfig } from "@capital-q/config/q-api";
-import type { MemoryItem } from "@capital-q/q-knowledge";
+import type { MemoryItem, RememberCommand } from "@capital-q/q-knowledge";
 import {
   AuthUserIdSchema,
   MembershipIdSchema,
@@ -36,13 +36,17 @@ const ITEM = {
   id: OWN,
   subject: null,
   memoryType: "correction",
+  memoryKey: "company.name",
+  structuredValue: {},
   content: "Their company is Yamfield Agro.",
   quote: "my company is Yamfield Agro",
   createdAt: "2026-09-29T08:00:00.000Z",
+  validTo: null,
 } as unknown as MemoryItem;
 
 function buildApp(signedIn = true) {
   const actors: ActorContext[] = [];
+  const remembered: RememberCommand[] = [];
   const security: QApiSecurityDependencies = {
     authenticator: {
       authenticate: () =>
@@ -71,9 +75,21 @@ function buildApp(signedIn = true) {
         actors.push(actor);
         return Promise.resolve(memoryItemId === OWN ? ITEM : null);
       },
+      remember: (command) => {
+        remembered.push(command);
+        return Promise.resolve(
+          command.candidate.content.includes("password")
+            ? { outcome: "REFUSED", reason: "SENSITIVE_CONTENT" }
+            : {
+                outcome: "REMEMBERED",
+                reason: "SUPERSEDED_EARLIER",
+                item: ITEM,
+              },
+        );
+      },
     },
   });
-  return { app, actors };
+  return { app, actors, remembered };
 }
 
 describe("Q memory routes", () => {
@@ -90,6 +106,8 @@ describe("Q memory routes", () => {
           quote: "my company is Yamfield Agro",
           about: "YOU",
           learnedAt: "2026-09-29T08:00:00.000Z",
+          origin: "CORRECTED",
+          forgetsAt: null,
         },
       ],
     });
@@ -113,6 +131,51 @@ describe("Q memory routes", () => {
       url: "/v1/q/memory/not-an-id/forget",
     });
     expect(malformed.statusCode).toBe(404);
+  });
+
+  it("corrects their own item through the Write Gate, superseding it under the same key", async () => {
+    const { app, remembered } = buildApp();
+    const own = await app.inject({
+      method: "POST",
+      url: `/v1/q/memory/${OWN}/correct`,
+      payload: { content: "My company is Yamfield Agro Ltd." },
+    });
+    expect(own.statusCode).toBe(204);
+    expect(remembered).toHaveLength(1);
+    expect(remembered[0]).toMatchObject({
+      actor: CONTEXT,
+      writeMode: "USER_CONFIRMED",
+      userTurns: ["My company is Yamfield Agro Ltd."],
+      candidate: {
+        memoryType: "correction",
+        memoryKey: "company.name",
+        content: "My company is Yamfield Agro Ltd.",
+        quote: "My company is Yamfield Agro Ltd.",
+      },
+    });
+  });
+
+  it("refuses to correct one that is not theirs, an empty correction, or a secret", async () => {
+    const { app, remembered } = buildApp();
+    const other = await app.inject({
+      method: "POST",
+      url: `/v1/q/memory/${NOT_OWN}/correct`,
+      payload: { content: "Something else entirely." },
+    });
+    expect(other.statusCode).toBe(404);
+    const empty = await app.inject({
+      method: "POST",
+      url: `/v1/q/memory/${OWN}/correct`,
+      payload: { content: " " },
+    });
+    expect(empty.statusCode).toBe(400);
+    expect(remembered).toHaveLength(0);
+    const secret = await app.inject({
+      method: "POST",
+      url: `/v1/q/memory/${OWN}/correct`,
+      payload: { content: "my password is hunter2" },
+    });
+    expect(secret.statusCode).toBe(422);
   });
 
   it("requires a session", async () => {

@@ -303,6 +303,7 @@ export {
 } from "./schedule.js";
 
 export {
+  correctQMemory,
   forgetQMemory,
   getQPreferenceLearning,
   listQMemory,

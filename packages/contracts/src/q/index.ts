@@ -945,14 +945,17 @@ export {
 } from "./profile-findings.js";
 
 export {
+  Q_MEMORY_CORRECT_PATH,
   Q_MEMORY_FORGET_PATH,
   Q_MEMORY_KINDS,
   Q_MEMORY_LEARNING_PATH,
   Q_MEMORY_PATH,
+  QMemoryCorrectionRequestSchema,
   QMemoryItemDtoSchema,
   QMemoryListDtoSchema,
   QPreferenceLearningChoiceRequestSchema,
   QPreferenceLearningDtoSchema,
+  type QMemoryCorrectionRequest,
   type QMemoryItemDto,
   type QMemoryListDto,
   type QPreferenceLearningChoiceRequest,
@@ -1142,7 +1145,13 @@ export {
   type QWorkSuggestionKind,
   type QWorkSuggestionListDto,
 } from "./work-page.js";
-export { Q_USAGE_PATH, QUsageDtoSchema, type QUsageDto } from "./usage.js";
+export {
+  Q_USAGE_PATH,
+  QUsageDtoSchema,
+  QUsageQuerySchema,
+  type QUsageDto,
+  type QUsageQuery,
+} from "./usage.js";
 // end AUTO block
 
 // DAILY block (The Q Daily, docs/specs/2026-10/daily.md)

@@ -1,9 +1,11 @@
 import {
+  Q_MEMORY_CORRECT_PATH,
   Q_MEMORY_FORGET_PATH,
   Q_MEMORY_LEARNING_PATH,
   Q_MEMORY_PATH,
   QMemoryListDtoSchema,
   QPreferenceLearningDtoSchema,
+  type QMemoryCorrectionRequest,
   type QPreferenceLearningChoiceRequest,
 } from "@capital-q/contracts";
 
@@ -32,6 +34,35 @@ export async function forgetQMemory(
         accept: "application/json",
         authorization: `Bearer ${session.accessToken}`,
       },
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) throw await readProblemResponse(response);
+}
+
+/**
+ * `204`: replaces one memory with the caller's own words. The old one is
+ * kept in history, marked superseded. Not theirs, or not live: a 404.
+ */
+export async function correctQMemory(
+  session: ApiSession,
+  memoryItemId: string,
+  request: QMemoryCorrectionRequest,
+): Promise<void> {
+  const doFetch = session.fetch ?? fetch;
+  const response = await doFetch(
+    `${session.baseUrl.replace(/\/$/, "")}${Q_MEMORY_CORRECT_PATH.replace(
+      ":memoryItemId",
+      encodeURIComponent(memoryItemId),
+    )}`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        authorization: `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify(request),
       cache: "no-store",
     },
   );
