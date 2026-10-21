@@ -276,3 +276,58 @@ describe("E4: an answer's own map and published fit basis", () => {
     expect(map?.textContent).toContain("as each investor publishes it");
   });
 });
+
+describe("the TABLE block (design pass, round 3)", () => {
+  const table = {
+    kind: "TABLE" as const,
+    title: "Side by side",
+    columns: [
+      { label: "Apex Capital", subject: investor(APEX) },
+      { label: "Northwind", subject: null },
+    ],
+    rows: [{ label: "Raised", cells: ["$1,200,000", ""] }],
+  };
+
+  it("is not a tab stop when it fits, and its header links are full-size targets", () => {
+    const { container } = render(<QResultBlocks blocks={[table]} />);
+    const frame = container.querySelector("[data-q-table]");
+    expect(frame?.getAttribute("tabindex")).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Apex Capital" }).className,
+    ).toContain("min-h-11");
+    // Figures line up; unknown is said in words.
+    expect(container.querySelector("td")?.className).toContain("cq-numeric");
+    expect(container.textContent).toContain("Not known");
+  });
+
+  it("is a named, focusable region when it scrolls sideways", async () => {
+    const observed: Array<() => void> = [];
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          observed.push(callback);
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const width = vi
+      .spyOn(HTMLElement.prototype, "scrollWidth", "get")
+      .mockReturnValue(900);
+    const client = vi
+      .spyOn(HTMLElement.prototype, "clientWidth", "get")
+      .mockReturnValue(320);
+    try {
+      render(<QResultBlocks blocks={[table]} />);
+      const region = await screen.findByRole("region", {
+        name: "Comparison table, scrolls sideways",
+      });
+      expect(region.getAttribute("tabindex")).toBe("0");
+    } finally {
+      width.mockRestore();
+      client.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+});

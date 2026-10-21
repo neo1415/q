@@ -1471,21 +1471,33 @@ export function QConversationPanel({
                     data-q-thread-status
                   >
                     {q.working ? <QSwarm state="WORKING" pixels={40} /> : null}
-                    <span className="inline-flex items-center gap-2 cq-caption text-(--cq-text-secondary)">
-                      {/* The same dot as the arrival's (owner 2026-10-18). */}
-                      {voice.active ? (
-                        <span
-                          aria-hidden="true"
-                          className="size-2 rounded-full bg-(--cq-accent) motion-safe:animate-pulse"
-                          data-q-state-dot
-                        />
-                      ) : null}
-                      {t(stateLabel ?? "Q")}
+                    <span className="flex min-w-0 flex-col">
+                      <span className="inline-flex items-center gap-2 cq-caption text-(--cq-text-secondary)">
+                        {/* The same dot as the arrival's (owner 2026-10-18). */}
+                        {voice.active ? (
+                          <span
+                            aria-hidden="true"
+                            className="size-2 rounded-full bg-(--cq-accent) motion-safe:animate-pulse"
+                            data-q-state-dot
+                          />
+                        ) : null}
+                        {t(stateLabel ?? "Q")}
+                      </span>
+                      {/* Where Q is, as its own line rather than joined to the
+                        state with a dot; keyed so a new stage fades in
+                        instead of swapping mid-glance (frontend-design,
+                        animate). Same shape as the arrival's. */}
                       {q.working &&
                       stage !== undefined &&
-                      (!voice.active || documentStage)
-                        ? ` · ${stage}`
-                        : ""}
+                      (!voice.active || documentStage) ? (
+                        <span
+                          key={stage}
+                          className="cq-stage-line cq-caption text-(--cq-text-secondary)"
+                          data-q-stage-line
+                        >
+                          {stage}
+                        </span>
+                      ) : null}
                     </span>
                   </div>
                 ) : null}
@@ -1596,7 +1608,11 @@ export function QConversationPanel({
                       </span>
                     )}
                     {!voice.active && q.working && stage !== undefined ? (
-                      <span className="cq-caption text-(--cq-text-secondary)">
+                      <span
+                        key={stage}
+                        className="cq-stage-line cq-caption text-(--cq-text-secondary)"
+                        data-q-stage-line
+                      >
                         {stage}
                       </span>
                     ) : null}
