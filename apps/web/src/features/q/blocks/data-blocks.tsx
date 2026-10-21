@@ -73,6 +73,9 @@ function useOverflows<T extends HTMLElement>() {
   return { ref, overflows };
 }
 
+/** A cell that is a figure: starts with a digit, or a currency then a digit. */
+const FIGURE = /^[^\p{L}\s]?\s?\d/u;
+
 export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
   const t = useT();
   const { ref, overflows } = useOverflows<HTMLDivElement>();
@@ -99,7 +102,7 @@ export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
               <th
                 key={`${column.label}-${String(index)}`}
                 scope="col"
-                className="cq-label min-w-32 px-4 py-1 align-bottom text-(--cq-text-primary)"
+                className="cq-label min-w-32 px-4 py-1 text-start align-bottom text-(--cq-text-primary)"
               >
                 <ColumnHead
                   label={column.label}
@@ -117,15 +120,18 @@ export function TableBody({ block }: { readonly block: Block<"TABLE"> }) {
             >
               <th
                 scope="row"
-                className="cq-body-sm min-w-28 px-0 py-2.5 pe-4 align-top font-normal text-(--cq-text-secondary)"
+                className="cq-body-sm min-w-28 px-0 py-2.5 pe-4 text-start align-top font-normal text-(--cq-text-secondary)"
               >
                 {row.label}
               </th>
               {row.cells.map((cell, index) => (
                 <td
                   key={`${row.label}-${String(index)}`}
-                  // Figures line up down a column (tabular numerals).
-                  className="cq-body-sm cq-numeric px-4 py-2.5 align-top text-(--cq-text-primary)"
+                  // Figures line up down a column (tabular numerals); words
+                  // keep proportional spacing ("Pre-seed").
+                  className={`cq-body-sm px-4 py-2.5 align-top text-(--cq-text-primary) ${
+                    FIGURE.test(cell) ? "cq-numeric" : ""
+                  }`}
                 >
                   {cell === "" ? (
                     // Unknown stays unknown, said in words, never a dash.
