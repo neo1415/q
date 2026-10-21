@@ -12,6 +12,7 @@ import { CRM_DESIGN_AR } from "./catalog/crm-design";
 import { CRM_RECORD_AR } from "./catalog/crm-record";
 import { DAILY_AR } from "./catalog/daily";
 import { DISCOVER_AR } from "./catalog/discover";
+import { DISCOVERY_PAGES_AR } from "./catalog/discovery-pages";
 import { DOCUMENTS_AR } from "./catalog/documents";
 import { GATEQ_AR } from "./catalog/gateq";
 import { LANGUAGE_AR } from "./catalog/language";
@@ -57,6 +58,7 @@ const ARABIC: Readonly<Record<string, string>> = {
   // First: what the live check of 2026-10-16 found; an area's own entry
   // for the same words wins.
   ...CRM_DESIGN_AR,
+  ...DISCOVERY_PAGES_AR,
   ...SWEEP_AR,
   ...CORE_AR,
   ...RELATIONSHIPS_AR,
