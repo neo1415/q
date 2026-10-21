@@ -120,7 +120,8 @@ const icon = {
 export type InboxDemo = {
   readonly details: Readonly<Record<string, GateqInboxDetailDto>>;
   readonly checked?: readonly string[];
-  readonly sheet?: "pass" | "pack" | null;
+  /** Design review only (/dev/gateq-review): a sheet already open. */
+  readonly sheet?: "pass" | "pack" | "book" | "ask" | "reply" | null;
   readonly phoneDetail?: boolean;
   readonly selected?: string;
 };
@@ -235,6 +236,12 @@ export function InboxView({
     if (demo?.sheet === "pass" && id !== undefined)
       return { kind: "pass", ids: [id] };
     if (demo?.sheet === "pack" && id !== undefined) return { kind: "pack", id };
+    if (demo?.sheet === "book" && id !== undefined)
+      return { kind: "reply", id, draft: "CALL" };
+    if (demo?.sheet === "ask" && id !== undefined)
+      return { kind: "reply", id, draft: "ASK" };
+    if (demo?.sheet === "reply" && id !== undefined)
+      return { kind: "reply", id };
     return null;
   });
   const [search, setSearch] = useState("");
