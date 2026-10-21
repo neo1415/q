@@ -1172,6 +1172,8 @@ describe("the answer is told what this run can do (CQ-QX-008)", () => {
           // G: accept an invitation to a company or firm, or ask to join.
           expect.objectContaining({ destination: "SETTINGS" }),
           expect.objectContaining({ destination: "SETTINGS" }),
+          // Correct something Q remembers, through the memory Write Gate.
+          expect.objectContaining({ destination: "MEMORY" }),
           // Their Q email address: copy it, or get a new one (inbound email).
           expect.objectContaining({ destination: "SETTINGS" }),
           // Set aside one of Q's suggestions on Work ("Not now").

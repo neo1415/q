@@ -551,14 +551,33 @@ export function createDataRoomService(dependencies: {
       false,
     );
 
-  const investorView = async (
+  const investorView = (
     reader: Extract<
       NonNullable<Awaited<ReturnType<typeof readerOf>>>,
       { kind: "INVESTOR" }
     >,
-  ): Promise<DataRoomInvestorView> => {
-    const { company, investor, relationshipId } = reader;
-    if (reader.connection !== "CONNECTED") {
+  ): Promise<DataRoomInvestorView> =>
+    projectRoom({
+      company: reader.company,
+      relationshipId: reader.relationshipId,
+      connection: reader.connection,
+      investorOrganisationId: reader.investor.investorOrganisationId,
+    });
+
+  /**
+   * The one projection of the room for an investor: the investor's own read
+   * and the founder's "see it as an investor" preview are this same code, so
+   * the preview can never show more, or less, than the investor gets.
+   */
+  const projectRoom = async (input: {
+    readonly company: DataRoomCompany;
+    readonly relationshipId: string | null;
+    readonly connection: RelationshipConnection;
+    /** Null: a preview, which reads no one's opens. */
+    readonly investorOrganisationId: string | null;
+  }): Promise<DataRoomInvestorView> => {
+    const { company, relationshipId } = input;
+    if (input.connection !== "CONNECTED") {
       const allowed = await outlineAllowed(company.id);
       const [folders, documents] = allowed
         ? await Promise.all([
@@ -572,7 +591,7 @@ export function createDataRoomService(dependencies: {
         access: "LOCKED",
         locked: {
           reason:
-            reader.connection === "INTEREST_PENDING"
+            input.connection === "INTEREST_PENDING"
               ? "INTEREST_PENDING"
               : "NOT_CONNECTED",
           outline: lockedOutline(folders, documents, allowed),
@@ -588,11 +607,13 @@ export function createDataRoomService(dependencies: {
       relationshipId === null
         ? Promise.resolve([] as readonly DataRoomRequestRecord[])
         : store.requests(sql, { companyId: company.id, relationshipId }),
-      store.viewsByOrganisation(
-        sql,
-        company.id,
-        investor.investorOrganisationId,
-      ),
+      input.investorOrganisationId === null
+        ? Promise.resolve(new Map<string, string>())
+        : store.viewsByOrganisation(
+            sql,
+            company.id,
+            input.investorOrganisationId,
+          ),
     ]);
     const openRequests = new Set(
       requests
@@ -718,6 +739,31 @@ export function createDataRoomService(dependencies: {
       return reader.kind === "OWNER"
         ? ownerView(reader.company)
         : investorView(reader);
+    },
+
+    /**
+     * Design ownroom-2 (2026-10-21), "see it as an investor": the owner
+     * only, the room exactly as one investor relationship would see it
+     * (from its real per-document grants and requests), or, with `as`
+     * null, as any investor not yet connected. The caller has checked the
+     * relationship is this company's. Null: one not-found for everyone else.
+     */
+    preview: async (
+      actor: ActorContext,
+      companyId: string,
+      as: {
+        readonly relationshipId: string;
+        readonly connection: RelationshipConnection;
+      } | null,
+    ): Promise<DataRoomInvestorView | null> => {
+      const reader = await readerOf(actor, companyId);
+      if (reader === null || reader.kind !== "OWNER") return null;
+      return projectRoom({
+        company: reader.company,
+        relationshipId: as?.relationshipId ?? null,
+        connection: as?.connection ?? "NOT_CONNECTED",
+        investorOrganisationId: null,
+      });
     },
 
     /** The founder sets one document's level (and, optionally, its folder). */

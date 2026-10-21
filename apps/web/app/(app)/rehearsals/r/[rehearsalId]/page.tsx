@@ -70,9 +70,7 @@ export default async function RehearsalReviewPage({
         total={1}
         label={t("a rehearsal review")}
       >
-        <div className="mx-auto w-full max-w-3xl">
-          <RehearsalReview rehearsal={rehearsal} />
-        </div>
+        <RehearsalReview rehearsal={rehearsal} />
       </QSection>
     </PageContainer>
   );

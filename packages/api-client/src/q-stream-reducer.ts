@@ -6,6 +6,7 @@ import type {
   QPublicFailure,
   QPublicFinding,
   QRunStatus,
+  QStageAbout,
   QStreamEvent,
   QVisibleStage,
 } from "@capital-q/contracts";
@@ -34,6 +35,8 @@ export type QStreamApprovalState = {
 export type QStageStep = {
   readonly sequence: number;
   readonly stage: QVisibleStage;
+  /** Round 4: what the run said the stage is about, when it said. */
+  readonly about?: QStageAbout | undefined;
 };
 
 export type QStreamState = {
@@ -155,6 +158,7 @@ export function reduceQStream(
       const step: QStageStep = {
         sequence: event.sequence,
         stage: event.data.stage,
+        ...(event.data.about === undefined ? {} : { about: event.data.about }),
       };
       const stageHistory = [
         ...state.stageHistory.filter((one) => one.sequence !== step.sequence),
@@ -272,6 +276,13 @@ export function qStageSteps(
     if (steps.at(-1) !== stage) steps.push(stage);
   }
   return steps;
+}
+
+/** Where Q is now: the newest step and what it is about; null before any. */
+export function qCurrentStage(
+  history: readonly QStageStep[],
+): QStageStep | null {
+  return history.at(-1) ?? null;
 }
 
 function applySequence(state: QStreamState, event: QStreamEvent): QStreamState {

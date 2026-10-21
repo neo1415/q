@@ -339,17 +339,25 @@ describe("the submitted investor brief", () => {
     expect(screen.getByLabelText(/Message to the founder/)).toBeTruthy();
     expect(actions.replyAction).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(screen.getByRole("button", { name: "Pass" }));
-    expect(screen.getByRole("button", { name: "Send and pass" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Pass with a reason" }));
+    expect(
+      screen.getByRole("button", { name: "Approve and send pass" }),
+    ).toBeTruthy();
     expect(actions.passAction).not.toHaveBeenCalled();
   });
   it("uses the submitted contact for human call and reply actions when legacy form contact differs", () => {
     show({
       contact: { name: "Old form name", email: "old-form@example.test" },
     });
+    // gateq-2: a call is asked for in a Q draft, to the submitted contact,
+    // and sent only as approved.
+    fireEvent.click(screen.getByRole("button", { name: "Book a call" }));
     expect(
-      screen.getByRole("link", { name: "Book a call" }).getAttribute("href"),
-    ).toContain("mailto:amara@example.test?");
+      screen.getByLabelText<HTMLTextAreaElement>(/Message to the founder/)
+        .value,
+    ).toMatch(/^Hi Amara,[\s\S]*30-minute call/);
+    expect(actions.replyAction).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     fireEvent.click(screen.getByRole("button", { name: "Reply" }));
     expect(
       screen.getByLabelText<HTMLTextAreaElement>(/Message to the founder/)
@@ -367,7 +375,9 @@ describe("the submitted investor brief", () => {
       screen.getByRole<HTMLButtonElement>("button", { name: "Reply" }).disabled,
     ).toBe(true);
     expect(
-      screen.getByRole<HTMLButtonElement>("button", { name: "Pass" }).disabled,
+      screen.getByRole<HTMLButtonElement>("button", {
+        name: "Pass with a reason",
+      }).disabled,
     ).toBe(true);
     expect(
       screen.getByRole<HTMLButtonElement>("button", { name: "Assign" })
@@ -427,7 +437,7 @@ describe("the submitted investor brief", () => {
     expect(currentManifest()?.dialogs.at(-1)?.refs).toEqual([
       { kind: "GATEQ_APPLICATION", id: item.applicationId },
     ]);
-    fireEvent.click(screen.getByRole("button", { name: "Back to inbox" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(currentManifest()?.focus).toBeUndefined();
     expect(currentManifest()?.dialogs).toEqual([]);
     mounted.unmount();

@@ -1,16 +1,8 @@
 "use client";
 
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  useTransition,
-  type RefObject,
-} from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
-  GATEQ_NOTE_MAX_CHARS,
   ApplicationContactDtoSchema,
   type ApplicationContactDto,
   type ApplicationCoverageDto,
@@ -24,7 +16,6 @@ import {
   ChevronDown,
   ChevronLeft,
   CircleAlert,
-  FileText,
   ICON_SIZE,
   ICON_STROKE,
   RotateCw,
@@ -38,38 +29,25 @@ import {
 } from "../apply-actions";
 import { FitGlyph, type GlyphKind } from "../fit-glyph";
 import "../gateq.css";
+import "../gateq-v2.css";
 import { shareMaterialsAction } from "../materials-actions";
 import { readRecovery, saveRecovery, amendRecovery } from "./session-recovery";
+import { AnswersPage } from "./answers-page";
 import { ContactStep } from "./contact-step";
 import {
   answersFromProfile,
-  bandFor,
   contactFromProfile,
-  COUNTRY_CHOICES,
-  CURRENCIES,
-  DECLINED,
   dimensionWord,
   ownLabel,
-  draftNote,
   FLOW_PROGRESS,
-  FORM_STEPS,
-  formatMoney,
-  INSTRUMENT_CHOICES,
-  LEAD_CHOICES,
   maySend,
-  MORE_COUNTRIES,
-  normaliseAmount,
+  onQuestionsPage,
+  pageRequest,
   progressFor,
-  RAISE_BANDS,
   reachWords,
-  requestFor,
   ruleLines,
-  SECTOR_CHOICES,
-  STAGE_CHOICES,
-  stepForDimension,
-  validateStep,
+  validatePage,
   verdictFor,
-  verdictTitle,
   type FormAnswers,
   type FormPrefill,
   type FormStep,
@@ -84,21 +62,20 @@ import { ReviewStep } from "./review-step";
 import { useT } from "@/features/i18n/language";
 
 /**
- * The GateQ form (F1, 2026-10-06; design a/gateq.html "Founder: GateQ form").
+ * The GateQ form (F1, 2026-10-06; design gatepub-1 2026-10-21, "Form with
+ * live rule standing").
  *
- * A founder checks their fit with an investor in four short steps, with
- * tappable answers and "I'd rather not say" everywhere. The investor's rules
- * are on screen first; after each step the API's deterministic engine
- * answers rule by rule. Sending is a separate press at the end: until the
- * founder presses "Submit to <fund>", the investor receives nothing (the
- * API's submission is the disclosure boundary). In the embed the credential
+ * A founder answers every question on one page, with tappable answers and
+ * "Preferred not to say" everywhere, and sees beside it how they stand
+ * against the investor's published rules: each answer is saved and the
+ * API's deterministic engine answers rule by rule (no model). Then the
+ * contact is confirmed (by account or by an emailed code), then the
+ * interview with Q whose turns the server keeps, then a review of the API's
+ * coverage check. Submit exists only on the review: until the founder
+ * presses "Submit to <fund>", the investor receives nothing (the API's
+ * submission is the disclosure boundary). In the embed the credential
  * lives only in this component's memory: a third-party frame has no cookie
  * to lean on.
- *
- * GateQ slice 1 (2026-10-13): contact first (confirmed by account or by an
- * emailed code), then the four steps and the rule check, then an interview
- * with Q whose turns the server keeps, then a review of the API's coverage
- * check. Submit exists only on the review.
  */
 
 const icon = {
@@ -188,7 +165,9 @@ export function GateQForm({
       : { ...base, materials: [deck.id] };
   });
   const fromProfile = initial.fromProfile;
-  const [step, setStep] = useState<FormStep>(preview?.step ?? "contact");
+  // Design gatepub-1: the questions come first, with the standing beside
+  // them; the contact is confirmed once they choose to go on.
+  const [step, setStep] = useState<FormStep>(preview?.step ?? "company");
   // Slice 1: the contact as the API holds it, and why we came back to it.
   const [contact, setContact] = useState<ApplicationContactDto | null>(
     preview?.contact ?? null,
@@ -208,6 +187,7 @@ export function GateQForm({
   const token = useRef<string | null>(null);
   const submitKey = useRef<string>("");
   const [recovering, setRecovering] = useState(preview === undefined);
+  const [touched, setTouched] = useState(false);
   const [submissionStarted, setSubmissionStarted] = useState(false);
   const heading = useRef<HTMLHeadingElement | null>(null);
   const firstRender = useRef(true);
@@ -231,7 +211,7 @@ export function GateQForm({
       );
       if (!progress.ok) {
         setProblem(progress.message);
-        setStep("contact");
+        setStep("company");
         setRecovering(false);
         return;
       }
@@ -253,14 +233,21 @@ export function GateQForm({
                 : null,
             },
       );
+      const pastQuestions =
+        restored.interview ||
+        restored.step === "interview" ||
+        restored.step === "review" ||
+        restored.step === "contact";
       setStep(
         progress.application.submittedAt !== null
           ? "sent"
-          : !progress.coverage.contact.confirmed
-            ? "contact"
-            : restored.interview && restored.step === "check"
-              ? "interview"
-              : restored.step,
+          : !pastQuestions
+            ? "company"
+            : !progress.coverage.contact.confirmed
+              ? "contact"
+              : restored.step === "review"
+                ? "review"
+                : "interview",
       );
       setRecovering(false);
     });
@@ -297,6 +284,7 @@ export function GateQForm({
     if (submissionStarted && field === "materials") return;
     setAnswers((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
+    setTouched(true);
   };
 
   const ensureToken = async (): Promise<string | null> => {
@@ -335,48 +323,87 @@ export function GateQForm({
           ? confirmed.companyName
           : current.companyName,
     }));
-    setStep("company");
+    // The questions were answered and admitted before the contact step.
+    setStep("interview");
   };
 
-  const next = (from: FormStep): FormStep => {
-    const index = FORM_STEPS.indexOf(from as (typeof FORM_STEPS)[number]);
-    return index === FORM_STEPS.length - 1
-      ? "check"
-      : (FORM_STEPS[index + 1] ?? "check");
+  // Design gatepub-1: the standing follows the answers. Each change (after
+  // a short pause) is saved and the API's deterministic engine answers;
+  // only the latest answer is shown, never a stale one over a newer.
+  const liveSeq = useRef(0);
+  const [checking, setChecking] = useState(false);
+  const liveKey = JSON.stringify(pageRequest(answers));
+  const liveCheck = async (seq: number) => {
+    // A newer answer, or "Continue", already superseded this one.
+    if (seq !== liveSeq.current) return;
+    const credential = await ensureToken();
+    if (credential === null || seq !== liveSeq.current) return;
+    setChecking(true);
+    const saved = await formRequest(() =>
+      saveAnswersAction(credential, pageRequest(answers)),
+    );
+    if (seq !== liveSeq.current) return;
+    setChecking(false);
+    if (saved.ok) setApplication(saved.application);
   };
+  const liveRef = useRef(liveCheck);
+  useEffect(() => {
+    liveRef.current = liveCheck;
+  });
+  const questionsPage = onQuestionsPage(step);
+  // A signed-in founder's profile already answers some questions: check
+  // those at once, so the panel never says "not answered" for them.
+  const live = touched || (prefill !== null && fromProfile.size > 1);
+  useEffect(() => {
+    if (
+      preview !== undefined ||
+      recovering ||
+      !questionsPage ||
+      !live ||
+      needsCompany ||
+      !gateway.acceptingApplications
+    )
+      return;
+    const seq = liveSeq.current + 1;
+    liveSeq.current = seq;
+    const timer = window.setTimeout(() => void liveRef.current(seq), 500);
+    return () => window.clearTimeout(timer);
+  }, [
+    liveKey,
+    live,
+    preview,
+    recovering,
+    questionsPage,
+    needsCompany,
+    gateway.acceptingApplications,
+  ]);
 
+  // "Continue to interview": the whole page is saved, the engine answers,
+  // and only an admitted application goes on (the API refuses the rest).
   const onContinue = () => {
     if (preview !== undefined) return;
-    const found = validateStep(step, answers, { anonymous });
+    const found = validatePage(answers);
     if (Object.values(found).some((value) => value !== undefined)) {
       setErrors(found);
       return;
     }
     setProblem(null);
+    liveSeq.current += 1;
     startTransition(async () => {
       const credential = await ensureToken();
       if (credential === null) return;
       const saved = await formRequest(() =>
-        saveAnswersAction(credential, requestFor(step, answers)),
+        saveAnswersAction(credential, pageRequest(answers)),
       );
+      setChecking(false);
       if (!saved.ok) {
         setProblem(saved.message);
         return;
       }
       setApplication(saved.application);
-      const upcoming = next(step);
-      if (upcoming === "note" && answers.note === "") {
-        set("note", draftNote(fund, answers));
-      }
-      setStep(upcoming);
+      if (!maySend(verdictFor(saved.application))) return;
+      setStep(contact?.emailConfirmed === true ? "interview" : "contact");
     });
-  };
-
-  // Slice 1: the check admits; the interview comes before the review.
-  const onToInterview = () => {
-    if (!maySend(verdict)) return;
-    setProblem(null);
-    setStep("interview");
   };
 
   // The only submission path: the review's Submit button.
@@ -447,20 +474,9 @@ export function GateQForm({
     });
   };
 
-  const onBack = () => {
-    setProblem(null);
-    if (step === "company") return setStep("contact");
-    if (step === "check") return setStep("note");
-    if (step === "interview") return setStep("check");
-    if (step === "review") return setStep("interview");
-    const index = FORM_STEPS.indexOf(step as (typeof FORM_STEPS)[number]);
-    if (index > 0) setStep(FORM_STEPS[index - 1] ?? "company");
-  };
-
   const n = progressFor(step);
-  const formStep = (FORM_STEPS as readonly FormStep[]).includes(step);
   const pastCheck =
-    step === "check" ||
+    step === "contact" ||
     step === "interview" ||
     step === "review" ||
     step === "sent";
@@ -531,71 +547,36 @@ export function GateQForm({
     );
   }
 
-  // A required rule established as unmet: say so plainly, offer the fix.
-  // (The interview and review show the API's own access answer instead of
-  // swapping the screen out from under the founder mid-conversation.)
-  if (verdict === "NOT_A_FIT" && (formStep || step === "check")) {
-    const miss = lines.find((line) => line.standing === "DOES_NOT_MEET");
-    const met = lines.filter((line) => line.standing === "MEETS").length;
+  // Design gatepub-1: the questions are one page with the standing beside
+  // them. A required rule not met is said there, plainly, and the page
+  // stays: the founder can change an answer and see it at once.
+  if (questionsPage) {
     return (
-      <div className={shell}>
-        {card}
-        <div className="gq-card gq-result">
-          <h2 ref={heading} tabIndex={-1} className="cq-title-md">
-            {t(verdictTitle("NOT_A_FIT", fund, lines))}
-          </h2>
-          <p className="cq-body gq-t2">
-            {answers.companyName || t("Your company")} {t("meets")} {met}{" "}
-            {t(
-              `of their ${lines.length} rules, but this gate only accepts companies that meet all of the required ones. That's about fit, not quality.`,
-            )}
-          </p>
-          <ResultLines lines={lines} />
-          <p className="cq-body-sm gq-t2">
-            {t("Something wrong?")}{" "}
-            <button
-              type="button"
-              className="underline underline-offset-4"
-              onClick={() =>
-                setStep(
-                  miss === undefined
-                    ? "company"
-                    : stepForDimension(miss.dimension),
-                )
-              }
-            >
-              {t("Change your answer")}
-            </button>
-            .
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {compact ? null : (
-              <a
-                href="/discover?tab=investors"
-                className={buttonClassName("primary")}
-              >
-                {t("Find investors who fit")}
-              </a>
-            )}
-            <Button variant="quiet" onClick={onBack}>
-              {t("Back")}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <AnswersPage
+        headingRef={heading}
+        gateway={gateway}
+        answers={answers}
+        errors={errors}
+        fromProfile={fromProfile}
+        materials={materials}
+        lines={lines}
+        verdict={verdict}
+        checking={checking}
+        pending={pending}
+        problem={problem}
+        compact={compact}
+        set={set}
+        onContinue={onContinue}
+      />
     );
   }
 
   const stage =
     step === "contact"
       ? "Your details"
-      : formStep
-        ? `Step ${FORM_STEPS.indexOf(step as (typeof FORM_STEPS)[number]) + 1} of 4`
-        : step === "check"
-          ? "Your fit"
-          : step === "interview"
-            ? "Interview with Q"
-            : "Review";
+      : step === "interview"
+        ? "Interview with Q"
+        : "Review";
   const head = (
     <div className="flex flex-col gap-2.5">
       <p className="cq-caption gq-t2">
@@ -608,10 +589,6 @@ export function GateQForm({
       </div>
     </div>
   );
-
-  // The steps that carry their own buttons.
-  const ownBar =
-    step === "contact" || step === "interview" || step === "review";
 
   return (
     <div className={shell}>
@@ -643,6 +620,14 @@ export function GateQForm({
             signedIn={!anonymous}
             initial={{
               ...contactFromProfile(prefill),
+              // The page's answers lead: the email they gave to be reached
+              // at, and the company they named.
+              ...(answers.contactEmail.trim() === ""
+                ? {}
+                : { email: answers.contactEmail.trim() }),
+              ...(answers.companyName.trim() === ""
+                ? {}
+                : { companyName: answers.companyName.trim() }),
               ...(contact === null
                 ? {}
                 : {
@@ -658,57 +643,6 @@ export function GateQForm({
             ensureToken={ensureToken}
             onConfirmed={onContactConfirmed}
             notice={contactNotice}
-          />
-        ) : null}
-        {step === "company" ? (
-          <CompanyStep
-            headingRef={heading}
-            answers={answers}
-            errors={errors}
-            fromProfile={fromProfile}
-            set={set}
-          />
-        ) : null}
-        {step === "round" ? (
-          <RoundStep
-            headingRef={heading}
-            answers={answers}
-            errors={errors}
-            set={set}
-          />
-        ) : null}
-        {step === "share" ? (
-          <ShareStep
-            headingRef={heading}
-            fund={fund}
-            answers={answers}
-            errors={errors}
-            materials={materials}
-            anonymous={anonymous}
-            confirmed={contact?.emailConfirmed === true ? contact : null}
-            set={set}
-          />
-        ) : null}
-        {step === "note" ? (
-          <NoteStep
-            headingRef={heading}
-            fund={fund}
-            answers={answers}
-            errors={errors}
-            fromProfile={!anonymous}
-            set={set}
-          />
-        ) : null}
-        {step === "check" ? (
-          <CheckStep
-            headingRef={heading}
-            fund={fund}
-            lines={lines}
-            verdict={verdict}
-            answers={answers}
-            materials={materials}
-            replyWithinDays={gateway.replyWithinDays ?? null}
-            onAnswer={(dimension) => setStep(stepForDimension(dimension))}
           />
         ) : null}
         {step === "interview" ? (
@@ -782,37 +716,18 @@ export function GateQForm({
               </div>
             ) : null}
           </div>
-        ) : ownBar ? null : (
+        ) : step === "contact" ? (
           <div className="gq-formbar">
-            <Button variant="quiet" onClick={onBack} disabled={pending}>
+            <Button
+              variant="quiet"
+              onClick={() => setStep("company")}
+              disabled={pending}
+            >
               <ChevronLeft {...icon} />
-              {t("Back")}
+              {t("Back to your answers")}
             </Button>
-            {step === "check" ? (
-              <Button
-                variant="primary"
-                style={{ minWidth: 160 }}
-                onClick={onToInterview}
-                disabled={pending || !maySend(verdict)}
-              >
-                {t("Continue to interview")}
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                style={{ minWidth: 160 }}
-                onClick={onContinue}
-                disabled={pending}
-              >
-                {pending
-                  ? t("Checking…")
-                  : step === "note"
-                    ? t("Check my fit")
-                    : t("Continue")}
-              </Button>
-            )}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -922,649 +837,5 @@ function GateCard({
         </div>
       </details>
     </aside>
-  );
-}
-
-function ResultLines({ lines }: { readonly lines: readonly RuleLine[] }) {
-  const t = useT();
-
-  return (
-    <div>
-      {lines.map((line) =>
-        line.standing === null ? null : (
-          <div key={line.label} className="gq-check">
-            <FitGlyph kind={GLYPH[line.standing]} />
-            <span>
-              <b className="font-medium">{t(dimensionWord(line.dimension))}</b>
-              {ownLabel(line) === null ? null : (
-                <>
-                  <br />
-                  <span className="cq-body-sm gq-t2">{ownLabel(line)}</span>
-                </>
-              )}
-            </span>
-            <span className="gq-status">
-              {t(STANDING_WORDS[line.standing])}
-            </span>
-          </div>
-        ),
-      )}
-    </div>
-  );
-}
-
-type SetAnswer = <K extends keyof FormAnswers>(
-  field: K,
-  value: FormAnswers[K],
-) => void;
-
-function FromProfile() {
-  const t = useT();
-
-  return (
-    <span className="gq-prefill">
-      <Check {...icon} size={13} />
-      {t("From your profile")}
-    </span>
-  );
-}
-
-/** One question, single choice, with "I'd rather not say". */
-function Options({
-  label,
-  options,
-  value,
-  onChange,
-  error,
-  badge,
-}: {
-  readonly label: string;
-  readonly options: readonly {
-    readonly value: string;
-    readonly label: string;
-  }[];
-  readonly value: string;
-  readonly onChange: (value: string) => void;
-  readonly error?: string | undefined;
-  readonly badge?: boolean;
-}) {
-  const t = useT();
-
-  const id = useId();
-  return (
-    <div className="gq-q">
-      <p className="gq-label" id={id}>
-        {t(label)}
-        {badge === true ? <FromProfile /> : null}
-      </p>
-      <div className="gq-opts" role="radiogroup" aria-labelledby={id}>
-        {[...options, { value: DECLINED, label: "I'd rather not say" }].map(
-          (option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="radio"
-              aria-checked={value === option.value}
-              className={`gq-opt${option.value === DECLINED ? " gq-skip" : ""}`}
-              onClick={() => onChange(option.value)}
-            >
-              {t(option.label)}
-            </button>
-          ),
-        )}
-      </div>
-      {error === undefined ? null : <p className="gq-err">{t(error)}</p>}
-    </div>
-  );
-}
-
-type StepProps = {
-  readonly headingRef: RefObject<HTMLHeadingElement | null>;
-  readonly answers: FormAnswers;
-  readonly errors: StepErrors;
-  readonly set: SetAnswer;
-};
-
-function CompanyStep({
-  headingRef,
-  answers,
-  errors,
-  fromProfile,
-  set,
-}: StepProps & { readonly fromProfile: ReadonlySet<keyof FormAnswers> }) {
-  const t = useT();
-
-  const [editing, setEditing] = useState(!fromProfile.has("companyName"));
-  const sectors = answers.sectors === DECLINED ? [] : answers.sectors;
-  const [other, setOther] = useState(answers.otherSector !== "");
-  const inList = COUNTRY_CHOICES.some((c) => c.value === answers.country);
-  const [elsewhere, setElsewhere] = useState(
-    answers.country !== "" && answers.country !== DECLINED && !inList,
-  );
-  const sectorId = useId();
-  const countryId = useId();
-  return (
-    <>
-      <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-        {t("Your company")}
-      </h1>
-      <p className="cq-body gq-t2">
-        {fromProfile.size > 0
-          ? t(
-              "Filled in from your profile. Change anything that's out of date.",
-            )
-          : t(
-              "Tap what fits. Rough is fine, and you can say you'd rather not.",
-            )}
-      </p>
-      {editing ? (
-        <div className="flex flex-col gap-3">
-          <div className="gq-field">
-            <label className="gq-label" htmlFor="gq-name">
-              {t("Company name")}
-            </label>
-            <input
-              id="gq-name"
-              className="gq-input"
-              value={answers.companyName}
-              maxLength={200}
-              autoComplete="organization"
-              onChange={(e) => set("companyName", e.target.value)}
-              aria-invalid={errors.companyName !== undefined}
-            />
-            {errors.companyName ? (
-              <p className="gq-err">{errors.companyName}</p>
-            ) : null}
-          </div>
-          <div className="gq-field">
-            <label className="gq-label" htmlFor="gq-line">
-              {t("What it does, in one line")}{" "}
-              <span className="gq-t3">{t("(optional)")}</span>
-            </label>
-            <input
-              id="gq-line"
-              className="gq-input"
-              value={answers.oneLiner}
-              maxLength={280}
-              onChange={(e) => set("oneLiner", e.target.value)}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="gq-card gq-cocard">
-          <span className="gq-logo" style={{ width: 48, height: 48 }}>
-            {t(answers.companyName.slice(0, 1).toUpperCase())}
-          </span>
-          <span className="min-w-0 flex-1">
-            <b className="cq-title-sm block">{answers.companyName}</b>
-            {answers.oneLiner ? (
-              <span className="cq-body-sm gq-t2 block">
-                {t(answers.oneLiner)}
-              </span>
-            ) : null}
-          </span>
-          <Button
-            variant="quiet"
-            size="compact"
-            onClick={() => setEditing(true)}
-          >
-            {t("Edit")}
-          </Button>
-        </div>
-      )}
-      <Options
-        label={t("Stage")}
-        badge={fromProfile.has("stage") && answers.stage !== ""}
-        options={STAGE_CHOICES}
-        value={answers.stage}
-        onChange={(value) => set("stage", value)}
-        error={errors.stage}
-      />
-      <div className="gq-q">
-        <p className="gq-label" id={sectorId}>
-          {t("Sector")}{" "}
-          <span className="gq-t3 font-normal">{t("(pick any)")}</span>
-        </p>
-        <div className="gq-opts" role="group" aria-labelledby={sectorId}>
-          {SECTOR_CHOICES.map((choice) => {
-            const on = sectors.includes(choice.value);
-            return (
-              <button
-                key={choice.value}
-                type="button"
-                aria-pressed={on}
-                className="gq-opt"
-                onClick={() =>
-                  set(
-                    "sectors",
-                    on
-                      ? sectors.filter((s) => s !== choice.value)
-                      : [...sectors, choice.value].slice(0, 5),
-                  )
-                }
-              >
-                {t(choice.label)}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            aria-pressed={other}
-            className="gq-opt"
-            onClick={() => {
-              if (answers.sectors === DECLINED) set("sectors", []);
-              setOther(!other);
-              if (other) set("otherSector", "");
-            }}
-          >
-            {t("Something else")}
-          </button>
-          <button
-            type="button"
-            aria-pressed={answers.sectors === DECLINED}
-            className="gq-opt gq-skip"
-            onClick={() => {
-              setOther(false);
-              set("otherSector", "");
-              set("sectors", answers.sectors === DECLINED ? [] : DECLINED);
-            }}
-          >
-            {t("I'd rather not say")}
-          </button>
-        </div>
-        {other ? (
-          <input
-            className="gq-input"
-            aria-label={t("Your sector, in a few words")}
-            placeholder={t("In a few words, like insurance software")}
-            maxLength={120}
-            value={answers.otherSector}
-            onChange={(e) => set("otherSector", e.target.value)}
-          />
-        ) : null}
-        {errors.sectors ? <p className="gq-err">{t(errors.sectors)}</p> : null}
-      </div>
-      <div className="gq-q">
-        <p className="gq-label" id={countryId}>
-          {t("Where is the company based?")}
-          {fromProfile.has("country") && answers.country !== "" ? (
-            <FromProfile />
-          ) : null}
-        </p>
-        <div className="gq-opts" role="radiogroup" aria-labelledby={countryId}>
-          {COUNTRY_CHOICES.map((choice) => (
-            <button
-              key={choice.value}
-              type="button"
-              role="radio"
-              aria-checked={answers.country === choice.value}
-              className="gq-opt"
-              onClick={() => {
-                setElsewhere(false);
-                set("country", choice.value);
-              }}
-            >
-              {t(choice.label)}
-            </button>
-          ))}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={elsewhere}
-            className="gq-opt"
-            onClick={() => {
-              setElsewhere(true);
-              if (inList || answers.country === DECLINED) set("country", "");
-            }}
-          >
-            {t("Elsewhere")}
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={answers.country === DECLINED}
-            className="gq-opt gq-skip"
-            onClick={() => {
-              setElsewhere(false);
-              set("country", DECLINED);
-            }}
-          >
-            {t("I'd rather not say")}
-          </button>
-        </div>
-        {elsewhere ? (
-          <select
-            className="gq-input"
-            aria-label={t("Country")}
-            value={
-              inList || answers.country === DECLINED ? "" : answers.country
-            }
-            onChange={(e) => set("country", e.target.value)}
-          >
-            <option value="">{t("Choose a country")}</option>
-            {MORE_COUNTRIES.map((choice) => (
-              <option key={choice.value} value={choice.value}>
-                {t(choice.label)}
-              </option>
-            ))}
-          </select>
-        ) : null}
-        {errors.country ? <p className="gq-err">{t(errors.country)}</p> : null}
-      </div>
-    </>
-  );
-}
-
-function RoundStep({ headingRef, answers, errors, set }: StepProps) {
-  const t = useT();
-
-  return (
-    <>
-      <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-        {t("Your round")}
-      </h1>
-      <p className="cq-body gq-t2">
-        {t("Rough numbers are fine. You can say you'd rather not.")}
-      </p>
-      <div className="gq-q">
-        <Options
-          label={t("How much are you raising?")}
-          options={RAISE_BANDS}
-          value={answers.band}
-          onChange={(value) => {
-            set("band", value);
-            if (value === DECLINED) set("amount", "");
-          }}
-          error={errors.band}
-        />
-        {answers.band === DECLINED ? null : (
-          <div className="flex max-w-[360px] gap-2">
-            <select
-              className="gq-input"
-              style={{ width: 96 }}
-              aria-label={t("Currency")}
-              value={answers.currency}
-              onChange={(e) => set("currency", e.target.value)}
-            >
-              {CURRENCIES.map((c) => (
-                <option key={c}>{t(c)}</option>
-              ))}
-            </select>
-            <input
-              className="gq-input"
-              inputMode="decimal"
-              aria-label={t("Exact amount")}
-              placeholder={t("Exact amount, like 1,200,000")}
-              value={answers.amount}
-              aria-invalid={errors.amount !== undefined}
-              onChange={(e) => {
-                set("amount", e.target.value);
-                const amount = normaliseAmount(e.target.value);
-                if (amount !== null && answers.currency === "USD") {
-                  const band = bandFor(amount);
-                  if (band !== "") set("band", band);
-                }
-              }}
-            />
-          </div>
-        )}
-        {errors.amount ? <p className="gq-err">{errors.amount}</p> : null}
-        {answers.band !== "" &&
-        answers.band !== DECLINED &&
-        answers.amount.trim() === "" ? (
-          <p className="cq-caption gq-t3">
-            {t(
-              "Add the exact amount so the round-size rule can be checked. Without it, that rule stays unanswered.",
-            )}
-          </p>
-        ) : null}
-      </div>
-      <Options
-        label={t("How are you raising?")}
-        options={INSTRUMENT_CHOICES}
-        value={answers.instrument}
-        onChange={(value) =>
-          set("instrument", value as FormAnswers["instrument"])
-        }
-      />
-      <Options
-        label={t("Do you have a lead investor?")}
-        options={LEAD_CHOICES}
-        value={answers.lead}
-        onChange={(value) => set("lead", value as FormAnswers["lead"])}
-      />
-    </>
-  );
-}
-
-function ShareStep({
-  headingRef,
-  fund,
-  answers,
-  errors,
-  materials,
-  anonymous,
-  confirmed,
-  set,
-}: StepProps & {
-  readonly fund: string;
-  readonly materials: readonly Material[];
-  readonly anonymous: boolean;
-  /** Slice 1: the contact confirmed on the first step replaces the fields. */
-  readonly confirmed: ApplicationContactDto | null;
-}) {
-  const t = useT();
-
-  return (
-    <>
-      <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-        {t("What to share")}
-      </h1>
-      <p className="cq-body gq-t2">
-        {materials.length > 0
-          ? t(`Pick what ${fund} should see. They only get what you tick.`)
-          : t(`${fund} gets your answers and your note. Nothing else.`)}
-      </p>
-      {materials.length > 0 ? (
-        <ul className="gq-hair">
-          {materials.map((material) => (
-            <li key={material.id}>
-              <label className="gq-mat">
-                <input
-                  type="checkbox"
-                  checked={answers.materials.includes(material.id)}
-                  onChange={(e) =>
-                    set(
-                      "materials",
-                      e.target.checked
-                        ? [...answers.materials, material.id]
-                        : answers.materials.filter((id) => id !== material.id),
-                    )
-                  }
-                />
-                <span className="flex-1">
-                  <b className="block font-medium">{material.name}</b>
-                  <span className="cq-caption gq-t2">{t(material.detail)}</span>
-                </span>
-                <FileText {...icon} size={ICON_SIZE.regular} />
-              </label>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {confirmed !== null ? (
-        <p className="cq-body-sm gq-t2">
-          {t(`${fund} may contact you at`)} <b>{confirmed.email}</b>
-          {t(", the email you confirmed.")}
-        </p>
-      ) : anonymous ? (
-        <div className="flex flex-col gap-3">
-          <div className="gq-field">
-            <label className="gq-label" htmlFor="gq-cname">
-              {t("Your name")} <span className="gq-t3">{t("(optional)")}</span>
-            </label>
-            <input
-              id="gq-cname"
-              className="gq-input"
-              autoComplete="name"
-              maxLength={200}
-              value={answers.contactName}
-              onChange={(e) => set("contactName", e.target.value)}
-            />
-          </div>
-          <div className="gq-field">
-            <label className="gq-label" htmlFor="gq-cmail">
-              {t("Email for their reply")}
-            </label>
-            <input
-              id="gq-cmail"
-              className="gq-input"
-              type="email"
-              autoComplete="email"
-              maxLength={254}
-              value={answers.contactEmail}
-              aria-invalid={errors.contactEmail !== undefined}
-              onChange={(e) => set("contactEmail", e.target.value)}
-            />
-            {errors.contactEmail ? (
-              <p className="gq-err">{t(errors.contactEmail)}</p>
-            ) : null}
-          </div>
-          <p className="cq-caption gq-t3">
-            {t(
-              "Have a Capital Q account? Sign in on the gate's page to share your deck too.",
-            )}
-          </p>
-        </div>
-      ) : null}
-    </>
-  );
-}
-
-function NoteStep({
-  headingRef,
-  fund,
-  answers,
-  errors,
-  fromProfile,
-  set,
-}: StepProps & { readonly fund: string; readonly fromProfile: boolean }) {
-  const t = useT();
-
-  return (
-    <>
-      <h1 ref={headingRef} tabIndex={-1} className="cq-title-lg">
-        {t("A short note")}
-      </h1>
-      <p className="cq-body gq-t2">
-        {t("Optional.")}{" "}
-        {fromProfile
-          ? t("A first draft from your profile; it's yours to change.")
-          : t("A line or two about why them.")}
-      </p>
-      <div className="gq-field">
-        <label className="gq-label" htmlFor="gq-msg">
-          {t(`Note to ${fund}`)}
-        </label>
-        <textarea
-          id="gq-msg"
-          className="gq-input"
-          rows={6}
-          maxLength={GATEQ_NOTE_MAX_CHARS + 50}
-          value={answers.note}
-          aria-invalid={errors.note !== undefined}
-          aria-describedby="gq-msg-count"
-          onChange={(e) => set("note", e.target.value)}
-        />
-        <span id="gq-msg-count" className="cq-caption gq-t3 text-end">
-          {answers.note.length} {t("of")} {GATEQ_NOTE_MAX_CHARS}
-        </span>
-        {errors.note ? <p className="gq-err">{errors.note}</p> : null}
-      </div>
-    </>
-  );
-}
-
-function CheckStep({
-  headingRef,
-  fund,
-  lines,
-  verdict,
-  answers,
-  materials,
-  replyWithinDays,
-  onAnswer,
-}: {
-  readonly headingRef: RefObject<HTMLHeadingElement | null>;
-  readonly fund: string;
-  readonly lines: readonly RuleLine[];
-  readonly verdict: ReturnType<typeof verdictFor>;
-  readonly answers: FormAnswers;
-  readonly materials: readonly Material[];
-  readonly replyWithinDays: number | null;
-  readonly onAnswer: (dimension: string) => void;
-}) {
-  const t = useT();
-
-  const unanswered = lines.filter(
-    (line) => line.standing === "NOT_ANSWERED" && line.required,
-  );
-  const shared = materials
-    .filter((m) => answers.materials.includes(m.id))
-    .map((m) => m.name.toLowerCase());
-  const amount = normaliseAmount(answers.amount);
-  return (
-    <div className="gq-card gq-result">
-      <div className="flex items-center gap-3">
-        <FitGlyph
-          kind={verdict === "FITS" && lines.length > 0 ? "fit" : "unk"}
-          size={28}
-        />
-        <h1 ref={headingRef} tabIndex={-1} className="cq-title-md">
-          {verdict === null
-            ? t("Checking…")
-            : t(verdictTitle(verdict, fund, lines))}
-        </h1>
-      </div>
-      <ResultLines lines={lines} />
-      {verdict === "NEEDS_ANSWERS" && unanswered.length > 0 ? (
-        <div className="gq-banner">
-          <CircleAlert {...icon} />
-          <span>
-            {t("Unanswered isn't a no, but this gate needs")}{" "}
-            {t(
-              unanswered
-                .map((line) => dimensionWord(line.dimension).toLowerCase())
-                .join(" and "),
-            )}{" "}
-            {t("to decide.")}{" "}
-            <button
-              type="button"
-              className="underline underline-offset-4"
-              onClick={() => onAnswer(unanswered[0]?.dimension ?? "STAGE")}
-            >
-              {t("Answer it")}
-            </button>
-          </span>
-        </div>
-      ) : null}
-      <p className="cq-body-sm gq-t2">
-        {t(
-          "Next, a few questions from Q, then you review everything before it goes. When you submit,",
-        )}{" "}
-        {t(`${fund} gets:`)} {t(answers.companyName || "your company")}
-        {t(", your answers")}
-        {amount !== null
-          ? t(` (raising ${formatMoney(amount, answers.currency)})`)
-          : ""}
-        {shared.length > 0 ? t(`, ${shared.join(", ")}`) : ""}
-        {answers.note.trim() !== "" ? t(" and your note") : ""}.
-        {replyWithinDays
-          ? t(
-              ` ${fund} promises a reply within ${replyWithinDays} working days.`,
-            )
-          : ""}
-      </p>
-    </div>
   );
 }

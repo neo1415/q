@@ -102,8 +102,7 @@ export function TeamSkeleton() {
 export function TeamError() {
   return (
     <div className="flex flex-col gap-6" data-team-error>
-      <h1 className="cq-title-lg text-(--cq-text-primary)">Team</h1>
-      <div className="cq-panel flex flex-col items-start gap-3 p-5">
+      <div className="flex flex-col items-start gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5">
         <CircleAlert
           aria-hidden="true"
           size={ICON_SIZE.prominent}

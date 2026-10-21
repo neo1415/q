@@ -48,6 +48,7 @@ import {
   type QResponseMessage,
   type QScreenContext,
   type QSubjectRef,
+  type QStageAbout,
   type QVisibleStage,
   type TenantModelPolicy,
   type CompanyEditableField,
@@ -81,6 +82,7 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   type PromptRegistry,
   renderPrompt,
+  bundleVersionOf,
   isEmptyPromise,
   stripEmptyPromises,
   withoutRecommendationClaims,
@@ -125,6 +127,7 @@ import {
   namedCompanySubjects,
   withCardSubjects,
 } from "./card-subjects.js";
+import { stageAbout, stageKey } from "./stage-subjects.js";
 import {
   createRunFits,
   fitAnswerCardsBlock,
@@ -1248,7 +1251,7 @@ export const TURN_UNREAD_NOTE =
  * detail on screen: fewer words to write is also the faster answer.
  */
 export const SPOKEN_TURN_NOTE =
-  "SPOKEN TURN: this answer is said aloud on a live call. answer: at most three short spoken sentences (about 60 words), first person, the direct answer to what they asked first, contractions, no lists, headings or markdown. A list, scores or a comparison go in answerCards; the words give the gist and the best one or two by name, then say they're on screen. At most two findings, one short sentence each: every word is written before the call can go on. Never read a list aloud.";
+  "SPOKEN TURN: this answer is said aloud on a live call. answer: at most three short spoken sentences (about 60 words), first person, the direct answer to what they asked first, contractions, no lists, headings or markdown. A list, scores or a comparison go in answerCards; the words give the gist and the best one or two by name, then say they're on screen. At most three findings. Never read a list aloud.";
 
 export const WRITING_DOCUMENT_NOTE =
   "THEY ASKED FOR THIS AS A DOCUMENT. Your answer IS the document's text: write the piece itself, in full, with a short heading line (# Title) and section headings where they help. Capital Q files your answer as their document with a PDF download right after you finish and shows its card, so never say you cannot make a PDF or document, never describe the document instead of writing it, and never say it is already attached.";
@@ -2013,6 +2016,14 @@ function phased<T>(label: string, work: () => Promise<T>): Promise<T> {
   return withRoundTripPhase(`answer.${label}`, work);
 }
 
+/** Arrival row 22: what the early arrival answer needs, from the turn's own reads. */
+type EarlyArrival = {
+  readonly reply: ArrivalReply;
+  readonly conversationId: QConversationMessage["conversationId"];
+  readonly latest: QConversationMessage;
+  readonly earlier: readonly QConversationMessage[];
+};
+
 export function createModelGatewayQAnswer(
   dependencies: ModelGatewayQAnswerDependencies,
 ): ModelGatewayQAnswer {
@@ -2091,10 +2102,14 @@ export function createModelGatewayQAnswer(
   async function showStage(
     request: QAnswerRequest,
     stage: QVisibleStage,
+    about?: QStageAbout,
   ): Promise<void> {
     try {
       const run = { id: request.runId, tenantId: request.tenantId };
-      const input = { type: "q.stage.changed", data: { stage } } as const;
+      const input = {
+        type: "q.stage.changed",
+        data: about === undefined ? { stage } : { stage, about },
+      } as const;
       // One statement on the request client where the store offers it
       // (S2); otherwise a transaction, as before.
       const done = await appendRunEventAtomic(repositories, sql, run, input);
@@ -2176,7 +2191,39 @@ export function createModelGatewayQAnswer(
     arrival: null,
   };
 
-  async function prepareTurn(request: QAnswerRequest) {
+  /**
+   * Arrival row 22: an arrival follow-up code can answer from the snapshot,
+   * offered as soon as it is known, so the answer does not wait for the
+   * rest of the turn's preparation (assemble, profile, readiness, prompt).
+   * Keyed by run; taken once by that run's answer.
+   */
+  const arrivalEarly = new Map<string, Promise<EarlyArrival | null>>();
+  function prepareTurn(request: QAnswerRequest) {
+    let offerEarly: (early: EarlyArrival | null) => void = () => undefined;
+    arrivalEarly.set(
+      request.runId,
+      new Promise<EarlyArrival | null>((resolve) => {
+        offerEarly = resolve;
+      }),
+    );
+    while (arrivalEarly.size > 64) {
+      const oldest = arrivalEarly.keys().next().value;
+      if (oldest === undefined) break;
+      arrivalEarly.delete(oldest);
+    }
+    const preparing = prepareTurnReads(request, offerEarly);
+    // Whatever happens to the reads, the early offer settles (null: none).
+    preparing.then(
+      () => offerEarly(null),
+      () => offerEarly(null),
+    );
+    return preparing;
+  }
+
+  async function prepareTurnReads(
+    request: QAnswerRequest,
+    offerEarly: (early: EarlyArrival | null) => void,
+  ) {
     const plan: PermittedContextPlan = request.plan;
     /**
      * Everything recently said in this CONVERSATION, not in this run.
@@ -2378,6 +2425,22 @@ export function createModelGatewayQAnswer(
       return null;
     };
     const arrivalDecision = decideArrival().catch(() => null);
+    // Arrival row 22. Only the code answers ahead of the arrival follow-up
+    // in answer() could take this turn (what needs them, their own
+    // mandate); their words are kept off the early path, so the answer is
+    // the one the full path would give.
+    if (
+      arrivalByCode &&
+      conversationId !== undefined &&
+      !asksWhatNeedsThem(latest.content) &&
+      !asksForOwnMandate(latest.content)
+    ) {
+      void arrivalDecision.then((reply) => {
+        if (reply !== null) {
+          offerEarly({ reply, conversationId, latest, earlier });
+        }
+      });
+    }
     const offerRead = timed(
       "offer",
       phased("offer", () => tools.offer(toolContext)),
@@ -3278,6 +3341,121 @@ export function createModelGatewayQAnswer(
     };
   }
   type PreparedTurn = Awaited<ReturnType<typeof prepareTurn>>;
+
+  /**
+   * Arrival row 22: the arrival follow-up answered before the rest of the
+   * turn is prepared. The same words, blocks and stored message as the
+   * full path's W1 answer (`persistCodeAnswer` there): no tool ran and no
+   * public page was read, so only the screen-move and miss-line rules of
+   * `persistAnswer` apply, and they are applied here the same way.
+   */
+  async function answerArrivalEarly(
+    request: QAnswerRequest,
+    early: EarlyArrival,
+    leadLines: string | undefined,
+    startedAt: number,
+  ): Promise<QAnswerOutcome> {
+    const { reply, conversationId, latest, earlier } = early;
+    const open = reply.open;
+    const given: QResultBlock[] =
+      open === undefined
+        ? []
+        : [
+            {
+              kind: "UI_INTENT",
+              intent: {
+                kind: "OPEN_RECORD_PAGE",
+                page: open.page,
+                id: open.id,
+                ...(open.anchor === undefined ? {} : { anchor: open.anchor }),
+              },
+            },
+          ];
+    let content =
+      leadLines === undefined ? reply.text : `${leadLines}\n\n${reply.text}`;
+    const localise = dependencies.localiseWords;
+    if (localise !== undefined) {
+      const said = await localise(
+        {
+          tenantId: request.tenantId,
+          userId: request.actorUserId,
+          runId: request.runId,
+        },
+        [content],
+      ).catch(() => null);
+      const prose = said?.[0];
+      if (prose !== null && prose !== undefined) content = prose;
+    }
+    const carried = withoutUnaskedMoves(
+      withFitIntegrity(given, {
+        asked: latest.content,
+        previous: previousCardCompanyIds(earlier),
+      }),
+      latest.content,
+    );
+    const blocks = carried.length === 0 ? undefined : carried;
+    const missed = screenActMissLine(
+      dependencies.uiActReceipts?.(request.actor) ?? [],
+      [...earlier].reverse().find((message) => message.role === "Q")?.content ??
+        null,
+    );
+    if (missed !== null && !content.includes("didn't go through")) {
+      const rest = withoutLandedClaims(content);
+      content = (rest.length === 0 ? missed : `${missed}\n\n${rest}`).slice(
+        0,
+        ANSWER_LIMIT_CHARS,
+      );
+    }
+    const messageId = QMessageIdSchema.parse(randomUUID());
+    const message = await transactions.run(async (tx) => {
+      const stored = await repositories.messages.insert(tx, {
+        id: messageId,
+        tenantId: request.tenantId,
+        conversationId,
+        runId: request.runId,
+        role: "Q",
+        content,
+        ...(blocks === undefined ? {} : { blocks }),
+      });
+      await appendRunEvent(
+        repositories,
+        tx,
+        { id: request.runId, tenantId: request.tenantId },
+        {
+          type: "q.message.completed",
+          data: {
+            message: {
+              ...(toQMessage(stored) as QResponseMessage),
+              ...(blocks === undefined ? {} : { blocks }),
+            },
+          },
+        },
+      );
+      return stored;
+    });
+    logger?.info(
+      {
+        qRunId: request.runId,
+        itemKey: reply.itemKey,
+        modelCalls: 0,
+        toolCalls: 0,
+        early: true,
+        totalMs: Date.now() - startedAt,
+      },
+      "q answered an arrival follow-up from the arrival snapshot",
+    );
+    return {
+      kind: "ANSWERED",
+      messageId: message.id,
+      modelPolicyVersion: "none",
+      // No prompt was rendered for this answer; the bundle it would have
+      // been rendered from is named, as the full path's code answers do.
+      promptBundleVersion: bundleVersionOf(
+        registry.getActive("Q_SYSTEM").versionId,
+        registry.getActive("COMPANY_ANALYST").versionId,
+      ),
+    };
+  }
   /**
    * Turns being prepared while they are read (speed sweep 2026-10-01: the
    * turn reader's ~1 s and these reads' ~0.5 s ran one after the other).
@@ -3285,6 +3463,8 @@ export function createModelGatewayQAnswer(
    * ever read.
    */
   const warming = new Map<string, Promise<PreparedTurn>>();
+  /** A stage a warmed turn already showed, so its answer does not repeat it. */
+  const stagedEarly = new Map<string, QVisibleStage>();
   const WARMING_MAX = 64;
 
   return {
@@ -3304,14 +3484,31 @@ export function createModelGatewayQAnswer(
        * the readers: the same memoised read, the same tools and plan, read
        * only; a turn answered by code simply never uses them.
        */
-      if (request.plan.screen?.manifest?.focus !== undefined) {
-        started.then((prepared) => prepared?.wide()).catch(() => undefined);
-      }
+      // Owner 2026-10-21 (no serial wait that can run beside another): a
+      // message that names a company has that company read while the turn
+      // is still being read, not after; the same memoised, read-only reads.
+      started
+        .then((prepared) => {
+          if (prepared === null) return undefined;
+          const names =
+            companyNameCandidates(prepared.latest.content).length > 0;
+          if (!names && request.plan.screen?.manifest?.focus === undefined) {
+            return undefined;
+          }
+          // Its stage goes out as the read starts (visible stages).
+          if (names && request.speculation === undefined) {
+            stagedEarly.set(request.runId, "REVIEWING_COMPANY");
+            void showStage(request, "REVIEWING_COMPANY");
+          }
+          return prepared.wide();
+        })
+        .catch(() => undefined);
       warming.set(request.runId, started);
       while (warming.size > WARMING_MAX) {
         const oldest = warming.keys().next().value;
         if (oldest === undefined) break;
         warming.delete(oldest);
+        stagedEarly.delete(oldest);
       }
     },
     answer: async (request: QAnswerRequest): Promise<QAnswerOutcome> => {
@@ -3350,6 +3547,33 @@ export function createModelGatewayQAnswer(
       // A speculative answer leaves the warmed reads where they are: if it
       // is cancelled, the turn's own answer takes them up (they only read).
       const gate = speculationGate(request.speculation);
+      /**
+       * Owner 2026-10-21 (visible stages): each step's stage goes out as
+       * the step starts, in order, and never holds the step up. Writes are
+       * queued (one after another, so they are stored in the order they
+       * happened) and a stage already showing is not written again. While
+       * the answer is speculative the stage waits with its text.
+       */
+      let stageNow: QVisibleStage | undefined = stagedEarly.get(request.runId);
+      stagedEarly.delete(request.runId);
+      let stageQueue: Promise<void> = Promise.resolve();
+      let stageKeyNow: string | undefined =
+        stageNow === undefined ? undefined : stageKey(stageNow, undefined);
+      const stageOnce = (
+        stage: QVisibleStage,
+        about?: QStageAbout,
+      ): Promise<void> => {
+        const key = stageKey(stage, about);
+        if (stage === stageNow && key === stageKeyNow) return stageQueue;
+        stageNow = stage;
+        stageKeyNow = key;
+        stageQueue = stageQueue.then(() =>
+          gate === null
+            ? showStage(request, stage, about)
+            : gate.emit(() => showStage(request, stage, about)),
+        );
+        return stageQueue;
+      };
       if (gate === null) warming.delete(request.runId);
       else
         void request.speculation?.decided.then(
@@ -3360,7 +3584,25 @@ export function createModelGatewayQAnswer(
           },
           () => undefined,
         );
-      const prepared = await (warmed ?? prepareTurn(request));
+      const preparing = warmed ?? prepareTurn(request);
+      // Arrival row 22: a snapshot answer by code goes out as soon as it
+      // is known. Never for a speculative answer, which stores nothing
+      // until it is adopted.
+      const early = gate === null ? arrivalEarly.get(request.runId) : undefined;
+      if (gate === null) arrivalEarly.delete(request.runId);
+      if (early !== undefined) {
+        const first = await Promise.race([
+          preparing.then(
+            () => null,
+            () => null,
+          ),
+          early,
+        ]);
+        if (first !== null) {
+          return answerArrivalEarly(request, first, leadLines, startedAt);
+        }
+      }
+      const prepared = await preparing;
       if (prepared === null) {
         return { kind: "FAILED", diagnosticCode: "INTERNAL_ERROR" };
       }
@@ -3566,6 +3808,13 @@ export function createModelGatewayQAnswer(
           (request.turnKind === undefined ||
             request.turnKind === "QUESTION_TO_Q") &&
           asksWhatNeedsThem(latest.content));
+      // Visible stages: the companies a message names are read here.
+      if (
+        !withoutWideReads &&
+        companyNameCandidates(latest.content).length > 0
+      ) {
+        void stageOnce("REVIEWING_COMPANY");
+      }
       let wideReads: WideReads = withoutWideReads
         ? NO_WIDE_READS
         : await prepared.wide();
@@ -3628,11 +3877,6 @@ export function createModelGatewayQAnswer(
           await gate.ready();
         }
         return tools.execute(proposal, context);
-      };
-      /** A visible stage: held with the answer's text while speculative. */
-      const stageShown = async (stage: QVisibleStage): Promise<void> => {
-        if (gate === null) await showStage(request, stage);
-        else gate.emit(() => showStage(request, stage));
       };
       /**
        * A setup reminder (founder directive 2026-09-27), only at a natural
@@ -5230,11 +5474,65 @@ export function createModelGatewayQAnswer(
           sayLeadLines();
         }
 
+        /**
+         * The public web read by code (see below), once per turn: the
+         * stage, the call under this run's tool context, and its result in
+         * front of the model as Capital Q's own read.
+         */
+        const researchHop = async (
+          researchTool: QOfferedTool,
+        ): Promise<void> => {
+          // The stage goes out as the search starts, beside it.
+          const stageWrite =
+            researchTool.visibleStage === undefined ||
+            researchTool.visibleStage === null
+              ? null
+              : stageOnce(researchTool.visibleStage);
+          const followUp = publicResearchFollowUp({
+            history: earlier,
+            question: latest.content,
+            aboutNamedOther: request.aboutNamedOther === true,
+            selected: selectedForResearch(),
+          });
+          const call = {
+            callId: "q-research",
+            name: "research_public_web",
+            // The service plans further phrasings from the person's words.
+            arguments: {
+              ...(followUp ?? { query: latest.content.trim().slice(0, 200) }),
+              // Enough pages to answer from, not only to compare.
+              maxSources: prospectsThin ? 5 : 4,
+            },
+          };
+          took("beforeResearch");
+          const [outcome] = await Promise.all([
+            callTool(call, toolContext),
+            stageWrite,
+          ]);
+          took("research");
+          toolCalls.push({
+            toolName: outcome.toolName,
+            providerName: call.name,
+            status: outcome.status,
+            failureCode: outcome.failureCode,
+            latencyMs: outcome.latencyMs,
+          });
+          collectSources(outcome);
+          messages = [
+            ...messages,
+            fetchedForYouMessage(call.name, outcome),
+            ...(prospectsThin && outcome.result.ok
+              ? [PROSPECT_RESEARCH_NOTE]
+              : []),
+          ];
+        };
+        const writingStage: QVisibleStage =
+          request.writingDocument === true
+            ? "PREPARING_DOCUMENT"
+            : "PREPARING_ANALYSIS";
         if (offered.length > 0) {
           took("prepare");
           let rounds = 0;
-          /** The stage last written this turn, so a repeat is not written again. */
-          let lastStageShown: QVisibleStage | undefined;
           let calls = 0;
           /**
            * Profiles code read after a search resolved to one company
@@ -5302,6 +5600,8 @@ export function createModelGatewayQAnswer(
             calls < Q_TOOL_LOOP_MAX_CALLS
           ) {
             modelCalls += 1;
+            // Visible stages: the model is now working on the answer.
+            if (rounds === 0) void stageOnce(writingStage);
             let result: Awaited<
               ReturnType<typeof gateway.execute<CompanyAnalystV26Result>>
             >;
@@ -5598,11 +5898,19 @@ export function createModelGatewayQAnswer(
               // changes (eight fit.profile reads wrote it eight times, one
               // after another), and beside the read rather than before it.
               const stage = tool?.visibleStage ?? null;
-              let stageWrite: Promise<void> | null = null;
-              if (stage !== null && stage !== lastStageShown) {
-                stageWrite = stageShown(stage);
-                lastStageShown = stage;
-              }
+              const about =
+                stage === null
+                  ? undefined
+                  : stageAbout({
+                      stage,
+                      args: call.arguments,
+                      read: runCompanies.read(request.runId),
+                    });
+              // Round 4: the stage names what it is about when this run has
+              // read it ("Looking at Nixo"); written again only when the
+              // stage or its names change.
+              const stageWrite =
+                stage === null ? null : stageOnce(stage, about);
               const settled = await early?.[index];
               if (settled !== undefined && !settled.ok) {
                 await stageWrite;
@@ -5737,12 +6045,7 @@ export function createModelGatewayQAnswer(
             if (chainedThisRound.length > 0) {
               const stage = offeredByName.get(CHAINED_GET_TOOL)?.visibleStage;
               const stageWrite =
-                stage !== undefined &&
-                stage !== null &&
-                stage !== lastStageShown
-                  ? stageShown(stage)
-                  : null;
-              if (stage !== undefined && stage !== null) lastStageShown = stage;
+                stage === undefined || stage === null ? null : stageOnce(stage);
               const [read] = await Promise.all([
                 Promise.allSettled(chainedThisRound),
                 stageWrite,
@@ -5824,46 +6127,7 @@ export function createModelGatewayQAnswer(
           researchTool !== undefined &&
           researchHopDue()
         ) {
-          if (
-            researchTool.visibleStage !== undefined &&
-            researchTool.visibleStage !== null
-          ) {
-            await stageShown(researchTool.visibleStage);
-          }
-          const followUp = publicResearchFollowUp({
-            history: earlier,
-            question: latest.content,
-            aboutNamedOther: request.aboutNamedOther === true,
-            selected: selectedForResearch(),
-          });
-          const call = {
-            callId: "q-research",
-            name: "research_public_web",
-            // The service plans further phrasings from the person's words.
-            arguments: {
-              ...(followUp ?? { query: latest.content.trim().slice(0, 200) }),
-              // Enough pages to answer from, not only to compare.
-              maxSources: prospectsThin ? 5 : 4,
-            },
-          };
-          took("beforeResearch");
-          const outcome = await callTool(call, toolContext);
-          took("research");
-          toolCalls.push({
-            toolName: outcome.toolName,
-            providerName: call.name,
-            status: outcome.status,
-            failureCode: outcome.failureCode,
-            latencyMs: outcome.latencyMs,
-          });
-          collectSources(outcome);
-          messages = [
-            ...messages,
-            fetchedForYouMessage(call.name, outcome),
-            ...(prospectsThin && outcome.result.ok
-              ? [PROSPECT_RESEARCH_NOTE]
-              : []),
-          ];
+          await researchHop(researchTool);
           if (request.signal?.aborted === true) {
             return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
           }
@@ -5880,6 +6144,7 @@ export function createModelGatewayQAnswer(
         }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
+          void stageOnce(writingStage);
           final = await gateway.execute<CompanyAnalystV26Result>(
             { ...base, messages, output: rendered.output },
             options,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { ChevronDown, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { QMark } from "@capital-q/ui/q-mark";
@@ -91,6 +91,7 @@ export function QAnswer({
   onOpenArtifact,
   mark = true,
   cardsInline = false,
+  working,
 }: {
   readonly turn: Extract<QTurn, { kind: "Q" }>;
   /** Continue in this thread from something Q referred to (QX-001 §9). */
@@ -100,6 +101,11 @@ export function QAnswer({
   readonly mark?: boolean | undefined;
   /** The dock has no separate answer stage. */
   readonly cardsInline?: boolean | undefined;
+  /**
+   * Round 4: where Q is, shown in the answer's own first line until Q's
+   * first words take its place (same line, same height: nothing moves).
+   */
+  readonly working?: ReactNode | undefined;
 }) {
   const t = useT();
   const id = useId();
@@ -143,6 +149,8 @@ export function QAnswer({
           streaming={turn.streaming}
           className="cq-body text-(--cq-text-primary)"
         />
+      ) : turn.streaming && working !== undefined ? (
+        working
       ) : null}
       {/* Artifacts live: in the thread too (Chat view, the Q sheet), the
           cards for what Q is naming go up while it talks; the answer's

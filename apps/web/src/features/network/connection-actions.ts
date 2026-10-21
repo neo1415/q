@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   answerConnectionRequest,
   ApiProblemError,
+  getConnectionStatus,
   requestConnection,
   type ApiSession,
 } from "@capital-q/api-client";
@@ -12,6 +13,7 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 import type {
   ConnectionRequestAnswerDto,
   ConnectionRequestResultDto,
+  ConnectionStatusDto,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -83,6 +85,33 @@ function refusal(
     }
   }
   return { ok: false, message: failed, retryable: true };
+}
+
+/**
+ * Where the founder's company stands with one investor: a request already
+ * sent (and its answer), or why the investor does not take one. Read when
+ * a sheet opens, so a directory never asks for every investor at once.
+ */
+export async function connectionStatusAction(
+  investorOrganisationId: string,
+): Promise<ConnectionActionResult<ConnectionStatusDto>> {
+  const active = await session();
+  if (active === null) return SIGNED_OUT;
+  const investorId = IdInput.safeParse(investorOrganisationId);
+  if (!investorId.success) return INVALID;
+  try {
+    return {
+      ok: true,
+      value: await getConnectionStatus(active, investorId.data),
+    };
+  } catch (error) {
+    return refusal(
+      error,
+      "Whether you can send a request couldn't be checked just now.",
+      "Only a member of a company on Capital Q can send a Connection Request.",
+      "This investor isn't available to you any more.",
+    );
+  }
 }
 
 /** A founder asks, for their company, to connect with an investor. */

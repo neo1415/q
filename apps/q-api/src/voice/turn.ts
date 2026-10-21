@@ -1487,6 +1487,9 @@ export function createVoiceTurnHandler(
             dependencies.room?.stage?.(actor, {
               runId,
               stage: event.data.stage,
+              ...(event.data.about === undefined
+                ? {}
+                : { about: event.data.about }),
             });
             break;
           case "q.run.started":

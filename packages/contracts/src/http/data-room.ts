@@ -253,6 +253,57 @@ export const DataRoomViewSchema = z.discriminatedUnion("viewer", [
 ]);
 export type DataRoomView = z.infer<typeof DataRoomViewSchema>;
 
+// --- the founder's "see it as an investor" ------------------------------------
+
+/**
+ * `GET ?relationship=<id>` — design ownroom-2 (2026-10-21). The owner only:
+ * the room exactly as one of the company's investor relationships would see
+ * it, computed by the same projection as the investor's own read (their
+ * real per-document grants, requests and the connection state). Without
+ * `relationship`: as any investor who can find the company but is not
+ * connected. Read only; it records no view and changes nothing.
+ */
+export const COMPANY_DATA_ROOM_PREVIEW_SEGMENT = "/data-room/preview" as const;
+
+export const DataRoomPreviewQuerySchema = z
+  .object({ relationship: UuidSchema.optional() })
+  .strict();
+export type DataRoomPreviewQuery = z.infer<typeof DataRoomPreviewQuerySchema>;
+
+export const DataRoomPreviewConnectionSchema = z.enum([
+  "CONNECTED",
+  "INTEREST_PENDING",
+  "NOT_CONNECTED",
+]);
+
+export const DataRoomPreviewDtoSchema = z
+  .object({
+    companyId: UuidSchema,
+    /** Who the room is shown as. Null relationship: anyone not yet connected. */
+    as: z
+      .object({
+        relationshipId: UuidSchema.nullable(),
+        investorOrganisationName: z.string().max(200).nullable(),
+        connection: DataRoomPreviewConnectionSchema,
+      })
+      .strict(),
+    view: DataRoomInvestorViewSchema,
+    /** The company's investor relationships the founder may preview as. */
+    investors: z
+      .array(
+        z
+          .object({
+            relationshipId: UuidSchema,
+            investorOrganisationName: z.string().max(200),
+            connection: DataRoomPreviewConnectionSchema,
+          })
+          .strict(),
+      )
+      .max(200),
+  })
+  .strict();
+export type DataRoomPreviewDto = z.infer<typeof DataRoomPreviewDtoSchema>;
+
 // --- commands ----------------------------------------------------------------
 
 export const SetDataRoomLevelRequestSchema = z
