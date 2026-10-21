@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   notices: vi.fn(),
   reminders: vi.fn(),
   commitments: vi.fn(),
+  usage: vi.fn(),
   steps: vi.fn(),
   remind: vi.fn(),
   read: vi.fn(),
@@ -74,6 +75,10 @@ vi.mock("@capital-q/api-client", async (load) => ({
   listReminders: mocks.reminders,
   getChatUnread: vi.fn().mockResolvedValue({ items: [] }),
   getRelationshipCommitments: mocks.commitments,
+  // The investor overview's period block also waits on usage; unmocked it
+  // was a real fetch to test.invalid, whose timing decided whether the
+  // block had landed before the assertions (CI run 39610577213).
+  getMyUsage: mocks.usage,
 }));
 vi.mock("@/features/results/results-dashboard", () => ({
   ResultsDashboard: ({
@@ -105,6 +110,7 @@ beforeEach(() => {
   mocks.notices.mockResolvedValue({ items: [] });
   mocks.reminders.mockResolvedValue({ items: [] });
   mocks.steps.mockResolvedValue([]);
+  mocks.usage.mockResolvedValue(null);
   mocks.remind.mockResolvedValue({ ok: true, value: {} });
   mocks.read.mockResolvedValue({ ok: true, value: null });
   mocks.dismiss.mockResolvedValue({ ok: true, value: null });
