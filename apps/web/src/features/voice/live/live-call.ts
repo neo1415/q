@@ -219,6 +219,14 @@ export function fastMoveLine(
   return `What they asked for (${path}) is still loading on their screen: do not say it is open; say it is coming up. Do not ask Q's backend for it.`;
 }
 
+/**
+ * Lane 7: what the voice is told when the screen did the request itself
+ * (closed, scrolled, went back, pressed, opened a tab or a document).
+ */
+export function fastActLine(): string {
+  return "Their screen has already done what they asked (it is done now, confirmed). Say at most two words, or nothing, then carry on; do not describe it and do not ask Q's backend for it.";
+}
+
 /** A page change is told to the voice once it has settled this long. */
 export const PAGE_NOTE_DEBOUNCE_MS = 1_200;
 
@@ -478,6 +486,12 @@ export async function startLiveCall(
         // Listening before the push, so a fast landing is not missed.
         const receipt = receiptListener();
         const moved = await navigationHeard(request.request);
+        // Lane 7: a tab, an act on the page or a document opened over it
+        // has no route receipt: it is done on their screen already.
+        if (moved !== null && !moved.route) {
+          receipt.stop();
+          return { commentary: fastActLine() };
+        }
         if (moved !== null) {
           const outcome = await receipt.for(moved.path);
           // R3: still on its way when the voice speaks ("it's coming up"):

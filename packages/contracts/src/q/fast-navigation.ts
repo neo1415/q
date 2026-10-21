@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { UuidSchema } from "../common/ids.js";
+
 import {
   QNavigateIntentSchema,
   QOpenRecordPageIntentSchema,
@@ -29,6 +31,12 @@ export const QFastNavigationRequestSchema = z
      * answer is used to prefetch only, never to move.
      */
     final: z.boolean(),
+    /**
+     * Lane 7: the company whose page is on screen, when there is one, so
+     * "open the term sheet" looks in that company's data room. Input,
+     * never proof: the document tool authorises the read as the person.
+     */
+    companyId: UuidSchema.optional(),
   })
   .strict();
 export type QFastNavigationRequest = z.infer<

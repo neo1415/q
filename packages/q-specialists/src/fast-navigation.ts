@@ -19,6 +19,7 @@ import {
   plausibleName,
   whichOneLine,
 } from "./named-record-request.js";
+import { documentAskOf, type DocumentAsk } from "./instant-request.js";
 import { pageRequestOf, takenBack } from "./page-request.js";
 import { tabAskOf, type TabAsk } from "./tab-request.js";
 
@@ -186,6 +187,13 @@ export async function resolveFastNavigation(input: {
     page: QRecordPage,
     name: string,
   ) => Promise<OpenRecordIntent | null>;
+  /**
+   * Lane 7: a document by its name, opened only when exactly one document
+   * the person may open matches (the tools' own authorize steps); null
+   * for none, several or one they may not open. Absent: not read here.
+   */
+  readonly openDocument?:
+    ((ask: DocumentAsk) => Promise<OpenRecordIntent | null>) | undefined;
 }): Promise<FastNavigation> {
   const text = input.text.trim();
   if (text.length === 0 || text.length > 300 || takenBack(text)) {
@@ -204,6 +212,19 @@ export async function resolveFastNavigation(input: {
         };
   }
   if (page !== null) return { kind: "LEAVE_TO_Q" };
+  // A document by its name is read before a record by its name, so
+  // "Halyard's term sheet" never opens Halyard's page instead. Anything
+  // but one authorised match is Q's to ask about; nothing is said here.
+  const document = documentAskOf(text);
+  if (document !== null) {
+    const opened =
+      input.openDocument === undefined
+        ? null
+        : await input.openDocument(document).catch(() => null);
+    return opened === null
+      ? { kind: "LEAVE_TO_Q" }
+      : { kind: "NAVIGATE", intent: opened };
+  }
   const record = await resolveNamedRecord(input);
   return record?.kind === "OPEN"
     ? { kind: "NAVIGATE", intent: record.intent }
