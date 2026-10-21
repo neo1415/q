@@ -103,7 +103,7 @@ export const FOUNDER_QA_ENTRIES: readonly QaEntry[] = [
       "why can i only watch other founders' pitches",
     ],
     answer:
-      "Expressing interest is an investor action on the one canonical relationship between a company and an investor. As a founder, Explore lets you watch other founders' pitches and learn from them; your own way forward with investors is a Connection Request or a GateQ application.",
+      "Expressing interest is an investor action on the one shared relationship between a company and an investor. As a founder, Explore lets you watch other founders' pitches and learn from them; your own way forward with investors is a Connection Request or a GateQ application.",
     sources: [
       "docs/adr/0023-founder-connection-requests.md",
       `${PADL} bilateral discovery`,
