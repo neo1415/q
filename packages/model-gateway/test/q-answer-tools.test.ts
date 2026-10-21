@@ -1324,6 +1324,19 @@ describe("answer seam tool loop", () => {
     });
   });
 
+  it("takes the conversation the turn already read instead of reading it again (turn latency row 5)", async () => {
+    const { seam, alpha, request, messages } = build({
+      script: [{ kind: "JSON", value: analystResult("ok") }],
+    });
+    const first = messages[0];
+    if (first === undefined) throw new Error("fixture");
+    const asked = { ...first, content: "From the turn's own read." };
+    await seam.answer({ ...request, history: [asked] });
+    const prompt = JSON.stringify(alpha.calls[0]?.request.messages);
+    expect(prompt).toContain("From the turn's own read.");
+    expect(prompt).not.toContain("Tell me about my company.");
+  });
+
   it("repairs a non-JSON text answer with a final structured call", async () => {
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
     const { seam, alpha, request, messages } = build({

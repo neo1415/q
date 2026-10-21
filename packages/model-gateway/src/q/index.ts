@@ -2185,12 +2185,15 @@ export function createModelGatewayQAnswer(
      * named. The person is having one conversation; which run a sentence
      * belonged to is our bookkeeping, not theirs.
      */
-    const history = await repositories.messages.listRecentForConversationOfRun(
-      sql,
-      request.tenantId,
-      request.runId,
-      64,
-    );
+    // Row 5: the turn's own read when the caller passed it.
+    const history =
+      request.history ??
+      (await repositories.messages.listRecentForConversationOfRun(
+        sql,
+        request.tenantId,
+        request.runId,
+        64,
+      ));
     const conversationId = history[0]?.conversationId;
     /**
      * The most recent document Q put in front of this person, from

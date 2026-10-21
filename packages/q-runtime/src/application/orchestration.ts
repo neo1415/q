@@ -23,6 +23,7 @@ import type {
   QVisibleStage,
 } from "@capital-q/contracts";
 import type { ActorContext, TenantId, UserId } from "@capital-q/security";
+import type { QConversationMessage } from "../contracts/index.js";
 
 /**
  * The Capital Q-owned orchestration port (doc 12 §10.2).
@@ -204,6 +205,12 @@ export type QConversationFetch = {
 };
 
 export type QAnswerRequest = QOrchestrationSubjectContext & {
+  /**
+   * Turn latency row 5: the conversation as this turn already read it
+   * (same tenant and run, 64 most recent), so the answer does not read it
+   * again. Absent: the answer reads it itself.
+   */
+  readonly history?: readonly QConversationMessage[] | undefined;
   /**
    * What earlier runs of this conversation fetched (QConversationFetch),
    * read once per turn by the answer seam. Absent: none kept, or the

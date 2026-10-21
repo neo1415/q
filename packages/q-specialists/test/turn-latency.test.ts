@@ -144,6 +144,7 @@ function seam(input: {
   const calls = { reader: 0, skim: 0, recall: 0, answer: 0 };
   const stored: string[] = [];
   let historyReads = 0;
+  const delegated: QAnswerRequest[] = [];
   const turns: QTurnReader = {
     read: () => {
       calls.reader += 1;
@@ -171,8 +172,9 @@ function seam(input: {
     },
     delegate: {
       warm: () => undefined,
-      answer: () => {
+      answer: (asked: QAnswerRequest) => {
         calls.answer += 1;
+        delegated.push(asked);
         return Promise.resolve({
           kind: "ANSWERED",
           messageId: "m",
@@ -228,7 +230,7 @@ function seam(input: {
     // Whatever the early read started has had its chance to run.
     await new Promise((resolve) => setTimeout(resolve, 0));
     const modelCalls = calls.reader + calls.skim + calls.recall + calls.answer;
-    return { calls, modelCalls, stored, historyReads };
+    return { calls, modelCalls, stored, historyReads, delegated };
   };
   return { run };
 }
@@ -365,8 +367,12 @@ describe("the conversation is read once per run (row 5)", () => {
       said: "why does Halyard fit my mandate so well?",
       history: afterTopThree(randomUUID()),
     });
-    const { historyReads, calls } = await s.run();
+    const { historyReads, calls, delegated } = await s.run();
     expect(historyReads).toBe(1);
     expect(calls.answer).toBe(1);
+    // The delegate's prompt takes the same read rather than a third one.
+    expect(delegated[0]?.history?.at(-1)?.content).toBe(
+      "why does Halyard fit my mandate so well?",
+    );
   });
 });
