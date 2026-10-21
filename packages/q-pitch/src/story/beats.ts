@@ -630,7 +630,8 @@ const inputs: readonly BeatInput[] = [
       "Playful energy. A light laugh on 'plus Jarvis from Iron Man'. Assured on 'the entire investment journey'.",
     tags: [
       [0, "[playful]"],
-      ["plus", "[laughs softly]"],
+      // S5 (3 takes): "[laughs softly]" was not performed here; a chuckle is.
+      ["plus", "[chuckles]"],
     ],
     cues: [
       [0, go("discover")],
@@ -1011,7 +1012,8 @@ const inputs: readonly BeatInput[] = [
       "Confident. A pause before the last line, then said with a small grin and a laugh on 'WITHOUT ME'.",
     tags: [
       ["HOW", "[pause]"],
-      ["WITHOUT", "[laughs]"],
+      // S5: a laugh before "WITHOUT" was not performed; after the line it is.
+      ["$end", "[laughs]"],
     ],
     cues: [["HOW", stage("type", 6, "How we ever did it without me.")]],
   },

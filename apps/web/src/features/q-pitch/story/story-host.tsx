@@ -31,6 +31,7 @@ import {
   type QSessionValue,
 } from "@/features/q/q-session";
 import { setTypedInterceptor } from "@/features/q/typed-intercept";
+import { QSwarm } from "@/features/q-swarm/q-swarm";
 import { presence } from "@/features/q-swarm/presence-cue";
 import { isLineLive } from "@/features/voice/session";
 
@@ -427,6 +428,66 @@ export function StoryHost({
 
 type Store<T> = ReturnType<typeof createStore<T>>;
 
+type Rect = {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+};
+type Viewport = { readonly w: number; readonly h: number };
+
+function sameRect(a: Rect | null, b: Rect | null): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    Math.abs(a.x - b.x) < 1 &&
+    Math.abs(a.y - b.y) < 1 &&
+    Math.abs(a.w - b.w) < 1 &&
+    Math.abs(a.h - b.h) < 1
+  );
+}
+
+const subscribeViewport = (notify: () => void) => {
+  window.addEventListener("resize", notify);
+  return () => window.removeEventListener("resize", notify);
+};
+let viewportCache: Viewport | null = null;
+function viewportSnapshot(): Viewport {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  if (viewportCache?.w !== w || viewportCache.h !== h) {
+    viewportCache = { w, h };
+  }
+  return viewportCache;
+}
+function useViewport(): Viewport | null {
+  return useSyncExternalStore(subscribeViewport, viewportSnapshot, () => null);
+}
+
+/** The page dimmed everywhere but around the lit section (even-odd). */
+function spotlightPath(lit: Rect, view: Viewport): string {
+  const pad = 10;
+  const x = Math.max(0, lit.x - pad);
+  const y = Math.max(0, lit.y - pad);
+  const w = Math.min(view.w - x, lit.w + pad * 2);
+  const h = Math.min(view.h - y, lit.h + pad * 2);
+  return `path(evenodd, "M0 0H${String(view.w)}V${String(view.h)}H0Z M${String(x)} ${String(y)}h${String(w)}v${String(h)}h-${String(w)}Z")`;
+}
+
+/** Where a side panel sits: beside the lit section, on the roomier side. */
+const PANEL_W = 380;
+function besidePlace(
+  lit: Rect,
+  view: Viewport,
+): { readonly x: number; readonly y: number } | null {
+  const gap = 16;
+  const y = Math.min(view.h - 420, Math.max(72, lit.y));
+  if (view.w - (lit.x + lit.w) >= PANEL_W + gap * 2) {
+    return { x: lit.x + lit.w + gap, y };
+  }
+  if (lit.x >= PANEL_W + gap * 2) return { x: lit.x - gap - PANEL_W, y };
+  return null;
+}
+
 /** The verbatim line holding word `word`, with its first word's index. */
 function captionLine(
   beat: StorySnapshot["beat"],
@@ -478,41 +539,72 @@ function StoryOverlay({
     return () => root.removeAttribute("data-story");
   }, [moodNow]);
 
-  // Measured after paint, on the next frame: captions never cover a lit
-  // section (they move above it), and from Act 4 Q's presence docks to the
-  // side it is not pointing at, following the highlight (a spring under
-  // 300 ms, transform only). Acts 0-3 keep Q centre stage.
-  const [layout, setLayout] = useState<{
-    readonly captionsTop: boolean;
-    readonly presence: { readonly x: number; readonly y: number } | null;
-  }>({ captionsTop: false, presence: null });
-  const act = snapshot.beat.act;
+  // The lit section, measured every few frames while the story plays (it
+  // moves while the page scrolls it into view). From it: the spotlight's
+  // cut-out, where Q's docked presence sits (the side Q is not pointing
+  // at, a spring under 300 ms) and where a side panel goes (beside the lit
+  // section, never over it). Paint-only: transforms, `translate` and
+  // clip-path, so nothing here shifts layout.
+  const [lit, setLit] = useState<Rect | null>(null);
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      const lit = document.querySelector<HTMLElement>("[data-qp-lit]");
-      const rect = lit?.getBoundingClientRect() ?? null;
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      const captionsTop =
-        rect !== null && rect.bottom > height - 220 && rect.top > 160;
-      let presence: { x: number; y: number } | null = null;
-      if (act >= 4) {
-        presence =
-          rect === null
-            ? { x: width - 72, y: 96 }
-            : {
-                x: rect.left + rect.width / 2 < width / 2 ? width - 72 : 24,
-                y: Math.min(
-                  height - 160,
-                  Math.max(96, rect.top + rect.height / 2),
-                ),
-              };
+    let frame = 0;
+    let id = 0;
+    let last: Rect | null = null;
+    const tick = () => {
+      frame += 1;
+      if (frame % 3 === 0) {
+        const element = document.querySelector<HTMLElement>("[data-qp-lit]");
+        const box = element?.getBoundingClientRect() ?? null;
+        const next: Rect | null =
+          box === null || box.width === 0
+            ? null
+            : { x: box.left, y: box.top, w: box.width, h: box.height };
+        if (!sameRect(last, next)) {
+          last = next;
+          setLit(next);
+        }
       }
-      setLayout({ captionsTop, presence });
-    });
+      id = requestAnimationFrame(tick);
+    };
+    id = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(id);
-  }, [snapshot.word, snapshot.index, act]);
-  const { captionsTop, presence } = layout;
+  }, []);
+  const woke = moodNow === "WAKE";
+  const viewport = useViewport();
+  const centreStage = !woke || snapshot.beat.n >= 55;
+  const docked =
+    centreStage || viewport === null
+      ? null
+      : lit === null
+        ? { x: viewport.w - 72, y: 88 }
+        : {
+            x: lit.x + lit.w / 2 < viewport.w / 2 ? viewport.w - 72 : 24,
+            y: Math.min(viewport.h - 220, Math.max(88, lit.y)),
+          };
+  const beside =
+    lit === null || viewport === null ? null : besidePlace(lit, viewport);
+
+  // The controls step back while the story plays: shown on a pointer move,
+  // a tap or a key, gone again after 2 s (kept while focused or halted).
+  const [chrome, setChrome] = useState(true);
+  const playing = snapshot.phase === "PLAYING";
+  useEffect(() => {
+    let timer = window.setTimeout(() => setChrome(false), 2_000);
+    const wake = () => {
+      setChrome(true);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setChrome(false), 2_000);
+    };
+    for (const type of ["pointermove", "pointerdown", "keydown"] as const) {
+      window.addEventListener(type, wake, { passive: true });
+    }
+    return () => {
+      window.clearTimeout(timer);
+      for (const type of ["pointermove", "pointerdown", "keydown"] as const) {
+        window.removeEventListener(type, wake);
+      }
+    };
+  }, []);
 
   // Typed words: story commands, then the QA bank, else Q as usual.
   const qa = useMemo(() => buildQaIndex("INVESTOR"), []);
@@ -574,32 +666,47 @@ function StoryOverlay({
   return (
     <>
       <div className="cq-story-scrim" data-mood={moodNow} aria-hidden />
-      <StoryStage
-        stage={stageNow}
-        mood={moodNow === "OFF" ? "STORY" : moodNow}
-      />
-      <span
-        className="cq-story-presence"
-        data-docked={presence === null ? undefined : ""}
-        data-speaking={snapshot.phase === "PLAYING" ? "" : undefined}
+      {/* Product beats: the page dims around the lit section, so the gold
+          breathing highlight is the one thing to look at. */}
+      <div
+        className="cq-story-spotlight"
+        data-on={woke && lit !== null ? "" : undefined}
         style={
-          presence === null
+          lit === null || viewport === null
             ? undefined
-            : {
-                transform: `translate3d(${String(presence.x)}px, ${String(presence.y)}px, 0)`,
-              }
+            : { clipPath: spotlightPath(lit, viewport) }
         }
         aria-hidden
       />
+      <StoryStage
+        stage={stageNow}
+        mood={moodNow === "OFF" ? "STORY" : moodNow}
+        beside={beside}
+      />
+      {/* Q, the narrator, always on screen: centre stage in the story
+          acts, docked beside the page on product beats. Lane S4's
+          particles form the cued figures at the larger size. */}
+      <div
+        className="cq-story-presence"
+        data-docked={docked === null ? undefined : ""}
+        style={
+          docked === null
+            ? undefined
+            : {
+                transform: `translate3d(${String(docked.x)}px, ${String(docked.y)}px, 0)`,
+              }
+        }
+        aria-hidden
+      >
+        <QSwarm
+          state={playing ? "SPEAKING" : "IDLE"}
+          pixels={docked === null ? 120 : 48}
+        />
+      </div>
       {captions && !done && word >= 0 ? (
-        // A fixed two-line box, keyed by its place: a new line or a move
-        // above a lit section is a new element, never a shifted one (CLS 0).
-        <p
-          key={captionsTop ? "top" : "bottom"}
-          className="cq-story-captions"
-          data-top={captionsTop ? "" : undefined}
-          aria-live="off"
-        >
+        // One place, always: a bottom band with its own soft scrim. The
+        // line is keyed, so a new line is a new element (CLS 0).
+        <p className="cq-story-captions" aria-live="off">
           <span
             className="cq-story-caption-line"
             key={`${String(beat.n)}-${String(line.start)}`}
@@ -641,7 +748,11 @@ function StoryOverlay({
           </button>
         </div>
       ) : null}
-      <nav className="cq-story-controls" aria-label="Story controls">
+      <nav
+        className="cq-story-controls"
+        aria-label="Story controls"
+        data-hidden={chrome || !playing ? undefined : ""}
+      >
         <span className="cq-story-count">
           {String(snapshot.index + 1)} / {String(player.total)}
         </span>

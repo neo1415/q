@@ -8,7 +8,7 @@ import {
   type StoryMood,
   type StoryVisual,
 } from "@capital-q/q-pitch";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { StoryQCard } from "./story-qcard";
 
@@ -136,14 +136,8 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
     case "none":
       return null;
     case "aperture":
-      return (
-        <div className="cq-story-centre">
-          <span className="cq-story-aperture" data-step={step} aria-hidden />
-          {step === 2 ? (
-            <p className="cq-story-type cq-story-type-sm">Q</p>
-          ) : null}
-        </div>
-      );
+      // Q's own presence (story-host, lane S4) is the aperture now.
+      return null;
     case "type":
       return (
         <>
@@ -621,12 +615,28 @@ function visualKey({ visual, step, text }: StageState): string {
 export function StoryStage({
   stage,
   mood,
+  beside = null,
 }: {
   readonly stage: StageState;
   readonly mood: StoryMood;
+  /** Where side panels go: beside the lit section (null: the corner). */
+  readonly beside?: { readonly x: number; readonly y: number } | null;
 }) {
   return (
-    <div className="cq-story-stage" data-mood={mood} data-visual={stage.visual}>
+    <div
+      className="cq-story-stage"
+      data-mood={mood}
+      data-visual={stage.visual}
+      data-beside={beside === null ? undefined : ""}
+      style={
+        beside === null
+          ? undefined
+          : ({
+              "--cq-story-beside-x": `${String(Math.round(beside.x))}px`,
+              "--cq-story-beside-y": `${String(Math.round(beside.y))}px`,
+            } as CSSProperties)
+      }
+    >
       {stage.fallback !== null ? (
         <div className="cq-story-panel cq-story-dockside">
           <p className="cq-story-kicker">Shown here instead</p>

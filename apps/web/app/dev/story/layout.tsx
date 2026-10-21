@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { PublicBrandStyle } from "@/features/brand-theme/public-brand-style";
+
 import { StoryHarnessHost } from "./story-harness-host";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +34,9 @@ export default function StoryHarnessLayout({
   }
   return (
     <>
+      {/* Capital Q's default black-and-gold preset, as the app shell
+          applies it (Q is gold). */}
+      <PublicBrandStyle />
       {children}
       <StoryHarnessHost />
     </>

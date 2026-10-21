@@ -176,37 +176,46 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   animation: cq-story-in var(--cq-motion-slow) var(--cq-ease) both;
 }
 
+/* Q, the narrator (lane S4's particle presence), always on screen. */
 .cq-story-presence {
   position: fixed;
-  left: calc(50% - 28px);
-  top: 18vh;
+  left: calc(50% - 60px);
+  top: 9vh;
   z-index: var(--cq-z-presence);
-  width: 56px;
-  height: 56px;
+  width: 120px;
+  height: 120px;
   pointer-events: none;
-  border-radius: var(--cq-radius-circle);
-  background: radial-gradient(
-    circle,
-    var(--cq-q-core) 0 30%,
-    var(--cq-q-light) 31% 50%,
-    transparent 51%
-  );
-  box-shadow: 0 0 32px 4px
-    color-mix(in oklch, var(--cq-q-bloom) 40%, transparent);
-  opacity: 0;
-  transition:
-    transform 280ms cubic-bezier(0.32, 0.72, 0, 1),
-    opacity var(--cq-motion-base) var(--cq-ease);
+  transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 .cq-story-presence[data-docked] {
   left: 0;
   top: 0;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
+}
+
+/* Product beats: everything but the lit section recedes (paint only). */
+.cq-story-spotlight {
+  position: fixed;
+  inset: 0;
+  z-index: var(--cq-z-sheet);
+  pointer-events: none;
+  background: color-mix(in oklch, var(--cq-canvas) 64%, transparent);
+  opacity: 0;
+  transition: opacity var(--cq-motion-emphasis) var(--cq-ease);
+}
+.cq-story-spotlight[data-on] {
   opacity: 1;
 }
-.cq-story-presence[data-speaking]:not([data-docked]) {
-  opacity: 0;
+
+/* Side panels sit beside the lit section, never over it. `translate`
+   leaves the entrance animation's transform alone. */
+.cq-story-stage[data-beside] .cq-story-dockside {
+  left: 0;
+  top: 0;
+  right: auto;
+  bottom: auto;
+  translate: var(--cq-story-beside-x) var(--cq-story-beside-y);
 }
 
 /* ── Visuals ─────────────────────────────────────────────────────────── */
@@ -688,56 +697,40 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
 /* ── Captions, controls, answers ─────────────────────────────────────── */
 .cq-story-captions {
   position: fixed;
-  left: 16px;
-  right: 16px;
-  bottom: calc(var(--cq-bottom-nav-height, 0px) + 96px);
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: var(--cq-z-toast);
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  height: 3.2em;
-  margin: 0 auto;
-  max-width: 760px;
+  height: calc(3.2em + 56px + var(--cq-bottom-nav-height, 0px));
+  margin: 0;
+  padding: 0 16px calc(28px + var(--cq-bottom-nav-height, 0px));
   overflow: hidden;
   pointer-events: none;
   text-align: center;
   font-size: clamp(1.0625rem, 2.4vw, 1.375rem);
   line-height: 1.5;
   color: var(--cq-text-primary);
-  text-shadow: 0 1px 12px var(--cq-canvas);
+  background: linear-gradient(
+    to top,
+    color-mix(in oklch, var(--cq-canvas) 92%, transparent) 40%,
+    transparent
+  );
 }
-html[data-story="NIGHT"] .cq-story-captions,
-html[data-story="HUSH"] .cq-story-captions,
-html[data-story="STORY"] .cq-story-captions {
+html:is([data-story="NIGHT"], [data-story="HUSH"], [data-story="STORY"])
+  .cq-story-captions {
   color: var(--cq-night-text);
-  text-shadow: 0 1px 12px var(--cq-night-canvas);
+  background: linear-gradient(
+    to top,
+    color-mix(in oklch, var(--cq-night-canvas) 92%, transparent) 40%,
+    transparent
+  );
 }
 .cq-story-caption-line {
   display: inline-block;
-  max-width: 100%;
-}
-/* Over a woken page, the line carries its own quiet backing. */
-html:is([data-story="WAKE"], [data-story="DAY"]) .cq-story-caption-line {
-  padding: 2px 14px;
-  border-radius: var(--cq-radius-lg);
-  border: 1px solid var(--cq-border-subtle);
-  background: var(--cq-surface-raised);
-  box-shadow: var(--cq-shadow-sm);
-  text-shadow: none;
-}
-html:is([data-story="WAKE"], [data-story="DAY"]) .cq-story-captions span span {
-  opacity: 0.7;
-}
-html:is([data-story="WAKE"], [data-story="DAY"])
-  .cq-story-captions
-  span
-  span[data-said] {
-  opacity: 1;
-}
-.cq-story-captions[data-top] {
-  top: 80px;
-  bottom: auto;
-  align-items: flex-start;
+  max-width: 760px;
 }
 .cq-story-captions span {
   opacity: 0.55;
@@ -750,22 +743,26 @@ html:is([data-story="WAKE"], [data-story="DAY"])
 .cq-story-controls {
   position: fixed;
   top: 12px;
-  left: 50%;
+  right: 12px;
   z-index: var(--cq-z-toast);
-  transform: translateX(-50%);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 4px;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100vw - 24px);
   padding: 4px;
   border-radius: var(--cq-radius-full);
   background: var(--cq-surface-raised);
   border: 1px solid var(--cq-border-subtle);
   box-shadow: var(--cq-shadow-sm);
-  opacity: 0.5;
+  opacity: 0.92;
   transition: opacity var(--cq-motion-base) var(--cq-ease);
+}
+/* Out of the way while the story plays; back on any pointer or key. */
+.cq-story-controls[data-hidden]:not(:focus-within) {
+  opacity: 0;
+  pointer-events: none;
 }
 .cq-story-controls:hover,
 .cq-story-controls:focus-within {
