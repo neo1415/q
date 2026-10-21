@@ -895,6 +895,10 @@ describe("answer seam tool loop", () => {
     expect(only?.messages.at(-1)?.content).toContain("LOOK IT UP FIRST");
     // Turn latency row 16: one lookup turn, reads side by side.
     expect(only?.messages.at(-1)?.content).toContain("ONE LOOKUP TURN");
+    // Round 5: empty fields are left for code to fill, findings never.
+    expect(only?.messages.at(-1)?.content).toContain(
+      "every field that would only be empty, null or false",
+    );
 
     expect(tools.executed).toHaveLength(0);
     expect(messages.at(-1)?.content).toBe("direct");
@@ -1338,6 +1342,40 @@ describe("answer seam tool loop", () => {
     expect(prompt).toContain("From the turn's own read.");
     expect(prompt).not.toContain("Tell me about my company.");
   });
+
+  it("logs where the answer's output went, as counts only (round 5)", async () => {
+    const { seam, request, logLines } = build({
+      script: [{ kind: "JSON", value: analystResult("A private answer.") }],
+    });
+    await seam.answer(request);
+    const produced = logLines.find((line) =>
+      line.includes("q answer produced"),
+    );
+    expect(produced).toContain('"outputSplit":{"total":');
+    expect(produced).not.toContain("A private answer.");
+  });
+
+  it.each(["JSON", "TEXT"] as const)(
+    "accepts an answer that leaves its empty fields out (%s; round 5)",
+    async (kind) => {
+      const minimum = {
+        answer: "Seed stage, by its own account.",
+        responseShape: "CONCISE",
+        insufficientEvidence: false,
+      };
+      const { seam, request, alpha, messages } = build({
+        script: [
+          kind === "JSON"
+            ? { kind: "JSON", value: minimum }
+            : { kind: "TEXT", text: JSON.stringify(minimum) },
+        ],
+      });
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      // No second call was needed to repair it.
+      expect(alpha.calls).toHaveLength(1);
+      expect(messages.at(-1)?.content).toBe("Seed stage, by its own account.");
+    },
+  );
 
   it("repairs a non-JSON text answer with a final structured call", async () => {
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
