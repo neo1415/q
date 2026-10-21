@@ -83,6 +83,31 @@
 | L-16 | Voice turns: artifacts as Q speaks                                                       | Follow-up session `claude/nervous-swirles-b16e03`, split agreed with turn-latency (voice path publishes `q.artifact.preview` from the same announcer; web side draws it). PR into `speed/q-oct20`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | IN ITS OWN PR (see its branch). Not in this branch                                                       |
 | L-17 | "Where I am", spoken as well as shown, typed and voice                                   | **Typed:** shown under the presence from the run's real `q.stage.changed` (`workingLabel`); typed answers are not spoken. **Voice (standard and duplex):** the silence ladder is back for its "where I am" lines only (`SPOKEN_SILENCE_LADDER` on, `SPOKEN_WHILE_WORKING_BEATS` = STAGE_LINE and PROGRESS_LINE; no hum, breathing or small-talk thread). Each line is composed from the run's live stage and subject. It is spoken, and now also **shown** under the presence: the new `onWorking` voice event, from duplex narration and from the ladder lines the standard sessions strip out of transcripts. Duplex: at most one per turn, never after the answer (INC-1). **Flag:** this partly reverses founder 2026-10-09 ("no sound at all while Q works") at the owner's 2026-10-20 ask; hums and threads stay off | FIXED, TESTED (ladder filter, duplex line, voice turn). The standard-session transcript path is untested |
 
+## 3b. Hand-over status (2026-10-21, moving to the cloud)
+
+Branch `claude/artifacts-live-e4a145`, PR #270 (draft) into `speed/q-oct20`. Round 1 (#265) is already in `speed/q-oct20`. Local runs were stopped at the coordinator's request; the full gates run in CI on #270.
+
+| Row | Status | Exact next step |
+| --- | --- | --- |
+| L-1 to L-7, L-9 to L-11 | DONE (round 1, in speed/q-oct20) | None |
+| L-8 stage wording | DONE | None (R38 neutral kept) |
+| L-12 spotlight | DONE (by design) | None |
+| L-13 picture | IN PROGRESS, picture session, `claude/friendly-nightingale-a8e377` | That session pushes and opens its PR into speed/q-oct20 |
+| L-14 summary | DONE in code; its tests ran green earlier in round 2, but the latest run was stopped | Run `packages/model-gateway/test/q-artifact-preview.test.ts` and `apps/web/test/artifacts-live.test.tsx` in CI |
+| L-15 researched identities | DONE in code; same as L-14 | Same as L-14, plus `packages/model-gateway/test/q-card-subjects.test.ts` |
+| L-16 voice previews | DONE in #268 (`claude/nervous-swirles-b16e03`) | Merge #268 with #270; expect small textual conflicts in shown.ts, q-session.tsx, artifacts-live.test.tsx and this file |
+| L-17 "where I am" spoken + shown | DONE in code; tests updated to the new rule | Confirm in CI: `apps/q-api/test/voice-no-filler.test.ts`, `silence-narration.test.ts`, `apps/web/test/voice-duplex.test.tsx`, `voice-incident-top-three.test.tsx` |
+| Linux `answer-canvas-stage.test.tsx` failure | FIX PUSHED (e9adac652); not re-run locally | Confirm in CI on #270 |
+| q-chat-reply / saved-compare / no-search-theatre timeouts | Load: `answer-canvas` import took 234 s locally; q-chat-reply now preloads it | Confirm in CI |
+| Design-skills pass | PARTLY DONE: frontend-design, emil-design-eng, animate, accessibility and apple-design applied to the preview and summary; `review-animations` is not installed here | In the cloud: run `improve-animations` (or `review-animations` if available) over live-preview.tsx, summary-block.tsx, answer-canvas.tsx and the Board flight; do a design pass on the voice working line and the company TABLE (data-blocks.tsx); take screenshots of a typed "compare X and Y" turn |
+| Merge latest speed/q-oct20 | NOT STARTED: the coordinator's fixes were not on the remote when last checked (992d1dbf5) | `git fetch origin speed/q-oct20 && git merge origin/speed/q-oct20` once they are pushed, then mark #270 ready |
+
+### Design pass (which skill drove which change)
+- **frontend-design:** summary points are not a sequence, so the numbers were removed; no all-caps labels; one entrance moment instead of scattered effects.
+- **emil-design-eng / animate:** preview frames enter with a 200 ms fade and a 6 px rise on `--cq-ease` (CSS `@starting-style` transition, interruptible). Reduced motion keeps the fade only. The summary highlight transitions colour properties only. No `scale(0)`, no `transition: all`.
+- **accessibility:** the spoken summary point is bold as well as lit, and marked `aria-current` (never colour alone). Image credits use secondary text for contrast. Avatars are decorative beside a visible name. The preview region is `aria-busy` and named.
+- **apple-design:** spatial consistency (the real cards land in the preview frames' places). No springs, because there are no gestures. The working line is treated as status feedback.
+
 ## 4. Tests and gates (run 2026-10-20/21, Windows worktree)
 
 New tests:
