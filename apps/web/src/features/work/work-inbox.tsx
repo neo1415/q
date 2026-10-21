@@ -25,7 +25,10 @@ import { CalendarDays, Check, Pause, Pencil, Play } from "@capital-q/ui/icons";
 import { Skeleton } from "@capital-q/ui/states";
 
 import { EntityAvatar } from "@/features/entity/entity-avatar";
-import { sendChatMessageAction } from "@/features/chat/chat-actions";
+import {
+  chatThreadAction,
+  sendChatMessageAction,
+} from "@/features/chat/chat-actions";
 import { EmailDraftEditor } from "@/features/integrations/email-draft-editor";
 import {
   approveQApprovalAction,
@@ -905,6 +908,27 @@ export function ApprovalDetail({
     };
   }, [approvalId, initial, version]);
   useEffect(() => () => window.clearTimeout(leaving.current), []);
+  // Why Q prepared a reply: what they last said, read from the thread.
+  const [theirs, setTheirs] = useState<string | null>(null);
+  useEffect(() => {
+    if (relationshipId === null) return;
+    let live = true;
+    void chatThreadAction(relationshipId)
+      .then((result) => {
+        if (!live || !result.ok) return;
+        const last = [...result.value.messages]
+          .filter((message) => !message.unsent)
+          .sort((a, b) => a.sentAt.localeCompare(b.sentAt))
+          .at(-1);
+        if (last !== undefined && !last.mine && last.body !== null) {
+          setTheirs(last.body);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [relationshipId]);
 
   if (failed) {
     return (
@@ -995,6 +1019,14 @@ export function ApprovalDetail({
           chat || email ? finishedWord : "Done",
         ]}
       />
+      {theirs === null ? null : (
+        <p className="m-0 cq-body-sm text-(--cq-text-secondary)">
+          <span className="font-medium text-(--cq-text-tertiary)">
+            {t(who === null ? "They said" : `${who} said`)}{" "}
+          </span>
+          “{theirs.length > 240 ? `${theirs.slice(0, 240)}…` : theirs}”
+        </p>
+      )}
       {plan.quote !== null ? (
         editing && chat && relationshipId !== null ? (
           <EditOwnReply

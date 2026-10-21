@@ -409,7 +409,7 @@ describe("the plan (How Q is handling it, option 2)", () => {
     );
     expect(screen.getByText("Two figures disagree")).toBeTruthy();
     expect(screen.getByText("Mina’s preferred call time")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Review it" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review the reply" }));
     await settle();
     expect(
       screen.getByText("Hi Mina, the unit economics are on tab 3."),

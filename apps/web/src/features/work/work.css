@@ -300,6 +300,13 @@
       inset 0 0 0 1px var(--wk-move-line),
       inset 3px 0 0 var(--wk-move);
   }
+  /* On a phone the decision opens in a sheet: no row stays marked. */
+  @media (max-width: 1023px) {
+    .cq-wk-inbox .cq-wk-qi[aria-current="true"] {
+      background: transparent;
+      box-shadow: none;
+    }
+  }
   .cq-wk-qi > .cq-wk-qbody {
     display: flex;
     min-width: 0;

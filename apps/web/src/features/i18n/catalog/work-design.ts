@@ -119,6 +119,8 @@ export const WORK_DESIGN_AR: Readonly<Record<string, string>> = {
   "Asked Q. Tell it which is current in the Q panel; the other stays in history.":
     "سُئل Q. أخبره في لوحة Q أيهما الحالي؛ ويبقى الآخر في السجل.",
   "Review it": "راجعه",
+  "Review the reply": "راجع الرد",
+  "{name} said": "قال {name}",
   "Needs your approval": "يحتاج إلى موافقتك",
   "Decided. The plan moves on.": "تقرّر. تمضي الخطة.",
   Missing: "ناقص",

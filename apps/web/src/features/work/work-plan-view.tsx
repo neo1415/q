@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import type { WorkforceJobDetailDto } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
-import { Clock, Flag, Play } from "@capital-q/ui/icons";
+import { Flag } from "@capital-q/ui/icons";
 
 import { useQSessionOptional } from "@/features/q/q-session";
 import { CrmSheet, useCrmToast } from "@/features/relationships/crm-kit";
@@ -172,16 +172,7 @@ function Plan({
       </div>
       <h2 className="cq-wk-pg">{t(entry.goal)}</h2>
       <div className="flex flex-wrap items-center gap-2.5">
-        <WorkTag
-          tone={entry.waiting ? "move" : "positive"}
-          icon={
-            entry.waiting ? (
-              <Clock aria-hidden="true" />
-            ) : (
-              <Play aria-hidden="true" />
-            )
-          }
-        >
+        <WorkTag tone={entry.waiting ? "move" : "positive"}>
           {t(entry.state)}
         </WorkTag>
         <span className="cq-label font-normal text-(--cq-text-tertiary)">
@@ -284,7 +275,14 @@ function Plan({
                       onClick={() => setOpen(step.approvalId)}
                       data-plan-review={step.approvalId}
                     >
-                      {t("Review it")}
+                      {t(
+                        /message\.send|email\.send/u.test(
+                          entry.approvals.get(step.approvalId)?.action
+                            .actionType ?? "",
+                        )
+                          ? "Review the reply"
+                          : "Review it",
+                      )}
                     </button>
                     <span className="cq-label font-normal text-(--cq-text-tertiary)">
                       {t("Needs your approval")}
