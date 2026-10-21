@@ -792,6 +792,18 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // bearer, and the host runtime decides every word (no person acts).
   "q-api/http/meeting-face.ts POST `${Q_MEETING_FACE_BRIDGE_BASE_PATH}/chat/completions`":
     WEBHOOK,
+  // Lane 6 camera mode: the page the hosted bot shows as its camera, its
+  // private room join and its voice stream; read by the bot under a
+  // per-meeting secret, never a person's action.
+  "q-api/http/meeting-face.ts GET Q_MEETING_FACE_PAGE_PATH": exempt(
+    "the meeting bot's camera page (machine reader, per-meeting secret)",
+  ),
+  "q-api/http/meeting-face.ts GET `${Q_MEETING_FACE_PAGE_PATH}/room`": exempt(
+    "the meeting bot's camera page joining its private face room",
+  ),
+  "q-api/http/meeting-face.ts GET `${Q_MEETING_FACE_PAGE_PATH}/voice`": exempt(
+    "the meeting bot's camera page streaming Q's voice",
+  ),
   "q-api/http/meeting-assistant.ts GET Q_MEETING_ASSISTANT_PATH": exempt(
     "the organiser reading whether Q is in their call and its notes; shown on the meeting itself",
   ),
