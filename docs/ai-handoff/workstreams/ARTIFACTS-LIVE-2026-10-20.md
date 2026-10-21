@@ -82,9 +82,28 @@
 | L-15 | Research results arranged as they arrive                   | Research results arrive with the completed message (`PUBLIC_SOURCE`, identity cards). Identity cards for read subjects now come up by name (L-1) only when the research read is in `RunRead`; external identities are not                                                                                                                                                                                                                                                                                                                                                                                                                                                | PARTLY: names in `RunRead` preview live. External research identities do not preview                                                                      |
 | L-16 | Voice turns                                                | The voice path (`apps/q-api/src/voice/turn.ts`) does not use the delta bus, so a spoken turn's cards still arrive through the room feed after the answer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | NOT FIXED: voice pipeline belongs to the turn-latency lane. The event is ready for it                                                                     |
 
-## 4. Tests and gates
+## 4. Tests and gates (run 2026-10-20/21, Windows worktree)
 
-See the PR body for the exact commands and results run in this session.
+New tests:
+
+- `packages/model-gateway/test/q-answer-artifact-preview.test.ts`: through the real answer seam, the preview rides in the same live frame as the first sentence naming a read company; never for an unread name; never twice; a requested comparison is up with the first words.
+- `q-artifact-preview.test.ts`: the announcer, the layout and `companiesTableBlock`.
+- `q-runtime/test/stream.test.ts`: the preview frame precedes its sentence; a refused subject is not sent; previews are never coalesced.
+- `api-client` reducer: the preview is held and then dropped on completion or failure.
+- `q-research/test/site-logo.test.ts`: candidate order, image check, cache, private addresses refused.
+- `apps/web/test/artifacts-live.test.tsx`: stage preview; table columns in order; set kept when already shown; photo → logo → initials, never a broken `<img>`; Board marks and chip in the controller.
+
+| Gate                                                                                                                     | Result                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `turbo run build --filter=./packages/*`                                                                                  | 53/53                                                                                                                                                          |
+| Root `tsc --noEmit -p tsconfig.json`                                                                                     | 0 errors                                                                                                                                                       |
+| `tsc` web / api / q-api                                                                                                  | all exit 0                                                                                                                                                     |
+| vitest, 13 package suites                                                                                                | 169 passed (4 failures fixed and re-run)                                                                                                                       |
+| vitest, web suites (artifacts-live, artifact-stage, q-presence-stage, entity-avatar, company-photo-route, q-stage-theme) | pass                                                                                                                                                           |
+| `answer-canvas.test.tsx` "Board's timeline"                                                                              | **fails, pre-existing and not touched.** Timezone-dependent: it expects "Today" for 21:04Z vs 23:00Z, but at UTC+1 they fall on different local days           |
+| eslint, changed files                                                                                                    | clean                                                                                                                                                          |
+| prettier                                                                                                                 | applied                                                                                                                                                        |
+| Not run                                                                                                                  | Playwright / browser screenshots (no local stack with seeded auth here), the full `pnpm check`, a live logo fetch (no provider key needed, but no running api) |
 
 ## 5. Deploy notes
 
