@@ -23,6 +23,7 @@ import {
   materialUploadTargetAction,
 } from "./material-actions";
 import { OnboardingClientError } from "./client";
+import { sayStreaming } from "./say-stream";
 import type { RuntimePort } from "./runtime-port";
 
 export const API_ADAPTER_NAME = "OnboardingApiClient";
@@ -71,7 +72,13 @@ export function createApiRuntimePort(input: {
       through(onboardingAnswerQuestionAction(request)),
     dismissQuestion: (request) =>
       through(onboardingDismissQuestionAction(request)),
-    say: (request) => through(onboardingSayAction(request)),
+    // A typed answer streams through its route (L9); the opening, with no
+    // words to answer, keeps the whole-turn action. A function never
+    // crosses into a server action.
+    say: ({ onSentence, ...request }) =>
+      onSentence !== undefined && request.text.trim().length > 0
+        ? sayStreaming(request, onSentence)
+        : through(onboardingSayAction(request)),
 
     /**
      * The real Evidence upload, in the three steps the API actually has

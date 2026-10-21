@@ -254,6 +254,8 @@ export function QOnboardingWorkspace({
     view === undefined || greeted ? null : welcomeBack(view, vocabulary),
   );
   const [turns, setTurns] = useState<readonly Turn[]>([]);
+  /** Q's reply to a typed turn as it is written (L9); null between turns. */
+  const [typedPartial, setTypedPartial] = useState<string | null>(null);
   /**
    * The question Q actually asked last, for the step it is asking about
    * (QX-004 core gate: one Q).
@@ -560,7 +562,13 @@ export function QOnboardingWorkspace({
         : "smooth",
       block: "nearest",
     });
-  }, [turns.length, proposals.length, gaps.length, qStream?.partial?.text]);
+  }, [
+    turns.length,
+    proposals.length,
+    gaps.length,
+    qStream?.partial?.text,
+    typedPartial,
+  ]);
 
   // While Q is reading a free-text turn, re-read the session on a timer
   // through the same client; the proposals arrive as its state.
@@ -902,7 +910,16 @@ export function QOnboardingWorkspace({
         trimmed.split(/\s+/).length >= 6;
       const draftId = view?.session.id;
       if (draftId !== undefined) holdPending(draftId, trimmed);
-      const turn = await actions.say(trimmed, recentTurns());
+      const turn = await actions
+        .say(trimmed, recentTurns(), undefined, (sentence) => {
+          setTypedPartial((partial) =>
+            partial === null ? sentence : `${partial} ${sentence}`,
+          );
+        })
+        .finally(() => {
+          // The settled reply takes its place, as written after the guards.
+          setTypedPartial(null);
+        });
       if (turn !== null && draftId !== undefined) {
         confirmSent(draftId, trimmed);
       }
@@ -1776,6 +1793,14 @@ export function QOnboardingWorkspace({
             streaming
           />
         ) : null}
+        {typedPartial === null ? null : (
+          <QLine
+            id="q-typed-streaming"
+            kind="Q"
+            text={typedPartial}
+            streaming
+          />
+        )}
         {stage === null ? null : (
           <QLine id="reading-stage" kind="Q" text={stage} />
         )}

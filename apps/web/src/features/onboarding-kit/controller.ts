@@ -135,6 +135,8 @@ export type OnboardingActions<TResponse> = {
     }[],
     /** The founder profile section they came to fill (Overview link). */
     focus?: string,
+    /** Q's sentences as they are written (L9); the turn streams when given. */
+    onSentence?: (sentence: string) => void,
   ) => Promise<OnboardingTurn | null>;
   /** Re-read the session from the runtime (Q's reading may have landed). */
   readonly refresh: () => Promise<void>;
@@ -365,7 +367,7 @@ export function useOnboardingJourney<
       }
       return run(() => submit(input), true);
     },
-    say: async (text, recentTurns, focus) => {
+    say: async (text, recentTurns, focus, onSentence) => {
       const say = requireClient().say;
       if (say === undefined) {
         return null;
@@ -412,6 +414,7 @@ export function useOnboardingJourney<
           text,
           recentTurns,
           ...(focus === undefined ? {} : { focus }),
+          ...(onSentence === undefined ? {} : { onSentence }),
         });
         turn = {
           understood: outcome.understood,
