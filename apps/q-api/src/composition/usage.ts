@@ -36,15 +36,27 @@ export function createOwnUsage(dependencies: {
   readonly now?: (() => Date) | undefined;
 }) {
   const now = dependencies.now ?? (() => new Date());
-  return async (actor: ActorContext): Promise<QUsageDto> => {
-    const at = now();
+  return async (
+    actor: ActorContext,
+    options: { readonly month?: "current" | "previous" | undefined } = {},
+  ): Promise<QUsageDto> => {
+    const today = now();
+    const previous = options.month === "previous";
+    // Any instant inside last calendar month (UTC) reads that month.
+    const at = previous
+      ? new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 15))
+      : today;
     const [month, instructions, plan] = await Promise.all([
       dependencies.ownMonth(
         { userId: actor.userId, tenantId: actor.tenantId },
         at,
       ),
       dependencies.instructions(actor).catch(() => []),
-      dependencies.plan?.(actor).catch(() => null) ?? Promise.resolve(null),
+      // The plan's standing is this month's: last month carries none.
+      previous
+        ? Promise.resolve(null)
+        : (dependencies.plan?.(actor).catch(() => null) ??
+          Promise.resolve(null)),
     ]);
     const named = new Map(instructions.map((row) => [row.id, row]));
     return {

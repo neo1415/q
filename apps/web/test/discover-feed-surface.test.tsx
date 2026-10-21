@@ -68,6 +68,10 @@ const expressInterestAction =
 vi.mock("../src/features/network/interest-actions", () => ({
   expressInterestAction: (input: unknown) => expressInterestAction(input),
 }));
+vi.mock("../src/features/network/connection-actions", () => ({
+  connectionStatusAction: vi.fn(),
+  requestConnectionAction: vi.fn(),
+}));
 
 vi.mock("../src/features/discover/feed/playback-source", () => ({
   authorisePlaybackAction: (companyId: string, mediaAssetId: string) =>
@@ -1046,10 +1050,8 @@ describe("the founder view is untouched", () => {
       />,
     );
 
-    // A list entry, not a feed card: no player, no Save, no Pass.
-    expect(
-      screen.getByRole("heading", { name: "Northbank Capital" }),
-    ).toBeTruthy();
+    // A directory card, not a feed card: no player, no Save, no Pass.
+    expect(screen.getByText("Northbank Capital")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Pass" })).toBeNull();
     expect(document.querySelector("video")).toBeNull();

@@ -178,6 +178,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   "api/http/company-material.ts GET DOCUMENT_ACCESS_PATH": cap("tool.read_my"),
   "api/http/company-material.ts GET FOLDER_ACCESS_PATH": cap("tool.read_my"),
+  // ownroom-2 (2026-10-21): the owner's room as one investor sees it, a
+  // read_my kind like who can see each document.
+  "api/http/company-material.ts GET `${base}${COMPANY_DATA_ROOM_PREVIEW_SEGMENT}`":
+    cap("tool.read_my"),
   "api/http/gateq.ts GET GATEQ_INVESTOR_GATES_PATH": cap(
     "tool.find_prospective_investors",
   ),
@@ -211,6 +215,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   ),
   // Founders' videos (ADR 0021): browsed on Discover's second tab.
   "api/http/discovery.ts GET DISCOVERY_INVESTOR_PATH": cap(
+    "offer.connection_request",
+  ),
+  // The investor's published Q Card, read on their page (brief 2).
+  "api/http/discovery.ts GET DISCOVERY_INVESTOR_CARD_PATH": cap(
     "offer.connection_request",
   ),
   "api/http/discovery.ts GET DISCOVERY_INVESTOR_PHOTO_PATH": exempt(

@@ -15,10 +15,11 @@ export function PageContainer({
   className,
 }: {
   readonly children: ReactNode;
-  readonly width?: "content" | "reading" | "narrow" | undefined;
+  readonly width?: "wide" | "content" | "reading" | "narrow" | undefined;
   readonly className?: string | undefined;
 }) {
   const maxWidth = {
+    wide: "max-w-(--cq-layout-wide)",
     content: "max-w-(--cq-layout-content)",
     reading: "max-w-(--cq-layout-reading)",
     narrow: "max-w-(--cq-layout-narrow)",

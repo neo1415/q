@@ -91,7 +91,9 @@ export function DocumentsTabBar({
       ref={listRef}
       role="tablist"
       aria-label={t("Documents")}
-      className="relative -mx-4 flex gap-1 overflow-x-auto border-b border-(--cq-border-subtle) px-4 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+      // Chosen design 2026-10-21 (Documents option 3): a segmented
+      // switch, the chosen tab raised on the sheet colour.
+      className="relative inline-flex max-w-full gap-0.5 self-start overflow-x-auto rounded-full bg-(--cq-surface-strong) p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       data-documents-tabs
     >
       {TABS.map((tab) => {
@@ -110,11 +112,11 @@ export function DocumentsTabBar({
             tabIndex={selected ? 0 : -1}
             onKeyDown={onKeyDown}
             onClick={() => setPick({ tab: tab.key, from: active })}
-            className={`cq-body-sm -mb-px inline-flex min-h-11 flex-none items-center gap-2 border-b-2 px-3 whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) ${selected ? "border-(--cq-accent) font-semibold text-(--cq-text-primary)" : "border-transparent font-medium text-(--cq-text-secondary) hover:text-(--cq-text-primary)"}`}
+            className={`inline-flex min-h-11 flex-none items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium whitespace-nowrap transition-[background-color,color,box-shadow] duration-(--cq-motion-fast) focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-[38px] ${selected ? "bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-[0_1px_2px_rgb(0_0_0/0.12)]" : "text-(--cq-text-secondary) hover:text-(--cq-text-primary)"}`}
           >
             {t(tab.label)}
             {count === undefined ? null : (
-              <span className="cq-caption rounded-full bg-(--cq-surface-subtle) px-2 py-px font-medium text-(--cq-text-secondary) tabular-nums">
+              <span className="tabular-nums">
                 <span className="sr-only">, </span>
                 {t(count)}
               </span>

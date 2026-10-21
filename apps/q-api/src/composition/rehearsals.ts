@@ -1100,6 +1100,23 @@ function reviewDto(row: RehearsalRow): QRehearsalReviewDto | null {
   };
 }
 
+/** A review's state and first note each way, for the rehearsals list. */
+export function summaryReview(review: QRehearsalReviewDto | null): {
+  readonly state: "READY" | "PROVISIONAL" | "NONE";
+  readonly wentWell: string | null;
+  readonly workOn: string | null;
+} {
+  if (review === null) return { state: "NONE", wentWell: null, workOn: null };
+  if (review.provisional === true) {
+    return { state: "PROVISIONAL", wentWell: null, workOn: null };
+  }
+  return {
+    state: "READY",
+    wentWell: review.wentRight[0]?.moment.slice(0, 300) ?? null,
+    workOn: review.wentWrong[0]?.moment.slice(0, 300) ?? null,
+  };
+}
+
 const wordsIn = (text: string) =>
   text.split(/\s+/).filter((word) => word.length > 0).length;
 
@@ -2674,6 +2691,8 @@ export function createRehearsalService(dependencies: {
             (turn) => turn.from === "YOU",
           ).length,
           createdAt: row.createdAt.toISOString(),
+          endedAt: row.endedAt?.toISOString() ?? null,
+          review: summaryReview(reviewDto(row)),
         })),
       };
     },

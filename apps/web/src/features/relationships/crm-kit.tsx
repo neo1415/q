@@ -31,8 +31,10 @@ import { useT } from "@/features/i18n/language";
 export type CrmButtonVariant = "primary" | "secondary" | "quiet" | "done";
 
 const VARIANT: Readonly<Record<CrmButtonVariant, string>> = {
+  // A page scope may re-point the primary (the warm-charcoal options);
+  // everywhere else it is the accent.
   primary:
-    "bg-(--cq-accent) text-(--cq-text-inverse) hover:bg-(--cq-accent-hover)",
+    "bg-[var(--cq-primary-action,var(--cq-accent))] text-[var(--cq-on-primary-action,var(--cq-text-inverse))] hover:bg-[var(--cq-primary-action-hover,var(--cq-accent-hover))]",
   secondary:
     "border border-(--cq-border) bg-(--cq-surface-raised) text-(--cq-text-primary) hover:border-(--cq-text-tertiary)",
   quiet:
@@ -62,6 +64,7 @@ export function ProgressButton({
   phase,
   idle,
   done,
+  pendingLabel,
   onClick,
   className,
   disabled = false,
@@ -72,6 +75,8 @@ export function ProgressButton({
   readonly phase: "idle" | "pending" | "done";
   readonly idle: ReactNode;
   readonly done: ReactNode;
+  /** The words while the server confirms; "Sending…" when not given. */
+  readonly pendingLabel?: ReactNode;
   readonly onClick?: (() => void) | undefined;
   readonly className?: string | undefined;
   readonly disabled?: boolean | undefined;
@@ -89,7 +94,7 @@ export function ProgressButton({
     >
       {phase === "pending" ? (
         <>
-          <span>{t("Sending…")}</span>
+          <span>{pendingLabel ?? t("Sending…")}</span>
           <span aria-hidden="true" className="cq-crm-pending-bar" />
         </>
       ) : phase === "done" ? (
@@ -366,6 +371,7 @@ export function CrmSheet({
   title,
   sub,
   avatar,
+  charcoal = false,
   children,
   ...rest
 }: {
@@ -374,6 +380,8 @@ export function CrmSheet({
   readonly title: string;
   readonly sub?: string | undefined;
   readonly avatar?: ReactNode;
+  /** A sheet is portalled out of the page: a warm-charcoal page says so. */
+  readonly charcoal?: boolean | undefined;
   readonly children: ReactNode;
 } & { readonly [data: `data-${string}`]: string | boolean | undefined }) {
   const t = useT();
@@ -383,7 +391,10 @@ export function CrmSheet({
         title={title}
         side="side"
         bare
-        className="rounded-t-2xl lg:w-[520px] lg:rounded-none [&>div:first-child]:lg:hidden [&>div:last-child]:px-0 [&>div:last-child]:pb-0"
+        className={cx(
+          "rounded-t-2xl lg:w-[520px] lg:rounded-none [&>div:first-child]:lg:hidden [&>div:last-child]:px-0 [&>div:last-child]:pb-0",
+          charcoal ? "cq-charcoal" : undefined,
+        )}
       >
         <div className="flex flex-col" {...rest}>
           <div className="flex items-center gap-3 border-b border-(--cq-border-subtle) px-5 py-4">

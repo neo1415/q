@@ -285,6 +285,10 @@ export {
   type RememberCommand,
 } from "./memory/service.js";
 export {
+  createMemoryCorrection,
+  type MemoryCorrectionOutcome,
+} from "./memory/correction.js";
+export {
   MEMORY_TEXT_MAX,
   NO_REHEARSALS_LINE,
   REHEARSALS_LABEL,

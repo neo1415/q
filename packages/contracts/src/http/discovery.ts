@@ -6,6 +6,7 @@ import { CurrencyCodeSchema } from "../common/money.js";
 import { StageCodeSchema } from "./companies.js";
 import { CompanyRaiseViewSchema } from "./company-raise.js";
 import { PitchSummaryDtoSchema } from "./media.js";
+import { PublicCardDtoSchema } from "./public-identity.js";
 import { MoneySchema } from "../common/money.js";
 import {
   EvidenceStatusSchema,
@@ -506,6 +507,24 @@ export const DiscoveredInvestorPhotoDtoSchema = z
 export type DiscoveredInvestorPhotoDto = z.infer<
   typeof DiscoveredInvestorPhotoDtoSchema
 >;
+/**
+ * `GET /v1/discovery/investors/:investorOrganisationId/card` — the
+ * investor's own Q Card as a signed-in participant would read it at their
+ * `/@handle` (network_visible and public_external fields only: what the
+ * investor chose to publish, including any declared mandate fields they put
+ * on the card). Asked by id so a founder's investor page can show it; the
+ * investor must first be one this founder may see (same 404 otherwise).
+ * `card` is null when they have no live card.
+ */
+export const DISCOVERY_INVESTOR_CARD_PATH =
+  "/v1/discovery/investors/:investorOrganisationId/card" as const;
+export const DiscoveredInvestorCardDtoSchema = z
+  .object({ card: PublicCardDtoSchema.nullable() })
+  .strict();
+export type DiscoveredInvestorCardDto = z.infer<
+  typeof DiscoveredInvestorCardDtoSchema
+>;
+
 export const DiscoveredInvestorProfileDtoSchema =
   DiscoveredInvestorDtoSchema.omit({ reasons: true });
 export type DiscoveredInvestorProfileDto = z.infer<

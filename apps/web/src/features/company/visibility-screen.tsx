@@ -8,12 +8,22 @@ import type {
   CompanyDto,
   CompanyNetworkPreview,
   MarketplaceReadinessAssessment,
+  MarketplaceReadinessRequirement,
 } from "@capital-q/contracts";
-import { Badge } from "@capital-q/ui/badge";
-import { Button, buttonClassName } from "@capital-q/ui/button";
-import { ContextIndicator } from "@capital-q/ui/context-indicator";
-import { Eye, ICON_SIZE, ICON_STROKE, Lock } from "@capital-q/ui/icons";
+import { cx } from "@capital-q/ui";
+import { buttonClassName } from "@capital-q/ui/button";
+import { CircleHelp, Compass, Eye, Lock } from "@capital-q/ui/icons";
 import { InlineNotice, Skeleton } from "@capital-q/ui/states";
+
+import { Tick } from "@/features/investors/match-marks";
+import {
+  CrmSheet,
+  CrmToastProvider,
+  ProgressButton,
+  QLine,
+  crmButton,
+  useCrmToast,
+} from "@/features/relationships/crm-kit";
 
 import { VisibilityCentre } from "./visibility-centre";
 import {
@@ -24,15 +34,17 @@ import {
 import { useT } from "@/features/i18n/language";
 
 /**
- * Visibility & Discovery (CQ-PRE-REC-001 §31-§36).
+ * Visibility (CQ-PRE-REC-001 §31-§36; app prototype "visibility", option
+ * 3, "Visible and recommended, separately").
  *
- * The one place a founder sees who can see what, and decides whether the
- * declared company profile is visible to investors across the network.
- * Every sentence here is derived from the company row and the network
- * projection the API returns; nothing is inferred from onboarding
- * completeness, and finishing onboarding never flips a switch. The preview
- * is the same projection Q serves an investor, so what is shown is what
- * would be seen.
+ * Two states side by side, never one: whether investors on the network can
+ * find the company (its declared profile, network_visible), and whether it
+ * can be included in investor recommendations (marketplace readiness, a
+ * derived assessment). Every sentence is derived from the company row, its
+ * network projection and the readiness the API returns; finishing setup
+ * never flips anything. Network-visible is signed-in Capital Q investors
+ * only; a public web address (public_external) is the Q Card's own choice
+ * and is never implied here (ADR-001).
  */
 
 export type VisibilityScreenProps = {
@@ -45,12 +57,28 @@ type Loaded = {
   readonly readiness: MarketplaceReadinessAssessment | null;
 };
 
-export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
+/** Requirements a person meets through verification. */
+const VERIFICATION: ReadonlySet<MarketplaceReadinessRequirement> = new Set([
+  "FOUNDER_IDENTITY_VERIFIED",
+  "ORGANISATION_VERIFIED",
+]);
+
+export function VisibilityScreen(props: VisibilityScreenProps) {
+  return (
+    <CrmToastProvider>
+      <Screen {...props} />
+    </CrmToastProvider>
+  );
+}
+
+function Screen({ companyId }: VisibilityScreenProps) {
   const t = useT();
+  const toast = useCrmToast();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [saved, setSaved] = useState<string | null>(null);
+  const [saving, setSaving] = useState<"idle" | "pending" | "done">("idle");
+  const [checking, setChecking] = useState<"idle" | "pending" | "done">("idle");
+  const [confirming, setConfirming] = useState(false);
 
   const load = useCallback(async () => {
     const result = await loadVisibilityOverviewAction(companyId);
@@ -65,9 +93,7 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
   useEffect(() => {
     let cancelled = false;
     void loadVisibilityOverviewAction(companyId).then((result) => {
-      if (cancelled) {
-        return;
-      }
+      if (cancelled) return;
       if (result.ok) {
         setLoaded(result.value);
         setError(null);
@@ -83,30 +109,52 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
   const choose = async (
     visibility: "organisation_private" | "network_visible",
   ) => {
-    if (loaded === null) {
+    if (loaded === null) return;
+    setSaving("pending");
+    setError(null);
+    const result = await setCompanyVisibilityAction(
+      companyId,
+      visibility,
+      loaded.company.version,
+    ).catch(() => null);
+    if (result === null || !result.ok) {
+      setSaving("idle");
+      setError(
+        result?.message ?? "That didn't go through. Reload and try again.",
+      );
       return;
     }
-    setBusy(true);
-    setSaved(null);
-    try {
-      const result = await setCompanyVisibilityAction(
-        companyId,
-        visibility,
-        loaded.company.version,
-      );
-      if (!result.ok) {
-        setError(result.message);
-        return;
-      }
-      setSaved(
-        visibility === "network_visible"
-          ? "Your company profile is now visible to investors on the Capital Q network."
-          : "Your company profile is private to your organisation again.",
-      );
-      await load();
-    } finally {
-      setBusy(false);
+    setConfirming(false);
+    toast(
+      visibility === "network_visible"
+        ? t(
+            "Your company profile is now visible to investors on the Capital Q network.",
+          )
+        : t("Your company profile is private to your organisation again."),
+    );
+    await load();
+    setSaving("idle");
+  };
+
+  const checkReadiness = async () => {
+    setChecking("pending");
+    setError(null);
+    const result = await assessMarketplaceReadinessAction(companyId).catch(
+      () => null,
+    );
+    if (result === null || !result.ok) {
+      setChecking("idle");
+      setError(result?.message ?? "Readiness couldn't be checked. Try again.");
+      return;
     }
+    await load();
+    setChecking("done");
+    toast(
+      result.value.state === "marketplace_ready"
+        ? t("Your company meets the requirements for investor recommendations.")
+        : t("Readiness checked. What remains is listed below."),
+    );
+    setTimeout(() => setChecking("idle"), 1600);
   };
 
   if (error !== null && loaded === null) {
@@ -132,252 +180,278 @@ export function VisibilityScreen({ companyId }: VisibilityScreenProps) {
   const { company, preview, readiness } = loaded;
   const visible = preview.networkVisible;
   const ready = company.marketplaceReadinessState === "marketplace_ready";
-  const outstanding =
-    readiness?.requirements.filter((r) => r.outcome === "OUTSTANDING") ?? [];
-
-  const checkReadiness = async () => {
-    setBusy(true);
-    setSaved(null);
-    try {
-      const result = await assessMarketplaceReadinessAction(companyId);
-      if (!result.ok) {
-        setError(result.message);
-        return;
-      }
-      setSaved(
-        result.value.state === "marketplace_ready"
-          ? "Your company meets the requirements for investor recommendations."
-          : "Readiness checked. What remains is listed below.",
-      );
-      await load();
-    } finally {
-      setBusy(false);
-    }
-  };
+  const rows = (readiness?.requirements ?? []).filter(
+    (r) => r.outcome !== "NOT_APPLICABLE",
+  );
+  const still = rows.filter((r) => r.outcome !== "SATISFIED");
+  const notes =
+    readiness === null ? [] : discoverabilityNotes(readiness.discoverability);
 
   return (
-    <div className="flex flex-col gap-10" data-visibility-screen>
-      {saved !== null ? (
-        <InlineNotice tone="positive" title={t("Saved")}>
-          {saved}
-        </InlineNotice>
-      ) : null}
-      {error !== null ? (
+    <div className="flex flex-col gap-4" data-visibility-screen>
+      {error === null ? null : (
         <InlineNotice tone="danger" title={t("That didn't go through")}>
           {error}
         </InlineNotice>
-      ) : null}
+      )}
 
-      {/*
-        The state is a dossier panel: the scope it is in, what that means,
-        and the one action that changes it. The scope indicator and the
-        words carry the meaning; the panel has no wash and no gradient.
-      */}
-      <section
-        aria-labelledby="visibility-status"
-        className="cq-panel max-w-(--cq-layout-reading)"
-        data-visible={visible ? "true" : "false"}
-      >
-        <header className="cq-panel-header flex-wrap">
-          <h2
-            id="visibility-status"
-            className="cq-title-md text-(--cq-text-primary)"
-          >
-            {visible
-              ? "Visible to investors on the network"
-              : "Private to your organisation"}
-          </h2>
-          <ContextIndicator
-            translate={t}
-            scope={visible ? "network_visible" : "organisation_private"}
+      <div className="grid gap-3.5 md:grid-cols-2">
+        <div className="flex flex-col gap-3.5">
+          <Stat
+            on={visible}
+            icon={
+              visible ? (
+                <Eye size={20} aria-hidden="true" />
+              ) : (
+                <Lock size={20} aria-hidden="true" />
+              )
+            }
+            title={
+              visible ? t("Discoverable") : t("Private to your organisation")
+            }
+            body={
+              visible
+                ? t("Investors can look your company up and ask Q about it.")
+                : t(
+                    "Only people in your organisation can see your company. Investors cannot find it, and Q will not mention it to them.",
+                  )
+            }
+            data-stat="visible"
           />
-        </header>
-        <div className="cq-panel-body flex flex-col gap-4">
-          <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
-            {visible
-              ? "Investors on Capital Q can find your company by name and read the profile below. Everything else you have shared with Q stays private."
-              : "Only people in your organisation can see your company. Investors cannot find it, and Q will not mention it to them."}
-          </p>
-          <p className="cq-status-line">
-            {visible ? (
-              <Eye
-                aria-hidden="true"
-                size={ICON_SIZE.compact}
-                strokeWidth={ICON_STROKE}
-              />
-            ) : (
-              <Lock
-                aria-hidden="true"
-                size={ICON_SIZE.compact}
-                strokeWidth={ICON_STROKE}
-              />
+          {visible ? (
+            <button
+              type="button"
+              className={crmButton("secondary", "self-start")}
+              onClick={() => setConfirming(true)}
+              data-make-private
+            >
+              {t("Make private again")}
+            </button>
+          ) : (
+            <ProgressButton
+              phase={saving}
+              pendingLabel={t("Saving…")}
+              idle={t("Make visible to investors")}
+              done={t("Visible")}
+              onClick={() => void choose("network_visible")}
+              className="self-start"
+              data-make-visible
+            />
+          )}
+          <span className="cq-caption text-(--cq-text-tertiary)">
+            {t(
+              "Visible to signed-in Capital Q investors only, never at a public web address.",
             )}
-            {visible
-              ? "Investors see the profile previewed below, nothing more."
-              : "Investors see nothing until you choose otherwise."}
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            {visible ? (
-              <Button
-                variant="secondary"
-                disabled={busy}
-                onClick={() => void choose("organisation_private")}
-              >
-                {t("Make private again")}
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                disabled={busy}
-                onClick={() => void choose("network_visible")}
-              >
-                {t("Make visible to investors")}
-              </Button>
-            )}
-            <span className="cq-status-line">
-              {t("Finishing setup never changes this on its own. You decide.")}
-            </span>
-          </div>
+          </span>
         </div>
-      </section>
+        <Stat
+          on={ready}
+          icon={<Compass size={20} aria-hidden="true" />}
+          title={
+            ready
+              ? t("Can be included in recommendations")
+              : t("Not in investor recommendations yet")
+          }
+          body={
+            ready
+              ? t(
+                  "Your company meets the requirements for investor recommendations.",
+                )
+              : t(
+                  "Being visible does not change that on its own; the requirements below decide it.",
+                )
+          }
+          data-stat="recommended"
+        />
+      </div>
 
       <section
-        aria-labelledby="visibility-discovery"
-        className="flex flex-col gap-4"
+        aria-labelledby="visibility-requirements"
+        className="flex flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-5 py-[18px]"
       >
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2
-            id="visibility-discovery"
-            className="cq-title-md text-(--cq-text-primary)"
+            id="visibility-requirements"
+            className="cq-body-sm font-medium text-(--cq-text-secondary)"
           >
-            {t("Discovery status")}
+            {t("Requirements for recommendations")}
           </h2>
-          <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
-            {visible
-              ? "Discoverable to investors: they can look your company up and ask Q about it."
-              : "Not discoverable yet: investors cannot find your company until you make it visible."}
-          </p>
-        </div>
-        <div className="flex flex-col gap-2">
-          <h3 className="cq-label text-(--cq-text-primary)">
-            {t("Investor recommendations")}
-          </h3>
-          <p className="cq-body max-w-(--cq-layout-reading) text-(--cq-text-secondary)">
-            {ready
-              ? "Your company meets the requirements and can be included in investor recommendations. Being visible and being recommended are separate: both are needed."
-              : "Not in investor recommendations yet. Being visible does not change that on its own; the requirements below decide it."}
-          </p>
+          <ProgressButton
+            variant="secondary"
+            phase={checking}
+            pendingLabel={t("Checking…")}
+            idle={t("Check readiness again")}
+            done={t("Checked")}
+            onClick={() => void checkReadiness()}
+            data-check-readiness
+          />
         </div>
         {readiness === null ? (
-          <p className="cq-status-line">
+          <p className="cq-body-sm text-(--cq-text-secondary)">
             {t("Readiness couldn't load. Try again in a moment.")}
           </p>
         ) : (
-          <ul
-            className="flex max-w-(--cq-layout-reading) flex-col divide-y divide-(--cq-border-subtle) border-y border-(--cq-border-subtle)"
-            data-marketplace-requirements
-          >
-            {readiness.requirements
-              .filter((r) => r.outcome !== "NOT_APPLICABLE")
-              .map((r) => (
-                <li
-                  key={r.requirement}
-                  className="cq-body-sm flex items-start gap-3 py-3 text-(--cq-text-secondary)"
-                  data-outcome={r.outcome}
-                >
-                  {/* The status word in a fixed column, in words as well as
-                      tone; the readiness of a requirement is never a colour. */}
-                  <span className="w-14 shrink-0" aria-hidden="true">
-                    <Badge tone="neutral">
-                      {r.outcome === "SATISFIED" ? "Done" : "Next"}
-                    </Badge>
-                  </span>
-                  <span>
-                    <span className="sr-only">
-                      {r.outcome === "SATISFIED" ? "Done: " : "Still needed: "}
-                    </span>
-                    {r.description}
-                  </span>
-                </li>
-              ))}
+          <ul data-marketplace-requirements>
+            {rows.map((r) => (
+              <li
+                key={r.requirement}
+                className="flex flex-wrap items-center gap-2.5 border-t border-(--cq-border-subtle) py-3 text-sm text-(--cq-text-primary) first:border-t-0"
+                data-outcome={r.outcome}
+              >
+                {r.outcome === "SATISFIED" ? (
+                  <Tick />
+                ) : (
+                  <CircleHelp
+                    size={18}
+                    aria-hidden="true"
+                    className="flex-none text-(--cq-text-tertiary)"
+                  />
+                )}
+                <span className="sr-only">
+                  {r.outcome === "SATISFIED"
+                    ? t("Done: ")
+                    : t("Still needed: ")}
+                </span>
+                <span className="min-w-0 flex-1">{r.description}</span>
+                {r.outcome !== "SATISFIED" &&
+                VERIFICATION.has(r.requirement) &&
+                readiness.verificationAvailable ? (
+                  <Link
+                    href="/verification"
+                    className={cx(crmButton("primary"), "max-sm:ms-[30px]")}
+                  >
+                    {t("Verify you and")} {company.canonicalName}
+                  </Link>
+                ) : null}
+              </li>
+            ))}
           </ul>
         )}
-        {readiness === null ||
-        discoverabilityNotes(readiness.discoverability).length === 0 ? null : (
-          <div
-            className="flex max-w-(--cq-layout-reading) flex-col gap-2"
-            data-discoverability
-          >
-            <h3 className="cq-label text-(--cq-text-primary)">
-              {t("How investors can find you")}
-            </h3>
-            <ul className="flex flex-col gap-2">
-              {discoverabilityNotes(readiness.discoverability).map((note) => (
-                <li
-                  key={note.fact}
-                  className="cq-body-sm text-(--cq-text-secondary)"
-                >
-                  {note.text}{" "}
-                  <Link
-                    href={note.href}
-                    className="underline underline-offset-4"
-                  >
-                    {t("Add it")}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <span className="cq-caption text-(--cq-text-tertiary)" role="status">
+          {readiness === null
+            ? null
+            : still.length === 0
+              ? t(
+                  "Your company meets the requirements and can be included in investor recommendations.",
+                )
+              : `${t("Still needed:")} ${still
+                  .map((r) => r.description.replace(/\.$/u, ""))
+                  .join("; ")}.`}
+        </span>
         {readiness !== null && !readiness.verificationAvailable ? (
-          <p className="cq-status-line max-w-(--cq-layout-reading) items-start">
-            <span>
-              {t(
-                "Identity and organisation verification are not yet available on Capital Q, so no company is in investor recommendations today. Nothing here calls your company verified when it isn't.",
-              )}
-            </span>
+          <p className="cq-caption text-(--cq-text-secondary)">
+            {t(
+              "Identity and organisation verification are not yet available on Capital Q, so no company is in investor recommendations today. Nothing here calls your company verified when it isn't.",
+            )}
           </p>
         ) : null}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => void checkReadiness()}
+        {notes.length === 0 ? null : (
+          <ul
+            className="flex flex-col gap-1.5 border-t border-(--cq-border-subtle) pt-3"
+            data-discoverability
           >
-            {outstanding.length === 0 && ready
-              ? "Check readiness again"
-              : "Check readiness"}
-          </Button>
-        </div>
+            {notes.map((note) => (
+              <li
+                key={note.fact}
+                className="cq-caption text-(--cq-text-secondary)"
+              >
+                {note.text}{" "}
+                <Link href={note.href} className="underline underline-offset-4">
+                  {t("Add it")}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
+
+      <QLine small={t("The requirements are the same for every company.")}>
+        {t(
+          "Recommendations rank companies by fit and evidence. No one can pay to be recommended.",
+        )}
+      </QLine>
 
       {/*
-        The visibility control centre (CQ-BIZ-003): who can see each
-        thing, the shares with named investors, and the company previewed
-        as each audience, all from the server.
+        The visibility control centre (CQ-BIZ-003): who can see each thing,
+        the shares with named investors, and the company as each audience
+        sees it, all from the server. Kept under the chosen design.
       */}
-      <VisibilityCentre
-        companyId={companyId}
-        refreshKey={String(company.version)}
-      />
+      <div className="pt-6">
+        <VisibilityCentre
+          companyId={companyId}
+          refreshKey={String(company.version)}
+        />
+      </div>
 
-      <section aria-label={t("Related")} className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* The pitch video is part of what investors see; it has its own
-              flow (CQ-MEDIA), founder-only. */}
-          <Link href="/pitch" className={buttonClassName("secondary")}>
-            {t("Your pitch video")}
-          </Link>
-          {/* Capital Q verifies; the founder asks (CQ-VERIFY-001). */}
-          <Link href="/verification" className={buttonClassName("secondary")}>
-            {t("Verification")}
-          </Link>
-          {/* Changes are asked of Q in one's own words and approved (ADR 0011). */}
-          <Link href="/home" className={buttonClassName("quiet")}>
-            {t("Ask Q to change it")}
-          </Link>
+      <CrmSheet
+        open={confirming}
+        onOpenChange={setConfirming}
+        title={t("Make your company private again?")}
+        sub={company.canonicalName}
+        data-make-private-sheet
+      >
+        <p className="cq-body text-(--cq-text-primary)">
+          {t(
+            "Investors will no longer find your company, and Q will not mention it to them. Conversations you already have stay open.",
+          )}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={crmButton("secondary")}
+            onClick={() => setConfirming(false)}
+          >
+            {t("Keep it visible")}
+          </button>
+          <ProgressButton
+            phase={saving}
+            pendingLabel={t("Saving…")}
+            idle={t("Make private")}
+            done={t("Private")}
+            onClick={() => void choose("organisation_private")}
+            data-confirm-private
+          />
         </div>
-      </section>
+      </CrmSheet>
+    </div>
+  );
+}
+
+function Stat({
+  on,
+  icon,
+  title,
+  body,
+  ...rest
+}: {
+  readonly on: boolean;
+  readonly icon: React.ReactNode;
+  readonly title: string;
+  readonly body: string;
+} & { readonly [data: `data-${string}`]: string | undefined }) {
+  return (
+    <div
+      className="cq-crm-swap flex items-center gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) px-[18px] py-4"
+      data-on={on ? "true" : "false"}
+      {...rest}
+    >
+      <span
+        aria-hidden="true"
+        className={cx(
+          "grid size-11 flex-none place-items-center rounded-full",
+          on
+            ? "bg-(--cq-positive-soft) text-(--cq-positive)"
+            : "bg-(--cq-surface-subtle) text-(--cq-text-secondary)",
+        )}
+      >
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <b className="block text-base font-semibold text-(--cq-text-primary)">
+          {title}
+        </b>
+        <span className="text-[13px] text-(--cq-text-secondary)">{body}</span>
+      </div>
     </div>
   );
 }

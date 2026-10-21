@@ -52,9 +52,22 @@ import { call, type ApiSession } from "./request.js";
  * notification settings (an API session).
  */
 
-/** The person's own usage this month (a Q API session). Read-only. */
-export function getMyUsage(session: ApiSession) {
-  return call(session, "GET", Q_USAGE_PATH, QUsageDtoSchema);
+/**
+ * The person's own usage this month, or last month (a Q API session).
+ * Read-only.
+ */
+export function getMyUsage(
+  session: ApiSession,
+  options: { readonly month?: "current" | "previous" | undefined } = {},
+) {
+  return call(
+    session,
+    "GET",
+    options.month === "previous"
+      ? `${Q_USAGE_PATH}?month=previous`
+      : Q_USAGE_PATH,
+    QUsageDtoSchema,
+  );
 }
 
 export function listQWork(session: ApiSession) {

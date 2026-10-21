@@ -90,6 +90,7 @@ function service(overrides: Partial<PublicIdentityService> = {}) {
         indexable: false,
       });
     },
+    cardForSubject: () => Promise.resolve(null),
     resolveCode: (code) =>
       Promise.resolve(code === "abcdefgh23" ? { handle: "kivu" } : null),
     cardPhotoFor: () => Promise.resolve(null),

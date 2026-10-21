@@ -385,6 +385,28 @@ export const FounderApplicationDtoSchema = z
     status: z.enum(["SENT", "REPLIED", "PASSED"]),
     reasonCode: GateqPassReasonSchema.nullable(),
     message: z.string().max(2000).nullable(),
+    /**
+     * Design gateqf-1 (2026-10-21): how the gate's PUBLISHED rules stood
+     * when the founder sent it, frozen at submission (the engine's answer,
+     * never a later re-check). Labels and status only, never a rule's
+     * configuration. Optional so an older API and a newer client agree.
+     */
+    rules: z
+      .array(
+        z
+          .object({
+            label: z.string().max(120),
+            required: z.boolean(),
+            standing: GateqRuleStandingSchema,
+          })
+          .strict(),
+      )
+      .max(64)
+      .optional(),
+    /** The investor's own reply promise for it (a date); null: none made. */
+    replyBy: z.string().nullable().optional(),
+    /** Whose gate it was, for the founder's own relationship record. */
+    investorOrganisationId: z.string().uuid().nullable().optional(),
   })
   .strict();
 export type FounderApplicationDto = z.infer<typeof FounderApplicationDtoSchema>;

@@ -1,9 +1,12 @@
 import {
+  MEMORY_CORRECT_PATH,
   Q_MEMORY_FORGET_PATH,
   Q_MEMORY_LEARNING_PATH,
   Q_MEMORY_PATH,
+  QMemoryCorrectionDtoSchema,
   QMemoryListDtoSchema,
   QPreferenceLearningDtoSchema,
+  type QMemoryCorrectionRequest,
   type QPreferenceLearningChoiceRequest,
 } from "@capital-q/contracts";
 
@@ -36,6 +39,28 @@ export async function forgetQMemory(
     },
   );
   if (!response.ok) throw await readProblemResponse(response);
+}
+
+/**
+ * Replaces one memory with the caller's own words (an API session: a
+ * declared person action, ADR 0040). The old one is kept in history,
+ * marked superseded. Not theirs, or not live: a 404.
+ */
+export function correctQMemory(
+  session: ApiSession,
+  memoryItemId: string,
+  request: QMemoryCorrectionRequest,
+) {
+  return call(
+    session,
+    "POST",
+    MEMORY_CORRECT_PATH.replace(
+      ":memoryItemId",
+      encodeURIComponent(memoryItemId),
+    ),
+    QMemoryCorrectionDtoSchema,
+    { body: request },
+  );
 }
 
 /** Whether Q may learn how the caller likes to work (lane ob1). A Q API session. */

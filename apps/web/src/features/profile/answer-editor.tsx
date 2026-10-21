@@ -33,7 +33,7 @@ import { useT } from "@/features/i18n/language";
 
 type Step = OnboardingStepManifest;
 
-function stepsOf(journey: ProfileJourney): readonly Step[] {
+export function stepsOf(journey: ProfileJourney): readonly Step[] {
   return (
     journey === "founder" ? FOUNDER_DEFINITION_CURRENT : INVESTOR_DEFINITION_V1
   ).steps;
@@ -41,7 +41,7 @@ function stepsOf(journey: ProfileJourney): readonly Step[] {
 
 type Draft = Readonly<Record<string, OnboardingResponseValue | null>>;
 
-function same(
+export function same(
   a: OnboardingResponseValue | null | undefined,
   b: OnboardingResponseValue | null | undefined,
 ): boolean {
@@ -184,7 +184,7 @@ export function AnswerEditor({
   );
 }
 
-function StepField({
+export function StepField({
   step,
   value,
   labels,

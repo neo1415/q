@@ -341,4 +341,21 @@ export type AppActionPorts = {
   /** The actor's own investor organisation, from their organisation. */
   readonly ownInvestorOrganisationId?:
     ((actor: ActorContext) => Promise<string | null>) | undefined;
+  /**
+   * What Q remembers (ADR 0012): the person's own correction, through the
+   * memory Write Gate. Only the actor's own live memory.
+   */
+  readonly memoryCorrection?: MemoryCorrectionPort | undefined;
+};
+
+/** The outcome of one correction, in the service's terms. */
+export type MemoryCorrectionOutcome =
+  "CORRECTED" | "NOT_FOUND" | "SENSITIVE" | "REFUSED";
+
+export type MemoryCorrectionPort = {
+  readonly correct: (
+    actor: ActorContext,
+    memoryItemId: string,
+    content: string,
+  ) => Promise<MemoryCorrectionOutcome>;
 };
