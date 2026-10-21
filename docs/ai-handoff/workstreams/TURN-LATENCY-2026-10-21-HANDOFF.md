@@ -180,3 +180,22 @@ Harness at scale 0.1 (real ms). The first finding now arrives long before the tu
 | Voice answer with cards | 4,072                | **5,748**     | 7,889    |
 
 Cards still land with the completed message. Card subjects are resolved against the run's reads at completion (`withCardSubjects`), so showing cards progressively needs the same treatment as findings: a per-card builder and an id rule agreed with lane 3.
+
+## COMPANY_ANALYST v27 candidate (branch `speed/analyst-v27`; ships only after eval parity)
+
+| Item                | Status                            | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v27 prompt          | READY, not active                 | `q-core/src/prompts/tasks/company-analyst.v27.ts` is v26 with two lines changed. A finding's `basis` becomes "the supplied fact labels only (F1, F2), never restated text". `basis` is used nowhere downstream: `findingBlockOf` drops it, nothing stores it, and q-evals doesn't grade it. A card for a company the fit tools scored leaves `measures` out, and Capital Q fills them. Output schema unchanged (v26). Not in `PROMPT_DEFINITIONS`, so production renders v26. |
+| Code fills measures | DONE (safe under v26 too)         | `withFitMeasures` (model-gateway `fit-cards.ts`): a card with no measures for a company this run's fit tools scored takes the platform's own levels from that fit; measures the model wrote are kept.                                                                                                                                                                                                                                                                         |
+| Gate                | DONE                              | `createCandidatePromptRegistry()` makes v27 active with v26 kept, deprecated. The eval world takes `registry`, and the CLI takes `q-eval run --prompts candidate`. Tests: `company-analyst-v27.test.ts` (only those two lines differ, absent from production, active only in the candidate registry) and `fit-answer-cards.test.ts` (`withFitMeasures`).                                                                                                                      |
+| Offline saving      | MEASURED (representative objects) | `answer-output-split.mjs`, v27 rows. Typed analysis 848 → 756 tokens (−11%, about 0.9 s); comparison 1,539 → 1,282 (−17%, about 2.6 s); spoken 441 → 385 (−13%). Production confirms with `outputSplit.findingsBasis` and `cards`.                                                                                                                                                                                                                                            |
+
+To ship:
+
+1. Run the faster-tier steps above with `--prompts candidate` against the v26 baseline:
+
+   ```
+   node scripts/q-eval.mjs run --profile LIVE_MODEL --out .evals/v27 --baseline .evals/tier-current.baseline.json --prompts candidate
+   ```
+
+2. If no hard invariant fails and every graded score is at least v26's: move `COMPANY_ANALYST_V27` into `PROMPT_DEFINITIONS`, mark v26 `DEPRECATED`, and remove it from `CANDIDATE_PROMPT_DEFINITIONS`.

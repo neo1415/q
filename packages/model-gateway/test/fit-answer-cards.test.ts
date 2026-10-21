@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { QAnswerCardsBlock } from "@capital-q/contracts";
 import { withoutRecommendationClaims } from "@capital-q/q-core";
 
 import {
@@ -10,6 +11,7 @@ import {
   fitsInOutcome,
   groundedFitWords,
   hasOrphanListItems,
+  withFitMeasures,
   type RunFit,
 } from "../src/q/fit-cards.js";
 import { analystResultBlocks } from "../src/q/result-blocks.js";
@@ -219,5 +221,63 @@ describe("R2: Q's company card says the raise the Discover card says", () => {
   });
   it("without the read, the disclosed raise as before", () => {
     expect(cardRaiseWords({ raise: money })).toBe("$4 million");
+  });
+});
+
+describe("COMPANY_ANALYST v27: a fit-scored card's measures come from the fit (withFitMeasures)", () => {
+  const block = (cards: QAnswerCardsBlock["cards"]): QAnswerCardsBlock => ({
+    kind: "ANSWER_CARDS",
+    shape: "RANKED",
+    title: "Fit against your mandate",
+    cards,
+    followUps: [],
+  });
+  const card = (
+    name: string,
+    companyId: string | null,
+    measures: QAnswerCardsBlock["cards"][number]["measures"] = [],
+  ) =>
+    ({
+      key: name,
+      name,
+      line: null,
+      reasons: ["Within your mandate."],
+      measures,
+      view: null,
+      said: null,
+      sourceCount: 0,
+      ...(companyId === null
+        ? {}
+        : { subject: { kind: "COMPANY", companyId } }),
+    }) as unknown as QAnswerCardsBlock["cards"][number];
+
+  it("fills a scored company's empty measures with the platform's own levels", () => {
+    const portside = ZINO_FITS.find((fit) => fit.name === "Portside");
+    if (portside === undefined) throw new Error("fixture");
+    const out = withFitMeasures(
+      block([card("Portside", portside.companyId)]),
+      ZINO_FITS,
+    );
+    const measures = out.cards[0]?.measures ?? [];
+    expect(measures.map((m) => [m.label, m.level])).toContainEqual([
+      "Stage",
+      "STRONG",
+    ]);
+    expect(measures.length).toBeGreaterThan(0);
+  });
+
+  it("keeps the model's measures, and a card no fit covers, as written", () => {
+    const written = [{ label: "Team", level: "GOOD" as const, value: null }];
+    const portside = ZINO_FITS.find((fit) => fit.name === "Portside");
+    const input = block([
+      card("Portside", portside?.companyId ?? null, written),
+      card("Unscored", "00000000-0000-4000-8000-000000000009"),
+      card("No subject", null),
+    ]);
+    const out = withFitMeasures(input, ZINO_FITS);
+    expect(out.cards[0]?.measures).toEqual(written);
+    expect(out.cards[1]?.measures).toEqual([]);
+    expect(out.cards[2]?.measures).toEqual([]);
+    expect(withFitMeasures(input, [])).toBe(input);
   });
 });

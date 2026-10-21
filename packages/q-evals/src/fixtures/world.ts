@@ -73,6 +73,7 @@ import {
 import {
   SYNTHETIC_COMPANY_FACTS,
   type AuthorisedFact,
+  type PromptRegistry,
 } from "@capital-q/q-core";
 import {
   CONTEXT_FIREWALL_POLICY_VERSION,
@@ -189,6 +190,12 @@ export type QEvalWorldOptions = {
    * is every eval case today — the world behaves exactly as before.
    */
   readonly specialist?: ((delegate: QAnswerPort) => QAnswerPort) | undefined;
+  /**
+   * The prompts the answer renders. Absent: the production registry. A
+   * candidate registry (`q-eval run --prompts candidate`) compares a prompt
+   * awaiting parity with the active one through the same graph.
+   */
+  readonly registry?: PromptRegistry | undefined;
 };
 
 export type QEvalWorld = {
@@ -796,6 +803,7 @@ export async function createQEvalWorld(
     gateway,
     repositories,
     sql,
+    ...(options.registry === undefined ? {} : { registry: options.registry }),
     transactions: db.transactions,
     context: options.retrieval?.context ?? context,
     tools: qTools.port,

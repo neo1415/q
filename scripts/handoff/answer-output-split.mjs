@@ -158,3 +158,24 @@ console.log("| --- | --- | --- | --- | --- | --- | --- | --- |");
 row("typed analysis", typed);
 row("comparison of two", comparison);
 row("spoken", spoken);
+
+// COMPANY_ANALYST v27 (candidate): basis is fact labels only, and a
+// fit-scored card's measures are left for code to fill.
+const v27 = (value) => ({
+  ...value,
+  findings: value.findings.map((f) => ({
+    ...f,
+    basis: f.basis.filter((b) => /^F\d+$/u.test(b)),
+  })),
+  ...(value.answerCards === undefined
+    ? {}
+    : {
+        answerCards: {
+          ...value.answerCards,
+          cards: value.answerCards.cards.map((c) => ({ ...c, measures: [] })),
+        },
+      }),
+});
+row("typed analysis, v27", v27(typed));
+row("comparison of two, v27", v27(comparison));
+row("spoken, v27", v27(spoken));

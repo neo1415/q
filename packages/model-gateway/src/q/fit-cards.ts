@@ -279,6 +279,33 @@ function cardOf(fit: RunFit): Omit<QAnswerCard, "key" | "hue"> {
 }
 
 /**
+ * Turn latency round 5 (COMPANY_ANALYST v27): a card for a company this
+ * run's fit tools scored, written without measures, takes the platform's
+ * own measures from that fit, exactly as a card code builds does. A card
+ * the model gave measures, or one no fit covers, is left as written.
+ */
+export function withFitMeasures(
+  block: QAnswerCardsBlock,
+  fits: readonly RunFit[],
+): QAnswerCardsBlock {
+  if (fits.length === 0) return block;
+  let changed = false;
+  const cards = block.cards.map((card) => {
+    if (card.measures.length > 0 || card.subject?.kind !== "COMPANY") {
+      return card;
+    }
+    const companyId = card.subject.companyId;
+    const fit = fits.find((one) => one.companyId === companyId);
+    if (fit === undefined) return card;
+    const measures = cardOf(fit).measures;
+    if (measures.length === 0) return card;
+    changed = true;
+    return { ...card, measures };
+  });
+  return changed ? { ...block, cards } : block;
+}
+
+/**
  * The ranked cards for the fits in hand, highest score first; null when
  * there are fewer than two (one company is an answer, not a list).
  * Restricted to the companies the answer names when it names any.
