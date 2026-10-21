@@ -51,12 +51,22 @@ export default async function VisibilityPage() {
         }
         label={t("visibility and discovery")}
       >
+        {/* A founder's page is option 3 of the chosen designs: being
+            visible and being recommended, said separately. */}
         <PageHeader
-          title={t("Visibility and discovery")}
+          title={
+            context.kind === "FOUNDER"
+              ? t("Visibility")
+              : t("Visibility and discovery")
+          }
           description={
             context.kind === "INVESTOR"
               ? "Who can see your investor profile, what they see, and whether founders can find you."
-              : "Who can see your company, what they see, and whether investors can find you."
+              : context.kind === "FOUNDER"
+                ? t(
+                    "Being visible and being recommended are separate: both are needed for investors to be shown your company.",
+                  )
+                : "Who can see your company, what they see, and whether investors can find you."
           }
         />
         {context.kind === "FOUNDER" ? (
