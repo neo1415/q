@@ -82,3 +82,17 @@ Round 2 (2026-10-21, after `origin/speed/q-oct20` was merged in with no conflict
 - `apps/web/src/features/briefing/arrival-briefing.tsx` and `apps/web/src/features/home/returning-welcome.tsx`: `headline`.
 - `packages/model-gateway/src/q/index.ts`: no memory wait for a code-answered arrival follow-up.
 - No contracts, migrations or authorisation rules changed. Every new read is the same actor's own, keyed by the full actor.
+
+## Handover status (2026-10-21, moving to cloud)
+
+| Rows                          | Status                               | Exact next step                                                                                                                                                                                  |
+| ----------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1–11, 13, 17, 19, 22 (memory) | DONE (code + targeted tests, pushed) | Let PR #263 CI (test, quality, pgTAP) run on `3522d93d7`; if green, the coordinator merges into `speed/q-oct20`                                                                                  |
+| 13                            | DONE at port level                   | Where a local Postgres exists, run `apps/q-api/test/arrival-snapshot.integration.test.ts` with `createRoundTripCounter` to record the real cold round trips (expected well under 126)            |
+| 14–16, 18, 21                 | DONE (already met / not a delay)     | none                                                                                                                                                                                             |
+| 12                            | NOT STARTED, by design               | none unless the probe and the build can share one database snapshot; probe-first is required for freshness                                                                                       |
+| 20                            | NOT STARTED, by design               | none: the R35 briefing is the welcome when the browser gate says no, which the server cannot know                                                                                                |
+| 22 (assemble/profile/offer)   | NOT STARTED                          | Give `answer()` a code-answer return before `prepareTurn` finishes (needs the prompt bundle version and the conversation id without the full prepare); measure it with the `prepareMs` log first |
+| All                           | Production verification NOT STARTED  | After deploy: read the `[arrival] read timed` web log and the q-api `durationMs` for `GET /v1/q/arrival-snapshot` (cold and warm), and time first greeting text and voice on Home                |
+
+Last local gates on `3522d93d7`: package builds 53/53; root, web and q-api `tsc` exit 0; eslint and prettier clean on changed files; targeted vitest all passed (213 + 64 + 24 + 42).
