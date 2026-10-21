@@ -2,7 +2,7 @@ import { inspect } from "node:util";
 
 import { describe, expect, it } from "vitest";
 
-import { parseQApiConfig } from "../src/q-api.js";
+import { parseQApiConfig, resolveElevenLabsApiKey } from "../src/q-api.js";
 import {
   SPEECH_PROVIDER_ENV_NAMES,
   speechProviderConfigStatus,
@@ -121,5 +121,67 @@ describe("speech provider configuration", () => {
     expect(JSON.stringify(web)).not.toContain(KEY);
     expect(JSON.stringify(web)).not.toContain("seng_");
     expect(JSON.stringify(web).toLowerCase()).not.toContain("elevenlabs");
+  });
+});
+
+describe("the ElevenLabs key under either name (owner decision 2026-10-21)", () => {
+  const OTHER = "sk_synthetic-alias-speech-key-00000000000000000";
+  const ENGINE = { ELEVENLABS_SPEECH_ENGINE_ID: "seng_0000000000000001" };
+
+  it("accepts ELEVENLABS_API_KEY alone", () => {
+    const config = parseQApiConfig({
+      ...base,
+      ...ENGINE,
+      ELEVENLABS_API_KEY: KEY,
+    });
+    expect(config.secrets.speechProviders.elevenLabs?.reveal()).toBe(KEY);
+    expect(config.voice.provider).toBe("elevenlabs");
+  });
+
+  it("accepts ELEVEN_LABS_API_KEY alone", () => {
+    const config = parseQApiConfig({
+      ...base,
+      ...ENGINE,
+      ELEVEN_LABS_API_KEY: OTHER,
+    });
+    expect(config.secrets.speechProviders.elevenLabs?.reveal()).toBe(OTHER);
+    expect(config.voice.provider).toBe("elevenlabs");
+    expect(JSON.stringify(config)).not.toContain(OTHER);
+  });
+
+  it("prefers ELEVENLABS_API_KEY when both are set", () => {
+    const config = parseQApiConfig({
+      ...base,
+      ...ENGINE,
+      ELEVENLABS_API_KEY: KEY,
+      ELEVEN_LABS_API_KEY: OTHER,
+    });
+    expect(config.secrets.speechProviders.elevenLabs?.reveal()).toBe(KEY);
+    expect(
+      resolveElevenLabsApiKey({
+        ELEVENLABS_API_KEY: KEY,
+        ELEVEN_LABS_API_KEY: OTHER,
+      }),
+    ).toBe(KEY);
+  });
+
+  it("keeps a disabled test value under the canonical name over a real alias", () => {
+    const disabled = "disabled-locally-000000000000";
+    expect(
+      resolveElevenLabsApiKey({
+        ELEVENLABS_API_KEY: disabled,
+        ELEVEN_LABS_API_KEY: OTHER,
+      }),
+    ).toBe(disabled);
+  });
+
+  it("with neither name, voice stays off exactly as before", () => {
+    const config = parseQApiConfig({ ...base, ...ENGINE });
+    expect(config.secrets.speechProviders.elevenLabs).toBeUndefined();
+    expect(config.voice.provider).toBeUndefined();
+    expect(resolveElevenLabsApiKey({})).toBeUndefined();
+    expect(
+      resolveElevenLabsApiKey({ ELEVEN_LABS_API_KEY: "  " }),
+    ).toBeUndefined();
   });
 });

@@ -656,6 +656,10 @@ export function createMeetingHostRuntime(dependencies: {
     if (pending === undefined) {
       pending = (async () => {
         // 2026-10-20: the booking and the record's next sequence together.
+        // 2026-10-21 (A6): the snapshot too. It is usually already built when
+        // the bot was created; after a restart it used to start only once
+        // these reads were back, so an early question waited on both rounds.
+        const snapshotting = prepareSnapshot(meetingId);
         const [context, startSeq] = await Promise.all([
           store.context(meetingId),
           dependencies.events?.nextSeq(meetingId).catch(() => 1),
@@ -718,9 +722,10 @@ export function createMeetingHostRuntime(dependencies: {
         // Q is in the call (its bot's events are arriving): its face may
         // join too, when the ledger allows. Never blocks or throws.
         dependencies.face?.start(meetingId);
-        // Usually already built when the bot was created; else built now.
+        // Usually already built when the bot was created; else in flight
+        // since the session began opening.
         const ready = session;
-        ready.snapshotReady = prepareSnapshot(meetingId).then((snapshot) => {
+        ready.snapshotReady = snapshotting.then((snapshot) => {
           ready.snapshot = snapshot;
         });
         // Q joins minutes before people do: read what every answer needs now.
