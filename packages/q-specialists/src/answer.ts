@@ -481,6 +481,68 @@ function companyCardsShownIn(
 /** Said when an earlier turn's own blocks are shown again (v54 fromShown). */
 export const RESHOWN_LINE = "Here's what I showed you, back on screen.";
 
+const ORDINAL_WORDS =
+  "first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|1st|2nd|3rd|[4-6]th";
+/**
+ * "What was the second one?", "which was the third company again?",
+ * "remind me what the last one was": only the name of a record Q listed,
+ * asked back. Anything more ("…and why does it fit?") is a question for
+ * the reading and the answer.
+ */
+const ORDINAL_RECALL = new RegExp(
+  [
+    `^(?:(?:and|so|sorry|ok(?:ay)?|wait|hold\\s+on)[,\\s]+)*(?:what|which|who)(?:'s|\\s+(?:was|is))\\s+(?:the\\s+)?(${ORDINAL_WORDS})(?:\\s+(?:one|company|investor|fund|firm|startup|card))?(?:\\s+(?:again|you\\s+(?:showed|mentioned|named|said)(?:\\s+me)?))*[\\s?.!]*$`,
+    `^(?:(?:can|could)\\s+you\\s+)?remind\\s+me\\s+(?:what|which|who)\\s+(?:the\\s+)?(${ORDINAL_WORDS})(?:\\s+(?:one|company|investor|fund|firm|startup|card))?\\s+(?:was|is)(?:\\s+again)?[\\s?.!]*$`,
+  ].join("|"),
+  "iu",
+);
+
+/**
+ * Owner live 2026-10-17 ("what was the second one?" took 3.3 s: two
+ * classification calls and a 1.8 s recall reply): the name of the record
+ * at that place in Q's own latest list, said by code with no model call.
+ * Only Q's own list in this conversation -- what this person was already
+ * shown -- and only when the words ask for nothing but that name.
+ */
+export function ordinalRecallLine(
+  text: string,
+  resolved: ResolvedReference | null,
+): string | null {
+  const said = text.replace(/[’]/gu, "'").trim();
+  const asked = ORDINAL_RECALL.exec(said);
+  if (asked === null) return null;
+  if (resolved?.kind !== "ONE" || resolved.via !== "Q_ANSWER") return null;
+  const name = resolved.entity.name?.trim() ?? "";
+  if (name.length === 0) return null;
+  const place = (asked[1] ?? asked[2] ?? "").toLowerCase();
+  const word: Readonly<Record<string, string>> = {
+    "1st": "first",
+    "2nd": "second",
+    "3rd": "third",
+    "4th": "fourth",
+    "5th": "fifth",
+    "6th": "sixth",
+  };
+  return `The ${word[place] ?? place} one was ${name}.`;
+}
+
+/** The same binding from the conversation alone (Q's lists, no page). */
+function ordinalRecallFromHistory(
+  text: string,
+  history: readonly QConversationMessage[],
+): string | null {
+  if (!ORDINAL_RECALL.test(text.replace(/[’]/gu, "'").trim())) return null;
+  const ask = referenceAskOf(text);
+  if (ask?.kind !== "ORDINAL") return null;
+  const resolved = resolveReference(ask, {
+    page: [],
+    answers: listsFromHistory(history),
+    answerIsNewest: true,
+    focus: focusFromHistory(history),
+  });
+  return ordinalRecallLine(text, resolved);
+}
+
 /** Two summaries of one card: the same words, ignoring case and the full stop. */
 function sameCard(a: string, b: string): boolean {
   const plain = (text: string) =>
@@ -2611,7 +2673,28 @@ export function createSpecialistQAnswer(
     (pageRequestOf(text) !== null && !takenBack(text)) ||
     screenActOf(text) !== null ||
     cardsLaneOf(text) !== null ||
-    fitRankingLaneOf(text) !== null;
+    fitRankingLaneOf(text) !== null ||
+    // Owner 2026-10-20: a tab by its name ("open the data room", "now the
+    // pitch deck") is opened by code (screenTabAnswer / namedRecordAnswer);
+    // its early skim and reading were two model calls nobody used.
+    (tabAskOf(text) !== null && !takenBack(text));
+
+  /**
+   * Whether the early skim can still decide anything for this turn. Its
+   * fast lane is never taken once Q has shown blocks here (a follow-up is
+   * the full reading's, owner live 2026-10-17), so after cards a typed
+   * turn's skim was a model call made only to be ignored. A spoken turn
+   * keeps it: the skim also gates the voice speculation.
+   */
+  const skimUsable = (
+    history: readonly QConversationMessage[],
+    latest: QConversationMessage,
+  ): boolean =>
+    (latest.utteranceRef !== undefined &&
+      dependencies.speculation?.spoken === true) ||
+    !conversationContextOf(history, latest.id).turns.some(
+      (turn) => turn.blocks.length > 0,
+    );
 
   /** A follow-up about a prepared entity, composed by code; null if none. */
   const preparedFollowUpOf = (
@@ -2647,8 +2730,17 @@ export function createSpecialistQAnswer(
       if (instantLaneOf(latest.content, history) !== null) return null;
       if (preparedFollowUpOf(latest.content, history) !== null) return null;
       if (codeAnswersWords(latest.content)) return null;
-      // K fast lane: the short first read starts as early as the reading.
-      if (dependencies.turnSkim !== undefined && !preskims.has(input.runId)) {
+      // "What was the second one?" after Q's list: its name, by code.
+      if (ordinalRecallFromHistory(latest.content, history) !== null) {
+        return null;
+      }
+      // K fast lane: the short first read starts as early as the reading,
+      // only where its lane could still be taken (see skimUsable).
+      if (
+        dependencies.turnSkim !== undefined &&
+        !preskims.has(input.runId) &&
+        skimUsable(history, latest)
+      ) {
         preskims.set(input.runId, {
           messageId: latest.id,
           skim: dependencies.turnSkim
@@ -3343,6 +3435,19 @@ export function createSpecialistQAnswer(
         "q bound a reference",
       );
     }
+    // "What was the second one?": the name in Q's own list, said by code
+    // with no reading and no model call (never an opened page: defect B).
+    const recalled =
+      pointed === null || sequences.has(conversationId)
+        ? null
+        : ordinalRecallLine(latest.content, pointed.resolved);
+    if (recalled !== null) {
+      logger?.info(
+        { qRunId: request.runId, lane: "ORDINAL_RECALL", modelCalls: 0 },
+        "q named a record from its own list by code",
+      );
+      return recordAnswer(request, conversationId, recalled);
+    }
     // "Open the second one" / "not that investor, the second one": a record
     // on their page or in Q's list, opened by code. Q's own company cards
     // keep their richer path below (talked about from the card).
@@ -3605,7 +3710,8 @@ export function createSpecialistQAnswer(
       skimmer === undefined ||
       request.speculation !== undefined ||
       request.plan.screen?.route === "ONBOARDING" ||
-      sequences.has(conversationId)
+      sequences.has(conversationId) ||
+      !skimUsable(history, latest)
         ? null
         : preskim !== undefined && preskim.messageId === latest.id
           ? preskim.skim
