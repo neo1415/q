@@ -241,7 +241,9 @@ describe("artifacts live, round 2", () => {
     expect(announcer.ahead(one)).toEqual({ subjects: [one], layout: "CARD" });
     expect(announcer.ahead(one)).toBeNull();
     // Saying the name later announces nothing new.
-    expect(announcer.sentence("Shadi Qishta is a finance director.")).toBeNull();
+    expect(
+      announcer.sentence("Shadi Qishta is a finance director."),
+    ).toBeNull();
   });
 
   it("previews an identity a lookup tool of this run returned, with its credited image", () => {
@@ -250,7 +252,10 @@ describe("artifacts live, round 2", () => {
       name: "Shadi Qishta",
       kind: "PERSON",
       externalPersonId: "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
-      image: { url: "https://images.example/shadi.jpg", attribution: "Wiki Commons" },
+      image: {
+        url: "https://images.example/shadi.jpg",
+        attribution: "Wiki Commons",
+      },
     });
     expect(subjectsNamedIn("I found Shadi Qishta in Doha.", known)).toEqual([
       {

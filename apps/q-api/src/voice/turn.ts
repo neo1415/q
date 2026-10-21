@@ -1484,9 +1484,6 @@ export function createVoiceTurnHandler(
             break;
           case "q.run.started":
           case "q.finding.available":
-          // The card preview is for the screen; the sentence that follows
-          // it in the same frame is what the line says.
-          case "q.artifact.preview":
             break;
         }
       }

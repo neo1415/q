@@ -468,7 +468,9 @@ describe("tool calls and usage", () => {
     expect(narration).toHaveBeenCalled();
     const bridgesNow = h
       .channel()
-      .sent.filter((event) => JSON.stringify(event).includes("Looking at the deck"));
+      .sent.filter((event) =>
+        JSON.stringify(event).includes("Looking at the deck"),
+      );
     // One bridge for the turn, with the stage line's exact words.
     expect(bridgesNow).toHaveLength(1);
     expect(h.working).toEqual(["Looking at the deck…"]);

@@ -20,10 +20,7 @@ import {
   type ActorContextDependencies,
 } from "../security/actor-context.js";
 import type { QVoiceRoutesDependencies } from "./routes.js";
-import type {
-  InterviewAgent,
-  InterviewAgentTurnInput,
-} from "./interview-agent.js";
+import type { InterviewAgent } from "./interview-agent.js";
 import type { PresenceTrigger } from "./presence-trigger.js";
 import { signupContextFromToken } from "./interview-steps.js";
 import { AccountPausedError } from "./standing.js";

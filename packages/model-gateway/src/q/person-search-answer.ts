@@ -79,9 +79,9 @@ function firstName(name: string): string {
  * attributed on its record), as an https URL with its credit; otherwise
  * none, and the card shows initials.
  */
-export function externalImageOf(subject: IdentityCard["subject"]):
-  | { readonly url: string; readonly attribution: string }
-  | undefined {
+export function externalImageOf(
+  subject: IdentityCard["subject"],
+): { readonly url: string; readonly attribution: string } | undefined {
   const image = subject.image;
   if (
     image.status !== "ATTACHED" ||

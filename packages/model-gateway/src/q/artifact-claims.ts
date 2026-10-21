@@ -87,6 +87,7 @@ export function drawnArtifacts(
       case "PUBLIC_SOURCE":
       case "ATTENTION":
       case "PICTURE":
+      case "SUMMARY":
         break;
     }
   }

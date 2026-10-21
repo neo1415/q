@@ -22,7 +22,7 @@ const VIEW = { not: "checked here" };
 function sse(frames: readonly string[], chunked = false): Response {
   const encoder = new TextEncoder();
   const text = frames.join("");
-  const parts = chunked ? text.match(/[\s\S]{1,7}/gu) ?? [] : [text];
+  const parts = chunked ? (text.match(/[\s\S]{1,7}/gu) ?? []) : [text];
   return new Response(
     new ReadableStream({
       start(controller) {
@@ -73,53 +73,71 @@ describe("a streamed typed onboarding turn", () => {
   });
 
   it("a stream that never opened returns null: the server action asks instead", async () => {
-    const offline = await sayStreamed(REQUEST, () => undefined, () =>
-      Promise.reject(new Error("offline")),
+    const offline = await sayStreamed(
+      REQUEST,
+      () => undefined,
+      () => Promise.reject(new Error("offline")),
     );
     expect(offline).toBeNull();
-    const noRoute = await sayStreamed(REQUEST, () => undefined, () =>
-      Promise.resolve(
-        new Response(JSON.stringify({ message: "not composed" }), {
-          status: 503,
-          headers: { "content-type": "application/json" },
-        }),
-      ),
+    const noRoute = await sayStreamed(
+      REQUEST,
+      () => undefined,
+      () =>
+        Promise.resolve(
+          new Response(JSON.stringify({ message: "not composed" }), {
+            status: 503,
+            headers: { "content-type": "application/json" },
+          }),
+        ),
     );
     expect(noRoute).toBeNull();
   });
 
   it("an API refusal is worded as the server action words it, and not retried", async () => {
-    const conflict = sayStreamed(REQUEST, () => undefined, () =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({ code: "VERSION_CONFLICT", status: 409 }),
-          { status: 409, headers: { "content-type": "application/problem+json" } },
+    const conflict = sayStreamed(
+      REQUEST,
+      () => undefined,
+      () =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({ code: "VERSION_CONFLICT", status: 409 }),
+            {
+              status: 409,
+              headers: { "content-type": "application/problem+json" },
+            },
+          ),
         ),
-      ),
     );
     await expect(conflict).rejects.toMatchObject({ kind: "CONFLICT" });
   });
 
   it("a stream that opened and dropped is an error, never a second send", async () => {
     let sends = 0;
-    const dropped = sayStreamed(REQUEST, () => undefined, () => {
-      sends += 1;
-      return Promise.resolve(
-        sse([frame("sentence", { text: "Clinics in Lagos, noted." })]),
-      );
-    });
+    const dropped = sayStreamed(
+      REQUEST,
+      () => undefined,
+      () => {
+        sends += 1;
+        return Promise.resolve(
+          sse([frame("sentence", { text: "Clinics in Lagos, noted." })]),
+        );
+      },
+    );
     await expect(dropped).rejects.toMatchObject({ kind: "NETWORK" });
     expect(sends).toBe(1);
   });
 
   it("a problem after the first sentence ends the turn as failed", async () => {
-    const failed = sayStreamed(REQUEST, () => undefined, () =>
-      Promise.resolve(
-        sse([
-          frame("sentence", { text: "One moment." }),
-          frame("problem", { code: "PROVIDER_UNAVAILABLE", status: 503 }),
-        ]),
-      ),
+    const failed = sayStreamed(
+      REQUEST,
+      () => undefined,
+      () =>
+        Promise.resolve(
+          sse([
+            frame("sentence", { text: "One moment." }),
+            frame("problem", { code: "PROVIDER_UNAVAILABLE", status: 503 }),
+          ]),
+        ),
     );
     await expect(failed).rejects.toBeInstanceOf(OnboardingClientError);
   });

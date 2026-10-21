@@ -28,7 +28,7 @@ import {
   createSentenceCutter,
 } from "@capital-q/q-core";
 import {
-  CompanyAnalystV22ResultSchema,
+  CompanyAnalystV26ResultSchema,
   COMPANY_INTELLIGENCE_DIMENSIONS,
   DisplayNameRequestSchema,
   ProfileUpdateSchema,
@@ -894,8 +894,8 @@ export function createCompanyIntelligenceSpecialist(
             // refused every answer that filled it (live 2026-09-30).
             // Kept at the active version: v14's gestures and v15's
             // proposalStatus were refused the same way by v12's schema.
-            // v22: the optional visual (RECOVERY, workstream E).
-            schema: CompanyAnalystV22ResultSchema,
+            // v22: the optional visual (RECOVERY, workstream E); v26: PICTURE.
+            schema: CompanyAnalystV26ResultSchema,
             // Independent readings: one malformed statement must not throw
             // away the change beside it (CQ-QX-007 A5).
             invalidListItems: "DROP",

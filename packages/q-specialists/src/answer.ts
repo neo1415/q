@@ -63,6 +63,7 @@ import {
   type QPageManifest,
   type QResponseMessage,
   type QResultBlock,
+  type QRunId,
   type QUiIntent,
   type QVisibleStage,
 } from "@capital-q/contracts";
@@ -145,6 +146,7 @@ import {
   type QToolFocus,
 } from "@capital-q/q-runtime";
 
+import type { TenantId } from "@capital-q/security";
 import type {
   QSpecialist,
   QSpecialistProbe,
@@ -2560,12 +2562,12 @@ export function createSpecialistQAnswer(
     string,
     {
       readonly at: number;
-      readonly tenantId: string;
+      readonly tenantId: TenantId;
       readonly history: Promise<readonly QConversationMessage[]>;
     }
   >();
   const PRELOADED_FRESH_MS = 5_000;
-  const readHistory = (tenantId: string, runId: string) =>
+  const readHistory = (tenantId: TenantId, runId: QRunId) =>
     repositories.messages.listRecentForConversationOfRun(
       sql,
       tenantId,
@@ -2573,8 +2575,8 @@ export function createSpecialistQAnswer(
       64,
     );
   const historyOfRun = (
-    tenantId: string,
-    runId: string,
+    tenantId: TenantId,
+    runId: QRunId,
   ): Promise<readonly QConversationMessage[]> => {
     const kept = preloaded.get(runId);
     preloaded.delete(runId);
@@ -4848,6 +4850,8 @@ export function createSpecialistQAnswer(
               questionKind: read.question?.kind ?? null,
               aboutNamedOther: read.aboutNamedOther,
             },
+      // Row 5: the conversation this turn already read, not read again.
+      history,
     };
     // The turn's own path has arrived at its answer: the speculation is
     // adopted only when that answer is the one it is already writing.
@@ -4943,17 +4947,21 @@ export function createSpecialistQAnswer(
       readonly ownRecords?: boolean;
       /** The turn reader's reading; absent when no reader is composed. */
       readonly reading?: QSpecialistTurnReading | null;
+      /** The run's conversation as the turn already read it (row 5). */
+      readonly history?: readonly QConversationMessage[];
     } = {},
   ): Promise<QAnswerOutcome> => {
     // The conversation, not the run: a voice turn is its own run, and a
     // specialist that sees one sentence cannot follow what is being
     // talked about.
-    const history = await repositories.messages.listRecentForConversationOfRun(
-      sql,
-      request.tenantId,
-      request.runId,
-      64,
-    );
+    const history =
+      route.history ??
+      (await repositories.messages.listRecentForConversationOfRun(
+        sql,
+        request.tenantId,
+        request.runId,
+        64,
+      ));
     const conversationId = history[0]?.conversationId;
     const latest = [...history].reverse().find((m) => m.role === "USER");
     if (conversationId === undefined || latest === undefined) {

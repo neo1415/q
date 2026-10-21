@@ -1028,22 +1028,33 @@ export const OnboardingInterviewTurnSchema = z
   .object({
     role: OnboardingInterviewTurnRoleSchema,
     text: z.string().min(1).max(ONBOARDING_TEXT_MAX_LENGTH),
-    /**
-     * The step a line of Q's asked, when it asked one: how Q knows, after
-     * a restart, which questions it has already put to the person.
-     */
-    stepKey: OnboardingStepKeySchema.optional(),
-    /**
-     * A person's line: the steps the independent reading found it stated,
-     * when one was recorded. A reading of words, never a recorded answer.
-     */
-    stated: z.array(OnboardingStepKeySchema).max(40).optional(),
     channel: OnboardingInterviewTurnChannelSchema,
     createdAt: UtcTimestampSchema,
   })
   .strict();
 export type OnboardingInterviewTurn = z.infer<
   typeof OnboardingInterviewTurnSchema
+>;
+
+/**
+ * The same turn with the interviewer's bookkeeping, for Q's interviewer
+ * only (`/turns/steps`). The thread the browser redraws stays what it
+ * shows; this form is how Q knows, after a restart or on another instance,
+ * which questions it already asked and what earlier lines stated.
+ */
+export const ONBOARDING_TURN_STEPS_SEGMENT = "/turns/steps";
+export const OnboardingInterviewTurnWithStepsSchema =
+  OnboardingInterviewTurnSchema.extend({
+    /** The step a line of Q's asked, when it asked one. */
+    stepKey: OnboardingStepKeySchema.optional(),
+    /**
+     * A person's line: the steps the independent reading found it stated,
+     * when one was recorded. A reading of words, never a recorded answer.
+     */
+    stated: z.array(OnboardingStepKeySchema).max(40).optional(),
+  }).strict();
+export type OnboardingInterviewTurnWithSteps = z.infer<
+  typeof OnboardingInterviewTurnWithStepsSchema
 >;
 
 /** `?limit=` -- the newest N turns, returned oldest first. */
@@ -1070,6 +1081,17 @@ export const ListOnboardingInterviewTurnsResponseSchema = z
   .strict();
 export type ListOnboardingInterviewTurnsResponse = z.infer<
   typeof ListOnboardingInterviewTurnsResponseSchema
+>;
+
+export const ListOnboardingInterviewTurnStepsResponseSchema = z
+  .object({
+    items: z
+      .array(OnboardingInterviewTurnWithStepsSchema)
+      .max(ONBOARDING_INTERVIEW_TURNS_MAX),
+  })
+  .strict();
+export type ListOnboardingInterviewTurnStepsResponse = z.infer<
+  typeof ListOnboardingInterviewTurnStepsResponseSchema
 >;
 
 /**

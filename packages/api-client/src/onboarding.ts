@@ -4,6 +4,8 @@ import {
   ONBOARDING_COVERAGE_SEGMENT,
   IDEMPOTENCY_KEY_HEADER,
   ListOnboardingInterviewTurnsResponseSchema,
+  ListOnboardingInterviewTurnStepsResponseSchema,
+  ONBOARDING_TURN_STEPS_SEGMENT,
   ONBOARDING_TURNS_SEGMENT,
   type AppendOnboardingInterviewTurnsRequest,
   ONBOARDING_ANSWER_SEGMENT,
@@ -291,6 +293,25 @@ export function listOnboardingInterviewTurns(
     "GET",
     `${byId(sessionId)}${ONBOARDING_TURNS_SEGMENT}${query}`,
     ListOnboardingInterviewTurnsResponseSchema,
+  );
+}
+
+/**
+ * `GET /v1/onboarding/sessions/:sessionId/turns/steps?limit=` -- the same
+ * thread with the step each Q line asked and what each person line stated.
+ * For Q's interviewer; the browser reads the plain thread.
+ */
+export function listOnboardingInterviewTurnSteps(
+  session: ApiSession,
+  sessionId: string,
+  limit?: number,
+) {
+  const query = limit === undefined ? "" : `?limit=${String(limit)}`;
+  return call(
+    session,
+    "GET",
+    `${byId(sessionId)}${ONBOARDING_TURN_STEPS_SEGMENT}${query}`,
+    ListOnboardingInterviewTurnStepsResponseSchema,
   );
 }
 

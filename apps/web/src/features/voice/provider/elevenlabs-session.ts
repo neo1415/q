@@ -165,7 +165,9 @@ export function useElevenLabsVoiceSession(
             const said =
               source === "user" ? message : stripSilenceBeats(message);
             // What was stripped is the "where I am" line: shown, not kept.
-            const working = message.slice(0, message.length - said.length).trim();
+            const working = message
+              .slice(0, message.length - said.length)
+              .trim();
             if (source !== "user" && working.length > 0) {
               eventsRef.current.onWorking?.(working);
             }

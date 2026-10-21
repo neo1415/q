@@ -325,9 +325,8 @@ describe("one presentation controller (audit 2026-10-15 §4)", () => {
 
 describe("artifacts live, round 2", () => {
   it("lights the summary point Q is saying, and labels what is not a verified fact", async () => {
-    const { SummaryBody } = await import(
-      "../src/features/q/blocks/summary-block"
-    );
+    const { SummaryBody } =
+      await import("../src/features/q/blocks/summary-block");
     const { announceQSaid } = await import("../src/features/q-swarm/q-said");
     vi.useFakeTimers();
     try {

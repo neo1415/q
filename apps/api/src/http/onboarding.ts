@@ -6,6 +6,8 @@ import {
   AppendOnboardingInterviewTurnsResponseSchema,
   ListOnboardingInterviewTurnsQuerySchema,
   ListOnboardingInterviewTurnsResponseSchema,
+  ListOnboardingInterviewTurnStepsResponseSchema,
+  ONBOARDING_TURN_STEPS_SEGMENT,
   ONBOARDING_TURNS_SEGMENT,
   CorrelationIdSchema,
   IDEMPOTENCY_KEY_HEADER,
@@ -369,7 +371,39 @@ export function registerOnboardingRoutes(
         limit: query.limit,
       });
       void reply.header("Cache-Control", "no-store");
-      return ListOnboardingInterviewTurnsResponseSchema.parse({ items });
+      // Only what the thread shows: the interviewer's step bookkeeping is
+      // not part of the conversation the browser redraws.
+      return ListOnboardingInterviewTurnsResponseSchema.parse({
+        items: items.map((t) => ({
+          role: t.role,
+          text: t.text,
+          channel: t.channel,
+          createdAt: t.createdAt,
+        })),
+      });
+    },
+  );
+
+  // The same thread with each line's step and reading, for Q's interviewer
+  // (asked-question memory and earlier statements survive a restart). Same
+  // owner check: it is the person's own conversation, read under their
+  // bearer.
+  app.get(
+    `${byId}${ONBOARDING_TURN_STEPS_SEGMENT}`,
+    { onRequest: withActor },
+    async (request, reply) => {
+      const query = parseContract(
+        ListOnboardingInterviewTurnsQuerySchema,
+        request.query ?? {},
+        "The thread request is not valid.",
+      );
+      const items = await runtime.listInterviewTurns({
+        actor: getOnboardingActor(request),
+        sessionId: sessionIdParam(request),
+        limit: query.limit,
+      });
+      void reply.header("Cache-Control", "no-store");
+      return ListOnboardingInterviewTurnStepsResponseSchema.parse({ items });
     },
   );
 

@@ -68,7 +68,10 @@ describe("speaking a typed answer as it streams", () => {
 
   it("stops at the speech route's ceiling", () => {
     const said = speakAll(
-      ["Alpha one. Beta two. Gamma three.", "Alpha one. Beta two. Gamma three."],
+      [
+        "Alpha one. Beta two. Gamma three.",
+        "Alpha one. Beta two. Gamma three.",
+      ],
       20,
     );
     expect(said.join(" ").length).toBeLessThanOrEqual(20);

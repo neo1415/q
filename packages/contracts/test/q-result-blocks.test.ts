@@ -173,6 +173,23 @@ const BLOCK_FIXTURES: Readonly<Record<string, unknown>> = {
       { label: "Apex Capital", countryCode: "GB", subject: null, note: null },
     ],
   },
+  SUMMARY: {
+    kind: "SUMMARY",
+    title: "Apex Capital in brief",
+    points: [
+      {
+        text: "Leads seed rounds in fintech.",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+      },
+      {
+        text: "Likely to want two years of runway.",
+        truthClass: "Q_INFERENCE",
+        evidenceStatus: "NO_EVIDENCE",
+      },
+    ],
+    missing: ["Their latest fund size"],
+  },
   PICTURE: {
     kind: "PICTURE",
     url: "https://images.pexels.com/photos/1/pexels-photo-1.jpeg",

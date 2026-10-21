@@ -283,9 +283,7 @@ function disclosable(
       case "MAP":
       case "TIMELINE":
       case "ATTENTION": // the person's own attention items, no evidence
-      // Artifacts live: the answer's own points with their truth class and
-      // evidence status, no evidence identifier.
-      case "SUMMARY":
+      case "SUMMARY": // the answer's own points, truth class kept, no evidence id
       case "COMPANY_REFERENCE":
       case "INVESTOR_REFERENCE":
       case "COMPARISON":

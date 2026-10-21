@@ -276,7 +276,9 @@ describe("while Q works it says where it is, and nothing else (owner 2026-10-20;
         expect(stripSilenceBeats(line), line).toBe("");
         // ... and never a hum or a remembered thread.
         expect(line, line).not.toMatch(/^(?:m+|hm+|mm-)/iu);
-        expect(line, line).not.toMatch(/by the way|before I forget|meanwhile|while that runs/iu);
+        expect(line, line).not.toMatch(
+          /by the way|before I forget|meanwhile|while that runs/iu,
+        );
       }
     } finally {
       vi.useRealTimers();
@@ -380,10 +382,19 @@ describe("the voice modules carry no filler", () => {
   });
 
   it("exports nothing that would bring a filler or progress line back", () => {
-    const offending = files.filter((path) =>
-      /export\s+(const|function|async function)\s+\w*(filler|progress|narrat)/i.test(
-        readFileSync(path, "utf8"),
-      ),
+    // The one exception is not Q: in a rehearsal the voice is the investor
+    // Q plays, and a person thinking past 3 s says so in character
+    // (rehearsal voices row 11, Kuuza's soft timeout). Only those
+    // PERSONA_ exports, only in the rehearsal turn, are allowed.
+    const offending = files.filter(
+      (path) =>
+        /export\s+(const|function|async function)\s+(?!PERSONA_)\w*(filler|progress|narrat)/i.test(
+          readFileSync(path, "utf8"),
+        ) ||
+        (!path.endsWith("rehearsal-turn.ts") &&
+          /export\s+(const|function|async function)\s+PERSONA_\w*filler/i.test(
+            readFileSync(path, "utf8"),
+          )),
     );
     expect(offending).toEqual([]);
   });

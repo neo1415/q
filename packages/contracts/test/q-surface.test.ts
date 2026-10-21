@@ -218,6 +218,23 @@ const completedRun = {
       },
     },
     {
+      kind: "SUMMARY",
+      title: "Apex Capital in brief",
+      points: [
+        {
+          text: "Leads seed rounds in fintech.",
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+        },
+        {
+          text: "Likely to want two years of runway.",
+          truthClass: "Q_INFERENCE",
+          evidenceStatus: "NO_EVIDENCE",
+        },
+      ],
+      missing: ["Their latest fund size"],
+    },
+    {
       kind: "PICTURE",
       url: "https://images.pexels.com/photos/1/pexels-photo-1.jpeg",
       alt: "A busy market street in Lagos",

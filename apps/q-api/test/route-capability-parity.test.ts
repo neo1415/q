@@ -604,6 +604,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     Q_TRANSPORT,
   "api/http/onboarding.ts POST `${byId}${ONBOARDING_TURNS_SEGMENT}`":
     Q_TRANSPORT,
+  // The same thread with each line's step, for Q's interviewer only.
+  "api/http/onboarding.ts GET `${byId}${ONBOARDING_TURN_STEPS_SEGMENT}`":
+    Q_TRANSPORT,
 
   "api/http/organisations.ts POST ORGANISATIONS_PATH": ONBOARDING_SETUP,
   "api/http/organisations.ts GET ORGANISATIONS_PATH": ONBOARDING_SETUP,

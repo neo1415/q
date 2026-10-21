@@ -23,6 +23,8 @@ function state(message: QMessage): QStreamState {
   return {
     messages: [message],
     partial: null,
+    preview: null,
+    runId: null,
     stage: null,
     failure: null,
     approval: null,

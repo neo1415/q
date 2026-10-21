@@ -105,6 +105,7 @@ export {
   claimBriefingOnboardingNudge,
   peekBriefingOnboardingNudge,
   listOnboardingInterviewTurns,
+  listOnboardingInterviewTurnSteps,
   getOnboardingCoverage,
   sayToOnboarding,
   completeOnboardingSession,

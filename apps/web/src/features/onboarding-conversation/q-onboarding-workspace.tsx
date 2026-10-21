@@ -924,7 +924,9 @@ export function QOnboardingWorkspace({
       setReplyStream(null);
       const turn = await actions
         .say(trimmed, recentTurns(), undefined, (sentence) => {
-          setReplyStream((so) => (so === null ? sentence : `${so} ${sentence}`));
+          setReplyStream((so) =>
+            so === null ? sentence : `${so} ${sentence}`,
+          );
         })
         .finally(() => {
           setReplyStream(null);

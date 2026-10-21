@@ -87,7 +87,7 @@ function worldWithThread(prior: readonly KeptTurn[] = []) {
         : input instanceof URL
           ? input.toString()
           : input.url;
-    if (/\/turns(\?|$)/.test(url)) {
+    if (/\/turns(\/steps)?(\?|$)/.test(url)) {
       if ((init?.method ?? "GET") === "POST") {
         const body = JSON.parse(
           typeof init?.body === "string" ? init.body : "{}",

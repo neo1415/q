@@ -87,12 +87,14 @@ function fakeRuntime() {
         {
           role: "PERSON" as const,
           text: "We are raising a seed round.",
+          stated: ["F2.round_stage"],
           channel: "VOICE" as const,
           createdAt: "2026-09-24T10:00:00.000Z",
         },
         {
           role: "Q" as const,
           text: "How much are you raising?",
+          stepKey: "F2.raise_amount",
           channel: "VOICE" as const,
           createdAt: "2026-09-24T10:00:01.000Z",
         },
@@ -188,6 +190,46 @@ describe("/v1/onboarding/sessions/:id/turns", () => {
     });
     expect(defaulted.statusCode).toBe(200);
     expect(fake.lists[1]?.limit).toBe(50);
+    await app.close();
+  });
+
+  it("keeps the interviewer's steps off the thread the browser reads", async () => {
+    const fake = fakeRuntime();
+    const app = buildApp(fake.runtime);
+    const plain = await app.inject({
+      method: "GET",
+      url: `/v1/onboarding/sessions/${SESSION_ID}/turns`,
+      headers: AUTH,
+    });
+    expect(plain.statusCode).toBe(200);
+    for (const item of plain.json<{ items: Record<string, unknown>[] }>()
+      .items) {
+      expect(Object.keys(item).sort()).toEqual([
+        "channel",
+        "createdAt",
+        "role",
+        "text",
+      ]);
+    }
+
+    const steps = await app.inject({
+      method: "GET",
+      url: `/v1/onboarding/sessions/${SESSION_ID}/turns/steps?limit=20`,
+      headers: AUTH,
+    });
+    expect(steps.statusCode).toBe(200);
+    expect(steps.headers["cache-control"]).toBe("no-store");
+    const items = steps.json<{ items: Record<string, unknown>[] }>().items;
+    expect(items[0]?.stated).toEqual(["F2.round_stage"]);
+    expect(items[1]?.stepKey).toBe("F2.raise_amount");
+    expect(fake.lists[1]?.limit).toBe(20);
+
+    const other = await app.inject({
+      method: "GET",
+      url: `/v1/onboarding/sessions/${OTHER_SESSION_ID}/turns/steps`,
+      headers: AUTH,
+    });
+    expect(other.statusCode).toBe(404);
     await app.close();
   });
 

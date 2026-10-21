@@ -5556,13 +5556,12 @@ export function createModelGatewayQAnswer(
               // Turn latency row 16: the stage is written once when it
               // changes (eight fit.profile reads wrote it eight times, one
               // after another), and beside the read rather than before it.
-              const stageWrite =
-                tool?.visibleStage !== undefined &&
-                tool.visibleStage !== null &&
-                tool.visibleStage !== lastStageShown
-                  ? stageShown(tool.visibleStage)
-                  : null;
-              if (stageWrite !== null) lastStageShown = tool?.visibleStage;
+              const stage = tool?.visibleStage ?? null;
+              let stageWrite: Promise<void> | null = null;
+              if (stage !== null && stage !== lastStageShown) {
+                stageWrite = stageShown(stage);
+                lastStageShown = stage;
+              }
               const settled = await early?.[index];
               if (settled !== undefined && !settled.ok) {
                 await stageWrite;

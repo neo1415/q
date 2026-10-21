@@ -143,41 +143,46 @@ export function useQSpeech(): QSpeech {
   );
 
   /** Plays the queue's next piece once it has arrived; stops when empty. */
-  const playNext = useCallback(async () => {
-    const mine = generation.current;
-    const next = pending.current.shift();
-    if (next === undefined) {
-      playing.current = false;
-      setStatus((was) => (was === "blocked" ? was : "idle"));
-      return;
+  const playNext = useCallback((): Promise<void> => {
+    // Named inside, so each piece's end can start the next without the
+    // callback reading itself before it is declared.
+    async function step(): Promise<void> {
+      const mine = generation.current;
+      const next = pending.current.shift();
+      if (next === undefined) {
+        playing.current = false;
+        setStatus((was) => (was === "blocked" ? was : "idle"));
+        return;
+      }
+      playing.current = true;
+      const blob = await next;
+      if (mine !== generation.current) return;
+      if (blob === null) {
+        // One piece without audio: the next one is still said.
+        void step();
+        return;
+      }
+      if (objectUrl.current !== null) URL.revokeObjectURL(objectUrl.current);
+      const url = URL.createObjectURL(blob);
+      objectUrl.current = url;
+      const element = new Audio(url);
+      element.onended = () => {
+        if (mine === generation.current) void step();
+      };
+      element.onerror = () => {
+        if (mine === generation.current) void step();
+      };
+      audio.current = element;
+      setStatus("speaking");
+      element.play().then(
+        () => undefined,
+        () => {
+          // The autoplay rule: the rest waits for the person's gesture.
+          if (mine === generation.current) setStatus("blocked");
+        },
+      );
     }
-    playing.current = true;
-    const blob = await next;
-    if (mine !== generation.current) return;
-    if (blob === null) {
-      // One piece without audio: the next one is still said.
-      void playNext();
-      return;
-    }
-    if (objectUrl.current !== null) URL.revokeObjectURL(objectUrl.current);
-    const url = URL.createObjectURL(blob);
-    objectUrl.current = url;
-    const element = new Audio(url);
-    element.onended = () => {
-      if (mine === generation.current) void playNext();
-    };
-    element.onerror = () => {
-      if (mine === generation.current) void playNext();
-    };
-    audio.current = element;
-    setStatus("speaking");
-    element.play().then(
-      () => undefined,
-      () => {
-        // The autoplay rule: the rest waits for the person's gesture.
-        if (mine === generation.current) setStatus("blocked");
-      },
-    );
+    return step();
   }, []);
 
   const queue = useCallback(

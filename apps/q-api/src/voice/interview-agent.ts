@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import {
   appendOnboardingInterviewTurns,
-  listOnboardingInterviewTurns,
+  listOnboardingInterviewTurnSteps,
 } from "@capital-q/api-client";
 import {
   CorrelationIdSchema,
@@ -971,7 +971,7 @@ export function createInterviewAgent(
             });
     // The whole conversation, from the kept thread; the browser's recent
     // turns only when the thread cannot be read.
-    const kept = await listOnboardingInterviewTurns(
+    const kept = await listOnboardingInterviewTurnSteps(
       input.session,
       input.onboardingSessionId,
     ).catch((error: unknown) => {
