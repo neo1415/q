@@ -244,6 +244,8 @@ function needAt(need: Need): string {
 
 const DONE_PREVIEW = 5;
 
+export type InboxRowKind = Row["kind"];
+
 export function WorkInbox({
   composer,
   needs,
@@ -257,6 +259,7 @@ export function WorkInbox({
   done,
   now,
   onDecided,
+  initialKind,
 }: {
   readonly composer: ReactNode;
   readonly needs: readonly Need[];
@@ -273,6 +276,11 @@ export function WorkInbox({
   readonly now: number;
   /** A decision taken (approved, declined, answered): it leaves the queue. */
   readonly onDecided: (key: string) => void;
+  /**
+   * The kind of row shown open until one is picked (the design review
+   * page opens each kind's preview this way); absent: the first need.
+   */
+  readonly initialKind?: Row["kind"] | undefined;
 }) {
   const t = useT();
   const [cards, setCards] = useState(suggestions);
@@ -307,7 +315,13 @@ export function WorkInbox({
   const [sheet, setSheet] = useState<string | null>(null);
   // The open decision: the one picked while it is still here, else the
   // first that needs a yes (approving one opens the next).
-  const selected = rows.find((row) => row.key === picked) ?? needs[0] ?? null;
+  const selected =
+    rows.find((row) => row.key === picked) ??
+    (initialKind === undefined
+      ? undefined
+      : rows.find((row) => row.kind === initialKind)) ??
+    needs[0] ??
+    null;
   const sheetRow = rows.find((row) => row.key === sheet) ?? null;
 
   const pick = (key: string) => {
