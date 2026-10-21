@@ -209,6 +209,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "api/http/discovery.ts GET DISCOVERY_INVESTOR_PATH": cap(
     "offer.connection_request",
   ),
+  // The investor's published Q Card, read on their page (brief 2).
+  "api/http/discovery.ts GET DISCOVERY_INVESTOR_CARD_PATH": cap(
+    "offer.connection_request",
+  ),
   "api/http/discovery.ts GET DISCOVERY_INVESTOR_PHOTO_PATH": exempt(
     "the avatar's image on a Q investor reference: a redirect to a short-lived signed logo URL, bytes browser <-> storage; Q names the investor instead",
   ),

@@ -8,6 +8,10 @@ vi.mock("@/components/app-shell/global-q", () => ({
   useGlobalQ: () => ({ askAbout: vi.fn(), askNow: vi.fn() }),
 }));
 vi.mock("@/features/q-aperture", () => ({ QAperture: () => null }));
+vi.mock("@/features/network/connection-actions", () => ({
+  connectionStatusAction: vi.fn(() => new Promise(() => undefined)),
+  requestConnectionAction: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/capital",
   useRouter: () => ({
@@ -29,7 +33,7 @@ import {
   performUiAct,
   resetUiActController,
 } from "../src/features/q/ui-act-controller";
-import { InvestorCards } from "../src/features/investors/investor-cards";
+import { InvestorDirectory } from "../src/features/investors/investor-directory";
 
 /**
  * RECOVERY-2026-10 (C1/C2): the real pages' controls, registered by their
@@ -230,28 +234,36 @@ describe("Readiness (section.risks, list.risks, list.pillars)", () => {
 });
 
 describe("Investor cards (list.investors items)", () => {
-  it("marks each card as an item, so the nth opens that investor's own link", () => {
+  it("marks each card as an item, so the nth opens that investor's own sheet", () => {
     render(
-      <InvestorCards
-        items={[1, 2].map((n) => ({
+      <InvestorDirectory
+        entries={[1, 2].map((n) => ({
           investorOrganisationId: `a0000000-0000-4000-8000-00000000000${String(n)}`,
-          displayName: `Fund ${String(n)}`,
-          investorType: "VENTURE_FUND",
-          websiteUrl: null,
-          hqCountry: "KE",
-          publicDescription: null,
-          deploymentState: null,
-          inboundPreference: null,
+          name: `Fund ${String(n)}`,
           photoUrl: null,
-          coverUrl: null,
-          reasons: [],
+          type: "Venture fund",
+          deployment: null,
+          focus: null,
+          looksFor: null,
+          cheque: null,
+          matches: { STAGE: "unk", SECTOR: "unk", GEOGRAPHY: "unk" },
+          reach: "OPEN",
+          gateHref: null,
+          where: null,
         }))}
       />,
     );
     const items = document.querySelectorAll("[data-q-item]");
     expect(items).toHaveLength(2);
-    expect(items[1]?.querySelector("a")?.getAttribute("href")).toBe(
-      "/investors/a0000000-0000-4000-8000-000000000002",
+    const open = items[1]?.querySelector("button");
+    expect(open?.getAttribute("data-investor-open")).toBe(
+      "a0000000-0000-4000-8000-000000000002",
     );
+    act(() => open?.click());
+    expect(
+      document.querySelector(
+        '[data-investor-sheet="a0000000-0000-4000-8000-000000000002"]',
+      ),
+    ).not.toBeNull();
   });
 });
