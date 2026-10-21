@@ -957,6 +957,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/briefing": exempt("development-only page"),
   "/dev/q-nav": exempt("development-only page"),
   "/dev/instant-nav": exempt("development-only page (instant-nav harness)"),
+  "/dev/q-story": exempt("development-only page (Q Story storyboard)"),
   "/dev/instant-nav/company/[id]": exempt(
     "development-only page (instant-nav harness)",
   ),

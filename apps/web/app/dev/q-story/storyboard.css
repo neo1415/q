@@ -1,0 +1,920 @@
+/*
+ * Q Story storyboard (S2). Every colour is a --cq-* token; every motion is
+ * transform or opacity (clip-path once, for the down-round line), so the
+ * story never moves layout and CLS stays 0. Reduced motion keeps the
+ * fades that carry meaning and drops movement (see the end of the file).
+ *
+ * Motion vocabulary (docs/design/ux-direction-2026-09.md §14.1):
+ *   enter   --cq-motion-emphasis (280 ms), --cq-ease, from 4-12 px / 0.96
+ *   exit    --cq-motion-base (200 ms), --cq-ease-exit: exits are faster
+ *   stagger 60 ms (montage), 40 ms (lists)
+ *   story   360-600 ms for the large type, which is read, not operated
+ */
+
+.qs-root {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--cq-canvas);
+  color: var(--cq-text-primary);
+  font-family: var(--cq-font-ui);
+}
+
+/* The real pages, all loaded at once and kept warm: no fetch mid-story. */
+.qs-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--cq-motion-slow) var(--cq-ease),
+    visibility 0s linear var(--cq-motion-slow);
+}
+.qs-frame[data-on="true"] {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity var(--cq-motion-slow) var(--cq-ease),
+    visibility 0s;
+}
+
+/* Story mode: the app recedes behind an opaque, unblurred scrim. */
+.qs-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 400ms var(--cq-ease);
+}
+.qs-scrim > span {
+  position: absolute;
+  inset: 0;
+  transition: opacity 700ms var(--cq-ease);
+}
+.qs-scrim-day {
+  background: var(--cq-canvas);
+}
+.qs-scrim-night {
+  background: var(--cq-night-canvas);
+  opacity: 0;
+}
+.qs-root[data-mode="night"] .qs-scrim-night {
+  opacity: 1;
+}
+.qs-root[data-scrim="1"] .qs-scrim {
+  opacity: 0.9;
+}
+.qs-root[data-scrim="2"] .qs-scrim {
+  opacity: 1;
+  transition-duration: 900ms;
+}
+
+/* The story layer: large quiet type and illustrative objects. */
+.qs-scene {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 72px 24px 168px;
+  pointer-events: none;
+  color: var(--cq-text-primary);
+  transition: color 700ms var(--cq-ease);
+}
+.qs-root[data-mode="night"] .qs-scene {
+  color: var(--cq-night-text);
+}
+.qs-muted {
+  opacity: 0.68;
+}
+.qs-tag {
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  opacity: 0.72;
+}
+
+/* The table turns (#15): the whole stage slides once, faded in transit. */
+.qs-turn {
+  animation: qs-turn 520ms var(--cq-ease) both;
+}
+@keyframes qs-turn {
+  from {
+    opacity: 0;
+    transform: translateX(14%);
+  }
+}
+
+/* Generic entrance used by every scene element: data-on drives it. */
+.qs-in {
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  transition:
+    opacity var(--cq-motion-emphasis) var(--cq-ease-exit),
+    transform var(--cq-motion-emphasis) var(--cq-ease-exit);
+}
+.qs-in[data-on="true"] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 360ms var(--cq-ease),
+    transform 360ms var(--cq-ease);
+}
+.qs-in[data-off="true"] {
+  opacity: 0.12;
+  transform: none;
+}
+
+.qs-big {
+  font-family: var(--cq-font-editorial);
+  font-weight: 400;
+  font-size: clamp(40px, 7.4vw, 104px);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  text-wrap: balance;
+  max-width: 16ch;
+}
+.qs-mid {
+  font-family: var(--cq-font-editorial);
+  font-weight: 400;
+  font-size: clamp(28px, 4.2vw, 56px);
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  text-align: center;
+  text-wrap: balance;
+}
+.qs-stack {
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+}
+
+/* #3 the hour, with the desk at 25% behind it. */
+.qs-photo-bleed {
+  position: absolute;
+  inset: 0;
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  opacity: 0.25;
+}
+
+/* Photo tiles; a failed load leaves the neutral "photo" placeholder. */
+.qs-photo {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--cq-radius-md);
+  background: color-mix(in oklab, currentColor 10%, transparent);
+  aspect-ratio: 4 / 3;
+}
+.qs-photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.qs-photo::after {
+  content: "photo";
+  position: absolute;
+  inset: auto auto 8px 10px;
+  font-size: 11px;
+  opacity: 0.6;
+  z-index: -1;
+}
+.qs-photo figcaption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--cq-night-text);
+  background: color-mix(in oklab, var(--cq-night-canvas) 78%, transparent);
+}
+
+/* #4-6 the inbox. */
+.qs-inbox {
+  width: min(560px, 100%);
+  display: grid;
+  gap: 8px;
+}
+.qs-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: var(--cq-radius-md);
+  background: color-mix(in oklab, currentColor 7%, transparent);
+  border: 1px solid color-mix(in oklab, currentColor 14%, transparent);
+  font-size: 15px;
+}
+.qs-row small {
+  display: block;
+  font-size: 12px;
+  opacity: 0.68;
+}
+.qs-row.qs-in {
+  transform: translateY(-14px);
+}
+.qs-ghost {
+  height: 46px;
+  border-radius: var(--cq-radius-md);
+  border: 1px dashed color-mix(in oklab, currentColor 18%, transparent);
+}
+
+/* #7-10, #14 the montage: 12 tiles, one needle. */
+.qs-grid {
+  width: min(1040px, 100%);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  transition: opacity 900ms var(--cq-ease);
+}
+.qs-grid .qs-photo {
+  opacity: 0;
+  transform: scale(0.94);
+  transition:
+    opacity 420ms var(--cq-ease),
+    transform 420ms var(--cq-ease);
+  transition-delay: calc(var(--i) * 60ms);
+}
+.qs-grid[data-step="1"] .qs-photo,
+.qs-grid[data-step="3"] .qs-photo,
+.qs-grid[data-step="4"] .qs-photo,
+.qs-grid[data-step="5"] .qs-photo {
+  opacity: 0.85;
+  transform: none;
+}
+.qs-grid[data-step="2"] .qs-photo {
+  opacity: 0.32;
+  transform: none;
+  transition-delay: 0ms;
+}
+.qs-grid[data-step="2"] .qs-photo[data-needle="true"] {
+  opacity: 1;
+  transform: scale(1.06);
+  outline: 2px solid var(--cq-accent);
+  outline-offset: 3px;
+}
+.qs-needle-label {
+  opacity: 0;
+  transition: opacity var(--cq-motion-emphasis) var(--cq-ease);
+}
+.qs-grid[data-step="2"] .qs-needle-label {
+  opacity: 1;
+}
+.qs-grid[data-step="3"] .qs-photo {
+  transition-delay: 0ms;
+  opacity: 0.55;
+}
+.qs-grid[data-step="4"] {
+  animation: qs-drift 14s linear both;
+}
+.qs-grid[data-step="4"] .qs-photo,
+.qs-grid[data-step="5"] .qs-photo {
+  transition-delay: 0ms;
+  opacity: 0.45;
+}
+.qs-grid[data-step="5"] {
+  opacity: 0.35;
+}
+@keyframes qs-drift {
+  to {
+    transform: translateX(-3%);
+  }
+}
+.qs-calendar {
+  position: absolute;
+  right: 6%;
+  bottom: 22%;
+  display: grid;
+  gap: 4px;
+}
+.qs-calendar span {
+  display: block;
+  width: 120px;
+  height: 14px;
+  border-radius: 4px;
+  background: color-mix(in oklab, currentColor 22%, transparent);
+}
+
+/* #13 the scale: one weight known, one unknown. */
+.qs-scale {
+  width: min(620px, 100%);
+}
+.qs-scale svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.qs-scale .qs-beam {
+  transform-origin: 50% 30%;
+  transform-box: fill-box;
+}
+.qs-scale[data-step="3"] .qs-beam {
+  animation: qs-unsettled 2.4s var(--cq-ease) 1;
+}
+@keyframes qs-unsettled {
+  30% {
+    transform: rotate(1.4deg);
+  }
+  65% {
+    transform: rotate(-0.8deg);
+  }
+}
+
+/* #16, #22 photo rows. */
+.qs-photorow {
+  width: min(1040px, 100%);
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  gap: 12px;
+}
+
+/* #18-21, #45 the rounds timeline. */
+.qs-rounds {
+  width: min(880px, 100%);
+  display: grid;
+  gap: 28px;
+}
+.qs-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  align-items: center;
+  height: 88px;
+}
+.qs-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 22px;
+  height: 2px;
+  background: color-mix(in oklab, currentColor 22%, transparent);
+}
+.qs-node {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  align-self: start;
+  font-size: 15px;
+  transition:
+    transform 1200ms var(--cq-ease),
+    opacity 1200ms var(--cq-ease);
+}
+.qs-dot {
+  width: 20px;
+  height: 20px;
+  margin-top: 13px;
+  border-radius: var(--cq-radius-full);
+  border: 2px solid color-mix(in oklab, currentColor 40%, transparent);
+  background: var(--cq-canvas);
+  display: grid;
+  place-items: center;
+  transition:
+    transform var(--cq-motion-emphasis) var(--cq-ease),
+    background-color var(--cq-motion-emphasis) var(--cq-ease);
+}
+.qs-node[data-on="true"] .qs-dot {
+  background: var(--cq-accent);
+  border-color: var(--cq-accent);
+  color: var(--cq-on-gold-action);
+  transform: scale(1.15);
+}
+.qs-node[data-away="true"] {
+  opacity: 0.4;
+  transform: translateX(var(--away));
+}
+.qs-bar {
+  height: 2px;
+  background: currentColor;
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 600ms var(--cq-ease),
+    transform 600ms var(--cq-ease);
+}
+.qs-bar[data-on="true"] {
+  opacity: 0.8;
+  transform: translateY(-10px);
+}
+.qs-maybes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  justify-content: center;
+  font-size: 17px;
+}
+.qs-chart {
+  width: min(520px, 100%);
+  justify-self: center;
+}
+.qs-chart polyline {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 1400ms var(--cq-ease);
+}
+.qs-chart[data-on="true"] polyline {
+  clip-path: inset(0 0 0 0);
+}
+
+/* #24 the verbs, #43 the channels. */
+.qs-icons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px 28px;
+}
+.qs-icon {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  font-size: 17px;
+}
+.qs-icon > span {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--cq-radius-lg);
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, currentColor 22%, transparent);
+}
+.qs-channels {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: min(720px, calc(100% - 32px));
+}
+
+/* #25 hope, as a warm field (not a glow on any object). */
+.qs-warm {
+  position: absolute;
+  inset: 0;
+  background: var(--cq-gold-action-soft);
+  opacity: 0;
+  transform: translateY(30%);
+  transition:
+    opacity 1800ms var(--cq-ease),
+    transform 2400ms var(--cq-ease);
+}
+.qs-warm[data-on="true"] {
+  opacity: 0.55;
+  transform: none;
+}
+
+/* #27 sent, delivered, never seen. */
+.qs-thread {
+  width: min(460px, 100%);
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+.qs-bubble {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 16px 16px 4px 16px;
+  background: color-mix(in oklab, currentColor 12%, transparent);
+  font-size: 15px;
+}
+.qs-receipt {
+  font-size: 12px;
+  opacity: 0.6;
+  margin-bottom: 18px;
+}
+
+/* Chips: mismatch (#30), readiness (#31), mandate payoff (#36), findings (#46). */
+.qs-chips {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  width: min(760px, calc(100% - 32px));
+  pointer-events: none;
+}
+.qs-root[data-scrim="0"] .qs-chips {
+  top: 72px;
+  transform: translateX(-50%);
+}
+.qs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: var(--cq-radius-full);
+  font-size: 15px;
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-primary);
+  border: 1px solid var(--cq-border-strong);
+  box-shadow: var(--cq-shadow-sm);
+}
+.qs-chip[data-kind="outline"] {
+  background: var(--cq-surface);
+  border-style: dashed;
+}
+.qs-chip[data-kind="pass"] svg {
+  color: var(--cq-positive);
+}
+.qs-chip[data-kind="miss"] svg {
+  color: var(--cq-text-secondary);
+}
+.qs-chip[data-kind="warn"] svg {
+  color: var(--cq-warning);
+}
+/* The ✕ turns ✓ as a flip about the x axis: the chip, not the page, moves. */
+.qs-flip {
+  animation: qs-flip 420ms var(--cq-ease) both;
+}
+@keyframes qs-flip {
+  from {
+    transform: perspective(400px) rotateX(-90deg);
+    opacity: 0.2;
+  }
+}
+
+/* #34 the wordmark. */
+.qs-wordmark {
+  font-size: clamp(40px, 6vw, 80px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  margin-top: 300px;
+}
+
+/* #48-49 the Q Card. */
+.qs-cardstage {
+  position: relative;
+  width: min(560px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  perspective: 1200px;
+}
+.qs-deck {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 18px;
+  border-radius: var(--cq-radius-md);
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-primary);
+  border: 1px solid var(--cq-border);
+  width: min(420px, 100%);
+  transition:
+    transform 520ms var(--cq-ease),
+    opacity 360ms var(--cq-ease-exit);
+}
+.qs-deck[data-away="true"] {
+  transform: translateX(-130%) rotate(-6deg);
+  opacity: 0;
+}
+.qs-card {
+  width: 100%;
+  transform-origin: 50% 50%;
+  transform: rotateY(-88deg);
+  opacity: 0;
+  transition:
+    transform 640ms var(--cq-ease),
+    opacity 240ms var(--cq-ease);
+}
+.qs-card[data-on="true"] {
+  transform: none;
+  opacity: 1;
+}
+.qs-parts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.qs-part {
+  font-size: 14px;
+  padding: 6px 12px;
+  border-radius: var(--cq-radius-full);
+  border: 1px solid color-mix(in oklab, currentColor 22%, transparent);
+  opacity: 0.45;
+  transition:
+    opacity var(--cq-motion-emphasis) var(--cq-ease),
+    transform var(--cq-motion-emphasis) var(--cq-ease);
+}
+.qs-part[data-on="true"] {
+  opacity: 1;
+  transform: translateY(-2px);
+  border-color: var(--cq-accent);
+}
+
+/* #50 both sides, #51 the montage of real pages. */
+.qs-split {
+  width: min(1100px, 100%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.qs-shot {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  font-size: 15px;
+}
+.qs-shot img,
+.qs-shot .qs-shot-blank {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top left;
+  border-radius: var(--cq-radius-md);
+  border: 1px solid var(--cq-border);
+  background: var(--cq-surface-sunken);
+}
+.qs-shots {
+  position: relative;
+  width: min(900px, 100%);
+  aspect-ratio: 16 / 11;
+}
+.qs-shots .qs-shot {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: scale(0.97);
+  transition:
+    opacity 200ms var(--cq-ease),
+    transform 360ms var(--cq-ease);
+}
+.qs-shots .qs-shot[data-on="true"] {
+  opacity: 1;
+  transform: none;
+}
+.qs-shot b {
+  font-weight: 500;
+  font-size: clamp(22px, 3vw, 34px);
+}
+
+/* #52 calendar pages, then minutes. */
+.qs-pages {
+  position: relative;
+  width: 220px;
+  height: 200px;
+  perspective: 800px;
+}
+.qs-page {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--cq-radius-lg);
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-primary);
+  border: 1px solid var(--cq-border);
+  font-size: 26px;
+  transform-origin: 50% 0;
+  transition:
+    transform 360ms var(--cq-ease),
+    opacity 300ms var(--cq-ease);
+  transition-delay: calc(var(--i) * 110ms);
+}
+.qs-pages[data-step="2"] .qs-page {
+  transform: rotateX(-100deg);
+  opacity: 0;
+}
+
+/* The highlight: the existing gold ring plus a breathing pulse (plan §3). */
+.qs-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  border-radius: var(--cq-radius-md);
+  opacity: 0;
+  transition: opacity var(--cq-motion-base) var(--cq-ease-exit);
+}
+.qs-ring[data-on="true"] {
+  opacity: 1;
+  transition: opacity var(--cq-motion-emphasis) var(--cq-ease);
+}
+.qs-ring > i {
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  border: 2px solid var(--cq-accent);
+  box-shadow: 0 0 0 4px var(--cq-accent-soft);
+  animation: qs-breathe 1.8s ease-in-out infinite alternate;
+}
+@keyframes qs-breathe {
+  to {
+    transform: scale(1.015);
+  }
+}
+.qs-note {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 12px);
+  white-space: nowrap;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: var(--cq-radius-sm);
+  background: var(--cq-charcoal);
+  color: var(--cq-on-charcoal);
+}
+
+/* Q's presence: centre stage in Acts 0-3, docked and following after. */
+.qs-presence {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 240px;
+  height: 240px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  transition: transform 300ms var(--cq-ease);
+  will-change: transform;
+}
+
+/* Captions: karaoke-light, bottom centre, two lines at most. */
+.qs-captions {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  width: min(880px, calc(100% - 32px));
+  text-align: center;
+  pointer-events: none;
+  transition: opacity var(--cq-motion-slow) var(--cq-ease);
+}
+.qs-captions[data-hidden="true"] {
+  opacity: 0;
+}
+.qs-captions p {
+  display: inline;
+  margin: 0;
+  padding: 6px 14px;
+  font-size: clamp(18px, 1.7vw, 24px);
+  line-height: 1.55;
+  font-weight: 500;
+  border-radius: var(--cq-radius-sm);
+  background: var(--cq-charcoal);
+  color: var(--cq-on-charcoal);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.qs-captions span {
+  opacity: 0.55;
+  transition: opacity 120ms linear;
+}
+.qs-captions span[data-said="true"] {
+  opacity: 1;
+}
+
+/* The review HUD: where we are, demo labelling, and the controls. */
+.qs-hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  pointer-events: none;
+}
+.qs-hud > * {
+  pointer-events: auto;
+}
+.qs-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: var(--cq-radius-full);
+  background: var(--cq-charcoal);
+  color: var(--cq-on-charcoal);
+  font-variant-numeric: tabular-nums;
+}
+.qs-hud-spacer {
+  flex: 1;
+}
+.qs-btn {
+  display: inline-grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--cq-radius-full);
+  background: var(--cq-charcoal);
+  color: var(--cq-on-charcoal);
+  font: inherit;
+  cursor: pointer;
+  transition: transform var(--cq-motion-fast) var(--cq-ease);
+}
+.qs-btn:active {
+  transform: scale(0.97);
+}
+.qs-btn:focus-visible {
+  outline: 2px solid var(--cq-focus-ring);
+  outline-offset: 2px;
+}
+.qs-credit {
+  position: absolute;
+  left: 16px;
+  bottom: 12px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.qs-address {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translate(-50%, -12px);
+  opacity: 0;
+  transition:
+    opacity 500ms var(--cq-ease),
+    transform 500ms var(--cq-ease);
+}
+.qs-address[data-on="true"] {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (max-width: 767px) {
+  .qs-scene {
+    padding: 72px 16px 176px;
+  }
+  .qs-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .qs-photorow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .qs-split {
+    grid-template-columns: 1fr;
+  }
+  .qs-wordmark {
+    margin-top: 220px;
+  }
+  .qs-calendar {
+    display: none;
+  }
+  .qs-captions {
+    bottom: 20px;
+  }
+  .qs-captions p {
+    font-size: 17px;
+  }
+  .qs-hud .qs-wide {
+    display: none;
+  }
+}
+
+/*
+ * Reduced motion: no slide, drift, flip, pulse or wobble. Fades that carry
+ * meaning stay, shortened; the ring is the ring only (plan §3).
+ */
+@media (prefers-reduced-motion: reduce) {
+  .qs-root * {
+    animation: none !important;
+  }
+  .qs-in,
+  .qs-in[data-on="true"],
+  .qs-grid .qs-photo,
+  .qs-node,
+  .qs-bar,
+  .qs-card,
+  .qs-deck,
+  .qs-page,
+  .qs-shots .qs-shot,
+  .qs-warm,
+  .qs-address {
+    transform: none !important;
+    transition-property: opacity !important;
+    transition-duration: 200ms !important;
+    transition-delay: 0ms !important;
+  }
+  .qs-presence {
+    transition: opacity 200ms linear;
+  }
+  .qs-chart polyline {
+    clip-path: none;
+    transition: none;
+  }
+}
