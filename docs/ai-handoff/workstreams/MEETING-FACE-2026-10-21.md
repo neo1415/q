@@ -114,3 +114,57 @@ The join chain (`claim → createPal → requested → joinMeeting → live`) is
 4. Decide on Raven perception for the face. It analyses participants' video, which is a consent question; it is off today.
 5. Decide on the single-participant design above.
 6. Rotate the Supabase and Railway tokens available to cloud sessions; both were refused today.
+
+## Round 2 — owner decisions 2026-10-21 (evening)
+
+### Face reliability in today's two-participant setup
+
+- **Sent at the call's time.** The face waits until 1 minute before the start, not 3 minutes early with the note-taker. It goes at once if `start` is called again. It is never sent if the call ends first. While it waits, Q's voice does not hold lines for it.
+- **Room timeout raised.** Tavus `participant_absent_timeout` is now 600 s (bounded by the face's length), up from 120 s. Before, a face sent early, or one left knocking, could end before anyone admitted it.
+- **Length is still 600 s (config, not code).** `CQ_MEETING_FACE_MAX_SECONDS` is 600 and the ledger's `billing.video_allowance_config.meeting_max_seconds` defaults to 600, so the face leaves after 10 minutes. For a full call, set **both** to 1800. Raising only the variable makes the ledger refuse every face (`CQ_VIDEO_SESSION_TOO_LONG`).
+- **Weekly allowance.** If the organiser's weekly allowance is used up, no face starts (Q keeps its voice). `billing.video_allowance_testers` exempts a subject.
+
+### New face (stock, by the Tavus stock face map; no account read was possible)
+
+| Rank        | Look             | Phoenix-4      | Phoenix-4.5    | Thumbnail                                                                      |
+| ----------- | ---------------- | -------------- | -------------- | ------------------------------------------------------------------------------ |
+| 1 (default) | Darius - Outdoor | `r4ba1277e4fb` | `rccbeedfc684` | https://mintcdn.com/tavus/dwmLqbtIIsjxhvN1/images/stock-faces/rccbeedfc684.jpg |
+| 2           | Mary - Office    | —              | `red9211eea81` | https://mintcdn.com/tavus/gbHjR9iJ03C32KC_/images/stock-faces/red9211eea81.jpg |
+| 3           | Celine - Casual  | `r1a0108fbd75` | `r5d40691d88d` | https://mintcdn.com/tavus/gbHjR9iJ03C32KC_/images/stock-faces/r5d40691d88d.jpg |
+
+- The old face, "Celine - Studio" (`r4f5b5ef55c8`), is already on Phoenix-4 and still barely moved. Tavus recommends its Phoenix-4.5 "Pro" faces for expression, so use a 4.5 id if the Builder plan allows it.
+- The default is the Phoenix-4 id, because the plan is known to include Phoenix-4.
+- Set `CQ_MEETING_FACE_ID` on Railway; `render.yaml` documents the value.
+- To confirm the face is on the account, run a read-only list call with the Tavus key (`TAVUS_API_KEY` or `CQ_TAVUS_API_KEYS`): `GET /v2/faces?face_type=system&verbose=true`.
+
+### One Q in the call: CAMERA mode (built, off until configured)
+
+How it works:
+
+- The hosted Recall note-taker is created with `output_media.camera` set to Capital Q's page: `GET /v1/q/meetings/face/page/:meetingId?k=…`.
+  - The key is derived from the meeting id with `CQ_MEETING_FACE_PAGE_SECRET`. Nothing is stored.
+  - The bot runs on the 4-core variant.
+  - When a login group is configured, it is signed in with `google_meet.google_login_group_id` and `login_required`.
+- The page shows Q's card until the face's private Tavus room is live. It then joins the room with Daily (0.92.2, pinned with an integrity hash), sends the call's audio (Recall's microphone) to the face, and shows the face's video and audio.
+- Recall cannot play output audio beside a page, so Q's own voice goes to the page over a voice stream whenever the face is not there.
+- Checked in Chromium: the page and Daily's call engine load under the page's CSP with no errors. A live join was not run (no paid sessions).
+
+Switches, all on q-api:
+
+| Variable                       | Value                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------ |
+| `CQ_MEETING_FACE`              | `on`                                                                                 |
+| `CQ_MEETING_FACE_MODE`         | `camera`                                                                             |
+| `CQ_MEETING_FACE_PAGE_SECRET`  | 32 or more random characters (a secret)                                              |
+| `Q_API_PUBLIC_URL`             | https                                                                                |
+| `RECALL_GOOGLE_LOGIN_GROUP_ID` | the Recall login group of the "Capital Q" Google Workspace account (owner, tomorrow) |
+
+- Without the page secret, the face joins Meet itself as today.
+- Camera mode applies to bots booked after it is switched on. A bot booked before keeps its own voice path.
+
+The owner's setup for tomorrow:
+
+1. A dedicated Google Workspace user named "Capital Q" (non-admin; Starter is enough).
+2. Recall's Google Login Group for that user, with SAML set up as in Recall's guide and `login_mode` set to `always`.
+3. Put its group id in `RECALL_GOOGLE_LOGIN_GROUP_ID`.
+4. Invite that account to calls so it is trusted and does not knock.

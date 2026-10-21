@@ -172,13 +172,17 @@ services:
         sync: false
       - key: Q_VOICE_EXPRESSIVE
         value: "false"
-      # Owner decision 35: Q's face in Google Meet. The stock replica is
-      # Tavus "Celine - Studio" (phoenix-4), on the Builder key (TAVUS_API_KEY).
-      # The shared video ledger bounds it; without it Q keeps its voice.
+      # Owner decision 35: Q's face in Google Meet, on the Builder key
+      # (TAVUS_API_KEY). 2026-10-21: the stock replica is Tavus "Darius -
+      # Outdoor" on Phoenix-4 (r4ba1277e4fb); its Phoenix-4.5 look is
+      # rccbeedfc684 when the plan has 4.5. Was "Celine - Studio"
+      # (r4f5b5ef55c8), which barely moved. The shared video ledger bounds
+      # it; without it Q keeps its voice. Hosting is Railway (ADR 0014):
+      # set the same values there.
       - key: CQ_MEETING_FACE
         value: "on"
       - key: CQ_MEETING_FACE_ID
-        value: r4f5b5ef55c8
+        value: r4ba1277e4fb
       - key: CQ_MEETING_FACE_MAX_SECONDS
         value: "600"
 
