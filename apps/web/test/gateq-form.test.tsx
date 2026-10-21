@@ -412,17 +412,19 @@ describe("the form's rules (pure)", () => {
     expect(model.normaliseCode("12 34-56")).toBe("123456");
   });
 
-  it("slice 1: the flow runs contact, form, interview, review", () => {
+  it("gatepub-1: the flow runs the questions page, contact, interview, review", () => {
     expect(model.FLOW_PROGRESS).toEqual([
-      "contact",
       "company",
-      "round",
-      "share",
-      "note",
+      "contact",
       "interview",
       "review",
     ]);
-    expect(model.progressFor("check")).toBe(model.progressFor("note"));
+    // Every older form step opens the one page of questions.
+    for (const step of ["company", "round", "share", "note", "check"] as const)
+      expect(model.onQuestionsPage(step)).toBe(true);
+    expect(model.onQuestionsPage("contact")).toBe(false);
+    expect(model.progressFor("check")).toBe(1);
+    expect(model.progressFor("review")).toBe(4);
     expect(
       model.latestQuestion([
         { from: "Q", text: "First?" },
@@ -443,6 +445,30 @@ describe("the form's rules (pure)", () => {
     );
     expect(model.maySubmit(coverageDto())).toBe(true);
   });
+
+  it("gatepub-1: sends only what can be read, and says each rule in words", () => {
+    expect(
+      model.pageRequest({
+        ...model.EMPTY_ANSWERS,
+        stage: "seed",
+        amount: "4,000,000",
+        contactEmail: "not-an-email",
+      }),
+    ).toEqual({ stage: "seed", raise: { amount: "4000000", currency: "USD" } });
+    expect(
+      model.standingWords({ required: true, standing: "DOES_NOT_MEET" }),
+    ).toBe("Required. Doesn't meet. This one is required");
+    expect(
+      model.standingWords({ required: false, standing: "DOES_NOT_MEET" }),
+    ).toBe("Preferred. Doesn't meet. Preferred only");
+    expect(model.standingWords({ required: true, standing: null })).toBe(
+      "Required. Not answered yet. Never counts as a no",
+    );
+    expect(model.validatePage(model.EMPTY_ANSWERS).contactEmail).toBe(
+      "Add an email so they can reply.",
+    );
+    expect(model.questionCountWords(5)).toBe("Five");
+  });
 });
 
 async function press(name: RegExp | string) {
@@ -462,13 +488,23 @@ function type(label: RegExp | string, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 }
 
+/** The one page of questions (design gatepub-1), answered and admitted. */
+async function answerPage() {
+  await flush();
+  type("Company name", "Kora Health");
+  type("Best way to reach you", "amara@kora.ng");
+  fireEvent.click(screen.getByRole("radio", { name: "Seed" }));
+  fireEvent.click(screen.getByRole("button", { name: "Health" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Nigeria" }));
+  type("Exact amount", "1,200,000");
+  await press("Continue to interview");
+}
+
 /** A guest through the contact step with an emailed code. */
 async function guestContact() {
   await flush();
   type("Full name", "Amara Okafor");
-  type(/^Email/, "amara@kora.ng");
   type("Your role", "Founder & CEO");
-  type("Company", "Kora Health");
   await press("Email me a code");
   expect(
     screen.getByText(/We sent a 6-digit code to amara@kora.ng/),
@@ -477,25 +513,20 @@ async function guestContact() {
   await press("Confirm");
 }
 
-/** The four form steps and the check, admitted. */
-async function formSteps() {
-  fireEvent.click(screen.getByRole("radio", { name: "Seed" }));
-  fireEvent.click(screen.getByRole("button", { name: "Health" }));
-  fireEvent.click(screen.getByRole("radio", { name: "Nigeria" }));
-  await press("Continue");
-  fireEvent.click(screen.getByRole("radio", { name: "$1M–$3M" }));
-  await press("Continue");
-  await press("Continue");
-  await press("Check my fit");
-}
-
 async function toReview() {
+  await answerPage();
   await guestContact();
-  await formSteps();
-  await press("Continue to interview");
   await flush();
   await press("Skip to review");
   await flush();
+}
+
+/** Real time passes for the page's short pause before it checks. */
+async function pause(ms = 650) {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    for (let i = 0; i < 10; i += 1) await Promise.resolve();
+  });
 }
 
 describe("the form, driven like a founder", () => {
@@ -536,21 +567,96 @@ describe("the form, driven like a founder", () => {
     expect(calls.open).not.toHaveBeenCalled();
   });
 
-  it("shows the investor's rules first and starts with who is applying", async () => {
+  it("starts with every question and how you stand, before anything is saved", async () => {
     render(<GateQForm gateway={GATEWAY} />);
     await flush();
-    expect(screen.getByText("West Africa")).toBeTruthy();
     expect(
-      screen.getByText(/Nothing is sent until you press Submit/),
+      screen.getByRole("heading", { name: "Apply to Sahel Capital" }),
     ).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Your details" })).toBeTruthy();
-    // Who receives it, and what they'll see, before anything is typed.
-    expect(screen.getByText(/goes to Sahel Capital's team only/)).toBeTruthy();
+    expect(screen.getByText(/Five short questions/)).toBeTruthy();
+    const panel = screen.getByRole("complementary", {
+      name: "How you stand against their rules",
+    });
+    // Only the published labels; unanswered never counts as a no.
+    expect(panel.querySelectorAll("[data-standing]")).toHaveLength(3);
+    expect(panel.textContent).toContain("West Africa");
+    expect(panel.textContent).toContain(
+      "Required. Not answered yet. Never counts as a no",
+    );
     expect(calls.start).not.toHaveBeenCalled();
+    expect(calls.save).not.toHaveBeenCalled();
   });
 
-  it("runs contact, then the form, then the interview, then the review, then submits", async () => {
+  it("checks each answer with the engine, live, and shows only its answer", async () => {
+    calls.save
+      .mockResolvedValueOnce({
+        ok: true,
+        sessionToken: TOKEN,
+        application: summary({
+          stillNeeded: ["West Africa", "$500k to $3M"],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        sessionToken: TOKEN,
+        // A label the gate never published is never shown.
+        application: summary({
+          access: "MAY_NOT_APPLY",
+          unmet: ["Pre-seed or seed", "Unpublished house rule"],
+          stillNeeded: ["West Africa", "$500k to $3M"],
+        }),
+      });
     render(<GateQForm gateway={GATEWAY} />);
+    await flush();
+    fireEvent.click(screen.getByRole("radio", { name: "Seed" }));
+    await pause();
+    expect(calls.start).toHaveBeenCalledTimes(1);
+    expect(calls.save.mock.calls[0]?.[1]).toEqual({ stage: "seed" });
+    const panel = () =>
+      screen.getByRole("complementary", {
+        name: "How you stand against their rules",
+      });
+    expect(
+      panel().querySelector('[data-standing="MEETS"]')?.textContent,
+    ).toContain("Pre-seed or seed");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Series A" }));
+    await pause();
+    expect(calls.save.mock.calls[1]?.[1]).toEqual({ stage: "series_a" });
+    expect(panel().textContent).toContain(
+      "Required. Doesn't meet. This one is required",
+    );
+    expect(panel().textContent).not.toContain("Unpublished house rule");
+    expect(panel().querySelectorAll("[data-standing]")).toHaveLength(3);
+    expect(
+      screen.getByText(/only takes companies that meet "Pre-seed or seed"/),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Continue to interview" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
+  it("runs the questions, then contact, then the interview, then the review, then submits", async () => {
+    render(<GateQForm gateway={GATEWAY} />);
+    await answerPage();
+    expect(calls.save.mock.calls.at(-1)?.[1]).toEqual({
+      companyName: "Kora Health",
+      stage: "seed",
+      sectors: ["Health"],
+      country: "NG",
+      raise: { amount: "1200000", currency: "USD" },
+      contactEmail: "amara@kora.ng",
+    });
+    expect(screen.getByRole("heading", { name: "Your details" })).toBeTruthy();
+    // The contact starts from the page's own answers.
+    expect(screen.getByLabelText<HTMLInputElement>(/^Email/).value).toBe(
+      "amara@kora.ng",
+    );
+    expect(screen.getByLabelText<HTMLInputElement>("Company").value).toBe(
+      "Kora Health",
+    );
     await guestContact();
     expect(calls.contact.mock.calls[0]?.[1]).toEqual({
       name: "Amara Okafor",
@@ -559,32 +665,7 @@ describe("the form, driven like a founder", () => {
       companyName: "Kora Health",
     });
     expect(calls.confirm).toHaveBeenCalledWith(TOKEN, "123456");
-    // The form, unchanged, with the company carried over from the contact.
-    expect(screen.getByRole("heading", { name: "Your company" })).toBeTruthy();
-    expect(screen.getByLabelText<HTMLInputElement>("Company name").value).toBe(
-      "Kora Health",
-    );
 
-    fireEvent.click(screen.getByRole("radio", { name: "Seed" }));
-    fireEvent.click(screen.getByRole("button", { name: "Health" }));
-    fireEvent.click(screen.getByRole("radio", { name: "Nigeria" }));
-    await press("Continue");
-    fireEvent.click(screen.getByRole("radio", { name: "$1M–$3M" }));
-    await press("Continue");
-    // The confirmed contact replaces the old reply-to fields.
-    expect(screen.queryByLabelText("Email for their reply")).toBeNull();
-    expect(screen.getByText("amara@kora.ng")).toBeTruthy();
-    await press("Continue");
-    expect(calls.save.mock.calls[2]?.[1]).toEqual({
-      contactName: "Amara Okafor",
-      contactEmail: "amara@kora.ng",
-    });
-    await press("Check my fit");
-    expect(
-      screen.getByText("You meet all 3 of Sahel Capital's rules"),
-    ).toBeTruthy();
-
-    await press("Continue to interview");
     expect(
       await screen.findByText("Who pays you today, clinics or patients?", {
         selector: "li span",
@@ -607,12 +688,9 @@ describe("the form, driven like a founder", () => {
     expect(calls.submit).toHaveBeenCalledTimes(1);
     expect(order).toEqual([
       "start",
+      "save",
       "contact",
       "confirm",
-      "save",
-      "save",
-      "save",
-      "save",
       "open",
       "turn",
       "transcript",
@@ -631,10 +709,9 @@ describe("the form, driven like a founder", () => {
 
   it("offers no Submit anywhere before the review", async () => {
     render(<GateQForm gateway={GATEWAY} />);
-    await guestContact();
-    await formSteps();
+    await answerPage();
     expect(screen.queryByRole("button", { name: /Submit|Send to/ })).toBeNull();
-    await press("Continue to interview");
+    await guestContact();
     await flush();
     expect(screen.queryByRole("button", { name: /Submit/ })).toBeNull();
     expect(calls.submit).not.toHaveBeenCalled();
@@ -720,8 +797,10 @@ describe("the form, driven like a founder", () => {
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Send to|Submit/ })).toBeNull();
     expect(
-      screen.queryByRole("button", { name: "Continue to interview" }),
-    ).toBeNull();
+      screen
+        .getByRole("button", { name: "Continue to interview" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("a signed-in founder confirms through the account, and shares only ticked documents on Submit", async () => {
@@ -745,6 +824,24 @@ describe("the form, driven like a founder", () => {
       />,
     );
     await flush();
+    expect(
+      screen.getByLabelText<HTMLInputElement>("Best way to reach you").value,
+    ).toBe("amara@kora.ng");
+    expect(
+      screen.getByText(/Filled in from your profile/),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole<HTMLInputElement>("checkbox", { name: /Pitch deck v3/ })
+        .checked,
+    ).toBe(true);
+    expect(
+      screen.getByRole<HTMLInputElement>("checkbox", {
+        name: /Management accounts/,
+      }).checked,
+    ).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Health" }));
+    type("Exact amount", "1,200,000");
+    await press("Continue to interview");
     expect(screen.getByLabelText<HTMLInputElement>(/^Email/).value).toBe(
       "amara@kora.ng",
     );
@@ -759,23 +856,6 @@ describe("the form, driven like a founder", () => {
     // No code for the account's own email.
     expect(calls.contact).not.toHaveBeenCalled();
     expect(screen.queryByLabelText("6-digit code")).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "Health" }));
-    await press("Continue");
-    fireEvent.click(screen.getByRole("radio", { name: "$1M–$3M" }));
-    await press("Continue");
-    expect(
-      screen.getByRole<HTMLInputElement>("checkbox", { name: /Pitch deck v3/ })
-        .checked,
-    ).toBe(true);
-    expect(
-      screen.getByRole<HTMLInputElement>("checkbox", {
-        name: /Management accounts/,
-      }).checked,
-    ).toBe(false);
-    await press("Continue");
-    await press("Check my fit");
-    await press("Continue to interview");
     await flush();
     await press("Skip to review");
     await flush();
