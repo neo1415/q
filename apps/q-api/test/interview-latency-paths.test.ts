@@ -310,7 +310,7 @@ describe("faster answers, with their stages shown (owner 2026-10-21)", () => {
     { stepKey: "F1.country", value: "ke", quote: "based in Kenya" },
   ];
 
-  it("reports each stage once, in order, from the turn's own events", async () => {
+  it("shows only stages that name something: the steps being saved (owner review 2026-10-21)", async () => {
     const world = founderWorld();
     const model = recordingModel(answers);
     const stages: string[] = [];
@@ -323,9 +323,37 @@ describe("faster answers, with their stages shown (owner 2026-10-21)", () => {
     }).turn({
       ...turn(world, said),
       actor,
-      onStage: (stage) => stages.push(stage.stage),
+      onStage: (stage) => stages.push(`${stage.stage}:${stage.label}`),
     });
-    expect(stages).toEqual(["READING", "SAVING"]);
+    // By the journey's own labels; never "reading what you said" or
+    // "writing a reply".
+    expect(stages).toEqual(["SAVING:Saving your stage and country"]);
+  });
+
+  it("names whom Q is looking up from their own record, never the model's words", async () => {
+    const world = founderWorld();
+    const model = recordingModel(answers);
+    const stages: string[] = [];
+    await createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({ stated: ["F1.stage", "F1.country"] })),
+      replyByCodeAfterCleanSave: true,
+      founderResearch: {
+        consider: () => true,
+        offerReady: () => Promise.resolve(0),
+        status: () => "IDLE" as never,
+        unsaid: () => new Set(),
+        markSaid: () => undefined,
+        takeNote: () => null,
+      },
+    }).turn({
+      ...turn(world, said),
+      actor,
+      onStage: (stage) => stages.push(`${stage.stage}:${stage.label}`),
+    });
+    expect(stages[0]).toBe("LOOKING_UP:Looking up Quillmark Health");
   });
 
   it("says what saved first, while the model writes the rest, and never twice", async () => {
