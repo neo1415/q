@@ -119,3 +119,45 @@ Notes:
 | 1. Code writes the structure                     | NOT STARTED: needs data     | No measurement of where the 1,100–2,280 tokens go. The hosted read token returns 401 and there is no provider key here. The schema (`CompanyAnalystV26ResultSchema`) shows the candidates: each finding's free-text `basis` (up to 8 × 300 characters), card `measures`/`citations` copied from tool results, and per-sentence `gestures`. Truth class and evidence status stay the model's own labels (evidence axes untouched). Next step: sample 30 recent answers, output tokens against answer and block lengths (query sent to the coordinator), then a COMPANY_ANALYST version whose `basis` is fact labels only and whose card measures are filled by code, with q-evals parity. |
 | 2. Answer and extras in parallel                 | NOT STARTED: owner decision | It doubles input tokens per turn (the ledger shows ~44k per answer), and two calls can disagree (answer against findings), so the whole-answer checks would also need to check the pair. Needs the item 1 data and the owner's cost call.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | 3. A faster tier with eval parity                | BLOCKED                     | No provider key in this environment, so q-evals can't score two real tiers. Needs a key (≤ $3) or a run where one exists.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+
+## Round 5b (21 October 2026): where the output goes; empty fields; lane 7 page acts
+
+### (a) Output split, measured offline
+
+`node scripts/handoff/answer-output-split.mjs` counts tokens per field with js-tiktoken o200k_base, the OpenAI GPT-4o-family encoding (production may route to another provider's tokenizer: allow ±10%). The objects are representative answers built from COMPANY_ANALYST v26's schema and task text, not recorded outputs; production's split comes from the new `outputSplit` log field.
+
+| object            | tokens | answer    | findings                         | cards                 | gestures | other     | chars |
+| ----------------- | ------ | --------- | -------------------------------- | --------------------- | -------- | --------- | ----- |
+| typed analysis    | 848    | 246 (29%) | 406 (48%); basis 112, labels 129 | 0 (0%); copied 0      | 93 (11%) | 103 (12%) | 4243  |
+| comparison of two | 1539   | 329 (21%) | 487 (32%); basis 135, labels 153 | 495 (32%); copied 178 | 123 (8%) | 105 (7%)  | 7527  |
+| spoken            | 441    | 62 (14%)  | 244 (55%); basis 68, labels 76   | 0 (0%); copied 0      | 33 (7%)  | 102 (23%) | 2151  |
+
+Of this, what code already holds:
+
+- card names, measures and citations copied from tool results: about 12% of a comparison;
+- fields written only empty, null or false: about 6–20%;
+- basis text restating supplied facts: about 8–14%.
+
+That is roughly 22–34%, at the 30% line.
+
+The answer prose is only 14–29% of the object, and it streams first. So the person has the whole answer text long before the object ends. The harness now uses these shares: "answer words all out" is about 5.1 s for one company and 7.0 s for a comparison, against completion at 14 s and 26 s.
+
+### Changes
+
+| Change                                    | Status                                        | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Empty fields left for code to fill        | DONE (prompt)                                 | `TOOLS_FIRST_NOTE`: "Leave out, too, every field that would only be empty, null or false … Findings with evidence are never left out for that reason." The schema's defaults fill them, and the adapters send the schema non-strict. Tests show a minimum answer is accepted on both the JSON and TEXT paths with no repair call. Estimated saving: about 60–90 tokens (0.6–0.9 s) per answer; confirm with `outputSplit.other` after deploying. |
+| (b) Production split                      | DONE                                          | "q answer produced" now carries `outputTokens` and `outputSplit` {total, answer, findings, findingsBasis, cards, gestures, other}, as character counts only (`output-split.ts`; tests `output-split.test.ts` and "logs where the answer's output went, as counts only").                                                                                                                                                                         |
+| Lane 7 page acts on the duplex line       | DONE                                          | `screenActOfTurn`: the screen-act lane also takes `instantRequestOf` page acts that have a screen act (back, scroll, top, bottom), with 0 model calls; the browser drops a repeat within 15 s. Close, a press by name and the theme keep the normal path and its early reading: they need a control resolved or a tool's authorize step. Tests: `turn-latency.test.ts`.                                                                          |
+| 1. Basis as labels, card measures by code | PROPOSED, needs a new COMPANY_ANALYST version | About 20% of a comparison. It changes how provenance is shown, so it needs q-evals parity and the prompt owner's agreement. Confirm the real share with `outputSplit` first.                                                                                                                                                                                                                                                                     |
+
+### (c) A faster tier for the answer: exactly what to run (blocked on a provider key)
+
+1. Use a local stack with migrations applied (`supabase start` and `pnpm db:reset`, or the repo's equivalent), and the live provider keys in the environment of this run only.
+2. Baseline: `node scripts/q-eval.mjs run --profile LIVE_MODEL --out .evals/tier-current --baseline .evals/tier-current.baseline.json --update-baseline`. Always pass `--baseline`: the default path is the committed `packages/q-evals/baselines/live_model.baseline.json`, which must not be overwritten. The report lands at `.evals/tier-current/live_model-<time>.json`.
+3. In the LOCAL database only, set `ai_ops.routing_policies.preferred_models` for `normal_dialogue.v1`, `evidence_synthesis.v1` and `comparison.v1` to the faster model's id.
+4. Run `node scripts/q-eval.mjs run --profile LIVE_MODEL --out .evals/tier-fast --baseline .evals/tier-current.baseline.json`. It prints the comparison with the baseline; `node scripts/q-eval.mjs compare .evals/tier-current.baseline.json .evals/tier-fast/live_model-<time>.json` gives it again.
+5. From local `ai_ops.model_usage`, compare p50 `latency_ms` and output tokens per second per task class for the two runs.
+6. Switch only if no hard invariant fails and every graded score is at least the baseline's. The switch is then a migration on `routing_policies`, for the owner to approve.
+
+The likely cost is under $3 (CALLS_PER_CASE × cases × about $0.02, as the eval scripts estimate).

@@ -1,1 +1,12 @@
-{"id":26,"said":"press Show more","page":"/feed","channel":"typed","kind":"button","ms":72,"runs":0,"reads":0,"moves":1,"outcome":"done on screen"}
+{
+  "id": 26,
+  "said": "press Show more",
+  "page": "/feed",
+  "channel": "typed",
+  "kind": "button",
+  "ms": 72,
+  "runs": 0,
+  "reads": 0,
+  "moves": 1,
+  "outcome": "done on screen"
+}

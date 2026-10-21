@@ -1,1 +1,15 @@
-{"id":106,"said":"open its data room","page":"/work","channel":"spoken","state":"aboutNixo","expect":"/company/9d1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f74?tab=dataroom","landed":"/company/9d1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f74?tab=dataroom","correct":true,"via":"code","chooseCalls":0,"ms":26,"runs":0,"moves":1}
+{
+  "id": 106,
+  "said": "open its data room",
+  "page": "/work",
+  "channel": "spoken",
+  "state": "aboutNixo",
+  "expect": "/company/9d1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f74?tab=dataroom",
+  "landed": "/company/9d1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f74?tab=dataroom",
+  "correct": true,
+  "via": "code",
+  "chooseCalls": 0,
+  "ms": 26,
+  "runs": 0,
+  "moves": 1
+}

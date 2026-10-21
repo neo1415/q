@@ -175,6 +175,8 @@ type Needs = {
 function timedModel(
   needs: Needs,
   answerTokens: number,
+  /** The answer text's share of the object (scripts/handoff/answer-output-split.mjs). */
+  answerShare: number,
   calls: string[],
   trace?: (what: string) => void,
 ): ModelProvider {
@@ -241,14 +243,16 @@ function timedModel(
       const sentence =
         "Northwind Ledger declares a seed stage and steady revenue growth. ";
       const answer = sentence
-        .repeat(Math.max(1, Math.round((answerTokens * 4 * 0.7) / 66)))
+        .repeat(Math.max(1, Math.round((answerTokens * 4 * answerShare) / 66)))
         .trim();
       const value = {
         answer,
         responseShape: "ANALYTICAL",
         findings: [
           {
-            statement: "x".repeat(Math.round(answerTokens * 4 * 0.3)),
+            statement: "x".repeat(
+              Math.round(answerTokens * 4 * (1 - answerShare)),
+            ),
             truthClass: "USER_CLAIM",
           },
         ],
@@ -383,6 +387,14 @@ type Journey = {
   readonly needs: Needs;
   /** Output tokens of the answer object, as measured (row 15). */
   readonly answerTokens: number;
+  /**
+   * The answer text's share of those tokens, estimated by
+   * scripts/handoff/answer-output-split.mjs (o200k_base, representative
+   * objects): typed 29%, comparison 21%, spoken 14%; a written document is
+   * nearly all text. The answer streams first; findings, cards and the
+   * rest follow it.
+   */
+  readonly answerShare: number;
   readonly reading: Record<string, unknown>;
   /** What the early skim says (production: FIT for a fit ask). */
   readonly skim?: string;
@@ -419,6 +431,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: false,
     needs: { companies: ["Northwind Ledger"], web: false, cards: false },
     answerTokens: 1_100,
+    answerShare: 0.29,
     reading: question("ANALYSIS", "What are the risks with Northwind Ledger?"),
   },
   {
@@ -429,6 +442,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: false,
     needs: { companies: ["Northwind Ledger"], web: false, cards: false },
     answerTokens: 1_100,
+    answerShare: 0.29,
     reading: question("ANALYSIS", "what are the risks with northwind ledger?"),
   },
   {
@@ -441,6 +455,7 @@ export const JOURNEYS: readonly Journey[] = [
       cards: false,
     },
     answerTokens: 2_280,
+    answerShare: 0.21,
     reading: question(
       "COMPARISON",
       "Compare Northwind Ledger and Halyard Health",
@@ -452,6 +467,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: false,
     needs: { companies: [], web: true, cards: false },
     answerTokens: 900,
+    answerShare: 0.29,
     reading: {
       ...question("FACTUAL", "latest public news on Northwind Ledger"),
       kind: "RESEARCH_REQUEST",
@@ -463,6 +479,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: true,
     needs: { companies: [], web: false, cards: false },
     answerTokens: 250,
+    answerShare: 0.14,
     reading: {
       ...question("ANALYSIS", "why does that matter for a seed investor"),
       aboutNamedOther: false,
@@ -475,6 +492,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: true,
     needs: { companies: [], web: false, cards: true },
     answerTokens: 350,
+    answerShare: 0.14,
     reading: {
       ...question("FIT", "show me the companies that fit my mandate best"),
       aboutNamedOther: false,
@@ -487,6 +505,7 @@ export const JOURNEYS: readonly Journey[] = [
     spoken: false,
     needs: { companies: ["Northwind Ledger"], web: false, cards: false },
     answerTokens: 2_000,
+    answerShare: 0.9,
     reading: {
       kind: "TOOL_REQUEST",
       confidence: "HIGH",
@@ -607,7 +626,13 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
   const gateway = createModelGateway({
     catalog: createStaticModelCatalog(catalog()),
     registry: createModelProviderRegistry([
-      timedModel(journey.needs, journey.answerTokens, calls, trace),
+      timedModel(
+        journey.needs,
+        journey.answerTokens,
+        journey.answerShare,
+        calls,
+        trace,
+      ),
     ]),
     usage: createInMemoryModelUsageRepository(),
     sleep: () => Promise.resolve(),

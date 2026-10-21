@@ -1,1 +1,15 @@
-{"id":126,"said":"open their deck","page":"/work","channel":"spoken","state":"torn","expect":"#chooser","landed":"#chooser","correct":true,"via":"chooser","chooseCalls":1,"ms":847,"runs":0,"moves":1}
+{
+  "id": 126,
+  "said": "open their deck",
+  "page": "/work",
+  "channel": "spoken",
+  "state": "torn",
+  "expect": "#chooser",
+  "landed": "#chooser",
+  "correct": true,
+  "via": "chooser",
+  "chooseCalls": 1,
+  "ms": 847,
+  "runs": 0,
+  "moves": 1
+}

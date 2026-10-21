@@ -1,1 +1,12 @@
-{"id":44,"said":"um, close it.","page":"/feed","channel":"spoken","kind":"close","ms":58,"runs":0,"reads":0,"moves":1,"outcome":"done on screen"}
+{
+  "id": 44,
+  "said": "um, close it.",
+  "page": "/feed",
+  "channel": "spoken",
+  "kind": "close",
+  "ms": 58,
+  "runs": 0,
+  "reads": 0,
+  "moves": 1,
+  "outcome": "done on screen"
+}

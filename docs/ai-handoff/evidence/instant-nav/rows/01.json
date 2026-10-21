@@ -1,1 +1,12 @@
-{"id":1,"said":"open discover","page":"/feed","channel":"typed","kind":"page","ms":40,"runs":1,"reads":0,"moves":1,"outcome":"moved (/discover)"}
+{
+  "id": 1,
+  "said": "open discover",
+  "page": "/feed",
+  "channel": "typed",
+  "kind": "page",
+  "ms": 40,
+  "runs": 1,
+  "reads": 0,
+  "moves": 1,
+  "outcome": "moved (/discover)"
+}

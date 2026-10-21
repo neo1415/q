@@ -1,1 +1,15 @@
-{"id":115,"said":"go back to the other one","page":"/company/7b1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f72","channel":"typed","state":"compared","expect":"/company/5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70","landed":"/company/5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70","correct":true,"via":"code","chooseCalls":0,"ms":36,"runs":0,"moves":1}
+{
+  "id": 115,
+  "said": "go back to the other one",
+  "page": "/company/7b1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f72",
+  "channel": "typed",
+  "state": "compared",
+  "expect": "/company/5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70",
+  "landed": "/company/5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70",
+  "correct": true,
+  "via": "code",
+  "chooseCalls": 0,
+  "ms": 36,
+  "runs": 0,
+  "moves": 1
+}

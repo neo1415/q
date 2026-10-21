@@ -1,1 +1,15 @@
-{"id":128,"said":"open their deck","page":"/feed","channel":"typed","state":"none","expect":"Q","landed":null,"correct":true,"via":"left to Q","chooseCalls":0,"ms":null,"runs":1,"moves":0}
+{
+  "id": 128,
+  "said": "open their deck",
+  "page": "/feed",
+  "channel": "typed",
+  "state": "none",
+  "expect": "Q",
+  "landed": null,
+  "correct": true,
+  "via": "left to Q",
+  "chooseCalls": 0,
+  "ms": null,
+  "runs": 1,
+  "moves": 0
+}

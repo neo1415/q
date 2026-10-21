@@ -1,1 +1,12 @@
-{"id":21,"said":"scroll down","page":"/feed","channel":"typed","kind":"scroll","ms":54,"runs":0,"reads":0,"moves":1,"outcome":"done on screen"}
+{
+  "id": 21,
+  "said": "scroll down",
+  "page": "/feed",
+  "channel": "typed",
+  "kind": "scroll",
+  "ms": 54,
+  "runs": 0,
+  "reads": 0,
+  "moves": 1,
+  "outcome": "done on screen"
+}
