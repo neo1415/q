@@ -49,3 +49,24 @@ export class OrganisationReferenceDataError extends Error {
     this.name = "OrganisationReferenceDataError";
   }
 }
+
+/**
+ * Enumeration-safe: raised identically whether the person does not exist,
+ * was never a member of the caller's organisation, or belongs to another.
+ */
+export class OrganisationMemberNotFoundError extends Error {
+  constructor(message = "That person isn't on your team.") {
+    super(message);
+    this.name = "OrganisationMemberNotFoundError";
+  }
+}
+
+/** A malformed activity filter or cursor. Describes the request only. */
+export class OrganisationActivityQueryError extends Error {
+  constructor(
+    message = "This activity view's filter or cursor is not valid. Start the view again.",
+  ) {
+    super(message);
+    this.name = "OrganisationActivityQueryError";
+  }
+}

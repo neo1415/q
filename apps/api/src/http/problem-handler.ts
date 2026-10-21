@@ -78,7 +78,9 @@ import {
   QCardVersionConflictError,
 } from "@capital-q/public-identity";
 import {
+  OrganisationActivityQueryError,
   OrganisationCreationConflictError,
+  OrganisationMemberNotFoundError,
   OrganisationNotFoundError,
   OrganisationVersionConflictError,
 } from "@capital-q/organisations";
@@ -363,6 +365,7 @@ function toProblem(
   // resources), so mapping them is purely a status decision.
   if (
     error instanceof OrganisationNotFoundError ||
+    error instanceof OrganisationMemberNotFoundError ||
     error instanceof CompanyNotFoundError ||
     error instanceof CompanyMemberNotFoundError ||
     error instanceof FounderProfileNotFoundError ||
@@ -428,6 +431,7 @@ function toProblem(
 
   // Describes the caller, never a company: safe to say plainly.
   if (
+    error instanceof OrganisationActivityQueryError ||
     error instanceof RelationshipPipelineLimitError ||
     error instanceof RelationshipPipelineQueryError ||
     error instanceof RelationshipViewLimitError
