@@ -1089,6 +1089,8 @@ export function createInterviewAgent(
     // Read once the plan authorises the run; nothing handed over until then.
     let delegationRead: Promise<QTurnAuthority | null> =
       Promise.resolve(NO_TURN_AUTHORITY);
+    /** The reading code decided exactly (one step stated), if it did. */
+    let codeDecided: QTurnAuthority | null = null;
     const port = createOnboardingPort({
       statedEarlier: (stepKey, quote) =>
         (statedBySession.get(input.onboardingSessionId) ?? []).some(
@@ -1203,6 +1205,7 @@ export function createInterviewAgent(
               });
             })()
           : null;
+      codeDecided = decided;
       delegationRead =
         decided !== null
           ? Promise.resolve(decided)
@@ -2169,6 +2172,48 @@ export function createInterviewAgent(
           await recordApproved(agreed);
           state = await port.state();
           if (actions.length !== before) open = await journeyOpenings();
+        }
+      }
+      // Code read the whole turn exactly ("Seed", "14", "Partner",
+      // "tidewell.africa" for the step just asked): code records it through
+      // the same guarded port and, when the save is clean, writes the reply
+      // too. No model call at all (onboarding speed 2026-10-21: a clean
+      // exact answer still waited a full tool round, about 1.8 s, before
+      // its first word). Anything less than a clean save goes to the model
+      // with these results in hand, as before.
+      const exactStep =
+        codeDecided === null ? undefined : [...codeDecided.stated][0];
+      if (
+        exactStep !== undefined &&
+        codeDecided?.stated.size === 1 &&
+        dependencies.replyByCodeAfterCleanSave === true
+      ) {
+        const said = utterance.trim().replace(/[.!]+$/u, "");
+        const answers = [{ stepKey: exactStep, value: said, quote: said }];
+        const results = await port
+          .record(
+            answers.map((answer) => ({
+              ...answer,
+              basis: "STATED" as const,
+              ownWords: false,
+            })),
+          )
+          .catch(() => []);
+        if (results.length > 0) {
+          actions.push({
+            tool: "record_answers",
+            input: { answers, by: "code: their whole reply answers the step" },
+            result: { ok: true, data: { results } },
+          });
+          await prefillFromSignup();
+          state = await port.state();
+          const written = await codeWrittenReply();
+          if (written !== null) {
+            stream?.push(written.reply);
+            result = written;
+            writtenByCode = true;
+            logger.info({}, "exact answer recorded and replied by code");
+          }
         }
       }
       while (

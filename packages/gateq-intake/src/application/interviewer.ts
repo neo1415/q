@@ -42,6 +42,7 @@ import {
   type QuestionNeed,
 } from "./question-needs.js";
 import { questionAngle } from "./answer-specificity.js";
+import { normaliseProposedFact } from "./normalise-fact.js";
 import { notRecordedLine, type NotRecorded } from "./not-recorded.js";
 import { amountStatedIn } from "./stated-amount.js";
 
@@ -59,8 +60,10 @@ import { amountStatedIn } from "./stated-amount.js";
  *
  *   - Every proposed fact is parsed against the closed intake contract. A
  *     dimension nobody defined, a value of the wrong shape, a provenance
- *     that is not one of the four: dropped, with a count logged. Invalid
- *     model output never becomes database state.
+ *     that is not one of the four: dropped, with a count logged. A value
+ *     the person stated in another shape ("Nigeria", "Series A", "$2m") is
+ *     put into its dimension's canonical shape and saved; one that holds
+ *     nothing of that shape never becomes database state.
  *   - Nothing the model says about qualification is read at all. There is
  *     no field for it in the result schema, and the caller gets GATE-001's
  *     answer instead.
@@ -76,6 +79,41 @@ import { amountStatedIn } from "./stated-amount.js";
  */
 
 export type InterviewChannel = "voice" | "text";
+
+/**
+ * A contact detail already held: the same address in any case, or a name
+ * whose every word is already in the name on record ("Laura" for "Laura
+ * Mensah"). A different one is a change, recorded with history kept.
+ */
+function sameContact(
+  proposed: NewApplicationFact,
+  onRecord: ApplicationFact | undefined,
+): boolean {
+  if (
+    onRecord === undefined ||
+    proposed.value.kind !== "TEXT" ||
+    onRecord.value.kind !== "TEXT"
+  ) {
+    return false;
+  }
+  const words = (text: string) =>
+    text
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}@._+-]+/u)
+      .filter((word) => word.length > 0);
+  if (proposed.dimension === "contact.email") {
+    return (
+      proposed.value.text.trim().toLowerCase() ===
+      onRecord.value.text.trim().toLowerCase()
+    );
+  }
+  if (proposed.dimension === "contact.name") {
+    const held = new Set(words(onRecord.value.text));
+    const said = words(proposed.value.text);
+    return said.length > 0 && said.every((word) => held.has(word));
+  }
+  return false;
+}
 
 /**
  * One live turn's budget. A public endpoint is somebody else's spending
@@ -584,35 +622,45 @@ export function createGateQInterviewer(
       // to talk Q into something -- is the signal worth seeing in a log,
       // and a diagnostic that reports zero there is a diagnostic lying.
       let rejected = discardedByIntent ? result.facts.length : 0;
-      // Never silently (G4): each refusal the applicant could put right is
-      // named in the reply. Unknown dimensions are the model's own error,
-      // not something they said, and stay counted only.
+      // Every answer they state is saved (owner principle 2026-10-21): a
+      // value in the wrong shape is put into its dimension's shape, and a
+      // contact detail they change is recorded over the old one, whose
+      // history the store keeps. The one refusal left is the truth guard:
+      // an amount they never said. Unknown dimensions are the model's own
+      // error, not something they said, and stay counted only.
       const notRecorded: NotRecorded[] = [];
+      const held = (dimension: ApplicationDimension) =>
+        input.application?.facts.find(
+          (fact) =>
+            fact.dimension === dimension &&
+            fact.supersededAt === null &&
+            fact.value.kind !== "NONE",
+        );
+      const currencyHeld = held("raise.currency")?.value;
       for (const candidate of proposed) {
         if (!DIMENSIONS.has(candidate.dimension)) {
           rejected += 1;
           continue;
         }
         const dimension = candidate.dimension as ApplicationDimension;
-        const parsed = NewApplicationFactSchema.safeParse({
-          dimension: candidate.dimension,
-          value: candidate.value,
-          provenance: candidate.provenance,
-        });
-        if (!parsed.success) {
+        const normalised = normaliseProposedFact(
+          {
+            dimension,
+            value: candidate.value,
+            provenance: candidate.provenance,
+          },
+          {
+            utterance: input.utterance,
+            currencyOnRecord:
+              currencyHeld?.kind === "CODE" ? currencyHeld.code : null,
+          },
+        );
+        if (normalised === null) {
+          // Words with nothing of the shape in them ("somewhere in
+          // Europe" for a country): their sentence stays on the transcript
+          // and the dimension stays open, so Q asks it. Counted, and never
+          // said as a failure.
           rejected += 1;
-          // Only when nothing usable is on the record for it already: a
-          // refused rewrite of a kept value loses nothing they said.
-          if (
-            input.application?.facts.some(
-              (fact) =>
-                fact.dimension === dimension &&
-                fact.supersededAt === null &&
-                fact.value.kind !== "NONE",
-            ) !== true
-          ) {
-            notRecorded.push({ dimension, reason: "UNREADABLE" });
-          }
           continue;
         }
         // An amount must be one the person said, not one Q worked out
@@ -620,43 +668,30 @@ export function createGateQInterviewer(
         // sentence is kept by the phrases it came in; the computed figure
         // is never recorded as their claim.
         if (
-          parsed.data.value.kind === "AMOUNT" &&
-          !amountStatedIn(parsed.data.value.amount, input.utterance)
+          normalised.value.kind === "AMOUNT" &&
+          !amountStatedIn(normalised.value.amount, input.utterance)
         ) {
           rejected += 1;
           notRecorded.push({ dimension, reason: "AMOUNT_NOT_STATED" });
           continue;
         }
-        // Contact details belong to the contact step the person confirmed:
-        // "I'm Laura" fills a missing name, it never replaces "Laura Mensah".
-        if (
-          (parsed.data.dimension === "contact.name" ||
-            parsed.data.dimension === "contact.email") &&
-          input.application?.facts.some(
-            (fact) =>
-              fact.dimension === parsed.data.dimension &&
-              fact.supersededAt === null &&
-              fact.value.kind !== "NONE",
-          ) === true
-        ) {
-          rejected += 1;
-          notRecorded.push({ dimension, reason: "CONTACT_CONFIRMED" });
-          continue;
-        }
+        // The same contact detail again ("I'm Laura" with "Laura Mensah"
+        // on record) is already held: nothing to write, nothing refused.
+        if (sameContact(normalised, held(dimension))) continue;
         const current = input.application?.facts.find(
           (fact) =>
-            fact.dimension === parsed.data.dimension &&
+            fact.dimension === normalised.dimension &&
             fact.supersededAt === null &&
             fact.provenance === "DOCUMENT_SUPPORTED" &&
-            JSON.stringify(fact.value) === JSON.stringify(parsed.data.value),
+            JSON.stringify(fact.value) === JSON.stringify(normalised.value),
         );
         // A model cannot mint evidence support. New document-derived values
         // need the authorized Evidence confirmation path and exact lineage.
         facts.push(
-          parsed.data.provenance === "DOCUMENT_SUPPORTED" &&
+          normalised.provenance === "DOCUMENT_SUPPORTED" &&
             current === undefined
-            ? { ...parsed.data, provenance: "APPLICANT_PROVIDED" }
-            : parsed.data,
+            ? { ...normalised, provenance: "APPLICANT_PROVIDED" }
+            : normalised,
         );
       }
 

@@ -19,6 +19,20 @@ describe("an amount is stated only when it is written in the person's words", ()
     );
   });
 
+  it("reads amounts said in words with a scale, and never a bare count", () => {
+    expect(amountsIn("We're raising two million dollars")).toEqual([2_000_000]);
+    expect(amountsIn("half a million")).toEqual([500_000]);
+    expect(amountsIn("one hundred and fifty thousand")).toEqual([150_000]);
+    expect(amountsIn("a million and a half? no, a million")).toContain(
+      1_000_000,
+    );
+    expect(amountsIn("two of them pay us")).toEqual([]);
+    expect(amountStatedIn("2000000", "two million")).toBe(true);
+    expect(amountStatedIn("4000000", "two of them pay two million")).toBe(
+      false,
+    );
+  });
+
   it("a product of what was said is not what was said", () => {
     const said = "Two of them pay us $180,000 each.";
     expect(amountStatedIn("180000", said)).toBe(true);

@@ -303,6 +303,64 @@ describe("the reply after a clean save is written by code", () => {
   });
 });
 
+describe("an exact answer is recorded and replied to by code, no model call (2026-10-21)", () => {
+  /** Turn one: the model asks the stage. Every later call is counted. */
+  function askingModel() {
+    let calls = 0;
+    const gateway = {
+      execute: () => {
+        calls += 1;
+        return Promise.resolve({
+          output: {
+            kind: "TEXT",
+            text: JSON.stringify({
+              reply: "What stage is Quillmark at?",
+              asking: "F1.stage",
+            }),
+          },
+        });
+      },
+    } as unknown as ModelGateway;
+    return { gateway, calls: () => calls };
+  }
+
+  it("'Seed' after Q asked the stage: saved, then the next question, zero model calls", async () => {
+    const world = founderWorld();
+    const model = askingModel();
+    const agent = createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({})),
+      replyByCodeAfterCleanSave: true,
+      readingByCodeWhereExact: true,
+    });
+    await agent.turn({ ...turn(world, "Hi, where do we start?"), actor });
+    const before = model.calls();
+    const outcome = await agent.turn({ ...turn(world, "Seed."), actor });
+    expect(model.calls()).toBe(before);
+    expect(world.recordedValue("F1.stage")).toBeDefined();
+    expect(outcome.reply).toContain("Seed");
+    expect(outcome.reply.trim().endsWith("?")).toBe(true);
+  });
+
+  it("without the code reply composed, the model still writes it", async () => {
+    const world = founderWorld();
+    const model = askingModel();
+    const agent = createInterviewAgent({
+      gateway: model.gateway,
+      firewall,
+      logger,
+      delegation: readerOf(reading({})),
+      readingByCodeWhereExact: true,
+    });
+    await agent.turn({ ...turn(world, "Hi, where do we start?"), actor });
+    const before = model.calls();
+    await agent.turn({ ...turn(world, "Seed."), actor });
+    expect(model.calls()).toBeGreaterThan(before);
+  });
+});
+
 describe("no closing reply while a stated fact is unsaved (live AF 2026-10-16)", () => {
   it("a step the reading found stated, not yet written, gets another model round", async () => {
     const world = founderWorld();

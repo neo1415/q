@@ -101,15 +101,14 @@ describe("a refused fact is never dropped silently", () => {
     expect(outcome.notRecorded).toHaveLength(1);
   });
 
-  it("words each reason plainly", () => {
+  it("words the one refusal plainly", () => {
     expect(
       notRecordedLine([
         { dimension: "raise.amount", reason: "AMOUNT_NOT_STATED" },
-        { dimension: "company.stage", reason: "UNREADABLE" },
-        { dimension: "contact.name", reason: "CONTACT_CONFIRMED" },
+        { dimension: "claims.revenue", reason: "AMOUNT_NOT_STATED" },
       ]),
     ).toBe(
-      "I haven't recorded a figure for raise size: I only keep amounts you say yourself, not ones I work out. What is the figure? I couldn't record what you said about stage. Could you put it another way? Your contact name stays as you confirmed on the contact step.",
+      "I haven't recorded a figure for raise size and revenue: I only keep amounts you say yourself, not ones I work out. What is the figure?",
     );
     expect(notRecordedLine([])).toBe("");
   });

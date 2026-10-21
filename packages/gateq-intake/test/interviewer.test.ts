@@ -113,15 +113,83 @@ const turn = (
 });
 
 describe("what survives validation", () => {
+  // Owner principle 2026-10-21: every stated answer is saved. These shapes
+  // used to be refused with "I couldn't record what you said about ...";
+  // each is now put into its dimension's canonical shape and recorded.
   it.each([
-    ["company.stage", { kind: "TEXT", text: "seed" }],
-    ["company.country", { kind: "CODE", code: "Kenya" }],
-    ["company.sector_phrases", { kind: "TEXT", text: "Climate" }],
-    ["raise.amount", { kind: "TEXT", text: "1500000 USD" }],
-    ["raise.currency", { kind: "TEXT", text: "USD" }],
+    [
+      "company.stage",
+      { kind: "TEXT", text: "seed" },
+      { kind: "CODE", code: "seed" },
+    ],
+    [
+      "company.stage",
+      { kind: "TEXT", text: "Series A" },
+      { kind: "CODE", code: "series_a" },
+    ],
+    [
+      "company.stage",
+      { kind: "CODE", code: "Pre-Seed" },
+      { kind: "CODE", code: "pre_seed" },
+    ],
+    [
+      "company.country",
+      { kind: "CODE", code: "Kenya" },
+      { kind: "CODE", code: "KE" },
+    ],
+    [
+      "company.country",
+      { kind: "TEXT", text: "Nairobi, Kenya" },
+      { kind: "CODE", code: "KE" },
+    ],
+    [
+      "company.country",
+      { kind: "CODE", code: "ke" },
+      { kind: "CODE", code: "KE" },
+    ],
+    [
+      "company.sector_phrases",
+      { kind: "TEXT", text: "Climate" },
+      { kind: "PHRASES", phrases: ["Climate"] },
+    ],
+    [
+      "company.sector_phrases",
+      { kind: "TEXT", text: "climate, logistics and fintech" },
+      { kind: "PHRASES", phrases: ["climate", "logistics", "fintech"] },
+    ],
+    [
+      "raise.amount",
+      { kind: "TEXT", text: "1500000 USD" },
+      { kind: "AMOUNT", amount: "1500000", currency: "USD" },
+    ],
+    [
+      "raise.amount",
+      { kind: "TEXT", text: "$1.5M" },
+      { kind: "AMOUNT", amount: "1500000", currency: "USD" },
+    ],
+    [
+      "raise.currency",
+      { kind: "TEXT", text: "USD" },
+      { kind: "CODE", code: "USD" },
+    ],
+    [
+      "raise.currency",
+      { kind: "TEXT", text: "US dollars" },
+      { kind: "CODE", code: "USD" },
+    ],
+    [
+      "contact.email",
+      { kind: "TEXT", text: "Mailto:Ama@Kijani.Africa" },
+      { kind: "TEXT", text: "ama@kijani.africa" },
+    ],
+    [
+      "company.website",
+      { kind: "TEXT", text: "kijani.africa" },
+      { kind: "TEXT", text: "https://kijani.africa" },
+    ],
   ] as const)(
-    "rejects %s proposals that would erase usable qualification data",
-    async (dimension, value) => {
+    "saves %s %j in its canonical shape",
+    async (dimension, value, expected) => {
       const { service } = interviewer({
         ...RESULT,
         facts: [
@@ -133,18 +201,87 @@ describe("what survives validation", () => {
           },
         ],
       });
-      const outcome = await service.turn(turn());
-      expect(outcome.facts).toEqual([]);
-      expect(outcome.rejectedFacts).toBe(1);
-      // Never silently (G4): Q's words stand, and the refused item is
-      // named so the applicant can say it again.
-      expect(outcome.reply.startsWith(RESULT.reply)).toBe(true);
-      expect(outcome.reply).toMatch(/I couldn't record what you said about/);
-      expect(outcome.notRecorded).toEqual([
-        { dimension, reason: "UNREADABLE" },
+      const outcome = await service.turn(
+        turn({
+          utterance:
+            "Kijani is a seed climate company in Nairobi, Kenya, raising $1.5M in US dollars.",
+        }),
+      );
+      expect(outcome.facts).toEqual([
+        { dimension, value: expected, provenance: "APPLICANT_PROVIDED" },
       ]);
+      expect(outcome.rejectedFacts).toBe(0);
+      expect(outcome.reply).toBe(RESULT.reply);
+      expect(outcome.notRecorded).toBeUndefined();
     },
   );
+
+  it("saves an amount said in words", async () => {
+    const { service } = interviewer({
+      ...RESULT,
+      facts: [
+        {
+          dimension: "raise.amount",
+          value: { kind: "AMOUNT", amount: "2500000", currency: "USD" },
+          provenance: "APPLICANT_PROVIDED",
+          correction: false,
+        },
+      ],
+    });
+    const outcome = await service.turn(
+      turn({
+        utterance:
+          "We're raising two and a half... no, two million five hundred thousand dollars.",
+      }),
+    );
+    expect(outcome.facts.map((f) => f.value)).toEqual([
+      { kind: "AMOUNT", amount: "2500000", currency: "USD" },
+    ]);
+    expect(outcome.notRecorded).toBeUndefined();
+  });
+
+  it("still refuses an amount they never said (the truth guard)", async () => {
+    const { service } = interviewer({
+      ...RESULT,
+      facts: [
+        {
+          dimension: "raise.amount",
+          value: { kind: "TEXT", text: "$3M" },
+          provenance: "APPLICANT_PROVIDED",
+          correction: false,
+        },
+      ],
+    });
+    const outcome = await service.turn(
+      turn({
+        utterance: "We're raising a seed round, about a year of runway.",
+      }),
+    );
+    expect(outcome.facts).toEqual([]);
+    expect(outcome.rejectedFacts).toBe(1);
+    expect(outcome.notRecorded).toEqual([
+      { dimension: "raise.amount", reason: "AMOUNT_NOT_STATED" },
+    ]);
+    expect(outcome.reply).toMatch(/I only keep amounts you say yourself/);
+  });
+
+  it("never says it couldn't record words with nothing of the shape in them", async () => {
+    const { service } = interviewer({
+      ...RESULT,
+      facts: [
+        {
+          dimension: "company.country",
+          value: { kind: "TEXT", text: "somewhere in Europe" },
+          provenance: "APPLICANT_PROVIDED",
+          correction: false,
+        },
+      ],
+    });
+    const outcome = await service.turn(turn());
+    expect(outcome.facts).toEqual([]);
+    expect(outcome.reply).toBe(RESULT.reply);
+    expect(outcome.reply).not.toMatch(/couldn't record/);
+  });
 
   it("replays an older paid checkpoint without restoring a wrongly shaped stage", () => {
     const outcome = InterviewTurnOutcomeSchema.parse({
@@ -780,6 +917,38 @@ describe("what the founder said, not what Q worked out (live 2026-10-15)", () =>
       turn({ utterance: "I'm Laura.", application: application([]) }),
     );
     expect(filled.facts.map((f) => f.dimension)).toEqual(["contact.name"]);
+    // A different name or a new email is a change: recorded over the old
+    // one (the store keeps its history), never refused (owner 2026-10-21).
+    const changed = interviewer({
+      ...RESULT,
+      facts: [
+        { ...spoken, value: { kind: "TEXT" as const, text: "Laura Owusu" } },
+        {
+          dimension: "contact.email" as const,
+          value: { kind: "TEXT" as const, text: "laura@new.example" },
+          provenance: "APPLICANT_PROVIDED" as const,
+          correction: true,
+        },
+      ] as never,
+    });
+    const email = {
+      ...confirmed,
+      id: randomUUID(),
+      dimension: "contact.email",
+      value: { kind: "TEXT", text: "laura@old.example" },
+    } as ApplicationFact;
+    const moved = await changed.service.turn(
+      turn({
+        utterance: "I'm Laura Owusu now, and use laura@new.example from today.",
+        application: application([confirmed, email]),
+      }),
+    );
+    expect(moved.facts.map((f) => [f.dimension, f.value])).toEqual([
+      ["contact.name", { kind: "TEXT", text: "Laura Owusu" }],
+      ["contact.email", { kind: "TEXT", text: "laura@new.example" }],
+    ]);
+    expect(moved.notRecorded).toBeUndefined();
+    expect(moved.reply).toBe(RESULT.reply);
   });
 });
 

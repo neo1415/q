@@ -9,12 +9,12 @@ import { DIMENSION_LABELS } from "./coverage.js";
  * figure that was then refused, and the applicant never knew.
  */
 export type NotRecordedReason =
-  /** An amount they did not say themselves (worked out, not stated). */
-  | "AMOUNT_NOT_STATED"
-  /** Their confirmed contact details stay as confirmed. */
-  | "CONTACT_CONFIRMED"
-  /** A value that could not be kept in the shape this item takes. */
-  | "UNREADABLE";
+  /**
+   * An amount they did not say themselves (worked out, not stated). The
+   * one refusal left (owner principle 2026-10-21): every other answer is
+   * put into its shape and saved, a changed contact detail included.
+   */
+  "AMOUNT_NOT_STATED";
 
 export type NotRecorded = {
   readonly dimension: ApplicationDimension;
@@ -28,8 +28,8 @@ function joinLabels(labels: readonly string[]): string {
 }
 
 /**
- * One plain line saying what was not recorded and why, asking again where
- * the applicant can put it right. Empty when everything read was kept.
+ * One plain line saying a worked-out figure was not recorded and asking
+ * for theirs. Empty when everything read was kept.
  */
 export function notRecordedLine(items: readonly NotRecorded[]): string {
   const of = (reason: NotRecordedReason) => [
@@ -40,23 +40,7 @@ export function notRecordedLine(items: readonly NotRecorded[]): string {
     ),
   ];
   const amounts = of("AMOUNT_NOT_STATED");
-  const unreadable = of("UNREADABLE");
-  const contact = of("CONTACT_CONFIRMED");
-  const lines: string[] = [];
-  if (amounts.length > 0) {
-    lines.push(
-      `I haven't recorded a figure for ${joinLabels(amounts)}: I only keep amounts you say yourself, not ones I work out. What is the figure?`,
-    );
-  }
-  if (unreadable.length > 0) {
-    lines.push(
-      `I couldn't record what you said about ${joinLabels(unreadable)}. Could you put it another way?`,
-    );
-  }
-  if (contact.length > 0) {
-    lines.push(
-      `Your ${joinLabels(contact)} ${contact.length === 1 ? "stays" : "stay"} as you confirmed on the contact step.`,
-    );
-  }
-  return lines.join(" ");
+  return amounts.length === 0
+    ? ""
+    : `I haven't recorded a figure for ${joinLabels(amounts)}: I only keep amounts you say yourself, not ones I work out. What is the figure?`;
 }
