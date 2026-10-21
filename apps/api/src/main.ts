@@ -164,7 +164,9 @@ import {
 } from "@capital-q/permissions";
 import {
   createInvitationMailer,
+  createOrganisationAdminService,
   createOrganisationService,
+  createPostgresOrganisationAdminStore,
   createPostgresTeamJournal,
   createPostgresTeamStore,
   createTeamService,
@@ -2793,6 +2795,11 @@ const { app, logger } = createApp(config, security, {
   admin: platformAdmin,
   // G1/G2: teams.
   team,
+  // Owner/admin backend: capabilities, activity feed, member summaries.
+  organisationAdmin: createOrganisationAdminService({
+    authorization,
+    store: createPostgresOrganisationAdminStore({ sql: database.sql }),
+  }),
   // ADR 0050: business etiquette guides (a person's own; the console's).
   etiquette: (() => {
     const adminStore = createEtiquetteGuideAdminStore({

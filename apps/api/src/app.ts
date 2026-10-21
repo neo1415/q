@@ -175,7 +175,11 @@ import type { EtiquetteGuidePort } from "@capital-q/app-actions";
 import type { EtiquetteGuideAdminStore } from "@capital-q/platform-admin";
 import { registerEtiquetteRoutes } from "./http/etiquette.js";
 import { registerTeamRoutes } from "./http/team.js";
-import type { TeamService } from "@capital-q/organisations";
+import type {
+  OrganisationAdminService,
+  TeamService,
+} from "@capital-q/organisations";
+import { registerOrganisationAdminRoutes } from "./http/organisation-admin.js";
 // end P5 block
 // BILLING block (ADR 0034)
 import {
@@ -295,6 +299,8 @@ export type ApiModules = {
     | undefined;
   /** G1/G2: the company or firm as a team. Absent: no team route registers. */
   readonly team?: TeamService | undefined;
+  /** Owner/admin backend: capabilities, activity feed, member summaries. */
+  readonly organisationAdmin?: OrganisationAdminService | undefined;
   // ADMIN block (ADR 0033)
   readonly adminFreshTokens?: AdminRoutesDependencies["freshTokens"];
   readonly adminVerificationDecider?: AdminRoutesDependencies["decideVerification"];
@@ -617,6 +623,15 @@ export function createApp(
       identities: security.identities,
       team: modules.team,
       namedPhotos: modules.namedPhotos,
+    });
+  }
+
+  // Organisation administration reads (capabilities, activity, members).
+  if (modules.organisationAdmin !== undefined) {
+    registerOrganisationAdminRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      organisationAdmin: modules.organisationAdmin,
     });
   }
 
