@@ -161,3 +161,22 @@ The answer prose is only 14–29% of the object, and it streams first. So the pe
 6. Switch only if no hard invariant fails and every graded score is at least the baseline's. The switch is then a migration on `routing_policies`, for the owner to approve.
 
 The likely cost is under $3 (CALLS_PER_CASE × cases × about $0.02, as the eval scripts estimate).
+
+## Round 5c (21 October 2026): progressive findings
+
+| Change                                                                        | Status | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Each finding is shown as it is written                                        | DONE   | `policy/partial-findings.ts` reads the root `findings` array out of the streaming object and returns each element once it closes. It is a scanner like `partial-answer.ts`: whole elements only, never twice, and text inside strings never counts. Each element is validated with `ModelFindingSchema`, built with `findingBlockOf` (the same function the completed message uses) and emitted as `q.finding.available {finding}` through the run's ordered stage queue. A speculative answer holds them until it is adopted. |
+| Stable ids, with the message authoritative (lane 3's contract, no new fields) | DONE   | The completed message's FINDING blocks take the id each finding was shown under, keyed by normalised statement, because invalid items dropped from the final list shift every position. The set-wide `withoutContradictedGaps` still runs at completion and can only remove. A named other's live finding carries no subjects; the message's own, settled subjects replace it by id (upsert). `persistAnswer` waits for the queued stages and live findings, so the completed message is always the last event.                |
+| Tests                                                                         | DONE   | `partial-findings.test.ts` (every chunk size, braces and quotes inside strings, no early report). `q-answer-tools.test.ts`: live findings arrive before the completed message, and their ids equal the FINDING blocks' ids; an invalid finding is never shown early. The harness has a "first finding" column and asserts it comes well before completion.                                                                                                                                                                     |
+
+Harness at scale 0.1 (real ms). The first finding now arrives long before the turn completes:
+
+| Journey                 | Answer words all out | First finding | Complete |
+| ----------------------- | -------------------- | ------------- | -------- |
+| Typed, one company      | 5,108                | **6,779**     | 14,292   |
+| Comparison of two       | 6,936                | **8,608**     | 27,034   |
+| Spoken follow-up        | 1,879                | **3,542**     | 5,650    |
+| Voice answer with cards | 4,072                | **5,748**     | 7,889    |
+
+Cards still land with the completed message. Card subjects are resolved against the run's reads at completion (`withCardSubjects`), so showing cards progressively needs the same treatment as findings: a per-card builder and an id rule agreed with lane 3.

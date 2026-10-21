@@ -248,14 +248,25 @@ function timedModel(
       const value = {
         answer,
         responseShape: "ANALYTICAL",
-        findings: [
+        // The rest of the object as findings of a realistic size (about
+        // 400 characters each, inside the statement limit), each valid.
+        findings: Array.from(
           {
-            statement: "x".repeat(
-              Math.round(answerTokens * 4 * (1 - answerShare)),
+            length: Math.max(
+              2,
+              Math.round((answerTokens * 4 * (1 - answerShare)) / 520),
             ),
-            truthClass: "USER_CLAIM",
           },
-        ],
+          (_, index) => ({
+            type: ["FACT", "RISK", "STRENGTH", "GAP"][index % 4] ?? "FACT",
+            statement:
+              `Point ${String(index + 1)}: ${"evidence ".repeat(44)}`.trim(),
+            truthClass: "USER_CLAIM",
+            evidenceStatus: "SELF_REPORTED",
+            confidence: "MODERATE",
+            basis: [],
+          }),
+        ),
         missingEvidence: [],
         contradictions: [],
         insufficientEvidence: false,
@@ -409,6 +420,7 @@ export type Timing = {
   readonly firstVisibleMs: number | null;
   readonly firstWordsMs: number | null;
   readonly lastWordsMs: number | null;
+  readonly firstFindingMs: number | null;
   readonly completeMs: number;
   readonly modelCalls: number;
   readonly calls: readonly string[];
@@ -536,6 +548,8 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
   let firstWordsMs: number | null = null;
   /** The last streamed sentence: the voice has the whole answer to say. */
   let lastWordsMs: number | null = null;
+  /** The first finding shown live (q.finding.available). */
+  let firstFindingMs: number | null = null;
   const stages: string[] = [];
   const traced: string[] = [];
   const trace = (what: string): void => {
@@ -602,6 +616,9 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
         input: { eventType?: string; visibleStage?: string | null },
       ) => {
         await wait(LATENCY.dbMs);
+        if (input.eventType === "q.finding.available") {
+          firstFindingMs ??= at();
+        }
         if (input.visibleStage !== null && input.visibleStage !== undefined) {
           stages.push(`${input.visibleStage}@${String(Math.round(at()))}`);
           firstVisibleMs ??= at();
@@ -766,6 +783,7 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
     firstVisibleMs,
     firstWordsMs,
     lastWordsMs,
+    firstFindingMs,
     completeMs,
     modelCalls: calls.length,
     calls,
@@ -784,11 +802,11 @@ describe("turn timing harness", () => {
     const rows: Timing[] = [];
     for (const journey of JOURNEYS) rows.push(await timeJourney(journey));
     const table = [
-      "| journey | first visible | first words | answer words all out | complete | model calls | calls |",
-      "| --- | --- | --- | --- | --- | --- | --- |",
+      "| journey | first visible | first words | answer words all out | first finding | complete | model calls | calls |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- |",
       ...rows.map(
         (row) =>
-          `| ${row.journey} | ${ms(row.firstVisibleMs)} | ${ms(row.firstWordsMs)} | ${ms(row.lastWordsMs)} | ${ms(row.completeMs)} | ${String(row.modelCalls)} | ${row.calls.join(", ")} |`,
+          `| ${row.journey} | ${ms(row.firstVisibleMs)} | ${ms(row.firstWordsMs)} | ${ms(row.lastWordsMs)} | ${ms(row.firstFindingMs)} | ${ms(row.completeMs)} | ${String(row.modelCalls)} | ${row.calls.join(", ")} |`,
       ),
     ].join("\n");
     console.log(`\n${table}\n`);
@@ -807,6 +825,14 @@ describe("turn timing harness", () => {
     // Every journey shows its steps, and the model's work has a stage.
     for (const one of rows) {
       expect(one.stages.some((stage) => /^[A-Z_]+@/u.test(stage))).toBe(true);
+    }
+    // Progressive findings (round 5): the first one is on screen well
+    // before the whole object is written.
+    for (const name of ["typed question about", "comparison"]) {
+      const one = row(name);
+      expect(one.firstFindingMs ?? Infinity).toBeLessThan(
+        one.completeMs * 0.75,
+      );
     }
     // Round 5: a company typed in lowercase is read by code, as a
     // capitalised one is: no lookup round at all (before: two, then one).
