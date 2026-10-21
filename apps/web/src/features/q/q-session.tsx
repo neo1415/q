@@ -13,8 +13,10 @@ import {
 } from "react";
 
 import type {
+  QArtifactPreview,
   QFailureClass,
   QRoomEntry,
+  QRoomPreview,
   QTurnDisposition,
 } from "@capital-q/contracts";
 
@@ -143,6 +145,11 @@ export type QSessionValue = {
    * shows an unanswered turn until something newer is said.
    */
   readonly voiceOutcomes: readonly VoiceOutcomeRow[];
+  /**
+   * Artifacts live on a voice line (L-16): the cards for what Q is saying
+   * now, from the room feed, until the answer lands.
+   */
+  readonly spokenPreview: QArtifactPreview | null;
   /** Q's state, from real signals only, with its word and detail. */
   readonly presence: {
     readonly state: QApertureState;
@@ -374,8 +381,24 @@ export function QSessionProvider({
   useEffect(() => {
     shownConversation.current = conversationId;
   }, [conversationId]);
+  const [spokenPreview, setSpokenPreview] = useState<QArtifactPreview | null>(
+    null,
+  );
+  const onRoomPreview = useCallback((live: QRoomPreview) => {
+    setSpokenPreview(live.preview);
+  }, []);
+  useEffect(() => {
+    if (!voice.active) setSpokenPreview(null);
+  }, [voice.active]);
   const onRoom = useCallback(
     (entries: readonly QRoomEntry[]) => {
+      // The answer has landed: its blocks decide what is shown.
+      setSpokenPreview((live) =>
+        live !== null &&
+        entries.some((entry) => entry.message.messageId === live.messageId)
+          ? null
+          : live,
+      );
       for (const entry of entries) {
         const named = entry.conversationId;
         if (named !== null && named !== shownConversation.current) {
@@ -393,7 +416,7 @@ export function QSessionProvider({
     },
     [qAbsorb, reread],
   );
-  useQRoomFeed(voice.active, onRoom);
+  useQRoomFeed(voice.active, onRoom, undefined, onRoomPreview);
 
   const voiceSpeaking = voice.client.state === "Q_SPEAKING";
   const wasSpeaking = useRef(false);
@@ -613,6 +636,7 @@ export function QSessionProvider({
       spoken,
       spokenOnly,
       voiceOutcomes,
+      spokenPreview,
       presence: { state, label, detail },
       open,
       talk,
@@ -630,6 +654,7 @@ export function QSessionProvider({
       spoken,
       spokenOnly,
       voiceOutcomes,
+      spokenPreview,
       state,
       label,
       detail,

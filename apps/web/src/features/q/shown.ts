@@ -569,10 +569,22 @@ type LivePreviewOf = NonNullable<Extract<QTurn, { kind: "Q" }>["preview"]>;
 export function livePreviewOf(
   turns: readonly QTurn[],
   shown: Pick<ShownItem, "blocks"> | null,
+  /**
+   * L-16: on a voice line the answer does not stream into the thread; its
+   * preview comes through the room feed instead, while Q says it.
+   */
+  spoken?: LivePreviewOf | null,
 ): LivePreviewOf | null {
   const latest = turns.at(-1);
-  if (latest?.kind !== "Q" || !latest.streaming) return null;
-  const preview = latest.preview;
+  const preview =
+    latest?.kind === "Q" && latest.streaming
+      ? latest.preview
+      : // The spoken answer is in the thread: its blocks decide now.
+        spoken === null ||
+          spoken === undefined ||
+          turns.some((turn) => turn.id === spoken.messageId)
+        ? undefined
+        : spoken;
   if (preview === undefined || preview.subjects.length === 0) return null;
   if (shown !== null) {
     const there = subjectOf(shown);

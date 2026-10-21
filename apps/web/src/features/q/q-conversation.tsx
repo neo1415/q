@@ -1204,6 +1204,7 @@ export function QConversationPanel({
                     )}
                     <QPresenceStage
                       live={voice.active}
+                      spokenPreview={session.spokenPreview}
                       onBoardLanded={onBoardLanded}
                       onPin={boardMarks.pin}
                       presence={(compact, mini) =>

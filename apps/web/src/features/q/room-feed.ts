@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-import type { QRoomEntry, QRoomRead } from "@capital-q/contracts";
+import type { QRoomEntry, QRoomPreview, QRoomRead } from "@capital-q/contracts";
 
 /**
  * voice-cards: the person's Q room feed, read in the browser.
@@ -37,6 +37,11 @@ export type RoomFeedReader = { readonly stop: () => void };
 export function startRoomFeed(options: {
   readonly read: RoomRead;
   readonly onEntries: (entries: readonly QRoomEntry[]) => void;
+  /**
+   * Artifacts live (L-16): the cards for what Q is saying now, before its
+   * answer lands. Never for an answer already handed over.
+   */
+  readonly onPreview?: ((preview: QRoomPreview) => void) | undefined;
   readonly now?: (() => number) | undefined;
   readonly wait?:
     ((ms: number, signal: AbortSignal) => Promise<void>) | undefined;
@@ -105,6 +110,10 @@ export function startRoomFeed(options: {
         });
       for (const entry of fresh) seen.add(entry.message.messageId);
       if (fresh.length > 0) options.onEntries(fresh);
+      const live = read.preview;
+      if (live !== undefined && !seen.has(live.preview.messageId)) {
+        options.onPreview?.(live);
+      }
     }
   })();
 
@@ -156,11 +165,14 @@ export function useQRoomFeed(
   active: boolean,
   onEntries: (entries: readonly QRoomEntry[]) => void,
   read: RoomRead = fetchRoomRead,
+  onPreview?: (preview: QRoomPreview) => void,
 ): void {
   const handler = useRef(onEntries);
+  const previewHandler = useRef(onPreview);
   useEffect(() => {
     handler.current = onEntries;
-  }, [onEntries]);
+    previewHandler.current = onPreview;
+  }, [onEntries, onPreview]);
   const seen = useRef(new Set<string>());
   useEffect(() => {
     if (!active) return;
@@ -168,6 +180,7 @@ export function useQRoomFeed(
       read,
       seen: seen.current,
       onEntries: (entries) => handler.current(entries),
+      onPreview: (preview) => previewHandler.current?.(preview),
     });
     return () => reader.stop();
   }, [active, read]);

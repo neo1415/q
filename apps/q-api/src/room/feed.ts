@@ -3,10 +3,13 @@ import { randomUUID } from "node:crypto";
 import {
   Q_ROOM_HOLD_MS,
   Q_ROOM_KEPT,
+  Q_ROOM_PREVIEW_MS,
   QRunIdSchema,
+  type QArtifactPreview,
   type CorrelationId,
   type QResponseMessage,
   type QRoomEntry,
+  type QRoomPreview,
   type QRoomRead,
   type QRoomSource,
 } from "@capital-q/contracts";
@@ -48,6 +51,15 @@ export type QRoomPublish = {
 export type QRoomFeed = {
   readonly epoch: string;
   readonly publish: (actor: ActorContext, entry: QRoomPublish) => void;
+  /**
+   * Artifacts live on a voice line: the cards for what Q is saying now,
+   * before its answer lands. Replaces the last one; dropped when that
+   * run's answer is published.
+   */
+  readonly preview: (
+    actor: ActorContext,
+    input: { readonly runId: string; readonly preview: QArtifactPreview },
+  ) => void;
   /** Entries after `after`; held up to `holdMs` for the next when none. */
   readonly read: (input: {
     readonly actor: ActorContext;
@@ -74,6 +86,8 @@ export type QRoomFeed = {
 type Room = {
   sequence: number;
   readonly entries: QRoomEntry[];
+  /** The live spoken preview and when it was set. */
+  live: { readonly preview: QRoomPreview; readonly at: number } | null;
   readonly listeners: Set<() => void>;
   lastReadAt: number;
   readers: number;
@@ -112,6 +126,7 @@ export function createQRoomFeed(
       room = {
         sequence: 0,
         entries: [],
+        live: null,
         listeners: new Set(),
         lastReadAt: 0,
         readers: 0,
@@ -123,6 +138,13 @@ export function createQRoomFeed(
 
   const after = (room: Room, cursor: number) =>
     room.entries.filter((entry) => entry.sequence > cursor);
+  /** The live preview, when it is newer than the cursor and still fresh. */
+  const liveAfter = (room: Room, cursor: number): QRoomPreview | undefined =>
+    room.live !== null &&
+    room.live.preview.sequence > cursor &&
+    now() - room.live.at <= Q_ROOM_PREVIEW_MS
+      ? room.live.preview
+      : undefined;
 
   const publish: QRoomFeed["publish"] = (actor, entry) => {
     const room = roomOf(actor);
@@ -144,7 +166,27 @@ export function createQRoomFeed(
       message: entry.message,
     });
     room.entries.splice(0, Math.max(0, room.entries.length - Q_ROOM_KEPT));
+    // The answer's blocks win: its preview is done.
+    if (room.live?.preview.runId === entry.runId) room.live = null;
     room.lastReadAt = Math.max(room.lastReadAt, now());
+    for (const listener of room.listeners) listener();
+  };
+
+  const preview: QRoomFeed["preview"] = (actor, input) => {
+    const runId = QRunIdSchema.safeParse(input.runId);
+    if (!runId.success) return;
+    const room = roomOf(actor);
+    // A run whose answer is already here has nothing left to preview.
+    if (room.entries.some((one) => one.runId === runId.data)) return;
+    room.sequence += 1;
+    room.live = {
+      preview: {
+        sequence: room.sequence,
+        runId: runId.data,
+        preview: input.preview,
+      },
+      at: now(),
+    };
     for (const listener of room.listeners) listener();
   };
 
@@ -159,6 +201,7 @@ export function createQRoomFeed(
   return {
     epoch,
     publish,
+    preview,
     watched,
 
     read: async ({
@@ -176,12 +219,21 @@ export function createQRoomFeed(
         theirs !== undefined && theirs !== epoch
           ? 0
           : Math.min(cursorIn, room.sequence);
-      const answer = (): QRoomRead => ({
-        epoch,
-        cursor: room.sequence,
-        entries: after(room, cursor),
-      });
-      if (!wait || after(room, cursor).length > 0 || signal?.aborted === true) {
+      const answer = (): QRoomRead => {
+        const live = liveAfter(room, cursor);
+        return {
+          epoch,
+          cursor: room.sequence,
+          entries: after(room, cursor),
+          ...(live === undefined ? {} : { preview: live }),
+        };
+      };
+      if (
+        !wait ||
+        after(room, cursor).length > 0 ||
+        liveAfter(room, cursor) !== undefined ||
+        signal?.aborted === true
+      ) {
         return answer();
       }
       room.readers += 1;

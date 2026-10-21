@@ -198,6 +198,34 @@ describe("the card comes up with the sentence that names it", () => {
       "Baridi Health",
     );
   });
+
+  it("on a voice line, puts up what Q is naming aloud until the answer is in the thread (L-16)", () => {
+    const spoken = preview("CARD", [BARIDI, "Baridi Health"]);
+    const asked = [person("p1", "Which one fits?")];
+    // The spoken answer does not stream into the thread: the room's
+    // preview is what is up.
+    expect(livePreviewOf(asked, null, spoken)?.subjects[0]?.name).toBe(
+      "Baridi Health",
+    );
+    // A typed answer streaming now wins.
+    const typed = preview("CARD", [MEDTRAIL, "MedTrail"]);
+    expect(
+      livePreviewOf(
+        [
+          ...asked,
+          answer("t1", "MedTrail...", { streaming: true, preview: typed }),
+        ],
+        null,
+        spoken,
+      )?.subjects[0]?.name,
+    ).toBe("MedTrail");
+    // The answer landed: its own blocks decide.
+    const landed = [
+      ...asked,
+      answer(MSG, "Baridi Health fits.", { blocks: [demoTop(3)] }),
+    ];
+    expect(livePreviewOf(landed, null, spoken)).toBeNull();
+  });
 });
 
 describe("pictures: a real logo or photo, else initials, never broken or blank", () => {

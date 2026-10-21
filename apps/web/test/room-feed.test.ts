@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { QRoomEntry, QRoomRead } from "@capital-q/contracts";
+import type { QRoomEntry, QRoomPreview, QRoomRead } from "@capital-q/contracts";
 
 import { startRoomFeed, type RoomRead } from "../src/features/q/room-feed";
 
@@ -146,5 +146,43 @@ describe("the room feed reader", () => {
     reader.stop();
     expect(waits).toEqual([2_000]);
     expect(got).toEqual(["m1"]);
+  });
+
+  it("hands over the spoken preview, never one for an answer already handed over (L-16)", async () => {
+    const live = (sequence: number, messageId: string): QRoomPreview =>
+      ({
+        sequence,
+        runId: "f0000000-0000-4000-8000-000000000020",
+        preview: {
+          messageId,
+          subjects: [
+            {
+              subject: {
+                kind: "COMPANY",
+                companyId: "a0000000-0000-4000-8000-000000000001",
+              },
+              name: "Haly",
+            },
+          ],
+          layout: "CARD",
+        },
+      }) as QRoomPreview;
+    const previews: string[] = [];
+    const { read } = scripted([
+      { epoch: "e1", cursor: 0, entries: [] },
+      { epoch: "e1", cursor: 1, entries: [], preview: live(1, "m1") },
+      { epoch: "e1", cursor: 2, entries: [entry(2, "m1")] },
+      // A stale read that still carries it: the answer is already here.
+      { epoch: "e1", cursor: 3, entries: [], preview: live(3, "m1") },
+    ]);
+    const reader = startRoomFeed({
+      read,
+      now: () => NOW,
+      onEntries: () => undefined,
+      onPreview: (one) => previews.push(one.preview.messageId),
+    });
+    await settle();
+    reader.stop();
+    expect(previews).toEqual(["m1"]);
   });
 });
