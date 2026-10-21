@@ -1,7 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import {
   createQStreamState,
@@ -52,6 +59,13 @@ import {
 } from "../onboarding-kit/material-actions";
 import { CONTINUE_LATER_PAUSE_MS } from "../onboarding-kit/components/continue-later";
 import { writeLastMode } from "../onboarding-kit/last-mode";
+import {
+  confirmSent,
+  holdPending,
+  keepTyping,
+  readDraft,
+  unsentAfterReload,
+} from "./draft-store";
 import { destinationPath } from "../voice/destinations";
 import { useFollowTurn } from "../voice/use-follow-turn";
 import { requestMove } from "../q/ui-act-controller";
@@ -211,6 +225,9 @@ const EMPTY_STEP_DRAFT: StepDraft = {
   taxonomyQuery: "",
   taxonomyResults: EMPTY_RESULTS,
 };
+
+/** Nothing to subscribe to: the value only changes once, on hydration. */
+const subscribeNever = () => () => undefined;
 
 function newId(): string {
   return crypto.randomUUID();
@@ -451,6 +468,29 @@ export function QOnboardingWorkspace({
     view?.session.version,
   );
   const remaining = view === undefined ? 0 : remainingCount(view);
+  // D7: words left in the composer last time come back with the interview.
+  // Storage is the browser's: read once hydrated (the server renders an
+  // empty composer), and the composer starts from it once per interview;
+  // every change is kept again as it is typed.
+  const draftSessionId = view?.session.id;
+  const hydrated = useSyncExternalStore(
+    subscribeNever,
+    () => true,
+    () => false,
+  );
+  const typedDraft = useMemo(
+    () =>
+      hydrated && draftSessionId !== undefined
+        ? { sessionId: draftSessionId, text: readDraft(draftSessionId).typing }
+        : null,
+    [hydrated, draftSessionId],
+  );
+  const keepDraft = useCallback(
+    (value: string) => {
+      if (draftSessionId !== undefined) keepTyping(draftSessionId, value);
+    },
+    [draftSessionId],
+  );
   const isFinal =
     prompt !== null && vocabulary.finalStepKeys.includes(prompt.stepKey);
   const taxonomy = useMemo(
@@ -531,7 +571,13 @@ export function QOnboardingWorkspace({
         : "smooth",
       block: "nearest",
     });
-  }, [turns.length, proposals.length, gaps.length, qStream?.partial?.text]);
+  }, [
+    turns.length,
+    proposals.length,
+    gaps.length,
+    qStream?.partial?.text,
+    replyStream,
+  ]);
 
   // While Q is reading a free-text turn, re-read the session on a timer
   // through the same client; the proposals arrive as its state.
@@ -623,9 +669,24 @@ export function QOnboardingWorkspace({
           kind: turn.role === "Q" ? ("Q" as const) : ("PERSON" as const),
           text: turn.text,
         }));
-        if (restored.length > 0) {
+        // D7: what they sent last time and Q never confirmed, unless the
+        // thread shows it reached Q; offered back as not answered.
+        const draft = readDraft(sessionId);
+        const keptLines = kept
+          .filter((turn) => turn.role === "PERSON")
+          .map((turn) => turn.text)
+          .slice(-(draft.pending.length + 2));
+        const unsent: Turn[] = unsentAfterReload(draft.pending, keptLines).map(
+          (text) => ({ id: newId(), kind: "PERSON", text, unsent: true }),
+        );
+        for (const text of draft.pending) {
+          if (!unsent.some((line) => line.text === text)) {
+            confirmSent(sessionId, text);
+          }
+        }
+        if (restored.length > 0 || unsent.length > 0) {
           // A turn typed while the thread loaded stays after it.
-          setTurns((current) => [...restored, ...current]);
+          setTurns((current) => [...restored, ...unsent, ...current]);
         }
         // Q is still asking what it last said: that line is the question,
         // and the interview is not opened a second time (see
@@ -856,6 +917,8 @@ export function QOnboardingWorkspace({
         prompt !== null &&
         prompt.control === "text" &&
         trimmed.split(/\s+/).length >= 6;
+      const draftId = view?.session.id;
+      if (draftId !== undefined) holdPending(draftId, trimmed);
       // Turn latency L9: Q's reply shows a sentence at a time while the turn
       // runs; the finished turn below then takes its place, as before.
       setReplyStream(null);
@@ -866,6 +929,9 @@ export function QOnboardingWorkspace({
         .finally(() => {
           setReplyStream(null);
         });
+      if (turn !== null && draftId !== undefined) {
+        confirmSent(draftId, trimmed);
+      }
       if (turn === null) {
         // Q never answered (a failure, a timeout, a lost connection). The
         // line says so and can be sent again; it is never left looking
@@ -991,6 +1057,7 @@ export function QOnboardingWorkspace({
       voiceConnected,
       voiceSendText,
       journeyName,
+      view?.session.id,
     ],
   );
 
@@ -1012,9 +1079,12 @@ export function QOnboardingWorkspace({
         return;
       }
       dropLine(line.id);
+      const draftId = view?.session.id;
+      // Held again as it goes; never twice.
+      if (draftId !== undefined) confirmSent(draftId, line.text);
       void say(line.text, true);
     },
-    [say, dropLine],
+    [say, dropLine, view?.session.id],
   );
 
   /**
@@ -2240,6 +2310,9 @@ export function QOnboardingWorkspace({
 
       <div className="cq-q-composer-dock">
         <QComposer
+          key={typedDraft?.sessionId ?? "draft"}
+          initialValue={typedDraft?.text ?? ""}
+          onValueChange={keepDraft}
           id="onboarding-q"
           contextScope={
             vocabulary.subject === "founder"

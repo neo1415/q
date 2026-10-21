@@ -336,4 +336,9 @@ export type OnboardingInterviewTurnRecord = {
   readonly channel: OnboardingInterviewTurnChannel;
   readonly turnRef: string | null;
   readonly createdAt: UtcTimestamp;
+  /**
+   * For a PERSON turn: the steps the independent reading found it stated
+   * (onboarding.interview_readings), when one was recorded. Null otherwise.
+   */
+  readonly stated?: readonly string[] | null;
 };

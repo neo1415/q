@@ -382,7 +382,19 @@ export type OnboardingInterviewTurnRepository = {
     sessionId: OnboardingSessionId,
     turnRef: string,
   ) => Promise<readonly OnboardingInterviewTurnRecord[]>;
-  /** The newest `limit` turns, oldest first. */
+  /**
+   * Records what the reading found an exchange's PERSON turn stated (D9).
+   * False when that exchange already has one: nothing was written.
+   */
+  readonly appendReading: (
+    tx: TransactionContext,
+    input: {
+      readonly sessionId: OnboardingSessionId;
+      readonly turnRef: string;
+      readonly stated: readonly string[];
+    },
+  ) => Promise<boolean>;
+  /** The newest `limit` turns, oldest first, each PERSON turn with its reading. */
   readonly listRecent: (
     executor: DatabaseExecutor,
     sessionId: OnboardingSessionId,

@@ -7,6 +7,7 @@ import {
   QInterviewTurnResponseSchema,
   Q_INTERVIEW_STREAM_EVENTS,
   Q_SSE_CONTENT_TYPE,
+  type QInterviewTurnResponse,
 } from "@capital-q/contracts";
 import { AuthenticationRequiredError } from "@capital-q/security";
 
@@ -19,7 +20,10 @@ import {
   type ActorContextDependencies,
 } from "../security/actor-context.js";
 import type { QVoiceRoutesDependencies } from "./routes.js";
-import type { InterviewAgent } from "./interview-agent.js";
+import type {
+  InterviewAgent,
+  InterviewAgentTurnInput,
+} from "./interview-agent.js";
 import type { PresenceTrigger } from "./presence-trigger.js";
 import { signupContextFromToken } from "./interview-steps.js";
 import { AccountPausedError } from "./standing.js";
@@ -67,6 +71,56 @@ export type QInterviewRouteDependencies = ActorContextDependencies & {
    */
   readonly presence?: PresenceTrigger | undefined;
 };
+
+type TurnOutcome = Awaited<ReturnType<InterviewAgent["turn"]>>;
+
+/** The outcome as the wire carries it, for both routes. */
+function toTurnResponse(outcome: TurnOutcome): QInterviewTurnResponse {
+  return QInterviewTurnResponseSchema.parse({
+    reply: outcome.reply,
+    intent: outcome.intent,
+    asking:
+      outcome.asking === null
+        ? null
+        : {
+            stepKey: outcome.asking.stepKey,
+            kind: outcome.asking.kind,
+            options: outcome.asking.options.map((option) => ({
+              key: option.key,
+              label: option.label,
+              ...(option.description === undefined
+                ? {}
+                : { description: option.description }),
+            })),
+            ...(outcome.asking.maxChoices === undefined
+              ? {}
+              : { maxChoices: outcome.asking.maxChoices }),
+          },
+    recorded: [...outcome.recorded],
+    skipped: [...outcome.skipped],
+    questionForQ: outcome.questionForQ,
+    researching: outcome.researching,
+    navigate: outcome.navigate,
+    handoff: outcome.handoff,
+    degraded: outcome.degraded,
+    askingAbout: [
+      ...(outcome.askingAbout ??
+        (outcome.asking === null ? [] : [outcome.asking.stepKey])),
+    ],
+    pending: {
+      recommendations: [...(outcome.pending?.recommendations ?? [])],
+      held: [...(outcome.pending?.held ?? [])],
+    },
+    ...(outcome.conduct === undefined ? {} : { conduct: outcome.conduct }),
+    ...(outcome.gestures === undefined || outcome.gestures.length === 0
+      ? {}
+      : { gestures: [...outcome.gestures] }),
+    ...(outcome.resumed === true ? { resumed: true } : {}),
+    ...(outcome.confirming === undefined
+      ? {}
+      : { confirming: { kind: outcome.confirming.kind } }),
+  });
+}
 
 export function registerQInterviewRoute(
   app: FastifyInstance,
@@ -168,50 +222,7 @@ export function registerQInterviewRoute(
 
       // The public look-ups by name, and the questions their findings
       // become, are the onboarding conductor's (inside `agent.turn`).
-      const response = QInterviewTurnResponseSchema.parse({
-        reply: outcome.reply,
-        intent: outcome.intent,
-        asking:
-          outcome.asking === null
-            ? null
-            : {
-                stepKey: outcome.asking.stepKey,
-                kind: outcome.asking.kind,
-                options: outcome.asking.options.map((option) => ({
-                  key: option.key,
-                  label: option.label,
-                  ...(option.description === undefined
-                    ? {}
-                    : { description: option.description }),
-                })),
-                ...(outcome.asking.maxChoices === undefined
-                  ? {}
-                  : { maxChoices: outcome.asking.maxChoices }),
-              },
-        recorded: [...outcome.recorded],
-        skipped: [...outcome.skipped],
-        questionForQ: outcome.questionForQ,
-        researching: outcome.researching,
-        navigate: outcome.navigate,
-        handoff: outcome.handoff,
-        degraded: outcome.degraded,
-        askingAbout: [
-          ...(outcome.askingAbout ??
-            (outcome.asking === null ? [] : [outcome.asking.stepKey])),
-        ],
-        pending: {
-          recommendations: [...(outcome.pending?.recommendations ?? [])],
-          held: [...(outcome.pending?.held ?? [])],
-        },
-        ...(outcome.conduct === undefined ? {} : { conduct: outcome.conduct }),
-        ...(outcome.gestures === undefined || outcome.gestures.length === 0
-          ? {}
-          : { gestures: [...outcome.gestures] }),
-        ...(outcome.resumed === true ? { resumed: true } : {}),
-        ...(outcome.confirming === undefined
-          ? {}
-          : { confirming: { kind: outcome.confirming.kind } }),
-      });
+      const response = toTurnResponse(outcome);
       if (stream !== null) {
         stream.end(Q_INTERVIEW_STREAM_EVENTS.RESULT, response);
         return reply;

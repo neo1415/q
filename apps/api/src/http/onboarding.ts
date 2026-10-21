@@ -389,6 +389,7 @@ export function registerOnboardingRoutes(
         sessionId: sessionIdParam(request),
         turnRef: input.turnRef,
         turns: input.turns,
+        ...(input.stated === undefined ? {} : { stated: input.stated }),
       });
       void reply
         .status(result.written ? 201 : 200)

@@ -40,6 +40,7 @@ const TurnRow = z.object({
   channel: OnboardingInterviewTurnChannelSchema,
   turn_ref: UuidSchema.nullable(),
   created_at: Timestamp,
+  stated_step_keys: z.array(OnboardingStepKeySchema).nullable().optional(),
 });
 
 function toTurn(row: unknown): OnboardingInterviewTurnRecord {
@@ -53,6 +54,7 @@ function toTurn(row: unknown): OnboardingInterviewTurnRecord {
     channel: r.channel,
     turnRef: r.turn_ref,
     createdAt: r.created_at,
+    stated: r.stated_step_keys ?? null,
   };
 }
 
@@ -83,11 +85,27 @@ export function createPostgresOnboardingInterviewTurnRepository(): OnboardingInt
          order by t.created_at, t.id`;
       return rows.map(toTurn);
     },
+    appendReading: async (tx, input) => {
+      // The unique index is the idempotency record: a retried exchange
+      // conflicts and writes nothing.
+      const rows = await tx.sql`
+        insert into onboarding.interview_readings
+               (session_id, turn_ref, stated_step_keys)
+        values (${input.sessionId}, ${input.turnRef},
+                ${[...input.stated]}::text[])
+        on conflict (session_id, turn_ref) do nothing
+        returning id`;
+      return rows.length > 0;
+    },
     listRecent: async (executor, sessionId, limit) => {
       const rows = await executor`
         select * from (
-          select ${turnColumns(executor)}
+          select ${turnColumns(executor)},
+                 case when t.role = 'PERSON' then r.stated_step_keys end
+                   as stated_step_keys
             from onboarding.interview_turns t
+            left join onboarding.interview_readings r
+              on r.session_id = t.session_id and r.turn_ref = t.turn_ref
            where t.session_id = ${sessionId}
            order by t.created_at desc, t.id desc
            limit ${limit}
