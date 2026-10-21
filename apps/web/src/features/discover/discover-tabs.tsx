@@ -140,7 +140,7 @@ export function DiscoverTabs({
         <div
           hidden={tab !== "YOURS"}
           inert={tab !== "YOURS"}
-          className="cq-stage"
+          className="cq-stage cq-cinema"
           data-feed-immersive={tab === "YOURS" ? "" : undefined}
         >
           <YourCompaniesFeed

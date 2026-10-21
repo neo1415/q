@@ -171,7 +171,7 @@ export function ExploreFeed({
 
   return (
     <div
-      className="cq-explore-feed"
+      className="cq-explore-feed cq-cinema"
       role="dialog"
       aria-modal="true"
       aria-label={`Pitches related to ${anchor.canonicalName}`}

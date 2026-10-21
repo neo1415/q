@@ -224,7 +224,7 @@ export function ElevatorBrief({
                 />
               </div>
             ) : (
-              <div className="cq-brief-poster">
+              <div className="cq-brief-poster cq-cinema">
                 <span className="pt">
                   <span
                     className="cq-brief-av"

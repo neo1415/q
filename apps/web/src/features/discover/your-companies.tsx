@@ -513,7 +513,10 @@ export function YourCompaniesFeed({
   }
   if (items.length === 0) {
     return (
-      <div className="cq-yours-feed cq-yours-empty" data-your-companies-empty>
+      <div
+        className="cq-yours-feed cq-yours-empty cq-cinema"
+        data-your-companies-empty
+      >
         <EmptyState
           title={
             failed === null
@@ -538,7 +541,7 @@ export function YourCompaniesFeed({
   const current = items[active];
   return (
     <div
-      className="cq-yours-feed"
+      className="cq-yours-feed cq-cinema"
       role="feed"
       aria-label={t("Your companies")}
       // Focusable so the arrow keys scroll it; its links are the tab stops.

@@ -573,7 +573,7 @@ function Mono({
       className={cx(
         "grid h-[30px] w-[30px] place-items-center rounded-[10px] text-[11.5px] font-semibold tracking-[0.01em] lg:h-[34px] lg:w-[34px] lg:text-[12.5px]",
         tone === "lead"
-          ? "bg-(--cq-stage-canvas) text-(--cq-stage-q-core)"
+          ? "cq-cinema bg-(--cq-stage-canvas) text-(--cq-stage-q-core)"
           : tone === "you"
             ? "bg-(--cq-accent-soft) text-(--cq-accent)"
             : "bg-(--cq-surface-subtle) text-(--cq-text-secondary)",

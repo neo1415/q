@@ -883,3 +883,40 @@ Founder-directed redesign released by pushing `claude/friendly-feynman-q9haun` t
 CI39379450382 on 41e31d18d: build, types, lint, pgTAP green; test red only on route-capability-parity (new `/dev/discover` unclassified). Fixed forward by classifying it exempt and regenerating `docs/recovery/capability-parity.md`; parity test 11/11 locally. Railway status could NOT be read: the environment `RAILWAY_TOKEN` returns Not Authorized (rotation outstanding). Live web returns 200; deployed revision not yet confirmed per service.
 
 Next: confirm CI on the fix commit and Railway revisions; founder to pick Profile / Data Room / CRM options (prototypes in the session, not in the repo).
+
+## Chosen designs release — 20 October 2026, 22:00 UTC (Claude)
+
+The founder-chosen redesign is integrated on `claude/friendly-feynman-q9haun` and pushed to `build/int-rc`, `recovery/2026-09-12-8y2j4w` and `recovery/2026-09-12` (93c336aeb).
+
+Contents:
+
+- **Company profile:** option 1, Decision brief, on every tab. Section by section has phone swipe and desktop side arrows. Code is in `features/company/brief/*`.
+- **Data room:** option 1.
+- **CRM, by page:**
+  - Overview: Morning brief.
+  - Pipeline: List / Table / Board.
+  - Capital: investor option 3 and founder option 1.
+  - Record: next-step rail, warm charcoal (`.cq-charcoal` scoped tokens).
+  - Diligence: checklist.
+  - Messages: inbox split.
+  - Calls: week calendar.
+  - Deal and close: new routes `relationships/{company|investor}/[id]/deal`.
+- **Q stage follows light and dark mode:** the `--cq-night-*` tokens are used in dark; `.cq-cinema` keeps video dark.
+- **Rounded corners are restored.**
+- **New API:** `POST /v1/relationships/:id/meeting-availability`, which returns busy times only.
+- **The shared button reads `--cq-primary-action`.**
+- **Dev review pages:** `/dev/profile` and `/dev/crm` return 404 in production.
+- **No migrations.**
+
+Local checks on the merged head:
+
+- root tsc: exit 0;
+- vitest (web, ui, api, parity, communication): 433 files and 4103 tests passed.
+
+Railway auto-deploy did NOT trigger for 1cb6c83f0, so the deploys were run manually through GraphQL `serviceInstanceDeployV2`. All four services reached SUCCESS at 1cb6c83f0. The live `/auth/sign-in` serves the new button class. 93c336aeb was triggered the same way; its verification is in the next entry.
+
+Next:
+
+- Real-data screenshots with Zino and Tensorgate need the founder's approval for production reads from the sandbox.
+- The founder picks options for the remaining pages (the gallery artifact is in the session).
+- Rotate the Railway and Supabase tokens pasted in chat, and add them as environment secrets.
