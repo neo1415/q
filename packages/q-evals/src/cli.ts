@@ -2,7 +2,7 @@
  * `q-eval` (CQ-Q-010 §76-§87, §135).
  *
  *   q-eval lint
- *   q-eval run --profile LOCAL_FAST|CI_CORE|LIVE_MODEL [--provider google|groq]
+ *   q-eval run --profile LOCAL_FAST|CI_CORE|LIVE_MODEL [--provider google|groq] [--prompts candidate]
  *              [--case A,B] [--out <dir>] [--baseline <file>] [--update-baseline] [--show-answers]
  *   q-eval compare <baseline.json> <result.json>
  *
@@ -11,6 +11,8 @@
  * dataset, or a runner fault. Live runs report key PRESENCE only.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+
+import { createCandidatePromptRegistry } from "@capital-q/q-core";
 import { resolve } from "node:path";
 
 import { loadDatabaseConfig } from "@capital-q/config/database";
@@ -160,7 +162,20 @@ async function run(args: Args): Promise<number> {
       }
     }
     console.log(`profile ${profile}: ${definition.description}`);
+    // --prompts candidate: the prompts awaiting eval parity (COMPANY_ANALYST
+    // v27) replace the active ones for this run only.
+    const prompts = args.flags["prompts"];
+    if (prompts !== undefined && prompts !== "candidate") {
+      console.error(`unknown --prompts ${String(prompts)} (only: candidate)`);
+      return 1;
+    }
+    if (prompts === "candidate") {
+      console.log("prompts: candidate (createCandidatePromptRegistry)");
+    }
     const result = await runQEvals(datasets, {
+      ...(prompts === "candidate"
+        ? { registry: createCandidatePromptRegistry() }
+        : {}),
       db,
       profile,
       providerMode: definition.providerMode,

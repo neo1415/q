@@ -140,6 +140,7 @@ import {
   groundedFitWords,
   hasOrphanListItems,
   spokenBeforeCards,
+  withFitMeasures,
 } from "./fit-cards.js";
 import {
   fitSweepAsk,
@@ -6721,7 +6722,11 @@ export function createModelGatewayQAnswer(
           read: companiesRead,
         })?.map((block) =>
           block.kind === "ANSWER_CARDS"
-            ? withCardSubjects(block, companiesRead)
+            ? // v27: a fit-scored card's measures are the platform's own.
+              withFitMeasures(
+                withCardSubjects(block, companiesRead),
+                runFits.read(request.runId),
+              )
             : block,
         );
         // Zino live 2026-10-07: a list with scores came back with no cards.

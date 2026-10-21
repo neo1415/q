@@ -149,6 +149,7 @@ export async function runQEvals(
     providerMode: options.providerMode,
     providerFilter: options.providerFilter,
     secrets: options.secrets,
+    ...(options.registry === undefined ? {} : { registry: options.registry }),
   });
   const results: QEvalCaseResult[] = [];
   const keepAnswers = options.keepAnswers ?? options.providerMode === "LIVE";

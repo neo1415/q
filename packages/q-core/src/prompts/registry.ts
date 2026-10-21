@@ -52,6 +52,7 @@ import { COMPANY_ANALYST_V23 } from "./tasks/company-analyst.v23.js";
 import { COMPANY_ANALYST_V24 } from "./tasks/company-analyst.v24.js";
 import { COMPANY_ANALYST_V25 } from "./tasks/company-analyst.v25.js";
 import { COMPANY_ANALYST_V26 } from "./tasks/company-analyst.v26.js";
+import { COMPANY_ANALYST_V27 } from "./tasks/company-analyst.v27.js";
 import { ARTIFACT_REVISION_V1 } from "./tasks/artifact-revision.v1.js";
 import { ARTIFACT_REVISION_V2 } from "./tasks/artifact-revision.v2.js";
 import { ARTIFACT_REVISION_V3 } from "./tasks/artifact-revision.v3.js";
@@ -628,4 +629,29 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
 /** The production registry: the source-controlled definitions above. */
 export function createDefaultPromptRegistry(): PromptRegistry {
   return createPromptRegistry(PROMPT_DEFINITIONS);
+}
+
+/**
+ * Prompts awaiting eval parity before they replace the active version
+ * (COMPANY_ANALYST v27). Never the production registry: an eval run asks
+ * for it explicitly (`q-eval run --prompts candidate`), and the version it
+ * replaces stays registered, deprecated, so both can be compared.
+ */
+export const CANDIDATE_PROMPT_DEFINITIONS: readonly PromptDefinition<
+  unknown,
+  unknown
+>[] = [COMPANY_ANALYST_V27];
+
+export function createCandidatePromptRegistry(): PromptRegistry {
+  const replaced = new Set(
+    CANDIDATE_PROMPT_DEFINITIONS.map((definition) => definition.id),
+  );
+  return createPromptRegistry([
+    ...PROMPT_DEFINITIONS.map((definition) =>
+      replaced.has(definition.id) && definition.status === "ACTIVE"
+        ? { ...definition, status: "DEPRECATED" as const }
+        : definition,
+    ),
+    ...CANDIDATE_PROMPT_DEFINITIONS,
+  ]);
 }

@@ -41,6 +41,8 @@ export {
 } from "./prompts/definition.js";
 
 export {
+  CANDIDATE_PROMPT_DEFINITIONS,
+  createCandidatePromptRegistry,
   createDefaultPromptRegistry,
   createPromptRegistry,
   PROMPT_DEFINITIONS,
@@ -1688,3 +1690,10 @@ export {
   V26_TRIMS,
   V26_VISUAL_LINE,
 } from "./prompts/tasks/company-analyst.v26.js";
+export {
+  COMPANY_ANALYST_V27,
+  V27_BASIS_FROM,
+  V27_BASIS_TO,
+  V27_CARDS_FROM,
+  V27_CARDS_TO,
+} from "./prompts/tasks/company-analyst.v27.js";
