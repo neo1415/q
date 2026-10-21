@@ -628,7 +628,7 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
     transactions: { run: (work) => work({} as never) },
     tools: toolPort(trace),
     deltas,
-    logger: silent as never,
+    logger: silent,
   });
   const turns: QTurnReader = {
     read: async () => {
@@ -660,7 +660,7 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
     transactions: { run: (work) => work({} as never) },
     turns,
     turnSkim,
-    logger: silent as never,
+    logger: silent,
     ...(journey.document === true
       ? {
           artifacts: {
