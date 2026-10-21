@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useQMotion } from "../q-aperture/q-motion";
 import type { QApertureState } from "../q-aperture/aperture-state";
@@ -9,6 +9,13 @@ import { surfaceDpr } from "./presence-budget";
 import { resolveColour, type Rgb } from "./presence-gl";
 import { whenIdle } from "../q/room/room-read";
 import { startPresenceLoop, type PresenceInputs } from "./presence-loop";
+import {
+  cueDetail,
+  FIGURE_MIN_PIXELS,
+  Q_FIGURE_EVENT,
+  type PresenceFigureId,
+} from "./presence-cue";
+import { PresenceFigureStill } from "./presence-figure-still";
 
 export { particleCount } from "./presence-budget";
 
@@ -58,6 +65,8 @@ export function QSwarm({
   readonly room?: boolean | undefined;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Q Story S4: a cued figure drawn still (reduced motion, or no canvas).
+  const [still, setStill] = useState<PresenceFigureId | null>(null);
   const environment = useQMotion();
   const { motion, bloom } = environment;
   // Motion Off still deserves the 3D still; only a device asking for
@@ -163,7 +172,33 @@ export function QSwarm({
       // W7: the first frame once the page is idle (at most 600 ms on).
       begin: (run) => whenIdle(run, 600),
     });
-    if (loop === null) return;
+    // Q Story S4 (presence-cue.ts): the particles form the cued figure
+    // when they move; otherwise, or with no canvas at all, the figure is
+    // drawn still over the presence for as long as it holds.
+    let stillTimer: ReturnType<typeof setTimeout> | undefined;
+    const onCue = (event: Event) => {
+      const cue = cueDetail(event);
+      if (cue === null || pixels < FIGURE_MIN_PIXELS) return;
+      if (loop !== null && live.current.motion === "full") {
+        loop.cue(cue);
+        return;
+      }
+      clearTimeout(stillTimer);
+      if (cue.kind === "RELEASE") {
+        setStill(null);
+        return;
+      }
+      setStill(cue.figure);
+      stillTimer = setTimeout(() => setStill(null), cue.holdMs);
+    };
+    window.addEventListener(Q_FIGURE_EVENT, onCue);
+    if (loop === null) {
+      return () => {
+        window.removeEventListener(Q_FIGURE_EVENT, onCue);
+        clearTimeout(stillTimer);
+        setStill(null);
+      };
+    }
     const onPointer = (event: PointerEvent) => {
       pointer = { x: event.clientX, y: event.clientY };
     };
@@ -212,6 +247,9 @@ export function QSwarm({
     // The dev harness asks for the Q moment, to screenshot it.
     canvas.addEventListener("cq:q-moment", loop.formQ);
     return () => {
+      window.removeEventListener(Q_FIGURE_EVENT, onCue);
+      clearTimeout(stillTimer);
+      setStill(null);
       canvas.removeEventListener("cq:q-moment", loop.formQ);
       window.removeEventListener("pointermove", onPointer);
       window.removeEventListener("pointerdown", onPointer);
@@ -235,14 +273,22 @@ export function QSwarm({
   }, [state, onStage, showing, room, motion, bloom]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden="true"
-      style={{ width: pixels, height: pixels }}
-      className="block"
-      data-q-swarm={state}
-      data-q-room={room ? "" : undefined}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        aria-hidden="true"
+        style={{
+          width: pixels,
+          height: pixels,
+          // The still figure stands in for the particles while it holds.
+          visibility: still === null ? undefined : "hidden",
+        }}
+        className="block"
+        data-q-swarm={state}
+        data-q-room={room ? "" : undefined}
+      />
+      {still === null ? null : <PresenceFigureStill figure={still} />}
+    </>
   );
 }
 

@@ -21,7 +21,23 @@ export type FigureKind =
   | "BUILDINGS"
   | "CHART_UP"
   | "CLAP"
-  | "HANDS";
+  | "HANDS"
+  // Pictograms (figure-library.ts): what Q is talking about, in light.
+  | "CLOCK"
+  | "INBOX"
+  | "MAGNIFIER"
+  | "PLANE"
+  | "ENVELOPE"
+  | "PEN"
+  | "CHART_DIP"
+  | "CHART_BARS"
+  | "SCALE"
+  | "HOUSE"
+  | "CALENDAR"
+  | "MAP_PIN"
+  | "COMPARE"
+  | "DOCUMENT"
+  | "HANDSHAKE";
 
 /** What a figure is animated by, each frame. */
 export type FigureInput = {
