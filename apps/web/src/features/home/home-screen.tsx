@@ -15,6 +15,7 @@ import {
 import { PersonaCards } from "@/features/persona/persona-cards";
 import { WorkPanel } from "@/features/work/work-panel";
 import { ArrivalStage } from "@/features/briefing/arrival-stage";
+import { warmArrivalSnapshot } from "@/features/briefing/arrival-warm";
 import type { QSubjectInput } from "@/features/q/actions";
 
 import {
@@ -172,17 +173,23 @@ export async function HomeScreen({
   /** Arrived from the answer chip's Board (C6): open on the Board. */
   readonly openBoard?: boolean | undefined;
 } = {}) {
-  const t = await serverT();
   const qConnected = loadWebServerConfig().qApiBaseUrl !== undefined;
+  // Speed lane 2026-10-20: the snapshot Q greets from is built while this
+  // page renders and hydrates, not first asked for after hydration.
+  if (qConnected) warmArrivalSnapshot();
   // Which subject Q's questions are about, if Capital Q knows of one. A
   // server fact, resolved once per render and never asked of the browser.
-  const context = qConnected
-    ? await resolveOwnContext()
-    : { kind: "NONE" as const };
   // A setup that was left part-way is offered back, in one tap -- to
   // somebody whose setup has not named a company yet as well, who is
-  // back rather than new (CQ-WEB-030).
-  const unfinished = qConnected ? await resolveUnfinishedSetup() : null;
+  // back rather than new (CQ-WEB-030). Independent reads, side by side.
+  const [t, language, context, unfinished] = await Promise.all([
+    serverT(),
+    serverUiLanguage(),
+    qConnected
+      ? resolveOwnContext()
+      : Promise.resolve<OwnContext>({ kind: "NONE" }),
+    qConnected ? resolveUnfinishedSetup() : Promise.resolve(null),
+  ]);
   const arrival = arrivalFor(context, unfinished);
 
   /*
@@ -219,7 +226,7 @@ export async function HomeScreen({
               ? "WELCOME"
               : "BRIEFING",
       };
-      const greeting = returningGreeting(facts, await serverUiLanguage());
+      const greeting = returningGreeting(facts, language);
       // Owner 2026-10-17: the greeting and one question, nothing more; a
       // founder's next steps are Q's to give when asked (and on Readiness).
       welcome = (

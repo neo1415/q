@@ -77,7 +77,14 @@ export type VoiceInterview = {
   /** Start (or restart with a different voice). */
   readonly talk: (input: {
     readonly thread: VoiceInterviewThread;
-    readonly firstMessage?: string | undefined;
+    /**
+     * What Q says first; a promise when it is still being prepared (the
+     * arrival briefing off Home): the line is asked for at once and waits
+     * for these words only when it is ready to speak them (speed lane
+     * 2026-10-20: it used to wait for them before asking at all).
+     */
+    readonly firstMessage?:
+      string | PromiseLike<string | undefined> | undefined;
     readonly voice?: QVoiceChoice | undefined;
     /**
      * The thread is already open: Q composes no opening of its own and
@@ -607,11 +614,24 @@ export function useVoiceInterview(
       const chosen = requested ?? voice;
       // The previous line -- this surface's own or another's -- is ended
       // and awaited before the server is asked for the next one.
+      // Started now, beside the server's answer below; a failed promise is
+      // no words of the caller's own.
+      const firstWords: Promise<string | undefined> =
+        typeof firstMessage === "string" || firstMessage === undefined
+          ? Promise.resolve(firstMessage)
+          : Promise.resolve(firstMessage).then(
+              (words) => words,
+              () => undefined,
+            );
       const lineOpening = openVoiceLine(holder, async () => {
         if (!mounted.current || generation.current !== mine) return;
         setNotice(null);
-        lastStart.current = { thread, firstMessage };
-        const started = await startVoiceSessionAction({
+        lastStart.current = {
+          thread,
+          firstMessage:
+            typeof firstMessage === "string" ? firstMessage : undefined,
+        };
+        const startRead = startVoiceSessionAction({
           ...(resume ? { resume: true } : {}),
           // G-D21: a line reopening by itself names the one it replaces;
           // the server refuses it if a newer line (another tab) has voice.
@@ -636,9 +656,12 @@ export function useVoiceInterview(
           ...deviceLocale(),
           voice: chosen,
         });
+        // The server's answer and the caller's words, side by side.
+        const [started, given] = await Promise.all([startRead, firstWords]);
         // Ended, superseded or unmounted while the server answered: this
         // line is never brought up.
         if (!mounted.current || generation.current !== mine) return;
+        lastStart.current = { thread, firstMessage: given };
         if (!started.ok) {
           if (started.replaced === true) {
             // Another tab has voice now: this one stops for good.
@@ -669,7 +692,7 @@ export function useVoiceInterview(
          */
         const opening =
           said(started.value.firstMessage) ??
-          said(firstMessage) ??
+          said(given) ??
           said(leadRef.current?.());
         await clientRef.current.start({
           credential:

@@ -205,4 +205,13 @@ export type InvestorOrganisationQueryPort = {
   readonly findCanonicalInvestorOrganisation: (
     investorOrganisationId: InvestorOrganisationId,
   ) => Promise<InvestorOrganisationIdentity | null>;
+  /**
+   * The same identities for many investor organisations in one read, for
+   * list views that would otherwise read them one by one (a company's
+   * relationship list; speed lane 2026-10-20). Absent ids are left out.
+   * Optional: callers fall back to findCanonicalInvestorOrganisation.
+   */
+  readonly findCanonicalInvestorOrganisations?: (
+    investorOrganisationIds: readonly InvestorOrganisationId[],
+  ) => Promise<readonly InvestorOrganisationIdentity[]>;
 };

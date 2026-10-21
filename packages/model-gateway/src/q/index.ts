@@ -2479,12 +2479,31 @@ export function createModelGatewayQAnswer(
         ),
         offerRead,
         availableRead,
-        timed(
-          "memory",
-          phased("memory", () =>
-            recallMemory(request, conversationId, latest.content),
-          ),
-        ),
+        arrivalByCode
+          ? // Speed lane 2026-10-20 (arrival row 22): a follow-up the
+            // snapshot answers by code is said with no model round, so it
+            // never waits for memory recall (its own database reads).
+            // Recall still runs; it is used whenever the code answer is not.
+            (() => {
+              const recall = timed(
+                "memory",
+                phased("memory", () =>
+                  recallMemory(request, conversationId, latest.content),
+                ),
+              );
+              return Promise.race([
+                recall,
+                arrivalDecision.then((answer) =>
+                  answer === null ? recall : NOTHING_REMEMBERED,
+                ),
+              ]);
+            })()
+          : timed(
+              "memory",
+              phased("memory", () =>
+                recallMemory(request, conversationId, latest.content),
+              ),
+            ),
       ]);
     const { arrivalAnswer, names: prefetchTools } = await prefetchToolsRead;
 

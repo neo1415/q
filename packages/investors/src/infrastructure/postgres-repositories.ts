@@ -405,6 +405,14 @@ export function createPostgresInvestorOrganisationQueryPort(options: {
          where i.id = ${id}`;
       return rows.length === 0 ? null : toIdentity(rows[0]);
     },
+    findCanonicalInvestorOrganisations: async (ids) => {
+      if (ids.length === 0) return [];
+      const rows = await sql`
+        select i.id, i.tenant_id, i.organisation_id, i.investor_type, i.display_name, i.deployment_state
+          from core.investor_organisations i
+         where i.id = any(${[...ids]}::uuid[])`;
+      return rows.map(toIdentity);
+    },
   };
 }
 

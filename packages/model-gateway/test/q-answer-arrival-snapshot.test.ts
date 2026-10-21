@@ -129,6 +129,7 @@ function build(
   arrivalSkim?: QTurnSkimmer,
   offered: readonly QOfferedTool[] = [],
   qHistory: readonly string[] = [],
+  memory?: { readonly recall: () => Promise<string> },
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -221,6 +222,7 @@ function build(
     transactions: { run: (work) => work({} as never) },
     tools,
     ...(arrivalSkim === undefined ? {} : { arrivalSkim }),
+    ...(memory === undefined ? {} : { memory }),
     arrivalSnapshot: () => {
       snapshotReads += 1;
       return Promise.resolve(snapshot());
@@ -347,6 +349,29 @@ describe("an arrival follow-up is answered by code, with no tool and no model ro
       for (const text of expected) expect(persisted.join("\n")).toContain(text);
     });
   }
+
+  it("never waits for memory recall: the code answer needs none (speed lane 2026-10-20)", async () => {
+    let recalls = 0;
+    const { seam, request, alpha, persisted } = build(
+      () => SNAPSHOT,
+      "what did they say?",
+      undefined,
+      [],
+      [],
+      {
+        // A recall that never answers (an embedding provider stalled).
+        recall: () => {
+          recalls += 1;
+          return new Promise<string>(() => undefined);
+        },
+      },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(alpha.calls).toHaveLength(0);
+    expect(persisted.join(" ")).toContain("Could we do Thursday 3pm");
+    // Recall was still asked for; only nothing waited on it.
+    expect(recalls).toBe(1);
+  });
 
   it("when the snapshot is withheld the normal path handles it", async () => {
     const { seam, request, alpha } = build(() => null, "what's the request?");

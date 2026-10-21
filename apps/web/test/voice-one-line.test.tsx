@@ -217,6 +217,49 @@ describe("one voice line per tab", () => {
     expect(mostLive).toBe(1);
   });
 
+  it("asks for the line at once and waits only for promised first words (speed lane 2026-10-20)", async () => {
+    startVoiceSessionAction.mockResolvedValueOnce(issue(IDS.again));
+    let give: (words: string) => void = () => undefined;
+    const briefing = new Promise<string>((resolve) => {
+      give = resolve;
+    });
+    const line = renderHook(() => useVoiceInterview());
+    let opened: Promise<void> = Promise.resolve();
+    await act(async () => {
+      opened = line.result.current.talk({
+        thread: {},
+        resume: true,
+        firstMessage: briefing,
+      });
+      await settle();
+    });
+    // The server was asked while the briefing was still being read; the
+    // transport waits for its words.
+    expect(startVoiceSessionAction).toHaveBeenCalledTimes(1);
+    expect(starts).toHaveLength(0);
+    await act(async () => {
+      give("Good afternoon, Zino. You have 2 things waiting.");
+      await opened;
+    });
+    expect(starts[0]?.firstMessage).toBe(
+      "Good afternoon, Zino. You have 2 things waiting.",
+    );
+  });
+
+  it("a failed promise of first words still opens the line, with the lead", async () => {
+    startVoiceSessionAction.mockResolvedValueOnce(issue(IDS.again));
+    const line = renderHook(() => useVoiceInterview());
+    await act(async () => {
+      await line.result.current.talk({
+        thread: {},
+        resume: true,
+        firstMessage: Promise.reject(new Error("briefing failed")),
+        lead: () => QUESTION,
+      });
+    });
+    expect(starts[0]?.firstMessage).toBe(QUESTION);
+  });
+
   it("two surfaces asking at the same moment still get one line", async () => {
     startVoiceSessionAction
       .mockResolvedValueOnce(issue(IDS.welcome))

@@ -123,9 +123,22 @@ async function show(page: ReactNode) {
     // Streamed blocks resolve over a few turns of the event loop, more on
     // a loaded CI runner than locally: wait until no loading shape is left
     // (bounded, so a block that never resolves still fails its assertion).
+    // No loading shape is not enough on its own: a block whose async parent
+    // has not rendered yet shows neither its fallback nor its content (CI
+    // 2026-10-20, run 39517154517: asserted after ~50 ms on a busy runner).
+    // So the page must also stop changing for three turns in a row.
+    let last = "";
+    let still = 0;
     for (let turn = 0; turn < 200; turn += 1) {
       await new Promise((resolve) => setTimeout(resolve, turn < 5 ? 0 : 10));
-      if (turn >= 4 && document.querySelector("[data-loading-rows]") === null)
+      const now = document.body.innerHTML;
+      still = now === last ? still + 1 : 0;
+      last = now;
+      if (
+        turn >= 4 &&
+        still >= 3 &&
+        document.querySelector("[data-loading-rows]") === null
+      )
         break;
     }
   });

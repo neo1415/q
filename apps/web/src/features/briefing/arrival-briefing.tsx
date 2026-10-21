@@ -1207,6 +1207,7 @@ export function OpenerChoices({
 export function ArrivalBriefing({
   variant,
   fallback = null,
+  headline,
   load = defaultLoad,
   decide = defaultDecide,
   readWords = defaultReadWords,
@@ -1228,6 +1229,14 @@ export function ArrivalBriefing({
   readonly onClose?: (() => void) | undefined;
   /** The page's own welcome, shown until (and unless) there is a briefing. */
   readonly fallback?: ReactNode;
+  /**
+   * The page's own greeting, as the server rendered it before the read
+   * (speed lane 2026-10-20): kept as the heading once the briefing lands,
+   * so the greeting on screen never changes under the person ("Welcome
+   * back, Zino." swapped to "Good afternoon, Zino." when the read came
+   * in). Absent: the briefing's greeting by their clock.
+   */
+  readonly headline?: string | undefined;
   readonly load?: ArrivalLoader;
   readonly decide?: ArrivalDecide;
   /** Reads their own words into card verbs (the dev harness scripts it). */
@@ -1369,7 +1378,7 @@ export function ArrivalBriefing({
             className="cq-title-lg text-balance text-(--cq-text-primary)"
             data-arrival-greeting
           >
-            {words.greeting}
+            {headline ?? words.greeting}
           </h1>
           <p
             className="cq-body-lg cq-prose text-balance text-(--cq-text-secondary)"
