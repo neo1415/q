@@ -244,11 +244,9 @@ export function registerQInterviewRoute(
           `${JSON.stringify(QInterviewStreamEventSchema.parse(event))}\n`,
         );
       };
-      // The person leaving cancels the turn, as a closed voice line does.
-      const left = new AbortController();
-      raw.on("close", () => {
-        if (!raw.writableEnded) left.abort();
-      });
+      // The person leaving does not cancel the turn: what they sent is
+      // saved whether or not anyone is still reading (a closed tab must
+      // never drop an answer). Only the remaining sentences go unsent.
       const turnInput: InterviewAgentTurnInput = {
         actor,
         session,
@@ -265,7 +263,6 @@ export function registerQInterviewRoute(
         utterance: input.utterance,
         recentTurns: [...input.recentTurns],
         ...(input.focus === undefined ? {} : { focus: input.focus }),
-        signal: left.signal,
         onSentence: (sentence) => {
           const text = sentence.trim();
           if (text.length > 0)

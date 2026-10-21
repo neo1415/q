@@ -78,7 +78,8 @@ export async function POST(request: Request): Promise<Response> {
         },
         body: JSON.stringify(input.data),
         cache: "no-store",
-        // A closed tab reaches the interviewer, as a dropped call does.
+        // A closed tab closes the stream; the interviewer still finishes
+        // the turn, so what they sent is saved either way.
         signal: request.signal,
       },
     );

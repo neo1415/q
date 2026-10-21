@@ -2643,17 +2643,39 @@ export function createInterviewAgent(
     void appendOnboardingInterviewTurns(
       input.session,
       input.onboardingSessionId,
-      {
-        turnRef: exchangeRef,
-        turns,
-        ...(statedNow.length === 0 ? {} : { stated: statedNow }),
-      },
-    ).catch((error: unknown) => {
-      logger.warn(
-        { err: error },
-        "the interview thread did not keep this exchange",
-      );
-    });
+      { turnRef: exchangeRef, turns },
+    )
+      .then(async () => {
+        // Its own request, after Q's line has landed: a reading that
+        // cannot be kept never costs the thread its exchange.
+        if (statedNow.length === 0) return;
+        await appendOnboardingInterviewTurns(
+          input.session,
+          input.onboardingSessionId,
+          {
+            turnRef: exchangeRef,
+            turns: [
+              {
+                role: "PERSON",
+                text: utterance.slice(0, 4_000),
+                channel: turnChannel,
+              },
+            ],
+            stated: statedNow,
+          },
+        ).catch((error: unknown) => {
+          logger.warn(
+            { err: error },
+            "the reading of their words was not kept",
+          );
+        });
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          { err: error },
+          "the interview thread did not keep this exchange",
+        );
+      });
 
     rememberRefused(input.onboardingSessionId, refusedStepsOf(actions));
     logger.info(
