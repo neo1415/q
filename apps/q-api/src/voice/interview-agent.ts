@@ -949,22 +949,39 @@ export function createInterviewAgent(
     const startedAt = now();
     const utterance = input.utterance.trim();
     const opening = utterance.length === 0;
-    // Each stage once a turn, as it happens; a listener that throws never
-    // costs the turn.
-    const stagesSaid = new Set<QInterviewStage["stage"]>();
+    // Only stages that tell the person something, naming the thing (owner
+    // review 2026-10-21): what is being saved, whom Q is looking up. Not
+    // "reading what you said" or "writing a reply" on a turn of seconds.
+    // Each line once a turn; a listener that throws never costs the turn.
+    const stagesSaid = new Set<string>();
     const stage = (key: QInterviewStage["stage"], label: string): void => {
-      if (input.onStage === undefined || stagesSaid.has(key)) return;
-      stagesSaid.add(key);
+      if (input.onStage === undefined || stagesSaid.has(label)) return;
+      stagesSaid.add(label);
       try {
         input.onStage({ stage: key, label: label.slice(0, 200) });
       } catch {
         // Display only.
       }
     };
-    stage(
-      "READING",
-      opening ? "Getting your setup ready" : "Reading what you said",
-    );
+    /** "Saving your round size", by the journey's own labels for the steps. */
+    const saving = (stepKeys: readonly string[]): void => {
+      const fields = coverageProfileFor(input.journeyType).fields;
+      const labels = [
+        ...new Set(
+          stepKeys
+            .map((key) => fields[key]?.label?.toLowerCase())
+            .filter((label): label is string => label !== undefined),
+        ),
+      ];
+      if (labels.length === 0) return;
+      const named =
+        labels.length === 1
+          ? labels[0]
+          : labels.length === 2
+            ? `${labels[0]} and ${labels[1]}`
+            : `${labels[0]}, ${labels[1]} and more`;
+      stage("SAVING", `Saving your ${named ?? ""}`);
+    };
     const runId = QRunIdSchema.parse(randomUUID());
     const correlationId = CorrelationIdSchema.safeParse(
       input.attribution.correlationId,
@@ -1298,7 +1315,7 @@ export function createInterviewAgent(
           "LOOKING_UP",
           name.length > 0
             ? `Looking up ${name.slice(0, 120)}`
-            : "Looking up public sources",
+            : "Looking into it",
         );
       }
       return started;
@@ -2308,7 +2325,7 @@ export function createInterviewAgent(
       ) {
         const said = utterance.trim().replace(/[.!]+$/u, "");
         const answers = [{ stepKey: exactStep, value: said, quote: said }];
-        stage("SAVING", "Saving your answer");
+        saving([exactStep]);
         const results = await port
           .record(
             answers.map((answer) => ({
@@ -2402,14 +2419,32 @@ export function createInterviewAgent(
         if (response.output.kind !== "TOOL_CALLS") break;
         const proposals = response.output.calls.slice(0, MAX_CALLS - calls);
         const roundStart = actions.length;
-        if (
-          proposals.some(
-            (call) =>
-              call.name === "record_answers" || call.name === "correct_answer",
-          )
-        ) {
-          stage("SAVING", "Saving your answers");
-        }
+        // The steps this round writes, as the model named them: display
+        // only, before the guarded tools decide what is actually saved.
+        saving(
+          proposals.flatMap((call) => {
+            if (
+              call.name !== "record_answers" &&
+              call.name !== "correct_answer"
+            ) {
+              return [];
+            }
+            const args: unknown = call.arguments;
+            const items =
+              typeof args === "object" && args !== null
+                ? Object.values(args).find(Array.isArray)
+                : undefined;
+            return (Array.isArray(items) ? (items as unknown[]) : []).flatMap(
+              (item) =>
+                typeof item === "object" &&
+                item !== null &&
+                "stepKey" in item &&
+                typeof item.stepKey === "string"
+                  ? [item.stepKey]
+                  : [],
+            );
+          }),
+        );
         for (const call of proposals) {
           calls += 1;
           const outcome = await tools.execute(
@@ -2468,7 +2503,6 @@ export function createInterviewAgent(
         // The reply, written after every result so far, with no tools left;
         // streamed, so its first sentence is shown and spoken while the rest
         // is written (owner 2026-10-21: first words within 2-3 s).
-        stage("WRITING", "Writing a reply");
         sayReceiptNow();
         const rendered = render();
         const response = await gateway.execute<InterviewAgentV16Result>(

@@ -48,6 +48,7 @@ export function registerFastNavigationRoutes(
       const decided = await dependencies.resolve(
         getActorContext(request),
         body.text,
+        body.companyId === undefined ? {} : { companyId: body.companyId },
       );
       return reply
         .code(200)

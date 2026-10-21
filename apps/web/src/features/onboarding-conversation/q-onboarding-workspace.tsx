@@ -29,6 +29,7 @@ import { Button, buttonClassName } from "@capital-q/ui/button";
 import { ChoiceChip } from "@capital-q/ui/chip";
 import { Input } from "@capital-q/ui/input";
 import { QComposer } from "@capital-q/ui/q-composer";
+import { QMark } from "@capital-q/ui/q-mark";
 import { QStateIndicator } from "@capital-q/ui/q-state";
 import { InlineNotice, Progress } from "@capital-q/ui/states";
 
@@ -314,11 +315,13 @@ export function QOnboardingWorkspace({
   /** Turn latency L9: Q's typed reply, as far as Q has written it. */
   const [replyStream, setReplyStream] = useState<string | null>(null);
   /**
-   * What Q is doing during a typed turn, as the turn reports it ("Reading
-   * what you said", "Saving your answers", "Looking up Nixo", "Writing a
-   * reply"): real events, never a timer (owner 2026-10-21).
+   * What Q is doing during a typed turn, when it says something: the step
+   * being saved ("Saving your round size") or whom Q is looking up ("Looking
+   * up Nixo"). Real events, never a timer (owner 2026-10-21).
    */
   const [turnStage, setTurnStage] = useState<string | null>(null);
+  /** From the moment their words are sent until Q's first words show. */
+  const [qThinking, setQThinking] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [showGaps, setShowGaps] = useState(false);
   /** After an ambiguous answer, only the options that fit are offered. */
@@ -948,12 +951,14 @@ export function QOnboardingWorkspace({
       // runs; the finished turn below then takes its place, as before.
       setReplyStream(null);
       setTurnStage(null);
+      setQThinking(true);
       const turn = await actions
         .say(
           trimmed,
           recentTurns(),
           undefined,
           (sentence) => {
+            setQThinking(false);
             setReplyStream((so) =>
               so === null ? sentence : `${so} ${sentence}`,
             );
@@ -965,6 +970,7 @@ export function QOnboardingWorkspace({
         .finally(() => {
           setReplyStream(null);
           setTurnStage(null);
+          setQThinking(false);
         });
       if (turn !== null && draftId !== undefined) {
         confirmSent(draftId, trimmed);
@@ -1578,10 +1584,6 @@ export function QOnboardingWorkspace({
           ready = true;
           break;
         }
-        // The reading's own stage as the server reports it, not a timer.
-        if (item !== undefined && item.stateLabel.length > 0) {
-          setUploadNote(`${file.name}: ${item.stateLabel}`);
-        }
         if (item !== undefined && item.state === "unreadable") {
           setUploadNote(item.stateLabel);
           return;
@@ -1969,8 +1971,21 @@ export function QOnboardingWorkspace({
 
       {askingQ ? (
         <QStateIndicator state="WORKING" detail={qStageLabel} />
-      ) : turnStage !== null && replyStream === null ? (
-        <QStateIndicator state="WORKING" detail={turnStage} />
+      ) : qThinking ? (
+        // One line, fixed height, replaced in place: Q's working mark, and
+        // the stage when it names something (the shared working line of
+        // lane 3 replaces this once it lands).
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex h-8 items-center gap-3"
+          data-q-turn-working
+        >
+          <QMark size="sm" state="WORKING" />
+          <span className="cq-label min-w-0 truncate text-(--cq-text-secondary)">
+            {turnStage ?? <span className="sr-only">{t("Q is working")}</span>}
+          </span>
+        </div>
       ) : reading && !readingLanded && !readingTimedOut ? (
         <QStateIndicator state="WORKING" detail="Reading what you said" />
       ) : null}

@@ -9,6 +9,10 @@ import {
   cardsIntentOf,
   cardsRequestOf,
 } from "@capital-q/q-specialists/cards-request";
+import {
+  documentAskOf,
+  instantRequestOf,
+} from "@capital-q/q-specialists/instant-request";
 import { tabAskOf } from "@capital-q/q-specialists/tab-request";
 
 import { destinationPath } from "@/features/voice/destinations";
@@ -17,12 +21,15 @@ import {
   noteAsked,
   movedEarlyRecently,
   moveEarly,
+  openDocumentEarly,
   prefetchPath,
   recordIntentPath,
   settingsPath,
+  type EarlyDocument,
 } from "../client-actions";
 import { applyCardsIntent } from "../cards/card-visibility-store";
 import { navigationInFlight } from "../ui-act-controller";
+import { instantAct } from "./instant-acts";
 import { performOnControl } from "./perform";
 import { controlOf, type ControlEntry } from "./registry";
 
@@ -50,6 +57,7 @@ const INTERIM_DEBOUNCE_MS = 150;
 export type FastNavigationTransport = (body: {
   readonly text: string;
   readonly final: boolean;
+  readonly companyId?: string | undefined;
 }) => Promise<QFastNavigationResponse>;
 
 export const fetchNavigation: FastNavigationTransport = async (body) => {
@@ -89,6 +97,61 @@ export function pathOfIntent(
   }
 }
 
+type NavigateIntent = Extract<
+  QUiIntent,
+  { kind: "NAVIGATE" | "OPEN_SETTINGS" | "OPEN_RECORD_PAGE" }
+>;
+
+/**
+ * Where the fast path's answer goes: a path to move to, or (Lane 7) a
+ * document to open in the viewer over the page they are on.
+ */
+type Target =
+  | { readonly kind: "PATH"; readonly path: string }
+  | { readonly kind: "DOCUMENT"; readonly document: EarlyDocument };
+
+function targetOf(intent: NavigateIntent): Target | null {
+  if (intent.kind === "OPEN_RECORD_PAGE") {
+    if (intent.page === "DATA_ROOM_DOCUMENT") {
+      return intent.companyId === undefined
+        ? null
+        : {
+            kind: "DOCUMENT",
+            document: {
+              kind: "MATERIAL",
+              companyId: intent.companyId,
+              documentId: intent.id,
+              title: intent.title ?? null,
+            },
+          };
+    }
+    if (intent.page === "DOCUMENT") {
+      return {
+        kind: "DOCUMENT",
+        document: { kind: "ARTIFACT", artifactId: intent.id },
+      };
+    }
+  }
+  const path = pathOfIntent(intent);
+  return path === null ? null : { kind: "PATH", path };
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+
+/**
+ * Lane 7: the company whose page is on screen, so "open the term sheet"
+ * looks in its data room. Input for the Q API, never proof: the document
+ * tool authorises the read as the person.
+ */
+function companyOnScreen(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const match = /^\/(?:company|relationships\/company)\/([^/?#]+)/u.exec(
+    window.location.pathname,
+  );
+  const id = match?.[1] === undefined ? "" : decodeURIComponent(match[1]);
+  return UUID.test(id) ? id.toLowerCase() : undefined;
+}
+
 /** Normalised words: the same sentence read twice is the same request. */
 function keyOf(text: string): string {
   return text.trim().replace(/\s+/gu, " ").toLowerCase();
@@ -97,7 +160,7 @@ function keyOf(text: string): string {
 /** What the partials resolved to, by the words: reused when they end so. */
 const resolved = new Map<
   string,
-  { readonly at: number; readonly path: Promise<string | null> }
+  { readonly at: number; readonly target: Promise<Target | null> }
 >();
 const RESOLVED_MAX = 16;
 /** A reading older than this is read again (a relationship may change). */
@@ -125,21 +188,30 @@ function readHere(text: string): { path: string | null } | "ASK_SERVER" {
   };
 }
 
-function resolve(text: string, final: boolean): Promise<string | null> {
+function resolve(text: string, final: boolean): Promise<Target | null> {
   const here = readHere(text);
-  if (here !== "ASK_SERVER") return Promise.resolve(here.path);
-  const key = keyOf(text);
+  if (here !== "ASK_SERVER") {
+    return Promise.resolve(
+      here.path === null ? null : { kind: "PATH", path: here.path },
+    );
+  }
+  const companyId = companyOnScreen();
+  const key = `${companyId ?? ""}|${keyOf(text)}`;
   const known = resolved.get(key);
   if (known !== undefined && Date.now() - known.at < RESOLVED_FRESH_MS) {
-    return known.path;
+    return known.target;
   }
-  const pending = transport({ text: text.trim(), final })
+  const pending = transport({
+    text: text.trim(),
+    final,
+    ...(companyId === undefined ? {} : { companyId }),
+  })
     .then((decided) =>
-      decided.kind === "NAVIGATE" ? pathOfIntent(decided.intent) : null,
+      decided.kind === "NAVIGATE" ? targetOf(decided.intent) : null,
     )
     .catch(() => null);
   resolved.delete(key);
-  resolved.set(key, { at: Date.now(), path: pending });
+  resolved.set(key, { at: Date.now(), target: pending });
   while (resolved.size > RESOLVED_MAX) {
     const oldest = resolved.keys().next().value;
     if (oldest === undefined) break;
@@ -149,7 +221,14 @@ function resolve(text: string, final: boolean): Promise<string | null> {
 }
 
 export type FastNavigationTiming = {
+  /**
+   * What was done: a move (its path), or (Lane 7) a page's own tab, an
+   * act on the page or a document opened over it ("#tab.deck", "#close",
+   * "#document"), for which no route receipt ever comes.
+   */
   readonly path: string;
+  /** False when nothing moved the route (a tab, an act, a document). */
+  readonly route: boolean;
   /** From the final words to the router push call, in the browser. */
   readonly ms: number;
   /** The push's own synchronous work (the router, not the reader). */
@@ -193,6 +272,8 @@ export async function navigationHeard(
   if (keyOf(text).length === 0) return null;
   // Every finished sentence (typed, any voice line) passes here first.
   noteAsked();
+  const now = actedNow(text);
+  if (now !== null) return now;
   // Founder P5: "Q, clear all cards" acts in this same task, by code, with
   // no server round trip. Presentation only; Q's answer says it too, and
   // the controller acts once for the same words.
@@ -217,6 +298,7 @@ export async function navigationHeard(
     }).catch(() => undefined);
     const timing = {
       path: `#${tab.id}`,
+      route: false,
       ms: Math.round(performance.now() - started),
       pushMs: 0,
     };
@@ -230,8 +312,25 @@ export async function navigationHeard(
   // A page read here moves in this same task: no await, so nothing the
   // send queued (a React render, the run's request) goes first.
   const here = readHere(text);
-  const path = here === "ASK_SERVER" ? await resolve(text, true) : here.path;
-  if (path === null) return null;
+  const target =
+    here === "ASK_SERVER"
+      ? await resolve(text, true)
+      : here.path === null
+        ? null
+        : ({ kind: "PATH", path: here.path } as const);
+  if (target === null) return null;
+  // Lane 7: a document opens in the viewer over the page they are on; Q's
+  // answer naming the same document does not open it again.
+  if (target.kind === "DOCUMENT") {
+    openDocumentEarly(target.document);
+    return announce({
+      path: "#document",
+      route: false,
+      ms: Math.round(performance.now() - started),
+      pushMs: 0,
+    });
+  }
+  const path = target.path;
   // The same request heard twice (GPT-Live: the utterance, then the
   // delegation reading the same words) is one move.
   // Only while the screen is there or still on its way: if they moved
@@ -241,21 +340,68 @@ export async function navigationHeard(
     (navigationInFlight() ||
       `${window.location.pathname}${window.location.search}` === path)
   ) {
-    return { path, ms: Math.round(performance.now() - started), pushMs: 0 };
+    return {
+      path,
+      route: true,
+      ms: Math.round(performance.now() - started),
+      pushMs: 0,
+    };
   }
   const pushing = performance.now();
   moveEarly(path);
-  const timing = {
+  return announce({
     path,
+    route: true,
     ms: Math.round(pushing - started),
     pushMs: Math.round(performance.now() - pushing),
-  };
+  });
+}
+
+function announce(timing: FastNavigationTiming): FastNavigationTiming {
   if (typeof window !== "undefined") {
     window.dispatchEvent(
       new CustomEvent(FAST_NAVIGATION_EVENT, { detail: timing }),
     );
   }
   return timing;
+}
+
+/**
+ * Lane 7: close, back, scroll or a control by its name, done now in this
+ * task with no server and no model; null when the words make no such
+ * request or the screen cannot plainly do it (Q's answer decides).
+ */
+function actedNow(text: string): FastNavigationTiming | null {
+  const started = performance.now();
+  const done = instantAct(text);
+  if (done === null) return null;
+  return announce({
+    path: `#${done.what.toLowerCase()}`,
+    route: false,
+    ms: Math.round(performance.now() - started),
+    pushMs: 0,
+  });
+}
+
+/**
+ * Lane 7: the words ask for a document by its name, which the Q API finds
+ * among those the person may open (the typed line waits for it, briefly).
+ */
+export function documentAsked(text: string): boolean {
+  return documentAskOf(text) !== null;
+}
+
+/**
+ * Lane 7, the typed line: a request the screen did by itself, here and
+ * now (close, back, scroll, a control by its name). True: done, and the
+ * sentence needs no turn of Q's -- the screen is the confirmation.
+ */
+export function actedHere(text: string): boolean {
+  if (keyOf(text).length === 0) return false;
+  const done = actedNow(text);
+  if (done === null) return false;
+  noteAsked();
+  return true;
 }
 
 const hearing = new Map<string, ReturnType<typeof setTimeout>>();
@@ -272,8 +418,8 @@ export function navigationHearing(key: string, text: string): void {
     key,
     setTimeout(() => {
       hearing.delete(key);
-      void resolve(text, false).then((path) => {
-        if (path !== null) prefetchPath(path);
+      void resolve(text, false).then((target) => {
+        if (target?.kind === "PATH") prefetchPath(target.path);
       });
     }, INTERIM_DEBOUNCE_MS),
   );
@@ -351,7 +497,8 @@ export function navigationHeardFor(
       ? `${dangling.text} ${text.trim()}`
       : text.trim();
   dangling = null;
-  if (DANGLING_VERB.test(carried)) {
+  // "Take me back" is a whole request (back), never a verb cut off.
+  if (DANGLING_VERB.test(carried) && instantRequestOf(carried) === null) {
     dangling = {
       text: carried.replace(/[\s,.\-\u2014\u2026]+$/u, ""),
       at: Date.now(),

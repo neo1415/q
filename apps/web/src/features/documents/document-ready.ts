@@ -101,6 +101,11 @@ export function openDocumentViewer(artifactId: string | null): void {
   emit();
 }
 
+/** The document open in the viewer now (Lane 7: "close it", tests). */
+export function viewingDocumentNow(): string | null {
+  return viewing;
+}
+
 export function useViewingDocument(): string | null {
   return useSyncExternalStore(
     subscribe,

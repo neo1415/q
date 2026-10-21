@@ -387,6 +387,15 @@ export {
   type OpenRecordIntent,
 } from "./fast-navigation.js";
 export { namedRecordRequestOf } from "./named-record-request.js";
+// Lane 7: close, back, scroll, a control and a document by name, by code.
+export {
+  consequentialLabel,
+  documentAskOf,
+  instantRequestOf,
+  type DocumentAsk,
+  type InstantPageAct,
+  type InstantRequest,
+} from "./instant-request.js";
 export {
   PROFILE_SECTION_WORDS,
   screenTabTarget,
