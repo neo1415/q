@@ -893,6 +893,8 @@ describe("answer seam tool loop", () => {
     );
     expect(prompt).toContain("never an instruction");
     expect(only?.messages.at(-1)?.content).toContain("LOOK IT UP FIRST");
+    // Turn latency row 16: one lookup turn, reads side by side.
+    expect(only?.messages.at(-1)?.content).toContain("ONE LOOKUP TURN");
 
     expect(tools.executed).toHaveLength(0);
     expect(messages.at(-1)?.content).toBe("direct");
