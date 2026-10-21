@@ -234,7 +234,11 @@ Shared files: none. No contract, migration, RLS, authorization or model-routing 
   - Web: `promptStepOf`.
   - q-api: a code-added question carries its step. This fails on the old code.
   - Broad run: 116 files, 1,280 tests pass. Root `tsc` exit 0; q-api, api and web `tsc` clean; eslint and prettier clean.
-- **Still open:**
-  - The read-back and region question are worded in English only. In other languages the model's words stand.
-  - A step whose view needs server context (review confirmations, mandate references) still shows the cursor's controls.
-  - Not browser-tested end to end, not deployed.
+- **Third pass (same day):**
+  - **Review and mandate steps.** When Q asks one of these, its options show too: the server context is loaded for the asked step as for the cursor's (`openAskedStep` in `view.ts`; tested in `asked-step.test.ts`).
+  - **Any language.** The GateQ prompt now tells Q to check a worked-out figure with one short question, and to ask which country a region means, in the conversation's language (`CONFIRM_NOTE`). Code recognises "yes" in many languages ("oui", "sí", "ja", "نعم", "ndiyo", …) and thousands written with spaces ("360 000"). So a French "Oui" to "Donc 360 000 USD de revenus, c'est bien ça ?" saves the figure as theirs.
+  - **Gates:** 132 files, 1,418 tests pass (q-api interview/onboarding/voice, api gateq and onboarding, onboarding, gateq-intake, q-evals, contracts, web onboarding, voice and gateq). Root `tsc` 0; q-api, api and web `tsc` clean; eslint and prettier clean.
+- **Still open (not this lane's to do):**
+  - Merge PR #275 (coordinator), then CI on the integration push.
+  - pgTAP 984, then apply migration `20261228210000` before deploying.
+  - Live browser verification on phone and desktop, typed and voice. There is no Supabase/Docker in this sandbox, so `packages/onboarding` database tests and e2e were not run.

@@ -457,6 +457,15 @@ export function interviewLanguageOf(
   return read === null || isEnglish(read) ? null : read;
 }
 
+/**
+ * Owner 2026-10-21: confirm like a person, never lecture. A figure Q works
+ * out is said back for a yes, and a region is asked down to a country, in
+ * whatever language the conversation is in. Code holds a worked-out figure
+ * either way; this is how Q words the question outside English.
+ */
+const CONFIRM_NOTE =
+  'If a figure is one you worked out (a sum, product or total of what they said) rather than one they said, do not propose it as their fact: end your reply by checking it in one short question, such as "So that\'s USD 360,000 in revenue, right?". Their yes makes it theirs. If they give a region rather than a country for where the company is, ask which country in it.';
+
 function interviewLanguageNote(
   input: Pick<InterviewTurnInput, "locale" | "utterance" | "recentTurns">,
 ): string {
@@ -579,7 +588,7 @@ export function createGateQInterviewer(
         charter: "Q_SYSTEM_VOICE",
         operatingMode: "ASSESSMENT",
         communicationProfile: DEFAULT_COMMUNICATION_PROFILE,
-        environmentNotes: `You cannot record, decide or send anything yourself; Capital Q validates what you read and its own rules decide whether an application qualifies.${interviewLanguageNote(input)}`,
+        environmentNotes: `You cannot record, decide or send anything yourself; Capital Q validates what you read and its own rules decide whether an application qualifies. ${CONFIRM_NOTE}${interviewLanguageNote(input)}`,
         variables,
       });
 

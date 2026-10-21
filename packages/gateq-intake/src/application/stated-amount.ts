@@ -32,7 +32,7 @@ const SCALES: Readonly<Record<string, number>> = {
 };
 
 const NUMBER =
-  /(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?\s*(k|thousand|mm|mn|m|millions|million|bn|b|billion)?(?![a-z])/giu;
+  /(\d{1,3}(?:[,\u00a0\u202f ]\d{3})+(?!\d)|\d+)(?:\.(\d+))?\s*(k|thousand|mm|mn|m|millions|million|bn|b|billion)?(?![a-z])/giu;
 
 const SMALL: Readonly<Record<string, number>> = {
   one: 1,
@@ -130,7 +130,8 @@ function wordAmountsIn(text: string): readonly number[] {
 export function amountsIn(text: string): readonly number[] {
   const found: number[] = [];
   for (const match of text.matchAll(NUMBER)) {
-    const whole = (match[1] ?? "").replace(/,/gu, "");
+    // "360,000", and "360 000" as French and others group thousands.
+    const whole = (match[1] ?? "").replace(/[,\u00a0\u202f ]/gu, "");
     const fraction = match[2] ?? "";
     const scale = SCALES[(match[3] ?? "").toLowerCase()] ?? 1;
     const value = Number(fraction === "" ? whole : `${whole}.${fraction}`);
@@ -149,7 +150,7 @@ export function amountStatedIn(amount: string, text: string): boolean {
 
 /** A reply that agrees ("Yes", "yeah, that's right", "correct"). */
 const AFFIRM =
-  /^\s*(?:yes|yeah|yep|yup|yes please|correct|right|exactly|indeed|sure|that'?s (?:right|correct|it)|that is (?:right|correct)|spot on)\b/iu;
+  /^\s*(?:yes|yeah|yep|yup|yes please|correct|right|exactly|indeed|sure|that'?s (?:right|correct|it)|that is (?:right|correct)|spot on|oui|exact|exactement|c'est (?:ça|ca|exact|correct)|sí|si|claro|correcto|exacto|sim|certo|isso|ja|genau|richtig|stimmt|sì|esatto|giusto|da|tak|ano|igen|evet|doğru|ndiyo|naam|ee|haa|beeni|bẹẹni|eeyi|hai|haan|हाँ|हां|ji|نعم|أجل|صحيح|بله|כן|ναι|да|так|はい|是|对|對|네|예|ใช่|vâng|đúng|ya|iya|betul|benar|oo|opo)(?=$|[\s,.!;:])/iu;
 /** A reply that turns it down, even after a "yes" ("yes, no, it's less"). */
 const DISAGREE = /\b(?:no|not|wrong|actually|but|less|more|wait)\b/iu;
 

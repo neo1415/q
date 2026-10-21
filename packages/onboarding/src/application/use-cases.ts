@@ -144,6 +144,7 @@ import {
   pendingQuestionViews,
   toSessionView,
   toStepView,
+  openAskedStep,
   type OnboardingSessionAggregate,
   presentationOf,
 } from "./view.js";
@@ -831,52 +832,50 @@ export function createOnboardingUseCases(
       session.currentStepKey === null
         ? undefined
         : aggregate.stepsByKey.get(session.currentStepKey);
-    let context: Readonly<Record<string, unknown>> | undefined;
-    if (
-      current !== undefined &&
-      (current.configuration.stepType === "confirmation" ||
-        current.configuration.stepType === "reference_select") &&
-      current.configuration.contextKey !== undefined &&
-      aggregate.path.eligibleKeys.has(current.stepKey)
-    ) {
-      const provider = runtime.stepContexts.get(
-        current.configuration.contextKey,
-      );
+    // A review or reference step's server-assembled context, for any
+    // eligible step the screen shows: the cursor's, and the one Q asked.
+    const contextFor = async (
+      step: OnboardingStepDefinition | undefined,
+    ): Promise<Readonly<Record<string, unknown>> | undefined> => {
+      if (
+        step === undefined ||
+        (step.configuration.stepType !== "confirmation" &&
+          step.configuration.stepType !== "reference_select") ||
+        step.configuration.contextKey === undefined ||
+        !aggregate.path.eligibleKeys.has(step.stepKey)
+      ) {
+        return undefined;
+      }
+      const provider = runtime.stepContexts.get(step.configuration.contextKey);
       if (provider === undefined) {
         throw new OnboardingRuntimeConfigurationError(
           "STEP_CONTEXT_PROVIDER_MISSING",
-          `step ${current.stepKey} needs ${current.configuration.contextKey}`,
+          `step ${step.stepKey} needs ${step.configuration.contextKey}`,
         );
       }
-      context = await provider.load({
+      return provider.load({
         executor,
         actor,
         session,
-        step: current,
+        step,
         currentResponses: aggregate.currentResponses,
       });
-    }
-    const sessionView = toSessionView(aggregate, changes, context);
+    };
     // The step Q asked, with its options, when it is another eligible step
-    // still open. Steps whose view needs server context are left to the
-    // cursor (their context provider runs for the current step only).
-    const asked =
-      askedStepKey === undefined || askedStepKey === session.currentStepKey
-        ? undefined
-        : aggregate.path.eligible.find((step) => step.stepKey === askedStepKey);
-    if (
-      asked === undefined ||
-      ("contextKey" in asked.configuration &&
-        asked.configuration.contextKey !== undefined) ||
-      aggregate.states.get(asked.stepKey)?.status === "COMPLETED"
-    ) {
-      return sessionView;
-    }
+    // still open (owner 2026-10-21: its options show under Q's words).
+    const askedOpen = openAskedStep(aggregate, askedStepKey);
+    const [context, askedContext] = await Promise.all([
+      contextFor(current),
+      contextFor(askedOpen),
+    ]);
+    const sessionView = toSessionView(aggregate, changes, context);
+    if (askedOpen === undefined) return sessionView;
     return {
       ...sessionView,
       askedStep: toStepView(
-        asked,
-        aggregate.currentResponses.get(asked.stepKey),
+        askedOpen,
+        aggregate.currentResponses.get(askedOpen.stepKey),
+        askedContext,
       ),
     };
   };

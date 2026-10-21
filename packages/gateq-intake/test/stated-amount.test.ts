@@ -33,6 +33,11 @@ describe("an amount is stated only when it is written in the person's words", ()
     );
   });
 
+  it("reads thousands grouped with spaces, as French and others write them", () => {
+    expect(amountsIn("Donc 360 000 USD de revenus")).toEqual([360_000]);
+    expect(amountsIn("1\u202f500\u202f000 €")).toEqual([1_500_000]);
+  });
+
   it("a product of what was said is not what was said", () => {
     const said = "Two of them pay us $180,000 each.";
     expect(amountStatedIn("180000", said)).toBe(true);

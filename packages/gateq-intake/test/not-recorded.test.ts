@@ -141,6 +141,57 @@ describe("a worked-out figure is read back for a yes, like a person would (owner
     }
   });
 
+  it("in another language: Q asks in theirs, and their 'Oui' makes the figure theirs", async () => {
+    const outcome = await run(
+      {
+        reply: "Merci. Qui sont vos clients ?",
+        intent: "ANSWER",
+        facts: [REVENUE_360K] as never,
+        asking: "company.customers",
+        questionForQ: null,
+        readyToReview: false,
+      },
+      {
+        locale: "fr",
+        utterance: "Oui.",
+        recentTurns: [
+          { role: "person", text: said },
+          {
+            role: "q",
+            text: "Donc 360 000 USD de revenus, c'est bien ça ?",
+          },
+        ],
+      },
+    );
+    expect(outcome.facts.map((fact) => fact.value)).toEqual([
+      { kind: "AMOUNT", amount: "360000", currency: "USD" },
+    ]);
+    expect(outcome.reply).toBe("Merci. Qui sont vos clients ?");
+  });
+
+  it("tells the model to check a worked-out figure, in any language", async () => {
+    const execute = vi.fn((_request: unknown) =>
+      Promise.resolve({ output: { kind: "STRUCTURED", value: ACKNOWLEDGED } }),
+    );
+    await createGateQInterviewer({ gateway: { execute } as never }).turn({
+      stage: "APPLICATION",
+      channel: "text",
+      locale: "fr",
+      publicGateway: PUBLIC_GATEWAY,
+      utterance: said,
+      recentTurns: [],
+      tangents: 0,
+      askedAlready: [],
+      attribution: {
+        tenantId: "c0000000-0000-4000-8000-00000000000a",
+        correlationId: "f0000000-0000-4000-8000-000000000001",
+      },
+    });
+    expect(JSON.stringify(execute.mock.calls[0]?.[0])).toContain(
+      "do not propose it as their fact: end your reply by checking it",
+    );
+  });
+
   it("adds nothing when everything read was kept", async () => {
     const outcome = await run({
       ...ACKNOWLEDGED,
