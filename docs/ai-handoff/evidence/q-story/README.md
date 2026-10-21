@@ -18,7 +18,7 @@ Branch `qstory/engine`, recorded with `scripts/q-pitch/record-story.mjs` in Chro
 
 ## Files
 
-- `story-desktop.webm`: the full story, desktop 1280×800, light.
+- `story-desktop.mp4`: the full story, desktop 1280×800, light (H.264, re-encoded from Playwright's WebM).
 - `frames/`: 12 key frames, desktop 1440×900 and phone 390×844, light and dark.
   - Frames are reached with the Next control, so each one shows its beat's cues landing.
 - `metrics.json`:
@@ -28,6 +28,38 @@ Branch `qstory/engine`, recorded with `scripts/q-pitch/record-story.mjs` in Chro
   - safe fallbacks;
   - preload time.
 
-## Results
+## Results (run 1, 20:31 UTC, `d9868fa2` + harness)
 
-Filled in from `metrics.json` after the run (see the HANDOFF-LOG entry for the numbers).
+The whole story ran: 56 beats, 7 min 33 s wall time, phase DONE.
+
+**Cue-to-word offset.** Negative means the act landed before its word.
+
+| Acts     | Count |      Median |         p95 |
+| -------- | ----: | ----------: | ----------: |
+| all      |   150 |      -92 ms |      +17 ms |
+| stage    |   120 |      -92 ms |      -76 ms |
+| mood     |     8 |      -93 ms |      -69 ms |
+| light    |    14 |     -107 ms |      -96 ms |
+| navigate |     7 | **+316 ms** | **+748 ms** |
+
+**Navigation lands late on the dev server.** It runs unoptimised and compiles on demand, even after a warm-up; production builds prefetch. Re-measure on a production build.
+
+**Frames.** 26,217 seen while playing; 63 over 50 ms (0.24%).
+
+**Safe fallbacks: 14.**
+
+- The harness pages do not render every live marker: the Discover card and its "Decide" rail, the sidebar nav selectors, the Q dock, and the relationship brief in `crm?view=record`.
+- Discover's dev page also opened after the navigation budget once.
+- The words went on every time, as designed.
+
+**CLS: 0.61. Not 0. Open.**
+
+| Source                                                     |   CLS | Cause                                                                                                                                                     |
+| ---------------------------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/dev/story/gateq?view=inbox`                              | 0.386 | The dev page's own load                                                                                                                                   |
+| `/dev/story`                                               | 0.134 | Story overlay: captions grow upward from a bottom anchor; centred stage blocks re-centre when a label appears; the mismatch chips switch layout at step 5 |
+| `gateq?view=gate`, `profile?tab=diligence`, `inbox-detail` |  0.09 | Page loads                                                                                                                                                |
+
+Fixes for the overlay causes are in progress. The recorder now attributes each shift to its element.
+
+**Preload: 447 ms.** Harness, no audio render: pictures and screenshots only.
