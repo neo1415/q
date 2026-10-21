@@ -762,6 +762,9 @@ export function createWorkPort(dependencies: {
       return {
         ...(lane.report as Record<string, unknown>),
         writtenAt: lane.report_at?.toISOString() ?? null,
+        relationshipId: lane.relationship_id,
+        companyId: lane.company_id,
+        laneOpen: !TERMINAL_STAGES.includes(lane.stage),
       };
     },
   };

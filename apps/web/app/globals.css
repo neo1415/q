@@ -5188,6 +5188,27 @@
     --cq-tile: var(--cq-charcoal);
     --cq-on-tile: var(--cq-on-charcoal);
   }
+  /*
+   * `.cq-ink` is the near-black option (Work: Rehearsals, The Q Daily): the
+   * primary button and dark tiles take the ink of the text itself, so they
+   * stay the strongest thing on the page in light and in dark.
+   */
+  .cq-ink {
+    --cq-primary-action: var(--cq-text-primary);
+    --cq-primary-action-hover: var(--cq-text-secondary);
+    --cq-on-primary-action: var(--cq-text-inverse);
+    --cq-tile: var(--cq-text-primary);
+    --cq-on-tile: var(--cq-text-inverse);
+  }
+  /* The Q Daily being prepared: a bar that travels, never a made-up percent. */
+  @keyframes cq-daily-indeterminate {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
   /* Busy time: hatched and labelled, never a colour alone. */
   .cq-busy-hatch {
     background: repeating-linear-gradient(

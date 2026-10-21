@@ -42,6 +42,7 @@ export {
   FileText,
   Filter,
   Flag,
+  Folder,
   FolderLock,
   Gauge,
   Globe,
