@@ -442,6 +442,10 @@ export const HOST_UNAVAILABLE =
 // Meet showed under the provider's own label, "PAL AI" (live 2026-10-18,
 // meeting ef8a7091: greeted as a guest and asked to introduce itself).
 const BOT_NAME = /^(?:q\b.*capital q|capital q\b|pal ai$)/i;
+/** Q in the call (its notes bot or its face), never a person. */
+export function isQInCall(name: string): boolean {
+  return BOT_NAME.test(name.trim());
+}
 /** Q's own words heard back within this long are its echo, not a person. */
 export const ECHO_WINDOW_MS = 45_000;
 

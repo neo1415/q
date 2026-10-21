@@ -10,6 +10,7 @@ import {
   DEFAULT_HOST_LIMITS,
   DEFAULT_HOST_POLICY,
   HOST_REFUSAL,
+  isQInCall,
   hostCarded,
   hostProposed,
   addressedToQ,
@@ -1732,6 +1733,12 @@ export function createMeetingHostRuntime(dependencies: {
         return;
       }
       session.lastEventAt = now();
+      // 2026-10-21 (lane 6, #295): the face waits until a minute before the
+      // booking; a person already in the call sends it now (a repeated
+      // start skips the wait; idempotent otherwise).
+      if (event.kind === "JOIN" && !isQInCall(event.participant.name)) {
+        dependencies.face?.start(meetingId);
+      }
       if (event.kind === "UTTERANCE") {
         session.utterances += 1;
         if (session.utterances === 1) {
