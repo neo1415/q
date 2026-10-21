@@ -70,9 +70,27 @@ describe("MEETING_HOST_TURN", () => {
     expect(outside).not.toContain("admin mode");
   });
 
-  it("v5: answers from the room-permitted prepared context and the working record; a suggestion is not an agreement", () => {
+  it("v6: says who Q is, why it is in the call and what Capital Q is, and answers a context gap from the booking", () => {
     const active = registry.getActive("MEETING_HOST_TURN").definition;
-    expect(active.version).toBe(5);
+    expect(active.version).toBe(6);
+    expect(active.template).toContain("ABOUT YOU AND CAPITAL Q");
+    // The locked PADL Decision #001 wording, not an invented description.
+    expect(active.template).toContain(
+      "Capital Q is an AI-native Investment Intelligence Operating System for private capital.",
+    );
+    expect(active.template).toContain(
+      "is not that: answer it (kind ANSWER) from ABOUT YOU AND CAPITAL Q",
+    );
+    expect(active.template).toContain("Never say you cannot find this meeting");
+    expect(active.template).not.toContain("say you don't have it;");
+    // The section sits before the authority rules and is not untrusted.
+    expect(active.template.indexOf("ABOUT YOU AND CAPITAL Q")).toBeLessThan(
+      active.template.indexOf("YOUR AUTHORITY"),
+    );
+  });
+
+  it("v5 (kept in v6): answers from the room-permitted prepared context and the working record; a suggestion is not an agreement", () => {
+    const active = registry.getActive("MEETING_HOST_TURN").definition;
     expect(active.template).toContain("{{prepared}}");
     expect(active.template).toContain("{{memory}}");
     expect(active.template).toContain("A suggestion is not an agreement");
@@ -86,8 +104,8 @@ describe("MEETING_HOST_TURN", () => {
     );
   });
 
-  it("v4 and before stay readable but are no longer active", () => {
-    expect(registry.getActive("MEETING_HOST_TURN").definition.version).toBe(5);
+  it("v5 and before stay readable but are no longer active", () => {
+    expect(registry.getActive("MEETING_HOST_TURN").definition.version).toBe(6);
   });
 
   it("v5 keeps v4: answers at once and conversationally, may use what is shown, and reads KEEP_WAITING", () => {

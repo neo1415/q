@@ -52,7 +52,7 @@ export const MEETING_HOST_TURN_V5: PromptDefinition<
 > = {
   ...MEETING_HOST_TURN_V4,
   version: 5,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Founder P3 2026-10-11: Q in a call answers from a prepared, room-permitted context (company, published mandate, deck claims, disclosed documents, agenda) and the working record of the meeting; may note an action item (NOTE); suggestions are not agreements and a proposed time is not confirmed until the investor explicitly accepts.",
   effectiveFrom: "2026-10-11",

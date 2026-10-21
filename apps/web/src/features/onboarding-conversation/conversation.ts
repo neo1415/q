@@ -148,6 +148,27 @@ function trimSentenceEnd(summary: string): string {
   return summary.replace(/[.!?]+$/, "");
 }
 
+/**
+ * The step whose options show under Q's words (owner 2026-10-21: Q asked
+ * the stage and no choices showed, because they followed the form cursor).
+ * Q's question while it is still open on their path; once it is answered
+ * or set aside, the form's own current step.
+ */
+export function promptStepOf(
+  view: Pick<OnboardingSessionView, "currentStep" | "progress">,
+  asked: OnboardingStepView | null,
+): OnboardingStepView | null {
+  const open =
+    asked !== null &&
+    view.progress.eligibleSteps.some(
+      (step) =>
+        step.stepKey === asked.stepKey &&
+        step.status !== "COMPLETED" &&
+        step.status !== "SKIPPED",
+    );
+  return open ? asked : view.currentStep;
+}
+
 /** The question Q asks now, from the session's current step. */
 export function promptFor(
   step: OnboardingStepView,

@@ -12,6 +12,7 @@ import {
   pendingQuestion,
   progressLines,
   promptFor,
+  promptStepOf,
   publicSourceOf,
   RESUME_AFTER_MS,
   stillNeeded,
@@ -121,6 +122,43 @@ function view(
     ...overrides,
   } as unknown as OnboardingSessionView;
 }
+
+describe("the options under Q's words follow Q's question (owner 2026-10-21)", () => {
+  const raising: OnboardingStepView = {
+    stepKey: "F6.raising",
+    stepType: "single_select",
+    required: true,
+    prompt: "Are you raising now?",
+    presentation: {
+      stepType: "single_select",
+      options: [
+        { optionKey: "yes", label: "Yes, now" },
+        { optionKey: "soon", label: "In the next six months" },
+      ],
+    },
+  } as unknown as OnboardingStepView;
+
+  it("shows the step Q asked, not the form cursor's, while it is open", () => {
+    const step = promptStepOf(view(), raising);
+    expect(step?.stepKey).toBe("F6.raising");
+    expect(
+      promptFor(step as OnboardingStepView, VOCABULARY).chips,
+    ).toHaveLength(2);
+  });
+
+  it("falls back to the cursor once Q's question is answered, or with none", () => {
+    const answered = view({
+      progress: {
+        ...view().progress,
+        eligibleSteps: view().progress.eligibleSteps.map((row) =>
+          row.stepKey === "F6.raising" ? { ...row, status: "COMPLETED" } : row,
+        ),
+      },
+    });
+    expect(promptStepOf(answered, raising)?.stepKey).toBe("F1.stage");
+    expect(promptStepOf(view(), null)?.stepKey).toBe("F1.stage");
+  });
+});
 
 describe("promptFor", () => {
   it("asks the step in the definition's words with its options as chips", () => {

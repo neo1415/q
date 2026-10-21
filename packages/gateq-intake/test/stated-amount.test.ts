@@ -19,6 +19,25 @@ describe("an amount is stated only when it is written in the person's words", ()
     );
   });
 
+  it("reads amounts said in words with a scale, and never a bare count", () => {
+    expect(amountsIn("We're raising two million dollars")).toEqual([2_000_000]);
+    expect(amountsIn("half a million")).toEqual([500_000]);
+    expect(amountsIn("one hundred and fifty thousand")).toEqual([150_000]);
+    expect(amountsIn("a million and a half? no, a million")).toContain(
+      1_000_000,
+    );
+    expect(amountsIn("two of them pay us")).toEqual([]);
+    expect(amountStatedIn("2000000", "two million")).toBe(true);
+    expect(amountStatedIn("4000000", "two of them pay two million")).toBe(
+      false,
+    );
+  });
+
+  it("reads thousands grouped with spaces, as French and others write them", () => {
+    expect(amountsIn("Donc 360 000 USD de revenus")).toEqual([360_000]);
+    expect(amountsIn("1\u202f500\u202f000 €")).toEqual([1_500_000]);
+  });
+
   it("a product of what was said is not what was said", () => {
     const said = "Two of them pay us $180,000 each.";
     expect(amountStatedIn("180000", said)).toBe(true);
@@ -87,6 +106,25 @@ describe("a frozen dossier shows a derived amount as Q's inference", () => {
       expect(out?.truthClass).toBe("USER_CLAIM");
       expect(out?.derivation).toBeUndefined();
     }
+  });
+
+  it("a figure Q read back and the founder agreed to is their claim", () => {
+    const confirmed = [
+      ...turns,
+      { seq: 7, role: "Q", text: "So that's USD 360,000 for revenue, right?" },
+      { seq: 8, role: "PERSON", text: "Yes, that's right." },
+    ];
+    const kept = withDerivedAmountsMarked(
+      dossier(fact("360000 USD", 8)),
+      confirmed,
+    ).dimensions[0]?.facts[0];
+    expect(kept?.truthClass).toBe("USER_CLAIM");
+    // A reply that does not agree leaves it Q's inference.
+    const refused = withDerivedAmountsMarked(dossier(fact("360000 USD", 8)), [
+      ...confirmed.slice(0, 3),
+      { seq: 8, role: "PERSON", text: "No, it's less than that." },
+    ]).dimensions[0]?.facts[0];
+    expect(refused?.truthClass).toBe("Q_INFERENCE");
   });
 
   it("the marked fact is still a valid dossier fact", () => {
