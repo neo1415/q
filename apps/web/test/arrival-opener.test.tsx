@@ -232,6 +232,36 @@ async function landed() {
 }
 
 describe("the opener on the page", () => {
+  it("keeps the server's heading when the read lands: the greeting never swaps (speed lane 2026-10-20)", async () => {
+    let land: (data: ArrivalData) => void = () => undefined;
+    const reading = new Promise<ArrivalData>((resolve) => {
+      land = resolve;
+    });
+    render(
+      <ArrivalBriefing
+        variant="page"
+        headline="Welcome back, Laura."
+        fallback={<h1>Welcome back, Laura.</h1>}
+        load={() => reading}
+        now={() => MORNING}
+      />,
+    );
+    expect(screen.getByRole("heading").textContent).toBe(
+      "Welcome back, Laura.",
+    );
+    await act(async () => {
+      land(BUSY);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The briefing has landed (its opener is ready for the voice) and the
+    // heading on screen is the same words.
+    expect(arrivalSpoken()).toMatch(/You have 3 things waiting./u);
+    expect(screen.getByRole("heading").textContent).toBe(
+      "Welcome back, Laura.",
+    );
+  });
+
   // Owner 2026-10-17: the Q page is a greeting and one open question, like
   // a chat app's first screen; what waits comes up when they ask for it.
   it("greets and asks one open question: no buttons, no cards until they ask", async () => {

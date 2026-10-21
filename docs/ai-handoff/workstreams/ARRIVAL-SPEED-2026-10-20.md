@@ -1,4 +1,4 @@
-# Arrival speed — 2026-10-20 (Claude, speed lane "arrival")
+| 22 | model-gateway `index.ts` arrival follow-up | a code-composed snapshot answer waited for `prepareTurn`'s assemble, profile, memory recall and offer | serial | prepare's slowest read | memory recall is no longer waited for once the snapshot has answered by code (`Promise.race` with the arrival decision; recall still runs for every other turn) | FIXED for memory (test: `q-answer-arrival-snapshot.test.ts`, a recall that never answers no longer holds the turn). Still waits for assemble/profile/offer: the stored answer carries the prompt bundle version and the conversation the prepared history resolved, and the offer decides which prefetch reads are skipped; answering before them needs a second persistence path || 19 | `q-session.tsx` `callOpening` → `use-voice-interview.ts` `talk` | a call with no greeting given (conversation open, or off Home) waited for the briefing (≤ `VOICE_BRIEFING_WAIT_MS` 2.5 s) before even asking the server for the line | serial before connect | ≤ 2.5 s + session start | `talk({ firstMessage })` accepts a promise: the server's session start and the briefing run side by side (`Promise.all`), and only the transport's first words wait; a failed promise falls back to the lead. The lowdown is kept | FIXED: connect = max(session start, briefing) instead of their sum (tests: `voice-one-line.test.tsx`, 2 new) || 17 | `ArrivalBriefing` page heading | the headline changed from "Welcome back, Zino." to "Good afternoon, Zino." when the read landed | after the read | visible swap at read time | `ArrivalBriefing` takes `headline` (the server-rendered greeting); `ReturningWelcome` passes `greeting.headline`, so the heading keeps the redesign's copy from first paint through the read; the line under it was already the same (`OPEN_QUESTION`) | FIXED (test: `arrival-opener.test.tsx` "keeps the server's heading when the read lands") || 13 | cold build: `relationship-status.ts`, `relationship-brief.ts`, `run-read-cache.ts` | attention + briefs cold build (126 round trips live on 2026-10-15; lane S since batched the investor side's 92) | parallel sources; the list read twice; founders: one investor read per relationship | founder, N relationships: list part 2 × (4 + N) round trips; investor: 2 × 6 | (a) the company list names investors in one read (`findCanonicalInvestorOrganisations`, new optional port method + Postgres `= any($ids)`); (b) the briefs take the request's cached list (`relationshipBriefs({ listings })`, wired in `withRunCachedRelationshipLists`), so attention and briefs share one list read per request, same actor key | FIXED: founder list part 2 × (4 + N) → 5 (N = 10: 28 → 5); investor 12 → 6. Counted at port level in `packages/network/test/relationship-list-company-batched.test.ts` (4 investor reads → 1) and `apps/q-api/test/relationship-list-shared.test.ts` (2 list reads → 1). Not re-measured against Postgres here (no local database on this machine; `arrival-snapshot.integration.test.ts` counts real round trips where one is) || 12 | `arrival-snapshot.ts` `forActorCore` | probe → build on a cold actor | serial | +1 probe (~10–20) | — | NOT FIXED (required for freshness): the stored stamp must be no newer than the data it vouches for. A build overlapping the probe could read data before a write and a stamp after it, and every later probe would then match and serve the stale snapshot until the next change. Probe-first keeps data ≥ stamp. Overlapping safely needs one consistent DB snapshot across the attention and brief services, which run on separate connections |# Arrival speed — 2026-10-20 (Claude, speed lane "arrival")
 
 Branch `claude/arrival-speed-910431`, cut from `speed/q-oct20` (= `origin/build/int-rc` at `1cb6c83f0`). PR into `speed/q-oct20`.
 
@@ -44,6 +44,8 @@ Branch `claude/arrival-speed-910431`, cut from `speed/q-oct20` (= `origin/build/
 
 Checked against the code three times after the edits: the read order in `arrival-read.ts` (rows 4–10), q-api `forActor` (rows 11–14), and Home and the voice path (rows 1–3 and 15–22).
 
+Round 2 (2026-10-21): rows 12, 13, 17, 19 and 22 were re-checked twice against the merged code: the list and brief reads, `talk` (the superseded check still runs before anything is recorded), the page heading and the gateway memory race.
+
 ## Timings (latency model, `arrival-read-timing.test.ts`)
 
 Critical path of the arrival read on the server, in ms:
@@ -61,9 +63,22 @@ Critical path of the arrival read on the server, in ms:
 
 The latency model per read: account 80, work-since 80, approvals 60, approval 70, workforce 150, done 120, notices 60, context 70, matches 320, readiness 150, deck 80, thread 80, snapshot warm 30 / cold 1400 (live), attention 900.
 
-## Shared files touched (minimal)
+## Shared files touched
+
+Round 1:
 
 - `apps/web/src/features/home/home-screen.tsx`: the warm call, plus parallel first reads.
 - New: `apps/web/app/api/q-arrival/route.ts`.
 - `apps/q-api/src/composition/arrival-snapshot.ts`: the Daily read runs in parallel.
-- Not touched: model-gateway, q-orchestrator, contracts, migrations, voice provider, onboarding, artifacts, meetings.
+- `apps/web/test/relationship-hub.test.tsx`: the streamed-page wait also waits for the page to stop changing (a CI race; no assertion changed).
+
+Round 2 (2026-10-21, after `origin/speed/q-oct20` was merged in with no conflicts):
+
+- `packages/investors`: optional `findCanonicalInvestorOrganisations` (port and Postgres).
+- `packages/network`: `relationship-status.ts` uses it for the company list; `relationship-brief.ts` takes `listings`.
+- `apps/q-api/src/composition/run-read-cache.ts`: the briefs use the cached list.
+- `apps/web/src/features/voice/use-voice-interview.ts`: `talk` accepts a promised `firstMessage`.
+- `apps/web/src/features/q/q-session.tsx`: passes the promise.
+- `apps/web/src/features/briefing/arrival-briefing.tsx` and `apps/web/src/features/home/returning-welcome.tsx`: `headline`.
+- `packages/model-gateway/src/q/index.ts`: no memory wait for a code-answered arrival follow-up.
+- No contracts, migrations or authorisation rules changed. Every new read is the same actor's own, keyed by the full actor.

@@ -102,28 +102,54 @@ export function withRunCachedRelationshipLists(
       actor.organisationId ?? "",
       actor.membershipId ?? "",
     ].join("/");
+  const forInvestor: InterestService["listRelationshipsForInvestor"] = (
+    query,
+  ) =>
+    cachedInRun(
+      {
+        aggregate: "relationships-investor",
+        tables: RELATIONSHIP_LIST_TABLES,
+        actor: who(query.actor),
+        fingerprint: "",
+      },
+      () => service.listRelationshipsForInvestor(query),
+    );
+  const forCompany: InterestService["listRelationshipsForCompany"] = (query) =>
+    cachedInRun(
+      {
+        aggregate: "relationships-company",
+        tables: RELATIONSHIP_LIST_TABLES,
+        actor: who(query.actor),
+        fingerprint: query.companyId,
+      },
+      () => service.listRelationshipsForCompany(query),
+    );
+  const briefs = service.relationshipBriefs;
   return {
     ...service,
-    listRelationshipsForInvestor: (query) =>
-      cachedInRun(
-        {
-          aggregate: "relationships-investor",
-          tables: RELATIONSHIP_LIST_TABLES,
-          actor: who(query.actor),
-          fingerprint: "",
-        },
-        () => service.listRelationshipsForInvestor(query),
-      ),
-    listRelationshipsForCompany: (query) =>
-      cachedInRun(
-        {
-          aggregate: "relationships-company",
-          tables: RELATIONSHIP_LIST_TABLES,
-          actor: who(query.actor),
-          fingerprint: query.companyId,
-        },
-        () => service.listRelationshipsForCompany(query),
-      ),
+    // Speed lane 2026-10-20: the briefs read the same list (the same
+    // service read, so the same authorisation) from this run's entry, not
+    // a second time (a cold arrival snapshot listed twice: once for the
+    // attention report, once for the briefs). A caller's own list wins.
+    ...(briefs === undefined
+      ? {}
+      : {
+          relationshipBriefs: (query: Parameters<typeof briefs>[0]) =>
+            briefs({
+              ...query,
+              listings:
+                query.listings ??
+                (() =>
+                  query.companyId === undefined
+                    ? forInvestor({ actor: query.actor })
+                    : forCompany({
+                        actor: query.actor,
+                        companyId: query.companyId,
+                      })),
+            }),
+        }),
+    listRelationshipsForInvestor: forInvestor,
+    listRelationshipsForCompany: forCompany,
   };
 }
 

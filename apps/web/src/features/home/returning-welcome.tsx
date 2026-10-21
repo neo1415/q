@@ -154,6 +154,8 @@ export function ReturningWelcome({
       */}
       <ArrivalBriefing
         variant="page"
+        // The heading the server rendered stays when the read lands.
+        headline={greeting.headline}
         // E1: the cards are the Q stage's layer, which outlives this welcome.
         cards="stage"
         fallback={

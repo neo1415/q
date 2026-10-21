@@ -369,6 +369,37 @@ export function createListRelationshipsForCompany(
             dependencies,
             relationships.map((relationship) => relationship.id),
           );
+    const findMany = dependencies.investors.findCanonicalInvestorOrganisations;
+    if (histories !== null && findMany !== undefined) {
+      // Speed lane 2026-10-20: the investors' names in one read for the
+      // whole list, not one read per relationship (a founder's cold
+      // arrival snapshot read the list twice, each row once more). Only
+      // relationships the company can see anything of are named.
+      const views = relationships.flatMap((relationship) => {
+        const view = viewOf(
+          relationship,
+          histories.get(relationship.id) ?? [],
+          "COMPANY",
+        );
+        return view === null ? [] : [{ relationship, view }];
+      });
+      const investors = await findMany([
+        ...new Set(
+          views.map(({ relationship }) =>
+            InvestorOrganisationIdSchema.parse(
+              relationship.investorOrganisationId,
+            ),
+          ),
+        ),
+      ]);
+      const byId = new Map(investors.map((one) => [one.id, one]));
+      return views.flatMap(({ relationship, view }) => {
+        const investor = byId.get(relationship.investorOrganisationId);
+        return investor === undefined
+          ? []
+          : [{ ...view, counterpartName: investor.displayName }];
+      });
+    }
     const listed = await inBatches(relationships, async (relationship) => {
       const view = viewOf(
         relationship,

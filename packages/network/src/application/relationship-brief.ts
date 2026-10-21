@@ -26,6 +26,7 @@ import {
   createListRelationshipsForCompany,
   createListRelationshipsForInvestor,
   createRelationshipById,
+  type RelationshipListing,
   type RelationshipStatus,
 } from "./relationship-status.js";
 
@@ -558,13 +559,23 @@ export function createRelationshipBriefs(
     readonly relationshipIds?: readonly string[] | undefined;
     readonly sources: RelationshipBriefBatchSources;
     readonly now?: Date | undefined;
+    /**
+     * The same actor's own list, already read and authorised by this
+     * service's list read for the same side (a request's cached list;
+     * speed lane 2026-10-20: a cold arrival snapshot read it twice).
+     * Absent: read here.
+     */
+    readonly listings?:
+      (() => Promise<readonly RelationshipListing[]>) | undefined;
   }): Promise<readonly RelationshipBrief[]> => {
     const { actor, sources } = query;
     const side = query.companyId === undefined ? "INVESTOR" : "COMPANY";
     const listings =
-      query.companyId === undefined
-        ? await forInvestor({ actor })
-        : await forCompany({ actor, companyId: query.companyId });
+      query.listings !== undefined
+        ? await query.listings()
+        : query.companyId === undefined
+          ? await forInvestor({ actor })
+          : await forCompany({ actor, companyId: query.companyId });
     const wanted =
       query.relationshipIds === undefined
         ? null

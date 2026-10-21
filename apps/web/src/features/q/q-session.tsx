@@ -440,8 +440,11 @@ export function QSessionProvider({
           ...(named === undefined ? {} : { conversationId: named }),
         },
         // Never "I'm listening" (Zino, 2026-10-08): the arrival briefing,
-        // or, when it is still being read, the promise of it.
-        firstMessage: greeting ?? (await callOpening()),
+        // or, when it is still being read, the promise of it. Handed over
+        // as a promise (speed lane 2026-10-20): the line is asked for at
+        // once and only its first words wait for the briefing, which used
+        // to hold the whole connection for up to 2.5 s.
+        firstMessage: greeting ?? callOpening(),
       });
     },
     [
