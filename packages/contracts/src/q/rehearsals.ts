@@ -526,6 +526,22 @@ export const QRehearsalSummaryDtoSchema = z
     score: z.number().int().min(0).max(100).nullable(),
     exchanges: z.number().int().min(0),
     createdAt: UtcTimestampSchema,
+    /** When it ended; null while it runs. Absent from an older server. */
+    endedAt: UtcTimestampSchema.nullable().optional(),
+    /**
+     * Where its review stands, for the list (Work, Rehearsals 2026-10-21):
+     * READY with its first note each way, PROVISIONAL while Q finishes it,
+     * NONE when none is written. The notes are the review's own words.
+     * Absent from an older server.
+     */
+    review: z
+      .object({
+        state: z.enum(["READY", "PROVISIONAL", "NONE"]),
+        wentWell: z.string().max(300).nullable(),
+        workOn: z.string().max(300).nullable(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type QRehearsalSummaryDto = z.infer<typeof QRehearsalSummaryDtoSchema>;

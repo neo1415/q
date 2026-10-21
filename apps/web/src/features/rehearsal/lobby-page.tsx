@@ -1,6 +1,9 @@
 import Link from "next/link";
 
-import type { RehearsalCounterpartKind } from "@capital-q/contracts";
+import {
+  RehearsalDifficultySchema,
+  type RehearsalCounterpartKind,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import { ChevronLeft, ICON_SIZE } from "@capital-q/ui/icons";
 import { EmptyState } from "@capital-q/ui/states";
@@ -23,11 +26,14 @@ export async function RehearsalLobbyPage({
   counterpartId,
   meeting,
   requestedVideo = false,
+  difficulty,
 }: {
   readonly kind: RehearsalCounterpartKind;
   readonly counterpartId: string;
   readonly meeting: string | undefined;
   readonly requestedVideo?: boolean;
+  /** `?difficulty=` from the Rehearsals page's sheet; anything else is ignored. */
+  readonly difficulty?: string | undefined;
 }) {
   const t = await serverT();
   const context = await resolveOwnContext();
@@ -87,6 +93,10 @@ export async function RehearsalLobbyPage({
             kind={kind}
             counterpartId={id.data}
             meetingId={meetingId.success ? meetingId.data : undefined}
+            initialDifficulty={
+              RehearsalDifficultySchema.safeParse(difficulty).data ??
+              "REALISTIC"
+            }
           />
         </div>
       </QSection>

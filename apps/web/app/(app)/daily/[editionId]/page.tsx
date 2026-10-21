@@ -10,7 +10,7 @@ import {
   PageHeader,
 } from "@/components/app-shell/page-container";
 import { DailyAnchorFocus } from "@/features/daily/anchor-focus";
-import { Newspaper } from "@/features/daily/newspaper";
+import { DailyPaper } from "@/features/daily/daily-paper";
 import { qApiSession } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
@@ -71,7 +71,12 @@ export default async function DailyEditionPage({
           {t("Latest edition")}
         </Link>
         <DailyAnchorFocus />
-        <Newspaper edition={edition} />
+        <div className="cq-ink">
+          <DailyPaper
+            edition={edition}
+            onEarlier={{ href: `/daily?date=${edition.editionDate}` }}
+          />
+        </div>
       </QSection>
     </PageContainer>
   );

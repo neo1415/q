@@ -297,6 +297,15 @@ export const QWorkReportDtoSchema = z
           .strict(),
       )
       .max(8),
+    /*
+     * Work, first-stage report (2026-10-21): what the prepared next steps
+     * need. The canonical relationship the interview ran in (null: none
+     * yet, so nothing can be sent), the company, and whether Q is still
+     * working this lane. Defaulted for an older server.
+     */
+    relationshipId: z.string().uuid().nullable().default(null),
+    companyId: z.string().uuid().nullable().default(null),
+    laneOpen: z.boolean().default(false),
   })
   .strict();
 export type QWorkReportDto = z.infer<typeof QWorkReportDtoSchema>;

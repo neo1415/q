@@ -5212,6 +5212,15 @@
     --cq-move: var(--cq-ink-action);
     --cq-move-soft: var(--cq-ink-action-soft);
   }
+  /* The Q Daily being prepared: a bar that travels, never a made-up percent. */
+  @keyframes cq-daily-indeterminate {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
   /* Busy time: hatched and labelled, never a colour alone. */
   .cq-busy-hatch {
     background: repeating-linear-gradient(

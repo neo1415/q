@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { getCompanyProfile } from "@capital-q/api-client";
 import { buttonClassName } from "@capital-q/ui/button";
-import { EmptyState } from "@capital-q/ui/states";
+import { EmptyState, InlineNotice } from "@capital-q/ui/states";
 
 import { PageContainer } from "@/components/app-shell/page-container";
-import { PitchGrid } from "@/features/pitch/pitch-grid";
-import { resolveOwnContext } from "@/features/q/context";
+import { listPitchMediaAction } from "@/features/pitch/pitch-actions";
+import { PitchMain } from "@/features/pitch/pitch-main";
+import { apiSession, resolveOwnContext } from "@/features/q/context";
 import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
 import { WorkHeader, workSideOf } from "@/features/work/work-header";
@@ -16,15 +18,45 @@ export const metadata: Metadata = { title: "Pitch & media" };
 export const dynamic = "force-dynamic";
 
 /**
- * Pitch & media (CQ-WEB-023, VID; ADR 0022): every live video the
- * founder's company has, as a grid, each opening its own page to publish,
- * name, choose who may watch, replace, preview or delete it.
+ * Pitch & media (CQ-WEB-023, VID; ADR 0022; chosen design 2026-10-21,
+ * "Main pitch with chapters"): the company's main pitch with its chapters
+ * from Q's reading of the transcript, who can watch it, the other videos,
+ * and what Q heard, for the founder to confirm. Each video still opens its
+ * own page to replace, preview or delete it.
  *
  * The person's own company is resolved on the server from their founder
  * journey; the screen then reads and changes the pitch through the API
  * under their session. Anyone without a company sees the way to start
  * one, not an upload control: there is nothing an upload could belong to.
  */
+async function FounderPitch({ companyId }: { readonly companyId: string }) {
+  const t = await serverT();
+  const session = await apiSession();
+  const [videos, profile] = await Promise.all([
+    listPitchMediaAction(companyId),
+    session === null
+      ? Promise.resolve(null)
+      : getCompanyProfile(session, companyId).catch(() => null),
+  ]);
+  if (!videos.ok) {
+    return (
+      <InlineNotice tone="warning" title={t("Your videos couldn't load")}>
+        {t(videos.message)}
+      </InlineNotice>
+    );
+  }
+  return (
+    <PitchMain
+      companyId={companyId}
+      companyName={profile?.canonicalName ?? null}
+      videos={videos.value}
+      sections={
+        profile === null ? null : (profile.overview?.pitchSections ?? [])
+      }
+    />
+  );
+}
+
 export default async function PitchPage() {
   const t = await serverT();
   const context = await resolveOwnContext();
@@ -42,7 +74,7 @@ export default async function PitchPage() {
       >
         <WorkHeader view="pitch" side={workSideOf(context)} />
         {context.kind === "FOUNDER" ? (
-          <PitchGrid companyId={context.companyId} />
+          <FounderPitch companyId={context.companyId} />
         ) : context.kind === "NONE" && context.unavailable === true ? (
           // Not known to have no company: Capital Q did not answer.
           <EmptyState

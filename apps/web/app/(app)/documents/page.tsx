@@ -105,7 +105,7 @@ export default async function DocumentsPage({
             counts={{
               ...(inbox === null || inbox.counts.open === 0
                 ? {}
-                : { requested: `${String(inbox.counts.open)} open` }),
+                : { requested: String(inbox.counts.open) }),
             }}
           />
         )}
