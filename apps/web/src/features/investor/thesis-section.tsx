@@ -4,18 +4,22 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import type { ThesisReadingDto } from "@capital-q/contracts";
-import { Button } from "@capital-q/ui/button";
 
 import { applySuggestionAction } from "@/features/assumptions/assumption-actions";
+import { ProfileSectionShell } from "@/features/profile/editable-section";
+import { VisibilityLabel } from "@/features/profile/visibility-label";
+import { QLine } from "@/features/relationships/crm-kit";
+import { accountButton, Pending } from "@/features/settings/account-kit";
 import { useT } from "@/features/i18n/language";
 
 /**
- * Q.02 "How Q reads your thesis" (2026-10-07; design "thesis"): what the
- * investor declared (their rules, which decide the feed), what they did
- * (saves and passes, counted) and what Q reads from it (labelled Q's
- * inference), kept apart. A suggestion changes the mandate only when they
- * press its button, which is the approval of exactly that one change, at
- * the mandate version they are looking at; "Not now" just hides it here.
+ * Q.02 "How Q reads your thesis" (chosen design "One page, edit in
+ * place", 2026-10-21): Q's reading of the investor's saves and passes,
+ * labelled as a reading, never a rule. What they declared decides the
+ * feed; what they did and what Q reads from it are kept apart, one tap
+ * away. A suggestion changes the mandate only when they approve it, which
+ * is the approval of exactly that one change at the mandate version they
+ * are looking at; "Leave it as a reading" just hides it here.
  */
 export function ThesisSection({
   reading,
@@ -28,20 +32,16 @@ export function ThesisSection({
   const router = useRouter();
   const [hidden, setHidden] = useState<readonly string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [, start] = useTransition();
   const suggestions = reading.suggestions.filter((s) => !hidden.includes(s.id));
-  const savedCounts = reading.observed.counts.filter(
-    (c) => c.decision === "SAVED",
-  );
-  const passedCounts = reading.observed.counts.filter(
-    (c) => c.decision === "PASSED",
-  );
-  const widest = Math.max(1, ...reading.observed.counts.map((c) => c.count));
+  const decisions = reading.observed.saved + reading.observed.passed;
 
   const approve = (suggestionId: string) => {
     if (reading.mandateId === null || reading.mandateVersion === null) return;
     const mandateId = reading.mandateId;
     const expectedVersion = reading.mandateVersion;
+    setBusy(suggestionId);
     start(async () => {
       const out = await applySuggestionAction({
         investorOrganisationId,
@@ -49,6 +49,7 @@ export function ThesisSection({
         suggestionId,
         expectedVersion,
       });
+      setBusy(null);
       setMessage(
         out.ok
           ? "Done. Your mandate is updated, and your feed follows it."
@@ -59,158 +60,159 @@ export function ThesisSection({
   };
 
   return (
-    <section
+    <ProfileSectionShell
       id="thesis"
-      aria-labelledby="thesis-title"
-      className="flex scroll-mt-6 flex-col gap-4"
-      data-thesis
+      title={t("How Q reads your thesis")}
+      variant="brief"
+      visibility={<VisibilityLabel scope="private" side="firm" translate={t} />}
     >
-      <div className="flex flex-col gap-1">
-        <h2 id="thesis-title" className="cq-title-md text-(--cq-text-primary)">
-          {t("How Q reads your thesis")}
-        </h2>
-        <p className="cq-body-sm text-(--cq-text-secondary)">
-          {t(
-            "What you declared decides your feed. What you did and what Q reads from it are shown apart, and never change your rules unless you approve.",
-          )}
-        </p>
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="flex flex-col gap-2" data-thesis-declared>
-          <h3 className="cq-title-sm text-(--cq-text-primary)">
-            {t("What you declared")}
-          </h3>
-          {reading.declared.length === 0 ? (
-            <p className="cq-body-sm text-(--cq-text-secondary)">
-              {t(
-                "No active mandate yet. Your answers above become your rules.",
+      <div data-thesis>
+        <QLine
+          small={
+            decisions === 0
+              ? t("From your saves and passes, once there are some.")
+              : t(
+                  `From ${String(reading.observed.saved)} saves and ${String(reading.observed.passed)} passes. A reading, not a fact about your thesis.`,
+                )
+          }
+        >
+          {reading.inferred.length === 0
+            ? t("Not enough saves and passes yet for Q to read anything.")
+            : reading.inferred.join(" ")}{" "}
+          {reading.inferred.length === 0
+            ? null
+            : t(
+                "That is a reading, not a rule: it never changes your declared mandate.",
               )}
-            </p>
-          ) : (
-            <dl className="flex flex-col divide-y divide-(--cq-border-subtle)">
-              {reading.declared.map((rule) => (
-                <div
-                  key={rule.label}
-                  className="flex justify-between gap-3 py-2"
-                >
-                  <dt className="cq-body-sm text-(--cq-text-secondary)">
-                    {rule.label}
-                  </dt>
-                  <dd className="cq-body-sm text-end text-(--cq-text-primary)">
-                    {rule.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </div>
-        <div className="flex flex-col gap-2" data-thesis-observed>
-          <h3 className="cq-title-sm text-(--cq-text-primary)">
-            {t("What you did")}
-          </h3>
-          <p className="cq-body-sm text-(--cq-text-secondary)">
-            Saved {String(reading.observed.saved)} · Passed{" "}
-            {String(reading.observed.passed)}
+        </QLine>
+      </div>
+      {suggestions.map((suggestion) => (
+        <div
+          key={suggestion.id}
+          className="flex flex-col gap-2"
+          data-thesis-suggestion={suggestion.id}
+        >
+          <p className="m-0 text-sm text-(--cq-text-primary)">
+            <b className="font-medium">{suggestion.title}</b>{" "}
+            <span className="text-(--cq-text-secondary)">
+              {suggestion.because} {suggestion.effect}
+            </span>
           </p>
-          <ul className="flex flex-col gap-1.5">
-            {[...savedCounts.slice(0, 3), ...passedCounts.slice(0, 3)].map(
-              (count) => (
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              className={accountButton("secondary", "sm")}
+              disabled={busy !== null}
+              aria-busy={busy === suggestion.id}
+              onClick={() => approve(suggestion.id)}
+              data-apply-suggestion={suggestion.id}
+            >
+              {busy === suggestion.id ? (
+                <Pending>{t("Saving…")}</Pending>
+              ) : (
+                t("Approve this change")
+              )}
+            </button>
+            <button
+              type="button"
+              className={accountButton("quiet", "sm")}
+              onClick={() =>
+                setHidden((current) => [...current, suggestion.id])
+              }
+            >
+              {t("Leave it as a reading")}
+            </button>
+          </div>
+        </div>
+      ))}
+      <details className="text-sm" data-thesis-detail>
+        <summary className="inline-flex min-h-11 cursor-pointer items-center text-[13px] text-(--cq-text-secondary) hover:text-(--cq-text-primary)">
+          {t("What this reading is from")}
+        </summary>
+        <div className="grid gap-4 pt-1 md:grid-cols-3">
+          <div className="flex flex-col gap-1.5" data-thesis-declared>
+            <h3 className="m-0 text-[13px] font-medium text-(--cq-text-secondary)">
+              {t("What you declared")}
+            </h3>
+            {reading.declared.length === 0 ? (
+              <p className="m-0 text-[13px] text-(--cq-text-tertiary)">
+                {t(
+                  "No active mandate yet. Your answers above become your rules.",
+                )}
+              </p>
+            ) : (
+              <dl className="m-0 flex flex-col">
+                {reading.declared.map((rule) => (
+                  <div
+                    key={rule.label}
+                    className="flex justify-between gap-3 border-t border-(--cq-border-subtle) py-1.5 first:border-t-0"
+                  >
+                    <dt className="text-[13px] text-(--cq-text-secondary)">
+                      {rule.label}
+                    </dt>
+                    <dd className="m-0 text-end text-[13px] text-(--cq-text-primary)">
+                      {rule.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5" data-thesis-observed>
+            <h3 className="m-0 text-[13px] font-medium text-(--cq-text-secondary)">
+              {t("What you did")}
+            </h3>
+            <p className="m-0 text-[13px] text-(--cq-text-primary)">
+              Saved {String(reading.observed.saved)} · Passed{" "}
+              {String(reading.observed.passed)}
+            </p>
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {reading.observed.counts.slice(0, 6).map((count) => (
                 <li
                   key={`${count.decision}-${count.dimension}-${count.value}`}
-                  className="cq-caption grid grid-cols-[minmax(0,7.5rem)_1fr_1.5rem] items-center gap-2 text-(--cq-text-secondary)"
+                  className="flex justify-between gap-2 text-xs text-(--cq-text-secondary)"
                 >
                   <span className="truncate">
                     {count.decision === "SAVED" ? "Saved" : "Passed"} ·{" "}
                     {count.label}
                   </span>
-                  <span
-                    aria-hidden="true"
-                    className="h-2 overflow-hidden rounded-full bg-(--cq-surface-subtle)"
-                  >
-                    <span
-                      className="block h-full rounded-full bg-(--cq-border-strong)"
-                      style={{
-                        width: `${String((count.count / widest) * 100)}%`,
-                      }}
-                    />
-                  </span>
-                  <span className="text-end">{String(count.count)}</span>
+                  <span>{String(count.count)}</span>
                 </li>
-              ),
-            )}
-          </ul>
-          <p className="cq-caption text-(--cq-text-tertiary)">
-            {t("Saving isn’t interest, and viewing counts for nothing here.")}
-          </p>
-        </div>
-        <div className="flex flex-col gap-2" data-thesis-inferred>
-          <h3 className="cq-title-sm flex flex-wrap items-center gap-2 text-(--cq-text-primary)">
-            {t("What Q reads from it")}
-            <span className="cq-caption rounded-md border border-dashed border-(--cq-border) px-1.5 text-(--cq-text-secondary)">
-              {t("Q’s inference")}
-            </span>
-          </h3>
-          {reading.inferred.length === 0 ? (
-            <p className="cq-body-sm text-(--cq-text-secondary)">
-              {t("Not enough saves and passes yet for Q to read anything.")}
+              ))}
+            </ul>
+            <p className="m-0 text-xs text-(--cq-text-tertiary)">
+              {t("Saving isn’t interest, and viewing counts for nothing here.")}
             </p>
-          ) : (
-            reading.inferred.map((line) => (
-              <p key={line} className="cq-body-sm text-(--cq-text-primary)">
-                {line}
+          </div>
+          <div className="flex flex-col gap-1.5" data-thesis-inferred>
+            <h3 className="m-0 flex flex-wrap items-center gap-2 text-[13px] font-medium text-(--cq-text-secondary)">
+              {t("What Q reads from it")}
+              <span className="rounded-(--cq-radius-sm) border border-dashed border-(--cq-border) px-1.5 text-xs">
+                {t("Q’s inference")}
+              </span>
+            </h3>
+            {reading.inferred.length === 0 ? (
+              <p className="m-0 text-[13px] text-(--cq-text-tertiary)">
+                {t("Nothing yet.")}
               </p>
-            ))
-          )}
-          <p className="cq-caption text-(--cq-text-tertiary)">
-            A reading of{" "}
-            {String(reading.observed.saved + reading.observed.passed)}{" "}
-            decisions, not a fact about your thesis.
-          </p>
-        </div>
-      </div>
-      {suggestions.length === 0 ? null : (
-        <div className="flex flex-col gap-3" data-thesis-suggestions>
-          <h3 className="cq-title-sm text-(--cq-text-primary)">
-            {t("Q suggests")}
-          </h3>
-          {suggestions.map((suggestion) => (
-            <div
-              key={suggestion.id}
-              className="flex flex-col gap-2 rounded-xl border border-(--cq-accent) bg-(--cq-accent-soft) p-4"
-            >
-              <p className="cq-body font-medium text-(--cq-text-primary)">
-                {suggestion.title}
-              </p>
-              <p className="cq-body-sm text-(--cq-text-secondary)">
-                {suggestion.because} {suggestion.effect}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="primary"
-                  disabled={pending}
-                  onClick={() => approve(suggestion.id)}
-                  data-apply-suggestion={suggestion.id}
+            ) : (
+              reading.inferred.map((line) => (
+                <p
+                  key={line}
+                  className="m-0 text-[13px] text-(--cq-text-primary)"
                 >
-                  {t("Approve this change")}
-                </Button>
-                <Button
-                  variant="quiet"
-                  onClick={() =>
-                    setHidden((current) => [...current, suggestion.id])
-                  }
-                >
-                  {t("Not now")}
-                </Button>
-              </div>
-            </div>
-          ))}
+                  {line}
+                </p>
+              ))
+            )}
+          </div>
         </div>
-      )}
+      </details>
       {message === null ? null : (
-        <p className="cq-body-sm text-(--cq-text-secondary)" role="status">
-          {message}
+        <p className="m-0 text-sm text-(--cq-text-secondary)" role="status">
+          {t(message)}
         </p>
       )}
-    </section>
+    </ProfileSectionShell>
   );
 }

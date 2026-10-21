@@ -2,9 +2,9 @@ import Link from "next/link";
 
 import { getTeam } from "@capital-q/api-client";
 import { Avatar } from "@capital-q/ui/avatar";
-import { buttonClassName } from "@capital-q/ui/button";
 
 import { ProfileSectionShell } from "@/features/profile/editable-section";
+import { accountButton } from "@/features/settings/account-styles";
 import { apiSession } from "@/features/q/context";
 
 import { teamWords } from "./team-words";
@@ -24,57 +24,50 @@ export async function ProfileTeamSection() {
   const words = teamWords(team.organisation.kind);
   const solo = team.members.length <= 1;
   return (
-    <ProfileSectionShell
-      id="team"
-      title={t("Team")}
-      description={
-        solo
-          ? `Just you, for now. You are ${team.organisation.name}.`
-          : `${String(team.members.length)} people work on ${team.organisation.name}.`
-      }
-      action={
-        <Link
-          href="/settings/team"
-          className={buttonClassName("secondary", "compact")}
-        >
-          {solo && team.you.can.invite ? "Invite your team" : "Open"}
-        </Link>
-      }
-    >
-      <ul className="flex flex-col" data-profile-team>
-        {team.members.slice(0, 6).map((member) => (
-          <li
-            key={member.membershipId}
-            className="flex items-center gap-3 py-1.5"
-          >
-            <Avatar
-              name={member.name}
-              size="sm"
-              src={member.avatarUrl ?? undefined}
-            />
-            <span className="min-w-0 flex-1 truncate cq-body-sm text-(--cq-text-primary)">
-              {member.name}
-              {member.isYou ? (
-                <span className="ms-1.5 cq-caption text-(--cq-text-tertiary)">
-                  {t("You")}
-                </span>
-              ) : null}
-            </span>
-            <span className="cq-caption text-(--cq-text-secondary)">
-              {member.role === "OWNER"
-                ? "Owner"
-                : member.role === "ADMIN"
-                  ? "Admin"
-                  : "Member"}
-            </span>
-          </li>
-        ))}
-      </ul>
+    <ProfileSectionShell id="team" title={t("Team")} variant="brief">
       {solo ? (
-        <p className="cq-caption text-(--cq-text-tertiary)">
-          Invite a colleague and this becomes a shared {words.word}.
+        <p className="m-0 max-w-[68ch] text-sm leading-normal text-(--cq-text-secondary)">
+          {t(words.soloLine(team.organisation.name))}
         </p>
-      ) : null}
+      ) : (
+        <ul className="m-0 flex list-none flex-col p-0" data-profile-team>
+          {team.members.slice(0, 6).map((member) => (
+            <li
+              key={member.membershipId}
+              className="flex items-center gap-3 border-t border-(--cq-border-subtle) py-2 first:border-t-0"
+            >
+              <Avatar
+                name={member.name}
+                size="sm"
+                src={member.avatarUrl ?? undefined}
+              />
+              <span className="min-w-0 flex-1 truncate text-sm text-(--cq-text-primary)">
+                {member.name}
+                {member.isYou ? (
+                  <span className="ms-1.5 text-xs text-(--cq-text-tertiary)">
+                    {t("You")}
+                  </span>
+                ) : null}
+              </span>
+              <span className="text-xs text-(--cq-text-secondary)">
+                {member.role === "OWNER"
+                  ? t("Owner")
+                  : member.role === "ADMIN"
+                    ? t("Admin")
+                    : t("Member")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <Link
+        href="/settings/team"
+        className={accountButton("secondary", "sm", "self-start")}
+      >
+        {solo && team.you.can.invite
+          ? t("Invite your team")
+          : t("Open your team")}
+      </Link>
     </ProfileSectionShell>
   );
 }

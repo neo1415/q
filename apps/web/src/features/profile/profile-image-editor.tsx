@@ -18,7 +18,17 @@ import {
 } from "@capital-q/contracts";
 import { Button } from "@capital-q/ui/button";
 import { DialogContent, DialogRoot } from "@capital-q/ui/dialog";
-import { Camera, ICON_SIZE, ICON_STROKE, X } from "@capital-q/ui/icons";
+import {
+  Camera,
+  ICON_SIZE,
+  ICON_STROKE,
+  Pencil,
+  Upload,
+  X,
+} from "@capital-q/ui/icons";
+
+import { CrmSheet } from "@/features/relationships/crm-kit";
+import { accountButton } from "@/features/settings/account-kit";
 
 import {
   clampCrop,
@@ -62,11 +72,24 @@ export type ProfileImageEditorProps = {
   readonly label: string;
   readonly hasImage: boolean;
   readonly className?: string | undefined;
+  /**
+   * The chosen designs' sheet (2026-10-21): the trigger opens a sheet with
+   * the current image large, Upload and (when there is one) Remove. Pass
+   * the current image's signed URL, or null for none.
+   */
+  readonly previewUrl?: string | null | undefined;
+  /** Whose image it is, for the initials when there is none. */
+  readonly previewName?: string | undefined;
+  /** A small round pencil trigger over the photo's corner. */
+  readonly compact?: boolean | undefined;
+  /** An organisation's logo: a rounded square rather than a circle. */
+  readonly square?: boolean | undefined;
 };
 
 type Phase =
   | { readonly step: "IDLE" }
   | { readonly step: "MENU" }
+  | { readonly step: "SHEET" }
   | { readonly step: "CROP"; readonly src: string; readonly image: Size }
   | { readonly step: "SAVING"; readonly message: string };
 
@@ -89,9 +112,11 @@ export function ProfileImageEditor(props: ProfileImageEditorProps) {
     return () => URL.revokeObjectURL(src);
   }, [phase]);
 
+  const sheetMode = props.previewUrl !== undefined;
   const open = () => {
     setError(null);
-    if (props.hasImage) setPhase({ step: "MENU" });
+    if (sheetMode) setPhase({ step: "SHEET" });
+    else if (props.hasImage) setPhase({ step: "MENU" });
     else fileInput.current?.click();
   };
 
@@ -172,15 +197,26 @@ export function ProfileImageEditor(props: ProfileImageEditorProps) {
         disabled={phase.step === "SAVING"}
         className={
           props.className ??
-          "inline-flex size-11 items-center justify-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-(--cq-shadow-sm) transition-colors hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
+          (props.compact === true
+            ? // A 32px mark with a 44px target around it.
+              "relative inline-flex size-8 items-center justify-center rounded-full border border-(--cq-border) bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-(--cq-shadow-xs) transition-colors before:absolute before:-inset-1.5 before:content-[''] hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60"
+            : "inline-flex size-11 items-center justify-center rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-raised) text-(--cq-text-primary) shadow-(--cq-shadow-sm) transition-colors hover:bg-(--cq-surface-subtle) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) disabled:opacity-60")
         }
         data-image-editor={props.kind}
       >
-        <Camera
-          size={ICON_SIZE.regular}
-          strokeWidth={ICON_STROKE}
-          aria-hidden
-        />
+        {props.compact === true ? (
+          <Pencil
+            size={ICON_SIZE.compact}
+            strokeWidth={ICON_STROKE}
+            aria-hidden
+          />
+        ) : (
+          <Camera
+            size={ICON_SIZE.regular}
+            strokeWidth={ICON_STROKE}
+            aria-hidden
+          />
+        )}
       </button>
       <input
         ref={fileInput}
@@ -207,6 +243,91 @@ export function ProfileImageEditor(props: ProfileImageEditorProps) {
           }}
         />
       )}
+
+      {sheetMode ? (
+        <CrmSheet
+          open={phase.step === "SHEET"}
+          onOpenChange={(next) => {
+            if (!next) setPhase({ step: "IDLE" });
+          }}
+          title={capitalise(props.label)}
+          sub={
+            props.kind === "COVER"
+              ? t("Shown across the top of your profile")
+              : props.square === true
+                ? t("Shown on your Q Card and your organisation’s profile")
+                : t("Shown on your Q Card and profile")
+          }
+          data-image-sheet={props.kind}
+        >
+          <div className="grid place-items-center p-3">
+            <span
+              className={`grid overflow-hidden border border-(--cq-border) bg-(--cq-surface-subtle) ${
+                props.kind === "COVER"
+                  ? "aspect-[4/1] w-full rounded-(--cq-radius-md)"
+                  : props.square === true
+                    ? "size-24 rounded-2xl"
+                    : "size-24 rounded-full"
+              }`}
+            >
+              {props.previewUrl === null || props.previewUrl === undefined ? (
+                <span
+                  aria-hidden
+                  className="grid size-full place-items-center text-[28px] font-semibold text-(--cq-text-secondary)"
+                >
+                  {props.kind === "COVER"
+                    ? null
+                    : initialsOf(props.previewName ?? "")}
+                </span>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element -- signed storage URL, browser to storage directly
+                <img
+                  src={props.previewUrl}
+                  alt=""
+                  className="size-full object-cover"
+                />
+              )}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2.5">
+            <button
+              type="button"
+              className={accountButton("secondary")}
+              onClick={() => {
+                setPhase({ step: "IDLE" });
+                fileInput.current?.click();
+              }}
+              data-image-upload
+            >
+              <Upload
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+              {props.hasImage ? t("Upload a new one") : t("Upload a photo")}
+            </button>
+            {props.hasImage ? (
+              <button
+                type="button"
+                className={accountButton("quiet")}
+                onClick={() => void remove()}
+                data-image-remove
+              >
+                {t("Remove")}
+              </button>
+            ) : null}
+          </div>
+          <span className="text-xs text-(--cq-text-tertiary)">
+            {props.kind === "COVER"
+              ? t(
+                  "A wide picture works best. You can crop before saving. JPEG, PNG or WebP, up to 25 MB.",
+                )
+              : t(
+                  "Square works best. You can crop before saving. JPEG, PNG or WebP, up to 25 MB.",
+                )}
+          </span>
+        </CrmSheet>
+      ) : null}
 
       <DialogRoot
         open={phase.step === "MENU"}
@@ -304,6 +425,16 @@ function Toast({
       </button>
     </div>
   );
+}
+
+function initialsOf(name: string): string {
+  const parts = name
+    .trim()
+    .split(/\s+/u)
+    .filter((word) => /^[\p{L}\p{N}]/u.test(word));
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
+  return (first + last).toUpperCase() || "?";
 }
 
 function capitalise(text: string): string {
