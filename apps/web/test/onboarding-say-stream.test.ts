@@ -72,6 +72,33 @@ describe("a streamed typed onboarding turn", () => {
     expect(outcome).toMatchObject({ kind: "UNAVAILABLE" });
   });
 
+  it("shows each stage as the turn reports it, before any sentence (owner 2026-10-21)", async () => {
+    const seen: string[] = [];
+    await sayStreamed(
+      REQUEST,
+      (text) => seen.push(`sentence:${text}`),
+      () =>
+        Promise.resolve(
+          sse([
+            frame("stage", {
+              stage: "READING",
+              label: "Reading what you said",
+            }),
+            frame("stage", { stage: "SAVING", label: "Saving your answers" }),
+            frame("stage", { stage: "BOGUS", label: "never shown" }),
+            frame("sentence", { text: "Clinics in Lagos, noted." }),
+            frame("problem", { status: 503 }),
+          ]),
+        ),
+      (stage) => seen.push(`stage:${stage.label}`),
+    ).catch(() => undefined);
+    expect(seen).toEqual([
+      "stage:Reading what you said",
+      "stage:Saving your answers",
+      "sentence:Clinics in Lagos, noted.",
+    ]);
+  });
+
   it("a stream that never opened returns null: the server action asks instead", async () => {
     const offline = await sayStreamed(
       REQUEST,

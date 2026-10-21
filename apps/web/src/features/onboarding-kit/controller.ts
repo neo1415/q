@@ -1,6 +1,10 @@
 "use client";
 
-import type { QConduct, QSentenceGesture } from "@capital-q/contracts";
+import type {
+  OnboardingStepView,
+  QConduct,
+  QSentenceGesture,
+} from "@capital-q/contracts";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
@@ -53,6 +57,8 @@ export type OnboardingTurn = {
   readonly researching: string | null;
   /** The steps Q's reply asks about; absent when not known. */
   readonly askingAbout?: readonly string[] | undefined;
+  /** The step Q asked, with its options, when it is not the cursor's. */
+  readonly askedStep?: OnboardingStepView | undefined;
   /** Q's patience after the turn (founder direction 2026-09-30). */
   readonly conduct?: QConduct | undefined;
   /** PRESENCE: what Q's particles form for which sentence. */
@@ -137,6 +143,11 @@ export type OnboardingActions<TResponse> = {
     focus?: string,
     /** Turn latency L9: Q's reply, a finished sentence at a time. */
     onSentence?: (text: string) => void,
+    /** What Q is doing now, from real events in the turn. */
+    onStage?: (stage: {
+      readonly stage: string;
+      readonly label: string;
+    }) => void,
   ) => Promise<OnboardingTurn | null>;
   /** Re-read the session from the runtime (Q's reading may have landed). */
   readonly refresh: () => Promise<void>;
@@ -367,7 +378,7 @@ export function useOnboardingJourney<
       }
       return run(() => submit(input), true);
     },
-    say: async (text, recentTurns, focus, onSentence) => {
+    say: async (text, recentTurns, focus, onSentence, onStage) => {
       const say = requireClient().say;
       if (say === undefined) {
         return null;
@@ -400,6 +411,7 @@ export function useOnboardingJourney<
             navigate: outcome.navigate,
             researching: outcome.researching,
             askingAbout: outcome.askingAbout,
+            askedStep: outcome.askedStep,
             conduct: outcome.conduct,
             gestures: outcome.gestures,
           };
@@ -415,6 +427,7 @@ export function useOnboardingJourney<
           recentTurns,
           ...(focus === undefined ? {} : { focus }),
           ...(onSentence === undefined ? {} : { onSentence }),
+          ...(onStage === undefined ? {} : { onStage }),
         });
         turn = {
           understood: outcome.understood,
@@ -422,6 +435,7 @@ export function useOnboardingJourney<
           navigate: outcome.navigate,
           researching: outcome.researching,
           askingAbout: outcome.askingAbout,
+          askedStep: outcome.askedStep,
           conduct: outcome.conduct,
           gestures: outcome.gestures,
         };

@@ -21,6 +21,7 @@ import {
   Q_VISIBLE_STAGE_LABELS,
   QConversationIdSchema,
   type OnboardingResponseValue,
+  type OnboardingStepView,
   type OnboardingUnderstanding,
   QVoiceDestinationSchema,
 } from "@capital-q/contracts";
@@ -81,6 +82,7 @@ import {
   publicSourceOf,
   progressLines,
   promptFor,
+  promptStepOf,
   remainingCount,
   reviewLines,
   stillNeeded,
@@ -126,6 +128,11 @@ export type QOnboardingWorkspaceActions = {
     focus?: string,
     /** Turn latency L9: Q's reply, a finished sentence at a time. */
     onSentence?: (text: string) => void,
+    /** What Q is doing now, from real events in the turn. */
+    onStage?: (stage: {
+      readonly stage: string;
+      readonly label: string;
+    }) => void,
   ) => Promise<OnboardingTurn | null>;
   readonly skip: () => Promise<void>;
   /** A tapped option, as the value it stands for (CQ-Q-VOICE-001 B §17). */
@@ -294,12 +301,24 @@ export function QOnboardingWorkspace({
    * until Q has spoken.
    */
   const [qAsking, setQAsking] = useState<readonly string[] | null>(null);
+  /**
+   * The step Q's last turn asked, with its options, when it is not the
+   * form cursor's step (owner 2026-10-21): Q asked the stage and no choices
+   * showed, because the chips followed the cursor. Null: the cursor's.
+   */
+  const [qAskedStep, setQAskedStep] = useState<OnboardingStepView | null>(null);
   const [reading, setReading] = useState(false);
   const [readingPolls, setReadingPolls] = useState(0);
   const [askingQ, setAskingQ] = useState(false);
   const [qStream, setQStream] = useState<QStreamState | null>(null);
   /** Turn latency L9: Q's typed reply, as far as Q has written it. */
   const [replyStream, setReplyStream] = useState<string | null>(null);
+  /**
+   * What Q is doing during a typed turn, as the turn reports it ("Reading
+   * what you said", "Saving your answers", "Looking up Nixo", "Writing a
+   * reply"): real events, never a timer (owner 2026-10-21).
+   */
+  const [turnStage, setTurnStage] = useState<string | null>(null);
   const [showReview, setShowReview] = useState(false);
   const [showGaps, setShowGaps] = useState(false);
   /** After an ambiguous answer, only the options that fit are offered. */
@@ -318,6 +337,8 @@ export function QOnboardingWorkspace({
     Readonly<Record<string, readonly string[]>>
   >({});
   const endRef = useRef<HTMLDivElement>(null);
+  /** Just below Q's options, clear of the docked composer. */
+  const controlsEndRef = useRef<HTMLDivElement>(null);
   /** The Q conversation a tangent continues in, so follow-ups keep their thread (§23). */
   const qConversationId = useRef<string | undefined>(undefined);
   const streamAbort = useRef<AbortController | null>(null);
@@ -385,13 +406,11 @@ export function QOnboardingWorkspace({
   const voiceConnected = voice.client.connected;
   const voiceSendText = voice.client.sendText;
 
-  const prompt: QPrompt | null = useMemo(
-    () =>
-      view === undefined || view.currentStep === null
-        ? null
-        : promptFor(view.currentStep, vocabulary),
-    [view, vocabulary],
-  );
+  const prompt: QPrompt | null = useMemo(() => {
+    if (view === undefined) return null;
+    const step = promptStepOf(view, qAskedStep);
+    return step === null ? null : promptFor(step, vocabulary);
+  }, [view, vocabulary, qAskedStep]);
   /**
    * Q's last sentence, waiting for the session to settle on the step it
    * was about. `say` resolves once the view has been re-read, so the
@@ -565,7 +584,9 @@ export function QOnboardingWorkspace({
   );
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({
+    // Down to Q's options when they show, so they are never left below the
+    // fold under the composer (owner 2026-10-21); else to the last line.
+    (controlsEndRef.current ?? endRef.current)?.scrollIntoView({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
         ? "auto"
         : "smooth",
@@ -577,6 +598,7 @@ export function QOnboardingWorkspace({
     gaps.length,
     qStream?.partial?.text,
     replyStream,
+    prompt?.stepKey,
   ]);
 
   // While Q is reading a free-text turn, re-read the session on a timer
@@ -708,7 +730,10 @@ export function QOnboardingWorkspace({
             focus,
           )
           .then((turn) => {
-            if (turn !== null) setQAsking(turn.askingAbout ?? null);
+            if (turn !== null) {
+              setQAsking(turn.askingAbout ?? null);
+              setQAskedStep(turn.askedStep ?? null);
+            }
             return turn?.reply ?? null;
           });
       })
@@ -922,14 +947,24 @@ export function QOnboardingWorkspace({
       // Turn latency L9: Q's reply shows a sentence at a time while the turn
       // runs; the finished turn below then takes its place, as before.
       setReplyStream(null);
+      setTurnStage(null);
       const turn = await actions
-        .say(trimmed, recentTurns(), undefined, (sentence) => {
-          setReplyStream((so) =>
-            so === null ? sentence : `${so} ${sentence}`,
-          );
-        })
+        .say(
+          trimmed,
+          recentTurns(),
+          undefined,
+          (sentence) => {
+            setReplyStream((so) =>
+              so === null ? sentence : `${so} ${sentence}`,
+            );
+          },
+          (stage) => {
+            setTurnStage(stage.label);
+          },
+        )
         .finally(() => {
           setReplyStream(null);
+          setTurnStage(null);
         });
       if (turn !== null && draftId !== undefined) {
         confirmSent(draftId, trimmed);
@@ -942,6 +977,7 @@ export function QOnboardingWorkspace({
         return;
       }
       setQAsking(turn.askingAbout ?? null);
+      setQAskedStep(turn.askedStep ?? null);
       // Q's own words, as Q wrote them. The reply carries both the
       // acknowledgement and the next question, so it also becomes the
       // live question under the composer until the step moves on.
@@ -1529,13 +1565,22 @@ export function QOnboardingWorkspace({
       const startedAt = Date.now();
       let ready = false;
       while (Date.now() - startedAt < 120_000) {
-        await new Promise((resolve) => setTimeout(resolve, 3_000));
+        // Every second while a deck is usually read, then every three: Q
+        // takes it up as soon as it lands, not up to 3 s after (owner
+        // 2026-10-21: answers within 5 s).
+        await new Promise((resolve) =>
+          setTimeout(resolve, Date.now() - startedAt < 15_000 ? 1_000 : 3_000),
+        );
         const listed = await materialListAction(companyIdForUpload);
         if (!listed.ok) break;
         const item = listed.value.find((f) => f.id === done.value.documentId);
         if (item !== undefined && item.state === "ready") {
           ready = true;
           break;
+        }
+        // The reading's own stage as the server reports it, not a timer.
+        if (item !== undefined && item.stateLabel.length > 0) {
+          setUploadNote(`${file.name}: ${item.stateLabel}`);
         }
         if (item !== undefined && item.state === "unreadable") {
           setUploadNote(item.stateLabel);
@@ -1924,6 +1969,8 @@ export function QOnboardingWorkspace({
 
       {askingQ ? (
         <QStateIndicator state="WORKING" detail={qStageLabel} />
+      ) : turnStage !== null && replyStream === null ? (
+        <QStateIndicator state="WORKING" detail={turnStage} />
       ) : reading && !readingLanded && !readingTimedOut ? (
         <QStateIndicator state="WORKING" detail="Reading what you said" />
       ) : null}
@@ -2179,6 +2226,12 @@ export function QOnboardingWorkspace({
               </Button>
             ) : null}
           </div>
+          {/* Scrolled to so the options sit clear of the docked composer. */}
+          <div
+            ref={controlsEndRef}
+            className="scroll-mb-40"
+            aria-hidden="true"
+          />
         </div>
       ) : null}
 

@@ -7,6 +7,7 @@ import {
   QInterviewTurnResponseSchema,
   Q_INTERVIEW_STREAM_EVENTS,
   Q_SSE_CONTENT_TYPE,
+  type QInterviewStage,
   type QInterviewTurnResponse,
 } from "@capital-q/contracts";
 import { AuthenticationRequiredError } from "@capital-q/security";
@@ -151,7 +152,9 @@ export function registerQInterviewRoute(
       const outcome = await dependencies.agent
         .turn({
           actor,
-          ...(stream === null ? {} : { onSentence: stream.sentence }),
+          ...(stream === null
+            ? {}
+            : { onSentence: stream.sentence, onStage: stream.stage }),
           session: { baseUrl: dependencies.apiBaseUrl, accessToken },
           onboardingSessionId: input.onboardingSessionId,
           journeyType:
@@ -246,6 +249,7 @@ export function wantsStream(accept: string | undefined): boolean {
  */
 export function openSentenceStream(reply: FastifyReply): {
   readonly sentence: (text: string) => void;
+  readonly stage: (stage: QInterviewStage) => void;
   readonly started: () => boolean;
   readonly end: (event: string, data: unknown) => void;
 } {
@@ -274,6 +278,13 @@ export function openSentenceStream(reply: FastifyReply): {
       write(Q_INTERVIEW_STREAM_EVENTS.SENTENCE, {
         text: said.slice(0, 2_000),
       });
+    },
+    // What Q is doing, as it happens: the screen shows it from the first
+    // event, so the person sees work within the first second.
+    stage: (stage) => {
+      if (ended) return;
+      start();
+      write(Q_INTERVIEW_STREAM_EVENTS.STAGE, stage);
     },
     started: () => open,
     end: (event, data) => {

@@ -34,6 +34,8 @@ export async function sayStreamed(
   request: SayStreamRequest,
   onSentence: (text: string) => void,
   transport: typeof fetch = (input, init) => fetch(input, init),
+  /** What Q is doing now (owner 2026-10-21), from real events in the turn. */
+  onStage?: (stage: { readonly stage: string; readonly label: string }) => void,
 ): Promise<SayOnboardingResponse | null> {
   const { sessionId, ...body } = request;
   let response: Response;
@@ -65,8 +67,11 @@ export async function sayStreamed(
     return null;
   }
   // Validated where it lands; loaded with the first streamed turn.
-  const { QInterviewSentenceSchema, SayOnboardingResponseSchema } =
-    await import("@capital-q/contracts");
+  const {
+    QInterviewSentenceSchema,
+    QInterviewStageSchema,
+    SayOnboardingResponseSchema,
+  } = await import("@capital-q/contracts");
   const parser = createSseParser();
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -80,6 +85,9 @@ export async function sayStreamed(
         if (message.event === "sentence") {
           const sentence = QInterviewSentenceSchema.safeParse(data);
           if (sentence.success) onSentence(sentence.data.text);
+        } else if (message.event === "stage") {
+          const stage = QInterviewStageSchema.safeParse(data);
+          if (stage.success) onStage?.(stage.data);
         } else if (message.event === "result") {
           const turn = SayOnboardingResponseSchema.safeParse(data);
           if (turn.success) return turn.data;
