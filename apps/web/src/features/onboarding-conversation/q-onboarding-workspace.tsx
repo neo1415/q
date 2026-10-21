@@ -96,6 +96,7 @@ import {
   type StillNeeded,
 } from "./conversation";
 import { useT } from "@/features/i18n/language";
+import { WorkingLine } from "@/components/working/working-line";
 
 /**
  * The Q-led onboarding workspace (CQ-PRE-REC-001 §15-§30; CQ-Q-VOICE-001 B
@@ -1971,20 +1972,15 @@ export function QOnboardingWorkspace({
 
       {askingQ ? (
         <QStateIndicator state="WORKING" detail={qStageLabel} />
-      ) : qThinking ? (
-        // One line, fixed height, replaced in place: Q's working mark, and
-        // the stage when it names something (the shared working line of
-        // lane 3 replaces this once it lands).
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex h-8 items-center gap-3"
-          data-q-turn-working
-        >
+      ) : qThinking || uploadNote !== null ? (
+        // Q's working mark and one line, fixed in height and replaced in
+        // place (lane 3's shared WorkingLine): the stage when it names
+        // something ("Saving your round size", "Looking up Nixo", "Reading
+        // deck.pdf"), else nothing but the mark.
+        <div className="flex h-8 items-center gap-3" data-q-turn-working>
           <QMark size="sm" state="WORKING" />
-          <span className="cq-label min-w-0 truncate text-(--cq-text-secondary)">
-            {turnStage ?? <span className="sr-only">{t("Q is working")}</span>}
-          </span>
+          <span className="sr-only">{t("Q is working")}</span>
+          <WorkingLine label={turnStage ?? uploadNote} reserve />
         </div>
       ) : reading && !readingLanded && !readingTimedOut ? (
         <QStateIndicator state="WORKING" detail="Reading what you said" />

@@ -338,7 +338,11 @@ function toolPort(onRead?: (what: string) => void): QToolPort {
       }
       await wait(LATENCY.readMs);
       if (proposal.name === "search_companies") {
-        const name = String(args["query"]);
+        // Case-insensitive, as the real search is.
+        const query = String(args["query"]).toLowerCase();
+        const name =
+          Object.keys(COMPANIES).find((key) => key.toLowerCase() === query) ??
+          String(args["query"]);
         return outcome(proposal, {
           items: [{ companyId: COMPANIES[name], canonicalName: name }],
         });
@@ -779,12 +783,11 @@ describe("turn timing harness", () => {
     for (const one of rows) {
       expect(one.stages.some((stage) => /^[A-Z_]+@/u.test(stage))).toBe(true);
     }
-    // Row 16: a company the model had to search for is read by code in the
-    // same round, so one lookup round, not two.
+    // Round 5: a company typed in lowercase is read by code, as a
+    // capitalised one is: no lookup round at all (before: two, then one).
     expect(row("typed question, company named").calls).toEqual([
       "skim",
       "reader",
-      "tools:search_companies",
       "answer:1100",
     ]);
   }, 600_000);
