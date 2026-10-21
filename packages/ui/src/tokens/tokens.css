@@ -244,6 +244,20 @@
   --cq-charcoal: oklch(0.33 0.014 70);
   --cq-charcoal-hover: oklch(0.29 0.012 70);
   --cq-on-charcoal: oklch(0.96 0.014 85);
+  /*
+   * Gold and near-black options (Work pages, owner 2026-10-21): the
+   * primary buttons, dark tiles and the "your move" mark of the pages that
+   * chose them. Read through a page scope (.cq-gold, .cq-ink), never
+   * directly. Gold carries white text at AA; near-black is the ink.
+   */
+  --cq-gold-action: oklch(0.55 0.11 78);
+  --cq-gold-action-hover: oklch(0.5 0.1 76);
+  --cq-on-gold-action: oklch(0.99 0.004 92);
+  --cq-gold-action-soft: oklch(0.95 0.035 85);
+  --cq-ink-action: oklch(0.21 0.008 70);
+  --cq-ink-action-hover: oklch(0.3 0.01 70);
+  --cq-on-ink-action: oklch(0.97 0.008 85);
+  --cq-ink-action-soft: oklch(0.94 0.006 85);
 }
 
 @media (min-width: 640px) {
@@ -315,6 +329,14 @@
     --cq-charcoal: oklch(0.86 0.018 80);
     --cq-charcoal-hover: oklch(0.9 0.016 80);
     --cq-on-charcoal: oklch(0.2 0.012 70);
+    --cq-gold-action: oklch(0.78 0.12 84);
+    --cq-gold-action-hover: oklch(0.83 0.11 86);
+    --cq-on-gold-action: oklch(0.2 0.03 75);
+    --cq-gold-action-soft: oklch(0.29 0.045 80);
+    --cq-ink-action: oklch(0.92 0.006 85);
+    --cq-ink-action-hover: oklch(0.96 0.004 85);
+    --cq-on-ink-action: oklch(0.18 0.008 70);
+    --cq-ink-action-soft: oklch(0.27 0.008 80);
     --cq-stage-canvas: var(--cq-night-canvas);
     --cq-stage-surface: var(--cq-night-surface);
     --cq-stage-surface-strong: var(--cq-night-surface-strong);
@@ -389,6 +411,14 @@
   --cq-charcoal: oklch(0.86 0.018 80);
   --cq-charcoal-hover: oklch(0.9 0.016 80);
   --cq-on-charcoal: oklch(0.2 0.012 70);
+  --cq-gold-action: oklch(0.78 0.12 84);
+  --cq-gold-action-hover: oklch(0.83 0.11 86);
+  --cq-on-gold-action: oklch(0.2 0.03 75);
+  --cq-gold-action-soft: oklch(0.29 0.045 80);
+  --cq-ink-action: oklch(0.92 0.006 85);
+  --cq-ink-action-hover: oklch(0.96 0.004 85);
+  --cq-on-ink-action: oklch(0.18 0.008 70);
+  --cq-ink-action-soft: oklch(0.27 0.008 80);
   --cq-stage-canvas: var(--cq-night-canvas);
   --cq-stage-surface: var(--cq-night-surface);
   --cq-stage-surface-strong: var(--cq-night-surface-strong);

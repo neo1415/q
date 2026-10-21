@@ -56,7 +56,11 @@ const IntentInput = z.enum(["SAVE", "UNSAVE", "PASS", "UNPASS"]);
 /** A pass's optional reason, in the contract's own codes. */
 const PassReasonInput = PassCompanyRequestSchema.shape.reason;
 /** Where a decision was made; the feed unless a company's profile says so. */
-const SurfaceInput = z.enum(["RECOMMENDATION_FEED", "COMPANY_PROFILE"]);
+const SurfaceInput = z.enum([
+  "RECOMMENDATION_FEED",
+  "COMPANY_PROFILE",
+  "SAVED_LIST",
+]);
 
 async function session(): Promise<ApiSession | null> {
   const { apiBaseUrl } = loadWebServerConfig();
@@ -131,7 +135,8 @@ export async function recordDecisionAction(input: {
   readonly intent: "SAVE" | "UNSAVE" | "PASS" | "UNPASS";
   readonly slateId: string | null;
   readonly clientEventId: string;
-  readonly surface?: "RECOMMENDATION_FEED" | "COMPANY_PROFILE" | undefined;
+  readonly surface?:
+    "RECOMMENDATION_FEED" | "COMPANY_PROFILE" | "SAVED_LIST" | undefined;
   /** PASS only, and only when the person chose one. */
   readonly reason?: string | undefined;
 }): Promise<FeedActionResult<InteractionRecordedDto>> {

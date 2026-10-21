@@ -1,70 +1,118 @@
 "use client";
 
+import "@/features/relationships/crm.css";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import type { InvitationPreviewDto } from "@capital-q/contracts";
-import { buttonClassName } from "@capital-q/ui/button";
-import { CircleAlert, ICON_STROKE } from "@capital-q/ui/icons";
+import {
+  Check,
+  Clock,
+  ICON_STROKE,
+  Link as LinkIcon,
+  X,
+} from "@capital-q/ui/icons";
 
 import { SignOutButton } from "@/features/auth";
+import { accountButton, Pending } from "@/features/settings/account-kit";
 
-import { acceptInvitationAction } from "./team-actions";
+import {
+  acceptInvitationAction,
+  declineInvitationAction,
+} from "./team-actions";
 import { teamWords } from "./team-words";
 import { useT } from "@/features/i18n/language";
 
 /**
- * Accept an invitation (G2), built to the mockup's accept view: one card,
- * centred. The states: ready to join, signed in with another email, the
- * link expired / cancelled / used / not valid, and loading.
+ * Accept an invitation (G2; chosen design "Who you'll work with, and every
+ * link state", 2026-10-21): one card, centred. Who invited them, to what,
+ * as which role and what that role may do, who is already there (by
+ * initials only: they are not in yet), when it expires and which email
+ * they are signed in as; Decline or Join. Every state of the link has its
+ * own card: not valid, expired, cancelled, declined, already used, and
+ * signed in with another email. Joining and declining are the API's to
+ * allow, as the invited, confirmed email only.
  */
 
 const CARD =
-  "cq-panel mx-auto mt-[6vh] flex w-full max-w-[460px] flex-col items-center gap-4.5 px-6 py-8 text-center";
+  "cq-crm-stagger mx-auto flex w-full max-w-[480px] flex-col gap-4 rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-5 shadow-(--cq-shadow-sm) sm:p-7";
 
 const ROLE = { ADMIN: "Admin", MEMBER: "Member" } as const;
 
 function Logo({ name }: { readonly name: string }) {
+  const letters = name
+    .trim()
+    .split(/\s+/u)
+    .filter((word) => /^[\p{L}\p{N}]/u.test(word))
+    .slice(0, 2)
+    .map((word) => word[0] ?? "")
+    .join("")
+    .toUpperCase();
   return (
     <span
       aria-hidden="true"
-      className="grid size-16 place-items-center rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface-subtle) text-[26px] font-semibold text-(--cq-text-primary)"
+      className="grid size-10 flex-none place-items-center rounded-[10px] bg-[var(--cq-tile,var(--cq-text-primary))] text-sm font-semibold text-[var(--cq-on-tile,var(--cq-text-inverse))]"
     >
-      {(name.trim()[0] ?? "?").toUpperCase()}
+      {letters || "?"}
     </span>
   );
 }
 
+function Frame({ children }: { readonly children: ReactNode }) {
+  return (
+    <div className="grid min-h-[calc(100dvh-8rem)] place-items-center px-4 py-10">
+      <div className="w-full max-w-[520px]">{children}</div>
+    </div>
+  );
+}
+
 function Problem({
+  icon,
   title,
   body,
   children,
 }: {
+  readonly icon: "link" | "clock" | "x";
   readonly title: string;
   readonly body: string;
   readonly children?: ReactNode;
 }) {
   const t = useT();
+  const Icon = icon === "link" ? LinkIcon : icon === "clock" ? Clock : X;
   return (
-    <div className="px-4">
+    <Frame>
       <div className={CARD} data-join-state="error">
-        <CircleAlert
-          aria-hidden="true"
-          size={28}
-          strokeWidth={ICON_STROKE}
-          className="text-(--cq-text-secondary)"
-        />
-        <h1 className="cq-title-lg text-(--cq-text-primary)">{title}</h1>
-        <p className="cq-body text-(--cq-text-secondary)">{body}</p>
+        <span className="grid size-12 place-items-center rounded-full bg-(--cq-surface-subtle) text-(--cq-text-secondary)">
+          <Icon size={22} strokeWidth={ICON_STROKE} aria-hidden="true" />
+        </span>
+        <h1 className="m-0 text-2xl leading-[1.2] font-semibold tracking-[-0.02em] text-(--cq-text-primary)">
+          {title}
+        </h1>
+        <p className="m-0 text-sm leading-normal text-(--cq-text-secondary)">
+          {body}
+        </p>
         {children ?? (
-          <Link href="/home" className={buttonClassName("secondary")}>
+          <Link
+            href="/home"
+            className={accountButton("secondary", "regular", "self-start")}
+          >
             {t("Go to Capital Q")}
           </Link>
         )}
       </div>
-    </div>
+    </Frame>
   );
+}
+
+function expiresIn(iso: string, now: Date = new Date()): string {
+  const days = Math.ceil(
+    (new Date(iso).getTime() - now.getTime()) / 86_400_000,
+  );
+  if (!Number.isFinite(days)) return "";
+  if (days <= 1) return "Expires within a day";
+  return `Expires in ${String(days)} days`;
 }
 
 export function JoinCard({
@@ -73,67 +121,129 @@ export function JoinCard({
   signedInAs,
   keeps,
   alreadyIn,
+  invitation = null,
 }: {
   readonly token: string;
   readonly preview: InvitationPreviewDto | null;
   readonly signedInAs: string | null;
   readonly keeps: string | null;
   readonly alreadyIn: boolean;
+  /**
+   * The same invitation in the person's own list (their verified email),
+   * which carries its id for Decline and when it expires. Null when it is
+   * not theirs to answer.
+   */
+  readonly invitation?: {
+    readonly invitationId: string;
+    readonly expiresAt: string;
+  } | null;
 }) {
   const t = useT();
   const router = useRouter();
-  const [pending, start] = useTransition();
+  const [phase, setPhase] = useState<
+    "idle" | "joining" | "declining" | "joined" | "declined"
+  >("idle");
   const [error, setError] = useState<string | null>(null);
 
   if (preview === null) {
     return (
       <Problem
+        icon="link"
         title={t("This invitation link isn't valid")}
-        body="It may have been copied only in part. Open the link from the email again, or ask for a new invitation."
+        body={t(
+          "It may have been copied only in part. Open the link from the email again, or ask for a new invitation.",
+        )}
       />
     );
   }
   const inviter = preview.invitedByName ?? "Your colleague";
   const inviterFirst = inviter.split(" ")[0] ?? inviter;
   const words = teamWords(preview.kind);
+  const org = preview.organisationName;
+  if (phase === "declined" || preview.state === "DECLINED") {
+    return (
+      <Problem
+        icon="x"
+        title={t("You declined this invitation")}
+        body={t(
+          `${inviter} is told you declined. If you change your mind, ask them for a new invitation.`,
+        )}
+      />
+    );
+  }
+  if (phase === "joined") {
+    return (
+      <Frame>
+        <div className={CARD} data-join-state="joined">
+          <span className="cq-crm-tick-in grid size-10 place-items-center rounded-full bg-(--cq-positive) text-(--cq-text-inverse)">
+            <Check size={20} strokeWidth={2.4} aria-hidden="true" />
+          </span>
+          <h1 className="m-0 text-2xl leading-[1.2] font-semibold tracking-[-0.02em] text-(--cq-text-primary)">
+            {t(`You’re in ${org}`)}
+          </h1>
+          <p className="m-0 text-sm text-(--cq-text-secondary)">
+            {preview.kind === "COMPANY"
+              ? t(
+                  "You’ll work on the company’s profile, data room and investor conversations. Your own workspace stays separate.",
+                )
+              : t(
+                  "You’ll work on the firm’s relationships, notes and inbox. Your own workspace stays separate.",
+                )}
+          </p>
+          <Link
+            href="/home"
+            className={accountButton("primary", "regular", "self-start")}
+            data-join-go
+          >
+            {t("Go to Capital Q")}
+          </Link>
+        </div>
+      </Frame>
+    );
+  }
   if (preview.state === "EXPIRED") {
     return (
       <Problem
+        icon="clock"
         title={t("This invitation has expired")}
-        body={`Invitations last 7 days. Ask ${inviterFirst} at ${preview.organisationName} to send a new one.`}
+        body={t(
+          `Invitations last 7 days. Ask ${inviterFirst} at ${org} for a new one.`,
+        )}
       />
     );
   }
   if (preview.state === "REVOKED") {
     return (
       <Problem
+        icon="x"
         title={t("This invitation was cancelled")}
-        body={`Ask ${inviterFirst} at ${preview.organisationName} if you should still join.`}
-      />
-    );
-  }
-  if (preview.state === "DECLINED") {
-    return (
-      <Problem
-        title={t("You declined this invitation")}
-        body={`Ask ${inviterFirst} at ${preview.organisationName} for a new one if you'd like to join.`}
+        body={t(
+          `The person who sent it cancelled it. Ask ${inviterFirst} at ${org} if you still need access.`,
+        )}
       />
     );
   }
   if (preview.state === "ACCEPTED") {
     return alreadyIn ? (
       <Problem
-        title={`You're in ${preview.organisationName}`}
-        body="This invitation was already used to join."
+        icon="x"
+        title={t(`You're in ${org}`)}
+        body={t("This invitation was already used to join.")}
       >
-        <Link href="/settings/team" className={buttonClassName("primary")}>
+        <Link
+          href="/settings/team"
+          className={accountButton("primary", "regular", "self-start")}
+        >
           {t("Open your team")}
         </Link>
       </Problem>
     ) : (
       <Problem
+        icon="x"
         title={t("This invitation was already used")}
-        body={`Ask ${inviterFirst} at ${preview.organisationName} for a new one.`}
+        body={t(
+          "This invitation was already used to join. Sign in with the account that used it.",
+        )}
       />
     );
   }
@@ -141,116 +251,168 @@ export function JoinCard({
     signedInAs !== null && signedInAs.trim().toLowerCase() !== preview.email;
   if (mismatch) {
     return (
-      <div className="px-4">
+      <Frame>
         <div className={CARD} data-join-state="limited">
-          <Logo name={preview.organisationName} />
-          <h1 className="cq-title-lg text-(--cq-text-primary)">
-            This invitation is for {preview.email}
+          <Logo name={org} />
+          <h1 className="m-0 text-2xl leading-[1.2] font-semibold tracking-[-0.02em] text-(--cq-text-primary)">
+            {t(`This invitation is for ${preview.email}`)}
           </h1>
-          <p className="cq-body text-(--cq-text-secondary)">
-            You&apos;re signed in as {signedInAs}. Sign in with the invited
-            email, or ask {inviterFirst} to invite this one.
+          <p className="m-0 text-sm text-(--cq-text-secondary)">
+            {t(
+              `You're signed in as ${signedInAs}. Sign in with the invited email, or ask ${inviterFirst} to invite this one.`,
+            )}
           </p>
-          <div className="w-full [&>*]:w-full">
+          <div className="[&>*]:w-full">
             <SignOutButton />
           </div>
         </div>
-      </div>
+      </Frame>
     );
   }
-  const others = Math.max(
-    0,
-    preview.memberCount - preview.memberInitials.length,
-  );
+  const busy = phase === "joining" || phase === "declining";
   return (
-    <div className="px-4">
+    <Frame>
       <div className={CARD} data-join-state={keeps === null ? "empty" : "full"}>
-        <Logo name={preview.organisationName} />
-        <h1 className="cq-title-lg text-(--cq-text-primary)">
-          Join {preview.organisationName}
+        <Logo name={org} />
+        <h1 className="m-0 text-2xl leading-[1.2] font-semibold tracking-[-0.02em] text-(--cq-text-primary)">
+          {t(`${inviter} invited you to join ${org}`)}
         </h1>
-        <p className="cq-body text-(--cq-text-secondary)">
-          {inviter} invited you as {preview.role === "ADMIN" ? "an" : "a"}{" "}
-          <b className="font-medium text-(--cq-text-primary)">
-            {t(ROLE[preview.role])}
+        <div className="flex flex-col gap-1 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface) p-3.5">
+          <b className="text-[15px] text-(--cq-text-primary)">
+            {t(`As ${ROLE[preview.role].toLowerCase()}`)}
           </b>
-          .{" "}
-          {preview.kind === "COMPANY"
-            ? "You'll work on the company's profile, data room and investor conversations."
-            : `You'll share the ${words.word}'s inbox, notes and relationships.`}
-        </p>
-        {preview.memberInitials.length > 0 ? (
-          <div className="flex items-center">
-            {preview.memberInitials.map((initials, index) => (
-              <span
-                key={`${initials}-${String(index)}`}
-                aria-hidden="true"
-                className="grid size-9 place-items-center rounded-full border-2 border-(--cq-surface-raised) bg-(--cq-surface-subtle) cq-caption font-medium text-(--cq-text-secondary)"
-                style={{ marginLeft: index === 0 ? 0 : -8 }}
-              >
-                {initials}
-              </span>
-            ))}
-            <span className="ms-2 cq-caption text-(--cq-text-secondary)">
-              {others > 0
-                ? `and ${String(others)} ${others === 1 ? "other" : "others"}`
-                : `${String(preview.memberCount)} ${preview.memberCount === 1 ? "person" : "people"}`}
+          <span className="text-[13px] leading-[1.45] text-(--cq-text-secondary)">
+            {t(preview.role === "ADMIN" ? words.admin : words.member)}
+          </span>
+        </div>
+        {preview.memberCount > 0 ? (
+          <div className="flex flex-col gap-2" data-join-team>
+            <span className="text-xs text-(--cq-text-tertiary)">
+              {t(`Already in ${org}`)}
             </span>
+            <div className="flex items-center gap-2.5">
+              <span className="flex items-center">
+                {preview.memberInitials.map((initials, index) => (
+                  <span
+                    key={`${initials}-${String(index)}`}
+                    aria-hidden="true"
+                    className="grid size-8 place-items-center rounded-full border-2 border-(--cq-surface-raised) bg-(--cq-surface-subtle) text-xs font-semibold text-(--cq-text-secondary)"
+                    style={{ marginInlineStart: index === 0 ? 0 : -8 }}
+                  >
+                    {initials}
+                  </span>
+                ))}
+              </span>
+              <span className="text-sm text-(--cq-text-primary)">
+                {preview.memberCount === 1
+                  ? t("1 person works here")
+                  : t(`${String(preview.memberCount)} people work here`)}
+              </span>
+            </div>
           </div>
         ) : null}
+        <span className="text-xs text-(--cq-text-tertiary)">
+          {[
+            invitation === null ? null : t(expiresIn(invitation.expiresAt)),
+            signedInAs === null ? null : t(`Signed in as ${signedInAs}`),
+          ]
+            .filter((part) => part !== null && part !== "")
+            .join(". ")}
+          {invitation === null && signedInAs === null ? null : "."}
+        </span>
         {keeps === null ? null : (
-          <p className="cq-body-sm text-(--cq-text-secondary)">
-            You&apos;ll keep{" "}
-            <b className="font-medium text-(--cq-text-primary)">{keeps}</b> too,
-            and switch between them from the top of the sidebar (on a phone,
-            from More).
+          <p className="m-0 text-[13px] text-(--cq-text-secondary)">
+            {t(
+              `You'll keep ${keeps} too, and switch between them from the top of the sidebar (on a phone, from More).`,
+            )}
           </p>
         )}
         {error === null ? null : (
-          <p role="alert" className="cq-body-sm text-(--cq-text-primary)">
+          <p role="alert" className="m-0 text-sm text-(--cq-text-primary)">
             {error}
           </p>
         )}
-        <button
-          type="button"
-          disabled={pending}
-          className={buttonClassName("primary", "regular", "w-full")}
-          onClick={() => {
-            start(async () => {
-              const out = await acceptInvitationAction(token);
-              if (!out.ok) {
-                setError(out.message);
-                return;
-              }
-              router.push("/settings/team");
-              router.refresh();
-            });
-          }}
-          data-join-accept
-        >
-          Join {preview.organisationName}
-        </button>
-        <Link
-          href="/home"
-          className={buttonClassName("quiet", "regular", "w-full")}
-        >
-          {t("Not now")}
-        </Link>
+        <div className="grid grid-cols-2 gap-2.5">
+          {invitation === null ? (
+            <Link
+              href="/home"
+              className={accountButton("secondary", "regular")}
+              aria-disabled={busy || undefined}
+            >
+              {t("Not now")}
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className={accountButton("secondary")}
+              disabled={busy}
+              aria-busy={phase === "declining"}
+              data-join-decline
+              onClick={() => {
+                setPhase("declining");
+                setError(null);
+                void declineInvitationAction(invitation.invitationId).then(
+                  (out) => {
+                    if (!out.ok) {
+                      setPhase("idle");
+                      setError(out.message);
+                      return;
+                    }
+                    setPhase("declined");
+                    router.refresh();
+                  },
+                );
+              }}
+            >
+              {phase === "declining" ? (
+                <Pending>{t("Declining…")}</Pending>
+              ) : (
+                t("Decline")
+              )}
+            </button>
+          )}
+          <button
+            type="button"
+            className={accountButton("primary")}
+            disabled={busy}
+            aria-busy={phase === "joining"}
+            data-join-accept
+            onClick={() => {
+              setPhase("joining");
+              setError(null);
+              void acceptInvitationAction(token).then((out) => {
+                if (!out.ok) {
+                  setPhase("idle");
+                  setError(out.message);
+                  return;
+                }
+                setPhase("joined");
+                router.refresh();
+              });
+            }}
+          >
+            {phase === "joining" ? (
+              <Pending>{t("Joining…")}</Pending>
+            ) : (
+              <span className="truncate">{t(`Join ${org}`)}</span>
+            )}
+          </button>
+        </div>
       </div>
-    </div>
+    </Frame>
   );
 }
 
 export function JoinCardSkeleton() {
   const bar = "bg-(--cq-surface-subtle) motion-safe:animate-pulse";
   return (
-    <div className="px-4">
+    <Frame>
       <div className={CARD} aria-busy="true" data-join-state="loading">
-        <div className={`size-16 rounded-2xl ${bar}`} />
-        <div className={`h-7 w-[70%] ${bar}`} />
-        <div className={`h-4 w-[90%] ${bar}`} />
-        <div className={`h-11 w-full rounded-md ${bar}`} />
+        <div className={`size-10 rounded-[10px] ${bar}`} />
+        <div className={`h-7 w-[70%] rounded-(--cq-radius-sm) ${bar}`} />
+        <div className={`h-16 w-full rounded-(--cq-radius-lg) ${bar}`} />
+        <div className={`h-11 w-full rounded-(--cq-radius-md) ${bar}`} />
       </div>
-    </div>
+    </Frame>
   );
 }

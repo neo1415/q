@@ -345,7 +345,7 @@ describe("how Q reads your thesis (Q.02)", () => {
     expect(screen.getByText("What you did")).toBeTruthy();
     expect(screen.getByText("Q’s inference")).toBeTruthy();
     expect(screen.getByText("Approve this change")).toBeTruthy();
-    fireEvent.click(screen.getByText("Not now"));
+    fireEvent.click(screen.getByText("Leave it as a reading"));
     expect(screen.queryByText("Add Ghana to your countries?")).toBeNull();
   });
 });

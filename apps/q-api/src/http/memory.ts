@@ -10,6 +10,7 @@ import {
   QPreferenceLearningDtoSchema,
 } from "@capital-q/contracts";
 import type {
+  MemoryItem,
   MemoryService,
   PreferenceLearningConsent,
 } from "@capital-q/q-knowledge";
@@ -33,6 +34,15 @@ export type MemoryRoutesDependencies = ActorContextDependencies & {
   readonly learningConsent?: PreferenceLearningConsent | undefined;
 };
 
+/**
+ * How Q came to know it, in the person's terms: their own quoted words,
+ * their correction, or Q's reading of how they work (no quote kept).
+ */
+function originOf(item: MemoryItem): "SAID" | "CORRECTED" | "LEARNED" {
+  if (item.memoryType === "correction") return "CORRECTED";
+  return item.quote === null ? "LEARNED" : "SAID";
+}
+
 const ForgetParamsSchema = z
   .object({ memoryItemId: z.string().uuid() })
   .strict();
@@ -54,6 +64,8 @@ export function registerMemoryRoutes(
         quote: item.quote === null ? null : item.quote.slice(0, 2_000),
         about: item.subject?.subjectType === "COMPANY" ? "COMPANY" : "YOU",
         learnedAt: item.createdAt,
+        origin: originOf(item),
+        forgetsAt: item.validTo,
       })),
     });
   });

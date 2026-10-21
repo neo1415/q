@@ -135,6 +135,9 @@ export const QWorkLaneDtoSchema = z
   .strict();
 export type QWorkLaneDto = z.infer<typeof QWorkLaneDtoSchema>;
 
+/** Who took a step of Q's work (the audit trail's "on whose authority"). */
+export const Q_WORK_STEP_ACTORS = ["Q", "YOU", "THEM"] as const;
+
 export const QWorkStepDtoSchema = z
   .object({
     words: z.string().max(500),
@@ -158,6 +161,14 @@ export const QWorkStepDtoSchema = z
       .strict()
       .nullable()
       .default(null),
+    /**
+     * Who acted, decided by code from the step's own kind (its key), never
+     * by a model: Q under the person's approved instruction, the person
+     * themself, or the other side. Null: an older server, or not known.
+     */
+    by: z.enum(Q_WORK_STEP_ACTORS).nullable().default(null),
+    /** The lane (company or investor) the step was about; null: the whole work. */
+    laneId: UuidSchema.nullable().default(null),
   })
   .strict();
 export type QWorkStepDto = z.infer<typeof QWorkStepDtoSchema>;
@@ -286,6 +297,15 @@ export const QWorkReportDtoSchema = z
           .strict(),
       )
       .max(8),
+    /*
+     * Work, first-stage report (2026-10-21): what the prepared next steps
+     * need. The canonical relationship the interview ran in (null: none
+     * yet, so nothing can be sent), the company, and whether Q is still
+     * working this lane. Defaulted for an older server.
+     */
+    relationshipId: z.string().uuid().nullable().default(null),
+    companyId: z.string().uuid().nullable().default(null),
+    laneOpen: z.boolean().default(false),
   })
   .strict();
 export type QWorkReportDto = z.infer<typeof QWorkReportDtoSchema>;

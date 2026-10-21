@@ -14,18 +14,18 @@ export default async function InvestorRehearsalPage({
   readonly searchParams: Promise<{
     readonly meeting?: string;
     readonly video?: string;
+    readonly difficulty?: string;
   }>;
 }) {
-  const [{ investorOrganisationId }, { meeting, video }] = await Promise.all([
-    params,
-    searchParams,
-  ]);
+  const [{ investorOrganisationId }, { meeting, video, difficulty }] =
+    await Promise.all([params, searchParams]);
   return (
     <RehearsalLobbyPage
       kind="INVESTOR_ORGANISATION"
       counterpartId={investorOrganisationId}
       meeting={meeting}
       requestedVideo={video === "1"}
+      difficulty={difficulty}
     />
   );
 }

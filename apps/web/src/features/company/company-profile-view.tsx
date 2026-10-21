@@ -39,7 +39,8 @@ import { compactMoneyText, moneyText } from "./money-text";
 import { OwnerPitchNotice } from "./overview-sections";
 import { raiseWords } from "./raise-words";
 import { ReadMore } from "./read-more";
-import { InvestorDataRoom, OwnerDataRoom } from "./material/data-room";
+import { InvestorDataRoom } from "./material/data-room";
+import { OwnRoom } from "./material/own-room";
 import { DeckCoach } from "./material/deck";
 import { ProfileFitProvider } from "./material/fit-panel-slot";
 import { TeamTab } from "./material/team";
@@ -365,7 +366,8 @@ export function CompanyProfileView({
                   The data room isn&rsquo;t available to you.
                 </p>
               ) : dataRoom.viewer === "OWNER" ? (
-                <OwnerDataRoom companyId={profile.companyId} view={dataRoom} />
+                // Design ownroom-2: the owner's room beside an investor's view.
+                <OwnRoom companyId={profile.companyId} view={dataRoom} />
               ) : (
                 <InvestorDataRoom
                   companyId={profile.companyId}

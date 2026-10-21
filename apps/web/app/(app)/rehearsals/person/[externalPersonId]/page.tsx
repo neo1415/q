@@ -21,9 +21,12 @@ export default async function ExternalPersonRehearsalPage({
   searchParams,
 }: {
   readonly params: Promise<{ readonly externalPersonId: string }>;
-  readonly searchParams: Promise<{ readonly meeting?: string }>;
+  readonly searchParams: Promise<{
+    readonly meeting?: string;
+    readonly difficulty?: string;
+  }>;
 }) {
-  const [{ externalPersonId }, { meeting }] = await Promise.all([
+  const [{ externalPersonId }, { meeting, difficulty }] = await Promise.all([
     params,
     searchParams,
   ]);
@@ -39,6 +42,7 @@ export default async function ExternalPersonRehearsalPage({
       kind="EXTERNAL_PERSON"
       counterpartId={externalPersonId}
       meeting={meeting}
+      difficulty={difficulty}
     />
   );
 }

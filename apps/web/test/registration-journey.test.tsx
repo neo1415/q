@@ -184,8 +184,19 @@ describe("choosing a workspace on arrival", () => {
 
   it("lists each workspace with what it is and the person's role there", () => {
     render(<WorkspaceChoice name="Ada" workspaces={workspaces} />);
-    expect(screen.getByText("Company · Owner · Last used")).toBeTruthy();
-    expect(screen.getByText("Investing · Member")).toBeTruthy();
+    expect(
+      screen.getByText("Company workspace. You are an owner"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Investor workspace. You are a member"),
+    ).toBeTruthy();
+    // The one they used last says so, in words.
+    expect(screen.getByText("Last used")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Switch any time from your name in the sidebar. Nothing moves between workspaces.",
+      ),
+    ).toBeTruthy();
   });
 
   it("switches to the one chosen, then goes Home", async () => {

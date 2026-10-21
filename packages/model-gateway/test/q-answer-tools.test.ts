@@ -937,7 +937,7 @@ describe("answer seam tool loop", () => {
     expect(toolTurn?.role).toBe("TOOL");
     expect(toolTurn?.content).toContain('"ok":true');
     expect(toolTurn?.content).toContain("Northwind (synthetic)");
-    expect(stages).toEqual(["REVIEWING_COMPANY"]);
+    expect(stages).toEqual(["PREPARING_ANALYSIS", "REVIEWING_COMPANY"]);
     expect(messages.at(-1)?.content).toBe("with tool");
     const observation = seam.lastObservation();
     expect(observation?.modelCalls).toBe(2);
@@ -1826,13 +1826,18 @@ describe("a named company read ahead of the model is not looked up again", () =>
  * focused on one record the wide reads start when the turn is warmed,
  * beside the readers, rather than after the reading.
  */
-describe("wide reads start at warm on a focused screen", () => {
+describe("wide reads start at warm on a focused screen or a named company", () => {
   const SEARCH: QOfferedTool = {
     ...GET_COMPANY,
     toolName: "company.search",
     definition: { ...GET_COMPANY.definition, name: "search_companies" },
   };
-  it.each([true, false])("focused=%s", async (focused) => {
+  it.each([
+    [true, "What are the risks with Northwind Ledger?", true],
+    // Owner 2026-10-21: a named company is read while the turn is read.
+    [false, "What are the risks with Northwind Ledger?", true],
+    [false, "what should I focus on today?", false],
+  ] as const)("focused=%s, %s", async (focused, said, early) => {
     const tools = toolPort([SEARCH, GET_COMPANY], (p) =>
       succeeded(p, { items: [], nextCursor: null, truthClass: "USER_CLAIM" }),
     );
@@ -1843,7 +1848,7 @@ describe("wide reads start at warm on a focused screen", () => {
     if (messages[0])
       messages[0] = {
         ...messages[0],
-        content: "What are the risks with Northwind Ledger?",
+        content: said,
       };
     const bound = {
       ...request,
@@ -1873,12 +1878,12 @@ describe("wide reads start at warm on a focused screen", () => {
     const before = tools.executed.filter(
       (p) => p.name === "search_companies",
     ).length;
-    expect(before > 0).toBe(focused);
+    expect(before > 0).toBe(early);
     await seam.answer(bound);
     // Read once either way: the warm read is the one the answer takes.
     expect(
       tools.executed.filter((p) => p.name === "search_companies"),
-    ).toHaveLength(1);
+    ).toHaveLength(early ? 1 : 0);
   });
 });
 

@@ -9,6 +9,7 @@ import {
   ApiProblemError,
   confirmDeckReading,
   decideDataRoomRequest,
+  getDataRoomPreview,
   openCompanyDeck,
   openDataRoomDocument,
   readDeckAgain,
@@ -25,6 +26,7 @@ import {
   DeckSectionCodeSchema,
   DeckSectionReviewActionSchema,
   SetDataRoomLevelRequestSchema,
+  type DataRoomPreviewDto,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
@@ -163,6 +165,41 @@ export async function requestAccessAction(input: {
         ? DATA_ROOM_CONNECT_FIRST
         : "The request wasn't sent. Try again.",
     );
+  }
+}
+
+/**
+ * Design ownroom-2: the founder's own room as one of their investor
+ * relationships (or anyone not yet connected) would see it. The API
+ * computes it from the real grants with the investor's own projection and
+ * refuses anyone but the owner; this only carries it. A read: nothing is
+ * recorded or changed.
+ */
+export async function dataRoomPreviewAction(input: {
+  readonly companyId: string;
+  readonly relationshipId: string | null;
+}): Promise<MaterialResult<DataRoomPreviewDto>> {
+  const companyId = Id.safeParse(input.companyId);
+  const relationshipId =
+    input.relationshipId === null ? null : Id.safeParse(input.relationshipId);
+  const api = await session();
+  if (
+    !companyId.success ||
+    (relationshipId !== null && !relationshipId.success) ||
+    api === null
+  )
+    return failed("That view didn't load. Try again.");
+  try {
+    return {
+      ok: true,
+      value: await getDataRoomPreview(
+        api,
+        companyId.data,
+        relationshipId === null ? null : (relationshipId.data ?? null),
+      ),
+    };
+  } catch {
+    return failed("That view didn't load. Try again.");
   }
 }
 

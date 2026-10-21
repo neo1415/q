@@ -132,29 +132,30 @@ Branch `claude/artifacts-live-e4a145`, PR #270 (draft) into `speed/q-oct20`. Rou
 - New tests: `apps/web/test/q-answer-artifacts-live.test.tsx` covers L-3 (the live preview in the thread, and its hand-over to the settled blocks) and L-11 (a settled answer reports its drawn kinds, a streaming one does not, and the report clears on unmount). `q-data-blocks.test.tsx` covers the summary title and the sticky labels.
 - Screenshots: `docs/design/2026-10-21/artifacts-r3/`, from a local production build with fictional data. The spoken summary highlight was confirmed lit in a real browser (Chromium, production build).
 
-#### Round 3: stage progress (owner requirement 2026-10-21, via the coordinator)
+#### Round 4: one live line, and task progress for durable work (coordinator product review, 2026-10-21)
 
-The owner's correction: make it as fast as can be done properly, and never weaken real work to hit a number. Times below are evidence, not a gate.
+The round-3 step list was merged in #277 and then rejected in review against `docs/design/ux-direction-2026-09.md`. §5.1 has an ordinary answer (THINKING) show one approved stage, and only a durable task (WORKING) show "task + stage" with determinate progress, in the dock's compact pill (§6.1) and the Now column (§7.1). The growing list was also noise and moved the layout. Round 4 replaces it:
 
-- **(a) Stage progress, DONE.** `apps/web/src/features/q/stage-progress.tsx` is a determinate step list: a check for each step done, a ring for the current one, `aria-current="step"`, one polite status line, and an opacity fade only. It has no percentage, no guessed next step and no spinner or shimmer.
-  - Driven only by real `q.stage.changed` events. The api-client reducer keeps `stageHistory`, keyed by sequence so it is replay-safe, and `qStageSteps` derives the list.
-  - Shown from `presence.steps` on Home (arrival and thread), the chat thread, the Q sheet and Now.
-  - Voice turns get their run's stages through the room feed. Additive contract: `QRoomStagesSchema`, `QRoomRead.stages`. The q-api `feed.stage` is called by the voice turn on each `q.stage.changed`.
-  - Labels are the approved ones. Web research stays "Looking into it" (R38, `no-search-theatre`), not "Checking the web".
-- **(b) Document jobs, DONE.** The document pipeline already emits a visible stage at each real step boundary (`prepare-artifact.ts` `visibleStageOf`): writing, laying out each page, finding pictures and drawing charts, checking every page. The same list shows them until the file card lands. No contract change was needed.
-- **(c) Measured.**
-  - `apps/web/test/stage-progress-timing.test.tsx` replays a compare turn through the real path (reducer → `turnsFrom` → `QAnswer` + `StageProgress`) at three stated latency profiles. It asserts that each element is in the DOM the moment its event arrives, with no timer or debounce in the UI path, and that the preview is painted before the full answer.
-  - Real Chromium, production build, 5 runs per row: time from an event's arrival to the frame that shows it (the median, then the worst run).
-
-| Element       | Desktop        | CPU slowed 4×   |
-| ------------- | -------------- | --------------- |
-| First stage   | 25.6 ms (26.2) | 38.5 ms (132.4) |
-| Preview frame | 20.9 ms (31.5) | 50.6 ms (59.8)  |
-| First words   | 23.6 ms (37.8) | 50.1 ms (73.9)  |
-| Full answer   | 23.4 ms (24.1) | 27.2 ms (39.3)  |
-
-- With the typical profile (first stage at 250 ms, preview at 1.5 s), the first step painted at a median of 276 ms after send and the preview at 1,523 ms. The UI adds about 1–2 frames on top of the server.
-- Screenshots: `docs/design/2026-10-21/artifacts-r3/progress-{light,dark}.png` (mid-turn: steps, first words, preview frame).
+- **Ordinary answers: one line** (`apps/web/src/features/q/stage-line.tsx` `StageLine`).
+  - It sits in Q's answer slot, held from the moment Q starts work, exactly where Q's first words land. It is one line high and truncated, so it never wraps, and it is replaced in place by a fade.
+  - It names what the stage is about when the run has read it: "Looking at Nixo", "Reading Nixo's deck and documents", "Comparing Nixo and Halyard". Otherwise it shows the approved label. Web research is always "Looking into it" (R38).
+  - Inside the thread, the thread's own live region announces it; elsewhere it is one polite status line.
+  - The same line, with its height reserved, is used under the arrival's state, in the Q sheet header, in Now and on a voice line.
+- **Durable work: task progress** (`TaskProgress`): "Deck for Nixo · 2 of 4 · Laying out each page", with a four-segment determinate bar. Done and current segments are filled and the current one is taller; there is no glow and no shimmer.
+  - Shown in Now and as a compact pill under the sidebar dock trigger (`global-q.tsx`).
+  - The count is the document pipeline's real fixed steps (`prepare-artifact.ts` `DOCUMENT_PIPELINE_STEPS`: writing, layout, pictures and charts, checking). A brief has no pipeline, so it gets no count.
+- **Contract (additive):** `QStageChangedEvent.data.about?: { subjects?: string[≤3], task?: { kind, step?, of? } }` (`QStageAboutSchema`; step and of come together, step ≤ of). Also `QRoomStages.about?`.
+  - model-gateway `stage-subjects.ts` `stageAbout`: names come only from this run's own reads, by the ids the tool call names; a comparison with no id is about the companies read so far; never for the public web. A stage is written again only when its names change.
+  - q-specialists `documentStageAbout` adds the task and its step.
+  - The voice turn forwards `about` to the room feed.
+- **Removed:** `StageProgress` and `presence.steps` (the round-3 list). The reducer keeps `stageHistory` and `qCurrentStage`.
+- **Evidence** (`docs/ai-handoff/evidence/stage-progress/`, from a local production build with fictional data): `{one,compare,deck}-{mobile-390,desktop}-{light,dark}.png`. Those are (a) a one-company answer mid-run, (b) a comparison mid-run and (c) a deck at step 2 of 4, with the dock pill and Now.
+- **CLS on the thread while a compare answer streams** (Chromium, `PerformanceObserver` layout-shift, 3 runs each):
+  - desktop 1280 px: **0** in every run, with no shifts;
+  - 390 px: **0.0157** in every run, from one shift.
+  - That one shift is the L-3 preview table frame below Q's streaming words being pushed down 48 px when the words wrap to more lines. The stage line itself shifts nothing.
+  - Taking it to 0 means moving the preview frame out from under the words while they stream, or holding it until the answer settles. That is a product choice for the owner or coordinator, and was not changed here.
+- Paint latency from round 3 still stands; nothing here adds a timer to the UI path (`apps/web/test/stage-line-timing.test.tsx`).
 
 ## 4. Tests and gates (run 2026-10-20/21, Windows worktree)
 

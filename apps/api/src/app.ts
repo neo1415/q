@@ -409,6 +409,8 @@ export type ApiModules = {
   /** Profile photos and covers. Absent: no image routes register. */
   readonly profileImages?:
     ProfileImageRoutesDependencies["profileImages"] | undefined;
+  /** What Q remembers: the person's own correction (ADR 0012). */
+  readonly memoryCorrection?: AppActionPorts["memoryCorrection"] | undefined;
   /** WORK-58: pause/resume their own instruction, set a suggestion aside. */
   readonly qWork?: QWorkPagePort | undefined;
   /** Recovery D6: stop one of Q's approved jobs. */
@@ -570,6 +572,11 @@ export function createApp(
       yourCompanies: modules.discovery.yourCompanies,
       mayPlay: modules.discovery.mayPlay,
       namedPhotos: modules.namedPhotos,
+      ...(modules.publicIdentity === undefined
+        ? {}
+        : {
+            investorCard: investorCardReader(modules.publicIdentity),
+          }),
     });
     if (modules.discovery.explore !== undefined) {
       registerExploreRoutes(app, {
@@ -693,6 +700,9 @@ export function createApp(
       ...(modules.profileImages === undefined
         ? {}
         : { profileImages: modules.profileImages }),
+      ...(modules.memoryCorrection === undefined
+        ? {}
+        : { memoryCorrection: modules.memoryCorrection }),
       ...(push === undefined
         ? {}
         : {
@@ -1102,4 +1112,20 @@ export function createApp(
   }
 
   return { app, logger };
+}
+
+/** A founder-side read of an investor's Q Card, as a participant sees it. */
+function investorCardReader(
+  publicIdentity: QCardRoutesDependencies["publicIdentity"],
+): (
+  investorOrganisationId: string,
+) => ReturnType<QCardRoutesDependencies["publicIdentity"]["cardForSubject"]> {
+  return (investorOrganisationId) =>
+    publicIdentity.cardForSubject({
+      subject: {
+        subjectType: "INVESTOR_ORGANISATION",
+        subjectId: investorOrganisationId,
+      },
+      audience: "PARTICIPANT",
+    });
 }

@@ -16,7 +16,7 @@ import {
 import { QResponseMessageSchema } from "./message.js";
 import { QClarificationRequestBlockSchema } from "./result-block.js";
 import { QRunStatusSchema } from "./run.js";
-import { QVisibleStageSchema } from "./stage.js";
+import { QStageAboutSchema, QVisibleStageSchema } from "./stage.js";
 import { QSubjectRefSchema } from "./subject.js";
 import { QContractVersionSchema } from "./version.js";
 
@@ -140,6 +140,8 @@ export const QRunStartedEventSchema = event("q.run.started", {
 
 export const QStageChangedEventSchema = event("q.stage.changed", {
   stage: QVisibleStageSchema,
+  /** Round 4: what the stage is about, when the run knows (additive). */
+  about: QStageAboutSchema.optional(),
 });
 
 export const QMessageDeltaEventSchema = event("q.message.delta", {

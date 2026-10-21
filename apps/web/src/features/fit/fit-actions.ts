@@ -2,8 +2,15 @@
 
 import { z } from "zod";
 
-import { getFitProfiles, getFitQView, getFitTop } from "@capital-q/api-client";
 import {
+  getFitCompare,
+  getFitProfiles,
+  getFitQView,
+  getFitTop,
+} from "@capital-q/api-client";
+import {
+  FIT_COMPARE_MAX,
+  FIT_COMPARE_MIN,
   FIT_IDS_MAX,
   type FitComparisonDto,
   type FitCompanyDto,
@@ -45,6 +52,29 @@ export async function fitQViewAction(
   if (!id.success || session === null) return null;
   try {
     return await getFitQView(session, id.data);
+  } catch {
+    return null;
+  }
+}
+
+const CompareIds = z
+  .array(z.string().uuid())
+  .min(FIT_COMPARE_MIN)
+  .max(FIT_COMPARE_MAX);
+
+/**
+ * Saved's compare tray (app prototype "shortlist", option 1): the picked
+ * companies side by side on the same fit as the top three. Each id is
+ * re-checked by the fit service; one the reader may not see is absent.
+ */
+export async function fitCompareAction(
+  companyIds: readonly string[],
+): Promise<FitComparisonDto | null> {
+  const ids = CompareIds.safeParse([...new Set(companyIds)]);
+  const session = await qApiSession();
+  if (!ids.success || session === null) return null;
+  try {
+    return await getFitCompare(session, ids.data);
   } catch {
     return null;
   }

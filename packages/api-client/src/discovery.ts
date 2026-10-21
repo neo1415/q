@@ -8,6 +8,8 @@ import {
   DISCOVERY_EXPLANATION_PATH,
   DISCOVERY_INVESTOR_PATH,
   DISCOVERY_INVESTOR_PHOTO_PATH,
+  DISCOVERY_INVESTOR_CARD_PATH,
+  DiscoveredInvestorCardDtoSchema,
   DISCOVERY_INVESTORS_PATH,
   DiscoveredInvestorPhotoDtoSchema,
   DiscoveredInvestorProfileDtoSchema,
@@ -101,6 +103,26 @@ export function getDiscoveredInvestorPhoto(
       encodeURIComponent(investorOrganisationId),
     ),
     DiscoveredInvestorPhotoDtoSchema,
+  );
+}
+
+/**
+ * `GET /v1/discovery/investors/:investorOrganisationId/card` — the
+ * investor's Q Card as a participant reads it, by id, for an investor this
+ * founder may see; `card` is null when they have none live.
+ */
+export function getDiscoveredInvestorCard(
+  session: ApiSession,
+  investorOrganisationId: string,
+) {
+  return call(
+    session,
+    "GET",
+    DISCOVERY_INVESTOR_CARD_PATH.replace(
+      ":investorOrganisationId",
+      encodeURIComponent(investorOrganisationId),
+    ),
+    DiscoveredInvestorCardDtoSchema,
   );
 }
 

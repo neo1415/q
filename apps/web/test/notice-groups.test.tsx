@@ -6,7 +6,15 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import type { NotificationDto } from "@capital-q/contracts";
 
@@ -14,9 +22,13 @@ import { groupNotices } from "../src/features/work/notice-groups";
 
 const list = vi.fn<() => Promise<unknown>>();
 const markRead = vi.fn<(ids: readonly string[]) => Promise<unknown>>();
+const names = vi.fn<() => Promise<unknown>>(() =>
+  Promise.resolve({ ok: true, value: {} }),
+);
 vi.mock("../src/features/work/work-actions", () => ({
   listNoticesAction: () => list(),
   markReadAction: (ids: readonly string[]) => markRead(ids),
+  noticeNamesAction: () => names(),
 }));
 vi.mock("../src/features/work/push-setting", () => ({
   PushSetting: () => null,
@@ -98,6 +110,10 @@ describe("groupNotices", () => {
 });
 
 describe("the notification centre", () => {
+  // Load the rail once on real timers: its first transform is slow.
+  beforeAll(async () => {
+    await import("../src/features/work/notification-center");
+  }, 60_000);
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -155,6 +171,44 @@ describe("the notification centre", () => {
       await Promise.resolve();
     });
     expect(markRead).toHaveBeenCalledWith([update.id]);
+  });
+
+  it("groups by who it is about, and a tile with nowhere to go is dealt with in place", async () => {
+    vi.resetModules();
+    const { NotificationCenter } =
+      await import("../src/features/work/notification-center");
+    const NORTHMOOR = "00000000-0000-4000-8000-00000000aaaa";
+    const need = notice({
+      title: "Reply to Mina is ready for your yes",
+      priority: "NEEDS_YOU",
+      linkPath: null,
+      named: {
+        kind: "INVESTOR_ORGANISATION",
+        id: NORTHMOOR,
+        photoUrl: null,
+      },
+    });
+    list.mockResolvedValue({ ok: true, value: { items: [need], unread: 1 } });
+    names.mockResolvedValue({
+      ok: true,
+      value: { [NORTHMOOR]: "Northmoor Capital" },
+    });
+    markRead.mockResolvedValue({ ok: true, value: null });
+    render(<NotificationCenter />);
+    await settleFirstRead();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Notifications, 1 new" }),
+    );
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Northmoor Capital")).toBeTruthy();
+    expect(screen.getByText("1 needs you")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Reply to Mina/u }));
+    expect(screen.getByText("Dealt with")).toBeTruthy();
+    expect(screen.getByText("0 need you")).toBeTruthy();
+    expect(markRead).toHaveBeenCalledWith([need.id]);
   });
 });
 

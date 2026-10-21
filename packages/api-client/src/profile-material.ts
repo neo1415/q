@@ -1,8 +1,10 @@
 import {
   COMPANIES_PATH,
   COMPANY_DATA_ROOM_OUTLINE_PATH,
+  COMPANY_DATA_ROOM_PREVIEW_SEGMENT,
   COMPANY_DATA_ROOM_REQUESTS_PATH,
   COMPANY_DATA_ROOM_SEGMENT,
+  DataRoomPreviewDtoSchema,
   COMPANY_DECK_OPEN_SEGMENT,
   COMPANY_DECK_SEGMENT,
   CompanyDeckViewSchema,
@@ -45,6 +47,24 @@ export function getCompanyDataRoom(session: ApiSession, companyId: string) {
     "GET",
     `${company(companyId)}${COMPANY_DATA_ROOM_SEGMENT}`,
     DataRoomViewSchema,
+  );
+}
+
+/** ownroom-2: the room as one investor relationship (or anyone not connected) sees it. */
+export function getDataRoomPreview(
+  session: ApiSession,
+  companyId: string,
+  relationshipId: string | null,
+) {
+  const query =
+    relationshipId === null
+      ? ""
+      : `?relationship=${encodeURIComponent(relationshipId)}`;
+  return call(
+    session,
+    "GET",
+    `${company(companyId)}${COMPANY_DATA_ROOM_PREVIEW_SEGMENT}${query}`,
+    DataRoomPreviewDtoSchema,
   );
 }
 

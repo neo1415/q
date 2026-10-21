@@ -13,6 +13,16 @@ import { MODEL_USAGE_PURPOSES } from "../model/index.js";
  */
 export const Q_USAGE_PATH = "/v1/q/usage" as const;
 
+/**
+ * `?month=previous` reads last calendar month instead (Settings → Usage's
+ * "Last month"). Only these two: older months are not offered. A previous
+ * month carries no plan standing (`plan: null`); limits are this month's.
+ */
+export const QUsageQuerySchema = z
+  .object({ month: z.enum(["current", "previous"]).optional() })
+  .strict();
+export type QUsageQuery = z.infer<typeof QUsageQuerySchema>;
+
 const Usd = z.string().regex(/^\d{1,9}(\.\d{1,6})?$/u);
 
 export const QUsageDtoSchema = z
