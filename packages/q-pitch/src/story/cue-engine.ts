@@ -99,6 +99,7 @@ export const ACT_BUDGET_MS: Readonly<Record<StoryAct["kind"], number>> = {
   stage: 400,
   mood: 400,
   unlight: 200,
+  figure: 200,
 };
 
 export type ActOutcome =

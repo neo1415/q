@@ -10,6 +10,8 @@ import {
 } from "@capital-q/q-pitch";
 import type { ReactNode } from "react";
 
+import { StoryQCard } from "./story-qcard";
+
 /**
  * The Q stage's story visuals (plan §3, "On screen"). Pure render of
  * `{visual, step, text}`: the cue engine moves the step on the word.
@@ -34,8 +36,20 @@ export const EMPTY_STAGE: StageState = {
   fallback: null,
 };
 
-const Label = ({ children }: { readonly children: ReactNode }) => (
-  <p className="cq-story-label">{children}</p>
+/**
+ * A small on-screen label. `shown={false}` keeps its space (visibility
+ * only), so a label arriving mid-visual never moves what is around it.
+ */
+const Label = ({
+  children,
+  shown = true,
+}: {
+  readonly children: ReactNode;
+  readonly shown?: boolean;
+}) => (
+  <p className="cq-story-label" data-reserved={shown ? undefined : ""}>
+    {children}
+  </p>
 );
 
 const DEMO = "Demonstration data";
@@ -107,13 +121,6 @@ const ROUNDS = [
   "Series A",
   "Series B",
   "Series C",
-] as const;
-const CARD_PARTS = [
-  "Story",
-  "Numbers",
-  "Raise",
-  "Intelligence",
-  "Relationships",
 ] as const;
 const OUTCOMES = [
   "Better opportunities reach investors faster.",
@@ -241,7 +248,7 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
               <p>A great one never found</p>
             </div>
           </div>
-          {step >= 3 ? <Label>Unknown stays unknown</Label> : null}
+          <Label shown={step >= 3}>Unknown stays unknown</Label>
         </div>
       );
     case "timeline":
@@ -272,9 +279,12 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
               </li>
             ))}
           </ol>
-          {step === 3 || step === 4 ? (
-            <p className="cq-story-bar">The bar is higher</p>
-          ) : null}
+          <p
+            className="cq-story-bar"
+            data-reserved={step === 3 || step === 4 ? undefined : ""}
+          >
+            The bar is higher
+          </p>
           {step >= 6 ? (
             <Label>Every stage, one associate</Label>
           ) : (
@@ -512,35 +522,21 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
         </div>
       );
     case "deck-to-card":
-    case "q-card":
+      // #48: "Send me your deck." The deck, then it slides away.
       return (
         <div className="cq-story-centre">
-          <div
-            className="cq-story-flip"
-            data-flipped={visual === "q-card" || step >= 2 ? "" : undefined}
-          >
-            <div className="cq-story-deck">
-              <span aria-hidden>PDF</span>
-              <strong>deck_final_v7.pdf</strong>
-            </div>
-            <div className="cq-story-qcard">
-              <p className="cq-story-kicker">Q Card</p>
-              <strong>Harbourline Cargo</strong>
-              <ul>
-                {CARD_PARTS.map((part, i) => (
-                  <li
-                    key={part}
-                    data-lit={
-                      visual === "q-card" && step === i + 1 ? "" : undefined
-                    }
-                  >
-                    {part}
-                  </li>
-                ))}
-              </ul>
-              <Label>Roadmap: the Q Card is a planned view · {DEMO}</Label>
-            </div>
+          <div className="cq-story-deck" data-gone={step >= 2 ? "" : undefined}>
+            <span aria-hidden>PDF</span>
+            <strong>deck_final_v7.pdf</strong>
           </div>
+        </div>
+      );
+    case "q-card":
+      // #48-49: the product's real Q Card page, demonstration company.
+      return (
+        <div className="cq-story-panel cq-story-card-panel">
+          <StoryQCard />
+          <Label>{DEMO} · a fictional company&apos;s Q Card</Label>
         </div>
       );
     case "split":
@@ -589,7 +585,7 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
               <i />
               <i />
             </span>
-            <p className="cq-story-type">
+            <p className="cq-story-type" key={step >= 2 ? "after" : "before"}>
               {step >= 2 ? "Minutes" : "Weeks · months · years"}
             </p>
           </div>
@@ -612,6 +608,16 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
   }
 }
 
+function visualKey({ visual, step, text }: StageState): string {
+  if (visual === "chips-mismatch") {
+    return `${visual}:${step > 4 ? "dock" : "centre"}`;
+  }
+  if (visual === "icons")
+    return `${visual}:${step >= 11 ? "channels" : "verbs"}`;
+  if (visual === "type") return `${visual}:${text ?? ""}`;
+  return visual;
+}
+
 export function StoryStage({
   stage,
   mood,
@@ -627,7 +633,9 @@ export function StoryStage({
           <p>{stage.fallback} did not open in time, so Q carries on here.</p>
         </div>
       ) : null}
-      <Visual stage={stage} />
+      {/* One element per visual and layout: a change of either mounts a new
+          block (an entrance), never moves the old one (CLS 0). */}
+      <Visual key={visualKey(stage)} stage={stage} />
     </div>
   );
 }

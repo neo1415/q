@@ -6,7 +6,7 @@
  *
  *   PEXELS_API=... NODE_USE_ENV_PROXY=1 node scripts/q-pitch/curate-story-pictures.mjs
  *
- * Writes apps/web/public/q-pitch/story/pictures/<n>.jpg and
+ * Writes apps/web/public/story-media/pictures/<n>.jpg and
  * packages/q-pitch/src/story/pictures.ts (number, file, alt, credit).
  */
 import { mkdir, writeFile } from "node:fs/promises";
@@ -48,7 +48,7 @@ const WANTED = [
   [20, "industrial factory exterior", "An established business"],
 ];
 
-const outDir = path.join(root, "apps/web/public/q-pitch/story/pictures");
+const outDir = path.join(root, "apps/web/public/story-media/pictures");
 await mkdir(outDir, { recursive: true });
 const used = new Set();
 const entries = [];
@@ -73,7 +73,7 @@ for (const [n, query, alt] of WANTED) {
   );
   entries.push({
     n,
-    file: `/q-pitch/story/pictures/${file}`,
+    file: `/story-media/pictures/${file}`,
     alt,
     photographer: photo.photographer,
     source: photo.url,

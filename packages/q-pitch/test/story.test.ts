@@ -120,7 +120,9 @@ describe("Q Story beat table", () => {
     const acts = STORY_BEATS.flatMap((b) => b.cues.map((c) => c.act));
     expect(
       acts.every((a) =>
-        ["mood", "stage", "navigate", "light", "unlight"].includes(a.kind),
+        ["mood", "stage", "navigate", "light", "unlight", "figure"].includes(
+          a.kind,
+        ),
       ),
     ).toBe(true);
     expect(beat(39).cues.map((c) => c.act)).toContainEqual({
@@ -253,7 +255,7 @@ describe("Q Story preload", () => {
     expect(manifest.audio).toHaveLength(56);
     expect(manifest.alignment).toHaveLength(56);
     expect(manifest.audio[0]).toBe(
-      "/q-pitch/story/cgSgspJ2msm6clMCkdW9/beat-01.mp3",
+      "/story-media/cgSgspJ2msm6clMCkdW9/beat-01.mp3",
     );
     expect(manifest.pictures).toHaveLength(STORY_PICTURES.length);
     expect(manifest.screens).toHaveLength(8);
@@ -272,7 +274,7 @@ describe("Q Story preload", () => {
     expect(STORY_PICTURES).toHaveLength(20);
     expect(MONTAGE_PICTURES).toHaveLength(12);
     for (const picture of STORY_PICTURES) {
-      expect(picture.file).toMatch(/^\/q-pitch\/story\/pictures\/\d{2}\.jpg$/u);
+      expect(picture.file).toMatch(/^\/story-media\/pictures\/\d{2}\.jpg$/u);
       expect(picture.photographer.length).toBeGreaterThan(0);
       expect(picture.source).toMatch(/^https:\/\/www\.pexels\.com\//u);
     }

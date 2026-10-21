@@ -125,6 +125,9 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   font-size: 0.75rem;
   opacity: 0.66;
 }
+[data-reserved] {
+  visibility: hidden;
+}
 .cq-story-credit {
   grid-column: 1 / -1;
   font-size: 0.6875rem;
@@ -569,57 +572,49 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   opacity: 0.08;
 }
 
-.cq-story-flip {
-  position: relative;
-  width: min(380px, 88vw);
-  aspect-ratio: 5 / 6;
-  perspective: 1200px;
-}
-.cq-story-deck,
-.cq-story-qcard {
-  position: absolute;
-  inset: 0;
+.cq-story-deck {
   display: grid;
   align-content: center;
   gap: 10px;
+  width: min(320px, 80vw);
+  aspect-ratio: 5 / 6;
   padding: 24px;
   border-radius: var(--cq-radius-xl);
   background: var(--cq-surface-raised);
   color: var(--cq-text-primary);
   box-shadow: var(--cq-shadow-overlay);
-  backface-visibility: hidden;
   transition:
     transform 700ms cubic-bezier(0.32, 0.72, 0, 1),
     opacity 500ms var(--cq-ease);
-  text-align: start;
 }
-.cq-story-qcard {
-  transform: rotateY(180deg);
-}
-.cq-story-flip[data-flipped] .cq-story-deck {
-  transform: translate3d(-120%, 0, 0) rotate(-8deg);
+.cq-story-deck[data-gone] {
+  transform: translate3d(-60vw, 0, 0) rotate(-8deg);
   opacity: 0;
 }
-.cq-story-flip[data-flipped] .cq-story-qcard {
-  transform: rotateY(0deg);
+/* The real Q Card page, in the app's own theme, scrolled by the light. */
+.cq-story-card-panel {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(78vh, 760px);
+  overflow: hidden;
+  background: var(--cq-canvas);
+  color: var(--cq-text-primary);
 }
-.cq-story-qcard ul {
-  display: grid;
-  gap: 6px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.cq-story-stage:is([data-mood="NIGHT"], [data-mood="HUSH"], [data-mood="STORY"])
+  .cq-story-card-panel {
+  background: var(--cq-canvas);
+  color: var(--cq-text-primary);
 }
-.cq-story-qcard li {
-  padding: 8px 10px;
+.cq-story-qcard-page {
+  max-height: calc(min(78vh, 760px) - 72px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.cq-story-qcard-page > div {
+  padding-bottom: 16px;
+}
+.cq-story-qcard-page [data-qp-lit] {
   border-radius: var(--cq-radius-md);
-  background: var(--cq-surface-subtle);
-  transition: box-shadow var(--cq-motion-base) var(--cq-ease);
 }
-.cq-story-qcard li[data-lit] {
-  box-shadow: 0 0 0 2px var(--cq-gold-mid);
-}
-
 .cq-story-split {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -693,12 +688,16 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
 /* ── Captions, controls, answers ─────────────────────────────────────── */
 .cq-story-captions {
   position: fixed;
-  left: 50%;
+  left: 16px;
+  right: 16px;
   bottom: calc(var(--cq-bottom-nav-height, 0px) + 96px);
   z-index: var(--cq-z-toast);
-  transform: translateX(-50%);
-  width: min(760px, calc(100vw - 32px));
-  max-height: 3.2em;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 3.2em;
+  margin: 0 auto;
+  max-width: 760px;
   overflow: hidden;
   pointer-events: none;
   text-align: center;
@@ -713,20 +712,22 @@ html[data-story="STORY"] .cq-story-captions {
   color: var(--cq-night-text);
   text-shadow: 0 1px 12px var(--cq-night-canvas);
 }
-/* Over a woken page, the caption carries its own quiet backing. */
-html:is([data-story="WAKE"], [data-story="DAY"]) .cq-story-captions {
-  width: auto;
-  max-width: min(760px, calc(100vw - 32px));
-  padding: 6px 14px;
+.cq-story-caption-line {
+  display: inline-block;
+  max-width: 100%;
+}
+/* Over a woken page, the line carries its own quiet backing. */
+html:is([data-story="WAKE"], [data-story="DAY"]) .cq-story-caption-line {
+  padding: 2px 14px;
   border-radius: var(--cq-radius-lg);
   background: color-mix(in oklch, var(--cq-surface-raised) 94%, transparent);
   box-shadow: var(--cq-shadow-sm);
   text-shadow: none;
-  max-height: none;
 }
 .cq-story-captions[data-top] {
   top: 80px;
   bottom: auto;
+  align-items: flex-start;
 }
 .cq-story-captions span {
   opacity: 0.55;

@@ -5,6 +5,7 @@ import {
   type StoryAct,
   type StoryAnchor,
   type StoryCue,
+  type StoryFigure,
   type StoryMood,
   type StoryRoute,
   type StoryVisual,
@@ -153,6 +154,11 @@ const stage = (visual: StoryVisual, step = 0, text?: string): StoryAct =>
 const go = (route: StoryRoute): StoryAct => ({ kind: "navigate", route });
 const light = (anchor: StoryAnchor): StoryAct => ({ kind: "light", anchor });
 const unlight: StoryAct = { kind: "unlight" };
+const figure = (name: StoryFigure, holdMs = 2_400): StoryAct => ({
+  kind: "figure",
+  figure: name,
+  holdMs,
+});
 
 const inputs: readonly BeatInput[] = [
   // ── Act 0: Hello ──────────────────────────────────────────────────────
@@ -188,6 +194,7 @@ const inputs: readonly BeatInput[] = [
     cues: [
       [0, mood("NIGHT")],
       ["11:47", stage("type", 1, "11:47 PM")],
+      ["11:47", figure("CLOCK", 3_000)],
     ],
   },
   {
@@ -202,7 +209,10 @@ const inputs: readonly BeatInput[] = [
     lines: ["Your inbox is full."],
     pace: "slow",
     delivery: "Quiet, a slight weight on 'full'.",
-    cues: [["inbox", stage("inbox", 0)]],
+    cues: [
+      ["inbox", stage("inbox", 0)],
+      ["inbox", figure("INBOX", 6_000)],
+    ],
   },
   {
     act: 1,
@@ -405,6 +415,7 @@ const inputs: readonly BeatInput[] = [
     cues: [
       [0, stage("chart-dip", 1)],
       ["down", stage("chart-dip", 2)],
+      ["down", figure("CHART_DIP", 3_000)],
     ],
   },
   {
@@ -457,10 +468,15 @@ const inputs: readonly BeatInput[] = [
     delivery: "Quick and rhythmic, one verb per beat, the grind.",
     cues: [
       ["search", stage("icons", 1)],
+      ["search", figure("MAGNIFIER", 900)],
       ["Pitch", stage("icons", 2)],
+      ["Pitch", figure("DOCUMENT", 900)],
       ["Fly", stage("icons", 3)],
+      ["Fly", figure("PLANE", 900)],
       ["Rewrite", stage("icons", 4)],
+      ["Rewrite", figure("PEN", 900)],
       ["Follow", stage("icons", 5)],
+      ["Follow", figure("ENVELOPE", 1_500)],
     ],
   },
   {
@@ -506,6 +522,7 @@ const inputs: readonly BeatInput[] = [
     cues: [
       [0, mood("DAY")],
       ["follow", stage("bubbles", 1)],
+      ["follow", figure("ENVELOPE", 3_000)],
       ["Again", stage("bubbles", 2)],
     ],
   },
@@ -852,7 +869,8 @@ const inputs: readonly BeatInput[] = [
     ],
     cues: [
       ["“Send", stage("deck-to-card", 1)],
-      ["Card?”", stage("deck-to-card", 2)],
+      ["They", stage("deck-to-card", 2)],
+      ["Card?”", stage("q-card", 1)],
     ],
   },
   {
@@ -863,12 +881,14 @@ const inputs: readonly BeatInput[] = [
     pace: "normal",
     delivery: "Rhythmic noun list, warm and even.",
     cues: [
-      [0, stage("q-card", 0)],
-      ["story,", stage("q-card", 1)],
-      ["numbers,", stage("q-card", 2)],
-      ["raise,", stage("q-card", 3)],
-      ["intelligence,", stage("q-card", 4)],
-      ["relationships.", stage("q-card", 5)],
+      // The real card's own parts (the company card has these today; a
+      // richer card is the owner's call, coordinator 21 Oct).
+      ["identity", light("qs.card.identity")],
+      ["story,", light("qs.card.about")],
+      ["numbers,", light("qs.card.more")],
+      ["raise,", light("qs.card.identity")],
+      ["intelligence,", light("qs.card.verified")],
+      ["relationships.", light("qs.card.actions")],
     ],
   },
   {
@@ -876,7 +896,10 @@ const inputs: readonly BeatInput[] = [
     lines: ["One platform.", "Both sides."],
     pace: "slow",
     delivery: "Two calm, confident beats.",
-    cues: [["Both", stage("split", 1)]],
+    cues: [
+      [0, { kind: "unlight" }],
+      ["Both", stage("split", 1)],
+    ],
   },
   {
     act: 6,
@@ -958,6 +981,7 @@ const inputs: readonly BeatInput[] = [
       ["What", stage("none")],
       ["HOME)", go("home")],
       ["HOME)", mood("WAKE")],
+      ["HOME)", figure("HOUSE", 4_000)],
     ],
   },
   {
@@ -966,7 +990,10 @@ const inputs: readonly BeatInput[] = [
     pace: "slow",
     delivery: "Warm, simple, personal.",
     tags: [[0, "[warmly]"]],
-    cues: [[0, stage("aperture", 2)]],
+    cues: [
+      [0, stage("aperture", 2)],
+      [0, figure("LETTER_Q", 3_000)],
+    ],
   },
   {
     act: 6,

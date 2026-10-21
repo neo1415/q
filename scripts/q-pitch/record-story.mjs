@@ -9,7 +9,7 @@
  *                            frames, CLS, fallbacks, preload time
  *
  * Also captures the talking-speed montage's screenshots (#51) into
- * apps/web/public/q-pitch/story/screens/ with --screens.
+ * apps/web/public/story-media/screens/ with --screens.
  *
  *   node scripts/q-pitch/record-story.mjs --base http://127.0.0.1:3200
  *     [--screens] [--frames] [--full] [--path /dev/story]
@@ -19,7 +19,7 @@
  * signed-in storage state (--state file) to record the real app.
  */
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -58,7 +58,30 @@ const CLS_SCRIPT = () => {
       for (const entry of list.getEntries()) {
         if (entry.hadRecentInput) continue;
         window.__cls += entry.value;
+        const describe = (node) => {
+          if (!(node instanceof window.Element)) return node?.nodeName ?? "?";
+          const cls =
+            typeof node.className === "string"
+              ? node.className.split(/\s+/u).slice(0, 2).join(".")
+              : "";
+          const data = [...node.attributes]
+            .filter(
+              (a) =>
+                a.name.startsWith("data-") ||
+                a.name === "id" ||
+                a.name === "aria-label",
+            )
+            .slice(0, 2)
+            .map(
+              (a) => `[${a.name}${a.value ? `=${a.value.slice(0, 30)}` : ""}]`,
+            )
+            .join("");
+          return `${node.tagName.toLowerCase()}${cls ? `.${cls}` : ""}${data}`;
+        };
         window.__shifts.push({
+          sources: (entry.sources ?? [])
+            .slice(0, 3)
+            .map((source) => describe(source.node)),
           value: entry.value,
           at: Math.round(entry.startTime),
           path: window.location.pathname + window.location.search,
@@ -81,33 +104,6 @@ async function open(viewport, colorScheme, recordVideo) {
       : {}),
   });
   await context.addInitScript(CLS_SCRIPT);
-  if (state === undefined) {
-    // Signed out (the harness): the app's session proxy guards /q-pitch/*,
-    // so the story's static files are answered from disk here, as the
-    // Discover harness's media is. A signed-in run loads them as usual.
-    await context.route("**/q-pitch/story/**", async (route) => {
-      const url = new URL(route.request().url());
-      const file = path.join(
-        root,
-        "apps/web/public",
-        decodeURIComponent(url.pathname),
-      );
-      if (!file.startsWith(path.join(root, "apps/web/public/q-pitch/story/"))) {
-        return route.abort();
-      }
-      try {
-        const body = await readFile(file);
-        const type = file.endsWith(".json")
-          ? "application/json"
-          : file.endsWith(".mp3")
-            ? "audio/mpeg"
-            : "image/jpeg";
-        return route.fulfill({ status: 200, body, contentType: type });
-      } catch {
-        return route.fulfill({ status: 404, body: "" });
-      }
-    });
-  }
   const page = await context.newPage();
   return { context, page };
 }
@@ -186,7 +182,7 @@ async function frames(viewport, colorScheme, beats, label) {
 
 if (flag("screens")) {
   // #51: one still per word, of the real page components (harness data).
-  const dir = path.join(root, "apps/web/public/q-pitch/story/screens");
+  const dir = path.join(root, "apps/web/public/story-media/screens");
   await mkdir(dir, { recursive: true });
   const shots = [
     ["discovery", "/dev/discover"],

@@ -10,7 +10,13 @@ import type { StoryRoute } from "./acts.js";
  * it is in memory; nothing is fetched from the database and no model is
  * called while the story plays.
  */
-export const STORY_ASSET_ROOT = "/q-pitch/story" as const;
+/**
+ * Static and public: marketing narration and credited stock pictures,
+ * nothing private. Kept outside `/q-pitch/*`, which the session proxy
+ * guards, so a signed-out page (a future landing) can play the story too
+ * (coordinator, 21 Oct).
+ */
+export const STORY_ASSET_ROOT = "/story-media" as const;
 
 /** Voice folders are ElevenLabs voice ids (or "fixture"), nothing else. */
 export const STORY_VOICE_ID = /^[A-Za-z0-9]{8,40}$/u;

@@ -256,3 +256,12 @@ describe("Q Story pages", () => {
     );
   });
 });
+
+describe("Q Story presence figures (lane S4)", () => {
+  it("names only figures Q's presence can form", async () => {
+    const { PRESENCE_FIGURE_IDS } =
+      await import("@/features/q-swarm/presence-cue");
+    const { STORY_FIGURES } = await import("@capital-q/q-pitch");
+    expect([...STORY_FIGURES].sort()).toEqual([...PRESENCE_FIGURE_IDS].sort());
+  });
+});

@@ -3,7 +3,7 @@
  * Q Story pre-render (plan 2026-10-21 §1, Narrator): every beat, rendered
  * once with ElevenLabs text-to-speech WITH TIMESTAMPS, stored as static
  * audio plus word alignment under
- * apps/web/public/q-pitch/story/<voiceId>/beat-NN.{mp3,json} and an
+ * apps/web/public/story-media/<voiceId>/beat-NN.{mp3,json} and an
  * index.json the web host reads to know the render exists.
  *
  * The words are the sealed beat table's (packages/q-pitch/src/story), with
@@ -94,7 +94,7 @@ if (key === undefined || key.startsWith("disabled")) {
   process.exit(1);
 }
 
-const outDir = path.join(root, "apps/web/public/q-pitch/story", voice);
+const outDir = path.join(root, "apps/web/public/story-media", voice);
 await mkdir(outDir, { recursive: true });
 const indexPath = path.join(outDir, "index.json");
 const previous = await readFile(indexPath, "utf8")

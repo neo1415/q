@@ -38,11 +38,8 @@ import { setTypedInterceptor } from "@/features/q/typed-intercept";
 
 import type { TourSubject } from "./subject-model";
 import {
-  abortableWait,
-  readingMs,
-  spokenPart,
+  answerAloud,
   setNarrationVoice,
-  standardVoiceLine,
   standardVoicePlaying,
 } from "./narrator";
 import { RESUME_KEY } from "./resume";
@@ -170,21 +167,6 @@ const HALTED: ReadonlySet<string> = new Set([
   "INTERRUPTED",
   "COMPLETE",
 ]);
-
-/** A bank answer in Q's standard voice, or its reading time without one. */
-export async function answerAloud(
-  text: string,
-  signal: AbortSignal,
-): Promise<void> {
-  const started = Date.now();
-  const spoken = await standardVoiceLine(
-    spokenPart(text),
-    "FEMALE",
-    signal,
-  ).catch(() => false);
-  if (!spoken)
-    await abortableWait(readingMs(text) - (Date.now() - started), signal);
-}
 
 /** How long "Tour complete" shows before normal Q takes over. */
 const HANDOVER_MS = 4_000;

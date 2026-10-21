@@ -66,6 +66,18 @@ export const STORY_ANCHORS: Readonly<Record<string, AnchorPlacement>> = {
   "qs.gateq.gate": { select: 'section[aria-labelledby="gq2-strict"]' },
   "qs.gateq.link": { select: 'section[aria-labelledby="gq2-link"]' },
   "qs.gateq.inbox": { select: ".gq2-list" },
+  // #48-49 The real Q Card, on the stage (story-qcard.tsx).
+  "qs.card.identity": { select: "[data-story-qcard] [data-q-card]" },
+  "qs.card.about": {
+    select: '[data-story-qcard] [data-card-section="about"]',
+  },
+  "qs.card.more": { select: '[data-story-qcard] [data-card-section="more"]' },
+  "qs.card.verified": {
+    select: "[data-story-qcard] [data-demo-attestation]",
+  },
+  "qs.card.actions": {
+    select: '[data-story-qcard] section[aria-label="Actions"]',
+  },
 };
 
 /** The fictional demo records the story opens (the v6 track's own). */

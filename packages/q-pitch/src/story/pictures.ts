@@ -15,14 +15,14 @@ export type StoryPicture = {
 export const STORY_PICTURES: readonly StoryPicture[] = [
   {
     n: 1,
-    file: "/q-pitch/story/pictures/01.jpg",
+    file: "/story-media/pictures/01.jpg",
     alt: "Markets",
     photographer: "Pixabay",
     source: "https://www.pexels.com/photo/numbers-on-monitor-534216/",
   },
   {
     n: 2,
-    file: "/q-pitch/story/pictures/02.jpg",
+    file: "/story-media/pictures/02.jpg",
     alt: "A factory floor",
     photographer: "EqualStock IN",
     source:
@@ -30,7 +30,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 3,
-    file: "/q-pitch/story/pictures/03.jpg",
+    file: "/story-media/pictures/03.jpg",
     alt: "A laboratory",
     photographer: "Artem Podrez",
     source:
@@ -38,7 +38,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 4,
-    file: "/q-pitch/story/pictures/04.jpg",
+    file: "/story-media/pictures/04.jpg",
     alt: "A farm",
     photographer: "Mwesigwa Joel",
     source:
@@ -46,7 +46,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 5,
-    file: "/q-pitch/story/pictures/05.jpg",
+    file: "/story-media/pictures/05.jpg",
     alt: "A city",
     photographer: "Luis Quintero",
     source:
@@ -54,7 +54,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 6,
-    file: "/q-pitch/story/pictures/06.jpg",
+    file: "/story-media/pictures/06.jpg",
     alt: "A studio",
     photographer: "Ron Lach",
     source:
@@ -62,7 +62,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 7,
-    file: "/q-pitch/story/pictures/07.jpg",
+    file: "/story-media/pictures/07.jpg",
     alt: "A port",
     photographer: "Oleksiy",
     source:
@@ -70,14 +70,14 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 8,
-    file: "/q-pitch/story/pictures/08.jpg",
+    file: "/story-media/pictures/08.jpg",
     alt: "Solar energy",
     photographer: "Tom Fisk",
     source: "https://www.pexels.com/photo/directly-above-solar-farm-9893731/",
   },
   {
     n: 9,
-    file: "/q-pitch/story/pictures/09.jpg",
+    file: "/story-media/pictures/09.jpg",
     alt: "A shop",
     photographer: "Demetra Ioannidou",
     source:
@@ -85,7 +85,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 10,
-    file: "/q-pitch/story/pictures/10.jpg",
+    file: "/story-media/pictures/10.jpg",
     alt: "A clinic",
     photographer: "https://kaboompics.com/",
     source:
@@ -93,7 +93,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 11,
-    file: "/q-pitch/story/pictures/11.jpg",
+    file: "/story-media/pictures/11.jpg",
     alt: "A software team",
     photographer: "cottonbro studio",
     source:
@@ -101,7 +101,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 12,
-    file: "/q-pitch/story/pictures/12.jpg",
+    file: "/story-media/pictures/12.jpg",
     alt: "A market",
     photographer: "Quý Nguyễn",
     source:
@@ -109,7 +109,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 13,
-    file: "/q-pitch/story/pictures/13.jpg",
+    file: "/story-media/pictures/13.jpg",
     alt: "A desk at night",
     photographer: "Julien Bachelet",
     source:
@@ -117,7 +117,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 14,
-    file: "/q-pitch/story/pictures/14.jpg",
+    file: "/story-media/pictures/14.jpg",
     alt: "Years of building",
     photographer: "Alax Matias",
     source:
@@ -125,7 +125,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 15,
-    file: "/q-pitch/story/pictures/15.jpg",
+    file: "/story-media/pictures/15.jpg",
     alt: "Their own money in",
     photographer: "https://kaboompics.com/",
     source:
@@ -133,7 +133,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 16,
-    file: "/q-pitch/story/pictures/16.jpg",
+    file: "/story-media/pictures/16.jpg",
     alt: "Payroll day",
     photographer: "Tima Miroshnichenko",
     source:
@@ -141,14 +141,14 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 17,
-    file: "/q-pitch/story/pictures/17.jpg",
+    file: "/story-media/pictures/17.jpg",
     alt: "A first customer",
     photographer: "cottonbro studio",
     source: "https://www.pexels.com/photo/two-men-shaking-hands-6127092/",
   },
   {
     n: 18,
-    file: "/q-pitch/story/pictures/18.jpg",
+    file: "/story-media/pictures/18.jpg",
     alt: "Logistics",
     photographer: "Tiger Lily",
     source:
@@ -156,7 +156,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 19,
-    file: "/q-pitch/story/pictures/19.jpg",
+    file: "/story-media/pictures/19.jpg",
     alt: "Retail",
     photographer: "Andrew Patrick Photo",
     source:
@@ -164,7 +164,7 @@ export const STORY_PICTURES: readonly StoryPicture[] = [
   },
   {
     n: 20,
-    file: "/q-pitch/story/pictures/20.jpg",
+    file: "/story-media/pictures/20.jpg",
     alt: "An established business",
     photographer: "女子 正真",
     source:

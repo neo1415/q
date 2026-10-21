@@ -84,6 +84,31 @@ export const STORY_MOODS = ["STORY", "NIGHT", "DAY", "HUSH", "WAKE"] as const;
 export const StoryMoodSchema = z.enum(STORY_MOODS);
 export type StoryMood = z.infer<typeof StoryMoodSchema>;
 
+/**
+ * The figures Q's presence can form (lane S4, `presence.form`): the same
+ * ids as the web's PRESENCE_FIGURE_IDS (a web test keeps them equal).
+ */
+export const STORY_FIGURES = [
+  "CLOCK",
+  "INBOX",
+  "MAGNIFIER",
+  "PLANE",
+  "ENVELOPE",
+  "PEN",
+  "CHART_DIP",
+  "CHART_BARS",
+  "SCALE",
+  "HOUSE",
+  "CALENDAR",
+  "MAP_PIN",
+  "COMPARE",
+  "DOCUMENT",
+  "HANDSHAKE",
+  "LETTER_Q",
+] as const;
+export const StoryFigureSchema = z.enum(STORY_FIGURES);
+export type StoryFigure = z.infer<typeof StoryFigureSchema>;
+
 export const StoryActSchema = z.discriminatedUnion("kind", [
   /** Scrim and chrome: story mode, night, day, the hush before "silence", the app waking. */
   z.object({ kind: z.literal("mood"), mood: StoryMoodSchema }).strict(),
@@ -102,6 +127,14 @@ export const StoryActSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("light"), anchor: StoryAnchorSchema }).strict(),
   /** Nothing lit. */
   z.object({ kind: z.literal("unlight") }).strict(),
+  /** Q's presence forms a figure and holds it (S4), then flows back. */
+  z
+    .object({
+      kind: z.literal("figure"),
+      figure: StoryFigureSchema,
+      holdMs: z.number().int().min(600).max(15_000),
+    })
+    .strict(),
 ]);
 export type StoryAct = z.infer<typeof StoryActSchema>;
 

@@ -31,11 +31,11 @@ import {
   type QSessionValue,
 } from "@/features/q/q-session";
 import { setTypedInterceptor } from "@/features/q/typed-intercept";
+import { presence } from "@/features/q-swarm/presence-cue";
 import { isLineLive } from "@/features/voice/session";
 
-import { setNarrationVoice } from "../narrator";
+import { answerAloud, setNarrationVoice } from "../narrator";
 import { lightSection, placeAnchors, unlightAll } from "../section-light";
-import { answerAloud } from "../tour-host";
 import { openTourVoice } from "../tour-voice";
 import {
   liveNarrator,
@@ -262,8 +262,14 @@ export function StoryHost({
                 });
                 await frame();
                 return true;
-              case "navigate":
-                return navigate(act, signal);
+              case "navigate": {
+                const landed = await navigate(act, signal);
+                // A page that did land clears an earlier fallback note.
+                if (landed && stage.get().fallback !== null) {
+                  stage.set(EMPTY_STAGE);
+                }
+                return landed;
+              }
               case "light":
                 return lightSection(
                   act.anchor,
@@ -273,6 +279,10 @@ export function StoryHost({
                 );
               case "unlight":
                 unlightAll();
+                return true;
+              case "figure":
+                // Lane S4: every legible Q presence forms the figure.
+                presence.form(act.figure, { holdMs: act.holdMs });
                 return true;
             }
           },
@@ -582,19 +592,27 @@ function StoryOverlay({
         aria-hidden
       />
       {captions && !done && word >= 0 ? (
+        // A fixed two-line box, keyed by its place: a new line or a move
+        // above a lit section is a new element, never a shifted one (CLS 0).
         <p
+          key={captionsTop ? "top" : "bottom"}
           className="cq-story-captions"
           data-top={captionsTop ? "" : undefined}
           aria-live="off"
         >
-          {line.words.map((text, i) => (
-            <span
-              key={`${String(beat.n)}-${String(line.start + i)}`}
-              data-said={line.start + i <= word ? "" : undefined}
-            >
-              {text}{" "}
-            </span>
-          ))}
+          <span
+            className="cq-story-caption-line"
+            key={`${String(beat.n)}-${String(line.start)}`}
+          >
+            {line.words.map((text, i) => (
+              <span
+                key={`${String(beat.n)}-${String(line.start + i)}`}
+                data-said={line.start + i <= word ? "" : undefined}
+              >
+                {text}{" "}
+              </span>
+            ))}
+          </span>
         </p>
       ) : null}
       {answer !== null ? (
