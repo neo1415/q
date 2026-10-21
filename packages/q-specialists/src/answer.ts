@@ -4962,6 +4962,13 @@ export function createSpecialistQAnswer(
         request.runId,
         64,
       ));
+    // Row 5: the delegate's own prompt takes the same read, not a third one.
+    const delegated = (asked: QAnswerRequest): Promise<QAnswerOutcome> =>
+      delegate.answer(
+        withReferences(
+          route.history === undefined ? asked : { ...asked, history },
+        ),
+      );
     const conversationId = history[0]?.conversationId;
     const latest = [...history].reverse().find((m) => m.role === "USER");
     if (conversationId === undefined || latest === undefined) {
@@ -4986,13 +4993,13 @@ export function createSpecialistQAnswer(
       route.ownRecords === true ||
       !specialist.supports(probe)
     ) {
-      return delegate.answer(withReferences(request));
+      return delegated(request);
     }
     const company = request.subjects.find(
       (subject) => subject.kind === "COMPANY",
     );
     if (company === undefined || company.kind !== "COMPANY") {
-      return delegate.answer(withReferences(request));
+      return delegated(request);
     }
     // Lane S 2026-10-15 (audit, run 941eac44: Maji Loop on screen, "What
     // does Spheros actually do?" answered about Maji Loop): the words name
@@ -5009,9 +5016,7 @@ export function createSpecialistQAnswer(
         { qRunId: request.runId },
         "q named counterpart differs from the company in focus",
       );
-      return delegate.answer(
-        withReferences({ ...request, aboutNamedOther: true }),
-      );
+      return delegated({ ...request, aboutNamedOther: true });
     }
 
     last = null;

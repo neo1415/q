@@ -222,7 +222,14 @@ function writeEnvFile(stack) {
     : "";
   const valueOf = (key) => {
     const match = new RegExp(`^${key}=(.*)$`, "m").exec(devEnv);
-    return process.env[key] ?? (match === null ? undefined : match[1].trim());
+    const value =
+      process.env[key] ?? (match === null ? undefined : match[1].trim());
+    // Owner decision: ELEVEN_LABS_API_KEY is accepted too; the canonical
+    // name wins (same rule as @capital-q/config resolveElevenLabsApiKey).
+    if (key === "ELEVENLABS_API_KEY" && (value === undefined || value === "")) {
+      return valueOf("ELEVEN_LABS_API_KEY");
+    }
+    return value;
   };
 
   const lines = [

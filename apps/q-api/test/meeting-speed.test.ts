@@ -657,3 +657,69 @@ describe("the real composer streams the turn through the gateway", () => {
     expect(seen).toEqual([{ firstAttemptTimeoutMs: 2_500, streamed: true }]);
   });
 });
+
+describe("after a restart the snapshot is rebuilt alongside the opening reads (A6)", () => {
+  it("starts the snapshot before the booking read comes back", async () => {
+    const order: string[] = [];
+    let releaseContext: () => void = () => undefined;
+    const contextGate = new Promise<void>((done) => {
+      releaseContext = done;
+    });
+    const runtime = createMeetingHostRuntime({
+      enabled: true,
+      publicBase: "https://q-api.example",
+      secret: SECRET,
+      store: {
+        context: async () => {
+          order.push("context:start");
+          await contextGate;
+          order.push("context:end");
+          return {
+            ...CONTEXT,
+            botId: BOT,
+            tenantId: "t-1",
+            organiserUserId: "u-i",
+            declined: false,
+          };
+        },
+        snapshotContext: () => {
+          order.push("snapshot:start");
+          return Promise.resolve(null);
+        },
+        roster: () => Promise.resolve(),
+        removedBy: () => Promise.resolve(),
+        note: () => Promise.resolve(),
+      },
+      snapshots: () => Promise.reject(new Error("not reached")),
+      composer: {
+        turn: () =>
+          Promise.resolve({
+            kind: "ANSWER",
+            line: "Fine.",
+            proposal: null,
+            guest: null,
+          }),
+      },
+      voice: {
+        speak: () => Promise.resolve(new Uint8Array([1])),
+        play: () => Promise.resolve(),
+        leave: () => Promise.resolve(),
+      },
+      now: () => START,
+      tickEveryMs: null,
+      leaveDelayMs: 0,
+    });
+    const received = runtime.receive(
+      MEETING,
+      recall("participant_events.join", ADA),
+    );
+    await new Promise((done) => setImmediate(done));
+    expect(order).toContain("snapshot:start");
+    expect(order).not.toContain("context:end");
+    releaseContext();
+    await received;
+    expect(order.indexOf("snapshot:start")).toBeLessThan(
+      order.indexOf("context:end"),
+    );
+  });
+});
