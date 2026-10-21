@@ -369,6 +369,53 @@ export function withConversationFindings<
   };
 }
 
+type FindingLike = NonNullable<AnalystResultLike["findings"]>[number];
+
+/**
+ * One finding as the person sees it, from the model's own reading of it.
+ * The same for a finding shown while the answer streams and for the
+ * completed message, so the two never differ. Null for an empty one.
+ */
+export function findingBlockOf(
+  finding: FindingLike,
+  subjects: readonly QSubjectRef[],
+  findingId: string,
+): Extract<QResultBlock, { kind: "FINDING" }> | null {
+  const statement = finding.statement.trim();
+  if (statement.length === 0) return null;
+  return {
+    kind: "FINDING",
+    finding: {
+      findingId: QFindingIdSchema.parse(findingId),
+      // An unrecognised type is an observation, not a guess at a
+      // stronger one: reading a model's label as RISK when the contract
+      // does not know it would be inventing severity.
+      type: (FINDING_TYPES.has(finding.type ?? "")
+        ? finding.type
+        : "OBSERVATION") as QFindingType,
+      statement,
+      confidence: (CONFIDENCE_LEVELS.has(finding.confidence ?? "")
+        ? finding.confidence
+        : "MODERATE") as QConfidenceLevel,
+      // The model's own reading of what kind of claim this is, passed
+      // through rather than re-decided here. An unrecognised value
+      // becomes the weakest honest one: a claim whose standing we
+      // cannot read is a user claim with no evidence, never a fact.
+      truthClass: (TRUTH_CLASSES.has(finding.truthClass ?? "")
+        ? finding.truthClass
+        : "USER_CLAIM") as TruthClass,
+      evidenceStatus: (EVIDENCE_STATUSES.has(finding.evidenceStatus ?? "")
+        ? finding.evidenceStatus
+        : "SELF_REPORTED") as EvidenceStatus,
+      // Deliberately empty. The finding's supporting evidence is real
+      // and its identifiers are not the browser's to hold.
+      evidenceRefs: [],
+      // What the run was authorised about, never what the model named.
+      subjects: [...subjects],
+    },
+  };
+}
+
 export function analystResultBlocks(input: {
   readonly result: AnalystResultLike;
   readonly subjects: readonly QSubjectRef[];
@@ -377,8 +424,13 @@ export function analystResultBlocks(input: {
   /** E3: blocks the contract refused, for the caller to log. */
   readonly onDropped?:
     ((dropped: readonly QResultBlockDrop[]) => void) | undefined;
-  /** Overridable so a test can pin the ids it asserts on. */
-  readonly findingId?: ((index: number) => string) | undefined;
+  /**
+   * A finding's id, by its place and its statement: a finding already
+   * shown while the answer streamed keeps the id it was shown under
+   * (`q.finding.available`). Overridable so a test can pin its ids.
+   */
+  readonly findingId?:
+    ((index: number, statement: string) => string) | undefined;
   /** The person's question: a summary asked for is laid out as one (L-14). */
   readonly question?: string | undefined;
 }): QResultBlock[] | undefined {
@@ -409,39 +461,12 @@ export function analystResultBlocks(input: {
   for (const [index, finding] of withoutContradictedGaps(
     input.result.findings ?? [],
   ).entries()) {
-    const statement = finding.statement.trim();
-    if (statement.length === 0) continue;
-    blocks.push({
-      kind: "FINDING",
-      finding: {
-        findingId: QFindingIdSchema.parse(idFor(index)),
-        // An unrecognised type is an observation, not a guess at a
-        // stronger one: reading a model's label as RISK when the contract
-        // does not know it would be inventing severity.
-        type: (FINDING_TYPES.has(finding.type ?? "")
-          ? finding.type
-          : "OBSERVATION") as QFindingType,
-        statement,
-        confidence: (CONFIDENCE_LEVELS.has(finding.confidence ?? "")
-          ? finding.confidence
-          : "MODERATE") as QConfidenceLevel,
-        // The model's own reading of what kind of claim this is, passed
-        // through rather than re-decided here. An unrecognised value
-        // becomes the weakest honest one: a claim whose standing we
-        // cannot read is a user claim with no evidence, never a fact.
-        truthClass: (TRUTH_CLASSES.has(finding.truthClass ?? "")
-          ? finding.truthClass
-          : "USER_CLAIM") as TruthClass,
-        evidenceStatus: (EVIDENCE_STATUSES.has(finding.evidenceStatus ?? "")
-          ? finding.evidenceStatus
-          : "SELF_REPORTED") as EvidenceStatus,
-        // Deliberately empty. The finding's supporting evidence is real
-        // and its identifiers are not the browser's to hold.
-        evidenceRefs: [],
-        // What the run was authorised about, never what the model named.
-        subjects: [...input.subjects],
-      },
-    });
+    const block = findingBlockOf(
+      finding,
+      input.subjects,
+      idFor(index, finding.statement),
+    );
+    if (block !== null) blocks.push(block);
   }
 
   // What the supplied context did not establish, and what conflicts in it.

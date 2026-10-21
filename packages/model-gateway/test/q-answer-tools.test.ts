@@ -184,6 +184,8 @@ function build(options: {
   ];
   const stages: string[] = [];
   const completed: unknown[] = [];
+  /** Live findings, and how many completed messages preceded each. */
+  const live: { payload: unknown; before: number }[] = [];
   const repositories = {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
@@ -219,6 +221,9 @@ function build(options: {
       ) => {
         if (input.eventType === "q.message.completed") {
           completed.push(input.payload);
+        }
+        if (input.eventType === "q.finding.available") {
+          live.push({ payload: input.payload, before: completed.length });
         }
         if (input.visibleStage !== null) {
           stages.push(input.visibleStage);
@@ -259,7 +264,7 @@ function build(options: {
     retrieval: { kind: "NOT_CONFIGURED" },
     plan: plan(),
   };
-  return { seam, alpha, messages, stages, logLines, request, completed };
+  return { seam, alpha, messages, stages, logLines, request, completed, live };
 }
 
 const call = (
@@ -1376,6 +1381,73 @@ describe("answer seam tool loop", () => {
       expect(messages.at(-1)?.content).toBe("Seed stage, by its own account.");
     },
   );
+
+  it("shows each finding as it is written, under the id the message keeps (round 5, lane 3)", async () => {
+    const finding = (statement: string, type: string) => ({
+      type,
+      statement,
+      truthClass: "USER_CLAIM",
+      evidenceStatus: "SELF_REPORTED",
+      confidence: "MODERATE",
+      basis: ["F1"],
+    });
+    const { seam, request, live, completed } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Northwind declares a seed stage."),
+            findings: [
+              finding("Revenue grew 40% last year.", "FACT"),
+              finding("Runway is not stated.", "RISK"),
+            ],
+          },
+        },
+      ],
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    // Both shown live, before the completed message.
+    expect(live).toHaveLength(2);
+    expect(live.every((one) => one.before === 0)).toBe(true);
+    const liveFindings = live.map(
+      (one) =>
+        (one.payload as { finding: { findingId: string; statement: string } })
+          .finding,
+    );
+    expect(liveFindings.map((f) => f.statement)).toEqual([
+      "Revenue grew 40% last year.",
+      "Runway is not stated.",
+    ]);
+    // The completed message's FINDING blocks carry the same ids.
+    const blocks =
+      (
+        completed[0] as {
+          message: {
+            blocks?: { kind: string; finding?: { findingId: string } }[];
+          };
+        }
+      ).message.blocks ?? [];
+    const finalIds = blocks
+      .filter((block) => block.kind === "FINDING")
+      .map((block) => block.finding?.findingId);
+    expect(finalIds).toEqual(liveFindings.map((f) => f.findingId));
+  });
+
+  it("never shows an invalid finding early; the message stays authoritative", async () => {
+    const { seam, request, live } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Answer."),
+            findings: [{ statement: "No type or labels." }],
+          },
+        },
+      ],
+    });
+    await seam.answer(request);
+    expect(live).toHaveLength(0);
+  });
 
   it("repairs a non-JSON text answer with a final structured call", async () => {
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));

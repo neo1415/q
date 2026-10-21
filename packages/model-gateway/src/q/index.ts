@@ -94,6 +94,7 @@ import {
   statesSomething,
   fenceUntrusted,
   dailyFollowUpKind,
+  ModelFindingSchema,
 } from "@capital-q/q-core";
 import { conversationContextOf } from "./conversation-context.js";
 import {
@@ -117,6 +118,7 @@ import {
 
 import { isModelGatewayError } from "../errors.js";
 import { createPartialAnswerReader } from "../policy/partial-answer.js";
+import { createPartialFindingsReader } from "../policy/partial-findings.js";
 import type { ModelGateway, ModelGatewayExecuteOptions } from "../gateway.js";
 import { acceptStructuredOutput } from "../policy/structured.js";
 import { withoutActionTalk, withoutStatusTalk } from "./action-talk.js";
@@ -311,6 +313,7 @@ import {
 import {
   analystResultBlocks,
   askedSubjects,
+  findingBlockOf,
   namesReadByRun,
   ownInvestorOrganisationIn,
   pictureBlock,
@@ -2102,6 +2105,28 @@ export function createModelGatewayQAnswer(
   let last: QAnswerObservation | undefined;
 
   /** Approved progress only; best effort, never a reason to fail the answer. */
+  /** A finding the answer finished, shown before the whole answer is. */
+  async function showFinding(
+    request: QAnswerRequest,
+    finding: Extract<QResultBlock, { kind: "FINDING" }>["finding"],
+  ): Promise<void> {
+    try {
+      const run = { id: request.runId, tenantId: request.tenantId };
+      const input = { type: "q.finding.available", data: { finding } } as const;
+      const done = await appendRunEventAtomic(repositories, sql, run, input);
+      if (done === "UNSUPPORTED") {
+        await transactions.run((tx) =>
+          appendRunEvent(repositories, tx, run, input),
+        );
+      }
+    } catch (error: unknown) {
+      logger?.warn(
+        { err: error, qRunId: request.runId },
+        "q live finding not recorded",
+      );
+    }
+  }
+
   async function showStage(
     request: QAnswerRequest,
     stage: QVisibleStage,
@@ -4311,6 +4336,41 @@ export function createModelGatewayQAnswer(
        * durable form and the one that decides what was said.
        */
       const partial = createPartialAnswerReader();
+      /**
+       * Progressive findings (round 5, with lane 3): each finding the
+       * answer finishes is shown at once as `q.finding.available`, under
+       * the id the completed message's FINDING block then carries. It is
+       * the same block the message builds (`findingBlockOf`, the same
+       * schema); the completed message stays authoritative and its
+       * set-wide checks only remove or merge. Keyed by statement, since an
+       * invalid item dropped from the final list shifts every place.
+       */
+      const liveFindings = createPartialFindingsReader();
+      const liveFindingIds = new Map<string, string>();
+      const findingKey = (statement: string): string =>
+        statement.trim().replace(/\s+/gu, " ").toLowerCase();
+      const showLive = (raw: unknown): void => {
+        const parsed = ModelFindingSchema.safeParse(raw);
+        if (!parsed.success) return;
+        const key = findingKey(parsed.data.statement);
+        if (liveFindingIds.has(key)) return;
+        const id = randomUUID();
+        const block = findingBlockOf(
+          parsed.data,
+          // A named other's subjects are settled with the message.
+          request.aboutNamedOther === true
+            ? []
+            : askedSubjects(request.subjects, plan),
+          id,
+        );
+        if (block === null) return;
+        liveFindingIds.set(key, id);
+        stages.queue = stages.queue.then(() =>
+          gate === null
+            ? showFinding(request, block.finding)
+            : gate.emit(() => showFinding(request, block.finding)),
+        );
+      };
       const cutter = createSentenceCutter();
       let streamedText = "";
       let seenText = "";
@@ -4489,6 +4549,7 @@ export function createModelGatewayQAnswer(
       };
       const onTextDelta = (fragment: string): void => {
         seenText += fragment;
+        for (const raw of liveFindings.push(seenText)) showLive(raw);
         const fresh = partial.push(seenText);
         if (fresh.length > 0) {
           seenAnswer += fresh;
@@ -4689,6 +4750,9 @@ export function createModelGatewayQAnswer(
         }
         // Nothing of a speculative answer is stored until it is adopted.
         if (gate !== null) await gate.ready();
+        // The stages and live findings already queued are stored first, so
+        // the completed message is the last word (lane 3 reconciles on it).
+        await stages.queue;
         return transactions.run(async (tx) => {
           const stored = await repositories.messages.insert(tx, {
             id: messageId,
@@ -6639,6 +6703,9 @@ export function createModelGatewayQAnswer(
         const modelBlocks = analystResultBlocks({
           result: withConversationFindings(analyst),
           question: latest.content,
+          // A finding already shown live keeps the id it was shown under.
+          findingId: (_index, statement) =>
+            liveFindingIds.get(findingKey(statement)) ?? randomUUID(),
           // Screen focus is not the target of a question naming another
           // company. Its reference must come from an exact name and a
           // successful authorised profile read, never a model-written id.
