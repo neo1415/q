@@ -4,8 +4,10 @@ import {
   COMPANY_MARKETPLACE_READINESS_SEGMENT,
   COMPANY_NETWORK_PREVIEW_SEGMENT,
   COMPANY_PROFILE_DECK_DOWNLOAD_SEGMENT,
+  COMPANY_PROFILE_LOGO_SEGMENT,
   COMPANY_PROFILE_PHOTO_SEGMENT,
   COMPANY_PROFILE_SEGMENT,
+  CompanyProfileLogoDtoSchema,
   CompanyProfilePhotoDtoSchema,
   COMPANY_VISIBILITY_SEGMENT,
   CompanyProfileDeckDownloadDtoSchema,
@@ -108,6 +110,16 @@ export function getCompanyProfilePhoto(session: ApiSession, companyId: string) {
     "GET",
     `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_PROFILE_PHOTO_SEGMENT}`,
     CompanyProfilePhotoDtoSchema,
+  );
+}
+
+/** `GET /v1/companies/:companyId/profile/logo` — the website's logo URL, or null. */
+export function getCompanyProfileLogo(session: ApiSession, companyId: string) {
+  return call(
+    session,
+    "GET",
+    `${COMPANIES_PATH}/${encodeURIComponent(companyId)}${COMPANY_PROFILE_LOGO_SEGMENT}`,
+    CompanyProfileLogoDtoSchema,
   );
 }
 

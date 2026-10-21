@@ -1,0 +1,152 @@
+import { describe, expect, it } from "vitest";
+
+import { RunRead } from "../src/q/card-subjects.js";
+import {
+  createSubjectAnnouncer,
+  previewLayoutFor,
+  subjectsNamedIn,
+} from "../src/q/artifact-preview.js";
+import { companiesTableBlock } from "../src/q/result-blocks.js";
+
+/**
+ * Artifacts live (owner 2026-10-20): which subjects a sentence names, by
+ * code, from the run's authorised reads only; and the company table both
+ * roles get, from what each company states.
+ */
+
+const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const I = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+
+function read(): RunRead {
+  const known = new RunRead();
+  known.companyNames.set(A, "Baridi Health Ltd");
+  known.companyNames.set(B, "MedTrail (fictional)");
+  known.investors.set("savannafund", {
+    investorOrganisationId: I,
+    name: "Savanna Fund",
+    country: "NG",
+    basis: [],
+  });
+  return known;
+}
+
+describe("subjectsNamedIn", () => {
+  it("finds whole names, the name without its legal suffix, and investors, in the order said", () => {
+    const named = subjectsNamedIn(
+      "Savanna Fund backed MedTrail, not Baridi Health.",
+      read(),
+    );
+    expect(named.map((one) => one.name)).toEqual([
+      "Savanna Fund",
+      "MedTrail (fictional)",
+      "Baridi Health Ltd",
+    ]);
+    expect(named[0]?.subject).toEqual({
+      kind: "INVESTOR_ORGANISATION",
+      investorOrganisationId: I,
+    });
+  });
+
+  it("never matches part of a word or a name nobody read", () => {
+    expect(subjectsNamedIn("MedTrails and Baridiana", read())).toEqual([]);
+    expect(subjectsNamedIn("Paystack grew fast.", read())).toEqual([]);
+  });
+});
+
+describe("createSubjectAnnouncer", () => {
+  it("announces each subject once, with everything named so far", () => {
+    const announcer = createSubjectAnnouncer({
+      read,
+      question: "What do you think?",
+    });
+    expect(announcer.sentence("Here is my view.")).toBeNull();
+    expect(announcer.sentence("Baridi Health leads.")).toEqual({
+      subjects: [
+        {
+          subject: { kind: "COMPANY", companyId: A },
+          name: "Baridi Health Ltd",
+        },
+      ],
+      layout: "CARD",
+    });
+    expect(announcer.sentence("Baridi Health again.")).toBeNull();
+    const next = announcer.sentence("MedTrail trails.");
+    expect(next?.subjects.map((one) => one.name)).toEqual([
+      "Baridi Health Ltd",
+      "MedTrail (fictional)",
+    ]);
+    expect(next?.layout).toBe("CARDS");
+  });
+
+  it("puts a requested comparison up whole with the first sentence", () => {
+    const announcer = createSubjectAnnouncer({
+      read,
+      question: "compare MedTrail vs Baridi Health",
+    });
+    const first = announcer.sentence("Both are early.");
+    expect(first?.layout).toBe("TABLE");
+    expect(first?.subjects.map((one) => one.name)).toEqual([
+      "MedTrail (fictional)",
+      "Baridi Health Ltd",
+    ]);
+  });
+
+  it("reads the run's reads as they stand at each sentence", () => {
+    let known = new RunRead();
+    const announcer = createSubjectAnnouncer({
+      read: () => known,
+      question: "Who is that?",
+    });
+    expect(announcer.sentence("Baridi Health is a clinic network.")).toBeNull();
+    known = read();
+    expect(announcer.sentence("Baridi Health is in Kenya.")).not.toBeNull();
+  });
+});
+
+describe("previewLayoutFor", () => {
+  it("is a table only for a comparison of two or more", () => {
+    expect(previewLayoutFor("compare them", 1)).toBe("CARD");
+    expect(previewLayoutFor("put those in a table", 3)).toBe("TABLE");
+    expect(previewLayoutFor("who are they", 3)).toBe("CARDS");
+    expect(previewLayoutFor("who", 0)).toBeNull();
+  });
+});
+
+describe("companiesTableBlock (either role)", () => {
+  it("lays two or more companies side by side from what each states; unknown stays empty", () => {
+    const known = read();
+    known.companyFacts.set(A, {
+      about: "Cold-chain clinics",
+      stageCode: "SERIES_A",
+      city: "Nairobi",
+      country: "KE",
+      founded: "2019-04-01",
+      website: null,
+    });
+    const block = companiesTableBlock(known);
+    expect(block).not.toBeNull();
+    if (block?.kind !== "TABLE") throw new Error("not a table");
+    expect(block.columns.map((one) => one.subject)).toEqual([
+      { kind: "COMPANY", companyId: A },
+      { kind: "COMPANY", companyId: B },
+    ]);
+    const row = (label: string) =>
+      block.rows.find((one) => one.label === label)?.cells;
+    expect(row("Stage")).toEqual(["Series A", ""]);
+    expect(row("Based in")).toEqual(["Nairobi, KE", ""]);
+    expect(row("Founded")).toEqual(["2019", ""]);
+    // Nobody stated a website: the row is left out, not filled in.
+    expect(row("Website")).toBeUndefined();
+  });
+
+  it("draws nothing for one company or when nothing was read", () => {
+    const one = new RunRead();
+    one.companyNames.set(A, "Baridi Health Ltd");
+    expect(companiesTableBlock(one)).toBeNull();
+    const two = new RunRead();
+    two.companyNames.set(A, "Baridi Health Ltd");
+    two.companyNames.set(B, "MedTrail");
+    expect(companiesTableBlock(two)).toBeNull();
+  });
+});

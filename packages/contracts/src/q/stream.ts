@@ -17,6 +17,7 @@ import { QResponseMessageSchema } from "./message.js";
 import { QClarificationRequestBlockSchema } from "./result-block.js";
 import { QRunStatusSchema } from "./run.js";
 import { QVisibleStageSchema } from "./stage.js";
+import { QSubjectRefSchema } from "./subject.js";
 import { QContractVersionSchema } from "./version.js";
 
 /**
@@ -45,6 +46,7 @@ export const Q_STREAM_EVENT_TYPES = [
   "q.run.started",
   "q.stage.changed",
   "q.message.delta",
+  "q.artifact.preview",
   "q.message.completed",
   "q.finding.available",
   "q.action.proposed",
@@ -73,6 +75,7 @@ export const Q_STREAM_TERMINAL_EVENT_TYPES = [
  */
 export const Q_STREAM_EPHEMERAL_EVENT_TYPES = [
   "q.message.delta",
+  "q.artifact.preview",
 ] as const satisfies readonly QStreamEventType[];
 
 export const Q_STREAM_DURABLE_EVENT_TYPES = [
@@ -144,6 +147,51 @@ export const QMessageDeltaEventSchema = event("q.message.delta", {
   text: z.string().min(1).max(Q_STREAM_DELTA_MAX_LENGTH),
 });
 
+/**
+ * Artifacts live (owner 2026-10-20): the subjects Q's words have named so
+ * far, so the screen can put each one's card up while Q is still talking
+ * and fill it in when the answer's blocks land.
+ *
+ * Ephemeral like a delta: presentation only, never stored or replayed,
+ * and the persisted message's blocks always win. Each subject is one the
+ * run's own tools returned under this person's authority (the same reads
+ * the answer's cards are built from), never a name a model wrote.
+ * `layout` is the shape code expects the answer to take, or null.
+ */
+export const Q_ARTIFACT_PREVIEW_LAYOUTS = ["CARD", "CARDS", "TABLE"] as const;
+export const QArtifactPreviewLayoutSchema = z.enum(Q_ARTIFACT_PREVIEW_LAYOUTS);
+export type QArtifactPreviewLayout = z.infer<
+  typeof QArtifactPreviewLayoutSchema
+>;
+export const Q_ARTIFACT_PREVIEW_SUBJECTS_MAX = 10;
+export const QArtifactPreviewSubjectSchema = z
+  .object({
+    subject: QSubjectRefSchema,
+    /** The name as the authorised read returned it. */
+    name: z.string().trim().min(1).max(80),
+  })
+  .strict();
+export type QArtifactPreviewSubject = z.infer<
+  typeof QArtifactPreviewSubjectSchema
+>;
+export const QArtifactPreviewSchema = z
+  .object({
+    messageId: QMessageIdSchema,
+    /** Every subject named so far, in the order Q named them. */
+    subjects: z
+      .array(QArtifactPreviewSubjectSchema)
+      .min(1)
+      .max(Q_ARTIFACT_PREVIEW_SUBJECTS_MAX),
+    layout: QArtifactPreviewLayoutSchema.nullable(),
+  })
+  .strict();
+export type QArtifactPreview = z.infer<typeof QArtifactPreviewSchema>;
+
+export const QArtifactPreviewEventSchema = event(
+  "q.artifact.preview",
+  QArtifactPreviewSchema.shape,
+);
+
 /** The durable form of what the deltas built. This, not the deltas, is history. */
 export const QMessageCompletedEventSchema = event("q.message.completed", {
   message: QResponseMessageSchema,
@@ -190,6 +238,7 @@ export const QStreamEventSchema = z.discriminatedUnion("type", [
   QRunStartedEventSchema,
   QStageChangedEventSchema,
   QMessageDeltaEventSchema,
+  QArtifactPreviewEventSchema,
   QMessageCompletedEventSchema,
   QFindingAvailableEventSchema,
   QActionProposedEventSchema,

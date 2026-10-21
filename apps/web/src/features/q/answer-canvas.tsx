@@ -32,6 +32,8 @@ import {
   LEVEL_WORD,
   type FitExplanation,
 } from "./answer-canvas-logic";
+import { EntityAvatar } from "@/features/entity/entity-avatar";
+
 import { MapBody } from "./blocks/data-blocks";
 import { answerCardRef, useVisibleCards } from "./cards/card-visibility";
 import {
@@ -343,6 +345,7 @@ function AnswerCard({
           ) : null}
           <h3>
             <span className="sr-only">{`Number ${String(rank)}: `}</span>
+            <CardAvatar card={card} size={28} />
             {card.name}
             <span
               className="cq-ac-talking"
@@ -642,6 +645,7 @@ function CompareTable({
                   <span className="cq-ac-rank" aria-hidden="true">
                     {index + 1}
                   </span>
+                  <CardAvatar card={card} size={24} />
                   {card.name}
                 </span>
                 {card.fit === null ? null : (
@@ -789,6 +793,52 @@ function StripCard({
         <span className="cq-ac-stripfit">{number}</span>
       )}
     </m.button>
+  );
+}
+
+/**
+ * Artifacts live (owner 2026-10-20): every card carries its subject's
+ * picture: the company's photo or its website's logo, an investor's
+ * logo, or initials. Never a broken image, never blank. A researched
+ * identity with no Capital Q record shows its initials.
+ */
+export function CardAvatar({
+  card,
+  size,
+}: {
+  readonly card: QAnswerCard;
+  readonly size: number;
+}) {
+  const subject = card.subject;
+  const investorId =
+    subject?.kind === "INVESTOR_ORGANISATION"
+      ? subject.investorOrganisationId
+      : (card.external?.investorOrganisationId ?? undefined);
+  if (subject?.kind === "COMPANY") {
+    return (
+      <EntityAvatar
+        kind="company"
+        name={card.name}
+        companyId={subject.companyId}
+        size={size}
+        decorative
+        fallback="initials"
+        siteLogo
+        className="cq-ac-avatar"
+      />
+    );
+  }
+  return (
+    <EntityAvatar
+      kind={investorId !== undefined ? "investor" : "person"}
+      name={card.name}
+      {...(investorId === undefined
+        ? { src: null }
+        : { investorOrganisationId: investorId })}
+      size={size}
+      decorative
+      className="cq-ac-avatar"
+    />
   );
 }
 

@@ -201,7 +201,23 @@ export class RunRead extends Map<string, string> {
   readonly countries = new Map<string, string>();
   /** Company id -> its name as the authorised read returned it (lane A). */
   readonly companyNames = new Map<string, string>();
+  /**
+   * Artifacts live: company id -> the profile facts a complete profile
+   * read returned (what the company states about itself), for a company
+   * table. Only from get_company's own authorised output.
+   */
+  readonly companyFacts = new Map<string, ReadCompanyFacts>();
 }
+
+/** A company's own declared profile facts, as get_company returned them. */
+export type ReadCompanyFacts = {
+  readonly about: string | null;
+  readonly stageCode: string | null;
+  readonly city: string | null;
+  readonly country: string | null;
+  readonly founded: string | null;
+  readonly website: string | null;
+};
 
 /**
  * The companies and investors one run's tools have returned, by run,
@@ -250,6 +266,20 @@ export function createRunCompanies(limit = 200) {
       }
       if (profile?.success) {
         known.profiles.set(profile.data.companyId, profile.data.canonicalName);
+        known.companyFacts.set(profile.data.companyId, {
+          about: profile.data.shortDescription,
+          stageCode: profile.data.currentStageCode,
+          city: profile.data.headquartersCity,
+          country: profile.data.headquartersCountry,
+          founded: profile.data.foundedDate,
+          website: profile.data.websiteUrl,
+        });
+        if (!known.companyNames.has(profile.data.companyId)) {
+          known.companyNames.set(
+            profile.data.companyId,
+            profile.data.canonicalName,
+          );
+        }
       }
       if (relationship?.success) {
         known.relationships.set(

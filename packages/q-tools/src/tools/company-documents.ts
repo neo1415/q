@@ -450,7 +450,7 @@ export function createReadCompanyDocumentTool(
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
     owner: "q-tools",
-    visibleStage: "REVIEWING_COMPANY",
+    visibleStage: "CHECKING_EVIDENCE",
     input: DocumentInputSchema,
     output: ReadOutputSchema,
     authorize: async (input, context) => {
@@ -589,7 +589,7 @@ export function createReadDocumentPagesTool(
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
     owner: "q-tools",
-    visibleStage: "REVIEWING_COMPANY",
+    visibleStage: "CHECKING_EVIDENCE",
     input: PagesInputSchema,
     output: PagesOutputSchema,
     authorize: async (input, context) => {

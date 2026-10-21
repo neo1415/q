@@ -55,6 +55,20 @@ const EVENT_FIXTURES: Readonly<Record<string, unknown>> = {
     type: "q.message.delta",
     data: { messageId: UUID, text: "Runway is " },
   },
+  "q.artifact.preview": {
+    ...base,
+    type: "q.artifact.preview",
+    data: {
+      messageId: UUID,
+      subjects: [
+        {
+          subject: { kind: "COMPANY", companyId: UUID },
+          name: "Baridi Health",
+        },
+      ],
+      layout: "CARD",
+    },
+  },
   "q.message.completed": {
     ...base,
     type: "q.message.completed",
@@ -258,6 +272,8 @@ describe("QStreamEvent", () => {
           return event.data.stage;
         case "q.message.delta":
           return event.data.text;
+        case "q.artifact.preview":
+          return event.data.messageId;
         case "q.message.completed":
           return event.data.message.messageId;
         case "q.finding.available":
@@ -291,11 +307,12 @@ describe("stream transport classification (CQ-Q-009)", () => {
     expect([...durable, ...ephemeral].sort()).toEqual(
       [...Q_STREAM_EVENT_TYPES].sort(),
     );
-    expect(ephemeral).toEqual(["q.message.delta"]);
+    expect(ephemeral).toEqual(["q.message.delta", "q.artifact.preview"]);
     for (const type of durable) {
       expect(isDurableQStreamEventType(type), type).toBe(true);
     }
     expect(isDurableQStreamEventType("q.message.delta")).toBe(false);
+    expect(isDurableQStreamEventType("q.artifact.preview")).toBe(false);
     // Terminal events are durable: the stream ends on persisted truth.
     for (const type of Q_STREAM_TERMINAL_EVENT_TYPES) {
       expect(durable).toContain(type);
@@ -306,7 +323,7 @@ describe("stream transport classification (CQ-Q-009)", () => {
     for (const [type, fixture] of Object.entries(EVENT_FIXTURES)) {
       const event = QStreamEventSchema.parse(fixture);
       expect(isDurableQStreamEvent(event), type).toBe(
-        type !== "q.message.delta",
+        type !== "q.message.delta" && type !== "q.artifact.preview",
       );
     }
   });

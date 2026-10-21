@@ -49,6 +49,21 @@ export type CompanyProfilePhotoDto = z.infer<
   typeof CompanyProfilePhotoDtoSchema
 >;
 
+/**
+ * `GET` — artifacts live (owner 2026-10-20): the logo on the company's own
+ * website, for an avatar with no photo. The same visibility as the
+ * profile; only the website already on the company's record is read, and
+ * the answer is a public https image URL on it, or null.
+ */
+export const COMPANY_PROFILE_LOGO_SEGMENT = "/profile/logo" as const;
+
+export const CompanyProfileLogoDtoSchema = z
+  .object({
+    logoUrl: z.string().url().startsWith("https://").max(2048).nullable(),
+  })
+  .strict();
+export type CompanyProfileLogoDto = z.infer<typeof CompanyProfileLogoDtoSchema>;
+
 export const CompanyProfileViewerSchema = z.enum([
   "INVESTOR",
   "FOUNDER",

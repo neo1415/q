@@ -199,7 +199,7 @@ export function createReadCompanyDeckTool(
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
     owner: "q-tools",
-    visibleStage: "REVIEWING_COMPANY",
+    visibleStage: "CHECKING_EVIDENCE",
     input: CompanyInputSchema,
     output: DeckOutputSchema,
     authorize: async (input, context) => {
@@ -273,7 +273,7 @@ export function createReadCompanyDataRoomTool(
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
     owner: "q-tools",
-    visibleStage: "REVIEWING_COMPANY",
+    visibleStage: "CHECKING_EVIDENCE",
     input: CompanyInputSchema,
     output: DataRoomOutputSchema,
     authorize: async (input, context) => {
@@ -375,7 +375,7 @@ export function createCoachMyDeckTool(
     approval: "NONE",
     idempotency: "SAFE_TO_REPEAT",
     owner: "q-tools",
-    visibleStage: "REVIEWING_COMPANY",
+    visibleStage: "CHECKING_EVIDENCE",
     input: z.object({}).strict(),
     output: CoachOutputSchema,
     authorize: async (_input, context) => {

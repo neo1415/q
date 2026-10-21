@@ -46,14 +46,18 @@ export const QVisibleStageSchema = z.enum(Q_VISIBLE_STAGES);
  */
 export const Q_VISIBLE_STAGE_LABELS: Readonly<Record<QVisibleStage, string>> = {
   UNDERSTANDING_REQUEST: "Understanding your request",
-  REVIEWING_COMPANY: "Reviewing company information",
-  CHECKING_EVIDENCE: "Checking evidence",
-  // R38: web research is quiet; the person sees neutral work, then Sources.
-  SEARCHING_PUBLIC_SOURCES: "Looking into it",
-  REVIEWING_INVESTOR_CRITERIA: "Reviewing investor criteria",
-  COMPARING_OPPORTUNITIES: "Comparing opportunities",
-  REVIEWING_RELATIONSHIP: "Reviewing relationship context",
-  PREPARING_ANALYSIS: "Preparing your analysis",
+  // Owner 2026-10-20 (artifacts live): Q says where it is, the way a
+  // colleague would ("reading their deck", "checking the web", "comparing
+  // the two"). This supersedes R38's neutral "Looking into it" for web
+  // research; Sources still follow the answer.
+  REVIEWING_COMPANY: "Looking at the company",
+  // The deck, data room and document reads (q-tools) show this stage.
+  CHECKING_EVIDENCE: "Reading their deck and documents",
+  SEARCHING_PUBLIC_SOURCES: "Checking the web",
+  REVIEWING_INVESTOR_CRITERIA: "Reading the investor's mandate",
+  COMPARING_OPPORTUNITIES: "Comparing them side by side",
+  REVIEWING_RELATIONSHIP: "Checking where things stand",
+  PREPARING_ANALYSIS: "Pulling it together",
   // Founder live 2026-09-29: a document takes a while; say so and to wait.
   PREPARING_DOCUMENT: "Writing your document. This takes a moment.",
   REVISING_DOCUMENT: "Making your changes to the document. One moment.",

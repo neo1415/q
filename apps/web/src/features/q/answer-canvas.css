@@ -292,6 +292,11 @@
   white-space: nowrap;
   color: var(--cq-text-primary);
 }
+/* Artifacts live: the subject's logo, photo or initials beside its name. */
+.cq-ac-card h3 .cq-ac-avatar {
+  vertical-align: middle;
+  margin-inline-end: 8px;
+}
 .cq-ac-line {
   margin: 2px 0 0;
   color: var(--cq-text-secondary);

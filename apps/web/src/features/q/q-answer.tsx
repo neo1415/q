@@ -6,6 +6,8 @@ import { ChevronDown, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 import { QMark } from "@capital-q/ui/q-mark";
 
 import type { QTurn, QTurnObjectBlock } from "./conversation";
+import { RenderedMark } from "./artifact-rendered";
+import { LivePreview } from "./live-preview";
 import { QMarkdown } from "./markdown";
 import { useMoveLine } from "./move-line";
 import { evidenceSummary, QEvidenceBody } from "./q-evidence";
@@ -140,11 +142,27 @@ export function QAnswer({
           className="cq-body text-(--cq-text-primary)"
         />
       ) : null}
+      {/* Artifacts live: in the thread too (Chat view, the Q sheet), the
+          cards for what Q is naming go up while it talks; the answer's
+          own blocks take their place when it settles. */}
+      {turn.streaming && turn.preview !== undefined ? (
+        <LivePreview preview={turn.preview} />
+      ) : null}
       {inline.length > 0 ? (
         <QResultBlocks
           blocks={inline}
           onAsk={onAsk}
           onOpenArtifact={onOpenArtifact}
+        />
+      ) : null}
+      {/* Artifacts live (audit 2026-10-15 §4): drawn inline in the thread
+          (Chat view, the Q sheet) counts as drawn, as on the Q stage, so
+          "as the table shows" stands here too. The newest answer mounts
+          last, so its set is the one reported. */}
+      {!turn.streaming && inline.length > 0 && turn.runId !== undefined ? (
+        <RenderedMark
+          run={turn.runId}
+          kinds={inline.map((block) => block.kind)}
         />
       ) : null}
       {/* DOCS: any substantive answer, as a PDF. */}
