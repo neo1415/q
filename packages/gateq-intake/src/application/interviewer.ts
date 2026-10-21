@@ -43,8 +43,8 @@ import {
 } from "./question-needs.js";
 import { questionAngle } from "./answer-specificity.js";
 import { normaliseProposedFact } from "./normalise-fact.js";
-import { notRecordedLine, type NotRecorded } from "./not-recorded.js";
-import { amountStatedIn } from "./stated-amount.js";
+import { readBackLine, readBacksIn, type NotRecorded } from "./not-recorded.js";
+import { affirmsReadBack, amountStatedIn } from "./stated-amount.js";
 
 /**
  * Q interviewing a GateQ applicant (CQ-GATE-002 §4, §5, §36, §39).
@@ -79,6 +79,22 @@ import { amountStatedIn } from "./stated-amount.js";
  */
 
 export type InterviewChannel = "voice" | "text";
+
+/**
+ * The reply around a read-back: without its closing question (the read-back
+ * is the question now) and without any sentence already stating a figure
+ * being read back, so Q says it once.
+ */
+function aroundReadBack(reply: string, amounts: readonly string[]): string {
+  const trimmed = reply.trim();
+  const sentences = trimmed.match(/[^.!?]+[.!?]*/gu) ?? [trimmed];
+  const kept = sentences.filter(
+    (sentence, index) =>
+      !(index === sentences.length - 1 && sentence.trim().endsWith("?")) &&
+      !amounts.some((amount) => amountStatedIn(amount, sentence)),
+  );
+  return kept.join("").trim();
+}
 
 /**
  * A contact detail already held: the same address in any case, or a name
@@ -637,6 +653,10 @@ export function createGateQInterviewer(
             fact.value.kind !== "NONE",
         );
       const currencyHeld = held("raise.currency")?.value;
+      // Q's last line: a figure it read back there is theirs once they agree.
+      const lastQ = [...input.recentTurns]
+        .reverse()
+        .find((turn) => turn.role === "q")?.text;
       for (const candidate of proposed) {
         if (!DIMENSIONS.has(candidate.dimension)) {
           rejected += 1;
@@ -663,16 +683,22 @@ export function createGateQInterviewer(
           rejected += 1;
           continue;
         }
-        // An amount must be one the person said, not one Q worked out
-        // ("two pay $180,000 each" is not "revenue 360000"). Their own
-        // sentence is kept by the phrases it came in; the computed figure
-        // is never recorded as their claim.
+        // An amount must be one the person said, or agreed to when Q said
+        // it back. One Q worked out ("two pay $180,000 each" read as revenue
+        // 360000) is not recorded as their claim yet: Q says it back as a
+        // question and their yes records it next turn.
         if (
           normalised.value.kind === "AMOUNT" &&
-          !amountStatedIn(normalised.value.amount, input.utterance)
+          !amountStatedIn(normalised.value.amount, input.utterance) &&
+          !affirmsReadBack(normalised.value.amount, lastQ, input.utterance)
         ) {
           rejected += 1;
-          notRecorded.push({ dimension, reason: "AMOUNT_NOT_STATED" });
+          notRecorded.push({
+            dimension,
+            reason: "AMOUNT_READ_BACK",
+            amount: normalised.value.amount,
+            currency: normalised.value.currency,
+          });
           continue;
         }
         // The same contact detail again ("I'm Laura" with "Laura Mensah"
@@ -695,10 +721,39 @@ export function createGateQInterviewer(
         );
       }
 
+      // Their yes to the figures Q read back records them, whether or not
+      // the model proposed them again (code reads Q's own read-back line).
+      if (result.intent !== "SABOTAGE") {
+        for (const back of readBacksIn(lastQ ?? "")) {
+          if (
+            facts.some((fact) => fact.dimension === back.dimension) ||
+            !affirmsReadBack(back.amount, lastQ, input.utterance)
+          ) {
+            continue;
+          }
+          const fact = NewApplicationFactSchema.safeParse({
+            dimension: back.dimension,
+            value: {
+              kind: "AMOUNT",
+              amount: back.amount,
+              currency: back.currency,
+            },
+            provenance: "APPLICANT_PROVIDED",
+          });
+          if (fact.success) facts.push(fact.data);
+        }
+      }
+
+      // A worked-out figure is asked about, so the read-back is this
+      // turn's question.
+      const readBack =
+        interviewLanguageOf(input) === null ? readBackLine(notRecorded) : "";
       const asking =
-        result.asking !== null && DIMENSIONS.has(result.asking)
-          ? (result.asking as ApplicationDimension)
-          : null;
+        readBack.length > 0
+          ? (notRecorded[0]?.dimension ?? null)
+          : result.asking !== null && DIMENSIONS.has(result.asking)
+            ? (result.asking as ApplicationDimension)
+            : null;
 
       logger?.debug(
         {
@@ -711,16 +766,19 @@ export function createGateQInterviewer(
         "gateq interview turn",
       );
 
-      // A refused item the reply may have acknowledged is said plainly in
-      // English; another language keeps the model's words, and the refused
-      // items show as still needed in the coverage panel.
-      const correction =
-        interviewLanguageOf(input) === null ? notRecordedLine(notRecorded) : "";
+      // The read-back replaces the reply's own closing question, so the
+      // applicant is asked one thing. In another language the model's words
+      // stand and the figure shows as still needed in coverage.
       return {
         reply:
-          correction.length === 0
+          readBack.length === 0
             ? result.reply
-            : `${result.reply} ${correction}`.slice(0, 4_000),
+            : `${aroundReadBack(
+                result.reply,
+                notRecorded.map((item) => item.amount),
+              )} ${readBack}`
+                .trim()
+                .slice(0, 4_000),
         intent: result.intent,
         facts,
         rejectedFacts: rejected,

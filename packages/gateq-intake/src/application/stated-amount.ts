@@ -147,6 +147,33 @@ export function amountStatedIn(amount: string, text: string): boolean {
   return amountsIn(text).some((value) => Math.abs(value - target) < 0.005);
 }
 
+/** A reply that agrees ("Yes", "yeah, that's right", "correct"). */
+const AFFIRM =
+  /^\s*(?:yes|yeah|yep|yup|yes please|correct|right|exactly|indeed|sure|that'?s (?:right|correct|it)|that is (?:right|correct)|spot on)\b/iu;
+/** A reply that turns it down, even after a "yes" ("yes, no, it's less"). */
+const DISAGREE = /\b(?:no|not|wrong|actually|but|less|more|wait)\b/iu;
+
+/**
+ * Whether the applicant agreed to a figure Q read back to them: Q's last
+ * turn says it, and their reply agrees and states no figure of its own (a
+ * figure they give is checked as said, on its own). Agreeing to a figure
+ * put to them makes it their claim, as a figure read back and confirmed
+ * does in onboarding.
+ */
+export function affirmsReadBack(
+  amount: string,
+  qText: string | undefined,
+  reply: string,
+): boolean {
+  return (
+    qText !== undefined &&
+    amountStatedIn(amount, qText) &&
+    AFFIRM.test(reply) &&
+    !DISAGREE.test(reply) &&
+    amountsIn(reply).length === 0
+  );
+}
+
 /**
  * An AMOUNT fact in words for a person: the ISO currency, then the exact
  * decimal grouped in thousands ("USD 360,000"; live check 2026-10-16:

@@ -103,6 +103,25 @@ describe("a frozen dossier shows a derived amount as Q's inference", () => {
     }
   });
 
+  it("a figure Q read back and the founder agreed to is their claim", () => {
+    const confirmed = [
+      ...turns,
+      { seq: 7, role: "Q", text: "So that's USD 360,000 for revenue, right?" },
+      { seq: 8, role: "PERSON", text: "Yes, that's right." },
+    ];
+    const kept = withDerivedAmountsMarked(
+      dossier(fact("360000 USD", 8)),
+      confirmed,
+    ).dimensions[0]?.facts[0];
+    expect(kept?.truthClass).toBe("USER_CLAIM");
+    // A reply that does not agree leaves it Q's inference.
+    const refused = withDerivedAmountsMarked(dossier(fact("360000 USD", 8)), [
+      ...confirmed.slice(0, 3),
+      { seq: 8, role: "PERSON", text: "No, it's less than that." },
+    ]).dimensions[0]?.facts[0];
+    expect(refused?.truthClass).toBe("Q_INFERENCE");
+  });
+
   it("the marked fact is still a valid dossier fact", () => {
     const shape =
       GateqDossierV1Schema.shape.dimensions.element.shape.facts.element;

@@ -7,7 +7,7 @@ import {
   createGateQInterviewer,
   type InterviewTurnInput,
 } from "../src/application/interviewer.js";
-import { notRecordedLine } from "../src/application/not-recorded.js";
+import { readBackLine, readBacksIn } from "../src/application/not-recorded.js";
 
 /**
  * Onboarding speed 2026-10-20 (G4): a fact Q read from the applicant's
@@ -69,17 +69,76 @@ const ACKNOWLEDGED: GateQInterviewerResult = {
   readyToReview: false,
 };
 
-describe("a refused fact is never dropped silently", () => {
-  it("says the worked-out figure was not recorded, and asks for theirs", async () => {
+describe("a worked-out figure is read back for a yes, like a person would (owner 2026-10-21)", () => {
+  it("asks 'So that's USD 360,000 for revenue, right?' instead of lecturing", async () => {
     const outcome = await run(ACKNOWLEDGED);
     expect(outcome.facts).toEqual([]);
     expect(outcome.notRecorded).toEqual([
-      { dimension: "claims.revenue", reason: "AMOUNT_NOT_STATED" },
+      {
+        dimension: "claims.revenue",
+        reason: "AMOUNT_READ_BACK",
+        amount: "360000",
+        currency: "USD",
+      },
     ]);
-    expect(outcome.reply).toContain(ACKNOWLEDGED.reply);
-    expect(outcome.reply).toMatch(
-      /I haven't recorded a figure for revenue: I only keep amounts you say yourself, not ones I work out\. What is the figure\?/,
+    // Said once, as the turn's one question.
+    expect(outcome.reply).toBe("So that's USD 360,000 for revenue, right?");
+    expect(outcome.asking).toBe("claims.revenue");
+    expect(outcome.reply).not.toMatch(/I only keep|haven't recorded/);
+  });
+
+  it("their 'Yes' records it as their claim, even if the model proposes nothing", async () => {
+    const outcome = await run(
+      {
+        reply: "Great. Who are your customers?",
+        intent: "ANSWER",
+        facts: [],
+        asking: "company.customers",
+        questionForQ: null,
+        readyToReview: false,
+      },
+      {
+        utterance: "Yes, that's right.",
+        recentTurns: [
+          { role: "person", text: said },
+          { role: "q", text: "So that's USD 360,000 for revenue, right?" },
+        ],
+      },
     );
+    expect(outcome.facts).toEqual([
+      {
+        dimension: "claims.revenue",
+        value: { kind: "AMOUNT", amount: "360000", currency: "USD" },
+        provenance: "APPLICANT_PROVIDED",
+      },
+    ]);
+    expect(outcome.notRecorded).toBeUndefined();
+  });
+
+  it("a 'no' or a different figure records nothing it read back", async () => {
+    const turns = [
+      { role: "person" as const, text: said },
+      {
+        role: "q" as const,
+        text: "So that's USD 360,000 for revenue, right?",
+      },
+    ];
+    const quiet: GateQInterviewerResult = {
+      reply: "Thanks. What is it, then?",
+      intent: "CORRECTION",
+      facts: [],
+      asking: "claims.revenue",
+      questionForQ: null,
+      readyToReview: false,
+    };
+    for (const utterance of [
+      "No, not quite.",
+      "Yes, but it's 340k really.",
+      "Hmm.",
+    ]) {
+      const outcome = await run(quiet, { utterance, recentTurns: turns });
+      expect(outcome.facts).toEqual([]);
+    }
   });
 
   it("adds nothing when everything read was kept", async () => {
@@ -95,21 +154,34 @@ describe("a refused fact is never dropped silently", () => {
     expect(outcome.notRecorded).toBeUndefined();
   });
 
-  it("keeps the model's words in another language; the refusal is still returned", async () => {
+  it("keeps the model's words in another language; the figure is still held", async () => {
     const outcome = await run(ACKNOWLEDGED, { locale: "fr" });
     expect(outcome.reply).toBe(ACKNOWLEDGED.reply);
+    expect(outcome.facts).toEqual([]);
     expect(outcome.notRecorded).toHaveLength(1);
   });
 
-  it("words the one refusal plainly", () => {
-    expect(
-      notRecordedLine([
-        { dimension: "raise.amount", reason: "AMOUNT_NOT_STATED" },
-        { dimension: "claims.revenue", reason: "AMOUNT_NOT_STATED" },
-      ]),
-    ).toBe(
-      "I haven't recorded a figure for raise size and revenue: I only keep amounts you say yourself, not ones I work out. What is the figure?",
+  it("words several figures in one question, and reads its own line back", () => {
+    const items = [
+      {
+        dimension: "raise.amount" as const,
+        reason: "AMOUNT_READ_BACK" as const,
+        amount: "2000000",
+        currency: "USD",
+      },
+      {
+        dimension: "claims.revenue" as const,
+        reason: "AMOUNT_READ_BACK" as const,
+        amount: "360000",
+        currency: "USD",
+      },
+    ];
+    const line = readBackLine(items);
+    expect(line).toBe(
+      "So that's USD 2,000,000 for raise size and USD 360,000 for revenue, right?",
     );
-    expect(notRecordedLine([])).toBe("");
+    expect(readBacksIn(`Thanks. ${line}`)).toEqual(items);
+    expect(readBackLine([])).toBe("");
+    expect(readBacksIn("Who are your customers?")).toEqual([]);
   });
 });

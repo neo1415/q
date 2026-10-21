@@ -240,7 +240,7 @@ describe("what survives validation", () => {
     expect(outcome.notRecorded).toBeUndefined();
   });
 
-  it("still refuses an amount they never said (the truth guard)", async () => {
+  it("never records an amount they never said; it is read back for their yes", async () => {
     const { service } = interviewer({
       ...RESULT,
       facts: [
@@ -260,9 +260,16 @@ describe("what survives validation", () => {
     expect(outcome.facts).toEqual([]);
     expect(outcome.rejectedFacts).toBe(1);
     expect(outcome.notRecorded).toEqual([
-      { dimension: "raise.amount", reason: "AMOUNT_NOT_STATED" },
+      {
+        dimension: "raise.amount",
+        reason: "AMOUNT_READ_BACK",
+        amount: "3000000",
+        currency: "USD",
+      },
     ]);
-    expect(outcome.reply).toMatch(/I only keep amounts you say yourself/);
+    expect(outcome.reply).toMatch(
+      /So that's USD 3,000,000 for raise size, right\?$/,
+    );
   });
 
   it("never says it couldn't record words with nothing of the shape in them", async () => {
