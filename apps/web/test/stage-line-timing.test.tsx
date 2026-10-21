@@ -4,7 +4,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   createQStreamState,
-  qStageSteps,
+  qCurrentStage,
   reduceQStream,
   type QStreamState,
 } from "@capital-q/api-client";
@@ -17,7 +17,8 @@ vi.mock("next/navigation", () => ({
 
 const { turnsFrom } = await import("../src/features/q/conversation");
 const { QAnswer } = await import("../src/features/q/q-answer");
-const { StageProgress } = await import("../src/features/q/stage-progress");
+const { StageLine, stageLineText, taskLineText } =
+  await import("../src/features/q/stage-line");
 const { loadWire } = await import("../src/features/q/wire");
 
 /**
@@ -175,15 +176,32 @@ function arrivals(profile: Profile): readonly Arrival[] {
   return list.sort((a, b) => a.at - b.at);
 }
 
-/** What a surface draws from the stream: the steps and the thread's Q turn. */
+/**
+ * What the thread draws from the stream (q-conversation, round 4): Q's
+ * answer slot from the moment it starts work, holding the one live line
+ * where Q's first words will land, then the answer itself.
+ */
 function Surface({ state }: { readonly state: QStreamState }) {
-  const steps =
-    state.messages.length > 0 ? [] : qStageSteps(state.stageHistory);
+  const now =
+    state.messages.length > 0 ? null : qCurrentStage(state.stageHistory);
+  const current =
+    now === null
+      ? null
+      : {
+          stage: now.stage,
+          ...(now.about === undefined ? {} : { about: now.about }),
+        };
   const latest = turnsFrom(state, []).findLast((turn) => turn.kind === "Q");
+  const line = (
+    <StageLine current={current} size="answer" live={false} reserve />
+  );
   return (
     <div>
-      <StageProgress steps={steps} />
-      {latest?.kind === "Q" ? <QAnswer turn={latest} mark={false} /> : null}
+      {latest?.kind === "Q" ? (
+        <QAnswer turn={latest} mark={false} working={line} />
+      ) : state.runId !== null ? (
+        <div data-q-pending>{line}</div>
+      ) : null}
     </div>
   );
 }
@@ -225,7 +243,7 @@ async function replay(profile: Profile): Promise<Timings> {
     const dom = view.container;
     if (
       Number.isNaN(seen.stage) &&
-      dom.querySelector("[data-q-stage-step]") !== null
+      dom.querySelector("[data-q-stage-line] .cq-stage-line") !== null
     ) {
       seen.stage = clock;
     }
@@ -286,35 +304,110 @@ describe("speed on the thread path (replayed stream)", () => {
     });
   }
 
-  it("shows only steps that happened, in order, and the last is current", () => {
+  it("names what the stage is about from the run's reads, and never names the web", () => {
+    const labels = {
+      REVIEWING_COMPANY: "Looking at the company",
+      COMPARING_OPPORTUNITIES: "Comparing them side by side",
+      CHECKING_EVIDENCE: "Reading their deck and documents",
+      SEARCHING_PUBLIC_SOURCES: "Looking into it",
+      PREPARING_ANALYSIS: "Pulling it together",
+      DESIGNING_DOCUMENT: "Laying out each page",
+    } as unknown as Parameters<typeof stageLineText>[1];
+    expect(stageLineText({ stage: "REVIEWING_COMPANY" }, labels)).toBe(
+      "Looking at the company",
+    );
+    expect(
+      stageLineText(
+        { stage: "REVIEWING_COMPANY", about: { subjects: ["Nixo"] } },
+        labels,
+      ),
+    ).toBe("Looking at Nixo");
+    expect(
+      stageLineText(
+        {
+          stage: "COMPARING_OPPORTUNITIES",
+          about: { subjects: ["Nixo", "Halyard"] },
+        },
+        labels,
+      ),
+    ).toBe("Comparing Nixo and Halyard");
+    // One name is not a comparison: the approved label, not "Comparing Nixo".
+    expect(
+      stageLineText(
+        { stage: "COMPARING_OPPORTUNITIES", about: { subjects: ["Nixo"] } },
+        labels,
+      ),
+    ).toBe("Comparing them side by side");
+    expect(
+      stageLineText(
+        { stage: "CHECKING_EVIDENCE", about: { subjects: ["Nixo"] } },
+        labels,
+      ),
+    ).toBe("Reading Nixo's deck and documents");
+    // R38: research is "Looking into it", whatever it is about.
+    expect(
+      stageLineText(
+        { stage: "SEARCHING_PUBLIC_SOURCES", about: { subjects: ["Nixo"] } },
+        labels,
+      ),
+    ).toBe("Looking into it");
+    expect(stageLineText({ stage: "PREPARING_ANALYSIS" }, labels)).toBe(
+      "Pulling it together",
+    );
+  });
+
+  it("says a durable task by its name and the pipeline's real step count", () => {
+    const labels = {
+      DESIGNING_DOCUMENT: "Laying out each page",
+    } as unknown as Parameters<typeof taskLineText>[1];
+    const deck = {
+      stage: "DESIGNING_DOCUMENT" as const,
+      about: {
+        subjects: ["Nixo"],
+        task: { kind: "PITCH_DECK" as const, step: 2, of: 4 },
+      },
+    };
+    expect(taskLineText(deck, labels)).toEqual([
+      "Deck for Nixo",
+      "2 of 4",
+      "Laying out each page",
+    ]);
+    expect(stageLineText(deck, labels)).toBe(
+      "Deck for Nixo · 2 of 4 · Laying out each page",
+    );
+    // A brief has no pipeline count: no number is invented.
+    expect(
+      taskLineText(
+        {
+          stage: "DESIGNING_DOCUMENT",
+          about: { subjects: ["Nixo"], task: { kind: "INVESTMENT_BRIEF" } },
+        },
+        labels,
+      ),
+    ).toEqual(["Brief for Nixo", "Laying out each page"]);
+  });
+
+  it("keeps one line, replaced in place: never a list, never a percentage", async () => {
     vi.useFakeTimers();
     let state = createQStreamState();
     const view = render(<Surface state={state} />);
-    // Nothing reported yet: no step, no guess.
-    expect(view.container.querySelector("[data-q-stage-progress]")).toBeNull();
     for (const { event: next } of arrivals(PROFILES[2] as Profile).filter(
-      (one) => one.event.type === "q.stage.changed",
+      (one) =>
+        one.event.type === "q.stage.changed" ||
+        one.event.type === "q.run.started",
     )) {
       state = reduceQStream(state, next);
+      act(() => {
+        view.rerender(<Surface state={state} />);
+      });
+      expect(
+        view.container.querySelectorAll("[data-q-stage-line]"),
+      ).toHaveLength(1);
     }
-    act(() => {
-      view.rerender(<Surface state={state} />);
-    });
-    const steps = [...view.container.querySelectorAll("[data-q-stage-step]")];
-    expect(steps.map((one) => one.getAttribute("data-q-stage-step"))).toEqual([
-      "REVIEWING_COMPANY",
-      "CHECKING_EVIDENCE",
-      "COMPARING_OPPORTUNITIES",
-      "PREPARING_ANALYSIS",
-    ]);
-    expect(steps.at(-1)?.getAttribute("aria-current")).toBe("step");
-    expect(
-      steps.slice(0, -1).every((one) => one.hasAttribute("data-q-stage-done")),
-    ).toBe(true);
-    // Words a person reads, never the enum, and no percentage anywhere.
+    expect(view.container.querySelectorAll("li")).toHaveLength(0);
     const text = view.container.textContent ?? "";
-    expect(text).toContain("Looking at the company");
-    expect(text).toContain("Comparing them side by side");
-    expect(text).not.toMatch(/%|COMPARING_OPPORTUNITIES/u);
+    expect(text).toBe("Pulling it together");
+    expect(text).not.toMatch(/%|PREPARING_ANALYSIS/u);
+    await Promise.resolve();
   });
 });
