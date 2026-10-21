@@ -12,6 +12,8 @@ import {
   asksForComparison,
   asksForPipelineSummary,
   comparisonLead,
+  profileLead,
+  researchLead,
   pipelineLead,
 } from "./early-lead.js";
 import {
@@ -168,6 +170,7 @@ import {
 } from "./named-company-fact.js";
 import { CHAINED_GET_TOOL, chainedCompanyOf } from "./chained-read.js";
 import { outputSplitOf } from "./output-split.js";
+import { createReadCache, type ReadCache } from "./read-cache.js";
 export { outputSplitOf, type OutputSplit } from "./output-split.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
 import {
@@ -1259,6 +1262,17 @@ export const TURN_UNREAD_NOTE =
 export const SPOKEN_TURN_NOTE =
   "SPOKEN TURN: this answer is said aloud on a live call. answer: at most three short spoken sentences (about 60 words), first person, the direct answer to what they asked first, contractions, no lists, headings or markdown. A list, scores or a comparison go in answerCards; the words give the gist and the best one or two by name, then say they're on screen. At most three findings. Never read a list aloud.";
 
+/**
+ * Owner 2026-10-21: Q must not drone. A typed answer is what a person can
+ * take in at once; a question whose full answer is long (a deep analysis,
+ * a report) gets the short answer and the offer of the full one as a
+ * document, which the existing document path writes when they say so
+ * (Q_REPORT; ANSWER_EXPORT for the answer as given). Findings with their
+ * evidence are kept either way.
+ */
+export const LONG_ANSWER_NOTE =
+  "TYPED TURN: a few short paragraphs at most, most important first. If the full answer would be long (a deep analysis, a report), give the short answer and offer to write it up as a document.";
+
 export const WRITING_DOCUMENT_NOTE =
   "THEY ASKED FOR THIS AS A DOCUMENT. Your answer IS the document's text: write the piece itself, in full, with a short heading line (# Title) and section headings where they help. Capital Q files your answer as their document with a PDF download right after you finish and shows its card, so never say you cannot make a PDF or document, never describe the document instead of writing it, and never say it is already attached.";
 
@@ -1396,6 +1410,7 @@ export function environmentNoteParts(
     ...(options.spoken === true && options.writingDocument !== true
       ? [SPOKEN_TURN_NOTE]
       : []),
+
     ...(options.writingDocument === true && options.turnUnread !== true
       ? [WRITING_DOCUMENT_NOTE]
       : []),
@@ -1650,6 +1665,11 @@ export type ModelGatewayQAnswerDependencies = {
    */
   readonly deltas?: QLiveDeltaBus | undefined;
   readonly registry?: PromptRegistry | undefined;
+  /**
+   * Reads this person already made under the same authority (read-cache.ts).
+   * Absent: one per seam. A test passes its own to control the clock.
+   */
+  readonly readCache?: ReadCache | undefined;
   readonly context?: QAuthorisedContextPort | undefined;
   /** The Tool Registry's port (CQ-Q-007). Absent: no tool is offered. */
   readonly tools?: QToolPort | undefined;
@@ -2048,6 +2068,7 @@ export function createModelGatewayQAnswer(
   // K4: identical concurrent reads within a run share one call. Which
   // tools are reads is the offer's own declaration, per run.
   const singleFlight = createSingleFlight();
+  const readCache = dependencies.readCache ?? createReadCache();
   const readOnlyByRun = new Map<string, Set<string>>();
   const noteOffer = (
     runId: string,
@@ -2080,6 +2101,20 @@ export function createModelGatewayQAnswer(
           },
         }),
     execute: async (proposal, toolContext) => {
+      const isRead =
+        readOnlyByRun.get(toolContext.runId)?.has(proposal.name) === true;
+      // What Q knows, Q knows (read-cache.ts): the same read under the
+      // same authority within minutes is answered from what was read.
+      const kept = isRead ? readCache.get(proposal, toolContext) : null;
+      if (kept !== null) {
+        logger?.info(
+          { qRunId: toolContext.runId, tool: proposal.name },
+          "q read answered from what this person already read",
+        );
+        runCompanies.note(toolContext.runId, kept);
+        runFits.note(toolContext.runId, kept);
+        return kept;
+      }
       const outcome = await singleFlight.execute(
         toolContext.runId,
         proposal,
@@ -2093,6 +2128,15 @@ export function createModelGatewayQAnswer(
       );
       runCompanies.note(toolContext.runId, outcome);
       runFits.note(toolContext.runId, outcome);
+      if (isRead) readCache.keep(proposal, toolContext, outcome);
+      else if (
+        outcome.status === "SUCCEEDED" &&
+        (outcome.classification === "PREPARE" ||
+          outcome.classification === "SIDE_EFFECT")
+      ) {
+        // Something of theirs changed: what was read for them is not kept.
+        readCache.forget(toolContext);
+      }
       return outcome;
     },
   };
@@ -3981,7 +4025,28 @@ export function createModelGatewayQAnswer(
             ? pipelineLead(outcome.result.data, latest.content)
             : null;
         }
-        if (!asksForComparison(latest.content)) return null;
+        if (!asksForComparison(latest.content)) {
+          // One company named, already read in full by this run: its own
+          // declared profile opens the answer (first word, owner 10-21).
+          const named = [...runCompanies.read(request.runId).profiles].filter(
+            ([, name]) => containsCompanyName(latest.content, name),
+          );
+          if (named.length !== 1) return null;
+          const [companyId] = named[0] ?? [];
+          if (companyId === undefined) return null;
+          const outcome = await tools
+            .execute(
+              {
+                callId: "q-early-lead-profile",
+                name: "get_company",
+                arguments: { companyId },
+              },
+              toolContext,
+            )
+            .catch(() => null);
+          const profile = profileOf(outcome);
+          return profile === null ? null : profileLead(profile);
+        }
         // The named companies this run already read in full (prepare's
         // named-visible reads): read again from the run's own kept reads.
         const named = [...runCompanies.read(request.runId).profiles].filter(
@@ -4084,7 +4149,10 @@ export function createModelGatewayQAnswer(
         leadLines !== undefined ||
         request.writingDocument === true ||
         request.askedAction !== undefined ||
-        (request.turnKind !== undefined && request.turnKind !== "QUESTION_TO_Q")
+        (request.turnKind !== undefined &&
+          request.turnKind !== "QUESTION_TO_Q" &&
+          // A web question opens from the record too, before the web.
+          request.turnKind !== "RESEARCH_REQUEST")
           ? null
           : await composeEarlyLead().catch(() => null);
       took("early-lead");
@@ -4427,6 +4495,24 @@ export function createModelGatewayQAnswer(
           streamedText += `${said} `;
           sendSaid(`${said} `);
         }
+      };
+      /**
+       * Owner 2026-10-21 (time to the first word): a public-web search
+       * takes seconds, so when nothing has been said yet, what Q is doing
+       * is said as the search starts -- true then, because the call is
+       * being made. Streamed only: the stored answer opens with what was
+       * found, not with a line that is past by then.
+       */
+      const sayResearching = (args: unknown): void => {
+        if (firstPublishedMs !== null || leadLines !== undefined) return;
+        const entity = (args as { readonly entityName?: unknown } | null)
+          ?.entityName;
+        const named =
+          typeof entity === "string" && entity.trim().length > 1
+            ? entity.trim().slice(0, 60)
+            : (companyNameCandidates(latest.content)[0] ?? null);
+        firstPublishedMs = Date.now() - startedAt;
+        sendSaid(`${researchLead(named)} `);
       };
       const publish = (text: string): void => {
         // Code's opening lines come first on every surface that listens to
@@ -5511,7 +5597,17 @@ export function createModelGatewayQAnswer(
               capabilities,
               ...workNote,
               CONVERSATION_FINDINGS_NOTE,
-              TOOLS_FIRST_NOTE,
+              // Owner 2026-10-21: a typed answer stays short and a long one
+              // becomes an offered document; said with the answer's own
+              // instructions, outside the bounded notes.
+              request.spoken !== true &&
+              request.writingDocument !== true &&
+              request.turnUnread !== true
+                ? {
+                    ...TOOLS_FIRST_NOTE,
+                    content: `${TOOLS_FIRST_NOTE.content} ${LONG_ANSWER_NOTE}`,
+                  }
+                : TOOLS_FIRST_NOTE,
             ];
 
       if (ownProfileCall !== null) {
@@ -5601,6 +5697,9 @@ export function createModelGatewayQAnswer(
             },
           };
           took("beforeResearch");
+          if (readCache.get(call, toolContext) === null) {
+            sayResearching(call.arguments);
+          }
           const [outcome] = await Promise.all([
             callTool(call, toolContext),
             stageWrite,
@@ -5637,6 +5736,14 @@ export function createModelGatewayQAnswer(
            */
           const chainedReads = new Map<string, Promise<QToolCallOutcome>>();
           const runCall = (call: ModelToolCall): Promise<QToolCallOutcome> => {
+            // Said only when the web is really asked (not answered from
+            // what this person already read).
+            if (
+              call.name === PUBLIC_WEB_TOOL &&
+              readCache.get(call, toolContext) === null
+            ) {
+              sayResearching(call.arguments);
+            }
             const companyId = (
               call.arguments as { readonly companyId?: unknown } | null
             )?.companyId;

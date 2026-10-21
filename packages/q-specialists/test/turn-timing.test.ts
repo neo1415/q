@@ -54,9 +54,13 @@ import { createSpecialistQAnswer } from "../src/answer.js";
  *   TURN_READER 1,200 ms    measured p50 1.2 s (row 4)
  *   tool-selection round    1,900 ms (row 16: two rounds 3.8-4.5 s;
  *                           PERFORMANCE-BASELINE.md: 1,798 + 2,036 ms)
- *   answer model            700 ms to first token (assumed, not
- *                           measured), then 100 tokens/s (row 15:
- *                           ~100 tokens/s, 1,100-2,280 tokens out)
+ *   answer model            1,600 ms to first token, then 125
+ *                           tokens/s: measured live 2026-10-21 on the
+ *                           real v26 prompt (8,158 input tokens),
+ *                           gpt-5.6-luna, first token 1,266 and 1,938 ms
+ *                           (scripts/handoff/live/answer-model-latency.mjs;
+ *                           the Gemini models routing prefers returned 402
+ *                           there). 1,100-2,280 tokens out (row 15)
  *   public web search       3,000 ms (model-gateway: "three seconds on
  *                           the web")
  *   a tool read             40 ms (row 7: 20-80 ms)
@@ -68,8 +72,8 @@ const LATENCY = {
   skimMs: 850,
   readerMs: 1_200,
   roundMs: 1_900,
-  firstTokenMs: 700,
-  tokensPerSecond: 100,
+  firstTokenMs: 1_600,
+  tokensPerSecond: 125,
   webMs: 3_000,
   readMs: 40,
   dbMs: 10,
@@ -173,7 +177,7 @@ type Needs = {
 
 /** A model that asks for what it needs, all at once, then answers. */
 function timedModel(
-  needs: Needs,
+  needs: Needs & { readonly forgetful?: boolean },
   answerTokens: number,
   /** The answer text's share of the object (scripts/handoff/answer-output-split.mjs). */
   answerShare: number,
@@ -193,8 +197,16 @@ function timedModel(
       const offered = new Set(request.tools.map((tool) => tool.name));
       const proposals: { name: string; arguments: Record<string, unknown> }[] =
         [];
+      const thisTurnRead = request.messages.some(
+        (message) => message.role === "TOOL",
+      );
       for (const name of needs.companies) {
         const id = COMPANIES[name] ?? "";
+        if (needs.forgetful === true && !thisTurnRead) {
+          // Asks again, though the conversation holds it.
+          proposals.push({ name: "get_company", arguments: { companyId: id } });
+          continue;
+        }
         if (seen.includes(`profile of ${name}`)) continue;
         if (seen.includes(id) && offered.has("get_company")) {
           proposals.push({ name: "get_company", arguments: { companyId: id } });
@@ -413,6 +425,20 @@ type Journey = {
   readonly before?: string;
   /** "Make me a PDF": exempt from the budget, its stages timed. */
   readonly document?: boolean;
+  /**
+   * A turn before the measured one, in the same conversation and seam
+   * (what Q knows, Q knows): its reads may serve the measured turn.
+   */
+  readonly earlier?: {
+    readonly said: string;
+    readonly reading: Record<string, unknown>;
+    readonly needs: Needs;
+  };
+  /**
+   * The model asks again for what the conversation already read (the
+   * re-search the owner saw), so only code can spare the read.
+   */
+  readonly forgetful?: boolean;
 };
 
 export type Timing = {
@@ -425,6 +451,12 @@ export type Timing = {
   readonly modelCalls: number;
   readonly calls: readonly string[];
   readonly stages: readonly string[];
+  /** What was stored as Q's answer. */
+  readonly stored: readonly string[];
+  /** Reads that reached the tool port in the measured turn. */
+  readonly reads: readonly string[];
+  /** The first words streamed. */
+  readonly firstText: string | null;
 };
 
 const question = (kind: string, text: string) => ({
@@ -486,6 +518,62 @@ export const JOURNEYS: readonly Journey[] = [
     },
   },
   {
+    // Not on Capital Q: no record to open from, so Q says what it is
+    // checking as the web search starts (streamed, never stored).
+    name: "public web search, company not on Capital Q",
+    said: "What is the latest public news on Acme Robotics?",
+    spoken: false,
+    needs: { companies: [], web: true, cards: false },
+    answerTokens: 900,
+    answerShare: 0.29,
+    reading: {
+      ...question("FACTUAL", "latest public news on Acme Robotics"),
+      kind: "RESEARCH_REQUEST",
+    },
+  },
+  {
+    // What Q knows, Q knows: the company was read last turn; the model
+    // asks for it again, and code answers from that read.
+    name: "follow-up on a company read last turn",
+    said: "what's their runway?",
+    spoken: false,
+    needs: { companies: ["Northwind Ledger"], web: false, cards: false },
+    answerTokens: 600,
+    answerShare: 0.29,
+    reading: {
+      ...question("FACTUAL", "what's their runway?"),
+      aboutNamedOther: false,
+    },
+    forgetful: true,
+    earlier: {
+      said: "Tell me about Northwind Ledger",
+      reading: question("ANALYSIS", "Tell me about Northwind Ledger"),
+      needs: { companies: ["Northwind Ledger"], web: false, cards: false },
+    },
+  },
+  {
+    // The web was read last turn for the same thing; asked about again.
+    name: "follow-up on what the web said",
+    said: "what did those sources say about their funding?",
+    spoken: false,
+    needs: { companies: [], web: true, cards: false },
+    answerTokens: 600,
+    answerShare: 0.29,
+    reading: {
+      ...question("FACTUAL", "what did those sources say about their funding?"),
+      kind: "RESEARCH_REQUEST",
+      aboutNamedOther: false,
+    },
+    earlier: {
+      said: "What is the latest public news on Acme Robotics?",
+      reading: {
+        ...question("FACTUAL", "latest public news on Acme Robotics"),
+        kind: "RESEARCH_REQUEST",
+      },
+      needs: { companies: [], web: true, cards: false },
+    },
+  },
+  {
     name: "spoken follow-up",
     said: "why does that matter for a seed investor",
     spoken: true,
@@ -542,10 +630,12 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
   const runId = randomUUID();
   const conversationId = randomUUID();
   const calls: string[] = [];
-  const started = performance.now();
+  let started = performance.now();
   const at = (): number => (performance.now() - started) / SCALE;
+  const reads: string[] = [];
   let firstVisibleMs: number | null = null;
   let firstWordsMs: number | null = null;
+  let firstText: string | null = null;
   /** The last streamed sentence: the voice has the whole answer to say. */
   let lastWordsMs: number | null = null;
   /** The first finding shown live (q.finding.available). */
@@ -571,7 +661,18 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
             createdAt: new Date(Date.now() - 30_000).toISOString(),
           } as unknown as QConversationMessage,
         ];
-  const latest = {
+  const userMessage = (said: string, inRun: string) =>
+    ({
+      id: randomUUID(),
+      tenantId: TENANT,
+      conversationId,
+      runId: inRun,
+      role: "USER",
+      content: said,
+      contentType: "TEXT",
+      createdAt: new Date().toISOString(),
+    }) as unknown as QConversationMessage;
+  let latest = {
     id: randomUUID(),
     tenantId: TENANT,
     conversationId,
@@ -632,7 +733,10 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
       if (delta.preview !== undefined) firstVisibleMs ??= at();
       if (delta.text.trim().length > 0) {
         lastWordsMs = at();
-        if (firstWordsMs === null) trace("first words");
+        if (firstWordsMs === null) {
+          trace("first words");
+          firstText = delta.text;
+        }
         firstWordsMs ??= at();
         firstVisibleMs ??= at();
       }
@@ -640,11 +744,17 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
     subscribe: () => () => undefined,
     subscriberCount: () => 1,
   };
+  // Mutable: an earlier turn needs what it needs, then the measured one.
+  const needsNow: Needs & { forgetful?: boolean } = {
+    ...(journey.earlier?.needs ?? journey.needs),
+  };
+  let readingNow: Record<string, unknown> =
+    journey.earlier?.reading ?? journey.reading;
   const gateway = createModelGateway({
     catalog: createStaticModelCatalog(catalog()),
     registry: createModelProviderRegistry([
       timedModel(
-        journey.needs,
+        needsNow,
         journey.answerTokens,
         journey.answerShare,
         calls,
@@ -672,7 +782,10 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
     repositories,
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
-    tools: toolPort(trace),
+    tools: toolPort((what) => {
+      trace(what);
+      reads.push(what.split(":")[0] ?? what);
+    }),
     deltas,
     logger: silent,
   });
@@ -682,7 +795,7 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
       trace("reader asked");
       await wait(LATENCY.readerMs);
       trace("reader done");
-      return journey.reading as never;
+      return readingNow as never;
     },
   };
   const turnSkim: QTurnSkimmer = {
@@ -733,40 +846,75 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
       ? { speculation: { spoken: true, observe: () => undefined } }
       : {}),
   });
-  const plan = PermittedContextPlanSchema.parse({
-    contractVersion: 1,
-    policyVersion: Q_CONTEXT_FIREWALL_POLICY_VERSION,
-    planId: randomUUID(),
-    fingerprint: "0".repeat(64),
-    runId,
-    tenantId: TENANT,
-    actor: { userId: USER },
-    purpose: { capability: "ANSWER", taskClass: "GENERAL_QUESTION" },
-    subjects: [],
-    scopes: [],
-    denied: [],
-    maxSensitivity: "CONFIDENTIAL",
-    allowedLayers: [],
-    combinationConstraints: [],
-    evaluatedAt: new Date().toISOString(),
-    revalidateAfter: new Date(Date.now() + 60_000).toISOString(),
-    revalidateOnResume: true,
-  });
-  const request = {
-    runId,
-    tenantId: TENANT,
-    actorUserId: USER,
-    actor: ActorContextSchema.parse({
-      userId: USER,
+  const planFor = (inRun: string) =>
+    PermittedContextPlanSchema.parse({
+      contractVersion: 1,
+      policyVersion: Q_CONTEXT_FIREWALL_POLICY_VERSION,
+      planId: randomUUID(),
+      fingerprint: "0".repeat(64),
+      runId: inRun,
       tenantId: TENANT,
-      actorType: "HUMAN",
-    }),
-    correlationId: `cor_${runId}`,
-    capability: "ANSWER",
-    subjects: [],
-    retrieval: { kind: "NOT_CONFIGURED" },
-    plan,
-  } as unknown as QAnswerRequest;
+      actor: { userId: USER },
+      purpose: { capability: "ANSWER", taskClass: "GENERAL_QUESTION" },
+      subjects: [],
+      scopes: [],
+      denied: [],
+      maxSensitivity: "CONFIDENTIAL",
+      allowedLayers: [],
+      combinationConstraints: [],
+      evaluatedAt: new Date().toISOString(),
+      revalidateAfter: new Date(Date.now() + 60_000).toISOString(),
+      revalidateOnResume: true,
+    });
+  const requestFor = (inRun: string) =>
+    ({
+      runId: inRun,
+      tenantId: TENANT,
+      actorUserId: USER,
+      actor: ActorContextSchema.parse({
+        userId: USER,
+        tenantId: TENANT,
+        actorType: "HUMAN",
+      }),
+      correlationId: `cor_${runId}`,
+      capability: "ANSWER",
+      subjects: [],
+      retrieval: { kind: "NOT_CONFIGURED" },
+      plan: planFor(inRun),
+    }) as unknown as QAnswerRequest;
+  if (journey.earlier !== undefined) {
+    // The turn before, in the same conversation: then the measured turn,
+    // with its own clock and counters.
+    const earlierRun = randomUUID();
+    latest = userMessage(journey.earlier.said, earlierRun);
+    const before = requestFor(earlierRun);
+    answer.preread?.({
+      runId: before.runId,
+      tenantId: before.tenantId,
+      actor: before.actor,
+      correlationId: before.correlationId,
+    });
+    expect((await answer.answer(before)).kind).toBe("ANSWERED");
+    earlier.push(latest, ...stored.splice(0));
+    latest = userMessage(journey.said, runId);
+    Object.assign(needsNow, journey.needs, {
+      forgetful: journey.forgetful === true,
+    });
+    readingNow = journey.reading;
+    calls.length = 0;
+    reads.length = 0;
+    stages.length = 0;
+    traced.length = 0;
+    firstVisibleMs = null;
+    firstWordsMs = null;
+    firstText = null;
+    lastWordsMs = null;
+    firstFindingMs = null;
+    started = performance.now();
+  } else if (journey.forgetful === true) {
+    needsNow.forgetful = true;
+  }
+  const request = requestFor(runId);
   answer.preread?.({
     runId: request.runId,
     tenantId: request.tenantId,
@@ -788,6 +936,9 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
     modelCalls: calls.length,
     calls,
     stages: [...stages, ...traced],
+    stored: stored.map((message) => message.content),
+    reads: [...reads],
+    firstText,
   };
 }
 
@@ -802,11 +953,11 @@ describe("turn timing harness", () => {
     const rows: Timing[] = [];
     for (const journey of JOURNEYS) rows.push(await timeJourney(journey));
     const table = [
-      "| journey | first visible | first words | answer words all out | first finding | complete | model calls | calls |",
-      "| --- | --- | --- | --- | --- | --- | --- | --- |",
+      "| journey | first visible | first words | answer words all out | first finding | complete | model calls | reads | calls |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
       ...rows.map(
         (row) =>
-          `| ${row.journey} | ${ms(row.firstVisibleMs)} | ${ms(row.firstWordsMs)} | ${ms(row.lastWordsMs)} | ${ms(row.firstFindingMs)} | ${ms(row.completeMs)} | ${String(row.modelCalls)} | ${row.calls.join(", ")} |`,
+          `| ${row.journey} | ${ms(row.firstVisibleMs)} | ${ms(row.firstWordsMs)} | ${ms(row.lastWordsMs)} | ${ms(row.firstFindingMs)} | ${ms(row.completeMs)} | ${String(row.modelCalls)} | ${row.reads.join(", ") || "-"} | ${row.calls.join(", ")} |`,
       ),
     ].join("\n");
     console.log(`\n${table}\n`);
@@ -826,6 +977,43 @@ describe("turn timing harness", () => {
     for (const one of rows) {
       expect(one.stages.some((stage) => /^[A-Z_]+@/u.test(stage))).toBe(true);
     }
+    // Owner 2026-10-21 (time to the first word): about 2 s where the work
+    // allows. A named company opens from its record as the model is asked,
+    // a web question too, before the web (before: 7.1 s).
+    for (const name of [
+      "typed question about",
+      "typed question, company named",
+      "comparison",
+      "public web search by name",
+    ]) {
+      expect(row(name).firstWordsMs ?? Infinity).toBeLessThan(2_000);
+    }
+    // A spoken follow-up with no record to open from: the speculative
+    // answer's own first words (skim 0.85 s + first token 1.6 s); the
+    // voice line's quick acknowledgement is said before that, by code.
+    expect(row("spoken follow-up").firstWordsMs ?? Infinity).toBeLessThan(
+      3_000,
+    );
+    // What Q knows, Q knows: nothing read last turn is read again.
+    expect(row("follow-up on a company read").reads).not.toContain(
+      "get_company",
+    );
+    expect(row("follow-up on a company read").reads).not.toContain(
+      "search_companies",
+    );
+    expect(row("follow-up on what the web said").reads).not.toContain(
+      "research_public_web",
+    );
+    // Not asked again, so Q never says it is checking the web.
+    expect(row("follow-up on what the web said").firstText ?? "").not.toContain(
+      "I'm checking",
+    );
+    // Not on Capital Q: what Q is checking, said as the search starts
+    // (after the round that composes it), and never stored with the answer.
+    const unknown = row("public web search, company not");
+    expect(unknown.firstText).toContain("I'm checking what's public on");
+    expect(unknown.firstWordsMs ?? Infinity).toBeLessThan(4_000);
+    expect(unknown.stored.join(" ")).not.toContain("I'm checking");
     // Progressive findings (round 5): the first one is on screen well
     // before the whole object is written.
     for (const name of ["typed question about", "comparison"]) {

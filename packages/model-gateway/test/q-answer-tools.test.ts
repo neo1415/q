@@ -1449,6 +1449,44 @@ describe("answer seam tool loop", () => {
     expect(live).toHaveLength(0);
   });
 
+  it("what Q knows, Q knows: a later turn's same read is not made again; 'check again' reads anew", async () => {
+    const tools = toolPort([GET_COMPANY], (p) =>
+      succeeded(p, { canonicalName: "Northwind", relationToYou: "SHARED" }),
+    );
+    const { seam, request, messages } = build({
+      script: [
+        call("first", { companyId: "n" }),
+        { kind: "JSON", value: analystResult("Seed stage.") },
+        call("second", { companyId: "n" }),
+        { kind: "JSON", value: analystResult("Runway is not stated.") },
+        call("third", { companyId: "n" }),
+        { kind: "JSON", value: analystResult("Still seed.") },
+      ],
+      tools,
+    });
+    const turn = async (said: string) => {
+      const first = messages[0];
+      if (first === undefined) throw new Error("fixture");
+      messages[0] = { ...first, content: said };
+      return seam.answer({
+        ...request,
+        runId: randomUUID() as typeof request.runId,
+      });
+    };
+    expect((await turn("tell me about Northwind")).kind).toBe("ANSWERED");
+    expect((await turn("what's their runway?")).kind).toBe("ANSWERED");
+    // The second turn's read came from what was already read.
+    expect(tools.executed.filter((p) => p.name === "get_company")).toHaveLength(
+      1,
+    );
+    expect((await turn("check again: what stage are they at?")).kind).toBe(
+      "ANSWERED",
+    );
+    expect(tools.executed.filter((p) => p.name === "get_company")).toHaveLength(
+      2,
+    );
+  });
+
   it("repairs a non-JSON text answer with a final structured call", async () => {
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
     const { seam, alpha, request, messages } = build({
