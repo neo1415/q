@@ -38,6 +38,9 @@ const mocks = vi.hoisted(() => ({
   reminders: vi.fn(),
   commitments: vi.fn(),
   usage: vi.fn(),
+  pipeline: vi.fn(),
+  views: vi.fn(),
+  deck: vi.fn(),
   steps: vi.fn(),
   remind: vi.fn(),
   read: vi.fn(),
@@ -79,6 +82,12 @@ vi.mock("@capital-q/api-client", async (load) => ({
   // was a real fetch to test.invalid, whose timing decided whether the
   // block had landed before the assertions (CI run 39610577213).
   getMyUsage: mocks.usage,
+  // The Pipeline's export scope and saved views, and a founder's deck
+  // review: unmocked, each was a real fetch to test.invalid, and a slow one
+  // left the list loading at assertion time (CI run 39626760368).
+  queryRelationshipPipeline: mocks.pipeline,
+  listRelationshipViews: mocks.views,
+  getCompanyDeck: mocks.deck,
 }));
 vi.mock("@/features/results/results-dashboard", () => ({
   ResultsDashboard: ({
@@ -111,6 +120,9 @@ beforeEach(() => {
   mocks.reminders.mockResolvedValue({ items: [] });
   mocks.steps.mockResolvedValue([]);
   mocks.usage.mockResolvedValue(null);
+  mocks.pipeline.mockRejectedValue(new Error("Unavailable"));
+  mocks.views.mockRejectedValue(new Error("Unavailable"));
+  mocks.deck.mockRejectedValue(new Error("Unavailable"));
   mocks.remind.mockResolvedValue({ ok: true, value: {} });
   mocks.read.mockResolvedValue({ ok: true, value: null });
   mocks.dismiss.mockResolvedValue({ ok: true, value: null });
