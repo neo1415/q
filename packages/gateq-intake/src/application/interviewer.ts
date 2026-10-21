@@ -85,8 +85,16 @@ const DIALOGUE_BUDGET = {
   maxAttempts: 3,
   maxEstimatedCostUsd: 0.05,
   maxOutputTokens: 1_024,
-  attemptTimeoutMs: 30_000,
+  // Onboarding speed 2026-10-20: three 30 s attempts let one turn hold an
+  // applicant for a minute and a half. A stalled model now gives way.
+  attemptTimeoutMs: 15_000,
 } as const;
+/**
+ * The first model's patience while another can take the turn: a healthy
+ * turn writes its reply well inside this, and a stalled one hands over
+ * instead of using the whole attempt (the onboarding interview's rule).
+ */
+const FIRST_ATTEMPT_MS = 8_000;
 
 export type InterviewTurnInput = {
   /** PUBLIC before an application exists; APPLICATION once it does. */
@@ -529,6 +537,7 @@ export function createGateQInterviewer(
           },
           {
             schema: GateQInterviewerResultSchema,
+            firstAttemptTimeoutMs: FIRST_ATTEMPT_MS,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );

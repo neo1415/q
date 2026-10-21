@@ -60,6 +60,7 @@ import { VoiceStage } from "../voice/voice-stage";
 import {
   acknowledgeValue,
   BRIDGE_LINE,
+  splitForQ,
   gapValue,
   isTaxonomySuggestion,
   pickedUp,
@@ -172,6 +173,13 @@ type Turn = {
   readonly id: string;
   readonly kind: "Q" | "PERSON";
   readonly text: string;
+  /**
+   * Their words did not reach Q (onboarding speed 2026-10-20): shown as
+   * not taken in, with a way to send them again, never as if Q heard them.
+   */
+  readonly unsent?: boolean | undefined;
+  /** How an unsent tap is made again; typed words are simply resent. */
+  readonly resend?: (() => void) | undefined;
 };
 
 const READING_POLL_MS = 3000;
@@ -301,6 +309,17 @@ export function QOnboardingWorkspace({
     },
     [],
   );
+  /** Their line did not reach Q: shown so, with a way to send it again. */
+  const markUnsent = useCallback((id: string, resend?: () => void) => {
+    setTurns((current) =>
+      current.map((line) =>
+        line.id === id ? { ...line, unsent: true, resend } : line,
+      ),
+    );
+  }, []);
+  const dropLine = useCallback((id: string) => {
+    setTurns((current) => current.filter((line) => line.id !== id));
+  }, []);
 
   // Voice (CQ-Q-VOICE-001 D §44-§50; E §67-§74): the same interview,
   // spoken. What the provider transcribes joins the thread as the person's
@@ -794,7 +813,7 @@ export function QOnboardingWorkspace({
     [push, qSubject, answerOf, view?.session.id],
   );
 
-  const say = useCallback(
+  const sayOne = useCallback(
     async (text: string, typed = false) => {
       const trimmed = text.trim();
       if (trimmed.length === 0) {
@@ -812,7 +831,8 @@ export function QOnboardingWorkspace({
           push("Q", liveQuestion);
         }
       }
-      push("PERSON", trimmed);
+      const personLine = newId();
+      push("PERSON", trimmed, personLine);
       if (journeyName !== undefined) {
         writeLastMode(journeyName, "conversation");
       }
@@ -834,6 +854,10 @@ export function QOnboardingWorkspace({
         trimmed.split(/\s+/).length >= 6;
       const turn = await actions.say(trimmed, recentTurns());
       if (turn === null) {
+        // Q never answered (a failure, a timeout, a lost connection). The
+        // line says so and can be sent again; it is never left looking
+        // heard while nothing of it was taken in.
+        markUnsent(personLine);
         return;
       }
       setQAsking(turn.askingAbout ?? null);
@@ -865,7 +889,7 @@ export function QOnboardingWorkspace({
         // the conversation from the runtime's reading of the sentence.
         push(
           "Q",
-          "I couldn't put that into words just now, but it's recorded below.",
+          "I couldn't put that into words just now. Anything I saved from it shows below.",
         );
         handleUnderstanding(turn.understood);
       }
@@ -948,12 +972,36 @@ export function QOnboardingWorkspace({
       settleReading,
       askQ,
       handleUnderstanding,
+      markUnsent,
       actions,
       voiceActive,
       voiceConnected,
       voiceSendText,
       journeyName,
     ],
+  );
+
+  /** What they said, in as many messages as Q can take, in order. */
+  const say = useCallback(
+    async (text: string, typed = false) => {
+      for (const part of splitForQ(text)) {
+        await sayOne(part, typed);
+      }
+    },
+    [sayOne],
+  );
+
+  /** Their unsent words, sent again in place of the line that failed. */
+  const sendAgain = useCallback(
+    (line: Turn) => {
+      if (line.resend !== undefined) {
+        line.resend();
+        return;
+      }
+      dropLine(line.id);
+      void say(line.text, true);
+    },
+    [say, dropLine],
   );
 
   /**
@@ -978,22 +1026,39 @@ export function QOnboardingWorkspace({
       if (liveQuestion !== null) {
         push("Q", liveQuestion);
       }
-      push("PERSON", spoken ?? chip.label);
+      const tapped = chip.value;
+      const stepKey = prompt.stepKey;
+      const personLine = newId();
+      push("PERSON", spoken ?? chip.label, personLine);
       settleReading();
       setNarrowedTo(null);
-      const ok = await actions.submitValue({
-        stepKey: prompt.stepKey,
-        value: chip.value,
-      });
-      if (ok) {
-        push("Q", acknowledgeValue(prompt.stepKey, chip.value, vocabulary));
-      }
+      const tap = async (): Promise<void> => {
+        const ok = await actions.submitValue({ stepKey, value: tapped });
+        if (ok) {
+          push("Q", acknowledgeValue(stepKey, tapped, vocabulary));
+        } else {
+          // A refused or conflicted tap used to leave their choice looking
+          // made (onboarding speed 2026-10-20).
+          markUnsent(personLine, () => {
+            setTurns((current) =>
+              current.map((line) =>
+                line.id === personLine
+                  ? { ...line, unsent: false, resend: undefined }
+                  : line,
+              ),
+            );
+            void tap();
+          });
+        }
+      };
+      await tap();
     },
     [
       prompt,
       liveQuestion,
       say,
       push,
+      markUnsent,
       settleReading,
       actions,
       vocabulary,
@@ -1020,17 +1085,34 @@ export function QOnboardingWorkspace({
     if (liveQuestion !== null) {
       push("Q", liveQuestion);
     }
-    push("PERSON", chosen.map((chip) => chip.label).join(", "));
+    const stepKey = prompt.stepKey;
+    const personLine = newId();
+    push("PERSON", chosen.map((chip) => chip.label).join(", "), personLine);
     settleReading();
-    const ok = await actions.submitValue({ stepKey: prompt.stepKey, value });
-    if (ok) {
-      push("Q", acknowledgeValue(prompt.stepKey, value, vocabulary));
-    }
+    const tap = async (): Promise<void> => {
+      const ok = await actions.submitValue({ stepKey, value });
+      if (ok) {
+        push("Q", acknowledgeValue(stepKey, value, vocabulary));
+      } else {
+        markUnsent(personLine, () => {
+          setTurns((current) =>
+            current.map((line) =>
+              line.id === personLine
+                ? { ...line, unsent: false, resend: undefined }
+                : line,
+            ),
+          );
+          void tap();
+        });
+      }
+    };
+    await tap();
   }, [
     liveQuestion,
     prompt,
     picks,
     push,
+    markUnsent,
     settleReading,
     actions,
     vocabulary,
@@ -1616,7 +1698,18 @@ export function QOnboardingWorkspace({
           <QLine key="greeting" id="greeting" kind="Q" text={greeting} />
         )}
         {turns.map((turn) => (
-          <QLine key={turn.id} id={turn.id} kind={turn.kind} text={turn.text} />
+          <QLine
+            key={turn.id}
+            id={turn.id}
+            kind={turn.kind}
+            text={turn.text}
+            unsent={turn.unsent === true}
+            onSendAgain={
+              turn.unsent === true && !working
+                ? () => sendAgain(turn)
+                : undefined
+            }
+          />
         ))}
         {qStream?.partial !== null && qStream?.partial !== undefined ? (
           <QLine
@@ -2325,13 +2418,18 @@ function QLine({
   text,
   streaming = false,
   heading = false,
+  unsent = false,
+  onSendAgain,
 }: {
   readonly id: string;
   readonly kind: Turn["kind"];
   readonly text: string;
   readonly streaming?: boolean;
   readonly heading?: boolean;
+  readonly unsent?: boolean;
+  readonly onSendAgain?: (() => void) | undefined;
 }) {
+  const t = useT();
   if (heading) {
     return (
       <li data-turn={id} className="flex flex-col gap-1 pt-2">
@@ -2363,6 +2461,19 @@ function QLine({
       >
         {text}
       </p>
+      {unsent ? (
+        <p
+          className="cq-caption flex items-center gap-2 text-(--cq-text-secondary)"
+          data-unsent
+        >
+          {t("Q didn't answer this, so it may not be saved yet.")}
+          {onSendAgain === undefined ? null : (
+            <Button size="compact" variant="quiet" onClick={onSendAgain}>
+              {t("Send again")}
+            </Button>
+          )}
+        </p>
+      ) : null}
     </li>
   );
 }

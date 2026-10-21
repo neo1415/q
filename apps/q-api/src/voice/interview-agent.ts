@@ -808,6 +808,43 @@ export function createInterviewAgent(
       recentAsks.delete(oldest);
     }
   };
+  /**
+   * The asked-question memory above, read back from the steps Q's kept
+   * lines asked (oldest first), when this process holds none for the
+   * session: a deploy or restart otherwise forgot every optional question
+   * already put to the person, and Q put them again (onboarding speed
+   * 2026-10-20). Once anything is held for the session, it wins.
+   */
+  const recallAsked = (
+    sessionId: string,
+    askedSteps: readonly (string | null)[],
+  ) => {
+    if (
+      askedSteps.length === 0 ||
+      recentAsks.has(sessionId) ||
+      lastAsked.has(sessionId)
+    ) {
+      return;
+    }
+    const counts = new Map<string, number>();
+    for (const stepKey of askedSteps) {
+      if (stepKey !== null) counts.set(stepKey, (counts.get(stepKey) ?? 0) + 1);
+    }
+    for (const [stepKey, times] of counts) {
+      askedOptional.add(
+        sessionId,
+        times >= 2 ? [stepKey, `${stepKey}${ASKED_AGAIN}`] : [stepKey],
+      );
+    }
+    for (const stepKey of askedSteps.slice(-2)) rememberAsk(sessionId, stepKey);
+    const asked = askedSteps.filter((k): k is string => k !== null);
+    const last = askedSteps.at(-1) ?? null;
+    if (last !== null) lastAsked.set(sessionId, last);
+    const before = asked.findLast((k) => k !== last);
+    if (last !== null && before !== undefined) {
+      askedBeforeLast.set(sessionId, before);
+    }
+  };
   // What each earlier utterance stated, as the independent reading found
   // it when it was said: a monologue's answers stay theirs on later turns
   // (live 2026-09-30). Bounded per session and across sessions.
@@ -881,6 +918,27 @@ export function createInterviewAgent(
       ? CorrelationIdSchema.parse(input.attribution.correlationId)
       : CorrelationIdSchema.parse(`cor_${randomUUID()}`);
 
+    // Independent reads, together (onboarding speed 2026-10-20: the thread,
+    // Q's standing and the firewall plan were three waits in a row before
+    // anything else could start). The plan's refusal still stops the turn
+    // where it always did, below; it is only asked sooner.
+    const planned = firewall.plan({
+      actor,
+      runId,
+      correlationId,
+      capability: "ANSWER",
+      subjects: [],
+    });
+    planned.catch(() => undefined);
+    const standingRead =
+      dependencies.standing === undefined
+        ? Promise.resolve(null)
+        : dependencies.standing
+            .read(actor.userId, actor.tenantId, new Date(now()))
+            .catch((error: unknown) => {
+              logger.warn({ err: error }, "Q's standing was not read");
+              return null;
+            });
     // The whole conversation, from the kept thread; the browser's recent
     // turns only when the thread cannot be read.
     const kept = await listOnboardingInterviewTurns(
@@ -890,6 +948,8 @@ export function createInterviewAgent(
       logger.warn({ err: error }, "interview thread not read for the Q run");
       return null;
     });
+    const turnChannel =
+      input.channel === "voice" ? ("VOICE" as const) : ("TEXT" as const);
     const thread =
       kept === null
         ? input.recentTurns.map((t) => ({
@@ -901,15 +961,16 @@ export function createInterviewAgent(
             text: t.text.slice(0, 2_000),
           }));
     const lastQTurn = thread.findLast((t) => t.role === "Q")?.text;
-    const standing =
-      dependencies.standing === undefined
-        ? null
-        : await dependencies.standing
-            .read(actor.userId, actor.tenantId, new Date(now()))
-            .catch((error: unknown) => {
-              logger.warn({ err: error }, "Q's standing was not read");
-              return null;
-            });
+    // A process that restarted (a deploy) holds none of this session's
+    // asked-question memory: it is read back from Q's kept lines, so an
+    // optional question already put to them is not put again.
+    if (kept !== null) {
+      recallAsked(
+        input.onboardingSessionId,
+        kept.items.filter((t) => t.role === "Q").map((t) => t.stepKey ?? null),
+      );
+    }
+    const standing = await standingRead;
     const personality = standing?.personality ?? "AUTO";
     // Multilingual Q: the language they chose for Q (Settings or by telling
     // Q), so the interview opens and asks in it.
@@ -935,6 +996,40 @@ export function createInterviewAgent(
     // A paused account talks to nobody until a person at Capital Q has
     // looked at it: refused here, before any model is called.
     if (conductBefore.suspended) throw new AccountPausedError();
+    /**
+     * The person's words are kept before any model reads them (onboarding
+     * speed 2026-10-20). They used to be written only with Q's reply, at
+     * the very end: a turn that failed, timed out or was interrupted by a
+     * barge-in lost what they said, and the next turn could not reach it.
+     * Kept now, a later turn reads them from the thread like any other.
+     * False when the write failed: the exchange is then kept whole at the
+     * end, as before. Never for a paused account (refused just above).
+     */
+    const personKept: Promise<boolean> = opening
+      ? Promise.resolve(false)
+      : appendOnboardingInterviewTurns(
+          input.session,
+          input.onboardingSessionId,
+          {
+            turnRef: randomUUID(),
+            turns: [
+              {
+                role: "PERSON",
+                text: utterance.slice(0, 4_000),
+                channel: turnChannel,
+              },
+            ],
+          },
+        ).then(
+          () => true,
+          (error: unknown) => {
+            logger.warn(
+              { err: error },
+              "the person's words were not kept before the Q run",
+            );
+            return false;
+          },
+        );
     // What Q is told before it reads the turn: what to do if this turn is
     // small talk. Code decides again from Q's reading afterwards.
     const ifChatter = decideConduct(conductBefore, "PERSON");
@@ -1002,28 +1097,44 @@ export function createInterviewAgent(
       ...compacted.recent,
     ];
 
-    const decision = await firewall.plan({
-      actor,
-      runId,
-      correlationId,
-      capability: "ANSWER",
-      subjects: [],
-    });
+    const decision = await planned;
     if (decision.outcome !== "AUTHORISED") {
       throw new Error(
         "the Context Firewall did not authorise this interview run",
       );
     }
+    // Memory is read beside the reading below, not after it.
+    const memory = dependencies.memory;
+    const loopRead =
+      memory === undefined
+        ? Promise.resolve({
+            memory: "",
+            profile: DEFAULT_COMMUNICATION_PROFILE,
+          })
+        : createLoopMemoryReader({ memory }).read({
+            actor,
+            plan: decision.plan,
+            sessionKey: input.onboardingSessionId,
+          });
+    loopRead.catch(() => undefined);
     const reader = dependencies.delegation;
     if (!opening && reader !== undefined) {
-      const pending = await port.pendingRecommendations().catch(() => []);
+      // Their words are on the thread before the reader (a model) sees
+      // them; the record and pending reads go alongside that write.
+      const [pending, stateForReading] = await Promise.all([
+        port.pendingRecommendations().catch(() => []),
+        dependencies.readingByCodeWhereExact === true
+          ? port.state().catch(() => null)
+          : Promise.resolve(null),
+        personKept,
+      ]);
       const askedKey = lastAsked.get(input.onboardingSessionId) ?? null;
       // Their whole reply is exactly a choice (or a bare figure) of the step
       // just asked: code reads that, with no model call (owner 2026-10-16).
       const decided =
         dependencies.readingByCodeWhereExact === true
-          ? await (async () => {
-              const view = (await port.state().catch(() => null)) ?? null;
+          ? (() => {
+              const view = stateForReading;
               const open = new Set(
                 view?.steps
                   .filter((row) => row.status === "OPEN")
@@ -1078,15 +1189,6 @@ export function createInterviewAgent(
               signal: input.signal,
             });
     }
-    const memory = dependencies.memory;
-    const loop =
-      memory === undefined
-        ? { memory: "", profile: DEFAULT_COMMUNICATION_PROFILE }
-        : await createLoopMemoryReader({ memory }).read({
-            actor,
-            plan: decision.plan,
-            sessionKey: input.onboardingSessionId,
-          });
     // A stated preference is kept through the Write Gate, quote-checked
     // against the person's own words in this conversation.
     const noteTool =
@@ -1172,7 +1274,7 @@ export function createInterviewAgent(
       signal: input.signal,
       conversation: { latestUserText: utterance },
     };
-    const offered = await tools.offer(context);
+    const [offered, loop] = await Promise.all([tools.offer(context), loopRead]);
     // What they typed at sign-up is their own answer (founder direction
     // 2026-09-30: prefill, then confirm): the company or firm name goes on
     // the record at once, so nothing that depends on it waits, and Q says
@@ -2008,6 +2110,9 @@ export function createInterviewAgent(
       );
     };
     try {
+      // Their words are kept before the first round's model sees them
+      // (already settled where the reader waited on it).
+      await personKept;
       // Before the first round, only what they said in earlier turns; the
       // latest words are the model's to record, and code's after its round.
       await recordStatedCurrency(true);
@@ -2237,7 +2342,11 @@ export function createInterviewAgent(
           // that last part again?". What was saved stays saved; the
           // backstop below adds the next question.
           "That's all on your record."
-        : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.";
+        : !opening && (await personKept)
+          ? // Their words are on the thread (kept before the model ran), so
+            // the next turn reads them; nothing is claimed saved.
+            "I couldn't reach my reasoning service just then, so I haven't taken that in yet. Your words are kept here, so there's no need to type them again: say \"go on\" in a moment and I'll pick them up."
+          : "I couldn't reach my reasoning service just then, so I haven't taken that in. Say it again in a moment.";
     // The model's reply, or code's line when it gave none: in their chosen
     // language through the shared translation layer when it is ready.
     const replyWritten =
@@ -2467,25 +2576,21 @@ export function createInterviewAgent(
       );
     }
 
-    // Kept: one exchange per turn, under one reference.
+    // Kept: Q's reply; their words too when the early write did not land.
     const turns = [
-      ...(opening
+      ...(opening || (await personKept)
         ? []
         : [
             {
               role: "PERSON" as const,
               text: utterance.slice(0, 4_000),
-              channel:
-                input.channel === "voice"
-                  ? ("VOICE" as const)
-                  : ("TEXT" as const),
+              channel: turnChannel,
             },
           ]),
       {
         role: "Q" as const,
         text: reply.slice(0, 4_000),
-        channel:
-          input.channel === "voice" ? ("VOICE" as const) : ("TEXT" as const),
+        channel: turnChannel,
         ...(stillOpen && askedOpen !== null
           ? { stepKey: askedOpen.stepKey }
           : {}),

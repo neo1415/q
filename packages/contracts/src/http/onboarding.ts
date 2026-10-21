@@ -1028,6 +1028,11 @@ export const OnboardingInterviewTurnSchema = z
   .object({
     role: OnboardingInterviewTurnRoleSchema,
     text: z.string().min(1).max(ONBOARDING_TEXT_MAX_LENGTH),
+    /**
+     * The step a line of Q's asked, when it asked one: how Q knows, after
+     * a restart, which questions it has already put to the person.
+     */
+    stepKey: OnboardingStepKeySchema.optional(),
     channel: OnboardingInterviewTurnChannelSchema,
     createdAt: UtcTimestampSchema,
   })
