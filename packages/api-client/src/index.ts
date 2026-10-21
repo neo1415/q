@@ -500,6 +500,7 @@ export {
   readDeckAgain,
   reviewDeckSection,
   getCompanyDataRoom,
+  getDataRoomPreview,
   getCompanyDeck,
   getCompanyFounder,
   openCompanyDeck,
