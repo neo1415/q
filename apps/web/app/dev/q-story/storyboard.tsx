@@ -105,6 +105,7 @@ function Photo({
       data-needle={needle}
     >
       {failed ? null : (
+        // eslint-disable-next-line @next/next/no-img-element -- a local review harness: the run answers these paths; no optimiser behind it
         <img
           src={media(`${k}.jpg`)}
           alt={PHOTOS[k].alt}
@@ -125,8 +126,10 @@ function In({
   as: Tag = "div",
   style,
   kind,
+  latest,
 }: {
   readonly kind?: string;
+  readonly latest?: boolean;
   readonly on: boolean;
   readonly off?: boolean;
   readonly children: ReactNode;
@@ -140,6 +143,7 @@ function In({
       data-on={on}
       data-off={off === true ? true : undefined}
       data-kind={kind}
+      data-latest={latest === true ? true : undefined}
       style={style}
     >
       {children}
@@ -167,6 +171,9 @@ const MONTAGE: readonly PhotoKey[] = [
 function SceneView({ s }: { readonly s: StoryState }) {
   const step = s.step;
   switch (s.scene) {
+    case "echo":
+      // The investor's desk from Act 1, faint: the same night, both sides.
+      return <Photo k="desk" className="qs-photo-bleed qs-echo" />;
     case "clock":
       return (
         <>
@@ -614,7 +621,13 @@ function SceneView({ s }: { readonly s: StoryState }) {
           ))}
         </div>
       );
-    default:
+    case "hello":
+    case "silence":
+    case "still":
+    case "handover":
+    case null:
+      // Nothing on the story layer: the presence, the scrim or the real
+      // page carries these beats.
       return null;
   }
 }
@@ -758,6 +771,7 @@ function Shot({ k }: { readonly k: string }) {
   return failed ? (
     <span className="qs-shot-blank" />
   ) : (
+    // eslint-disable-next-line @next/next/no-img-element -- as above: page captures the recording run answers
     <img
       src={media(`shot-${k}.png`)}
       alt=""
@@ -769,6 +783,8 @@ function Shot({ k }: { readonly k: string }) {
 
 /* ——— Chips: foreshadowed in Act 2, paid off in Acts 4 and 5. ——— */
 
+const MANDATE_ORDER = ["thesis", "stage", "geography", "cheque size"];
+
 function ChipStrip({ s }: { readonly s: StoryState }) {
   if (s.chips === "none") return null;
   const n = s.chipStep;
@@ -778,13 +794,17 @@ function ChipStrip({ s }: { readonly s: StoryState }) {
     return (
       <div className="qs-chips" aria-live="polite">
         {names.map((name, i) => {
-          const flipped = pass && n >= i + 1;
+          // The mandate names them in its own order: thesis first.
+          const flipped = pass && MANDATE_ORDER.indexOf(name) < n;
           const shown = pass || n >= i + 1;
           return (
             <In
               key={`${name}-${String(flipped)}`}
               on={shown}
               kind={flipped ? "pass" : "miss"}
+              latest={
+                pass ? MANDATE_ORDER.indexOf(name) === n - 1 : i === n - 1
+              }
               className={`qs-chip ${flipped ? "qs-flip" : ""}`}
             >
               {flipped ? (
@@ -809,7 +829,13 @@ function ChipStrip({ s }: { readonly s: StoryState }) {
     return (
       <div className="qs-chips">
         {names.map((name, i) => (
-          <In key={name} on={n >= i + 1} kind="outline" className="qs-chip">
+          <In
+            key={name}
+            on={n >= i + 1}
+            kind="outline"
+            latest={i === n - 1}
+            className="qs-chip"
+          >
             <CircleAlert aria-hidden size={16} />
             {name}
           </In>
@@ -826,7 +852,13 @@ function ChipStrip({ s }: { readonly s: StoryState }) {
   return (
     <div className="qs-chips">
       {findings.map(([Icon, name, kind], i) => (
-        <In key={name} on={n >= i + 1} kind={kind} className="qs-chip">
+        <In
+          key={name}
+          on={n >= i + 1}
+          kind={kind}
+          latest={i === n - 1}
+          className="qs-chip"
+        >
           <Icon aria-hidden size={16} />
           {name}
         </In>
@@ -868,6 +900,7 @@ function textOf(el: Element): string {
 
 /** The element behind a cue, by its visible text, in its own frame. */
 function locate(doc: Document, target: LitTarget): Element | null {
+  if (target.selector !== undefined) return doc.querySelector(target.selector);
   const want = target.text.toLowerCase();
   const groups = [
     "h1,h2,h3,h4,legend,dt,th",
@@ -886,23 +919,30 @@ function locate(doc: Document, target: LitTarget): Element | null {
   return null;
 }
 
+type Rect = {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+};
+
 function Ring({
   target,
   frames,
+  onRect,
 }: {
   readonly target: LitTarget | null;
   readonly frames: RefObject<Map<Frame, HTMLIFrameElement>>;
+  readonly onRect: (rect: Rect | null) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [found, setFound] = useState(false);
+  const [foundFor, setFoundFor] = useState<LitTarget | null>(null);
   useEffect(() => {
-    if (target === null) {
-      setFound(false);
-      return;
-    }
+    if (target === null) return;
     let el: Element | null = null;
     let raf = 0;
     let tries = 0;
+    let last = "";
     const reduce = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
@@ -915,7 +955,9 @@ function Ring({
         if (el !== null) {
           const r = el.getBoundingClientRect();
           const h = frame?.clientHeight ?? 0;
-          if (r.top < 64 || r.bottom > h - 140) {
+          // Section navigation: bring the section to the middle, clear of
+          // the captions and the review bar.
+          if (r.top < 64 || r.bottom > h - 160) {
             el.scrollIntoView({
               block: "center",
               behavior: reduce ? "auto" : "smooth",
@@ -929,18 +971,30 @@ function Ring({
         node.style.transform = `translate(${String(r.left)}px, ${String(r.top)}px)`;
         node.style.width = `${String(r.width)}px`;
         node.style.height = `${String(r.height)}px`;
-        setFound(true);
+        // Near the bottom the captions own the space under and over the
+        // ring, so its note moves beside it.
+        node.dataset["place"] =
+          r.bottom > window.innerHeight - 180 ? "beside" : "below";
+        setFoundFor(target);
+        // Q's presence follows the light; tell it only when it moved.
+        const key = [r.left, r.top, r.width, r.height]
+          .map((v) => Math.round(v / 8))
+          .join(",");
+        if (key !== last) {
+          last = key;
+          onRect({ x: r.left, y: r.top, w: r.width, h: r.height });
+        }
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [target, frames]);
+  }, [target, frames, onRect]);
   return (
     <div
       ref={ref}
       className="qs-ring"
-      data-on={target !== null && found}
+      data-on={target !== null && foundFor === target}
       aria-hidden
     >
       <i />
@@ -953,14 +1007,57 @@ function Ring({
 
 /* ——— Presence ——— */
 
+/**
+ * The Q page's own presence, inside the real /home: Q stands exactly there
+ * while that page is the stage, and the page's copy is hidden so there is
+ * one Q (display only, in this harness).
+ */
+function useHomeAnchor(
+  frames: RefObject<Map<Frame, HTMLIFrameElement>>,
+): Rect | null {
+  const [anchor, setAnchor] = useState<Rect | null>(null);
+  useEffect(() => {
+    let timer = 0;
+    const find = () => {
+      const doc = frames.current.get("home")?.contentDocument;
+      const canvases = Array.from(
+        doc?.querySelectorAll<HTMLCanvasElement>("canvas[data-q-swarm]") ?? [],
+      );
+      let best: HTMLCanvasElement | null = null;
+      let area = 0;
+      for (const c of canvases) {
+        const r = c.getBoundingClientRect();
+        if (r.width * r.height > area && r.width > 160) {
+          area = r.width * r.height;
+          best = c;
+        }
+      }
+      if (best === null) {
+        timer = window.setTimeout(find, 400);
+        return;
+      }
+      const r = best.getBoundingClientRect();
+      best.style.visibility = "hidden";
+      setAnchor({ x: r.left, y: r.top, w: r.width, h: r.height });
+    };
+    find();
+    return () => window.clearTimeout(timer);
+  }, [frames]);
+  return anchor;
+}
+
 function Presence({
   s,
   speaking,
   wide,
+  lit,
+  home,
 }: {
   readonly s: StoryState;
   readonly speaking: () => number;
   readonly wide: boolean;
+  readonly lit: Rect | null;
+  readonly home: Rect | null;
 }) {
   const [vw, setVw] = useState(1440);
   const [vh, setVh] = useState(900);
@@ -973,30 +1070,55 @@ function Presence({
     window.addEventListener("resize", read);
     return () => window.removeEventListener("resize", read);
   }, []);
-  const box = 240;
   const docked = s.presence !== "centre";
-  const scale = docked ? (wide ? 0.42 : 0.34) : wide ? 1 : 0.72;
-  const x = docked
-    ? s.presence === "dock-right"
-      ? vw - box / 2 - box * scale * 0.5 - (wide ? 24 : 8) - box / 2
-      : (wide ? 24 : 8) + box * scale * 0.5 - box / 2
-    : vw / 2 - box / 2;
-  const y = docked
-    ? vh - box / 2 - box * scale * 0.5 - (wide ? 96 : 120)
-    : vh * (wide ? 0.4 : 0.36) - box / 2;
+  // Stage size at centre (as the Q page's own presence), dock size beside
+  // the light: drawn at its size, never scaled up from a small canvas.
+  const box = docked ? 240 : wide ? 380 : 260;
+  const dockScale = wide ? 0.42 : 0.3;
+  // (dockScale applies to the 240 px dock box.)
+  const half = (box * dockScale) / 2;
+  const gutter = wide ? 56 : 30;
+  let cx: number;
+  let cy: number;
+  let scale: number;
+  if (!docked) {
+    // Centre stage; on the real Q page, exactly where its presence stands.
+    const onHome = s.frame === "home" && s.scrim === 0 && home !== null;
+    cx = onHome ? home.x + home.w / 2 : vw / 2;
+    cy = onHome ? home.y + home.h / 2 : vh * (wide ? 0.4 : 0.34);
+    scale = 1;
+  } else if (lit !== null) {
+    // Docked beside the light, on the side Q is not pointing at, level
+    // with it, and never over the lit section.
+    const litRight = lit.x + lit.w;
+    const roomRight = vw - litRight;
+    const right = roomRight >= half * 2 + 8 || lit.x < half * 2 + 8;
+    cx = right
+      ? Math.min(vw - gutter, litRight + half + 12)
+      : Math.max(gutter, lit.x - half - 12);
+    cy = Math.min(Math.max(lit.y + lit.h / 2, 110), vh - 220);
+    scale = dockScale;
+  } else {
+    cx = s.presence === "dock-left" ? gutter : vw - gutter;
+    cy = vh - (wide ? 230 : 250);
+    scale = dockScale;
+  }
   return (
     <div
       className="qs-presence"
       style={{
-        transform: `translate(${String(x)}px, ${String(y)}px) scale(${String(scale)})`,
+        width: box,
+        height: box,
+        transform: `translate(${String(cx - box / 2)}px, ${String(cy - box / 2)}px) scale(${String(scale)})`,
       }}
     >
       <QAperture
         key={s.flash}
         state={s.aperture}
-        size={220}
+        size={box - 20}
         stage={!docked}
         outputLevel={speaking}
+        room={s.scene === "handover"}
         label={docked ? undefined : true}
       />
     </div>
@@ -1059,10 +1181,16 @@ export function Storyboard() {
     base: 0,
     speed: 1,
   });
-  const [, setTick] = useState(0);
+  // What the screen shows: copied from the clock when a cue or word changes.
+  const [view, setView] = useState({ t: 0, playing: false });
+  const show = useCallback(() => {
+    setView({ t: clock.current.t, playing: clock.current.playing });
+  }, []);
   const [captionsOn, setCaptionsOn] = useState(true);
   const [wide, setWide] = useState(true);
   const framesRef = useRef(new Map<Frame, HTMLIFrameElement>());
+  const [litRect, setLitRect] = useState<Rect | null>(null);
+  const home = useHomeAnchor(framesRef);
   const register = useCallback((k: Frame, el: HTMLIFrameElement | null) => {
     if (el === null) framesRef.current.delete(k);
     else framesRef.current.set(k, el);
@@ -1081,23 +1209,23 @@ export function Storyboard() {
       c.t = Math.max(0, Math.min(t, timeline.total));
       c.base = c.t;
       c.at = performance.now();
-      setTick((n) => n + 1);
+      show();
     },
-    [timeline.total],
+    [timeline.total, show],
   );
   const play = useCallback(() => {
     const c = clock.current;
     c.base = c.t;
     c.at = performance.now();
     c.playing = true;
-    setTick((n) => n + 1);
-  }, []);
+    show();
+  }, [show]);
   const pause = useCallback(() => {
     const c = clock.current;
     c.t = now();
     c.playing = false;
-    setTick((n) => n + 1);
-  }, [now]);
+    show();
+  }, [now, show]);
 
   // One loop: re-render only when a cue or a spoken word changes.
   useEffect(() => {
@@ -1115,22 +1243,29 @@ export function Storyboard() {
       const key = `${String(cueIndexAt(timeline, c.t))}:${String(line?.source ?? -1)}:${String(said)}`;
       if (key !== lastKey) {
         lastKey = key;
-        setTick((n) => n + 1);
+        show();
       }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [now, timeline]);
+  }, [now, timeline, show]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const speed = Number(params.get("speed") ?? "1");
-    clock.current.speed = Number.isFinite(speed) && speed > 0 ? speed : 1;
-    const t = Number(params.get("t") ?? "0");
-    seek(Number.isFinite(t) ? t : 0);
-    if (params.get("play") === "1") play();
-    if (params.get("captions") === "0") setCaptionsOn(false);
+    const mq = window.matchMedia("(min-width: 768px)");
+    const read = () => setWide(mq.matches);
+    // Opened at ?t= (a key frame) or playing (?play=1): read once, after
+    // the first paint, so the server render and hydration agree.
+    const init = requestAnimationFrame(() => {
+      read();
+      const params = new URLSearchParams(window.location.search);
+      const speed = Number(params.get("speed") ?? "1");
+      clock.current.speed = Number.isFinite(speed) && speed > 0 ? speed : 1;
+      const t = Number(params.get("t") ?? "0");
+      seek(Number.isFinite(t) ? t : 0);
+      if (params.get("play") === "1") play();
+      if (params.get("captions") === "0") setCaptionsOn(false);
+    });
     const beats = timeline.states.map((s, i) => ({
       t: timeline.cueTimes[i] ?? 0,
       beat: s.beat,
@@ -1149,14 +1284,14 @@ export function Storyboard() {
         return at;
       },
     };
-    const mq = window.matchMedia("(min-width: 768px)");
-    const read = () => setWide(mq.matches);
-    read();
     mq.addEventListener("change", read);
-    return () => mq.removeEventListener("change", read);
+    return () => {
+      cancelAnimationFrame(init);
+      mq.removeEventListener("change", read);
+    };
   }, [timeline, seek, play, pause, now]);
 
-  const t = clock.current.t;
+  const t = view.t;
   const idx = cueIndexAt(timeline, t);
   const s = stateFor(timeline, idx);
 
@@ -1201,8 +1336,14 @@ export function Storyboard() {
         <SceneView s={s} />
       </div>
       <ChipStrip s={s} />
-      <Ring target={s.lit} frames={framesRef} />
-      <Presence s={s} speaking={speaking} wide={wide} />
+      <Ring target={s.lit} frames={framesRef} onRect={setLitRect} />
+      <Presence
+        s={s}
+        speaking={speaking}
+        wide={wide}
+        lit={s.lit === null ? null : litRect}
+        home={home}
+      />
       <div
         className="qs-address qs-pill"
         data-on={s.scene === "trillions" && s.step >= 3}
@@ -1215,22 +1356,21 @@ export function Storyboard() {
         visible={captionsOn && s.captions}
       />
       <div className="qs-hud">
-        <span className="qs-pill">Storyboard · not the final engine</span>
         <span className="qs-pill">
-          Act {s.act} · {s.beat}
+          <span className="qs-wide">Storyboard ·&nbsp;</span>Act {s.act} ·{" "}
+          {s.beat}
+          <span className="qs-wide">
+            &nbsp;· {mmss(t)} / {mmss(timeline.total)}
+          </span>
         </span>
         {s.demo ? <span className="qs-pill">Demonstration data</span> : null}
-        <span className="qs-hud-spacer" />
-        <span className="qs-pill qs-wide">
-          {mmss(t)} / {mmss(timeline.total)}
-        </span>
         <button
           type="button"
           className="qs-btn"
-          aria-label={clock.current.playing ? "Pause" : "Play"}
-          onClick={() => (clock.current.playing ? pause() : play())}
+          aria-label={view.playing ? "Pause" : "Play"}
+          onClick={() => (view.playing ? pause() : play())}
         >
-          {clock.current.playing ? (
+          {view.playing ? (
             <Pause aria-hidden size={16} />
           ) : (
             <Play aria-hidden size={16} />

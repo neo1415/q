@@ -153,18 +153,31 @@
 }
 
 /* #3 the hour, with the desk at 25% behind it. */
-.qs-photo-bleed {
+.qs-photo.qs-photo-bleed {
   position: absolute;
   inset: 0;
   object-fit: cover;
   width: 100%;
   height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
   opacity: 0.25;
+}
+
+.qs-echo {
+  opacity: 0.12;
+  animation: qs-fade-in 1600ms var(--cq-ease) both;
+}
+@keyframes qs-fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 /* Photo tiles; a failed load leaves the neutral "photo" placeholder. */
 .qs-photo {
   position: relative;
+  margin: 0;
   overflow: hidden;
   border-radius: var(--cq-radius-md);
   background: color-mix(in oklab, currentColor 10%, transparent);
@@ -508,7 +521,8 @@
   pointer-events: none;
 }
 .qs-root[data-scrim="0"] .qs-chips {
-  top: 72px;
+  top: auto;
+  bottom: 156px;
   transform: translateX(-50%);
 }
 .qs-chip {
@@ -553,7 +567,7 @@
   font-size: clamp(40px, 6vw, 80px);
   font-weight: 600;
   letter-spacing: -0.03em;
-  margin-top: 300px;
+  margin-top: 340px;
 }
 
 /* #48-49 the Q Card. */
@@ -733,13 +747,17 @@
   color: var(--cq-on-charcoal);
 }
 
+.qs-ring[data-place="beside"] .qs-note {
+  left: calc(100% + 14px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 /* Q's presence: centre stage in Acts 0-3, docked and following after. */
 .qs-presence {
   position: absolute;
   left: 0;
   top: 0;
-  width: 240px;
-  height: 240px;
   display: grid;
   place-items: center;
   pointer-events: none;
@@ -769,8 +787,22 @@
   line-height: 1.55;
   font-weight: 500;
   border-radius: var(--cq-radius-sm);
-  background: var(--cq-charcoal);
-  color: var(--cq-on-charcoal);
+  color: var(--cq-text-primary);
+  transition: color 700ms var(--cq-ease);
+}
+.qs-root[data-mode="night"] .qs-captions p {
+  color: var(--cq-night-text);
+}
+/* Over a real page the caption needs its own opaque ground (no glass),
+   and it rises above the page's composer and bottom navigation. */
+.qs-root[data-scrim="0"] .qs-captions {
+  bottom: 96px;
+}
+.qs-root[data-scrim="0"] .qs-captions p {
+  background: var(--cq-surface-raised);
+  border: 1px solid var(--cq-border-strong);
+  box-shadow: var(--cq-shadow-overlay);
+  color: var(--cq-text-primary);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -785,10 +817,11 @@
 /* The review HUD: where we are, demo labelling, and the controls. */
 .qs-hud {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: 10px;
   right: 12px;
+  max-width: calc(100% - 24px);
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
@@ -801,16 +834,14 @@
 .qs-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   min-height: 28px;
   padding: 4px 10px;
   border-radius: var(--cq-radius-full);
-  background: var(--cq-charcoal);
-  color: var(--cq-on-charcoal);
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-secondary);
+  border: 1px solid var(--cq-border);
   font-variant-numeric: tabular-nums;
-}
-.qs-hud-spacer {
-  flex: 1;
+  white-space: nowrap;
 }
 .qs-btn {
   display: inline-grid;
@@ -818,10 +849,10 @@
   min-width: 44px;
   min-height: 44px;
   padding: 0 10px;
-  border: 0;
+  border: 1px solid var(--cq-border);
   border-radius: var(--cq-radius-full);
-  background: var(--cq-charcoal);
-  color: var(--cq-on-charcoal);
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-primary);
   font: inherit;
   cursor: pointer;
   transition: transform var(--cq-motion-fast) var(--cq-ease);
@@ -870,7 +901,7 @@
     grid-template-columns: 1fr;
   }
   .qs-wordmark {
-    margin-top: 220px;
+    margin-top: 330px;
   }
   .qs-calendar {
     display: none;
@@ -878,10 +909,25 @@
   .qs-captions {
     bottom: 20px;
   }
+  .qs-root[data-scrim="0"] .qs-captions {
+    bottom: 84px;
+  }
+  .qs-root[data-scrim="0"] .qs-chips {
+    bottom: 176px;
+  }
+  /* Over a real page a phone has room for one chip: the one that just
+     changed. The ring on the page carries the rest. */
+  .qs-root[data-scrim="0"] .qs-chip:not([data-latest]) {
+    display: none;
+  }
   .qs-captions p {
     font-size: 17px;
   }
   .qs-hud .qs-wide {
+    display: none;
+  }
+  /* No room beside a full-width control on a phone; the caption says it. */
+  .qs-ring[data-place="beside"] .qs-note {
     display: none;
   }
 }

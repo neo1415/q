@@ -8,8 +8,8 @@
  */
 export const PHOTOS = {
   desk: {
-    alt: "A dimly lit modern office desk with a laptop, headphones, and speakers at 1:00 AM.",
-    credit: "Photo by Julien Bachelet on Pexels",
+    alt: "Warm ambient lighting in a workspace with a laptop and a table lamp.",
+    credit: "Photo by Czapp Árpád on Pexels",
   },
   m1: {
     alt: "Lively outdoor market with colorful fruit and vegetable stalls in an urban setting.",

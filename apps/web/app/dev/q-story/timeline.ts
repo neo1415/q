@@ -119,6 +119,7 @@ export type Scene =
   | "outcomes"
   | "trillions"
   | "channels"
+  | "echo"
   | "handover";
 
 export type Chips = "none" | "mismatch" | "readiness" | "mandate" | "findings";
@@ -131,6 +132,8 @@ export type LitTarget = {
   readonly section?: boolean;
   /** A short note beside the ring, e.g. a gap the plan names. */
   readonly note?: string;
+  /** For a control with no visible words of its own (the composer). */
+  readonly selector?: string;
 };
 
 export type StoryState = {
@@ -288,6 +291,7 @@ const CUES: readonly (readonly [number, number, Patch])[] = [
   [133, 0, { chipStep: 2 }],
   [135, 0, { chipStep: 3 }],
   [137, 0, { chipStep: 4 }],
+  [139, 0, { beat: "#30 They were right", scene: "echo", chips: "none" }],
   [141, 0, { beat: "…you just weren't ready" }],
   [143, 0, { beat: "#31 Weak governance", chips: "readiness", chipStep: 1 }],
   [145, 0, { chipStep: 2 }],
@@ -338,12 +342,12 @@ const CUES: readonly (readonly [number, number, Patch])[] = [
   [165, 4, { lit: lit("shell", "CRM", false) }],
   [165, 5, { lit: lit("shell", "Work", false) }],
   [167, 0, { beat: "#36 I learn how you invest", frame: "mandate", lit: null }],
-  [169, 1, { lit: lit("mandate", "Thesis"), chips: "mandate", chipStep: 0 }],
-  [171, 0, { lit: lit("mandate", "Stage"), chipStep: 1 }],
+  [169, 1, { lit: lit("mandate", "Thesis"), chips: "mandate", chipStep: 1 }],
+  [171, 0, { lit: lit("mandate", "Stage"), chipStep: 2 }],
   [173, 0, { lit: lit("mandate", "Sectors") }],
-  [175, 0, { lit: lit("mandate", "Geography"), chipStep: 2 }],
-  [177, 0, { lit: lit("mandate", "Cheque"), chipStep: 3 }],
-  [179, 0, { lit: lit("mandate", "Business models"), chipStep: 4 }],
+  [175, 0, { lit: lit("mandate", "Geography"), chipStep: 3 }],
+  [177, 0, { lit: lit("mandate", "Cheque"), chipStep: 4 }],
+  [179, 0, { lit: lit("mandate", "Business models") }],
   [181, 0, { lit: lit("mandate", "Never shown") }],
   [
     183,
@@ -574,7 +578,20 @@ const CUES: readonly (readonly [number, number, Patch])[] = [
   ],
   [301, 0, { beat: "#55 I'm Q", scene: null }],
   [309, 0, { beat: "#56 Without me", scene: "handover", step: 1 }],
-  [309, 6, { lit: lit("home", "Ask Q", false, "Q&A mode: ask me anything") }],
+  [
+    309,
+    6,
+    {
+      lit: {
+        frame: "home",
+        text: "",
+        selector: "form:has(textarea)",
+        note: "Q&A mode: ask me anything",
+      },
+      // At rest on its stage Q forms its own mark: the grin.
+      aperture: "IDLE",
+    },
+  ],
 ];
 
 export type TimedWord = {
@@ -702,9 +719,12 @@ export function cueIndexAt(timeline: Timeline, t: number): number {
   return i;
 }
 
+/** The line being said, or just said; the newer line wins at a boundary. */
 export function lineAt(timeline: Timeline, t: number): TimedLine | null {
+  let hit: TimedLine | null = null;
   for (const line of timeline.lines) {
-    if (t >= line.start - 0.05 && t <= line.end + 0.6) return line;
+    if (line.start - 0.05 > t) break;
+    if (t <= line.end + 0.6) hit = line;
   }
-  return null;
+  return hit;
 }
