@@ -5,6 +5,7 @@ import {
   type NewApplicationFact,
 } from "../contracts/index.js";
 
+import { countryOfCity } from "./cities.js";
 import { amountsIn } from "./stated-amount.js";
 
 /**
@@ -135,7 +136,8 @@ export function countryCodeIn(words: string): string | null {
   const wanted = words
     .trim()
     .toLowerCase()
-    .replace(/^(?:we(?:'re| are)?\s+)?(?:based\s+)?(?:in\s+)?/u, "")
+    // "We're based in Lagos", "headquartered out of Nairobi": the place.
+    .replace(/^.*?\b(?:in|out of|from)\s+/u, "")
     .replace(/[.!]+$/u, "")
     .trim();
   if (wanted.length === 0) return null;
@@ -143,13 +145,20 @@ export function countryCodeIn(words: string): string | null {
     const code = wanted.toUpperCase();
     return [...regions().values()].includes(code) ? code : null;
   }
-  const direct = COUNTRY_ALIASES[wanted] ?? regions().get(wanted);
-  if (direct !== undefined) return direct;
-  // "Lagos, Nigeria": the part that names a country, last first.
-  const parts = wanted.split(/\s*[,/;]\s*|\s+-\s+/u).reverse();
+  const named = (part: string): string | null =>
+    COUNTRY_ALIASES[part] ?? regions().get(part) ?? null;
+  const direct = named(wanted) ?? countryOfCity(wanted);
+  if (direct !== null) return direct;
+  // "Lagos, Nigeria": the part that names a country, last first; else the
+  // city it names ("Lagos and London": the first city).
+  const parts = wanted.split(/\s*[,/;]\s*|\s+-\s+|\s+and\s+/u);
+  for (const part of [...parts].reverse()) {
+    const code = named(part);
+    if (code !== null) return code;
+  }
   for (const part of parts) {
-    const code = COUNTRY_ALIASES[part] ?? regions().get(part);
-    if (code !== undefined) return code;
+    const code = countryOfCity(part);
+    if (code !== null) return code;
   }
   return null;
 }

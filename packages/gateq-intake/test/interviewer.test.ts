@@ -148,6 +148,21 @@ describe("what survives validation", () => {
       { kind: "CODE", code: "KE" },
     ],
     [
+      "company.country",
+      { kind: "TEXT", text: "Lagos" },
+      { kind: "CODE", code: "NG" },
+    ],
+    [
+      "company.country",
+      { kind: "TEXT", text: "We're based out of Cape Town" },
+      { kind: "CODE", code: "ZA" },
+    ],
+    [
+      "company.country",
+      { kind: "TEXT", text: "London and Lagos" },
+      { kind: "CODE", code: "GB" },
+    ],
+    [
       "company.sector_phrases",
       { kind: "TEXT", text: "Climate" },
       { kind: "PHRASES", phrases: ["Climate"] },
@@ -272,7 +287,7 @@ describe("what survives validation", () => {
     );
   });
 
-  it("never says it couldn't record words with nothing of the shape in them", async () => {
+  it("never says it couldn't record a region; it asks which country", async () => {
     const { service } = interviewer({
       ...RESULT,
       facts: [
@@ -286,8 +301,12 @@ describe("what survives validation", () => {
     });
     const outcome = await service.turn(turn());
     expect(outcome.facts).toEqual([]);
-    expect(outcome.reply).toBe(RESULT.reply);
     expect(outcome.reply).not.toMatch(/couldn't record/);
+    // A region, not a country: Q asks which country in it, as its question.
+    expect(outcome.reply).toBe(
+      "Lagos, got it. Which country in Europe is the company based in?",
+    );
+    expect(outcome.asking).toBe("company.country");
   });
 
   it("replays an older paid checkpoint without restoring a wrongly shaped stage", () => {

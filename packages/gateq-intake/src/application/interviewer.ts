@@ -42,6 +42,7 @@ import {
   type QuestionNeed,
 } from "./question-needs.js";
 import { questionAngle } from "./answer-specificity.js";
+import { regionIn } from "./cities.js";
 import { normaliseProposedFact } from "./normalise-fact.js";
 import { readBackLine, readBacksIn, type NotRecorded } from "./not-recorded.js";
 import { affirmsReadBack, amountStatedIn } from "./stated-amount.js";
@@ -645,6 +646,8 @@ export function createGateQInterviewer(
       // an amount they never said. Unknown dimensions are the model's own
       // error, not something they said, and stay counted only.
       const notRecorded: NotRecorded[] = [];
+      /** A region given for the country: asked down to a country. */
+      let narrowTo: string | null = null;
       const held = (dimension: ApplicationDimension) =>
         input.application?.facts.find(
           (fact) =>
@@ -675,6 +678,24 @@ export function createGateQInterviewer(
               currencyHeld?.kind === "CODE" ? currencyHeld.code : null,
           },
         );
+        if (
+          normalised === null &&
+          dimension === "company.country" &&
+          candidate.value.kind !== "NONE"
+        ) {
+          // A region, not a country ("somewhere in Europe"): Q asks which
+          // country in it, by name, as the turn's question.
+          const region = regionIn(
+            candidate.value.kind === "TEXT"
+              ? candidate.value.text
+              : candidate.value.kind === "CODE"
+                ? candidate.value.code
+                : candidate.value.kind === "PHRASES"
+                  ? candidate.value.phrases.join(", ")
+                  : "",
+          );
+          if (region !== null) narrowTo = region;
+        }
         if (normalised === null) {
           // Words with nothing of the shape in them ("somewhere in
           // Europe" for a country): their sentence stays on the transcript
@@ -746,11 +767,16 @@ export function createGateQInterviewer(
 
       // A worked-out figure is asked about, so the read-back is this
       // turn's question.
-      const readBack =
-        interviewLanguageOf(input) === null ? readBackLine(notRecorded) : "";
+      const english = interviewLanguageOf(input) === null;
+      const readBack = english
+        ? readBackLine(notRecorded) ||
+          (narrowTo === null
+            ? ""
+            : `Which country in ${narrowTo} is the company based in?`)
+        : "";
       const asking =
         readBack.length > 0
-          ? (notRecorded[0]?.dimension ?? null)
+          ? (notRecorded[0]?.dimension ?? "company.country")
           : result.asking !== null && DIMENSIONS.has(result.asking)
             ? (result.asking as ApplicationDimension)
             : null;
