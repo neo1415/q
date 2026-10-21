@@ -4,12 +4,15 @@ import {
   Q_ROOM_HOLD_MS,
   Q_ROOM_KEPT,
   Q_ROOM_PREVIEW_MS,
+  Q_ROOM_STAGES_MAX,
   QRunIdSchema,
   type QArtifactPreview,
   type CorrelationId,
   type QResponseMessage,
   type QRoomEntry,
   type QRoomPreview,
+  type QRoomStages,
+  type QVisibleStage,
   type QRoomRead,
   type QRoomSource,
 } from "@capital-q/contracts";
@@ -60,6 +63,15 @@ export type QRoomFeed = {
     actor: ActorContext,
     input: { readonly runId: string; readonly preview: QArtifactPreview },
   ) => void;
+  /**
+   * A voice turn's run reported a stage (owner 2026-10-21): the screen
+   * shows the steps so far while Q talks. Dropped when that run's answer
+   * is published.
+   */
+  readonly stage: (
+    actor: ActorContext,
+    input: { readonly runId: string; readonly stage: QVisibleStage },
+  ) => void;
   /** Entries after `after`; held up to `holdMs` for the next when none. */
   readonly read: (input: {
     readonly actor: ActorContext;
@@ -88,6 +100,8 @@ type Room = {
   readonly entries: QRoomEntry[];
   /** The live spoken preview and when it was set. */
   live: { readonly preview: QRoomPreview; readonly at: number } | null;
+  /** The live spoken turn's stages so far, and when the last arrived. */
+  stages: { readonly stages: QRoomStages; readonly at: number } | null;
   readonly listeners: Set<() => void>;
   lastReadAt: number;
   readers: number;
@@ -127,6 +141,7 @@ export function createQRoomFeed(
         sequence: 0,
         entries: [],
         live: null,
+        stages: null,
         listeners: new Set(),
         lastReadAt: 0,
         readers: 0,
@@ -144,6 +159,14 @@ export function createQRoomFeed(
     room.live.preview.sequence > cursor &&
     now() - room.live.at <= Q_ROOM_PREVIEW_MS
       ? room.live.preview
+      : undefined;
+
+  /** The live stages, when newer than the cursor and still fresh. */
+  const stagesAfter = (room: Room, cursor: number): QRoomStages | undefined =>
+    room.stages !== null &&
+    room.stages.stages.sequence > cursor &&
+    now() - room.stages.at <= Q_ROOM_PREVIEW_MS
+      ? room.stages.stages
       : undefined;
 
   const publish: QRoomFeed["publish"] = (actor, entry) => {
@@ -168,6 +191,7 @@ export function createQRoomFeed(
     room.entries.splice(0, Math.max(0, room.entries.length - Q_ROOM_KEPT));
     // The answer's blocks win: its preview is done.
     if (room.live?.preview.runId === entry.runId) room.live = null;
+    if (room.stages?.stages.runId === entry.runId) room.stages = null;
     room.lastReadAt = Math.max(room.lastReadAt, now());
     for (const listener of room.listeners) listener();
   };
@@ -190,6 +214,27 @@ export function createQRoomFeed(
     for (const listener of room.listeners) listener();
   };
 
+  const stage: QRoomFeed["stage"] = (actor, input) => {
+    const runId = QRunIdSchema.safeParse(input.runId);
+    if (!runId.success) return;
+    const room = roomOf(actor);
+    if (room.entries.some((one) => one.runId === runId.data)) return;
+    // A new run starts its own list; the same stage twice running is one.
+    const before =
+      room.stages?.stages.runId === runId.data ? room.stages.stages.stages : [];
+    if (before.at(-1) === input.stage) return;
+    room.sequence += 1;
+    room.stages = {
+      stages: {
+        sequence: room.sequence,
+        runId: runId.data,
+        stages: [...before, input.stage].slice(-Q_ROOM_STAGES_MAX),
+      },
+      at: now(),
+    };
+    for (const listener of room.listeners) listener();
+  };
+
   const watched: QRoomFeed["watched"] = (actor) => {
     const room = rooms.get(keyOf(actor));
     return (
@@ -202,6 +247,7 @@ export function createQRoomFeed(
     epoch,
     publish,
     preview,
+    stage,
     watched,
 
     read: async ({
@@ -221,17 +267,20 @@ export function createQRoomFeed(
           : Math.min(cursorIn, room.sequence);
       const answer = (): QRoomRead => {
         const live = liveAfter(room, cursor);
+        const steps = stagesAfter(room, cursor);
         return {
           epoch,
           cursor: room.sequence,
           entries: after(room, cursor),
           ...(live === undefined ? {} : { preview: live }),
+          ...(steps === undefined ? {} : { stages: steps }),
         };
       };
       if (
         !wait ||
         after(room, cursor).length > 0 ||
         liveAfter(room, cursor) !== undefined ||
+        stagesAfter(room, cursor) !== undefined ||
         signal?.aborted === true
       ) {
         return answer();

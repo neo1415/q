@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { HOST_TAKING_LATEST, type HostContext } from "@capital-q/communication";
 import type { MeetingHostResultV2 as MeetingHostResult } from "@capital-q/q-core";
@@ -178,8 +178,14 @@ function harness(options: {
     untilRelative: number,
   ) => {
     const queue = [...events].sort((a, b) => a[0] - b[0]);
+    // The runtime's own waits (untilQuiet: until Q's audio has played) are
+    // timers; on the real clock a fast runner finished the whole call before
+    // a 1 ms timer fired, and Q's answer stayed queued behind it (CI run
+    // 39619616819). They run on the same fake clock as everything else.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     for (let t = at(0); t <= at(untilRelative); t += 100) {
       clock.at = t;
+      if (t > at(0)) vi.advanceTimersByTime(100);
       // As the webhook does: answered at once, handled in order per call,
       // never waiting on a model call in flight.
       while (queue.length > 0 && at(queue[0]?.[0] ?? Infinity) <= t) {
@@ -223,6 +229,10 @@ const JOINS: [number, unknown][] = [
   [0, recall("participant_events.join", OYENIYI, 0)],
   [0.1, recall("participant_events.speech_on", OYENIYI, 0.1)],
 ];
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("Q answers within about two seconds of a question to it", () => {
   it("replays 2026-10-04: an open microphone's flag never drops, Q still answers", async () => {

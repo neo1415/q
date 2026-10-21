@@ -363,6 +363,16 @@ describe("artifacts live, round 2", () => {
       const current = container.querySelector("[data-q-summary-current]");
       expect(current?.getAttribute("data-q-summary-point")).toBe("1");
       expect(current?.getAttribute("aria-current")).toBe("true");
+      // Lit by the rail's shape as well as its colour, never by a change
+      // of weight that would reflow the words (design pass, round 3).
+      const rail = current?.querySelector("[aria-hidden='true']");
+      expect(rail?.className).toContain("scale-x-100");
+      expect(
+        container.querySelector(
+          "[data-q-summary-point='0'] [aria-hidden='true']",
+        )?.className,
+      ).toContain("scale-x-50");
+      expect(current?.innerHTML).not.toContain("font-medium");
     } finally {
       vi.useRealTimers();
     }

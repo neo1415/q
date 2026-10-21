@@ -423,9 +423,10 @@ describe("renderer", () => {
       22,
     );
     expect(historical.characters / 4).toBeLessThan(4_500);
-    // v26 (L-13): ~40 tokens for PICTURE and pictureQuery, under the same cap.
+    // v26 (L-13): ~40 tokens for PICTURE and pictureQuery, then ~280 tokens
+    // of repeated wording said once, so it keeps at least 5% headroom.
     expect(rendered.bundle.task).toBe("company-analyst/v26");
-    expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS);
+    expect(rendered.characters / 4).toBeLessThan(V23_MAX_PROMPT_TOKENS * 0.95);
     expect(rendered.characters - historical.characters).toBeGreaterThan(0);
   });
 });

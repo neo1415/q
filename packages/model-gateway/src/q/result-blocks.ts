@@ -844,9 +844,38 @@ export type QPicturePort = {
     readonly requestedQuery: string;
     readonly userText: string;
     readonly earlierUserText: readonly string[];
+    /**
+     * Names of the companies, investors, people and organisations this
+     * run read. The picture library never receives one, even when the
+     * person typed it: a picture search carries no identity.
+     */
+    readonly withheld?: readonly string[] | undefined;
     readonly signal?: AbortSignal | undefined;
   }) => Promise<QPictureBlock | null>;
 };
+
+/** Every name a run read, for a picture search to withhold (L-13). */
+export function namesReadByRun(read: {
+  readonly companyNames: ReadonlyMap<string, string>;
+  readonly profiles: ReadonlyMap<string, string>;
+  readonly investors: ReadonlyMap<string, { readonly name: string }>;
+  readonly externals: ReadonlyMap<string, { readonly name: string }>;
+  readonly relationships: ReadonlyMap<
+    string,
+    { readonly counterpart: { readonly name: string | null } }
+  >;
+}): readonly string[] {
+  const names = new Set<string>([
+    ...read.companyNames.values(),
+    ...read.profiles.values(),
+    ...[...read.investors.values()].map((one) => one.name),
+    ...[...read.externals.values()].map((one) => one.name),
+    ...[...read.relationships.values()].map(
+      (one) => one.counterpart.name ?? "",
+    ),
+  ]);
+  return [...names].filter((name) => name.trim().length > 0).slice(0, 100);
+}
 
 /**
  * How long a picture may hold the finished answer. The answer's words have
@@ -861,6 +890,7 @@ export async function pictureBlock(input: {
   readonly pictures: QPicturePort | undefined;
   readonly userText: string;
   readonly earlierUserText: readonly string[];
+  readonly withheld?: readonly string[] | undefined;
   readonly signal?: AbortSignal | undefined;
   readonly waitMs?: number | undefined;
 }): Promise<QPictureBlock | null> {
@@ -887,6 +917,7 @@ export async function pictureBlock(input: {
         requestedQuery: query,
         userText: input.userText,
         earlierUserText: input.earlierUserText,
+        withheld: input.withheld ?? [],
         signal,
       }),
       aborted,

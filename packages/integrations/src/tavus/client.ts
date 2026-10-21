@@ -250,6 +250,13 @@ export type TavusClient = {
     readonly name: string;
     readonly meetingUrl: string;
     readonly maxCallSeconds: number;
+    /**
+     * What the face says when it is in the call (Tavus `custom_greeting`),
+     * after the PAL's spoken disclosure. Without it the face joined
+     * silently and Q's own introduction only reached the call after
+     * someone spoke (live meeting 2026-10-21).
+     */
+    readonly greeting?: string | null | undefined;
   }) => Promise<TavusConversation>;
   /** Recovery only, on this same account; unrelated rooms never escape. */
   readonly findConversationsForPal: (
@@ -431,6 +438,9 @@ export function createTavusClient(dependencies: {
         face_id: input.faceId,
         conversation_name: input.name,
         meeting_url: input.meetingUrl,
+        ...(input.greeting === null || input.greeting === undefined
+          ? {}
+          : { custom_greeting: input.greeting.slice(0, 1_000) }),
         properties: {
           // The provider's own backstop: the face cannot outlive this.
           max_call_duration: input.maxCallSeconds,

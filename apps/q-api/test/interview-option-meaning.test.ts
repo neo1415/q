@@ -46,3 +46,20 @@ describe("an option chosen by meaning", () => {
     }
   });
 });
+
+describe("a text answer longer than its step holds (owner 2026-10-21)", () => {
+  const short = {
+    stepKey: "F1.company_name",
+    configuration: { stepType: "short_text", minLength: 1, maxLength: 20 },
+  } as unknown as OnboardingStepManifest;
+
+  it("is kept up to the limit, cut at a word, never refused", () => {
+    expect(
+      toResponseValue(short, "Quillmark Health Systems of Nairobi"),
+    ).toEqual({ type: "TEXT", text: "Quillmark Health" });
+    expect(toResponseValue(short, "Quillmark")).toEqual({
+      type: "TEXT",
+      text: "Quillmark",
+    });
+  });
+});

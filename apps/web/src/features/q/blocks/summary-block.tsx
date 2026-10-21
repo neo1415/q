@@ -91,21 +91,30 @@ export function SummaryBody({ block }: { readonly block: QSummaryBlock }) {
               aria-current={current ? "true" : undefined}
               data-q-summary-point={index}
               data-q-summary-current={current ? "" : undefined}
-              className={`flex rounded-md border-s-2 px-3 py-2 transition-[background-color,border-color] duration-(--cq-motion-base) ease-(--cq-ease) ${
-                current
-                  ? "border-(--cq-text-primary) bg-(--cq-surface-subtle)"
-                  : "border-(--cq-border-subtle)"
+              className={`relative flex rounded-(--cq-radius-md) py-2 ps-4 pe-3 transition-[background-color] duration-(--cq-motion-base) ease-(--cq-ease) ${
+                current ? "bg-(--cq-surface-subtle)" : ""
               }`}
             >
+              {/* The rail is the lit signal: it thickens (shape) as well as
+                  darkening (colour), by transform so the text never
+                  reflows; the weight of the words stays put
+                  (emil-design-eng, accessibility). */}
+              <span
+                aria-hidden="true"
+                className={`absolute inset-y-1 start-0 w-1 rounded-full transition-[transform,background-color] duration-(--cq-motion-base) ease-(--cq-ease) motion-reduce:transition-[background-color] ${
+                  current
+                    ? "scale-x-100 bg-(--cq-text-primary)"
+                    : "scale-x-50 bg-(--cq-border-subtle)"
+                }`}
+              />
               <span className="flex min-w-0 flex-col gap-0.5">
-                {/* Lit by weight as well as colour: never colour alone. */}
-                <span
-                  className={`cq-body text-(--cq-text-primary) ${current ? "font-medium" : ""}`}
-                >
+                <span className="cq-body text-(--cq-text-primary)">
                   {point.text}
                 </span>
                 {truth === null ? null : (
-                  <span className="cq-caption text-(--cq-text-tertiary)">
+                  // What the point is (claim, inference) carries meaning:
+                  // secondary text, AA on the lit background too.
+                  <span className="cq-caption text-(--cq-text-secondary)">
                     {truth}
                   </span>
                 )}
@@ -116,7 +125,7 @@ export function SummaryBody({ block }: { readonly block: QSummaryBlock }) {
       </ul>
       {block.missing.length === 0 ? null : (
         <div className="flex flex-col gap-1">
-          <span className="cq-label text-(--cq-text-tertiary)">
+          <span className="cq-label text-(--cq-text-secondary)">
             Not on file yet
           </span>
           <ul className="cq-body-sm m-0 flex list-disc flex-col gap-0.5 ps-5 text-(--cq-text-secondary)">

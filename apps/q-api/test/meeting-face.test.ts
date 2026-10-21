@@ -9,6 +9,7 @@ import {
   createMeetingFace,
   ledgerRefusal,
   MEETING_FACE_NAME,
+  meetingFaceGreeting,
   meetingFaceSecondsFrom,
   type MeetingFaceStore,
 } from "../src/composition/meeting-face.js";
@@ -65,6 +66,28 @@ describe("the Tavus adapter, for a meeting face", () => {
         participant_absent_timeout: 120,
       },
     });
+  });
+
+  it("2026-10-21: carries the face's greeting as the provider's custom greeting", async () => {
+    const fetch = fakeFetch(200, { conversation_id: "c-meet" });
+    await createTavusClient({
+      apiKey: "disabled-locally-000000000000",
+      fetch,
+    }).joinMeeting({
+      palId: "p1",
+      faceId: FACE,
+      name: MEETING_FACE_NAME,
+      meetingUrl: MEET,
+      maxCallSeconds: 600,
+      greeting: "Zino booked this call on Capital Q and asked me to join.",
+    });
+    const sent = JSON.parse(fetch.mock.calls[0]?.[1]?.body as string) as Record<
+      string,
+      unknown
+    >;
+    expect(sent.custom_greeting).toBe(
+      "Zino booked this call on Capital Q and asked me to join.",
+    );
   });
 
   it("refuses a length past the cap, or any link that is not Google Meet, before any request", async () => {
@@ -192,6 +215,8 @@ function memoryStore(refuse: string | null = null) {
               tenantId: "00000000-0000-4000-8000-00000000f0a1",
               organiserUserId: "00000000-0000-4000-8000-00000000f0b1",
               meetLink: MEET,
+              organiserName: "Zino Okafor",
+              purpose: "TensorGate's seed round",
             }
           : null,
       ),
@@ -247,6 +272,8 @@ function setup(
     refuse?: string | null;
     failJoin?: boolean;
     enabled?: boolean;
+    /** null: the production default. */
+    expectGraceMs?: number | null;
   } = {},
 ) {
   const { client, calls } = fakeClient({ failJoin: options.failJoin ?? false });
@@ -267,6 +294,9 @@ function setup(
     bridgePath: (id) => `/v1/q/meetings/face/bridge/${id}`,
     store: memory.store,
     answerWaitMs: 50,
+    ...(options.expectGraceMs === null
+      ? {}
+      : { expectGraceMs: options.expectGraceMs ?? 30 }),
   });
   return { face, calls, memory, bearer: () => bearer };
 }
@@ -535,5 +565,93 @@ describe("2026-10-20: an answer streamed through the face", () => {
     face.finish?.(MEETING);
     await reading;
     expect(rest).toEqual([]);
+  });
+});
+
+describe("2026-10-21 live meeting: the face introduces itself and answers in the turn it was asked", () => {
+  it("joins with who Q is, why it is here and for whom, from the booking", async () => {
+    const { face, calls } = setup();
+    face.start(MEETING);
+    await face.settled(MEETING);
+    expect(calls.pals[0]?.disclosure?.spoken).toBe(
+      "Hello, I'm Q, the AI investment analyst inside Capital Q.",
+    );
+    expect(calls.joins[0]?.greeting).toBe(
+      "Zino booked this call on Capital Q and asked me to join about TensorGate's seed round. I'll keep notes for both sides and answer questions from what this call shares. Just say \"Q\" when you need me.",
+    );
+    // Never the provider's default name.
+    expect(calls.pals[0]?.name).toBe("Capital Q");
+    expect(calls.joins[0]?.name).toBe("Capital Q");
+  });
+
+  it("writes a plain greeting when the booking names no organiser, and leaves out a long or odd purpose", () => {
+    expect(meetingFaceGreeting({ organiserName: null, purpose: null })).toBe(
+      "This call was booked on Capital Q, and I've been asked to join. I'll keep notes for both sides and answer questions from what this call shares. Just say \"Q\" when you need me.",
+    );
+    expect(
+      meetingFaceGreeting({ organiserName: "Ada", purpose: "x".repeat(121) }),
+    ).toMatch(/^Ada booked this call on Capital Q and asked me to join\. /u);
+    expect(
+      meetingFaceGreeting({
+        organiserName: "Ada\u0000<b>",
+        purpose: "Intro\u202e call.",
+      }),
+    ).toMatch(
+      /^Adab booked this call on Capital Q and asked me to join about Intro call\. /u,
+    );
+  });
+
+  it("a line queued while nobody spoke and the answer to the question asked now go in the same turn", async () => {
+    const { face, memory, bearer } = setup();
+    face.start(MEETING);
+    await face.settled(MEETING);
+    const id = [...memory.rows.values()][0]?.id ?? "";
+    // Said by the host while nobody was speaking: no turn was open.
+    face.say(MEETING, "Hi Zino, welcome.");
+    const asked = face.bridge(
+      id,
+      bearer(),
+      [{ role: "user", text: "Q, what are you here for?" }],
+      signal(),
+    );
+    const result = await asked;
+    expect(result).toMatchObject({
+      kind: "STREAM",
+      first: "Hi Zino, welcome.",
+    });
+    if (result.kind !== "STREAM") return;
+    const rest: string[] = [];
+    const reading = (async () => {
+      for await (const part of result.rest) rest.push(part);
+    })();
+    face.say(MEETING, "Zino asked me to keep notes for both sides.");
+    await reading;
+    expect(rest).toEqual(["Zino asked me to keep notes for both sides."]);
+  });
+
+  it("a follow-up whose answer begins seconds after the face's turn ends is still answered in that turn", async () => {
+    const { face, memory, bearer } = setup({ expectGraceMs: null });
+    face.start(MEETING);
+    await face.settled(MEETING);
+    const id = [...memory.rows.values()][0]?.id ?? "";
+    vi.useFakeTimers();
+    try {
+      const followUp = face.bridge(
+        id,
+        bearer(),
+        [{ role: "user", text: "and how big is that market" }],
+        signal(),
+      );
+      // Captions plus the host's hold: the answer begins 3 s later.
+      await vi.advanceTimersByTimeAsync(3_000);
+      face.expect?.(MEETING);
+      face.say(MEETING, "The deck says forty billion dollars.");
+      await expect(followUp).resolves.toEqual({
+        kind: "LINE",
+        text: "The deck says forty billion dollars.",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

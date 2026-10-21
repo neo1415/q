@@ -306,6 +306,7 @@ import {
 import {
   analystResultBlocks,
   askedSubjects,
+  namesReadByRun,
   ownInvestorOrganisationIn,
   pictureBlock,
   withConversationFindings,
@@ -319,6 +320,7 @@ export {
   provenanceLine,
   withoutContradictedGaps,
   type AnalystResultLike,
+  namesReadByRun,
   PICTURE_WAIT_MS,
   pictureBlock,
   type QPictureBlock,
@@ -6626,6 +6628,7 @@ export function createModelGatewayQAnswer(
           pictures: dependencies.pictures,
           userText: toolContext.conversation?.latestUserText ?? "",
           earlierUserText: toolContext.conversation?.earlierUserText ?? [],
+          withheld: namesReadByRun(companiesRead),
           signal: request.signal,
         });
         const codeBlocks = [

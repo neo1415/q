@@ -178,6 +178,28 @@ export function quickAcknowledgement(
 }
 
 /**
+ * The receipt alone, for what was saved, without a question (owner
+ * 2026-10-21: Q's first words within 2-3 s). Said by code the moment the
+ * saves commit, while the model writes the rest of a reply that needs its
+ * judgement. Null when nothing committed, or a label is unknown.
+ */
+export function quickReceipt(
+  input: Pick<AcknowledgementInput, "results" | "labelOf" | "turnIndex">,
+): string | null {
+  const committed = input.results.filter(
+    (result) => result.outcome === "COMMITTED",
+  );
+  const parts = acknowledgementParts({
+    ...input,
+    results: committed,
+    next: { question: "-", optional: false },
+  });
+  if (parts === null) return null;
+  const said = parts.items.map(acknowledgedLine).join("; ");
+  return `${parts.lead}: ${said}${endOf(said)}`;
+}
+
+/**
  * The same acknowledgement in another language (lane ob1 with lane ml):
  * the English product-copy lines it needs (lead, labels, choices, the
  * question) are listed by `acknowledgementCopy`; `acknowledgementIn` puts
