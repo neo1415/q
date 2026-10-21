@@ -113,6 +113,10 @@ function harness(options: {
     readonly feed: ((fragment: string) => void) | undefined;
     readonly resolve: (result: MeetingHostResult) => void;
   }[] = [];
+  // Sleeps on the fake clock, woken by `play` (see meeting-host-latency).
+  const sleepers: { readonly due: number; readonly wake: () => void }[] = [];
+  const sleep = (ms: number) =>
+    new Promise<void>((wake) => sleepers.push({ due: clock.at + ms, wake }));
   const firstTokenMs = options.firstTokenMs ?? 400;
   const doneMs = options.doneMs ?? 1_800;
   const store: MeetingHostStore = {
@@ -178,6 +182,7 @@ function harness(options: {
     tickEveryMs: null,
     leaveDelayMs: 0,
     streamAnswers: options.stream,
+    sleep,
   });
   /** The fake model's progress at the current time. */
   const advanceModel = () => {
@@ -208,6 +213,10 @@ function harness(options: {
     const queue = [...events].sort((a, b) => a[0] - b[0]);
     for (let t = 0; t <= untilMs; t += 50) {
       clock.at = START + t;
+      for (const sleeper of sleepers.filter((s) => s.due <= clock.at)) {
+        sleepers.splice(sleepers.indexOf(sleeper), 1);
+        sleeper.wake();
+      }
       while (queue.length > 0 && (queue[0]?.[0] ?? Infinity) <= t) {
         const next = queue.shift();
         if (next !== undefined) void runtime.receive(MEETING, next[1]);

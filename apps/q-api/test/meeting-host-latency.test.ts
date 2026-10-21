@@ -107,6 +107,11 @@ function harness(options: {
   const asked: string[] = [];
   const saved: HeardLine[][] = [];
   const held: (() => void)[] = [];
+  // Sleeps on the fake clock, woken by `play` as it advances, so a test's
+  // result never depends on how fast the machine turns the event loop.
+  const sleepers: { readonly due: number; readonly wake: () => void }[] = [];
+  const sleep = (ms: number) =>
+    new Promise<void>((wake) => sleepers.push({ due: clock.at + ms, wake }));
   let answer = 0;
   const store: MeetingHostStore = {
     context: () =>
@@ -170,6 +175,7 @@ function harness(options: {
     tickEveryMs: null,
     leaveDelayMs: 0,
     speakInPieces: options.pieces ?? false,
+    sleep,
   });
   const at = (relative: number) => START + relative * 1_000;
   /** Events at their call times, with the 100 ms ticker in between. */
@@ -180,6 +186,10 @@ function harness(options: {
     const queue = [...events].sort((a, b) => a[0] - b[0]);
     for (let t = at(0); t <= at(untilRelative); t += 100) {
       clock.at = t;
+      for (const sleeper of sleepers.filter((s) => s.due <= t)) {
+        sleepers.splice(sleepers.indexOf(sleeper), 1);
+        sleeper.wake();
+      }
       // As the webhook does: answered at once, handled in order per call,
       // never waiting on a model call in flight.
       while (queue.length > 0 && at(queue[0]?.[0] ?? Infinity) <= t) {
