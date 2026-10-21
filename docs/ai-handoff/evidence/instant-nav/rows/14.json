@@ -1,1 +1,12 @@
-{"id":14,"said":"switch to the For you tab","page":"/feed","channel":"spoken","kind":"tab by name","ms":44,"runs":0,"reads":0,"moves":1,"outcome":"done on screen"}
+{
+  "id": 14,
+  "said": "switch to the For you tab",
+  "page": "/feed",
+  "channel": "spoken",
+  "kind": "tab by name",
+  "ms": 44,
+  "runs": 0,
+  "reads": 0,
+  "moves": 1,
+  "outcome": "done on screen"
+}

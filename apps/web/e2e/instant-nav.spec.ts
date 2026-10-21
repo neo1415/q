@@ -714,7 +714,8 @@ for (const one of CASES) {
       mkdirSync(join(EVIDENCE, "rows"), { recursive: true });
       writeFileSync(
         join(EVIDENCE, "rows", `${String(one.id).padStart(2, "0")}.json`),
-        `${JSON.stringify(row)}\n`,
+        // Two-space JSON is what Prettier keeps; one line failed format:check.
+        `${JSON.stringify(row, null, 2)}\n`,
       );
     }
   });

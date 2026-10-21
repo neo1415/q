@@ -1,1 +1,12 @@
-{"id":18,"said":"close the document","page":"/feed","channel":"typed","kind":"close (nothing open)","ms":null,"runs":1,"reads":0,"moves":0,"outcome":"left to Q"}
+{
+  "id": 18,
+  "said": "close the document",
+  "page": "/feed",
+  "channel": "typed",
+  "kind": "close (nothing open)",
+  "ms": null,
+  "runs": 1,
+  "reads": 0,
+  "moves": 0,
+  "outcome": "left to Q"
+}
