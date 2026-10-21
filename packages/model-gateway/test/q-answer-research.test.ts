@@ -416,7 +416,15 @@ describe("answer seam: Q decides to research", () => {
       query: question,
       maxSources: 4,
     });
-    expect(stages).toEqual(["REVIEWING_COMPANY", "SEARCHING_PUBLIC_SOURCES"]);
+    // Each step's stage as it starts (owner 2026-10-21): the named company
+    // read by code, the model at work, its lookup, the web, the writing.
+    expect(stages).toEqual([
+      "REVIEWING_COMPANY",
+      "PREPARING_ANALYSIS",
+      "REVIEWING_COMPANY",
+      "SEARCHING_PUBLIC_SOURCES",
+      "PREPARING_ANALYSIS",
+    ]);
     // The research result reached the final structured call as a TOOL turn.
     const finalCall = alpha.calls.at(-1)?.request;
     expect(finalCall?.output.kind).toBe("STRUCTURED");
@@ -613,7 +621,11 @@ describe("answer seam: public-web research", () => {
       latestUserText: "Which markets does the public web say we operate in?",
       earlierUserText: [],
     });
-    expect(stages).toEqual(["SEARCHING_PUBLIC_SOURCES"]);
+    expect(stages).toEqual([
+      "PREPARING_ANALYSIS",
+      "SEARCHING_PUBLIC_SOURCES",
+      "PREPARING_ANALYSIS",
+    ]);
     const toolTurn = alpha.calls[1]?.request.messages.at(-1);
     expect(toolTurn?.role).toBe("TOOL");
     expect(toolTurn?.content).toContain("news.example.com");

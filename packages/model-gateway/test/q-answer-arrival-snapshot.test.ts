@@ -130,6 +130,7 @@ function build(
   offered: readonly QOfferedTool[] = [],
   qHistory: readonly string[] = [],
   memory?: { readonly recall: () => Promise<string> },
+  stalled?: { readonly assemble: boolean },
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -223,6 +224,15 @@ function build(
     tools,
     ...(arrivalSkim === undefined ? {} : { arrivalSkim }),
     ...(memory === undefined ? {} : { memory }),
+    ...(stalled?.assemble === true
+      ? {
+          // Context assembly and the profile read that never finish.
+          context: { assemble: () => new Promise<never>(() => undefined) },
+          communication: {
+            profileFor: () => new Promise<never>(() => undefined),
+          },
+        }
+      : {}),
     arrivalSnapshot: () => {
       snapshotReads += 1;
       return Promise.resolve(snapshot());
@@ -371,6 +381,40 @@ describe("an arrival follow-up is answered by code, with no tool and no model ro
     expect(persisted.join(" ")).toContain("Could we do Thursday 3pm");
     // Recall was still asked for; only nothing waited on it.
     expect(recalls).toBe(1);
+  });
+
+  it("never waits for context assembly or the profile read (arrival row 22)", async () => {
+    const { seam, request, alpha, persisted, events } = build(
+      () => SNAPSHOT,
+      "what's the request?",
+      undefined,
+      [],
+      [],
+      undefined,
+      { assemble: true },
+    );
+    // Before: the code answer waited for prepareTurn's assemble and
+    // profile, so a stalled read held it (this await never returned).
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(alpha.calls).toHaveLength(0);
+    expect(persisted.join(" ")).toContain("Could we do Thursday 3pm");
+    expect(events.join(" ")).toContain("q.message.completed");
+  });
+
+  it("the early answer is the full path's: same words when nothing stalls", async () => {
+    const late = build(() => SNAPSHOT, "what did they say?");
+    const early = build(
+      () => SNAPSHOT,
+      "what did they say?",
+      undefined,
+      [],
+      [],
+      undefined,
+      { assemble: true },
+    );
+    await late.seam.answer(late.request);
+    await early.seam.answer(early.request);
+    expect(early.persisted).toEqual(late.persisted);
   });
 
   it("when the snapshot is withheld the normal path handles it", async () => {
