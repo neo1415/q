@@ -616,7 +616,12 @@ export function WorkInbox({
         </QControl>
         <div className="cq-wk-qdetail hidden lg:flex" data-work-detail>
           {selected === null ? (
-            <ClearState />
+            // Unknown is not "clear": a failed read never says nothing waits.
+            approvalsFailed ? (
+              <UnreadState />
+            ) : (
+              <ClearState />
+            )
           ) : (
             <RowDetail
               key={selected.key}
@@ -686,6 +691,22 @@ function runningLine(item: QWorkDto): string {
       : "Waiting for your yes";
   }
   return item.lastStep?.words ?? item.summary ?? "Running";
+}
+
+function UnreadState() {
+  const t = useT();
+  return (
+    <div
+      role="status"
+      className="m-auto flex max-w-sm flex-col items-center gap-2.5 rounded-(--cq-radius-lg) border border-dashed border-(--cq-border) p-7 text-center text-(--cq-text-secondary)"
+    >
+      <span className="cq-body-sm">
+        {t(
+          "What waits for your yes couldn’t load. Nothing is sent without it; try again in a moment.",
+        )}
+      </span>
+    </div>
+  );
 }
 
 function ClearState() {

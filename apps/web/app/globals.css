@@ -5189,17 +5189,17 @@
   .cq-preview-light {
     --cq-preview-canvas: oklch(0.985 0.004 92);
     --cq-preview-surface: oklch(1 0 0);
-    --cq-preview-accent: oklch(0.53 0.18 258);
+    --cq-preview-accent: var(--cq-gold-deep);
   }
   .cq-preview-dark {
     --cq-preview-canvas: oklch(0.16 0.01 258);
     --cq-preview-surface: oklch(0.22 0.011 258);
-    --cq-preview-accent: oklch(0.72 0.15 258);
+    --cq-preview-accent: var(--cq-gold-mid);
   }
   .cq-preview-auto {
     --cq-preview-canvas: oklch(0.985 0.004 92);
     --cq-preview-surface: oklch(0.16 0.01 258);
-    --cq-preview-accent: oklch(0.53 0.18 258);
+    --cq-preview-accent: var(--cq-gold-deep);
   }
 }
 
@@ -5207,8 +5207,9 @@
   /*
    * The prototypes' option tones (warm charcoal, gold, near-black) are not
    * the brand (founder, 2026-10-21): pages that carry .cq-charcoal,
-   * .cq-gold or .cq-ink keep the app's own colours — the accent for the
-   * primary action, ink for tiles — so those scopes set nothing here.
+   * .cq-gold or .cq-ink keep Capital Q's black-and-gold brand — the brand
+   * accent for the primary action, ink for tiles — so those scopes set
+   * nothing here.
    */
   /* The Q Daily being prepared: a bar that travels, never a made-up percent. */
   @keyframes cq-daily-indeterminate {
