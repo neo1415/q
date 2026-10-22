@@ -20,6 +20,9 @@ import { AccountToastProvider } from "@/features/settings/account-kit";
 import { accountButton } from "@/features/settings/account-styles";
 import { ProfileTeamSection } from "@/features/team/profile-team";
 
+import { WhenAllowed } from "@/features/organisation/capabilities";
+import { CAP } from "@/features/organisation/role-words";
+
 import { AnswersKvSection, type AnswersKvEditable } from "./answers-kv";
 import { EditableSection, ProfileSectionShell } from "./editable-section";
 import {
@@ -343,6 +346,7 @@ export function OwnProfileView({
                 variant="brief"
                 title={t("In your words")}
                 visibility={vis("members")}
+                capability={CAP.COMPANY_EDIT}
                 profile={{
                   kind: "COMPANY",
                   subjectId: company.id,
@@ -360,6 +364,7 @@ export function OwnProfileView({
                 variant="brief"
                 title={t("Your company")}
                 visibility={vis("members")}
+                capability={CAP.COMPANY_EDIT}
                 profile={{
                   kind: "COMPANY",
                   subjectId: company.id,
@@ -406,6 +411,7 @@ export function OwnProfileView({
                 variant="brief"
                 title={t("In your words")}
                 visibility={vis("members")}
+                capability={CAP.INVESTOR_EDIT}
                 profile={{
                   kind: "INVESTOR_ORGANISATION",
                   subjectId: investor.id,
@@ -421,6 +427,7 @@ export function OwnProfileView({
                 journey="investor"
                 lines={mandate.lines}
                 editable={mandate.editable}
+                capability={CAP.MANDATE_EDIT}
                 setupHref="/onboarding/investor?review=1"
                 visibility={vis("private")}
                 intro={t(
@@ -438,6 +445,7 @@ export function OwnProfileView({
                 variant="brief"
                 title={t("Your firm")}
                 visibility={vis("members")}
+                capability={CAP.INVESTOR_EDIT}
                 profile={{
                   kind: "INVESTOR_ORGANISATION",
                   subjectId: investor.id,
@@ -700,6 +708,10 @@ function OrganisationImages({
   /** Design review only: the sheet that opens on its own. */
   readonly open?: ProfileReview["sheet"];
 }) {
+  // A member sees the logo and cover; changing them is an admin's (the
+  // upload path authorises again).
+  const editCapability =
+    subjectType === "COMPANY" ? CAP.COMPANY_EDIT : CAP.INVESTOR_EDIT;
   return (
     <div
       className="flex flex-col gap-0.5 border-t border-(--cq-border-subtle) py-2.5 sm:grid sm:grid-cols-[180px_minmax(0,1fr)] sm:gap-0"
@@ -721,6 +733,7 @@ function OrganisationImages({
             )}
           </div>
           <div className="absolute -end-1.5 -bottom-1.5">
+            <WhenAllowed capability={editCapability}>
             <ProfileImageEditor
               subjectType={subjectType}
               subjectId={subjectId}
@@ -733,6 +746,7 @@ function OrganisationImages({
               compact
               initiallyOpen={open === "logo"}
             />
+            </WhenAllowed>
           </div>
         </div>
         <div className="relative aspect-[4/1] h-14 min-w-0 overflow-hidden rounded-md border border-(--cq-border-subtle) bg-(--cq-surface-strong)">
@@ -741,6 +755,7 @@ function OrganisationImages({
             <img src={coverUrl} alt="" className="size-full object-cover" />
           )}
           <div className="absolute top-1/2 end-2 -translate-y-1/2">
+            <WhenAllowed capability={editCapability}>
             <ProfileImageEditor
               subjectType={subjectType}
               subjectId={subjectId}
@@ -751,6 +766,7 @@ function OrganisationImages({
               compact
               initiallyOpen={open === "cover"}
             />
+            </WhenAllowed>
           </div>
         </div>
       </div>

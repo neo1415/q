@@ -5,6 +5,8 @@ import { useState, type ReactNode } from "react";
 import { buttonClassName } from "@capital-q/ui/button";
 import { Pencil, ICON_SIZE, ICON_STROKE } from "@capital-q/ui/icons";
 
+import { LockedEdit, useGate } from "@/features/organisation/capabilities";
+
 import { EditableProfile, type EditableProfileProps } from "./editable-profile";
 
 /**
@@ -26,6 +28,7 @@ export function EditableSection({
   variant = "default",
   visibility,
   intro,
+  capability,
 }: {
   readonly id: string;
   readonly title: string;
@@ -38,9 +41,16 @@ export function EditableSection({
   readonly visibility?: ReactNode;
   /** One line under the title, above the fields (brief only). */
   readonly intro?: ReactNode;
+  /**
+   * The capability editing needs (from GET /v1/me/capabilities), so a
+   * member sees "Admins only" where Edit would be. Presentation only: the
+   * write path still authorises every save.
+   */
+  readonly capability?: string | undefined;
 }) {
   const [editing, setEditing] = useState(false);
   const brief = variant === "brief";
+  const gate = useGate(capability);
   return (
     <ProfileSectionShell
       id={id}
@@ -49,6 +59,9 @@ export function EditableSection({
       variant={variant}
       visibility={visibility}
       action={
+        !gate.allowed ? (
+          <LockedEdit gate={gate} />
+        ) : (
         <button
           type="button"
           onClick={() => setEditing((value) => !value)}
@@ -70,6 +83,7 @@ export function EditableSection({
           )}
           {editing ? "Done" : "Edit"}
         </button>
+        )
       }
     >
       {intro === undefined ? null : (
@@ -77,7 +91,11 @@ export function EditableSection({
           {intro}
         </p>
       )}
-      <EditableProfile {...profile} editable={editing} variant={variant} />
+      <EditableProfile
+        {...profile}
+        editable={editing && gate.allowed}
+        variant={variant}
+      />
       {children}
     </ProfileSectionShell>
   );

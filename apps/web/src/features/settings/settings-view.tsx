@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
+import { ActivitySettingsRow } from "@/features/organisation/activity-settings-row";
+
 import type {
   BillingAccountPlanDto,
   MyEtiquetteGuideDto,
@@ -264,6 +266,7 @@ export function SettingsView({
               {group(
                 "team",
                 t("Team"),
+                <>
                 <SRow
                   title={acting?.name ?? t("Your team")}
                   description={
@@ -284,7 +287,9 @@ export function SettingsView({
                       ? t("Invite your team")
                       : t("Open your team")}
                   </Link>
-                </SRow>,
+                </SRow>
+                <ActivitySettingsRow />
+                </>,
               )}
 
               {group(

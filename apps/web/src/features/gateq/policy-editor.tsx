@@ -16,6 +16,8 @@ import { QSwarm } from "@/features/q-swarm/q-swarm";
 
 import { extractPolicyAction, publishPolicyAction } from "./gateway-actions";
 import { useT } from "@/features/i18n/language";
+import { GateNote, useGate } from "@/features/organisation/capabilities";
+import { CAP } from "@/features/organisation/role-words";
 
 /**
  * The investor's side of "Q sets it up for you" (P7). Paste or upload the
@@ -110,6 +112,7 @@ export function PolicyEditor({
 
   const router = useRouter();
   const textId = useId();
+  const publishNoteId = useId();
   const file = useRef<HTMLInputElement>(null);
   const [text, setText] = useState(preview?.text ?? "");
   const [source, setSource] = useState<"PASTED_TEXT" | "UPLOADED_FILE">(
@@ -133,6 +136,9 @@ export function PolicyEditor({
   const [published, setPublished] = useState(false);
   const [pending, startTransition] = useTransition();
   const requestKey = useRef<string | null>(null);
+  // Publishing makes rules live for every founder: an admin's call. The
+  // API refuses it to anyone else whatever this shows.
+  const publishGate = useGate(CAP.GATE_PUBLISH);
 
   const read = () =>
     startTransition(async () => {
@@ -440,7 +446,13 @@ export function PolicyEditor({
           )}
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="primary" onClick={publish} disabled={pending}>
+            <Button
+              variant="primary"
+              onClick={publish}
+              disabled={pending || !publishGate.allowed}
+              aria-describedby={publishGate.allowed ? undefined : publishNoteId}
+              data-gated-control={publishGate.allowed ? undefined : true}
+            >
               {pending
                 ? t("Publishing…")
                 : proposals.length === 0
@@ -455,6 +467,7 @@ export function PolicyEditor({
               {t("Back to the text")}
             </Button>
           </div>
+          <GateNote gate={publishGate} id={publishNoteId} />
         </div>
       )}
       {published ? (

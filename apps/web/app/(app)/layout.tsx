@@ -22,6 +22,8 @@ import { BrandStyle, loadBrandStyle } from "@/features/brand-theme/brand-style";
 import { InstallPrompt } from "@/pwa/install-prompt";
 import { SearchPalette } from "@/features/search/search-palette";
 import { loadMyOrganisations } from "@/features/team/load-organisations";
+import { CapabilitiesProvider } from "@/features/organisation/capabilities";
+import { loadMyCapabilities } from "@/features/organisation/load-capabilities";
 import { PitchWarmup } from "@/features/discover/player/pitch-warmup-trigger";
 import { qPitchEnabled } from "@/features/q-pitch/flag";
 import { QPitchEntrySlot } from "@/features/q-pitch/tour-entry-slot";
@@ -64,6 +66,9 @@ export default async function ApplicationLayout({
     .then((found) => found !== null)
     .catch(() => false);
   const brandRead = loadBrandStyle().catch(() => null);
+  // What they may do in their active organisation, read once per request
+  // and handed to client controls (presentation only; the API decides).
+  const capabilitiesRead = loadMyCapabilities();
   const context = await resolveOwnContext();
   const qPitch = qPitchEnabled();
   const shell: ShellContext =
@@ -113,7 +118,8 @@ export default async function ApplicationLayout({
   // WORK-58: the Admin group shows only to a platform admin, decided by
   // the API (the console's own route refuses anyone else regardless).
   // P5: the brand colour, read alongside so it paints with the first frame.
-  const [verifyNudgeState, admin, brandCss, organisations] = await Promise.all([
+  const [verifyNudgeState, admin, brandCss, organisations, capabilities] =
+    await Promise.all([
     unfinished === null && context.kind !== "NONE"
       ? verifyRead
       : Promise.resolve(null),
@@ -121,6 +127,7 @@ export default async function ApplicationLayout({
     brandRead,
     // G2: the switcher's list (shown only for two or more).
     loadMyOrganisations(),
+    capabilitiesRead,
   ]);
   // Any language: the interface follows the language they chose; Q's
   // machine translations fill what no hand catalogue covers.
@@ -128,6 +135,7 @@ export default async function ApplicationLayout({
   const machine = await machineUiText(language);
   return (
     <LanguageProvider language={language} machine={machine}>
+      <CapabilitiesProvider value={capabilities}>
       <AppShell
         context={{ ...shell, admin, organisations, qPitch }}
         subject={subject}
@@ -171,6 +179,7 @@ export default async function ApplicationLayout({
           />
         </Suspense>
       </AppShell>
+      </CapabilitiesProvider>
     </LanguageProvider>
   );
 }

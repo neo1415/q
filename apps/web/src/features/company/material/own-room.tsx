@@ -33,6 +33,8 @@ import {
 } from "./material-actions";
 import "./own-room.css";
 import { useT } from "@/features/i18n/language";
+import { GateNote, useGate } from "@/features/organisation/capabilities";
+import { CAP } from "@/features/organisation/role-words";
 
 /**
  * The founder's own data room, "See it as an investor would" (design
@@ -207,6 +209,9 @@ export function OwnRoom({
   const [saving, startSaving] = useTransition();
   const seq = useRef(0);
   const loadedOnce = useRef(demo !== undefined);
+  // Who sees each document is an admin's decision (disclosure.manage); a
+  // member sees the room as it is. The API authorises every change again.
+  const manage = useGate(CAP.DISCLOSURE_MANAGE);
 
   const candidates = lensCandidates(lens, preview, view.requests);
   const target =
@@ -391,7 +396,10 @@ export function OwnRoom({
                     <button
                       type="button"
                       className="cq-ownroom-acc"
-                      disabled={saving}
+                      disabled={saving || !manage.allowed}
+                      title={
+                        manage.reason === null ? undefined : t(manage.reason)
+                      }
                       aria-label={t(
                         `Who can see ${document.title}: ${accessWords(document)}`,
                       )}
@@ -406,6 +414,7 @@ export function OwnRoom({
               </section>
             ))
           )}
+          <GateNote gate={manage} className="mt-3" />
           {message === null ? null : (
             <p
               role="status"
@@ -483,7 +492,7 @@ export function OwnRoom({
               aria-checked={outline}
               aria-label={t("Folder names")}
               className="cq-ownroom-sw"
-              disabled={saving}
+              disabled={saving || !manage.allowed}
               onClick={toggleOutline}
             >
               <i aria-hidden />

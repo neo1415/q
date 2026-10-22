@@ -1,5 +1,6 @@
 import type { PendingClaimDto, TeamDto } from "@capital-q/contracts";
 
+import { RoleCard } from "@/features/organisation/role-card";
 import { QSection } from "@/features/q/q-section";
 import { AccountColumn, AccountHead } from "@/features/settings/account-layout";
 
@@ -38,7 +39,12 @@ export function TeamSettingsView({
         {team === null ? (
           <TeamError />
         ) : (
-          <TeamPage initial={team} reviewRoleFor={reviewRoleFor} />
+          <>
+            <TeamPage initial={team} reviewRoleFor={reviewRoleFor} />
+            <div className="pt-6">
+              <RoleCard team={team} />
+            </div>
+          </>
         )}
         <div className="pt-3.5">
           <CompanyClaims initial={claims} companyName={claimsFor} />
