@@ -10,6 +10,15 @@ import { after, before, test } from "node:test";
 
 import { DEMO_STATEMENT_SUFFIX } from "./plan.mjs";
 import { applyAll, FIXTURE_PATH, localDatabase, planAll } from "./seed.mjs";
+const MANIFEST = JSON.parse(
+  readFileSync(
+    new URL(
+      "../../../supabase/seed-assets/capital-q-documents/manifest.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
 
 const TEMPLATE_URL = process.env.CQ_SEED_TEST_DATABASE_URL;
 const fixture = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
@@ -392,46 +401,48 @@ test(
 );
 
 test(
-  "the data room: the deck and the model only, as an upload registers them",
+  "the data room: every manifest document, as an upload registers it",
   { skip },
   async () => {
     const docs = await db.read(
       `select d.title, d.document_type, d.download_audience, e.level, e.visibility_scope, e.folder_code, v.storage_bucket, v.uploaded_by_user_id = d.created_by_user_id as same_uploader from evidence.documents d join evidence.data_room_entries e on e.document_id = d.id join evidence.document_versions v on v.id = d.current_version_id where d.company_id = '${ids.cqCompany}' order by d.title`,
     );
+    // Owner 2026-10-22 ("upload everything"): all six, at the manifest's
+    // levels. Only the deck is downloadable by investors.
+    const expected = MANIFEST.documents
+      .map((d) => ({
+        title: d.title,
+        document_type: d.documentType,
+        download_audience:
+          d.documentType === "PITCH_DECK" ? "INVESTORS" : "ORGANISATION",
+        level: d.dataRoomLevel,
+        visibility_scope:
+          d.dataRoomLevel === "PUBLIC"
+            ? "network_visible"
+            : "specifically_shared",
+        folder_code: d.folderCode,
+        storage_bucket: "cq-documents-private",
+        same_uploader: true,
+      }))
+      .sort((a, b) => (a.title < b.title ? -1 : a.title > b.title ? 1 : 0));
+    assert.equal(expected.length, 6);
     assert.deepEqual(
       [...docs].map((r) => ({ ...r })),
-      [
-        {
-          title: "Financial model 2026–2028",
-          document_type: "FINANCIAL_MODEL",
-          download_audience: "ORGANISATION",
-          level: "ON_REQUEST",
-          visibility_scope: "specifically_shared",
-          folder_code: "financials",
-          storage_bucket: "cq-documents-private",
-          same_uploader: true,
-        },
-        {
-          title: "Pitch deck, Q3 2026",
-          document_type: "PITCH_DECK",
-          download_audience: "INVESTORS",
-          level: "PUBLIC",
-          visibility_scope: "network_visible",
-          folder_code: "fundraising",
-          storage_bucket: "cq-documents-private",
-          same_uploader: true,
-        },
-      ],
-      "business documents only: no legal summaries, no cap table",
+      expected,
+    );
+    assert.deepEqual(
+      [...docs].filter((r) => r.level === "PUBLIC").map((r) => r.document_type),
+      ["PITCH_DECK"],
+      "only the deck is open to investors",
     );
     const uploads = [...stored.values()].filter(
       (o) => o.bucket === "cq-documents-private",
     );
-    assert.equal(uploads.length, 2, "the bytes are stored before the rows");
+    assert.equal(uploads.length, 6, "the bytes are stored before the rows");
     const events = await db.read(
       "select count(*)::int as n from events.outbox where event_type = 'evidence.document.version_created'",
     );
-    assert.equal(events[0].n, 2, "the real pipeline is told, as for an upload");
+    assert.equal(events[0].n, 6, "the real pipeline is told, as for an upload");
     const [confirmed] = await db.read(
       "select p.display_name from evidence.deck_extraction_confirmations c join identity.user_profiles p on p.id = c.confirmed_by_user_id",
     );

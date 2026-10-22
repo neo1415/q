@@ -174,7 +174,7 @@
         {
           "key": "financial.contribution_margin",
           "type": "financial",
-          "statement": "Contribution margin was 61% in Q3 2026 (revenue less hosting, model and payment costs).",
+          "statement": "Contribution margin was 61% in Q3 2026 (revenue less cost of revenue and variable onboarding and support costs).",
           "value": {
             "kind": "PERCENT",
             "value": 61,

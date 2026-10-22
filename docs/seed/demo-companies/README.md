@@ -57,10 +57,11 @@ Source: `supabase/seed-assets/demo-companies/companies.json`, one fixture shared
 3. Apply: the same command with `--apply`. It runs one transaction per company and is safe to run again; a second run plans nothing.
 4. Scores: the workers recompute on the outbox events the seed writes (`evidence.claim.changed`, `core.company.updated`). The 30-minute sweep is the backstop.
 5. Team (owner 2026-10-22): `--person zino=<email> --person daniel=<email> --person adeyemi=<email>` seeds organisation memberships directly with the `organisation_member` role. **No invitation is created or sent.** It adds `company_members` with titles (Founder & CEO, Co-founder, Engineering) and, for founders only, network-visible background lines that are **roles only** ("Founder & CEO, Capital Q"). No career history is invented. Only founders get a person Q Card.
-6. Data room: `--documents` uploads the business documents from `supabase/seed-assets/capital-q-documents/manifest.json`, and only those (owner: business docs only). The bytes go to `cq-documents-private`, and the rows are written as the founder's own upload: `evidence.documents`, version 1, a `data_room_entries` row, audit, and `evidence.document.version_created`.
+6. Data room: `--documents` uploads every document in `supabase/seed-assets/capital-q-documents/manifest.json` (owner, 22 Oct: "upload everything", superseding "business docs only"). The bytes go to `cq-documents-private`, and the rows are written as the founder's own upload: `evidence.documents`, version 1, a `data_room_entries` row, audit, and `evidence.document.version_created`.
    - The pitch deck is `PUBLIC` (fundraising folder), downloadable by investors.
    - The financial model is `ON_REQUEST` (financials folder).
-   - The legal summaries and the cap table stay in the repository and are **not** uploaded.
+   - The cap table, incorporation summary, shareholder-agreement summary and board note are ON_REQUEST. Each is watermarked as an illustrative demonstration document, not a legal or financial record.
+   - Documents are never verification, and none is written.
    - A sha256 mismatch against the manifest stops the run.
    - On hosted, the event starts the real pipeline: processing, `evidence.document.ready`, then Q's deck reader through the model gateway.
 7. Deck confirmation, a **separate later run**: once the reading exists, `--confirm-deck` confirms the latest reading of the current deck version on the founder's behalf (owner: "seed marks it confirmed"). It is audited `deck_extraction.confirmed` with `confirmedOnOwnerApproval: true`. With no reading yet, it plans nothing.
@@ -87,7 +88,7 @@ Source: `supabase/seed-assets/demo-companies/companies.json`, one fixture shared
   - idempotent;
   - a duplicate stops the run;
   - team: member role only, no invitations, roles-only backgrounds;
-  - data room: deck and model only, with the right levels and audiences, and confirmed by David;
+  - data room: all six manifest documents at their levels, only the deck open to investors, and confirmed by David;
   - person cards for the founders only.
 
 ## Scores (local, after seeding, deterministic scorers)
@@ -137,7 +138,7 @@ The deck reading here is the **local fixture**. On hosted, the result depends on
 | Legal and corporate   | 0/6               | 0/6               |
 
 - Confidence stays Low: everything is self-reported, and verification is unfaked.
-- Diligence, governance and legal stay empty, because the owner chose business documents only.
+- Uploading the four legal and corporate documents changes nothing: 76 Strong, 4/8 areas, 15/46 criteria. **InvestIQ does not read data-room documents other than the deck**; diligence, governance and legal grade only from a confirmed deck, background lines and verification. So those areas stay at 0, and no score comes from the illustrative summaries.
 - Unicorn potential is unchanged: insufficient evidence (P2 2, P3 2.5, P4 3, P5 2).
 
 ## Discoverability
@@ -169,7 +170,7 @@ So claims reach at most 9 of 46 criteria.
 - **The other 37 criteria** come only from:
   - a deck whose sections the founder confirmed, for product, competition, go-to-market, founders and team;
   - founders' own network-visible background lines;
-  - data-room documents, for governance, legal and diligence;
+  - verification and confirmed facts for governance, legal and diligence (the scorer does not read data-room documents other than the deck);
   - Capital Q's organisation verification;
   - a pitch investors may play.
 

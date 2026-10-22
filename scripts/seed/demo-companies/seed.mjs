@@ -397,7 +397,7 @@ export async function planAll(
       plan === null ? { person, sql: null } : { person, ...plan, rendition },
     );
   }
-  // The data room (owner 2026-10-22: business documents only), uploaded by
+  // The data room (owner 2026-10-22: "upload everything"), uploaded by
   // the founder named for it; and, later, his confirmation of Q's reading.
   let docs = null;
   let confirmation = null;
@@ -437,9 +437,24 @@ export async function planAll(
           documents: files,
           existingTitles: existing.map((r) => r.title),
         });
+        // The pitch video is not seeded: a pitch needs the founder's session
+        // and the stream provider, so it is uploaded at /pitch/new. The seed
+        // only checks the file is the one the manifest names.
+        const video = manifest.pitchVideo;
+        const videoSha = createHash("sha256")
+          .update(readFileSync(join(dirname(DOCUMENTS_MANIFEST), video.file)))
+          .digest("hex");
+        if (videoSha !== video.sha256) {
+          throw new Error(`${video.file}: sha256 does not match the manifest`);
+        }
         docs = {
           company,
           planned,
+          pitchVideo: {
+            file: video.file,
+            audience: video.audience,
+            uploadPath: video.uploadPath,
+          },
           sql: renderDocumentsSql({
             seedKey: fixture.seedKey,
             company,
@@ -584,7 +599,7 @@ export function describe(planned) {
     lines.push(
       d.skip
         ? `- data room: SKIP (${d.skip})`
-        : `- data room: ${d.planned.length === 0 ? "documents already there" : d.planned.map((x) => `${x.title} (${x.dataRoomLevel})`).join(", ")}${d.fixtureReading ? " + LOCAL FIXTURE READING" : ""}`,
+        : `- data room: ${d.planned.length === 0 ? "documents already there" : d.planned.map((x) => `${x.title} (${x.dataRoomLevel})`).join(", ")}${d.fixtureReading ? " + LOCAL FIXTURE READING" : ""}${d.pitchVideo ? `\n- pitch video (OWNER STEP, not seeded): upload supabase/seed-assets/capital-q-documents/${d.pitchVideo.file} at ${d.pitchVideo.uploadPath}, audience "${d.pitchVideo.audience}"` : ""}`,
     );
   }
   if (planned.confirmation) {

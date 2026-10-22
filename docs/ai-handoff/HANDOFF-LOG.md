@@ -1137,3 +1137,11 @@ Evidence stage: **code + local database tests**. Not applied to hosted; the prod
 - **Scores (local, fixture reading):** Capital Q InvestIQ 50 Investable → 76 Strong, Low confidence; 4/8 areas, 15/46 criteria. Unicorn: still insufficient evidence. Verification is unfaked.
 - **Checks:** seed tests 12/12; vitest 23 files, 255 tests; root, web and api tsc clean; eslint and prettier clean on changed files.
 - **Owner steps:** the pitch video at `/pitch/new` ("Everyone on Capital Q"); account emails for Zino, Daniel and Adeyemi; Zino's headshot; the beat #49 relationships decision.
+
+## Capital Q data room: all six documents — 22 October 2026 (Claude S6, `seed/capital-q-team-docs`)
+
+- The owner superseded "business docs only" with "upload everything", confirmed directly to S6. `--documents` uploads all six manifest documents. Only the deck is PUBLIC; the rest are ON_REQUEST and watermarked illustrative.
+- The pitch video stays an owner step at `/pitch/new`. The seed checks its sha256 and prints the step.
+- Capital Q's contribution-margin statement is reworded to match the documents: revenue less cost of revenue and variable onboarding and support.
+- Re-score (local): unchanged at 76 Strong, Low confidence, 4/8 areas, 15/46 criteria. InvestIQ reads no data-room document except the deck, so governance, legal and diligence stay at 0.
+- Checks: seed tests 12/12.
