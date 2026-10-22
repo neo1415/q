@@ -67,13 +67,16 @@
     }
   ],
   "pitchVideo": {
-    "$comment": "Q genuinely pitching Capital Q: a copy of the Q Story master, not a founder video. Upload through /pitch/new (founder session and stream provider) with the audience below.",
+    "$comment": "Q genuinely pitching Capital Q: a copy of the Q Story INVESTOR edition, not a founder video. The owner-approved investor master (reported by S1), with no rehearsal stamp. Upload through /pitch/new (founder session and stream provider) with the audience below.",
+    "final": true,
+    "ownerApprovedForAudience": true,
     "file": "capital-q-pitch-video.mp4",
-    "source": "docs/ai-handoff/evidence/q-story/master/q-story-master-720p.mp4",
+    "source": "qstory/editions-card@25c6141b0:docs/ai-handoff/evidence/q-story/master/investor/q-story-master-720p.mp4",
     "mime": "video/mp4",
-    "bytes": 10115269,
-    "sha256": "7f02f0adb8d239922df0ca77e64218ec16706e5a8baa4028f84f8a9a166a6829",
-    "title": "Capital Q — the Q Story",
+    "bytes": 6445790,
+    "sha256": "8c84963b809aac9f1ed1a599d2d546a1f74666a442b3e6f93a6e493d39a8eff6",
+    "title": "Capital Q — the story, for investors",
+    "caption": "Q, Capital Q's AI investment analyst, tells the Capital Q story over the real product. Demonstration data.",
     "audience": "Everyone on Capital Q",
     "uploadPath": "/pitch/new"
   },

@@ -34,7 +34,11 @@ Owner direction, 22 October 2026. Capital Q is seeded as a demonstration company
 
 ## Pitch video
 
-`capital-q-pitch-video.mp4` is a copy of the Q Story master (`docs/ai-handoff/evidence/q-story/master/q-story-master-720p.mp4`): Q genuinely pitching Capital Q, not a founder video. It goes up through `/pitch/new` with the audience "Everyone on Capital Q", which needs the founder's session and the stream provider.
+`capital-q-pitch-video.mp4` is a copy of the Q Story **investor edition** (3:58.8, 720p share copy, from branch `qstory/editions-card` @ `25c6141b0`): Q genuinely pitching Capital Q, not a founder video.
+
+- Title: "Capital Q — the story, for investors".
+- It goes up through `/pitch/new` with the audience "Everyone on Capital Q", which needs the founder's session and the stream provider.
+- This is the owner-approved master, as reported by S1, with no rehearsal stamp (`pitchVideo.ownerApprovedForAudience: true`). If it is replaced, copy the new file and re-run `finalize.py`, so that the sha256 and bytes in the manifest change in the same commit.
 
 ## Rebuild
 
