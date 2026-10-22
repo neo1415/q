@@ -72,6 +72,8 @@ const CORE = [
   "revise_my_document",
   // Q room W5: "make slide 3 shorter" can come mid-anything too.
   "edit_my_document",
+  // Lane 8: "what does the document I just sent say?" comes with any turn.
+  "read_attached_document",
   // AUTO (ADR 0030): "what are you working on" and "stop" from any turn.
   "list_q_work",
   "stop_q_work",

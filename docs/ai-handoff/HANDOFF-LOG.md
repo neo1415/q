@@ -996,3 +996,21 @@ Evidence stage: **code + local checks only**.
   - `updateTag` runs on a card save and on a handle claim.
   - `connection()` replaces `force-dynamic`, which forced no-store.
   - Test: `apps/web/test/q-card-public-cache.test.ts`.
+
+## 2026-10-22 — Claude, lane 8: Q reads attached documents (`speed/q-uploads`, PR into `speed/q-oct20`)
+
+- **Fixed:** Send is now live on a finished attachment alone, and held while one uploads. Drag-and-drop and several files work. A WorkingLine shows "Reading <file>".
+- **Built:** one attachments store for the Q page and the dock.
+  - Ids ride `screen.attachedDocumentIds` on the turn and its follow-ups; "New chat" clears them.
+  - The new tool `read_attached_document` reads each one as the asker through Evidence (`document.view`).
+  - It waits up to 12 s for the pipeline's pages. A short document is read whole; a long one by its opening plus pages matched by FTS.
+  - It finds earlier uploads by name.
+  - The model-gateway prefetch puts the pages into the prompt as USER_CLAIM / DOCUMENT_SUPPORTED facts, cited by page.
+- **No migration.** Nothing is persisted beyond the existing document.
+- **Lane 4:** the `index.ts` edit is an isolated commit; lane 4 was told before it was made.
+- **Evidence:** `docs/ai-handoff/evidence/q-uploads/`.
+- **Not done:**
+  - onboarding was left on its own working upload path;
+  - no OCR for images (they say plainly that they can't be read);
+  - no full-stack or live run.
+    \=======

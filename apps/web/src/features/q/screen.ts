@@ -169,6 +169,19 @@ export function setRoomDeck(
 }
 
 /**
+ * Lane 8: the documents attached in Q's composer on this tab, for this
+ * conversation (sent ones stay, so a follow-up is answered from them
+ * too). Ids only: the Q API reads each as the asker or not at all.
+ */
+let attachedDocumentIds: readonly string[] = [];
+
+export function setAttachedDocuments(ids: readonly string[]): void {
+  attachedDocumentIds = [
+    ...new Set(ids.filter((id) => UUID.test(id)).map((id) => id.toLowerCase())),
+  ].slice(-5);
+}
+
+/**
  * What the page says is in front of the person (R18/R21): the Discover
  * card's company, and its pitch and position when one is playing or
  * paused. Registered by the page (through the global Q moment source) and
@@ -239,6 +252,9 @@ export function currentScreen(
         : { artifactVersion: roomDeck.version }),
     };
   } else if (open !== null) screen = { ...screen, artifactId: open };
+  if (attachedDocumentIds.length > 0) {
+    screen = { ...screen, attachedDocumentIds: [...attachedDocumentIds] };
+  }
   // Q room R1: the whole page, as ids and closed kinds only.
   const manifest = currentManifest();
   return manifest === undefined ? screen : { ...screen, manifest };

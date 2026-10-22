@@ -933,6 +933,11 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     { acts: true },
   ),
   tool(
+    "read_attached_document",
+    "DOCUMENT",
+    "Reads a document they attached or uploaded to Q (PDF, Word, PowerPoint, spreadsheet, text), now or earlier by its name, and answers from it with page citations.",
+  ),
+  tool(
     "list_uploaded_documents",
     "DOCUMENT",
     "Lists the documents their company uploaded and whether Q has read them.",
