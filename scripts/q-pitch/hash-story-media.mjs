@@ -6,7 +6,7 @@
  * and a cached old clip can never play against a new script. index.json
  * itself keeps its name (it is the one file fetched fresh).
  *
- *   node scripts/q-pitch/hash-story-media.mjs [--voice EXAVITQu4vr4xnSDxMaL]
+ *   node scripts/q-pitch/hash-story-media.mjs [--voice pFZP5JQG7iQjIQuC4Bku]
  *
  * Idempotent: an already hashed beat is re-hashed from its current file.
  */
@@ -20,7 +20,7 @@ const root = path.resolve(
   "../..",
 );
 const at = process.argv.indexOf("--voice");
-const voice = at === -1 ? "EXAVITQu4vr4xnSDxMaL" : process.argv[at + 1];
+const voice = at === -1 ? "pFZP5JQG7iQjIQuC4Bku" : process.argv[at + 1];
 if (!/^[A-Za-z0-9]{8,40}$/u.test(voice ?? ""))
   throw new Error("not a voice id");
 const dir = path.join(root, "apps/web/public/story-media", voice);
