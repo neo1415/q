@@ -68,15 +68,18 @@ export const STORY_ANCHORS: Readonly<Record<string, AnchorPlacement>> = {
   "qs.gateq.inbox": { select: ".gq2-list" },
   // #48-49 The real Q Card, on the stage (story-qcard.tsx).
   "qs.card.identity": { select: "[data-story-qcard] [data-q-card]" },
-  "qs.card.about": {
-    select: '[data-story-qcard] [data-card-section="about"]',
+  // S6's sections (CARD_SECTION_IDS); a company card always renders all
+  // five, "Not shared yet" when empty, so a word never misses its part.
+  "qs.card.story": { select: '[data-story-qcard] [data-card-section="story"]' },
+  "qs.card.numbers": {
+    select: '[data-story-qcard] [data-card-section="numbers"]',
   },
-  "qs.card.more": { select: '[data-story-qcard] [data-card-section="more"]' },
-  "qs.card.verified": {
-    select: "[data-story-qcard] [data-demo-attestation]",
+  "qs.card.raise": { select: '[data-story-qcard] [data-card-section="raise"]' },
+  "qs.card.intelligence": {
+    select: '[data-story-qcard] [data-card-section="intelligence"]',
   },
-  "qs.card.actions": {
-    select: '[data-story-qcard] section[aria-label="Actions"]',
+  "qs.card.relationships": {
+    select: '[data-story-qcard] [data-card-section="relationships"]',
   },
 };
 

@@ -265,3 +265,20 @@ describe("Q Story presence figures (lane S4)", () => {
     expect([...STORY_FIGURES].sort()).toEqual([...PRESENCE_FIGURE_IDS].sort());
   });
 });
+
+describe("Q Story Q Card (#48-49)", () => {
+  it("the demonstration company's card parses under the public card contract, every section filled", async () => {
+    const { STORY_QCARD } =
+      await import("@/features/q-pitch/story/story-qcard");
+    const keys = STORY_QCARD.fields.map((field) => field.key);
+    for (const key of [
+      "tractionMetrics",
+      "currentRaise",
+      "investabilitySummary",
+      "relationshipSummary",
+    ]) {
+      expect(keys).toContain(key);
+    }
+    expect(STORY_QCARD.demoAttested).toEqual(STORY_QCARD.verified);
+  });
+});

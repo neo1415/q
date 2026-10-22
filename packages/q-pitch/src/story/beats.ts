@@ -18,7 +18,7 @@ import {
  * `docs/specs/q-pitch/story/Q_STORY_VERBATIM.txt`, ignoring only line-break
  * layout, so one changed word fails CI.
  *
- * Delivery is kept apart from the words. `tags` are ElevenLabs v3 audio
+ * Delivery is kept apart from the words. `tags` are ElevenLabs audio
  * tags placed before a word (or at the end), sent to the renderer only;
  * `delivery` is the same direction in prose for the live-voice fallback.
  * Cues are anchored to word indices, never to times, so a re-render with a
@@ -30,7 +30,7 @@ export const STORY_VERSION = "story-v7.1" as const;
 /** The document's title line: shown, never spoken. */
 export const STORY_TITLE = "Q Story" as const;
 
-/** The audio tags the story may use (ElevenLabs v3 delivery, not words). */
+/** The audio tags the story may use (ElevenLabs delivery, v3 and v4 turbo; not words). */
 export const STORY_AUDIO_TAGS = [
   "[warmly]",
   "[softly]",
@@ -882,17 +882,13 @@ const inputs: readonly BeatInput[] = [
     pace: "normal",
     delivery: "Rhythmic noun list, warm and even.",
     cues: [
-      // The real card's own parts (the company card has these today; a
-      // richer card is the owner's call, coordinator 21 Oct).
-      // The card is on the stage from the first word, so a jump to this
-      // beat (go to 49) shows it too; same visual, so nothing remounts.
-      [0, stage("q-card", 1)],
+      // The real card's own sections (S6, CARD_SECTION_IDS), one per noun.
       ["identity", light("qs.card.identity")],
-      ["story,", light("qs.card.about")],
-      ["numbers,", light("qs.card.more")],
-      ["raise,", light("qs.card.identity")],
-      ["intelligence,", light("qs.card.verified")],
-      ["relationships.", light("qs.card.actions")],
+      ["story,", light("qs.card.story")],
+      ["numbers,", light("qs.card.numbers")],
+      ["raise,", light("qs.card.raise")],
+      ["intelligence,", light("qs.card.intelligence")],
+      ["relationships.", light("qs.card.relationships")],
     ],
   },
   {
