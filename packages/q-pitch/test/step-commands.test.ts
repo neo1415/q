@@ -151,7 +151,10 @@ describe("a STEP intent moves the director to exactly that step", () => {
 describe("engine audit phrasings (21 Oct)", () => {
   it("reads the misses the audit found as commands", () => {
     expect(parseStepCommand("next one")).toEqual({ kind: "NEXT" });
-    expect(parseStepCommand("I want to go back")).toEqual({ kind: "BACK", count: 1 });
+    expect(parseStepCommand("I want to go back")).toEqual({
+      kind: "BACK",
+      count: 1,
+    });
     expect(parseStepCommand("stop talking")).toEqual({ kind: "PAUSE" });
     expect(parseStepCommand("hold on a second")).toEqual({ kind: "PAUSE" });
     expect(parseStepCommand("wait a moment")).toEqual({ kind: "PAUSE" });
@@ -159,6 +162,8 @@ describe("engine audit phrasings (21 Oct)", () => {
 
   it("still treats a question as a question", () => {
     expect(parseStepCommand("what's the next one for founders?")).toBeNull();
-    expect(parseStepCommand("why would I want to go back to email?")).toBeNull();
+    expect(
+      parseStepCommand("why would I want to go back to email?"),
+    ).toBeNull();
   });
 });
