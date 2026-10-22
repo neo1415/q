@@ -1,81 +1,57 @@
 {
-  "recordedAt": "2026-10-22T00:55:52.969Z",
+  "recordedAt": "2026-10-22T01:10:13.308Z",
   "base": "http://127.0.0.1:3200",
   "path": "/dev/story",
   "viewport": {
     "width": 1280,
     "height": 800
   },
-  "wallMs": 452047,
-  "narrator": "FALLBACK",
-  "preloadMs": 394,
+  "wallMs": 395249,
+  "narrator": "RENDERED",
+  "preloadMs": 1108,
   "offsets": {
-    "median": -96,
-    "p95": -65,
+    "median": -93,
+    "p95": -74,
     "count": 165
   },
   "offsetsByKind": {
     "stage": {
-      "median": -93,
-      "p95": -78,
+      "median": -89,
+      "p95": -76,
       "count": 116
     },
     "mood": {
-      "median": -98,
-      "p95": -88,
+      "median": -93,
+      "p95": -76,
       "count": 8
     },
     "navigate": {
-      "median": 28,
-      "p95": 183,
+      "median": 12,
+      "p95": 199,
       "count": 7
     },
     "light": {
-      "median": -112,
-      "p95": -102,
+      "median": -108,
+      "p95": -99,
       "count": 21
     }
   },
   "frames": {
-    "count": 26785,
-    "long": 8
+    "count": 23267,
+    "long": 12
   },
-  "fallbacks": 14,
+  "fallbacks": 13,
   "beat": 56,
   "phase": "DONE",
   "cls": {
-    "cls": 0.021713928222656248,
+    "cls": 0.0007978515625,
     "shifts": [
       {
         "sources": [
-          "p.cq-story-standing"
-        ],
-        "value": 0.000365570068359375,
-        "at": 276908,
-        "path": "/dev/story/discover"
-      },
-      {
-        "sources": [
-          "p.cq-story-standing"
-        ],
-        "value": 0.000365570068359375,
-        "at": 287201,
-        "path": "/dev/story/crm?view=record"
-      },
-      {
-        "sources": [
           "span.hidden.sm:inline-flex"
         ],
         "value": 0.00039892578125,
-        "at": 297809,
-        "path": "/dev/story/gateq?view=gate"
-      },
-      {
-        "sources": [
-          "p.cq-story-standing"
-        ],
-        "value": 0.000365570068359375,
-        "at": 301216,
+        "at": 258761,
         "path": "/dev/story/gateq?view=gate"
       },
       {
@@ -83,47 +59,7 @@
           "span.hidden.sm:inline-flex"
         ],
         "value": 0.00039892578125,
-        "at": 311658,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "sources": [
-          "div.cq-story-presence[data-surface=stage]"
-        ],
-        "value": 0.0064453125,
-        "at": 330911,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "sources": [
-          "p.cq-story-standing"
-        ],
-        "value": 0.000365570068359375,
-        "at": 392678,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "sources": [
-          "p.cq-story-standing"
-        ],
-        "value": 0.000365570068359375,
-        "at": 395756,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "sources": [
-          "p.cq-story-standing"
-        ],
-        "value": 0.000365570068359375,
-        "at": 403947,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "sources": [
-          "div.cq-story-presence[data-surface=page][data-docked]"
-        ],
-        "value": 0.012277343750000001,
-        "at": 435958,
+        "at": 272143,
         "path": "/dev/story/gateq?view=inbox"
       }
     ]
