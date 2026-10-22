@@ -175,6 +175,11 @@ export type QIntelligenceDependencies = {
   /** J7: whether a quote asks to clear a field, read by meaning. */
   readonly clearCheck?: ClearCheck | undefined;
   /**
+   * Owner 2026-10-22: typed answers have their findings and cards written
+   * by a second call beside them; input spend per turn roughly doubles.
+   */
+  readonly parallelExtras?: boolean | undefined;
+  /**
    * A typed yes or no to a change waiting in the conversation, read by
    * DECISION_READER and acted on through the Approval Engine (founder
    * fixture #1; pending-decision.ts).
@@ -417,6 +422,9 @@ export function composeQIntelligence(
     ...(dependencies.clearCheck === undefined
       ? {}
       : { clearCheck: dependencies.clearCheck }),
+    ...(dependencies.parallelExtras === undefined
+      ? {}
+      : { parallelExtras: dependencies.parallelExtras }),
     ...(dependencies.memory === undefined
       ? {}
       : { memory: dependencies.memory }),

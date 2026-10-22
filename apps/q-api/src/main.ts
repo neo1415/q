@@ -4094,6 +4094,9 @@ const arrivalSnapshots = createArrivalSnapshots({
   daily: (actor) => dailyStore.latest(actor.userId, actor.tenantId),
 });
 const qIntelligence = composeQIntelligence({
+  // Owner 2026-10-22: findings and cards beside the answer, at about twice
+  // the input tokens a typed turn; CQ_Q_PARALLEL_EXTRAS=off for one call.
+  parallelExtras: process.env.CQ_Q_PARALLEL_EXTRAS !== "off",
   // L-13: credited pictures for answers, from the deck-photo key.
   pictures: createPexelsQPictures(
     process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
