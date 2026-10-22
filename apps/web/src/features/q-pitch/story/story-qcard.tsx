@@ -28,7 +28,7 @@ export const STORY_QCARD: PublicCardDto = PublicCardDtoSchema.parse({
     },
     { key: "currentStageCode", value: "seed", scope: "public_external" },
     { key: "headquartersCity", value: "Mombasa", scope: "public_external" },
-    { key: "headquartersCountry", value: "ke", scope: "public_external" },
+    { key: "headquartersCountry", value: "KE", scope: "public_external" },
     { key: "foundedDate", value: "2022-03-01", scope: "network_visible" },
   ],
   verified: ["ORGANISATION_VERIFIED"],

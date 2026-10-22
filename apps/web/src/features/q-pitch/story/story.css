@@ -603,7 +603,9 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
 /* The real Q Card page, in the app's own theme, scrolled by the light. */
 .cq-story-card-panel {
   width: min(560px, calc(100vw - 32px));
-  max-height: min(78vh, 760px);
+  /* Above the caption band, never into it. */
+  max-height: min(62vh, 640px);
+  margin-bottom: 18vh;
   overflow: hidden;
   background: var(--cq-canvas);
   color: var(--cq-text-primary);
@@ -614,7 +616,7 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   color: var(--cq-text-primary);
 }
 .cq-story-qcard-page {
-  max-height: calc(min(78vh, 760px) - 72px);
+  max-height: calc(min(62vh, 640px) - 72px);
   overflow-y: auto;
   scrollbar-width: none;
 }
