@@ -71,6 +71,19 @@ export type CompanySectionCardField =
   (typeof COMPANY_SECTION_CARD_FIELDS)[number];
 
 /**
+ * Sections that can reach Capital Q members only, never a public link:
+ * Q's reading is built from member-visible evidence (a public summary would
+ * launder it), team members are other people, and data room titles are
+ * listed only to investors who can find the company (DATA_ROOM_LISTED_LEVELS).
+ * The server refuses `public_external` for these.
+ */
+export const NETWORK_ONLY_CARD_FIELDS = [
+  "investabilitySummary",
+  "team",
+  "documentsOnRequest",
+] as const;
+
+/**
  * The declared fields a company card may show. The name is always public.
  * `photo` and `cover` are the subject's profile images (profile-images.ts):
  * on the card their value is a short-lived signed read URL, and they reach
@@ -220,23 +233,33 @@ export const CardDetailSchema = z.discriminatedUnion("kind", [
   z
     .object({
       kind: z.literal("RAISE"),
-      /** "Seed", "Series A": the round as the owner named it; null unknown. */
-      round: z.string().min(1).max(60).nullable(),
-      instrument: z.string().min(1).max(60).nullable(),
-      target: MoneySchema.nullable(),
-      /** Committed so far, when the owner records it; null is unknown. */
-      committed: MoneySchema.nullable(),
-      useOfFunds: z.array(z.string().min(1).max(160)).max(8),
+      /** The round's stage code ("seed"); null unknown. The reader labels it. */
+      stageCode: z.string().min(1).max(60).nullable(),
+      /** The instrument code ("safe", "equity"); null unknown. */
+      instrumentCode: z.string().min(1).max(60).nullable(),
+      target: MoneySchema,
+      /** The owner's own words on what the money is for; null unstated. */
+      useOfFunds: z.string().min(1).max(1000).nullable(),
+      targetCloseDate: z.iso.date().nullable(),
       ...CardTruthShape,
     })
     .strict(),
   z
     .object({
       kind: z.literal("INTELLIGENCE"),
-      /** Q's reading, labelled as such: a band in words, never a percentage. */
-      readiness: z.string().min(1).max(60).nullable(),
-      investability: z.string().min(1).max(60).nullable(),
-      summary: z.string().min(1).max(600).nullable(),
+      /**
+       * Q's investor-facing InvestIQ reading (never the founder-private
+       * readiness diagnosis), labelled as Q's: a band and a confidence in
+       * words, never a percentage. INSUFFICIENT_EVIDENCE is unknown, not poor.
+       */
+      status: z.enum(["ASSESSED", "INSUFFICIENT_EVIDENCE"]),
+      band: z.string().min(1).max(60).nullable(),
+      confidence: z.string().min(1).max(60).nullable(),
+      /** The strongest areas, by name ("Traction"), best first. */
+      strengths: z.array(z.string().min(1).max(80)).max(3),
+      areasScored: z.number().int().min(0).max(16),
+      areasTotal: z.number().int().min(0).max(16),
+      method: z.string().min(1).max(80),
       assessedAt: UtcTimestampSchema.nullable(),
     })
     .strict(),

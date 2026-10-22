@@ -390,3 +390,4 @@ export {
   type PipelinePage,
   type RelationshipPipelineQueryService,
 } from "./application/relationship-pipeline-query.js";
+export { createPostgresCompanyPipelineCounts } from "./infrastructure/postgres-relationship-party-states.js";

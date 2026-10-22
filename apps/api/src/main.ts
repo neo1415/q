@@ -58,6 +58,9 @@ import {
   type AdminUsageDto,
   NO_RAISE_VIEW,
   PolicyExtractionDtoSchema,
+  INVESTABILITY_BAND_LABELS,
+  INVESTABILITY_METHOD_LABEL,
+  SCORE_CONFIDENCE_LABELS,
 } from "@capital-q/contracts";
 import {
   createBrandThemeStore,
@@ -108,6 +111,7 @@ import {
   createCapitalService,
   createPostgresCapitalObjectiveQueryPort,
   createPostgresCapitalObjectiveTimes,
+  createPostgresCapitalObjectiveRepository,
 } from "@capital-q/capital";
 import { createResultsReader } from "@capital-q/results";
 import {
@@ -119,6 +123,8 @@ import {
   readinessDeckFrom,
   readinessFollowUps,
   readinessRaiseFrom,
+  createPostgresInvestabilityStore,
+  INVESTABILITY_METHOD_VERSION,
 } from "@capital-q/readiness";
 import {
   CompanyIdSchema,
@@ -133,6 +139,7 @@ import {
   createPostgresInvestorOrganisationQueryPort,
   createPostgresInvestorProfileQueryPort,
   InvestorOrganisationIdSchema,
+  createPostgresInvestorTeamRead,
 } from "@capital-q/investors";
 import {
   createCommitmentService,
@@ -149,6 +156,7 @@ import {
   createPostgresRelationshipEventRepository,
   createPostgresRelationshipRepository,
   type RelationshipQueryPort,
+  createPostgresCompanyPipelineCounts,
 } from "@capital-q/network";
 import {
   actorPrincipal,
@@ -300,6 +308,8 @@ import {
   findActiveDocumentById,
   DocumentNotFoundError,
   DocumentIdSchema,
+  createPostgresClaimQueryPort,
+  createPostgresDataRoom,
 } from "@capital-q/evidence";
 import {
   composeChat,
@@ -2170,7 +2180,102 @@ const investorFacts = createPostgresInvestorProfileQueryPort({
 const cardVerification = createPublicVerificationReader({
   sql: database.sql,
 });
+// The card's richer sections (Q Story S6): each owning context's server-
+// side read, composed here. The card's owner decides whether each section
+// shows and to whom; the directory and the projection decide per row.
+const cardClaims = createPostgresClaimQueryPort({ sql: database.sql });
+const cardObjectives = createPostgresCapitalObjectiveRepository();
+const cardInvestability = createPostgresInvestabilityStore({
+  sql: database.sql,
+});
+const cardPipeline = createPostgresCompanyPipelineCounts({ sql: database.sql });
+const cardDataRoom = createPostgresDataRoom();
+const cardInvestorTeam = createPostgresInvestorTeamRead({ sql: database.sql });
+
 const cardSubjects = createSubjectDirectory({
+  findCompanySections: async ({ tenantId, companyId }) => {
+    const tenant = TenantIdSchema.parse(tenantId);
+    const [claims, objective, iq, pipeline, team, documents, folders] =
+      await Promise.all([
+        cardClaims
+          .listCurrentClaims(
+            tenant,
+            { subjectType: "COMPANY", subjectId: companyId },
+            {},
+          )
+          // Nothing narrower than network_visible is ever handed on.
+          .then((rows) =>
+            rows.filter(
+              (claim) =>
+                claim.visibilityScope === "network_visible" ||
+                claim.visibilityScope === "public_external",
+            ),
+          ),
+        cardObjectives.findActive(
+          database.sql,
+          tenant,
+          CompanyIdSchema.parse(companyId),
+        ),
+        cardInvestability
+          .current([companyId], INVESTABILITY_METHOD_VERSION)
+          .then((views) => views.get(companyId) ?? null),
+        cardPipeline.byState(companyId),
+        companyTeamProjection.teamForNetwork({ tenantId, companyId }),
+        cardDataRoom.documentsOf(database.sql, companyId),
+        cardDataRoom.folders(database.sql),
+      ]);
+    const folderLabel = new Map(folders.map((f) => [f.code, f.label]));
+    return {
+      claims: claims.map((claim) => ({
+        claimKey: claim.claimKey,
+        statement: claim.statement,
+        structuredValue: claim.structuredValue,
+        validFrom: claim.validFrom,
+        validTo: claim.validTo,
+        truthClass: claim.truthClass,
+        evidenceStatus: claim.evidenceStatus,
+        visibilityScope: claim.visibilityScope,
+      })),
+      raise:
+        objective === null
+          ? null
+          : {
+              stageCode: objective.targetStage,
+              instrumentCode: objective.instrumentCode,
+              target: objective.target,
+              useOfFunds: objective.useOfFundsSummary,
+              targetCloseDate: objective.targetCloseDate,
+            },
+      investability:
+        iq === null
+          ? null
+          : {
+              status: iq.status,
+              band:
+                iq.band === null ? null : INVESTABILITY_BAND_LABELS[iq.band],
+              confidence:
+                iq.confidence === null
+                  ? null
+                  : SCORE_CONFIDENCE_LABELS[iq.confidence],
+              strengths: iq.up.map((factor) => factor.label),
+              areasScored: iq.coverage.areasScored,
+              areasTotal: iq.coverage.areasTotal,
+              method: INVESTABILITY_METHOD_LABEL,
+              assessedAt: iq.assessedAt,
+            },
+      pipeline,
+      team: team.map((member) => ({
+        name: member.name,
+        role: member.businessTitle ?? (member.isFounder ? "Founder" : null),
+      })),
+      documents: documents.map((doc) => ({
+        title: doc.title,
+        category: folderLabel.get(doc.folderCode) ?? null,
+        level: doc.level,
+      })),
+    };
+  },
+  findInvestorTeam: (subject) => cardInvestorTeam.current(subject),
   // Founder design 2026-09-28: the active mandate's shareable facts, off
   // on every card until its owner turns one on.
   findInvestorMandateFacts: createInvestorCardFacts({
