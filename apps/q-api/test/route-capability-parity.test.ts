@@ -905,6 +905,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   // Lane 7: the context tie-break; reads which candidates the person may
   // open and picks one. Changes nothing.
   "q-api/http/fast-navigation.ts POST Q_NAVIGATION_CHOOSE_PATH": Q_TRANSPORT,
+  // Q Story ending: which prepared answer a spoken question means. Reads
+  // public product copy; changes nothing.
+  "q-api/http/q-pitch-qa.ts POST Q_PITCH_QA_MATCH_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST Q_RUNS_PATH": Q_TRANSPORT,
   "q-api/http/q-runs.ts GET runPath": Q_TRANSPORT,
   "q-api/http/q-runs.ts POST `${runPath}${Q_RUN_MESSAGES_SUFFIX}`": Q_TRANSPORT,
@@ -1352,6 +1355,9 @@ const Q_TRANSPORT_NOT_ACTIONS: ReadonlySet<string> = new Set([
   // Lane 7: which of the person's own authorised candidates their words
   // mean ("open that"); reads, changes nothing.
   "q-api/http/fast-navigation.ts POST Q_NAVIGATION_CHOOSE_PATH",
+  // Q Story ending: which prepared answer a spoken question means; reads,
+  // changes nothing.
+  "q-api/http/q-pitch-qa.ts POST Q_PITCH_QA_MATCH_PATH",
 ]);
 
 /**

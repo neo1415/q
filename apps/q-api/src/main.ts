@@ -1,4 +1,5 @@
 import { notAssessedUnicornPotential } from "@capital-q/contracts";
+import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
 /**
  * Q runtime service — a separate deployable boundary, not a module of the
  * application API and not a component of the web app (TA-005, IDA-002;
@@ -637,6 +638,11 @@ import {
   recentUiActReceipts,
 } from "./http/ui-act-receipts.js";
 import { createFastNavigation } from "./composition/fast-navigation.js";
+import {
+  createQPitchQaMatcher,
+  loadQPitchQaVectors,
+  Q_PITCH_QA_EMBED_TIMEOUT_MS,
+} from "./composition/q-pitch-qa.js";
 import { createNavigationChooser } from "./composition/navigation-chooser.js";
 import { createWelcomeHost } from "./voice/welcome.js";
 import type { VoiceAttachment } from "./voice/provider.js";
@@ -6985,6 +6991,20 @@ const { app, logger: appLogger } = createApp(
       firewall: baseFirewall,
       tools: qTools.port,
       ownRelationships: errandRelationships.ownRelationships,
+      logger,
+    }),
+    // Q Story ending: a spoken question to the Q&A bank. Tier 2 (meaning)
+    // embeds through the reviewed OpenAI adapter, with the key this service
+    // already holds; without it, or without current vectors, tier 1 alone.
+    qPitchQa: createQPitchQaMatcher({
+      vectors: loadQPitchQaVectors(),
+      provider:
+        providerSecrets.openai === undefined
+          ? undefined
+          : createOpenAIEmbeddingProvider({
+              apiKey: providerSecrets.openai.reveal(),
+              timeoutMs: Q_PITCH_QA_EMBED_TIMEOUT_MS,
+            }),
       logger,
     }),
     // Lane 7: "open their deck" when the screen is torn between two or
