@@ -336,7 +336,7 @@ describe("Q Story audio bank (budgeted preload)", () => {
       readFileSync(
         fileURLToPath(
           new URL(
-            "../public/story-media/EXAVITQu4vr4xnSDxMaL/index.json",
+            "../public/story-media/pFZP5JQG7iQjIQuC4Bku/index.json",
             import.meta.url,
           ),
         ),
