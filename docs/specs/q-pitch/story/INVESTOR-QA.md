@@ -58,19 +58,28 @@ The bank is matched on the device, with no AI call: under a millisecond on avera
 | Tuning set: 300 spoken questions, 100 unrelated   | 109      | 106 (97%)             | 59 more                     | 0 of 200 checks              |
 | Blind set: 200 written after tuning, 60 unrelated | 62       | 58 (94%)              | 23 more                     | 0 of 120 checks              |
 
-**Tier 2: meaning (built, not yet switched on).**
+**Tier 2: meaning (switched on 2026-10-22).**
 
 - **When it runs:** for a question tier 1 isn't sure of.
-- **What it does:** the Q API embeds the question with the same embedding service retrieval uses (OpenAI `text-embedding-3-small`), then compares it with precomputed vectors for every stored wording. That takes about 200–400 ms.
-- **Why it's off:** it needs the vectors file, which comes from a one-off paid run of `scripts/q-pitch/embed-qa-bank.mjs --live`. That run is about 3,000 short strings, roughly $0.001. It has to be approved, and it hasn't been run yet.
-- **What the run does:** it sets tier 2's thresholds so that no unrelated question gets an answer, then measures tier 1 and tier 2 together on the blind set.
-- **Until then:** tier 1 decides alone.
+- **What it does:** the Q API embeds the question with the same embedding service retrieval uses (OpenAI `text-embedding-3-small`), then compares it with precomputed vectors for every stored wording, kept at 512 dimensions. A live call took about 200 ms, or 770 ms when it also had to open the connection. Tier 2 waits at most 1.2 s, then tier 1's decision stands.
+- **One-off cost:** the vectors came from a single approved run of `scripts/q-pitch/embed-qa-bank.mjs --live`: 2,348 strings, about 23,000 tokens, about $0.0005.
+- **Thresholds**, calibrated on the tuning set so that no unrelated question gets an answer at 95% precision or better:
+  - answer at a similarity of 0.765 or more;
+  - "Do you mean …?" from 0.695.
+- **Staying current:** if the bank's wordings change, a test fails until the run is repeated.
+
+**Measured with both tiers**, the real vectors, and the same sets as above:
+
+| Set                                           | Answered | Correct when answered | Also offered as "Do you mean …?" | Unrelated questions answered             |
+| --------------------------------------------- | -------- | --------------------- | -------------------------------- | ---------------------------------------- |
+| Tuning: 300 spoken questions, 100 unrelated   | 186      | 179 (96%)             | 49                               | 0 of 200 checks (20 asked "Do you mean") |
+| Blind: 200 written after tuning, 60 unrelated | 90       | 86 (96%)              | 38                               | 0 of 120 checks (8 asked "Do you mean")  |
 
 **What this means.**
 
-- On wording it has never seen, the bank answers about a third of questions outright and asks "Do you mean …?" for roughly another seventh. The rest go to normal Q.
+- On wording it has never seen, the bank now answers 43% of questions outright (word matching alone: 31%), with 96% of those answers correct.
+- It asks "Do you mean …?" with the right entry for about another 19%. The rest go to normal Q.
 - It answers no unrelated question in either set.
-- A local embedding model would raise this, but it needs a new dependency and a model download on the pitch page, and the owner hasn't approved that.
 
 ## What Capital Q is and who it's for (10)
 
