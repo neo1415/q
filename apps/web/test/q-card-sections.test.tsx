@@ -313,6 +313,6 @@ describe("a person's card (owner 2026-10-22)", () => {
         .getByRole("link", { name: "@savanna" })
         .getAttribute("href"),
     ).toBe("/@savanna");
-    expect(within(focus).getByText("Shown to Capital Q members")).toBeTruthy();
+    expect(within(focus).getByText("Members only")).toBeTruthy();
   });
 });
