@@ -996,6 +996,7 @@ html[data-story-film]
   .cq-story-stage
   > :not(.cq-story-dockside):not(.cq-story-montage):not(
     :has(
+      .cq-story-screens,
       .cq-story-type,
       .cq-story-wordmark,
       .cq-story-outcomes,
@@ -1003,7 +1004,14 @@ html[data-story-film]
       [data-story-qcard]
     )
   ) {
-  zoom: 1.75;
+  /* The tallest panels (inbox, readiness, the deck sheet) end just above
+     the subtitles at this size; 1.75 put their bottoms in the band. */
+  zoom: 1.68;
+}
+/* The product screens fit the space between Q and the subtitles at 16:10,
+   rather than scaling past the frame's bottom. */
+html[data-story-film] .cq-story-screens {
+  width: min(1400px, 94vw, calc((100vh - 470px) * 1.6));
 }
 /* The montage fits the space between Q and the subtitles (three rows of
    4:3 tiles), rather than scaling past the frame like the panels. */
