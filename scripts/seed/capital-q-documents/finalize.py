@@ -16,27 +16,33 @@ WATERMARK = (
     "demo. Not a legal or financial record."
 )
 PDF, XLSX = "application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-# The seed uploads only these two (owner, 22 Oct 2026): business documents,
-# no legal or cap-table material until real ones exist. folderCode values are
+# Everything is uploaded (owner, 22 Oct 2026). documentType values are the
+# evidence.documents types (migration 20261228121200); folderCode values are
 # evidence.data_room_folders codes (migration 20261207110000).
 DOCS = [
     ("pitch-deck.pdf", "Pitch deck, Q3 2026", "PITCH_DECK", PDF, "PUBLIC", "fundraising"),
     ("financial-model.xlsx", "Financial model 2026–2028", "FINANCIAL_MODEL", XLSX, "ON_REQUEST", "financials"),
+    ("capital-q-cap-table.xlsx", "Cap table summary (illustrative)", "CORPORATE", XLSX, "ON_REQUEST", "cap_table"),
+    (
+        "capital-q-certificate-of-incorporation-summary.pdf",
+        "Certificate of incorporation — summary",
+        "CORPORATE",
+        PDF,
+        "ON_REQUEST",
+        "corporate",
+    ),
+    (
+        "capital-q-shareholder-agreement-summary.pdf",
+        "Shareholder agreement — summary",
+        "LEGAL",
+        PDF,
+        "ON_REQUEST",
+        "legal_ip",
+    ),
+    ("capital-q-board-composition-note.pdf", "Board composition note", "GOVERNANCE", PDF, "ON_REQUEST", "corporate"),
 ]
-# Produced for completeness; never uploaded by the seed.
-NOT_UPLOADED = [
-    "capital-q-cap-table.xlsx",
-    "capital-q-certificate-of-incorporation-summary.pdf",
-    "capital-q-shareholder-agreement-summary.pdf",
-    "capital-q-board-composition-note.pdf",
-]
-TITLES = {
-    "capital-q-cap-table.xlsx": "Cap table summary",
-    "capital-q-certificate-of-incorporation-summary.pdf": "Certificate of incorporation — summary",
-    "capital-q-shareholder-agreement-summary.pdf": "Shareholder agreement — summary",
-    "capital-q-board-composition-note.pdf": "Board composition note",
-}
-VIDEO = Path("docs/ai-handoff/evidence/q-story/master/q-story-master-720p.mp4")
+# A copy of the Q Story master (docs/ai-handoff/evidence/q-story/master/q-story-master-720p.mp4).
+VIDEO_NAME = "capital-q-pitch-video.mp4"
 
 
 def sha256(path):
@@ -60,9 +66,6 @@ def stamp(path, title):
 
 
 def main(out_dir):
-    for name in NOT_UPLOADED:
-        if name.endswith(".pdf"):
-            stamp(out_dir / name, TITLES[name])
     entries = []
     for name, title, doc_type, mime, level, folder in DOCS:
         path = out_dir / name
@@ -87,15 +90,13 @@ def main(out_dir):
         "asOf": "2026-09-30",
         "watermark": WATERMARK,
         "documents": entries,
-        "notUploaded": {
-            "$comment": "Owner, 22 Oct 2026: no incorporation, shareholder-agreement or board summaries and no cap table in the data room until real ones exist. Kept here, never uploaded.",
-            "files": NOT_UPLOADED,
-        },
         "pitchVideo": {
-            "$comment": "Q genuinely pitching Capital Q (the Q Story master). Not a founder video and not uploaded by the seed: David uploads it at /pitch/new (needs his session and the stream provider) as an owner step.",
-            "source": str(VIDEO),
-            "bytes": VIDEO.stat().st_size if VIDEO.exists() else None,
-            "sha256": sha256(VIDEO) if VIDEO.exists() else None,
+            "$comment": "Q genuinely pitching Capital Q: a copy of the Q Story master, not a founder video. Upload through /pitch/new (founder session and stream provider) with the audience below.",
+            "file": VIDEO_NAME,
+            "source": "docs/ai-handoff/evidence/q-story/master/q-story-master-720p.mp4",
+            "mime": "video/mp4",
+            "bytes": (out_dir / VIDEO_NAME).stat().st_size,
+            "sha256": sha256(out_dir / VIDEO_NAME),
             "title": "Capital Q — the Q Story",
             "audience": "Everyone on Capital Q",
             "uploadPath": "/pitch/new",

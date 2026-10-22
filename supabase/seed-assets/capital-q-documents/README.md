@@ -6,22 +6,17 @@ Owner direction, 22 October 2026. Capital Q is seeded as a demonstration company
 
 > DEMONSTRATION DOCUMENT — illustrative, prepared for the Capital Q product demo. Not a legal or financial record.
 
-**Uploaded by the seed** (owner, 22 Oct 2026: business documents only):
+**Everything is uploaded** (owner, 22 Oct 2026):
 
-| File                   | Type              | Data room level | Folder        |
-| ---------------------- | ----------------- | --------------- | ------------- |
-| `pitch-deck.pdf`       | `PITCH_DECK`      | `PUBLIC`        | `fundraising` |
-| `financial-model.xlsx` | `FINANCIAL_MODEL` | `ON_REQUEST`    | `financials`  |
-
-- The deck has 15 slides in black and gold.
-- The model covers 36 months, with inputs on their own Assumptions sheet and reconciliation checks.
-
-**Kept here, never uploaded**, until real documents exist (`manifest.json` → `notUploaded`):
-
-- `capital-q-cap-table.xlsx`
-- `capital-q-certificate-of-incorporation-summary.pdf`
-- `capital-q-shareholder-agreement-summary.pdf`
-- `capital-q-board-composition-note.pdf`
+| File                                                 | Type              | Data room level                  | Folder        |
+| ---------------------------------------------------- | ----------------- | -------------------------------- | ------------- |
+| `pitch-deck.pdf`                                     | `PITCH_DECK`      | `PUBLIC`                         | `fundraising` |
+| `financial-model.xlsx`                               | `FINANCIAL_MODEL` | `ON_REQUEST`                     | `financials`  |
+| `capital-q-cap-table.xlsx`                           | `CORPORATE`       | `ON_REQUEST`                     | `cap_table`   |
+| `capital-q-certificate-of-incorporation-summary.pdf` | `CORPORATE`       | `ON_REQUEST`                     | `corporate`   |
+| `capital-q-shareholder-agreement-summary.pdf`        | `LEGAL`           | `ON_REQUEST`                     | `legal_ip`    |
+| `capital-q-board-composition-note.pdf`               | `GOVERNANCE`      | `ON_REQUEST`                     | `corporate`   |
+| `capital-q-pitch-video.mp4`                          | pitch video       | audience "Everyone on Capital Q" | `/pitch/new`  |
 
 ## Rules these files keep
 
@@ -39,7 +34,7 @@ Owner direction, 22 October 2026. Capital Q is seeded as a demonstration company
 
 ## Pitch video
 
-There is no fabricated founder video. `manifest.json` → `pitchVideo` names the Q Story master: Q genuinely pitching Capital Q. The seed does not upload it. David uploads it at `/pitch/new` with the audience "Everyone on Capital Q", as an owner step, because it needs his session and the stream provider.
+`capital-q-pitch-video.mp4` is a copy of the Q Story master (`docs/ai-handoff/evidence/q-story/master/q-story-master-720p.mp4`): Q genuinely pitching Capital Q, not a founder video. It goes up through `/pitch/new` with the audience "Everyone on Capital Q", which needs the founder's session and the stream provider.
 
 ## Rebuild
 
