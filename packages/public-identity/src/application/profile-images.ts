@@ -333,6 +333,7 @@ export function createProfileImageService(
     });
     if (
       facts === null ||
+      facts.tenantId !== actor.tenantId ||
       actor.organisationId === undefined ||
       facts.organisationId !== actor.organisationId
     ) {
@@ -349,7 +350,7 @@ export function createProfileImageService(
         resourceId: subject.subjectId,
       },
     });
-    return { tenantId: facts.tenantId, organisationId: facts.organisationId };
+    return { tenantId: actor.tenantId, organisationId: facts.organisationId };
   };
 
   const signed = async (row: ProfileImageRow): Promise<string | null> => {

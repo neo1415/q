@@ -145,6 +145,7 @@ export const COMPANY_AR: Readonly<Record<string, string>> = {
   "Previous roles": "الأدوار السابقة",
   "Previous section": "القسم السابق",
   "Q Card": "بطاقة Q",
+  "Your personal Q Card": "بطاقة Q الشخصية الخاصة بك",
   "Q shows investors the same twelve sections for every company, so missing ones read “Not in the deck yet” until you add them. They never see these notes, and deck quality is never used to rank you.":
     "يعرض Q على المستثمرين الأقسام الاثني عشر نفسها لكل شركة، فتظهر الأقسام الناقصة بعبارة «ليس في العرض التقديمي بعد» حتى تضيفها. ولا يرون هذه الملاحظات أبداً، ولا تُستخدم جودة العرض لترتيبك أبداً.",
   "Q's reading of public pages. Not on your profile until you confirm it.":

@@ -33,17 +33,31 @@ Each file is named `<subject>-<audience>-<scheme>-<width>.png`:
 - **Typography.** The name moved from 700 to 600 weight, because ADR 0017 prohibits weights of 700 and above. Large numbers use `tracking-tight` and `cq-numeric`.
 - **Link preview.** The OG image now draws the `black_gold` dark card, with a gold edge, ivory name and champagne "Q Card · Capital Q". It still uses public_external fields only.
 
+## The person card (owner 2026-10-22)
+
+Screenshots: `person-*-*.png` (`?subject=person` on the harness).
+
+- **Whose card.** A person's own card is managed by that person only, the same rule their profile photo already follows. It has no organisation; no organisation admin can claim or edit it. The handle namespace is shared with organisations.
+- **What it shows:**
+  - name;
+  - role · organisation, as the descriptor;
+  - headline, as their story;
+  - country;
+  - photo and cover;
+  - "What they're looking for".
+- **"What they're looking for"** is built only from their firm's or company's own Q Card, as that card shows the same audience: the investor's cheque size, stages, sectors and what they look for; or a founder's raise and stage. It links to the organisation's card and says "From @firm, as it shows to you". A person's card can therefore never widen what the organisation chose to share.
+- **Verification.**
+  - The founder-identity claim shown is this very person's, never a co-founder's.
+  - The organisation claim is worded "Savanna Ventures verified by Capital Q". It is stated only to an audience the card already tells who the employer is (enforced server-side).
+- **Design.** The role line now wraps to two lines instead of truncating on 390 px.
+
 ## Known gaps (named, not hidden)
 
-- **No PERSON subject type.** The task asks for a person card (investor/founder). A card is still per organisation (COMPANY or INVESTOR_ORGANISATION).
-  - The investor card covers the firm's role and type, its mandate summary, what they look for, verification and now its team (names and titles, members only).
-  - A true per-person card needs:
-    - a PERSON subject on `core.handles` and `core.shareable_identities` (a check-constraint migration);
-    - self-ownership authorization in place of `handle.manage`.
-
-  That touches shared authorization, so it is proposed rather than built in this lane.
-
-- **Use of funds** is the owner's own `use_of_funds_summary` on the active capital objective, shown only when they put "The raise" on the card. The amount committed so far is not shown: no actor-free read of commitments exists, and unknown is left out rather than guessed.
+- **Migration not yet applied.** The person card needs `supabase/migrations/20261229090000_person_q_card.sql` (additive; pgTAP test `521_person_q_card.test.sql`). The pgTAP suite could not run in this sandbox (no Docker); CI's database job runs it. Until it is applied, claiming a person handle fails with a database check error. Nothing else changes.
+- **Q cannot make a person card.** Q's `handle.claim` action and the app actions for card claim and update stay organisation-only. A person makes their own card on their profile.
+- **Affiliation choice.** When someone has both a company membership and an investor representation, the company is shown.
+- **Use of funds** is the owner's own `use_of_funds_summary` on the active capital objective, shown only when they put "The raise" on the card.
+- **The amount committed so far is deliberately not shown.** It sums investors' commitments, which are theirs, not the company's to publish.
 - **Public-read cache (done, polish PR):** the anonymous projection is identical for every anonymous visitor, so it is cached for 30 seconds and tagged by handle. A signed-in read is never cached. Saving the card in the profile expires its tag at once (`updateTag`), and claiming a handle expires every anonymous card read. Other profile edits (description, mandate, photo) show within 30 seconds, well inside the signed image URLs' one hour. The page is still rendered per request (`connection()`), not `force-dynamic`, which would have forced no-store.
 - **Polish (coordinator review):**
   - every members-only section marks itself with one short right-aligned "Members only" (with the full meaning for screen readers);

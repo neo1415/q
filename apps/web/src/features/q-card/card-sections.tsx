@@ -12,7 +12,12 @@ import { Check, ICON_STROKE } from "@capital-q/ui/icons";
 
 import { compactMoneyText, moneyText } from "@/features/company/money-text";
 
-import { cardFieldValue } from "./card-content";
+import {
+  cardFieldLabel,
+  cardFieldValue,
+  cardListItems,
+  CARD_LIST_FIELDS,
+} from "./card-content";
 
 /**
  * The Q Card's sections (owner 2026-10-21, Q Story S6): "one living
@@ -36,6 +41,7 @@ export const CARD_SECTION_IDS = {
   relationships: "relationships",
   team: "team",
   documents: "documents",
+  focus: "focus",
 } as const;
 
 export const EVIDENCE_WORDS: Readonly<Record<EvidenceStatus, string>> = {
@@ -457,6 +463,108 @@ export function DocumentsSection({
       <p className="cq-caption text-(--cq-text-tertiary)">
         Titles only. Ask for access from inside Capital Q; the company decides.
       </p>
+    </CardSection>
+  );
+}
+
+/**
+ * A person's "what they're looking for" (owner 2026-10-22): their firm's or
+ * company's own card facts, exactly as that card shows them to this
+ * audience, with a link to it. Said as the organisation's, never the
+ * person's own claim.
+ */
+export function FocusSection({
+  field,
+}: {
+  readonly field: PublicCardField | undefined;
+}) {
+  const detail = detailOf(field, "FOCUS");
+  const lists =
+    detail?.fields.filter((item) => CARD_LIST_FIELDS.has(item.key)) ?? [];
+  const facts =
+    detail?.fields.filter(
+      (item) =>
+        !CARD_LIST_FIELDS.has(item.key) && item.key !== "shortDescription",
+    ) ?? [];
+  const about = detail?.fields.find((item) => item.key === "shortDescription");
+  return (
+    <CardSection
+      id={CARD_SECTION_IDS.focus}
+      label="What they're looking for"
+      members={field?.scope === "network_visible"}
+      empty={detail === null}
+    >
+      {detail === null ? null : (
+        <div className="flex flex-col gap-3" data-card-focus={detail.side}>
+          {detail.raise === null ? null : (
+            <div className="flex flex-col gap-0.5">
+              <p className="cq-numeric text-[1.75rem] leading-tight font-semibold tracking-tight text-(--cq-text-primary)">
+                Raising {compactMoneyText(detail.raise.target)}
+              </p>
+              {detail.raise.stageCode === null ? null : (
+                <p className="cq-body-sm text-(--cq-text-secondary)">
+                  {cardFieldValue({
+                    key: "currentStageCode",
+                    value: detail.raise.stageCode,
+                    scope: "network_visible",
+                  })}{" "}
+                  round · {TRUTH_WORDS.USER_CLAIM}
+                </p>
+              )}
+            </div>
+          )}
+          {about === undefined ? null : (
+            <p className="cq-body text-(--cq-text-primary)">{about.value}</p>
+          )}
+          {facts.length === 0 ? null : (
+            <dl className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-3">
+              {facts.map((item) => (
+                <div key={item.key} className="flex flex-col gap-0.5">
+                  <dd className="cq-title-sm cq-numeric order-1 text-(--cq-text-primary)">
+                    {cardFieldValue({ ...item, scope: "network_visible" })}
+                  </dd>
+                  <dt className="cq-caption order-2 text-(--cq-text-secondary)">
+                    {cardFieldLabel(item.key)}
+                  </dt>
+                </div>
+              ))}
+            </dl>
+          )}
+          {lists.map((item) => (
+            <div key={item.key} className="flex flex-col gap-2">
+              <h3 className="cq-body-sm text-(--cq-text-secondary)">
+                {cardFieldLabel(item.key)}
+              </h3>
+              <ul className="flex flex-wrap gap-1.5">
+                {cardListItems({ ...item, scope: "network_visible" }).map(
+                  (entry) => (
+                    <li
+                      key={entry}
+                      className="cq-body-sm rounded-full border border-(--cq-border-subtle) bg-(--cq-surface-subtle) px-2.5 py-0.5"
+                    >
+                      {entry}
+                    </li>
+                  ),
+                )}
+              </ul>
+            </div>
+          ))}
+          <p className="cq-caption text-(--cq-text-tertiary)">
+            From{" "}
+            {detail.organisationHandle === null ? (
+              "their organisation's Q Card"
+            ) : (
+              <a
+                href={`/@${detail.organisationHandle}`}
+                className="underline underline-offset-4 hover:text-(--cq-text-primary)"
+              >
+                @{detail.organisationHandle}
+              </a>
+            )}
+            , as it shows to you.
+          </p>
+        </div>
+      )}
     </CardSection>
   );
 }

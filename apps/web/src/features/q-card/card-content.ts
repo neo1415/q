@@ -47,6 +47,12 @@ const IMAGE_LABELS: Readonly<Partial<Record<QCardField, string>>> = {
   relationshipSummary: "Investor conversations",
   team: "Team",
   documentsOnRequest: "Documents on request",
+  // A person's card (owner 2026-10-22).
+  headline: "Headline",
+  roleTitle: "Role",
+  affiliation: "Organisation",
+  countryCode: "Country",
+  personFocus: "What they're looking for",
 };
 
 /**
@@ -66,6 +72,11 @@ export const CARD_SECTION_HINTS: Readonly<Partial<Record<QCardField, string>>> =
     team: "Names and roles of the people on your team.",
     documentsOnRequest:
       "Titles of data room documents investors can request. Never the files.",
+    personFocus:
+      "From your firm's or company's own Q Card, showing only what that card shows the same audience.",
+    roleTitle: "Your title where you work now.",
+    affiliation: "The company or firm you work at now.",
+    countryCode: "Your country, from your profile.",
   };
 
 /** Mandate facts that are lists; their value is "; "-separated names. */
@@ -108,6 +119,10 @@ export function cardImage(
 
 export function cardFieldValue(field: PublicCardField): string {
   if (CARD_LIST_FIELDS.has(field.key)) return cardListItems(field).join(", ");
+  // A person's country reads by the same country names as a company's.
+  if (field.key === "countryCode") {
+    return cardFieldValue({ ...field, key: "headquartersCountry" });
+  }
   const spec = SPECS.get(field.key);
   return spec === undefined
     ? field.value
@@ -120,7 +135,11 @@ export function cardTagline(
   fields: readonly PublicCardField[],
 ): string | null {
   const key =
-    subjectType === "COMPANY" ? "shortDescription" : "publicDescription";
+    subjectType === "COMPANY"
+      ? "shortDescription"
+      : subjectType === "PERSON"
+        ? "headline"
+        : "publicDescription";
   const found = fields.find((field) => field.key === key);
   if (found === undefined) return null;
   return found.value.length > 180
@@ -165,14 +184,16 @@ export function cardDescriptor(
     return field === undefined ? null : cardFieldValue(field);
   };
   const parts =
-    subjectType === "COMPANY"
-      ? [
-          read("currentStageCode"),
-          [read("headquartersCity"), read("headquartersCountry")]
-            .filter((part) => part !== null)
-            .join(", ") || null,
-        ]
-      : [read("investorType"), read("hqCountry")];
+    subjectType === "PERSON"
+      ? [read("roleTitle"), read("affiliation")]
+      : subjectType === "COMPANY"
+        ? [
+            read("currentStageCode"),
+            [read("headquartersCity"), read("headquartersCountry")]
+              .filter((part) => part !== null)
+              .join(", ") || null,
+          ]
+        : [read("investorType"), read("hqCountry")];
   const present = parts.filter((part) => part !== null);
   return present.length === 0 ? null : present.join(" · ");
 }

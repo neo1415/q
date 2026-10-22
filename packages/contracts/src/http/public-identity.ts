@@ -41,6 +41,11 @@ export type Handle = z.infer<typeof HandleSchema>;
 export const Q_CARD_SUBJECT_TYPES = [
   "COMPANY",
   "INVESTOR_ORGANISATION",
+  /**
+   * A person's own card (owner 2026-10-22): managed by that person only,
+   * never by their organisation. Its subject id is the person's user id.
+   */
+  "PERSON",
 ] as const;
 export const QCardSubjectTypeSchema = z.enum(Q_CARD_SUBJECT_TYPES);
 export type QCardSubjectType = z.infer<typeof QCardSubjectTypeSchema>;
@@ -132,6 +137,23 @@ export const INVESTOR_CARD_FIELDS = [
   /** The people who represent the firm, with their roles. */
   "team",
 ] as const;
+/**
+ * The fields a person's card may show (owner 2026-10-22). The name is
+ * always public. `personFocus` is what they are looking for, built from
+ * their firm's or company's own card at the same audience -- never more
+ * than that organisation already shows.
+ */
+export const PERSON_CARD_FIELDS = [
+  "displayName",
+  "headline",
+  "roleTitle",
+  "affiliation",
+  "countryCode",
+  "photo",
+  "cover",
+  "personFocus",
+] as const;
+
 export const QCardFieldSchema = z.enum([
   ...COMPANY_CARD_FIELDS,
   "displayName",
@@ -140,6 +162,11 @@ export const QCardFieldSchema = z.enum([
   "hqCountry",
   "deploymentState",
   ...INVESTOR_MANDATE_CARD_FIELDS,
+  "headline",
+  "roleTitle",
+  "affiliation",
+  "countryCode",
+  "personFocus",
 ]);
 export type QCardField = z.infer<typeof QCardFieldSchema>;
 
@@ -294,6 +321,34 @@ export const CardDetailSchema = z.discriminatedUnion("kind", [
         )
         .min(1)
         .max(12),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("FOCUS"),
+      /** Which side of the table the person sits on, from their affiliation. */
+      side: z.enum(["INVESTOR", "FOUNDER"]),
+      /** Their organisation's live card, when it has one, for a link. */
+      organisationHandle: HandleSchema.nullable(),
+      /** The organisation card's own fields, exactly as that card shows them. */
+      fields: z
+        .array(
+          z
+            .object({
+              key: QCardFieldSchema,
+              value: z.string().min(1).max(2048),
+            })
+            .strict(),
+        )
+        .max(8),
+      /** A founder's company raise, when that card shows it to this audience. */
+      raise: z
+        .object({
+          target: MoneySchema,
+          stageCode: z.string().min(1).max(60).nullable(),
+        })
+        .strict()
+        .nullable(),
     })
     .strict(),
   z

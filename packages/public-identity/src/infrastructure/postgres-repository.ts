@@ -41,7 +41,7 @@ function toHandle(row: unknown): HandleRow {
 const CardRowSchema = z.object({
   id: z.string().uuid(),
   tenant_id: z.string().uuid(),
-  organisation_id: z.string().uuid(),
+  organisation_id: z.string().uuid().nullable(),
   subject_type: QCardSubjectTypeSchema,
   subject_id: z.string().uuid(),
   public_code: z.string(),

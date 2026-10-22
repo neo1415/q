@@ -119,3 +119,53 @@ export function createPostgresCompanyTeamProjection(options: {
     },
   };
 }
+
+const AffiliationRow = z.object({
+  company_id: z.string().uuid(),
+  tenant_id: z.string().uuid(),
+  organisation_id: z.string().uuid(),
+  canonical_name: z.string().min(1),
+  business_title: z.string().nullable(),
+  is_founder: z.boolean(),
+});
+
+/**
+ * Where a person works now, for their own Q Card's affiliation line (owner
+ * 2026-10-22): their earliest current company membership, founders first.
+ * Server-side; the person's card decides what shows and to whom.
+ */
+export function createPostgresCompanyAffiliationRead(options: {
+  readonly sql: DatabaseExecutor;
+}) {
+  return {
+    currentForUser: async (
+      userId: string,
+    ): Promise<{
+      readonly subjectId: string;
+      readonly tenantId: string;
+      readonly organisationId: string;
+      readonly name: string;
+      readonly roleTitle: string | null;
+    } | null> => {
+      const [raw] = await options.sql`
+        select m.company_id, c.tenant_id, c.organisation_id, c.canonical_name,
+               m.business_title, m.is_founder
+          from core.company_members m
+          join core.companies c on c.id = m.company_id
+         where m.user_id = ${userId}
+           and m.is_current
+         order by m.is_founder desc, m.started_at asc, m.id asc
+         limit 1`;
+      if (raw === undefined) return null;
+      const row = AffiliationRow.parse(raw);
+      return {
+        subjectId: row.company_id,
+        tenantId: row.tenant_id,
+        organisationId: row.organisation_id,
+        name: row.canonical_name,
+        roleTitle:
+          row.business_title?.trim() || (row.is_founder ? "Founder" : null),
+      };
+    },
+  };
+}

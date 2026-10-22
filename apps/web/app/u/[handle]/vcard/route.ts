@@ -37,6 +37,18 @@ export async function GET(
     cardUrl: `${appOrigin()}/@${result.handle}`,
     websiteUrl: website,
     note: cardTagline(result.subjectType, publicFields),
+    ...(result.subjectType === "PERSON"
+      ? {
+          person: {
+            organisation:
+              publicFields.find((field) => field.key === "affiliation")
+                ?.value ?? null,
+            title:
+              publicFields.find((field) => field.key === "roleTitle")?.value ??
+              null,
+          },
+        }
+      : {}),
   });
   return new NextResponse(body, {
     status: 200,
