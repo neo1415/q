@@ -17,10 +17,11 @@ import {
  * The reader says by meaning that they want companies other than those.
  */
 describe("TURN_READER v56: a FIT question for companies not shown yet", () => {
-  it("is the active reader, on top of v55 kept whole; v55 is deprecated", () => {
+  it("is v55 kept whole plus the FIT rule; both are now deprecated (v57 is active)", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(56);
+    expect(active.definition.version).toBe(57);
     expect(TURN_READER_V55.status).toBe("DEPRECATED");
+    expect(TURN_READER_V56.status).toBe("DEPRECATED");
     expect(TURN_READER_V56.template).toContain(V55_SCREEN_CONTROLS);
     expect(TURN_READER_V56.template.replace(V56_FIT_EXCLUDE_SHOWN, "")).toBe(
       TURN_READER_V55.template,
@@ -77,7 +78,7 @@ describe("TURN_READER v56: a FIT question for companies not shown yet", () => {
         actionGroups: "",
       },
     });
-    expect(rendered.bundle.task).toMatch(/\/v56$/u);
+    expect(rendered.bundle.task).toMatch(/\/v57$/u);
     expect(JSON.stringify(rendered.output)).toContain("excludeShown");
   });
 });

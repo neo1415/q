@@ -1,0 +1,407 @@
+{
+  "version": "story-v7.1",
+  "voice": "EXAVITQu4vr4xnSDxMaL",
+  "model": "eleven_v4_turbo",
+  "beats": {
+    "beat-03": {
+      "chars": 29,
+      "durationMs": 2508,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.953
+    },
+    "beat-26": {
+      "chars": 40,
+      "durationMs": 2821,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.396,
+      "silenceCutMs": 100
+    },
+    "beat-56": {
+      "chars": 153,
+      "durationMs": 10684,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.642
+    },
+    "beat-01": {
+      "chars": 19,
+      "durationMs": 2038,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.199
+    },
+    "beat-02": {
+      "chars": 80,
+      "durationMs": 4598,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.632
+    },
+    "beat-04": {
+      "chars": 26,
+      "durationMs": 1724,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.854
+    },
+    "beat-05": {
+      "chars": 19,
+      "durationMs": 2194,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.899
+    },
+    "beat-06": {
+      "chars": 88,
+      "durationMs": 5564,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.755
+    },
+    "beat-07": {
+      "chars": 31,
+      "durationMs": 2351,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.946
+    },
+    "beat-08": {
+      "chars": 79,
+      "durationMs": 4911,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.576
+    },
+    "beat-09": {
+      "chars": 39,
+      "durationMs": 3161,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.778
+    },
+    "beat-10": {
+      "chars": 103,
+      "durationMs": 7471,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.625
+    },
+    "beat-11": {
+      "chars": 44,
+      "durationMs": 3396,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.654
+    },
+    "beat-12": {
+      "chars": 135,
+      "durationMs": 8673,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.567
+    },
+    "beat-13": {
+      "chars": 159,
+      "durationMs": 11233,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.552
+    },
+    "beat-14": {
+      "chars": 127,
+      "durationMs": 8046,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.505
+    },
+    "beat-15": {
+      "chars": 66,
+      "durationMs": 3396,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.756
+    },
+    "beat-16": {
+      "chars": 153,
+      "durationMs": 10762,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.562
+    },
+    "beat-17": {
+      "chars": 41,
+      "durationMs": 3318,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.851
+    },
+    "beat-18": {
+      "chars": 103,
+      "durationMs": 6922,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.565
+    },
+    "beat-19": {
+      "chars": 254,
+      "durationMs": 16927,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.551
+    },
+    "beat-20": {
+      "chars": 47,
+      "durationMs": 2691,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.744
+    },
+    "beat-21": {
+      "chars": 135,
+      "durationMs": 10031,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.661
+    },
+    "beat-22": {
+      "chars": 180,
+      "durationMs": 10919,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.507
+    },
+    "beat-23": {
+      "chars": 146,
+      "durationMs": 10188,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.598
+    },
+    "beat-24": {
+      "chars": 46,
+      "durationMs": 5329,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.907
+    },
+    "beat-25": {
+      "chars": 70,
+      "durationMs": 6844,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.71
+    },
+    "beat-27": {
+      "chars": 63,
+      "durationMs": 5486,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.761
+    },
+    "beat-28": {
+      "chars": 105,
+      "durationMs": 6609,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.598
+    },
+    "beat-29": {
+      "chars": 109,
+      "durationMs": 8359,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.637
+    },
+    "beat-30": {
+      "chars": 79,
+      "durationMs": 6191,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.742
+    },
+    "beat-31": {
+      "chars": 143,
+      "durationMs": 10841,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.598
+    },
+    "beat-32": {
+      "chars": 69,
+      "durationMs": 5721,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.617
+    },
+    "beat-33": {
+      "chars": 22,
+      "durationMs": 1567,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.901
+    },
+    "beat-34": {
+      "chars": 18,
+      "durationMs": 1802,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.319
+    },
+    "beat-35": {
+      "chars": 131,
+      "durationMs": 8359,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.654
+    },
+    "beat-36": {
+      "chars": 107,
+      "durationMs": 10371,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.763
+    },
+    "beat-37": {
+      "chars": 47,
+      "durationMs": 3396,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.883
+    },
+    "beat-38": {
+      "chars": 45,
+      "durationMs": 3239,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.66
+    },
+    "beat-39": {
+      "chars": 55,
+      "durationMs": 3082,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.653
+    },
+    "beat-40": {
+      "chars": 83,
+      "durationMs": 6531,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.615
+    },
+    "beat-41": {
+      "chars": 142,
+      "durationMs": 7967,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.561
+    },
+    "beat-42": {
+      "chars": 42,
+      "durationMs": 3082,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.021
+    },
+    "beat-43": {
+      "chars": 140,
+      "durationMs": 9404,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.604
+    },
+    "beat-44": {
+      "chars": 270,
+      "durationMs": 18129,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.488
+    },
+    "beat-45": {
+      "chars": 304,
+      "durationMs": 18521,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.531
+    },
+    "beat-46": {
+      "chars": 106,
+      "durationMs": 8046,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.669
+    },
+    "beat-47": {
+      "chars": 105,
+      "durationMs": 8046,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.699
+    },
+    "beat-48": {
+      "chars": 122,
+      "durationMs": 8438,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.694
+    },
+    "beat-49": {
+      "chars": 121,
+      "durationMs": 8438,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.63
+    },
+    "beat-50": {
+      "chars": 25,
+      "durationMs": 2508,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.805
+    },
+    "beat-51": {
+      "chars": 86,
+      "durationMs": 9091,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.752
+    },
+    "beat-52": {
+      "chars": 77,
+      "durationMs": 6191,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.659
+    },
+    "beat-53": {
+      "chars": 198,
+      "durationMs": 14446,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.551
+    },
+    "beat-54": {
+      "chars": 112,
+      "durationMs": 8281,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.69
+    },
+    "beat-55": {
+      "chars": 15,
+      "durationMs": 1411,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.47
+    }
+  },
+  "complete": true,
+  "ledger": {
+    "thisRunChars": 5353,
+    "totalChars": 5353,
+    "usdPer1kEstimate": 0.3,
+    "thisRunUsdEstimate": 1.61
+  }
+}

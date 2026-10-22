@@ -1,5 +1,5 @@
 /**
- * v6: where `/q-pitch?start=1` (Q's Q_PITCH destination, reached from
+ * v6/v7: where `/q-pitch?start=1` (Q's Q_PITCH destination, reached from
  * "pitch Capital Q" by meaning) starts the tour, by the person's side. The
  * host still admits only accounts it may run on; this only picks the track.
  *
@@ -9,7 +9,8 @@
  * Home sections the first step lights were not on screen.
  */
 export function tourStartFor(kind: string): string | null {
-  if (kind === "INVESTOR") return "/home?qpitch=investor-v6&new=1";
+  // v7 (owner, 21 Oct): "present / pitch Capital Q" is the story track.
+  if (kind === "INVESTOR") return "/home?qpitch=story&new=1";
   if (kind === "FOUNDER") return "/home?qpitch=founder-v6&new=1";
   return null;
 }

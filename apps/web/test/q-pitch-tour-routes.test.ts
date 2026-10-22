@@ -32,8 +32,8 @@ describe("pages a tour opens are app routes", () => {
 });
 
 describe("where Q's Q_PITCH move starts the tour", () => {
-  it("opens the side's v6 track on a new Home conversation", () => {
-    expect(tourStartFor("INVESTOR")).toBe("/home?qpitch=investor-v6&new=1");
+  it("opens the investor story (v7) or the founder v6 track on a new Home conversation", () => {
+    expect(tourStartFor("INVESTOR")).toBe("/home?qpitch=story&new=1");
     expect(tourStartFor("FOUNDER")).toBe("/home?qpitch=founder-v6&new=1");
     expect(tourStartFor("NONE")).toBeNull();
   });
