@@ -1,5 +1,18 @@
 # Capital Q — Current shared engineering state
 
+## speed/q-oct20 ready to deploy — 22 October 2026, 07:52 UTC (Claude coordinator)
+
+- **CI fully green** at `0be7ce681`, run 39740513923 on #267 (build, typecheck, format+lint, test, pgTAP including 521 person_q_card and 984, quality).
+- **Not deployed:** Railway is still in a platform outage. Deploying needs the owner's explicit OK.
+- **Migrations to apply before the code:** `20261228214500_onboarding_interview_readings` and `20261229090000_person_q_card`. `20261228210000` is already applied.
+- **Contents:**
+  - the speed lanes 1–8;
+  - the Q Story engine, with the Lily voice, the live ending, "pitch yourself" from anywhere, and the tier 1 + tier 2 spoken Q&A matcher (vectors committed);
+  - the Q Card redesign and the person card;
+  - uploads (Send works on an attachment alone; Q reads the document);
+  - parallel answer extras (`CQ_Q_PARALLEL_EXTRAS=off` switches them off).
+- **Master video:** `qstory/engine` c21127229, `docs/ai-handoff/evidence/q-story/master/`, sent to the owner. It carries the "Internal rehearsal" stamp until the owner approves AUDIENCE.
+
 ## Speed / quality / Q Story integration — 21 October 2026, 21:05 UTC (Claude coordinator)
 
 **Integration branch:** `speed/q-oct20`, which is NOT build/int-rc. It merged build/int-rc at 13b170a3. Draft PR #267 into build/int-rc is used for Linux CI.
