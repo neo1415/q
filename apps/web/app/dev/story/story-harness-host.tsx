@@ -26,7 +26,7 @@ function harnessPath(route: StoryRoute): string {
     case "gateq-gate":
       return "/dev/story/gateq?view=gate";
     case "gateq-application":
-      return "/dev/story/gateq?view=inbox-detail";
+      return "/dev/story/gateq-review?page=investor-inbox&state=dossier";
     case "gateq-inbox":
       return "/dev/story/gateq?view=inbox";
   }

@@ -23,18 +23,28 @@ const NAV = (href: string): AnchorPlacement => ({
 
 export const STORY_ANCHORS: Readonly<Record<string, AnchorPlacement>> = {
   // #35 Discover, the dock, the journey.
+  // The live feed wraps its cards in the carousel control; the stage's
+  // card stands alone (both are the same article).
   "qs.discover.card": {
-    select: '[data-q-control="carousel.feed"] article[data-company-id]',
+    select:
+      '[data-q-control="carousel.feed"] article[data-company-id], main article[data-company-id]',
   },
   "qs.discover.why": {
-    select: '[data-q-control="carousel.feed"] article[data-company-id] h3',
+    select:
+      '[data-q-control="carousel.feed"] article[data-company-id] h3, main article[data-company-id] h3',
   },
   // #39 Express interest is lit, never pressed (a consequential action).
   "qs.discover.interest": {
     select:
-      '[data-q-control="carousel.feed"] article[data-company-id] [aria-label="Decide"]',
+      '[data-q-control="carousel.feed"] article[data-company-id] [aria-label="Decide"], main article[data-company-id] [aria-label="Decide"]',
   },
-  "qs.dock": { select: ".cq-q-dock-pill" },
+  // Q's way in: Discover hides the floating dock and merges it into the
+  // rail's Ask Q (first in document order); elsewhere the dock's pill when
+  // compact, else its one button.
+  "qs.dock": {
+    select:
+      "main [data-feed-ask-q], [data-q-dock-pill], [data-q-dock] [data-q-dock-button]",
+  },
   "qs.nav.discover": NAV("/discover"),
   "qs.nav.explore": NAV("/explore"),
   "qs.nav.crm": NAV("/relationships"),

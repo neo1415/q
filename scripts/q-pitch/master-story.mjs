@@ -141,7 +141,7 @@ async function answerMedia(context) {
     "/dev/story/profile?tab=diligence",
     "/dev/story/crm?view=record",
     "/dev/story/gateq?view=gate",
-    "/dev/story/gateq?view=inbox-detail",
+    "/dev/story/gateq-review?page=investor-inbox&state=dossier",
     "/dev/story/gateq?view=inbox",
   ]) {
     // "load", not "networkidle": Discover keeps a stream open by design.
