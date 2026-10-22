@@ -1,65 +1,42 @@
 {
-  "$comment": "Capital Q's demonstration data room (owner direction 2026-10-22). Loaded by the S6 demo-companies seed. Every file carries the watermark below on every page or sheet and in its file properties. Documents are not verification and must never create a verification claim. Figures match supabase/seed-assets/demo-companies/companies.json; the SAFE valuation cap and the founder/ESOP split are illustrative placeholders that the owner confirms.",
+  "$comment": "Capital Q's demonstration data room (owner direction 2026-10-22). Loaded by the S6 demo-companies seed. Every file carries the watermark below on every page or sheet and in its file properties. Documents are not verification and must never create a verification claim. Figures match supabase/seed-assets/demo-companies/companies.json; the SAFE valuation cap and the founder/ESOP split are illustrative values the owner approved on 22 Oct 2026.",
   "seedKey": "capital-q-documents-v1",
   "company": "capital-q",
   "asOf": "2026-09-30",
   "watermark": "DEMONSTRATION DOCUMENT — illustrative, prepared for the Capital Q product demo. Not a legal or financial record.",
   "documents": [
     {
-      "file": "capital-q-pitch-deck-q3-2026.pdf",
+      "file": "pitch-deck.pdf",
       "title": "Pitch deck, Q3 2026",
-      "kind": "pitch_deck",
-      "mimeType": "application/pdf",
-      "pages": 15,
-      "bytes": 403416,
-      "sha256": "b8aecec7380bb57b0addb2edc043091f5b24934a5cfa9322db0fc50801675c42"
+      "documentType": "PITCH_DECK",
+      "mime": "application/pdf",
+      "sha256": "e64094e3e3c9250613548f9f59dbf5adaead5b1f345fa95c8675bb792e449590",
+      "dataRoomLevel": "PUBLIC",
+      "folderCode": "fundraising",
+      "watermark": "DEMONSTRATION DOCUMENT — illustrative, prepared for the Capital Q product demo. Not a legal or financial record."
     },
     {
-      "file": "capital-q-financial-model-2026-2028.xlsx",
+      "file": "financial-model.xlsx",
       "title": "Financial model 2026–2028",
-      "kind": "financial_model",
-      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "bytes": 31411,
-      "sha256": "a2ecc239da68d5b7c256e6bf6eca2fca04bd6fce4f52bba4303b482c53ed8f0f"
-    },
-    {
-      "file": "capital-q-cap-table.xlsx",
-      "title": "Cap table summary",
-      "kind": "cap_table",
-      "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "bytes": 8354,
-      "sha256": "13099f288cee050aa45712f851bee80c8c267cba554eee78479556e1dde8cb7a"
-    },
-    {
-      "file": "capital-q-certificate-of-incorporation-summary.pdf",
-      "title": "Certificate of incorporation — summary",
-      "kind": "legal_summary",
-      "mimeType": "application/pdf",
-      "pages": 1,
-      "bytes": 208803,
-      "sha256": "5c464a2b1a8678df907eac0737495c5f03f3f0be099ce4b45b715b3a42c0eb4c"
-    },
-    {
-      "file": "capital-q-shareholder-agreement-summary.pdf",
-      "title": "Shareholder agreement — summary",
-      "kind": "legal_summary",
-      "mimeType": "application/pdf",
-      "pages": 1,
-      "bytes": 202578,
-      "sha256": "99c6c3b2ea30c8458f9d4fe80d0d6dd27bdc442638b99f8e79451c90faeea367"
-    },
-    {
-      "file": "capital-q-board-composition-note.pdf",
-      "title": "Board composition note",
-      "kind": "governance",
-      "mimeType": "application/pdf",
-      "pages": 1,
-      "bytes": 220002,
-      "sha256": "cebd2697b7575570051f8c4963796d0093868be3d5548a5803260584e5e2e78d"
+      "documentType": "FINANCIAL_MODEL",
+      "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "sha256": "47268ef9f6387b7f6901fa7bbfdcd2b750c3921c67c873348b495c5ef3577f6d",
+      "dataRoomLevel": "ON_REQUEST",
+      "folderCode": "financials",
+      "watermark": "DEMONSTRATION DOCUMENT — illustrative, prepared for the Capital Q product demo. Not a legal or financial record."
     }
   ],
+  "notUploaded": {
+    "$comment": "Owner, 22 Oct 2026: no incorporation, shareholder-agreement or board summaries and no cap table in the data room until real ones exist. Kept here, never uploaded.",
+    "files": [
+      "capital-q-cap-table.xlsx",
+      "capital-q-certificate-of-incorporation-summary.pdf",
+      "capital-q-shareholder-agreement-summary.pdf",
+      "capital-q-board-composition-note.pdf"
+    ]
+  },
   "pitchVideo": {
-    "$comment": "Q genuinely pitching Capital Q (the Q Story master). Not a founder video. Upload through the normal /pitch/new path at the owner-approved deploy step; never fabricated.",
+    "$comment": "Q genuinely pitching Capital Q (the Q Story master). Not a founder video and not uploaded by the seed: David uploads it at /pitch/new (needs his session and the stream provider) as an owner step.",
     "source": "docs/ai-handoff/evidence/q-story/master/q-story-master-720p.mp4",
     "bytes": 10115269,
     "sha256": "7f02f0adb8d239922df0ca77e64218ec16706e5a8baa4028f84f8a9a166a6829",
@@ -68,6 +45,7 @@
     "uploadPath": "/pitch/new"
   },
   "illustrativeValues": {
+    "$comment": "Owner approved these illustrative values on 22 Oct 2026; each stays marked illustrative.",
     "safePostMoneyValuationCapUsd": "10000000",
     "foundersSharesPreRound": {
       "david": 6000000,

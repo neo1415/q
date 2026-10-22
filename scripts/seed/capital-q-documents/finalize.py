@@ -16,14 +16,26 @@ WATERMARK = (
     "demo. Not a legal or financial record."
 )
 PDF, XLSX = "application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+# The seed uploads only these two (owner, 22 Oct 2026): business documents,
+# no legal or cap-table material until real ones exist. folderCode values are
+# evidence.data_room_folders codes (migration 20261207110000).
 DOCS = [
-    ("capital-q-pitch-deck-q3-2026.pdf", "Pitch deck, Q3 2026", "pitch_deck", PDF),
-    ("capital-q-financial-model-2026-2028.xlsx", "Financial model 2026–2028", "financial_model", XLSX),
-    ("capital-q-cap-table.xlsx", "Cap table summary", "cap_table", XLSX),
-    ("capital-q-certificate-of-incorporation-summary.pdf", "Certificate of incorporation — summary", "legal_summary", PDF),
-    ("capital-q-shareholder-agreement-summary.pdf", "Shareholder agreement — summary", "legal_summary", PDF),
-    ("capital-q-board-composition-note.pdf", "Board composition note", "governance", PDF),
+    ("pitch-deck.pdf", "Pitch deck, Q3 2026", "PITCH_DECK", PDF, "PUBLIC", "fundraising"),
+    ("financial-model.xlsx", "Financial model 2026–2028", "FINANCIAL_MODEL", XLSX, "ON_REQUEST", "financials"),
 ]
+# Produced for completeness; never uploaded by the seed.
+NOT_UPLOADED = [
+    "capital-q-cap-table.xlsx",
+    "capital-q-certificate-of-incorporation-summary.pdf",
+    "capital-q-shareholder-agreement-summary.pdf",
+    "capital-q-board-composition-note.pdf",
+]
+TITLES = {
+    "capital-q-cap-table.xlsx": "Cap table summary",
+    "capital-q-certificate-of-incorporation-summary.pdf": "Certificate of incorporation — summary",
+    "capital-q-shareholder-agreement-summary.pdf": "Shareholder agreement — summary",
+    "capital-q-board-composition-note.pdf": "Board composition note",
+}
 VIDEO = Path("docs/ai-handoff/evidence/q-story/master/q-story-master-720p.mp4")
 
 
@@ -48,23 +60,39 @@ def stamp(path, title):
 
 
 def main(out_dir):
+    for name in NOT_UPLOADED:
+        if name.endswith(".pdf"):
+            stamp(out_dir / name, TITLES[name])
     entries = []
-    for name, title, kind, mime in DOCS:
+    for name, title, doc_type, mime, level, folder in DOCS:
         path = out_dir / name
-        entry = {"file": name, "title": title, "kind": kind, "mimeType": mime}
         if mime == PDF:
-            entry["pages"] = stamp(path, title)
-        entry.update({"bytes": path.stat().st_size, "sha256": sha256(path)})
-        entries.append(entry)
+            stamp(path, title)
+        entries.append(
+            {
+                "file": name,
+                "title": title,
+                "documentType": doc_type,
+                "mime": mime,
+                "sha256": sha256(path),
+                "dataRoomLevel": level,
+                "folderCode": folder,
+                "watermark": WATERMARK,
+            }
+        )
     manifest = {
-        "$comment": "Capital Q's demonstration data room (owner direction 2026-10-22). Loaded by the S6 demo-companies seed. Every file carries the watermark below on every page or sheet and in its file properties. Documents are not verification and must never create a verification claim. Figures match supabase/seed-assets/demo-companies/companies.json; the SAFE valuation cap and the founder/ESOP split are illustrative placeholders that the owner confirms.",
+        "$comment": "Capital Q's demonstration data room (owner direction 2026-10-22). Loaded by the S6 demo-companies seed. Every file carries the watermark below on every page or sheet and in its file properties. Documents are not verification and must never create a verification claim. Figures match supabase/seed-assets/demo-companies/companies.json; the SAFE valuation cap and the founder/ESOP split are illustrative values the owner approved on 22 Oct 2026.",
         "seedKey": "capital-q-documents-v1",
         "company": "capital-q",
         "asOf": "2026-09-30",
         "watermark": WATERMARK,
         "documents": entries,
+        "notUploaded": {
+            "$comment": "Owner, 22 Oct 2026: no incorporation, shareholder-agreement or board summaries and no cap table in the data room until real ones exist. Kept here, never uploaded.",
+            "files": NOT_UPLOADED,
+        },
         "pitchVideo": {
-            "$comment": "Q genuinely pitching Capital Q (the Q Story master). Not a founder video. Upload through the normal /pitch/new path at the owner-approved deploy step; never fabricated.",
+            "$comment": "Q genuinely pitching Capital Q (the Q Story master). Not a founder video and not uploaded by the seed: David uploads it at /pitch/new (needs his session and the stream provider) as an owner step.",
             "source": str(VIDEO),
             "bytes": VIDEO.stat().st_size if VIDEO.exists() else None,
             "sha256": sha256(VIDEO) if VIDEO.exists() else None,
@@ -73,6 +101,7 @@ def main(out_dir):
             "uploadPath": "/pitch/new",
         },
         "illustrativeValues": {
+            "$comment": "Owner approved these illustrative values on 22 Oct 2026; each stays marked illustrative.",
             "safePostMoneyValuationCapUsd": "10000000",
             "foundersSharesPreRound": {"david": 6000000, "zino": 3000000},
             "esopReservedShares": 1000000,

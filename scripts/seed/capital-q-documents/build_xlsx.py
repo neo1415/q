@@ -484,5 +484,5 @@ def build_cap_table(out):
 if __name__ == "__main__":
     out_dir = Path(sys.argv[1])
     out_dir.mkdir(parents=True, exist_ok=True)
-    build_model(out_dir / "capital-q-financial-model-2026-2028.xlsx")
+    build_model(out_dir / "financial-model.xlsx")
     build_cap_table(out_dir / "capital-q-cap-table.xlsx")

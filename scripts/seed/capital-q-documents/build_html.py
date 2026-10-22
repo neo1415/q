@@ -369,7 +369,7 @@ def deck():
             '<div class="wordmark">Capital <i>Q</i></div>'
             '<div class="big" style="font-size:64px">What’s your <em>Q Card?</em></div>'
             '<p class="lede">Capital Q’s own Q Card: capital-q-hq · capital-qweb-production.up.railway.app</p>'
-            '<div class="meta">Data room on request: financial model 2026–2028 · cap table · certificate of incorporation summary · shareholder agreement summary · board composition note.</div>'
+            '<div class="meta">Data room: this deck, and the financial model 2026–2028 on request.</div>'
             "</div>",
         )
     )
@@ -529,7 +529,7 @@ def board():
 if __name__ == "__main__":
     out = Path(sys.argv[1])
     out.mkdir(parents=True, exist_ok=True)
-    (out / "capital-q-pitch-deck-q3-2026.html").write_text(deck(), encoding="utf-8")
+    (out / "pitch-deck.html").write_text(deck(), encoding="utf-8")
     (out / "capital-q-certificate-of-incorporation-summary.html").write_text(incorporation(), encoding="utf-8")
     (out / "capital-q-shareholder-agreement-summary.html").write_text(sha(), encoding="utf-8")
     (out / "capital-q-board-composition-note.html").write_text(board(), encoding="utf-8")
