@@ -25,7 +25,11 @@
       "headline": null,
       "photo": null
     },
-    "excel": { "displayName": "Excel Chukwu", "headline": null, "photo": null }
+    "excel": {
+      "displayName": "Excel Chukwu",
+      "headline": null,
+      "photo": null
+    }
   },
   "companies": [
     {
@@ -79,15 +83,23 @@
         },
         {
           "key": "customers.paying_accounts",
-          "type": "traction",
+          "type": "customers",
           "statement": "12 investor firms paid for pilot subscriptions in September 2026.",
-          "value": { "kind": "COUNT", "value": 12, "asOf": "2026-09-30" }
+          "value": {
+            "kind": "COUNT",
+            "value": 12,
+            "asOf": "2026-09-30"
+          }
         },
         {
           "key": "traction.active_users",
           "type": "traction",
           "statement": "1,240 founders and investors were active in September 2026.",
-          "value": { "kind": "COUNT", "value": 1240, "asOf": "2026-09-30" }
+          "value": {
+            "kind": "COUNT",
+            "value": 1240,
+            "asOf": "2026-09-30"
+          }
         },
         {
           "key": "traction.growth",
@@ -108,19 +120,31 @@
           "key": "financial.gross_margin",
           "type": "financial",
           "statement": "Gross margin was 78% in Q3 2026.",
-          "value": { "kind": "PERCENT", "value": 78, "asOf": "2026-09-30" }
+          "value": {
+            "kind": "PERCENT",
+            "value": 78,
+            "asOf": "2026-09-30"
+          }
         },
         {
           "key": "financial.nrr",
           "type": "financial",
           "statement": "Net revenue retention across pilot accounts was 112% in Q3 2026.",
-          "value": { "kind": "PERCENT", "value": 112, "asOf": "2026-09-30" }
+          "value": {
+            "kind": "PERCENT",
+            "value": 112,
+            "asOf": "2026-09-30"
+          }
         },
         {
           "key": "team.employee_count",
           "type": "team",
           "statement": "The team is 6 people.",
-          "value": { "kind": "COUNT", "value": 6, "asOf": "2026-09-30" }
+          "value": {
+            "kind": "COUNT",
+            "value": 6,
+            "asOf": "2026-09-30"
+          }
         },
         {
           "key": "market.size",
@@ -133,20 +157,46 @@
             "currency": "USD",
             "evidenceCapturedAt": "2026-09-30"
           }
+        },
+        {
+          "key": "capital.raise_target",
+          "type": "capital",
+          "statement": "Raising USD 1,500,000 at pre-seed on a SAFE, closing by 2027-03-31.",
+          "value": {
+            "kind": "MONEY",
+            "amount": "1500000",
+            "currency": "USD",
+            "asOf": "2026-09-30"
+          }
         }
       ],
       "founders": [
-        { "person": "david", "title": "Founder & CEO" },
-        { "person": "zino", "title": "Co-founder" }
+        {
+          "person": "david",
+          "title": "Founder & CEO"
+        },
+        {
+          "person": "zino",
+          "title": "Co-founder"
+        }
       ],
       "team": [
-        { "person": "daniel", "title": "Engineering" },
-        { "person": "adeyemi", "title": "Engineering" }
+        {
+          "person": "daniel",
+          "title": "Engineering"
+        },
+        {
+          "person": "adeyemi",
+          "title": "Engineering"
+        }
       ],
       "raise": {
         "stageCode": "pre_seed",
         "instrumentCode": "safe",
-        "target": { "amount": "1500000", "currency": "USD" },
+        "target": {
+          "amount": "1500000",
+          "currency": "USD"
+        },
         "targetCloseDate": "2027-03-31",
         "useOfFunds": "Grow the investor network across West and East Africa, hire four engineers, and complete Capital Q's own verification and data-room partnerships."
       },
@@ -169,7 +219,9 @@
     {
       "key": "kuuza-ai",
       "mode": "FILL_GAPS",
-      "match": { "names": ["KUUZA AI", "Kuuza AI", "Kuuza"] },
+      "match": {
+        "names": ["KUUZA AI", "Kuuza AI", "Kuuza"]
+      },
       "canonicalName": "KUUZA AI",
       "handle": null,
       "websiteUrl": null,
@@ -199,9 +251,13 @@
         },
         {
           "key": "customers.employers",
-          "type": "traction",
+          "type": "customers",
           "statement": "18 employers paid for KUUZA AI in September 2026.",
-          "value": { "kind": "COUNT", "value": 18, "asOf": "2026-09-30" }
+          "value": {
+            "kind": "COUNT",
+            "value": 18,
+            "asOf": "2026-09-30"
+          }
         },
         {
           "key": "traction.growth",
@@ -222,7 +278,11 @@
           "key": "financial.gross_margin",
           "type": "financial",
           "statement": "Gross margin was 72% in Q3 2026.",
-          "value": { "kind": "PERCENT", "value": 72, "asOf": "2026-09-30" }
+          "value": {
+            "kind": "PERCENT",
+            "value": 72,
+            "asOf": "2026-09-30"
+          }
         }
       ],
       "founders": [],
@@ -235,7 +295,9 @@
     {
       "key": "songscribe",
       "mode": "CORRECT",
-      "match": { "names": ["Songscribe", "SongScribe", "Song Scribe"] },
+      "match": {
+        "names": ["Songscribe", "SongScribe", "Song Scribe"]
+      },
       "canonicalName": "Songscribe",
       "handle": "songscribe",
       "websiteUrl": null,
@@ -265,15 +327,23 @@
         },
         {
           "key": "customers.paying_accounts",
-          "type": "traction",
+          "type": "customers",
           "statement": "410 songwriters paid for a subscription in September 2026.",
-          "value": { "kind": "COUNT", "value": 410, "asOf": "2026-09-30" }
+          "value": {
+            "kind": "COUNT",
+            "value": 410,
+            "asOf": "2026-09-30"
+          }
         },
         {
           "key": "traction.active_users",
           "type": "traction",
           "statement": "8,600 songwriters were active in September 2026.",
-          "value": { "kind": "COUNT", "value": 8600, "asOf": "2026-09-30" }
+          "value": {
+            "kind": "COUNT",
+            "value": 8600,
+            "asOf": "2026-09-30"
+          }
         },
         {
           "key": "traction.growth",
@@ -291,24 +361,52 @@
           "key": "financial.gross_margin",
           "type": "financial",
           "statement": "Gross margin was 64% in Q3 2026.",
-          "value": { "kind": "PERCENT", "value": 64, "asOf": "2026-09-30" }
+          "value": {
+            "kind": "PERCENT",
+            "value": 64,
+            "asOf": "2026-09-30"
+          }
         },
         {
           "key": "team.employee_count",
           "type": "team",
           "statement": "The team is 4 people.",
-          "value": { "kind": "COUNT", "value": 4, "asOf": "2026-09-30" }
+          "value": {
+            "kind": "COUNT",
+            "value": 4,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "capital.raise_target",
+          "type": "capital",
+          "statement": "Raising USD 750,000 at pre-seed on a SAFE, closing by 2027-02-28.",
+          "value": {
+            "kind": "MONEY",
+            "amount": "750000",
+            "currency": "USD",
+            "asOf": "2026-09-30"
+          }
         }
       ],
       "founders": [
-        { "person": "excel", "title": "Co-founder" },
-        { "person": "zino", "title": "Co-founder" }
+        {
+          "person": "excel",
+          "title": "Co-founder"
+        },
+        {
+          "person": "zino",
+          "title": "Co-founder"
+        }
       ],
       "team": [],
       "raise": {
         "stageCode": "pre_seed",
         "instrumentCode": "safe",
-        "target": { "amount": "750000", "currency": "USD" },
+        "target": {
+          "amount": "750000",
+          "currency": "USD"
+        },
         "targetCloseDate": "2027-02-28",
         "useOfFunds": "Melody generation, a mobile app, and artist partnerships in Lagos, Nairobi and Johannesburg."
       },

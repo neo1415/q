@@ -1099,3 +1099,30 @@ Evidence stage: **code + local production-build checks; nothing deployed.**
   - In-story spoken answers use the narrator's voice. This is an additive optional `presenter: "STORY"` on `CreateQSpeechRequestSchema`, mapped in q-api to `STORY_VOICE_ID`. Q's global voice is unchanged.
 - **Checks:** root tsc clean; web and q-api tsc clean; vitest story/q-pitch 260/260, q-api speech + contracts 543/543; eslint and prettier clean on changed files. Browser check of the ending: card and clip at +2.5 s.
 - **Not done:** the live-line listening can't run locally (no providers). The owner still has to approve the story ledger, so the story stays INTERNAL_REHEARSAL.
+
+## Demonstration companies seed — 22 October 2026 (Claude S6, `seed/demo-companies`)
+
+Evidence stage: **code + local database tests**. Not applied to hosted; the production run is an owner-approved step at deploy time (`docs/seed/demo-companies/README.md`).
+
+- **Owner answers (22 Oct):**
+  - David's surname is Nwankwo (confirmed).
+  - Capital Q is in Lagos, NG; website `https://capital-qweb-production.up.railway.app/`.
+  - KUUZA AI: fill gaps only.
+  - A visible "Demonstration data" label everywhere.
+  - Songscribe is real and its owners agreed. It is an AI songwriting assistant founded by Excel Chukwu and Zino Mario.
+- **Migration** `20261229100000_company_demonstration_data` (additive column). The coordinator applies it.
+- **Local database without Docker:** all migrations apply from empty. pgTAP 520 24/24, 521 11/11, 580 14/14.
+- **Checks:**
+  - seed tests 9/9;
+  - vitest 85 files, 1,032 tests;
+  - root, web, api, q-api and workers tsc: clean;
+  - eslint and prettier: clean.
+- **Scores (local):**
+  - Capital Q and Songscribe: InvestIQ 50, Investable, Low confidence.
+  - Unicorn: insufficient evidence for both.
+  - KUUZA AI: not listed.
+- **Open:**
+  - Zino's photo.
+  - Account emails for the person cards.
+  - Real verification, deck and backgrounds to move scores.
+  - Investor Discover needs verification.
