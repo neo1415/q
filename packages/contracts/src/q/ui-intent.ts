@@ -509,7 +509,6 @@ export const Q_SETTINGS_SECTIONS = [
   "usage",
   "memory",
   "plan",
-  "activity",
 ] as const;
 export const QSettingsSectionSchema = z.enum(Q_SETTINGS_SECTIONS);
 export type QSettingsSection = z.infer<typeof QSettingsSectionSchema>;

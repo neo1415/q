@@ -232,7 +232,6 @@ export function settingsPath(section: QSettingsSection): string {
     case "plan":
     case "billing":
     case "team":
-    case "activity":
       return `/settings/${section}`;
     case "account":
     case "appearance":
