@@ -167,9 +167,11 @@ describe.skipIf(!committed)("the committed bank vectors", () => {
         const [words, meaning] = sides[side];
         return combineQaTiers(words.match(text), meaning.decide(vector(text)));
       };
-      for (const [questions, unrelated] of [
-        [HELD_OUT, NOT_IN_BANK],
-        [BLIND, BLIND_NOT_IN_BANK],
+      // Measured 2026-10-22 (tier 1 + 2): tuning 179 right, 7 wrong; blind
+      // 86 right, 4 wrong; no unrelated question answered in either.
+      for (const [questions, unrelated, atLeast] of [
+        [HELD_OUT, NOT_IN_BANK, 170],
+        [BLIND, BLIND_NOT_IN_BANK, 80],
       ] as const) {
         let right = 0;
         let wrong = 0;
@@ -179,7 +181,8 @@ describe.skipIf(!committed)("the committed bank vectors", () => {
           if (decided.entry.id === id) right += 1;
           else wrong += 1;
         }
-        expect(right / Math.max(1, right + wrong)).toBeGreaterThanOrEqual(0.9);
+        expect(right / Math.max(1, right + wrong)).toBeGreaterThanOrEqual(0.95);
+        expect(right).toBeGreaterThanOrEqual(atLeast);
         for (const text of unrelated) {
           for (const side of ["INVESTOR", "FOUNDER"] as const) {
             expect(both(text, side).kind, text).not.toBe("ANSWER");
