@@ -13,6 +13,7 @@
  *
  *   node scripts/q-pitch/master-story.mjs --base http://127.0.0.1:3200 \
  *     [--voice pFZP5JQG7iQjIQuC4Bku] [--pitches <dir>] [--skip-ocr]
+ *     [--edition investor|founder]   (writes to master/<edition>/)
  *
  * Another voice set is one flag: --voice <id> (its render must exist under
  * apps/web/public/story-media/<id>/). Playwright records no sound, so each
@@ -45,7 +46,17 @@ const base = option("base", "http://127.0.0.1:3200");
 const voice = option("voice", "pFZP5JQG7iQjIQuC4Bku");
 const skipOcr = process.argv.includes("--skip-ocr");
 if (!/^[A-Za-z0-9]{8,40}$/u.test(voice)) throw new Error("not a voice id");
-const out = path.join(root, "docs/ai-handoff/evidence/q-story/master");
+// --edition investor|founder: one of the story's cuts (editions.ts); the
+// full story is the default and keeps the folder it always had.
+const edition = option("edition", "full");
+if (!["full", "investor", "founder"].includes(edition)) {
+  throw new Error("not an edition");
+}
+const out = path.join(
+  root,
+  "docs/ai-handoff/evidence/q-story/master",
+  edition === "full" ? "" : edition,
+);
 const work = path.join(os.tmpdir(), `q-story-master-${String(Date.now())}`);
 await mkdir(out, { recursive: true });
 await mkdir(work, { recursive: true });
@@ -109,9 +120,12 @@ const mediaDir = path.join(root, "apps/web/public/story-media", voice);
 const index = JSON.parse(
   await readFile(path.join(mediaDir, "index.json"), "utf8"),
 );
-const clips = Object.keys(index.files)
-  .sort()
-  .map((id) => path.join(mediaDir, index.files[id].audio));
+// The cut's beats in play order (the built package is the script's source).
+const story = await import(path.join(root, "packages/q-pitch/dist/index.js"));
+const order = story.editionBeats(story.STORY_EDITIONS[edition.toUpperCase()]);
+const clips = order.map((beat) =>
+  path.join(mediaDir, index.files[beat.id].audio),
+);
 
 const browser = await chromium.launch({
   ...(existsSync("/opt/pw-browsers/chromium")
@@ -193,14 +207,17 @@ await context.addInitScript((banned) => {
   window.__audioStarts = [];
   const Source = window.AudioBufferSourceNode;
   const start = Source.prototype.start;
-  Source.prototype.start = function (when, ...rest) {
+  Source.prototype.start = function (when, offset, length) {
     const ctx = this.context;
     const delay = Math.max(0, ((when ?? 0) - ctx.currentTime) * 1000);
     window.__audioStarts.push({
       at: Date.now() + delay,
-      duration: this.buffer?.duration ?? 0,
+      duration: length ?? this.buffer?.duration ?? 0,
+      // A cut part plays a window of its beat's clip.
+      offset: offset ?? 0,
+      length: length ?? null,
     });
-    return start.call(this, when, ...rest);
+    return start.call(this, when, offset, length);
   };
   // Layout shifts, and what is on screen every 0.5 s.
   window.__cls = 0;
@@ -227,9 +244,12 @@ await context.addInitScript((banned) => {
 
 const videoStart = Date.now();
 const page = await context.newPage();
-await page.goto(`${base}/dev/story?voice=${voice}&film=1`, {
-  waitUntil: "networkidle",
-});
+await page.goto(
+  `${base}/dev/story?voice=${voice}&film=1${edition === "full" ? "" : `&edition=${edition}`}`,
+  {
+    waitUntil: "networkidle",
+  },
+);
 await page.waitForFunction(
   () =>
     [...document.querySelectorAll("button")].some(
@@ -282,6 +302,10 @@ if (starts.length !== clips.length) {
 const pairs = starts.slice(0, clips.length).map((s, i) => ({
   clip: clips[i],
   delayMs: Math.max(0, Math.round(s.at - videoStart)),
+  trim:
+    s.length === null
+      ? ""
+      : `atrim=start=${String(s.offset)}:duration=${String(s.length)},asetpts=PTS-STARTPTS,`,
 }));
 const master = path.join(out, "q-story-master-1080p.mp4");
 ff([
@@ -292,7 +316,7 @@ ff([
   `${pairs
     .map(
       (p, i) =>
-        `[${String(i + 1)}:a]adelay=${String(p.delayMs)}|${String(p.delayMs)}[a${String(i)}]`,
+        `[${String(i + 1)}:a]${p.trim}adelay=${String(p.delayMs)}|${String(p.delayMs)}[a${String(i)}]`,
     )
     .join(
       ";",
