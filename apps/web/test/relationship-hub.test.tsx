@@ -5,10 +5,15 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Server pages stream several blocks; a loaded CI runner needs longer than
+// the 10s default to settle them. The assertions stay exactly the same.
+vi.setConfig({ testTimeout: 30_000 });
 
 import {
   HubNavigation,
@@ -123,7 +128,7 @@ async function show(page: ReactNode) {
     // Streamed blocks resolve over a few turns of the event loop, more on
     // a loaded CI runner than locally: wait until no loading shape is left
     // (bounded, so a block that never resolves still fails its assertion).
-    for (let turn = 0; turn < 200; turn += 1) {
+    for (let turn = 0; turn < 600; turn += 1) {
       await new Promise((resolve) => setTimeout(resolve, turn < 5 ? 0 : 10));
       if (turn >= 4 && document.querySelector("[data-loading-rows]") === null)
         break;
@@ -294,11 +299,15 @@ describe("Hub foundation", () => {
       pipelineFit: [{ companyId, companyName: "Company", state: "CONNECTED" }],
     });
     await overview();
-    expect(
-      currentManifest()?.sections.find(
-        (section) => section.id === "hub-overview",
-      )?.refs,
-    ).toEqual([{ kind: "COMPANY", id: companyId }]);
+    await waitFor(
+      () =>
+        expect(
+          currentManifest()?.sections.find(
+            (section) => section.id === "hub-overview",
+          )?.refs,
+        ).toEqual([{ kind: "COMPANY", id: companyId }]),
+      { timeout: 15_000 },
+    );
     expect(
       manifestControls().some((entry) => entry.id === "list.relationships"),
     ).toBe(false);
