@@ -41,9 +41,10 @@ DOCS = [
     ),
     ("capital-q-board-composition-note.pdf", "Board composition note", "GOVERNANCE", PDF, "ON_REQUEST", "corporate"),
 ]
-# A copy of the Q Story INVESTOR edition 720p share copy (branch
-# qstory/editions-card, docs/ai-handoff/evidence/q-story/master/investor/).
-# PROVISIONAL: S1's final take replaces it; re-run this script then.
+# A copy of S1's final Q Story INVESTOR take, 720p share copy (branch
+# qstory/editions-card @ 934ae9ca9, docs/ai-handoff/evidence/q-story/master/investor/).
+# If the owner approves it for an audience, S1 re-cuts without the
+# "Internal rehearsal" corner; replace the copy and re-run this script.
 VIDEO_NAME = "capital-q-pitch-video.mp4"
 
 
@@ -96,10 +97,11 @@ def main(out_dir):
         "watermark": WATERMARK,
         "documents": entries,
         "pitchVideo": {
-            "$comment": "Q genuinely pitching Capital Q: a copy of the Q Story INVESTOR edition, not a founder video. PROVISIONAL until S1 delivers the final take (David's photo on the Q Card, scrim fix); its frames still carry 'Internal rehearsal' until the owner approves the cut. Upload through /pitch/new (founder session and stream provider) with the audience below.",
-            "final": False,
+            "$comment": "Q genuinely pitching Capital Q: a copy of the Q Story INVESTOR edition, not a founder video. S1's final take; its corner still reads 'Internal rehearsal' until the owner approves the cut for an audience, after which S1 re-cuts and the hash changes. Upload through /pitch/new (founder session and stream provider) with the audience below.",
+            "final": True,
+            "ownerApprovedForAudience": False,
             "file": VIDEO_NAME,
-            "source": "qstory/editions-card:docs/ai-handoff/evidence/q-story/master/investor/q-story-master-720p.mp4",
+            "source": "qstory/editions-card@934ae9ca9:docs/ai-handoff/evidence/q-story/master/investor/q-story-master-720p.mp4",
             "mime": "video/mp4",
             "bytes": (out_dir / VIDEO_NAME).stat().st_size,
             "sha256": sha256(out_dir / VIDEO_NAME),

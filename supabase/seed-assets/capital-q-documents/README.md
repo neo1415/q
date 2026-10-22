@@ -38,7 +38,7 @@ Owner direction, 22 October 2026. Capital Q is seeded as a demonstration company
 
 - Title: "Capital Q — the story, for investors".
 - It goes up through `/pitch/new` with the audience "Everyone on Capital Q", which needs the founder's session and the stream provider.
-- **Provisional** (`pitchVideo.final: false`). S1's final take replaces it; re-run `finalize.py` when that happens. Until the owner approves the cut, its frames carry "Internal rehearsal".
+- This is S1's final take (`qstory/editions-card` @ `934ae9ca9`). Its corner still reads "Internal rehearsal" (`pitchVideo.ownerApprovedForAudience: false`). If the owner approves the cut, S1 re-cuts it; replace the copy and re-run `finalize.py`.
 
 ## Rebuild
 
