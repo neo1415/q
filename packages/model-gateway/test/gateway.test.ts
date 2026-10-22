@@ -520,6 +520,53 @@ describe("reliability", () => {
     expect(already.attempts).toBe(0);
   });
 
+  it("after an exhausted account (402), the next turn makes no call to it and goes to the fallback (round 8)", async () => {
+    const health = createProcessLocalProviderHealth();
+    const { gateway, alpha, beta } = build({
+      alpha: [
+        { kind: "FAIL", failureClass: "PERMANENT", accountExhausted: true },
+      ],
+      dependencies: { health },
+    });
+    const first = await gateway.execute(request());
+    expect(first.providerCode).toBe("beta");
+    const alphaCalls = alpha.calls.length;
+    const second = await gateway.execute(request());
+    expect(second.providerCode).toBe("beta");
+    // Zero calls to the failing provider on the second turn.
+    expect(alpha.calls.length).toBe(alphaCalls);
+    expect(second.route.candidates[0]).toMatchObject({
+      providerCode: "alpha",
+      reason: "PROVIDER_TEMPORARILY_FAILING",
+    });
+    expect(beta.calls.length).toBe(2);
+  });
+
+  it("a model backing off after a 429 is still tried when nothing else is eligible", async () => {
+    const health = createProcessLocalProviderHealth();
+    health.recordFailure(
+      "alpha",
+      "alpha-standard",
+      "RATE_LIMIT",
+      new Date(),
+      100,
+      false,
+      30_000,
+    );
+    health.recordFailure(
+      "beta",
+      "beta-cheap",
+      "PERMANENT",
+      new Date(),
+      100,
+      true,
+    );
+    const { gateway, alpha } = build({ dependencies: { health } });
+    const result = await gateway.execute(request());
+    expect(result.providerCode).toBe("alpha");
+    expect(alpha.calls.length).toBe(1);
+  });
+
   it("temporarily skips a provider that keeps failing, without making an ineligible one eligible", async () => {
     const health = createProcessLocalProviderHealth({
       failureThreshold: 2,

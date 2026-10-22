@@ -180,7 +180,12 @@ export const noTenantModelPolicy: TenantModelPolicyPort = {
  * TEMPORARILY_FAILING is skipped for a short window; nothing here can make
  * an ineligible provider eligible.
  */
-export type ProviderHealthState = "HEALTHY" | "TEMPORARILY_FAILING";
+/**
+ * BACKING_OFF (round 8): a model that just answered 429 is tried only when
+ * no other eligible model is left, so one rate limit never strands a turn.
+ */
+export type ProviderHealthState =
+  "HEALTHY" | "TEMPORARILY_FAILING" | "BACKING_OFF";
 
 export type ProviderHealthPort = {
   /**
@@ -210,6 +215,8 @@ export type ProviderHealthPort = {
     elapsedMs?: number,
     /** The provider account cannot serve until a person acts (credit, quota). */
     accountExhausted?: boolean,
+    /** A rate limit's own Retry-After, when the provider gave one. */
+    retryAfterMs?: number,
   ) => void;
   readonly recordSuccess: (
     code: ModelProviderCode,
