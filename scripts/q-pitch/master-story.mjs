@@ -158,8 +158,9 @@ await answerMedia(context);
 await context.addInitScript((banned) => {
   // Each beat's audio start, in wall-clock ms (for the mix).
   window.__audioStarts = [];
-  const start = AudioBufferSourceNode.prototype.start;
-  AudioBufferSourceNode.prototype.start = function (when, ...rest) {
+  const Source = window.AudioBufferSourceNode;
+  const start = Source.prototype.start;
+  Source.prototype.start = function (when, ...rest) {
     const ctx = this.context;
     const delay = Math.max(0, ((when ?? 0) - ctx.currentTime) * 1000);
     window.__audioStarts.push({
@@ -323,7 +324,7 @@ const files = (await readdir(frames)).sort();
 const ocrHits = [];
 if (!skipOcr) {
   for (const file of files) {
-    let text = "";
+    let text;
     try {
       text = execFileSync(
         "tesseract",
