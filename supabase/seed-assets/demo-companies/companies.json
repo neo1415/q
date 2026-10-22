@@ -168,6 +168,16 @@
             "currency": "USD",
             "asOf": "2026-09-30"
           }
+        },
+        {
+          "key": "financial.contribution_margin",
+          "type": "financial",
+          "statement": "Contribution margin was 61% in Q3 2026 (revenue less hosting, model and payment costs).",
+          "value": {
+            "kind": "PERCENT",
+            "value": 61,
+            "asOf": "2026-09-30"
+          }
         }
       ],
       "founders": [
@@ -386,6 +396,28 @@
             "amount": "750000",
             "currency": "USD",
             "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "financial.contribution_margin",
+          "type": "financial",
+          "statement": "Contribution margin was 38% in Q3 2026 (subscription revenue less model, hosting and app-store costs).",
+          "value": {
+            "kind": "PERCENT",
+            "value": 38,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "market.size",
+          "type": "market",
+          "truthClass": "ESTIMATE",
+          "statement": "Estimated annual spend by independent songwriters and home studios in Africa on songwriting and music-production software: USD 300 million.",
+          "value": {
+            "kind": "MONEY",
+            "amount": "300000000",
+            "currency": "USD",
+            "evidenceCapturedAt": "2026-09-30"
           }
         }
       ],
