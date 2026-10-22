@@ -88,6 +88,8 @@ const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/discover/yours": "old address, redirects to /discover?tab=yours",
   "/settings/reconnect/google": "a hand-off from Google, not a page to visit",
   "/join": "an invitation link",
+  "/settings/activity":
+    "the organisation's accountability record, for admins and owners from Team; Q reads no one's activity by design",
 };
 
 function pages(dir: string): string[] {
