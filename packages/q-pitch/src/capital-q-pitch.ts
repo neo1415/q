@@ -65,7 +65,7 @@ export const CAPITAL_Q_PITCH: readonly PitchSection[] = z
       sources: [
         `${PADL} Decision #001`,
         `${PADL} purpose`,
-        "packages/q-pitch/src/knowledge-pack.ts kp.unknown.market-size",
+        "packages/q-pitch/src/qa-bank-product.ts qa.market-size",
       ],
     },
     {
@@ -144,7 +144,7 @@ export const CAPITAL_Q_PITCH: readonly PitchSection[] = z
       standing: "NOT_KNOWN",
       sources: [
         `${LANDING} capture notes (FDN Capital Partners)`,
-        "packages/q-pitch/src/knowledge-pack.ts kp.unknown.team",
+        "packages/q-pitch/src/qa-bank.ts qa.team",
       ],
     },
     {

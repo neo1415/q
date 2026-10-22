@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  PREMIERE_SCRIPT,
+  INVESTOR_V6_SCRIPT,
   SceneLineSchema,
   buildStepGraph,
 } from "../src/index.js";
 
 describe("the step graph (v6: steps addressed by id)", () => {
-  const graph = buildStepGraph(PREMIERE_SCRIPT);
+  const graph = buildStepGraph(INVESTOR_V6_SCRIPT);
 
   it("numbers every scene from 1 and links each to its neighbours", () => {
-    expect(graph.steps).toHaveLength(PREMIERE_SCRIPT.scenes.length);
+    expect(graph.steps).toHaveLength(INVESTOR_V6_SCRIPT.scenes.length);
     graph.steps.forEach((step, index) => {
       expect(step.number).toBe(index + 1);
       expect(step.prevId).toBe(graph.steps[index - 1]?.stepId ?? null);
