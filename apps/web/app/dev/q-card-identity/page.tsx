@@ -23,7 +23,7 @@ export const metadata: Metadata = {
  * shows exactly what an anonymous scanner would get from this projection.
  *
  * Development only; a production build serves it only when
- * CQ_DEV_PREVIEW=1 is set on that server. `?subject=company|investor`,
+ * CQ_DEV_PREVIEW=1 is set on that server. `?subject=company|investor|person`,
  * `?audience=public|participant`, `?empty=1` (a company with nothing shared).
  */
 
@@ -213,6 +213,36 @@ const INVESTOR_FIELDS: readonly PublicCardField[] = [
   },
 ];
 
+const PERSON_FIELDS: readonly PublicCardField[] = [
+  {
+    key: "headline",
+    value: "Backing East African logistics and B2B software from seed.",
+    scope: "public_external",
+  },
+  { key: "roleTitle", value: "Managing Partner", scope: "public_external" },
+  { key: "affiliation", value: "Savanna Ventures", scope: "public_external" },
+  { key: "countryCode", value: "KE", scope: "network_visible" },
+  {
+    key: "personFocus",
+    value: "Investment focus",
+    scope: "public_external",
+    detail: {
+      kind: "FOCUS",
+      side: "INVESTOR",
+      organisationHandle: "savanna-ventures",
+      fields: [
+        { key: "mandateTypicalCheque", value: "$250K–$1.5M" },
+        { key: "mandateStages", value: "Seed; Series A" },
+        {
+          key: "mandateSectors",
+          value: "Logistics; B2B software; Fintech infrastructure",
+        },
+      ],
+      raise: null,
+    },
+  },
+];
+
 function one(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -229,17 +259,39 @@ export default async function QCardIdentityHarness({
     notFound();
   }
   const params = await searchParams;
-  const investor = one(params["subject"]) === "investor";
+  const subject = one(params["subject"]);
+  const investor = subject === "investor";
+  const person = subject === "person";
   const audience =
     one(params["audience"]) === "participant" ? "PARTICIPANT" : "PUBLIC";
   const empty = one(params["empty"]) === "1";
-  const handle = investor ? "savanna-ventures" : "kivu-freight";
+  const handle = person
+    ? "wanjiku-kamau"
+    : investor
+      ? "savanna-ventures"
+      : "kivu-freight";
   const projected: PublicCardDto = {
     kind: "CARD",
     handle,
-    subjectType: investor ? "INVESTOR_ORGANISATION" : "COMPANY",
-    name: investor ? "Savanna Ventures" : "Kivu Freight",
-    fields: empty ? [] : [...(investor ? INVESTOR_FIELDS : COMPANY_FIELDS)],
+    subjectType: person
+      ? "PERSON"
+      : investor
+        ? "INVESTOR_ORGANISATION"
+        : "COMPANY",
+    name: person
+      ? "Wanjiku Kamau"
+      : investor
+        ? "Savanna Ventures"
+        : "Kivu Freight",
+    fields: empty
+      ? []
+      : [
+          ...(person
+            ? PERSON_FIELDS
+            : investor
+              ? INVESTOR_FIELDS
+              : COMPANY_FIELDS),
+        ],
     verified: ["ORGANISATION_VERIFIED"],
     demoAttested: [],
     audience,

@@ -18,6 +18,7 @@ import { createOnboardingCoverageReader } from "./onboarding-coverage.js";
 import {
   createCompanyClaims,
   createPlatformCompanyPublishing,
+  createPostgresCompanyAffiliationRead,
 } from "@capital-q/companies";
 import {
   createApplicationMaterials,
@@ -140,6 +141,7 @@ import {
   createPostgresInvestorProfileQueryPort,
   InvestorOrganisationIdSchema,
   createPostgresInvestorTeamRead,
+  createPostgresInvestorAffiliationRead,
 } from "@capital-q/investors";
 import {
   createCommitmentService,
@@ -258,6 +260,7 @@ import {
   createAuthorizationService,
   OrganisationIdSchema,
   TenantIdSchema,
+  UserIdSchema,
 } from "@capital-q/security";
 // BILLING block (ADR 0034)
 import {
@@ -345,6 +348,7 @@ import {
   createPostgresAuthorizationPolicySource,
   createPostgresPersonProfileStore,
   createPostgresSessionLiveness,
+  createPostgresPersonCardRead,
 } from "@capital-q/security/postgres";
 import {
   createLocalJwtAccessTokenAuthenticator,
@@ -2195,7 +2199,55 @@ const cardPipeline = createPostgresCompanyPipelineCounts({ sql: database.sql });
 const cardDataRoom = createPostgresDataRoom();
 const cardInvestorTeam = createPostgresInvestorTeamRead({ sql: database.sql });
 
+// A person's own Q Card (owner 2026-10-22): their basics, where they work
+// now (a company first, else an investor organisation), and Capital Q's
+// claims about this very person.
+const personCards = createPostgresPersonCardRead({ sql: database.sql });
+const companyAffiliations = createPostgresCompanyAffiliationRead({
+  sql: database.sql,
+});
+const investorAffiliations = createPostgresInvestorAffiliationRead({
+  sql: database.sql,
+});
+
 const cardSubjects = createSubjectDirectory({
+  findPerson: async (userId) => {
+    const id = UserIdSchema.safeParse(userId);
+    if (!id.success) return null;
+    const [person, company, investor] = await Promise.all([
+      personCards.read(id.data),
+      companyAffiliations.currentForUser(id.data),
+      investorAffiliations.currentForUser(id.data),
+    ]);
+    if (person === null) return null;
+    return {
+      ...person,
+      affiliation:
+        company !== null
+          ? { subjectType: "COMPANY" as const, ...company }
+          : investor !== null
+            ? { subjectType: "INVESTOR_ORGANISATION" as const, ...investor }
+            : null,
+    };
+  },
+  // The affiliation's own card, through the same projection `/@handle`
+  // uses; bound late because the card service is composed below.
+  affiliationCard: (input) => publicIdentity.cardForSubject(input),
+  personVerification: async (subject) => {
+    const standings = await cardVerification.personStandings({
+      tenantId: TenantIdSchema.parse(subject.tenantId),
+      organisationId: OrganisationIdSchema.parse(subject.organisationId),
+      userId: subject.userId,
+    });
+    return {
+      organisation: standings.organisation.verified,
+      founderIdentity: standings.founderIdentity.verified,
+      demoAttested: {
+        organisation: standings.organisation.syntheticDemo,
+        founderIdentity: standings.founderIdentity.syntheticDemo,
+      },
+    };
+  },
   findCompanySections: async ({ tenantId, companyId }) => {
     const tenant = TenantIdSchema.parse(tenantId);
     const [claims, objective, iq, pipeline, team, documents, folders] =

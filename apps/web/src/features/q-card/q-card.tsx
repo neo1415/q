@@ -112,7 +112,7 @@ export function QCard({
             {name}
           </Name>
           {descriptor === null || descriptor.length === 0 ? null : (
-            <p className="cq-body truncate text-(--cq-qcard-muted)">
+            <p className="cq-body line-clamp-2 text-(--cq-qcard-muted)">
               {descriptor}
             </p>
           )}

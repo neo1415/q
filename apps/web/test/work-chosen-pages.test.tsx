@@ -235,8 +235,6 @@ describe("the rehearsal review", () => {
 
   it("ties a note to the line it is about, and says when it is about the whole", () => {
     render(<RehearsalReview rehearsal={rehearsal} />);
-    // Scored 72 and 64 out of 100; the review writes them out of 10, as the
-    // rehearsals list does.
     expect(screen.getByText("7.2")).toBeTruthy();
     expect(screen.getByText("Up 0.8 since last time (6.4)")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /The ask was vague/u }));

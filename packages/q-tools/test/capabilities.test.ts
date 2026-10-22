@@ -70,6 +70,7 @@ const EVERY_PORT: QToolPorts = {
   preferenceLearning: STUB,
   profileMaterial: STUB,
   evidenceDocuments: STUB,
+  attachedDocuments: STUB,
   relationshipMail: STUB,
   inboundEmail: STUB,
   onboardingReminders: STUB,

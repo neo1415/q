@@ -37,7 +37,7 @@ export function PlanView({
   readonly accountName: string | null;
   /** Back from the payment provider's checkout. */
   readonly checkoutDone: boolean;
-  /** Design review only: see PlanBoard. */
+  /** Design review only (passed through to PlanBoard) */
   readonly reviewSheet?: "billing" | "talk" | undefined;
 }) {
   const free = plan?.source === "LAUNCH_DEFAULT";

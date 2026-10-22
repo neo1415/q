@@ -1,9 +1,13 @@
-import { INVESTOR_MANDATE_CARD_FIELDS } from "@capital-q/contracts";
+import {
+  INVESTOR_MANDATE_CARD_FIELDS,
+  type PublicCardDto,
+} from "@capital-q/contracts";
 
 import type { SubjectDirectory, SubjectFacts } from "../application/ports.js";
 import {
   companySections,
   investorTeamSection,
+  personFocus,
   type CompanySectionInputs,
 } from "../domain/sections.js";
 
@@ -44,7 +48,61 @@ export type InvestorMandateCardFacts = Readonly<
   Partial<Record<(typeof INVESTOR_MANDATE_CARD_FIELDS)[number], string | null>>
 >;
 
+/** A person's own declared profile and current affiliation. */
+export type PersonProfileRead = {
+  readonly displayName: string;
+  readonly headline: string | null;
+  readonly countryCode: string | null;
+  /** Where they work now; null when no current membership. */
+  readonly affiliation: {
+    readonly subjectType: "COMPANY" | "INVESTOR_ORGANISATION";
+    readonly subjectId: string;
+    readonly tenantId: string;
+    readonly organisationId: string;
+    readonly name: string;
+    readonly roleTitle: string | null;
+  } | null;
+};
+
 export type SubjectDirectoryPorts = {
+  /**
+   * A person's card (owner 2026-10-22). Optional; absent, no person can be
+   * found and so no person card can be made or shown.
+   */
+  readonly findPerson?:
+    ((userId: string) => Promise<PersonProfileRead | null>) | undefined;
+  /**
+   * The affiliation's own live card for one audience, exactly as `/@handle`
+   * shows it to that audience. A person's "what they're looking for" is
+   * built only from this, so it can never show more than the organisation's
+   * own card already does.
+   */
+  readonly affiliationCard?:
+    | ((input: {
+        readonly subject: {
+          readonly subjectType: "COMPANY" | "INVESTOR_ORGANISATION";
+          readonly subjectId: string;
+        };
+        readonly audience: "PUBLIC" | "PARTICIPANT";
+      }) => Promise<PublicCardDto | null>)
+    | undefined;
+  /** Capital Q's own claims about this very person and their organisation. */
+  readonly personVerification?:
+    | ((subject: {
+        readonly tenantId: string;
+        readonly organisationId: string;
+        readonly userId: string;
+      }) => Promise<{
+        readonly organisation: boolean;
+        readonly founderIdentity: boolean;
+        readonly demoAttested?:
+          | {
+              readonly organisation: boolean;
+              readonly founderIdentity: boolean;
+            }
+          | undefined;
+      }>)
+    | undefined;
   /**
    * The card's richer sections (Q Story S6): each owning context's rows
    * for one company, read server-side. Optional; absent, no section shows.
@@ -103,6 +161,57 @@ export function createSubjectDirectory(
 ): SubjectDirectory {
   return {
     find: async (subject): Promise<SubjectFacts | null> => {
+      if (subject.subjectType === "PERSON") {
+        const person =
+          (await ports.findPerson?.(subject.subjectId).catch(() => null)) ??
+          null;
+        if (person === null) return null;
+        const at = person.affiliation;
+        const notVerified = { organisation: false, founderIdentity: false };
+        const [verified, publicCard, memberCard] =
+          at === null
+            ? [notVerified, null, null]
+            : await Promise.all([
+                ports
+                  .personVerification?.({
+                    tenantId: at.tenantId,
+                    organisationId: at.organisationId,
+                    userId: subject.subjectId,
+                  })
+                  .catch(() => notVerified) ?? notVerified,
+                ports
+                  .affiliationCard?.({ subject: at, audience: "PUBLIC" })
+                  .catch(() => null) ?? null,
+                ports
+                  .affiliationCard?.({ subject: at, audience: "PARTICIPANT" })
+                  .catch(() => null) ?? null,
+              ]);
+        const focus =
+          at === null
+            ? null
+            : personFocus({
+                side: at.subjectType === "COMPANY" ? "FOUNDER" : "INVESTOR",
+                publicCard,
+                memberCard,
+              });
+        return {
+          tenantId: null,
+          organisationId: null,
+          name: person.displayName,
+          facts: {
+            displayName: person.displayName,
+            headline: person.headline,
+            roleTitle: at?.roleTitle ?? null,
+            affiliation: at?.name ?? null,
+            countryCode: person.countryCode,
+            personFocus: focus?.value ?? null,
+          },
+          ...(focus === null
+            ? {}
+            : { details: { personFocus: focus.details } }),
+          verified,
+        };
+      }
       if (subject.subjectType === "COMPANY") {
         const company = await ports.findCompany(subject.subjectId);
         if (company === null) return null;

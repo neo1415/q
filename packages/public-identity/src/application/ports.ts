@@ -20,8 +20,10 @@ export type QCardSubject = {
 
 /** A subject's trusted ownership, declared facts and verified claims. */
 export type SubjectFacts = {
-  readonly tenantId: string;
-  readonly organisationId: string;
+  /** Null for a PERSON: a person is not owned by one tenant's row here. */
+  readonly tenantId: string | null;
+  /** Null for a PERSON: a person's card belongs to the person, not an organisation. */
+  readonly organisationId: string | null;
   readonly name: string;
   /** Declared profile fields by card field key; null means not stated. */
   readonly facts: Readonly<Record<string, string | null>>;
@@ -67,7 +69,7 @@ export type HandleRow = {
 export type CardRow = {
   readonly id: string;
   readonly tenantId: string;
-  readonly organisationId: string;
+  readonly organisationId: string | null;
   readonly subjectType: QCardSubjectType;
   readonly subjectId: string;
   readonly publicCode: string;
@@ -114,7 +116,7 @@ export type PublicIdentityRepository = {
     row: {
       readonly handle: string;
       readonly tenantId: string;
-      readonly organisationId: string;
+      readonly organisationId: string | null;
       readonly subject: QCardSubject;
       readonly claimedByUserId: string;
     },
@@ -127,7 +129,7 @@ export type PublicIdentityRepository = {
     tx: TransactionContext,
     row: {
       readonly tenantId: string;
-      readonly organisationId: string;
+      readonly organisationId: string | null;
       readonly subject: QCardSubject;
       readonly publicCode: string;
       readonly fieldScopes: QCardFieldScopes;

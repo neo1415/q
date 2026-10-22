@@ -591,6 +591,8 @@ export type QToolPorts = {
   readonly profileMaterial?: ProfileMaterialPort | undefined;
   /** R33: their organisation's uploaded documents (metadata). */
   readonly evidenceDocuments?: EvidenceDocumentsPort | undefined;
+  /** Lane 8: a document they attached to Q, read as them. */
+  readonly attachedDocuments?: AttachedDocumentsPort | undefined;
   /** R33 / BIZ-007: a relationship's email thread. */
   readonly relationshipMail?: RelationshipMailPort | undefined;
   /**
@@ -1064,6 +1066,54 @@ export type ApprovalInboxPort = {
  * R33: the person's own documents (artifacts Q prepared for them), read as
  * their documents list reads them: the artifact service, as the actor.
  */
+/**
+ * Lane 8: a document the person attached to Q, read as them through the
+ * Evidence service (document.view in their own organisation; one not
+ * theirs is null, the same as absent). Found by id, else by words from its
+ * name among their own uploads, else their latest. `state` says whether
+ * the pipeline has read it yet; pages are the latest extraction's, the
+ * whole text when it is short and the pages answering `question` when not.
+ */
+export type AttachedDocumentsPort = {
+  readonly read: (
+    actor: ActorContext,
+    request: {
+      readonly documentId?: string;
+      readonly name?: string;
+      readonly question?: string;
+    },
+  ) => Promise<{
+    readonly document:
+      | (AttachedDocumentIdentity &
+          (
+            | { readonly state: "READING" }
+            | { readonly state: "UNREADABLE"; readonly reason: string }
+            | {
+                readonly state: "READ";
+                readonly pageCount: number;
+                readonly whole: boolean;
+                readonly pages: readonly {
+                  readonly page: number;
+                  readonly text: string;
+                }[];
+              }
+          ))
+      | null;
+    readonly others: readonly {
+      readonly documentId: string;
+      readonly title: string;
+      readonly uploadedAt: string;
+    }[];
+  } | null>;
+};
+
+export type AttachedDocumentIdentity = {
+  readonly documentId: string;
+  readonly title: string;
+  readonly filename: string;
+  readonly uploadedAt: string;
+};
+
 export type OwnDocumentsPort = {
   readonly list: (
     actor: ActorContext,

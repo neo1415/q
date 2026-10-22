@@ -34,7 +34,9 @@ import {
   CARD_SECTION_IDS,
   CardSection,
   DocumentsSection,
+  FocusSection,
   IntelligenceSection,
+  MembersOnly,
   NumbersSection,
   RaiseSection,
   RelationshipsSection,
@@ -86,6 +88,10 @@ const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([
   "shortDescription",
   "publicDescription",
   "websiteUrl",
+  // A person's name line, role line and headline.
+  "headline",
+  "roleTitle",
+  "affiliation",
 ]);
 
 export function PublicCardView({
@@ -108,7 +114,9 @@ export function PublicCardView({
         field.key ===
         (card.subjectType === "COMPANY"
           ? "shortDescription"
-          : "publicDescription"),
+          : card.subjectType === "PERSON"
+            ? "headline"
+            : "publicDescription"),
     )?.value ?? null;
   const descriptor = cardDescriptor(card.subjectType, fields);
   const photo = cardImage(fields, "photo");
@@ -118,10 +126,29 @@ export function PublicCardView({
     (field) => !SHOWN_ELSEWHERE.has(field.key),
   );
   const demo = new Set<string>(card.demoAttested);
+  // On a person's card the organisation is their employer, named.
+  const employer =
+    card.subjectType === "PERSON"
+      ? (fields.find((field) => field.key === "affiliation")?.value ?? null)
+      : null;
   const verified = card.verified.map((label) =>
     demo.has(label)
-      ? { label, text: DEMO_WORDS[label] ?? label, demo: true }
-      : { label, text: VERIFIED_WORDS[label] ?? label, demo: false },
+      ? {
+          label,
+          text:
+            employer !== null && label === "ORGANISATION_VERIFIED"
+              ? `${employer}: demo data only, not verified`
+              : (DEMO_WORDS[label] ?? label),
+          demo: true,
+        }
+      : {
+          label,
+          text:
+            employer !== null && label === "ORGANISATION_VERIFIED"
+              ? `${employer} verified by Capital Q`
+              : (VERIFIED_WORDS[label] ?? label),
+          demo: false,
+        },
   );
   const signIn = `/auth/sign-in?next=${encodeURIComponent(`/@${card.handle}`)}`;
 
@@ -154,16 +181,22 @@ export function PublicCardView({
   });
   const lookFor = byKey("mandateLookFor");
   const location = byKey(
-    card.subjectType === "COMPANY" ? "headquartersCountry" : "hqCountry",
+    card.subjectType === "COMPANY"
+      ? "headquartersCountry"
+      : card.subjectType === "PERSON"
+        ? "countryCode"
+        : "hqCountry",
   );
   // Said once: an investor's status already leads the glance when shown.
   const status =
     card.subjectType === "COMPANY"
       ? byKey("currentStageCode")
-      : glance.some((item) => item.key === "deploymentState")
+      : card.subjectType === "PERSON" ||
+          glance.some((item) => item.key === "deploymentState")
         ? undefined
         : byKey("deploymentState");
   const company = card.subjectType === "COMPANY";
+  const person = card.subjectType === "PERSON";
   const storyEmpty =
     tagline === null && status === undefined && location === undefined;
   const more = facts.filter(
@@ -174,6 +207,9 @@ export function PublicCardView({
       field.key !== location?.key &&
       field.key !== status?.key,
   );
+
+  const moreAllMembers =
+    more.length > 0 && more.every((field) => field.scope === "network_visible");
 
   return (
     <div className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-col gap-4 px-4 pb-12 sm:px-6 sm:pt-4 sm:pb-16">
@@ -406,13 +442,21 @@ export function PublicCardView({
           </CardSection>
         )}
 
+        {person ? <FocusSection field={byKey("personFocus")} /> : null}
+
         <TeamSection field={byKey("team")} empty={company} />
         {company ? (
           <DocumentsSection field={byKey("documentsOnRequest")} />
         ) : null}
 
         {more.length === 0 ? null : (
-          <CardSection id="more" label="Additional information">
+          <CardSection
+            id="more"
+            label="Additional information"
+            // One marker at the heading when every row is members-only;
+            // mixed rows carry it inline beside their own label.
+            members={moreAllMembers}
+          >
             <dl className="divide-y divide-(--cq-border-subtle)">
               {more.map((field) => (
                 <div
@@ -421,18 +465,16 @@ export function PublicCardView({
                   data-scope={field.scope}
                   className="flex items-baseline justify-between gap-6 py-3"
                 >
-                  <dt className="cq-body-sm shrink-0 text-(--cq-text-secondary)">
+                  <dt className="cq-body-sm flex shrink-0 items-baseline gap-2 text-(--cq-text-secondary)">
                     {cardFieldLabel(field.key)}
+                    {field.scope === "network_visible" && !moreAllMembers ? (
+                      <MembersOnly />
+                    ) : null}
                   </dt>
                   <dd className="cq-body min-w-0 text-end break-words">
                     {field.key === "foundedDate"
                       ? field.value.slice(0, 4)
                       : cardFieldValue(field)}
-                    {field.scope === "network_visible" ? (
-                      <span className="cq-caption block text-(--cq-text-tertiary)">
-                        Shown to Capital Q members
-                      </span>
-                    ) : null}
                   </dd>
                 </div>
               ))}
@@ -462,6 +504,7 @@ export function PublicCardView({
 /** Fields drawn by their own section, never again as a plain row. */
 const SECTION_KEYS: ReadonlySet<string> = new Set([
   ...COMPANY_SECTION_CARD_FIELDS,
+  "personFocus",
 ]);
 
 /** Mandate facts shown in "Investment at a glance", not again below. */

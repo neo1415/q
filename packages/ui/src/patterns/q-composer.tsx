@@ -4,6 +4,7 @@ import {
   useId,
   useRef,
   useState,
+  type DragEvent,
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
@@ -37,6 +38,18 @@ import { useUiText } from "../primitives/ui-text.js";
 export const Q_COMPOSER_PLACEHOLDER =
   "Ask Q about your company, capital, or relationships";
 
+/**
+ * Lane 8: one attached file as the composer shows it. `ready` means the
+ * server has it: Send is live on a ready file alone, and stays off while
+ * any file is still uploading, so a question never leaves without the
+ * document it is about.
+ */
+export type QComposerAttachment = {
+  readonly key: string;
+  readonly label: string;
+  readonly state: "uploading" | "ready" | "failed";
+};
+
 export type QComposerProps = {
   readonly id?: string | undefined;
   readonly contextScope?: ContextScope | undefined;
@@ -58,9 +71,17 @@ export type QComposerProps = {
    */
   readonly onAttach?: ((file: File) => void | Promise<void>) | undefined;
   readonly attachLabel?: string | undefined;
-  /** What is attached or attaching, in the surface's own words. */
-  readonly attachments?: readonly string[] | undefined;
+  /**
+   * What is attached or attaching, in the surface's own words. A plain
+   * string is a note only; a QComposerAttachment also decides Send.
+   */
+  readonly attachments?: readonly (string | QComposerAttachment)[] | undefined;
   readonly attachAccept?: string | undefined;
+  /**
+   * Where the attachments are (the surface's WorkingLine: "Reading
+   * term-sheet.pdf"), set under the field. Words from real progress only.
+   */
+  readonly attachmentStatus?: ReactNode | undefined;
   /**
    * A question to start from, which the person can edit or clear. Only
    * ever a draft: nothing is sent until they send it.
@@ -104,6 +125,7 @@ export function QComposer({
   attachLabel = "Attach a document",
   attachments = [],
   attachAccept,
+  attachmentStatus,
   initialValue = "",
   onValueChange,
   showContext = true,
@@ -116,11 +138,27 @@ export function QComposer({
   const [value, setValue] = useState(initialValue);
   const [notice, setNotice] = useState<"unavailable" | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const trimmed = value.trim();
-  const canSubmit = trimmed.length > 0 && !disabled && !submitting;
+  const attached = attachments.filter(
+    (entry): entry is QComposerAttachment => typeof entry !== "string",
+  );
+  // Lane 8: a finished attachment is something to say on its own; one
+  // still uploading holds Send, so the question waits for its document.
+  const uploading = attached.some((entry) => entry.state === "uploading");
+  const ready = attached.some((entry) => entry.state === "ready");
+  const canSubmit =
+    (trimmed.length > 0 || ready) && !uploading && !disabled && !submitting;
+
+  const attachFiles = (files: FileList | null | undefined) => {
+    if (onAttach === undefined || files === null || files === undefined) {
+      return;
+    }
+    for (const file of Array.from(files).slice(0, 5)) void onAttach(file);
+  };
 
   // JS fallback for browsers without `field-sizing: content`; the class's
   // max-height caps it, and past the cap the field scrolls.
@@ -173,8 +211,36 @@ export function QComposer({
     <form
       onSubmit={handleSubmit}
       aria-labelledby={`${inputId}-title`}
+      // Lane 8: a file dropped on the composer is attached, as the
+      // button does; the border says where it will land.
+      {...(onAttach === undefined || disabled
+        ? {}
+        : {
+            onDragOver: (event: DragEvent<HTMLFormElement>) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = "copy";
+              if (!dragging) setDragging(true);
+            },
+            onDragLeave: (event: DragEvent<HTMLFormElement>) => {
+              if (
+                event.relatedTarget instanceof Node &&
+                event.currentTarget.contains(event.relatedTarget)
+              ) {
+                return;
+              }
+              setDragging(false);
+            },
+            onDrop: (event: DragEvent<HTMLFormElement>) => {
+              if (!event.dataTransfer.types.includes("Files")) return;
+              event.preventDefault();
+              setDragging(false);
+              attachFiles(event.dataTransfer.files);
+            },
+          })}
+      data-dragging={dragging ? "" : undefined}
       className={cx(
-        "flex flex-col gap-2 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) px-2 py-1 shadow-(--cq-shadow-xs) transition-colors duration-(--cq-motion-fast) focus-within:border-(--cq-border-strong)",
+        "flex flex-col gap-2 rounded-lg border border-(--cq-border) bg-(--cq-surface-raised) px-2 py-1 shadow-(--cq-shadow-xs) transition-colors duration-(--cq-motion-fast) focus-within:border-(--cq-border-strong) data-[dragging]:border-dashed data-[dragging]:border-(--cq-accent)",
         className,
       )}
     >
@@ -220,6 +286,7 @@ export function QComposer({
               <input
                 ref={fileRef}
                 type="file"
+                multiple
                 className="sr-only"
                 tabIndex={-1}
                 aria-hidden="true"
@@ -227,13 +294,11 @@ export function QComposer({
                   ? {}
                   : { accept: attachAccept })}
                 onChange={(event) => {
-                  const file = event.target.files?.[0];
+                  const files = Array.from(event.target.files ?? []);
                   // The input is cleared either way, so choosing the same
                   // file twice still fires.
                   event.target.value = "";
-                  if (file !== undefined) {
-                    void onAttach(file);
-                  }
+                  for (const file of files.slice(0, 5)) void onAttach(file);
                 }}
               />
               <IconButton
@@ -298,16 +363,31 @@ export function QComposer({
           className="flex flex-wrap gap-2"
           data-q-attachments
         >
-          {attachments.map((attachment) => (
-            <li
-              key={attachment}
-              className="cq-caption rounded-md bg-(--cq-surface-sunken) px-2 py-1 text-(--cq-text-secondary)"
-            >
-              {attachment}
-            </li>
-          ))}
+          {attachments.map((attachment) =>
+            typeof attachment === "string" ? (
+              <li
+                key={attachment}
+                className="cq-caption rounded-md bg-(--cq-surface-sunken) px-2 py-1 text-(--cq-text-secondary)"
+              >
+                {attachment}
+              </li>
+            ) : (
+              <li
+                key={attachment.key}
+                className="cq-caption rounded-md bg-(--cq-surface-sunken) px-2 py-1 text-(--cq-text-secondary)"
+                data-q-attachment={attachment.state}
+              >
+                {attachment.label}
+              </li>
+            ),
+          )}
         </ul>
       ) : null}
+      {attachmentStatus === undefined ? null : (
+        <div className="px-1 pb-1" data-q-attachment-status>
+          {attachmentStatus}
+        </div>
+      )}
       {notice === "unavailable" ? (
         <InlineNotice
           tone="info"

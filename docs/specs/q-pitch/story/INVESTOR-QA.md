@@ -41,9 +41,28 @@
 
 ## How Q decides to answer from the bank
 
-1. **Exact wording.** A question asked as stored, ignoring small words, plurals and synonyms but keeping negations such as "can't", gets that entry's answer.
-2. **Meaning.** Otherwise Q scores the question against every entry's wordings. It keeps the name "Q" and "Capital Q", and keeps question words such as who, what and where in short questions.
-3. **Margin.** The best entry must lead the runner-up by at least 10% of its own score. A close call, or a question below the threshold, goes to normal Q instead of a guessed prepared answer.
+The bank is matched on the device, with no AI call: under a millisecond on average and a few milliseconds at worst.
+
+1. **Clean the spoken question.** Fillers ("um", "you know", "quick question") are dropped, and speech-to-text forms are repaired ("gate queue" becomes GateQ, "capital cue" becomes Capital Q). A misheard word is read as the bank's nearest word when it is one letter off, keeping its first letter.
+2. **Not for the bank.** Instructions aimed at Q's rules ("ignore your rules", "pretend"), screen commands ("go back", "open"), and questions about one company or founder on screen go to normal Q.
+3. **Exact wording.** A question that matches a stored wording, after clean-up and synonyms, gets that entry's answer. Each entry has 16 stored wordings, most of them spoken style.
+4. **Meaning.** Otherwise Q compares the question with every stored wording. Rare words weigh more, and words the bank has never seen count against a match. Q then decides:
+   - **Answer at once** when the best entry is close enough and clearly ahead of the runner-up, with at least two meaningful words in common.
+   - **"Do you mean …?"** when the best entry is close but not certain. Q names one entry, or the two closest. A yes gives the prepared answer.
+   - **Normal Q** for anything else.
+
+**Measured** (tests in `packages/q-pitch/test/qa-spoken.test.ts`):
+
+| Set                                               | Answered | Correct when answered | Offered as "Do you mean …?" | Unrelated questions answered |
+| ------------------------------------------------- | -------- | --------------------- | --------------------------- | ---------------------------- |
+| Tuning set: 300 spoken questions, 100 unrelated   | 109      | 106 (97%)             | 59 more                     | 0 of 200 checks              |
+| Blind set: 200 written after tuning, 60 unrelated | 62       | 58 (94%)              | 23 more                     | 0 of 120 checks              |
+
+**What this means.**
+
+- On wording it has never seen, the bank answers about a third of questions outright and asks "Do you mean …?" for roughly another seventh. The rest go to normal Q.
+- It answers no unrelated question in either set.
+- A local embedding model would raise this, but it needs a new dependency and a model download on the pitch page, and the owner hasn't approved that.
 
 ## What Capital Q is and who it's for (10)
 

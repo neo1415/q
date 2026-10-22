@@ -1,0 +1,272 @@
+/**
+ * Arabic for organisation roles and administration (2026-10-21): the
+ * "Your role" card, admin-only controls and their reasons, Settings →
+ * Activity, a team member's page, and the words the activity feed's
+ * server sends (actions, generic resources, stages). Keys are the English
+ * source; see ../patterns.ts for `{name}`, `{n}` and `{date}`. Names,
+ * figures and email addresses are never translated.
+ */
+export const ORGANISATION_AR: Readonly<Record<string, string>> = {
+  // Roles
+  Owner: "المالك",
+  Admin: "مسؤول",
+  Member: "عضو",
+  "Your role": "دورك",
+  "You can": "يمكنك",
+  "Kept for owners": "مخصّص للمالكين",
+  "Kept for admins and owners": "مخصّص للمسؤولين والمالكين",
+  "No one else here is an admin yet.": "لا يوجد مسؤول آخر هنا بعد.",
+  "Your admin:": "المسؤول لديك:",
+  "Your admins:": "المسؤولون لديك:",
+  "See the team's activity": "اطّلع على نشاط الفريق",
+  "Admins only": "للمسؤولين فقط",
+  "You have every admin power, and you are answerable for the account: ownership and closing it are yours.":
+    "لديك كل صلاحيات المسؤول، وأنت المسؤول عن الحساب: الملكية وإغلاقه بيدك.",
+  "You run the team: people, roles, the profile and what is shared. Owners also hand over ownership.":
+    "أنت تدير الفريق: الأشخاص والأدوار والملف وما تتم مشاركته. ويستطيع المالكون أيضًا نقل الملكية.",
+  "You work on everything day to day. Some changes are kept for admins, so they stay deliberate.":
+    "تعمل على كل شيء يومًا بيوم. بعض التغييرات مخصّصة للمسؤولين، لتبقى مدروسة.",
+
+  // What a role may do
+  "Approve what Q sends for you": "الموافقة على ما يرسله Q نيابةً عنك",
+  "Upload documents": "رفع المستندات",
+  "Edit the company profile": "تعديل ملف الشركة",
+  "Decide who sees each data room document":
+    "تحديد من يرى كل مستند في غرفة البيانات",
+  "Change the raise": "تغيير جولة التمويل",
+  "Edit the firm's profile": "تعديل ملف الشركة الاستثمارية",
+  "Change the mandate": "تغيير التفويض الاستثماري",
+  "Publish the gate's rules": "نشر قواعد البوابة",
+  "Invite people and change their roles": "دعوة الأشخاص وتغيير أدوارهم",
+  "Choose the plan and manage billing": "اختيار الخطة وإدارة الفوترة",
+  "See what everyone on the team has done": "رؤية ما قام به كل فرد في الفريق",
+  "Hand over ownership": "نقل الملكية",
+
+  // Why a control is held back
+  "Only admins and owners see the team's activity.":
+    "لا يرى نشاط الفريق إلا المسؤولون والمالكون.",
+  "Only admins can do this.": "هذا الإجراء للمسؤولين فقط.",
+  "Only owners can do this.": "هذا الإجراء للمالكين فقط.",
+  "Only admins can edit the company profile.":
+    "لا يعدّل ملف الشركة إلا المسؤولون.",
+  "Only admins can edit the firm's profile.":
+    "لا يعدّل ملف الشركة الاستثمارية إلا المسؤولون.",
+  "Only admins can change the mandate.":
+    "لا يغيّر التفويض الاستثماري إلا المسؤولون.",
+  "Only admins can publish the gate's rules.":
+    "لا ينشر قواعد البوابة إلا المسؤولون.",
+  "Only admins decide who sees each document.":
+    "المسؤولون وحدهم يحدّدون من يرى كل مستند.",
+  "Only admins can change the raise.": "لا يغيّر جولة التمويل إلا المسؤولون.",
+
+  // Settings → Activity
+  Activity: "النشاط",
+  "Open activity": "افتح النشاط",
+  "Who did what for the team, newest first, including what Q did with someone's approval.":
+    "من فعل ماذا للفريق، الأحدث أولًا، بما في ذلك ما فعله Q بموافقة أحدهم.",
+  "your team's activity": "نشاط فريقك",
+  "Who did what, newest first. Q appears under the approval of the person it acted for.":
+    "من فعل ماذا، الأحدث أولًا. يظهر Q تحت موافقة الشخص الذي تصرّف نيابةً عنه.",
+  "Who did what for {name}, newest first. Q appears under the approval of the person it acted for.":
+    "من فعل ماذا لـ {name}، الأحدث أولًا. يظهر Q تحت موافقة الشخص الذي تصرّف نيابةً عنه.",
+  "This is the accountability record. It never shows anyone's conversations with Q, what Q remembers for them, or their reminders.":
+    "هذا سجلّ المساءلة. لا يعرض أبدًا محادثات أي شخص مع Q، ولا ما يتذكّره Q له، ولا تذكيراته.",
+  "Filter activity": "تصفية النشاط",
+  Person: "الشخص",
+  Everyone: "الجميع",
+  Kind: "النوع",
+  Everything: "كل شيء",
+  From: "من",
+  To: "إلى",
+  to: "إلى",
+  "Try again": "حاول مرة أخرى",
+  "Nothing matches these filters.": "لا شيء يطابق عوامل التصفية هذه.",
+  "Clear filters": "مسح عوامل التصفية",
+  "Nothing has happened here yet. When anyone on the team acts, or Q acts with their approval, it shows here.":
+    "لم يحدث شيء هنا بعد. عندما يتصرّف أي فرد في الفريق، أو يتصرّف Q بموافقته، يظهر ذلك هنا.",
+  "They haven't done anything here yet.": "لم يقم بأي شيء هنا بعد.",
+  "That's everything.": "هذا كل شيء.",
+  "Loading…": "جارٍ التحميل…",
+  "Show more": "عرض المزيد",
+  "Set to": "عُيّن إلى",
+  Cleared: "مُسح",
+  "Didn't go through": "لم يتم",
+  "Not allowed": "غير مسموح",
+  "Activity couldn't load. Nothing changed; try again.":
+    "تعذّر تحميل النشاط. لم يتغيّر شيء؛ حاول مرة أخرى.",
+  "Those filters didn't make sense. Clear them and try again.":
+    "عوامل التصفية هذه غير منطقية. امسحها وحاول مرة أخرى.",
+  "Please sign in again to continue.": "يرجى تسجيل الدخول مرة أخرى للمتابعة.",
+  "Only admins and owners see this.": "لا يرى هذا إلا المسؤولون والمالكون.",
+  "Only admins and owners see this": "لا يرى هذا إلا المسؤولون والمالكون",
+  "This page shows what everyone on the team has done. Ask an admin if you need to know what changed.":
+    "تعرض هذه الصفحة ما قام به كل فرد في الفريق. اسأل مسؤولًا إن احتجت إلى معرفة ما تغيّر.",
+  "You're a {role}. This page shows what everyone on the team has done; ask an admin if you need to know what changed.":
+    "أنت {role}. تعرض هذه الصفحة ما قام به كل فرد في الفريق؛ اسأل مسؤولًا إن احتجت إلى معرفة ما تغيّر.",
+  "You're an {role}. This page shows what everyone on the team has done; ask an admin if you need to know what changed.":
+    "أنت {role}. تعرض هذه الصفحة ما قام به كل فرد في الفريق؛ اسأل مسؤولًا إن احتجت إلى معرفة ما تغيّر.",
+  "See your team": "اطّلع على فريقك",
+  "{what} couldn't load. Nothing changed; reload in a moment.":
+    "تعذّر تحميل {what}. لم يتغيّر شيء؛ أعد التحميل بعد لحظة.",
+  "This person": "هذا الشخص",
+
+  // When
+  "Just now": "الآن",
+  "just now": "الآن",
+  "1 minute ago": "قبل دقيقة",
+  "{n} minutes ago": "قبل {n} دقيقة",
+  "1 hour ago": "قبل ساعة",
+  "{n} hours ago": "قبل {n} ساعة",
+  Yesterday: "أمس",
+  yesterday: "أمس",
+
+  // Kinds of activity
+  Team: "الفريق",
+  "Company or firm details": "تفاصيل الشركة",
+  Profiles: "الملفات",
+  Relationships: "العلاقات",
+  Messages: "الرسائل",
+  Meetings: "الاجتماعات",
+  Documents: "المستندات",
+  Sharing: "المشاركة",
+  Raise: "جولة التمويل",
+  Mandate: "التفويض الاستثماري",
+  Videos: "الفيديوهات",
+  Verification: "التحقق",
+  Other: "أخرى",
+
+  // A member's page
+  "Team member": "عضو الفريق",
+  "a team member": "عضو في الفريق",
+  "That person isn't on your team.": "هذا الشخص ليس في فريقك.",
+  "Joined {date}": "انضم في {date}",
+  "Left {date}": "غادر في {date}",
+  "Removed {date}": "أُزيل في {date}",
+  "Since {date}": "منذ {date}",
+  "Not active yet": "لم ينشط بعد",
+  "Last active {when}": "آخر نشاط {when}",
+  "Last 30 days": "آخر 30 يومًا",
+  "{n} actions": "{n} إجراء",
+  "Nothing in the last 30 days.": "لا شيء خلال آخر 30 يومًا.",
+  "Relationships they worked on": "العلاقات التي عمل عليها",
+  "None yet.": "لا شيء بعد.",
+  "1 update": "تحديث واحد",
+  "{n} updates": "{n} تحديثات",
+  "1 note": "ملاحظة واحدة",
+  "{n} notes": "{n} ملاحظات",
+  "Role history": "سجل الأدوار",
+  "Invitations they sent": "الدعوات التي أرسلها",
+  "What they did": "ما قام به",
+  Waiting: "في الانتظار",
+  Expired: "منتهية",
+  Joined: "انضم",
+  Cancelled: "أُلغيت",
+  Declined: "رُفضت",
+
+  // Who acted (the feed's server words)
+  "Q, under {name}'s approval": "Q، بموافقة {name}",
+  "Q, under a person's approval": "Q، بموافقة أحد الأشخاص",
+  "A connected app": "تطبيق متصل",
+  "Someone outside your team": "شخص من خارج فريقك",
+
+  // What they did (the feed's server words)
+  "Accepted a proposed time": "قبل موعدًا مقترحًا",
+  "Accepted ownership": "قبل الملكية",
+  "Added a note to a relationship": "أضاف ملاحظة إلى علاقة",
+  "Added a note": "أضاف ملاحظة",
+  "Corrected a note": "صحّح ملاحظة",
+  "Moved a relationship on": "دفع علاقة إلى الأمام",
+  "Answered a request to connect": "ردّ على طلب تواصل",
+  "Asked for a document": "طلب مستندًا",
+  "Asked to connect": "طلب التواصل",
+  "Asked to join": "طلب الانضمام",
+  "Booked a meeting": "حجز اجتماعًا",
+  "Changed a relationship's stage": "غيّر مرحلة علاقة",
+  "Changed a teammate's role": "غيّر دور أحد أعضاء الفريق",
+  "Changed the mandate": "غيّر التفويض الاستثماري",
+  "Changed the raise": "غيّر جولة التمويل",
+  "Changed who can see the deck": "غيّر من يمكنه رؤية العرض التقديمي",
+  "Confirmed a commitment amount": "أكّد مبلغ التزام",
+  "Created the organisation": "أنشأ الجهة",
+  "Declined a request to join": "رفض طلب انضمام",
+  "Declined an invitation": "رفض دعوة",
+  "Declined ownership": "رفض الملكية",
+  "Expressed interest": "أبدى اهتمامًا",
+  "Invited someone to the team": "دعا شخصًا إلى الفريق",
+  "Joined by claiming the company": "انضم بالمطالبة بالشركة",
+  "Joined the team from an invitation": "انضم إلى الفريق بدعوة",
+  "Left the team": "غادر الفريق",
+  "Let someone in": "سمح لشخص بالانضمام",
+  "Moved a deal on": "دفع صفقة إلى الأمام",
+  "Moved a meeting": "نقل اجتماعًا",
+  "Offered ownership": "عرض الملكية",
+  "Recorded deal terms": "سجّل شروط الصفقة",
+  "Removed someone from the team": "أزال شخصًا من الفريق",
+  "Resent an invitation": "أعاد إرسال دعوة",
+  "Responded to interest": "ردّ على اهتمام",
+  "Scheduled a meeting": "حدّد موعد اجتماع",
+  "Sent a message": "أرسل رسالة",
+  "Sent an email": "أرسل بريدًا إلكترونيًا",
+  "Sent diligence questions": "أرسل أسئلة العناية الواجبة",
+  "Shared a document": "شارك مستندًا",
+  "Shared the raise": "شارك جولة التمويل",
+  "Stopped sharing the raise": "أوقف مشاركة جولة التمويل",
+  "Updated diligence": "حدّث العناية الواجبة",
+  "Updated the company profile": "حدّث ملف الشركة",
+  "Updated the organisation's details": "حدّث تفاصيل الجهة",
+  "Updated the pitch details": "حدّث تفاصيل العرض",
+  "Updated their profile": "حدّث ملفه",
+  "Verification was decided": "صدر قرار التحقق",
+  "Withdrew an invitation": "سحب دعوة",
+  "Withdrew someone's access": "سحب صلاحية وصول أحدهم",
+  "Changed the team": "غيّر الفريق",
+  "Changed the organisation": "غيّر الجهة",
+  "Changed a profile": "غيّر ملفًا",
+  "Worked on a relationship": "عمل على علاقة",
+  "Changed a meeting": "غيّر اجتماعًا",
+  "Changed a document": "غيّر مستندًا",
+  "Changed what is shared": "غيّر ما تتم مشاركته",
+  "Changed a video": "غيّر فيديو",
+  "Verification changed": "تغيّر التحقق",
+  "Made a change": "أجرى تغييرًا",
+
+  // What it was about, when nothing more may be shown
+  "a company": "شركة",
+  "an investor": "مستثمر",
+  "a relationship": "علاقة",
+  "a relationship note": "ملاحظة على علاقة",
+  "a document": "مستند",
+  "a raise": "جولة تمويل",
+  "a mandate": "تفويض استثماري",
+  "an application page": "صفحة طلب",
+  "a founder profile": "ملف مؤسس",
+  "a profile": "ملف",
+  "an invitation": "دعوة",
+  "a request to join": "طلب انضمام",
+  "an ownership offer": "عرض ملكية",
+  "the organisation": "الجهة",
+  "an approved action": "إجراء تمت الموافقة عليه",
+  "a video": "فيديو",
+  "a meeting": "اجتماع",
+  "a message": "رسالة",
+  "an item": "عنصر",
+
+  // Stages (before → after)
+  "Interest expressed": "تم إبداء الاهتمام",
+  Connected: "متصل",
+  "Meeting scheduled": "تم تحديد اجتماع",
+  Met: "تم اللقاء",
+  "In diligence": "قيد العناية الواجبة",
+  "Moving forward": "تتقدّم",
+  Paused: "متوقفة مؤقتًا",
+  Resumed: "استُؤنفت",
+  Passed: "تم التجاوز",
+  "Commitment stated": "تم إعلان الالتزام",
+  "Commitment confirmed": "تم تأكيد الالتزام",
+  "Commitment withdrawn": "تم سحب الالتزام",
+  "Terms recorded": "تم تسجيل الشروط",
+
+  // Design review
+  "Admin-only controls": "عناصر تحكم للمسؤولين فقط",
+  "Your gate": "بوابتك",
+};

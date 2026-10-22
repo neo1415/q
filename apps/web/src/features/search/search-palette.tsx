@@ -366,7 +366,9 @@ function Body({
                 entity:
                   result.card.subjectType === "COMPANY"
                     ? "company"
-                    : "investor",
+                    : result.card.subjectType === "PERSON"
+                      ? "person"
+                      : "investor",
                 where: "Found by handle",
                 line: result.card.descriptor,
               })
@@ -582,10 +584,14 @@ export function PaletteQCard({
         </span>
       </div>
       <div className="flex items-center gap-3.5">
-        <LogoTile
-          kind={card.subjectType === "COMPANY" ? "company" : "investor"}
-          name={card.name}
-        />
+        {card.subjectType === "PERSON" ? (
+          <EntityAvatar kind="person" name={card.name} size={40} decorative />
+        ) : (
+          <LogoTile
+            kind={card.subjectType === "COMPANY" ? "company" : "investor"}
+            name={card.name}
+          />
+        )}
         <div className="min-w-0">
           <b className="block text-xl font-semibold tracking-[-0.01em] text-(--cq-text-primary)">
             {card.name}

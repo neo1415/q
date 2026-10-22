@@ -20,14 +20,35 @@ export function buildVCard(card: {
   readonly cardUrl: string;
   readonly websiteUrl: string | null;
   readonly note: string | null;
+  /**
+   * A person's card (owner 2026-10-22): their organisation and title, when
+   * the card shows them publicly. Absent: an organisation's card.
+   */
+  readonly person?:
+    | {
+        readonly organisation: string | null;
+        readonly title: string | null;
+      }
+    | undefined;
 }): string {
+  const person = card.person;
   const lines = [
     "BEGIN:VCARD",
     "VERSION:3.0",
     `FN:${escapeVCardText(card.name)}`,
-    // An organisation's card: structured name empty, ORG carries it.
-    "N:;;;;",
-    `ORG:${escapeVCardText(card.name)}`,
+    ...(person === undefined
+      ? // An organisation's card: structured name empty, ORG carries it.
+        ["N:;;;;", `ORG:${escapeVCardText(card.name)}`]
+      : [
+          // A person's name as one family-name-free value: never guessed apart.
+          `N:;${escapeVCardText(card.name)};;;`,
+          ...(person.organisation === null
+            ? []
+            : [`ORG:${escapeVCardText(person.organisation)}`]),
+          ...(person.title === null
+            ? []
+            : [`TITLE:${escapeVCardText(person.title)}`]),
+        ]),
     `URL;TYPE=WORK:${card.cardUrl}`,
     ...(card.websiteUrl === null ? [] : [`URL:${card.websiteUrl}`]),
     ...(card.note === null ? [] : [`NOTE:${escapeVCardText(card.note)}`]),

@@ -73,7 +73,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
     id: "qa.what-is-q",
     side: "BOTH",
     question: "What is Q?",
-    paraphrases: ["what does q do", "who is q", "what are you exactly"],
+    paraphrases: ["what does q do", "who is q", "so what is q exactly"],
     answer:
       "I'm Q, the investment analyst inside Capital Q. I learn each investor's mandate and each business's story, assess companies on their evidence, match the two, answer questions and do the work you approve. I'm an analyst, not the source of truth, and the decisions stay with you.",
     sources: [`${PADL} Decision #9`, `${INVESTOR_TOUR} opening`],
@@ -567,7 +567,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
     question: "Are the pitch videos made with AI?",
     paraphrases: [
       "can founders use an ai avatar",
-      "is that a real founder in the video",
+      "is that a real person in the video",
       "how do i know a video is genuine",
       "are avatars allowed",
     ],
@@ -1009,8 +1009,8 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
       "which parts of the demo are real",
       "what works right now",
       "is this a mockup",
-      "what have you actually built",
-      "what is still to come",
+      "what have you actually built that works today",
+      "what is still in development",
     ],
     answer:
       "Each part of the product is marked in our certification record as live or not yet, and I describe it only that way. Recorded as live and verified on the product: matching, Discover, company profiles, diligence, documents, the CRM and pipeline, GateQ, my work for you and the Q Daily. Not yet certified: the spoken presentation, live video rehearsals and the full live-meeting journey. Illustrative moments in a story are illustrations, not product claims, and a rehearsal shown in a tour is a prepared exchange.",

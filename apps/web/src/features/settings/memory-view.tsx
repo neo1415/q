@@ -25,7 +25,7 @@ export function MemoryView({
   readonly t: (english: string) => string;
   readonly items: readonly QMemoryItemDto[] | null;
   readonly learning: QPreferenceLearningDto | null;
-  /** Design review only: see QMemoryList. */
+  /** Design review only (passed through to QMemoryList) */
   readonly review?:
     { readonly forgotten?: string; readonly correcting?: string } | undefined;
 }) {

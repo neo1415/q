@@ -151,16 +151,14 @@ describe("the company card's sections", () => {
     const raise = section(container, "raise");
     expect(within(raise).getByText("$1.5M")).toBeTruthy();
     expect(within(raise).getByText("Two new corridors.")).toBeTruthy();
-    expect(within(raise).getByText("Shown to Capital Q members")).toBeTruthy();
+    expect(within(raise).getByText("Members only")).toBeTruthy();
     expect(within(raise).getByText(/Seed round · SAFE/)).toBeTruthy();
     expect(
       within(section(container, "team")).getByText("Amina Otieno"),
     ).toBeTruthy();
     // The public numbers section carries no members marker.
     expect(
-      within(section(container, "numbers")).queryByText(
-        "Shown to Capital Q members",
-      ),
+      within(section(container, "numbers")).queryByText("Members only"),
     ).toBeNull();
   });
 
@@ -249,5 +247,72 @@ describe("number text", () => {
     expect(metricText({ ...base, amount: null })).toBe("Unknown");
     expect(metricText({ ...base, amount: "1234567" })).toBe("1,234,567");
     expect(metricText({ ...base, unit: "%", amount: "38.5" })).toBe("38.5%");
+  });
+});
+
+describe("a person's card (owner 2026-10-22)", () => {
+  const PERSON_FIELDS: readonly PublicCardField[] = [
+    {
+      key: "headline",
+      value: "Backing East African logistics",
+      scope: "public_external",
+    },
+    { key: "roleTitle", value: "Managing Partner", scope: "public_external" },
+    { key: "affiliation", value: "Savanna Ventures", scope: "public_external" },
+    { key: "countryCode", value: "KE", scope: "network_visible" },
+    {
+      key: "personFocus",
+      value: "Investment focus",
+      scope: "network_visible",
+      detail: {
+        kind: "FOCUS",
+        side: "INVESTOR",
+        organisationHandle: "savanna",
+        fields: [
+          { key: "mandateStages", value: "Seed; Series A" },
+          { key: "mandateLookFor", value: "Repeat founders" },
+        ],
+        raise: null,
+      },
+    },
+  ];
+
+  it("names the person, their role and organisation, and their own line", () => {
+    const { container } = render(
+      <PublicCardView card={card("PUBLIC", PERSON_FIELDS, "PERSON")} />,
+    );
+    expect(
+      screen.getByText("Managing Partner · Savanna Ventures"),
+    ).toBeTruthy();
+    expect(screen.getByText("Backing East African logistics")).toBeTruthy();
+    // No company sections on a person.
+    expect(container.querySelector('[data-card-section="numbers"]')).toBeNull();
+  });
+
+  it("keeps a members-only focus and country off the anonymous page", () => {
+    const { container } = render(
+      <PublicCardView card={card("PUBLIC", PERSON_FIELDS, "PERSON")} />,
+    );
+    const text = container.textContent;
+    expect(text).not.toContain("Repeat founders");
+    expect(text).not.toContain("Kenya");
+    expect(
+      within(section(container, "focus")).getByText("Not shared yet"),
+    ).toBeTruthy();
+  });
+
+  it("shows a participant the focus, said as the firm card's, with its link", () => {
+    const { container } = render(
+      <PublicCardView card={card("PARTICIPANT", PERSON_FIELDS, "PERSON")} />,
+    );
+    const focus = section(container, "focus");
+    expect(within(focus).getByText("Repeat founders")).toBeTruthy();
+    expect(within(focus).getByText("Series A")).toBeTruthy();
+    expect(
+      within(focus)
+        .getByRole("link", { name: "@savanna" })
+        .getAttribute("href"),
+    ).toBe("/@savanna");
+    expect(within(focus).getByText("Members only")).toBeTruthy();
   });
 });

@@ -3,6 +3,7 @@ import {
   COMPANY_CARD_FIELDS,
   INVESTOR_CARD_FIELDS,
   NETWORK_ONLY_CARD_FIELDS,
+  PERSON_CARD_FIELDS,
   QCardFieldScopesSchema,
   type PublicCardField,
   type QCardField,
@@ -27,11 +28,13 @@ export const CARD_FIELDS: Readonly<
 > = {
   COMPANY: COMPANY_CARD_FIELDS,
   INVESTOR_ORGANISATION: INVESTOR_CARD_FIELDS,
+  PERSON: PERSON_CARD_FIELDS,
 };
 
 export const NAME_FIELD: Readonly<Record<QCardSubjectType, QCardField>> = {
   COMPANY: "canonicalName",
   INVESTOR_ORGANISATION: "displayName",
+  PERSON: "displayName",
 };
 
 /**
@@ -73,6 +76,17 @@ export const DEFAULT_FIELD_SCOPES: Readonly<
     websiteUrl: "public_external",
     hqCountry: "network_visible",
     deploymentState: "network_visible",
+  },
+  // A person's card: who they are and where they work is identity-level;
+  // where they live and what they're after start with members.
+  PERSON: {
+    displayName: "public_external",
+    photo: "public_external",
+    headline: "public_external",
+    roleTitle: "public_external",
+    affiliation: "public_external",
+    countryCode: "network_visible",
+    personFocus: "network_visible",
   },
 };
 

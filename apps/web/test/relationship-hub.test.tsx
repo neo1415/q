@@ -5,10 +5,15 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Server pages stream several blocks; a loaded CI runner needs longer than
+// the 10s default to settle them. The assertions stay exactly the same.
+vi.setConfig({ testTimeout: 30_000 });
 
 import {
   HubNavigation,
@@ -147,7 +152,7 @@ async function show(page: ReactNode) {
     // So the page must also stop changing for three turns in a row.
     let last = "";
     let still = 0;
-    for (let turn = 0; turn < 200; turn += 1) {
+    for (let turn = 0; turn < 600; turn += 1) {
       await new Promise((resolve) => setTimeout(resolve, turn < 5 ? 0 : 10));
       const now = document.body.innerHTML;
       still = now === last ? still + 1 : 0;
@@ -325,11 +330,15 @@ describe("Hub foundation", () => {
       pipelineFit: [{ companyId, companyName: "Company", state: "CONNECTED" }],
     });
     await overview();
-    expect(
-      currentManifest()?.sections.find(
-        (section) => section.id === "hub-overview",
-      )?.refs,
-    ).toEqual([{ kind: "COMPANY", id: companyId }]);
+    await waitFor(
+      () =>
+        expect(
+          currentManifest()?.sections.find(
+            (section) => section.id === "hub-overview",
+          )?.refs,
+        ).toEqual([{ kind: "COMPANY", id: companyId }]),
+      { timeout: 15_000 },
+    );
     expect(
       manifestControls().some((entry) => entry.id === "list.relationships"),
     ).toBe(false);
@@ -741,7 +750,13 @@ describe("S2: the Pipeline is the one record list", () => {
         .getAttribute("aria-current"),
     ).toBe("page");
     expect(screen.queryByRole("link", { name: "Relationships" })).toBeNull();
-    const layouts = screen.getByRole("group", { name: "Layout" });
+    // The list streams in after the header; on a loaded runner it can take
+    // longer than show()'s bounded wait, so wait for the switch itself.
+    const layouts = await screen.findByRole(
+      "group",
+      { name: "Layout" },
+      { timeout: 15_000 },
+    );
     expect(
       within(layouts)
         .getByRole("link", { name: "List" })
@@ -753,7 +768,7 @@ describe("S2: the Pipeline is the one record list", () => {
     expect(
       manifestControls().some((entry) => entry.id === "tab.pipeline-list"),
     ).toBe(true);
-  });
+  }, 30_000);
 
   it("opens a bare /relationships on the Overview, never a redirect loop", async () => {
     // Owner 2026-10-16: the CRM's front page is the Overview.
