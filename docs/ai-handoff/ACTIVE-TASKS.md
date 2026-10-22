@@ -1,5 +1,24 @@
 # Active tasks — authoritative cross-model board
 
+## Q Story + speed lanes — 21 October 2026, 21:05 UTC (Claude coordinator)
+
+Coordinator session: session_01SxtUYQjYXwv8hH5D5RGfsK. Lanes are cloud sessions; each has its own branch and opens PRs into `speed/q-oct20`.
+
+| Lane                | Session                          | Branch                        | Now                                                                                                                                                                  |
+| ------------------- | -------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1 story engine     | session_016MSJisJMAnRkjdAef3eYoL | qstory/engine (draft PR #299) | Design fixes: Q on stage, auto-hide controls, caption band, spotlight dim, gold, CLS 0. Then claim-id ledger, upgrades, v5 tour removal, "What is Capital Q?" prompt |
+| S2 storyboard video | session_01DZ4GE33wHfkXUHDeuUjdXt | qstory/storyboard             | Re-capture in gold over real pages                                                                                                                                   |
+| S3 investor Q&A     | session_01JfbXUViBZ3etd1Jhpcgjvi | qstory/qa                     | Retrieval fixes (≥30/32 probes)                                                                                                                                      |
+| S4 presence figures | session_01Y6psHdTWPBjZmossscKbpP | qstory/presence-figures       | Re-capture evidence in gold                                                                                                                                          |
+| S5 voice render     | session_01BHC5RMofbNP6pwu5xDohKH | qstory/render                 | ElevenLabs render with timestamps, ≤$3                                                                                                                               |
+| S6 Q Card           | session_01DX8MTCQesT7f1gyAN5MKnT | qstory/qcard                  | Richer, permission-true, gold redesign                                                                                                                               |
+| Lane 4 latency      | session_01YWifU5JkN4FbUyx6ZPQFKC | speed/turn-latency-r3         | Provider cool-down for 402/401/403/quota                                                                                                                             |
+| Lane 7 navigation   | session_015LBWXZvgdqFsZ3GXd2qCir | speed/instant-nav-r1          | Done (#286, #292)                                                                                                                                                    |
+
+**Owner-facing storyboard (mock-up):** https://claude.ai/artifact/Nhfw5fcoVqQsAH4NdeNCZM
+
+**Next:** merge the S1–S6 PRs after review (look at frames and video), CI green on #267, the owner's live re-tests, then ask before build/int-rc or deploying.
+
 ## Discover A + Q home voice room — 20 October 2026, 06:45 UTC (Claude)
 
 Founder-directed redesign released by pushing `claude/friendly-feynman-q9haun` to `build/int-rc` and `recovery/2026-09-12` (41e31d18d, fast-forward from 692e7cfb1). Contents: Q home voice room (captions, public web source cards, room presence), Discover A desktop stage + dossier (Q's read with coverage bars, Ask Q over the dossier, interest sending/sent + toast, save/pass toasts with Undo and optional pass reason, no-pitch still, end of slate, 1-of-N), Discover A phone (no bottom buttons, swipe right = interest confirm, swipe left = pass, captions toggle), Escape now closes sheets. Dev harness `/dev/discover` (404 in production). No migrations, no contract breaks (pass `reason` optional, UNPASS uses existing path).

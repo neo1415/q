@@ -379,6 +379,7 @@ function fakeTavus(
       });
     },
     joinMeeting: () => Promise.reject(new Error("unused")),
+    createMeetingRoom: () => Promise.reject(new Error("unused")),
     findConversationsForPal: () => Promise.resolve([]),
     endConversation: (id) => {
       calls.ended.push({ key, id });

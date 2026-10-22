@@ -921,6 +921,18 @@ Next:
 - The founder picks options for the remaining pages (the gallery artifact is in the session).
 - Rotate the Railway and Supabase tokens pasted in chat, and add them as environment secrets.
 
+## 21 October 2026, 21:05 UTC — Claude coordinator (speed + Q Story)
+
+- **Integrated** 25+ lane PRs into `speed/q-oct20`, each reviewed against the docs and the owner's intent before merging. Several were sent back: the stage checklist became a single line, findings were restored to 3, red card tint removed, context navigation built, onboarding stages restored.
+- **Root cause found** for the "blue Q": test pages and evidence rendered without the default `black_gold` preset. Recorded as plan §0.
+- **Q Story:**
+  - the story is saved verbatim;
+  - the 56-beat plan, with emotional map, word-clock cues and a claim mapping;
+  - S1–S6 lanes are running;
+  - the owner storyboard artifact is published.
+- **Credentials:** the Supabase/Railway tokens supplied today work. Keep them as environment secrets; do not revoke them.
+- **Nothing deployed.** Owner OK is required for build/int-rc and deploy.
+
 ## 2026-10-21 (night) — Claude, Q Story S2 storyboard (`qstory/storyboard`, PR into `speed/q-oct20`)
 
 - **Built:** dev-only `/dev/q-story` (gated like `/dev/instant-nav`; classified in `apps/q-api/test/route-capability-parity.test.ts`; parity matrix regenerated). It replays the plan's beat table on a fixed clock with karaoke captions over the real dev-harness pages (fixtures only), with word-anchored cues, highlight ring, story-mode scrim, photo montage, chips (✕ → ✓ payoff) and Q's presence following the light.

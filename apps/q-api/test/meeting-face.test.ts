@@ -63,7 +63,7 @@ describe("the Tavus adapter, for a meeting face", () => {
       properties: {
         max_call_duration: 600,
         participant_left_timeout: 30,
-        participant_absent_timeout: 120,
+        participant_absent_timeout: 600,
       },
     });
   });
@@ -151,12 +151,19 @@ describe("the Tavus adapter, for a meeting face", () => {
 type Calls = {
   pals: Parameters<TavusClient["createPal"]>[0][];
   joins: Parameters<TavusClient["joinMeeting"]>[0][];
+  rooms: Parameters<TavusClient["createMeetingRoom"]>[0][];
   ended: string[];
   deleted: string[];
 };
 
 function fakeClient(options: { failJoin?: boolean } = {}) {
-  const calls: Calls = { pals: [], joins: [], ended: [], deleted: [] };
+  const calls: Calls = {
+    pals: [],
+    joins: [],
+    rooms: [],
+    ended: [],
+    deleted: [],
+  };
   const unused = () => Promise.reject(new Error("unused"));
   const client: TavusClient = {
     createPal: (input) => {
@@ -177,6 +184,15 @@ function fakeClient(options: { failJoin?: boolean } = {}) {
         conversationId: "conv1",
         conversationUrl: null,
         status: "active",
+      });
+    },
+    createMeetingRoom: (input) => {
+      calls.rooms.push(input);
+      return Promise.resolve({
+        conversationId: "room1",
+        conversationUrl: "https://tavus.daily.co/room1",
+        status: "active",
+        meetingToken: "room-token-1",
       });
     },
     findConversationsForPal: () => Promise.resolve([]),
@@ -204,7 +220,10 @@ type Row = {
 };
 
 /** Mirrors the table: one row per meeting; the ledger may refuse the insert. */
-function memoryStore(refuse: string | null = null) {
+function memoryStore(
+  refuse: string | null = null,
+  startsAt: Date | null = null,
+) {
   const rows = new Map<string, Row>();
   let claims = 0;
   const store: MeetingFaceStore = {
@@ -217,6 +236,7 @@ function memoryStore(refuse: string | null = null) {
               meetLink: MEET,
               organiserName: "Zino Okafor",
               purpose: "TensorGate's seed round",
+              startsAt,
             }
           : null,
       ),
@@ -274,10 +294,12 @@ function setup(
     enabled?: boolean;
     /** null: the production default. */
     expectGraceMs?: number | null;
+    mode?: "MEET" | "CAMERA";
+    startsAt?: Date | null;
   } = {},
 ) {
   const { client, calls } = fakeClient({ failJoin: options.failJoin ?? false });
-  const memory = memoryStore(options.refuse ?? null);
+  const memory = memoryStore(options.refuse ?? null, options.startsAt ?? null);
   let bearer = "";
   const face = createMeetingFace({
     enabled: options.enabled ?? true,
@@ -294,6 +316,7 @@ function setup(
     bridgePath: (id) => `/v1/q/meetings/face/bridge/${id}`,
     store: memory.store,
     answerWaitMs: 50,
+    ...(options.mode === undefined ? {} : { mode: options.mode }),
     ...(options.expectGraceMs === null
       ? {}
       : { expectGraceMs: options.expectGraceMs ?? 30 }),
@@ -653,5 +676,57 @@ describe("2026-10-21 live meeting: the face introduces itself and answers in the
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("owner decision 2026-10-21: one Q in the call (CAMERA), and a face sent at the call's time", () => {
+  it("CAMERA: the face gets a private room for the note-taker's page, no Meet identity, and its room only while live", async () => {
+    const { face, calls } = setup({ mode: "CAMERA" });
+    expect(face.room(MEETING)).toBeNull();
+    face.start(MEETING);
+    await face.settled(MEETING);
+    expect(calls.joins).toEqual([]);
+    expect(calls.pals[0]?.conferencing).toBeUndefined();
+    expect(calls.rooms[0]).toMatchObject({
+      faceId: FACE,
+      name: "Capital Q",
+      maxCallSeconds: 600,
+    });
+    expect(calls.rooms[0]?.greeting).toMatch(/^Zino booked this call/u);
+    expect(face.live(MEETING)).toBe(true);
+    expect(face.room(MEETING)).toEqual({
+      url: "https://tavus.daily.co/room1",
+      token: "room-token-1",
+    });
+    face.end(MEETING, "CALL_ENDED");
+    expect(face.room(MEETING)).toBeNull();
+    await vi.waitFor(() => expect(calls.ended).toEqual(["room1"]));
+  });
+
+  it("waits until a minute before the start, without holding Q's voice, and goes at once when started again", async () => {
+    const { face, calls } = setup({
+      startsAt: new Date(Date.now() + 10 * 60_000),
+    });
+    face.start(MEETING);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(calls.pals).toEqual([]);
+    // Not "being sent": Q's own voice does not wait for it.
+    expect(face.starting?.(MEETING)).toBe(false);
+    face.start(MEETING);
+    await face.settled(MEETING);
+    expect(calls.joins).toHaveLength(1);
+    expect(face.live(MEETING)).toBe(true);
+  });
+
+  it("is never sent when the call ends while it waits for the start", async () => {
+    const { face, calls, memory } = setup({
+      startsAt: new Date(Date.now() + 10 * 60_000),
+    });
+    face.start(MEETING);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    face.end(MEETING, "CALL_ENDED");
+    await face.settled(MEETING);
+    expect(calls.pals).toEqual([]);
+    expect(memory.claims()).toBe(0);
   });
 });
