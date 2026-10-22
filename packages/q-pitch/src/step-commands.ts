@@ -90,13 +90,13 @@ const STEPWORD =
   "(?:steps?|etapes?|etape|pasos?|passos?|etapas?|schritte?|schritt|passi|passo|hatua)";
 
 const NEXT =
-  /^(?:next|next step|skip|skip this|skip that|suivant|suivante|etape suivante|passe|passer|siguiente|siguiente paso|saltar|proximo|proxima|proximo passo|pular|weiter|nachster schritt|nachste|uberspringen|avanti|prossimo|salta|ijayo|endelea mbele|ruka)$/u;
+  /^(?:next|next one|next step|skip|skip this|skip that|suivant|suivante|etape suivante|passe|passer|siguiente|siguiente paso|saltar|proximo|proxima|proximo passo|pular|weiter|nachster schritt|nachste|uberspringen|avanti|prossimo|salta|ijayo|endelea mbele|ruka)$/u;
 const PAUSE =
-  /^(?:pause|stop|hold on|wait|pause the tour|stop the tour|attends|attendez|arrete|pausa|para|espera|halt|warte|anhalten|aspetta|ferma|subiri|simama)$/u;
+  /^(?:pause|stop|stop talking|hold on|hold on a second|hold on a sec|wait|wait a second|wait a moment|one moment|pause the tour|stop the tour|attends|attendez|arrete|pausa|para|espera|halt|warte|anhalten|aspetta|ferma|subiri|simama)$/u;
 const RESUME =
   /^(?:resume|continue|carry on|go on|keep going|resume the tour|reprends|reprendre|continuer|continua|continuar|sigue|seguir|weiter machen|fortsetzen|riprendi|continuare|endelea)$/u;
 const BACK_ONE =
-  /^(?:go back|back|previous|previous step|rewind|retour|reviens|precedent|precedente|atras|volver|anterior|voltar|zuruck|vorherige|indietro|precedente|rudi|nyuma)$/u;
+  /^(?:go back|back|i want to go back|take me back|previous|previous step|rewind|retour|reviens|precedent|precedente|atras|volver|anterior|voltar|zuruck|vorherige|indietro|precedente|rudi|nyuma)$/u;
 
 const BACK_N = new RegExp(
   `^(?:go back|back|rewind|recule|reviens|retour|retrocede|vuelve|atras|volta|voltar|zuruck|geh zuruck|torna indietro|indietro|rudi nyuma|rudi)\\s+(?:by\\s+|de\\s+|um\\s+|di\\s+)?(?:${STEPWORD}\\s+)?(\\S+)(?:\\s+${STEPWORD})?(?:\\s+(?:back|en arriere|atras|zuruck|indietro|nyuma))?$`,

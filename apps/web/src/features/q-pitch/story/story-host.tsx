@@ -714,6 +714,9 @@ function StoryOverlay({
           acts, docked beside the page on product beats. Lane S4's
           particles form the cued figures at the larger size. */}
       <div
+        // Centre and docked are two placements, never one box resized
+        // (a resize is a layout shift): each is its own element.
+        key={docked === null ? "centre" : "docked"}
         className="cq-story-presence"
         data-docked={docked === null ? undefined : ""}
         data-surface={woke ? "page" : "stage"}
@@ -753,14 +756,20 @@ function StoryOverlay({
           </span>
         </p>
       ) : null}
-      <p className="cq-story-standing">
-        {[
+      {(() => {
+        const standing = [
           rehearsal ? "Internal rehearsal" : null,
           demonstrationBeat(beat.n) ? DEMONSTRATION_LABEL : null,
         ]
           .filter((part) => part !== null)
-          .join(" · ")}
-      </p>
+          .join(" · ");
+        // Keyed by its words: a new label is a new element (CLS 0).
+        return (
+          <p key={standing} className="cq-story-standing">
+            {standing}
+          </p>
+        );
+      })()}
       {answer !== null ? (
         <div className="cq-story-answer" role="status">
           <p className="cq-story-kicker">{answer.question}</p>
