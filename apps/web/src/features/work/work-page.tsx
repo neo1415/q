@@ -50,7 +50,7 @@ import { groupNotices, summarisesCards } from "./notice-groups";
 import { readPlan } from "./plan-words";
 import { usePrepared } from "./use-prepared";
 import { WorkCostDays } from "./work-cost-days";
-import { needRows, WorkInbox } from "./work-inbox";
+import { needRows, WorkInbox, type InboxRowKind } from "./work-inbox";
 import { workButton, WorkSwitch, type WorkView } from "./work-kit";
 import { WorkPlanView } from "./work-plan-view";
 import type { WorkforceView } from "./workforce-actions";
@@ -97,6 +97,8 @@ type Props = {
   readonly initialView?: WorkView | undefined;
   /** False: never read the team again (the design review page). */
   readonly liveReads?: boolean | undefined;
+  /** The kind of row whose preview shows first (the design review page). */
+  readonly initialKind?: InboxRowKind | undefined;
 };
 
 /** Each view's option: its primary buttons and dark tiles. */
@@ -124,6 +126,7 @@ function WorkPageBody({
   workforce,
   initialView,
   liveReads = true,
+  initialKind,
 }: Props) {
   const t = useT();
 
@@ -230,6 +233,7 @@ function WorkPageBody({
           done={done}
           now={now}
           onDecided={decided}
+          initialKind={initialKind}
         />
       ) : null}
       {hasTeam && view === "team" ? (

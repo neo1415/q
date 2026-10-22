@@ -352,3 +352,13 @@ function memoryTeamStore(db: MemoryTeamDb): TeamStore<MemoryTeamDb> {
       ),
   };
 }
+
+export {
+  likeMatches,
+  MemoryOrganisationAdminDb,
+  type MemoryAdminMembership,
+  type MemoryAuditRow,
+  type MemoryRelationship,
+  type MemoryRelationshipEvent,
+  type MemoryRelationshipNote,
+} from "./memory-organisation-admin-store.js";

@@ -74,16 +74,48 @@ export function memoryOrigin(item: QMemoryItemDto): string {
 
 export function QMemoryList({
   items,
+  review,
 }: {
   readonly items: readonly QMemoryItemDto[];
+  /**
+   * Design review only (/dev/account-review): one memory just forgotten
+   * (its Undo showing, nothing sent), or one with its correct sheet open.
+   */
+  readonly review?:
+    { readonly forgotten?: string; readonly correcting?: string } | undefined;
 }) {
   const t = useT();
   const toast = useAccountToast();
   const router = useRouter();
   // Hidden now; the forget is sent when its Undo window closes.
-  const [leaving, setLeaving] = useState<ReadonlySet<string>>(new Set());
-  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
-  const [correcting, setCorrecting] = useState<QMemoryItemDto | null>(null);
+  const [leaving, setLeaving] = useState<ReadonlySet<string>>(
+    () => new Set(review?.forgotten === undefined ? [] : [review.forgotten]),
+  );
+  const [gone, setGone] = useState<ReadonlySet<string>>(
+    () => new Set(review?.forgotten === undefined ? [] : [review.forgotten]),
+  );
+  const [correcting, setCorrecting] = useState<QMemoryItemDto | null>(
+    () =>
+      items.find((item) => item.memoryItemId === review?.correcting) ?? null,
+  );
+  // Design review: the forgotten memory's Undo, shown once and kept up.
+  const reviewForgotten = review?.forgotten;
+  const reviewShown = useRef(false);
+  useEffect(() => {
+    if (reviewForgotten === undefined || reviewShown.current) return;
+    reviewShown.current = true;
+    toast({
+      text: t("Forgotten. Q won’t use it again."),
+      action: {
+        label: t("Undo"),
+        run: () => {
+          setGone((current) => without(current, reviewForgotten));
+          setLeaving((current) => without(current, reviewForgotten));
+        },
+      },
+      stay: true,
+    });
+  }, [reviewForgotten, t, toast]);
   // Timers waiting to send a forget, by memory id (a stable Map, not state
   // that renders).
   const [pending] = useState(

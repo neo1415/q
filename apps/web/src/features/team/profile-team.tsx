@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { getTeam } from "@capital-q/api-client";
+import type { TeamDto } from "@capital-q/contracts";
 import { Avatar } from "@capital-q/ui/avatar";
 
 import { ProfileSectionShell } from "@/features/profile/editable-section";
@@ -15,11 +16,17 @@ import { serverT } from "@/features/i18n/server";
  * one line, and the way to Settings → Team. Read under the person's own
  * session; a read that fails shows nothing rather than a wrong team.
  */
-export async function ProfileTeamSection() {
+export async function ProfileTeamSection({
+  given,
+}: {
+  /** Design review only (/dev/account-review): the team, given. */
+  readonly given?: TeamDto | undefined;
+} = {}) {
   const t = await serverT();
-  const session = await apiSession();
+  const session = given === undefined ? await apiSession() : null;
   const team =
-    session === null ? null : await getTeam(session).catch(() => null);
+    given ??
+    (session === null ? null : await getTeam(session).catch(() => null));
   if (team === null) return null;
   const words = teamWords(team.organisation.kind);
   const solo = team.members.length <= 1;

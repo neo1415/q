@@ -74,13 +74,16 @@ export function FounderApplications({
   state,
   applications,
   limited = false,
+  demoOpen,
 }: {
   readonly state: "full" | "loading" | "empty" | "error" | "limited";
   readonly applications: readonly FounderApplicationDto[];
   readonly limited?: boolean;
+  /** Design review only (/dev/gateq-review): this application's sheet open. */
+  readonly demoOpen?: string | undefined;
 }) {
   const t = useT();
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(demoOpen ?? null);
 
   if (state === "loading") {
     return (
