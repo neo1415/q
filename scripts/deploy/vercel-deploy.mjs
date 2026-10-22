@@ -214,6 +214,9 @@ const files = listed.stdout
   .split("\0")
   .filter(Boolean)
   .filter((file) => !EXCLUDED_PREFIXES.some((p) => file.startsWith(p)))
+  // Test suites are never part of a build; leaving them out keeps the
+  // upload under Vercel's file rate limit.
+  .filter((file) => !/(^|\/)test\//u.test(file))
   // Secrets never leave the machine, tracked or not.
   .filter((file) => {
     const base = file.split("/").pop() ?? "";
@@ -251,8 +254,10 @@ log("1. project");
 const projectSettings = {
   framework: "nextjs",
   rootDirectory: "apps/web",
-  nodeVersion: "24.x",
 };
+// Creating a project does not accept nodeVersion; it is set by the update
+// that follows, on new and existing projects alike.
+const runtimeSettings = { nodeVersion: "24.x" };
 const found = await vercel(
   "GET",
   `/v9/projects/${encodeURIComponent(options.project)}`,
@@ -266,11 +271,12 @@ if (dry || found.status === 404) {
     body: { name: options.project, ...projectSettings },
   });
   projectId = created.json?.id ?? options.project;
-} else {
-  await vercel("PATCH", `/v9/projects/${encodeURIComponent(projectId)}`, {
-    body: projectSettings,
-  });
 }
+await vercel(
+  "PATCH",
+  `/v9/projects/${encodeURIComponent(projectId ?? options.project)}`,
+  { body: { ...projectSettings, ...runtimeSettings } },
+);
 
 log("\n2. environment (production + preview, encrypted)");
 log(`  from ${envFile}:`);
@@ -315,19 +321,32 @@ if (!dry && deployment.status === 400) {
     for (let f = queue.shift(); f !== undefined; f = queue.shift()) {
       const url = new URL("/v2/files", API);
       if (options.team) url.searchParams.set("teamId", options.team);
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/octet-stream",
-          "x-vercel-digest": f.sha,
-        },
-        body: f.data,
-      });
-      if (!response.ok) fail(`upload of ${f.file} → ${response.status}`);
+      // Vercel rate-limits file uploads (429): wait as told, or back off,
+      // and retry the same file; a 5xx is retried the same way.
+      let response;
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        response = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/octet-stream",
+            "x-vercel-digest": f.sha,
+          },
+          body: f.data,
+        });
+        if (response.ok || (response.status !== 429 && response.status < 500))
+          break;
+        const after = Number(response.headers.get("retry-after"));
+        const wait =
+          Number.isFinite(after) && after > 0
+            ? after * 1000
+            : Math.min(60_000, 2000 * 2 ** attempt);
+        await new Promise((resolve) => setTimeout(resolve, wait));
+      }
+      if (!response?.ok) fail(`upload of ${f.file} → ${response?.status}`);
     }
   };
-  await Promise.all(Array.from({ length: 8 }, worker));
+  await Promise.all(Array.from({ length: 4 }, worker));
   deployment = await vercel(
     "POST",
     "/v13/deployments?skipAutoDetectionConfirmation=1",
