@@ -51,10 +51,10 @@ function fakeProvider(
       configuration: OPENAI_TE3_SMALL_1024_CONFIGURATION,
       endpoint: null,
     }),
-    embedDocuments: async ({ inputs }) => {
+    embedDocuments: ({ inputs }) => {
       calls.count += 1;
       const v = vector();
-      return {
+      return Promise.resolve({
         batchSize: inputs.length,
         latencyMs: 1,
         embeddings: inputs.map(() => ({
@@ -69,7 +69,7 @@ function fakeProvider(
           inputCharacters: 1,
           latencyMs: 1,
         })),
-      };
+      });
     },
     embedQuery: () => Promise.reject(new Error("not used")),
     health: () => Promise.reject(new Error("not used")),
