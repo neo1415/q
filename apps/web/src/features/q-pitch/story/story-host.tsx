@@ -151,6 +151,7 @@ export function StoryHost({
   role,
   onExit,
   harness,
+  voice,
 }: {
   readonly account: string;
   readonly role: "INVESTOR" | "FOUNDER";
@@ -160,6 +161,8 @@ export function StoryHost({
    * story over the dev review pages' fictional data, with no account.
    */
   readonly harness?: { readonly pathFor: StoryPathFor } | undefined;
+  /** A rendered voice set other than Q's own (the harness's `?voice=`). */
+  readonly voice?: string | undefined;
 }) {
   const router = useRouter();
   const pathFor = harness?.pathFor ?? storyPath;
@@ -201,13 +204,14 @@ export function StoryHost({
     void preloadStory({
       prefetch: (path) => router.prefetch(path),
       pathFor,
+      ...(voice === undefined ? {} : { voice }),
       onProgress: setProgress,
       signal: controller.signal,
     }).then((loaded) => {
       if (!controller.signal.aborted) setAssets(loaded);
     });
     return () => controller.abort();
-  }, [actor, router, pathFor]);
+  }, [actor, router, pathFor, voice]);
 
   const [player, setPlayer] = useState<StoryPlayer | null>(null);
   // Cancels a voice line still opening when the story is left (audit).

@@ -98,7 +98,8 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
 }
 
 .cq-story-type {
-  font-family: var(--cq-font-editorial);
+  font-family: var(--cq-font-ui);
+  font-weight: 600;
   font-size: clamp(2rem, 6vw, 4.5rem);
   line-height: 1.05;
   letter-spacing: -0.02em;
@@ -112,7 +113,8 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   animation: none;
 }
 .cq-story-wordmark {
-  font-family: var(--cq-font-editorial);
+  font-family: var(--cq-font-ui);
+  font-weight: 600;
   font-size: clamp(2.5rem, 8vw, 5.5rem);
   letter-spacing: -0.03em;
   animation: cq-story-in var(--cq-motion-slow) var(--cq-ease) both;
@@ -584,7 +586,8 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   list-style: none;
   margin: 0;
   padding: 0;
-  font-family: var(--cq-font-editorial);
+  font-family: var(--cq-font-ui);
+  font-weight: 600;
   font-size: clamp(1.5rem, 4.5vw, 3rem);
 }
 .cq-story-fade li {
