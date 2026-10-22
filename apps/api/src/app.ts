@@ -180,6 +180,7 @@ import type {
   TeamService,
 } from "@capital-q/organisations";
 import { registerOrganisationAdminRoutes } from "./http/organisation-admin.js";
+import type { ScreenActionAudit } from "./http/app-action-audit.js";
 // end P5 block
 // BILLING block (ADR 0034)
 import {
@@ -301,6 +302,8 @@ export type ApiModules = {
   readonly team?: TeamService | undefined;
   /** Owner/admin backend: capabilities, activity feed, member summaries. */
   readonly organisationAdmin?: OrganisationAdminService | undefined;
+  /** Accountability for a person's consequential screen actions. */
+  readonly screenActionAudit?: ScreenActionAudit | undefined;
   // ADMIN block (ADR 0033)
   readonly adminFreshTokens?: AdminRoutesDependencies["freshTokens"];
   readonly adminVerificationDecider?: AdminRoutesDependencies["decideVerification"];
@@ -643,6 +646,7 @@ export function createApp(
     resolver: security.resolver,
     // The video provider's failures, as the pitch routes always answered.
     problemOf: mediaProviderProblem,
+    audit: modules.screenActionAudit,
     ports: {
       ...(modules.media === undefined ? {} : { media: modules.media }),
       ...(modules.companies === undefined

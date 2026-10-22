@@ -48,6 +48,17 @@ export const PRIVATE_ACTION_PATTERNS: readonly string[] = [
   "billing.%",
   "etiquette\\_guide.%",
   "platform.%",
+  // A person's own settings, connections, onboarding answers and Q memory.
+  "memory.%",
+  "app.memory.%",
+  "integrations.%",
+  "app.integrations.%",
+  "settings.%",
+  "app.settings.%",
+  "onboarding.%",
+  "app.onboarding.%",
+  "app.set\\_my\\_speaking\\_guide",
+  "app.remove\\_my\\_speaking\\_guide",
 ];
 
 type KindRule = { readonly prefix: string; readonly kind: ActivityKind };
@@ -240,19 +251,39 @@ const KNOWN: Readonly<Record<string, Known>> = {
   },
   "crm.company_note.add": {
     code: "relationship.note.add",
-    words: "Added a note to a relationship",
+    words: "Added a note",
   },
   "crm.investor_note.add": {
     code: "relationship.note.add",
-    words: "Added a note to a relationship",
+    words: "Added a note",
   },
   "relationship.note.add": {
     code: "relationship.note.add",
-    words: "Added a note to a relationship",
+    words: "Added a note",
+  },
+  "relationship.note.correct": {
+    code: "relationship.note.correct",
+    words: "Corrected a note",
   },
   "relationship.stage.change": {
     code: "relationship.stage.change",
-    words: "Changed a relationship's stage",
+    words: "Moved a relationship on",
+  },
+  "relationship.event.message_sent": {
+    code: "message.send",
+    words: "Sent a message",
+  },
+  "relationship.event.document_shared": {
+    code: "document.share",
+    words: "Shared a document",
+  },
+  "relationship.event.document_requested": {
+    code: "diligence.change",
+    words: "Asked for a document",
+  },
+  "relationship.event.meeting_rescheduled": {
+    code: "meeting.reschedule",
+    words: "Moved a meeting",
   },
   "message.send": { code: "message.send", words: "Sent a message" },
   "email.send": { code: "email.send", words: "Sent an email" },
@@ -410,20 +441,45 @@ export function genericLabel(resourceType: string): string {
   return GENERIC_LABELS[resourceType] ?? "an item";
 }
 
-/** Opaque keyset cursor over (occurred_at desc, internal key desc). */
-export type ActivityCursor = { readonly at: string; readonly key: string };
+/** Where a feed row comes from; part of the keyset so ties never shift. */
+export type ActivitySource = "a" | "e" | "n";
+
+/**
+ * Opaque keyset cursor over (occurred_at desc, source desc, key desc), the
+ * order of the whole union (audit, relationship events, notes). An audit
+ * key is its storage id zero-padded to 20 digits; the others are uuids.
+ */
+export type ActivityCursor = {
+  readonly at: string;
+  readonly source: ActivitySource;
+  readonly key: string;
+};
+
+const KEY_FORMAT =
+  /^(?:[0-9]{20}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 export function encodeActivityCursor(cursor: ActivityCursor): string {
-  return Buffer.from(`${cursor.at}|${cursor.key}`, "utf8").toString(
-    "base64url",
-  );
+  return Buffer.from(
+    `${cursor.at}|${cursor.source}|${cursor.key}`,
+    "utf8",
+  ).toString("base64url");
 }
 
 export function decodeActivityCursor(value: string): ActivityCursor | null {
   if (value.length === 0 || value.length > 200) return null;
   const text = Buffer.from(value, "base64url").toString("utf8");
-  const [at, key, extra] = text.split("|");
-  if (at === undefined || key === undefined || extra !== undefined) return null;
-  if (Number.isNaN(Date.parse(at)) || !/^[0-9]{1,19}$/.test(key)) return null;
-  return { at, key };
+  const [at, source, key, extra] = text.split("|");
+  if (
+    at === undefined ||
+    source === undefined ||
+    key === undefined ||
+    extra !== undefined
+  )
+    return null;
+  if (source !== "a" && source !== "e" && source !== "n") return null;
+  if (Number.isNaN(Date.parse(at)) || !KEY_FORMAT.test(key)) return null;
+  return { at, source, key };
 }
+
+/** Relationship event types that are stage moves (the feed's stage source). */
+export const STAGE_EVENT_TYPES: readonly string[] = Object.keys(STAGE_WORDS);

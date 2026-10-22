@@ -21,15 +21,17 @@ import {
  * client grants and stays that way. Every statement is bounded by the
  * organisation (and tenant) the service passed from the actor context.
  *
- * The feed's effective action type is, for a Q-executed action, the action
- * Q carried out (metadata.actionType, format-checked); privacy filters and
- * kind filters apply to it in SQL, so a page never shrinks after the fetch
- * and the keyset cursor stays stable.
+ * The feed is one ordered union (feedRows). Its effective action type is,
+ * for a Q-executed action, the action Q carried out (metadata.actionType,
+ * format-checked); privacy and kind filters apply to it in SQL, so a page
+ * never shrinks after the fetch, and the keyset (at, source, key) is total
+ * across the union, so the cursor stays stable.
  */
 
 const ACTION_FORMAT = "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$";
 
 const ActivityRow = z.object({
+  source: z.enum(["a", "e", "n"]),
   key: z.string(),
   event_id: z.string(),
   occurred_at: z.string(),
@@ -43,7 +45,105 @@ const ActivityRow = z.object({
   outcome: z.enum(["SUCCEEDED", "FAILED", "DENIED"]),
   role_from: z.string().nullable(),
   role_to: z.string().nullable(),
+  stage_from: z.string().nullable(),
+  stage_to: z.string().nullable(),
 });
+
+type FeedScope = {
+  readonly tenantId: string;
+  readonly organisationId: string;
+  readonly qExecutedTypes: readonly string[];
+  readonly stageEventTypes: readonly string[];
+};
+
+/**
+ * Every feed row of one organisation, from three sources, as one relation
+ * (a fragment: the caller adds its filters, order and limit):
+ *
+ *   a  audit.material_actions of this organisation. A person's audit row
+ *      that a relationship event of the same act (same correlation, same
+ *      person) already shows is left to the event, which carries the stage;
+ *      a screen action's `app.*` row is left to its service's own audit row
+ *      when there is one (same correlation), so one act is one line.
+ *   e  relationship events a person of THIS organisation acted in, on a
+ *      relationship this organisation is a party to; never personal_private
+ *      (what someone privately discovered stays theirs). A stage move
+ *      carries the previous stage move on the same relationship.
+ *   n  this organisation's own notes on its side of a relationship; a note
+ *      that supersedes another is a correction.
+ */
+function feedRows(sql: DatabaseExecutor, scope: FeedScope) {
+  return sql`
+    select 'a'::text as source, lpad(a.id::text, 20, '0') as key,
+           a.event_id::text as event_id, a.occurred_at, a.actor_type,
+           a.actor_id::text as actor_id,
+           a.authority_user_id::text as authority_user_id, a.action_type,
+           case
+             when a.action_type = any(${[...scope.qExecutedTypes]}::text[])
+              and a.metadata->>'actionType' ~ ${ACTION_FORMAT}
+             then a.metadata->>'actionType'
+             else a.action_type
+           end as effective_type,
+           a.resource_type, a.resource_id, a.outcome,
+           case when a.action_type = 'team.membership.role_changed'
+                then a.metadata->>'from' end as role_from,
+           case when a.action_type = 'team.membership.role_changed'
+                then a.metadata->>'to' end as role_to,
+           null::text as stage_from, null::text as stage_to
+      from audit.material_actions a
+     where a.organisation_id = ${scope.organisationId}
+       and a.tenant_id = ${scope.tenantId}
+       and not (a.actor_type = 'human' and a.correlation_id is not null and exists (
+             select 1 from network.relationship_events e2
+              where e2.correlation_id = 'cor_' || a.correlation_id::text
+                and e2.actor_type = 'HUMAN'
+                and e2.actor_id = a.actor_id
+                and e2.visibility_scope <> 'personal_private'))
+       and not (a.actor_type = 'human' and a.action_type like 'app.%'
+                and a.correlation_id is not null and exists (
+             select 1 from audit.material_actions a2
+              where a2.correlation_id = a.correlation_id
+                and a2.organisation_id = a.organisation_id
+                and a2.id <> a.id
+                and a2.action_type not like 'app.%'))
+    union all
+    select 'e', e.id::text, e.id::text, e.occurred_at, 'human',
+           e.actor_id::text, e.actor_id::text, 'relationship.event',
+           case when e.event_type = any(${[...scope.stageEventTypes]}::text[])
+                then 'relationship.stage.change'
+                else 'relationship.event.' || e.event_type end,
+           'relationship', e.relationship_id::text, 'SUCCEEDED', null, null,
+           case when e.event_type = any(${[...scope.stageEventTypes]}::text[]) then (
+             select p.event_type from network.relationship_events p
+              where p.relationship_id = e.relationship_id
+                and p.sequence < e.sequence
+                and p.event_type = any(${[...scope.stageEventTypes]}::text[])
+                and p.visibility_scope <> 'personal_private'
+              order by p.sequence desc limit 1) end,
+           case when e.event_type = any(${[...scope.stageEventTypes]}::text[])
+                then e.event_type end
+      from network.relationship_events e
+      join network.relationships r on r.id = e.relationship_id
+      join core.companies c on c.id = r.company_id
+      join core.investor_organisations io on io.id = r.investor_organisation_id
+     where e.actor_type = 'HUMAN'
+       and e.visibility_scope <> 'personal_private'
+       and ((c.organisation_id = ${scope.organisationId} and c.tenant_id = ${scope.tenantId})
+            or io.organisation_id = ${scope.organisationId})
+       and exists (
+             select 1 from identity.organisation_memberships m
+              where m.organisation_id = ${scope.organisationId}
+                and m.user_id = e.actor_id)
+    union all
+    select 'n', n.id::text, n.id::text, n.created_at, 'human',
+           n.author_user_id::text, n.author_user_id::text, 'relationship.note',
+           case when n.supersedes_note_id is null
+                then 'relationship.note.add' else 'relationship.note.correct' end,
+           'relationship_note', n.id::text, 'SUCCEEDED', null, null, null, null
+      from network.relationship_notes n
+     where n.organisation_id = ${scope.organisationId}
+       and n.tenant_id = ${scope.tenantId}`;
+}
 
 const PersonRow = z.object({
   user_id: z.string(),
@@ -69,54 +169,37 @@ export function createPostgresOrganisationAdminStore(options: {
 
   return {
     activity: async (filter) => {
+      const before = filter.before;
       const rows = await sql`
-        with shown as (
-          select a.id, a.event_id, a.occurred_at, a.actor_type, a.actor_id,
-                 a.authority_user_id, a.action_type, a.resource_type,
-                 a.resource_id, a.outcome, a.metadata,
-                 case
-                   when a.action_type = any(${[...filter.qExecutedTypes]}::text[])
-                    and a.metadata->>'actionType' ~ ${ACTION_FORMAT}
-                   then a.metadata->>'actionType'
-                   else a.action_type
-                 end as effective_type
-            from audit.material_actions a
-           where a.organisation_id = ${filter.organisationId}
-             and a.tenant_id = ${filter.tenantId}
-             and (${filter.userId ?? null}::uuid is null
-                  or a.actor_id = ${filter.userId ?? null}::uuid
-                  or a.authority_user_id = ${filter.userId ?? null}::uuid)
-             and (${filter.from ?? null}::timestamptz is null
-                  or a.occurred_at >= ${filter.from ?? null}::timestamptz)
-             and (${filter.to ?? null}::timestamptz is null
-                  or a.occurred_at < ${filter.to ?? null}::timestamptz)
-             and (${filter.before?.at ?? null}::timestamptz is null
-                  or a.occurred_at < ${filter.before?.at ?? null}::timestamptz
-                  or (a.occurred_at = ${filter.before?.at ?? null}::timestamptz
-                      and a.id < ${filter.before?.key ?? null}::bigint))
-        )
-        select s.id::text as key, s.event_id::text as event_id,
-               to_char(s.occurred_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as occurred_at,
-               s.actor_type, s.actor_id::text as actor_id,
-               s.authority_user_id::text as authority_user_id,
-               s.action_type, s.effective_type, s.resource_type, s.resource_id,
-               s.outcome,
-               case when s.action_type = 'team.membership.role_changed'
-                    then s.metadata->>'from' end as role_from,
-               case when s.action_type = 'team.membership.role_changed'
-                    then s.metadata->>'to' end as role_to
-          from shown s
-         where not (s.effective_type like any(${[...filter.privatePatterns]}::text[]))
-           and (s.action_type = any(${[...filter.qExecutedTypes]}::text[])
-                or not (s.action_type like any(${[...filter.privatePatterns]}::text[])))
+        select f.source, f.key, f.event_id,
+               to_char(f.occurred_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as occurred_at,
+               f.actor_type, f.actor_id, f.authority_user_id, f.action_type,
+               f.effective_type, f.resource_type, f.resource_id, f.outcome,
+               f.role_from, f.role_to, f.stage_from, f.stage_to
+          from (${feedRows(sql, filter)}) f
+         where not (f.effective_type like any(${[...filter.privatePatterns]}::text[]))
+           and (f.action_type = any(${[...filter.qExecutedTypes]}::text[])
+                or not (f.action_type like any(${[...filter.privatePatterns]}::text[])))
            and (cardinality(${[...filter.include]}::text[]) = 0
-                or s.effective_type like any(${[...filter.include]}::text[]))
-           and not (s.effective_type like any(${[...filter.exclude]}::text[]))
-         order by s.occurred_at desc, s.id desc
+                or f.effective_type like any(${[...filter.include]}::text[]))
+           and not (f.effective_type like any(${[...filter.exclude]}::text[]))
+           and (${filter.userId ?? null}::text is null
+                or f.actor_id = ${filter.userId ?? null}::text
+                or f.authority_user_id = ${filter.userId ?? null}::text)
+           and (${filter.from ?? null}::timestamptz is null
+                or f.occurred_at >= ${filter.from ?? null}::timestamptz)
+           and (${filter.to ?? null}::timestamptz is null
+                or f.occurred_at < ${filter.to ?? null}::timestamptz)
+           and (${before?.at ?? null}::timestamptz is null
+                or f.occurred_at < ${before?.at ?? null}::timestamptz
+                or (f.occurred_at = ${before?.at ?? null}::timestamptz
+                    and (f.source, f.key) < (${before?.source ?? null}::text, ${before?.key ?? null}::text)))
+         order by f.occurred_at desc, f.source desc, f.key desc
          limit ${filter.limit}`;
       return rows.map((raw): ActivityRecord => {
         const r = ActivityRow.parse(raw);
         return {
+          source: r.source,
           key: r.key,
           eventId: r.event_id,
           occurredAt: r.occurred_at,
@@ -130,6 +213,8 @@ export function createPostgresOrganisationAdminStore(options: {
           outcome: r.outcome,
           roleFrom: r.role_from,
           roleTo: r.role_to,
+          stageFrom: r.stage_from,
+          stageTo: r.stage_to,
         };
       });
     },
@@ -477,23 +562,14 @@ export function createPostgresOrganisationAdminStore(options: {
       const rows = await sql<
         { effective_type: string; count: number; last_at: string | null }[]
       >`
-        with shown as (
-          select a.occurred_at, a.action_type,
-                 case
-                   when a.action_type = any(${[...input.qExecutedTypes]}::text[])
-                    and a.metadata->>'actionType' ~ ${ACTION_FORMAT}
-                   then a.metadata->>'actionType'
-                   else a.action_type
-                 end as effective_type
-            from audit.material_actions a
-           where a.organisation_id = ${input.organisationId}
-             and a.tenant_id = ${input.tenantId}
-             and (a.actor_id = ${input.userId} or a.authority_user_id = ${input.userId})
-        ), visible as (
-          select * from shown s
-           where not (s.effective_type like any(${[...input.privatePatterns]}::text[]))
-             and (s.action_type = any(${[...input.qExecutedTypes]}::text[])
-                  or not (s.action_type like any(${[...input.privatePatterns]}::text[])))
+        with visible as (
+          select f.occurred_at, f.effective_type
+            from (${feedRows(sql, input)}) f
+           where (f.actor_id = ${input.userId}::text
+                  or f.authority_user_id = ${input.userId}::text)
+             and not (f.effective_type like any(${[...input.privatePatterns]}::text[]))
+             and (f.action_type = any(${[...input.qExecutedTypes]}::text[])
+                  or not (f.action_type like any(${[...input.privatePatterns]}::text[])))
         )
         select v.effective_type, count(*)::int as count, null::text as last_at
           from visible v

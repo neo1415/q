@@ -31,6 +31,8 @@ import {
   genericLabel,
   roleWord,
   kindPatterns,
+  STAGE_EVENT_TYPES,
+  STAGE_WORDS,
 } from "../domain/activity.js";
 import {
   OrganisationActivityQueryError,
@@ -299,6 +301,7 @@ export function createOrganisationAdminService(
         exclude: patterns.exclude,
         privatePatterns: PRIVATE_ACTION_PATTERNS,
         qExecutedTypes: Q_EXECUTED_ACTION_TYPES,
+        stageEventTypes: STAGE_EVENT_TYPES,
         from: query.from,
         to: query.to,
         before,
@@ -308,7 +311,11 @@ export function createOrganisationAdminService(
       const last = page.at(-1);
       const nextCursor =
         rows.length > limit && last !== undefined
-          ? encodeActivityCursor({ at: last.occurredAt, key: last.key })
+          ? encodeActivityCursor({
+              at: last.occurredAt,
+              source: last.source,
+              key: last.key,
+            })
           : null;
 
       const userIds = new Set<string>();
@@ -343,6 +350,22 @@ export function createOrganisationAdminService(
           const after = roleWord(row.roleTo);
           change = before === null && after === null ? null : { before, after };
         }
+        // A stage move: the previous stage move on the same relationship
+        // and this one, from the relationship's own history. Shown only to
+        // an admin who already sees their side's relationships.
+        if (
+          action.code === "relationship.stage.change" &&
+          visible &&
+          row.stageTo !== null
+        ) {
+          change = {
+            before:
+              row.stageFrom === null
+                ? null
+                : (STAGE_WORDS[row.stageFrom] ?? null),
+            after: STAGE_WORDS[row.stageTo] ?? null,
+          };
+        }
         return {
           id: row.eventId,
           at: row.occurredAt,
@@ -376,6 +399,7 @@ export function createOrganisationAdminService(
           since: since.toISOString(),
           privatePatterns: PRIVATE_ACTION_PATTERNS,
           qExecutedTypes: Q_EXECUTED_ACTION_TYPES,
+          stageEventTypes: STAGE_EVENT_TYPES,
         }),
         store.relationshipsTouched({
           tenantId: org.tenantId,

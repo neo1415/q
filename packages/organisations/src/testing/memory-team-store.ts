@@ -358,4 +358,7 @@ export {
   MemoryOrganisationAdminDb,
   type MemoryAdminMembership,
   type MemoryAuditRow,
+  type MemoryRelationship,
+  type MemoryRelationshipEvent,
+  type MemoryRelationshipNote,
 } from "./memory-organisation-admin-store.js";
