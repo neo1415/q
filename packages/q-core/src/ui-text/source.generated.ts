@@ -5154,6 +5154,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Who did what, newest first. Q appears under the approval of the person it acted for.",
   "Who do you want to practise with?",
   "Who is asking",
+  "Who is it for?",
   "Who is looking",
   "Who receives this",
   "Who sees it",
