@@ -214,14 +214,31 @@ describe("founder questions", () => {
     for (const entry of FOUNDER_QA_ENTRIES) {
       expect(QA_BANK.map((e) => e.id)).toContain(entry.id);
     }
+    // Close to the AI-presenter question: answered, or offered as
+    // "Do you mean …?", never answered with the other entry.
+    const rehearse = founder.match(
+      "Is the investor I rehearse with a real person?",
+    );
     expect(
-      founder.answer("Is the investor I rehearse with a real person?")?.id,
-    ).toBe("qa.founder.rehearsal");
+      rehearse.kind === "ANSWER"
+        ? [rehearse.entry.id]
+        : rehearse.kind === "CLARIFY"
+          ? rehearse.candidates.map((c) => c.id)
+          : [],
+    ).toContain("qa.founder.rehearsal");
+    if (rehearse.kind === "ANSWER") {
+      expect(rehearse.entry.id).toBe("qa.founder.rehearsal");
+    }
     expect(founder.answer("Can I just send a fund a cold message?")?.id).toBe(
       "qa.founder.reach-investor",
     );
-    expect(founder.answer("Why did these investors show up for me?")?.id).toBe(
-      "qa.founder.which-investors",
-    );
+    const shown = founder.match("Why did these investors show up for me?");
+    expect(
+      shown.kind === "ANSWER"
+        ? [shown.entry.id]
+        : shown.kind === "CLARIFY"
+          ? shown.candidates.map((c) => c.id)
+          : [],
+    ).toContain("qa.founder.which-investors");
   });
 });

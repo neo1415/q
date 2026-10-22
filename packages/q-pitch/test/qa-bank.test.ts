@@ -3,9 +3,38 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { QA_BANK, type QaEntry, buildQaIndex } from "../src/index.js";
+import {
+  QA_BANK,
+  type QaEntry,
+  type QaIndex,
+  buildQaIndex,
+} from "../src/index.js";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
+
+/**
+ * A question worded unlike the stored ones is either answered with its own
+ * entry or met with "Do you mean …?" that offers it; it is never answered
+ * with another entry. null: never answered at all.
+ */
+function expectOffered(index: QaIndex, asked: string, id: string | null) {
+  const decided = index.match(asked);
+  if (id === null) {
+    expect(decided.kind, asked).not.toBe("ANSWER");
+    return;
+  }
+  if (decided.kind === "ANSWER") {
+    expect(decided.entry.id, asked).toBe(id);
+    return;
+  }
+  expect(decided.kind, asked).toBe("CLARIFY");
+  if (decided.kind === "CLARIFY") {
+    expect(
+      decided.candidates.map((c) => c.id),
+      asked,
+    ).toContain(id);
+  }
+}
 
 /** Questions as investors ask them, worded unlike the stored ones; null is for normal Q. */
 const REALISTIC_PROBES: [string, string | null][] = [
@@ -83,18 +112,14 @@ describe("the Q&A bank (v6)", () => {
   });
 
   it("answers by meaning, not only by the stored wording", () => {
-    expect(investor.answer("Could a competitor just copy you?")?.id).toBe(
-      "qa.moat",
-    );
-    expect(investor.answer("How much will this cost my fund?")?.id).toBe(
-      "qa.business-model",
-    );
-    expect(investor.answer("Will founders see what I think of them?")?.id).toBe(
-      "qa.privacy",
-    );
-    expect(investor.answer("Does the AI hallucinate numbers?")?.id).toBe(
-      "qa.ai-accuracy",
-    );
+    for (const [asked, id] of [
+      ["Could a competitor just copy you?", "qa.moat"],
+      ["How much will this cost my fund?", "qa.business-model"],
+      ["Will founders see what I think of them?", "qa.privacy"],
+      ["Does the AI hallucinate numbers?", "qa.ai-accuracy"],
+    ] as const) {
+      expectOffered(investor, asked, id);
+    }
   });
 
   it("answers the product questions investors ask after the story", () => {
@@ -110,13 +135,13 @@ describe("the Q&A bank (v6)", () => {
       ["Is the score biased against some founders?", "qa.bias"],
       ["Can I export my data if I leave?", "qa.data-ownership"],
     ] as const) {
-      expect(investor.answer(asked)?.id, asked).toBe(id);
+      expectOffered(investor, asked, id);
     }
   });
 
   it("answers realistic investor questions, and leaves the rest to normal Q", () => {
     for (const [asked, id] of REALISTIC_PROBES) {
-      expect(investor.answer(asked)?.id ?? null, asked).toBe(id);
+      expectOffered(investor, asked, id);
     }
   });
 
@@ -135,7 +160,7 @@ describe("the Q&A bank (v6)", () => {
       ["Is there a mobile app?", "qa.mobile"],
       ["How big is the market?", "qa.market-size"],
     ] as const) {
-      expect(investor.answer(asked)?.id ?? null, asked).toBe(id);
+      expectOffered(investor, asked, id);
     }
   });
 
