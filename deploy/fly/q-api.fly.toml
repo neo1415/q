@@ -1,0 +1,59 @@
+# Capital Q Q runtime (q-api) on Fly.io — fallback host while Railway
+# (ADR 0014) is unavailable. Deployed by scripts/deploy/fly-deploy.mjs from
+# the repository root, which runs the equivalent of:
+#   fly deploy . --config deploy/fly/q-api.fly.toml --dockerfile Dockerfile \
+#     --build-target q-api --remote-only --ha=false
+# Secrets are never in this file (docs/ai-handoff/FLY-DEPLOY.md). The script
+# overrides `app` with its --prefix / FLY_APP_Q_API setting.
+
+app = "capital-q-q-api"
+primary_region = "ams"
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
+[build]
+  build-target = "q-api"
+
+[env]
+  NODE_ENV = "production"
+  # A platform label is not a product claim: same posture as Railway.
+  CAPITAL_Q_ENV = "staging"
+  REGION = "eu-west"
+  LOG_LEVEL = "info"
+  HOST = "0.0.0.0"
+  PORT = "3002"
+  # Hosted Supabase through its session pooler (DATABASE_URL is a secret).
+  DATABASE_CONNECTION_MODE = "session_pooler"
+  Q_VOICE_EXPRESSIVE = "false"
+
+[http_service]
+  internal_port = 3002
+  force_https = true
+  # Cheapest posture: the machine stops when idle and Fly's proxy starts it
+  # again on the next request (a cold start of a few seconds). Voice calls
+  # back into this app (Q_API_PUBLIC_URL), so for a pitch day keep one warm:
+  # set min_machines_running = 1 here and redeploy (or
+  # `fly scale count 1 --app <app>` plus this setting), then back to 0.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+  # Readiness checks the database, as Railway's healthcheck did. q-api
+  # composes its whole tool registry before it listens, hence the longer
+  # grace period.
+  [[http_service.checks]]
+    grace_period = "45s"
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/health/ready"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1024mb"

@@ -1,0 +1,42 @@
+# Capital Q background workers on Fly.io — fallback host while Railway
+# (ADR 0014) is unavailable. Deployed by scripts/deploy/fly-deploy.mjs from
+# the repository root, which runs the equivalent of:
+#   fly deploy . --config deploy/fly/workers.fly.toml --dockerfile Dockerfile \
+#     --build-target workers --remote-only --ha=false
+# Secrets are never in this file (docs/ai-handoff/FLY-DEPLOY.md). The script
+# overrides `app` with its --prefix / FLY_APP_WORKERS setting.
+#
+# Always on: outbox publishing, document processing and schedules run here,
+# so this app has NO [http_service]. Fly's auto-stop belongs to the proxy and
+# applies only to services, so a machine with none is never stopped for
+# idleness; the restart policy brings the process back if it exits. Fly
+# machine checks are HTTP/TCP only and workers listen on nothing (doc 21,
+# IDA-033), so the liveness signal is the process itself, read with
+# `fly status` and `fly logs`.
+
+app = "capital-q-workers"
+primary_region = "ams"
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
+[build]
+  build-target = "workers"
+
+[env]
+  NODE_ENV = "production"
+  # A platform label is not a product claim: same posture as Railway.
+  CAPITAL_Q_ENV = "staging"
+  REGION = "eu-west"
+  LOG_LEVEL = "info"
+  # Hosted Supabase through its session pooler (DATABASE_URL is a secret).
+  DATABASE_CONNECTION_MODE = "session_pooler"
+  # The only policy permitted outside development (same as Railway).
+  CQ_MALWARE_POLICY = "REQUIRE_CLEAN"
+
+[[restart]]
+  policy = "always"
+  retries = 10
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

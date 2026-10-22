@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && node node_modules/turbo/bin/turbo run build --filter=@capital-q/web... --env-mode=loose",
+  "regions": ["fra1"]
+}

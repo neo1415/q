@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
 /**
@@ -23,7 +24,26 @@ const securityHeaders = [
   },
 ];
 
+/**
+ * Container builds only (root Dockerfile, Fly.io fallback host): a
+ * self-contained `server.js` with just the traced files, so the web image
+ * does not carry the whole workspace. Off unless the build sets
+ * NEXT_OUTPUT_STANDALONE=1, so `next start` on Railway and locally behaves
+ * exactly as before. Tracing starts at the monorepo root because workspace
+ * packages live outside apps/web.
+ */
+const standalone =
+  process.env["NEXT_OUTPUT_STANDALONE"] === "1"
+    ? {
+        output: "standalone" as const,
+        outputFileTracingRoot: fileURLToPath(
+          new URL("../../", import.meta.url),
+        ),
+      }
+    : {};
+
 const nextConfig: NextConfig = {
+  ...standalone,
   poweredByHeader: false,
   experimental: {
     // P9: the sidebar prefetches a whole page on hover. A hover-prefetched

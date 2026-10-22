@@ -1,0 +1,44 @@
+# Build context for the root Dockerfile (Fly.io fallback host, see
+# docs/ai-handoff/FLY-DEPLOY.md). Only what a service build reads goes to the
+# builder: manifests, lockfile, TypeScript sources and the web app's assets.
+
+# Secrets never enter a build context or an image layer.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+.cq-secrets
+
+# Installed and generated output; the image installs and builds its own.
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/*.tsbuildinfo
+**/coverage
+**/playwright-report
+**/test-results
+**/blob-report
+**/out
+
+# Not read by any service build.
+.git
+.github
+.claude
+.railway
+docs
+design
+capital-q-audit
+supabase
+tests
+infra
+scripts/*
+!scripts/deploy
+scripts/deploy/fly-deploy.mjs
+render.yaml
+deploy
+Dockerfile
+.dockerignore
+**/*.log
+**/.DS_Store

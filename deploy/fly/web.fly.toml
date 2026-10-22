@@ -1,0 +1,56 @@
+# Capital Q web (Next.js standalone) on Fly.io — fallback host while Railway
+# (ADR 0014) is unavailable. Deployed by scripts/deploy/fly-deploy.mjs from
+# the repository root, which runs the equivalent of:
+#   fly deploy . --config deploy/fly/web.fly.toml --dockerfile Dockerfile \
+#     --build-target web --remote-only --ha=false \
+#     --build-arg NEXT_PUBLIC_SUPABASE_URL=... \
+#     --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
+# Secrets are never in this file (docs/ai-handoff/FLY-DEPLOY.md). The script
+# overrides `app` with its --prefix / FLY_APP_WEB setting.
+
+app = "capital-q-web"
+primary_region = "ams"
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
+[build]
+  build-target = "web"
+
+[env]
+  NODE_ENV = "production"
+  # A platform label is not a product claim: same posture as Railway.
+  CAPITAL_Q_ENV = "staging"
+  REGION = "eu-west"
+  LOG_LEVEL = "info"
+  # Next.js standalone server.js binds to HOSTNAME:PORT.
+  HOSTNAME = "0.0.0.0"
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Cheapest posture: the machine stops when idle and Fly's proxy starts it
+  # again on the next request (a cold start of a few seconds). For a pitch
+  # day keep one warm: set min_machines_running = 1 here and redeploy (or
+  # `fly scale count 1 --app <app>` plus this setting), then back to 0.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+  # A static route: no session, no database, no upstream call.
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/favicon.ico"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1024mb"
