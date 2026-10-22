@@ -232,8 +232,8 @@ await context.addInitScript((banned) => {
     ".cq-story-stage .cq-story-tagline",
     ".cq-story-stage .cq-story-split",
     ".cq-story-stage .cq-story-centre > .cq-story-panel",
+    ".cq-story-stage > .cq-story-panel:not(.cq-story-dockside)",
     ".cq-story-stage .cq-story-screens",
-    ".cq-story-stage [data-story-qcard]",
   ].join(", ");
   window.__badge = 0;
   new window.PerformanceObserver((list) => {
@@ -255,14 +255,22 @@ await context.addInitScript((banned) => {
     // lit section): where they are, and since when, for the clutter check.
     const now = Date.now();
     const seen = new Map();
+    // Type over the story's own photo backdrop (#3's desk) is the design.
+    const photo = document.querySelector(".cq-story-stage .cq-story-backdrop");
+    // Q's own presence is never clutter: its box is left out of the ring.
+    const q = [...document.querySelectorAll(".cq-story-presence")].map((n) => {
+      const r = n.getBoundingClientRect();
+      return [r.x, r.y, r.width, r.height].map(Math.round);
+    });
     for (const node of document.querySelectorAll(OVER_PAGE)) {
+      if (photo !== null && node.matches(".cq-story-type")) continue;
       const r = node.getBoundingClientRect();
       if (r.width < 8 || r.height < 8) continue;
       if (Number(window.getComputedStyle(node).opacity) < 0.99) continue;
       const box = [r.x, r.y, r.width, r.height].map(Math.round);
       const key = box.join(",");
       seen.set(key, window.__overSince.get(key) ?? now);
-      window.__overlays.push({ at: now, box, since: seen.get(key) });
+      window.__overlays.push({ at: now, box, since: seen.get(key), q });
     }
     window.__overSince = seen;
   }, 500);
@@ -450,6 +458,8 @@ if (!skipOcr) {
 // ring's median; page rows showing through a thin scrim measure 2-4%, a
 // solid scrim 0%. A box is checked once it has been up for 0.6 s (past the
 // scrim's own fade), at most once a second.
+// The ring starts GAP px out (clear of a panel's own shadow), RING wide.
+const GAP = 24;
 const RING = 32;
 const CLUTTER_MAX = 0.01;
 const overlayClutter = [];
@@ -460,11 +470,24 @@ for (const sample of evidence.overlays) {
   const key = `${String(second)}:${sample.box.join(",")}`;
   if (second < 0 || checked.has(key)) continue;
   checked.add(key);
-  const [x, y, w, h] = sample.box;
+  const [bx, by, bw, bh] = sample.box;
+  // The inner edge of the ring: the box grown by GAP.
+  const x = bx - GAP;
+  const y = by - GAP;
+  const w = bw + 2 * GAP;
+  const h = bh + 2 * GAP;
   const X = Math.max(0, x - RING);
   const Y = Math.max(0, y - RING);
   const W = Math.min(viewport.width - X, w + 2 * RING);
   const H = Math.min(viewport.height - Y, h + 2 * RING);
+  const inQ = (gx, gy) =>
+    sample.q.some(
+      ([qx, qy, qw, qh]) =>
+        gx >= qx - 16 &&
+        gx < qx + qw + 16 &&
+        gy >= qy - 16 &&
+        gy < qy + qh + 16,
+    );
   if (W <= 0 || H <= 0) continue;
   let bytes;
   try {
@@ -492,6 +515,7 @@ for (const sample of evidence.overlays) {
       const gx = X + i;
       const gy = Y + j;
       if (gx >= x && gx < x + w && gy >= y && gy < y + h) continue;
+      if (inQ(gx, gy)) continue;
       ring.push(bytes[j * W + i] ?? 0);
     }
   }

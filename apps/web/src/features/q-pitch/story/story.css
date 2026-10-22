@@ -59,7 +59,9 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
    solid scrim in the mood's own canvas, so nothing on it competes with
    the visual's words. Beside a lit section the page stays (spotlight). */
 .cq-story-scrim[data-covering] {
-  opacity: 0.96;
+  /* Solid: at 0.96 a light page's rows still showed 10 grey levels apart
+     behind dark type (the master audit's clutter check). */
+  opacity: 1;
 }
 .cq-story-scrim[data-covering]:is(
     [data-mood="OFF"],
