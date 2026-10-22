@@ -280,6 +280,7 @@ import type { QTurnSkimmer } from "./turn-skim.js";
 export { arrivalSnapshotFact };
 import { onScreenCompanyFact, ownCompanySnapshotFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
+import { attachedDocumentFacts } from "./attached-document-fact.js";
 import { reRenderAskOf } from "./re-render.js";
 import {
   manifestFacts,
@@ -2595,6 +2596,45 @@ export function createModelGatewayQAnswer(
     // Awaited with the other reads below; a failure there is as before.
     documentRead.catch(() => undefined);
     /**
+     * Lane 8: the documents they attached in the composer, read for them
+     * through read_attached_document under this plan, as the asker (one
+     * not theirs reads as NONE and adds nothing), so the first answer is
+     * about the document with no tool round.
+     */
+    let attachedDocuments: readonly AuthorisedFact[] = [];
+    const attachmentRead = (async (): Promise<void> => {
+      const ids = plan.screen?.attachedDocumentIds;
+      if (ids === undefined || ids.length === 0) return;
+      const { names } = await prefetchToolsRead;
+      if (!names.has("read_attached_document")) return;
+      const question = latest?.content.slice(0, 500).trim();
+      const reads = await Promise.all(
+        ids.map((documentId, index) =>
+          tools
+            .execute(
+              {
+                callId: `q-attached-${String(index)}`,
+                name: "read_attached_document",
+                arguments: {
+                  documentId,
+                  ...(question === undefined || question.length === 0
+                    ? {}
+                    : { question }),
+                },
+              },
+              toolContext,
+            )
+            .catch(() => null),
+        ),
+      );
+      attachedDocuments = reads.flatMap((outcome) =>
+        outcome?.result.ok === true
+          ? attachedDocumentFacts(outcome.result.data)
+          : [],
+      );
+    })();
+    attachmentRead.catch(() => undefined);
+    /**
      * Q room R1: the whole page on their screen (sections, tab, filters,
      * open windows), sent as ids only and read back here through the read
      * tools the model could call, under the same plan, as the asker. A ref
@@ -3319,6 +3359,7 @@ export function createModelGatewayQAnswer(
       timed("company", companyRead),
       timed("daily", dailyRead),
       timed("document", documentRead),
+      timed("attachments", attachmentRead),
       timed("page", pageRead),
     ]);
     prepareMs["reads"] = Date.now() - prepareStarted;
@@ -3389,6 +3430,7 @@ export function createModelGatewayQAnswer(
       onScreenDaily,
       onScreenDailyCall,
       onScreenDocument,
+      attachedDocuments,
       onScreenDocumentCall,
       onScreenPage,
       onScreenDossier,
@@ -3738,6 +3780,7 @@ export function createModelGatewayQAnswer(
         onScreenDaily,
         onScreenDailyCall,
         onScreenDocument,
+        attachedDocuments,
         onScreenDocumentCall,
         onScreenPage,
         onScreenDossier,
@@ -4171,6 +4214,7 @@ export function createModelGatewayQAnswer(
           ...w.namedCompanies,
           ...(onScreenDaily === null ? [] : [onScreenDaily]),
           ...(onScreenDocument === null ? [] : [onScreenDocument]),
+          ...attachedDocuments,
           ...onScreenPage,
           ...(w.ownDay === null ? [] : [w.ownDay]),
           ...(w.arrival === null ? [] : [w.arrival]),
