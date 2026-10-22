@@ -3,7 +3,8 @@ import {
   ATLAS_SCRIPT,
   PREMIERE_SCRIPT,
   SHORT_SCRIPT,
-  STORY_BEATS,
+  STORY_LEDGER,
+  certifyStory,
   certifyTour,
   type TourScript,
 } from "@capital-q/q-pitch";
@@ -40,6 +41,24 @@ function admitted(script: TourScript, now: string): ReadonlySet<string> {
   return new Set(gate.scenes.map((s) => s.sceneId));
 }
 
+function storyStanding(now: string): {
+  readonly certifiedScenes: number;
+  readonly scenes: number;
+} {
+  const actor = STORY_LEDGER[0]?.actorContext;
+  if (actor === undefined) return { certifiedScenes: 0, scenes: 0 };
+  const gate = certifyStory({
+    now,
+    actor,
+    staleFeatureIds: [],
+    ownerApproved: false,
+  });
+  return {
+    certifiedScenes: gate.certifiedProductBeats,
+    scenes: gate.productBeats,
+  };
+}
+
 export function tourOptions(now: string): readonly TourOption[] {
   const option = (
     key: TourOption["key"],
@@ -61,8 +80,9 @@ export function tourOptions(now: string): readonly TourOption[] {
       title: "Q tells the Capital Q story",
       length: "About 7 minutes",
       href: "/home?qpitch=story&new=1",
-      certifiedScenes: 0,
-      scenes: STORY_BEATS.length,
+      // Product beats whose claims all hold for the ledger's own actor; the
+      // story's narrative and demonstration beats make no certified claim.
+      ...storyStanding(now),
     },
     option(
       "premiere",

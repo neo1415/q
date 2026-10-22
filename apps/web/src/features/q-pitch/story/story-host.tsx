@@ -17,6 +17,9 @@ import {
   STORY_BEATS,
   TourActorSchema,
   buildQaIndex,
+  certifyStory,
+  DEMONSTRATION_LABEL,
+  STORY_CLAIMS,
   parseStoryCommand,
   percentiles,
   routeAtBeat,
@@ -166,6 +169,20 @@ export function StoryHost({
       TourActorSchema.safeParse({ role, account }).success,
     [account, role, harness],
   );
+  // The story's certification gate, once (claims per beat; story/claims.ts).
+  // Until the owner approves and every product claim holds, the story is
+  // an internal rehearsal and says so on screen.
+  const gate = useMemo(() => {
+    const parsed = TourActorSchema.safeParse({ role, account });
+    return parsed.success
+      ? certifyStory({
+          now: new Date().toISOString(),
+          actor: parsed.data,
+          staleFeatureIds: [],
+          ownerApproved: false,
+        })
+      : null;
+  }, [account, role]);
   const session = useQSessionOptional();
   const sessionRef = useRef(session);
   useEffect(() => {
@@ -410,6 +427,7 @@ export function StoryHost({
   return (
     <StoryOverlay
       player={player}
+      rehearsal={gate?.audience !== "AUDIENCE"}
       stage={stage}
       mood={mood}
       captions={captions}
@@ -427,6 +445,15 @@ export function StoryHost({
 }
 
 type Store<T> = ReturnType<typeof createStore<T>>;
+
+/** The beat shows demonstration data (story/claims.ts), so it says so. */
+function demonstrationBeat(n: number): boolean {
+  const claim = STORY_CLAIMS[n];
+  return (
+    claim?.kind === "DEMONSTRATION" ||
+    (claim?.kind === "PRODUCT" && claim.demonstration)
+  );
+}
 
 type Rect = {
   readonly x: number;
@@ -506,6 +533,7 @@ function captionLine(
 
 function StoryOverlay({
   player,
+  rehearsal,
   stage,
   mood,
   captions,
@@ -515,6 +543,8 @@ function StoryOverlay({
   onExit,
 }: {
   readonly player: StoryPlayer;
+  /** Not certified for an audience: labelled as an internal rehearsal. */
+  readonly rehearsal: boolean;
   readonly stage: Store<StageState>;
   readonly mood: Store<Mood>;
   readonly captions: boolean;
@@ -723,6 +753,14 @@ function StoryOverlay({
           </span>
         </p>
       ) : null}
+      <p className="cq-story-standing">
+        {[
+          rehearsal ? "Internal rehearsal" : null,
+          demonstrationBeat(beat.n) ? DEMONSTRATION_LABEL : null,
+        ]
+          .filter((part) => part !== null)
+          .join(" · ")}
+      </p>
       {answer !== null ? (
         <div className="cq-story-answer" role="status">
           <p className="cq-story-kicker">{answer.question}</p>

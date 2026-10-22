@@ -744,6 +744,21 @@ html:is([data-story="NIGHT"], [data-story="HUSH"], [data-story="STORY"])
     transparent
   );
 }
+/* The story's standing, always visible and never in the way. */
+.cq-story-standing {
+  position: fixed;
+  right: 16px;
+  bottom: calc(10px + var(--cq-bottom-nav-height, 0px));
+  z-index: var(--cq-z-toast);
+  margin: 0;
+  pointer-events: none;
+  font-size: 0.75rem;
+  color: var(--cq-text-secondary);
+}
+html:is([data-story="NIGHT"], [data-story="HUSH"], [data-story="STORY"])
+  .cq-story-standing {
+  color: var(--cq-night-text-muted);
+}
 .cq-story-caption-line {
   display: inline-block;
   max-width: 760px;
