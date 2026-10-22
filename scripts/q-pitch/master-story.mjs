@@ -459,8 +459,17 @@ const RING = 32;
 const CLUTTER_MAX = 0.01;
 const overlayClutter = [];
 const checked = new Set();
+// A box is checked only while it stays: still there half a second later
+// (a frame is sampled up to ~0.5 s from the page's own reading, so a box
+// on its way out would be measured over the page it is leaving).
+const lastSeen = new Map();
+for (const sample of evidence.overlays) {
+  const key = sample.box.join(",");
+  lastSeen.set(key, Math.max(lastSeen.get(key) ?? 0, sample.at));
+}
 for (const sample of evidence.overlays) {
   if (sample.at - sample.since < 600) continue;
+  if ((lastSeen.get(sample.box.join(",")) ?? 0) - sample.at < 450) continue;
   const second = Math.round((sample.at - videoStart) / 1000 - trimStart);
   const key = `${String(second)}:${sample.box.join(",")}`;
   if (second < 0 || checked.has(key)) continue;

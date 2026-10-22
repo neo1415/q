@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-10-22T11:00:31.484Z",
+  "recordedAt": "2026-10-22T12:49:59.697Z",
   "voice": "pFZP5JQG7iQjIQuC4Bku",
   "model": "eleven_v4_turbo",
   "probe": {
@@ -17,46 +17,46 @@
       }
     ],
     "format": {
-      "duration": "237.900000"
+      "duration": "238.233008"
     }
   },
   "bytes": {
-    "master": 37585153,
-    "share": 6766240
+    "master": 35954034,
+    "share": 6706533
   },
   "story": {
     "narrator": "RENDERED",
-    "preloadMs": 1011,
+    "preloadMs": 1049,
     "offsets": {
-      "median": -79,
-      "p95": 245,
-      "count": 125
+      "median": -87,
+      "p95": 235,
+      "count": 126
     },
     "offsetsByKind": {
       "stage": {
-        "median": -73,
-        "p95": -29,
-        "count": 69
+        "median": -84,
+        "p95": -20,
+        "count": 70
       },
       "mood": {
-        "median": -68,
-        "p95": -13,
+        "median": -83,
+        "p95": -64,
         "count": 6
       },
       "navigate": {
-        "median": 339,
-        "p95": 653,
+        "median": 316,
+        "p95": 699,
         "count": 9
       },
       "light": {
-        "median": -102,
-        "p95": -51,
+        "median": -97,
+        "p95": -75,
         "count": 36
       }
     },
     "frames": {
-      "count": 7977,
-      "long": 545
+      "count": 10430,
+      "long": 279
     },
     "fallbacks": 0,
     "fallbackCues": [],
@@ -70,111 +70,135 @@
   "pageTextHits": [
     {
       "word": "can't",
-      "at": 1792666312553
+      "at": 1792672886336
     },
     {
       "word": "can't",
-      "at": 1792666313052
+      "at": 1792672886824
     },
     {
       "word": "can't",
-      "at": 1792666313552
+      "at": 1792672887324
     },
     {
       "word": "can't",
-      "at": 1792666314052
+      "at": 1792672887824
     },
     {
       "word": "can't",
-      "at": 1792666314569
+      "at": 1792672888324
     },
     {
       "word": "can't",
-      "at": 1792666315052
+      "at": 1792672888825
     },
     {
       "word": "can't",
-      "at": 1792666315565
+      "at": 1792672889325
     },
     {
       "word": "can't",
-      "at": 1792666316052
+      "at": 1792672889825
     },
     {
       "word": "can't",
-      "at": 1792666316556
+      "at": 1792672890325
     },
     {
       "word": "can't",
-      "at": 1792666317053
+      "at": 1792672890833
     },
     {
       "word": "can't",
-      "at": 1792666317563
+      "at": 1792672891327
     },
     {
       "word": "can't",
-      "at": 1792666318054
+      "at": 1792672891824
     },
     {
       "word": "can't",
-      "at": 1792666318552
+      "at": 1792672892324
     },
     {
       "word": "can't",
-      "at": 1792666319053
+      "at": 1792672892824
     },
     {
       "word": "can't",
-      "at": 1792666319552
+      "at": 1792672893348
     },
     {
       "word": "can't",
-      "at": 1792666320052
+      "at": 1792672893824
     },
     {
       "word": "can't",
-      "at": 1792666320553
+      "at": 1792672894324
     },
     {
       "word": "can't",
-      "at": 1792666321053
+      "at": 1792672894826
     },
     {
       "word": "can't",
-      "at": 1792666321552
+      "at": 1792672895324
     },
     {
       "word": "can't",
-      "at": 1792666322052
+      "at": 1792672895824
     },
     {
       "word": "can't",
-      "at": 1792666322565
+      "at": 1792672896329
     },
     {
       "word": "can't",
-      "at": 1792666323052
+      "at": 1792672896827
     },
     {
       "word": "can't",
-      "at": 1792666323562
+      "at": 1792672897324
     },
     {
       "word": "can't",
-      "at": 1792666324066
+      "at": 1792672897824
     },
     {
       "word": "can't",
-      "at": 1792666324553
+      "at": 1792672898324
     },
     {
       "word": "can't",
-      "at": 1792666325052
+      "at": 1792672898847
     }
   ],
   "devBadgeSamples": 0,
   "ocrFrames": 476,
-  "ocrHits": [],
-  "defects": 26
+  "ocrHits": [
+    {
+      "word": "can't",
+      "frame": "f0253.png",
+      "second": 126
+    },
+    {
+      "word": "can't",
+      "frame": "f0254.png",
+      "second": 126.5
+    }
+  ],
+  "overlayBoxesChecked": 110,
+  "overlayClutter": [
+    {
+      "second": 217,
+      "box": [
+        482,
+        389,
+        955,
+        356
+      ],
+      "clutter": 7.8
+    }
+  ],
+  "defects": 29
 }
