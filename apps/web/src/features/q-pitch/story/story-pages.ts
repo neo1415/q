@@ -66,6 +66,10 @@ export const STORY_ANCHORS: Readonly<Record<string, AnchorPlacement>> = {
   "qs.gateq.gate": { select: 'section[aria-labelledby="gq2-strict"]' },
   "qs.gateq.link": { select: 'section[aria-labelledby="gq2-link"]' },
   "qs.gateq.inbox": { select: ".gq2-list" },
+  // #44 word by word: the top application, its qualification, the rules.
+  "qs.gateq.row-1": { select: ".gq2-list .gq2-row" },
+  "qs.gateq.row-1-tag": { select: ".gq2-list .gq2-row .gq2-tag" },
+  "qs.gateq.rules": { select: ".gq2-more .gq2-sec" },
   // #48-49 The real Q Card, on the stage (story-qcard.tsx).
   "qs.card.identity": { select: "[data-story-qcard] [data-q-card]" },
   // S6's sections (CARD_SECTION_IDS); a company card always renders all

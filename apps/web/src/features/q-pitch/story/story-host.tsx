@@ -299,13 +299,16 @@ export function StoryHost({
                 }
                 return landed;
               }
-              case "light":
-                return lightSection(
+              case "light": {
+                const lit = await lightSection(
                   act.anchor,
                   {},
                   signal,
                   ACT_BUDGET_MS.light,
                 );
+                if (lit) clearCaptionBand();
+                return lit;
+              }
               case "unlight":
                 unlightAll();
                 return true;
@@ -501,13 +504,34 @@ function useViewport(): Viewport | null {
   return useSyncExternalStore(subscribeViewport, viewportSnapshot, () => null);
 }
 
+/** Where the caption band starts (its top edge), or the viewport bottom. */
+function captionBandTop(): number {
+  const band = document.querySelector<HTMLElement>(".cq-story-captions");
+  return band?.getBoundingClientRect().top ?? window.innerHeight;
+}
+
+/**
+ * The caption band is reserved space (coordinator, 22 Oct): once a section
+ * is lit, scroll it so its bottom clears the band, keeping its top in view.
+ */
+function clearCaptionBand(): void {
+  const element = document.querySelector<HTMLElement>("[data-qp-lit]");
+  if (element === null) return;
+  const box = element.getBoundingClientRect();
+  const limit = captionBandTop() - 16;
+  if (box.bottom <= limit) return;
+  const by = Math.min(box.bottom - limit, Math.max(0, box.top - 72));
+  if (by > 1) window.scrollBy({ top: by, behavior: "smooth" });
+}
+
 /** The page dimmed everywhere but around the lit section (even-odd). */
 function spotlightPath(lit: Rect, view: Viewport): string {
   const pad = 10;
   const x = Math.max(0, lit.x - pad);
   const y = Math.max(0, lit.y - pad);
   const w = Math.min(view.w - x, lit.w + pad * 2);
-  const h = Math.min(view.h - y, lit.h + pad * 2);
+  // Never into the caption band: the band is the words' place.
+  const h = Math.max(0, Math.min(captionBandTop() - y, lit.h + pad * 2));
   return `path(evenodd, "M0 0H${String(view.w)}V${String(view.h)}H0Z M${String(x)} ${String(y)}h${String(w)}v${String(h)}h-${String(w)}Z")`;
 }
 
@@ -612,7 +636,7 @@ function StoryOverlay({
   }, []);
   const woke = moodNow === "WAKE";
   const viewport = useViewport();
-  const centreStage = !woke || snapshot.beat.n >= 55;
+  const centreStage = !woke;
   // Docked on product beats: in the caption band, beside its own words
   // (the band has no page text under it), so Q never covers the page.
   const docked =
@@ -703,7 +727,23 @@ function StoryOverlay({
     snapshot.phase === "PAUSED" || snapshot.phase === "INTERRUPTED";
   return (
     <>
-      <div className="cq-story-scrim" data-mood={moodNow} aria-hidden />
+      {/* Q, the narrator, always on screen. Centre stage in the story acts,
+          inside the scrim: the scrim's night is the surface the particles
+          read (QSwarm's surfaceIsDark), so no shape is drawn behind Q, only
+          a faint gold bloom. Docked in the caption band on product beats.
+          Two placements, two elements (a resize would be a layout shift). */}
+      <div className="cq-story-scrim" data-mood={moodNow} aria-hidden>
+        {docked === null ? (
+          // Re-keyed when the scrim turns from night to day: the particles
+          // read their surface once, at mount.
+          <div
+            key={moodNow === "DAY" ? "centre-day" : "centre-night"}
+            className="cq-story-presence"
+          >
+            <QSwarm state={playing ? "SPEAKING" : "IDLE"} pixels={160} />
+          </div>
+        ) : null}
+      </div>
       {/* Product beats: the page dims around the lit section, so the gold
           breathing highlight is the one thing to look at. */}
       <div
@@ -716,38 +756,24 @@ function StoryOverlay({
         }
         aria-hidden
       />
+      {docked === null ? null : (
+        <div
+          key="docked"
+          className="cq-story-presence"
+          data-docked=""
+          style={{
+            transform: `translate3d(${String(docked.x)}px, ${String(docked.y)}px, 0)`,
+          }}
+          aria-hidden
+        >
+          <QSwarm state={playing ? "SPEAKING" : "IDLE"} pixels={56} />
+        </div>
+      )}
       <StoryStage
         stage={stageNow}
         mood={moodNow === "OFF" ? "STORY" : moodNow}
         beside={beside}
       />
-      {/* Q, the narrator, always on screen: centre stage in the story
-          acts, docked beside the page on product beats. Lane S4's
-          particles form the cued figures at the larger size. */}
-      <div
-        // Centre and docked are two placements, never one box resized
-        // (a resize is a layout shift): each is its own element.
-        key={docked === null ? "centre" : "docked"}
-        className="cq-story-presence"
-        data-docked={docked === null ? undefined : ""}
-        data-surface={woke ? "page" : "stage"}
-        style={
-          docked === null
-            ? undefined
-            : {
-                transform: `translate3d(${String(docked.x)}px, ${String(docked.y)}px, 0)`,
-              }
-        }
-        aria-hidden
-      >
-        {/* Keyed by its surface: the presence reads light or dark from
-            the backing behind it once, at mount. */}
-        <QSwarm
-          key={woke ? "page" : "stage"}
-          state={playing ? "SPEAKING" : "IDLE"}
-          pixels={docked === null ? 160 : 56}
-        />
-      </div>
       {captions && !done && word >= 0 ? (
         // One place, always: a bottom band with its own soft scrim. The
         // line is keyed, so a new line is a new element (CLS 0).

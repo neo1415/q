@@ -783,9 +783,14 @@ const inputs: readonly BeatInput[] = [
     cues: [
       [0, stage("none")],
       [0, go("gateq-inbox")],
+      // Word by word, the specific thing named (coordinator, 22 Oct).
       ["lands", light("qs.gateq.inbox")],
-      ["interview", light("qs.gateq.transcript")],
-      ["rise", light("qs.gateq.inbox")],
+      ["interview", light("qs.gateq.row-1")],
+      ["Score", light("qs.gateq.row-1-tag")],
+      ["Match", light("qs.gateq.rules")],
+      // Ranking is not built (plan §8.3): the list as it is, labelled demo.
+      ["rank", light("qs.gateq.inbox")],
+      ["rise", light("qs.gateq.row-1")],
     ],
   },
   // ── Act 5: For businesses ─────────────────────────────────────────────
@@ -991,6 +996,8 @@ const inputs: readonly BeatInput[] = [
     delivery: "Warm, simple, personal.",
     tags: [[0, "[warmly]"]],
     cues: [
+      // Back to the story stage after HOME: Q, centre, for the last lines.
+      [0, mood("STORY")],
       [0, stage("aperture", 2)],
       [0, figure("LETTER_Q", 3_000)],
     ],
