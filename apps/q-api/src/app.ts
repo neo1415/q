@@ -45,7 +45,9 @@ import type { QRoomFeed } from "./room/feed.js";
 import { registerQRoomRoutes } from "./room/routes.js";
 import type { FastNavigationResolver } from "./composition/fast-navigation.js";
 import type { NavigationChooser } from "./composition/navigation-chooser.js";
+import type { QPitchQaMatcher } from "./composition/q-pitch-qa.js";
 import { registerFastNavigationRoutes } from "./http/fast-navigation.js";
+import { registerQPitchQaRoutes } from "./http/q-pitch-qa.js";
 import {
   registerUiActReceiptRoutes,
   type UiActReceiptLedger,
@@ -293,6 +295,8 @@ export type QApiModules = {
   readonly fastNavigation?: FastNavigationResolver | undefined;
   /** Lane 7: the tie-break for a pointing request ("open their deck"). */
   readonly fastNavigationChoose?: NavigationChooser | undefined;
+  /** Q Story ending: a spoken question to the Q&A bank (tier 1, then 2). */
+  readonly qPitchQa?: QPitchQaMatcher | undefined;
   /** The Approval Engine (CQ-Q-008); absent means no approval routes. */
   readonly qActions?: QApprovalRoutesDependencies["qActions"] | undefined;
   /** What runs an approved action: resume, or the gate when the run cannot resume. */
@@ -462,6 +466,14 @@ export function createApp(
         identity: security.identity,
         resolve: modules.fastNavigation,
         choose: modules.fastNavigationChoose,
+      });
+    }
+    if (modules.qPitchQa !== undefined) {
+      registerQPitchQaRoutes(app, {
+        authenticator: security.authenticator,
+        resolver: security.resolver,
+        identity: security.identity,
+        match: modules.qPitchQa,
       });
     }
     if (modules.uiActReceipts !== undefined) {

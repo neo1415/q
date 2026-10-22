@@ -722,6 +722,16 @@ function asked(entry: QaEntry): string {
   return q.charAt(0).toLowerCase() + q.slice(1);
 }
 
+/** "Do you mean …?" for one entry, or "…, or …?" for two. */
+export function clarifyPrompt(
+  candidates: readonly [QaEntry, ...QaEntry[]],
+): string {
+  const [first, second] = candidates;
+  return second !== undefined
+    ? `Do you mean ${asked(first)}, or ${asked(second)}?`
+    : `Do you mean ${asked(first)}?`;
+}
+
 /**
  * Builds the in-memory index for one side (entries for that side and for
  * BOTH). Each stored wording is a weighted set of terms (rarer terms weigh
@@ -859,11 +869,7 @@ export function buildQaIndex(
       lead < QA_MARGIN
         ? [first.entry, second.entry]
         : [first.entry];
-    const prompt =
-      candidates[1] !== undefined
-        ? `Do you mean ${asked(candidates[0])}, or ${asked(candidates[1])}?`
-        : `Do you mean ${asked(candidates[0])}?`;
-    return { kind: "CLARIFY", candidates, prompt };
+    return { kind: "CLARIFY", candidates, prompt: clarifyPrompt(candidates) };
   };
   return {
     match,

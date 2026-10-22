@@ -52,6 +52,7 @@ export { PREMIERE_CERTIFICATION_LEDGER } from "./premiere-ledger.js";
 export * from "./step-commands.js";
 export * from "./step-graph.js";
 export * from "./qa-bank.js";
+export * from "./qa-semantic.js";
 export * from "./demo-investors.js";
 export * from "./capital-q-pitch.js";
 export {

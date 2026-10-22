@@ -291,6 +291,9 @@ importers:
       '@capital-q/q-orchestrator':
         specifier: workspace:*
         version: link:../../packages/q-orchestrator
+      '@capital-q/q-pitch':
+        specifier: workspace:*
+        version: link:../../packages/q-pitch
       '@capital-q/q-presence':
         specifier: workspace:*
         version: link:../../packages/q-presence

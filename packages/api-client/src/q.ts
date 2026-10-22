@@ -72,6 +72,10 @@ import {
   type QRoomRead,
   Q_UI_ACT_RECEIPTS_PATH,
   Q_FAST_NAVIGATION_PATH,
+  Q_PITCH_QA_MATCH_PATH,
+  QPitchQaMatchResponseSchema,
+  type QPitchQaMatchRequest,
+  type QPitchQaMatchResponse,
   Q_NAVIGATION_CHOOSE_PATH,
   QFastNavigationResponseSchema,
   QNavigationChooseResponseSchema,
@@ -411,6 +415,23 @@ export function resolveQNavigation(
     "POST",
     Q_FAST_NAVIGATION_PATH,
     QFastNavigationResponseSchema,
+    { body: input },
+  );
+}
+
+/**
+ * Q Story ending: which prepared answer a spoken question means, when the
+ * browser's word matcher was not sure (tier 2 embeds it on the server).
+ */
+export function matchQPitchQa(
+  session: ApiSession,
+  input: QPitchQaMatchRequest,
+): Promise<QPitchQaMatchResponse> {
+  return call(
+    session,
+    "POST",
+    Q_PITCH_QA_MATCH_PATH,
+    QPitchQaMatchResponseSchema,
     { body: input },
   );
 }
