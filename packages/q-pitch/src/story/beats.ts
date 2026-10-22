@@ -169,7 +169,12 @@ const inputs: readonly BeatInput[] = [
     delivery:
       "Warm and bright, a smile in the voice. A friendly first hello, unhurried.",
     tags: [[0, "[warmly]"]],
-    cues: [[0, stage("aperture", 1)]],
+    // Q is on screen from the first frame, so "Hi. I'm Q." is said by
+    // something there: the light canvas, Q large at its centre.
+    cues: [
+      [0, mood("DAY")],
+      [0, stage("aperture", 1)],
+    ],
   },
   {
     act: 0,
@@ -833,7 +838,8 @@ const inputs: readonly BeatInput[] = [
     pace: "normal",
     delivery: "Clear and caring, one finding per line.",
     cues: [
-      [0, stage("investiq", 0)],
+      // Opens with its first row: never an empty panel.
+      [0, stage("investiq", 1)],
       ["ready.", stage("investiq", 1)],
       ["weak.", stage("investiq", 2)],
       ["matters.", stage("investiq", 3)],

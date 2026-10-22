@@ -203,6 +203,13 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
     transparent 70%
   );
 }
+/* The opening and the close: Q large at the centre, saying "Hi. I'm Q." */
+.cq-story-presence[data-aperture] {
+  left: calc(50% - 160px);
+  top: calc(44vh - 160px);
+  width: 320px;
+  height: 320px;
+}
 .cq-story-presence[data-docked] {
   left: 0;
   top: 0;
@@ -682,34 +689,6 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   transform: none;
 }
 
-.cq-story-stopwatch .cq-story-pages {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-}
-.cq-story-pages i {
-  display: block;
-  width: 48px;
-  height: 60px;
-  border-radius: var(--cq-radius-sm);
-  background: var(--cq-surface-strong);
-  animation: cq-story-flip-page 420ms var(--cq-ease) infinite alternate;
-}
-.cq-story-pages i:nth-child(2) {
-  animation-delay: 140ms;
-}
-.cq-story-pages i:nth-child(3) {
-  animation-delay: 280ms;
-}
-@keyframes cq-story-flip-page {
-  to {
-    transform: rotateX(70deg);
-  }
-}
-.cq-story-stopwatch[data-step="2"] .cq-story-pages i {
-  animation: none;
-}
-
 .cq-story-outcomes {
   gap: 10px;
   font-size: clamp(1.0625rem, 2.6vw, 1.5rem);
@@ -772,7 +751,8 @@ html:is([data-story="NIGHT"], [data-story="HUSH"], [data-story="STORY"])
   max-width: 760px;
 }
 .cq-story-captions span {
-  opacity: 0.55;
+  /* Words still to come stay readable (4.5:1 on either canvas). */
+  opacity: 0.72;
   transition: opacity 120ms linear;
 }
 .cq-story-captions span[data-said] {
@@ -940,4 +920,43 @@ html:is([data-story="NIGHT"], [data-story="HUSH"], [data-story="STORY"])
   .cq-story-montage figure[data-lit] {
     opacity: 1;
   }
+}
+
+/* ── Film (the recorded master, `?film=1` on the harness) ───────────────
+   Read on a phone at 720p: subtitles about twice the size, stage
+   artifacts scaled up, no player controls. The large type is already
+   large and keeps its size. */
+html[data-story-film] .cq-story-controls {
+  display: none;
+}
+html[data-story-film] .cq-story-captions {
+  font-size: 2.625rem;
+  line-height: 1.35;
+  height: calc(2.7em + 56px);
+  padding-bottom: 24px;
+}
+html[data-story-film] .cq-story-caption-line {
+  max-width: 1500px;
+}
+html[data-story-film] .cq-story-captions span {
+  opacity: 0.78;
+}
+html[data-story-film] .cq-story-stage {
+  padding-bottom: calc(2.7 * 2.625rem + 80px);
+}
+html[data-story-film]
+  .cq-story-stage
+  > :not(.cq-story-dockside):not(
+    :has(
+      .cq-story-type,
+      .cq-story-wordmark,
+      .cq-story-outcomes,
+      .cq-story-photo,
+      [data-story-qcard]
+    )
+  ) {
+  zoom: 1.75;
+}
+html[data-story-film] .cq-story-standing {
+  font-size: 1rem;
 }

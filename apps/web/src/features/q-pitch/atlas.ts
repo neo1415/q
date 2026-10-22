@@ -1,4 +1,8 @@
-import { STORY_LEDGER, certifyStory } from "@capital-q/q-pitch";
+import {
+  STORY_LEDGER,
+  certifyStory,
+  storyOwnerApproved,
+} from "@capital-q/q-pitch";
 
 /**
  * The tour entry's model: what the Q Pitch page offers, with its honest
@@ -28,7 +32,7 @@ function storyStanding(now: string): {
     now,
     actor,
     staleFeatureIds: [],
-    ownerApproved: false,
+    ownerApproved: storyOwnerApproved(),
   });
   return {
     certifiedScenes: gate.certifiedProductBeats,
