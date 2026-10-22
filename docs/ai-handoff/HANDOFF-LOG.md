@@ -1044,3 +1044,22 @@ Evidence stage: **code + local checks only**.
   - no OCR for images (they say plainly that they can't be read);
   - no full-stack or live run.
     \=======
+
+## 2026-10-22 — Claude, S1 Q Story engine (`qstory/engine`, draft PR #299 into `speed/q-oct20`)
+
+Evidence stage: **code + local production-build checks; nothing deployed.**
+
+- **Master video (Lily, eleven_v4_turbo):** `docs/ai-handoff/evidence/q-story/master/q-story-master-1080p.mp4` (1920×1080, 30 fps, 6:43) and `q-story-master-720p.mp4` (9.3 MB), with `audit.json` and 2 s frame sheets.
+  - Audit hits went from 554 to 28, and all 28 are GateQ's own strict-gate copy ("Others see why and can't send").
+  - Fallback cues 13 → 0, dev badge 0, CLS 0.0001.
+  - Recorded with `scripts/q-pitch/master-story.mjs --pitches <dir>`. The clips come from `scripts/q-pitch/fetch-pitch-clips.mjs` (Pexels, never committed).
+- **Harness:**
+  - Discover renders in the app shell, with every rule checked.
+  - Beat 41 opens the GateQ review dossier application, so it has a transcript and a brief.
+  - The montage screens are retaken from the prod build.
+- **Live story only:**
+  - After the last beat and 2.5 s of quiet, Q asks "Do you have any questions?" (S5's Lily clip, `closing.*`) and listens: the person's own Q line opens with that question when one isn't open already.
+  - "Hey Q, pitch yourself" (`classifyStoryTrigger` STORY), typed or said on any page with Q Pitch on, opens the story and starts it.
+  - In-story spoken answers use the narrator's voice. This is an additive optional `presenter: "STORY"` on `CreateQSpeechRequestSchema`, mapped in q-api to `STORY_VOICE_ID`. Q's global voice is unchanged.
+- **Checks:** root tsc clean; web and q-api tsc clean; vitest story/q-pitch 260/260, q-api speech + contracts 543/543; eslint and prettier clean on changed files. Browser check of the ending: card and clip at +2.5 s.
+- **Not done:** the live-line listening can't run locally (no providers). The owner still has to approve the story ledger, so the story stays INTERNAL_REHEARSAL.
