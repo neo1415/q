@@ -280,7 +280,10 @@ import type { QTurnSkimmer } from "./turn-skim.js";
 export { arrivalSnapshotFact };
 import { onScreenCompanyFact, ownCompanySnapshotFact } from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
-import { attachedDocumentFacts } from "./attached-document-fact.js";
+import {
+  attachedDocumentFacts,
+  attachedDocumentsWithin,
+} from "./attached-document-fact.js";
 import { reRenderAskOf } from "./re-render.js";
 import {
   manifestFacts,
@@ -2608,6 +2611,8 @@ export function createModelGatewayQAnswer(
       const { names } = await prefetchToolsRead;
       if (!names.has("read_attached_document")) return;
       const question = latest?.content.slice(0, 500).trim();
+      // The read shows as it starts, through the run's one stage tracker.
+      stepStarts(request, "CHECKING_EVIDENCE");
       const reads = await Promise.all(
         ids.map((documentId, index) =>
           tools
@@ -2627,10 +2632,12 @@ export function createModelGatewayQAnswer(
             .catch(() => null),
         ),
       );
-      attachedDocuments = reads.flatMap((outcome) =>
-        outcome?.result.ok === true
-          ? attachedDocumentFacts(outcome.result.data)
-          : [],
+      attachedDocuments = attachedDocumentsWithin(
+        reads.map((outcome) =>
+          outcome?.result.ok === true
+            ? attachedDocumentFacts(outcome.result.data)
+            : [],
+        ),
       );
     })();
     attachmentRead.catch(() => undefined);
