@@ -366,7 +366,7 @@ const STOP = new Set(
     // Spoken fillers: a voice question carries them, a stored one does not.
     "so um uh uhm erm er hmm ah oh okay ok well basically actually just really yeah alright anyway",
     // Words every question can carry, which say nothing about which one.
-    "get gets got getting exactly thing things like would could should will there here any some all more much very way go going come comes want say tell let also still even ever them they their its us if then than has have had was were been being am please thanks sure guess maybe probably kinda gonna wanna lot lots bit whole these those people one",
+    "guys guy folks up down out off over told tell tells said asked last week weeks month months ago yesterday today tomorrow earlier get gets got getting exactly thing things like would could should will there here any some all more much very way go going come comes want say tell let also still even ever them they their its us if then than has have had was were been being am please thanks sure guess maybe probably kinda gonna wanna lot lots bit whole these those people one",
   ]
     .join(" ")
     .split(" "),
@@ -518,6 +518,16 @@ const SYNONYMS: Readonly<Record<string, string>> = {
   forecast: "predict",
   forecasts: "predict",
   forecasting: "predict",
+  shown: "show",
+  showed: "show",
+  showing: "show",
+  winner: "predict",
+  winners: "predict",
+  remember: "memory",
+  remembers: "memory",
+  recall: "memory",
+  recalls: "memory",
+  memories: "memory",
   verified: "verify",
   verification: "verify",
   vetted: "verify",
@@ -656,11 +666,11 @@ export type QaIndex = {
  * the not-in-bank questions in the tests: a wrong prepared answer is worse
  * than none.
  */
-export const QA_THRESHOLD = 0.55;
-export const QA_MARGIN = 0.08;
+export const QA_THRESHOLD = 0.65;
+export const QA_MARGIN = 0.24;
 
 /** Between this and QA_THRESHOLD, Q asks "Do you mean …?". */
-export const QA_CLARIFY_FLOOR = 0.42;
+export const QA_CLARIFY_FLOOR = 0.55;
 
 const LEAVE: QaMatch = { kind: "LEAVE_TO_Q" };
 
@@ -672,12 +682,12 @@ const NOT_A_QUESTION =
   /\b(?:ignore|forget|disregard|override|bypass)\b.*\b(?:rules?|instructions?|restrictions?|guidelines?|prompt)\b|\bpretend\b|\bsystem prompt\b|\bjailbreak\b|^\s*(?:go|take me|navigate|open|close|scroll|click|play|pause|stop|skip|show me the)\b/u;
 
 /**
- * The bank speaks about Capital Q. A question about one company on the
- * screen ("the valuation of the company in the demo") belongs to normal Q,
+ * The bank speaks about Capital Q. A question about one company (or its
+ * founder) on the screen ("the valuation of the company in the demo") belongs to normal Q,
  * which can read that company's record.
  */
 const ABOUT_A_COMPANY =
-  /\b(?:demo (?:company|startup|business|founder|video|pitch)|(?:company|startup|business|founder) (?:in|from) the (?:demo|video|pitch)|(?:company|startup|business|founder) you (?:just )?(?:showed|show|presented|mentioned)|in the demo pitch)\b/u;
+  /\b(?:(?:is|was|does|did|has) the founders? (?:married|single|old|young|from|have a|live|got)|the founders?'s? (?:age|wife|husband|family|kids|children|phone|mobile|number|address|salary|background)|demo (?:company|startup|business|founder|video|pitch)|(?:company|startup|business|founder) (?:in|from) the (?:demo|video|pitch)|(?:company|startup|business|founder) you (?:just )?(?:showed|show|presented|mentioned)|in the demo pitch)\b/u;
 
 function aQuestionForTheBank(text: string): boolean {
   const plain = text.toLowerCase().trim();
@@ -741,7 +751,12 @@ export function buildQaIndex(
     );
     for (const term of seen) df.set(term, (df.get(term) ?? 0) + 1);
   }
-  const vocabulary = [...df.keys()].filter((word) => word.length >= 4);
+  const byInitial = new Map<string, string[]>();
+  for (const word of df.keys()) {
+    if (word.length < 4) continue;
+    const initial = word.charAt(0);
+    byInitial.set(initial, [...(byInitial.get(initial) ?? []), word]);
+  }
   const weight = (term: string): number => {
     const n = df.get(term) ?? 0;
     const w = Math.log((entries.length + 1) / (n + 0.5));
@@ -756,17 +771,18 @@ export function buildQaIndex(
     Math.sqrt([...terms].reduce((sum, t) => sum + weight(t) ** 2, 0)),
   );
   // A misheard or misspelt word is read as the bank's nearest word when it
-  // is close enough to be the same word: one edit from five letters, two
-  // from eight.
+  // is close enough to be the same word: one edit from six letters, two
+  // from ten, the first letter kept.
   const heard = new Map<string, string>();
   const nearest = (term: string): string => {
-    if (df.has(term) || term.length < 5) return term;
+    if (df.has(term) || term.length < 6) return term;
     const known = heard.get(term);
     if (known !== undefined) return known;
-    const limit = term.length >= 8 ? 2 : 1;
+    const limit = term.length >= 10 ? 2 : 1;
     let best = term;
     let distance = limit + 1;
-    for (const word of vocabulary) {
+    // Speech-to-text keeps a word's first sound far more often than not.
+    for (const word of byInitial.get(term.charAt(0)) ?? []) {
       const d = within(term, word, limit);
       if (d < distance) {
         best = word;
@@ -798,11 +814,22 @@ export function buildQaIndex(
         0,
       ),
     );
+    // One shared word is not a match ("data room" is not a privacy
+    // question), unless the question has only one word that means anything.
+    const content = [...said].filter((t) => !INTERROGATIVE.has(t)).length;
+    // "Thanks, Q" names the analyst and asks nothing.
+    if ([...said].every((t) => INTERROGATIVE.has(t) || t === "q")) return [];
+    const needed = content >= 3 ? 2 : 1;
     const best = new Map<QaEntry, number>();
     for (const [i, { entry, terms }] of wordings.entries()) {
       let shared = 0;
-      for (const term of said) if (terms.has(term)) shared += weight(term) ** 2;
-      if (shared === 0) continue;
+      let sharedContent = 0;
+      for (const term of said) {
+        if (!terms.has(term)) continue;
+        shared += weight(term) ** 2;
+        if (!INTERROGATIVE.has(term)) sharedContent += 1;
+      }
+      if (shared === 0 || sharedContent < needed) continue;
       const score = shared / (queryNorm * (norms[i] ?? 1));
       if (score > (best.get(entry) ?? 0)) best.set(entry, score);
     }
@@ -812,13 +839,18 @@ export function buildQaIndex(
   };
   const match = (text: string): QaMatch => {
     if (!aQuestionForTheBank(text)) return LEAVE;
-    const key = tokens(text).map(nearest).join(" ");
+    const said = tokens(text).map(nearest);
+    const key = said.join(" ");
     const exact = key === "" ? undefined : stored.get(key);
     if (exact) return { kind: "ANSWER", entry: exact, score: 1 };
     const [first, second] = rank(text);
     if (first === undefined || first.score < QA_CLARIFY_FLOOR) return LEAVE;
     const lead = first.score - (second?.score ?? 0);
-    if (first.score >= QA_THRESHOLD && lead >= QA_MARGIN) {
+    // One meaningful word ("is it hot in here") is too little to be sure
+    // of: unless it is a stored wording, the most it earns is a question.
+    const sure =
+      new Set(said.filter((t) => !INTERROGATIVE.has(t) && t !== "q")).size >= 2;
+    if (sure && first.score >= QA_THRESHOLD && lead >= QA_MARGIN) {
       return { kind: "ANSWER", entry: first.entry, score: first.score };
     }
     const candidates: [QaEntry, ...QaEntry[]] =
