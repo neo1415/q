@@ -62,27 +62,27 @@ export function EditableSection({
         !gate.allowed ? (
           <LockedEdit gate={gate} />
         ) : (
-        <button
-          type="button"
-          onClick={() => setEditing((value) => !value)}
-          aria-pressed={editing}
-          aria-label={editing ? `Done editing ${title}` : `Edit ${title}`}
-          className={
-            brief
-              ? "inline-flex min-h-11 shrink-0 items-center rounded-(--cq-radius-md) px-2.5 text-[13px] font-medium text-(--cq-text-secondary) transition-colors hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
-              : buttonClassName("quiet", "regular", "shrink-0 gap-2")
-          }
-          data-section-edit={id}
-        >
-          {editing || brief ? null : (
-            <Pencil
-              size={ICON_SIZE.compact}
-              strokeWidth={ICON_STROKE}
-              aria-hidden
-            />
-          )}
-          {editing ? "Done" : "Edit"}
-        </button>
+          <button
+            type="button"
+            onClick={() => setEditing((value) => !value)}
+            aria-pressed={editing}
+            aria-label={editing ? `Done editing ${title}` : `Edit ${title}`}
+            className={
+              brief
+                ? "inline-flex min-h-11 shrink-0 items-center rounded-(--cq-radius-md) px-2.5 text-[13px] font-medium text-(--cq-text-secondary) transition-colors hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) lg:min-h-9"
+                : buttonClassName("quiet", "regular", "shrink-0 gap-2")
+            }
+            data-section-edit={id}
+          >
+            {editing || brief ? null : (
+              <Pencil
+                size={ICON_SIZE.compact}
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+            )}
+            {editing ? "Done" : "Edit"}
+          </button>
         )
       }
     >

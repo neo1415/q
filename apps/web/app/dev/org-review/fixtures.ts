@@ -28,7 +28,11 @@ export const PEOPLE = {
 } as const;
 
 /** Who the reviewer is, by role: the owner, an admin, or a member. */
-const YOU: Readonly<Record<TeamRole, number>> = { OWNER: 0, ADMIN: 1, MEMBER: 2 };
+const YOU: Readonly<Record<TeamRole, number>> = {
+  OWNER: 0,
+  ADMIN: 1,
+  MEMBER: 2,
+};
 
 export function teamAs(role: TeamRole, now: number): TeamDto {
   const base = team("investor", "full", now);
@@ -46,7 +50,10 @@ export function teamAs(role: TeamRole, now: number): TeamDto {
         own: role === "OWNER",
       },
     },
-    members: base.members.map((member, at) => ({ ...member, isYou: at === me })),
+    members: base.members.map((member, at) => ({
+      ...member,
+      isYou: at === me,
+    })),
     invitations: admin ? base.invitations : [],
     joinRequests: admin ? base.joinRequests : [],
     // The owner sees the hand-over they started; an admin sees none.
@@ -166,7 +173,7 @@ export function activityItems(now: number): ActivityItemDto[] {
       action: {
         code: "relationship.stage.change",
         kind: "RELATIONSHIPS",
-        words: "Changed a relationship's stage",
+        words: "Moved a relationship on",
       },
       resource: {
         kind: "relationship",
@@ -266,7 +273,11 @@ export function memberSummary(now: number): MemberSummaryDto {
     },
     roleHistory: [
       { role: "ADMIN", from: iso(now - 2 * HOUR), until: null },
-      { role: "MEMBER", from: iso(now - 140 * DAY), until: iso(now - 2 * HOUR) },
+      {
+        role: "MEMBER",
+        from: iso(now - 140 * DAY),
+        until: iso(now - 2 * HOUR),
+      },
     ],
     invitationsSent: [
       {

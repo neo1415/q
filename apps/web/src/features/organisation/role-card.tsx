@@ -62,9 +62,7 @@ export function RoleCard({ team }: { readonly team: TeamDto }) {
       {lines === null ? (
         <p className="m-0 max-w-[64ch] text-sm text-(--cq-text-secondary)">
           {t(
-            role === "MEMBER"
-              ? teamWords(kind).member
-              : teamWords(kind).admin,
+            role === "MEMBER" ? teamWords(kind).member : teamWords(kind).admin,
           )}
         </p>
       ) : (
@@ -93,7 +91,9 @@ export function RoleCard({ team }: { readonly team: TeamDto }) {
           {lines.cannot.length === 0 ? null : (
             <div className="flex flex-col gap-1.5">
               <h3 className="m-0 text-[13px] font-medium text-(--cq-text-secondary)">
-                {role === "ADMIN" ? t("Kept for owners") : t("Kept for admins and owners")}
+                {role === "ADMIN"
+                  ? t("Kept for owners")
+                  : t("Kept for admins and owners")}
               </h3>
               <ul
                 className="m-0 flex list-none flex-col gap-1 p-0"

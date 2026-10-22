@@ -78,7 +78,10 @@ export function OrgDenied({
                 `You're ${role === "MEMBER" ? "a" : "an"} ${ROLE_WORD[role]}. This page shows what everyone on the team has done; ask an admin if you need to know what changed.`,
               )}
         </p>
-        <Link href="/settings/team" className={accountButton("secondary", "sm")}>
+        <Link
+          href="/settings/team"
+          className={accountButton("secondary", "sm")}
+        >
           {t("See your team")}
         </Link>
       </div>
@@ -112,7 +115,8 @@ export function ActivityPageView({
 }: {
   readonly t: T;
   readonly organisationName: string | null;
-  readonly activity: AdminRead<ActivityPageDto> | { readonly status: "LOADING" };
+  readonly activity:
+    AdminRead<ActivityPageDto> | { readonly status: "LOADING" };
   readonly people: readonly ActivityPerson[];
   readonly filters?: ActivityFilters | undefined;
   readonly review?: { readonly loading?: boolean } | undefined;
@@ -198,7 +202,10 @@ export function MemberPageView({
           back={{ href: "/settings/team", label: t("Team") }}
         />
         {summary.status === "NOT_FOUND" ? (
-          <p className="m-0 text-[15px] text-(--cq-text-secondary)" data-org-missing>
+          <p
+            className="m-0 text-[15px] text-(--cq-text-secondary)"
+            data-org-missing
+          >
             {t("That person isn't on your team.")}
           </p>
         ) : (
@@ -222,7 +229,10 @@ export function MemberPageView({
       ? t("Not active yet")
       : t(`Last active ${lastActive(summary.value.lastActiveAt, now)}`),
   ].filter((part): part is string => part !== null);
-  const counted = last30Days.counts.reduce((sum, entry) => sum + entry.count, 0);
+  const counted = last30Days.counts.reduce(
+    (sum, entry) => sum + entry.count,
+    0,
+  );
   return (
     <AccountColumn>
       <QSection id="member" kind="TEAM" label={t("a team member")}>
@@ -230,11 +240,7 @@ export function MemberPageView({
           title={member.name}
           back={{ href: "/settings/team", label: t("Team") }}
           right={
-            <Avatar
-              name={member.name}
-              size="lg"
-              src={avatarUrl ?? undefined}
-            />
+            <Avatar name={member.name} size="lg" src={avatarUrl ?? undefined} />
           }
           sub={
             <>
@@ -281,7 +287,10 @@ export function MemberPageView({
             {t("None yet.")}
           </p>
         ) : (
-          <ul className="m-0 flex list-none flex-col p-0" data-member-relationships>
+          <ul
+            className="m-0 flex list-none flex-col p-0"
+            data-member-relationships
+          >
             {relationships.map((relationship) => (
               <li
                 key={relationship.relationshipId}
@@ -357,7 +366,10 @@ export function MemberPageView({
             {t("None yet.")}
           </p>
         ) : (
-          <ul className="m-0 flex list-none flex-col p-0" data-member-invitations>
+          <ul
+            className="m-0 flex list-none flex-col p-0"
+            data-member-invitations
+          >
             {invitationsSent.map((invitation) => (
               <li
                 key={invitation.invitationId}
@@ -370,7 +382,8 @@ export function MemberPageView({
                   {t(ROLE_WORD[invitation.role])}
                 </span>
                 <span className="ms-auto text-[13px] text-(--cq-text-secondary)">
-                  {t(STATE_WORD[invitation.state])} · {t(dayWords(invitation.sentAt))}
+                  {t(STATE_WORD[invitation.state])} ·{" "}
+                  {t(dayWords(invitation.sentAt))}
                 </span>
               </li>
             ))}

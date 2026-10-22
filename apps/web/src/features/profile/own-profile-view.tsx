@@ -734,18 +734,18 @@ function OrganisationImages({
           </div>
           <div className="absolute -end-1.5 -bottom-1.5">
             <WhenAllowed capability={editCapability}>
-            <ProfileImageEditor
-              subjectType={subjectType}
-              subjectId={subjectId}
-              kind="AVATAR"
-              label="logo"
-              hasImage={avatarUrl !== null}
-              previewUrl={avatarUrl}
-              previewName={name}
-              square
-              compact
-              initiallyOpen={open === "logo"}
-            />
+              <ProfileImageEditor
+                subjectType={subjectType}
+                subjectId={subjectId}
+                kind="AVATAR"
+                label="logo"
+                hasImage={avatarUrl !== null}
+                previewUrl={avatarUrl}
+                previewName={name}
+                square
+                compact
+                initiallyOpen={open === "logo"}
+              />
             </WhenAllowed>
           </div>
         </div>
@@ -756,16 +756,16 @@ function OrganisationImages({
           )}
           <div className="absolute top-1/2 end-2 -translate-y-1/2">
             <WhenAllowed capability={editCapability}>
-            <ProfileImageEditor
-              subjectType={subjectType}
-              subjectId={subjectId}
-              kind="COVER"
-              label="cover"
-              hasImage={coverUrl !== null}
-              previewUrl={coverUrl}
-              compact
-              initiallyOpen={open === "cover"}
-            />
+              <ProfileImageEditor
+                subjectType={subjectType}
+                subjectId={subjectId}
+                kind="COVER"
+                label="cover"
+                hasImage={coverUrl !== null}
+                previewUrl={coverUrl}
+                compact
+                initiallyOpen={open === "cover"}
+              />
             </WhenAllowed>
           </div>
         </div>

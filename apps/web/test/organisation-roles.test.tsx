@@ -31,7 +31,11 @@ import { ActivityFeed } from "../src/features/organisation/activity-feed";
 import { ActivityPageView } from "../src/features/organisation/admin-pages";
 import { CapabilitiesProvider } from "../src/features/organisation/capabilities";
 import { RoleCard } from "../src/features/organisation/role-card";
-import { CAP, gateOf, roleLines } from "../src/features/organisation/role-words";
+import {
+  CAP,
+  gateOf,
+  roleLines,
+} from "../src/features/organisation/role-words";
 import { EditableSection } from "../src/features/profile/editable-section";
 import { INVESTOR_FIELDS } from "../src/features/profile/profile-fields";
 import { TeamPage } from "../src/features/team/team-page";
@@ -46,7 +50,9 @@ const t = (english: string) => english;
 
 function asRole(role: TeamRole, node: React.ReactNode) {
   return render(
-    <CapabilitiesProvider value={capabilitiesAs(role)}>{node}</CapabilitiesProvider>,
+    <CapabilitiesProvider value={capabilitiesAs(role)}>
+      {node}
+    </CapabilitiesProvider>,
   );
 }
 
@@ -82,17 +88,13 @@ describe("role-aware controls (capabilities from the DTO, never role strings)", 
 
   it("shows Edit to an admin", () => {
     asRole("ADMIN", firmSection());
-    expect(
-      screen.getByRole("button", { name: "Edit Your firm" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit Your firm" })).toBeTruthy();
     expect(document.querySelector("[data-gated-control]")).toBeNull();
   });
 
   it("leaves a control to the server when capabilities are unknown", () => {
     render(firmSection());
-    expect(
-      screen.getByRole("button", { name: "Edit Your firm" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit Your firm" })).toBeTruthy();
     expect(gateOf(null, CAP.INVESTOR_EDIT).allowed).toBe(true);
   });
 
@@ -127,15 +129,15 @@ describe("role-aware controls (capabilities from the DTO, never role strings)", 
         expect(document.querySelector("[data-role-cannot]")).toBeNull();
       }
       if (role === "ADMIN") {
-        expect(
-          document.querySelector("[data-role-cannot]")?.textContent,
-        ).toBe("Hand over ownership");
+        expect(document.querySelector("[data-role-cannot]")?.textContent).toBe(
+          "Hand over ownership",
+        );
       }
       cleanup();
     }
-    expect(roleLines(capabilitiesAs("MEMBER").capabilities, "FIRM").can).toEqual(
-      ["Approve what Q sends for you", "Upload documents"],
-    );
+    expect(
+      roleLines(capabilitiesAs("MEMBER").capabilities, "FIRM").can,
+    ).toEqual(["Approve what Q sends for you", "Upload documents"]);
   });
 });
 
@@ -202,10 +204,14 @@ describe("the activity feed", () => {
     ).toBeTruthy();
     cleanup();
     render(<ActivityFeed initial={activityPage(NOW, "empty")} people={[]} />);
-    expect(document.querySelector('[data-activity-state="empty"]')).toBeTruthy();
+    expect(
+      document.querySelector('[data-activity-state="empty"]'),
+    ).toBeTruthy();
     cleanup();
     render(<ActivityFeed initial={null} people={[]} />);
-    expect(document.querySelector('[data-activity-state="error"]')).toBeTruthy();
+    expect(
+      document.querySelector('[data-activity-state="error"]'),
+    ).toBeTruthy();
   });
 });
 

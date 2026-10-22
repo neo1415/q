@@ -20,7 +20,10 @@ import {
 import { QMark } from "@capital-q/ui/q-mark";
 
 import { useT } from "@/features/i18n/language";
-import { accountButton, fieldClassName } from "@/features/settings/account-styles";
+import {
+  accountButton,
+  fieldClassName,
+} from "@/features/settings/account-styles";
 
 import { activityAction } from "./activity-actions";
 import {
@@ -79,7 +82,9 @@ export function ActivityFeed({
     initial?.nextCursor ?? null,
   );
   const [failed, setFailed] = useState<string | null>(
-    initial === null ? "Activity couldn't load. Nothing changed; try again." : null,
+    initial === null
+      ? "Activity couldn't load. Nothing changed; try again."
+      : null,
   );
   const [denied, setDenied] = useState(false);
   const [filters, setFilters] = useState<ActivityFilters>(() => ({
@@ -112,7 +117,9 @@ export function ActivityFeed({
       }
       setFailed(null);
       setItems((current) =>
-        after === undefined ? out.value.items : [...current, ...out.value.items],
+        after === undefined
+          ? out.value.items
+          : [...current, ...out.value.items],
       );
       setCursor(out.value.nextCursor);
     });

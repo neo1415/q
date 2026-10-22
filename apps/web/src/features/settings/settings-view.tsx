@@ -267,28 +267,28 @@ export function SettingsView({
                 "team",
                 t("Team"),
                 <>
-                <SRow
-                  title={acting?.name ?? t("Your team")}
-                  description={
-                    acting === null || words === null
-                      ? t("Set up when Q onboards you.")
-                      : acting.memberCount <= 1
-                        ? t(words.soloLine(acting.name))
-                        : t(
-                            `You are ${ROLE_WORD[acting.role]}. ${acting.role === "MEMBER" ? words.member : words.admin}`,
-                          )
-                  }
-                >
-                  <Link
-                    href="/settings/team"
-                    className={accountButton("secondary", "sm")}
+                  <SRow
+                    title={acting?.name ?? t("Your team")}
+                    description={
+                      acting === null || words === null
+                        ? t("Set up when Q onboards you.")
+                        : acting.memberCount <= 1
+                          ? t(words.soloLine(acting.name))
+                          : t(
+                              `You are ${ROLE_WORD[acting.role]}. ${acting.role === "MEMBER" ? words.member : words.admin}`,
+                            )
+                    }
                   >
-                    {acting !== null && acting.memberCount <= 1
-                      ? t("Invite your team")
-                      : t("Open your team")}
-                  </Link>
-                </SRow>
-                <ActivitySettingsRow />
+                    <Link
+                      href="/settings/team"
+                      className={accountButton("secondary", "sm")}
+                    >
+                      {acting !== null && acting.memberCount <= 1
+                        ? t("Invite your team")
+                        : t("Open your team")}
+                    </Link>
+                  </SRow>
+                  <ActivitySettingsRow />
                 </>,
               )}
 

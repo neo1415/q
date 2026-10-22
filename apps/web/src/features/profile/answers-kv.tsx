@@ -151,25 +151,25 @@ export function AnswersKvSection({
   const action = !gate.allowed ? (
     <LockedEdit gate={gate} />
   ) : editable === null || steps.length === 0 ? (
-      <Link
-        href={setupHref}
-        aria-label={`${t("Edit")} ${title.toLowerCase()}`}
-        className="inline-flex min-h-11 shrink-0 items-center rounded-(--cq-radius-md) px-2.5 text-[13px] font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-9"
-      >
-        {t("Edit")}
-      </Link>
-    ) : (
-      <button
-        type="button"
-        onClick={() => (editing ? setEditing(false) : start())}
-        aria-pressed={editing}
-        disabled={phase === "pending"}
-        className="inline-flex min-h-11 shrink-0 items-center rounded-(--cq-radius-md) px-2.5 text-[13px] font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-9"
-        data-section-edit={id}
-      >
-        {editing ? t("Cancel") : t("Edit")}
-      </button>
-    );
+    <Link
+      href={setupHref}
+      aria-label={`${t("Edit")} ${title.toLowerCase()}`}
+      className="inline-flex min-h-11 shrink-0 items-center rounded-(--cq-radius-md) px-2.5 text-[13px] font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-9"
+    >
+      {t("Edit")}
+    </Link>
+  ) : (
+    <button
+      type="button"
+      onClick={() => (editing ? setEditing(false) : start())}
+      aria-pressed={editing}
+      disabled={phase === "pending"}
+      className="inline-flex min-h-11 shrink-0 items-center rounded-(--cq-radius-md) px-2.5 text-[13px] font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-9"
+      data-section-edit={id}
+    >
+      {editing ? t("Cancel") : t("Edit")}
+    </button>
+  );
 
   return (
     <ProfileSectionShell

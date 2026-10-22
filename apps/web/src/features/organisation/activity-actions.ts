@@ -1,6 +1,9 @@
 "use server";
 
-import { ApiProblemError, getOrganisationActivity } from "@capital-q/api-client";
+import {
+  ApiProblemError,
+  getOrganisationActivity,
+} from "@capital-q/api-client";
 import {
   ActivityQuerySchema,
   type ActivityPageDto,

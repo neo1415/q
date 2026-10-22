@@ -98,7 +98,7 @@ export default async function OrgReviewPage({
   const role: TeamRole =
     ROLE_OF[state] ??
     (entry.id === "activity" || entry.id === "member" ? "ADMIN" : "MEMBER");
-  const now = Date.now();
+  const now = reviewClock();
   const t = await serverT();
   return (
     <>
@@ -213,8 +213,7 @@ function ReviewPage({
                 subjectId: HARBOURLINE.id,
                 fields: INVESTOR_FIELDS.filter(
                   (spec) =>
-                    spec.field === "displayName" ||
-                    spec.field === "websiteUrl",
+                    spec.field === "displayName" || spec.field === "websiteUrl",
                 ),
                 values: {
                   displayName: `${HARBOURLINE.name} (fictional)`,
@@ -246,6 +245,11 @@ function ReviewPage({
   }
 }
 
+/** The fixtures' dates are relative to now, so they read as recent. */
+function reviewClock(): number {
+  return Date.now();
+}
+
 function ReviewIndex() {
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-10 text-(--cq-text-primary)">
@@ -253,8 +257,8 @@ function ReviewIndex() {
         Organisation roles, design review
       </h1>
       <p className="m-0 text-sm text-(--cq-text-secondary)">
-        Fictional data only. Each link renders the real page in one state,
-        under the capabilities that role holds.
+        Fictional data only. Each link renders the real page in one state, under
+        the capabilities that role holds.
       </p>
       {PAGES.map((entry) => (
         <section key={entry.id} className="flex flex-col gap-2">

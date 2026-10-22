@@ -55,7 +55,10 @@ export function gateReason(capability: string): string {
   return REASONS[capability] ?? "Only admins can do this.";
 }
 
-export type Gate = { readonly allowed: boolean; readonly reason: string | null };
+export type Gate = {
+  readonly allowed: boolean;
+  readonly reason: string | null;
+};
 
 /**
  * Whether a control shows as usable. Unknown capabilities (the read failed,
@@ -83,18 +86,34 @@ type Line = {
 
 /** What a role means here, line by line, keyed on capabilities held. */
 const LINES: readonly Line[] = [
-  { capability: CAP.Q_APPROVE, side: "BOTH", can: "Approve what Q sends for you" },
+  {
+    capability: CAP.Q_APPROVE,
+    side: "BOTH",
+    can: "Approve what Q sends for you",
+  },
   { capability: CAP.DOCUMENT_CREATE, side: "BOTH", can: "Upload documents" },
-  { capability: CAP.COMPANY_EDIT, side: "COMPANY", can: "Edit the company profile" },
+  {
+    capability: CAP.COMPANY_EDIT,
+    side: "COMPANY",
+    can: "Edit the company profile",
+  },
   {
     capability: CAP.DISCLOSURE_MANAGE,
     side: "COMPANY",
     can: "Decide who sees each data room document",
   },
   { capability: CAP.RAISE_EDIT, side: "COMPANY", can: "Change the raise" },
-  { capability: CAP.INVESTOR_EDIT, side: "FIRM", can: "Edit the firm's profile" },
+  {
+    capability: CAP.INVESTOR_EDIT,
+    side: "FIRM",
+    can: "Edit the firm's profile",
+  },
   { capability: CAP.MANDATE_EDIT, side: "FIRM", can: "Change the mandate" },
-  { capability: CAP.GATE_PUBLISH, side: "FIRM", can: "Publish the gate's rules" },
+  {
+    capability: CAP.GATE_PUBLISH,
+    side: "FIRM",
+    can: "Publish the gate's rules",
+  },
   {
     capability: CAP.ORGANISATION_ADMIN,
     side: "BOTH",
@@ -132,9 +151,13 @@ export function roleLines(
   kind: TeamKind,
 ): { readonly can: readonly string[]; readonly cannot: readonly string[] } {
   const held = new Set(capabilities);
-  const mine = LINES.filter((line) => line.side === "BOTH" || line.side === kind);
+  const mine = LINES.filter(
+    (line) => line.side === "BOTH" || line.side === kind,
+  );
   return {
-    can: mine.filter((line) => held.has(line.capability)).map((line) => line.can),
+    can: mine
+      .filter((line) => held.has(line.capability))
+      .map((line) => line.can),
     cannot: mine
       .filter((line) => !held.has(line.capability))
       .map((line) => line.can),
@@ -201,7 +224,8 @@ export function whenWords(iso: string, now: Date = new Date()): string {
     return minutes === 1 ? "1 minute ago" : `${String(minutes)} minutes ago`;
   }
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return hours === 1 ? "1 hour ago" : `${String(hours)} hours ago`;
+  if (hours < 24)
+    return hours === 1 ? "1 hour ago" : `${String(hours)} hours ago`;
   if (hours < 48) return "Yesterday";
   return dayWords(iso);
 }
@@ -232,7 +256,9 @@ export function activityQuery(
   cursor?: string,
 ): ActivityQuery {
   const from =
-    filters.fromDay === undefined ? undefined : dayBound(filters.fromDay, false);
+    filters.fromDay === undefined
+      ? undefined
+      : dayBound(filters.fromDay, false);
   const to =
     filters.toDay === undefined ? undefined : dayBound(filters.toDay, true);
   return {
@@ -244,4 +270,3 @@ export function activityQuery(
     ...(cursor === undefined ? {} : { cursor }),
   };
 }
-

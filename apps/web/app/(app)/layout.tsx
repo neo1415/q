@@ -120,15 +120,15 @@ export default async function ApplicationLayout({
   // P5: the brand colour, read alongside so it paints with the first frame.
   const [verifyNudgeState, admin, brandCss, organisations, capabilities] =
     await Promise.all([
-    unfinished === null && context.kind !== "NONE"
-      ? verifyRead
-      : Promise.resolve(null),
-    adminRead,
-    brandRead,
-    // G2: the switcher's list (shown only for two or more).
-    loadMyOrganisations(),
-    capabilitiesRead,
-  ]);
+      unfinished === null && context.kind !== "NONE"
+        ? verifyRead
+        : Promise.resolve(null),
+      adminRead,
+      brandRead,
+      // G2: the switcher's list (shown only for two or more).
+      loadMyOrganisations(),
+      capabilitiesRead,
+    ]);
   // Any language: the interface follows the language they chose; Q's
   // machine translations fill what no hand catalogue covers.
   const language = uiLanguageOf(standing?.language);
@@ -136,49 +136,49 @@ export default async function ApplicationLayout({
   return (
     <LanguageProvider language={language} machine={machine}>
       <CapabilitiesProvider value={capabilities}>
-      <AppShell
-        context={{ ...shell, admin, organisations, qPitch }}
-        subject={subject}
-        qConnected={qConnected}
-        onboarding={gate}
-        verifyNudge={verifyNudgeState}
-      >
-        <BrandStyle css={brandCss} />
-        {children}
-        <InstallPrompt />
-        {/* Search as a palette (app prototype "search", option 2): / from
+        <AppShell
+          context={{ ...shell, admin, organisations, qPitch }}
+          subject={subject}
+          qConnected={qConnected}
+          onboarding={gate}
+          verifyNudge={verifyNudgeState}
+        >
+          <BrandStyle css={brandCss} />
+          {children}
+          <InstallPrompt />
+          {/* Search as a palette (app prototype "search", option 2): / from
             any page opens it over what the person is doing. */}
-        <SearchPalette viewer={user.authUserId} />
-        {/* An investor's first pitches, cached before Discover opens (ADR 0064). */}
-        {context.kind === "INVESTOR" && unfinished === null ? (
-          <PitchWarmup />
-        ) : null}
-        <QSwarmPointer />
-        {/* Q Pitch rehearsal host (QP-F08): off unless the server enables it;
+          <SearchPalette viewer={user.authUserId} />
+          {/* An investor's first pitches, cached before Discover opens (ADR 0064). */}
+          {context.kind === "INVESTOR" && unfinished === null ? (
+            <PitchWarmup />
+          ) : null}
+          <QSwarmPointer />
+          {/* Q Pitch rehearsal host (QP-F08): off unless the server enables it;
           the host itself admits only fictional demo accounts. Its subject
           read streams after the page and never holds the first byte. */}
-        {qPitch &&
-        unfinished === null &&
-        user.email !== null &&
-        (context.kind === "INVESTOR" || context.kind === "FOUNDER") ? (
-          <Suspense fallback={null}>
-            <QPitchEntrySlot account={user.email} role={context.kind} />
-          </Suspense>
-        ) : null}
-        {/* RECOVERY-2026-10 (C): Q's control of the page -- the route trail,
+          {qPitch &&
+          unfinished === null &&
+          user.email !== null &&
+          (context.kind === "INVESTOR" || context.kind === "FOUNDER") ? (
+            <Suspense fallback={null}>
+              <QPitchEntrySlot account={user.email} role={context.kind} />
+            </Suspense>
+          ) : null}
+          {/* RECOVERY-2026-10 (C): Q's control of the page -- the route trail,
           receipts to the Q API, and the notice when an act did not happen. */}
-        <Suspense fallback={null}>
-          <QControlRuntime
-            viewer={{
-              kind:
-                context.kind === "FOUNDER" || context.kind === "INVESTOR"
-                  ? context.kind
-                  : "NONE",
-              admin,
-            }}
-          />
-        </Suspense>
-      </AppShell>
+          <Suspense fallback={null}>
+            <QControlRuntime
+              viewer={{
+                kind:
+                  context.kind === "FOUNDER" || context.kind === "INVESTOR"
+                    ? context.kind
+                    : "NONE",
+                admin,
+              }}
+            />
+          </Suspense>
+        </AppShell>
       </CapabilitiesProvider>
     </LanguageProvider>
   );
