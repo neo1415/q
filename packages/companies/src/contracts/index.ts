@@ -49,6 +49,11 @@ export type Company = {
   readonly marketplaceVisibility: MarketplaceVisibility;
   readonly marketplaceReadinessState: string;
   readonly logoStorageKey: string | null;
+  /**
+   * The profile carries owner-approved demonstration figures (migration
+   * 20261229100000): every surface says so. Absent: false.
+   */
+  readonly demonstrationData?: boolean | undefined;
   readonly version: number;
   readonly createdAt: UtcTimestamp;
   readonly updatedAt: UtcTimestamp;

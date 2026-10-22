@@ -76,6 +76,8 @@ const CompanyRowSchema = z.object({
   marketplace_readiness_state: MarketplaceReadinessStateSchema,
   logo_storage_key: z.string().nullable(),
   version: z.number().int().min(1),
+  /** Owner-approved demo figures (migration 20261229100000); absent reads false. */
+  demonstration_data: z.boolean().default(false),
   created_at: TimestampSchema,
   updated_at: TimestampSchema,
 });
@@ -100,6 +102,7 @@ function toCompany(row: unknown): Company {
     marketplaceVisibility: parsed.marketplace_visibility,
     marketplaceReadinessState: parsed.marketplace_readiness_state,
     logoStorageKey: parsed.logo_storage_key,
+    demonstrationData: parsed.demonstration_data,
     version: parsed.version,
     createdAt: parsed.created_at,
     updatedAt: parsed.updated_at,
@@ -113,7 +116,7 @@ function companySelect(executor: DatabaseExecutor) {
            c.headquarters_city, c.current_stage_code, c.primary_description,
            c.short_description, c.company_status, c.marketplace_visibility,
            c.marketplace_readiness_state, c.logo_storage_key, c.version,
-           c.created_at, c.updated_at
+           c.created_at, c.updated_at, c.demonstration_data
       from core.companies c`;
 }
 
@@ -351,6 +354,7 @@ const ProfileRowSchema = CompanyRowSchema.pick({
   short_description: true,
   company_status: true,
   marketplace_visibility: true,
+  demonstration_data: true,
 });
 
 function toProfileFacts(row: unknown): CompanyProfileFacts {
@@ -370,6 +374,7 @@ function toProfileFacts(row: unknown): CompanyProfileFacts {
     shortDescription: p.short_description,
     companyStatus: p.company_status,
     marketplaceVisibility: p.marketplace_visibility,
+    demonstrationData: p.demonstration_data,
   };
 }
 
@@ -662,7 +667,8 @@ export function createPostgresCompanyQueryPort(options: {
         select c.id, c.tenant_id, c.organisation_id, c.canonical_name, c.legal_name,
                c.website_url, c.founded_date::text as founded_date, c.headquarters_country,
                c.headquarters_city, c.current_stage_code, c.primary_description,
-               c.short_description, c.company_status, c.marketplace_visibility
+               c.short_description, c.company_status, c.marketplace_visibility,
+               c.demonstration_data
           from core.companies c
          where c.id = ${companyId}`;
       return rows.length === 0 ? null : toProfileFacts(rows[0]);

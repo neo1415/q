@@ -17,6 +17,7 @@ import type {
 } from "@capital-q/contracts";
 import { deckAskTerms } from "@capital-q/contracts";
 
+import { DemonstrationNote } from "@/components/demonstration-note";
 import type { QuestionsRoute } from "@/features/assumptions/assumptions-section";
 import { capitalTabHref } from "@/features/capital/capital-tabs";
 
@@ -279,6 +280,11 @@ export function CompanyProfileView({
         verified={verified}
         deck={overview === null ? null : deck}
       />
+      {profile.demonstrationData === true ? (
+        <div className="pb-3">
+          <DemonstrationNote />
+        </div>
+      ) : null}
       <BriefTabBar
         label={`${profile.canonicalName} profile`}
         base={base}

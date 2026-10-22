@@ -316,3 +316,23 @@ describe("a person's card (owner 2026-10-22)", () => {
     expect(within(focus).getByText("Members only")).toBeTruthy();
   });
 });
+
+describe("demonstration data (owner 2026-10-22)", () => {
+  it("says so on the card of a company with demonstration figures, to everyone", () => {
+    const { container } = render(
+      <PublicCardView
+        card={{ ...card("PUBLIC", [METRICS]), demonstration: true }}
+      />,
+    );
+    const note = container.querySelector("[data-demonstration-data]");
+    expect(note?.textContent).toContain("Demonstration data.");
+    expect(note?.textContent).toContain("not verified");
+  });
+
+  it("says nothing of the kind on any other card", () => {
+    const { container } = render(
+      <PublicCardView card={card("PUBLIC", [METRICS])} />,
+    );
+    expect(container.querySelector("[data-demonstration-data]")).toBeNull();
+  });
+});

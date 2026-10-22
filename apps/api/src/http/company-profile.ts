@@ -449,6 +449,7 @@ export function registerCompanyProfileRoutes(
         headquartersCity: projection.headquartersCity,
         photoUrl: images.photo,
         coverUrl: images.cover,
+        demonstrationData: company.demonstrationData === true,
         overview: full
           ? {
               legalName: projection.legalName,

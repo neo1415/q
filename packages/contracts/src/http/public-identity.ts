@@ -406,6 +406,11 @@ export const PublicCardDtoSchema = z
     demoAttested: z.array(z.enum(PUBLIC_VERIFICATION_LABELS)).max(2),
     /** Who this projection was built for. */
     audience: z.enum(["PUBLIC", "PARTICIPANT"]),
+    /**
+     * The organisation's profile carries owner-approved demonstration
+     * figures: the card says so to everyone. Absent: false.
+     */
+    demonstration: z.boolean().optional(),
     indexable: z.boolean(),
   })
   .strict();

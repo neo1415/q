@@ -268,6 +268,11 @@ export type CompanyProfileFacts = {
   readonly shortDescription: string | null;
   readonly companyStatus: CompanyStatus;
   readonly marketplaceVisibility: MarketplaceVisibility;
+  /**
+   * The profile carries owner-approved demonstration figures: every surface
+   * says so. Absent: false.
+   */
+  readonly demonstrationData?: boolean | undefined;
 };
 
 export const COMPANY_SEARCH_LIMIT_MAX = 50;

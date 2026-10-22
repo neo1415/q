@@ -278,6 +278,11 @@ export const CompanyProfileDtoSchema = z
     overview: CompanyProfileOverviewSchema.nullable(),
     /** Every video this reader may play, newest first. */
     videos: z.array(PitchSummaryDtoSchema).max(30),
+    /**
+     * The profile carries owner-approved demonstration figures: the page
+     * says "Demonstration data" plainly. Absent from older servers: false.
+     */
+    demonstrationData: z.boolean().optional(),
   })
   .strict();
 export type CompanyProfileDto = z.infer<typeof CompanyProfileDtoSchema>;
