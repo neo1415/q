@@ -12,7 +12,7 @@
  *   sheets/sheet-NN.jpg        a frame every 2 s, for the eye pass
  *
  *   node scripts/q-pitch/master-story.mjs --base http://127.0.0.1:3200 \
- *     [--voice EXAVITQu4vr4xnSDxMaL] [--skip-ocr]
+ *     [--voice pFZP5JQG7iQjIQuC4Bku] [--skip-ocr]
  *
  * Another voice set is one flag: --voice <id> (its render must exist under
  * apps/web/public/story-media/<id>/). Playwright records no sound, so each
@@ -37,7 +37,7 @@ const option = (name, fallback) => {
   return at === -1 ? fallback : process.argv[at + 1];
 };
 const base = option("base", "http://127.0.0.1:3200");
-const voice = option("voice", "EXAVITQu4vr4xnSDxMaL");
+const voice = option("voice", "pFZP5JQG7iQjIQuC4Bku");
 const skipOcr = process.argv.includes("--skip-ocr");
 if (!/^[A-Za-z0-9]{8,40}$/u.test(voice)) throw new Error("not a voice id");
 const out = path.join(root, "docs/ai-handoff/evidence/q-story/master");
@@ -144,11 +144,9 @@ async function answerMedia(context) {
     "/dev/story/gateq?view=inbox-detail",
     "/dev/story/gateq?view=inbox",
   ]) {
-    await page.goto(`${base}${url}`, {
-      waitUntil: "networkidle",
-      timeout: 120_000,
-    });
-    await page.waitForTimeout(800);
+    // "load", not "networkidle": Discover keeps a stream open by design.
+    await page.goto(`${base}${url}`, { waitUntil: "load", timeout: 120_000 });
+    await page.waitForTimeout(2_500);
   }
   await context.close();
 }
