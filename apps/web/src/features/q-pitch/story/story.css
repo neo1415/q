@@ -179,19 +179,29 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
 /* Q, the narrator (lane S4's particle presence), always on screen. */
 .cq-story-presence {
   position: fixed;
-  left: calc(50% - 60px);
-  top: 9vh;
-  z-index: var(--cq-z-presence);
-  width: 120px;
-  height: 120px;
+  left: calc(50% - 80px);
+  top: 7vh;
+  z-index: var(--cq-z-toast);
+  width: 160px;
+  height: 160px;
   pointer-events: none;
   transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+/* Its backing is the scene's own colour (nearly invisible on the scrim),
+   so the particles draw for the surface they are actually seen on. */
+.cq-story-presence[data-surface="stage"] {
+  border-radius: var(--cq-radius-circle);
+  background: color-mix(in oklch, var(--cq-night-canvas) 52%, transparent);
+}
+.cq-story-presence[data-surface="page"] {
+  border-radius: var(--cq-radius-circle);
+  background: color-mix(in oklch, var(--cq-canvas) 60%, transparent);
 }
 .cq-story-presence[data-docked] {
   left: 0;
   top: 0;
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
 }
 
 /* Product beats: everything but the lit section recedes (paint only). */

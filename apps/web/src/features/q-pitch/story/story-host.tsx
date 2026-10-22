@@ -572,15 +572,12 @@ function StoryOverlay({
   const woke = moodNow === "WAKE";
   const viewport = useViewport();
   const centreStage = !woke || snapshot.beat.n >= 55;
+  // Docked on product beats: in the caption band, beside its own words
+  // (the band has no page text under it), so Q never covers the page.
   const docked =
     centreStage || viewport === null
       ? null
-      : lit === null
-        ? { x: viewport.w - 72, y: 88 }
-        : {
-            x: lit.x + lit.w / 2 < viewport.w / 2 ? viewport.w - 72 : 24,
-            y: Math.min(viewport.h - 220, Math.max(88, lit.y)),
-          };
+      : { x: 24, y: viewport.h - 88 - 56 };
   const beside =
     lit === null || viewport === null ? null : besidePlace(lit, viewport);
 
@@ -689,6 +686,7 @@ function StoryOverlay({
       <div
         className="cq-story-presence"
         data-docked={docked === null ? undefined : ""}
+        data-surface={woke ? "page" : "stage"}
         style={
           docked === null
             ? undefined
@@ -698,9 +696,12 @@ function StoryOverlay({
         }
         aria-hidden
       >
+        {/* Keyed by its surface: the presence reads light or dark from
+            the backing behind it once, at mount. */}
         <QSwarm
+          key={woke ? "page" : "stage"}
           state={playing ? "SPEAKING" : "IDLE"}
-          pixels={docked === null ? 120 : 48}
+          pixels={docked === null ? 160 : 56}
         />
       </div>
       {captions && !done && word >= 0 ? (
