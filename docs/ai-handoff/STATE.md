@@ -35,6 +35,27 @@
 - Meeting: the Google Workspace "Capital Q" account (tomorrow), `CQ_MEETING_FACE_ID` (Darius `r4ba1277e4fb`, or `rccbeedfc684` on Phoenix-4.5), and raising the face length in both places together.
 - 16 investor-Q&A facts (`docs/specs/q-pitch/story/INVESTOR-QA.md`).
 
+## Chosen designs, black-and-gold, organisation roles — 22 October 2026, 06:05 UTC (Claude)
+
+- **Release:** de5728338 is green in CI39709842207: tests, build, typecheck, lint and pgTAP. It is pushed to `build/int-rc`, `recovery/2026-09-12-8y2j4w` and `recovery/2026-09-12`, but **not yet deployed**.
+- **Railway:** a platform outage (since 2026-10-21) pauses every build. API deploys answer "Deploys have been paused due to an upstream issue", and GitHub auto-deploy does not fire.
+  - Live is still 93c336aeb on all four services.
+  - The token in the environment and the one pasted on 2026-10-20 are dead.
+  - A replacement token is held outside the repo.
+- **Migration:** 20261228210000_organisation_activity_capability is applied to hosted (249/249). It is additive: one capability, granted to organisation_admin only.
+- **Contents:**
+  - The 30 founder-chosen pages: Work, discovery, GateQ and account.
+  - Explore video cards square.
+  - Prototype option tones removed, so everything uses the black_gold brand preset.
+  - Tasks failure state fixed; rehearsal score out of 10.
+  - The organisation activity feed and member summary (`/v1/organisation/*`, `/v1/me/capabilities`).
+  - Owner, admin and member screens: `/settings/activity`, `/settings/team/[userId]`, the role card, and capability gating.
+  - Review pages under `/dev/*-review`, which 404 in production.
+- **Founder decisions** (DECISIONS 37–38):
+  - Admins never see members' private Q content.
+  - The brand is black and gold.
+- **Next:** deploy de5728338 as soon as Railway resumes builds, then do live verification (sign-in, the new pages, roles).
+
 ## Chosen designs release — 20 October 2026, 22:00 UTC (Claude)
 
 The founder-chosen redesign is integrated on `claude/friendly-feynman-q9haun` and pushed to `build/int-rc`, `recovery/2026-09-12-8y2j4w` and `recovery/2026-09-12` (93c336aeb).
