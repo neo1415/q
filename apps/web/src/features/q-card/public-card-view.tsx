@@ -165,12 +165,10 @@ export function PublicCardView({
         ? undefined
         : byKey("deploymentState");
   const company = card.subjectType === "COMPANY";
-  const founded = byKey("foundedDate");
   const more = facts.filter(
     (field) =>
       !GLANCE_KEYS.has(field.key) &&
       !SECTION_KEYS.has(field.key) &&
-      field.key !== "foundedDate" &&
       field.key !== "mandateLookFor" &&
       field.key !== location?.key &&
       field.key !== status?.key,
@@ -352,9 +350,6 @@ export function PublicCardView({
                       }
                     />
                   )}
-                  {founded === undefined ? null : (
-                    <Fact label="Founded" value={founded.value.slice(0, 4)} />
-                  )}
                 </dl>
               )}
             </>
@@ -429,7 +424,9 @@ export function PublicCardView({
                     {cardFieldLabel(field.key)}
                   </dt>
                   <dd className="cq-body min-w-0 text-end break-words">
-                    {cardFieldValue(field)}
+                    {field.key === "foundedDate"
+                      ? field.value.slice(0, 4)
+                      : cardFieldValue(field)}
                     {field.scope === "network_visible" ? (
                       <span className="cq-caption block text-(--cq-text-tertiary)">
                         Shown to Capital Q members
