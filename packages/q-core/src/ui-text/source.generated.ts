@@ -5287,6 +5287,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Your own words; investors see them as your claim",
   "Your past rehearsals couldn’t load just now.",
   "Your payment went through. Your plan changes as soon as the payment provider confirms it, usually within a minute.",
+  "Your personal Q Card",
   "Your photo",
   "Your picks on the same fit as your top three. Unknown never counts against a company, and the order is never paid for.",
   "Your pitch couldn't load",

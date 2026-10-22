@@ -33,7 +33,9 @@ export const HANDLE_CLAIM = QActionTypeSchema.parse("handle.claim");
 
 export const HandleClaimPayloadSchema = z
   .object({
-    subjectType: QCardSubjectTypeSchema,
+    // Organisations only: a person's own card is made by that person on
+    // their profile, never through an organisation's approved action.
+    subjectType: QCardSubjectTypeSchema.exclude(["PERSON"]),
     subjectId: UuidSchema,
     handle: HandleSchema,
   })

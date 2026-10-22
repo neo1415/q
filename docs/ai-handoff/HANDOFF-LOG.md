@@ -921,8 +921,6 @@ Next:
 - The founder picks options for the remaining pages (the gallery artifact is in the session).
 - Rotate the Railway and Supabase tokens pasted in chat, and add them as environment secrets.
 
-<<<<<<< HEAD
-
 ## 21 October 2026, 21:05 UTC — Claude coordinator (speed + Q Story)
 
 - **Integrated** 25+ lane PRs into `speed/q-oct20`, each reviewed against the docs and the owner's intent before merging. Several were sent back: the stage checklist became a single line, findings were restored to 3, red card tint removed, context navigation built, onboarding stages restored.
@@ -946,7 +944,6 @@ Next:
   - prettier check.
 - **No app code changed.** No provider calls apart from a Pexels search through `packages/q-daily`'s port; the photos are not committed.
 - **Flags for the owner** (in STORYBOARD.md): product first appears at 4:28 of 7:55; GateQ score/rank gap (§8.3); the shipped nav differs from the plan's list; a Q Card component exists; story-mode scrim vs ADR 0017.
-  \=======
 
 ## Q Story S6: the Q Card — 22 October 2026 (Claude, branch `qstory/qcard`, PR into `speed/q-oct20`)
 
@@ -988,4 +985,32 @@ Evidence stage: **code + local checks only**. Not merged, not deployed. No migra
   - The amount committed in the raise is not shown.
   - The anonymous read is not cached yet.
 
-> > > > > > > origin/qstory/qcard
+## Q Story S6 follow-up: the person Q Card — 22 October 2026 (Claude, `qstory/person-card`, draft PR for owner approval)
+
+The owner asked for the per-person card to be built. Evidence stage: **code + local checks only**.
+
+**Needs a migration:** `20261229090000_person_q_card.sql`.
+
+- It is additive: it widens the two subject-type checks, makes `organisation_id` nullable only for PERSON, and requires a PERSON row's claimer/creator to be the person.
+- pgTAP test: `rls/521_person_q_card.test.sql`. It was **not run locally** (no Docker); the CI database job runs it.
+- The coordinator applies it.
+
+What changed:
+
+- **Authorization:** a person manages only their own card, the same rule as `profile-images` PERSON. No new capability. Q's `handle.claim` and the app-action card claim/update are narrowed to organisation subjects.
+- **New server-side reads:**
+  - `createPostgresPersonCardRead` (security/postgres);
+  - `createPostgresCompanyAffiliationRead` (companies);
+  - `createPostgresInvestorAffiliationRead` (investors);
+  - `personStandings` (verification): the person's own founder-identity claim only.
+- **Focus:** a person's "what they're looking for" is built only from their organisation's own card at the same audience.
+- **The organisation-verified claim** on a person card is shown only when the affiliation is visible.
+- **Web:**
+  - a profile section, "Your personal Q Card";
+  - public rendering, Person JSON-LD, vCard N/ORG/TITLE;
+  - search handles person cards;
+  - one i18n string added.
+- **Checks:**
+  - root, web, api, q-api and workers tsc: all pass;
+  - vitest: public-identity, app-actions, network, verification, investors, companies, q-api handle-claim and parity, and the web q-card, search, profile and i18n tests — 72 files, all passed after the catalogue fix;
+  - eslint and prettier on changed files: clean.

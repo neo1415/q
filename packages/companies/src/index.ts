@@ -200,7 +200,10 @@ export {
   projectTeamForNetwork,
   type TeamProjectionSource,
 } from "./domain/team-projection.js";
-export { createPostgresCompanyTeamProjection } from "./infrastructure/postgres-team-projection.js";
+export {
+  createPostgresCompanyAffiliationRead,
+  createPostgresCompanyTeamProjection,
+} from "./infrastructure/postgres-team-projection.js";
 export {
   ageFrom,
   projectFounderPerson,

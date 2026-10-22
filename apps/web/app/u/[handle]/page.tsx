@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * `/@handle` (BIZ-004; reached through a rewrite to `/u/[handle]`): an
- * organisation's public Q identity, value before any sign-in -- most often
+ * organisation's -- or, since 2026-10-22, a person's -- public Q identity, value before any sign-in -- most often
  * opened by a phone camera from a Q Card (R26; the layout is
  * `PublicCardView`).
  *
@@ -87,6 +87,8 @@ export default async function PublicCardPage({
   const tagline = cardTagline(card.subjectType, publicFields);
   const url = `${appOrigin()}/@${card.handle}`;
   const website = publicFields.find((field) => field.key === "websiteUrl");
+  const role = publicFields.find((field) => field.key === "roleTitle");
+  const employer = publicFields.find((field) => field.key === "affiliation");
 
   return (
     <main className="min-h-dvh bg-(--cq-canvas) text-(--cq-text-primary)">
@@ -99,12 +101,30 @@ export default async function PublicCardPage({
               "@context": "https://schema.org",
               "@type": "ProfilePage",
               url,
-              mainEntity: {
-                "@type": "Organization",
-                name: card.name,
-                ...(tagline === null ? {} : { description: tagline }),
-                ...(website === undefined ? {} : { sameAs: [website.value] }),
-              },
+              mainEntity:
+                card.subjectType === "PERSON"
+                  ? {
+                      "@type": "Person",
+                      name: card.name,
+                      ...(tagline === null ? {} : { description: tagline }),
+                      ...(role === undefined ? {} : { jobTitle: role.value }),
+                      ...(employer === undefined
+                        ? {}
+                        : {
+                            worksFor: {
+                              "@type": "Organization",
+                              name: employer.value,
+                            },
+                          }),
+                    }
+                  : {
+                      "@type": "Organization",
+                      name: card.name,
+                      ...(tagline === null ? {} : { description: tagline }),
+                      ...(website === undefined
+                        ? {}
+                        : { sameAs: [website.value] }),
+                    },
             }).replace(/</g, "\\u003c"),
           }}
         />
