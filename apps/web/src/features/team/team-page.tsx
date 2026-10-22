@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useEffect,
@@ -49,6 +50,8 @@ import {
   RadioList,
 } from "@/features/settings/account-kit";
 import { useT } from "@/features/i18n/language";
+import { useCapabilities } from "@/features/organisation/capabilities";
+import { CAP } from "@/features/organisation/role-words";
 
 /**
  * Settings → Team (G2; chosen design "Invite first", 2026-10-21): the
@@ -566,6 +569,11 @@ function MemberRow({
   // Yourself: leave. Someone else: remove (an owner only by an owner).
   const removable =
     !member.isYou && can.removeMembers && (member.role !== "OWNER" || can.own);
+  // Admins and owners open a person's page (their role history and what
+  // they did); the API decides again (organisation.activity.view).
+  const capabilities = useCapabilities();
+  const tracks =
+    capabilities?.capabilities.includes(CAP.ACTIVITY_VIEW) === true;
   return (
     <li
       className="grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 border-t border-(--cq-border-subtle) py-3 first:border-t-0"
@@ -578,9 +586,19 @@ function MemberRow({
         src={member.avatarUrl ?? undefined}
       />
       <span className="min-w-0">
-        <b className="block truncate text-[15px] font-semibold text-(--cq-text-primary)">
-          {member.name}
-        </b>
+        {tracks ? (
+          <Link
+            href={`/settings/team/${member.userId}`}
+            className="block truncate text-[15px] font-semibold text-(--cq-text-primary) underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring)"
+            data-team-member-link
+          >
+            {member.name}
+          </Link>
+        ) : (
+          <b className="block truncate text-[15px] font-semibold text-(--cq-text-primary)">
+            {member.name}
+          </b>
+        )}
         <span className="block truncate text-[13px] text-(--cq-text-secondary)">
           {t(ROLE_WORD[member.role])}.{" "}
           {member.isYou ? t("You") : t(`Joined ${joinedOn(member.joinedAt)}`)}

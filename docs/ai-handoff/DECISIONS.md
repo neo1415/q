@@ -151,3 +151,13 @@ Core Seven remains the governing assessment framework. The new directive authori
 34. **Synthetic demo verification:** it is kept, but displayed as a distinct "Demo verified (synthetic)" badge. The gold badge is only for real operator or provider verification.
 35. **Q in Google Meet:** Q appears as a real Tavus presenter, a stock replica of a Black woman, rather than a letter tile.
 36. **Live voice:** the trial limits for the owner's test accounts are removed, and the daily caps are raised to $25 live and $15 realtime.
+
+## Organisation roles (2026-10-22)
+
+37. **Admins never see members' private Q conversations or Q memory.** The founder decided this on 2026-10-22. The organisation activity feed and member pages, for owners and admins only, show:
+    - what each person did directly: notes and corrections, relationship stage moves, consequential screen actions;
+    - what Q did under a person's approval.
+
+    They never show Q conversations, memory, delegations, standing instructions or other `personal_private` content.
+
+38. **Colour.** Capital Q's colours are the black-and-gold brand preset: gold on black in dark mode, and bronze-gold on ivory in light mode. The prototypes' charcoal, gold and near-black option tones are not used, and blue is only the unbranded token fallback.

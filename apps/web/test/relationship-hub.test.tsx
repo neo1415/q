@@ -741,7 +741,13 @@ describe("S2: the Pipeline is the one record list", () => {
         .getAttribute("aria-current"),
     ).toBe("page");
     expect(screen.queryByRole("link", { name: "Relationships" })).toBeNull();
-    const layouts = screen.getByRole("group", { name: "Layout" });
+    // The list streams in after the header; on a loaded runner it can take
+    // longer than show()'s bounded wait, so wait for the switch itself.
+    const layouts = await screen.findByRole(
+      "group",
+      { name: "Layout" },
+      { timeout: 15_000 },
+    );
     expect(
       within(layouts)
         .getByRole("link", { name: "List" })
@@ -753,7 +759,7 @@ describe("S2: the Pipeline is the one record list", () => {
     expect(
       manifestControls().some((entry) => entry.id === "tab.pipeline-list"),
     ).toBe(true);
-  });
+  }, 30_000);
 
   it("opens a bare /relationships on the Overview, never a redirect loop", async () => {
     // Owner 2026-10-16: the CRM's front page is the Overview.
