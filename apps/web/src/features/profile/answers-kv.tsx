@@ -13,6 +13,7 @@ import {
   useAccountToast,
 } from "@/features/settings/account-kit";
 import { useT } from "@/features/i18n/language";
+import { LockedEdit, useGate } from "@/features/organisation/capabilities";
 
 import { reviseProfileAnswerAction } from "./answer-actions";
 import { same, StepField, stepsOf } from "./answer-editor";
@@ -51,6 +52,7 @@ export function AnswersKvSection({
   saveNote,
   emptyText,
   initiallyEditing = false,
+  capability,
 }: {
   readonly id: string;
   readonly title: string;
@@ -68,8 +70,11 @@ export function AnswersKvSection({
   readonly emptyText: string;
   /** Design review only (/dev/account-review): opens in its edit form. */
   readonly initiallyEditing?: boolean | undefined;
+  /** The capability saving needs; without it, "Admins only" (the API still decides). */
+  readonly capability?: string | undefined;
 }) {
   const t = useT();
+  const gate = useGate(capability);
   const toast = useAccountToast();
   const router = useRouter();
   const steps = useMemo(
@@ -143,27 +148,28 @@ export function AnswersKvSection({
       ? line.items.join(", ")
       : line.value;
 
-  const action =
-    editable === null || steps.length === 0 ? (
-      <Link
-        href={setupHref}
-        aria-label={`${t("Edit")} ${title.toLowerCase()}`}
-        className="inline-flex min-h-11 shrink-0 items-center rounded-(--cq-radius-md) px-2.5 text-[13px] font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-9"
-      >
-        {t("Edit")}
-      </Link>
-    ) : (
-      <button
-        type="button"
-        onClick={() => (editing ? setEditing(false) : start())}
-        aria-pressed={editing}
-        disabled={phase === "pending"}
-        className="inline-flex min-h-11 shrink-0 items-center rounded-(--cq-radius-md) px-2.5 text-[13px] font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-9"
-        data-section-edit={id}
-      >
-        {editing ? t("Cancel") : t("Edit")}
-      </button>
-    );
+  const action = !gate.allowed ? (
+    <LockedEdit gate={gate} />
+  ) : editable === null || steps.length === 0 ? (
+    <Link
+      href={setupHref}
+      aria-label={`${t("Edit")} ${title.toLowerCase()}`}
+      className="inline-flex min-h-11 shrink-0 items-center rounded-(--cq-radius-md) px-2.5 text-[13px] font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-9"
+    >
+      {t("Edit")}
+    </Link>
+  ) : (
+    <button
+      type="button"
+      onClick={() => (editing ? setEditing(false) : start())}
+      aria-pressed={editing}
+      disabled={phase === "pending"}
+      className="inline-flex min-h-11 shrink-0 items-center rounded-(--cq-radius-md) px-2.5 text-[13px] font-medium text-(--cq-text-secondary) hover:bg-(--cq-surface-subtle) hover:text-(--cq-text-primary) lg:min-h-9"
+      data-section-edit={id}
+    >
+      {editing ? t("Cancel") : t("Edit")}
+    </button>
+  );
 
   return (
     <ProfileSectionShell
@@ -178,7 +184,7 @@ export function AnswersKvSection({
           {intro}
         </p>
       )}
-      {editing ? (
+      {editing && gate.allowed ? (
         <div className="flex flex-col" data-answers="editing">
           {error === null ? null : (
             <p

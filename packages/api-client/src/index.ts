@@ -514,6 +514,8 @@ export {
 export { exploreRelated, exploreSearch, exploreSlate } from "./explore.js";
 // G1/G2 block: teams.
 export * from "./team.js";
+// Organisation administration: capabilities, activity, member summaries.
+export * from "./organisation-admin.js";
 export * from "./gateq-inbox.js";
 export * from "./company-claims.js";
 export * from "./readiness.js";

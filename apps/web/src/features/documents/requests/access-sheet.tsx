@@ -30,6 +30,8 @@ import {
 } from "./request-actions";
 import { shortDate } from "./requests-model";
 import { useT } from "@/features/i18n/language";
+import { GateNote, useGate } from "@/features/organisation/capabilities";
+import { CAP } from "@/features/organisation/role-words";
 
 /**
  * The access editor (founder documents, 2026-10-08): who can see one
@@ -272,6 +274,9 @@ function DocumentAccess({
   const t = useT();
 
   const [busy, setBusy] = useState(false);
+  // Who sees a document is an admin's call (disclosure.manage); the
+  // API authorises every change again whatever this shows.
+  const manage = useGate(CAP.DISCLOSURE_MANAGE);
   const run = async (
     work: () => Promise<{ ok: boolean; message?: string }>,
     words: string,
@@ -287,9 +292,10 @@ function DocumentAccess({
   };
   return (
     <div className="flex flex-col gap-5" data-document-access-sheet>
+      <GateNote gate={manage} />
       <ScopeChoices
         current={access.level}
-        busy={busy}
+        busy={busy || !manage.allowed}
         onChoose={(level) =>
           void run(
             () =>
@@ -332,7 +338,7 @@ function DocumentAccess({
                 </span>
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy || !manage.allowed}
                   onClick={() =>
                     void run(
                       () => revokeAccessAction(grant.policyId),
@@ -356,7 +362,7 @@ function DocumentAccess({
           candidates={access.candidates}
           awaiting={access.awaitingConnection}
           label={t("Share")}
-          busy={busy}
+          busy={busy || !manage.allowed}
           onShare={(input) =>
             void run(
               () => shareDocumentAction(access.documentId, input),
@@ -406,6 +412,9 @@ function FolderAccess({
   const t = useT();
 
   const [busy, setBusy] = useState(false);
+  // Who sees a document is an admin's call (disclosure.manage); the
+  // API authorises every change again whatever this shows.
+  const manage = useGate(CAP.DISCLOSURE_MANAGE);
   const levels = new Set(access.documents.map((document) => document.level));
   const current =
     levels.size === 1 ? (access.documents[0]?.level ?? null) : null;
@@ -424,6 +433,7 @@ function FolderAccess({
   };
   return (
     <div className="flex flex-col gap-5" data-folder-access-sheet>
+      <GateNote gate={manage} />
       {current === null ? (
         <p className="cq-caption text-(--cq-text-secondary)">
           {t(
@@ -433,7 +443,7 @@ function FolderAccess({
       ) : null}
       <ScopeChoices
         current={current}
-        busy={busy}
+        busy={busy || !manage.allowed}
         onChoose={(level) =>
           void run(
             () => setFolderLevelAction(companyId, access.folderCode, level),
@@ -471,7 +481,7 @@ function FolderAccess({
           candidates={access.candidates}
           awaiting={access.awaitingConnection}
           label={t("Share the folder")}
-          busy={busy}
+          busy={busy || !manage.allowed}
           onShare={(input) =>
             void run(
               () => shareFolderAction(companyId, access.folderCode, input),

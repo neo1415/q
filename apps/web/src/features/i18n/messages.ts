@@ -9,6 +9,7 @@ import { ADMIN_AR } from "./catalog/admin";
 import { COMPANY_AR } from "./catalog/company";
 import { CORE_AR } from "./catalog/core";
 import { ACCOUNT_AR } from "./catalog/account";
+import { ORGANISATION_AR } from "./catalog/organisation";
 import { CRM_DESIGN_AR } from "./catalog/crm-design";
 import { WORK_DESIGN_AR } from "./catalog/work-design";
 import { CRM_RECORD_AR } from "./catalog/crm-record";
@@ -62,6 +63,9 @@ const ARABIC: Readonly<Record<string, string>> = {
   // for the same words wins. The Work designs' short words ("Save",
   // "Share") only fill gaps.
   ...WORK_CHOSEN_AR,
+  // Organisation roles and activity (2026-10-21): first, so every area's
+  // own word for a shared one ("Admin", "Team") still wins.
+  ...ORGANISATION_AR,
   ...ACCOUNT_AR,
   ...CRM_DESIGN_AR,
   ...DISCOVERY_PAGES_AR,
