@@ -1,0 +1,71 @@
+{
+  "scenario": 7,
+  "name": "talk-while-researching",
+  "line": "ElevenLabs Agents (expressive mode)",
+  "voice": "Lily pFZP5JQG7iQjIQuC4Bku",
+  "conversationId": "conv_4801m5hbwrwtfz2v9270qbdq2gx0",
+  "wallSeconds": 32,
+  "latenciesMs": [6600, 1599],
+  "playbackFlushes": 0,
+  "said": "[warmly] I'm checking your pipeline for the best fits right now. Pro rata means that each party gets their proportionate share of something, based on their existing ownership or contribution. Okay, your best fits right now are Ajopot and Ledgerfold, tied at the top, with Clinicrest coming in next.",
+  "heard": "Can you check which companies fit my mandate best right now? And while you're at it, remind me, what does pro rata actually mean?",
+  "events": [
+    {
+      "ms": 486,
+      "type": "ready",
+      "out": "pcm_16000"
+    },
+    {
+      "ms": 490,
+      "type": "user_step",
+      "text": "Can you check which companies fit my mandate best right now?"
+    },
+    {
+      "ms": 4889,
+      "type": "user_speech_end"
+    },
+    {
+      "ms": 4955,
+      "type": "user_step",
+      "text": "And while you're at it, remind me, what does pro rata actually mean?"
+    },
+    {
+      "ms": 9890,
+      "type": "user_speech_end"
+    },
+    {
+      "ms": 11398,
+      "type": "user_transcript",
+      "text": "Can you check which companies fit my mandate best right now? And while you're at it, remind me, what does pro rata actually mean?"
+    },
+    {
+      "ms": 11399,
+      "type": "first_audio_chunk",
+      "after": 9990
+    },
+    {
+      "ms": 13939,
+      "type": "agent_response",
+      "text": "[warmly] I'm checking your pipeline for the best fits right now. Pro rata means that each party gets their proportionate share of something, based on their existing ownership or contribution."
+    },
+    {
+      "ms": 13939,
+      "type": "client_tool_call",
+      "name": "check_pipeline"
+    },
+    {
+      "ms": 19940,
+      "type": "client_tool_result_sent"
+    },
+    {
+      "ms": 19990,
+      "type": "agent_tool_response",
+      "name": "check_pipeline"
+    },
+    {
+      "ms": 21633,
+      "type": "agent_response",
+      "text": "Okay, your best fits right now are Ajopot and Ledgerfold, tied at the top, with Clinicrest coming in next."
+    }
+  ]
+}

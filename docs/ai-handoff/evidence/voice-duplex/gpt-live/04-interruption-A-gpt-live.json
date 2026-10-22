@@ -1,0 +1,365 @@
+{
+  "scenario": 4,
+  "name": "interruption",
+  "provider": "live",
+  "reportedModel": "gpt-live-1",
+  "reportedSession": "(present)",
+  "backend": "offline",
+  "slowBackend": null,
+  "inputs": "synthetic: gpt-4o-mini-tts, Nigerian English accent instructions",
+  "wallSeconds": 27,
+  "billedSeconds": 25,
+  "usageConfirmed": true,
+  "closedReason": "close_requested",
+  "hardStopped": false,
+  "costUsd": 0.0208,
+  "ttsCostUsd": 0.0025,
+  "latenciesMs": [
+    {
+      "step": 1,
+      "ms": 1142
+    },
+    {
+      "step": 1,
+      "ms": 1179
+    }
+  ],
+  "qAudioSeconds": 25,
+  "playbackFlushes": 0,
+  "fillerHits": [],
+  "delegations": [],
+  "bridge": {
+    "delegations": [],
+    "acked": 0,
+    "refused": []
+  },
+  "eventTypes": {
+    "session.started": 1,
+    "session.output_audio.delta": 247,
+    "session.input_transcript.delta": 22,
+    "session.output_transcript.delta": 38,
+    "session.usage.updated": 1,
+    "session.closed": 1
+  },
+  "firstEvents": {
+    "session.started": "{\"event_id\":\"event_EbiQM56esIITnbRBrdLec\",\"type\":\"session.started\",\"session\":{\"id\":\"live_u2_EbiQMp3oN1TRsXNv0hoXPi63mAu6X4mA\",\"expires_at\":1792664810,\"model\":\"gpt-live-1\",\"instructions\":\"You are Q, the investment analyst inside Capital Q, a private-capital platform that connects founders and investors. You are speaking with one person on a live voice call.\\n\\nSpeaking style:\\nTalk like a sharp, wa",
+    "session.input_transcript.delta": "{\"type\":\"session.input_transcript.delta\",\"start_ms\":600,\"end_ms\":800,\"delta\":\" Can\",\"event_id\":\"event_EbiQNFgYAKktMqaow3xSp\"}",
+    "session.output_transcript.delta": "{\"type\":\"session.output_transcript.delta\",\"start_ms\":5000,\"end_ms\":5200,\"delta\":\" Sure.\",\"event_id\":\"event_EbiQSOwz6SxmtvfrqmtDM\"}",
+    "session.usage.updated": "{\"type\":\"session.usage.updated\",\"usage\":{\"seconds\":14},\"context_window\":{\"usage_ratio\":0.022078125},\"event_id\":\"event_EbiQb7wM5S8Ilj1Y01ak7\"}",
+    "session.closed": "{\"event_id\":\"event_EbiQmGLRYmJA5MQBQamPM\",\"type\":\"session.closed\",\"reason\":\"close_requested\",\"session\":{\"id\":\"live_u2_EbiQMp3oN1TRsXNv0hoXPi63mAu6X4mA\",\"expires_at\":1792664810,\"model\":\"gpt-live-1\",\"instructions\":\"You are Q, the investment analyst inside Capital Q, a private-capital platform that connects founders and investors. You are speaking with one person on a live voice call.\\n\\nSpeaking sty"
+  },
+  "heard": " Can you explain what a SAFE is and how it's different from a convertible note Sorry, sorry. Wait just the short version. One sentence",
+  "said": " Sure. A SAFE is a contract that gives an investor the right to future equity when there's a priced round. That's alright. A SAFE is a right to future equity with no debt or interest, while a convertible note is a loan that converts later.",
+  "timeline": [
+    {
+      "ms": 363,
+      "dir": "user",
+      "text": "Can you explain what a SAFE is, and how it's different from a convertible note?"
+    },
+    {
+      "ms": 1485,
+      "dir": "heard",
+      "text": " Can"
+    },
+    {
+      "ms": 1601,
+      "dir": "heard",
+      "text": " you"
+    },
+    {
+      "ms": 2070,
+      "dir": "heard",
+      "text": " explain"
+    },
+    {
+      "ms": 2229,
+      "dir": "heard",
+      "text": " what a"
+    },
+    {
+      "ms": 2863,
+      "dir": "heard",
+      "text": " SAFE"
+    },
+    {
+      "ms": 2984,
+      "dir": "heard",
+      "text": " is"
+    },
+    {
+      "ms": 3452,
+      "dir": "heard",
+      "text": " and"
+    },
+    {
+      "ms": 3683,
+      "dir": "heard",
+      "text": " how"
+    },
+    {
+      "ms": 3791,
+      "dir": "heard",
+      "text": " it's"
+    },
+    {
+      "ms": 4255,
+      "dir": "heard",
+      "text": " different from"
+    },
+    {
+      "ms": 4390,
+      "dir": "heard",
+      "text": " a"
+    },
+    {
+      "ms": 5013,
+      "dir": "heard",
+      "text": " convertible"
+    },
+    {
+      "ms": 5393,
+      "dir": "heard",
+      "text": " note"
+    },
+    {
+      "ms": 5926,
+      "dir": "q",
+      "text": " Sure."
+    },
+    {
+      "ms": 6336,
+      "dir": "q",
+      "text": " A"
+    },
+    {
+      "ms": 6759,
+      "dir": "q",
+      "text": " SAFE"
+    },
+    {
+      "ms": 7163,
+      "dir": "q",
+      "text": " is"
+    },
+    {
+      "ms": 7312,
+      "dir": "q",
+      "text": " a contract"
+    },
+    {
+      "ms": 7965,
+      "dir": "q",
+      "text": " that"
+    },
+    {
+      "ms": 8121,
+      "dir": "q",
+      "text": " gives"
+    },
+    {
+      "ms": 8352,
+      "dir": "q",
+      "text": " an"
+    },
+    {
+      "ms": 8513,
+      "dir": "q",
+      "text": " investor"
+    },
+    {
+      "ms": 8942,
+      "dir": "q",
+      "text": " the right"
+    },
+    {
+      "ms": 9332,
+      "dir": "q",
+      "text": " to"
+    },
+    {
+      "ms": 9522,
+      "dir": "q",
+      "text": " future"
+    },
+    {
+      "ms": 9912,
+      "dir": "q",
+      "text": " equity"
+    },
+    {
+      "ms": 10522,
+      "dir": "q",
+      "text": " when"
+    },
+    {
+      "ms": 10590,
+      "dir": "user",
+      "text": "Sorry, sorry, wait. Just the short version. One sentence."
+    },
+    {
+      "ms": 10702,
+      "dir": "q",
+      "text": " there's"
+    },
+    {
+      "ms": 11115,
+      "dir": "q",
+      "text": " a priced"
+    },
+    {
+      "ms": 11496,
+      "dir": "q",
+      "text": " round."
+    },
+    {
+      "ms": 12311,
+      "dir": "heard",
+      "text": " Sorry"
+    },
+    {
+      "ms": 12916,
+      "dir": "q",
+      "text": " That's"
+    },
+    {
+      "ms": 13106,
+      "dir": "heard",
+      "text": ", sorry"
+    },
+    {
+      "ms": 13107,
+      "dir": "q",
+      "text": " alright."
+    },
+    {
+      "ms": 14111,
+      "dir": "heard",
+      "text": ". Wait"
+    },
+    {
+      "ms": 14695,
+      "dir": "heard",
+      "text": " just"
+    },
+    {
+      "ms": 14906,
+      "dir": "heard",
+      "text": " the"
+    },
+    {
+      "ms": 15118,
+      "dir": "heard",
+      "text": " short"
+    },
+    {
+      "ms": 15501,
+      "dir": "heard",
+      "text": " version"
+    },
+    {
+      "ms": 16309,
+      "dir": "heard",
+      "text": ". One"
+    },
+    {
+      "ms": 16710,
+      "dir": "q",
+      "text": " A"
+    },
+    {
+      "ms": 16926,
+      "dir": "heard",
+      "text": " sentence"
+    },
+    {
+      "ms": 16929,
+      "dir": "q",
+      "text": " SAFE"
+    },
+    {
+      "ms": 17349,
+      "dir": "q",
+      "text": " is"
+    },
+    {
+      "ms": 17578,
+      "dir": "q",
+      "text": " a right"
+    },
+    {
+      "ms": 17719,
+      "dir": "q",
+      "text": " to future"
+    },
+    {
+      "ms": 18328,
+      "dir": "q",
+      "text": " equity"
+    },
+    {
+      "ms": 18761,
+      "dir": "q",
+      "text": " with"
+    },
+    {
+      "ms": 18937,
+      "dir": "q",
+      "text": " no"
+    },
+    {
+      "ms": 19111,
+      "dir": "q",
+      "text": " debt"
+    },
+    {
+      "ms": 19511,
+      "dir": "q",
+      "text": " or interest"
+    },
+    {
+      "ms": 19625,
+      "dir": "q",
+      "text": ","
+    },
+    {
+      "ms": 20010,
+      "dir": "q",
+      "text": " while"
+    },
+    {
+      "ms": 20392,
+      "dir": "q",
+      "text": " a convertible"
+    },
+    {
+      "ms": 21045,
+      "dir": "q",
+      "text": " note"
+    },
+    {
+      "ms": 21227,
+      "dir": "q",
+      "text": " is"
+    },
+    {
+      "ms": 21411,
+      "dir": "q",
+      "text": " a loan"
+    },
+    {
+      "ms": 21805,
+      "dir": "q",
+      "text": " that"
+    },
+    {
+      "ms": 21982,
+      "dir": "q",
+      "text": " converts"
+    },
+    {
+      "ms": 22411,
+      "dir": "q",
+      "text": " later."
+    }
+  ]
+}

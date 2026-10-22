@@ -1,0 +1,640 @@
+{
+  "scenario": 2,
+  "name": "humour",
+  "provider": "live",
+  "reportedModel": "gpt-live-1",
+  "reportedSession": "(present)",
+  "backend": "offline",
+  "slowBackend": null,
+  "inputs": "synthetic: gpt-4o-mini-tts, Nigerian English accent instructions",
+  "wallSeconds": 51,
+  "billedSeconds": 49,
+  "usageConfirmed": true,
+  "closedReason": "close_requested",
+  "hardStopped": false,
+  "costUsd": 0.0408,
+  "ttsCostUsd": 0.0028,
+  "latenciesMs": [
+    {
+      "step": 1,
+      "ms": 928
+    },
+    {
+      "step": 1,
+      "ms": 1641
+    }
+  ],
+  "qAudioSeconds": 48,
+  "playbackFlushes": 0,
+  "fillerHits": [],
+  "delegations": [],
+  "bridge": {
+    "delegations": [],
+    "acked": 0,
+    "refused": []
+  },
+  "eventTypes": {
+    "session.started": 1,
+    "session.output_audio.delta": 485,
+    "session.input_transcript.delta": 29,
+    "session.output_transcript.delta": 86,
+    "session.usage.updated": 3,
+    "session.closed": 1
+  },
+  "firstEvents": {
+    "session.started": "{\"event_id\":\"event_EbiOcpRSjViZZprSq4iGo\",\"type\":\"session.started\",\"session\":{\"id\":\"live_u2_EbiOcp3oN6jUYbhYxYAU7QAraHw0jbFU\",\"expires_at\":1792664702,\"model\":\"gpt-live-1\",\"instructions\":\"You are Q, the investment analyst inside Capital Q, a private-capital platform that connects founders and investors. You are speaking with one person on a live voice call.\\n\\nSpeaking style:\\nTalk like a sharp, wa",
+    "session.input_transcript.delta": "{\"type\":\"session.input_transcript.delta\",\"start_ms\":1200,\"end_ms\":1400,\"delta\":\" Q\",\"event_id\":\"event_EbiOePrCHd8oQ1VVlYPix\"}",
+    "session.output_transcript.delta": "{\"type\":\"session.output_transcript.delta\",\"start_ms\":6600,\"end_ms\":6800,\"delta\":\" Mm.\",\"event_id\":\"event_EbiOk0iE5HRsfe4jGqQ6t\"}",
+    "session.usage.updated": "{\"type\":\"session.usage.updated\",\"usage\":{\"seconds\":14},\"context_window\":{\"usage_ratio\":0.021625},\"event_id\":\"event_EbiOr3APfcHd4dx09Rxko\"}",
+    "session.closed": "{\"event_id\":\"event_EbiPRsprrIuk2Q53menZT\",\"type\":\"session.closed\",\"reason\":\"close_requested\",\"session\":{\"id\":\"live_u2_EbiOcp3oN6jUYbhYxYAU7QAraHw0jbFU\",\"expires_at\":1792664702,\"model\":\"gpt-live-1\",\"instructions\":\"You are Q, the investment analyst inside Capital Q, a private-capital platform that connects founders and investors. You are speaking with one person on a live voice call.\\n\\nSpeaking sty"
+  },
+  "heard": " Q, my co-founder just told an investor that our burn rate is aggressive but spiritual. Should I be worried Haha. Okay, okay. So how do I explain burn properly next time",
+  "said": " Mm. I'd be a little concerned and I'd use it as a cue to steer the message back to facts. Spiritual sounds flippant, and investors want clear signals. So, just reset the frame. Try we're investing ahead of revenue, but we have a handle on it. Start with the number, monthly burn and runway. Then, explain why it's at that level. Hiring, growth bets, whatever's driving it. Close with what you're doing to manage it. Specific milestones and what you'd trim if you had to. It shows control and discipline, without killing the story.",
+  "timeline": [
+    {
+      "ms": 732,
+      "dir": "user",
+      "text": "Q, my co-founder just told an investor that our burn rate is aggressive but spiritual. Should I be worried?"
+    },
+    {
+      "ms": 2512,
+      "dir": "heard",
+      "text": " Q"
+    },
+    {
+      "ms": 2698,
+      "dir": "heard",
+      "text": ", my"
+    },
+    {
+      "ms": 2856,
+      "dir": "heard",
+      "text": " co"
+    },
+    {
+      "ms": 3298,
+      "dir": "heard",
+      "text": "-founder"
+    },
+    {
+      "ms": 3494,
+      "dir": "heard",
+      "text": " just"
+    },
+    {
+      "ms": 3694,
+      "dir": "heard",
+      "text": " told"
+    },
+    {
+      "ms": 3865,
+      "dir": "heard",
+      "text": " an"
+    },
+    {
+      "ms": 4360,
+      "dir": "heard",
+      "text": " investor"
+    },
+    {
+      "ms": 4493,
+      "dir": "heard",
+      "text": " that our"
+    },
+    {
+      "ms": 4906,
+      "dir": "heard",
+      "text": " burn"
+    },
+    {
+      "ms": 5105,
+      "dir": "heard",
+      "text": " rate"
+    },
+    {
+      "ms": 5291,
+      "dir": "heard",
+      "text": " is"
+    },
+    {
+      "ms": 5902,
+      "dir": "heard",
+      "text": " aggressive"
+    },
+    {
+      "ms": 6060,
+      "dir": "heard",
+      "text": " but"
+    },
+    {
+      "ms": 6662,
+      "dir": "heard",
+      "text": " spiritual"
+    },
+    {
+      "ms": 7303,
+      "dir": "heard",
+      "text": ". Should I"
+    },
+    {
+      "ms": 7460,
+      "dir": "heard",
+      "text": " be"
+    },
+    {
+      "ms": 7960,
+      "dir": "heard",
+      "text": " worried"
+    },
+    {
+      "ms": 7962,
+      "dir": "q",
+      "text": " Mm."
+    },
+    {
+      "ms": 8365,
+      "dir": "q",
+      "text": " I'd"
+    },
+    {
+      "ms": 8790,
+      "dir": "q",
+      "text": " be a"
+    },
+    {
+      "ms": 8985,
+      "dir": "q",
+      "text": " little"
+    },
+    {
+      "ms": 9241,
+      "dir": "q",
+      "text": " concerned"
+    },
+    {
+      "ms": 9947,
+      "dir": "q",
+      "text": " and"
+    },
+    {
+      "ms": 10577,
+      "dir": "q",
+      "text": " I'd"
+    },
+    {
+      "ms": 10789,
+      "dir": "q",
+      "text": " use"
+    },
+    {
+      "ms": 10984,
+      "dir": "q",
+      "text": " it as"
+    },
+    {
+      "ms": 11169,
+      "dir": "q",
+      "text": " a cue"
+    },
+    {
+      "ms": 11570,
+      "dir": "q",
+      "text": " to"
+    },
+    {
+      "ms": 11787,
+      "dir": "q",
+      "text": " steer"
+    },
+    {
+      "ms": 11965,
+      "dir": "q",
+      "text": " the message"
+    },
+    {
+      "ms": 12376,
+      "dir": "q",
+      "text": " back"
+    },
+    {
+      "ms": 12571,
+      "dir": "q",
+      "text": " to"
+    },
+    {
+      "ms": 12748,
+      "dir": "q",
+      "text": " facts."
+    },
+    {
+      "ms": 14163,
+      "dir": "q",
+      "text": " Spiritual"
+    },
+    {
+      "ms": 14796,
+      "dir": "q",
+      "text": " sounds"
+    },
+    {
+      "ms": 15216,
+      "dir": "q",
+      "text": " flipp"
+    },
+    {
+      "ms": 15378,
+      "dir": "q",
+      "text": "ant,"
+    },
+    {
+      "ms": 15976,
+      "dir": "q",
+      "text": " and"
+    },
+    {
+      "ms": 16147,
+      "dir": "q",
+      "text": " investors"
+    },
+    {
+      "ms": 16787,
+      "dir": "q",
+      "text": " want"
+    },
+    {
+      "ms": 16978,
+      "dir": "q",
+      "text": " clear"
+    },
+    {
+      "ms": 17189,
+      "dir": "q",
+      "text": " signals."
+    },
+    {
+      "ms": 17952,
+      "dir": "q",
+      "text": " So,"
+    },
+    {
+      "ms": 18385,
+      "dir": "q",
+      "text": " just"
+    },
+    {
+      "ms": 18551,
+      "dir": "q",
+      "text": " reset"
+    },
+    {
+      "ms": 18971,
+      "dir": "q",
+      "text": " the frame"
+    },
+    {
+      "ms": 19168,
+      "dir": "q",
+      "text": "."
+    },
+    {
+      "ms": 19786,
+      "dir": "q",
+      "text": " Try"
+    },
+    {
+      "ms": 20392,
+      "dir": "q",
+      "text": " we're"
+    },
+    {
+      "ms": 20766,
+      "dir": "q",
+      "text": " investing"
+    },
+    {
+      "ms": 21177,
+      "dir": "q",
+      "text": " ahead"
+    },
+    {
+      "ms": 21453,
+      "dir": "q",
+      "text": " of revenue"
+    },
+    {
+      "ms": 21654,
+      "dir": "q",
+      "text": ","
+    },
+    {
+      "ms": 22017,
+      "dir": "q",
+      "text": " but"
+    },
+    {
+      "ms": 22221,
+      "dir": "q",
+      "text": " we"
+    },
+    {
+      "ms": 22402,
+      "dir": "q",
+      "text": " have"
+    },
+    {
+      "ms": 22598,
+      "dir": "q",
+      "text": " a"
+    },
+    {
+      "ms": 22785,
+      "dir": "q",
+      "text": " handle"
+    },
+    {
+      "ms": 22977,
+      "dir": "q",
+      "text": " on"
+    },
+    {
+      "ms": 23170,
+      "dir": "q",
+      "text": " it."
+    },
+    {
+      "ms": 25228,
+      "dir": "user",
+      "text": "Haha, okay okay. So how do I explain burn properly next time?"
+    },
+    {
+      "ms": 26661,
+      "dir": "heard",
+      "text": " Haha"
+    },
+    {
+      "ms": 27073,
+      "dir": "heard",
+      "text": ". Okay"
+    },
+    {
+      "ms": 27459,
+      "dir": "heard",
+      "text": ", okay"
+    },
+    {
+      "ms": 28116,
+      "dir": "heard",
+      "text": ". So"
+    },
+    {
+      "ms": 28297,
+      "dir": "heard",
+      "text": " how do"
+    },
+    {
+      "ms": 28478,
+      "dir": "heard",
+      "text": " I"
+    },
+    {
+      "ms": 28854,
+      "dir": "heard",
+      "text": " explain"
+    },
+    {
+      "ms": 29281,
+      "dir": "heard",
+      "text": " burn"
+    },
+    {
+      "ms": 29663,
+      "dir": "heard",
+      "text": " properly"
+    },
+    {
+      "ms": 30099,
+      "dir": "heard",
+      "text": " next"
+    },
+    {
+      "ms": 30260,
+      "dir": "heard",
+      "text": " time"
+    },
+    {
+      "ms": 31197,
+      "dir": "q",
+      "text": " Start with"
+    },
+    {
+      "ms": 31370,
+      "dir": "q",
+      "text": " the number"
+    },
+    {
+      "ms": 31565,
+      "dir": "q",
+      "text": ","
+    },
+    {
+      "ms": 32154,
+      "dir": "q",
+      "text": " monthly"
+    },
+    {
+      "ms": 32573,
+      "dir": "q",
+      "text": " burn"
+    },
+    {
+      "ms": 32989,
+      "dir": "q",
+      "text": " and"
+    },
+    {
+      "ms": 33158,
+      "dir": "q",
+      "text": " runway."
+    },
+    {
+      "ms": 33969,
+      "dir": "q",
+      "text": " Then,"
+    },
+    {
+      "ms": 34582,
+      "dir": "q",
+      "text": " explain"
+    },
+    {
+      "ms": 34980,
+      "dir": "q",
+      "text": " why"
+    },
+    {
+      "ms": 35185,
+      "dir": "q",
+      "text": " it's at"
+    },
+    {
+      "ms": 35381,
+      "dir": "q",
+      "text": " that"
+    },
+    {
+      "ms": 35558,
+      "dir": "q",
+      "text": " level."
+    },
+    {
+      "ms": 36362,
+      "dir": "q",
+      "text": " Hiring,"
+    },
+    {
+      "ms": 36951,
+      "dir": "q",
+      "text": " growth"
+    },
+    {
+      "ms": 37368,
+      "dir": "q",
+      "text": " bets,"
+    },
+    {
+      "ms": 37978,
+      "dir": "q",
+      "text": " whatever's"
+    },
+    {
+      "ms": 38390,
+      "dir": "q",
+      "text": " driving"
+    },
+    {
+      "ms": 38583,
+      "dir": "q",
+      "text": " it."
+    },
+    {
+      "ms": 39354,
+      "dir": "q",
+      "text": " Close"
+    },
+    {
+      "ms": 39985,
+      "dir": "q",
+      "text": " with what"
+    },
+    {
+      "ms": 40173,
+      "dir": "q",
+      "text": " you're doing"
+    },
+    {
+      "ms": 40376,
+      "dir": "q",
+      "text": " to"
+    },
+    {
+      "ms": 40543,
+      "dir": "q",
+      "text": " manage"
+    },
+    {
+      "ms": 40962,
+      "dir": "q",
+      "text": " it."
+    },
+    {
+      "ms": 41544,
+      "dir": "q",
+      "text": " Specific"
+    },
+    {
+      "ms": 41990,
+      "dir": "q",
+      "text": " milestones"
+    },
+    {
+      "ms": 42816,
+      "dir": "q",
+      "text": " and"
+    },
+    {
+      "ms": 42999,
+      "dir": "q",
+      "text": " what"
+    },
+    {
+      "ms": 43186,
+      "dir": "q",
+      "text": " you'd"
+    },
+    {
+      "ms": 43352,
+      "dir": "q",
+      "text": " trim"
+    },
+    {
+      "ms": 43814,
+      "dir": "q",
+      "text": " if you"
+    },
+    {
+      "ms": 43934,
+      "dir": "q",
+      "text": " had"
+    },
+    {
+      "ms": 44039,
+      "dir": "q",
+      "text": " to."
+    },
+    {
+      "ms": 44703,
+      "dir": "q",
+      "text": " It"
+    },
+    {
+      "ms": 45093,
+      "dir": "q",
+      "text": " shows"
+    },
+    {
+      "ms": 45273,
+      "dir": "q",
+      "text": " control"
+    },
+    {
+      "ms": 45694,
+      "dir": "q",
+      "text": " and"
+    },
+    {
+      "ms": 45875,
+      "dir": "q",
+      "text": " discipline,"
+    },
+    {
+      "ms": 46252,
+      "dir": "q",
+      "text": " without"
+    },
+    {
+      "ms": 46675,
+      "dir": "q",
+      "text": " killing"
+    },
+    {
+      "ms": 47100,
+      "dir": "q",
+      "text": " the story"
+    },
+    {
+      "ms": 47263,
+      "dir": "q",
+      "text": "."
+    }
+  ]
+}

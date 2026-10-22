@@ -1,0 +1,471 @@
+{
+  "scenario": 3,
+  "name": "hesitant-question",
+  "provider": "live",
+  "reportedModel": "gpt-live-1",
+  "reportedSession": "(present)",
+  "backend": "offline",
+  "slowBackend": null,
+  "inputs": "synthetic: gpt-4o-mini-tts, Nigerian English accent instructions",
+  "wallSeconds": 47,
+  "billedSeconds": 46,
+  "usageConfirmed": true,
+  "closedReason": "close_requested",
+  "hardStopped": false,
+  "costUsd": 0.0383,
+  "ttsCostUsd": 0.0035,
+  "latenciesMs": [
+    {
+      "step": 0,
+      "ms": 1764
+    }
+  ],
+  "qAudioSeconds": 44,
+  "playbackFlushes": 0,
+  "fillerHits": [],
+  "delegations": [],
+  "bridge": {
+    "delegations": [],
+    "acked": 0,
+    "refused": []
+  },
+  "eventTypes": {
+    "session.started": 1,
+    "session.output_audio.delta": 444,
+    "session.input_transcript.delta": 26,
+    "session.output_transcript.delta": 57,
+    "session.usage.updated": 3,
+    "session.closed": 1
+  },
+  "firstEvents": {
+    "session.started": "{\"event_id\":\"event_EbiPX5goJ2TS0ItFg5PIZ\",\"type\":\"session.started\",\"session\":{\"id\":\"live_u1_EbiPWp3oNNN3eNkbDfkZrXdhqQCx5Uwi\",\"expires_at\":1792664758,\"model\":\"gpt-live-1\",\"instructions\":\"You are Q, the investment analyst inside Capital Q, a private-capital platform that connects founders and investors. You are speaking with one person on a live voice call.\\n\\nSpeaking style:\\nTalk like a sharp, wa",
+    "session.input_transcript.delta": "{\"type\":\"session.input_transcript.delta\",\"start_ms\":2200,\"end_ms\":2400,\"delta\":\" So\",\"event_id\":\"event_EbiPZHFpMz7LVE3hKXP4s\"}",
+    "session.output_transcript.delta": "{\"type\":\"session.output_transcript.delta\",\"start_ms\":8800,\"end_ms\":9000,\"delta\":\" Mm.\",\"event_id\":\"event_EbiPgjEQfBkhMfQKh6QQR\"}",
+    "session.usage.updated": "{\"type\":\"session.usage.updated\",\"usage\":{\"seconds\":14},\"context_window\":{\"usage_ratio\":0.020203125},\"event_id\":\"event_EbiPlEZ8WBhIHyt5VTxWx\"}",
+    "session.closed": "{\"event_id\":\"event_EbiQI9GHpCiLtwN2uENKx\",\"type\":\"session.closed\",\"reason\":\"close_requested\",\"session\":{\"id\":\"live_u1_EbiPWp3oNNN3eNkbDfkZrXdhqQCx5Uwi\",\"expires_at\":1792664758,\"model\":\"gpt-live-1\",\"instructions\":\"You are Q, the investment analyst inside Capital Q, a private-capital platform that connects founders and investors. You are speaking with one person on a live voice call.\\n\\nSpeaking sty"
+  },
+  "heard": " So, m. dot. I was wondering like If we raise a small bridge round now, before the Series A, does that, you know, send the wrong signal to investors",
+  "said": " Mm. Right. Not necessarily. A bridge can be fine if it's clearly for something specific like extending runway to hit a near-term milestone that unlocks the A. The trouble is when it looks like a lifeline because things aren't on track. What matters is your story and your terms. If you frame it as buying time to increase valuation, many investors respect that.",
+  "timeline": [
+    {
+      "ms": 395,
+      "dir": "user",
+      "text": "So, em... I was wondering, like... if we raise a small bridge round now, before the Series A... does that, you know, send the wrong signal to investors?"
+    },
+    {
+      "ms": 3071,
+      "dir": "heard",
+      "text": " So"
+    },
+    {
+      "ms": 4124,
+      "dir": "heard",
+      "text": ", m."
+    },
+    {
+      "ms": 4283,
+      "dir": "heard",
+      "text": " dot"
+    },
+    {
+      "ms": 6520,
+      "dir": "heard",
+      "text": ". I"
+    },
+    {
+      "ms": 6659,
+      "dir": "heard",
+      "text": " was"
+    },
+    {
+      "ms": 7269,
+      "dir": "heard",
+      "text": " wondering"
+    },
+    {
+      "ms": 7682,
+      "dir": "heard",
+      "text": " like"
+    },
+    {
+      "ms": 9789,
+      "dir": "q",
+      "text": " Mm."
+    },
+    {
+      "ms": 11065,
+      "dir": "heard",
+      "text": " If"
+    },
+    {
+      "ms": 11671,
+      "dir": "heard",
+      "text": " we"
+    },
+    {
+      "ms": 12115,
+      "dir": "heard",
+      "text": " raise"
+    },
+    {
+      "ms": 12310,
+      "dir": "heard",
+      "text": " a"
+    },
+    {
+      "ms": 12471,
+      "dir": "heard",
+      "text": " small"
+    },
+    {
+      "ms": 12942,
+      "dir": "heard",
+      "text": " bridge"
+    },
+    {
+      "ms": 13082,
+      "dir": "heard",
+      "text": " round"
+    },
+    {
+      "ms": 13687,
+      "dir": "q",
+      "text": " Right."
+    },
+    {
+      "ms": 13854,
+      "dir": "heard",
+      "text": " now"
+    },
+    {
+      "ms": 14493,
+      "dir": "heard",
+      "text": ", before the"
+    },
+    {
+      "ms": 14890,
+      "dir": "heard",
+      "text": " Series"
+    },
+    {
+      "ms": 15265,
+      "dir": "heard",
+      "text": " A"
+    },
+    {
+      "ms": 15867,
+      "dir": "heard",
+      "text": ", does"
+    },
+    {
+      "ms": 16258,
+      "dir": "heard",
+      "text": " that"
+    },
+    {
+      "ms": 16679,
+      "dir": "heard",
+      "text": ", you know"
+    },
+    {
+      "ms": 17096,
+      "dir": "heard",
+      "text": ", send the"
+    },
+    {
+      "ms": 17471,
+      "dir": "heard",
+      "text": " wrong"
+    },
+    {
+      "ms": 17904,
+      "dir": "heard",
+      "text": " signal"
+    },
+    {
+      "ms": 18075,
+      "dir": "heard",
+      "text": " to"
+    },
+    {
+      "ms": 18867,
+      "dir": "heard",
+      "text": " investors"
+    },
+    {
+      "ms": 19829,
+      "dir": "q",
+      "text": " Not"
+    },
+    {
+      "ms": 20014,
+      "dir": "q",
+      "text": " necessarily."
+    },
+    {
+      "ms": 21004,
+      "dir": "q",
+      "text": " A"
+    },
+    {
+      "ms": 21393,
+      "dir": "q",
+      "text": " bridge"
+    },
+    {
+      "ms": 22034,
+      "dir": "q",
+      "text": " can be"
+    },
+    {
+      "ms": 22194,
+      "dir": "q",
+      "text": " fine"
+    },
+    {
+      "ms": 22623,
+      "dir": "q",
+      "text": " if"
+    },
+    {
+      "ms": 22831,
+      "dir": "q",
+      "text": " it's"
+    },
+    {
+      "ms": 23014,
+      "dir": "q",
+      "text": " clearly"
+    },
+    {
+      "ms": 23588,
+      "dir": "q",
+      "text": " for something"
+    },
+    {
+      "ms": 24022,
+      "dir": "q",
+      "text": " specific"
+    },
+    {
+      "ms": 24809,
+      "dir": "q",
+      "text": " like"
+    },
+    {
+      "ms": 25003,
+      "dir": "q",
+      "text": " extending"
+    },
+    {
+      "ms": 25630,
+      "dir": "q",
+      "text": " runway"
+    },
+    {
+      "ms": 26043,
+      "dir": "q",
+      "text": " to"
+    },
+    {
+      "ms": 26232,
+      "dir": "q",
+      "text": " hit"
+    },
+    {
+      "ms": 26395,
+      "dir": "q",
+      "text": " a"
+    },
+    {
+      "ms": 26791,
+      "dir": "q",
+      "text": " near-term"
+    },
+    {
+      "ms": 27614,
+      "dir": "q",
+      "text": " milestone"
+    },
+    {
+      "ms": 28420,
+      "dir": "q",
+      "text": " that"
+    },
+    {
+      "ms": 28597,
+      "dir": "q",
+      "text": " unlocks"
+    },
+    {
+      "ms": 29434,
+      "dir": "q",
+      "text": " the"
+    },
+    {
+      "ms": 29610,
+      "dir": "q",
+      "text": " A."
+    },
+    {
+      "ms": 30189,
+      "dir": "q",
+      "text": " The"
+    },
+    {
+      "ms": 30633,
+      "dir": "q",
+      "text": " trouble"
+    },
+    {
+      "ms": 31118,
+      "dir": "q",
+      "text": " is"
+    },
+    {
+      "ms": 31334,
+      "dir": "q",
+      "text": " when"
+    },
+    {
+      "ms": 31740,
+      "dir": "q",
+      "text": " it looks"
+    },
+    {
+      "ms": 32161,
+      "dir": "q",
+      "text": " like"
+    },
+    {
+      "ms": 32416,
+      "dir": "q",
+      "text": " a"
+    },
+    {
+      "ms": 32586,
+      "dir": "q",
+      "text": " lifeline"
+    },
+    {
+      "ms": 33275,
+      "dir": "q",
+      "text": " because"
+    },
+    {
+      "ms": 33766,
+      "dir": "q",
+      "text": " things"
+    },
+    {
+      "ms": 34134,
+      "dir": "q",
+      "text": " aren't on"
+    },
+    {
+      "ms": 34321,
+      "dir": "q",
+      "text": " track."
+    },
+    {
+      "ms": 35806,
+      "dir": "q",
+      "text": " What matters"
+    },
+    {
+      "ms": 36294,
+      "dir": "q",
+      "text": " is"
+    },
+    {
+      "ms": 36736,
+      "dir": "q",
+      "text": " your"
+    },
+    {
+      "ms": 36903,
+      "dir": "q",
+      "text": " story"
+    },
+    {
+      "ms": 37429,
+      "dir": "q",
+      "text": " and"
+    },
+    {
+      "ms": 37831,
+      "dir": "q",
+      "text": " your"
+    },
+    {
+      "ms": 37997,
+      "dir": "q",
+      "text": " terms."
+    },
+    {
+      "ms": 39019,
+      "dir": "q",
+      "text": " If"
+    },
+    {
+      "ms": 39454,
+      "dir": "q",
+      "text": " you"
+    },
+    {
+      "ms": 39649,
+      "dir": "q",
+      "text": " frame"
+    },
+    {
+      "ms": 39826,
+      "dir": "q",
+      "text": " it"
+    },
+    {
+      "ms": 40042,
+      "dir": "q",
+      "text": " as"
+    },
+    {
+      "ms": 40189,
+      "dir": "q",
+      "text": " buying"
+    },
+    {
+      "ms": 40596,
+      "dir": "q",
+      "text": " time"
+    },
+    {
+      "ms": 40982,
+      "dir": "q",
+      "text": " to increase"
+    },
+    {
+      "ms": 41440,
+      "dir": "q",
+      "text": " valuation,"
+    },
+    {
+      "ms": 42424,
+      "dir": "q",
+      "text": " many"
+    },
+    {
+      "ms": 42621,
+      "dir": "q",
+      "text": " investors"
+    },
+    {
+      "ms": 43239,
+      "dir": "q",
+      "text": " respect"
+    },
+    {
+      "ms": 43399,
+      "dir": "q",
+      "text": " that."
+    }
+  ]
+}

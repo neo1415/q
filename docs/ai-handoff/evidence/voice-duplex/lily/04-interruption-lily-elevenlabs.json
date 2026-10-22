@@ -1,0 +1,71 @@
+{
+  "scenario": 4,
+  "name": "interruption",
+  "line": "ElevenLabs Agents (expressive mode)",
+  "voice": "Lily pFZP5JQG7iQjIQuC4Bku",
+  "conversationId": "conv_6201m5hbs8edezq9xaf0p1zr6frd",
+  "wallSeconds": 27,
+  "latenciesMs": [1100, 1400],
+  "playbackFlushes": 1,
+  "said": "A SAFE is an agreement for future equity, essentially a promise to give ... A SAFE is a simpler agreement for future equity, while a convertible note is a debt instrument that converts to equity.",
+  "heard": "Can you explain what a SAFE is and how it's different from a convertible note? Sorry, sorry. Wait. Just the short version. One sentence.",
+  "events": [
+    {
+      "ms": 547,
+      "type": "ready",
+      "out": "pcm_16000"
+    },
+    {
+      "ms": 550,
+      "type": "user_step",
+      "text": "Can you explain what a SAFE is, and how it's different from a convertible note?"
+    },
+    {
+      "ms": 5149,
+      "type": "user_speech_end"
+    },
+    {
+      "ms": 6241,
+      "type": "user_transcript",
+      "text": "Can you explain what a SAFE is and how it's different from a convertible note?"
+    },
+    {
+      "ms": 6242,
+      "type": "first_audio_chunk",
+      "after": 5249
+    },
+    {
+      "ms": 9883,
+      "type": "user_step",
+      "text": "Sorry, sorry, wait. Just the short version. One sentence."
+    },
+    {
+      "ms": 10810,
+      "type": "interruption"
+    },
+    {
+      "ms": 10811,
+      "type": "agent_response",
+      "text": "A SAFE is an agreement for future equity, essentially a promise to give ..."
+    },
+    {
+      "ms": 15349,
+      "type": "user_speech_end"
+    },
+    {
+      "ms": 16818,
+      "type": "user_transcript",
+      "text": "Sorry, sorry. Wait. Just the short version. One sentence."
+    },
+    {
+      "ms": 16820,
+      "type": "first_audio_chunk",
+      "after": 15449
+    },
+    {
+      "ms": 18674,
+      "type": "agent_response",
+      "text": "A SAFE is a simpler agreement for future equity, while a convertible note is a debt instrument that converts to equity."
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "scenario": 2,
+  "name": "humour",
+  "line": "ElevenLabs Agents (expressive mode)",
+  "voice": "Lily pFZP5JQG7iQjIQuC4Bku",
+  "conversationId": "conv_8501m5hbpq3dfqvsgpc7ebepegdn",
+  "wallSeconds": 40,
+  "latenciesMs": [1599, 999],
+  "playbackFlushes": 0,
+  "said": "[chuckles] That's certainly a [warmly] unique way to put it. I'd say it's probably best to clarify what \"spiritual\" means in terms of your burn rate, as investors usually prefer more concrete financial language. When discussing burn, focus on the [direct] actual cash outflow and how it aligns with your strategic milestones. Explain what you're spending on and the [practical] expected return on that investment.",
+  "heard": "Q, my co-founder, just told an investor that our burn rate is aggressive but spiritual. Should I be worried? Ha ha. Okay, okay. So how do I explain burn properly next time?",
+  "events": [
+    {
+      "ms": 437,
+      "type": "ready",
+      "out": "pcm_16000"
+    },
+    {
+      "ms": 449,
+      "type": "user_step",
+      "text": "Q, my co-founder just told an investor that our burn rate is aggressive but spiritual. Should I be worried?"
+    },
+    {
+      "ms": 6949,
+      "type": "user_speech_end"
+    },
+    {
+      "ms": 8501,
+      "type": "user_transcript",
+      "text": "Q, my co-founder, just told an investor that our burn rate is aggressive but spiritual. Should I be worried?"
+    },
+    {
+      "ms": 8502,
+      "type": "first_audio_chunk",
+      "after": 7048
+    },
+    {
+      "ms": 11265,
+      "type": "agent_response",
+      "text": "[chuckles] That's certainly a [warmly] unique way to put it. I'd say it's probably best to clarify what \"spiritual\" means in terms of your burn rate, as investors usually prefer more concrete financial language."
+    },
+    {
+      "ms": 21372,
+      "type": "user_step",
+      "text": "Haha, okay okay. So how do I explain burn properly next time?"
+    },
+    {
+      "ms": 25949,
+      "type": "user_speech_end"
+    },
+    {
+      "ms": 27005,
+      "type": "user_transcript",
+      "text": "Ha ha. Okay, okay. So how do I explain burn properly next time?"
+    },
+    {
+      "ms": 27005,
+      "type": "first_audio_chunk",
+      "after": 26049
+    },
+    {
+      "ms": 29536,
+      "type": "agent_response",
+      "text": "When discussing burn, focus on the [direct] actual cash outflow and how it aligns with your strategic milestones. Explain what you're spending on and the [practical] expected return on that investment."
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "scenario": 3,
+  "name": "hesitant-question",
+  "line": "ElevenLabs Agents (expressive mode)",
+  "voice": "Lily pFZP5JQG7iQjIQuC4Bku",
+  "conversationId": "conv_1801m5hbr4z1fzgrp4wecc4bxa0x",
+  "wallSeconds": 36,
+  "latenciesMs": [1600],
+  "playbackFlushes": 0,
+  "said": "[warmly] That's a really common concern. A bridge round can actually be a smart move if it helps you hit key milestones before your Series A, showing stronger traction. It's all about how you frame it and what you achieve with the capital.",
+  "heard": "So, Em, dot, I was wondering, like, if we raise a small bridge round now, before the series A, does that, you know, send the wrong signal to investors?",
+  "events": [
+    {
+      "ms": 481,
+      "type": "ready",
+      "out": "pcm_16000"
+    },
+    {
+      "ms": 489,
+      "type": "user_step",
+      "text": "So, em... I was wondering, like... if we raise a small bridge round now, before the Series A... does that, you know, send the wrong signal to investors?"
+    },
+    {
+      "ms": 18388,
+      "type": "user_speech_end"
+    },
+    {
+      "ms": 19899,
+      "type": "user_transcript",
+      "text": "So, Em, dot, I was wondering, like, if we raise a small bridge round now, before the series A, does that, you know, send the wrong signal to investors?"
+    },
+    {
+      "ms": 19899,
+      "type": "first_audio_chunk",
+      "after": 18488
+    },
+    {
+      "ms": 23486,
+      "type": "agent_response",
+      "text": "[warmly] That's a really common concern. A bridge round can actually be a smart move if it helps you hit key milestones before your Series A, showing stronger traction. It's all about how you frame it and what you achieve with the capital."
+    }
+  ]
+}

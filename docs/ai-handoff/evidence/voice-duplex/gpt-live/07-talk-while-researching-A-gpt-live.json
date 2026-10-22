@@ -1,0 +1,535 @@
+{
+  "scenario": 7,
+  "name": "talk-while-researching",
+  "provider": "live",
+  "reportedModel": "gpt-live-1",
+  "reportedSession": "(present)",
+  "backend": "offline",
+  "slowBackend": null,
+  "inputs": "synthetic: gpt-4o-mini-tts, Nigerian English accent instructions",
+  "wallSeconds": 34,
+  "billedSeconds": 31,
+  "usageConfirmed": true,
+  "closedReason": "close_requested",
+  "hardStopped": false,
+  "costUsd": 0.0258,
+  "ttsCostUsd": 0.0024,
+  "latenciesMs": [
+    {
+      "step": 1,
+      "ms": 1194
+    }
+  ],
+  "qAudioSeconds": 31,
+  "playbackFlushes": 0,
+  "fillerHits": [],
+  "delegations": [
+    {
+      "id": "item_EbiR1nDTi6ZFYKIJ1zruV",
+      "request": "Can you check which companies fit my mandate best right now? And while you're at it, remind me, what does pro rata actually mean",
+      "ms": 0,
+      "startedAt": 11123,
+      "runId": null,
+      "failed": false,
+      "scriptedNoRule": false,
+      "commentary": "Q's backend is not connected in this test call, so nothing about \"Can you check which companies fit my mandate best right now? And while you're at it, remind me, what does pro rata actually mean\" could be checked. Say so honestly and briefly, do not invent records, and carry on with what you can discuss without them."
+    }
+  ],
+  "bridge": {
+    "delegations": [
+      {
+        "id": "item_EbiR1nDTi6ZFYKIJ1zruV",
+        "providerId": "item_EbiR1nDTi6ZFYKIJ1zruV",
+        "request": "Can you check which companies fit my mandate best right now? And while you're at it, remind me, what does pro rata actually mean",
+        "status": "SPOKEN",
+        "createdAt": 1792657651104,
+        "context": [
+          {
+            "role": "user",
+            "text": "Can you check which companies fit my mandate best right now? And while you're at it, remind me, what does pro rata actually mean"
+          },
+          {
+            "role": "q",
+            "text": "Sure."
+          }
+        ],
+        "answeredAt": 1792657651504,
+        "commentary": "Q's backend is not connected in this test call, so nothing about \"Can you check which companies fit my mandate best right now? And while you're at it, remind me, what does pro rata actually mean\" could be checked. Say so honestly and briefly, do not invent records, and carry on with what you can discuss without them."
+      }
+    ],
+    "acked": 1,
+    "refused": []
+  },
+  "eventTypes": {
+    "session.started": 1,
+    "session.output_audio.delta": 315,
+    "session.input_transcript.delta": 24,
+    "session.delegation.created": 1,
+    "session.output_transcript.delta": 60,
+    "session.commentary.appended": 1,
+    "session.usage.updated": 2,
+    "session.closed": 1
+  },
+  "firstEvents": {
+    "session.started": "{\"event_id\":\"event_EbiQqNm7pCMnLi74eIfuu\",\"type\":\"session.started\",\"session\":{\"id\":\"live_u1_EbiQqp3oNPNuRSqx6myCUFT1kbo7xjpd\",\"expires_at\":1792664840,\"model\":\"gpt-live-1\",\"instructions\":\"You are Q, the investment analyst inside Capital Q, a private-capital platform that connects founders and investors. You are speaking with one person on a live voice call.\\n\\nSpeaking style:\\nTalk like a sharp, wa",
+    "session.input_transcript.delta": "{\"type\":\"session.input_transcript.delta\",\"start_ms\":600,\"end_ms\":800,\"delta\":\" Can\",\"event_id\":\"event_EbiQrkTbBeJkfuwaDls88\"}",
+    "session.delegation.created": "{\"type\":\"session.delegation.created\",\"offset_ms\":9600,\"delegation\":{\"id\":\"item_EbiR1nDTi6ZFYKIJ1zruV\",\"type\":\"delegation\",\"target\":\"client\"},\"event_id\":\"event_EbiR1PgqOkVhRYuiy7uFy\"}",
+    "session.output_transcript.delta": "{\"type\":\"session.output_transcript.delta\",\"start_ms\":9800,\"end_ms\":10000,\"delta\":\" Sure.\",\"event_id\":\"event_EbiR1sN6sgTTFQT3Wc2fh\"}",
+    "session.commentary.appended": "{\"type\":\"session.commentary.appended\",\"start_ms\":10600,\"end_ms\":10800,\"event_id\":\"event_EbiR28vyNXL1oXxO8ouIE\",\"client_event_id\":\"cq_639e194489bc432094a5\"}",
+    "session.usage.updated": "{\"type\":\"session.usage.updated\",\"usage\":{\"seconds\":14},\"context_window\":{\"usage_ratio\":0.0218125},\"event_id\":\"event_EbiR5zrEEgc9uvGaHN7gQ\"}",
+    "session.closed": "{\"event_id\":\"event_EbiRNnzkeZf1qdAqok0UQ\",\"type\":\"session.closed\",\"reason\":\"close_requested\",\"session\":{\"id\":\"live_u1_EbiQqp3oNPNuRSqx6myCUFT1kbo7xjpd\",\"expires_at\":1792664840,\"model\":\"gpt-live-1\",\"instructions\":\"You are Q, the investment analyst inside Capital Q, a private-capital platform that connects founders and investors. You are speaking with one person on a live voice call.\\n\\nSpeaking sty"
+  },
+  "heard": " Can you check which companies fit my mandate best right now? And while you're at it, remind me, what does pro rata actually mean",
+  "said": " Sure. So, I can't see your records from here, so I can't check the live best fits. But, on pro rata, it just means in proportion. In deals, it's your right to keep your ownership percentage by buying enough in the next round. And if you'd like, we can talk through what you'd expect a strong fit to look like, while that connection's sorted.",
+  "timeline": [
+    {
+      "ms": 506,
+      "dir": "user",
+      "text": "Can you check which companies fit my mandate best right now?"
+    },
+    {
+      "ms": 1616,
+      "dir": "heard",
+      "text": " Can"
+    },
+    {
+      "ms": 1786,
+      "dir": "heard",
+      "text": " you"
+    },
+    {
+      "ms": 2233,
+      "dir": "heard",
+      "text": " check"
+    },
+    {
+      "ms": 2786,
+      "dir": "heard",
+      "text": " which"
+    },
+    {
+      "ms": 3427,
+      "dir": "heard",
+      "text": " companies"
+    },
+    {
+      "ms": 3626,
+      "dir": "heard",
+      "text": " fit"
+    },
+    {
+      "ms": 3786,
+      "dir": "heard",
+      "text": " my"
+    },
+    {
+      "ms": 4382,
+      "dir": "heard",
+      "text": " mandate"
+    },
+    {
+      "ms": 4838,
+      "dir": "heard",
+      "text": " best"
+    },
+    {
+      "ms": 4915,
+      "dir": "user",
+      "text": "And while you're at it, remind me, what does pro rata actually mean?"
+    },
+    {
+      "ms": 4976,
+      "dir": "heard",
+      "text": " right"
+    },
+    {
+      "ms": 5409,
+      "dir": "heard",
+      "text": " now"
+    },
+    {
+      "ms": 5980,
+      "dir": "heard",
+      "text": "? And"
+    },
+    {
+      "ms": 6419,
+      "dir": "heard",
+      "text": " while"
+    },
+    {
+      "ms": 6634,
+      "dir": "heard",
+      "text": " you're"
+    },
+    {
+      "ms": 6824,
+      "dir": "heard",
+      "text": " at"
+    },
+    {
+      "ms": 6989,
+      "dir": "heard",
+      "text": " it"
+    },
+    {
+      "ms": 7833,
+      "dir": "heard",
+      "text": ", remind"
+    },
+    {
+      "ms": 7988,
+      "dir": "heard",
+      "text": " me"
+    },
+    {
+      "ms": 8629,
+      "dir": "heard",
+      "text": ", what"
+    },
+    {
+      "ms": 8774,
+      "dir": "heard",
+      "text": " does"
+    },
+    {
+      "ms": 9188,
+      "dir": "heard",
+      "text": " pro"
+    },
+    {
+      "ms": 9584,
+      "dir": "heard",
+      "text": " rata"
+    },
+    {
+      "ms": 10195,
+      "dir": "heard",
+      "text": " actually"
+    },
+    {
+      "ms": 10721,
+      "dir": "heard",
+      "text": " mean"
+    },
+    {
+      "ms": 10723,
+      "dir": "in",
+      "type": "session.delegation.created",
+      "id": "item_EbiR1nDTi6ZFYKIJ1zruV"
+    },
+    {
+      "ms": 10892,
+      "dir": "q",
+      "text": " Sure."
+    },
+    {
+      "ms": 11124,
+      "dir": "out",
+      "type": "session.commentary.append",
+      "delegation": "item_EbiR1nDTi6ZFYKIJ1zruV",
+      "content": "Q's backend is not connected in this test call, so nothing about \"Can you check which companies fit my mandate best right now? And while you're at it, remind me, what does pro rata actually mean\" could be checked. Say so honestly and briefly, do not invent records, and carry on with what you can discuss without them."
+    },
+    {
+      "ms": 11536,
+      "dir": "q",
+      "text": " So,"
+    },
+    {
+      "ms": 11710,
+      "dir": "q",
+      "text": " I"
+    },
+    {
+      "ms": 11711,
+      "dir": "in",
+      "type": "session.commentary.appended",
+      "id": "cq_639e194489bc432094a5"
+    },
+    {
+      "ms": 11914,
+      "dir": "q",
+      "text": " can't"
+    },
+    {
+      "ms": 12099,
+      "dir": "q",
+      "text": " see"
+    },
+    {
+      "ms": 12327,
+      "dir": "q",
+      "text": " your"
+    },
+    {
+      "ms": 12516,
+      "dir": "q",
+      "text": " records"
+    },
+    {
+      "ms": 12916,
+      "dir": "q",
+      "text": " from"
+    },
+    {
+      "ms": 13090,
+      "dir": "q",
+      "text": " here,"
+    },
+    {
+      "ms": 13707,
+      "dir": "q",
+      "text": " so"
+    },
+    {
+      "ms": 13913,
+      "dir": "q",
+      "text": " I can't"
+    },
+    {
+      "ms": 14437,
+      "dir": "q",
+      "text": " check"
+    },
+    {
+      "ms": 14625,
+      "dir": "q",
+      "text": " the"
+    },
+    {
+      "ms": 14791,
+      "dir": "q",
+      "text": " live"
+    },
+    {
+      "ms": 15186,
+      "dir": "q",
+      "text": " best"
+    },
+    {
+      "ms": 15294,
+      "dir": "q",
+      "text": " fits."
+    },
+    {
+      "ms": 16119,
+      "dir": "q",
+      "text": " But,"
+    },
+    {
+      "ms": 16310,
+      "dir": "q",
+      "text": " on"
+    },
+    {
+      "ms": 16523,
+      "dir": "q",
+      "text": " pro"
+    },
+    {
+      "ms": 16724,
+      "dir": "q",
+      "text": " rata,"
+    },
+    {
+      "ms": 16904,
+      "dir": "q",
+      "text": " it"
+    },
+    {
+      "ms": 17299,
+      "dir": "q",
+      "text": " just"
+    },
+    {
+      "ms": 17733,
+      "dir": "q",
+      "text": " means"
+    },
+    {
+      "ms": 18146,
+      "dir": "q",
+      "text": " in"
+    },
+    {
+      "ms": 18326,
+      "dir": "q",
+      "text": " proportion."
+    },
+    {
+      "ms": 19091,
+      "dir": "q",
+      "text": " In"
+    },
+    {
+      "ms": 19496,
+      "dir": "q",
+      "text": " deals,"
+    },
+    {
+      "ms": 19914,
+      "dir": "q",
+      "text": " it's"
+    },
+    {
+      "ms": 20120,
+      "dir": "q",
+      "text": " your"
+    },
+    {
+      "ms": 20292,
+      "dir": "q",
+      "text": " right"
+    },
+    {
+      "ms": 20733,
+      "dir": "q",
+      "text": " to keep"
+    },
+    {
+      "ms": 20918,
+      "dir": "q",
+      "text": " your"
+    },
+    {
+      "ms": 21119,
+      "dir": "q",
+      "text": " ownership"
+    },
+    {
+      "ms": 21494,
+      "dir": "q",
+      "text": " percentage"
+    },
+    {
+      "ms": 22109,
+      "dir": "q",
+      "text": " by"
+    },
+    {
+      "ms": 22292,
+      "dir": "q",
+      "text": " buying"
+    },
+    {
+      "ms": 22744,
+      "dir": "q",
+      "text": " enough"
+    },
+    {
+      "ms": 23159,
+      "dir": "q",
+      "text": " in the"
+    },
+    {
+      "ms": 23345,
+      "dir": "q",
+      "text": " next"
+    },
+    {
+      "ms": 23517,
+      "dir": "q",
+      "text": " round."
+    },
+    {
+      "ms": 24351,
+      "dir": "q",
+      "text": " And"
+    },
+    {
+      "ms": 24753,
+      "dir": "q",
+      "text": " if you'd"
+    },
+    {
+      "ms": 24904,
+      "dir": "q",
+      "text": " like,"
+    },
+    {
+      "ms": 25498,
+      "dir": "q",
+      "text": " we"
+    },
+    {
+      "ms": 25720,
+      "dir": "q",
+      "text": " can"
+    },
+    {
+      "ms": 25916,
+      "dir": "q",
+      "text": " talk"
+    },
+    {
+      "ms": 26123,
+      "dir": "q",
+      "text": " through"
+    },
+    {
+      "ms": 26307,
+      "dir": "q",
+      "text": " what"
+    },
+    {
+      "ms": 26508,
+      "dir": "q",
+      "text": " you'd"
+    },
+    {
+      "ms": 26711,
+      "dir": "q",
+      "text": " expect"
+    },
+    {
+      "ms": 26914,
+      "dir": "q",
+      "text": " a"
+    },
+    {
+      "ms": 27120,
+      "dir": "q",
+      "text": " strong"
+    },
+    {
+      "ms": 27514,
+      "dir": "q",
+      "text": " fit"
+    },
+    {
+      "ms": 27722,
+      "dir": "q",
+      "text": " to"
+    },
+    {
+      "ms": 27910,
+      "dir": "q",
+      "text": " look"
+    },
+    {
+      "ms": 28112,
+      "dir": "q",
+      "text": " like,"
+    },
+    {
+      "ms": 28296,
+      "dir": "q",
+      "text": " while"
+    },
+    {
+      "ms": 28714,
+      "dir": "q",
+      "text": " that"
+    },
+    {
+      "ms": 28905,
+      "dir": "q",
+      "text": " connection's"
+    },
+    {
+      "ms": 29293,
+      "dir": "q",
+      "text": " sorted."
+    }
+  ]
+}

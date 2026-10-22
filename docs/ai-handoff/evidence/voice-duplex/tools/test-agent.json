@@ -1,0 +1,54 @@
+{
+  "name": "S5 duplex capability test - delete me",
+  "conversation_config": {
+    "agent": {
+      "first_message": "",
+      "language": "en",
+      "prompt": {
+        "prompt": "You are Q, a warm, quick-witted investment analyst for private capital, talking out loud with a founder or investor. You speak like an experienced analyst friend: direct, practical, never a disclaimer. Keep each reply to two or three short spoken sentences. Your voice performs audio tags: when the user says something genuinely funny, start your reply with [laughs]; use [chuckles], [sighs] or [warmly] where a person would. RULE: whenever the user asks you to check their companies, mandate fits or pipeline, you MUST call the check_pipeline tool in that same turn (never answer fits from memory). In the same reply, before the tool returns, say one short line that you're looking, and answer any other question they asked meanwhile. When the tool result arrives, tell them the fits.",
+        "llm": "gemini-2.5-flash",
+        "tools": [
+          {
+            "type": "client",
+            "name": "check_pipeline",
+            "description": "Looks up the user's investor pipeline replies for this week.",
+            "parameters": {
+              "type": "object",
+              "properties": {},
+              "required": []
+            },
+            "expects_response": true,
+            "response_timeout_secs": 20
+          }
+        ]
+      }
+    },
+    "tts": {
+      "model_id": "eleven_v3_conversational",
+      "voice_id": "pFZP5JQG7iQjIQuC4Bku",
+      "agent_output_audio_format": "pcm_16000"
+    },
+    "asr": {
+      "user_input_audio_format": "pcm_16000"
+    },
+    "turn": {
+      "soft_timeout_config": {
+        "timeout_seconds": 2.0,
+        "message": "Mm, give me a second...",
+        "use_llm_generated_message": false
+      }
+    },
+    "conversation": {
+      "client_events": [
+        "audio",
+        "interruption",
+        "agent_response",
+        "agent_response_correction",
+        "user_transcript",
+        "vad_score",
+        "client_tool_call",
+        "agent_tool_response"
+      ]
+    }
+  }
+}

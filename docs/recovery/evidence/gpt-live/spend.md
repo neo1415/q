@@ -55,3 +55,7 @@ Live OpenAI calls stopped at the founder's request; the scratch key file has bee
 - **TTS:** inputs were synthesised once per line and cached (rows marked "+ TTS inputs"). Their cost (about $0.015 per minute of audio) is included in those rows.
 - **Basis:** GPT-Live rows use `usage.seconds` from `session.closed`; the three preview rows are unconfirmed (OpenAI's 15 s minimum). Realtime rows are priced from `response.done` token usage. These are estimates: the OpenAI usage dashboard is authoritative.
 - **Row order:** the 04:46 and 04:55 preview rows were logged after the 04:49 recording; the running total is in logging order.
+  | 2026-10-22 08:25 | S5-voice-duplex | Scenario 2 humour on gpt-live-1 + TTS inputs | 49 | $0.044 | $2.013 |
+  | 2026-10-22 08:26 | S5-voice-duplex | Scenario 3 hesitant-question on gpt-live-1 + TTS inputs | 46 | $0.042 | $2.055 |
+  | 2026-10-22 08:27 | S5-voice-duplex | Scenario 4 interruption on gpt-live-1 + TTS inputs | 25 | $0.023 | $2.078 |
+  | 2026-10-22 08:27 | S5-voice-duplex | Scenario 7 talk-while-researching on gpt-live-1 + TTS inputs | 31 | $0.028 | $2.106 |

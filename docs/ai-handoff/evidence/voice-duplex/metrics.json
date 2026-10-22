@@ -1,0 +1,70 @@
+[
+  {
+    "clip": "02-humour-A-gpt-live",
+    "q_words_during_user_speech": [],
+    "tag_words_spoken": [],
+    "audio_events": []
+  },
+  {
+    "clip": "02-humour-lily-elevenlabs",
+    "q_words_during_user_speech": [],
+    "tag_words_spoken": [],
+    "audio_events": [[6.76, "[chuckles]"]]
+  },
+  {
+    "clip": "03-hesitant-question-A-gpt-live",
+    "q_words_during_user_speech": [],
+    "tag_words_spoken": [],
+    "audio_events": []
+  },
+  {
+    "clip": "03-hesitant-question-lily-elevenlabs",
+    "q_words_during_user_speech": [],
+    "tag_words_spoken": [],
+    "audio_events": []
+  },
+  {
+    "clip": "04-interruption-A-gpt-live",
+    "q_words_during_user_speech": [
+      [13.58, "That's"],
+      [13.74, "all"],
+      [13.86, "right."]
+    ],
+    "tag_words_spoken": [],
+    "audio_events": [],
+    "barge_in_onset_s": 12.4,
+    "q_kept_talking_after_onset_s": 0.0,
+    "q_words_while_user_interrupts": [
+      [13.58, "That's"],
+      [13.74, "all"],
+      [13.86, "right."]
+    ]
+  },
+  {
+    "clip": "04-interruption-lily-elevenlabs",
+    "q_words_during_user_speech": [],
+    "tag_words_spoken": [],
+    "audio_events": [],
+    "barge_in_onset_s": 10.86,
+    "q_kept_talking_after_onset_s": 0.0,
+    "q_words_while_user_interrupts": []
+  },
+  {
+    "clip": "07-talk-while-researching-A-gpt-live",
+    "q_words_during_user_speech": [],
+    "tag_words_spoken": [],
+    "audio_events": [],
+    "first_q_word_after_user_s": 1.48,
+    "longest_gap_inside_q_reply_s": 0.68,
+    "q_reply_span_s": 19.2
+  },
+  {
+    "clip": "07-talk-while-researching-lily-elevenlabs",
+    "q_words_during_user_speech": [],
+    "tag_words_spoken": [],
+    "audio_events": [],
+    "first_q_word_after_user_s": 1.94,
+    "longest_gap_inside_q_reply_s": 0.66,
+    "q_reply_span_s": 17.84
+  }
+]
