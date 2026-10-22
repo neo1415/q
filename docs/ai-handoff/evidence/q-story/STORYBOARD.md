@@ -314,6 +314,37 @@ These are in the storyboard now so you can judge them:
 
 ---
 
+### 6. The Q Card: make it the hero it's meant to be
+
+Frames `13-act6-q-card-*` show the real component (`apps/web/src/features/q-card/q-card.tsx`) exactly as it ships. In the film, the line "What's your Q Card?" is the moment investors should want one. Today the card can't carry that line. It is an elegant badge: Q mark, "Q Card", the name, a grey descriptor, a rule and the @handle. It does not yet look like "one living private-capital identity with your story, your numbers, your raise, your intelligence, and your relationships". These suggestions stay within the product rules (evidence before opinion; no scores, percentages or fit meters; glow on Q only).
+
+- **Give it two faces.**
+  - **Front, identity:**
+    - logo and name;
+    - one line of story (the company's own short description);
+    - sector, stage and HQ as plain words;
+    - verification marks (domain, organisation) as small labelled ticks.
+  - **Back, the live sheet,** five rows matching the five nouns in the line:
+    - **Story:** the one-sentence pitch.
+    - **Numbers:** two or three founder metrics, each with its evidence label (Self-reported, Document-supported, Verified).
+    - **Raise:** amount, instrument and close date, with "founder-stated" where true.
+    - **Intelligence:** readiness in words ("6 of 8 areas strong or developing"), the same sentence Readiness uses. Never a number.
+    - **Relationships:** "In conversation with 4 investors" (visible only to the founder; the shared card shows nothing private).
+
+  The flip in the film (#48) then becomes the product's own interaction, not a storyboard effect.
+
+- **Freshness, so "living" is visible:** "Updated 3 days ago" in the corner, and an evidence dot per row. A stale card should look stale.
+- **A material, not a glow:** the gold should come from the surface, not from light around it.
+  - Keep the one arc of light but make it finer.
+  - Add an engraved, guilloché-style line field in `--cq-gold-*` at very low contrast behind the name, like a certificate or a banknote. That is the private-capital vernacular, and it says "this is a document of record".
+  - The soft outer glow (`--cq-qcard-glow`) reads as glow on a card, which ADR 0017 reserves for Q. Keep the glow on the Q mark in the corner only.
+- **Type with weight:** the name in the editorial face at display size (the same voice as the film's large type), the descriptor in the UI face, and figures in tabular numerals. Today the name and the handle are close in visual weight.
+- **Fill the right side:** without a QR the right third is empty. The QR (dark on white, as designed) belongs on the back face. The front's right side can hold the company logo, or the round's status as a stamp-like mark ("Raising · Seed").
+- **Share is the point:** a visible "Share Q Card" with copy-link and QR, and the public page `/c/@handle` showing the front face only. The investor's question "What's your Q Card?" needs a one-tap answer.
+- **On a phone:** the card should fill the width at the 1.8:1 ratio, with the back face reached by a tap (not hover). The rows stack, with no truncation.
+
+Rough cost: the back face is a read-only composite of data the profile, Readiness and the raise already hold (plan §8.2 option a). The material and type changes are CSS plus two tokens.
+
 ## Notes for S1 (engine) and the integration owner
 
 - **Cue table.** Every cue is in [`timeline.ts`](../../../../apps/web/app/dev/q-story/timeline.ts) as `[source line, word index, patch]`. It is a working draft of the word-anchored cue list S1 needs. The word indices were checked against the verbatim text.
