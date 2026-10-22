@@ -48,25 +48,35 @@ export function supabaseStorage() {
   const key = process.env.SUPABASE_SECRET_KEY?.trim();
   if (!url || !key) {
     throw new Error(
-      "SUPABASE_URL and SUPABASE_SECRET_KEY are required to upload a photo",
+      "SUPABASE_URL and SUPABASE_SECRET_KEY are required to upload a file",
     );
   }
   return {
-    putObject: async ({ key: objectKey, body, contentType }) => {
-      const r = await fetch(
-        `${url}/storage/v1/object/${PROFILE_IMAGE_BUCKET}/${objectKey}`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${key}`,
-            apikey: key,
-            "content-type": contentType,
-            "x-upsert": "true",
-          },
-          body,
+    putObject: async ({ bucket, key: objectKey, body, contentType }) => {
+      const r = await fetch(`${url}/storage/v1/object/${bucket}/${objectKey}`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${key}`,
+          apikey: key,
+          "content-type": contentType,
+          "x-upsert": "true",
         },
-      );
+        body,
+      });
       if (!r.ok) throw new Error(`storage: HTTP ${r.status}`);
+    },
+  };
+}
+
+/** Local rehearsal only: objects written under a directory, by bucket/key. */
+export function directoryStorage(root) {
+  return {
+    putObject: async ({ bucket, key, body }) => {
+      const { mkdirSync, writeFileSync } = await import("node:fs");
+      const { dirname, join } = await import("node:path");
+      const path = join(root, bucket, key);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, body);
     },
   };
 }
