@@ -6,6 +6,7 @@
 // `interruption` event (what its official client does).
 //
 //   node el-run.mjs <agent_id> <scenario 2|3|4|7> <outDir> <ttsCacheDir>
+/* global Buffer, WebSocket, clearTimeout, console, fetch, process, setTimeout -- Node 22+ */
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
