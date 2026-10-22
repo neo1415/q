@@ -31,6 +31,7 @@ import { greetingSeed, warmGreeting } from "@/features/briefing/greeting";
 
 import { useWire } from "./use-wire";
 import { conversationIdOf } from "./wire-constants";
+import { bindAttachmentsTo } from "./q-attachments";
 
 import { apertureStateFor, type QApertureState } from "../q-aperture";
 import { destinationPath } from "../voice/destinations";
@@ -303,6 +304,11 @@ export function QSessionProvider({
   useEffect(() => {
     if (settledOpen) rememberActiveConversation("home", activeConversation);
   }, [activeConversation, settledOpen]);
+  // Lane 8: what was attached belongs to this conversation; another one,
+  // or "New chat", starts with nothing attached.
+  useEffect(() => {
+    bindAttachmentsTo(activeConversation);
+  }, [activeConversation]);
 
   const [spoken, setSpoken] = useState<readonly SpokenLine[]>([]);
   // The real voice; a development harness may hold a scripted one.

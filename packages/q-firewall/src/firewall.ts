@@ -195,9 +195,15 @@ export function screenWithin(
     artifactSlide,
     artifactVersion,
     manifest,
+    attachedDocumentIds,
   } = screen;
   return {
     route: screen.route,
+    // Lane 8: documents they attached in Q's composer, as ids only. It
+    // grants nothing: their words are read solely through
+    // read_attached_document, as the asker, through Evidence's own
+    // document.view check, and one that is not theirs reads as NONE.
+    ...(attachedDocumentIds === undefined ? {} : { attachedDocumentIds }),
     // Q room R1: what the whole page shows, as ids and closed kinds only.
     // It grants nothing: each ref is read through its own read tool under
     // this plan, as the asker, and a refused one is dropped unread.

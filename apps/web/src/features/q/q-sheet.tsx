@@ -28,6 +28,14 @@ import { ViewTransition } from "@/components/view-transition";
 import { QAperture, QLumen } from "../q-aperture";
 import { useDockMenu } from "../q-dock/use-dock-menu";
 import { interceptTyped } from "./typed-intercept";
+import {
+  attachToQ,
+  attachmentQuestion,
+  markAttachmentsSent,
+  Q_ATTACH_ACCEPT,
+  useQAttachments,
+} from "./q-attachments";
+import { WorkingLine } from "@/components/working/working-line";
 import { homeHref } from "./active-conversation";
 import { failureMessage, recoveryHint } from "./conversation";
 import { useAnchorQuestion } from "./follow-newest";
@@ -71,6 +79,7 @@ export function QSheetConversation({
   readonly moment?: QMoment | null | undefined;
 }) {
   const t = useT();
+  const attached = useQAttachments();
   const session = useQSession();
   const { q, turns, voice, subject, presence, spokenOnly } = session;
   const dockMenu = useDockMenu();
@@ -289,21 +298,48 @@ export function QSheetConversation({
                 // 2026-09-30); otherwise they are asked as a question.
                 onSubmit:
                   voice.active && voice.client.connected
-                    ? (text: string) => {
-                        if (interceptTyped(text)) return;
+                    ? (typed: string) => {
+                        const text = attachmentQuestion(typed);
+                        if (text.length === 0 || interceptTyped(text)) return;
                         voice.client.sendText(text);
+                        markAttachmentsSent();
                       }
-                    : (text: string) =>
-                        interceptTyped(text)
-                          ? Promise.resolve()
-                          : q.ask(
-                              text,
-                              moment === null
-                                ? undefined
-                                : { viewing: viewingOf(moment) },
-                            ),
+                    : async (typed: string) => {
+                        // Lane 8: Send on an attached document alone asks
+                        // about it; words of their own go as typed.
+                        const text = attachmentQuestion(typed);
+                        if (text.length === 0) return;
+                        if (text === typed.trim() && interceptTyped(text)) {
+                          return;
+                        }
+                        await q.ask(
+                          text,
+                          moment === null
+                            ? undefined
+                            : { viewing: viewingOf(moment) },
+                        );
+                        markAttachmentsSent();
+                      },
+                // Lane 8: a document attached here goes to their own
+                // organisation's documents (never the company on screen,
+                // which may be someone else's) and with the next question.
+                onAttach: (file: File) => attachToQ(file),
+                attachLabel: t("Attach a document"),
+                attachAccept: Q_ATTACH_ACCEPT,
               }
             : {})}
+          attachments={attached.attachments}
+          {...(attached.status === null
+            ? {}
+            : {
+                attachmentStatus: (
+                  <WorkingLine
+                    label={t(attached.status)}
+                    active
+                    data-q-attachment-reading=""
+                  />
+                ),
+              })}
         />
         {inline ? null : (
           <div className="flex items-center justify-between gap-2">

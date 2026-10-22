@@ -457,11 +457,15 @@ function screenWithManifest(
     artifactVersion,
     timeZone,
     manifest,
+    attachedDocumentIds,
   } = screen;
   return {
     route: screen.route,
     // The person's own clock: not an entity, nothing to resolve.
     ...(timeZone === undefined ? {} : { timeZone }),
+    // Lane 8: what they attached, as ids. Read only through
+    // read_attached_document, as the asker; one not theirs reads as NONE.
+    ...(attachedDocumentIds === undefined ? {} : { attachedDocumentIds }),
     // Q room R1: the page's manifest, ids and closed kinds only. Kept as
     // asked; every ref is read back as the asker before the model sees
     // anything, and one that does not resolve is dropped there.

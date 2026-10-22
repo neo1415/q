@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -112,5 +112,65 @@ describe("QComposer", () => {
     await user.type(input, "one{Shift>}{Enter}{/Shift}two");
     // The fallback sizes to the content; the class's max-height caps it.
     expect((input as HTMLTextAreaElement).style.height).toBe("96px");
+  });
+
+  // Lane 8 (owner's boss, 2026-10-22): "it attached, but the send button
+  // did not come alive".
+  it("sends on a finished attachment alone, and holds Send while one uploads", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    const { rerender } = render(
+      <QComposer
+        onSubmit={onSubmit}
+        onAttach={vi.fn()}
+        attachments={[
+          { key: "a", label: "term-sheet.pdf · reading", state: "uploading" },
+        ]}
+      />,
+    );
+    const send = screen.getByRole("button", { name: "Send to Q" });
+    expect(send.hasAttribute("disabled")).toBe(true);
+    // Words typed while it uploads still wait for the document.
+    await user.type(screen.getByRole("textbox", { name: "Ask Q" }), "Hi");
+    expect(send.hasAttribute("disabled")).toBe(true);
+    await user.clear(screen.getByRole("textbox", { name: "Ask Q" }));
+    rerender(
+      <QComposer
+        onSubmit={onSubmit}
+        onAttach={vi.fn()}
+        attachments={[{ key: "a", label: "term-sheet.pdf", state: "ready" }]}
+      />,
+    );
+    expect(send.hasAttribute("disabled")).toBe(false);
+    await user.click(send);
+    expect(onSubmit).toHaveBeenCalledWith("");
+  });
+
+  it("a failed attachment alone sends nothing", () => {
+    render(
+      <QComposer
+        onSubmit={vi.fn()}
+        onAttach={vi.fn()}
+        attachments={[{ key: "a", label: "x · too large", state: "failed" }]}
+      />,
+    );
+    expect(
+      screen
+        .getByRole("button", { name: "Send to Q" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
+  it("attaches a file dropped on the composer", () => {
+    const onAttach = vi.fn();
+    render(<QComposer onSubmit={vi.fn()} onAttach={onAttach} />);
+    const form = screen.getByRole("form", { name: "Ask Q" });
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+    const dataTransfer = { types: ["Files"], files: [file], dropEffect: "" };
+    fireEvent.dragOver(form, { dataTransfer });
+    expect(form.hasAttribute("data-dragging")).toBe(true);
+    fireEvent.drop(form, { dataTransfer });
+    expect(onAttach).toHaveBeenCalledWith(file);
+    expect(form.hasAttribute("data-dragging")).toBe(false);
   });
 });
