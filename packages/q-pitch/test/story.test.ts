@@ -405,7 +405,7 @@ describe("Q Story trigger", () => {
 
 describe("Q Story claims and gate", () => {
   it("is approved only by a recorded owner yes for this exact cut", () => {
-    expect(storyOwnerApproved()).toBe(false);
+    expect(storyOwnerApproved(STORY_VERSION, [])).toBe(false);
     const yes = {
       approvedBy: "owner",
       at: "2026-10-22T04:00:00Z",

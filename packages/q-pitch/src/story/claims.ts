@@ -148,7 +148,18 @@ export const StoryOwnerApprovalSchema = z
   .strict();
 export type StoryOwnerApproval = z.infer<typeof StoryOwnerApprovalSchema>;
 
-export const STORY_OWNER_APPROVALS: readonly StoryOwnerApproval[] = [];
+/**
+ * Recorded 2026-10-22: the owner, in the S1 session, asked whether all
+ * three editions are approved for an audience, answered "yes, I approve".
+ * Each cut is approved by its own version.
+ */
+const OWNER = "owner (founder)";
+const APPROVED_AT = "2026-10-22T14:40:00Z";
+export const STORY_OWNER_APPROVALS: readonly StoryOwnerApproval[] = [
+  { approvedBy: OWNER, at: APPROVED_AT, storyVersion: "story-v7.1" },
+  { approvedBy: OWNER, at: APPROVED_AT, storyVersion: "story-v7.1-investor" },
+  { approvedBy: OWNER, at: APPROVED_AT, storyVersion: "story-v7.1-founder" },
+];
 
 export function storyOwnerApproved(
   version: string = STORY_VERSION,

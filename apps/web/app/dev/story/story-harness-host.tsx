@@ -3,7 +3,19 @@
 import dynamic from "next/dynamic";
 import { useSyncExternalStore } from "react";
 
-import type { StoryEditionId, StoryRoute } from "@capital-q/q-pitch";
+import {
+  STORY_LEDGER,
+  type StoryEditionId,
+  type StoryRoute,
+} from "@capital-q/q-pitch";
+
+/**
+ * The fictional demo account the story's claims are certified for (the
+ * ledger's actor): the harness plays the story as that account sees it, so
+ * the certification gate (and its "Internal rehearsal" stamp) is the real
+ * one, never bypassed.
+ */
+const HARNESS_ACCOUNT = STORY_LEDGER[0]?.actorContext.account ?? "harness";
 
 const StoryHost = dynamic(
   () => import("@/features/q-pitch/story/story-host").then((m) => m.StoryHost),
@@ -80,7 +92,7 @@ export function StoryHarnessHost() {
   );
   return (
     <StoryHost
-      account="harness"
+      account={HARNESS_ACCOUNT}
       role="INVESTOR"
       harness={HARNESS}
       voice={voice}
