@@ -47,17 +47,13 @@
     "cls": 0.0007978515625,
     "shifts": [
       {
-        "sources": [
-          "span.hidden.sm:inline-flex"
-        ],
+        "sources": ["span.hidden.sm:inline-flex"],
         "value": 0.00039892578125,
         "at": 258761,
         "path": "/dev/story/gateq?view=gate"
       },
       {
-        "sources": [
-          "span.hidden.sm:inline-flex"
-        ],
+        "sources": ["span.hidden.sm:inline-flex"],
         "value": 0.00039892578125,
         "at": 272143,
         "path": "/dev/story/gateq?view=inbox"
