@@ -8,12 +8,14 @@
       "familyName": "Nwankwo",
       "familyNameConfirmed": true,
       "headline": "Founder of Capital Q, the home of private capital.",
-      "photo": "supabase/seed-assets/capital-q-team/david-founder.jpg"
+      "photo": "supabase/seed-assets/capital-q-team/david-founder.jpg",
+      "backgrounds": ["Founder & CEO, Capital Q"]
     },
     "zino": {
       "displayName": "Captain Zino Mario",
       "headline": "Co-founder of Capital Q and Songscribe.",
-      "photo": null
+      "photo": null,
+      "backgrounds": ["Co-founder, Capital Q", "Co-founder, Songscribe"]
     },
     "daniel": {
       "displayName": "Daniel Oyeniyi",
@@ -172,7 +174,7 @@
         {
           "key": "financial.contribution_margin",
           "type": "financial",
-          "statement": "Contribution margin was 61% in Q3 2026 (revenue less hosting, model and payment costs).",
+          "statement": "Contribution margin was 61% in Q3 2026 (revenue less cost of revenue and variable onboarding and support costs).",
           "value": {
             "kind": "PERCENT",
             "value": 61,
@@ -452,5 +454,6 @@
         "team": "network_visible"
       }
     }
-  ]
+  ],
+  "$commentBackgrounds": "Background lines are roles the owner stated, nothing more: no dates, employers or career history are invented for real people. Their own backgrounds replace these when they supply them."
 }

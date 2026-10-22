@@ -1,0 +1,413 @@
+{
+  "$comment": "LOCAL REHEARSAL FIXTURE — NOT A MODEL READING. Twelve deck sections transcribed by hand from supabase/seed-assets/capital-q-documents/pitch-deck.pdf (the deck's own words and figures), so the deterministic scorers can be measured on a local database without a model call. seed.mjs refuses to write it with --hosted: on the hosted platform the real document pipeline and Q's deck reader (through the model gateway) produce the reading, and --confirm-deck confirms that one.",
+  "promptVersion": 1,
+  "schemaVersion": 1,
+  "pageCount": 15,
+  "sections": [
+    {
+      "section": "PROBLEM",
+      "status": "PRESENT",
+      "summary": "Private capital still runs on inboxes, decks and silence: investors cannot find the right deals and founders chase the wrong investors.",
+      "pages": [2],
+      "facts": [
+        {
+          "label": "Investor pain",
+          "value": "Decks, introductions, referrals and applications pile up; the right deal does not announce itself.",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [2],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "Founder pain",
+          "value": "Search, pitch, fly, rewrite, follow up — then silence.",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [2],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        }
+      ],
+      "confidence": "HIGH"
+    },
+    {
+      "section": "SOLUTION",
+      "status": "PRESENT",
+      "summary": "One platform for both sides, with Q doing the analyst work: Q, Discover, GateQ, Investability IQ and the Q Card.",
+      "pages": [3, 4],
+      "facts": [
+        {
+          "label": "Product",
+          "value": "Q, Discover, GateQ, Investability IQ and the Q Card on one platform for investors and businesses.",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [3],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        }
+      ],
+      "confidence": "HIGH"
+    },
+    {
+      "section": "VALUE_PROPOSITION",
+      "status": "PRESENT",
+      "summary": "Every fact carries its source and how it is supported, so trust is earned before the first meeting; meetings become decisions, not introductions.",
+      "pages": [3, 5],
+      "facts": [
+        {
+          "label": "Promise",
+          "value": "Every fact carries its source and how it is supported, so trust is earned before the first meeting.",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [3],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        }
+      ],
+      "confidence": "HIGH"
+    },
+    {
+      "section": "MARKET",
+      "status": "PRESENT",
+      "summary": "An estimated USD 1.2B annual spend on deal sourcing and diligence tools by African and emerging-market private capital (company estimate); beachhead West and East Africa.",
+      "pages": [6],
+      "facts": [
+        {
+          "label": "Market size (estimate)",
+          "value": "USD 1.2B",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "30 September 2026",
+          "pages": [6],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "MEDIUM"
+        },
+        {
+          "label": "Beachhead",
+          "value": "West and East Africa",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [6],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        }
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "section": "GO_TO_MARKET",
+      "status": "PRESENT",
+      "summary": "Investor firms subscribe to Discover and Q; GateQ plugs into websites, accelerators and programmes; founders start free with Q.",
+      "pages": [5, 7],
+      "facts": [
+        {
+          "label": "Channels",
+          "value": "Investor-firm subscriptions; GateQ on websites, application pages, accelerators and programmes.",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [5, 7],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "MEDIUM"
+        }
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "section": "BUSINESS_MODEL",
+      "status": "PRESENT",
+      "summary": "B2B SaaS for the people who allocate capital: pilot ARPA USD 400 per firm per month; no pay-to-rank.",
+      "pages": [7],
+      "facts": [
+        {
+          "label": "Pilot ARPA",
+          "value": "USD 400 per firm per month",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "September 2026",
+          "pages": [7],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "Gross margin",
+          "value": "78%",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "Q3 2026",
+          "pages": [7],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "Contribution margin",
+          "value": "61%",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "Q3 2026",
+          "pages": [7],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        }
+      ],
+      "confidence": "HIGH"
+    },
+    {
+      "section": "TRACTION",
+      "status": "PRESENT",
+      "summary": "Paid pilots: USD 4,800 MRR in September 2026, 12 paying investor firms, 1,240 active users, MRR up 60% June to September.",
+      "pages": [8],
+      "facts": [
+        {
+          "label": "MRR",
+          "value": "USD 4,800",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "September 2026",
+          "pages": [8],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "ARR run-rate",
+          "value": "USD 57,600",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "September 2026",
+          "pages": [8],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "Paying investor firms",
+          "value": "12",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "September 2026",
+          "pages": [8],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "Active users",
+          "value": "1,240",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "September 2026",
+          "pages": [8],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "MRR growth",
+          "value": "+60% (USD 3,000 to USD 4,800)",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "June to September 2026",
+          "pages": [8],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "Net revenue retention",
+          "value": "112%",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "Q3 2026",
+          "pages": [8],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        }
+      ],
+      "confidence": "HIGH"
+    },
+    {
+      "section": "COMPETITION",
+      "status": "PRESENT",
+      "summary": "Against deal databases, CRMs, fundraising marketplaces and human advisers, Capital Q alone serves both sides with sourced evidence, inbound triage, explainable matching and readiness (company's own assessment).",
+      "pages": [9],
+      "facts": [
+        {
+          "label": "Positioning",
+          "value": "Others hold lists. Capital Q holds the evidence.",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [9],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "MEDIUM"
+        }
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "section": "FINANCIALS",
+      "status": "PRESENT",
+      "summary": "Illustrative model: revenue USD 37,916 in FY2026 to USD 617,302 in FY2028; exit ARR about USD 0.87M by end of 2028; net burn USD 9,512 a month in September 2026.",
+      "pages": [11],
+      "facts": [
+        {
+          "label": "FY2026 revenue",
+          "value": "USD 37,916",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "FY2026",
+          "pages": [11],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "MEDIUM"
+        },
+        {
+          "label": "Exit ARR run-rate FY2028",
+          "value": "USD 865,724 (forecast)",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "December 2028",
+          "pages": [11],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "LOW"
+        }
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "section": "THE_ASK",
+      "status": "PRESENT",
+      "summary": "Raising USD 1,500,000 at pre-seed on a SAFE, target close 31 March 2027; use of funds: engineering 45%, investor network 25%, verification and data rooms 15%, operations and reserve 15%.",
+      "pages": [12, 13],
+      "facts": [
+        {
+          "label": "Raise",
+          "value": "USD 1,500,000 SAFE, pre-seed",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "Q3 2026",
+          "pages": [12],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "Target close",
+          "value": "31 March 2027",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [12],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "Use of funds",
+          "value": "Engineering 45%, investor network 25%, verification and data rooms 15%, operations and reserve 15%",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [13],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        }
+      ],
+      "confidence": "HIGH"
+    },
+    {
+      "section": "FOUNDERS",
+      "status": "PRESENT",
+      "summary": "David Nwankwo, Founder & CEO, and Captain Zino Mario, Co-founder; roles only, backgrounds supplied by each person.",
+      "pages": [10],
+      "facts": [
+        {
+          "label": "Founder & CEO",
+          "value": "David Nwankwo",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [10],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "Co-founder",
+          "value": "Captain Zino Mario",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [10],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        }
+      ],
+      "confidence": "MEDIUM"
+    },
+    {
+      "section": "TEAM",
+      "status": "PRESENT",
+      "summary": "Six people building in Lagos: the two founders, engineers Daniel Oyeniyi and Adeyemi Odunyugbo, and two colleagues across go-to-market and operations; board of the two founders until the seed round.",
+      "pages": [10],
+      "facts": [
+        {
+          "label": "Engineering",
+          "value": "Daniel Oyeniyi",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [10],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "Engineering",
+          "value": "Adeyemi Odunyugbo",
+          "unknownReason": null,
+          "kind": "TEXT",
+          "asOf": null,
+          "pages": [10],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        },
+        {
+          "label": "Team size",
+          "value": "6",
+          "unknownReason": null,
+          "kind": "FIGURE",
+          "asOf": "Q3 2026",
+          "pages": [10],
+          "truthClass": "USER_CLAIM",
+          "evidenceStatus": "SELF_REPORTED",
+          "confidence": "HIGH"
+        }
+      ],
+      "confidence": "HIGH"
+    }
+  ]
+}

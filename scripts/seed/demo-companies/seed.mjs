@@ -12,6 +12,11 @@
 //
 //   Person Q Cards for people who already have accounts and agreed:
 //     --person david=<email> --person zino=<email>
+//   Capital Q's data room (business documents only), uploaded by its founder;
+//   then, once Q has read the deck, his confirmation (owner-approved):
+//     --documents        (local rehearsal: add --local-fixture-reading)
+//     --confirm-deck     (a later run, after the reading exists)
+//   Local runs with files need --storage-dir <dir>.
 //   Their own profile photo (owner-supplied, with permission), for a person
 //   also named with --person; hosted uploads need SUPABASE_URL and
 //   SUPABASE_SECRET_KEY:
@@ -24,12 +29,25 @@ import { createRequire } from "node:module";
 import { dirname, extname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { planPersonPhoto, supabaseStorage } from "./photo.mjs";
+import { createHash } from "node:crypto";
+
+import {
+  directoryStorage,
+  PROFILE_IMAGE_BUCKET,
+  planPersonPhoto,
+  supabaseStorage,
+} from "./photo.mjs";
 
 import {
   planCompany,
   renderCompanySql,
   renderPersonCardSql,
+  renderTeamSql,
+  DOCUMENT_BUCKET,
+  planDocuments,
+  renderDeckConfirmationSql,
+  renderDocumentsSql,
+  renderFixtureReadingSql,
   seedUuid,
 } from "./plan.mjs";
 
@@ -39,6 +57,14 @@ export const FIXTURE_PATH = join(
   "supabase/seed-assets/demo-companies/companies.json",
 );
 const HOSTED_PROJECT_REF = "vcohxiqsmnkzxnvawgri";
+export const DOCUMENTS_MANIFEST = join(
+  ROOT,
+  "supabase/seed-assets/capital-q-documents/manifest.json",
+);
+const FIXTURE_READING = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "local-deck-reading.fixture.json",
+);
 
 /** A database the seed can read from and write to. */
 export function localDatabase(url) {
@@ -183,7 +209,14 @@ const CONTENT_TYPES = {
 export async function planAll(
   db,
   fixture,
-  { persons = {}, photos = {}, now } = {},
+  {
+    persons = {},
+    photos = {},
+    documents = false,
+    confirmDeck = false,
+    fixtureReading = false,
+    now,
+  } = {},
 ) {
   const owner = (
     await db.read(
@@ -214,14 +247,39 @@ export async function planAll(
     const users = await db.read(
       `select p.id, ac.tenant_id from identity.user_profiles p join auth.users u on u.id = p.auth_user_id left join identity.user_active_contexts c on c.user_id = p.id left join identity.organisation_memberships ac on ac.id = c.membership_id where lower(u.email) = lower(${q(email)}) and p.status = 'active'`,
     );
-    if (users.length !== 1 || users[0].tenant_id === null) {
+    if (users.length !== 1) {
       people.push({
         person,
-        skip: "no single active account with a current organisation for that email",
+        skip: "no single active account for that email",
       });
       continue;
     }
     const userId = users[0].id;
+    // The company they found or join here gives a tenant when they have no
+    // organisation of their own yet.
+    const home = companies.find(({ plan }) => {
+      const spec = fixture.companies.find((c) => c.key === plan.key);
+      return (
+        !plan.skip &&
+        [...spec.founders, ...spec.team].some((m) => m.person === person)
+      );
+    });
+    const tenantId = users[0].tenant_id ?? home?.plan.ids.tenant ?? null;
+    // A personal Q Card only for a founder the fixture names (David, Zino).
+    const founder = fixture.companies.some((c) =>
+      c.founders.some((f) => f.person === person),
+    );
+    if (!founder || tenantId === null) {
+      people.push({
+        person,
+        userId,
+        tenantId,
+        handle: null,
+        sql: null,
+        noCard: true,
+      });
+      continue;
+    }
     const [handles, cards] = await Promise.all([
       db.read(
         `select handle from core.handles where subject_type = 'PERSON' and subject_id = ${q(userId)} and status = 'ACTIVE'`,
@@ -234,17 +292,81 @@ export async function planAll(
     people.push({
       person,
       userId,
+      tenantId,
       handle: handles[0]?.handle ?? handle,
       sql: renderPersonCardSql({
         seedKey: fixture.seedKey,
         userId,
         handle,
-        tenantId: users[0].tenant_id,
+        tenantId,
         existingHandle: handles[0]?.handle ?? null,
         existingCard: cards[0] ?? null,
       }),
     });
   }
+  // The team: founders and team the fixture names, for people named here.
+  const memberRole = (
+    await db.read(
+      "select id from permissions.roles where code = 'organisation_member'",
+    )
+  )[0]?.id;
+  const teams = [];
+  for (const { plan } of companies) {
+    if (plan.skip) continue;
+    const spec = fixture.companies.find((c) => c.key === plan.key);
+    const wanted = [
+      ...spec.founders.map((f) => ({ ...f, isFounder: true })),
+      ...spec.team.map((t) => ({ ...t, isFounder: false })),
+    ].filter((m) => people.some((p) => p.person === m.person && !p.skip));
+    if (wanted.length === 0) continue;
+    const members = [];
+    for (const m of wanted) {
+      const userId = people.find((p) => p.person === m.person).userId;
+      const [membership, member, context, backgrounds] = await Promise.all([
+        db.read(
+          `select 1 from identity.organisation_memberships where organisation_id = ${q(plan.ids.organisation)} and user_id = ${q(userId)} and membership_status = 'active'`,
+        ),
+        db.read(
+          `select 1 from core.company_members where company_id = ${q(plan.ids.company)} and user_id = ${q(userId)} and is_current`,
+        ),
+        db.read(
+          `select 1 from identity.user_active_contexts where user_id = ${q(userId)}`,
+        ),
+        db.read(
+          `select title from core.founder_background_entries where user_id = ${q(userId)}`,
+        ),
+      ]);
+      members.push({
+        userId,
+        title: m.title,
+        isFounder: m.isFounder,
+        backgrounds: m.isFounder
+          ? (fixture.people[m.person].backgrounds ?? [])
+          : [],
+        hasMembership: membership.length > 0,
+        hasCompanyMember: member.length > 0,
+        hasActiveContext: context.length > 0,
+        existingBackgroundTitles: backgrounds.map((b) => b.title),
+      });
+    }
+    teams.push({
+      company: plan.name,
+      people: wanted.map((m) => m.person),
+      sql: renderTeamSql({
+        seedKey: fixture.seedKey,
+        company: {
+          id: plan.ids.company,
+          tenant: plan.ids.tenant,
+          organisation: plan.ids.organisation,
+        },
+        memberRoleId: memberRole,
+        authorityUserId: owner,
+        now: at,
+        members,
+      }),
+    });
+  }
+
   const planned = [];
   for (const [person, path] of Object.entries(photos)) {
     const who = people.find((p) => p.person === person && !p.skip);
@@ -259,13 +381,14 @@ export async function planAll(
     const current = await db.read(
       `select id from core.profile_images where subject_type = 'PERSON' and subject_id = ${q(who.userId)} and kind = 'AVATAR' and status = 'READY'`,
     );
-    const tenant = await db.read(
-      `select ac.tenant_id from identity.user_active_contexts c join identity.organisation_memberships ac on ac.id = c.membership_id where c.user_id = ${q(who.userId)}`,
-    );
+    if (who.tenantId === null) {
+      planned.push({ person, skip: "no organisation to file the photo under" });
+      continue;
+    }
     const plan = planPersonPhoto({
       seedKey: fixture.seedKey,
       userId: who.userId,
-      tenantId: tenant[0].tenant_id,
+      tenantId: who.tenantId,
       source: { bytes, contentType },
       rendition,
       currentReadyId: current[0]?.id ?? null,
@@ -274,7 +397,125 @@ export async function planAll(
       plan === null ? { person, sql: null } : { person, ...plan, rendition },
     );
   }
-  return { owner, companies, people, photos: planned };
+  // The data room (owner 2026-10-22: "upload everything"), uploaded by
+  // the founder named for it; and, later, his confirmation of Q's reading.
+  let docs = null;
+  let confirmation = null;
+  if (documents || confirmDeck) {
+    const manifest = JSON.parse(readFileSync(DOCUMENTS_MANIFEST, "utf8"));
+    const target = companies.find(({ plan }) => plan.key === manifest.company);
+    const spec = fixture.companies.find((c) => c.key === manifest.company);
+    const uploader = people.find(
+      (p) => p.person === spec.founders[0]?.person && !p.skip,
+    );
+    if (target === undefined || target.plan.skip || uploader === undefined) {
+      docs = { skip: "the company and its founder (--person) are both needed" };
+    } else {
+      const company = {
+        id: target.plan.ids.company,
+        tenant: target.plan.ids.tenant,
+        organisation: target.plan.ids.organisation,
+      };
+      if (documents) {
+        const existing = await db.read(
+          `select title from evidence.documents where company_id = ${q(company.id)} and status = 'ACTIVE'`,
+        );
+        const files = manifest.documents.map((d) => {
+          const bytes = new Uint8Array(
+            readFileSync(join(dirname(DOCUMENTS_MANIFEST), d.file)),
+          );
+          const sha = createHash("sha256").update(bytes).digest("hex");
+          if (sha !== d.sha256) {
+            throw new Error(`${d.file}: sha256 does not match the manifest`);
+          }
+          return { ...d, bytes, sizeBytes: bytes.byteLength };
+        });
+        const planned = planDocuments({
+          seedKey: fixture.seedKey,
+          company,
+          uploaderUserId: uploader.userId,
+          documents: files,
+          existingTitles: existing.map((r) => r.title),
+        });
+        // The pitch video is not seeded: a pitch needs the founder's session
+        // and the stream provider, so it is uploaded at /pitch/new. The seed
+        // only checks the file is the one the manifest names.
+        const video = manifest.pitchVideo;
+        const videoSha = createHash("sha256")
+          .update(readFileSync(join(dirname(DOCUMENTS_MANIFEST), video.file)))
+          .digest("hex");
+        if (videoSha !== video.sha256) {
+          throw new Error(`${video.file}: sha256 does not match the manifest`);
+        }
+        docs = {
+          company,
+          planned,
+          pitchVideo: {
+            file: video.file,
+            audience: video.audience,
+            uploadPath: video.uploadPath,
+          },
+          sql: renderDocumentsSql({
+            seedKey: fixture.seedKey,
+            company,
+            planned,
+            authorityUserId: owner,
+            now: at,
+          }),
+          fixtureReading: fixtureReading
+            ? (() => {
+                const reading = JSON.parse(
+                  readFileSync(FIXTURE_READING, "utf8"),
+                );
+                const deck = planned.find(
+                  (d) => d.documentType === "PITCH_DECK",
+                );
+                return deck === undefined
+                  ? null
+                  : renderFixtureReadingSql({
+                      seedKey: fixture.seedKey,
+                      company,
+                      document: deck,
+                      fixture: reading,
+                    });
+              })()
+            : null,
+        };
+      }
+      if (confirmDeck) {
+        const [reading] = await db.read(
+          `select x.id as extraction_id, d.id as document_id, (c.extraction_id is not null) as confirmed from evidence.documents d join evidence.deck_extractions x on x.document_version_id = d.current_version_id left join evidence.deck_extraction_confirmations c on c.extraction_id = x.id where d.company_id = ${q(company.id)} and d.document_type = 'PITCH_DECK' and d.status = 'ACTIVE' order by x.reading_number desc, x.created_at desc limit 1`,
+        );
+        confirmation =
+          reading === undefined
+            ? {
+                skip: "no reading of the deck yet: run again once Q has read it",
+              }
+            : reading.confirmed
+              ? { sql: null }
+              : {
+                  sql: renderDeckConfirmationSql({
+                    seedKey: fixture.seedKey,
+                    company,
+                    extractionId: reading.extraction_id,
+                    documentId: reading.document_id,
+                    userId: uploader.userId,
+                    authorityUserId: owner,
+                    now: at,
+                  }),
+                };
+      }
+    }
+  }
+  return {
+    owner,
+    companies,
+    people,
+    teams,
+    photos: planned,
+    documents: docs,
+    confirmation,
+  };
 }
 
 export function personHandle(person) {
@@ -291,6 +532,7 @@ export function personHandle(person) {
 export async function applyAll(db, planned, { storage } = {}) {
   for (const c of planned.companies) if (c.sql !== null) await db.run(c.sql);
   for (const p of planned.people) if (p.sql) await db.run(p.sql);
+  for (const t of planned.teams ?? []) if (t.sql) await db.run(t.sql);
   for (const photo of planned.photos ?? []) {
     if (!photo.sql) continue;
     if (storage === undefined) {
@@ -298,12 +540,28 @@ export async function applyAll(db, planned, { storage } = {}) {
     }
     // The bytes first: a READY row never points at a missing object.
     await storage.putObject({
+      bucket: PROFILE_IMAGE_BUCKET,
       key: photo.objectKey,
       body: photo.rendition.bytes,
       contentType: photo.rendition.contentType,
     });
     await db.run(photo.sql);
   }
+  const docs = planned.documents;
+  if (docs?.sql) {
+    if (storage === undefined) throw new Error("documents need storage");
+    for (const d of docs.planned) {
+      await storage.putObject({
+        bucket: DOCUMENT_BUCKET,
+        key: d.storageKey,
+        body: d.bytes,
+        contentType: d.mime,
+      });
+    }
+    await db.run(docs.sql);
+  }
+  if (docs?.fixtureReading) await db.run(docs.fixtureReading);
+  if (planned.confirmation?.sql) await db.run(planned.confirmation.sql);
 }
 
 export function describe(planned) {
@@ -324,6 +582,11 @@ export function describe(planned) {
       `    taxonomy: +${plan.taxonomy.length}; raise: ${plan.raise === null ? "unchanged" : plan.raise.replace === null ? "create" : "replace"}; card: ${plan.card === null ? "unchanged" : plan.card.create ? "create" : "update scopes"}; handle: ${plan.handle?.handle ?? "unchanged"}`,
     );
   }
+  for (const t of planned.teams ?? []) {
+    lines.push(
+      `- team ${t.company}: ${t.sql === null ? "already there" : `memberships (member role only, no invitations) and titles for ${t.people.join(", ")}`}`,
+    );
+  }
   for (const photo of planned.photos ?? []) {
     lines.push(
       photo.skip
@@ -331,11 +594,26 @@ export function describe(planned) {
         : `- photo ${photo.person}: ${photo.sql === null ? "already this photo" : `upload ${photo.rendition.width}x${photo.rendition.height} WebP and set as their avatar`}`,
     );
   }
+  if (planned.documents) {
+    const d = planned.documents;
+    lines.push(
+      d.skip
+        ? `- data room: SKIP (${d.skip})`
+        : `- data room: ${d.planned.length === 0 ? "documents already there" : d.planned.map((x) => `${x.title} (${x.dataRoomLevel})`).join(", ")}${d.fixtureReading ? " + LOCAL FIXTURE READING" : ""}${d.pitchVideo ? `\n- pitch video (OWNER STEP, not seeded): upload supabase/seed-assets/capital-q-documents/${d.pitchVideo.file} at ${d.pitchVideo.uploadPath}, audience "${d.pitchVideo.audience}"` : ""}`,
+    );
+  }
+  if (planned.confirmation) {
+    lines.push(
+      planned.confirmation.skip
+        ? `- deck confirmation: SKIP (${planned.confirmation.skip})`
+        : `- deck confirmation: ${planned.confirmation.sql === null ? "already confirmed" : "confirm Q's reading as the founder (owner-approved)"}`,
+    );
+  }
   for (const p of planned.people) {
     lines.push(
       p.skip
         ? `- person ${p.person}: SKIP (${p.skip})`
-        : `- person ${p.person}: ${p.sql === null ? "card already there" : `card @${p.handle}`}`,
+        : `- person ${p.person}: ${p.noCard ? "team only (no personal card)" : p.sql === null ? "card already there" : `card @${p.handle}`}`,
     );
   }
   return lines.join("\n");
@@ -365,17 +643,38 @@ async function main() {
       photos[name] = path;
     }
   });
+  const documents = args.includes("--documents");
+  const confirmDeck = args.includes("--confirm-deck");
+  const fixtureReading = args.includes("--local-fixture-reading");
+  if (fixtureReading && hosted) {
+    throw new Error(
+      "--local-fixture-reading is for local rehearsal only; the hosted reading comes from Q's deck reader",
+    );
+  }
   const fixture = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
   const db = hosted ? hostedDatabase() : localDatabase(url);
   try {
-    const planned = await planAll(db, fixture, { persons, photos });
+    const planned = await planAll(db, fixture, {
+      persons,
+      photos,
+      documents,
+      confirmDeck,
+      fixtureReading,
+    });
     console.log(describe(planned));
     if (!apply) {
       console.log("\nDry run: nothing written. Add --apply to write.");
       return;
     }
     await applyAll(db, planned, {
-      storage: Object.keys(photos).length === 0 ? undefined : supabaseStorage(),
+      storage:
+        Object.keys(photos).length === 0 && !documents
+          ? undefined
+          : hosted
+            ? supabaseStorage()
+            : args.includes("--storage-dir")
+              ? directoryStorage(args[args.indexOf("--storage-dir") + 1])
+              : undefined,
     });
     console.log("\nApplied.");
   } finally {

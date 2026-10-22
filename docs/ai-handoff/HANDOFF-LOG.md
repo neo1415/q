@@ -1126,3 +1126,22 @@ Evidence stage: **code + local database tests**. Not applied to hosted; the prod
   - Account emails for the person cards.
   - Real verification, deck and backgrounds to move scores.
   - Investor Discover needs verification.
+
+## Capital Q team and data room seed — 22 October 2026 (Claude S6, `seed/capital-q-team-docs`, stacked on `seed/team-photo-card`)
+
+Evidence stage: **code + local database tests**. Not applied to hosted; the production run is owner-approved at deploy (`docs/seed/demo-companies/README.md`, steps 5–8).
+
+- **Team:** memberships seeded directly (`organisation_member`), with **no invitations**, for David Nwankwo (Founder & CEO), Captain Zino Mario (Co-founder), Daniel Oyeniyi and Adeyemi Odunyugbo (Engineering). Background lines are roles only.
+- **Data room:** S7's manifest is consumed, and only the pitch deck (PUBLIC, investors may download) and the financial model (ON_REQUEST) are uploaded, through the real document path (`evidence.document.version_created`). Legal summaries and the cap table are not uploaded.
+- **Deck reading:** on hosted, the real pipeline and the gateway deck reader produce it. Locally, a clearly marked fixture (`local-deck-reading.fixture.json`), refused with `--hosted`. `--confirm-deck` is a later, separate run.
+- **Scores (local, fixture reading):** Capital Q InvestIQ 50 Investable → 76 Strong, Low confidence; 4/8 areas, 15/46 criteria. Unicorn: still insufficient evidence. Verification is unfaked.
+- **Checks:** seed tests 12/12; vitest 23 files, 255 tests; root, web and api tsc clean; eslint and prettier clean on changed files.
+- **Owner steps:** the pitch video at `/pitch/new` ("Everyone on Capital Q"); account emails for Zino, Daniel and Adeyemi; Zino's headshot; the beat #49 relationships decision.
+
+## Capital Q data room: all six documents — 22 October 2026 (Claude S6, `seed/capital-q-team-docs`)
+
+- The owner superseded "business docs only" with "upload everything", confirmed directly to S6. `--documents` uploads all six manifest documents. Only the deck is PUBLIC; the rest are ON_REQUEST and watermarked illustrative.
+- The pitch video stays an owner step at `/pitch/new`. The seed checks its sha256 and prints the step.
+- Capital Q's contribution-margin statement is reworded to match the documents: revenue less cost of revenue and variable onboarding and support.
+- Re-score (local): unchanged at 76 Strong, Low confidence, 4/8 areas, 15/46 criteria. InvestIQ reads no data-room document except the deck, so governance, legal and diligence stay at 0.
+- Checks: seed tests 12/12.
