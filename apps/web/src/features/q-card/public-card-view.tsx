@@ -35,6 +35,7 @@ import {
   CardSection,
   DocumentsSection,
   IntelligenceSection,
+  MembersOnly,
   NumbersSection,
   RaiseSection,
   RelationshipsSection,
@@ -174,6 +175,9 @@ export function PublicCardView({
       field.key !== location?.key &&
       field.key !== status?.key,
   );
+
+  const moreAllMembers =
+    more.length > 0 && more.every((field) => field.scope === "network_visible");
 
   return (
     <div className="mx-auto flex w-full max-w-(--cq-layout-reading) flex-col gap-4 px-4 pb-12 sm:px-6 sm:pt-4 sm:pb-16">
@@ -412,7 +416,13 @@ export function PublicCardView({
         ) : null}
 
         {more.length === 0 ? null : (
-          <CardSection id="more" label="Additional information">
+          <CardSection
+            id="more"
+            label="Additional information"
+            // One marker at the heading when every row is members-only;
+            // mixed rows carry it inline beside their own label.
+            members={moreAllMembers}
+          >
             <dl className="divide-y divide-(--cq-border-subtle)">
               {more.map((field) => (
                 <div
@@ -421,18 +431,16 @@ export function PublicCardView({
                   data-scope={field.scope}
                   className="flex items-baseline justify-between gap-6 py-3"
                 >
-                  <dt className="cq-body-sm shrink-0 text-(--cq-text-secondary)">
+                  <dt className="cq-body-sm flex shrink-0 items-baseline gap-2 text-(--cq-text-secondary)">
                     {cardFieldLabel(field.key)}
+                    {field.scope === "network_visible" && !moreAllMembers ? (
+                      <MembersOnly />
+                    ) : null}
                   </dt>
                   <dd className="cq-body min-w-0 text-end break-words">
                     {field.key === "foundedDate"
                       ? field.value.slice(0, 4)
                       : cardFieldValue(field)}
-                    {field.scope === "network_visible" ? (
-                      <span className="cq-caption block text-(--cq-text-tertiary)">
-                        Shown to Capital Q members
-                      </span>
-                    ) : null}
                   </dd>
                 </div>
               ))}

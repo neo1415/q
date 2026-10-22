@@ -984,3 +984,15 @@ Evidence stage: **code + local checks only**. Not merged, not deployed. No migra
   - A PERSON subject type (per-person card) needs a migration plus self-ownership authorization. It is proposed, not built.
   - The amount committed in the raise is not shown.
   - The anonymous read is not cached yet.
+
+## Q Card polish and public-read cache — 22 October 2026 (Claude, `qstory/qcard-polish`)
+
+Evidence stage: **code + local checks only**.
+
+- **Coordinator review items:**
+  - (a) and (b): one right-aligned "Members only" marker. It sits on every section heading and at the "Additional information" heading, never under a value.
+  - (c): Q's-reading caption raised to body-small secondary.
+- **Cache:** the anonymous `/@handle` read is cached for 30 seconds and tagged `q-card-public` / `q-card:<handle>`. A signed-in read is never cached.
+  - `updateTag` runs on a card save and on a handle claim.
+  - `connection()` replaces `force-dynamic`, which forced no-store.
+  - Test: `apps/web/test/q-card-public-cache.test.ts`.

@@ -44,4 +44,8 @@ Each file is named `<subject>-<audience>-<scheme>-<width>.png`:
   That touches shared authorization, so it is proposed rather than built in this lane.
 
 - **Use of funds** is the owner's own `use_of_funds_summary` on the active capital objective, shown only when they put "The raise" on the card. The amount committed so far is not shown: no actor-free read of commitments exists, and unknown is left out rather than guessed.
-- The public page is still `force-dynamic`. The read is per visitor, because a signed-in participant gets a wider projection. A cached anonymous read is a follow-up; signed image URLs expire and need care.
+- **Public-read cache (done, polish PR):** the anonymous projection is identical for every anonymous visitor, so it is cached for 30 seconds and tagged by handle. A signed-in read is never cached. Saving the card in the profile expires its tag at once (`updateTag`), and claiming a handle expires every anonymous card read. Other profile edits (description, mandate, photo) show within 30 seconds, well inside the signed image URLs' one hour. The page is still rendered per request (`connection()`), not `force-dynamic`, which would have forced no-store.
+- **Polish (coordinator review):**
+  - every members-only section marks itself with one short right-aligned "Members only" (with the full meaning for screen readers);
+  - "Additional information" puts it at the heading;
+  - "Q's inference, not a verified fact or a recommendation" is body-small secondary, never smaller than the card's metadata.
