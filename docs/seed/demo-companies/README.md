@@ -56,7 +56,16 @@ Source: `supabase/seed-assets/demo-companies/companies.json`, one fixture shared
    - no SKIP you didn't expect.
 3. Apply: the same command with `--apply`. It runs one transaction per company and is safe to run again; a second run plans nothing.
 4. Scores: the workers recompute on the outbox events the seed writes (`evidence.claim.changed`, `core.company.updated`). The 30-minute sweep is the backstop.
-5. Photos: David's own photo is seeded with `--photo david=supabase/seed-assets/capital-q-team/david-founder.jpg` (needs `--person david=<email>`, plus `SUPABASE_URL` and `SUPABASE_SECRET_KEY` for the upload). It is re-encoded by the product's own processor, uploaded first, and recorded as his READY avatar. It then shows on Capital Q's Q Card team section (members only) and on his own card. Alternatively, upload David's headshot (`supabase/seed-assets/capital-q-team/david-founder.jpg`, on branch `seed/team-photos`) through the profile UI, which re-encodes it, as David's photo and, if wanted, Capital Q's logo. Zino's is pending from the owner. No photo of a real person is fetched from the web.
+5. Team (owner 2026-10-22): `--person zino=<email> --person daniel=<email> --person adeyemi=<email>` seeds organisation memberships directly with the `organisation_member` role. **No invitation is created or sent.** It adds `company_members` with titles (Founder & CEO, Co-founder, Engineering) and, for founders only, network-visible background lines that are **roles only** ("Founder & CEO, Capital Q"). No career history is invented. Only founders get a person Q Card.
+6. Data room: `--documents` uploads the business documents from `supabase/seed-assets/capital-q-documents/manifest.json`, and only those (owner: business docs only). The bytes go to `cq-documents-private`, and the rows are written as the founder's own upload: `evidence.documents`, version 1, a `data_room_entries` row, audit, and `evidence.document.version_created`.
+   - The pitch deck is `PUBLIC` (fundraising folder), downloadable by investors.
+   - The financial model is `ON_REQUEST` (financials folder).
+   - The legal summaries and the cap table stay in the repository and are **not** uploaded.
+   - A sha256 mismatch against the manifest stops the run.
+   - On hosted, the event starts the real pipeline: processing, `evidence.document.ready`, then Q's deck reader through the model gateway.
+7. Deck confirmation, a **separate later run**: once the reading exists, `--confirm-deck` confirms the latest reading of the current deck version on the founder's behalf (owner: "seed marks it confirmed"). It is audited `deck_extraction.confirmed` with `confirmedOnOwnerApproval: true`. With no reading yet, it plans nothing.
+8. Pitch video: an **owner step**. David records or uploads the Q Story master at `/pitch/new` with audience "Everyone on Capital Q". It needs his session and the stream provider, so a seed cannot do it.
+9. Photos: David's own photo is seeded with `--photo david=supabase/seed-assets/capital-q-team/david-founder.jpg` (needs `--person david=<email>`, plus `SUPABASE_URL` and `SUPABASE_SECRET_KEY` for the upload). It is re-encoded by the product's own processor, uploaded first, and recorded as his READY avatar. It then shows on Capital Q's Q Card team section (members only) and on his own card. Alternatively, upload David's headshot (`supabase/seed-assets/capital-q-team/david-founder.jpg`, on branch `seed/team-photos`) through the profile UI, which re-encodes it, as David's photo and, if wanted, Capital Q's logo. Zino's is pending from the owner. No photo of a real person is fetched from the web.
 
 ## Local rehearsal (no Docker)
 
@@ -66,7 +75,8 @@ Source: `supabase/seed-assets/demo-companies/companies.json`, one fixture shared
   CQ_SEED_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:54329/cq \
     node --test scripts/seed/demo-companies/seed.local.test.mjs
   ```
-- 9 tests:
+- `--local-fixture-reading` writes `scripts/seed/demo-companies/local-deck-reading.fixture.json` as the deck reading. It is a **LOCAL REHEARSAL FIXTURE — NOT A MODEL READING**, hand-transcribed from the deck so the scorers can be measured without a model call. `--hosted` refuses it. `--storage-dir <dir>` writes uploads to a directory instead of Supabase Storage.
+- 12 tests:
   - one canonical Capital Q;
   - claims self-reported only, and no verification;
   - wrong figures and raise superseded;
@@ -75,7 +85,10 @@ Source: `supabase/seed-assets/demo-companies/companies.json`, one fixture shared
   - listed to Q;
   - Q Cards;
   - idempotent;
-  - a duplicate stops the run.
+  - a duplicate stops the run;
+  - team: member role only, no invitations, roles-only backgrounds;
+  - data room: deck and model only, with the right levels and audiences, and confirmed by David;
+  - person cards for the founders only.
 
 ## Scores (local, after seeding, deterministic scorers)
 
@@ -100,6 +113,32 @@ Self-reported evidence carries weight 0.5, so confidence stays Low. **That is ho
 - The team as accounts with titles.
 - A pitch video.
 - Capital Q's organisation verification, decided by an operator.
+
+### Capital Q before and after the team and data room (local, InvestIQ)
+
+The deck reading here is the **local fixture**. On hosted, the result depends on Q's real reading of the deck.
+
+| Stage                                   | Score | Band       | Confidence | Areas | Criteria |
+| --------------------------------------- | ----- | ---------- | ---------- | ----- | -------- |
+| Claims only                             | 50    | Investable | Low        | 1/8   | 8/46     |
+| + team and role-only backgrounds        | 50    | Investable | Low        | 2/8   | 9/46     |
+| + data room with an unconfirmed reading | 69    | Strong     | Low        | 4/8   | 15/46    |
+| + deck confirmed                        | 76    | Strong     | Low        | 4/8   | 15/46    |
+
+| Area                  | Before (graded)   | After (graded)    |
+| --------------------- | ----------------- | ----------------- |
+| Business fundamentals | 3/6               | 5/6, scored       |
+| Commercial strength   | 2/6, insufficient | 3/6, scored       |
+| Financial readiness   | 1/6               | 3/6, scored       |
+| Management and team   | 1/5               | 2/5, scored       |
+| Investment case       | 1/6               | 2/6, insufficient |
+| Diligence readiness   | 0/6               | 0/6               |
+| Governance            | 0/5               | 0/5               |
+| Legal and corporate   | 0/6               | 0/6               |
+
+- Confidence stays Low: everything is self-reported, and verification is unfaked.
+- Diligence, governance and legal stay empty, because the owner chose business documents only.
+- Unicorn potential is unchanged: insufficient evidence (P2 2, P3 2.5, P4 3, P5 2).
 
 ## Discoverability
 

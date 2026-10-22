@@ -686,3 +686,149 @@ export function renderTeamSql({
   );
   return ["begin;", ...s, "commit;"].join("\n");
 }
+
+export const DOCUMENT_BUCKET = "cq-documents-private";
+
+/** ADR-001 scope each data-room level is stored as. */
+const LEVEL_SCOPE = {
+  PUBLIC: "network_visible",
+  ON_REQUEST: "specifically_shared",
+};
+
+/**
+ * The company's data-room documents (owner 2026-10-22: business documents
+ * only), written exactly as an upload registers them: the document, its
+ * first version in the private bucket, the data-room entry at its level,
+ * an audit row and `evidence.document.version_created`, so the real
+ * pipeline -- scanning, text extraction and Q's deck reading through the
+ * model gateway -- runs on them. Uploaded by the founder who agreed.
+ * A document already there (same title) is left alone.
+ */
+export function planDocuments({
+  seedKey,
+  company,
+  uploaderUserId,
+  documents,
+  existingTitles,
+}) {
+  return documents
+    .filter((d) => !existingTitles.includes(d.title))
+    .map((d) => {
+      const id = seedUuid(seedKey, "document", company.id, d.sha256);
+      const versionId = seedUuid(
+        seedKey,
+        "document-version",
+        company.id,
+        d.sha256,
+      );
+      const keyHex = seedUuid(seedKey, "document-key", d.sha256).replace(
+        /-/g,
+        "",
+      );
+      return {
+        ...d,
+        id,
+        versionId,
+        storageKey: `raw/${company.tenant}/${keyHex}`,
+        uploaderUserId,
+      };
+    });
+}
+
+export function renderDocumentsSql({
+  seedKey,
+  company,
+  planned,
+  authorityUserId,
+  now,
+}) {
+  if (planned.length === 0) return null;
+  const ctx = {
+    seedKey,
+    key: `documents:${company.id}`,
+    ids: { tenant: company.tenant, organisation: company.organisation },
+    authorityUserId,
+    now,
+    salt: now,
+    correlation: seedUuid(seedKey, "documents", company.id, now),
+  };
+  const s = ["begin;"];
+  for (const d of planned) {
+    const audience =
+      d.documentType === "PITCH_DECK" ? "INVESTORS" : "ORGANISATION";
+    const scope = LEVEL_SCOPE[d.dataRoomLevel];
+    if (scope === undefined)
+      throw new Error(`unknown data-room level ${d.dataRoomLevel}`);
+    s.push(
+      `insert into evidence.documents (id, tenant_id, company_id, owner_organisation_id, document_type, title, visibility_scope, sensitivity_class, status, created_by_user_id, download_audience, owner_kind) values (${lit(d.id)}, ${lit(company.tenant)}, ${lit(company.id)}, ${lit(company.organisation)}, ${lit(d.documentType)}, ${lit(d.title)}, ${lit(scope)}, 'CONFIDENTIAL', 'ACTIVE', ${lit(d.uploaderUserId)}, ${lit(audience)}, 'ORGANISATION') on conflict (id) do nothing;`,
+      `insert into evidence.document_versions (id, tenant_id, document_id, version_number, storage_bucket, storage_key, original_filename, mime_type, size_bytes, sha256, uploaded_by_user_id) values (${lit(d.versionId)}, ${lit(company.tenant)}, ${lit(d.id)}, 1, ${lit(DOCUMENT_BUCKET)}, ${lit(d.storageKey)}, ${lit(d.file)}, ${lit(d.mime)}, ${d.sizeBytes}, ${lit(d.sha256)}, ${lit(d.uploaderUserId)}) on conflict (id) do nothing;`,
+      `update evidence.documents set current_version_id = ${lit(d.versionId)} where id = ${lit(d.id)} and current_version_id is null;`,
+      `insert into evidence.data_room_entries (document_id, tenant_id, company_id, folder_code, level, updated_by_user_id) values (${lit(d.id)}, ${lit(company.tenant)}, ${lit(company.id)}, ${lit(d.folderCode ?? "other")}, ${lit(d.dataRoomLevel)}, ${lit(d.uploaderUserId)}) on conflict do nothing;`,
+      audit(ctx, "document.version_registered", "document", d.id, {
+        documentVersionId: d.versionId,
+        versionNumber: 1,
+        sizeBytes: d.sizeBytes,
+        level: d.dataRoomLevel,
+        demonstrationDocument: true,
+      }),
+      event(
+        ctx,
+        "evidence.document.version_created",
+        { type: "document", id: d.id },
+        {
+          documentId: d.id,
+          documentVersionId: d.versionId,
+          versionNumber: 1,
+          supersedesVersionId: null,
+        },
+        "capitalq://api/evidence",
+      ),
+    );
+  }
+  s.push("commit;");
+  return s.join("\n");
+}
+
+/**
+ * The founder's confirmation of Q's reading of the deck, recorded on the
+ * owner's approval (22 Oct): only for an existing reading of the current
+ * deck version, exactly as the review screen records it.
+ */
+export function renderDeckConfirmationSql({
+  seedKey,
+  company,
+  extractionId,
+  documentId,
+  userId,
+  authorityUserId,
+  now,
+}) {
+  const ctx = {
+    seedKey,
+    key: `deck:${company.id}`,
+    ids: { tenant: company.tenant, organisation: company.organisation },
+    authorityUserId,
+    now,
+    salt: now,
+    correlation: seedUuid(seedKey, "deck-confirm", extractionId),
+  };
+  return [
+    "begin;",
+    `insert into evidence.deck_extraction_confirmations (extraction_id, tenant_id, confirmed_by_user_id) values (${lit(extractionId)}, ${lit(company.tenant)}, ${lit(userId)}) on conflict (extraction_id) do nothing;`,
+    audit(ctx, "deck_extraction.confirmed", "document", documentId, {
+      extractionId,
+      confirmedOnOwnerApproval: true,
+    }),
+    "commit;",
+  ].join("\n");
+}
+
+/** LOCAL ONLY: the hand-transcribed fixture reading (never hosted). */
+export function renderFixtureReadingSql({
+  seedKey,
+  company,
+  document,
+  fixture,
+}) {
+  return `insert into evidence.deck_extractions (id, tenant_id, company_id, document_id, document_version_id, prompt_version, schema_version, page_count, sections) values (${lit(seedUuid(seedKey, "fixture-reading", document.versionId))}, ${lit(company.tenant)}, ${lit(company.id)}, ${lit(document.id)}, ${lit(document.versionId)}, ${fixture.promptVersion}, ${fixture.schemaVersion}, ${fixture.pageCount}, ${json(fixture.sections)}) on conflict do nothing;`;
+}

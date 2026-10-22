@@ -21,8 +21,8 @@ let db;
 /** Stand-in for the private bucket: what the seed uploaded, by key. */
 const stored = new Map();
 const storage = {
-  putObject: async ({ key, body, contentType }) => {
-    stored.set(key, { bytes: body.byteLength, contentType });
+  putObject: async ({ bucket, key, body, contentType }) => {
+    stored.set(key, { bucket, bytes: body.byteLength, contentType });
   },
 };
 const PERSONS = {
@@ -116,9 +116,18 @@ before(async () => {
   const planned = await planAll(db, fixture, {
     persons: PERSONS,
     photos: PHOTOS,
+    documents: true,
+    fixtureReading: true,
     now: "2026-10-22T10:00:00.000Z",
   });
   await applyAll(db, planned, { storage });
+  // Later, once a reading exists: the founder's confirmation.
+  const confirm = await planAll(db, fixture, {
+    persons: PERSONS,
+    confirmDeck: true,
+    now: "2026-10-22T10:30:00.000Z",
+  });
+  await applyAll(db, confirm, { storage });
 });
 
 after(async () => {
@@ -382,12 +391,64 @@ test(
   },
 );
 
+test(
+  "the data room: the deck and the model only, as an upload registers them",
+  { skip },
+  async () => {
+    const docs = await db.read(
+      `select d.title, d.document_type, d.download_audience, e.level, e.visibility_scope, e.folder_code, v.storage_bucket, v.uploaded_by_user_id = d.created_by_user_id as same_uploader from evidence.documents d join evidence.data_room_entries e on e.document_id = d.id join evidence.document_versions v on v.id = d.current_version_id where d.company_id = '${ids.cqCompany}' order by d.title`,
+    );
+    assert.deepEqual(
+      [...docs].map((r) => ({ ...r })),
+      [
+        {
+          title: "Financial model 2026–2028",
+          document_type: "FINANCIAL_MODEL",
+          download_audience: "ORGANISATION",
+          level: "ON_REQUEST",
+          visibility_scope: "specifically_shared",
+          folder_code: "financials",
+          storage_bucket: "cq-documents-private",
+          same_uploader: true,
+        },
+        {
+          title: "Pitch deck, Q3 2026",
+          document_type: "PITCH_DECK",
+          download_audience: "INVESTORS",
+          level: "PUBLIC",
+          visibility_scope: "network_visible",
+          folder_code: "fundraising",
+          storage_bucket: "cq-documents-private",
+          same_uploader: true,
+        },
+      ],
+      "business documents only: no legal summaries, no cap table",
+    );
+    const uploads = [...stored.values()].filter(
+      (o) => o.bucket === "cq-documents-private",
+    );
+    assert.equal(uploads.length, 2, "the bytes are stored before the rows");
+    const events = await db.read(
+      "select count(*)::int as n from events.outbox where event_type = 'evidence.document.version_created'",
+    );
+    assert.equal(events[0].n, 2, "the real pipeline is told, as for an upload");
+    const [confirmed] = await db.read(
+      "select p.display_name from evidence.deck_extraction_confirmations c join identity.user_profiles p on p.id = c.confirmed_by_user_id",
+    );
+    assert.equal(confirmed.display_name, "David Nwankwo");
+  },
+);
+
 test("idempotent: a second run plans nothing", { skip }, async () => {
   const again = await planAll(db, fixture, {
     persons: PERSONS,
     photos: PHOTOS,
+    documents: true,
+    confirmDeck: true,
     now: "2026-10-22T11:00:00.000Z",
   });
+  assert.deepEqual(again.documents.planned, []);
+  assert.equal(again.confirmation.sql, null);
   for (const photo of again.photos) assert.equal(photo.sql, null);
   for (const team of again.teams) assert.equal(team.sql, null);
   for (const { plan, sql } of again.companies) {
