@@ -29,6 +29,8 @@ const CERT = "docs/specs/q-pitch/CERTIFICATION_MANIFEST.md";
 const INVESTOR_TOUR = "packages/q-pitch/src/investor-v6.ts";
 const FOUNDER_TOUR = "packages/q-pitch/src/founder-v6.ts";
 const SECURITY = "docs/architecture/15_Capital_Q_Security_Architecture.md";
+const OWNER_FACTS =
+  "docs/specs/q-pitch/story/INVESTOR-QA.md questions Q cannot answer";
 
 export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
   // ── What it is and who it is for ────────────────────────────────────
@@ -43,6 +45,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
       "is it for angels or venture funds",
       "does it work for family offices and private equity",
       "who is the day one user",
+      "who is it for",
     ],
     answer:
       "Both sides of private capital. On one side, investors of every kind, from angels investing their own money to funds answering to their own backers. On the other, businesses raising capital: a first raise, a later round, a difficult round, or an established company looking for growth capital. Q learns each investor's thesis and each business's story, and connects the two.",
@@ -65,6 +68,15 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
       `${STORY} the other side of the table`,
       `${INVESTIQ} Stage handling`,
     ],
+  },
+  {
+    id: "qa.what-is-q",
+    side: "BOTH",
+    question: "What is Q?",
+    paraphrases: ["what does q do", "who is q", "what are you exactly"],
+    answer:
+      "I'm Q, the investment analyst inside Capital Q. I learn each investor's mandate and each business's story, assess companies on their evidence, match the two, answer questions and do the work you approve. I'm an analyst, not the source of truth, and the decisions stay with you.",
+    sources: [`${PADL} Decision #9`, `${INVESTOR_TOUR} opening`],
   },
   {
     id: "qa.tiktok-jarvis",
@@ -103,6 +115,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
       "is this for africa or the middle east",
       "do you work outside your home market",
       "which countries are companies from",
+      "does it work in nigeria",
     ],
     answer:
       "Capital Q is offered by FDN Capital Partners, which works from Lagos and Dubai. Inside the product, geography is part of every investor's mandate, so matching respects where you invest. Which markets the company will launch in first is a question for the founders; I won't guess at it.",
@@ -230,6 +243,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
     question: "How do I put GateQ on my website?",
     paraphrases: [
       "where can i plug gateq in",
+      "how do i set up gateq",
       "can gateq handle applications from my accelerator",
       "how do inbound applications reach me",
       "can i use gateq on social media",
@@ -733,6 +747,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
     paraphrases: [
       "what should i never rely on q for",
       "what is q not allowed to do",
+      "what can't q do",
       "is there anything q refuses to do",
       "where does q stop",
     ],
@@ -763,6 +778,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
     paraphrases: [
       "do founders own what they upload",
       "can i export my records when i leave",
+      "can i export my data",
       "who owns the assessments",
       "does capital q own my documents",
     ],
@@ -775,7 +791,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
     side: "BOTH",
     question: "Can I delete my data?",
     paraphrases: [
-      "what happens if i leave",
+      "what if i leave the platform",
       "can i close my account",
       "can i withdraw access i gave",
       "how long do you keep records",
@@ -906,6 +922,84 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
     sources: [`${PADL} Decision #85`, `${PADL} Decision #144`],
   },
 
+  // ── Holding answers: facts the owner has not supplied ───────────────
+  // The knowledge pack's UNKNOWN business entries, folded in: Q says it does not know and
+  // will not estimate, and offers a human follow-up.
+  {
+    id: "qa.valuation",
+    side: "BOTH",
+    question: "What is Capital Q's valuation?",
+    paraphrases: [
+      "what valuation are you raising at",
+      "how much have you raised so far",
+      "who has invested in capital q",
+      "what is your funding history",
+    ],
+    answer:
+      "Capital Q's funding history and valuation haven't been given to me as approved company material, so I don't know them and won't estimate them. The raise is stated as USD 2 million, as the founders' own claim. The founders can answer the rest directly.",
+    sources: [OWNER_FACTS, "Capital Q company record (raise: founder claim)"],
+  },
+  {
+    id: "qa.market-size",
+    side: "BOTH",
+    question: "How big is the market?",
+    paraphrases: [
+      "what is your market size",
+      "what is the total addressable market",
+      "how large is the opportunity",
+      "what is the tam",
+    ],
+    answer:
+      "Capital Q's market size hasn't been given to me as approved company material, so I won't put a number on it. I'd rather leave it to the founders than invent one.",
+    sources: [OWNER_FACTS],
+  },
+  {
+    id: "qa.unit-economics",
+    side: "BOTH",
+    question: "What are your unit economics?",
+    paraphrases: [
+      "what are your margins",
+      "what is your gross margin",
+      "how much does each workflow cost you to run",
+      "what is your cost per user",
+      "are the ai running costs sustainable",
+    ],
+    answer:
+      "Unit economics and margins haven't been given to me as approved company material, so I don't know them and won't estimate them. The founders can take you through them.",
+    sources: [OWNER_FACTS],
+  },
+  {
+    id: "qa.data-location",
+    side: "BOTH",
+    question: "Where is my data stored?",
+    paraphrases: [
+      "where is the data hosted",
+      "which country are the servers in",
+      "do you keep data in europe",
+      "what about data residency",
+      "is my data stored in the eu",
+    ],
+    answer:
+      "Capital Q is built to keep data in the European Union: keeping it there is a requirement of the architecture, and the services run in the Netherlands. Formal data-protection commitments for particular countries are for the founders to confirm.",
+    sources: [
+      "docs/adr/0014-railway-replaces-render-for-node-services.md region",
+    ],
+  },
+  {
+    id: "qa.mobile",
+    side: "BOTH",
+    question: "Is there a mobile app?",
+    paraphrases: [
+      "can i use it on my phone",
+      "is there an ios or android app",
+      "does it work on mobile",
+      "is it a web app",
+    ],
+    answer:
+      "Capital Q runs in the web browser. Whether there will be a dedicated phone app isn't in my sources, so I won't promise one; the founders can tell you.",
+    sources: ["CLAUDE.md Repository Architecture (apps/web)"],
+  },
+
   // ── Live, roadmap and the company ───────────────────────────────────
   {
     id: "qa.whats-live",
@@ -913,6 +1007,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
     question: "What is live today and what is still planned?",
     paraphrases: [
       "which parts of the demo are real",
+      "what works right now",
       "is this a mockup",
       "what have you actually built",
       "what is still to come",
