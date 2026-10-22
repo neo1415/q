@@ -379,7 +379,7 @@ export const OpenPageInputSchema = z
       .optional()
       .describe("With the deck tab: open the deck in its viewer at once."),
     section: QSettingsSectionSchema.optional().describe(
-      "For SETTINGS: account, team, appearance, q (Q's personality), speaking (their speaking guide), notifications, connections (Google), billing, privacy, usage, memory, plan.",
+      "For SETTINGS: account, team, appearance, q (Q's personality), speaking (their speaking guide), notifications, connections (Google), billing, privacy, usage, memory, plan, activity (the organisation's activity feed, for its admins).",
     ),
   })
   .strict();
