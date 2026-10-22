@@ -983,6 +983,9 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/account-review": exempt(
     "development-only page (design review, fictional data)",
   ),
+  "/dev/org-review": exempt(
+    "development-only page (design review, fictional data)",
+  ),
   "/dev/presence": exempt("development-only page"),
   "/dev/work": exempt("development-only page"),
   "/dev/briefing": exempt("development-only page"),
@@ -1099,6 +1102,16 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/daily": cap("navigate.DAILY"),
   "/daily/[editionId]": cap("tool.get_q_daily"),
   "/settings/team": cap("tool.read_my"),
+  // Organisation administration (2026-10-21): admins' and owners' reads
+  // of the accountability record. The API refuses anyone without
+  // organisation.activity.view; Q has no read of the feed by design, so a
+  // member cannot reach it through Q either.
+  "/settings/activity": exempt(
+    "admins' and owners' activity feed (organisation.activity.view, decided by the API); no Q tool reads it, by design",
+  ),
+  "/settings/team/[userId]": exempt(
+    "one member's page for admins and owners (organisation.activity.view, decided by the API); reached from Team, no Q tool reads it, by design",
+  ),
   "/join/[token]": cap("offer.team_join"),
   "/settings/memory": cap("navigate.MEMORY"),
   "/settings/usage": cap("navigate.USAGE"),
