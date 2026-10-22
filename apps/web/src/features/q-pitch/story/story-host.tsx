@@ -28,6 +28,7 @@ import {
   routeAtBeat,
   subtitleForm,
   type QaEntry,
+  type QaMatch,
   type ScheduledCue,
   type StoryAct,
   type StoryMood,
@@ -43,6 +44,7 @@ import { presence } from "@/features/q-swarm/presence-cue";
 import { isLineLive } from "@/features/voice/session";
 
 import { answerAloud, setNarrationVoice } from "../narrator";
+import { matchSpokenQuestion } from "../qa-match";
 import { lightSection, placeAnchors, unlightAll } from "../section-light";
 import { openTourVoice } from "../tour-voice";
 import {
@@ -814,7 +816,27 @@ function StoryOverlay({
   const [answer, setAnswer] = useState<QaEntry | null>(null);
   const [asked, setAsked] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [clarify, setClarify] = useState<Extract<
+    QaMatch,
+    { kind: "CLARIFY" }
+  > | null>(null);
   const speaking = useRef<AbortController | null>(null);
+  const asking = useRef<AbortController | null>(null);
+  // A prepared answer, at once. Typed: spoken in the narrator's voice (one
+  // voice inside the story). Said: Q's open line is answering aloud.
+  const show = useCallback(
+    (entry: QaEntry, from: "TYPED" | "VOICE", controller: AbortController) => {
+      setAsked(false);
+      setClarify(null);
+      setAnswer(entry);
+      speaking.current?.abort();
+      speaking.current = controller;
+      if (from === "TYPED") {
+        void answerAloud(entry.answer, controller.signal, "STORY");
+      }
+    },
+    [],
+  );
   const hear = useCallback(
     (text: string, from: "TYPED" | "VOICE"): boolean => {
       const command = parseStoryCommand(
@@ -825,6 +847,7 @@ function StoryOverlay({
       if (command !== null) {
         setNotice(null);
         setAsked(false);
+        setClarify(null);
         if (command.kind === "END") onExit();
         else if (command.kind === "CAPTIONS")
           onCaptions(command.on ?? !captions);
@@ -846,41 +869,53 @@ function StoryOverlay({
         }
         return true;
       }
-      const entry = qa.answer(text);
-      if (entry === null) {
-        // A spoken question the bank does not hold: the story pauses and
-        // Q's own live line answers it; then the offer to carry on.
-        if (from === "VOICE") {
-          // After the story, the open line answers it; nothing to pause.
-          if (player.snapshot().phase === "DONE") return true;
-          player.interrupt();
+      const after = player.snapshot().phase === "DONE";
+      const decide = (decided: QaMatch, controller: AbortController) => {
+        if (controller.signal.aborted) return;
+        if (decided.kind === "ANSWER") {
+          show(decided.entry, from, controller);
+        } else if (decided.kind === "CLARIFY") {
           setAnswer(null);
+          setAsked(false);
+          setClarify(decided);
+        } else if (!after) {
+          // Not the bank's: Q's own open line answers it; then the offer
+          // to carry on from the same beat.
+          setAnswer(null);
+          setClarify(null);
           setAsked(true);
-          return true;
         }
-        return false;
-      }
-      player.interrupt();
-      setAsked(false);
-      setAnswer(entry);
-      speaking.current?.abort();
+      };
+      asking.current?.abort();
       const controller = new AbortController();
-      speaking.current = controller;
-      // Spoken questions are answered by the live line itself; typed ones
-      // in Q's standard voice.
+      asking.current = controller;
       if (from === "TYPED") {
-        // In the narrator's voice: one voice inside the story.
-        void answerAloud(entry.answer, controller.signal, "STORY");
+        // Taken or not is decided now, so tier 1 alone: a typed question
+        // the bank does not hold goes to Q exactly as before.
+        const decided = qa.match(text);
+        if (decided.kind === "LEAVE_TO_Q") return false;
+        if (!after) player.interrupt();
+        decide(decided, controller);
+        return true;
       }
+      // Said aloud (mid-story, or after "Do you have any questions?"): the
+      // story stops at once; the bank decides, tier 1 in the browser and
+      // tier 2 (meaning) only when unsure, so a reworded question still
+      // gets its prepared answer.
+      if (!after) player.interrupt();
+      void matchSpokenQuestion(qa, text, "INVESTOR", {
+        signal: controller.signal,
+      }).then((decided) => decide(decided, controller));
       return true;
     },
-    [player, qa, onExit, onCaptions, onMuted, captions, muted],
+    [player, qa, show, onExit, onCaptions, onMuted, captions, muted],
   );
   useEffect(() => {
     const release = setTypedInterceptor((text) => hear(text, "TYPED"));
     return () => {
       release();
       speaking.current?.abort();
+      asking.current?.abort();
     };
   }, [hear]);
 
@@ -1035,14 +1070,47 @@ function StoryOverlay({
               speaking.current?.abort();
               setAnswer(null);
               setAsked(false);
-              player.resume();
+              if (!done) player.resume();
             }}
           >
-            Carry on
+            {done ? "Back" : "Carry on"}
           </button>
         </div>
       ) : null}
-      {done && closing ? (
+      {clarify !== null && answer === null ? (
+        // A close call: Q asks rather than guess (S3's matcher).
+        <div className="cq-story-answer" role="status">
+          <p className="cq-story-kicker">{clarify.prompt}</p>
+          <div className="cq-story-choices">
+            {clarify.candidates.map((entry) => (
+              <button
+                key={entry.id}
+                type="button"
+                className="cq-story-btn"
+                onClick={() => {
+                  const controller = new AbortController();
+                  asking.current?.abort();
+                  asking.current = controller;
+                  show(entry, "TYPED", controller);
+                }}
+              >
+                {entry.question}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="cq-story-btn"
+              onClick={() => {
+                setClarify(null);
+                if (!done) player.resume();
+              }}
+            >
+              {done ? "Neither" : "Neither, carry on"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {done && closing && answer === null && clarify === null ? (
         <div className="cq-story-answer" role="status">
           <p className="cq-story-kicker">{STORY_CLOSING_QUESTION}</p>
           <p>Ask me aloud, or type your question below.</p>
