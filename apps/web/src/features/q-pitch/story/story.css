@@ -994,7 +994,7 @@ html[data-story-film] .cq-story-stage {
 }
 html[data-story-film]
   .cq-story-stage
-  > :not(.cq-story-dockside):not(
+  > :not(.cq-story-dockside):not(.cq-story-montage):not(
     :has(
       .cq-story-type,
       .cq-story-wordmark,
@@ -1004,6 +1004,11 @@ html[data-story-film]
     )
   ) {
   zoom: 1.75;
+}
+/* The montage fits the space between Q and the subtitles (three rows of
+   4:3 tiles), rather than scaling past the frame like the panels. */
+html[data-story-film] .cq-story-montage {
+  width: min(1000px, 94vw, calc((100vh - 480px) * 1.7));
 }
 /* The closing outcomes: a list of lines, read at 720p. */
 html[data-story-film] .cq-story-outcomes {

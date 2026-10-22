@@ -224,6 +224,7 @@ await context.addInitScript((banned) => {
   window.__shifts = [];
   window.__textHits = [];
   window.__overlays = [];
+  window.__outOfFrame = [];
   window.__overSince = new Map();
   // Each visual over the page, whole: the stage's top-level blocks (lines
   // stacked in one block are one box), never a panel docked beside a lit
@@ -266,6 +267,30 @@ await context.addInitScript((banned) => {
       const key = box.join(",");
       seen.set(key, window.__overSince.get(key) ?? now);
       window.__overlays.push({ at: now, box, since: seen.get(key), q });
+    }
+    // Every stage visual (docked panels too) stays inside the frame and
+    // above the subtitle band.
+    const band =
+      document.querySelector(".cq-story-captions")?.getBoundingClientRect()
+        .top ?? window.innerHeight;
+    for (const node of document.querySelectorAll(
+      ".cq-story-stage > :not(.cq-story-backdrop)",
+    )) {
+      const r = node.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8) continue;
+      if (Number(window.getComputedStyle(node).opacity) < 0.99) continue;
+      if (
+        r.left < -1 ||
+        r.top < -1 ||
+        r.right > window.innerWidth + 1 ||
+        r.bottom > band + 1
+      ) {
+        window.__outOfFrame.push({
+          at: now,
+          box: [r.x, r.y, r.width, r.height].map(Math.round),
+          band: Math.round(band),
+        });
+      }
     }
     window.__overSince = seen;
   }, 500);
@@ -314,6 +339,7 @@ const evidence = await page.evaluate(() => ({
   textHits: window.__textHits,
   badge: window.__badge,
   overlays: window.__overlays,
+  outOfFrame: window.__outOfFrame,
 }));
 const video = page.video();
 await context.close();
@@ -591,11 +617,21 @@ const audit = {
   ocrHits,
   overlayBoxesChecked: checked.size,
   overlayClutter,
+  // Stage visuals past the frame or into the subtitle band, by second.
+  outOfFrame: [
+    ...new Map(
+      evidence.outOfFrame.map((hit) => [
+        Math.round((hit.at - videoStart) / 1000 - trimStart),
+        hit,
+      ]),
+    ),
+  ].map(([second, hit]) => ({ second, box: hit.box, band: hit.band })),
   defects:
     evidence.textHits.length +
     evidence.badge +
     ocrHits.length +
     overlayClutter.length +
+    evidence.outOfFrame.length +
     (evidence.story?.fallbacks ?? 0),
 };
 await writeFile(
