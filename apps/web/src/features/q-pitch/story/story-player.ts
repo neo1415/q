@@ -87,6 +87,7 @@ export class StoryPlayer {
   #cues: readonly ScheduledCue[] = [];
   #generation = 0;
   #fallbacks = 0;
+  readonly #fallbackCues: string[] = [];
   #frames = { count: 0, long: 0, last: 0 };
 
   constructor(input: {
@@ -126,6 +127,11 @@ export class StoryPlayer {
   /** Cue-to-word offsets, for the evidence (median, p95). */
   get samples(): readonly CueSample[] {
     return this.#samples;
+  }
+
+  /** Which acts took the safe fallback (evidence). */
+  get fallbackCues(): readonly string[] {
+    return this.#fallbackCues;
   }
 
   /** Frames seen and frames over 50 ms (dropped), while playing. */
@@ -292,6 +298,9 @@ export class StoryPlayer {
       const cue = this.#cues.find((c) => c.cueId === outcome.cueId);
       if (cue === undefined) continue;
       this.#fallbacks += 1;
+      this.#fallbackCues.push(
+        `${cue.cueId} ${cue.act.kind}${"anchor" in cue.act ? ` ${cue.act.anchor}` : "route" in cue.act ? ` ${cue.act.route}` : ""}`,
+      );
       this.#acts.fallback(outcome.act, cue);
       this.#set({});
     }

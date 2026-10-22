@@ -384,6 +384,7 @@ export function StoryHost({
       ),
       frames: player.frames,
       fallbacks: player.snapshot().fallbacks,
+      fallbackCues: player.fallbackCues,
       beat: player.snapshot().index + 1,
       phase: player.snapshot().phase,
     });

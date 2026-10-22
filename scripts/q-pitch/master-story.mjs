@@ -77,7 +77,7 @@ ff([
   `${photos
     .map(
       (_, i) =>
-        `[${String(i)}:v]scale=1200:2133:force_original_aspect_ratio=increase,crop=720:1280,zoompan=z='min(zoom+0.0012,1.08)':d=90:s=720x1280:fps=30,setsar=1[v${String(i)}]`,
+        `[${String(i)}:v]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,fps=24,setsar=1[v${String(i)}]`,
     )
     .join(
       ";",
@@ -86,8 +86,13 @@ ff([
   "[out]",
   "-c:v",
   "libvpx-vp9",
+  // Real-time settings: a 12 s stand-in pitch, not a film; seconds, not minutes.
+  "-deadline",
+  "realtime",
+  "-cpu-used",
+  "8",
   "-b:v",
-  "900k",
+  "700k",
   "-an",
   pitchWebm,
 ]);
