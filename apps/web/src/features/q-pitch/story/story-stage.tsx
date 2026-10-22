@@ -601,6 +601,25 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
   }
 }
 
+/**
+ * Whether the visual sits OVER the page (centre stage), rather than beside
+ * a lit section (the docked panels). Over the page, the story's scrim goes
+ * solid behind it, so no row of the app ever competes with its words
+ * (owner, 22 Oct: outcome lines over the GateQ list were unreadable).
+ */
+export function coversPage({ visual, step }: StageState): boolean {
+  if (BESIDE_OR_EMPTY.has(visual)) return false;
+  if (visual === "icons") return step < 11;
+  if (visual === "chips-mismatch") return step <= 4;
+  return true;
+}
+const BESIDE_OR_EMPTY: ReadonlySet<StageState["visual"]> = new Set([
+  "none",
+  "aperture",
+  "top-three",
+  "comparison",
+]);
+
 function visualKey({ visual, step, text }: StageState): string {
   if (visual === "chips-mismatch") {
     return `${visual}:${step > 4 ? "dock" : "centre"}`;

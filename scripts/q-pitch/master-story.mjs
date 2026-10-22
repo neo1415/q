@@ -223,6 +223,18 @@ await context.addInitScript((banned) => {
   window.__cls = 0;
   window.__shifts = [];
   window.__textHits = [];
+  window.__overlays = [];
+  window.__overSince = new Map();
+  const OVER_PAGE = [
+    ".cq-story-stage .cq-story-type",
+    ".cq-story-stage .cq-story-outcomes",
+    ".cq-story-stage .cq-story-wordmark",
+    ".cq-story-stage .cq-story-tagline",
+    ".cq-story-stage .cq-story-split",
+    ".cq-story-stage .cq-story-centre > .cq-story-panel",
+    ".cq-story-stage .cq-story-screens",
+    ".cq-story-stage [data-story-qcard]",
+  ].join(", ");
   window.__badge = 0;
   new window.PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
@@ -239,6 +251,20 @@ await context.addInitScript((banned) => {
     if (document.querySelector("nextjs-portal, [data-nextjs-toast]") !== null) {
       window.__badge += 1;
     }
+    // Large stage type and artifacts over the page (not docked beside a
+    // lit section): where they are, and since when, for the clutter check.
+    const now = Date.now();
+    const seen = new Map();
+    for (const node of document.querySelectorAll(OVER_PAGE)) {
+      const r = node.getBoundingClientRect();
+      if (r.width < 8 || r.height < 8) continue;
+      if (Number(window.getComputedStyle(node).opacity) < 0.99) continue;
+      const box = [r.x, r.y, r.width, r.height].map(Math.round);
+      const key = box.join(",");
+      seen.set(key, window.__overSince.get(key) ?? now);
+      window.__overlays.push({ at: now, box, since: seen.get(key) });
+    }
+    window.__overSince = seen;
   }, 500);
 }, BANNED);
 
@@ -284,6 +310,7 @@ const evidence = await page.evaluate(() => ({
   shifts: window.__shifts,
   textHits: window.__textHits,
   badge: window.__badge,
+  overlays: window.__overlays,
 }));
 const video = page.video();
 await context.close();
@@ -308,6 +335,8 @@ const pairs = starts.slice(0, clips.length).map((s, i) => ({
       : `atrim=start=${String(s.offset)}:duration=${String(s.length)},asetpts=PTS-STARTPTS,`,
 }));
 const master = path.join(out, "q-story-master-1080p.mp4");
+/** Where the film starts in the recording (the Start press). */
+const trimStart = Math.max(0, (startedAt - videoStart) / 1000 - 0.2);
 ff([
   "-i",
   raw,
@@ -342,7 +371,7 @@ ff([
   "-movflags",
   "+faststart",
   "-ss",
-  String(Math.max(0, (startedAt - videoStart) / 1000 - 0.2)),
+  String(trimStart),
   "-to",
   String((doneAt - videoStart) / 1000 - 0.15),
   master,
@@ -414,6 +443,71 @@ if (!skipOcr) {
     }
   }
 }
+// ── Clutter behind overlay text (owner, 22 Oct) ──────────────────────
+// Large stage type and artifacts over the page need a quiet backing: the
+// ring just outside each box (never the glyphs) must be one even tone.
+// Clutter is the share of ring pixels more than 8 grey levels from the
+// ring's median; page rows showing through a thin scrim measure 2-4%, a
+// solid scrim 0%. A box is checked once it has been up for 0.6 s (past the
+// scrim's own fade), at most once a second.
+const RING = 32;
+const CLUTTER_MAX = 0.01;
+const overlayClutter = [];
+const checked = new Set();
+for (const sample of evidence.overlays) {
+  if (sample.at - sample.since < 600) continue;
+  const second = Math.round((sample.at - videoStart) / 1000 - trimStart);
+  const key = `${String(second)}:${sample.box.join(",")}`;
+  if (second < 0 || checked.has(key)) continue;
+  checked.add(key);
+  const [x, y, w, h] = sample.box;
+  const X = Math.max(0, x - RING);
+  const Y = Math.max(0, y - RING);
+  const W = Math.min(viewport.width - X, w + 2 * RING);
+  const H = Math.min(viewport.height - Y, h + 2 * RING);
+  if (W <= 0 || H <= 0) continue;
+  let bytes;
+  try {
+    bytes = execFileSync("ffmpeg", [
+      "-loglevel",
+      "error",
+      "-ss",
+      String((sample.at - videoStart) / 1000 - trimStart),
+      "-i",
+      master,
+      "-frames:v",
+      "1",
+      "-vf",
+      `crop=${String(W)}:${String(H)}:${String(X)}:${String(Y)},format=gray`,
+      "-f",
+      "rawvideo",
+      "-",
+    ]);
+  } catch {
+    continue;
+  }
+  const ring = [];
+  for (let j = 0; j < H; j += 1) {
+    for (let i = 0; i < W; i += 1) {
+      const gx = X + i;
+      const gy = Y + j;
+      if (gx >= x && gx < x + w && gy >= y && gy < y + h) continue;
+      ring.push(bytes[j * W + i] ?? 0);
+    }
+  }
+  if (ring.length === 0) continue;
+  const median = [...ring].sort((a, b) => a - b)[Math.floor(ring.length / 2)];
+  const clutter =
+    ring.filter((v) => Math.abs(v - median) > 8).length / ring.length;
+  if (clutter > CLUTTER_MAX) {
+    overlayClutter.push({
+      second,
+      box: sample.box,
+      clutter: Math.round(clutter * 1000) / 10,
+    });
+  }
+}
+
 const sheets = path.join(out, "sheets");
 await rm(sheets, { recursive: true, force: true });
 await mkdir(sheets, { recursive: true });
@@ -457,10 +551,13 @@ const audit = {
   devBadgeSamples: evidence.badge,
   ocrFrames: files.length,
   ocrHits,
+  overlayBoxesChecked: checked.size,
+  overlayClutter,
   defects:
     evidence.textHits.length +
     evidence.badge +
     ocrHits.length +
+    overlayClutter.length +
     (evidence.story?.fallbacks ?? 0),
 };
 await writeFile(

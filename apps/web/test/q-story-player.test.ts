@@ -267,19 +267,35 @@ describe("Q Story presence figures (lane S4)", () => {
 });
 
 describe("Q Story Q Card (#48-49)", () => {
-  it("the demonstration company's card parses under the public card contract, every section filled", async () => {
-    const { STORY_QCARD } =
-      await import("@/features/q-pitch/story/story-qcard");
-    const keys = STORY_QCARD.fields.map((field) => field.key);
+  it("is Capital Q's own card from the seed's fixture: every section, labelled demonstration, the founder's face", async () => {
+    const { storyQCard } = await import("@/features/q-pitch/story/story-qcard");
+    const card = storyQCard("https://example.test");
+    expect(card.name).toBe("Capital Q");
+    expect(card.demonstration).toBe(true);
+    // Not Capital Q's check: nothing is shown as verified.
+    expect(card.verified).toEqual([]);
+    const keys = card.fields.map((field) => field.key);
     for (const key of [
       "tractionMetrics",
       "currentRaise",
       "investabilitySummary",
       "relationshipSummary",
+      "team",
     ]) {
       expect(keys).toContain(key);
     }
-    expect(STORY_QCARD.demoAttested).toEqual(STORY_QCARD.verified);
+    const team = card.fields.find((field) => field.key === "team")?.detail;
+    expect(team?.kind).toBe("TEAM");
+    if (team?.kind !== "TEAM") return;
+    expect(team.members[0]).toEqual({
+      name: "David Nwankwo",
+      role: "Founder & CEO",
+      photoUrl: "https://example.test/story-media/team/david-founder.jpg",
+    });
+    // No photo for anyone the owner has not supplied one for: initials.
+    expect(team.members.slice(1).every((m) => m.photoUrl === undefined)).toBe(
+      true,
+    );
   });
 });
 

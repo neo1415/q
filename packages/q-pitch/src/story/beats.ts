@@ -880,6 +880,9 @@ const inputs: readonly BeatInput[] = [
       ["“What’s", "[curious]"],
     ],
     cues: [
+      // The previous beat's panel (#46 Investability IQ, #47 matches)
+      // leaves with it: "And then…" starts on a clear stage.
+      [0, stage("none")],
       ["“Send", stage("deck-to-card", 1)],
       ["They", stage("deck-to-card", 2)],
       ["Card?”", stage("q-card", 1)],

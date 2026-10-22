@@ -73,7 +73,12 @@ import {
   type PreloadProgress,
   type StoryAssets,
 } from "./story-preload";
-import { EMPTY_STAGE, StoryStage, type StageState } from "./story-stage";
+import {
+  coversPage,
+  EMPTY_STAGE,
+  StoryStage,
+  type StageState,
+} from "./story-stage";
 
 /**
  * Q Story host (v7, plan 2026-10-21): Q tells the owner's story over the
@@ -1018,7 +1023,12 @@ function StoryOverlay({
           read (QSwarm's surfaceIsDark), so no shape is drawn behind Q, only
           a faint gold bloom. Docked in the caption band on product beats.
           Two placements, two elements (a resize would be a layout shift). */}
-      <div className="cq-story-scrim" data-mood={moodNow} aria-hidden>
+      <div
+        className="cq-story-scrim"
+        data-mood={moodNow}
+        data-covering={coversPage(stageNow) ? "" : undefined}
+        aria-hidden
+      >
         {docked === null ? (
           // Re-keyed when the scrim turns from night to day: the particles
           // read their surface once, at mount.

@@ -55,6 +55,19 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   opacity: 0;
   transition-duration: var(--cq-motion-emphasis);
 }
+/* A visual over the page (story-stage coversPage): the page goes behind a
+   solid scrim in the mood's own canvas, so nothing on it competes with
+   the visual's words. Beside a lit section the page stays (spotlight). */
+.cq-story-scrim[data-covering] {
+  opacity: 0.96;
+}
+.cq-story-scrim[data-covering]:is(
+    [data-mood="OFF"],
+    [data-mood="WAKE"],
+    [data-mood="DAY"]
+  ) {
+  background: var(--cq-canvas);
+}
 
 /* ── The Q stage ────────────────────────────────────────────────────── */
 .cq-story-stage {
