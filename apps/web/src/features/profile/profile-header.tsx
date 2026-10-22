@@ -196,6 +196,8 @@ export function OwnProfileHero({
     readonly subjectId: string;
     readonly url: string | null;
     readonly editable: boolean;
+    /** Design review only (/dev/account-review): the photo sheet, open. */
+    readonly sheetOpen?: boolean | undefined;
   };
 }) {
   return (
@@ -234,6 +236,7 @@ export function OwnProfileHero({
               previewUrl={photo.url}
               previewName={name}
               compact
+              initiallyOpen={photo.sheetOpen}
             />
           </div>
         ) : null}

@@ -30,6 +30,7 @@ import {
   assessMarketplaceReadinessAction,
   loadVisibilityOverviewAction,
   setCompanyVisibilityAction,
+  type VisibilityOverview,
 } from "./visibility-actions";
 import { useT } from "@/features/i18n/language";
 
@@ -49,6 +50,13 @@ import { useT } from "@/features/i18n/language";
 
 export type VisibilityScreenProps = {
   readonly companyId: string;
+  /**
+   * Design review only (/dev/discovery-review): the overview, given, so
+   * the first render is complete without a session. The visibility centre
+   * below the chosen design reads under a session of its own and is left
+   * out then.
+   */
+  readonly review?: VisibilityOverview | undefined;
 };
 
 type Loaded = {
@@ -71,10 +79,10 @@ export function VisibilityScreen(props: VisibilityScreenProps) {
   );
 }
 
-function Screen({ companyId }: VisibilityScreenProps) {
+function Screen({ companyId, review }: VisibilityScreenProps) {
   const t = useT();
   const toast = useCrmToast();
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [loaded, setLoaded] = useState<Loaded | null>(review ?? null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<"idle" | "pending" | "done">("idle");
   const [checking, setChecking] = useState<"idle" | "pending" | "done">("idle");
@@ -90,7 +98,9 @@ function Screen({ companyId }: VisibilityScreenProps) {
     }
   }, [companyId]);
 
+  const reviewing = review !== undefined;
   useEffect(() => {
+    if (reviewing) return;
     let cancelled = false;
     void loadVisibilityOverviewAction(companyId).then((result) => {
       if (cancelled) return;
@@ -104,7 +114,7 @@ function Screen({ companyId }: VisibilityScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [companyId]);
+  }, [companyId, reviewing]);
 
   const choose = async (
     visibility: "organisation_private" | "network_visible",
@@ -376,12 +386,14 @@ function Screen({ companyId }: VisibilityScreenProps) {
         the shares with named investors, and the company as each audience
         sees it, all from the server. Kept under the chosen design.
       */}
-      <div className="pt-6">
-        <VisibilityCentre
-          companyId={companyId}
-          refreshKey={String(company.version)}
-        />
-      </div>
+      {reviewing ? null : (
+        <div className="pt-6">
+          <VisibilityCentre
+            companyId={companyId}
+            refreshKey={String(company.version)}
+          />
+        </div>
+      )}
 
       <CrmSheet
         open={confirming}

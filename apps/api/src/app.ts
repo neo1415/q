@@ -175,7 +175,12 @@ import type { EtiquetteGuidePort } from "@capital-q/app-actions";
 import type { EtiquetteGuideAdminStore } from "@capital-q/platform-admin";
 import { registerEtiquetteRoutes } from "./http/etiquette.js";
 import { registerTeamRoutes } from "./http/team.js";
-import type { TeamService } from "@capital-q/organisations";
+import type {
+  OrganisationAdminService,
+  TeamService,
+} from "@capital-q/organisations";
+import { registerOrganisationAdminRoutes } from "./http/organisation-admin.js";
+import type { ScreenActionAudit } from "./http/app-action-audit.js";
 // end P5 block
 // BILLING block (ADR 0034)
 import {
@@ -295,6 +300,10 @@ export type ApiModules = {
     | undefined;
   /** G1/G2: the company or firm as a team. Absent: no team route registers. */
   readonly team?: TeamService | undefined;
+  /** Owner/admin backend: capabilities, activity feed, member summaries. */
+  readonly organisationAdmin?: OrganisationAdminService | undefined;
+  /** Accountability for a person's consequential screen actions. */
+  readonly screenActionAudit?: ScreenActionAudit | undefined;
   // ADMIN block (ADR 0033)
   readonly adminFreshTokens?: AdminRoutesDependencies["freshTokens"];
   readonly adminVerificationDecider?: AdminRoutesDependencies["decideVerification"];
@@ -620,6 +629,15 @@ export function createApp(
     });
   }
 
+  // Organisation administration reads (capabilities, activity, members).
+  if (modules.organisationAdmin !== undefined) {
+    registerOrganisationAdminRoutes(app, {
+      authenticator: security.authenticator,
+      resolver: security.resolver,
+      organisationAdmin: modules.organisationAdmin,
+    });
+  }
+
   // ADR 0040 (Proposed): the routes of the app's declared actions, each on
   // its own path, through the services composed above.
   const push = modules.push;
@@ -628,6 +646,7 @@ export function createApp(
     resolver: security.resolver,
     // The video provider's failures, as the pitch routes always answered.
     problemOf: mediaProviderProblem,
+    audit: modules.screenActionAudit,
     ports: {
       ...(modules.media === undefined ? {} : { media: modules.media }),
       ...(modules.companies === undefined
