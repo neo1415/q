@@ -247,3 +247,37 @@ export function createPostgresRelationshipPartyStates() {
 export type RelationshipPartyStateRepository = ReturnType<
   typeof createPostgresRelationshipPartyStates
 >;
+
+/**
+ * A company's investor conversations counted by its own projected state
+ * (Q Card, Q Story S6): counts only, never who. Only rows the company's
+ * own fold may see are counted, exactly as its pipeline shows them.
+ */
+export function createPostgresCompanyPipelineCounts({
+  sql,
+}: {
+  readonly sql: DatabaseExecutor;
+}) {
+  return {
+    async byState(
+      companyId: string,
+    ): Promise<Readonly<Record<string, number>>> {
+      const rows = await sql`
+        select s.state, count(*)::int as count
+          from network.relationship_party_states s
+         where s.party = 'COMPANY'
+           and s.company_id = ${companyId}
+           and s.visible
+         group by s.state`;
+      const parsed = z
+        .array(
+          z.object({
+            state: RelationshipStateV2Schema,
+            count: z.number().int(),
+          }),
+        )
+        .parse(rows);
+      return Object.fromEntries(parsed.map((row) => [row.state, row.count]));
+    },
+  };
+}

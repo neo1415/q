@@ -1,7 +1,6 @@
 import { ImageResponse } from "next/og";
 
-import { RASTER_COLORS, THEME_COLORS } from "@capital-q/ui/tokens";
-
+import { BLACK_GOLD } from "@/features/brand-theme/brand-presets";
 import { cardTagline } from "@/features/q-card/card-content";
 import {
   displayUrlFor,
@@ -11,8 +10,8 @@ import {
 /**
  * The link preview for `/@handle` (BIZ-004), rendered with next/og. Built
  * from public_external fields only, whoever asks -- a preview travels
- * further than the page. Colours are the design tokens' sRGB renderings;
- * BIZ-005's brand kit will feed the accent edge.
+ * further than the page. Colours are the black_gold preset's dark card
+ * (Q is gold, owner 2026-10-21).
  */
 
 export const alt = "Q Card on Capital Q";
@@ -33,6 +32,15 @@ export default async function OpenGraphImage({
       : card.fields.filter((field) => field.scope === "public_external");
   const tagline =
     card === null ? null : cardTagline(card.subjectType, publicFields);
+  // Q is gold (owner 2026-10-21): the black_gold preset's own dark card.
+  const ink = BLACK_GOLD.palette?.dark;
+  const colours = {
+    canvas: ink?.canvas ?? "black",
+    surface: ink?.["qcard-surface"] ?? "black",
+    text: ink?.["qcard-text"] ?? "white",
+    muted: ink?.["qcard-muted"] ?? "gray",
+    edge: ink?.["qcard-edge"] ?? "gold",
+  };
 
   return new ImageResponse(
     <div
@@ -40,7 +48,7 @@ export default async function OpenGraphImage({
         width: "100%",
         height: "100%",
         display: "flex",
-        background: THEME_COLORS.light.canvas,
+        background: colours.canvas,
         padding: 64,
       }}
     >
@@ -52,9 +60,8 @@ export default async function OpenGraphImage({
           width: "100%",
           height: "100%",
           borderRadius: 32,
-          border: `2px solid ${RASTER_COLORS.border}`,
-          borderLeft: `16px solid ${THEME_COLORS.light.accent}`,
-          background: RASTER_COLORS.surface,
+          border: `2px solid ${colours.edge}`,
+          background: colours.surface,
           padding: "56px 64px",
         }}
       >
@@ -63,7 +70,7 @@ export default async function OpenGraphImage({
             style={{
               fontSize: 72,
               fontWeight: 600,
-              color: RASTER_COLORS.textPrimary,
+              color: colours.text,
             }}
           >
             {card?.name ?? "Capital Q"}
@@ -72,7 +79,7 @@ export default async function OpenGraphImage({
             <div
               style={{
                 fontSize: 34,
-                color: RASTER_COLORS.textSecondary,
+                color: colours.muted,
                 lineHeight: 1.3,
               }}
             >
@@ -85,11 +92,11 @@ export default async function OpenGraphImage({
             display: "flex",
             justifyContent: "space-between",
             fontSize: 30,
-            color: RASTER_COLORS.textSecondary,
+            color: colours.muted,
           }}
         >
           <span>{card === null ? "" : displayUrlFor(card.handle)}</span>
-          <span>Q Card · Capital Q</span>
+          <span style={{ color: colours.edge }}>Q Card · Capital Q</span>
         </div>
       </div>
     </div>,

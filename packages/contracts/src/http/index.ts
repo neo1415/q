@@ -1122,8 +1122,11 @@ export {
 } from "./visibility.js";
 
 export {
+  CardDetailSchema,
+  CardMetricSchema,
   ClaimHandleRequestSchema,
   COMPANY_CARD_FIELDS,
+  COMPANY_SECTION_CARD_FIELDS,
   HANDLE_HOLD_DAYS,
   HANDLE_MAX_LENGTH,
   HANDLE_MIN_LENGTH,
@@ -1131,6 +1134,7 @@ export {
   HandleSchema,
   INVESTOR_CARD_FIELDS,
   INVESTOR_MANDATE_CARD_FIELDS,
+  NETWORK_ONLY_CARD_FIELDS,
   PUBLIC_CARD_CODES_PATH,
   PUBLIC_HANDLES_PATH,
   PUBLIC_VERIFICATION_LABELS,
@@ -1151,6 +1155,9 @@ export {
   UpdateQCardRequestSchema,
   type ClaimHandleRequest,
   type Handle,
+  type CardDetail,
+  type CardMetric,
+  type CompanySectionCardField,
   type PublicCardCodeDto,
   type PublicCardDto,
   type PublicCardField,

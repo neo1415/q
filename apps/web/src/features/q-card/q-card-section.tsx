@@ -4,6 +4,7 @@ import { ApiProblemError, getQCard } from "@capital-q/api-client";
 import {
   COMPANY_CARD_FIELDS,
   INVESTOR_CARD_FIELDS,
+  NETWORK_ONLY_CARD_FIELDS,
   type QCardDto,
   type QCardSubjectType,
 } from "@capital-q/contracts";
@@ -11,6 +12,7 @@ import {
 import { apiSession } from "@/features/q/context";
 
 import {
+  CARD_SECTION_HINTS,
   cardDescriptor,
   cardFieldLabel,
   cardFieldValue,
@@ -105,21 +107,29 @@ export async function QCardSection({
     .filter((key) => key !== nameField && key !== "photo")
     .map((key) => {
       const raw = values?.[key];
+      const hint = CARD_SECTION_HINTS[key];
+      const networkOnly = (
+        NETWORK_ONLY_CARD_FIELDS as readonly string[]
+      ).includes(key);
       return {
         key,
         label: cardFieldLabel(key),
-        ...(values === undefined
-          ? {}
-          : {
-              value:
-                raw === null || raw === undefined
-                  ? null
-                  : cardFieldValue({
-                      key,
-                      value: raw,
-                      scope: "network_visible",
-                    }),
-            }),
+        ...(networkOnly ? { networkOnly } : {}),
+        // A section is assembled from the profile: its hint, not one value.
+        ...(hint !== undefined
+          ? { hint }
+          : values === undefined
+            ? {}
+            : {
+                value:
+                  raw === null || raw === undefined
+                    ? null
+                    : cardFieldValue({
+                        key,
+                        value: raw,
+                        scope: "network_visible",
+                      }),
+              }),
       };
     });
   const handle = card?.handle ?? null;

@@ -1,8 +1,14 @@
 import { z } from "zod";
 
+import { DecimalStringSchema } from "../common/decimal.js";
 import { UuidSchema } from "../common/ids.js";
+import { CurrencyCodeSchema, MoneySchema } from "../common/money.js";
 import { UtcTimestampSchema } from "../common/time.js";
 import { ResourceVersionSchema } from "../common/version.js";
+import {
+  EvidenceStatusSchema,
+  TruthClassSchema,
+} from "../evidence/vocabulary.js";
 
 /**
  * Handles and the Q Card (BIZ-004).
@@ -45,6 +51,39 @@ export const QCardScopeSchema = z.enum(Q_CARD_SCOPES);
 export type QCardScope = z.infer<typeof QCardScopeSchema>;
 
 /**
+ * The card's richer sections (owner 2026-10-21, Q Story S6: "your story,
+ * your numbers, your raise, your intelligence, and your relationships").
+ * Each is one card field like any other -- off until the owner puts it on
+ * the card and picks its audience -- and carries a structured `detail`.
+ * Every number keeps its truth class and evidence status; relationships
+ * are counts by stage, never names; documents are titles offered on
+ * request, never the files.
+ */
+export const COMPANY_SECTION_CARD_FIELDS = [
+  "tractionMetrics",
+  "currentRaise",
+  "investabilitySummary",
+  "relationshipSummary",
+  "team",
+  "documentsOnRequest",
+] as const;
+export type CompanySectionCardField =
+  (typeof COMPANY_SECTION_CARD_FIELDS)[number];
+
+/**
+ * Sections that can reach Capital Q members only, never a public link:
+ * Q's reading is built from member-visible evidence (a public summary would
+ * launder it), team members are other people, and data room titles are
+ * listed only to investors who can find the company (DATA_ROOM_LISTED_LEVELS).
+ * The server refuses `public_external` for these.
+ */
+export const NETWORK_ONLY_CARD_FIELDS = [
+  "investabilitySummary",
+  "team",
+  "documentsOnRequest",
+] as const;
+
+/**
  * The declared fields a company card may show. The name is always public.
  * `photo` and `cover` are the subject's profile images (profile-images.ts):
  * on the card their value is a short-lived signed read URL, and they reach
@@ -60,6 +99,7 @@ export const COMPANY_CARD_FIELDS = [
   "foundedDate",
   "photo",
   "cover",
+  ...COMPANY_SECTION_CARD_FIELDS,
 ] as const;
 /**
  * The investor's declared mandate, as a card may show it (founder design
@@ -89,6 +129,8 @@ export const INVESTOR_CARD_FIELDS = [
   "photo",
   "cover",
   ...INVESTOR_MANDATE_CARD_FIELDS,
+  /** The people who represent the firm, with their roles. */
+  "team",
 ] as const;
 export const QCardFieldSchema = z.enum([
   ...COMPANY_CARD_FIELDS,
@@ -158,12 +200,130 @@ export type UpdateQCardRequest = z.infer<typeof UpdateQCardRequestSchema>;
 export const PUBLIC_HANDLES_PATH = "/v1/public/handles" as const;
 export const PUBLIC_CARD_CODES_PATH = "/v1/public/cards" as const;
 
+const CardTruthShape = {
+  truthClass: TruthClassSchema,
+  evidenceStatus: EvidenceStatusSchema,
+};
+
+/**
+ * One number on a card. `amount` null is unknown, never zero; money has a
+ * currency, a count or a percentage has none.
+ */
+export const CardMetricSchema = z
+  .object({
+    label: z.string().min(1).max(80),
+    amount: DecimalStringSchema.nullable(),
+    currency: CurrencyCodeSchema.nullable(),
+    /** "%", "customers": how a non-money amount reads; null for money. */
+    unit: z.string().min(1).max(24).nullable(),
+    /** The period the number covers, as the owner stated it ("FY2025"). */
+    period: z.string().min(1).max(40).nullable(),
+    ...CardTruthShape,
+  })
+  .strict();
+export type CardMetric = z.infer<typeof CardMetricSchema>;
+
+export const CardDetailSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("METRICS"),
+      metrics: z.array(CardMetricSchema).min(1).max(8),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("RAISE"),
+      /** The round's stage code ("seed"); null unknown. The reader labels it. */
+      stageCode: z.string().min(1).max(60).nullable(),
+      /** The instrument code ("safe", "equity"); null unknown. */
+      instrumentCode: z.string().min(1).max(60).nullable(),
+      target: MoneySchema,
+      /** The owner's own words on what the money is for; null unstated. */
+      useOfFunds: z.string().min(1).max(1000).nullable(),
+      targetCloseDate: z.iso.date().nullable(),
+      ...CardTruthShape,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("INTELLIGENCE"),
+      /**
+       * Q's investor-facing InvestIQ reading (never the founder-private
+       * readiness diagnosis), labelled as Q's: a band and a confidence in
+       * words, never a percentage. INSUFFICIENT_EVIDENCE is unknown, not poor.
+       */
+      status: z.enum(["ASSESSED", "INSUFFICIENT_EVIDENCE"]),
+      band: z.string().min(1).max(60).nullable(),
+      confidence: z.string().min(1).max(60).nullable(),
+      /** The strongest areas, by name ("Traction"), best first. */
+      strengths: z.array(z.string().min(1).max(80)).max(3),
+      areasScored: z.number().int().min(0).max(16),
+      areasTotal: z.number().int().min(0).max(16),
+      method: z.string().min(1).max(80),
+      assessedAt: UtcTimestampSchema.nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("RELATIONSHIPS"),
+      /** Investor conversations by stage: counts only, never who. */
+      stages: z
+        .array(
+          z
+            .object({
+              label: z.string().min(1).max(60),
+              count: z.number().int().min(1),
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(8),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("TEAM"),
+      members: z
+        .array(
+          z
+            .object({
+              name: z.string().min(1).max(120),
+              role: z.string().min(1).max(120).nullable(),
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(12),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("DOCUMENTS"),
+      /** Titles only: the files stay in the data room, behind a request. */
+      documents: z
+        .array(
+          z
+            .object({
+              title: z.string().min(1).max(160),
+              category: z.string().min(1).max(60).nullable(),
+            })
+            .strict(),
+        )
+        .min(1)
+        .max(20),
+    })
+    .strict(),
+]);
+export type CardDetail = z.infer<typeof CardDetailSchema>;
+
 export const PublicCardFieldSchema = z
   .object({
     key: QCardFieldSchema,
     /** The machine value (a stage code, a country code, a date); the reader labels it. */
     value: z.string().min(1).max(2048),
     scope: QCardScopeSchema,
+    /** A section's structured content (COMPANY_SECTION_CARD_FIELDS, team). */
+    detail: CardDetailSchema.optional(),
   })
   .strict();
 export type PublicCardField = z.infer<typeof PublicCardFieldSchema>;
@@ -181,7 +341,7 @@ export const PublicCardDtoSchema = z
     subjectType: QCardSubjectTypeSchema,
     name: z.string().min(1).max(200),
     /** Only fields the audience may see; public first, then network. */
-    fields: z.array(PublicCardFieldSchema).max(20),
+    fields: z.array(PublicCardFieldSchema).max(24),
     verified: z.array(z.enum(PUBLIC_VERIFICATION_LABELS)).max(2),
     /**
      * The subset of `verified` that rests on the synthetic-demo attestation
