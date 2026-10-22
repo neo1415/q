@@ -14,6 +14,7 @@ export const CORE_AR: Readonly<Record<string, string>> = {
   Profile: "الملف الشخصي",
   Settings: "الإعدادات",
   "Pitch & media": "العرض والوسائط",
+  "Who is it for?": "لمن هو؟",
   "Data room & deck": "غرفة البيانات والعرض",
   "Company requests": "طلبات الشركات",
   Rehearsals: "التدريبات",

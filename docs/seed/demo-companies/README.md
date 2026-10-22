@@ -56,7 +56,7 @@ Source: `supabase/seed-assets/demo-companies/companies.json`, one fixture shared
    - no SKIP you didn't expect.
 3. Apply: the same command with `--apply`. It runs one transaction per company and is safe to run again; a second run plans nothing.
 4. Scores: the workers recompute on the outbox events the seed writes (`evidence.claim.changed`, `core.company.updated`). The 30-minute sweep is the backstop.
-5. Photos: upload David's headshot (`supabase/seed-assets/capital-q-team/david-founder.jpg`, on branch `seed/team-photos`) through the profile UI, which re-encodes it, as David's photo and, if wanted, Capital Q's logo. Zino's is pending from the owner. No photo of a real person is fetched from the web.
+5. Photos: David's own photo is seeded with `--photo david=supabase/seed-assets/capital-q-team/david-founder.jpg` (needs `--person david=<email>`, plus `SUPABASE_URL` and `SUPABASE_SECRET_KEY` for the upload). It is re-encoded by the product's own processor, uploaded first, and recorded as his READY avatar. It then shows on Capital Q's Q Card team section (members only) and on his own card. Alternatively, upload David's headshot (`supabase/seed-assets/capital-q-team/david-founder.jpg`, on branch `seed/team-photos`) through the profile UI, which re-encodes it, as David's photo and, if wanted, Capital Q's logo. Zino's is pending from the owner. No photo of a real person is fetched from the web.
 
 ## Local rehearsal (no Docker)
 
@@ -82,7 +82,7 @@ Source: `supabase/seed-assets/demo-companies/companies.json`, one fixture shared
 | Company    | InvestIQ                                                     | Unicorn potential     |
 | ---------- | ------------------------------------------------------------ | --------------------- |
 | Capital Q  | 50, **Investable**, Low confidence; 1/8 areas, 8/46 criteria | Insufficient evidence |
-| Songscribe | 50, **Investable**, Low confidence; 0/8 areas, 7/46 criteria | Insufficient evidence |
+| Songscribe | 50, **Investable**, Low confidence; 1/8 areas, 8/46 criteria | Insufficient evidence |
 | KUUZA AI   | not scored: not listed (its founder's choice)                | not scored            |
 
 **What moved them:**
@@ -108,3 +108,42 @@ Self-reported evidence carries weight 0.5, so confidence stays Low. **That is ho
 - **Explore** needs a pitch video.
 
 These remain owner actions.
+
+## Coverage: why claims alone cannot lift the scores further
+
+InvestIQ maps a network-visible claim to a criterion by its claim type alone:
+
+| Claim type         | Criterion                  |
+| ------------------ | -------------------------- |
+| financial, revenue | `fh.historical_financials` |
+| traction, metric   | `cp.traction`              |
+| customers          | `cp.customer_base`         |
+| market             | `mo.market_size`           |
+| team               | `fl.leadership_depth`      |
+| compliance         | `gir.regulatory_exposure`  |
+| capital            | `cs.raise_amount`          |
+
+So claims reach at most 9 of 46 criteria.
+
+- **Capital Q** covers 8. Songscribe covers 8 since its market estimate was added.
+- **`compliance` is left empty on purpose.** It would assert Capital Q's regulatory position, which nobody has stated.
+- **The other 37 criteria** come only from:
+  - a deck whose sections the founder confirmed, for product, competition, go-to-market, founders and team;
+  - founders' own network-visible background lines;
+  - data-room documents, for governance, legal and diligence;
+  - Capital Q's organisation verification;
+  - a pitch investors may play.
+
+A seed may not invent any of these.
+
+**Unicorn potential, per pillar after seeding:**
+
+| Pillar             | Capital Q | Songscribe |
+| ------------------ | --------- | ---------- |
+| P2 market          | 2         | 2          |
+| P3 problem and fit | 2.5       | 2.5        |
+| P4 traction        | 3         | 3          |
+| P5 unit economics  | 2         | 2          |
+
+- Every other pillar is unknown: founders, moat, team, scalability, timing, distribution, capital strength and ecosystem.
+- Runway (P8) is excluded on purpose: with cash and burn it reveals runway.

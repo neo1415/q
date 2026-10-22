@@ -202,6 +202,7 @@ export {
 } from "./domain/team-projection.js";
 export {
   createPostgresCompanyAffiliationRead,
+  createPostgresCompanyCardTeamRead,
   createPostgresCompanyTeamProjection,
 } from "./infrastructure/postgres-team-projection.js";
 export {

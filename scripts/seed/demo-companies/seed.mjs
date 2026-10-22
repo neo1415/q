@@ -12,13 +12,19 @@
 //
 //   Person Q Cards for people who already have accounts and agreed:
 //     --person david=<email> --person zino=<email>
+//   Their own profile photo (owner-supplied, with permission), for a person
+//   also named with --person; hosted uploads need SUPABASE_URL and
+//   SUPABASE_SECRET_KEY:
+//     --photo david=supabase/seed-assets/capital-q-team/david-founder.jpg
 //
 // The token stays in process memory; nothing here prints or writes it.
 // Idempotent: deterministic ids, and a second run plans nothing.
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, extname, join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { planPersonPhoto, supabaseStorage } from "./photo.mjs";
 
 import {
   planCompany,
@@ -151,8 +157,34 @@ async function readNodes(db) {
   return new Map(rows.map((r) => [`${r.vocab}|${r.display_name}`, r.id]));
 }
 
+/** The product's own re-encoder, so a seeded photo is exactly an upload's. */
+async function processAvatar(bytes) {
+  const identity = await import(
+    pathToFileURL(join(ROOT, "packages/public-identity/dist/index.js")).href
+  );
+  const contracts = await import(
+    pathToFileURL(join(ROOT, "packages/contracts/dist/index.js")).href
+  );
+  const rendition = await identity
+    .createSharpImageProcessor()
+    .process(bytes, contracts.PROFILE_IMAGE_DIMENSIONS.AVATAR);
+  if (rendition === null) throw new Error("the photo is not a usable image");
+  return rendition;
+}
+
+const CONTENT_TYPES = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+};
+
 /** Plan every company (and person card) without writing anything. */
-export async function planAll(db, fixture, { persons = {}, now } = {}) {
+export async function planAll(
+  db,
+  fixture,
+  { persons = {}, photos = {}, now } = {},
+) {
   const owner = (
     await db.read(
       "select user_id from identity.platform_admins where role = 'platform_owner' order by granted_at limit 1",
@@ -213,7 +245,36 @@ export async function planAll(db, fixture, { persons = {}, now } = {}) {
       }),
     });
   }
-  return { owner, companies, people };
+  const planned = [];
+  for (const [person, path] of Object.entries(photos)) {
+    const who = people.find((p) => p.person === person && !p.skip);
+    if (who === undefined) {
+      planned.push({ person, skip: "name the person with --person first" });
+      continue;
+    }
+    const contentType = CONTENT_TYPES[extname(path).toLowerCase()];
+    if (contentType === undefined) throw new Error(`unsupported image ${path}`);
+    const bytes = new Uint8Array(readFileSync(join(ROOT, path)));
+    const rendition = await processAvatar(bytes);
+    const current = await db.read(
+      `select id from core.profile_images where subject_type = 'PERSON' and subject_id = ${q(who.userId)} and kind = 'AVATAR' and status = 'READY'`,
+    );
+    const tenant = await db.read(
+      `select ac.tenant_id from identity.user_active_contexts c join identity.organisation_memberships ac on ac.id = c.membership_id where c.user_id = ${q(who.userId)}`,
+    );
+    const plan = planPersonPhoto({
+      seedKey: fixture.seedKey,
+      userId: who.userId,
+      tenantId: tenant[0].tenant_id,
+      source: { bytes, contentType },
+      rendition,
+      currentReadyId: current[0]?.id ?? null,
+    });
+    planned.push(
+      plan === null ? { person, sql: null } : { person, ...plan, rendition },
+    );
+  }
+  return { owner, companies, people, photos: planned };
 }
 
 export function personHandle(person) {
@@ -227,9 +288,22 @@ export function personHandle(person) {
     .slice(0, 30);
 }
 
-export async function applyAll(db, planned) {
+export async function applyAll(db, planned, { storage } = {}) {
   for (const c of planned.companies) if (c.sql !== null) await db.run(c.sql);
   for (const p of planned.people) if (p.sql) await db.run(p.sql);
+  for (const photo of planned.photos ?? []) {
+    if (!photo.sql) continue;
+    if (storage === undefined) {
+      throw new Error("a photo needs storage to upload to");
+    }
+    // The bytes first: a READY row never points at a missing object.
+    await storage.putObject({
+      key: photo.objectKey,
+      body: photo.rendition.bytes,
+      contentType: photo.rendition.contentType,
+    });
+    await db.run(photo.sql);
+  }
 }
 
 export function describe(planned) {
@@ -248,6 +322,13 @@ export function describe(planned) {
       `    fields: ${Object.keys(plan.changes).join(", ") || "none"}${plan.label ? "; + demonstration label" : ""}`,
       `    claims: +${plan.claims.length} (${plan.claims.map((c) => c.claim.key).join(", ") || "none"}); superseded ${plan.claims.reduce((n, c) => n + c.supersede.length, 0)}`,
       `    taxonomy: +${plan.taxonomy.length}; raise: ${plan.raise === null ? "unchanged" : plan.raise.replace === null ? "create" : "replace"}; card: ${plan.card === null ? "unchanged" : plan.card.create ? "create" : "update scopes"}; handle: ${plan.handle?.handle ?? "unchanged"}`,
+    );
+  }
+  for (const photo of planned.photos ?? []) {
+    lines.push(
+      photo.skip
+        ? `- photo ${photo.person}: SKIP (${photo.skip})`
+        : `- photo ${photo.person}: ${photo.sql === null ? "already this photo" : `upload ${photo.rendition.width}x${photo.rendition.height} WebP and set as their avatar`}`,
     );
   }
   for (const p of planned.people) {
@@ -276,16 +357,26 @@ async function main() {
       persons[name] = email;
     }
   });
+  const photos = {};
+  args.forEach((arg, i) => {
+    if (arg === "--photo") {
+      const [name, path] = String(args[i + 1]).split("=");
+      if (!name || !path) throw new Error("--photo name=path");
+      photos[name] = path;
+    }
+  });
   const fixture = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
   const db = hosted ? hostedDatabase() : localDatabase(url);
   try {
-    const planned = await planAll(db, fixture, { persons });
+    const planned = await planAll(db, fixture, { persons, photos });
     console.log(describe(planned));
     if (!apply) {
       console.log("\nDry run: nothing written. Add --apply to write.");
       return;
     }
-    await applyAll(db, planned);
+    await applyAll(db, planned, {
+      storage: Object.keys(photos).length === 0 ? undefined : supabaseStorage(),
+    });
     console.log("\nApplied.");
   } finally {
     await db.close();

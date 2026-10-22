@@ -448,3 +448,33 @@ describe("demonstration data", () => {
     expect(plain?.demonstration).toBe(false);
   });
 });
+
+describe("team faces", () => {
+  it("carries a member's own signed photo, and never anything that is not a URL", () => {
+    const sections = companySections(
+      inputs({
+        team: [
+          {
+            name: "David Nwankwo",
+            role: "Founder & CEO",
+            photoUrl: "https://storage.test/d.webp?sig=1",
+          },
+          { name: "Captain Zino Mario", role: "Co-founder", photoUrl: null },
+          { name: "Someone", role: null, photoUrl: "javascript:alert(1)" },
+        ],
+      }),
+    );
+    const team = sections.details["team"]?.network_visible;
+    expect(team?.kind === "TEAM" ? team.members : []).toEqual([
+      {
+        name: "David Nwankwo",
+        role: "Founder & CEO",
+        photoUrl: "https://storage.test/d.webp?sig=1",
+      },
+      { name: "Captain Zino Mario", role: "Co-founder" },
+      { name: "Someone", role: null },
+    ]);
+    // Members only: never on a public card.
+    expect(sections.details["team"]?.public_external).toBeNull();
+  });
+});

@@ -169,3 +169,74 @@ export function createPostgresCompanyAffiliationRead(options: {
     },
   };
 }
+
+const CardMemberRow = z.object({
+  user_id: z.string().uuid(),
+  display_name: z.string().nullable(),
+  given_name: z.string().nullable(),
+  family_name: z.string().nullable(),
+  business_title: z.string().nullable(),
+  is_founder: z.boolean(),
+});
+
+/**
+ * A company's current team for its Q Card's team section (owner
+ * 2026-10-22): names and titles, plus each member's user id so the card can
+ * show that person's own profile photo, which follows their name. Server-
+ * side only; the id never leaves the API. With no members, the founders the
+ * company itself named publicly, without ids (initials only).
+ */
+export function createPostgresCompanyCardTeamRead(options: {
+  readonly sql: DatabaseExecutor;
+}) {
+  return {
+    current: async (company: {
+      readonly tenantId: string;
+      readonly companyId: string;
+    }): Promise<
+      readonly {
+        readonly userId: string | null;
+        readonly name: string;
+        readonly role: string | null;
+      }[]
+    > => {
+      const rows = await options.sql`
+        select m.user_id, p.display_name, p.given_name, p.family_name,
+               m.business_title, m.is_founder
+          from core.company_members m
+          join identity.user_profiles p on p.id = m.user_id
+         where m.tenant_id = ${company.tenantId}
+           and m.company_id = ${company.companyId}
+           and m.is_current
+         order by m.is_founder desc, m.started_at asc, m.id asc
+         limit 12`;
+      if (rows.length === 0) {
+        return (await publicFounders(options.sql, company)).map((member) => ({
+          userId: null,
+          name: member.name,
+          role: member.businessTitle ?? (member.isFounder ? "Founder" : null),
+        }));
+      }
+      return rows.flatMap((raw) => {
+        const row = CardMemberRow.parse(raw);
+        const name =
+          row.display_name?.trim() ||
+          [row.given_name, row.family_name]
+            .filter((part) => part !== null && part.trim() !== "")
+            .join(" ")
+            .trim();
+        return name.length === 0
+          ? []
+          : [
+              {
+                userId: row.user_id,
+                name,
+                role:
+                  row.business_title?.trim() ||
+                  (row.is_founder ? "Founder" : null),
+              },
+            ];
+      });
+    },
+  };
+}

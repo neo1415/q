@@ -410,19 +410,62 @@ export function TeamSection({
           {detail.members.map((member, index) => (
             <li
               key={`${member.name}-${index}`}
-              className="flex min-w-0 flex-col border-t border-(--cq-border-subtle) py-2.5"
+              className="flex min-w-0 items-center gap-3 border-t border-(--cq-border-subtle) py-2.5"
+              data-card-member={member.name}
             >
-              <span className="cq-body truncate text-(--cq-text-primary)">
-                {member.name}
-              </span>
-              <span className="cq-body-sm truncate text-(--cq-text-secondary)">
-                {member.role ?? "Role not stated"}
+              <MemberFace name={member.name} photoUrl={member.photoUrl} />
+              <span className="flex min-w-0 flex-col">
+                <span className="cq-body truncate text-(--cq-text-primary)">
+                  {member.name}
+                </span>
+                <span className="cq-body-sm truncate text-(--cq-text-secondary)">
+                  {member.role ?? "Role not stated"}
+                </span>
               </span>
             </li>
           ))}
         </ul>
       )}
     </CardSection>
+  );
+}
+
+/**
+ * A team member's own profile photo when the card carries one (it follows
+ * their name), else their initials. Decorative: the name beside it is the
+ * text.
+ */
+function MemberFace({
+  name,
+  photoUrl,
+}: {
+  readonly name: string;
+  readonly photoUrl?: string | null | undefined;
+}) {
+  const initials = name
+    .split(/\s+/)
+    .filter((part) => part.length > 0 && !/^captain$/i.test(part))
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+  return typeof photoUrl === "string" ? (
+    // eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived storage URL loaded by the browser from storage directly
+    <img
+      src={photoUrl}
+      alt=""
+      width={40}
+      height={40}
+      className="size-10 shrink-0 rounded-full object-cover"
+      data-member-photo
+    />
+  ) : (
+    <span
+      aria-hidden="true"
+      className="cq-body-sm inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-(--cq-border) bg-(--cq-surface-subtle) font-semibold text-(--cq-text-secondary)"
+      data-member-initials
+    >
+      {initials}
+    </span>
   );
 }
 

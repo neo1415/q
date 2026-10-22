@@ -67,6 +67,8 @@ export type CompanySectionInputs = {
   readonly team: readonly {
     readonly name: string;
     readonly role: string | null;
+    /** The member's own profile photo, signed; null: initials. */
+    readonly photoUrl?: string | null | undefined;
   }[];
   readonly documents: readonly SectionDocument[];
 };
@@ -341,6 +343,10 @@ export function companySections(input: CompanySectionInputs): {
         member.role === null || member.role.trim().length === 0
           ? null
           : member.role.trim().slice(0, 120),
+      ...(typeof member.photoUrl === "string" &&
+      /^https?:\/\//.test(member.photoUrl)
+        ? { photoUrl: member.photoUrl }
+        : {}),
     }));
   const team: CardDetail | null =
     members.length === 0 ? null : { kind: "TEAM", members };
