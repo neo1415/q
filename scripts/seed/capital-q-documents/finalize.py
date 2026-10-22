@@ -41,10 +41,9 @@ DOCS = [
     ),
     ("capital-q-board-composition-note.pdf", "Board composition note", "GOVERNANCE", PDF, "ON_REQUEST", "corporate"),
 ]
-# A copy of S1's final Q Story INVESTOR take, 720p share copy (branch
-# qstory/editions-card @ 934ae9ca9, docs/ai-handoff/evidence/q-story/master/investor/).
-# If the owner approves it for an audience, S1 re-cuts without the
-# "Internal rehearsal" corner; replace the copy and re-run this script.
+# A copy of S1's owner-approved Q Story INVESTOR master, 720p share copy
+# (branch qstory/editions-card @ 25c6141b0,
+# docs/ai-handoff/evidence/q-story/master/investor/), with no rehearsal stamp.
 VIDEO_NAME = "capital-q-pitch-video.mp4"
 
 
@@ -97,11 +96,11 @@ def main(out_dir):
         "watermark": WATERMARK,
         "documents": entries,
         "pitchVideo": {
-            "$comment": "Q genuinely pitching Capital Q: a copy of the Q Story INVESTOR edition, not a founder video. S1's final take; its corner still reads 'Internal rehearsal' until the owner approves the cut for an audience, after which S1 re-cuts and the hash changes. Upload through /pitch/new (founder session and stream provider) with the audience below.",
+            "$comment": "Q genuinely pitching Capital Q: a copy of the Q Story INVESTOR edition, not a founder video. The owner-approved investor master (reported by S1), with no rehearsal stamp. Upload through /pitch/new (founder session and stream provider) with the audience below.",
             "final": True,
-            "ownerApprovedForAudience": False,
+            "ownerApprovedForAudience": True,
             "file": VIDEO_NAME,
-            "source": "qstory/editions-card@934ae9ca9:docs/ai-handoff/evidence/q-story/master/investor/q-story-master-720p.mp4",
+            "source": "qstory/editions-card@25c6141b0:docs/ai-handoff/evidence/q-story/master/investor/q-story-master-720p.mp4",
             "mime": "video/mp4",
             "bytes": (out_dir / VIDEO_NAME).stat().st_size,
             "sha256": sha256(out_dir / VIDEO_NAME),
