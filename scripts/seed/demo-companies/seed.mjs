@@ -30,6 +30,7 @@ import {
   planCompany,
   renderCompanySql,
   renderPersonCardSql,
+  renderTeamSql,
   seedUuid,
 } from "./plan.mjs";
 
@@ -214,14 +215,39 @@ export async function planAll(
     const users = await db.read(
       `select p.id, ac.tenant_id from identity.user_profiles p join auth.users u on u.id = p.auth_user_id left join identity.user_active_contexts c on c.user_id = p.id left join identity.organisation_memberships ac on ac.id = c.membership_id where lower(u.email) = lower(${q(email)}) and p.status = 'active'`,
     );
-    if (users.length !== 1 || users[0].tenant_id === null) {
+    if (users.length !== 1) {
       people.push({
         person,
-        skip: "no single active account with a current organisation for that email",
+        skip: "no single active account for that email",
       });
       continue;
     }
     const userId = users[0].id;
+    // The company they found or join here gives a tenant when they have no
+    // organisation of their own yet.
+    const home = companies.find(({ plan }) => {
+      const spec = fixture.companies.find((c) => c.key === plan.key);
+      return (
+        !plan.skip &&
+        [...spec.founders, ...spec.team].some((m) => m.person === person)
+      );
+    });
+    const tenantId = users[0].tenant_id ?? home?.plan.ids.tenant ?? null;
+    // A personal Q Card only for a founder the fixture names (David, Zino).
+    const founder = fixture.companies.some((c) =>
+      c.founders.some((f) => f.person === person),
+    );
+    if (!founder || tenantId === null) {
+      people.push({
+        person,
+        userId,
+        tenantId,
+        handle: null,
+        sql: null,
+        noCard: true,
+      });
+      continue;
+    }
     const [handles, cards] = await Promise.all([
       db.read(
         `select handle from core.handles where subject_type = 'PERSON' and subject_id = ${q(userId)} and status = 'ACTIVE'`,
@@ -234,17 +260,81 @@ export async function planAll(
     people.push({
       person,
       userId,
+      tenantId,
       handle: handles[0]?.handle ?? handle,
       sql: renderPersonCardSql({
         seedKey: fixture.seedKey,
         userId,
         handle,
-        tenantId: users[0].tenant_id,
+        tenantId,
         existingHandle: handles[0]?.handle ?? null,
         existingCard: cards[0] ?? null,
       }),
     });
   }
+  // The team: founders and team the fixture names, for people named here.
+  const memberRole = (
+    await db.read(
+      "select id from permissions.roles where code = 'organisation_member'",
+    )
+  )[0]?.id;
+  const teams = [];
+  for (const { plan } of companies) {
+    if (plan.skip) continue;
+    const spec = fixture.companies.find((c) => c.key === plan.key);
+    const wanted = [
+      ...spec.founders.map((f) => ({ ...f, isFounder: true })),
+      ...spec.team.map((t) => ({ ...t, isFounder: false })),
+    ].filter((m) => people.some((p) => p.person === m.person && !p.skip));
+    if (wanted.length === 0) continue;
+    const members = [];
+    for (const m of wanted) {
+      const userId = people.find((p) => p.person === m.person).userId;
+      const [membership, member, context, backgrounds] = await Promise.all([
+        db.read(
+          `select 1 from identity.organisation_memberships where organisation_id = ${q(plan.ids.organisation)} and user_id = ${q(userId)} and membership_status = 'active'`,
+        ),
+        db.read(
+          `select 1 from core.company_members where company_id = ${q(plan.ids.company)} and user_id = ${q(userId)} and is_current`,
+        ),
+        db.read(
+          `select 1 from identity.user_active_contexts where user_id = ${q(userId)}`,
+        ),
+        db.read(
+          `select title from core.founder_background_entries where user_id = ${q(userId)}`,
+        ),
+      ]);
+      members.push({
+        userId,
+        title: m.title,
+        isFounder: m.isFounder,
+        backgrounds: m.isFounder
+          ? (fixture.people[m.person].backgrounds ?? [])
+          : [],
+        hasMembership: membership.length > 0,
+        hasCompanyMember: member.length > 0,
+        hasActiveContext: context.length > 0,
+        existingBackgroundTitles: backgrounds.map((b) => b.title),
+      });
+    }
+    teams.push({
+      company: plan.name,
+      people: wanted.map((m) => m.person),
+      sql: renderTeamSql({
+        seedKey: fixture.seedKey,
+        company: {
+          id: plan.ids.company,
+          tenant: plan.ids.tenant,
+          organisation: plan.ids.organisation,
+        },
+        memberRoleId: memberRole,
+        authorityUserId: owner,
+        now: at,
+        members,
+      }),
+    });
+  }
+
   const planned = [];
   for (const [person, path] of Object.entries(photos)) {
     const who = people.find((p) => p.person === person && !p.skip);
@@ -259,13 +349,14 @@ export async function planAll(
     const current = await db.read(
       `select id from core.profile_images where subject_type = 'PERSON' and subject_id = ${q(who.userId)} and kind = 'AVATAR' and status = 'READY'`,
     );
-    const tenant = await db.read(
-      `select ac.tenant_id from identity.user_active_contexts c join identity.organisation_memberships ac on ac.id = c.membership_id where c.user_id = ${q(who.userId)}`,
-    );
+    if (who.tenantId === null) {
+      planned.push({ person, skip: "no organisation to file the photo under" });
+      continue;
+    }
     const plan = planPersonPhoto({
       seedKey: fixture.seedKey,
       userId: who.userId,
-      tenantId: tenant[0].tenant_id,
+      tenantId: who.tenantId,
       source: { bytes, contentType },
       rendition,
       currentReadyId: current[0]?.id ?? null,
@@ -274,7 +365,7 @@ export async function planAll(
       plan === null ? { person, sql: null } : { person, ...plan, rendition },
     );
   }
-  return { owner, companies, people, photos: planned };
+  return { owner, companies, people, teams, photos: planned };
 }
 
 export function personHandle(person) {
@@ -291,6 +382,7 @@ export function personHandle(person) {
 export async function applyAll(db, planned, { storage } = {}) {
   for (const c of planned.companies) if (c.sql !== null) await db.run(c.sql);
   for (const p of planned.people) if (p.sql) await db.run(p.sql);
+  for (const t of planned.teams ?? []) if (t.sql) await db.run(t.sql);
   for (const photo of planned.photos ?? []) {
     if (!photo.sql) continue;
     if (storage === undefined) {
@@ -324,6 +416,11 @@ export function describe(planned) {
       `    taxonomy: +${plan.taxonomy.length}; raise: ${plan.raise === null ? "unchanged" : plan.raise.replace === null ? "create" : "replace"}; card: ${plan.card === null ? "unchanged" : plan.card.create ? "create" : "update scopes"}; handle: ${plan.handle?.handle ?? "unchanged"}`,
     );
   }
+  for (const t of planned.teams ?? []) {
+    lines.push(
+      `- team ${t.company}: ${t.sql === null ? "already there" : `memberships (member role only, no invitations) and titles for ${t.people.join(", ")}`}`,
+    );
+  }
   for (const photo of planned.photos ?? []) {
     lines.push(
       photo.skip
@@ -335,7 +432,7 @@ export function describe(planned) {
     lines.push(
       p.skip
         ? `- person ${p.person}: SKIP (${p.skip})`
-        : `- person ${p.person}: ${p.sql === null ? "card already there" : `card @${p.handle}`}`,
+        : `- person ${p.person}: ${p.noCard ? "team only (no personal card)" : p.sql === null ? "card already there" : `card @${p.handle}`}`,
     );
   }
   return lines.join("\n");

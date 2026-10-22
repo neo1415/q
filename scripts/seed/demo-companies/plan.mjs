@@ -596,3 +596,93 @@ export function renderPersonCardSql({
   s.push("commit;");
   return s.join("\n");
 }
+
+/**
+ * The team of a company, for people who already have accounts and agreed
+ * (owner 2026-10-22): an active organisation membership with the baseline
+ * member role only -- owner and admin are authority, and a seed never
+ * grants them -- a current company membership with their title, and, for
+ * founders, background lines that are their stated roles only. Nothing is
+ * sent: no invitation, no email. Existing rows are kept as they are.
+ */
+export function renderTeamSql({
+  seedKey,
+  company,
+  memberRoleId,
+  authorityUserId,
+  now,
+  members,
+}) {
+  const s = [];
+  const ctx = {
+    seedKey,
+    key: `team:${company.id}`,
+    ids: { tenant: company.tenant, organisation: company.organisation },
+    authorityUserId,
+    now,
+    salt: now,
+    correlation: seedUuid(seedKey, "team", company.id, now),
+  };
+  for (const m of members) {
+    const membershipId = seedUuid(
+      seedKey,
+      "membership",
+      company.organisation,
+      m.userId,
+    );
+    if (!m.hasMembership) {
+      s.push(
+        `insert into identity.organisation_memberships (id, tenant_id, organisation_id, user_id, membership_status, joined_at, primary_business_title, metadata) values (${lit(membershipId)}, ${lit(company.tenant)}, ${lit(company.organisation)}, ${lit(m.userId)}, 'active', now(), ${lit(m.title)}, ${json({ seed: seedKey, invitationSent: false })}) on conflict (id) do nothing;`,
+        `insert into identity.membership_roles (membership_id, role_id) values (${lit(membershipId)}, ${lit(memberRoleId)}) on conflict do nothing;`,
+        audit(
+          ctx,
+          "membership.created",
+          "organisation_membership",
+          membershipId,
+          {
+            role: "organisation_member",
+            invitationSent: false,
+          },
+        ),
+      );
+      if (!m.hasActiveContext) {
+        s.push(
+          `insert into identity.user_active_contexts (user_id, membership_id) values (${lit(m.userId)}, ${lit(membershipId)}) on conflict do nothing;`,
+        );
+      }
+    }
+    if (!m.hasCompanyMember) {
+      const memberId = seedUuid(
+        seedKey,
+        "company-member",
+        company.id,
+        m.userId,
+      );
+      s.push(
+        `insert into core.company_members (id, tenant_id, company_id, user_id, relationship_type, business_title, is_founder) values (${lit(memberId)}, ${lit(company.tenant)}, ${lit(company.id)}, ${lit(m.userId)}, 'team_member', ${lit(m.title)}, ${m.isFounder ? "true" : "false"}) on conflict (id) do nothing;`,
+        audit(ctx, "company_member.created", "company_member", memberId, {
+          title: m.title,
+          isFounder: m.isFounder,
+        }),
+      );
+    }
+    m.backgrounds
+      .filter((title) => !m.existingBackgroundTitles.includes(title))
+      .forEach((title, index) => {
+        s.push(
+          `insert into core.founder_background_entries (id, tenant_id, user_id, title, visibility_scope, sort_order) values (${lit(seedUuid(seedKey, "background", m.userId, title))}, ${lit(company.tenant)}, ${lit(m.userId)}, ${lit(title)}, 'network_visible', ${index}) on conflict (id) do nothing;`,
+        );
+      });
+  }
+  if (s.length === 0) return null;
+  s.push(
+    event(
+      ctx,
+      "core.company.updated",
+      { type: "company", id: company.id },
+      { version: 1, companyId: company.id, changedFields: ["team"] },
+      "capitalq://api/core/company",
+    ),
+  );
+  return ["begin;", ...s, "commit;"].join("\n");
+}

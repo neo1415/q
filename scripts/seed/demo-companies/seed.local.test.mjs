@@ -25,6 +25,11 @@ const storage = {
     stored.set(key, { bytes: body.byteLength, contentType });
   },
 };
+const PERSONS = {
+  david: "david@example.invalid",
+  zino: "zino@example.invalid",
+  daniel: "daniel@example.invalid",
+};
 const PHOTOS = {
   david: "supabase/seed-assets/capital-q-team/david-founder.jpg",
 };
@@ -44,7 +49,9 @@ const ids = {
 const SETUP = `
 insert into auth.users (id, email) values
   ('${ids.ownerAuth}', 'owner@example.invalid'),
-  ('${ids.davidAuth}', 'david@example.invalid');
+  ('${ids.davidAuth}', 'david@example.invalid'),
+  ('00000000-0000-4000-8000-00000000a003', 'zino@example.invalid'),
+  ('00000000-0000-4000-8000-00000000a004', 'daniel@example.invalid');
 insert into identity.platform_admins (user_id, role)
   select id, 'platform_owner' from identity.user_profiles where auth_user_id = '${ids.ownerAuth}';
 
@@ -70,6 +77,8 @@ insert into identity.organisation_memberships (id, tenant_id, organisation_id, u
 insert into identity.user_active_contexts (user_id, membership_id)
   select id, '${ids.davidMembership}' from identity.user_profiles where auth_user_id = '${ids.davidAuth}';
 update identity.user_profiles set display_name = 'David Nwankwo' where auth_user_id = '${ids.davidAuth}';
+update identity.user_profiles set display_name = 'Captain Zino Mario' where auth_user_id = '00000000-0000-4000-8000-00000000a003';
+update identity.user_profiles set display_name = 'Daniel Oyeniyi' where auth_user_id = '00000000-0000-4000-8000-00000000a004';
 `;
 
 /** The founder's own KUUZA AI figure, written the way the product writes one. */
@@ -105,7 +114,7 @@ before(async () => {
   await db.run(KUUZA_OWN_CLAIM);
   await db.run(CAPITAL_Q_WRONG);
   const planned = await planAll(db, fixture, {
-    persons: { david: "david@example.invalid" },
+    persons: PERSONS,
     photos: PHOTOS,
     now: "2026-10-22T10:00:00.000Z",
   });
@@ -284,11 +293,15 @@ test(
     );
     assert.equal(handle.handle, "capital-q-hq");
     const person = await db.read(
-      "select h.handle, h.organisation_id, s.created_by_user_id = s.subject_id as own from core.handles h join core.shareable_identities s on s.subject_type = h.subject_type and s.subject_id = h.subject_id where h.subject_type = 'PERSON'",
+      "select h.handle, h.organisation_id, s.created_by_user_id = s.subject_id as own from core.handles h join core.shareable_identities s on s.subject_type = h.subject_type and s.subject_id = h.subject_id where h.subject_type = 'PERSON' order by h.handle",
     );
     assert.deepEqual(
       [...person].map((row) => ({ ...row })),
-      [{ handle: "david-nwankwo", organisation_id: null, own: true }],
+      [
+        { handle: "david-nwankwo", organisation_id: null, own: true },
+        { handle: "zino-mario", organisation_id: null, own: true },
+      ],
+      "founders only: Daniel joins the team without a personal card",
     );
   },
 );
@@ -313,13 +326,70 @@ test(
   },
 );
 
+test(
+  "the team: member role only, titles, no invitations, roles-only backgrounds",
+  { skip },
+  async () => {
+    const members = await db.read(
+      `select p.display_name, m.business_title, m.is_founder from core.company_members m join identity.user_profiles p on p.id = m.user_id where m.company_id = '${ids.cqCompany}' and m.is_current order by m.is_founder desc, p.display_name`,
+    );
+    assert.deepEqual(
+      [...members].map((r) => ({ ...r })),
+      [
+        {
+          display_name: "Captain Zino Mario",
+          business_title: "Co-founder",
+          is_founder: true,
+        },
+        {
+          display_name: "David Nwankwo",
+          business_title: "Founder & CEO",
+          is_founder: true,
+        },
+        {
+          display_name: "Daniel Oyeniyi",
+          business_title: "Engineering",
+          is_founder: false,
+        },
+      ],
+    );
+    const roles = await db.read(
+      `select distinct r.code from identity.organisation_memberships om join identity.membership_roles mr on mr.membership_id = om.id join permissions.roles r on r.id = mr.role_id where om.organisation_id = '${CAPITAL_Q_ORG}'`,
+    );
+    assert.deepEqual(
+      [...roles].map((r) => r.code),
+      ["organisation_member"],
+      "a seed never grants owner or admin",
+    );
+    const invitations = await db.read(
+      "select count(*)::int as n from identity.organisation_invitations",
+    );
+    assert.equal(invitations[0].n, 0, "no invitation is created or sent");
+    const backgrounds = await db.read(
+      "select p.display_name, b.title, b.from_year, b.detail, b.visibility_scope from core.founder_background_entries b join identity.user_profiles p on p.id = b.user_id order by 1, 2",
+    );
+    assert.deepEqual(
+      [...backgrounds].map(
+        (r) =>
+          `${r.display_name}: ${r.title} | ${r.from_year} | ${r.detail} | ${r.visibility_scope}`,
+      ),
+      [
+        "Captain Zino Mario: Co-founder, Capital Q | null | null | network_visible",
+        "Captain Zino Mario: Co-founder, Songscribe | null | null | network_visible",
+        "David Nwankwo: Founder & CEO, Capital Q | null | null | network_visible",
+      ],
+    );
+  },
+);
+
 test("idempotent: a second run plans nothing", { skip }, async () => {
   const again = await planAll(db, fixture, {
-    persons: { david: "david@example.invalid" },
+    persons: PERSONS,
     photos: PHOTOS,
     now: "2026-10-22T11:00:00.000Z",
   });
   for (const photo of again.photos) assert.equal(photo.sql, null);
+  for (const team of again.teams) assert.equal(team.sql, null);
   for (const { plan, sql } of again.companies) {
     assert.equal(sql, null, `${plan.key} would change again`);
   }
