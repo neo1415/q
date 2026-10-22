@@ -317,6 +317,7 @@ if (!dry && deployment.status === 400) {
   }
   log(`  uploading ${needed.size} files Vercel does not have`);
   const queue = files.filter((f) => needed.has(f.sha));
+  let uploaded = 0;
   const worker = async () => {
     for (let f = queue.shift(); f !== undefined; f = queue.shift()) {
       const url = new URL("/v2/files", API);
@@ -336,6 +337,8 @@ if (!dry && deployment.status === 400) {
         });
         if (response.ok || (response.status !== 429 && response.status < 500))
           break;
+        if (attempt === 0)
+          log(`  rate limited (${response.status}); waiting before retrying`);
         const after = Number(response.headers.get("retry-after"));
         const wait =
           Number.isFinite(after) && after > 0
@@ -344,6 +347,8 @@ if (!dry && deployment.status === 400) {
         await new Promise((resolve) => setTimeout(resolve, wait));
       }
       if (!response?.ok) fail(`upload of ${f.file} → ${response?.status}`);
+      uploaded += 1;
+      if (uploaded % 100 === 0) log(`  uploaded ${uploaded}/${needed.size}`);
     }
   };
   await Promise.all(Array.from({ length: 4 }, worker));
