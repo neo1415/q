@@ -1,6 +1,10 @@
 "use client";
 
-import { PublicCardDtoSchema, type PublicCardDto } from "@capital-q/contracts";
+import {
+  INVESTABILITY_BAND_LABELS,
+  PublicCardDtoSchema,
+  type PublicCardDto,
+} from "@capital-q/contracts";
 
 import { PublicCardView } from "@/features/q-card/public-card-view";
 
@@ -138,18 +142,20 @@ export function storyQCard(origin: string): PublicCardDto {
         },
       },
       {
-        // Q's reading of the seeded company, as the deterministic scorer
-        // gives it after seeding (S6): words only, no number.
+        // Q's reading of the seeded company with its data room (S6 #324,
+        // #325; deck confirmed), as the deterministic scorer gives it on the
+        // seeded data: STRONG, Low confidence, 4 of 8 areas. Words only, no
+        // number, in the product's own band label.
         key: "investabilitySummary",
-        value: "Investable",
+        value: INVESTABILITY_BAND_LABELS.STRONG,
         scope: qCard.investabilitySummary,
         detail: {
           kind: "INTELLIGENCE",
           status: "ASSESSED",
-          band: "Investable",
+          band: INVESTABILITY_BAND_LABELS.STRONG,
           confidence: "Low confidence",
           strengths: [],
-          areasScored: 1,
+          areasScored: 4,
           areasTotal: 8,
           method: "FDN InvestIQ v1",
           assessedAt: null,
