@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { FOUNDER_QA_ENTRIES } from "./qa-bank-founder.js";
 import { PRODUCT_QA_ENTRIES } from "./qa-bank-product.js";
+import { SPOKEN_PARAPHRASES } from "./qa-bank-spoken.js";
 
 /**
  * Q Pitch v6: the Q&A bank (owner, 16 Oct). Questions people are likely to
@@ -48,8 +49,8 @@ const Q_ARCH = "docs/architecture/12_Q_Technical_Architecture.md";
 const RECS =
   "docs/architecture/19_Capital_Q_Discovery_Matching_Recommendation_Architecture.md";
 
-/** The bank. Grows by entries; the shape and the honesty tests stay. */
-export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
+/** The written entries, before the spoken paraphrases are merged in. */
+const WRITTEN: readonly QaEntry[] = [
   {
     id: "qa.what-is-it",
     side: "BOTH",
@@ -346,13 +347,47 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
   },
   ...FOUNDER_QA_ENTRIES,
   ...PRODUCT_QA_ENTRIES,
-]);
+];
+
+/** The bank. Grows by entries; the shape and the honesty tests stay. */
+export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse(
+  WRITTEN.map((entry) => ({
+    ...entry,
+    paraphrases: [
+      ...entry.paraphrases,
+      ...(SPOKEN_PARAPHRASES[entry.id] ?? []),
+    ],
+  })),
+);
 
 const STOP = new Set(
-  "a an the of to and or in on for is are be it this that i me my you your we our do does can with about at as by from".split(
-    " ",
-  ),
+  [
+    "a an the of to and or in on for is are be it this that i me my you your we our do does can with about at as by from",
+    // Spoken fillers: a voice question carries them, a stored one does not.
+    "so um uh uhm erm er hmm ah oh okay ok well basically actually just really yeah alright anyway",
+    // Words every question can carry, which say nothing about which one.
+    "get gets got getting exactly thing things like would could should will there here any some all more much very way go going come comes want say tell let also still even ever them they their its us if then than has have had was were been being am please thanks sure guess maybe probably kinda gonna wanna lot lots bit whole these those people one",
+  ]
+    .join(" ")
+    .split(" "),
 );
+
+/**
+ * Spoken questions arrive through speech-to-text: filler phrases, and the
+ * product's names heard as ordinary words ("gate queue", "capital cue").
+ * Both are folded before tokens, the same way for the bank and the asker.
+ */
+const SPOKEN: readonly (readonly [RegExp, string])[] = [
+  [/\bgate\s*(?:q|queue|cue|que|cu|kyu)\b/gu, "gateq"],
+  [/\bcapital\s+(?:queue|cue|que|cu|kyu)\b/gu, "capital q"],
+  [/\b(?:hey|hi|okay|ok)\s+(?:queue|cue|q)\b/gu, " "],
+  [/\binvest(?:\s*i\s*q|\s+iq|iq)\b/gu, "investiq"],
+  [/\binvestib(?:ility|le)\b/gu, "investability"],
+  [
+    /(?<!\b(?:do|did|does|would|will|how|don t|dont)\s)\byou know\b|\b(?:i mean|kind of|sort of|quick question|real quick|i was wondering|i wanted to ask|let me ask|can you tell me|could you tell me|tell me|i guess|i think|if you don't mind|out of curiosity)\b/gu,
+    " ",
+  ],
+];
 
 /**
  * Question words carry intent in a short question ("Who is it for?" is
@@ -373,54 +408,203 @@ const SYNONYMS: Readonly<Record<string, string>> = {
   cost: "pricing",
   costs: "pricing",
   charge: "pricing",
+  charges: "pricing",
   pay: "pricing",
+  pays: "pricing",
+  paying: "pricing",
+  paid: "pricing",
   subscription: "pricing",
-  revenue: "stage",
+  fees: "pricing",
+  fee: "pricing",
   monetise: "money",
   monetize: "money",
+  monetisation: "money",
+  monetization: "money",
   earn: "money",
-  rivals: "competitors",
+  earns: "money",
   competitor: "competitors",
   competition: "competitors",
   competitive: "competitors",
+  rivals: "competitors",
+  rival: "competitors",
   alternatives: "competitors",
+  landscape: "competitors",
   confidential: "privacy",
   confidentiality: "privacy",
   private: "privacy",
-  secure: "privacy",
-  security: "privacy",
+  secure: "security",
+  hack: "security",
+  hacked: "security",
+  hacker: "security",
+  breach: "security",
+  breaches: "security",
+  attack: "security",
+  encrypted: "security",
+  encryption: "security",
   hallucinate: "accuracy",
+  hallucinates: "accuracy",
+  hallucination: "accuracy",
   hallucinations: "accuracy",
   accurate: "accuracy",
   reliable: "accuracy",
   trust: "accuracy",
-  scoring: "scores",
+  wrong: "accuracy",
+  mistakes: "accuracy",
   score: "scores",
+  scoring: "scores",
   investiq: "scores",
   investability: "scores",
   suitability: "scores",
+  rating: "scores",
+  ratings: "scores",
   ranked: "ranking",
   rank: "ranking",
   order: "ranking",
-  feed: "ranking",
-  people: "team",
+  ordering: "ranking",
   raising: "raise",
   round: "raise",
-  ask: "raise",
   timing: "now",
   traction: "stage",
   customers: "stage",
-  users: "stage",
+  revenue: "stage",
   gateway: "gateq",
-  site: "website",
   apply: "gateq",
+  applying: "gateq",
+  application: "gateq",
+  applications: "gateq",
+  inbound: "gateq",
+  site: "website",
+  difference: "different",
+  differ: "different",
+  differs: "different",
+  versus: "different",
+  vs: "different",
+  server: "host",
+  servers: "host",
+  residency: "host",
+  located: "host",
+  location: "host",
+  datacenter: "host",
+  datacentre: "host",
+  owns: "own",
+  owner: "own",
+  ownership: "own",
+  rights: "own",
+  deletion: "delete",
+  erase: "delete",
+  erased: "delete",
+  remove: "delete",
+  removed: "delete",
+  wipe: "delete",
+  certifications: "certification",
+  certified: "certification",
+  certify: "certification",
+  cert: "certification",
+  certs: "certification",
+  soc: "certification",
+  iso: "certification",
+  accreditation: "certification",
+  regulated: "regulation",
+  regulator: "regulation",
+  regulators: "regulation",
+  licence: "regulation",
+  license: "regulation",
+  licensed: "regulation",
+  compliance: "regulation",
+  compliant: "regulation",
+  broker: "regulation",
+  prediction: "predict",
+  predictions: "predict",
+  forecast: "predict",
+  forecasts: "predict",
+  forecasting: "predict",
+  verified: "verify",
+  verification: "verify",
+  vetted: "verify",
+  vet: "verify",
+  vetting: "verify",
+  kyc: "verify",
+  biased: "bias",
+  unfair: "bias",
+  fairness: "bias",
+  discriminate: "bias",
+  discrimination: "bias",
+  prejudice: "bias",
+  learns: "learn",
+  learning: "learn",
+  smarter: "learn",
+  improve: "learn",
+  improves: "learn",
+  improving: "learn",
+  languages: "language",
+  spanish: "language",
+  french: "language",
+  arabic: "language",
+  english: "language",
+  portuguese: "language",
+  speak: "voice",
+  speaking: "voice",
+  talk: "voice",
+  talking: "voice",
+  microphone: "voice",
+  mic: "voice",
+  spoken: "voice",
+  aloud: "voice",
+  swipes: "swipe",
+  swiping: "swipe",
+  scroll: "swipe",
+  scrolling: "swipe",
+  integrates: "integrate",
+  integration: "integrate",
+  integrations: "integrate",
+  sync: "integrate",
+  syncs: "integrate",
+  plugin: "integrate",
+  connect: "integrate",
+  connects: "integrate",
+  plans: "roadmap",
+  planned: "roadmap",
+  future: "roadmap",
+  postmoney: "valuation",
+  premoney: "valuation",
+  companies: "company",
+  business: "company",
+  businesses: "company",
+  startup: "company",
+  startups: "company",
+  founders: "founder",
+  entrepreneur: "founder",
+  entrepreneurs: "founder",
+  phone: "mobile",
+  phones: "mobile",
+  ios: "mobile",
+  android: "mobile",
+  iphone: "mobile",
+  app: "mobile",
+  information: "data",
+  info: "data",
+  meetings: "meeting",
+  call: "meeting",
+  calls: "meeting",
+  colleagues: "team",
+  colleague: "team",
+  partners: "team",
 };
 
+/** A light stem: enough that "hosted", "hosting" and "hosts" meet. */
+function stem(word: string): string {
+  if (word.length > 5 && word.endsWith("ing")) return word.slice(0, -3);
+  if (word.length > 4 && word.endsWith("ied")) return `${word.slice(0, -3)}y`;
+  if (word.length > 4 && word.endsWith("ies")) return `${word.slice(0, -3)}y`;
+  if (word.length > 4 && word.endsWith("ed")) return word.slice(0, -2);
+  if (word.length > 5 && word.endsWith("ly")) return word.slice(0, -2);
+  return word.replace(/(?<=..[^s])s$/u, "");
+}
+
 function tokens(text: string): string[] {
-  const words = text
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
+  let spoken = text.toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "");
+  for (const [heard, meant] of SPOKEN) spoken = spoken.replace(heard, meant);
+  const words = spoken
     // A negation changes the question ("what can't Q do" is not "what is
     // Q"), so it survives the apostrophe.
     .replace(/\b(?:can['’]t|cannot)\b/gu, "can not")
@@ -430,7 +614,7 @@ function tokens(text: string): string[] {
     .split(/\s+/u)
     // "q" is the analyst's name, the one single letter that means something.
     .filter((word) => (word.length > 1 || word === "q") && !STOP.has(word))
-    .map((word) => SYNONYMS[word] ?? word.replace(/(?<=..)s$/u, ""));
+    .map((word) => SYNONYMS[word] ?? SYNONYMS[stem(word)] ?? stem(word));
   // "Capital Q" is one name: its own term, beside its two words.
   const names = words.flatMap((word, i) =>
     word === "capital" && words[i + 1] === "q" ? ["capital-q"] : [],
@@ -438,99 +622,223 @@ function tokens(text: string): string[] {
   return [...words, ...names];
 }
 
+/**
+ * What the bank does with a question:
+ * - ANSWER: confident, the prepared answer at once;
+ * - CLARIFY: a close call between entries (or one just short of
+ *   confident), so Q asks "Do you mean …?" rather than guess;
+ * - LEAVE_TO_Q: the bank does not hold it; normal Q answers.
+ */
+export type QaMatch =
+  | { readonly kind: "ANSWER"; readonly entry: QaEntry; readonly score: number }
+  | {
+      readonly kind: "CLARIFY";
+      readonly candidates: readonly [QaEntry, ...QaEntry[]];
+      /** Spoken as is: "Do you mean …, or …?" */
+      readonly prompt: string;
+    }
+  | { readonly kind: "LEAVE_TO_Q" };
+
 export type QaIndex = {
+  /** The full decision. */
+  readonly match: (text: string) => QaMatch;
+  /** The confident answer only (ANSWER), else null: the earlier API. */
   readonly answer: (text: string) => QaEntry | null;
+  /** The closest entries and their similarity (0–1), best first. */
+  readonly rank: (
+    text: string,
+  ) => readonly { readonly entry: QaEntry; readonly score: number }[];
 };
 
-/** Minimum BM25 score for a match; tuned on the bank's own paraphrases. */
-export const QA_THRESHOLD = 1.4;
+/**
+ * Similarity (0–1) at which the bank answers, and how far the best entry
+ * must lead the runner-up. Calibrated on the held-out spoken questions and
+ * the not-in-bank questions in the tests: a wrong prepared answer is worse
+ * than none.
+ */
+export const QA_THRESHOLD = 0.55;
+export const QA_MARGIN = 0.08;
+
+/** Between this and QA_THRESHOLD, Q asks "Do you mean …?". */
+export const QA_CLARIFY_FLOOR = 0.42;
+
+const LEAVE: QaMatch = { kind: "LEAVE_TO_Q" };
 
 /**
- * How far the best entry must lead the runner-up, as a share of its own
- * score. A close call is a guess, and a wrong prepared answer is worse
- * than none: below the margin the question goes to normal Q.
+ * An instruction aimed at Q's rules is never a product question, whatever
+ * words it shares with one: it goes to normal Q, which holds the rules.
  */
-export const QA_MARGIN = 0.1;
+const NOT_A_QUESTION =
+  /\b(?:ignore|forget|disregard|override|bypass)\b.*\b(?:rules?|instructions?|restrictions?|guidelines?|prompt)\b|\bpretend\b|\bsystem prompt\b|\bjailbreak\b|^\s*(?:go|take me|navigate|open|close|scroll|click|play|pause|stop|skip|show me the)\b/u;
+
+/**
+ * The bank speaks about Capital Q. A question about one company on the
+ * screen ("the valuation of the company in the demo") belongs to normal Q,
+ * which can read that company's record.
+ */
+const ABOUT_A_COMPANY =
+  /\b(?:demo (?:company|startup|business|founder|video|pitch)|(?:company|startup|business|founder) (?:in|from) the (?:demo|video|pitch)|(?:company|startup|business|founder) you (?:just )?(?:showed|show|presented|mentioned)|in the demo pitch)\b/u;
+
+function aQuestionForTheBank(text: string): boolean {
+  const plain = text.toLowerCase().trim();
+  return !NOT_A_QUESTION.test(plain) && !ABOUT_A_COMPANY.test(plain);
+}
+
+/** Edit distance, stopping once it exceeds `limit`. */
+function within(a: string, b: string, limit: number): number {
+  if (Math.abs(a.length - b.length) > limit) return limit + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i += 1) {
+    const row = [i];
+    let low = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const value = Math.min(
+        (prev[j] ?? 0) + 1,
+        (row[j - 1] ?? 0) + 1,
+        (prev[j - 1] ?? 0) + cost,
+      );
+      row.push(value);
+      low = Math.min(low, value);
+    }
+    if (low > limit) return limit + 1;
+    prev = row;
+  }
+  return prev[b.length] ?? limit + 1;
+}
+
+function asked(entry: QaEntry): string {
+  const q = entry.question.replace(/[?.!]+$/u, "");
+  return q.charAt(0).toLowerCase() + q.slice(1);
+}
 
 /**
  * Builds the in-memory index for one side (entries for that side and for
- * BOTH). Microseconds per question; nothing leaves the browser.
+ * BOTH). Each stored wording is a weighted set of terms (rarer terms weigh
+ * more); a question is compared with every wording, and an entry scores its
+ * closest one. Words the bank never uses count against a match, so a
+ * question about something else ("the score in the Arsenal game") stays
+ * far from every entry. Well under a millisecond per question; nothing
+ * leaves the browser and no model is called.
  */
 export function buildQaIndex(
   side: Exclude<QaSide, "BOTH">,
   bank: readonly QaEntry[] = QA_BANK,
 ): QaIndex {
   const entries = bank.filter((e) => e.side === side || e.side === "BOTH");
-  const docs = entries.map((e) =>
-    tokens([e.question, ...e.paraphrases].join(" ")),
+  const wordings = entries.flatMap((entry) =>
+    [entry.question, ...entry.paraphrases].map((text) => ({
+      entry,
+      terms: new Set(tokens(text)),
+    })),
   );
-  const avg =
-    docs.reduce((sum, d) => sum + d.length, 0) / Math.max(1, docs.length);
+  // Rarity is counted per entry: a word every wording of one entry uses is
+  // still that entry's word.
   const df = new Map<string, number>();
-  for (const doc of docs) {
-    for (const term of new Set(doc)) df.set(term, (df.get(term) ?? 0) + 1);
+  for (const entry of entries) {
+    const seen = new Set(
+      tokens([entry.question, ...entry.paraphrases].join(" ")),
+    );
+    for (const term of seen) df.set(term, (df.get(term) ?? 0) + 1);
   }
-  const idf = (term: string) => {
+  const vocabulary = [...df.keys()].filter((word) => word.length >= 4);
+  const weight = (term: string): number => {
     const n = df.get(term) ?? 0;
-    return Math.log(1 + (docs.length - n + 0.5) / (n + 0.5));
+    const w = Math.log((entries.length + 1) / (n + 0.5));
+    return INTERROGATIVE.has(term) ? w * 0.5 : w;
   };
-  // A question asked as stored (up to stop words, plurals and synonyms) is
-  // that entry's, however close another entry scores. A wording stored by
-  // two entries belongs to neither and falls through to scoring.
+  /**
+   * A word the bank has never seen weighs more than the rarest known word:
+   * "the score in the Arsenal game" is about Arsenal, whatever it shares.
+   */
+  const unseen = 1.5 * Math.log((entries.length + 1) / 0.5);
+  const norms = wordings.map(({ terms }) =>
+    Math.sqrt([...terms].reduce((sum, t) => sum + weight(t) ** 2, 0)),
+  );
+  // A misheard or misspelt word is read as the bank's nearest word when it
+  // is close enough to be the same word: one edit from five letters, two
+  // from eight.
+  const heard = new Map<string, string>();
+  const nearest = (term: string): string => {
+    if (df.has(term) || term.length < 5) return term;
+    const known = heard.get(term);
+    if (known !== undefined) return known;
+    const limit = term.length >= 8 ? 2 : 1;
+    let best = term;
+    let distance = limit + 1;
+    for (const word of vocabulary) {
+      const d = within(term, word, limit);
+      if (d < distance) {
+        best = word;
+        distance = d;
+      }
+    }
+    heard.set(term, best);
+    return best;
+  };
+  // A question asked as stored (up to fillers, stop words, plurals and
+  // synonyms) is that entry's. A wording stored by two entries belongs to
+  // neither and falls through to scoring.
   const stored = new Map<string, QaEntry | null>();
   for (const entry of entries) {
-    for (const asked of [entry.question, ...entry.paraphrases]) {
-      const key = tokens(asked).join(" ");
+    for (const wording of [entry.question, ...entry.paraphrases]) {
+      const key = tokens(wording).join(" ");
       if (key === "") continue;
       const held = stored.get(key);
       stored.set(key, held === undefined || held === entry ? entry : null);
     }
   }
-  const K1 = 1.2;
-  const B = 0.75;
+  const rank = (text: string) => {
+    if (!aQuestionForTheBank(text)) return [];
+    const said = new Set(tokens(text).map(nearest));
+    if (said.size === 0) return [];
+    const queryNorm = Math.sqrt(
+      [...said].reduce(
+        (sum, t) => sum + (df.has(t) ? weight(t) : unseen) ** 2,
+        0,
+      ),
+    );
+    const best = new Map<QaEntry, number>();
+    for (const [i, { entry, terms }] of wordings.entries()) {
+      let shared = 0;
+      for (const term of said) if (terms.has(term)) shared += weight(term) ** 2;
+      if (shared === 0) continue;
+      const score = shared / (queryNorm * (norms[i] ?? 1));
+      if (score > (best.get(entry) ?? 0)) best.set(entry, score);
+    }
+    return [...best.entries()]
+      .map(([entry, score]) => ({ entry, score }))
+      .sort((a, b) => b.score - a.score);
+  };
+  const match = (text: string): QaMatch => {
+    if (!aQuestionForTheBank(text)) return LEAVE;
+    const key = tokens(text).map(nearest).join(" ");
+    const exact = key === "" ? undefined : stored.get(key);
+    if (exact) return { kind: "ANSWER", entry: exact, score: 1 };
+    const [first, second] = rank(text);
+    if (first === undefined || first.score < QA_CLARIFY_FLOOR) return LEAVE;
+    const lead = first.score - (second?.score ?? 0);
+    if (first.score >= QA_THRESHOLD && lead >= QA_MARGIN) {
+      return { kind: "ANSWER", entry: first.entry, score: first.score };
+    }
+    const candidates: [QaEntry, ...QaEntry[]] =
+      second !== undefined &&
+      second.score >= QA_CLARIFY_FLOOR &&
+      lead < QA_MARGIN
+        ? [first.entry, second.entry]
+        : [first.entry];
+    const prompt =
+      candidates[1] !== undefined
+        ? `Do you mean ${asked(candidates[0])}, or ${asked(candidates[1])}?`
+        : `Do you mean ${asked(candidates[0])}?`;
+    return { kind: "CLARIFY", candidates, prompt };
+  };
   return {
+    match,
+    rank,
     answer: (text) => {
-      const key = tokens(text).join(" ");
-      const exact = key === "" ? undefined : stored.get(key);
-      if (exact) return exact;
-      const all = [...new Set(tokens(text))];
-      const content = all.filter((term) => !INTERROGATIVE.has(term));
-      const query = content.length <= 2 ? all : content;
-      if (query.length === 0) return null;
-      let best: QaEntry | null = null;
-      let bestScore = 0;
-      let runnerUp = 0;
-      for (const [index, doc] of docs.entries()) {
-        let score = 0;
-        let matched = 0;
-        let matchedContent = 0;
-        for (const term of query) {
-          const tf = doc.filter((t) => t === term).length;
-          if (tf === 0) continue;
-          matched += 1;
-          if (!INTERROGATIVE.has(term)) matchedContent += 1;
-          score +=
-            (idf(term) * tf * (K1 + 1)) /
-            (tf + K1 * (1 - B + (B * doc.length) / avg));
-        }
-        // One shared word is not a match ("data room" is not a privacy
-        // question), unless that word is the whole question. A question
-        // word alone never counts as the shared content.
-        if (content.length > 0) {
-          if (matchedContent < Math.min(2, content.length)) continue;
-        } else if (matched === 0) continue;
-        const entry = entries[index];
-        if (entry === undefined) continue;
-        if (score > bestScore) {
-          runnerUp = bestScore;
-          best = entry;
-          bestScore = score;
-        } else if (score > runnerUp) {
-          runnerUp = score;
-        }
-      }
-      if (bestScore < QA_THRESHOLD) return null;
-      return bestScore - runnerUp >= QA_MARGIN * bestScore ? best : null;
+      const decided = match(text);
+      return decided.kind === "ANSWER" ? decided.entry : null;
     },
   };
 }
