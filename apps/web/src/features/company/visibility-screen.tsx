@@ -26,6 +26,8 @@ import {
 } from "@/features/relationships/crm-kit";
 
 import { VisibilityCentre } from "./visibility-centre";
+import { GateNote, useGate } from "@/features/organisation/capabilities";
+import { CAP } from "@/features/organisation/role-words";
 import {
   assessMarketplaceReadinessAction,
   loadVisibilityOverviewAction,
@@ -81,6 +83,9 @@ export function VisibilityScreen(props: VisibilityScreenProps) {
 
 function Screen({ companyId, review }: VisibilityScreenProps) {
   const t = useT();
+  // Changing who sees the company is an editor's call; the API refuses it to
+  // anyone else and does not serve them the control centre at all.
+  const editGate = useGate(CAP.COMPANY_EDIT);
   const toast = useCrmToast();
   const [loaded, setLoaded] = useState<Loaded | null>(review ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -228,7 +233,9 @@ function Screen({ companyId, review }: VisibilityScreenProps) {
             }
             data-stat="visible"
           />
-          {visible ? (
+          {!editGate.allowed ? (
+            <GateNote gate={editGate} />
+          ) : visible ? (
             <button
               type="button"
               className={crmButton("secondary", "self-start")}
@@ -386,7 +393,7 @@ function Screen({ companyId, review }: VisibilityScreenProps) {
         the shares with named investors, and the company as each audience
         sees it, all from the server. Kept under the chosen design.
       */}
-      {reviewing ? null : (
+      {reviewing || !editGate.allowed ? null : (
         <div className="pt-6">
           <VisibilityCentre
             companyId={companyId}
