@@ -2,7 +2,16 @@
 
 ## Chosen designs, black-and-gold, organisation roles — 22 October 2026, 06:05 UTC (Claude)
 
-- **Release:** de5728338 is green in CI39709842207: tests, build, typecheck, lint and pgTAP. It is pushed to `build/int-rc`, `recovery/2026-09-12-8y2j4w` and `recovery/2026-09-12`, but **not yet deployed**.
+- **Release:** de5728338 is green in CI39709842207 (tests, build, typecheck, lint, pgTAP). **DEPLOYED on 2026-10-22 at 17:20 UTC:** all four Railway services are SUCCESS at de5728338. Railway resumed builds around 17:03 UTC.
+- **Live checks:**
+  - `/auth/sign-in` returns 200, and api and q-api `/health/ready` return 200.
+  - The brand accent is #8a6a12 / #c9a227.
+  - `.cq-explore-tile` has border-radius 0.
+  - `/settings/activity` returns 307 to sign-in when signed out.
+  - `/dev/*-review` pages return 404.
+  - `/v1/me/capabilities` returns 401 without auth.
+  - Signed-in role checks are still to do: they need demo-account credentials.
+- **Fallback host:** prepared on branch `deploy/fly` (Fly.io for api, q-api and workers; Vercel or Fly for web). The Fly account needs a card. Vercel Hobby hit its 5,000 uploads/day limit. The `capital-q-web` Vercel project exists with its env vars set.
 - **Railway:** a platform outage (since 2026-10-21) pauses every build. API deploys answer "Deploys have been paused due to an upstream issue", and GitHub auto-deploy does not fire.
   - Live is still 93c336aeb on all four services.
   - The token in the environment and the one pasted on 2026-10-20 are dead.
