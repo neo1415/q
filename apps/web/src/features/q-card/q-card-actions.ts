@@ -1,5 +1,6 @@
 "use server";
 
+import { updateTag } from "next/cache";
 import { z } from "zod";
 
 import {
@@ -16,6 +17,7 @@ import {
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
+import { PUBLIC_CARD_TAG, publicCardTag } from "./public-card-data";
 
 /**
  * The Q Card from the profile page (BIZ-004), server side. Claiming a
@@ -95,15 +97,15 @@ export async function claimHandleAction(
     };
   }
   try {
-    return {
-      ok: true,
-      card: await claimHandle(
-        current,
-        subject.data.subjectType,
-        subject.data.subjectId,
-        handle.data,
-      ),
-    };
+    const card = await claimHandle(
+      current,
+      subject.data.subjectType,
+      subject.data.subjectId,
+      handle.data,
+    );
+    // The old handle now redirects: no anonymous read may keep it live.
+    updateTag(PUBLIC_CARD_TAG);
+    return { ok: true, card };
   } catch (error) {
     return translate(error);
   }
@@ -133,15 +135,18 @@ export async function updateQCardAction(
     };
   }
   try {
-    return {
-      ok: true,
-      card: await updateQCard(
-        current,
-        subject.data.subjectType,
-        subject.data.subjectId,
-        input.data,
-      ),
-    };
+    const card = await updateQCard(
+      current,
+      subject.data.subjectType,
+      subject.data.subjectId,
+      input.data,
+    );
+    // A field the owner just hid must leave the public page now, not when
+    // the cache next revalidates.
+    updateTag(
+      card.handle === null ? PUBLIC_CARD_TAG : publicCardTag(card.handle),
+    );
+    return { ok: true, card };
   } catch (error) {
     return translate(error);
   }

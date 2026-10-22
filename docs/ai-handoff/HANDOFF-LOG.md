@@ -921,8 +921,6 @@ Next:
 - The founder picks options for the remaining pages (the gallery artifact is in the session).
 - Rotate the Railway and Supabase tokens pasted in chat, and add them as environment secrets.
 
-<<<<<<< HEAD
-
 ## 21 October 2026, 21:05 UTC — Claude coordinator (speed + Q Story)
 
 - **Integrated** 25+ lane PRs into `speed/q-oct20`, each reviewed against the docs and the owner's intent before merging. Several were sent back: the stage checklist became a single line, findings were restored to 3, red card tint removed, context navigation built, onboarding stages restored.
@@ -946,7 +944,6 @@ Next:
   - prettier check.
 - **No app code changed.** No provider calls apart from a Pexels search through `packages/q-daily`'s port; the photos are not committed.
 - **Flags for the owner** (in STORYBOARD.md): product first appears at 4:28 of 7:55; GateQ score/rank gap (§8.3); the shipped nav differs from the plan's list; a Q Card component exists; story-mode scrim vs ADR 0017.
-  \=======
 
 ## Q Story S6: the Q Card — 22 October 2026 (Claude, branch `qstory/qcard`, PR into `speed/q-oct20`)
 
@@ -988,4 +985,15 @@ Evidence stage: **code + local checks only**. Not merged, not deployed. No migra
   - The amount committed in the raise is not shown.
   - The anonymous read is not cached yet.
 
-> > > > > > > origin/qstory/qcard
+## Q Card polish and public-read cache — 22 October 2026 (Claude, `qstory/qcard-polish`)
+
+Evidence stage: **code + local checks only**.
+
+- **Coordinator review items:**
+  - (a) and (b): one right-aligned "Members only" marker. It sits on every section heading and at the "Additional information" heading, never under a value.
+  - (c): Q's-reading caption raised to body-small secondary.
+- **Cache:** the anonymous `/@handle` read is cached for 30 seconds and tagged `q-card-public` / `q-card:<handle>`. A signed-in read is never cached.
+  - `updateTag` runs on a card save and on a handle claim.
+  - `connection()` replaces `force-dynamic`, which forced no-store.
+  - Test: `apps/web/test/q-card-public-cache.test.ts`.
+- **Also fixed:** the #305 merge left conflict markers in this log. They are removed here, both sides kept; `qstory/person-card` makes the identical edit.

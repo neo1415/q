@@ -104,7 +104,7 @@ describe("audience filtering on the public page", () => {
     expect(text).not.toContain("2019");
     expect(text).not.toContain("Members-only one-liner.");
     expect(text).not.toContain("members-only.example");
-    expect(text).not.toContain("Shown to Capital Q members");
+    expect(text).not.toContain("Members only");
     expect(container.querySelector('[data-scope="network_visible"]')).toBe(
       null,
     );
@@ -127,7 +127,12 @@ describe("audience filtering on the public page", () => {
     const row = screen.getByText("Founded").closest("[data-card-field]");
     expect(row?.getAttribute("data-scope")).toBe("network_visible");
     expect(row?.textContent).toContain("2019");
-    expect(row?.textContent).toContain("Shown to Capital Q members");
+    // Every row is members-only: one marker, at the section heading.
+    const more = row?.closest("[data-card-section]");
+    expect(more?.querySelector("h2")?.parentElement?.textContent).toContain(
+      "Members only",
+    );
+    expect(row?.querySelector("[data-members-only]")).toBe(null);
   });
 });
 
