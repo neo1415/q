@@ -1045,6 +1045,42 @@ Evidence stage: **code + local checks only**.
   - no full-stack or live run.
     \=======
 
+## 22 October 2026, 03:20 UTC — Claude coordinator (speed + Q Story, night)
+
+Evidence stage: **code + local checks; CI running on #267; not deployed** (Railway still in a major outage).
+
+- **`speed/q-oct20` at d5ec13f7c** has these merged:
+  - lane 1's CI fix and the `build/int-rc` merges (#310);
+  - Q Card #305, with the person card (migration `20261229090000_person_q_card`, pgTAP 521; **not applied**) and the polish;
+  - lane 4's parallel extras #306 (`CQ_Q_PARALLEL_EXTRAS=off` switches it off; the owner accepted the cost);
+  - lane 8 uploads #308 (Send live on an attachment alone; `read_attached_document`);
+  - the Q Story engine #299 with the voice render;
+  - S3's spoken bank matcher #311.
+- **Q is not given Settings › Activity by name.** The `build/int-rc` owner's privacy stance ("Q reads no one's activity") wins; my contract addition is reverted.
+- **Owner decisions:**
+  - Story voice: **Lily** (`pFZP5JQG7iQjIQuC4Bku`, eleven_v4_turbo). Voice spend about $1.62 of the $3 cap.
+  - The "Do you have any questions?" ending belongs to the live Q Pitch only, not the video.
+- **Master video:** the Lily master is at `qstory/engine` b74361536 (`docs/ai-handoff/evidence/q-story/master/`). The coordinator's frame review found:
+  - a blank opening with no Q;
+  - the player controls visible;
+  - small, low-contrast subtitles;
+  - undersized artifacts;
+  - an empty Investability IQ box;
+  - stray shapes on "Weeks · months · years".
+
+  S1 is re-recording. The "Internal rehearsal" stamp stays until the owner approves AUDIENCE.
+
+- **CI on #267** (run 39714828957):
+  - typecheck and format/lint: green;
+  - build: failed in corepack's pnpm install;
+  - pgTAP: failed;
+  - lane 1 is on both.
+- **Open for the owner:**
+  - Lily as Q's voice everywhere (story answers are already scoped to Lily);
+  - S3 tier 2 (embedding precompute blocked by the session permission check; a $0.001 call) or an in-browser model;
+  - AUDIENCE approval for the video;
+  - rotate the Railway and Supabase tokens.
+
 ## 2026-10-22 — Claude, S1 Q Story engine (`qstory/engine`, draft PR #299 into `speed/q-oct20`)
 
 Evidence stage: **code + local production-build checks; nothing deployed.**
