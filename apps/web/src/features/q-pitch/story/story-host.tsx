@@ -14,12 +14,20 @@ import {
 
 import {
   ACT_BUDGET_MS,
-  STORY_BEATS,
   STORY_CLOSING_QUESTION,
   STORY_CLOSING_QUIET_MS,
   TourActorSchema,
   buildQaIndex,
   certifyStory,
+  cutAlignment,
+  editionBeats,
+  editionProductStep,
+  STORY_EDITIONS,
+  STORY_LEDGER,
+  STORY_PRODUCT_BEAT,
+  type StoryAudioWindow,
+  type StoryBeat,
+  type StoryEditionId,
   storyOwnerApproved,
   DEMONSTRATION_LABEL,
   STORY_CLAIMS,
@@ -136,9 +144,9 @@ async function playClip(
   }
 }
 
-function moodBefore(index: number): Mood {
+function moodBefore(index: number, beats: readonly StoryBeat[]): Mood {
   let mood: Mood = "OFF";
-  for (const beat of STORY_BEATS.slice(0, index)) {
+  for (const beat of beats.slice(0, index)) {
     for (const cue of beat.cues)
       if (cue.act.kind === "mood") mood = cue.act.mood;
   }
@@ -193,6 +201,7 @@ export function StoryHost({
   voice,
   autostart = false,
   film = false,
+  edition = "FULL",
 }: {
   readonly account: string;
   readonly role: "INVESTOR" | "FOUNDER";
@@ -212,8 +221,12 @@ export function StoryHost({
   readonly autostart?: boolean;
   /** The recorded master (harness `?film=1`): film type sizes, no controls. */
   readonly film?: boolean;
+  /** Which cut plays (editions.ts): everyone, investors or founders. */
+  readonly edition?: StoryEditionId;
 }) {
   const router = useRouter();
+  const cut = STORY_EDITIONS[edition];
+  const beats = useMemo(() => editionBeats(cut), [cut]);
   const pathFor = harness?.pathFor ?? storyPath;
   const actor = useMemo(
     () =>
@@ -227,14 +240,20 @@ export function StoryHost({
   const gate = useMemo(() => {
     const parsed = TourActorSchema.safeParse({ role, account });
     return parsed.success
-      ? certifyStory({
-          now: new Date().toISOString(),
-          actor: parsed.data,
-          staleFeatureIds: [],
-          ownerApproved: storyOwnerApproved(),
-        })
+      ? certifyStory(
+          {
+            now: new Date().toISOString(),
+            actor: parsed.data,
+            staleFeatureIds: [],
+            // This cut's own approval: each edition is its own version.
+            ownerApproved: storyOwnerApproved(cut.version),
+          },
+          STORY_CLAIMS,
+          STORY_LEDGER,
+          beats,
+        )
       : null;
-  }, [account, role]);
+  }, [account, role, cut, beats]);
   useEffect(() => {
     if (!film) return;
     const root = document.documentElement;
@@ -262,11 +281,28 @@ export function StoryHost({
       ...(voice === undefined ? {} : { voice }),
       onProgress: setProgress,
       signal: controller.signal,
+      order: beats.map((beat) => beat.n),
     }).then((loaded) => {
       if (!controller.signal.aborted) setAssets(loaded);
     });
     return () => controller.abort();
-  }, [actor, router, pathFor, voice]);
+  }, [actor, router, pathFor, voice, beats]);
+
+  // The edition's timings: a cut part's words from its beat's timings, and
+  // where it sits in the beat's clip (editions.ts, cutAlignment).
+  const timings = useMemo(() => {
+    if (assets === null) return null;
+    const alignments = new Map(assets.alignments);
+    const windows = new Map<number, StoryAudioWindow>();
+    for (const beat of beats) {
+      const full = assets.alignments.get(beat.n);
+      if (beat.cut === null || full === undefined) continue;
+      const part = cutAlignment(full, beat.cut);
+      alignments.set(beat.n, part.alignment);
+      windows.set(beat.n, part.window);
+    }
+    return { alignments, windows };
+  }, [assets, beats]);
 
   const [player, setPlayer] = useState<StoryPlayer | null>(null);
   const voiceChosen = useRef(false);
@@ -338,7 +374,11 @@ export function StoryHost({
       ) {
         // The press is the gesture that lets the decoded audio play.
         await assets.context.resume();
-        narrator = renderedNarrator(assets.context, assets.bank);
+        narrator = renderedNarrator(
+          assets.context,
+          assets.bank,
+          timings?.windows,
+        );
       } else if (
         withVoice &&
         (await openTourVoice(
@@ -369,7 +409,8 @@ export function StoryHost({
         return false;
       };
       const next = new StoryPlayer({
-        alignments: assets.alignments,
+        beats,
+        alignments: timings?.alignments ?? assets.alignments,
         narrator,
         acts: {
           run: async (
@@ -434,8 +475,8 @@ export function StoryHost({
           settle: (index) => {
             unlightAll();
             stage.set(EMPTY_STAGE);
-            mood.set(moodBefore(index));
-            const route = routeAtBeat(index) ?? "home";
+            mood.set(moodBefore(index, beats));
+            const route = routeAtBeat(index, beats) ?? "home";
             const path = pathFor(route);
             if (
               path !== null &&
@@ -450,7 +491,7 @@ export function StoryHost({
       setStarting(false);
       next.start(0);
     },
-    [assets, mood, stage, pathFor],
+    [assets, timings, beats, mood, stage, pathFor],
   );
 
   // Asked for in words: with voice, as soon as it is ready, when the
@@ -561,6 +602,9 @@ export function StoryHost({
   return (
     <StoryOverlay
       player={player}
+      productStep={
+        editionProductStep(beats, STORY_PRODUCT_BEAT) ?? STORY_PRODUCT_BEAT
+      }
       rehearsal={gate?.audience !== "AUDIENCE"}
       stage={stage}
       mood={mood}
@@ -690,6 +734,7 @@ function captionLine(
 
 function StoryOverlay({
   player,
+  productStep,
   rehearsal,
   stage,
   mood,
@@ -701,6 +746,8 @@ function StoryOverlay({
   onExit,
 }: {
   readonly player: StoryPlayer;
+  /** "Skip to the product": its step in the edition playing. */
+  readonly productStep: number;
   /** Not certified for an audience: labelled as an internal rehearsal. */
   readonly rehearsal: boolean;
   readonly stage: Store<StageState>;
@@ -843,6 +890,7 @@ function StoryOverlay({
         text,
         player.snapshot().index,
         player.total,
+        productStep,
       );
       if (command !== null) {
         setNotice(null);
@@ -908,7 +956,17 @@ function StoryOverlay({
       }).then((decided) => decide(decided, controller));
       return true;
     },
-    [player, qa, show, onExit, onCaptions, onMuted, captions, muted],
+    [
+      player,
+      qa,
+      show,
+      onExit,
+      onCaptions,
+      onMuted,
+      captions,
+      muted,
+      productStep,
+    ],
   );
   useEffect(() => {
     const release = setTypedInterceptor((text) => hear(text, "TYPED"));

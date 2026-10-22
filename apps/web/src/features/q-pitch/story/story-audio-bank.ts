@@ -20,6 +20,8 @@ export class StoryAudioBank {
   readonly #loading = new Map<number, Promise<AudioBuffer | null>>();
   readonly #queue: (() => void)[] = [];
   #active = 0;
+  /** The beats in play order (an edition's), by number. */
+  #order: readonly number[] = Array.from({ length: 56 }, (_, i) => i + 1);
 
   constructor(context: AudioContext, urlOf: (beat: number) => string | null) {
     this.#context = context;
@@ -56,14 +58,22 @@ export class StoryAudioBank {
     return work;
   }
 
+  /** Play order: an edition plays a subset of the beats. */
+  follow(order: readonly number[]): void {
+    this.#order = order;
+  }
+
   /**
-   * Keep `beat` and the next AUDIO_AHEAD beats decoded; let go of beats
-   * more than one behind (a "go back" re-fetches from the HTTP cache).
+   * Keep `beat` and the next AUDIO_AHEAD beats (in play order) decoded;
+   * let go of beats more than one behind (a "go back" re-fetches from the
+   * HTTP cache).
    */
   window(beat: number, ahead: number = AUDIO_AHEAD): void {
-    for (let n = beat; n <= beat + ahead; n += 1) void this.load(n);
+    const at = Math.max(0, this.#order.indexOf(beat));
+    for (const n of this.#order.slice(at, at + ahead + 1)) void this.load(n);
+    const keep = new Set(this.#order.slice(Math.max(0, at - 1)));
     for (const n of [...this.#buffers.keys()]) {
-      if (n < beat - 1) this.#buffers.delete(n);
+      if (!keep.has(n)) this.#buffers.delete(n);
     }
   }
 

@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
+import type { StoryEditionId } from "@capital-q/q-pitch";
+
 import { RESUME_KEY } from "./resume";
 import { markQPitchRunning } from "./tour-presence";
 import { markStoryAvailable, useStoryTrigger } from "./story/story-offer";
@@ -17,7 +19,16 @@ type Start = {
   readonly chapter: string | null;
   /** Asked for in words: the story starts on arrival (`&start=`). */
   readonly autostart?: boolean;
+  /** The story's cut (`&edition=investor|founder`); default everyone. */
+  readonly edition?: StoryEditionId;
 };
+function editionOf(value: string | null): StoryEditionId {
+  return value === "investor"
+    ? "INVESTOR"
+    : value === "founder"
+      ? "FOUNDER"
+      : "FULL";
+}
 function choiceOf(value: string | null): EntryChoice | null {
   return value === "story" || value === "founder-v6" || value === "investor-v6"
     ? value
@@ -59,6 +70,7 @@ function readStart(search: string): Start | null {
           tour,
           chapter: chapter !== null && CHAPTER.test(chapter) ? chapter : null,
           autostart: params.has("start"),
+          edition: editionOf(params.get("edition")),
         };
   const resumed = start ?? readResume();
   lastRead = { search, start: resumed };
@@ -149,6 +161,7 @@ export function QPitchEntry({
         role={role}
         onExit={exit}
         autostart={started.autostart === true}
+        edition={started.edition ?? "FULL"}
       />
     );
   }

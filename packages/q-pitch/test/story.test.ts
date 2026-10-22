@@ -359,8 +359,27 @@ describe("Q Story trigger", () => {
       "present Capital Q to us",
       "Hey Q, pitch yourself",
     ]) {
-      expect(classifyStoryTrigger(said)).toEqual({ kind: "STORY" });
+      expect(classifyStoryTrigger(said)).toEqual({
+        kind: "STORY",
+        edition: "FULL",
+      });
     }
+  });
+
+  it("picks the cut from the audience asked for", () => {
+    const cases: [string, string][] = [
+      ["pitch to an investor", "INVESTOR"],
+      ["Pitch Capital Q to investors", "INVESTOR"],
+      ["Hey Q, pitch yourself to an investor", "INVESTOR"],
+      ["pitch to a founder", "FOUNDER"],
+      ["pitch Capital Q to a business", "FOUNDER"],
+      ["pitch to everyone", "FULL"],
+      ["pitch yourself", "FULL"],
+    ];
+    for (const [said, edition] of cases) {
+      expect(classifyStoryTrigger(said)).toEqual({ kind: "STORY", edition });
+    }
+    expect(classifyStoryTrigger("pitch")).toBeNull();
   });
 
   it("answers 'What is Capital Q?' in two sentences and offers the story", () => {
@@ -392,11 +411,12 @@ describe("Q Story claims and gate", () => {
       at: "2026-10-22T04:00:00Z",
       storyVersion: STORY_VERSION,
     };
-    expect(storyOwnerApproved(yes)).toBe(true);
-    expect(storyOwnerApproved({ ...yes, storyVersion: "story-v6" })).toBe(
-      false,
-    );
-    expect(storyOwnerApproved({ ...yes, approvedBy: "" })).toBe(false);
+    expect(storyOwnerApproved(STORY_VERSION, [yes])).toBe(true);
+    // Another cut (an edition) needs its own yes.
+    expect(storyOwnerApproved(`${STORY_VERSION}-investor`, [yes])).toBe(false);
+    expect(
+      storyOwnerApproved(STORY_VERSION, [{ ...yes, approvedBy: "" }]),
+    ).toBe(false);
   });
 
   const SAVANNA = {

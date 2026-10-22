@@ -1,4 +1,5 @@
 import { normaliseCommand } from "../step-commands.js";
+import type { StoryEditionId } from "./editions.js";
 
 /**
  * When the story starts from words (plan §4, Triggers):
@@ -12,7 +13,11 @@ import { normaliseCommand } from "../step-commands.js";
  * turn reader still decides every other request).
  */
 export type StoryTrigger =
-  | { readonly kind: "STORY" }
+  | {
+      readonly kind: "STORY";
+      /** Which cut: "to an investor" INVESTOR, "to a founder" FOUNDER. */
+      readonly edition: StoryEditionId;
+    }
   | { readonly kind: "BRIEF"; readonly answer: string; readonly offer: string };
 
 /** Plain words, no figures, nothing beyond the product's documented design. */
@@ -23,7 +28,7 @@ export const CAPITAL_Q_OFFER =
 
 const NAME = "(?:capital ?q|capitalq|capital cue|this platform|this app)";
 const STORY = new RegExp(
-  `^(?:(?:q|hey q|ok|okay|please|can you|could you|would you)\\s+)*(?:(?:present|pitch|demo|introduce)\\s+(?:us\\s+|me\\s+)?(?:${NAME}|yourself)|(?:tell|show)\\s+(?:me|us)\\s+(?:your|the)\\s+story|(?:tell|show)\\s+(?:me|us)\\s+the\\s+capital ?q\\s+story|give\\s+(?:me|us)\\s+(?:the|your)\\s+pitch)(?:\\s+(?:please|now|to me|to us))*$`,
+  `^(?:(?:q|hey q|ok|okay|please|can you|could you|would you)\\s+)*(?:(?:present|pitch|demo|introduce)\\s+(?:us\\s+|me\\s+)?(?:${NAME}|yourself)|(?:tell|show)\\s+(?:me|us)\\s+(?:your|the)\\s+story|(?:tell|show)\\s+(?:me|us)\\s+the\\s+capital ?q\\s+story|give\\s+(?:me|us)\\s+(?:the|your)\\s+pitch|pitch)(?:\\s+(?:to|for)\\s+(?:an?\\s+|the\\s+)?(investors?|founders?|business(?:es)?|companies|company|everyone|everybody|all))?(?:\\s+(?:please|now|to me|to us))*$`,
   "u",
 );
 const BRIEF = new RegExp(
@@ -31,10 +36,22 @@ const BRIEF = new RegExp(
   "u",
 );
 
+function audience(word: string | undefined): StoryEditionId {
+  if (word === undefined) return "FULL";
+  if (word.startsWith("investor")) return "INVESTOR";
+  if (/^(?:founder|business|compan)/u.test(word)) return "FOUNDER";
+  return "FULL";
+}
+
 export function classifyStoryTrigger(text: string): StoryTrigger | null {
   const said = normaliseCommand(text);
   if (said.length === 0 || said.length > 80) return null;
-  if (STORY.test(said)) return { kind: "STORY" };
+  const story = STORY.exec(said);
+  // "pitch" alone is not an ask; "pitch to an investor" is.
+  const bare = /(?:^|\s)pitch$/u.test(said);
+  if (story !== null && !(bare && story[1] === undefined)) {
+    return { kind: "STORY", edition: audience(story[1]) };
+  }
   if (BRIEF.test(said)) {
     return { kind: "BRIEF", answer: CAPITAL_Q_BRIEF, offer: CAPITAL_Q_OFFER };
   }

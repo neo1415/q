@@ -38,9 +38,20 @@ describe("Q Pitch out of the sidebar (owner, 17 Oct): Profile links it", () => {
 describe("tour entry model", () => {
   it("offers the v7 story only (the v5 tours are retired), with its honest standing", () => {
     const options = tourOptions(NOW);
-    expect(options.map((o) => o.href)).toEqual(["/home?qpitch=story&new=1"]);
-    const [story] = options;
-    expect(story?.scenes).toBeGreaterThan(0);
-    expect(story?.certifiedScenes).toBeLessThanOrEqual(story?.scenes ?? 0);
+    // Three cuts (owner, 22 Oct): everyone, investors, founders.
+    expect(options.map((o) => o.href)).toEqual([
+      "/home?qpitch=story&new=1",
+      "/home?qpitch=story&new=1&edition=investor",
+      "/home?qpitch=story&new=1&edition=founder",
+    ]);
+    expect(options.map((o) => o.title)).toEqual([
+      "Everyone",
+      "Investors",
+      "Founders",
+    ]);
+    for (const story of options) {
+      expect(story.scenes).toBeGreaterThan(0);
+      expect(story.certifiedScenes).toBeLessThanOrEqual(story.scenes);
+    }
   });
 });

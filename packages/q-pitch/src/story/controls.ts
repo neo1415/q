@@ -31,6 +31,8 @@ export function parseStoryCommand(
   text: string,
   current: number,
   total: number = STORY_BEATS.length,
+  /** Where the product part (#33) is in the edition playing (1-based). */
+  productStep: number = STORY_PRODUCT_BEAT,
 ): StoryCommand | null {
   const said = normaliseCommand(text)
     .replace(/^(?:(?:q|hey q|ok|okay|please)\s+)+/u, "")
@@ -38,7 +40,7 @@ export function parseStoryCommand(
   if (PRODUCT.test(said)) {
     return {
       kind: "MOVE",
-      move: { kind: "STEP", step: STORY_PRODUCT_BEAT },
+      move: { kind: "STEP", step: productStep },
     };
   }
   const captions = CAPTIONS.exec(said);

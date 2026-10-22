@@ -132,11 +132,12 @@ export type StoryGateEnvironment = {
 };
 
 /**
- * The owner's approval of the story for an audience, as a record: who,
- * when, and which cut. Null until given. Approval is of one cut: a new
- * STORY_VERSION needs it again, so a re-cut story is never shown to an
- * audience on an old yes. The gate reads it (storyOwnerApproved); the
- * "Internal rehearsal" stamp is never removed by hand.
+ * The owner's approvals of the story for an audience, as records: who,
+ * when, and which cut. Empty until given. An approval is of one cut (an
+ * edition's version, editions.ts): a re-cut or another edition needs its
+ * own yes, so no audience ever sees a cut on another cut's approval. The
+ * gate reads them (storyOwnerApproved); the "Internal rehearsal" stamp is
+ * never removed by hand.
  */
 export const StoryOwnerApprovalSchema = z
   .object({
@@ -147,15 +148,16 @@ export const StoryOwnerApprovalSchema = z
   .strict();
 export type StoryOwnerApproval = z.infer<typeof StoryOwnerApprovalSchema>;
 
-export const STORY_OWNER_APPROVAL: StoryOwnerApproval | null = null;
+export const STORY_OWNER_APPROVALS: readonly StoryOwnerApproval[] = [];
 
 export function storyOwnerApproved(
-  approval: StoryOwnerApproval | null = STORY_OWNER_APPROVAL,
+  version: string = STORY_VERSION,
+  approvals: readonly StoryOwnerApproval[] = STORY_OWNER_APPROVALS,
 ): boolean {
-  return (
-    approval !== null &&
-    StoryOwnerApprovalSchema.safeParse(approval).success &&
-    approval.storyVersion === STORY_VERSION
+  return approvals.some(
+    (approval) =>
+      StoryOwnerApprovalSchema.safeParse(approval).success &&
+      approval.storyVersion === version,
   );
 }
 
