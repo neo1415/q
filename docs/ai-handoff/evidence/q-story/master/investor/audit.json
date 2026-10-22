@@ -1,0 +1,180 @@
+{
+  "recordedAt": "2026-10-22T11:00:31.484Z",
+  "voice": "pFZP5JQG7iQjIQuC4Bku",
+  "model": "eleven_v4_turbo",
+  "probe": {
+    "programs": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 1920,
+        "height": 1080,
+        "r_frame_rate": "30/1"
+      },
+      {
+        "codec_name": "aac",
+        "r_frame_rate": "0/0"
+      }
+    ],
+    "format": {
+      "duration": "237.900000"
+    }
+  },
+  "bytes": {
+    "master": 37585153,
+    "share": 6766240
+  },
+  "story": {
+    "narrator": "RENDERED",
+    "preloadMs": 1011,
+    "offsets": {
+      "median": -79,
+      "p95": 245,
+      "count": 125
+    },
+    "offsetsByKind": {
+      "stage": {
+        "median": -73,
+        "p95": -29,
+        "count": 69
+      },
+      "mood": {
+        "median": -68,
+        "p95": -13,
+        "count": 6
+      },
+      "navigate": {
+        "median": 339,
+        "p95": 653,
+        "count": 9
+      },
+      "light": {
+        "median": -102,
+        "p95": -51,
+        "count": 36
+      }
+    },
+    "frames": {
+      "count": 7977,
+      "long": 545
+    },
+    "fallbacks": 0,
+    "fallbackCues": [],
+    "beat": 37,
+    "phase": "DONE"
+  },
+  "cls": 0.00013133359053497942,
+  "shifts": 1,
+  "audioStarts": 38,
+  "clips": 37,
+  "pageTextHits": [
+    {
+      "word": "can't",
+      "at": 1792666312553
+    },
+    {
+      "word": "can't",
+      "at": 1792666313052
+    },
+    {
+      "word": "can't",
+      "at": 1792666313552
+    },
+    {
+      "word": "can't",
+      "at": 1792666314052
+    },
+    {
+      "word": "can't",
+      "at": 1792666314569
+    },
+    {
+      "word": "can't",
+      "at": 1792666315052
+    },
+    {
+      "word": "can't",
+      "at": 1792666315565
+    },
+    {
+      "word": "can't",
+      "at": 1792666316052
+    },
+    {
+      "word": "can't",
+      "at": 1792666316556
+    },
+    {
+      "word": "can't",
+      "at": 1792666317053
+    },
+    {
+      "word": "can't",
+      "at": 1792666317563
+    },
+    {
+      "word": "can't",
+      "at": 1792666318054
+    },
+    {
+      "word": "can't",
+      "at": 1792666318552
+    },
+    {
+      "word": "can't",
+      "at": 1792666319053
+    },
+    {
+      "word": "can't",
+      "at": 1792666319552
+    },
+    {
+      "word": "can't",
+      "at": 1792666320052
+    },
+    {
+      "word": "can't",
+      "at": 1792666320553
+    },
+    {
+      "word": "can't",
+      "at": 1792666321053
+    },
+    {
+      "word": "can't",
+      "at": 1792666321552
+    },
+    {
+      "word": "can't",
+      "at": 1792666322052
+    },
+    {
+      "word": "can't",
+      "at": 1792666322565
+    },
+    {
+      "word": "can't",
+      "at": 1792666323052
+    },
+    {
+      "word": "can't",
+      "at": 1792666323562
+    },
+    {
+      "word": "can't",
+      "at": 1792666324066
+    },
+    {
+      "word": "can't",
+      "at": 1792666324553
+    },
+    {
+      "word": "can't",
+      "at": 1792666325052
+    }
+  ],
+  "devBadgeSamples": 0,
+  "ocrFrames": 476,
+  "ocrHits": [],
+  "defects": 26
+}
