@@ -25,7 +25,7 @@ export function TeamSettingsView({
   readonly team: TeamDto | null;
   readonly claims: readonly PendingClaimDto[];
   readonly claimsFor: string | null;
-  /** Design review only: see TeamPage. */
+  /** Design review only (passed through to TeamPage) */
   readonly reviewRoleFor?: string | undefined;
 }) {
   return (

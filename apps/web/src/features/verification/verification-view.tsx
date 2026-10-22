@@ -44,7 +44,7 @@ export function VerificationView({
   readonly notice: VerificationNotice | null;
   readonly fromSetup: boolean;
   readonly skipTo: string;
-  /** Design review only: see KybSection. */
+  /** Design review only (passed through to KybSection) */
   readonly review?: KybReview | undefined;
 }) {
   const optional = kyb !== null && personVerificationOptional(kyb);

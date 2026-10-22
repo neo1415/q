@@ -45,7 +45,7 @@ export function ReviewsView({
   readonly subject: string;
   readonly subjectRef: string | null;
   readonly reviews: readonly HumanReviewDto[] | null;
-  /** Design review only: see ReviewForm. */
+  /** Design review only (passed through to ReviewForm) */
   readonly review?:
     | {
         readonly reason: string;
