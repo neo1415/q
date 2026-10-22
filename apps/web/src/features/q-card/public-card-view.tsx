@@ -1,19 +1,17 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import type { PublicCardDto } from "@capital-q/contracts";
+import {
+  COMPANY_SECTION_CARD_FIELDS,
+  type PublicCardDto,
+} from "@capital-q/contracts";
 import { buttonClassName } from "@capital-q/ui/button";
 import {
-  ChartColumn,
   Check,
-  ChevronDown,
   Download,
   ExternalLink,
-  FileText,
   Globe,
   ICON_STROKE,
-  Info,
-  Lightbulb,
   MapPin,
   Search,
   ShieldCheck,
@@ -32,6 +30,17 @@ import {
   textFields,
   websiteLabel,
 } from "./card-content";
+import {
+  CARD_SECTION_IDS,
+  CardSection,
+  DocumentsSection,
+  IntelligenceSection,
+  NotShared,
+  NumbersSection,
+  RaiseSection,
+  RelationshipsSection,
+  TeamSection,
+} from "./card-sections";
 import { QCard } from "./q-card";
 
 /**
@@ -155,9 +164,13 @@ export function PublicCardView({
       : glance.some((item) => item.key === "deploymentState")
         ? undefined
         : byKey("deploymentState");
+  const company = card.subjectType === "COMPANY";
+  const founded = byKey("foundedDate");
   const more = facts.filter(
     (field) =>
       !GLANCE_KEYS.has(field.key) &&
+      !SECTION_KEYS.has(field.key) &&
+      field.key !== "foundedDate" &&
       field.key !== "mandateLookFor" &&
       field.key !== location?.key &&
       field.key !== status?.key,
@@ -297,136 +310,138 @@ export function PublicCardView({
         </p>
       </section>
 
-      {tagline === null ? null : (
-        <Fold
-          id="about"
-          title="About"
-          icon={
-            <FileText aria-hidden="true" size={18} strokeWidth={ICON_STROKE} />
-          }
-          open
-        >
-          <SeeMore text={tagline} />
-        </Fold>
-      )}
-
-      {status === undefined && location === undefined ? null : (
-        <div className="grid grid-cols-2 gap-3" data-card-tiles>
-          {status === undefined ? null : (
-            <Tile
-              label={
-                card.subjectType === "COMPANY" ? "Stage" : "Current status"
-              }
-              value={cardFieldValue(status)}
-            />
+      <article
+        aria-label={`${card.name}'s Q Card`}
+        className="flex flex-col divide-y divide-(--cq-border-subtle) rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface) px-5 py-6 sm:px-8 sm:py-8"
+        data-card-dossier
+      >
+        <CardSection id={CARD_SECTION_IDS.story} label="Story">
+          {tagline === null &&
+          status === undefined &&
+          location === undefined ? (
+            <NotShared what="story" />
+          ) : (
+            <>
+              {tagline === null ? null : (
+                <div className="cq-body text-(--cq-text-primary)">
+                  <SeeMore text={tagline} />
+                </div>
+              )}
+              {status === undefined && location === undefined ? null : (
+                <dl className="flex flex-wrap gap-x-8 gap-y-2" data-card-tiles>
+                  {status === undefined ? null : (
+                    <Fact
+                      label={
+                        card.subjectType === "COMPANY"
+                          ? "Stage"
+                          : "Current status"
+                      }
+                      value={cardFieldValue(status)}
+                    />
+                  )}
+                  {location === undefined ? null : (
+                    <Fact
+                      label="Location"
+                      value={cardFieldValue(location)}
+                      icon={
+                        <MapPin
+                          aria-hidden="true"
+                          size={14}
+                          strokeWidth={ICON_STROKE}
+                        />
+                      }
+                    />
+                  )}
+                  {founded === undefined ? null : (
+                    <Fact label="Founded" value={founded.value.slice(0, 4)} />
+                  )}
+                </dl>
+              )}
+            </>
           )}
-          {location === undefined ? null : (
-            <Tile
-              label="Location"
-              value={cardFieldValue(location)}
-              icon={
-                <MapPin
-                  aria-hidden="true"
-                  size={16}
-                  strokeWidth={ICON_STROKE}
-                />
-              }
-            />
-          )}
-        </div>
-      )}
+        </CardSection>
 
-      {glance.length === 0 && chipRows.length === 0 ? null : (
-        <Fold
-          id="glance"
-          title="Investment at a glance"
-          icon={
-            <ChartColumn
-              aria-hidden="true"
-              size={18}
-              strokeWidth={ICON_STROKE}
-            />
-          }
-          open
-        >
-          {glance.length === 0 ? null : (
-            <dl
-              className="grid grid-cols-1 gap-3 sm:grid-cols-3"
-              data-card-glance
-            >
-              {glance.map((item) => (
-                <div key={item.key} className="flex flex-col gap-0.5">
-                  <dd className="cq-title-sm cq-numeric order-1">
-                    {item.value}
-                  </dd>
-                  <dt className="cq-caption order-2 text-(--cq-text-secondary)">
-                    {item.label}
+        {company ? (
+          <>
+            <NumbersSection field={byKey("tractionMetrics")} />
+            <RaiseSection field={byKey("currentRaise")} />
+            <IntelligenceSection field={byKey("investabilitySummary")} />
+            <RelationshipsSection field={byKey("relationshipSummary")} />
+          </>
+        ) : null}
+
+        {glance.length === 0 && chipRows.length === 0 ? null : (
+          <CardSection id="glance" label="Investment at a glance">
+            {glance.length === 0 ? null : (
+              <dl
+                className="grid grid-cols-1 gap-3 sm:grid-cols-3"
+                data-card-glance
+              >
+                {glance.map((item) => (
+                  <div key={item.key} className="flex flex-col gap-0.5">
+                    <dd className="cq-title-sm cq-numeric order-1">
+                      {item.value}
+                    </dd>
+                    <dt className="cq-caption order-2 text-(--cq-text-secondary)">
+                      {item.label}
+                    </dt>
+                  </div>
+                ))}
+              </dl>
+            )}
+            {chipRows.map((row) => (
+              <div
+                key={row.key}
+                className="flex flex-col gap-2 pt-1"
+                data-card-field={row.key}
+              >
+                <h3 className="cq-body-sm text-(--cq-text-secondary)">
+                  {row.label}
+                </h3>
+                <Chips items={row.items} />
+              </div>
+            ))}
+          </CardSection>
+        )}
+
+        {lookFor === undefined ? null : (
+          <CardSection id="look-for" label="What they look for">
+            <Chips items={cardListItems(lookFor)} />
+          </CardSection>
+        )}
+
+        <TeamSection field={byKey("team")} empty={company} />
+        {company ? (
+          <DocumentsSection field={byKey("documentsOnRequest")} />
+        ) : null}
+
+        {more.length === 0 ? null : (
+          <CardSection id="more" label="Additional information">
+            <dl className="divide-y divide-(--cq-border-subtle)">
+              {more.map((field) => (
+                <div
+                  key={field.key}
+                  data-card-field={field.key}
+                  data-scope={field.scope}
+                  className="flex items-baseline justify-between gap-6 py-3"
+                >
+                  <dt className="cq-body-sm shrink-0 text-(--cq-text-secondary)">
+                    {cardFieldLabel(field.key)}
                   </dt>
+                  <dd className="cq-body min-w-0 text-end break-words">
+                    {cardFieldValue(field)}
+                    {field.scope === "network_visible" ? (
+                      <span className="cq-caption block text-(--cq-text-tertiary)">
+                        Shown to Capital Q members
+                      </span>
+                    ) : null}
+                  </dd>
                 </div>
               ))}
             </dl>
-          )}
-          {chipRows.map((row) => (
-            <div
-              key={row.key}
-              className="flex flex-col gap-2 pt-3"
-              data-card-field={row.key}
-            >
-              <h3 className="cq-label text-(--cq-text-primary)">{row.label}</h3>
-              <Chips items={row.items} />
-            </div>
-          ))}
-        </Fold>
-      )}
-
-      {lookFor === undefined ? null : (
-        <Fold
-          id="look-for"
-          title="What they look for"
-          icon={
-            <Lightbulb aria-hidden="true" size={18} strokeWidth={ICON_STROKE} />
-          }
-        >
-          <p className="cq-caption pb-2 text-(--cq-text-secondary)">
-            The types of founders, teams and opportunities they&apos;re most
-            excited about.
-          </p>
-          <Chips items={cardListItems(lookFor)} />
-        </Fold>
-      )}
-
-      {more.length === 0 ? null : (
-        <Fold
-          id="more"
-          title="Additional information"
-          icon={<Info aria-hidden="true" size={18} strokeWidth={ICON_STROKE} />}
-        >
-          <dl className="divide-y divide-(--cq-border-subtle)">
-            {more.map((field) => (
-              <div
-                key={field.key}
-                data-card-field={field.key}
-                data-scope={field.scope}
-                className="flex items-baseline justify-between gap-6 py-3"
-              >
-                <dt className="cq-body-sm shrink-0 text-(--cq-text-secondary)">
-                  {cardFieldLabel(field.key)}
-                </dt>
-                <dd className="cq-body min-w-0 text-end break-words">
-                  {field.key === "foundedDate"
-                    ? field.value.slice(0, 4)
-                    : cardFieldValue(field)}
-                  {field.scope === "network_visible" ? (
-                    <span className="cq-caption block text-(--cq-text-tertiary)">
-                      Shown to Capital Q members
-                    </span>
-                  ) : null}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </Fold>
-      )}
+          </CardSection>
+        )}
+      </article>
 
       <footer className="flex items-start gap-2 border-t border-(--cq-border-subtle) pt-4">
         <ShieldCheck
@@ -446,6 +461,11 @@ export function PublicCardView({
   );
 }
 
+/** Fields drawn by their own section, never again as a plain row. */
+const SECTION_KEYS: ReadonlySet<string> = new Set([
+  ...COMPANY_SECTION_CARD_FIELDS,
+]);
+
 /** Mandate facts shown in "Investment at a glance", not again below. */
 const GLANCE_KEYS: ReadonlySet<string> = new Set([
   "mandateTypicalCheque",
@@ -456,42 +476,7 @@ const GLANCE_KEYS: ReadonlySet<string> = new Set([
   "mandateCustomerTypes",
 ]);
 
-/** A card section that folds: a native disclosure, open when it leads. */
-function Fold({
-  id,
-  title,
-  icon,
-  open = false,
-  children,
-}: {
-  readonly id: string;
-  readonly title: string;
-  readonly icon: ReactNode;
-  readonly open?: boolean;
-  readonly children: ReactNode;
-}) {
-  return (
-    <details
-      open={open}
-      className="group rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface)"
-      data-card-section={id}
-    >
-      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 focus-visible:outline-2 focus-visible:outline-(--cq-focus-ring) [&::-webkit-details-marker]:hidden">
-        <span className="text-(--cq-text-secondary)">{icon}</span>
-        <h2 className="cq-title-sm flex-1">{title}</h2>
-        <ChevronDown
-          aria-hidden="true"
-          size={18}
-          strokeWidth={ICON_STROKE}
-          className="text-(--cq-text-tertiary) transition-transform duration-(--cq-motion-fast) group-open:rotate-180 motion-reduce:transition-none"
-        />
-      </summary>
-      <div className="px-4 pb-4">{children}</div>
-    </details>
-  );
-}
-
-function Tile({
+function Fact({
   label,
   value,
   icon,
@@ -501,12 +486,12 @@ function Tile({
   readonly icon?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-xl border border-(--cq-border-subtle) bg-(--cq-surface) px-4 py-3">
-      <span className="cq-body flex items-center gap-1.5 text-(--cq-text-primary)">
+    <div className="flex flex-col">
+      <dt className="cq-caption order-2 text-(--cq-text-secondary)">{label}</dt>
+      <dd className="cq-body order-1 flex items-center gap-1.5 text-(--cq-text-primary)">
         {icon}
         {value}
-      </span>
-      <span className="cq-caption text-(--cq-text-secondary)">{label}</span>
+      </dd>
     </div>
   );
 }
