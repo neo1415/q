@@ -52,3 +52,52 @@ export function createPostgresInvestorTeamRead({
     },
   };
 }
+
+/**
+ * Where a person represents an investor organisation now, for their own Q
+ * Card's affiliation line (owner 2026-10-22). The earliest current
+ * representation wins; server-side, the person's card decides what shows.
+ */
+export function createPostgresInvestorAffiliationRead({
+  sql,
+}: {
+  readonly sql: DatabaseExecutor;
+}) {
+  const AffiliationRow = z.object({
+    investor_organisation_id: z.string().uuid(),
+    tenant_id: z.string().uuid(),
+    organisation_id: z.string().uuid(),
+    display_name: z.string().min(1),
+    business_title: z.string().nullable(),
+  });
+  return {
+    currentForUser: async (
+      userId: string,
+    ): Promise<{
+      readonly subjectId: string;
+      readonly tenantId: string;
+      readonly organisationId: string;
+      readonly name: string;
+      readonly roleTitle: string | null;
+    } | null> => {
+      const [raw] = await sql`
+        select r.investor_organisation_id, i.tenant_id, i.organisation_id,
+               i.display_name, r.business_title
+          from core.investor_representatives r
+          join core.investor_organisations i on i.id = r.investor_organisation_id
+         where r.user_id = ${userId}
+           and r.is_current
+         order by r.started_at asc, r.id asc
+         limit 1`;
+      if (raw === undefined) return null;
+      const row = AffiliationRow.parse(raw);
+      return {
+        subjectId: row.investor_organisation_id,
+        tenantId: row.tenant_id,
+        organisationId: row.organisation_id,
+        name: row.display_name,
+        roleTitle: row.business_title?.trim() || null,
+      };
+    },
+  };
+}

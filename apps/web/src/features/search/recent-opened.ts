@@ -12,7 +12,7 @@ export type RecentPerson = {
   readonly kind: "person";
   readonly name: string;
   readonly href: string;
-  readonly entity: "company" | "investor";
+  readonly entity: "company" | "investor" | "person";
   readonly companyId?: string | undefined;
   /** "In your CRM", "In Discover", "Found by handle". */
   readonly where: string;
@@ -46,7 +46,9 @@ function valid(value: unknown): value is RecentItem {
       typeof item.href === "string" &&
       item.href.startsWith("/") &&
       !item.href.startsWith("//") &&
-      (item.entity === "company" || item.entity === "investor") &&
+      (item.entity === "company" ||
+        item.entity === "investor" ||
+        item.entity === "person") &&
       typeof item.where === "string"
     );
   }

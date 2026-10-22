@@ -243,8 +243,13 @@ const InvestorUpdate = z
 const RepresentativeMe = investorBody(
   UpsertMyInvestorRepresentativeRequestSchema,
 );
+// Organisations only: a person's own card is made and changed by that
+// person on their profile, never as an organisation's action.
 const QCardSubject = z
-  .object({ subjectType: QCardSubjectTypeSchema, subjectId: UuidSchema })
+  .object({
+    subjectType: QCardSubjectTypeSchema.exclude(["PERSON"]),
+    subjectId: UuidSchema,
+  })
   .strict();
 const HandleClaim = z
   .object({ subject: QCardSubject, input: ClaimHandleRequestSchema })

@@ -3,7 +3,7 @@
 import { z } from "zod";
 
 import { discoverInvestors, listNetworkPitches } from "@capital-q/api-client";
-import { HANDLE_PATTERN } from "@capital-q/contracts";
+import { HANDLE_PATTERN, type QCardSubjectType } from "@capital-q/contracts";
 
 import {
   cardDescriptor,
@@ -40,7 +40,7 @@ export type PaletteVideo = {
 export type PaletteCard = {
   readonly handle: string;
   readonly name: string;
-  readonly subjectType: "COMPANY" | "INVESTOR_ORGANISATION";
+  readonly subjectType: QCardSubjectType;
   /** "Venture fund · Kenya": only from the fields the card shows. */
   readonly descriptor: string | null;
   readonly tagline: string | null;
@@ -129,7 +129,9 @@ async function byHandle(raw: string): Promise<PaletteResult> {
       ? [read("headquartersCity"), read("headquartersCountry")]
           .filter((part): part is string => part !== null)
           .join(", ") || null
-      : read("hqCountry");
+      : found.subjectType === "PERSON"
+        ? read("countryCode")
+        : read("hqCountry");
   return {
     kind: "CARD",
     card: {
@@ -159,7 +161,7 @@ async function byHandle(raw: string): Promise<PaletteResult> {
  * single such match the card just opens in full.
  */
 async function connectHrefFor(
-  subjectType: "COMPANY" | "INVESTOR_ORGANISATION",
+  subjectType: QCardSubjectType,
   name: string,
 ): Promise<string | null> {
   const context = await resolveOwnContext();

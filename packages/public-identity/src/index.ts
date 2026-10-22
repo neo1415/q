@@ -25,6 +25,7 @@ export {
 export {
   companySections,
   investorTeamSection,
+  personFocus,
   type CompanySectionInputs,
   type SectionClaim,
   type SectionDocument,
@@ -101,6 +102,7 @@ export {
   type InvestorMandateCardFacts,
   type CompanyProfileRead,
   type InvestorProfileRead,
+  type PersonProfileRead,
   type SubjectDirectoryPorts,
 } from "./infrastructure/subject-directory.js";
 
