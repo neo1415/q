@@ -534,7 +534,7 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
       return (
         <div className="cq-story-panel cq-story-card-panel">
           <StoryQCard />
-          <Label>{DEMO} · a fictional company&apos;s Q Card</Label>
+          <Label>{DEMO} · Capital Q&apos;s own Q Card</Label>
         </div>
       );
     case "split":

@@ -893,6 +893,8 @@ const inputs: readonly BeatInput[] = [
     pace: "normal",
     delivery: "Rhythmic noun list, warm and even.",
     cues: [
+      // On the first word too, so a jump to #49 shows the card.
+      [0, stage("q-card", 1)],
       // The real card's own sections (S6, CARD_SECTION_IDS), one per noun.
       ["identity", light("qs.card.identity")],
       ["story,", light("qs.card.story")],
