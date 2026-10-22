@@ -36,6 +36,7 @@ export {
 } from "./application-identity.js";
 
 export { createPostgresPersonProfileStore } from "./person-profile-store.js";
+export { createPostgresPersonCardRead } from "./person-card-read.js";
 
 export {
   createPostgresContextEpochReader,

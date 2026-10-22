@@ -548,6 +548,30 @@ export default async function ProfilePage() {
             <ProfileTeamSection />
           </Suspense>
 
+          {/* The person's own card (owner 2026-10-22): theirs alone. */}
+          {person !== null ? (
+            <ProfileSectionShell
+              id="my-q-card"
+              variant="brief"
+              title={t("Your personal Q Card")}
+              visibility={vis("link")}
+            >
+              <QCardSection
+                subjectType="PERSON"
+                subjectId={person.userId}
+                name={person.displayName ?? t("You")}
+                tagline={person.headline}
+                values={{
+                  headline: person.headline,
+                  photo:
+                    (personImages?.avatar ?? null) === null ? null : "Added",
+                  cover:
+                    (personImages?.cover ?? null) === null ? null : "Added",
+                }}
+              />
+            </ProfileSectionShell>
+          ) : null}
+
           {/* The shareable identity (BIZ-004). */}
           {company !== null || investor !== null ? (
             <ProfileSectionShell

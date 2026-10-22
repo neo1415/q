@@ -102,6 +102,19 @@ export function createPublicVerificationReader(options: {
     readonly organisation: PublicClaimStanding;
     readonly founderIdentity: PublicClaimStanding;
   }>;
+  /**
+   * A person's own Q Card (owner 2026-10-22): their organisation's claim,
+   * and the founder-identity claim about this very person -- never another
+   * founder's, so one verified co-founder cannot vouch for the rest.
+   */
+  readonly personStandings: (subject: {
+    readonly tenantId: string;
+    readonly organisationId: string;
+    readonly userId: string;
+  }) => Promise<{
+    readonly organisation: PublicClaimStanding;
+    readonly founderIdentity: PublicClaimStanding;
+  }>;
 } {
   const repository =
     options.repository ?? createPostgresVerificationClaimRepository();
@@ -130,6 +143,26 @@ export function createPublicVerificationReader(options: {
           now,
         ),
         founderIdentity: standing(founderIdentityOf(claims, null, now), now),
+      };
+    },
+    personStandings: async (subject) => {
+      const now = clock();
+      const claims = await repository.currentForOrganisation(
+        options.sql,
+        subject.tenantId,
+        subject.organisationId,
+      );
+      const own = claims.filter(
+        (claim) =>
+          claim.claimType === "FOUNDER_IDENTITY" &&
+          claim.subjectId === subject.userId,
+      );
+      return {
+        organisation: standing(
+          organisationIdentityOf(claims, subject.organisationId),
+          now,
+        ),
+        founderIdentity: standing(founderIdentityOf(own, null, now), now),
       };
     },
   };

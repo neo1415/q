@@ -5,6 +5,7 @@ import {
   COMPANY_CARD_FIELDS,
   INVESTOR_CARD_FIELDS,
   NETWORK_ONLY_CARD_FIELDS,
+  PERSON_CARD_FIELDS,
   type QCardDto,
   type QCardSubjectType,
 } from "@capital-q/contracts";
@@ -93,7 +94,11 @@ export async function QCardSection({
   }
   const nameField = subjectType === "COMPANY" ? "canonicalName" : "displayName";
   const fields = (
-    subjectType === "COMPANY" ? COMPANY_CARD_FIELDS : INVESTOR_CARD_FIELDS
+    subjectType === "COMPANY"
+      ? COMPANY_CARD_FIELDS
+      : subjectType === "PERSON"
+        ? PERSON_CARD_FIELDS
+        : INVESTOR_CARD_FIELDS
   )
     // The photo has the name's scope (founder decision 2026-10-04), so
     // neither is a choice here.

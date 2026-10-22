@@ -181,11 +181,24 @@ export function createPublicIdentityService(
     dependencies.randomBytes ??
     ((size: number) => new Uint8Array(nodeRandomBytes(size)));
 
-  /** The subject if it is the actor's own; one "not found" otherwise. */
+  /**
+   * The subject if it is the actor's own; one "not found" otherwise. A
+   * PERSON card is the person's alone (the same rule as their profile
+   * photo): its subject is the actor's own user id, in the actor's tenant,
+   * with no organisation, and no organisation role can manage it.
+   */
   const owned = async (
     actor: ActorContext,
     subject: QCardSubject,
-  ): Promise<SubjectFacts> => {
+  ): Promise<SubjectFacts & { readonly tenantId: string }> => {
+    if (subject.subjectType === "PERSON") {
+      if (subject.subjectId !== actor.userId) {
+        throw new QCardSubjectNotFoundError();
+      }
+      const facts = await subjects.find(subject);
+      if (facts === null) throw new QCardSubjectNotFoundError();
+      return { ...facts, tenantId: actor.tenantId, organisationId: null };
+    }
     const facts = await subjects.find(subject);
     if (
       facts === null ||
@@ -195,21 +208,35 @@ export function createPublicIdentityService(
     ) {
       throw new QCardSubjectNotFoundError();
     }
-    return facts;
+    return { ...facts, tenantId: actor.tenantId };
   };
 
-  /** The exact resource, in the actor's own (already matched) organisation. */
-  const resourceOf = (actor: ActorContext, subject: QCardSubject) => {
+  /**
+   * The capability check on the exact resource, in the actor's own
+   * (already matched) organisation. A person's own card needs none beyond
+   * being that person, which `owned` has established.
+   */
+  const authorise = async (
+    actor: ActorContext,
+    subject: QCardSubject,
+    purpose: "MANAGE" | "VIEW",
+  ): Promise<void> => {
+    if (subject.subjectType === "PERSON") return;
     if (actor.organisationId === undefined) {
       throw new QCardSubjectNotFoundError();
     }
-    return {
-      kind: "RESOURCE" as const,
-      tenantId: actor.tenantId,
-      organisationId: actor.organisationId,
-      resourceType: RESOURCE_TYPE[subject.subjectType],
-      resourceId: subject.subjectId,
-    };
+    await authorization.requireCapability({
+      actor,
+      capability:
+        purpose === "MANAGE" ? HANDLE_MANAGE : VIEW[subject.subjectType],
+      resource: {
+        kind: "RESOURCE" as const,
+        tenantId: actor.tenantId,
+        organisationId: actor.organisationId,
+        resourceType: RESOURCE_TYPE[subject.subjectType],
+        resourceId: subject.subjectId,
+      },
+    });
   };
 
   const toDto = async (
@@ -280,32 +307,38 @@ export function createPublicIdentityService(
       (scopes.photo !== undefined || scopes.cover !== undefined)
         ? await dependencies.cardImages(subject).catch(() => null)
         : null;
+    const fields = projectCardFields(
+      subject.subjectType,
+      scopes,
+      {
+        ...facts.facts,
+        photo: images?.photo ?? null,
+        cover: images?.cover ?? null,
+      },
+      audience,
+      facts.details,
+    );
+    // On a person's card the organisation claim is about their employer:
+    // stated only to an audience the card already tells who that is.
+    const organisationShown =
+      subject.subjectType !== "PERSON" ||
+      fields.some((field) => field.key === "affiliation");
+    const organisationVerified =
+      facts.verified.organisation && organisationShown;
     return {
       kind: "CARD",
       handle: live.handle,
       subjectType: subject.subjectType,
       name: facts.name.slice(0, 200),
-      fields: projectCardFields(
-        subject.subjectType,
-        scopes,
-        {
-          ...facts.facts,
-          photo: images?.photo ?? null,
-          cover: images?.cover ?? null,
-        },
-        audience,
-        facts.details,
-      ),
+      fields,
       verified: [
-        ...(facts.verified.organisation
-          ? (["ORGANISATION_VERIFIED"] as const)
-          : []),
+        ...(organisationVerified ? (["ORGANISATION_VERIFIED"] as const) : []),
         ...(facts.verified.founderIdentity
           ? (["FOUNDER_IDENTITY_VERIFIED"] as const)
           : []),
       ],
       demoAttested: [
-        ...(facts.verified.organisation &&
+        ...(organisationVerified &&
         facts.verified.demoAttested?.organisation === true
           ? (["ORGANISATION_VERIFIED"] as const)
           : []),
@@ -322,21 +355,13 @@ export function createPublicIdentityService(
   return {
     getCard: async ({ actor, subject }) => {
       await owned(actor, subject);
-      await authorization.requireCapability({
-        actor,
-        capability: VIEW[subject.subjectType],
-        resource: resourceOf(actor, subject),
-      });
+      await authorise(actor, subject, "VIEW");
       return currentDto(subject);
     },
 
     claimHandle: async ({ actor, subject, handle: raw, correlationId }) => {
       const facts = await owned(actor, subject);
-      await authorization.requireCapability({
-        actor,
-        capability: HANDLE_MANAGE,
-        resource: resourceOf(actor, subject),
-      });
+      await authorise(actor, subject, "MANAGE");
       const reading = normaliseHandle(raw);
       if (!reading.ok) throw new HandleUnavailableError("SHAPE");
       const handle = reading.handle;
@@ -434,11 +459,7 @@ export function createPublicIdentityService(
 
     updateCard: async ({ actor, subject, input, correlationId }) => {
       await owned(actor, subject);
-      await authorization.requireCapability({
-        actor,
-        capability: HANDLE_MANAGE,
-        resource: resourceOf(actor, subject),
-      });
+      await authorise(actor, subject, "MANAGE");
       let scopes = input.fieldScopes;
       if (scopes !== undefined) {
         const fitted = fitFieldScopes(subject.subjectType, scopes);

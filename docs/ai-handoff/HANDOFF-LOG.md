@@ -960,3 +960,33 @@ Evidence stage: **code + local checks only**. Not merged, not deployed. No migra
   - A PERSON subject type (per-person card) needs a migration plus self-ownership authorization. It is proposed, not built.
   - The amount committed in the raise is not shown.
   - The anonymous read is not cached yet.
+
+## Q Story S6 follow-up: the person Q Card — 22 October 2026 (Claude, `qstory/qcard`, PR #305)
+
+The owner asked for the per-person card to be built. Evidence stage: **code + local checks only**.
+
+**Needs a migration:** `20261229090000_person_q_card.sql`.
+
+- It is additive: it widens the two subject-type checks, makes `organisation_id` nullable only for PERSON, and requires a PERSON row's claimer/creator to be the person.
+- pgTAP test: `rls/521_person_q_card.test.sql`. It was **not run locally** (no Docker); the CI database job runs it.
+- The coordinator applies it.
+
+What changed:
+
+- **Authorization:** a person manages only their own card, the same rule as `profile-images` PERSON. No new capability. Q's `handle.claim` and the app-action card claim/update are narrowed to organisation subjects.
+- **New server-side reads:**
+  - `createPostgresPersonCardRead` (security/postgres);
+  - `createPostgresCompanyAffiliationRead` (companies);
+  - `createPostgresInvestorAffiliationRead` (investors);
+  - `personStandings` (verification): the person's own founder-identity claim only.
+- **Focus:** a person's "what they're looking for" is built only from their organisation's own card at the same audience.
+- **The organisation-verified claim** on a person card is shown only when the affiliation is visible.
+- **Web:**
+  - a profile section, "Your personal Q Card";
+  - public rendering, Person JSON-LD, vCard N/ORG/TITLE;
+  - search handles person cards;
+  - one i18n string added.
+- **Checks:**
+  - root, web, api, q-api and workers tsc: all pass;
+  - vitest: public-identity, app-actions, network, verification, investors, companies, q-api handle-claim and parity, and the web q-card, search, profile and i18n tests — 72 files, all passed after the catalogue fix;
+  - eslint and prettier on changed files: clean.

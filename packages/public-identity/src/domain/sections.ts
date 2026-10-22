@@ -3,6 +3,8 @@ import {
   type CardDetail,
   type CardMetric,
   type EvidenceStatus,
+  type PublicCardDto,
+  type QCardField,
   type QCardScope,
   type TruthClass,
 } from "@capital-q/contracts";
@@ -411,5 +413,88 @@ export function investorTeamSection(
   return {
     facts: { team: sections.facts["team"] ?? null },
     details: { team: sections.details["team"] ?? {} },
+  };
+}
+
+/** What a person's focus may echo from their organisation's own card. */
+const FOCUS_KEYS: Readonly<
+  Record<"INVESTOR" | "FOUNDER", readonly QCardField[]>
+> = {
+  INVESTOR: [
+    "mandateTypicalCheque",
+    "mandateStages",
+    "mandateSectors",
+    "mandateGeographies",
+    "mandateLookFor",
+    "deploymentState",
+  ],
+  FOUNDER: ["currentStageCode", "shortDescription"],
+};
+
+function focusFrom(
+  side: "INVESTOR" | "FOUNDER",
+  card: PublicCardDto | null,
+): CardDetail | null {
+  if (card === null) return null;
+  const fields = FOCUS_KEYS[side].flatMap((key) => {
+    const field = card.fields.find((candidate) => candidate.key === key);
+    return field === undefined ? [] : [{ key, value: field.value }];
+  });
+  const raiseDetail =
+    side === "FOUNDER"
+      ? card.fields.find((field) => field.key === "currentRaise")?.detail
+      : undefined;
+  const raise =
+    raiseDetail?.kind === "RAISE"
+      ? { target: raiseDetail.target, stageCode: raiseDetail.stageCode }
+      : null;
+  if (fields.length === 0 && raise === null) return null;
+  return {
+    kind: "FOCUS",
+    side,
+    organisationHandle: card.handle,
+    fields,
+    raise,
+  };
+}
+
+/**
+ * A person's "what they're looking for" (owner 2026-10-22), per scope,
+ * built only from their organisation's own card as that card shows it to
+ * the same audience: anyone sees what the organisation's card shows anyone,
+ * members what it shows members. A person's card therefore never widens
+ * what their organisation chose to share.
+ */
+export function personFocus(input: {
+  readonly side: "INVESTOR" | "FOUNDER";
+  readonly publicCard: PublicCardDto | null;
+  readonly memberCard: PublicCardDto | null;
+}): {
+  readonly value: string | null;
+  readonly details: Readonly<Partial<Record<QCardScope, CardDetail | null>>>;
+} {
+  // Each projection is re-filtered to its own audience's scopes.
+  const publicCard =
+    input.publicCard === null
+      ? null
+      : {
+          ...input.publicCard,
+          fields: input.publicCard.fields.filter(
+            (field) => field.scope === "public_external",
+          ),
+        };
+  const details = {
+    public_external: focusFrom(input.side, publicCard),
+    network_visible: focusFrom(input.side, input.memberCard),
+  };
+  const any = details.network_visible ?? details.public_external;
+  return {
+    value:
+      any === null
+        ? null
+        : input.side === "INVESTOR"
+          ? "Investment focus"
+          : "Company focus",
+    details,
   };
 }
