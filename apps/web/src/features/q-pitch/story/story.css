@@ -216,7 +216,7 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   inset: 0;
   z-index: var(--cq-z-sheet);
   pointer-events: none;
-  background: color-mix(in oklch, var(--cq-canvas) 64%, transparent);
+  background: color-mix(in oklch, var(--cq-canvas) 42%, transparent);
   opacity: 0;
   transition: opacity var(--cq-motion-emphasis) var(--cq-ease);
 }

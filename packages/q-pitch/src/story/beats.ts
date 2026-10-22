@@ -1083,10 +1083,17 @@ export function renderText(beat: StoryBeat): string {
   return parts.join(" ");
 }
 
+/** The script's stray closing bracket ("HOME)"), never shown or said. */
+const STRAY_CLOSE = /^([^(]*)\)$/u;
+
+/** A word as the subtitle shows it: the verbatim word, minus a stray ")". */
+export function subtitleForm(word: string): string {
+  return word.replace(STRAY_CLOSE, "$1");
+}
+
 /** A word as the voice should say it (letters unchanged, see renderText). */
 export function spokenForm(word: string): string {
-  return word
-    .replace(/^([^(]*)\)$/u, "$1")
+  return subtitleForm(word)
     .replace(/CapitalQ/u, "Capital Q")
     .replace(/GateQ/u, "Gate Q");
 }

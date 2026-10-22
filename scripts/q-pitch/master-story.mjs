@@ -236,6 +236,8 @@ await page.waitForFunction(
 // A breath on the opening frame, then Start (the press is the gesture).
 await page.waitForTimeout(1_500);
 await page.getByRole("button", { name: "Start the story" }).click();
+// The film opens at the press: the start dialog is not part of the story.
+const startedAt = Date.now();
 // The pointer leaves, so the controls step back for the whole story.
 await page.mouse.move(viewport.width - 4, viewport.height / 2);
 await page.waitForFunction(
@@ -243,9 +245,12 @@ await page.waitForFunction(
   undefined,
   {
     timeout: 15 * 60_000,
-    polling: 500,
+    polling: 100,
   },
 );
+// And closes on the last word: the end card is the live product's, not
+// the film's.
+const doneAt = Date.now();
 await page.waitForTimeout(3_000);
 const evidence = await page.evaluate(() => ({
   story: window.__cqStoryEvidence?.() ?? null,
@@ -307,7 +312,10 @@ ff([
   "192k",
   "-movflags",
   "+faststart",
-  "-shortest",
+  "-ss",
+  String(Math.max(0, (startedAt - videoStart) / 1000 - 0.2)),
+  "-to",
+  String((doneAt - videoStart) / 1000 - 0.15),
   master,
 ]);
 const share = path.join(out, "q-story-master-720p.mp4");

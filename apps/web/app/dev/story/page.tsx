@@ -5,9 +5,7 @@
 export default function StoryHarnessHome() {
   return (
     <main className="cq-q-home grid min-h-dvh place-items-center bg-(--cq-canvas) px-4">
-      <p className="sr-only">
-        Q Story harness: fictional data, no service is read.
-      </p>
+      <p className="sr-only">Q Story: fictional data, no service is read.</p>
     </main>
   );
 }

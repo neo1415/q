@@ -23,6 +23,7 @@ import {
   parseStoryCommand,
   percentiles,
   routeAtBeat,
+  subtitleForm,
   type QaEntry,
   type ScheduledCue,
   type StoryAct,
@@ -846,7 +847,7 @@ function StoryOverlay({
                 key={`${String(beat.n)}-${String(line.start + i)}`}
                 data-said={line.start + i <= word ? "" : undefined}
               >
-                {text}{" "}
+                {subtitleForm(text)}{" "}
               </span>
             ))}
           </span>

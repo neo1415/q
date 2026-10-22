@@ -212,15 +212,28 @@ const sampleInterest: ExpressInterestPort = ({ companyId }) =>
     );
   });
 
-export function DiscoverHarness() {
+/** Every hard rule checked: no "can't be checked yet" line (the Q Story). */
+const ALL_CHECKED: readonly DiscoveredCompanyDto[] = COMPANIES.map(
+  (company) => ({ ...company, unverifiedExclusions: [] }),
+);
+
+export function DiscoverHarness({
+  allRulesChecked = false,
+}: {
+  readonly allRulesChecked?: boolean;
+}) {
   return (
     <GlobalQProvider subject={NO_SUBJECT} connected={false}>
-      <Feed />
+      <Feed companies={allRulesChecked ? ALL_CHECKED : COMPANIES} />
     </GlobalQProvider>
   );
 }
 
-function Feed() {
+function Feed({
+  companies,
+}: {
+  readonly companies: readonly DiscoveredCompanyDto[];
+}) {
   const [index, setIndex] = useState(0);
   const [muted, setMuted] = useState(true);
   const [saved, setSaved] = useState<ReadonlySet<string>>(new Set());
@@ -230,16 +243,16 @@ function Feed() {
   const [tally, setTally] = useState<FeedTally>(NO_TALLY);
   const [ended, setEnded] = useState(false);
   const [interestAsked, setInterestAsked] = useState(0);
-  const card = COMPANIES[index];
+  const card = companies[index];
   if (card === undefined) return null;
-  const last = index === COMPANIES.length - 1;
+  const last = index === companies.length - 1;
   const moveOn = () => {
     if (last) setEnded(true);
     else setIndex(index + 1);
   };
   const previous = () => setIndex((at) => Math.max(0, at - 1));
   const policyFor = (companyId: string): FeedPreloadPolicy => {
-    const at = COMPANIES.findIndex((item) => item.companyId === companyId);
+    const at = companies.findIndex((item) => item.companyId === companyId);
     return at === index
       ? "ACTIVE"
       : Math.abs(at - index) === 1
@@ -273,7 +286,7 @@ function Feed() {
       onUndoPass={(companyId) => {
         setTally((was) => ({ ...was, passed: Math.max(0, was.passed - 1) }));
         setEnded(false);
-        setIndex(COMPANIES.findIndex((item) => item.companyId === companyId));
+        setIndex(companies.findIndex((item) => item.companyId === companyId));
       }}
       onUndoSave={(companyId) => {
         setSaved((current) => {
@@ -295,9 +308,9 @@ function Feed() {
         {decided ?? ""}
       </span>
       <PitchStage
-        items={COMPANIES}
+        items={companies}
         index={index}
-        next={() => setIndex((at) => Math.min(COMPANIES.length - 1, at + 1))}
+        next={() => setIndex((at) => Math.min(companies.length - 1, at + 1))}
         previous={previous}
         canAdvance={!last}
         canRetreat={index > 0}
@@ -308,7 +321,7 @@ function Feed() {
         muted={muted}
         onMutedChange={setMuted}
         label="Companies to review"
-        positionLabel={`${String(index + 1)} of ${String(COMPANIES.length)}`}
+        positionLabel={`${String(index + 1)} of ${String(companies.length)}`}
         onDecide={(verdict) => {
           if (verdict === "INTEREST") {
             setDecided(`INTEREST:${card.companyId}`);

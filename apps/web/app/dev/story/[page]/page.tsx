@@ -34,7 +34,7 @@ export default async function StoryHarnessPage({
             admin: false,
           }}
         >
-          <DiscoverHarness />
+          <DiscoverHarness allRulesChecked />
         </AppShell>
       );
     case "crm":

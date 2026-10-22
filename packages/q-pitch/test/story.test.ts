@@ -30,6 +30,7 @@ import {
   storyManifest,
   storyRoutes,
   storyText,
+  subtitleForm,
   warmRoutes,
   wordAt,
   wordsFromCharacters,
@@ -132,6 +133,13 @@ describe("Q Story beat table", () => {
       kind: "light",
       anchor: "qs.discover.interest",
     });
+  });
+
+  it("subtitles never show the script's stray bracket", () => {
+    expect(beat(54).words).toContain("HOME)");
+    expect(subtitleForm("HOME)")).toBe("HOME");
+    expect(subtitleForm("(see)")).toBe("(see)");
+    expect(subtitleForm("CapitalQ")).toBe("CapitalQ");
   });
 });
 

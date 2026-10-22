@@ -19,7 +19,7 @@
  * signed-in storage state (--state file) to record the real app.
  */
 import { existsSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -187,26 +187,60 @@ if (flag("screens")) {
   // #51: one still per word, of the real page components (harness data).
   const dir = path.join(root, "apps/web/public/story-media/screens");
   await mkdir(dir, { recursive: true });
+  // Production build only (no dev badge). Discover is the story's own,
+  // in the app shell, every rule checked, its pitch playing: --pitches
+  // <dir> (scripts/q-pitch/fetch-pitch-clips.mjs).
   const shots = [
-    ["discovery", "/dev/discover"],
+    ["discovery", "/dev/story/discover"],
     ["inbound", "/dev/gateq-v2?view=inbox"],
     ["intelligence", "/dev/profile?tab=diligence"],
     ["readiness", "/dev/crm?view=raise&tab=readiness"],
     ["matching", "/dev/crm?view=raise&tab=investors"],
     ["data", "/dev/profile?tab=dataroom"],
     ["relationships", "/dev/crm?view=record"],
-    ["execution", "/dev/work"],
+    ["execution", "/dev/work-review?page=tasks&state=approval"],
   ];
   const { context, page } = await open(
     { width: 1280, height: 800 },
     "light",
     false,
   );
+  const pitchDir = option("pitches", null);
+  if (pitchDir !== null) {
+    const clips = await Promise.all(
+      (await readdir(pitchDir))
+        .filter((name) => /^pitch-\d+\.webm$/u.test(name))
+        .sort()
+        .map((name) => readFile(path.join(pitchDir, name))),
+    );
+    const clipFor = new Map();
+    await context.route("**/dev/discover/media/**", (route) => {
+      const url = route.request().url();
+      if (url.endsWith(".jpg")) return route.fulfill({ status: 404 });
+      const asset = new URL(url).pathname.split("/").pop() ?? "";
+      if (!clipFor.has(asset)) {
+        clipFor.set(asset, clips[clipFor.size % clips.length]);
+      }
+      return route.fulfill({
+        body: clipFor.get(asset),
+        contentType: "video/webm",
+      });
+    });
+    await context.route("**/api/pitch-captions/**", (route) =>
+      route.fulfill({ body: "WEBVTT\n\n", contentType: "text/vtt" }),
+    );
+  }
   for (const [name, url] of shots) {
     await page
       .goto(`${base}${url}`, { waitUntil: "load", timeout: 180_000 })
       .catch(() => undefined);
-    await page.waitForTimeout(2_500);
+    await page.waitForTimeout(4_000);
+    // The story's start dialog is not part of the page being shown.
+    await page.evaluate(() => {
+      for (const node of document.querySelectorAll(".cq-story-gate")) {
+        node.remove();
+      }
+    });
     await page.screenshot({
       path: path.join(dir, `${name}.jpg`),
       type: "jpeg",
