@@ -980,7 +980,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
       "is my data stored in the eu",
     ],
     answer:
-      "Capital Q is built to keep data in the European Union: keeping it there is a requirement of the architecture, and the services run in the Netherlands. Formal data-protection commitments for particular countries are for the founders to confirm.",
+      "Your records are stored in the European Union: they are kept in Frankfurt and the app runs in the Netherlands, and keeping data in the EU is a requirement of the architecture. When Q uses an AI model, that request is processed by the model provider under its own terms. Which providers and regions are used, and formal commitments for particular countries, are for the founders to confirm.",
     sources: [
       "docs/adr/0014-railway-replaces-render-for-node-services.md region",
     ],
