@@ -225,16 +225,11 @@ await context.addInitScript((banned) => {
   window.__textHits = [];
   window.__overlays = [];
   window.__overSince = new Map();
-  const OVER_PAGE = [
-    ".cq-story-stage .cq-story-type",
-    ".cq-story-stage .cq-story-outcomes",
-    ".cq-story-stage .cq-story-wordmark",
-    ".cq-story-stage .cq-story-tagline",
-    ".cq-story-stage .cq-story-split",
-    ".cq-story-stage .cq-story-centre > .cq-story-panel",
-    ".cq-story-stage > .cq-story-panel:not(.cq-story-dockside)",
-    ".cq-story-stage .cq-story-screens",
-  ].join(", ");
+  // Each visual over the page, whole: the stage's top-level blocks (lines
+  // stacked in one block are one box), never a panel docked beside a lit
+  // section.
+  const OVER_PAGE =
+    ".cq-story-stage > :not(.cq-story-dockside):not(.cq-story-backdrop)";
   window.__badge = 0;
   new window.PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
@@ -263,7 +258,7 @@ await context.addInitScript((banned) => {
       return [r.x, r.y, r.width, r.height].map(Math.round);
     });
     for (const node of document.querySelectorAll(OVER_PAGE)) {
-      if (photo !== null && node.matches(".cq-story-type")) continue;
+      if (photo !== null) continue;
       const r = node.getBoundingClientRect();
       if (r.width < 8 || r.height < 8) continue;
       if (Number(window.getComputedStyle(node).opacity) < 0.99) continue;
@@ -454,9 +449,9 @@ if (!skipOcr) {
 // ── Clutter behind overlay text (owner, 22 Oct) ──────────────────────
 // Large stage type and artifacts over the page need a quiet backing: the
 // ring just outside each box (never the glyphs) must be one even tone.
-// Clutter is the share of ring pixels more than 8 grey levels from the
-// ring's median; page rows showing through a thin scrim measure 2-4%, a
-// solid scrim 0%. A box is checked once it has been up for 0.6 s (past the
+// Clutter is the share of ring pixels with a sharp edge to a neighbour
+// (more than 6 grey levels): page rows and text showing through measure
+// several percent; a solid scrim, a soft shadow or a gradient 0%. A box is checked once it has been up for 0.6 s (past the
 // scrim's own fade), at most once a second.
 // The ring starts GAP px out (clear of a panel's own shadow), RING wide.
 const GAP = 24;
@@ -509,20 +504,30 @@ for (const sample of evidence.overlays) {
   } catch {
     continue;
   }
-  const ring = [];
-  for (let j = 0; j < H; j += 1) {
-    for (let i = 0; i < W; i += 1) {
-      const gx = X + i;
-      const gy = Y + j;
-      if (gx >= x && gx < x + w && gy >= y && gy < y + h) continue;
-      if (inQ(gx, gy)) continue;
-      ring.push(bytes[j * W + i] ?? 0);
+  const inRing = (i, j) => {
+    const gx = X + i;
+    const gy = Y + j;
+    if (gx >= x && gx < x + w && gy >= y && gy < y + h) return false;
+    return !inQ(gx, gy);
+  };
+  const at = (i, j) => bytes[j * W + i] ?? 0;
+  let ring = 0;
+  let edges = 0;
+  for (let j = 0; j + 1 < H; j += 1) {
+    for (let i = 0; i + 1 < W; i += 1) {
+      if (!inRing(i, j)) continue;
+      ring += 1;
+      const p = at(i, j);
+      if (
+        (inRing(i + 1, j) && Math.abs(p - at(i + 1, j)) > 6) ||
+        (inRing(i, j + 1) && Math.abs(p - at(i, j + 1)) > 6)
+      ) {
+        edges += 1;
+      }
     }
   }
-  if (ring.length === 0) continue;
-  const median = [...ring].sort((a, b) => a - b)[Math.floor(ring.length / 2)];
-  const clutter =
-    ring.filter((v) => Math.abs(v - median) > 8).length / ring.length;
+  if (ring === 0) continue;
+  const clutter = edges / ring;
   if (clutter > CLUTTER_MAX) {
     overlayClutter.push({
       second,
