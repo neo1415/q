@@ -629,5 +629,13 @@
       "audio": "beat-56.ec72306934.mp3",
       "alignment": "beat-56.b3148d736e.json"
     }
+  },
+  "closing": {
+    "text": "Do you have any questions?",
+    "chars": 26,
+    "model": "eleven_v4_turbo",
+    "durationMs": 1724,
+    "timing": "forced-alignment",
+    "alignmentLoss": 0.625
   }
 }
