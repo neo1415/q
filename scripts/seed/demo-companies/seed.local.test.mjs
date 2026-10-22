@@ -1,0 +1,311 @@
+// node --test scripts/seed/demo-companies/seed.local.test.mjs
+//
+// Against a real, migrated Postgres (CQ_SEED_TEST_DATABASE_URL, e.g.
+// postgresql://postgres@127.0.0.1:54329/cq). Each run clones that database
+// as a template, so it starts clean and leaves nothing behind. Skipped when
+// the variable is unset.
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { after, before, test } from "node:test";
+
+import { DEMO_STATEMENT_SUFFIX } from "./plan.mjs";
+import { applyAll, FIXTURE_PATH, localDatabase, planAll } from "./seed.mjs";
+
+const TEMPLATE_URL = process.env.CQ_SEED_TEST_DATABASE_URL;
+const fixture = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
+const CAPITAL_Q_ORG = "f95c3469-ef29-4574-a508-c1ba1131d842";
+const TEST_DB = `cq_seed_test_${process.pid}`;
+
+let admin;
+let db;
+
+const ids = {
+  ownerAuth: "00000000-0000-4000-8000-00000000a001",
+  davidAuth: "00000000-0000-4000-8000-00000000a002",
+  cqTenant: "00000000-0000-4000-8000-00000000b001",
+  cqCompany: "00000000-0000-4000-8000-00000000c001",
+  kTenant: "00000000-0000-4000-8000-00000000b002",
+  kOrg: "00000000-0000-4000-8000-00000000d002",
+  kCompany: "00000000-0000-4000-8000-00000000c002",
+  davidMembership: "00000000-0000-4000-8000-00000000e001",
+};
+
+/** A platform with a WRONG Capital Q and a founder-entered KUUZA AI. */
+const SETUP = `
+insert into auth.users (id, email) values
+  ('${ids.ownerAuth}', 'owner@example.invalid'),
+  ('${ids.davidAuth}', 'david@example.invalid');
+insert into identity.platform_admins (user_id, role)
+  select id, 'platform_owner' from identity.user_profiles where auth_user_id = '${ids.ownerAuth}';
+
+insert into identity.tenants (id, name) values ('${ids.cqTenant}', 'Capital Q'), ('${ids.kTenant}', 'KUUZA AI');
+insert into identity.organisations (id, tenant_id, organisation_type, display_name, slug)
+  values ('${CAPITAL_Q_ORG}', '${ids.cqTenant}', 'company', 'Capital Q', 'capital-q-org'),
+         ('${ids.kOrg}', '${ids.kTenant}', 'company', 'KUUZA AI', 'kuuza-ai-org');
+insert into identity.tenant_organisations (tenant_id, organisation_id)
+  values ('${ids.cqTenant}', '${CAPITAL_Q_ORG}'), ('${ids.kTenant}', '${ids.kOrg}');
+
+-- Capital Q exists with WRONG data: wrong stage, wrong country, private.
+insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug, headquarters_country, current_stage_code, short_description, marketplace_visibility)
+  values ('${ids.cqCompany}', '${ids.cqTenant}', '${CAPITAL_Q_ORG}', 'Capital Q', 'capital-q', 'US', 'series_b', 'A CRM for deal flow.', 'organisation_private');
+
+-- KUUZA AI as its founder entered it, with a figure of their own.
+insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug, short_description, marketplace_visibility)
+  values ('${ids.kCompany}', '${ids.kTenant}', '${ids.kOrg}', 'KUUZA AI', 'kuuza-ai', 'AI simulator and coach for practising sales, customer-service and other workplace conversations.', 'organisation_private');
+
+-- David: an account and a current membership at Capital Q.
+insert into identity.organisation_memberships (id, tenant_id, organisation_id, user_id, membership_status, joined_at)
+  select '${ids.davidMembership}', '${ids.cqTenant}', '${CAPITAL_Q_ORG}', id, 'active', now()
+    from identity.user_profiles where auth_user_id = '${ids.davidAuth}';
+insert into identity.user_active_contexts (user_id, membership_id)
+  select id, '${ids.davidMembership}' from identity.user_profiles where auth_user_id = '${ids.davidAuth}';
+update identity.user_profiles set display_name = 'David Nwankwo' where auth_user_id = '${ids.davidAuth}';
+`;
+
+/** The founder's own KUUZA AI figure, written the way the product writes one. */
+const KUUZA_OWN_CLAIM = `
+insert into evidence.sources (id, tenant_id, source_type, subject_type, subject_id, title, visibility_scope, sensitivity_class)
+  values ('00000000-0000-4000-8000-00000000f001', '${ids.kTenant}', 'USER_STATEMENT', 'COMPANY', '${ids.kCompany}', 'Founder', 'network_visible', 'PUBLIC');
+insert into evidence.claim_revisions (id, tenant_id, claim_id, revision_number, statement, structured_value, truth_class, evidence_status, lifecycle_status, changed_by_type, changed_by_id, source_id)
+  values ('00000000-0000-4000-8000-00000000f003', '${ids.kTenant}', '00000000-0000-4000-8000-00000000f002', 1, 'Our own MRR.', '{"kind":"MONEY","amount":"9100","currency":"USD"}', 'USER_CLAIM', 'SELF_REPORTED', 'CURRENT', 'SOURCE', '00000000-0000-4000-8000-00000000f001', '00000000-0000-4000-8000-00000000f001');
+insert into evidence.claims (id, tenant_id, subject_type, subject_id, claim_type, claim_key, statement, structured_value, asserted_by_type, asserted_by_id, asserted_at, truth_class, evidence_status, lifecycle_status, visibility_scope, sensitivity_class, current_revision_id, current_revision_number)
+  values ('00000000-0000-4000-8000-00000000f002', '${ids.kTenant}', 'COMPANY', '${ids.kCompany}', 'financial', 'financial.monthly_revenue', 'Our own MRR.', '{"kind":"MONEY","amount":"9100","currency":"USD"}', 'SOURCE', '00000000-0000-4000-8000-00000000f001', now(), 'USER_CLAIM', 'SELF_REPORTED', 'CURRENT', 'organisation_private', 'INTERNAL', '00000000-0000-4000-8000-00000000f003', 1);
+`;
+
+/** Capital Q's WRONG figure and WRONG raise, as they might be on the platform. */
+const CAPITAL_Q_WRONG = `
+insert into evidence.sources (id, tenant_id, source_type, subject_type, subject_id, title, visibility_scope, sensitivity_class)
+  values ('00000000-0000-4000-8000-00000000f101', '${ids.cqTenant}', 'USER_STATEMENT', 'COMPANY', '${ids.cqCompany}', 'Old', 'network_visible', 'PUBLIC');
+insert into evidence.claim_revisions (id, tenant_id, claim_id, revision_number, statement, structured_value, truth_class, evidence_status, lifecycle_status, changed_by_type, changed_by_id, source_id)
+  values ('00000000-0000-4000-8000-00000000f103', '${ids.cqTenant}', '00000000-0000-4000-8000-00000000f102', 1, 'MRR is USD 999,999.', '{"kind":"MONEY","amount":"999999","currency":"USD"}', 'USER_CLAIM', 'SELF_REPORTED', 'CURRENT', 'SOURCE', '00000000-0000-4000-8000-00000000f101', '00000000-0000-4000-8000-00000000f101');
+insert into evidence.claims (id, tenant_id, subject_type, subject_id, claim_type, claim_key, statement, structured_value, asserted_by_type, asserted_by_id, asserted_at, truth_class, evidence_status, lifecycle_status, visibility_scope, sensitivity_class, current_revision_id, current_revision_number)
+  values ('00000000-0000-4000-8000-00000000f102', '${ids.cqTenant}', 'COMPANY', '${ids.cqCompany}', 'financial', 'financial.monthly_revenue', 'MRR is USD 999,999.', '{"kind":"MONEY","amount":"999999","currency":"USD"}', 'SOURCE', '00000000-0000-4000-8000-00000000f101', now(), 'USER_CLAIM', 'SELF_REPORTED', 'CURRENT', 'network_visible', 'PUBLIC', '00000000-0000-4000-8000-00000000f103', 1);
+insert into core.capital_objectives (id, tenant_id, company_id, target_amount, currency_code, target_stage, created_by_user_id)
+  select '00000000-0000-4000-8000-00000000f104', '${ids.cqTenant}', '${ids.cqCompany}', 20000000, 'USD', 'series_b', id
+    from identity.user_profiles where auth_user_id = '${ids.ownerAuth}';
+`;
+
+before(async () => {
+  if (!TEMPLATE_URL) return;
+  admin = localDatabase(TEMPLATE_URL.replace(/\/[^/]*$/, "/postgres"));
+  const template = new URL(TEMPLATE_URL).pathname.slice(1);
+  await admin.run(`create database ${TEST_DB} template ${template}`);
+  db = localDatabase(TEMPLATE_URL.replace(/\/[^/]*$/, `/${TEST_DB}`));
+  await db.run(SETUP);
+  await db.run(KUUZA_OWN_CLAIM);
+  await db.run(CAPITAL_Q_WRONG);
+  const planned = await planAll(db, fixture, {
+    persons: { david: "david@example.invalid" },
+    now: "2026-10-22T10:00:00.000Z",
+  });
+  await applyAll(db, planned);
+});
+
+after(async () => {
+  if (!TEMPLATE_URL) return;
+  await db.close();
+  await admin.run(`drop database if exists ${TEST_DB} with (force)`);
+  await admin.close();
+});
+
+const skip = TEMPLATE_URL ? false : "CQ_SEED_TEST_DATABASE_URL is not set";
+
+test(
+  "Capital Q is corrected in place: one canonical company, never a second",
+  { skip },
+  async () => {
+    const rows = await db.read(
+      "select * from core.companies where lower(canonical_name) in ('capital q','capitalq','capital-q')",
+    );
+    assert.equal(rows.length, 1);
+    const c = rows[0];
+    assert.equal(c.id, ids.cqCompany);
+    assert.equal(c.organisation_id, CAPITAL_Q_ORG);
+    assert.equal(c.current_stage_code, "pre_seed");
+    assert.equal(c.headquarters_country, "NG");
+    assert.equal(c.headquarters_city, "Lagos");
+    assert.equal(c.marketplace_visibility, "network_visible");
+    assert.equal(c.demonstration_data, true);
+    assert.match(c.primary_description, /demonstration data/);
+  },
+);
+
+test(
+  "every seeded figure is self-reported demonstration data, never verified",
+  { skip },
+  async () => {
+    const claims = await db.read(
+      `select claim_key, statement, truth_class, evidence_status, visibility_scope from evidence.claims where subject_id = '${ids.cqCompany}' and lifecycle_status = 'CURRENT'`,
+    );
+    assert.ok(claims.length >= 9);
+    for (const c of claims) {
+      assert.equal(c.evidence_status, "SELF_REPORTED");
+      assert.ok(["USER_CLAIM", "ESTIMATE"].includes(c.truth_class));
+      assert.ok(c.statement.endsWith(DEMO_STATEMENT_SUFFIX));
+      assert.equal(c.visibility_scope, "network_visible");
+    }
+    const verified = await db.read(
+      "select count(*)::int as n from evidence.claims where evidence_status in ('EXTERNALLY_VERIFIED','PLATFORM_VERIFIED') or truth_class = 'VERIFIED'",
+    );
+    assert.equal(verified[0].n, 0);
+    const attestations = await db.read(
+      "select count(*)::int as n from evidence.verification_claims",
+    );
+    assert.equal(attestations[0].n, 0, "the seed never writes a verification");
+  },
+);
+
+test(
+  "Capital Q's wrong figure and raise are superseded, never deleted",
+  { skip },
+  async () => {
+    const [old] = await db.read(
+      "select lifecycle_status, current_revision_number from evidence.claims where id = '00000000-0000-4000-8000-00000000f102'",
+    );
+    assert.equal(old.lifecycle_status, "SUPERSEDED");
+    assert.equal(old.current_revision_number, 2);
+    const revisions = await db.read(
+      "select revision_number, lifecycle_status from evidence.claim_revisions where claim_id = '00000000-0000-4000-8000-00000000f102' order by 1",
+    );
+    assert.deepEqual(
+      revisions.map((r) => r.lifecycle_status),
+      ["CURRENT", "SUPERSEDED"],
+    );
+    const current = await db.read(
+      `select structured_value from evidence.claims where subject_id = '${ids.cqCompany}' and claim_key = 'financial.monthly_revenue' and lifecycle_status = 'CURRENT'`,
+    );
+    assert.equal(current.length, 1);
+    assert.equal(current[0].structured_value.amount, "4800");
+    const raises = await db.read(
+      `select status, target_amount::text as amount from core.capital_objectives where company_id = '${ids.cqCompany}' order by created_at, status`,
+    );
+    assert.deepEqual(raises.map((r) => `${r.status}:${r.amount}`).sort(), [
+      "ACTIVE:1500000",
+      "REPLACED:20000000",
+    ]);
+  },
+);
+
+test(
+  "KUUZA AI keeps everything its founder entered; only gaps are filled",
+  { skip },
+  async () => {
+    const [k] = await db.read(
+      `select * from core.companies where id = '${ids.kCompany}'`,
+    );
+    assert.equal(
+      k.short_description,
+      "AI simulator and coach for practising sales, customer-service and other workplace conversations.",
+    );
+    assert.equal(k.marketplace_visibility, "organisation_private");
+    assert.equal(k.current_stage_code, null);
+    assert.equal(k.headquarters_country, null);
+    const mrr = await db.read(
+      `select structured_value, lifecycle_status from evidence.claims where subject_id = '${ids.kCompany}' and claim_key = 'financial.monthly_revenue'`,
+    );
+    assert.equal(
+      mrr.length,
+      1,
+      "the founder's own figure is not superseded or duplicated",
+    );
+    assert.equal(mrr[0].structured_value.amount, "9100");
+    assert.equal(mrr[0].lifecycle_status, "CURRENT");
+    const added = await db.read(
+      `select claim_key from evidence.claims where subject_id = '${ids.kCompany}' and claim_key <> 'financial.monthly_revenue' order by 1`,
+    );
+    assert.deepEqual(
+      added.map((r) => r.claim_key),
+      ["customers.employers", "financial.gross_margin", "traction.growth"],
+    );
+    assert.equal(k.demonstration_data, true);
+  },
+);
+
+test(
+  "Songscribe is created once, with its founders and its raise",
+  { skip },
+  async () => {
+    const rows = await db.read(
+      "select * from core.companies where canonical_name = 'Songscribe'",
+    );
+    assert.equal(rows.length, 1);
+    const [founders] = await db.read(
+      `select structured_value from evidence.claims where subject_id = '${rows[0].id}' and claim_key = 'team.founders'`,
+    );
+    assert.deepEqual(
+      founders.structured_value.founders.map((f) => f.name),
+      ["Excel Chukwu", "Captain Zino Mario"],
+    );
+    const [raise] = await db.read(
+      `select target_amount::text as amount, currency_code from core.capital_objectives where company_id = '${rows[0].id}' and status = 'ACTIVE'`,
+    );
+    assert.deepEqual(raise, { amount: "750000", currency_code: "USD" });
+  },
+);
+
+test(
+  "discoverable to Q: listed and eligible in the knowledge projection",
+  { skip },
+  async () => {
+    const listed = await db.read(
+      `select p.canonical_name, p.listed, p.discovery_eligible from knowledge.company_profiles p join core.companies c on c.id = p.company_id where c.demonstration_data order by 1`,
+    );
+    const byName = Object.fromEntries(listed.map((r) => [r.canonical_name, r]));
+    assert.equal(byName["Capital Q"]?.listed, true);
+    assert.equal(byName["Capital Q"]?.discovery_eligible, true);
+    assert.equal(byName["Songscribe"]?.listed, true);
+    // KUUZA AI stays where its founder put it.
+    assert.equal(byName["KUUZA AI"]?.listed ?? false, false);
+  },
+);
+
+test(
+  "Q Cards: Capital Q's company card and David's own card",
+  { skip },
+  async () => {
+    const [card] = await db.read(
+      `select field_scopes from core.shareable_identities where subject_type = 'COMPANY' and subject_id = '${ids.cqCompany}'`,
+    );
+    assert.equal(card.field_scopes.tractionMetrics, "public_external");
+    assert.equal(card.field_scopes.investabilitySummary, "network_visible");
+    const [handle] = await db.read(
+      `select handle from core.handles where subject_id = '${ids.cqCompany}' and status = 'ACTIVE'`,
+    );
+    assert.equal(handle.handle, "capital-q-hq");
+    const person = await db.read(
+      "select h.handle, h.organisation_id, s.created_by_user_id = s.subject_id as own from core.handles h join core.shareable_identities s on s.subject_type = h.subject_type and s.subject_id = h.subject_id where h.subject_type = 'PERSON'",
+    );
+    assert.deepEqual(
+      [...person].map((row) => ({ ...row })),
+      [{ handle: "david-nwankwo", organisation_id: null, own: true }],
+    );
+  },
+);
+
+test("idempotent: a second run plans nothing", { skip }, async () => {
+  const again = await planAll(db, fixture, {
+    persons: { david: "david@example.invalid" },
+    now: "2026-10-22T11:00:00.000Z",
+  });
+  for (const { plan, sql } of again.companies) {
+    assert.equal(sql, null, `${plan.key} would change again`);
+  }
+  for (const p of again.people) assert.equal(p.sql, null);
+});
+
+test(
+  "a duplicate Capital Q stops the seed rather than picking one",
+  { skip },
+  async () => {
+    await db.run(`
+    insert into identity.tenants (id, name) values ('00000000-0000-4000-8000-00000000b009', 'Copy');
+    insert into identity.organisations (id, tenant_id, organisation_type, display_name, slug) values ('00000000-0000-4000-8000-00000000d009', '00000000-0000-4000-8000-00000000b009', 'company', 'Songscribe copy', 'song-copy');
+    insert into identity.tenant_organisations (tenant_id, organisation_id) values ('00000000-0000-4000-8000-00000000b009', '00000000-0000-4000-8000-00000000d009');
+    insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug) values ('00000000-0000-4000-8000-00000000c009', '00000000-0000-4000-8000-00000000b009', '00000000-0000-4000-8000-00000000d009', 'SongScribe', 'songscribe');
+  `);
+    await assert.rejects(
+      planAll(db, fixture, { now: "2026-10-22T12:00:00.000Z" }),
+      /one canonical company is required/,
+    );
+  },
+);

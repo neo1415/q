@@ -95,6 +95,11 @@ const METRICS: ReadonlyArray<{
     label: "Customers",
     unit: "customers",
   },
+  {
+    keys: ["customers.paying_accounts", "customers.employers"],
+    label: "Paying customers",
+    unit: "customers",
+  },
   { keys: ["traction.active_users"], label: "Active users", unit: "users" },
   { keys: ["financial.gross_margin"], label: "Gross margin", unit: "%" },
   { keys: ["financial.nrr"], label: "Net revenue retention", unit: "%" },

@@ -1,0 +1,302 @@
+#!/usr/bin/env node
+// Demonstration companies (owner direction 2026-10-22): Capital Q, KUUZA AI
+// and Songscribe. See plan.mjs for the rules; this file reads the current
+// state, plans, prints what would change and, only with --apply, runs it.
+//
+//   Local (tests, rehearsal):
+//     node scripts/seed/demo-companies/seed.mjs --database-url postgresql://postgres@127.0.0.1:54329/cq [--apply]
+//
+//   Hosted (production): a separate, explicit step the owner approves at
+//   deploy time. Dry run first, read the plan, then --apply:
+//     SUPABASE_ACCESS_TOKEN=... node scripts/seed/demo-companies/seed.mjs --hosted [--apply]
+//
+//   Person Q Cards for people who already have accounts and agreed:
+//     --person david=<email> --person zino=<email>
+//
+// The token stays in process memory; nothing here prints or writes it.
+// Idempotent: deterministic ids, and a second run plans nothing.
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  planCompany,
+  renderCompanySql,
+  renderPersonCardSql,
+  seedUuid,
+} from "./plan.mjs";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+export const FIXTURE_PATH = join(
+  ROOT,
+  "supabase/seed-assets/demo-companies/companies.json",
+);
+const HOSTED_PROJECT_REF = "vcohxiqsmnkzxnvawgri";
+
+/** A database the seed can read from and write to. */
+export function localDatabase(url) {
+  const require = createRequire(join(ROOT, "packages/database/package.json"));
+  const postgres = require("postgres");
+  const sql = postgres(url, { max: 1, onnotice: () => {} });
+  return {
+    read: (text) => sql.unsafe(text),
+    run: (text) => sql.unsafe(text).simple(),
+    close: () => sql.end(),
+  };
+}
+
+export function hostedDatabase() {
+  const query = async (text, readOnly) => {
+    const token = process.env.SUPABASE_ACCESS_TOKEN?.trim();
+    if (!token) throw new Error("SUPABASE_ACCESS_TOKEN is required");
+    const r = await fetch(
+      `https://api.supabase.com/v1/projects/${HOSTED_PROJECT_REF}/database/query`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ query: text, read_only: readOnly }),
+      },
+    );
+    const body = await r.json().catch(() => null);
+    if (!r.ok) {
+      throw new Error(
+        `sql: HTTP ${r.status} ${JSON.stringify(body).slice(0, 400)}`,
+      );
+    }
+    return body;
+  };
+  return {
+    read: (text) => query(text, true),
+    run: (text) => query(text, false),
+    close: async () => {},
+  };
+}
+
+const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
+
+/** Everything planCompany needs to know about one company now. */
+export async function readCompanyState(db, spec) {
+  const byOrg = spec.match.organisationId
+    ? await db.read(
+        `select * from core.companies where organisation_id = ${q(spec.match.organisationId)} and company_status = 'active'`,
+      )
+    : [];
+  const byName =
+    byOrg.length > 0
+      ? []
+      : await db.read(
+          `select * from core.companies where company_status = 'active' and lower(btrim(canonical_name)) = any(array[${spec.match.names.map((n) => q(n.toLowerCase())).join(",")}])`,
+        );
+  const found = [...byOrg, ...byName];
+  if (found.length > 1) {
+    throw new Error(
+      `${spec.canonicalName}: ${found.length} active companies match; one canonical company is required, so nothing was changed`,
+    );
+  }
+  const company = found[0] ?? null;
+  if (company === null) {
+    return {
+      company: null,
+      claims: [],
+      objective: null,
+      taxonomyNodeIds: new Set(),
+      taxonomyVocabsUsed: new Set(),
+      memberCount: 0,
+      handle: null,
+      card: null,
+    };
+  }
+  const id = q(company.id);
+  const [claims, objectives, assigned, members, handles, cards] =
+    await Promise.all([
+      db.read(
+        `select id, claim_key, structured_value, current_revision_number, statement, truth_class, evidence_status, valid_from from evidence.claims where subject_type = 'COMPANY' and subject_id = ${id} and lifecycle_status = 'CURRENT'`,
+      ),
+      db.read(
+        `select id, target_amount::text as target_amount, currency_code, target_stage, instrument_code, target_close_date::text as target_close_date, use_of_funds_summary from core.capital_objectives where company_id = ${id} and status = 'ACTIVE'`,
+      ),
+      db.read(
+        `select a.node_id, v.code as vocab from taxonomy.entity_assignments a join taxonomy.nodes n on n.id = a.node_id join taxonomy.vocabularies v on v.id = n.vocabulary_id where a.entity_type = 'COMPANY' and a.entity_id = ${id} and a.status = 'ACTIVE'`,
+      ),
+      db.read(
+        `select count(*)::int as n from core.company_members where company_id = ${id} and is_current`,
+      ),
+      db.read(
+        `select handle from core.handles where subject_type = 'COMPANY' and subject_id = ${id} and status = 'ACTIVE'`,
+      ),
+      db.read(
+        `select id, field_scopes, version from core.shareable_identities where subject_type = 'COMPANY' and subject_id = ${id}`,
+      ),
+    ]);
+  return {
+    company,
+    claims,
+    objective: objectives[0] ?? null,
+    taxonomyNodeIds: new Set(assigned.map((a) => a.node_id)),
+    taxonomyVocabsUsed: new Set(assigned.map((a) => a.vocab)),
+    memberCount: members[0]?.n ?? 0,
+    handle: handles[0]?.handle ?? null,
+    card: cards[0] ?? null,
+  };
+}
+
+async function readNodes(db) {
+  const rows = await db.read(
+    `select n.id, n.display_name, v.code as vocab from taxonomy.nodes n join taxonomy.vocabularies v on v.id = n.vocabulary_id`,
+  );
+  return new Map(rows.map((r) => [`${r.vocab}|${r.display_name}`, r.id]));
+}
+
+/** Plan every company (and person card) without writing anything. */
+export async function planAll(db, fixture, { persons = {}, now } = {}) {
+  const owner = (
+    await db.read(
+      "select user_id from identity.platform_admins where role = 'platform_owner' order by granted_at limit 1",
+    )
+  )[0]?.user_id;
+  if (!owner) throw new Error("no platform owner to attribute the seed to");
+  const nodes = await readNodes(db);
+  const at = now ?? new Date().toISOString();
+  const companies = [];
+  for (const spec of fixture.companies) {
+    const state = await readCompanyState(db, spec);
+    const plan = planCompany(fixture, spec, { ...state, nodes });
+    companies.push({
+      plan,
+      sql: renderCompanySql(plan, {
+        seedKey: fixture.seedKey,
+        authorityUserId: owner,
+        now: at,
+      }),
+    });
+  }
+  const people = [];
+  for (const [person, email] of Object.entries(persons)) {
+    if (fixture.people[person] === undefined) {
+      throw new Error(`unknown person "${person}" in the fixture`);
+    }
+    const users = await db.read(
+      `select p.id, ac.tenant_id from identity.user_profiles p join auth.users u on u.id = p.auth_user_id left join identity.user_active_contexts c on c.user_id = p.id left join identity.organisation_memberships ac on ac.id = c.membership_id where lower(u.email) = lower(${q(email)}) and p.status = 'active'`,
+    );
+    if (users.length !== 1 || users[0].tenant_id === null) {
+      people.push({
+        person,
+        skip: "no single active account with a current organisation for that email",
+      });
+      continue;
+    }
+    const userId = users[0].id;
+    const [handles, cards] = await Promise.all([
+      db.read(
+        `select handle from core.handles where subject_type = 'PERSON' and subject_id = ${q(userId)} and status = 'ACTIVE'`,
+      ),
+      db.read(
+        `select id from core.shareable_identities where subject_type = 'PERSON' and subject_id = ${q(userId)}`,
+      ),
+    ]);
+    const handle = personHandle(fixture.people[person]);
+    people.push({
+      person,
+      userId,
+      handle: handles[0]?.handle ?? handle,
+      sql: renderPersonCardSql({
+        seedKey: fixture.seedKey,
+        userId,
+        handle,
+        tenantId: users[0].tenant_id,
+        existingHandle: handles[0]?.handle ?? null,
+        existingCard: cards[0] ?? null,
+      }),
+    });
+  }
+  return { owner, companies, people };
+}
+
+export function personHandle(person) {
+  const name =
+    person.displayName?.replace(/^captain\s+/i, "") ??
+    `${person.givenName} ${person.familyName}`;
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 30);
+}
+
+export async function applyAll(db, planned) {
+  for (const c of planned.companies) if (c.sql !== null) await db.run(c.sql);
+  for (const p of planned.people) if (p.sql) await db.run(p.sql);
+}
+
+export function describe(planned) {
+  const lines = [];
+  for (const { plan } of planned.companies) {
+    if (plan.skip) {
+      lines.push(`- ${plan.key}: SKIP (${plan.skip})`);
+      continue;
+    }
+    if (plan.noop) {
+      lines.push(`- ${plan.name}: nothing to change`);
+      continue;
+    }
+    lines.push(
+      `- ${plan.name} [${plan.mode}] ${plan.create ? "CREATE" : `company ${plan.ids.company}`}`,
+      `    fields: ${Object.keys(plan.changes).join(", ") || "none"}${plan.label ? "; + demonstration label" : ""}`,
+      `    claims: +${plan.claims.length} (${plan.claims.map((c) => c.claim.key).join(", ") || "none"}); superseded ${plan.claims.reduce((n, c) => n + c.supersede.length, 0)}`,
+      `    taxonomy: +${plan.taxonomy.length}; raise: ${plan.raise === null ? "unchanged" : plan.raise.replace === null ? "create" : "replace"}; card: ${plan.card === null ? "unchanged" : plan.card.create ? "create" : "update scopes"}; handle: ${plan.handle?.handle ?? "unchanged"}`,
+    );
+  }
+  for (const p of planned.people) {
+    lines.push(
+      p.skip
+        ? `- person ${p.person}: SKIP (${p.skip})`
+        : `- person ${p.person}: ${p.sql === null ? "card already there" : `card @${p.handle}`}`,
+    );
+  }
+  return lines.join("\n");
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const apply = args.includes("--apply");
+  const url = args[args.indexOf("--database-url") + 1];
+  const hosted = args.includes("--hosted");
+  if (hosted === args.includes("--database-url")) {
+    throw new Error("choose one target: --database-url <url> or --hosted");
+  }
+  const persons = {};
+  args.forEach((arg, i) => {
+    if (arg === "--person") {
+      const [name, email] = String(args[i + 1]).split("=");
+      if (!name || !email) throw new Error("--person name=email");
+      persons[name] = email;
+    }
+  });
+  const fixture = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
+  const db = hosted ? hostedDatabase() : localDatabase(url);
+  try {
+    const planned = await planAll(db, fixture, { persons });
+    console.log(describe(planned));
+    if (!apply) {
+      console.log("\nDry run: nothing written. Add --apply to write.");
+      return;
+    }
+    await applyAll(db, planned);
+    console.log("\nApplied.");
+  } finally {
+    await db.close();
+  }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}
+
+export { seedUuid };

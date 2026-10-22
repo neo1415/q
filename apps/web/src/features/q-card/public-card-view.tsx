@@ -18,6 +18,7 @@ import {
 } from "@capital-q/ui/icons";
 
 import { QNavIcon } from "@/components/app-shell/q-nav-icon";
+import { DemonstrationNote } from "@/components/demonstration-note";
 import { SeeMore } from "@/components/see-more";
 
 import {
@@ -294,6 +295,10 @@ export function PublicCardView({
           ))}
         </ul>
       )}
+
+      {card.demonstration === true ? (
+        <DemonstrationNote subject="card" />
+      ) : null}
 
       <section aria-label="Actions" className="flex flex-col gap-2">
         <a

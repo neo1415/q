@@ -416,3 +416,35 @@ describe("the subject directory", () => {
     expect(failed?.details).toBeUndefined();
   });
 });
+
+describe("demonstration data", () => {
+  it("is carried from the company read to the card's subject facts", async () => {
+    const company = {
+      tenantId: "t",
+      organisationId: "o",
+      canonicalName: "Capital Q",
+      shortDescription: null,
+      currentStageCode: null,
+      headquartersCity: null,
+      headquartersCountry: null,
+      websiteUrl: null,
+      foundedDate: null,
+    };
+    const ports = {
+      findInvestor: () => Promise.resolve(null),
+      companyVerification: () =>
+        Promise.resolve({ organisation: false, founderIdentity: false }),
+    };
+    const demo = await createSubjectDirectory({
+      ...ports,
+      findCompany: () =>
+        Promise.resolve({ ...company, demonstrationData: true }),
+    }).find({ subjectType: "COMPANY", subjectId: COMPANY_ID });
+    expect(demo?.demonstration).toBe(true);
+    const plain = await createSubjectDirectory({
+      ...ports,
+      findCompany: () => Promise.resolve(company),
+    }).find({ subjectType: "COMPANY", subjectId: COMPANY_ID });
+    expect(plain?.demonstration).toBe(false);
+  });
+});

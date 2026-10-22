@@ -29,6 +29,8 @@ export type CompanyProfileRead = {
   readonly headquartersCountry: string | null;
   readonly websiteUrl: string | null;
   readonly foundedDate: string | null;
+  /** Owner-approved demonstration figures; absent reads false. */
+  readonly demonstrationData?: boolean | undefined;
 };
 
 export type InvestorProfileRead = {
@@ -198,6 +200,11 @@ export function createSubjectDirectory(
           tenantId: null,
           organisationId: null,
           name: person.displayName,
+          // Their focus echoes the organisation's card: so does its label.
+          demonstration:
+            focus !== null &&
+            (publicCard?.demonstration === true ||
+              memberCard?.demonstration === true),
           facts: {
             displayName: person.displayName,
             headline: person.headline,
@@ -237,6 +244,7 @@ export function createSubjectDirectory(
           tenantId: company.tenantId,
           organisationId: company.organisationId,
           name: company.canonicalName,
+          demonstration: company.demonstrationData === true,
           facts: {
             canonicalName: company.canonicalName,
             shortDescription: company.shortDescription,

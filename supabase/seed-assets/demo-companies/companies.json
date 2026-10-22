@@ -1,0 +1,424 @@
+{
+  "$comment": "Demonstration companies (owner direction 2026-10-22). One source for the seed script (scripts/seed/demo-companies) and the Q Story's Q Card fixture. Every number is DEMONSTRATION DATA: truth class USER_CLAIM or ESTIMATE, evidence status SELF_REPORTED, never verified. Identity facts come from the owner; anything not given is null (unknown), never guessed.",
+  "seedKey": "demo-companies-v1",
+  "asOf": "2026-09-30",
+  "people": {
+    "david": {
+      "givenName": "David",
+      "familyName": "Nwankwo",
+      "familyNameConfirmed": true,
+      "headline": "Founder of Capital Q, the home of private capital.",
+      "photo": "supabase/seed-assets/capital-q-team/david-founder.jpg"
+    },
+    "zino": {
+      "displayName": "Captain Zino Mario",
+      "headline": "Co-founder of Capital Q and Songscribe.",
+      "photo": null
+    },
+    "daniel": {
+      "displayName": "Daniel Oyeniyi",
+      "headline": null,
+      "photo": null
+    },
+    "adeyemi": {
+      "displayName": "Adeyemi Odunyugbo",
+      "headline": null,
+      "photo": null
+    },
+    "excel": {
+      "displayName": "Excel Chukwu",
+      "headline": null,
+      "photo": null
+    }
+  },
+  "companies": [
+    {
+      "key": "capital-q",
+      "mode": "CORRECT",
+      "match": {
+        "organisationId": "f95c3469-ef29-4574-a508-c1ba1131d842",
+        "names": ["Capital Q", "CapitalQ", "Capital-Q"]
+      },
+      "canonicalName": "Capital Q",
+      "handle": "capital-q-hq",
+      "websiteUrl": "https://capital-qweb-production.up.railway.app/",
+      "headquartersCity": "Lagos",
+      "headquartersCountry": "NG",
+      "foundedDate": null,
+      "stageCode": "pre_seed",
+      "shortDescription": "The home of private capital: founders and investors meet on evidence, with Q, an AI investment analyst, doing the work in between.",
+      "primaryDescription": "Capital Q is an AI-native investment intelligence platform for private capital. Founders upload what they already have and Q reads it, finds the gaps and builds an investor-ready profile. Investors set a mandate once and get a personalised, explainable feed of companies that fit, with Q answering their questions from evidence, not opinion. Every fact carries its source and how it is supported, so trust is earned before the first meeting.",
+      "taxonomy": {
+        "industry": ["Capital Markets", "Fintech"],
+        "business_model": ["B2B SaaS"],
+        "customer_type": ["Business Customer", "Financial Institution"],
+        "technology": [
+          "Artificial Intelligence",
+          "Natural Language Processing"
+        ],
+        "product_category": ["Data & Analytics Platform"]
+      },
+      "claims": [
+        {
+          "key": "financial.monthly_revenue",
+          "type": "financial",
+          "statement": "Monthly recurring revenue was USD 4,800 in September 2026 (pilot subscriptions).",
+          "value": {
+            "kind": "MONEY",
+            "amount": "4800",
+            "currency": "USD",
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "financial.arr",
+          "type": "financial",
+          "statement": "Annual recurring revenue run-rate was USD 57,600 at the end of September 2026.",
+          "value": {
+            "kind": "MONEY",
+            "amount": "57600",
+            "currency": "USD",
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "customers.paying_accounts",
+          "type": "customers",
+          "statement": "12 investor firms paid for pilot subscriptions in September 2026.",
+          "value": {
+            "kind": "COUNT",
+            "value": 12,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "traction.active_users",
+          "type": "traction",
+          "statement": "1,240 founders and investors were active in September 2026.",
+          "value": {
+            "kind": "COUNT",
+            "value": 1240,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "traction.growth",
+          "type": "traction",
+          "statement": "Monthly recurring revenue grew 60% from June to September 2026 (USD 3,000 to USD 4,800).",
+          "value": {
+            "kind": "PERCENT",
+            "metric": "REVENUE",
+            "value": 60,
+            "periodStart": "2026-06-30",
+            "periodEnd": "2026-09-30",
+            "startAmount": "3000",
+            "endAmount": "4800",
+            "currency": "USD"
+          }
+        },
+        {
+          "key": "financial.gross_margin",
+          "type": "financial",
+          "statement": "Gross margin was 78% in Q3 2026.",
+          "value": {
+            "kind": "PERCENT",
+            "value": 78,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "financial.nrr",
+          "type": "financial",
+          "statement": "Net revenue retention across pilot accounts was 112% in Q3 2026.",
+          "value": {
+            "kind": "PERCENT",
+            "value": 112,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "team.employee_count",
+          "type": "team",
+          "statement": "The team is 6 people.",
+          "value": {
+            "kind": "COUNT",
+            "value": 6,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "market.size",
+          "type": "market",
+          "truthClass": "ESTIMATE",
+          "statement": "Estimated annual spend on deal sourcing and diligence tools by African and emerging-market private capital: USD 1.2 billion.",
+          "value": {
+            "kind": "MONEY",
+            "amount": "1200000000",
+            "currency": "USD",
+            "evidenceCapturedAt": "2026-09-30"
+          }
+        },
+        {
+          "key": "capital.raise_target",
+          "type": "capital",
+          "statement": "Raising USD 1,500,000 at pre-seed on a SAFE, closing by 2027-03-31.",
+          "value": {
+            "kind": "MONEY",
+            "amount": "1500000",
+            "currency": "USD",
+            "asOf": "2026-09-30"
+          }
+        }
+      ],
+      "founders": [
+        {
+          "person": "david",
+          "title": "Founder & CEO"
+        },
+        {
+          "person": "zino",
+          "title": "Co-founder"
+        }
+      ],
+      "team": [
+        {
+          "person": "daniel",
+          "title": "Engineering"
+        },
+        {
+          "person": "adeyemi",
+          "title": "Engineering"
+        }
+      ],
+      "raise": {
+        "stageCode": "pre_seed",
+        "instrumentCode": "safe",
+        "target": {
+          "amount": "1500000",
+          "currency": "USD"
+        },
+        "targetCloseDate": "2027-03-31",
+        "useOfFunds": "Grow the investor network across West and East Africa, hire four engineers, and complete Capital Q's own verification and data-room partnerships."
+      },
+      "documents": [
+        "Pitch deck, Q3 2026",
+        "Financial model 2026–2028",
+        "Pilot customer summary",
+        "Cap table summary"
+      ],
+      "governance": "Two founders; board of two founders until the seed round; advisory board being formed.",
+      "qCard": {
+        "tractionMetrics": "public_external",
+        "currentRaise": "public_external",
+        "relationshipSummary": "network_visible",
+        "investabilitySummary": "network_visible",
+        "team": "network_visible",
+        "documentsOnRequest": "network_visible"
+      }
+    },
+    {
+      "key": "kuuza-ai",
+      "mode": "FILL_GAPS",
+      "match": {
+        "names": ["KUUZA AI", "Kuuza AI", "Kuuza"]
+      },
+      "canonicalName": "KUUZA AI",
+      "handle": null,
+      "websiteUrl": null,
+      "headquartersCity": null,
+      "headquartersCountry": null,
+      "foundedDate": null,
+      "stageCode": null,
+      "shortDescription": "AI-powered hiring and skills assessment platform for African employers.",
+      "primaryDescription": "KUUZA AI helps African employers screen candidates, assess real workplace skills with AI-simulated conversations and reduce time to hire. It is sold as B2B SaaS to businesses in Nigeria, Kenya and South Africa.",
+      "taxonomy": {
+        "industry": ["HR Technology"],
+        "business_model": ["B2B SaaS"],
+        "customer_type": ["Business Customer", "Small & Medium Business"],
+        "technology": ["Artificial Intelligence", "Natural Language Processing"]
+      },
+      "claims": [
+        {
+          "key": "financial.monthly_revenue",
+          "type": "financial",
+          "statement": "Monthly recurring revenue was USD 6,500 in September 2026.",
+          "value": {
+            "kind": "MONEY",
+            "amount": "6500",
+            "currency": "USD",
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "customers.employers",
+          "type": "customers",
+          "statement": "18 employers paid for KUUZA AI in September 2026.",
+          "value": {
+            "kind": "COUNT",
+            "value": 18,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "traction.growth",
+          "type": "traction",
+          "statement": "Monthly recurring revenue grew 30% from June to September 2026 (USD 5,000 to USD 6,500).",
+          "value": {
+            "kind": "PERCENT",
+            "metric": "REVENUE",
+            "value": 30,
+            "periodStart": "2026-06-30",
+            "periodEnd": "2026-09-30",
+            "startAmount": "5000",
+            "endAmount": "6500",
+            "currency": "USD"
+          }
+        },
+        {
+          "key": "financial.gross_margin",
+          "type": "financial",
+          "statement": "Gross margin was 72% in Q3 2026.",
+          "value": {
+            "kind": "PERCENT",
+            "value": 72,
+            "asOf": "2026-09-30"
+          }
+        }
+      ],
+      "founders": [],
+      "team": [],
+      "raise": null,
+      "documents": [],
+      "governance": null,
+      "qCard": null
+    },
+    {
+      "key": "songscribe",
+      "mode": "CORRECT",
+      "match": {
+        "names": ["Songscribe", "SongScribe", "Song Scribe"]
+      },
+      "canonicalName": "Songscribe",
+      "handle": "songscribe",
+      "websiteUrl": null,
+      "headquartersCity": null,
+      "headquartersCountry": null,
+      "foundedDate": null,
+      "stageCode": "pre_seed",
+      "shortDescription": "An AI songwriting assistant that helps artists draft lyrics and melodies, then shape them into finished songs.",
+      "primaryDescription": "Songscribe is an AI co-writer for musicians. Artists start from an idea, a voice note or a hook; Songscribe suggests lyrics, rhymes, structure and melody, keeps every draft, and leaves the artist in control of what is theirs. It is sold as a consumer subscription with a free tier.",
+      "taxonomy": {
+        "industry": ["Media & Entertainment"],
+        "business_model": ["Consumer Subscription", "Freemium"],
+        "customer_type": ["Consumer"],
+        "technology": ["Artificial Intelligence", "Natural Language Processing"]
+      },
+      "claims": [
+        {
+          "key": "financial.monthly_revenue",
+          "type": "financial",
+          "statement": "Monthly recurring revenue was USD 3,200 in September 2026.",
+          "value": {
+            "kind": "MONEY",
+            "amount": "3200",
+            "currency": "USD",
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "customers.paying_accounts",
+          "type": "customers",
+          "statement": "410 songwriters paid for a subscription in September 2026.",
+          "value": {
+            "kind": "COUNT",
+            "value": 410,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "traction.active_users",
+          "type": "traction",
+          "statement": "8,600 songwriters were active in September 2026.",
+          "value": {
+            "kind": "COUNT",
+            "value": 8600,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "traction.growth",
+          "type": "traction",
+          "statement": "Paying songwriters grew 41% from June to September 2026 (290 to 410).",
+          "value": {
+            "kind": "PERCENT",
+            "metric": "PAYING_CUSTOMERS",
+            "value": 41,
+            "periodStart": "2026-06-30",
+            "periodEnd": "2026-09-30"
+          }
+        },
+        {
+          "key": "financial.gross_margin",
+          "type": "financial",
+          "statement": "Gross margin was 64% in Q3 2026.",
+          "value": {
+            "kind": "PERCENT",
+            "value": 64,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "team.employee_count",
+          "type": "team",
+          "statement": "The team is 4 people.",
+          "value": {
+            "kind": "COUNT",
+            "value": 4,
+            "asOf": "2026-09-30"
+          }
+        },
+        {
+          "key": "capital.raise_target",
+          "type": "capital",
+          "statement": "Raising USD 750,000 at pre-seed on a SAFE, closing by 2027-02-28.",
+          "value": {
+            "kind": "MONEY",
+            "amount": "750000",
+            "currency": "USD",
+            "asOf": "2026-09-30"
+          }
+        }
+      ],
+      "founders": [
+        {
+          "person": "excel",
+          "title": "Co-founder"
+        },
+        {
+          "person": "zino",
+          "title": "Co-founder"
+        }
+      ],
+      "team": [],
+      "raise": {
+        "stageCode": "pre_seed",
+        "instrumentCode": "safe",
+        "target": {
+          "amount": "750000",
+          "currency": "USD"
+        },
+        "targetCloseDate": "2027-02-28",
+        "useOfFunds": "Melody generation, a mobile app, and artist partnerships in Lagos, Nairobi and Johannesburg."
+      },
+      "documents": ["Pitch deck, Q3 2026", "Subscriber metrics, Q3 2026"],
+      "governance": null,
+      "qCard": {
+        "tractionMetrics": "public_external",
+        "currentRaise": "public_external",
+        "relationshipSummary": "network_visible",
+        "investabilitySummary": "network_visible",
+        "team": "network_visible"
+      }
+    }
+  ]
+}

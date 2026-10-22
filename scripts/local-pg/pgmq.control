@@ -1,0 +1,4 @@
+comment = 'Local stub of pgmq for running Capital Q migrations without Supabase'
+default_version = '1.0'
+relocatable = false
+schema = pgmq

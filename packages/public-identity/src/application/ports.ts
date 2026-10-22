@@ -25,6 +25,8 @@ export type SubjectFacts = {
   /** Null for a PERSON: a person's card belongs to the person, not an organisation. */
   readonly organisationId: string | null;
   readonly name: string;
+  /** The profile carries owner-approved demonstration figures. */
+  readonly demonstration?: boolean | undefined;
   /** Declared profile fields by card field key; null means not stated. */
   readonly facts: Readonly<Record<string, string | null>>;
   /**

@@ -349,6 +349,7 @@ export function createPublicIdentityService(
       ],
       audience,
       indexable: card.indexable,
+      ...(facts.demonstration === true ? { demonstration: true } : {}),
     };
   };
 
