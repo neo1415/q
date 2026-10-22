@@ -18,6 +18,16 @@ const TEST_DB = `cq_seed_test_${process.pid}`;
 
 let admin;
 let db;
+/** Stand-in for the private bucket: what the seed uploaded, by key. */
+const stored = new Map();
+const storage = {
+  putObject: async ({ key, body, contentType }) => {
+    stored.set(key, { bytes: body.byteLength, contentType });
+  },
+};
+const PHOTOS = {
+  david: "supabase/seed-assets/capital-q-team/david-founder.jpg",
+};
 
 const ids = {
   ownerAuth: "00000000-0000-4000-8000-00000000a001",
@@ -96,9 +106,10 @@ before(async () => {
   await db.run(CAPITAL_Q_WRONG);
   const planned = await planAll(db, fixture, {
     persons: { david: "david@example.invalid" },
+    photos: PHOTOS,
     now: "2026-10-22T10:00:00.000Z",
   });
-  await applyAll(db, planned);
+  await applyAll(db, planned, { storage });
 });
 
 after(async () => {
@@ -282,11 +293,33 @@ test(
   },
 );
 
+test(
+  "David's own photo: re-encoded, uploaded first, owned by him",
+  { skip },
+  async () => {
+    const rows = await db.read(
+      "select i.status, i.object_key, i.width, i.height, i.organisation_id, i.created_by_user_id = i.subject_id as own from core.profile_images i where i.subject_type = 'PERSON' and i.kind = 'AVATAR'",
+    );
+    assert.equal(rows.length, 1);
+    const [row] = rows;
+    assert.equal(row.status, "READY");
+    assert.equal(row.own, true);
+    assert.equal(row.organisation_id, null);
+    assert.equal(row.width, row.height, "a square avatar");
+    assert.match(row.object_key, /^img\/[0-9a-f-]+\/[0-9a-f-]+\.webp$/);
+    const object = stored.get(row.object_key);
+    assert.equal(object?.contentType, "image/webp");
+    assert.ok(object.bytes > 1000);
+  },
+);
+
 test("idempotent: a second run plans nothing", { skip }, async () => {
   const again = await planAll(db, fixture, {
     persons: { david: "david@example.invalid" },
+    photos: PHOTOS,
     now: "2026-10-22T11:00:00.000Z",
   });
+  for (const photo of again.photos) assert.equal(photo.sql, null);
   for (const { plan, sql } of again.companies) {
     assert.equal(sql, null, `${plan.key} would change again`);
   }
