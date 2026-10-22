@@ -64,7 +64,9 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   pointer-events: none;
   display: grid;
   place-items: center;
-  padding: 16px;
+  /* Below Q's presence, above the caption band: nothing covers either. */
+  padding: calc(7vh + 172px) 16px
+    calc(3.2em + 64px + var(--cq-bottom-nav-height, 0px));
   color: var(--cq-text-primary);
   font-family: var(--cq-font-ui);
 }
@@ -613,9 +615,9 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
 /* The real Q Card page, in the app's own theme, scrolled by the light. */
 .cq-story-card-panel {
   width: min(560px, calc(100vw - 32px));
-  /* Above the caption band, never into it. */
-  max-height: min(62vh, 640px);
-  margin-bottom: 18vh;
+  max-height: calc(
+    93vh - 172px - 3.2em - 64px - var(--cq-bottom-nav-height, 0px)
+  );
   overflow: hidden;
   background: var(--cq-canvas);
   color: var(--cq-text-primary);
@@ -626,7 +628,9 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   color: var(--cq-text-primary);
 }
 .cq-story-qcard-page {
-  max-height: calc(min(62vh, 640px) - 72px);
+  max-height: calc(
+    93vh - 244px - 3.2em - 64px - var(--cq-bottom-nav-height, 0px)
+  );
   overflow-y: auto;
   scrollbar-width: none;
 }
