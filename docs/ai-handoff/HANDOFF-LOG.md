@@ -932,3 +932,15 @@ Next:
   - the owner storyboard artifact is published.
 - **Credentials:** the Supabase/Railway tokens supplied today work. Keep them as environment secrets; do not revoke them.
 - **Nothing deployed.** Owner OK is required for build/int-rc and deploy.
+
+## 2026-10-21 (night) — Claude, Q Story S2 storyboard (`qstory/storyboard`, PR into `speed/q-oct20`)
+
+- **Built:** dev-only `/dev/q-story` (gated like `/dev/instant-nav`; classified in `apps/q-api/test/route-capability-parity.test.ts`; parity matrix regenerated). It replays the plan's beat table on a fixed clock with karaoke captions over the real dev-harness pages (fixtures only), with word-anchored cues, highlight ring, story-mode scrim, photo montage, chips (✕ → ✓ payoff) and Q's presence following the light.
+- **Evidence:** `docs/ai-handoff/evidence/q-story/STORYBOARD.md`, 72 key-frame PNGs under `storyboard/` (17 moments × desktop/phone × light/dark = 68, plus 4 reduced-motion), and two full-length captioned MP4 films (desktop dark, phone light).
+- **Checks:**
+  - verbatim line table = `Q_STORY_VERBATIM.txt` (158 lines, 796 words);
+  - route parity test 11/11;
+  - eslint and tsc clean on the new files;
+  - prettier check.
+- **No app code changed.** No provider calls apart from a Pexels search through `packages/q-daily`'s port; the photos are not committed.
+- **Flags for the owner** (in STORYBOARD.md): product first appears at 4:28 of 7:55; GateQ score/rank gap (§8.3); the shipped nav differs from the plan's list; a Q Card component exists; story-mode scrim vs ADR 0017.

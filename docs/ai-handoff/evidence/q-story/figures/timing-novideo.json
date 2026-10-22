@@ -5,105 +5,105 @@
   "perFigure": {
     "WAVE": {
       "frames": 360,
-      "mean": 0.25,
+      "mean": 0.27,
       "p50": 0.1,
-      "p95": 0.9
+      "p95": 1
     },
     "CLOCK": {
-      "frames": 303,
+      "frames": 312,
       "mean": 0.33,
       "p50": 0.1,
-      "p95": 0.9
+      "p95": 1.1
     },
     "INBOX": {
-      "frames": 309,
-      "mean": 0.24,
+      "frames": 312,
+      "mean": 0.26,
       "p50": 0.1,
       "p95": 0.8
     },
     "MAGNIFIER": {
-      "frames": 306,
-      "mean": 0.21,
+      "frames": 303,
+      "mean": 0.28,
       "p50": 0.1,
-      "p95": 0.7
+      "p95": 1
     },
     "PLANE": {
-      "frames": 303,
-      "mean": 0.21,
-      "p50": 0.1,
-      "p95": 0.8
-    },
-    "ENVELOPE": {
-      "frames": 297,
-      "mean": 0.24,
-      "p50": 0.1,
-      "p95": 0.9
-    },
-    "PEN": {
-      "frames": 300,
-      "mean": 0.19,
-      "p50": 0.1,
-      "p95": 0.6
-    },
-    "CHART_DIP": {
-      "frames": 303,
-      "mean": 0.2,
-      "p50": 0.1,
-      "p95": 0.8
-    },
-    "CHART_BARS": {
       "frames": 306,
-      "mean": 0.2,
-      "p50": 0.1,
-      "p95": 0.7
-    },
-    "SCALE": {
-      "frames": 300,
-      "mean": 0.19,
-      "p50": 0.1,
-      "p95": 0.7
-    },
-    "HOUSE": {
-      "frames": 300,
-      "mean": 0.19,
-      "p50": 0.1,
-      "p95": 0.7
-    },
-    "CALENDAR": {
-      "frames": 303,
-      "mean": 0.21,
-      "p50": 0.1,
-      "p95": 0.7
-    },
-    "MAP_PIN": {
-      "frames": 309,
       "mean": 0.26,
       "p50": 0.1,
       "p95": 0.9
     },
-    "COMPARE": {
-      "frames": 309,
+    "ENVELOPE": {
+      "frames": 303,
+      "mean": 0.25,
+      "p50": 0.1,
+      "p95": 0.8
+    },
+    "PEN": {
+      "frames": 312,
+      "mean": 0.27,
+      "p50": 0.1,
+      "p95": 0.9
+    },
+    "CHART_DIP": {
+      "frames": 318,
+      "mean": 0.27,
+      "p50": 0.1,
+      "p95": 1
+    },
+    "CHART_BARS": {
+      "frames": 306,
       "mean": 0.23,
+      "p50": 0.1,
+      "p95": 0.8
+    },
+    "SCALE": {
+      "frames": 312,
+      "mean": 0.25,
+      "p50": 0.1,
+      "p95": 0.8
+    },
+    "HOUSE": {
+      "frames": 315,
+      "mean": 0.29,
+      "p50": 0.1,
+      "p95": 1
+    },
+    "CALENDAR": {
+      "frames": 309,
+      "mean": 0.24,
+      "p50": 0.1,
+      "p95": 0.9
+    },
+    "MAP_PIN": {
+      "frames": 309,
+      "mean": 0.29,
+      "p50": 0.1,
+      "p95": 0.9
+    },
+    "COMPARE": {
+      "frames": 282,
+      "mean": 0.25,
       "p50": 0.1,
       "p95": 0.8
     },
     "DOCUMENT": {
       "frames": 309,
-      "mean": 0.2,
+      "mean": 0.26,
+      "p50": 0.1,
+      "p95": 0.9
+    },
+    "HANDSHAKE": {
+      "frames": 306,
+      "mean": 0.23,
       "p50": 0.1,
       "p95": 0.8
     },
-    "HANDSHAKE": {
-      "frames": 303,
-      "mean": 0.18,
-      "p50": 0.1,
-      "p95": 0.7
-    },
     "LETTER_Q": {
-      "frames": 303,
-      "mean": 0.21,
+      "frames": 312,
+      "mean": 0.26,
       "p50": 0.1,
-      "p95": 0.9
+      "p95": 0.8
     }
   }
 }
