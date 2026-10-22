@@ -921,6 +921,8 @@ Next:
 - The founder picks options for the remaining pages (the gallery artifact is in the session).
 - Rotate the Railway and Supabase tokens pasted in chat, and add them as environment secrets.
 
+<<<<<<< HEAD
+
 ## 21 October 2026, 21:05 UTC — Claude coordinator (speed + Q Story)
 
 - **Integrated** 25+ lane PRs into `speed/q-oct20`, each reviewed against the docs and the owner's intent before merging. Several were sent back: the stage checklist became a single line, findings were restored to 3, red card tint removed, context navigation built, onboarding stages restored.
@@ -961,3 +963,46 @@ Next:
   - onboarding was left on its own working upload path;
   - no OCR for images (they say plainly that they can't be read);
   - no full-stack or live run.
+    \=======
+
+## Q Story S6: the Q Card — 22 October 2026 (Claude, branch `qstory/qcard`, PR into `speed/q-oct20`)
+
+Evidence stage: **code + local checks only**. Not merged, not deployed. No migration.
+
+- **Richer card, per-section and permission-true:** new card fields, each with a structured `detail` (contract `CardDetailSchema`):
+  - `tractionMetrics`;
+  - `currentRaise`;
+  - `investabilitySummary`;
+  - `relationshipSummary`;
+  - `team`;
+  - `documentsOnRequest`.
+- **Same scope system as before:** each field is off until the owner picks an audience. The keys pass the existing `card_field_scopes_valid` check, so there is no schema change.
+- **Members-only sections:** the server refuses `public_external` for `investabilitySummary`, `team` and `documentsOnRequest` (`NETWORK_ONLY_CARD_FIELDS`).
+- **Per-row scope:** claims and data room levels are filtered against each scope. A public numbers section never carries a members-only claim.
+- **Never on a card:** burn, cash, runway and forecasts.
+- **Composition:** `apps/api/src/main.ts` `findCompanySections` composes:
+  - evidence claims;
+  - the active capital objective;
+  - the InvestIQ store;
+  - `createPostgresCompanyPipelineCounts` (new, network);
+  - the team projection;
+  - the data room.
+- **Investor team:** `createPostgresInvestorTeamRead` (new, investors).
+- **Web:**
+  - `features/q-card/card-sections.tsx` and a dossier layout in `public-card-view.tsx`;
+  - owner controls with hints, and no "everyone" option on members-only sections;
+  - black_gold OG image;
+  - fixture harness `/dev/q-card-identity` (development-only).
+- **Story anchors:** `[data-card-section="story|numbers|raise|intelligence|relationships|team|documents"]` (sent to S1).
+- **Evidence:** screenshots and design notes are in `docs/ai-handoff/evidence/q-story/qcard/`.
+- **Checks:**
+  - packages build;
+  - root tsc and the web/api tsc: exit 0;
+  - vitest: public-identity, q-card web tests, network, parity — 27 files, all passed;
+  - eslint and prettier on changed files: clean.
+- **Open:**
+  - A PERSON subject type (per-person card) needs a migration plus self-ownership authorization. It is proposed, not built.
+  - The amount committed in the raise is not shown.
+  - The anonymous read is not cached yet.
+
+> > > > > > > origin/qstory/qcard

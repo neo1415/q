@@ -248,11 +248,22 @@ function RailRow({
   );
 }
 
-export function NotificationCenter() {
+export function NotificationCenter({
+  review,
+}: {
+  /**
+   * The design review page only: the rail starts open with these names,
+   * and nothing is marked read (the notices are fictional).
+   */
+  readonly review?:
+    { readonly names: Readonly<Record<string, string>> } | undefined;
+} = {}) {
   const t = useT();
 
-  const [open, setOpen] = useState(false);
-  const [names, setNames] = useState<Readonly<Record<string, string>>>({});
+  const [open, setOpen] = useState(review !== undefined);
+  const [names, setNames] = useState<Readonly<Record<string, string>>>(
+    review?.names ?? {},
+  );
   const [dealt, setDealt] = useState<ReadonlySet<string>>(new Set());
   // Q Pitch (premiere v5) and Q's own UI acts: open or close this panel
   // deterministically, DONE once it shows. Reading is not consequential.
@@ -282,7 +293,7 @@ export function NotificationCenter() {
 
   // Updates are seen once shown; what needs them waits until dealt with.
   useEffect(() => {
-    if (!open || items === null) return;
+    if (!open || items === null || review !== undefined) return;
     const ids = items
       .filter((item) => !item.read && item.priority !== "NEEDS_YOU")
       .map((item) => item.id);
@@ -290,10 +301,10 @@ export function NotificationCenter() {
     void markReadAction(ids.slice(0, 50)).then((result) => {
       if (result.ok) noticesRead(ids.length);
     });
-  }, [open, items]);
+  }, [open, items, review]);
   // Who each notice is about, once the rail is first opened.
   useEffect(() => {
-    if (!open) return;
+    if (!open || review !== undefined) return;
     let live = true;
     void readNames().then((value) => {
       if (live) setNames(value);
@@ -301,7 +312,7 @@ export function NotificationCenter() {
     return () => {
       live = false;
     };
-  }, [open]);
+  }, [open, review]);
 
   const groups = railGroups(items ?? [], names);
   const waiting = groups.reduce(
@@ -315,6 +326,7 @@ export function NotificationCenter() {
   const deal = (group: NoticeGroup) => {
     setDealt((was) => new Set([...was, group.key]));
     if (linked(group.notice.linkPath)) close();
+    if (review !== undefined) return;
     void markReadAction(group.ids.slice(0, 50)).then((result) => {
       if (!result.ok) return;
       noticesRead(group.ids.length);

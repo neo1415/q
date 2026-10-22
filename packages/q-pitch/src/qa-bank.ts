@@ -106,6 +106,7 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
       "what does the score out of a hundred mean",
       "why is this company ranked above that one",
       "is the score a measure of quality",
+      "what is the difference between investability and suitability",
     ],
     answer:
       "There are two scores, never blended. Investability asks how investable a company is on its evidence; it is the InvestIQ method over investor-eligible evidence, the same for every investor, with its coverage and confidence shown. Suitability asks how well it fits this investor's mandate, and differs per investor. When too little is known, there is no number at all: unknown stays unknown and is never read as poor.",
@@ -138,6 +139,8 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
       "who has access to my data",
       "can founders see my notes about them",
       "security of the platform",
+      "who can see my deal flow",
+      "will founders see my opinion of them",
     ],
     answer:
       "Every piece of information carries a setting for who may see it, and that is enforced on our side at every layer, not just hidden on screen. Founder-private material never reaches an investor, and never quietly changes how an investor ranks or sees a company. What Q knows is not the same as what you may see: Q filters by permission before it reasons, and a data room opens only when the founder shares it.",
@@ -275,6 +278,7 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
       "how does the gateway work",
       "what is the investor gateway",
       "how do founders apply to an investor",
+      "how do i apply to a vc fund",
       "what is the interview before the interview",
     ],
     answer:
@@ -345,10 +349,17 @@ export const QA_BANK: readonly QaEntry[] = z.array(QaEntrySchema).parse([
 ]);
 
 const STOP = new Set(
-  "a an the of to and or in on for is are be it this that i me my you your we our do does how what why who can with about at as by from".split(
+  "a an the of to and or in on for is are be it this that i me my you your we our do does can with about at as by from".split(
     " ",
   ),
 );
+
+/**
+ * Question words carry intent in a short question ("Who is it for?" is
+ * nothing but them) and are noise in a long one, so the index keeps them
+ * and a query weighs them only while it has at most two other words.
+ */
+const INTERROGATIVE = new Set("who what where when why how which".split(" "));
 
 /** Words that mean the same thing here, folded to one. */
 const SYNONYMS: Readonly<Record<string, string>> = {
@@ -401,18 +412,30 @@ const SYNONYMS: Readonly<Record<string, string>> = {
   customers: "stage",
   users: "stage",
   gateway: "gateq",
+  site: "website",
   apply: "gateq",
 };
 
 function tokens(text: string): string[] {
-  return text
+  const words = text
     .toLowerCase()
     .normalize("NFKD")
     .replace(/\p{M}/gu, "")
+    // A negation changes the question ("what can't Q do" is not "what is
+    // Q"), so it survives the apostrophe.
+    .replace(/\b(?:can['’]t|cannot)\b/gu, "can not")
+    .replace(/\bwon['’]t\b/gu, "will not")
+    .replace(/n['’]t\b/gu, " not")
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .split(/\s+/u)
-    .filter((word) => word.length > 1 && !STOP.has(word))
+    // "q" is the analyst's name, the one single letter that means something.
+    .filter((word) => (word.length > 1 || word === "q") && !STOP.has(word))
     .map((word) => SYNONYMS[word] ?? word.replace(/(?<=..)s$/u, ""));
+  // "Capital Q" is one name: its own term, beside its two words.
+  const names = words.flatMap((word, i) =>
+    word === "capital" && words[i + 1] === "q" ? ["capital-q"] : [],
+  );
+  return [...words, ...names];
 }
 
 export type QaIndex = {
@@ -421,6 +444,13 @@ export type QaIndex = {
 
 /** Minimum BM25 score for a match; tuned on the bank's own paraphrases. */
 export const QA_THRESHOLD = 1.4;
+
+/**
+ * How far the best entry must lead the runner-up, as a share of its own
+ * score. A close call is a guess, and a wrong prepared answer is worse
+ * than none: below the margin the question goes to normal Q.
+ */
+export const QA_MARGIN = 0.1;
 
 /**
  * Builds the in-memory index for one side (entries for that side and for
@@ -444,35 +474,63 @@ export function buildQaIndex(
     const n = df.get(term) ?? 0;
     return Math.log(1 + (docs.length - n + 0.5) / (n + 0.5));
   };
+  // A question asked as stored (up to stop words, plurals and synonyms) is
+  // that entry's, however close another entry scores. A wording stored by
+  // two entries belongs to neither and falls through to scoring.
+  const stored = new Map<string, QaEntry | null>();
+  for (const entry of entries) {
+    for (const asked of [entry.question, ...entry.paraphrases]) {
+      const key = tokens(asked).join(" ");
+      if (key === "") continue;
+      const held = stored.get(key);
+      stored.set(key, held === undefined || held === entry ? entry : null);
+    }
+  }
   const K1 = 1.2;
   const B = 0.75;
   return {
     answer: (text) => {
-      const query = [...new Set(tokens(text))];
+      const key = tokens(text).join(" ");
+      const exact = key === "" ? undefined : stored.get(key);
+      if (exact) return exact;
+      const all = [...new Set(tokens(text))];
+      const content = all.filter((term) => !INTERROGATIVE.has(term));
+      const query = content.length <= 2 ? all : content;
       if (query.length === 0) return null;
       let best: QaEntry | null = null;
       let bestScore = 0;
+      let runnerUp = 0;
       for (const [index, doc] of docs.entries()) {
         let score = 0;
         let matched = 0;
+        let matchedContent = 0;
         for (const term of query) {
           const tf = doc.filter((t) => t === term).length;
           if (tf === 0) continue;
           matched += 1;
+          if (!INTERROGATIVE.has(term)) matchedContent += 1;
           score +=
             (idf(term) * tf * (K1 + 1)) /
             (tf + K1 * (1 - B + (B * doc.length) / avg));
         }
         // One shared word is not a match ("data room" is not a privacy
-        // question), unless that word is the whole question.
-        if (matched < Math.min(2, query.length)) continue;
+        // question), unless that word is the whole question. A question
+        // word alone never counts as the shared content.
+        if (content.length > 0) {
+          if (matchedContent < Math.min(2, content.length)) continue;
+        } else if (matched === 0) continue;
         const entry = entries[index];
-        if (entry !== undefined && score > bestScore) {
+        if (entry === undefined) continue;
+        if (score > bestScore) {
+          runnerUp = bestScore;
           best = entry;
           bestScore = score;
+        } else if (score > runnerUp) {
+          runnerUp = score;
         }
       }
-      return bestScore >= QA_THRESHOLD ? best : null;
+      if (bestScore < QA_THRESHOLD) return null;
+      return bestScore - runnerUp >= QA_MARGIN * bestScore ? best : null;
     },
   };
 }

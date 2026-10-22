@@ -77,10 +77,22 @@ const firstName = (name: string) => name.split(" ")[0] ?? name;
 const INK =
   "inline-flex h-11 select-none items-center justify-center gap-2 rounded-md bg-(--cq-text-primary) px-4 cq-body-sm font-medium whitespace-nowrap text-(--cq-canvas) transition-opacity duration-(--cq-motion-fast) hover:opacity-90 disabled:opacity-50 lg:h-10";
 
-export function TeamPage({ initial }: { readonly initial: TeamDto }) {
+export function TeamPage({
+  initial,
+  reviewRoleFor,
+}: {
+  readonly initial: TeamDto;
+  /** Design review only (/dev/account-review): this member's role sheet, open. */
+  readonly reviewRoleFor?: string | undefined;
+}) {
   const t = useT();
   const [team, setTeam] = useState(initial);
-  const [sheet, setSheet] = useState<Sheet | null>(null);
+  const [sheet, setSheet] = useState<Sheet | null>(() => {
+    const member = initial.members.find(
+      (candidate) => candidate.membershipId === reviewRoleFor,
+    );
+    return member === undefined ? null : { kind: "role", member };
+  });
   const [toast, setToast] = useState<string | null>(null);
   // P15: invitations whose email did not go, with their one-time links.
   const [unsent, setUnsent] = useState<readonly UnsentInvite[]>([]);

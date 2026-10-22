@@ -1,4 +1,9 @@
-import type { QCardFieldScopes, QCardSubjectType } from "@capital-q/contracts";
+import type {
+  CardDetail,
+  QCardFieldScopes,
+  QCardScope,
+  QCardSubjectType,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionContext } from "@capital-q/database";
 
 /**
@@ -20,6 +25,15 @@ export type SubjectFacts = {
   readonly name: string;
   /** Declared profile fields by card field key; null means not stated. */
   readonly facts: Readonly<Record<string, string | null>>;
+  /**
+   * A section's structured content by card field key and audience scope
+   * (CardSectionDetails); shown only beside a field `facts` also holds.
+   */
+  readonly details?:
+    | Readonly<
+        Record<string, Readonly<Partial<Record<QCardScope, CardDetail | null>>>>
+      >
+    | undefined;
   /** Capital Q's own verification claims, never a statement or a reading. */
   readonly verified: {
     readonly organisation: boolean;

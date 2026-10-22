@@ -21,6 +21,10 @@ import {
 import { createCorrelationId } from "@capital-q/observability";
 
 import {
+  screenActionAuditEntry,
+  type ScreenActionAudit,
+} from "./app-action-audit.js";
+import {
   createActionReplayGuard,
   idempotencyKeyOf,
   type ActionReplayGuard,
@@ -59,6 +63,12 @@ export type AppActionRoutesDependencies = ActorContextDependencies & {
    */
   readonly problemOf?:
     ((error: unknown, requestId: string) => ProblemDetails | null) | undefined;
+  /**
+   * Accountability for a person's consequential screen actions
+   * (app-action-audit.ts): recorded here, once, for every generated route.
+   * Absent (tests, a deployment without a database): nothing is recorded.
+   */
+  readonly audit?: ScreenActionAudit | undefined;
 };
 
 /** The routes this registry declares, as `<METHOD> <path>` (the parity guard reads it). */
@@ -223,7 +233,26 @@ export function registerAppActionRoutes(
           reply.callNotFound();
           return undefined;
         }
-        const run = () => action.run(dependencies.ports, context, input);
+        const run = async () => {
+          const out = await action.run(dependencies.ports, context, input);
+          // Only a run that returned is recorded: a thrown service failure
+          // changed nothing. A replayed intent never re-enters here.
+          const entry = screenActionAuditEntry(
+            action,
+            context,
+            input,
+            action.succeeded?.(out) ?? true,
+          );
+          if (entry !== null && dependencies.audit !== undefined) {
+            await dependencies.audit.record(entry).catch((error: unknown) => {
+              request.log.error(
+                { err: error, requestId: request.id, action: action.name },
+                "a screen action's audit record could not be written",
+              );
+            });
+          }
+          return out;
+        };
         // A service that keys its own work (`idempotencyKeyOf`) is the
         // durable guard and answers its replays itself (`deduplicated`, its
         // own conflict rules); a second, in-process guard would shadow that.

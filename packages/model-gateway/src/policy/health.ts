@@ -63,6 +63,14 @@ const TIMEOUT_MEANS_UNHEALTHY_AFTER_MS = 20_000;
  */
 const ACCOUNT_EXHAUSTED_OPEN_MS = 10 * 60_000;
 
+/**
+ * Round 8 (hosted Gemini 402, 2026-10-21): a 429 backs that one model off
+ * at once, for the provider's Retry-After or this long, bounded; during it
+ * the model is tried only when no other eligible model is left.
+ */
+const RATE_LIMIT_BACKOFF_MS = 15_000;
+const RATE_LIMIT_BACKOFF_MAX_MS = 60_000;
+
 export type ProviderHealthOptions = {
   readonly failureThreshold?: number | undefined;
   readonly windowMs?: number | undefined;
@@ -82,6 +90,9 @@ export function createProcessLocalProviderHealth(
     options.accountExhaustedOpenForMs ?? ACCOUNT_EXHAUSTED_OPEN_MS;
   /** Provider-wide: every model on an exhausted account. */
   const accountOpenUntil = new Map<ModelProviderCode, number>();
+  /** One model, after a 429: tried only as the last resort until then. */
+  const backoffUntil = new Map<string, number>();
+
   const keyOf = (code: ModelProviderCode, model: ModelCode): string =>
     `${code}\u0000${model}`;
 
@@ -98,15 +109,46 @@ export function createProcessLocalProviderHealth(
     if (accountUntil !== undefined && accountUntil > at.getTime()) {
       return "TEMPORARILY_FAILING";
     }
+    const backoff = backoffUntil.get(keyOf(code, model));
+    if (backoff !== undefined && backoff > at.getTime()) {
+      return "BACKING_OFF";
+    }
     return "HEALTHY";
   };
 
   return {
     state,
-    recordFailure: (code, model, failureClass, at, elapsedMs, exhausted) => {
+    recordFailure: (
+      code,
+      model,
+      failureClass,
+      at,
+      elapsedMs,
+      exhausted,
+      retryAfterMs,
+    ) => {
+      const now = at.getTime();
+      // An account that cannot pay does not heal by itself: every model on
+      // it is skipped, so no turn pays the failed first attempt again
+      // (hosted Gemini 402, 2026-10-21).
       if (exhausted === true) {
-        accountOpenUntil.set(code, at.getTime() + accountOpenForMs);
+        accountOpenUntil.set(code, now + accountOpenForMs);
         return;
+      }
+      // A key the provider refused (401/403, after the adapter tried its
+      // other keys) does not heal either; only this model is skipped, as a
+      // refusal can be one model's (not enabled for the key).
+      if (failureClass === "AUTHENTICATION") {
+        openUntil.set(keyOf(code, model), now + accountOpenForMs);
+        return;
+      }
+      if (failureClass === "RATE_LIMIT") {
+        const key = keyOf(code, model);
+        const forMs = Math.min(
+          RATE_LIMIT_BACKOFF_MAX_MS,
+          Math.max(1_000, retryAfterMs ?? RATE_LIMIT_BACKOFF_MS),
+        );
+        backoffUntil.set(key, now + forMs);
       }
       if (!AVAILABILITY_FAILURES.has(failureClass)) {
         return;
@@ -120,7 +162,6 @@ export function createProcessLocalProviderHealth(
         return;
       }
       const key = keyOf(code, model);
-      const now = at.getTime();
       const recent = (failures.get(key) ?? []).filter(
         (t) => now - t <= windowMs,
       );
@@ -134,6 +175,7 @@ export function createProcessLocalProviderHealth(
     recordSuccess: (code, model) => {
       accountOpenUntil.delete(code);
       const key = keyOf(code, model);
+      backoffUntil.delete(key);
       failures.delete(key);
       openUntil.delete(key);
     },
