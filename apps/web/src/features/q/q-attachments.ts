@@ -97,8 +97,58 @@ function patch(key: string, change: Partial<Item>): void {
   });
 }
 
+/** Where an attached file goes; Evidence's own upload in the app. */
+export type QAttachmentUpload = (input: {
+  readonly file: File;
+  readonly mimeType: string;
+  /** One per file: a retried request is the same upload, never a second. */
+  readonly idempotencyKey: string;
+  readonly companyId?: string | undefined;
+}) => Promise<
+  | { readonly ok: true; readonly documentId: string }
+  | { readonly ok: false; readonly message: string }
+>;
+
+/**
+ * Permission, then the bytes straight into private storage, then the
+ * server verifies what landed and queues it to be read.
+ */
+export const uploadThroughEvidence: QAttachmentUpload = async ({
+  file,
+  mimeType,
+  idempotencyKey,
+  companyId,
+}) => {
+  const target = await materialUploadTargetAction({
+    ...(companyId === undefined ? {} : { companyId }),
+    documentType: "UNCLASSIFIED",
+    filename: file.name,
+    mimeType,
+    sizeBytes: file.size,
+    idempotencyKey,
+  });
+  if (!target.ok) return { ok: false, message: target.message };
+  const put = await fetch(target.value.url, {
+    method: target.value.method,
+    headers: target.value.headers,
+    body: file,
+  });
+  if (!put.ok) return { ok: false, message: "could not be uploaded" };
+  const completed = await materialUploadCompleteAction(
+    target.value.uploadSessionId,
+    idempotencyKey,
+  );
+  return completed.ok
+    ? { ok: true, documentId: completed.value.documentId }
+    : { ok: false, message: completed.message };
+};
+
 /** Upload one file and mark it ready once the server has verified it. */
-export async function attachToQ(file: File, companyId?: string): Promise<void> {
+export async function attachToQ(
+  file: File,
+  companyId?: string,
+  upload: QAttachmentUpload = uploadThroughEvidence,
+): Promise<void> {
   const key = crypto.randomUUID();
   update({
     ...snapshot,
@@ -119,36 +169,17 @@ export async function attachToQ(file: File, companyId?: string): Promise<void> {
     return;
   }
   try {
-    const target = await materialUploadTargetAction({
-      ...(companyId === undefined ? {} : { companyId }),
-      documentType: "UNCLASSIFIED",
-      filename: file.name,
+    const uploaded = await upload({
+      file,
       mimeType: mimeOf(file),
-      sizeBytes: file.size,
       idempotencyKey: key,
+      companyId,
     });
-    if (!target.ok) {
-      fail(target.message);
-      return;
+    if (uploaded.ok) {
+      patch(key, { state: "ready", documentId: uploaded.documentId });
+    } else {
+      fail(uploaded.message);
     }
-    const put = await fetch(target.value.url, {
-      method: target.value.method,
-      headers: target.value.headers,
-      body: file,
-    });
-    if (!put.ok) {
-      fail("could not be uploaded");
-      return;
-    }
-    const completed = await materialUploadCompleteAction(
-      target.value.uploadSessionId,
-      key,
-    );
-    if (!completed.ok) {
-      fail(completed.message);
-      return;
-    }
-    patch(key, { state: "ready", documentId: completed.value.documentId });
   } catch {
     fail("could not be uploaded");
   }

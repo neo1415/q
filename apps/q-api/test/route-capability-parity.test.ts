@@ -990,6 +990,7 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/brand-preview": exempt("development-only page"),
   "/dev/q-cards": exempt("development-only page"),
   "/dev/q-room": exempt("development-only page"),
+  "/dev/q-attach": exempt("development-only page (lane 8 attachments)"),
   "/dev/results": exempt("development-only page"),
   "/dev/rehearsal-video": exempt("development-only page"),
   "/dev/rehearsals": exempt("development-only page"),
