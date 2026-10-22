@@ -32,7 +32,7 @@ export const TURN_READER_V56: PromptDefinition<
 > = {
   ...TURN_READER_V55,
   version: 56,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Production 2026-10-17 (conversation 4f07dae7): v55 plus excludeShown on a FIT question -- they want companies other than those Q already showed in this conversation (new, other, more, different, anything else, who else), read by meaning in any language; code leaves the shown companies out of the same deterministic fit ranking.",
   effectiveFrom: "2026-10-17",

@@ -1,0 +1,67 @@
+{
+  "recordedAt": "2026-10-22T01:10:13.308Z",
+  "base": "http://127.0.0.1:3200",
+  "path": "/dev/story",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "wallMs": 395249,
+  "narrator": "RENDERED",
+  "preloadMs": 1108,
+  "offsets": {
+    "median": -93,
+    "p95": -74,
+    "count": 165
+  },
+  "offsetsByKind": {
+    "stage": {
+      "median": -89,
+      "p95": -76,
+      "count": 116
+    },
+    "mood": {
+      "median": -93,
+      "p95": -76,
+      "count": 8
+    },
+    "navigate": {
+      "median": 12,
+      "p95": 199,
+      "count": 7
+    },
+    "light": {
+      "median": -108,
+      "p95": -99,
+      "count": 21
+    }
+  },
+  "frames": {
+    "count": 23267,
+    "long": 12
+  },
+  "fallbacks": 13,
+  "beat": 56,
+  "phase": "DONE",
+  "cls": {
+    "cls": 0.0007978515625,
+    "shifts": [
+      {
+        "sources": [
+          "span.hidden.sm:inline-flex"
+        ],
+        "value": 0.00039892578125,
+        "at": 258761,
+        "path": "/dev/story/gateq?view=gate"
+      },
+      {
+        "sources": [
+          "span.hidden.sm:inline-flex"
+        ],
+        "value": 0.00039892578125,
+        "at": 272143,
+        "path": "/dev/story/gateq?view=inbox"
+      }
+    ]
+  }
+}

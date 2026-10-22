@@ -36,9 +36,10 @@ describe("Q Pitch out of the sidebar (owner, 17 Oct): Profile links it", () => {
 });
 
 describe("tour entry model", () => {
-  it("offers the premiere and the two-minute version as full-load tour links", () => {
+  it("offers the story, the premiere and the two-minute version as full-load tour links", () => {
     const options = tourOptions(NOW);
     expect(options.map((o) => o.href)).toEqual([
+      "/home?qpitch=story&new=1",
       "/home?qpitch=premiere",
       "/home?qpitch=short",
     ]);

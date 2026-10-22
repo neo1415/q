@@ -1,0 +1,937 @@
+/*
+ * Q Story (v7): story mode over the real app. Tokens only (--cq-*), no raw
+ * colour. Every animation is transform or opacity (compositor-only), so
+ * nothing on the page moves its layout (CLS 0). Under reduced motion the
+ * motion goes and the states stay: the gold ring without the pulse,
+ * pictures and chips shown without their entrances.
+ */
+
+/* ── Story mode on the document ─────────────────────────────────────── */
+/* The highlight pulse: the existing gold ring plus a slow breath. */
+@keyframes cq-story-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.015);
+  }
+}
+html[data-story] [data-qp-anchor][data-qp-lit] {
+  animation: cq-story-breathe 1.8s ease-in-out infinite;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.cq-story-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--cq-z-sheet);
+  pointer-events: none;
+  background: var(--cq-stage-canvas);
+  opacity: 0;
+  transition: opacity var(--cq-motion-slow) var(--cq-ease);
+}
+/* Chrome recedes to about 35%: the scrim is 65%, deeper at night. */
+/* The story's dark acts are night in light mode too: the night tokens are
+   drawn for the night canvas, so they always sit on it. */
+.cq-story-scrim[data-mood="STORY"] {
+  background: var(--cq-night-canvas);
+  opacity: 0.9;
+}
+.cq-story-scrim[data-mood="NIGHT"] {
+  background: var(--cq-night-canvas);
+  opacity: 0.9;
+}
+.cq-story-scrim[data-mood="HUSH"] {
+  background: var(--cq-night-canvas);
+  opacity: 0.97;
+}
+.cq-story-scrim[data-mood="DAY"] {
+  background: var(--cq-canvas);
+  opacity: 0.86;
+}
+.cq-story-scrim[data-mood="WAKE"] {
+  opacity: 0;
+  transition-duration: var(--cq-motion-emphasis);
+}
+
+/* ── The Q stage ────────────────────────────────────────────────────── */
+.cq-story-stage {
+  position: fixed;
+  inset: 0;
+  z-index: var(--cq-z-sheet);
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  /* Below Q's presence, above the caption band: nothing covers either. */
+  padding: calc(7vh + 172px) 16px
+    calc(3.2em + 64px + var(--cq-bottom-nav-height, 0px));
+  color: var(--cq-text-primary);
+  font-family: var(--cq-font-ui);
+}
+.cq-story-stage[data-mood="NIGHT"],
+.cq-story-stage[data-mood="HUSH"],
+.cq-story-stage[data-mood="STORY"] {
+  color: var(--cq-night-text);
+}
+.cq-story-centre {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  max-width: min(960px, 100%);
+  text-align: center;
+  animation: cq-story-in var(--cq-motion-emphasis) var(--cq-ease) both;
+}
+.cq-story-stack {
+  gap: 20px;
+}
+@keyframes cq-story-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.cq-story-type {
+  font-family: var(--cq-font-editorial);
+  font-size: clamp(2rem, 6vw, 4.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  animation: cq-story-in var(--cq-motion-emphasis) var(--cq-ease) both;
+}
+.cq-story-type-sm {
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+}
+.cq-story-stack .cq-story-type:not([data-in]) {
+  opacity: 0;
+  animation: none;
+}
+.cq-story-wordmark {
+  font-family: var(--cq-font-editorial);
+  font-size: clamp(2.5rem, 8vw, 5.5rem);
+  letter-spacing: -0.03em;
+  animation: cq-story-in var(--cq-motion-slow) var(--cq-ease) both;
+}
+.cq-story-kicker {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: inherit;
+  opacity: 0.72;
+}
+.cq-story-label {
+  font-size: 0.75rem;
+  opacity: 0.66;
+}
+[data-reserved] {
+  visibility: hidden;
+}
+.cq-story-credit {
+  grid-column: 1 / -1;
+  font-size: 0.6875rem;
+  opacity: 0.6;
+  text-align: end;
+}
+
+/* A floating panel: on the Q stage, or beside the page once the app wakes. */
+.cq-story-panel {
+  display: grid;
+  gap: 12px;
+  width: min(440px, 100%);
+  padding: 20px;
+  border-radius: var(--cq-radius-xl);
+  border: 1px solid var(--cq-border-subtle);
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-primary);
+  box-shadow: var(--cq-shadow-overlay);
+  animation: cq-story-in var(--cq-motion-emphasis) var(--cq-ease) both;
+}
+.cq-story-wide {
+  width: min(720px, 100%);
+}
+/* Docked panels sit above the Q dock, clear of the page's centre. */
+.cq-story-dockside {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--cq-bottom-nav-height, 0px) + 120px);
+  width: min(380px, calc(100vw - 32px));
+}
+
+/* The Q aperture: Q's own light (ADR 0017: glow belongs to Q). */
+.cq-story-aperture {
+  display: block;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--cq-radius-circle);
+  background: radial-gradient(
+    circle at 50% 50%,
+    var(--cq-q-core) 0 34%,
+    var(--cq-q-light) 35% 52%,
+    transparent 53%
+  );
+  box-shadow: 0 0 48px 8px
+    color-mix(in oklch, var(--cq-q-bloom) 45%, transparent);
+  animation: cq-story-in var(--cq-motion-slow) var(--cq-ease) both;
+}
+
+/* Q, the narrator (lane S4's particle presence), always on screen. */
+.cq-story-presence {
+  position: fixed;
+  left: calc(50% - 80px);
+  top: 7vh;
+  z-index: var(--cq-z-toast);
+  width: 160px;
+  height: 160px;
+  pointer-events: none;
+  transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+/* Its backing is the scene's own colour (nearly invisible on the scrim),
+   so the particles draw for the surface they are actually seen on. */
+.cq-story-presence[data-surface="stage"] {
+  border-radius: var(--cq-radius-circle);
+  background: color-mix(in oklch, var(--cq-night-canvas) 52%, transparent);
+}
+.cq-story-presence[data-surface="page"] {
+  border-radius: var(--cq-radius-circle);
+  background: color-mix(in oklch, var(--cq-canvas) 60%, transparent);
+}
+.cq-story-presence[data-docked] {
+  left: 0;
+  top: 0;
+  width: 56px;
+  height: 56px;
+}
+
+/* Product beats: everything but the lit section recedes (paint only). */
+.cq-story-spotlight {
+  position: fixed;
+  inset: 0;
+  z-index: var(--cq-z-sheet);
+  pointer-events: none;
+  background: color-mix(in oklch, var(--cq-canvas) 64%, transparent);
+  opacity: 0;
+  transition: opacity var(--cq-motion-emphasis) var(--cq-ease);
+}
+.cq-story-spotlight[data-on] {
+  opacity: 1;
+}
+
+/* Side panels sit beside the lit section, never over it. `translate`
+   leaves the entrance animation's transform alone. */
+.cq-story-stage[data-beside] .cq-story-dockside {
+  left: 0;
+  top: 0;
+  right: auto;
+  bottom: auto;
+  translate: var(--cq-story-beside-x) var(--cq-story-beside-y);
+}
+
+/* ── Visuals ─────────────────────────────────────────────────────────── */
+/* On the dark stage, panels are night surfaces, never a white box. */
+.cq-story-stage:is([data-mood="NIGHT"], [data-mood="HUSH"], [data-mood="STORY"])
+  .cq-story-panel {
+  background:
+    linear-gradient(var(--cq-night-surface), var(--cq-night-surface)),
+    var(--cq-night-canvas);
+  border-color: var(--cq-night-border);
+  color: var(--cq-night-text);
+}
+.cq-story-stage:is([data-mood="NIGHT"], [data-mood="HUSH"], [data-mood="STORY"])
+  :is(.cq-story-list, .cq-story-blocks, .cq-story-findings, .cq-story-cards)
+  li {
+  background: var(--cq-night-surface-strong);
+}
+.cq-story-stage:is([data-mood="NIGHT"], [data-mood="HUSH"], [data-mood="STORY"])
+  :is(.cq-story-list, .cq-story-cards, .cq-story-findings)
+  li
+  span {
+  color: var(--cq-night-text-muted);
+}
+.cq-story-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  margin: 0;
+  opacity: 0.25;
+  animation: cq-story-fade var(--cq-motion-slow) var(--cq-ease) both;
+}
+.cq-story-backdrop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cq-story-backdrop figcaption {
+  position: absolute;
+  left: 16px;
+  bottom: 12px;
+  font-size: 0.6875rem;
+}
+@keyframes cq-story-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.25;
+  }
+}
+.cq-story-photo {
+  position: relative;
+  width: min(760px, 92vw);
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: var(--cq-radius-xl);
+  animation: cq-story-in var(--cq-motion-slow) var(--cq-ease) both;
+}
+.cq-story-photo img,
+.cq-story-montage img,
+.cq-story-screens img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cq-story-photo figcaption,
+.cq-story-screens figcaption {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-size: 0.6875rem;
+  color: var(--cq-on-tile);
+  opacity: 0.85;
+}
+
+.cq-story-montage {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  width: min(900px, 94vw);
+}
+.cq-story-montage figure {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--cq-radius-md);
+  opacity: 0;
+  transform: scale(0.92);
+  animation: cq-story-tile var(--cq-motion-emphasis) var(--cq-ease) both;
+  animation-delay: calc(var(--i) * 60ms);
+  transition:
+    opacity var(--cq-motion-slow) var(--cq-ease),
+    filter var(--cq-motion-slow) var(--cq-ease);
+}
+@keyframes cq-story-tile {
+  to {
+    opacity: 0.55;
+    transform: none;
+  }
+}
+.cq-story-montage figure[data-lit] {
+  animation-name: cq-story-tile-lit;
+  box-shadow: 0 0 0 2px var(--cq-gold-mid);
+}
+@keyframes cq-story-tile-lit {
+  to {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+.cq-story-montage[data-step="4"] {
+  animation: cq-story-drift 8s linear both;
+}
+@keyframes cq-story-drift {
+  to {
+    transform: translate3d(-24px, -8px, 0);
+  }
+}
+.cq-story-montage[data-step="5"] figure {
+  animation-name: cq-story-tile-dim;
+}
+@keyframes cq-story-tile-dim {
+  to {
+    opacity: 0.18;
+    transform: none;
+  }
+}
+
+.cq-story-list,
+.cq-story-blocks,
+.cq-story-bubbles,
+.cq-story-findings,
+.cq-story-cards,
+.cq-story-outcomes {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  text-align: start;
+}
+.cq-story-list li,
+.cq-story-blocks li,
+.cq-story-bubbles li,
+.cq-story-findings li,
+.cq-story-cards li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--cq-radius-md);
+  background: var(--cq-surface-subtle);
+  font-size: 0.9375rem;
+}
+.cq-story-list li span,
+.cq-story-cards li span,
+.cq-story-findings li span {
+  font-size: 0.8125rem;
+  color: var(--cq-text-secondary);
+}
+.cq-story-list li,
+.cq-story-blocks li,
+.cq-story-bubbles li,
+.cq-story-findings li,
+.cq-story-chips li,
+.cq-story-outcomes li,
+.cq-story-timeline li {
+  opacity: 0;
+  transform: translate3d(0, 8px, 0);
+  transition:
+    opacity var(--cq-motion-base) var(--cq-ease),
+    transform var(--cq-motion-base) var(--cq-ease);
+}
+.cq-story-list li[data-in],
+.cq-story-blocks li[data-in],
+.cq-story-bubbles li[data-in],
+.cq-story-findings li[data-in],
+.cq-story-chips li[data-in],
+.cq-story-outcomes li[data-in],
+.cq-story-timeline li[data-in] {
+  opacity: 1;
+  transform: none;
+}
+.cq-story-blocks {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+/* #4-5: the inbox stack is there before its items land, one per word. */
+.cq-story-list li:not([data-in]) {
+  opacity: 0.22;
+  transform: none;
+  color: transparent;
+}
+.cq-story-list li:not([data-in]) span {
+  color: transparent;
+}
+.cq-story-bubbles li {
+  justify-self: end;
+  background: var(--cq-accent-soft);
+}
+.cq-story-bubbles li span {
+  font-size: 0.6875rem;
+  color: var(--cq-text-tertiary);
+}
+.cq-story-findings li[data-tone="ready"] strong::before {
+  content: "✓ ";
+}
+.cq-story-findings li[data-tone="block"] {
+  box-shadow: inset 3px 0 0 var(--cq-gold-mid);
+}
+.cq-story-cards li {
+  animation: cq-story-in var(--cq-motion-emphasis) var(--cq-ease) both;
+  animation-delay: calc(var(--i) * 80ms);
+  transition: transform var(--cq-motion-emphasis) var(--cq-ease);
+}
+.cq-story-cards li[data-lit] {
+  transform: scale(1.03);
+  box-shadow: 0 0 0 2px var(--cq-gold-mid);
+}
+
+.cq-story-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cq-story-chips li {
+  padding: 8px 14px;
+  border-radius: var(--cq-radius-full);
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-primary);
+  font-size: 0.9375rem;
+}
+.cq-story-chips-lg li {
+  font-size: clamp(1rem, 2.4vw, 1.375rem);
+  padding: 10px 18px;
+}
+.cq-story-chips-outline li {
+  background: transparent;
+  color: inherit;
+  border: 1px dashed currentColor;
+}
+.cq-story-chips li[data-tone="match"] {
+  box-shadow: 0 0 0 2px var(--cq-gold-mid);
+}
+
+.cq-story-scale {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+}
+.cq-story-scale p {
+  font-size: 0.9375rem;
+  margin-top: 8px;
+}
+.cq-story-weight {
+  display: block;
+  width: 96px;
+  height: 64px;
+  margin: 0 auto;
+  border-radius: var(--cq-radius-md);
+  background: var(--cq-surface-strong);
+}
+.cq-story-weight[data-unknown] {
+  background: transparent;
+  border: 2px dashed currentColor;
+  opacity: 0;
+  transition: opacity var(--cq-motion-slow) var(--cq-ease);
+}
+.cq-story-scale[data-step="2"] .cq-story-weight[data-unknown],
+.cq-story-scale[data-step="3"] .cq-story-weight[data-unknown] {
+  opacity: 1;
+}
+
+.cq-story-timeline {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.875rem;
+}
+.cq-story-timeline li {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+.cq-story-timeline li span {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--cq-radius-circle);
+  background: var(--cq-text-primary);
+}
+.cq-story-timeline li[data-lit] span {
+  background: var(--cq-gold-mid);
+  box-shadow: 0 0 0 6px
+    color-mix(in oklch, var(--cq-gold-light) 30%, transparent);
+}
+.cq-story-timeline li[data-far] {
+  transform: translate3d(48px, 0, 0);
+  opacity: 0.4;
+}
+.cq-story-bar {
+  font-size: 0.8125rem;
+  color: var(--cq-text-secondary);
+  border-top: 1px dashed var(--cq-border-strong);
+  padding-top: 6px;
+}
+
+.cq-story-chart {
+  width: 100%;
+  height: auto;
+}
+.cq-story-line {
+  fill: none;
+  stroke: var(--cq-text-primary);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  transition: stroke-dashoffset 900ms var(--cq-ease);
+}
+.cq-story-chart[data-step="1"] .cq-story-line:not(.cq-story-dip),
+.cq-story-chart[data-step="2"] .cq-story-line {
+  stroke-dashoffset: 0;
+}
+
+.cq-story-warmth {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at 50% 100%,
+    color-mix(in oklch, var(--cq-gold-light) 40%, transparent),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 1.2s var(--cq-ease);
+}
+.cq-story-warmth[data-step="1"] {
+  opacity: 0.5;
+}
+.cq-story-warmth[data-step="2"] {
+  opacity: 0.9;
+}
+
+.cq-story-fade {
+  display: flex;
+  gap: 24px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--cq-font-editorial);
+  font-size: clamp(1.5rem, 4.5vw, 3rem);
+}
+.cq-story-fade li {
+  transition: opacity 700ms var(--cq-ease);
+}
+.cq-story-fade[data-step="2"] li:nth-child(1),
+.cq-story-fade[data-step="3"] li:nth-child(-n + 2),
+.cq-story-fade[data-step="4"] li {
+  opacity: 0.08;
+}
+
+.cq-story-deck {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  width: min(320px, 80vw);
+  aspect-ratio: 5 / 6;
+  padding: 24px;
+  border-radius: var(--cq-radius-xl);
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-primary);
+  box-shadow: var(--cq-shadow-overlay);
+  transition:
+    transform 700ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 500ms var(--cq-ease);
+}
+.cq-story-deck[data-gone] {
+  transform: translate3d(-60vw, 0, 0) rotate(-8deg);
+  opacity: 0;
+}
+/* The real Q Card page, in the app's own theme, scrolled by the light. */
+.cq-story-card-panel {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(
+    93vh - 172px - 3.2em - 64px - var(--cq-bottom-nav-height, 0px)
+  );
+  overflow: hidden;
+  background: var(--cq-canvas);
+  color: var(--cq-text-primary);
+}
+.cq-story-stage:is([data-mood="NIGHT"], [data-mood="HUSH"], [data-mood="STORY"])
+  .cq-story-card-panel {
+  background: var(--cq-canvas);
+  color: var(--cq-text-primary);
+}
+.cq-story-qcard-page {
+  max-height: calc(
+    93vh - 244px - 3.2em - 64px - var(--cq-bottom-nav-height, 0px)
+  );
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.cq-story-qcard-page > div {
+  padding-bottom: 16px;
+}
+.cq-story-qcard-page [data-qp-lit] {
+  border-radius: var(--cq-radius-md);
+}
+.cq-story-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: min(720px, 92vw);
+}
+.cq-story-split > div {
+  padding: 24px;
+  border-radius: var(--cq-radius-xl);
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-primary);
+}
+
+.cq-story-screens {
+  position: relative;
+  width: min(820px, 92vw);
+  aspect-ratio: 16 / 10;
+}
+.cq-story-screens figure {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: var(--cq-radius-xl);
+  background: var(--cq-surface-sunken);
+  box-shadow: var(--cq-shadow-overlay);
+  opacity: 0;
+  transform: scale(0.97);
+  transition:
+    opacity 160ms var(--cq-ease),
+    transform 240ms var(--cq-ease);
+}
+.cq-story-screens figure[data-in] {
+  opacity: 1;
+  transform: none;
+}
+
+.cq-story-stopwatch .cq-story-pages {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+.cq-story-pages i {
+  display: block;
+  width: 48px;
+  height: 60px;
+  border-radius: var(--cq-radius-sm);
+  background: var(--cq-surface-strong);
+  animation: cq-story-flip-page 420ms var(--cq-ease) infinite alternate;
+}
+.cq-story-pages i:nth-child(2) {
+  animation-delay: 140ms;
+}
+.cq-story-pages i:nth-child(3) {
+  animation-delay: 280ms;
+}
+@keyframes cq-story-flip-page {
+  to {
+    transform: rotateX(70deg);
+  }
+}
+.cq-story-stopwatch[data-step="2"] .cq-story-pages i {
+  animation: none;
+}
+
+.cq-story-outcomes {
+  gap: 10px;
+  font-size: clamp(1.0625rem, 2.6vw, 1.5rem);
+  text-align: center;
+}
+
+/* ── Captions, controls, answers ─────────────────────────────────────── */
+.cq-story-captions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--cq-z-toast);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: calc(3.2em + 56px + var(--cq-bottom-nav-height, 0px));
+  margin: 0;
+  padding: 0 16px calc(28px + var(--cq-bottom-nav-height, 0px));
+  overflow: hidden;
+  pointer-events: none;
+  text-align: center;
+  font-size: clamp(1.0625rem, 2.4vw, 1.375rem);
+  line-height: 1.5;
+  color: var(--cq-text-primary);
+  /* Solid where the words are, soft only at its top edge: page text
+     never shows through a caption. */
+  background: linear-gradient(
+    to top,
+    var(--cq-canvas) 0 70%,
+    color-mix(in oklch, var(--cq-canvas) 0%, transparent)
+  );
+}
+html:is([data-story="NIGHT"], [data-story="HUSH"], [data-story="STORY"])
+  .cq-story-captions {
+  color: var(--cq-night-text);
+  background: linear-gradient(
+    to top,
+    var(--cq-night-canvas) 0 70%,
+    color-mix(in oklch, var(--cq-night-canvas) 0%, transparent)
+  );
+}
+/* The story's standing, always visible and never in the way. */
+.cq-story-standing {
+  position: fixed;
+  right: 16px;
+  bottom: calc(10px + var(--cq-bottom-nav-height, 0px));
+  z-index: var(--cq-z-toast);
+  margin: 0;
+  pointer-events: none;
+  font-size: 0.75rem;
+  color: var(--cq-text-secondary);
+}
+html:is([data-story="NIGHT"], [data-story="HUSH"], [data-story="STORY"])
+  .cq-story-standing {
+  color: var(--cq-night-text-muted);
+}
+.cq-story-caption-line {
+  display: inline-block;
+  max-width: 760px;
+}
+.cq-story-captions span {
+  opacity: 0.55;
+  transition: opacity 120ms linear;
+}
+.cq-story-captions span[data-said] {
+  opacity: 1;
+}
+
+.cq-story-controls {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: var(--cq-z-toast);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: calc(100vw - 24px);
+  padding: 4px;
+  border-radius: var(--cq-radius-full);
+  background: var(--cq-surface-raised);
+  border: 1px solid var(--cq-border-subtle);
+  box-shadow: var(--cq-shadow-sm);
+  opacity: 0.92;
+  transition: opacity var(--cq-motion-base) var(--cq-ease);
+}
+/* Out of the way while the story plays; back on any pointer or key. */
+.cq-story-controls[data-hidden]:not(:focus-within) {
+  opacity: 0;
+  pointer-events: none;
+}
+.cq-story-controls:hover,
+.cq-story-controls:focus-within {
+  opacity: 1;
+}
+.cq-story-count {
+  /* Room for "56 / 56", so the bar never moves as the count grows. */
+  min-width: 7ch;
+  white-space: nowrap;
+  text-align: center;
+  padding: 0 10px;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--cq-text-secondary);
+}
+.cq-story-notice {
+  padding: 0 10px;
+  font-size: 0.8125rem;
+  color: var(--cq-text-secondary);
+}
+.cq-story-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  border-radius: var(--cq-radius-full);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--cq-text-primary);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.cq-story-btn:hover {
+  background: var(--cq-surface-subtle);
+}
+.cq-story-btn:focus-visible {
+  outline: 2px solid var(--cq-gold-mid);
+  outline-offset: 2px;
+}
+.cq-story-btn[aria-pressed="true"] {
+  border-color: var(--cq-border-strong);
+}
+.cq-story-btn-primary {
+  background: var(--cq-primary-action);
+  color: var(--cq-on-primary-action);
+}
+.cq-story-btn-primary:hover {
+  background: var(--cq-primary-action-hover);
+}
+.cq-story-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.cq-story-gate,
+.cq-story-answer {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--cq-bottom-nav-height, 0px) + 24px);
+  z-index: var(--cq-z-toast);
+  transform: translateX(-50%);
+  display: grid;
+  gap: 10px;
+  width: min(520px, calc(100vw - 32px));
+  padding: 20px;
+  border-radius: var(--cq-radius-xl);
+  border: 1px solid var(--cq-border-subtle);
+  background: var(--cq-surface-raised);
+  color: var(--cq-text-primary);
+  box-shadow: var(--cq-shadow-overlay);
+  font-size: 0.9375rem;
+}
+.cq-story-gate-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.cq-story-gate-meta {
+  font-size: 0.8125rem;
+  color: var(--cq-text-secondary);
+}
+.cq-story-gate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cq-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .cq-story-montage {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .cq-story-scale {
+    gap: 16px;
+  }
+  .cq-story-split {
+    grid-template-columns: 1fr;
+  }
+  /* One row on a phone: the beat count and the four moves; captions and
+     sound stay in the words ("hide captions", "mute"). */
+  .cq-story-controls {
+    flex-wrap: nowrap;
+    border-radius: var(--cq-radius-xl);
+  }
+  .cq-story-controls .cq-story-btn {
+    padding: 0 10px;
+  }
+  .cq-story-controls [data-wide] {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-story] [data-qp-anchor][data-qp-lit] {
+    animation: none;
+  }
+  .cq-story-stage *,
+  .cq-story-presence,
+  .cq-story-scrim,
+  .cq-story-captions span {
+    animation: none !important;
+    transition: none !important;
+  }
+  .cq-story-montage figure {
+    opacity: 0.55;
+    transform: none;
+  }
+  .cq-story-montage figure[data-lit] {
+    opacity: 1;
+  }
+}

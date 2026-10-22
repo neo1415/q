@@ -430,3 +430,25 @@ Every other atlas feature currently has no certification entry and must not be p
 - About 15 Q runs for triggers and diagnosis, about $0.004 each (q-api logs: `gpt-5.6-luna`, NORMAL_DIALOGUE), so **about $0.06** in total.
 - Bank answers: no model calls.
 - No Tavus, no voice sessions; captions only.
+
+## Q Story v7 (`qstory/engine`, 21–22 Oct 2026): beat claims (PROPOSED)
+
+Status: **PROPOSED**. Coordinator decision, 21 Oct. The source of truth is `packages/q-pitch/src/story/claims.ts`, which a test keeps complete; every claim id is one an existing entry above allows.
+
+- **NARRATIVE: no product claim.** Beats 1–34 (Acts 0–3) and 50, 52, 53, 55 and 56.
+- **DEMONSTRATION:** shown with the on-screen label "Demonstration data"; never a certified claim. Beats 39, 43, 45–49 and 51.
+- **PRODUCT:** the story's gate (`certifyStory`) holds each claim to a PRODUCTION_LIVE_VERIFIED entry for the same actor that allows that exact claim, unexpired and not stale. Until the owner approves the story and every claim holds, it runs as an INTERNAL_REHEARSAL and says so on screen.
+
+| ID    | Beat                               | Claim ids                                                                                           | Also shows demonstration data                 |
+| ----- | ---------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| QS-35 | Discover, the journey              | `INV6-DISCOVER-FEED.c1`                                                                             |                                               |
+| QS-36 | The mandate, word by word          | `INV-MANDATE-VIEW.c1`                                                                               |                                               |
+| QS-37 | Discover around the mandate        | `INV6-DISCOVER-FEED.c2`                                                                             |                                               |
+| QS-38 | Swipe                              | `FEED-VIEW.c1`                                                                                      |                                               |
+| QS-40 | Ask, compare, interrogate, prepare | `INV-DISCOVER-TOP3.c1`, `INV-COMPARE-TABLE.c1`, `INV6-PROFILE-DILIGENCE.c1`, `MEETING-PREP-VIEW.c1` | Yes: the top-three and comparison artifacts   |
+| QS-41 | Interview Before the Interview     | `GATEQ-DOSSIER-VIEW.c1`, `INV6-GATEQ.c2`                                                            |                                               |
+| QS-42 | GateQ                              | `INV6-GATEQ.c1`                                                                                     |                                               |
+| QS-44 | The GateQ inbox                    | `GATEQ-INBOX-VIEW.c1`                                                                               | Yes: score and rank are not built (plan §8.3) |
+| QS-54 | "HOME": Q goes home                | `QP-HOME-HANDOFF.c1`                                                                                |                                               |
+
+**Browser receipts for the story:** none yet. The evidence in `docs/ai-handoff/evidence/q-story/` was recorded on the `/dev/story` harness with fictional fixtures, not on production.

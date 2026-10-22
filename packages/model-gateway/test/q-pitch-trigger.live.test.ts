@@ -104,6 +104,9 @@ const PITCH_REQUESTS = [
   "Zeig uns, was Capital Q kann",
   "apresenta o Capital Q para nós",
   "Tuonyeshe Capital Q inafanya nini",
+  // v57 (Q Story): the story's own words.
+  "present Capital Q",
+  "tell me your story",
 ];
 const NOT_PITCH = [
   "what is a pitch deck?",
@@ -113,6 +116,9 @@ const NOT_PITCH = [
   "show me Harbourline's pitch",
   "make me a pitch deck for my company",
   "take me to Discover",
+  // v57: asked alone, what Capital Q is gets a brief answer, not the film.
+  "what is Capital Q?",
+  "c'est quoi Capital Q ?",
 ];
 
 describe.skipIf(!LIVE || GEMINI === undefined)(
