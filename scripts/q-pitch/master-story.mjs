@@ -12,7 +12,7 @@
  *   sheets/sheet-NN.jpg        a frame every 2 s, for the eye pass
  *
  *   node scripts/q-pitch/master-story.mjs --base http://127.0.0.1:3200 \
- *     [--voice pFZP5JQG7iQjIQuC4Bku] [--skip-ocr]
+ *     [--voice pFZP5JQG7iQjIQuC4Bku] [--pitches <dir>] [--skip-ocr]
  *
  * Another voice set is one flag: --voice <id> (its render must exist under
  * apps/web/public/story-media/<id>/). Playwright records no sound, so each
@@ -116,12 +116,37 @@ const browser = await chromium.launch({
 });
 const viewport = { width: 1920, height: 1080 };
 
+// --pitches <dir>: stand-in pitch clips (scripts/q-pitch/fetch-pitch-clips.mjs),
+// one per company in the order the feed asks for them; else the stills.
+const pitchDir = option("pitches", null);
+const pitchClips =
+  pitchDir === null
+    ? [pitchBytes]
+    : await Promise.all(
+        (await readdir(pitchDir))
+          .filter((name) => /^pitch-\d+\.webm$/u.test(name))
+          .sort()
+          .map((name) => readFile(path.join(pitchDir, name))),
+      );
+const clipFor = new Map();
 async function answerMedia(context) {
   await context.route("**/dev/discover/media/**", (route) => {
     const url = route.request().url();
-    return url.endsWith(".jpg")
-      ? route.fulfill({ body: posterBytes, contentType: "image/jpeg" })
-      : route.fulfill({ body: pitchBytes, contentType: "video/webm" });
+    if (url.endsWith(".jpg")) {
+      // With real clips, no poster: a still that is not the clip's own
+      // first frame would flash before it plays.
+      return pitchDir === null
+        ? route.fulfill({ body: posterBytes, contentType: "image/jpeg" })
+        : route.fulfill({ status: 404 });
+    }
+    const asset = new URL(url).pathname.split("/").pop() ?? "";
+    if (!clipFor.has(asset)) {
+      clipFor.set(asset, pitchClips[clipFor.size % pitchClips.length]);
+    }
+    return route.fulfill({
+      body: clipFor.get(asset),
+      contentType: "video/webm",
+    });
   });
   await context.route("**/api/pitch-captions/**", (route) =>
     route.fulfill({ body: "WEBVTT\n\n", contentType: "text/vtt" }),
@@ -232,9 +257,10 @@ const evidence = await page.evaluate(() => ({
 }));
 const video = page.video();
 await context.close();
-await browser.close();
+// Saved before the browser goes: the recording is the browser's file.
 const raw = path.join(work, "raw.webm");
 await video?.saveAs(raw);
+await browser.close();
 
 // ── Mix: each clip at its logged start ─────────────────────────────────
 const starts = evidence.starts.filter((s) => s.duration > 0.2);
