@@ -17,7 +17,7 @@
  *
  *   pnpm exec turbo run build --filter=@capital-q/q-pitch
  *   NODE_USE_ENV_PROXY=1 ELEVENLABS_API_KEY=... node scripts/q-pitch/render-story.mjs [--dry-run]
- *     [--beats 1,2,3] [--voice EXAVITQu4vr4xnSDxMaL] [--model eleven_v3]
+ *     [--beats 1,2,3] [--voice EXAVITQu4vr4xnSDxMaL] [--model eleven_v4_turbo]
  *     [--usd-per-1k 0.30] [--max-chars 7000] [--format mp3_44100_96]
  *     [--out apps/web/public/story-media] [--align-only]
  *     [--max-gap beat-26:1200]
@@ -79,10 +79,14 @@ const maxGap = new Map(
 );
 // Q's own voice ("Sarah", apps/q-api elevenlabs-speak VOICE_IDS.FEMALE).
 const voice = option("voice", "EXAVITQu4vr4xnSDxMaL");
-// v3 is the model that honours audio tags. The conversational variant is
-// what Q's live replies use; the with-timestamps endpoint is tried with it
-// first and with the plain v3 model if it is refused.
-const models = option("model", "eleven_v3_conversational,eleven_v3").split(",");
+// v4 turbo (owner's choice, 2026-10-22): measured on the story it performs
+// the audio tags (STT hears the sighs, chuckles and laughs; no tag is read
+// aloud) at half v3's credit rate. v3 conversational is the fallback if
+// the with-timestamps endpoint refuses it.
+const models = option(
+  "model",
+  "eleven_v4_turbo,eleven_v3_conversational",
+).split(",");
 const usdPer1k = Number(option("usd-per-1k", "0.30"));
 const maxChars = Number(option("max-chars", "7000"));
 const only = option("beats", null);
