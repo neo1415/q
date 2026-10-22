@@ -18,6 +18,11 @@
  * apps/web/public/story-media/<id>/). Playwright records no sound, so each
  * beat's audio is logged as it starts and its clip is mixed in at that
  * moment. Nothing here reads a service or calls a model.
+ *
+ * The "Internal rehearsal" stamp is the gate's (certifyStory), never the
+ * recorder's: when the owner's approval is recorded for this cut
+ * (STORY_OWNER_APPROVAL in packages/q-pitch/src/story/claims.ts) and every
+ * product claim holds, a rebuild and a re-run records the AUDIENCE cut.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";

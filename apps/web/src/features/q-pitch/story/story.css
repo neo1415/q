@@ -837,6 +837,12 @@ html:is([data-story="NIGHT"], [data-story="HUSH"], [data-story="STORY"])
 }
 
 .cq-story-gate,
+/* "Do you mean …?": the candidates, then "Neither". */
+.cq-story-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .cq-story-answer {
   position: fixed;
   left: 50%;
@@ -956,6 +962,11 @@ html[data-story-film]
     )
   ) {
   zoom: 1.75;
+}
+/* The closing outcomes: a list of lines, read at 720p. */
+html[data-story-film] .cq-story-outcomes {
+  font-size: 2.5rem;
+  gap: 14px;
 }
 html[data-story-film] .cq-story-standing {
   font-size: 1rem;
