@@ -1,0 +1,96 @@
+{
+  "$comment": "Capital Q's demonstration data room (owner direction 2026-10-22). Loaded by the S6 demo-companies seed. Every file carries the watermark below on every page or sheet and in its file properties. Documents are not verification and must never create a verification claim. Figures match supabase/seed-assets/demo-companies/companies.json; the SAFE valuation cap and the founder/ESOP split are illustrative values the owner approved on 22 Oct 2026.",
+  "seedKey": "capital-q-documents-v1",
+  "company": "capital-q",
+  "asOf": "2026-09-30",
+  "watermark": "DEMONSTRATION DOCUMENT — illustrative, prepared for the Capital Q product demo. Not a legal or financial record.",
+  "documents": [
+    {
+      "file": "pitch-deck.pdf",
+      "title": "Pitch deck, Q3 2026",
+      "documentType": "PITCH_DECK",
+      "mime": "application/pdf",
+      "sha256": "6b94f06168d5fe67b977cc8c1a05456db4ac3e784187b9699332f8a2d7618d0f",
+      "dataRoomLevel": "PUBLIC",
+      "folderCode": "fundraising",
+      "watermark": "DEMONSTRATION DOCUMENT — illustrative, prepared for the Capital Q product demo. Not a legal or financial record."
+    },
+    {
+      "file": "financial-model.xlsx",
+      "title": "Financial model 2026–2028",
+      "documentType": "FINANCIAL_MODEL",
+      "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "sha256": "146c3a2861b728c5659b3e65e9ad2e378d15089df8dc8b1aba7d955dfe09feaf",
+      "dataRoomLevel": "ON_REQUEST",
+      "folderCode": "financials",
+      "watermark": "DEMONSTRATION DOCUMENT — illustrative, prepared for the Capital Q product demo. Not a legal or financial record."
+    },
+    {
+      "file": "capital-q-cap-table.xlsx",
+      "title": "Cap table summary (illustrative)",
+      "documentType": "CORPORATE",
+      "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "sha256": "d3407862e080712e8a09357de88bf255294378302aa730144a0f197a80d456bf",
+      "dataRoomLevel": "ON_REQUEST",
+      "folderCode": "cap_table",
+      "watermark": "DEMONSTRATION DOCUMENT — illustrative, prepared for the Capital Q product demo. Not a legal or financial record."
+    },
+    {
+      "file": "capital-q-certificate-of-incorporation-summary.pdf",
+      "title": "Certificate of incorporation — summary",
+      "documentType": "CORPORATE",
+      "mime": "application/pdf",
+      "sha256": "3d0771220ac5f9657f4f75ff0eb6a9ba191512e38cc5b791f2ede476b84b5137",
+      "dataRoomLevel": "ON_REQUEST",
+      "folderCode": "corporate",
+      "watermark": "DEMONSTRATION DOCUMENT — illustrative, prepared for the Capital Q product demo. Not a legal or financial record."
+    },
+    {
+      "file": "capital-q-shareholder-agreement-summary.pdf",
+      "title": "Shareholder agreement — summary",
+      "documentType": "LEGAL",
+      "mime": "application/pdf",
+      "sha256": "a8fbc064ce402203ca32633beaff724d26d7dc0ea712ca517d4478e8074d63ff",
+      "dataRoomLevel": "ON_REQUEST",
+      "folderCode": "legal_ip",
+      "watermark": "DEMONSTRATION DOCUMENT — illustrative, prepared for the Capital Q product demo. Not a legal or financial record."
+    },
+    {
+      "file": "capital-q-board-composition-note.pdf",
+      "title": "Board composition note",
+      "documentType": "GOVERNANCE",
+      "mime": "application/pdf",
+      "sha256": "8919095995dd611ca9fb66cfcdf1ffa7cee9264cb8270410fa78ef2a675e88ea",
+      "dataRoomLevel": "ON_REQUEST",
+      "folderCode": "corporate",
+      "watermark": "DEMONSTRATION DOCUMENT — illustrative, prepared for the Capital Q product demo. Not a legal or financial record."
+    }
+  ],
+  "pitchVideo": {
+    "$comment": "Q genuinely pitching Capital Q: a copy of the Q Story master, not a founder video. Upload through /pitch/new (founder session and stream provider) with the audience below.",
+    "file": "capital-q-pitch-video.mp4",
+    "source": "docs/ai-handoff/evidence/q-story/master/q-story-master-720p.mp4",
+    "mime": "video/mp4",
+    "bytes": 10115269,
+    "sha256": "7f02f0adb8d239922df0ca77e64218ec16706e5a8baa4028f84f8a9a166a6829",
+    "title": "Capital Q — the Q Story",
+    "audience": "Everyone on Capital Q",
+    "uploadPath": "/pitch/new"
+  },
+  "illustrativeValues": {
+    "$comment": "Owner approved these illustrative values on 22 Oct 2026; each stays marked illustrative.",
+    "safePostMoneyValuationCapUsd": "10000000",
+    "foundersSharesPreRound": {
+      "david": 6000000,
+      "zino": 3000000
+    },
+    "esopReservedShares": 1000000
+  },
+  "build": [
+    "python3 scripts/seed/capital-q-documents/build_xlsx.py supabase/seed-assets/capital-q-documents",
+    "python3 <xlsx skill>/scripts/recalc.py <each .xlsx>  # LibreOffice computes cached values",
+    "python3 scripts/seed/capital-q-documents/build_html.py <scratch html dir>",
+    "node scripts/seed/capital-q-documents/print_pdfs.mjs <scratch html dir> supabase/seed-assets/capital-q-documents",
+    "python3 scripts/seed/capital-q-documents/finalize.py supabase/seed-assets/capital-q-documents"
+  ]
+}
