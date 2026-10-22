@@ -116,6 +116,9 @@ function createStore<T>(initial: T) {
 const frame = () =>
   new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
+/** Q's moment to form on stage before the first word. */
+const OPENING_FORM_MS = 800;
+
 /** One rendered clip, through the story's audio clock. False if it failed. */
 async function playClip(
   context: AudioContext,
@@ -492,8 +495,24 @@ export function StoryHost({
           },
         },
       });
+      // The opening is set at the press, and Q is given a moment to form
+      // before its first word, so "Hi. I'm Q." is said by a formed Q in
+      // every edition (coordinator, 22 Oct).
+      for (const cue of beats[0]?.cues ?? []) {
+        if (cue.at !== 0) continue;
+        if (cue.act.kind === "mood") mood.set(cue.act.mood);
+        if (cue.act.kind === "stage") {
+          stage.set({
+            visual: cue.act.visual,
+            step: cue.act.step,
+            text: cue.act.text ?? null,
+            fallback: null,
+          });
+        }
+      }
       setPlayer(next);
       setStarting(false);
+      await new Promise((resolve) => setTimeout(resolve, OPENING_FORM_MS));
       next.start(0);
     },
     [assets, timings, beats, mood, stage, pathFor],

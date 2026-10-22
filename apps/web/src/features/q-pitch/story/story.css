@@ -118,6 +118,8 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   font-size: clamp(2rem, 6vw, 4.5rem);
   line-height: 1.05;
   letter-spacing: -0.02em;
+  /* Balanced lines: never one word alone on the last line ("me."). */
+  text-wrap: balance;
   animation: cq-story-in var(--cq-motion-emphasis) var(--cq-ease) both;
 }
 .cq-story-type-sm {
