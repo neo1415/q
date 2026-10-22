@@ -1145,3 +1145,31 @@ Evidence stage: **code + local database tests**. Not applied to hosted; the prod
 - Capital Q's contribution-margin statement is reworded to match the documents: revenue less cost of revenue and variable onboarding and support.
 - Re-score (local): unchanged at 76 Strong, Low confidence, 4/8 areas, 15/46 criteria. InvestIQ reads no data-room document except the deck, so governance, legal and diligence stay at 0.
 - Checks: seed tests 12/12.
+
+## 22 October 2026, 15:55 UTC — Claude coordinator (Q Story editions, Capital Q seed)
+
+Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed. CI on #267 for this head has not been confirmed. NOT deployed** (Railway still in a major outage).
+
+- **Q Story editions:** FULL, INVESTOR and FOUNDER, each a verbatim cut of Lily's audio.
+  - Triggers: "pitch to an investor / founder / everyone"; the Q Pitch page has a three-way picker.
+  - Beat-34 title card: "Capital Q / Home of Private Capital".
+  - Capital Q's own Q Card: David Nwankwo's photo, the "Strong" reading, and a story-only "Investor conversations: 12" (the owner chose this; never written to the database).
+  - The owner approved all three for AUDIENCE; the approvals are recorded per version, and the stamp is gone through the gate.
+  - Masters, under `docs/ai-handoff/evidence/q-story/master/`, sent to the owner:
+    - INVESTOR 3:58.8, at 25c6141b0;
+    - FOUNDER 4:26.8, at 7ea60dded;
+    - FULL 6:44.7, at 1ebe3ce07.
+  - New audit checks: clutter behind over-page visuals; out-of-frame or subtitle-band intrusion.
+- **Capital Q seed:**
+  - #319, #322 and #324 for the companies and team; #325 for all six documents; #323 by S7 for the documents themselves.
+  - Every document is watermarked as a demonstration document; the legal ones are summaries only.
+  - The pitch video is the INVESTOR master.
+  - Local InvestIQ: 76 STRONG once the deck is confirmed. Governance, legal and diligence stay at 0 by design: those areas read only confirmed facts and verification.
+  - The hosted seed run is a deploy-time step that needs the owner's OK.
+- **Migrations to apply before the code:** 20261228214500, 20261229090000 and 20261229100000. 20261228210000 is already applied.
+- **Open for the owner:**
+  - Zino's headshot;
+  - account emails for Zino, Daniel and Adeyemi;
+  - David uploads the pitch video at /pitch/new after deploy;
+  - the voice hybrid decision, or fix the Speech Engine id;
+  - rotate the Railway and Supabase tokens.
