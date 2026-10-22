@@ -7,7 +7,7 @@ describe("Q Pitch holds the voice (15 Oct cost bug: a paid line opened before St
     expect(
       tourHoldsVoice({
         running: false,
-        search: "?qpitch=premiere",
+        search: "?qpitch=story",
         resumeStored: false,
       }),
     ).toBe(true);

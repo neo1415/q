@@ -56,12 +56,7 @@ export {
   type KnowledgePack,
   type PackEntry,
 } from "./knowledge-pack.js";
-export {
-  ATLAS_SCRIPT,
-  PREMIERE_CERTIFICATION_LEDGER,
-  PREMIERE_SCRIPT,
-  SHORT_SCRIPT,
-} from "./premiere.js";
+export { PREMIERE_CERTIFICATION_LEDGER } from "./premiere-ledger.js";
 export * from "./step-commands.js";
 export * from "./step-graph.js";
 export * from "./qa-bank.js";

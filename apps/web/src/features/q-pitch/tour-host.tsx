@@ -15,12 +15,6 @@ import {
   FOUNDER_V6_SCRIPT,
   INVESTOR_V6_LEDGER,
   INVESTOR_V6_SCRIPT,
-  PILOT_CERTIFICATION_LEDGER,
-  PILOT_SCRIPT,
-  PREMIERE_CERTIFICATION_LEDGER,
-  ATLAS_SCRIPT,
-  PREMIERE_SCRIPT,
-  SHORT_SCRIPT,
   TourActorSchema,
   TourRunner,
   buildQaIndex,
@@ -108,34 +102,11 @@ function actionWords(snapshot: TourSnapshot): string | null {
   }
 }
 
-export type TourChoice =
-  "pilot" | "premiere" | "short" | "atlas" | "founder-v6" | "investor-v6";
+/** The v6 tracks; the v5 tours are retired (the v7 story has its own host). */
+export type TourChoice = "founder-v6" | "investor-v6";
 
-/**
- * Which script, and what the gate may admit. The premiere opts into
- * CODE_VERIFIED scenes, as an INTERNAL_REHEARSAL only, to rehearse the full
- * r3 cut and collect the browser receipts that would promote them.
- */
+/** Which script, and what the gate may admit. */
 const TOURS = {
-  pilot: {
-    script: PILOT_SCRIPT,
-    ledger: PILOT_CERTIFICATION_LEDGER,
-    accepted: ["PRODUCTION_LIVE_VERIFIED"],
-    label: "Internal rehearsal · draft script · demonstration data",
-  },
-  short: {
-    script: SHORT_SCRIPT,
-    ledger: PREMIERE_CERTIFICATION_LEDGER,
-    accepted: ["PRODUCTION_LIVE_VERIFIED"],
-    label: "Internal rehearsal · two-minute draft · demonstration data",
-  },
-  atlas: {
-    script: ATLAS_SCRIPT,
-    ledger: PREMIERE_CERTIFICATION_LEDGER,
-    accepted: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
-    label:
-      "Internal rehearsal · Feature Atlas · includes code-verified scenes without a browser receipt · demonstration data",
-  },
   // Q Pitch v6, founder track (Lane qpf): Capital Q presented to founders.
   "investor-v6": {
     script: INVESTOR_V6_SCRIPT,
@@ -148,13 +119,6 @@ const TOURS = {
     ledger: FOUNDER_V6_LEDGER,
     accepted: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
     label: "Q Pitch · founder track · demonstration data",
-  },
-  premiere: {
-    script: PREMIERE_SCRIPT,
-    ledger: PREMIERE_CERTIFICATION_LEDGER,
-    accepted: ["PRODUCTION_LIVE_VERIFIED", "CODE_VERIFIED"],
-    label:
-      "Internal rehearsal · premiere v5 · includes code-verified scenes without a browser receipt · demonstration data",
   },
 } as const;
 
