@@ -141,6 +141,7 @@ export const DOCUMENTS_AR: Readonly<Record<string, string>> = {
   "In data room ·": "في غرفة البيانات ·",
   "Share a document you have": "شارِك مستنداً لديك",
   "Attach a document you have": "أرفق مستنداً لديك",
+  "Attach a document": "أرفق مستنداً",
   "Choose a document": "اختر مستنداً",
   "Or one you have…": "أو مستنداً لديك…",
   "File in": "احفظ في",

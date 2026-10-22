@@ -499,6 +499,7 @@ export const QOpenSetupIntentSchema = z
 export const Q_SETTINGS_SECTIONS = [
   "account",
   "team",
+  "activity",
   "appearance",
   "q",
   "speaking",

@@ -508,6 +508,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "At the end it returns to the default plan by itself.",
   "Attach",
   "Attach a PDF, PNG or JPEG of 10 MB or less.",
+  "Attach a document",
   "Attach a document you have",
   "Attach a shared document",
   "Attach evidence",
