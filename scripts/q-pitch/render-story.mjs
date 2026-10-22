@@ -17,7 +17,7 @@
  *
  *   pnpm exec turbo run build --filter=@capital-q/q-pitch
  *   NODE_USE_ENV_PROXY=1 ELEVENLABS_API_KEY=... node scripts/q-pitch/render-story.mjs [--dry-run]
- *     [--beats 1,2,3] [--voice EXAVITQu4vr4xnSDxMaL] [--model eleven_v4_turbo]
+ *     [--beats 1,2,3] [--voice pFZP5JQG7iQjIQuC4Bku] [--model eleven_v4_turbo]
  *     [--usd-per-1k 0.30] [--max-chars 7000] [--format mp3_44100_96]
  *     [--out apps/web/public/story-media] [--align-only]
  *     [--max-gap beat-26:1200]
@@ -84,8 +84,9 @@ const maxGap = new Map(
       return [id, Number(ms)];
     }),
 );
-// Q's own voice ("Sarah", apps/q-api elevenlabs-speak VOICE_IDS.FEMALE).
-const voice = option("voice", "EXAVITQu4vr4xnSDxMaL");
+// The story's narrator ("Lily", the owner's pick from the voice A/B,
+// 2026-10-22); apps/web story-preload STORY_VOICE reads the same folder.
+const voice = option("voice", "pFZP5JQG7iQjIQuC4Bku");
 // v4 turbo (owner's choice, 2026-10-22): measured on the story it performs
 // the audio tags (STT hears the sighs, chuckles and laughs; no tag is read
 // aloud) at half v3's credit rate. v3 conversational is the fallback if

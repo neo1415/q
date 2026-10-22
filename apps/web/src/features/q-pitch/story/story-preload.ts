@@ -28,8 +28,11 @@ import { storyPath, type StoryPathFor } from "./story-pages";
  * story then plays on fixture timings with the live or silent narrator.
  */
 
-/** Q's own voice ("Sarah"), the render's folder (scripts/q-pitch/render-story.mjs). */
-export const STORY_VOICE = "EXAVITQu4vr4xnSDxMaL";
+/**
+ * The story's narrator ("Lily", the owner's pick from the voice A/B on
+ * 2026-10-22), the render's folder (scripts/q-pitch/render-story.mjs).
+ */
+export const STORY_VOICE = "pFZP5JQG7iQjIQuC4Bku";
 
 /** The render's index: which beats exist, by their content-hashed names. */
 const MEDIA_FILE = /^beat-\d{2}\.[0-9a-f]{10}\.(?:mp3|json)$/u;

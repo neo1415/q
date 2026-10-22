@@ -1,0 +1,445 @@
+<title>Q Story Voice A/B</title>
+<meta name="claude:viewport-fit-sides" content="cover" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap"
+/>
+<style>
+  /* Layout: one listening column; each take is a row with its label, player and measured numbers. */
+  :root {
+    --bg: #f6f4ef;
+    --surface: #fffdf8;
+    --fg: #1d1a14;
+    --muted: #6b6455;
+    --line: #e2dccd;
+    --gold: #9a6f12;
+    --gold-soft: #f2e6c6;
+    --display: "Fraunces", Georgia, serif;
+    --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12110e;
+      --surface: #1b1914;
+      --fg: #efe9dc;
+      --muted: #a39b88;
+      --line: #2e2a21;
+      --gold: #d9a93a;
+      --gold-soft: #2c2412;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12110e;
+    --surface: #1b1914;
+    --fg: #efe9dc;
+    --muted: #a39b88;
+    --line: #2e2a21;
+    --gold: #d9a93a;
+    --gold-soft: #2c2412;
+    color-scheme: dark;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 40px 64px;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    display: grid;
+    gap: 32px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(30px, 6vw, 42px);
+    line-height: 1.1;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h2 {
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: 22px;
+    margin: 0;
+  }
+  p {
+    margin: 0;
+    max-width: 65ch;
+  }
+  .lede {
+    color: var(--muted);
+  }
+  .passage {
+    font-family: var(--display);
+    font-size: 17px;
+    border-left: 2px solid var(--gold);
+    padding-left: 14px;
+    color: var(--muted);
+    font-style: italic;
+  }
+  .group {
+    display: grid;
+    gap: 12px;
+  }
+  .group-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--gold);
+    letter-spacing: 0.04em;
+  }
+  .take {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    display: grid;
+    gap: 10px;
+  }
+  .take.pick {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px var(--gold) inset;
+  }
+  .take-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .name {
+    font-weight: 600;
+    font-size: 17px;
+  }
+  .desc {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .rank {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: var(--gold-soft);
+    color: var(--gold);
+    padding: 2px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  audio {
+    width: 100%;
+  }
+  dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 6px 16px;
+    margin: 0;
+    font-size: 13px;
+  }
+  dl div {
+    min-width: 0;
+  }
+  dt {
+    color: var(--muted);
+  }
+  dd {
+    margin: 0;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+  .note {
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .ranking ol {
+    margin: 8px 0 0;
+    padding-left: 22px;
+    display: grid;
+    gap: 6px;
+    max-width: 65ch;
+  }
+  footer {
+    font-size: 13px;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+    display: grid;
+    gap: 6px;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+  }
+</style>
+
+<main>
+  <header style="display: grid; gap: 12px">
+    <span class="tag">Q STORY · BEATS 1–12 · ABOUT 45–55 S EACH</span>
+    <h1>Which voice is Q?</h1>
+    <p class="lede">
+      The same opening passage in six takes. All ElevenLabs takes use
+      <code>eleven_v4_turbo</code> with the story's delivery cues (sighs,
+      whispers, pauses). The OpenAI takes read the same words with written
+      delivery instructions. Turn your sound on and pick by ear.
+    </p>
+    <p class="passage">
+      “Hi. I’m Q. … let me tell you a story. It’s 11:47 at night. … Is this
+      worth the risk? Do I trust this business? … cost you too.”
+    </p>
+  </header>
+
+  <section class="group">
+    <div class="group-head">
+      <h2>A · Current voice</h2>
+      <span class="tag">ELEVENLABS V4 TURBO</span>
+    </div>
+    <article class="take">
+      <div class="take-head">
+        <span class="name">Sarah</span><span class="rank">My rank 4</span>
+      </div>
+      <p class="desc">Q’s voice today. Mature, reassuring, American.</p>
+      <audio id="a-sarah" controls preload="metadata" src="A-sarah.mp3"></audio>
+      <dl>
+        <div>
+          <dt>Length</dt>
+          <dd>53.0 s</dd>
+        </div>
+        <div>
+          <dt>Words heard right</dt>
+          <dd>99%</dd>
+        </div>
+        <div>
+          <dt>Sigh heard</dt>
+          <dd>yes</dd>
+        </div>
+        <div>
+          <dt>Pitch range</dt>
+          <dd>12.6 st</dd>
+        </div>
+      </dl>
+    </article>
+  </section>
+
+  <section class="group">
+    <div class="group-head">
+      <h2>B · Richer library voices</h2>
+      <span class="tag">ELEVENLABS V4 TURBO</span>
+    </div>
+    <article class="take pick">
+      <div class="take-head">
+        <span class="name">Brian</span><span class="rank">My rank 1</span>
+      </div>
+      <p class="desc">Deep, resonant, comforting. American male.</p>
+      <audio
+        id="b-brian"
+        controls
+        preload="metadata"
+        src="B3-brian.mp3"
+      ></audio>
+      <dl>
+        <div>
+          <dt>Length</dt>
+          <dd>50.6 s</dd>
+        </div>
+        <div>
+          <dt>Words heard right</dt>
+          <dd>99%</dd>
+        </div>
+        <div>
+          <dt>Sigh heard</dt>
+          <dd>yes</dd>
+        </div>
+        <div>
+          <dt>Pitch range</dt>
+          <dd>16.7 st</dd>
+        </div>
+      </dl>
+    </article>
+    <article class="take">
+      <div class="take-head">
+        <span class="name">Lily</span><span class="rank">My rank 2</span>
+      </div>
+      <p class="desc">Velvety, confident. British female.</p>
+      <audio id="b-lily" controls preload="metadata" src="B2-lily.mp3"></audio>
+      <dl>
+        <div>
+          <dt>Length</dt>
+          <dd>54.9 s</dd>
+        </div>
+        <div>
+          <dt>Words heard right</dt>
+          <dd>99%</dd>
+        </div>
+        <div>
+          <dt>Sigh heard</dt>
+          <dd>yes</dd>
+        </div>
+        <div>
+          <dt>Pitch range</dt>
+          <dd>15.3 st</dd>
+        </div>
+      </dl>
+    </article>
+    <article class="take">
+      <div class="take-head">
+        <span class="name">George</span><span class="rank">My rank 3</span>
+      </div>
+      <p class="desc">Warm, captivating storyteller. British male.</p>
+      <audio
+        id="b-george"
+        controls
+        preload="metadata"
+        src="B1-george.mp3"
+      ></audio>
+      <dl>
+        <div>
+          <dt>Length</dt>
+          <dd>52.8 s</dd>
+        </div>
+        <div>
+          <dt>Words heard right</dt>
+          <dd>99%</dd>
+        </div>
+        <div>
+          <dt>Sigh heard</dt>
+          <dd>yes</dd>
+        </div>
+        <div>
+          <dt>Pitch range</dt>
+          <dd>14.6 st</dd>
+        </div>
+      </dl>
+    </article>
+  </section>
+
+  <section class="group">
+    <div class="group-head">
+      <h2>C · OpenAI voices</h2>
+      <span class="tag">GPT-4O-MINI-TTS</span>
+    </div>
+    <article class="take">
+      <div class="take-head">
+        <span class="name">Marin</span><span class="rank">My rank 5</span>
+      </div>
+      <p class="desc">Q’s live female voice on GPT-Live.</p>
+      <audio
+        id="c-marin"
+        controls
+        preload="metadata"
+        src="C1-openai-marin.mp3"
+      ></audio>
+      <dl>
+        <div>
+          <dt>Length</dt>
+          <dd>42.9 s</dd>
+        </div>
+        <div>
+          <dt>Words heard right</dt>
+          <dd>95%</dd>
+        </div>
+        <div>
+          <dt>Sigh heard</dt>
+          <dd>no</dd>
+        </div>
+        <div>
+          <dt>Pitch range</dt>
+          <dd>10.2 st</dd>
+        </div>
+      </dl>
+    </article>
+    <article class="take">
+      <div class="take-head">
+        <span class="name">Cedar</span><span class="rank">My rank 6</span>
+      </div>
+      <p class="desc">Q’s live male voice on GPT-Live.</p>
+      <audio
+        id="c-cedar"
+        controls
+        preload="metadata"
+        src="C2-openai-cedar.mp3"
+      ></audio>
+      <dl>
+        <div>
+          <dt>Length</dt>
+          <dd>39.3 s</dd>
+        </div>
+        <div>
+          <dt>Words heard right</dt>
+          <dd>95%</dd>
+        </div>
+        <div>
+          <dt>Sigh heard</dt>
+          <dd>no</dd>
+        </div>
+        <div>
+          <dt>Pitch range</dt>
+          <dd>9.0 st</dd>
+        </div>
+      </dl>
+    </article>
+    <p class="note">
+      These use OpenAI’s speech endpoint with the same marin and cedar voices
+      GPT-Live uses. The live realtime model can sound slightly different.
+    </p>
+  </section>
+
+  <section class="ranking">
+    <h2>How I ranked them</h2>
+    <p class="note">
+      I can’t listen, so this ranking comes from measurements, not taste. Your
+      ear decides.
+    </p>
+    <ol>
+      <li>
+        <strong>Brian</strong> has the widest pitch movement of all six, so it’s
+        the least monotone. It performs the sigh, and every word is clear.
+      </li>
+      <li>
+        <strong>Lily</strong> is the most expressive female voice, if Q should
+        stay female.
+      </li>
+      <li>
+        <strong>George</strong> is close behind and is labelled a storyteller
+        voice.
+      </li>
+      <li>
+        <strong>Sarah</strong> is the flattest ElevenLabs voice here, which fits
+        the feedback that she sounds like a basic voice with emotions added.
+      </li>
+      <li>
+        <strong>OpenAI marin and cedar</strong> are the most monotone. They ran
+        about 25% faster than the pace they were asked for, performed no sigh,
+        and in marin’s take the transcript is missing “Do I trust this
+        business?”. They also can’t follow per-line delivery cues, and they
+        return no word timings, so the story’s cues would need an extra
+        alignment step.
+      </li>
+    </ol>
+  </section>
+
+  <footer>
+    <span
+      >“Pitch range” is the spread of the voice’s pitch in semitones (5th to
+      95th percentile): higher means more movement, lower means flatter. “Words
+      heard right” is a speech-to-text transcript matched against the
+      script.</span
+    >
+    <span
+      >Spend for this comparison: about $0.21 (612 ElevenLabs credits plus about
+      $0.03 of OpenAI). Files:
+      <code>docs/ai-handoff/evidence/q-story/voice-ab/</code>.</span
+    >
+  </footer>
+</main>

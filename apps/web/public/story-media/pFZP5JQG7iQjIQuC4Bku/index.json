@@ -1,0 +1,633 @@
+{
+  "version": "story-v7.1",
+  "voice": "pFZP5JQG7iQjIQuC4Bku",
+  "model": "eleven_v4_turbo",
+  "beats": {
+    "beat-01": {
+      "chars": 19,
+      "durationMs": 2038,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.226
+    },
+    "beat-02": {
+      "chars": 80,
+      "durationMs": 4362,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.637
+    },
+    "beat-03": {
+      "chars": 29,
+      "durationMs": 2691,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.153
+    },
+    "beat-04": {
+      "chars": 26,
+      "durationMs": 1959,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.688
+    },
+    "beat-05": {
+      "chars": 19,
+      "durationMs": 2038,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.909
+    },
+    "beat-06": {
+      "chars": 88,
+      "durationMs": 6269,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.752
+    },
+    "beat-07": {
+      "chars": 31,
+      "durationMs": 2429,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.868
+    },
+    "beat-08": {
+      "chars": 79,
+      "durationMs": 5068,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.648
+    },
+    "beat-09": {
+      "chars": 39,
+      "durationMs": 3082,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.728
+    },
+    "beat-10": {
+      "chars": 103,
+      "durationMs": 7889,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.588
+    },
+    "beat-11": {
+      "chars": 44,
+      "durationMs": 3396,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.608
+    },
+    "beat-12": {
+      "chars": 135,
+      "durationMs": 8986,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.594
+    },
+    "beat-13": {
+      "chars": 159,
+      "durationMs": 11886,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.541
+    },
+    "beat-14": {
+      "chars": 127,
+      "durationMs": 8046,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.526
+    },
+    "beat-15": {
+      "chars": 66,
+      "durationMs": 3396,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.663
+    },
+    "beat-16": {
+      "chars": 153,
+      "durationMs": 10762,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.56
+    },
+    "beat-17": {
+      "chars": 41,
+      "durationMs": 3474,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.851
+    },
+    "beat-18": {
+      "chars": 103,
+      "durationMs": 7158,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.573
+    },
+    "beat-19": {
+      "chars": 254,
+      "durationMs": 17789,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.541
+    },
+    "beat-20": {
+      "chars": 47,
+      "durationMs": 2926,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.673
+    },
+    "beat-21": {
+      "chars": 135,
+      "durationMs": 10266,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.655
+    },
+    "beat-22": {
+      "chars": 180,
+      "durationMs": 11468,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.552
+    },
+    "beat-23": {
+      "chars": 146,
+      "durationMs": 10449,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.589
+    },
+    "beat-24": {
+      "chars": 46,
+      "durationMs": 5721,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.877
+    },
+    "beat-25": {
+      "chars": 70,
+      "durationMs": 6844,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.714
+    },
+    "beat-26": {
+      "chars": 40,
+      "durationMs": 2821,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.123,
+      "silenceCutMs": 260
+    },
+    "beat-27": {
+      "chars": 63,
+      "durationMs": 5407,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.738
+    },
+    "beat-28": {
+      "chars": 105,
+      "durationMs": 7158,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.697
+    },
+    "beat-29": {
+      "chars": 109,
+      "durationMs": 8438,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.666
+    },
+    "beat-30": {
+      "chars": 79,
+      "durationMs": 6269,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.713
+    },
+    "beat-31": {
+      "chars": 143,
+      "durationMs": 10998,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.609
+    },
+    "beat-32": {
+      "chars": 69,
+      "durationMs": 5799,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.668
+    },
+    "beat-33": {
+      "chars": 22,
+      "durationMs": 1646,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.844
+    },
+    "beat-34": {
+      "chars": 18,
+      "durationMs": 1724,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.333
+    },
+    "beat-35": {
+      "chars": 131,
+      "durationMs": 8124,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.634
+    },
+    "beat-36": {
+      "chars": 107,
+      "durationMs": 10684,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.767
+    },
+    "beat-37": {
+      "chars": 47,
+      "durationMs": 3396,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.76
+    },
+    "beat-38": {
+      "chars": 45,
+      "durationMs": 3318,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.722
+    },
+    "beat-39": {
+      "chars": 55,
+      "durationMs": 3318,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.626
+    },
+    "beat-40": {
+      "chars": 83,
+      "durationMs": 6766,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.606
+    },
+    "beat-41": {
+      "chars": 142,
+      "durationMs": 8516,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.557
+    },
+    "beat-42": {
+      "chars": 42,
+      "durationMs": 3318,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.931
+    },
+    "beat-43": {
+      "chars": 140,
+      "durationMs": 9639,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.587
+    },
+    "beat-44": {
+      "chars": 270,
+      "durationMs": 18521,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.526
+    },
+    "beat-45": {
+      "chars": 304,
+      "durationMs": 19331,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.525
+    },
+    "beat-46": {
+      "chars": 106,
+      "durationMs": 8751,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.648
+    },
+    "beat-47": {
+      "chars": 105,
+      "durationMs": 8202,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.679
+    },
+    "beat-48": {
+      "chars": 122,
+      "durationMs": 8751,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.638
+    },
+    "beat-49": {
+      "chars": 121,
+      "durationMs": 8673,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.608
+    },
+    "beat-50": {
+      "chars": 25,
+      "durationMs": 2691,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.841
+    },
+    "beat-51": {
+      "chars": 86,
+      "durationMs": 9639,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.785
+    },
+    "beat-52": {
+      "chars": 77,
+      "durationMs": 6113,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.641
+    },
+    "beat-53": {
+      "chars": 198,
+      "durationMs": 14838,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.555
+    },
+    "beat-54": {
+      "chars": 112,
+      "durationMs": 9404,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.743
+    },
+    "beat-55": {
+      "chars": 15,
+      "durationMs": 1411,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.562
+    },
+    "beat-56": {
+      "chars": 153,
+      "durationMs": 10684,
+      "model": "eleven_v4_turbo",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.636
+    }
+  },
+  "complete": true,
+  "ledger": {
+    "thisRunChars": 5353,
+    "totalChars": 5353,
+    "usdPer1kEstimate": 0.3,
+    "thisRunUsdEstimate": 1.61
+  },
+  "files": {
+    "beat-01": {
+      "audio": "beat-01.47f19bede3.mp3",
+      "alignment": "beat-01.c3a4fd83eb.json"
+    },
+    "beat-02": {
+      "audio": "beat-02.6178a0601a.mp3",
+      "alignment": "beat-02.4d690be9d7.json"
+    },
+    "beat-03": {
+      "audio": "beat-03.56f425f48a.mp3",
+      "alignment": "beat-03.e95de4bd50.json"
+    },
+    "beat-04": {
+      "audio": "beat-04.3452586c5a.mp3",
+      "alignment": "beat-04.68bbd8e80f.json"
+    },
+    "beat-05": {
+      "audio": "beat-05.16a087c855.mp3",
+      "alignment": "beat-05.86a67c4014.json"
+    },
+    "beat-06": {
+      "audio": "beat-06.53184207ad.mp3",
+      "alignment": "beat-06.b7b9a663af.json"
+    },
+    "beat-07": {
+      "audio": "beat-07.b425fb3d7b.mp3",
+      "alignment": "beat-07.cfc2c915ca.json"
+    },
+    "beat-08": {
+      "audio": "beat-08.4117bd91a3.mp3",
+      "alignment": "beat-08.a41b0283de.json"
+    },
+    "beat-09": {
+      "audio": "beat-09.597f3700fb.mp3",
+      "alignment": "beat-09.a47c7eb0a6.json"
+    },
+    "beat-10": {
+      "audio": "beat-10.a1afe0542a.mp3",
+      "alignment": "beat-10.71b5628af8.json"
+    },
+    "beat-11": {
+      "audio": "beat-11.bc64a5f1cb.mp3",
+      "alignment": "beat-11.3b4b83f57c.json"
+    },
+    "beat-12": {
+      "audio": "beat-12.0cb0739152.mp3",
+      "alignment": "beat-12.74894ec251.json"
+    },
+    "beat-13": {
+      "audio": "beat-13.36942044ce.mp3",
+      "alignment": "beat-13.7787622963.json"
+    },
+    "beat-14": {
+      "audio": "beat-14.454bdc11ed.mp3",
+      "alignment": "beat-14.367ffe4273.json"
+    },
+    "beat-15": {
+      "audio": "beat-15.28bb99ba63.mp3",
+      "alignment": "beat-15.86151ae328.json"
+    },
+    "beat-16": {
+      "audio": "beat-16.747c690a11.mp3",
+      "alignment": "beat-16.6e91dc95ab.json"
+    },
+    "beat-17": {
+      "audio": "beat-17.7e71698d6a.mp3",
+      "alignment": "beat-17.1d5a0a7586.json"
+    },
+    "beat-18": {
+      "audio": "beat-18.e5667cae44.mp3",
+      "alignment": "beat-18.8e55194d98.json"
+    },
+    "beat-19": {
+      "audio": "beat-19.0d5353b44e.mp3",
+      "alignment": "beat-19.1197bffa5d.json"
+    },
+    "beat-20": {
+      "audio": "beat-20.bed6000f84.mp3",
+      "alignment": "beat-20.d1e055f6e3.json"
+    },
+    "beat-21": {
+      "audio": "beat-21.47e3042776.mp3",
+      "alignment": "beat-21.c337bfd817.json"
+    },
+    "beat-22": {
+      "audio": "beat-22.baa8ca5ada.mp3",
+      "alignment": "beat-22.c2bf9477a3.json"
+    },
+    "beat-23": {
+      "audio": "beat-23.8b1a7d772c.mp3",
+      "alignment": "beat-23.dd0a335012.json"
+    },
+    "beat-24": {
+      "audio": "beat-24.8a2f4b38dd.mp3",
+      "alignment": "beat-24.b600fd8d70.json"
+    },
+    "beat-25": {
+      "audio": "beat-25.e3a2580e77.mp3",
+      "alignment": "beat-25.8856c26706.json"
+    },
+    "beat-26": {
+      "audio": "beat-26.5d21ff7c73.mp3",
+      "alignment": "beat-26.f50e6253a4.json"
+    },
+    "beat-27": {
+      "audio": "beat-27.f6fbce7ad0.mp3",
+      "alignment": "beat-27.7c828b9938.json"
+    },
+    "beat-28": {
+      "audio": "beat-28.73ee004130.mp3",
+      "alignment": "beat-28.e4e8f78f1f.json"
+    },
+    "beat-29": {
+      "audio": "beat-29.60d7314b12.mp3",
+      "alignment": "beat-29.d6ba0272c3.json"
+    },
+    "beat-30": {
+      "audio": "beat-30.5dcd581b94.mp3",
+      "alignment": "beat-30.df8cb97471.json"
+    },
+    "beat-31": {
+      "audio": "beat-31.519e272f1c.mp3",
+      "alignment": "beat-31.c2e46168ff.json"
+    },
+    "beat-32": {
+      "audio": "beat-32.ea1341c60a.mp3",
+      "alignment": "beat-32.401617e5bf.json"
+    },
+    "beat-33": {
+      "audio": "beat-33.7e51f24c3f.mp3",
+      "alignment": "beat-33.9652d106b5.json"
+    },
+    "beat-34": {
+      "audio": "beat-34.66ce248fa0.mp3",
+      "alignment": "beat-34.ae08c21632.json"
+    },
+    "beat-35": {
+      "audio": "beat-35.1c4d5ab8ad.mp3",
+      "alignment": "beat-35.7ebb8b4f45.json"
+    },
+    "beat-36": {
+      "audio": "beat-36.f7ba07ea3d.mp3",
+      "alignment": "beat-36.897d9b84b4.json"
+    },
+    "beat-37": {
+      "audio": "beat-37.111ca8b09d.mp3",
+      "alignment": "beat-37.93a4af3f59.json"
+    },
+    "beat-38": {
+      "audio": "beat-38.b2a2d6bc98.mp3",
+      "alignment": "beat-38.262773ab71.json"
+    },
+    "beat-39": {
+      "audio": "beat-39.1683358d66.mp3",
+      "alignment": "beat-39.f853a594cc.json"
+    },
+    "beat-40": {
+      "audio": "beat-40.1d702689fa.mp3",
+      "alignment": "beat-40.a5d858547e.json"
+    },
+    "beat-41": {
+      "audio": "beat-41.f71f58eb2d.mp3",
+      "alignment": "beat-41.f8e7342ac7.json"
+    },
+    "beat-42": {
+      "audio": "beat-42.bd7ac16a1c.mp3",
+      "alignment": "beat-42.4f853e55d9.json"
+    },
+    "beat-43": {
+      "audio": "beat-43.f39b542d1c.mp3",
+      "alignment": "beat-43.c973f9b637.json"
+    },
+    "beat-44": {
+      "audio": "beat-44.b88b1157af.mp3",
+      "alignment": "beat-44.366a924f17.json"
+    },
+    "beat-45": {
+      "audio": "beat-45.dde2a38104.mp3",
+      "alignment": "beat-45.25ea9564c5.json"
+    },
+    "beat-46": {
+      "audio": "beat-46.7921c0cc08.mp3",
+      "alignment": "beat-46.c787c8ae92.json"
+    },
+    "beat-47": {
+      "audio": "beat-47.aec0ea295f.mp3",
+      "alignment": "beat-47.8b5006bd6f.json"
+    },
+    "beat-48": {
+      "audio": "beat-48.6f96d2a792.mp3",
+      "alignment": "beat-48.a16c1b61d3.json"
+    },
+    "beat-49": {
+      "audio": "beat-49.62e667a58b.mp3",
+      "alignment": "beat-49.c762c5eced.json"
+    },
+    "beat-50": {
+      "audio": "beat-50.222917aa40.mp3",
+      "alignment": "beat-50.111f65fb78.json"
+    },
+    "beat-51": {
+      "audio": "beat-51.09288e7296.mp3",
+      "alignment": "beat-51.013613e165.json"
+    },
+    "beat-52": {
+      "audio": "beat-52.88647af27b.mp3",
+      "alignment": "beat-52.a57476e1da.json"
+    },
+    "beat-53": {
+      "audio": "beat-53.9f2dff8d5f.mp3",
+      "alignment": "beat-53.2c4a6e6332.json"
+    },
+    "beat-54": {
+      "audio": "beat-54.36fd4437a2.mp3",
+      "alignment": "beat-54.afc43fcfdb.json"
+    },
+    "beat-55": {
+      "audio": "beat-55.fd606845c9.mp3",
+      "alignment": "beat-55.7f9a4b143a.json"
+    },
+    "beat-56": {
+      "audio": "beat-56.ec72306934.mp3",
+      "alignment": "beat-56.b3148d736e.json"
+    }
+  }
+}
