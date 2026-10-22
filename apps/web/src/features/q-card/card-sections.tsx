@@ -157,21 +157,37 @@ export function CardSection({
       data-card-section={id}
       className="flex scroll-mt-20 flex-col gap-3 py-6 first:pt-0 last:pb-0"
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 id={heading} className="cq-label text-(--cq-text-secondary)">
+      <div className="flex items-baseline justify-between gap-4">
+        <h2
+          id={heading}
+          className="cq-label min-w-0 text-(--cq-text-secondary)"
+        >
           {label}
         </h2>
-        {members === true ? (
-          <span className="cq-caption text-(--cq-text-tertiary)">
-            Shown to Capital Q members
-          </span>
-        ) : null}
+        {members === true ? <MembersOnly /> : null}
       </div>
       {title === undefined ? null : (
         <p className="cq-title-sm text-(--cq-text-primary)">{title}</p>
       )}
       {children}
     </section>
+  );
+}
+
+/**
+ * The one marker for content shown because the visitor is a signed-in
+ * member: short enough to sit at the right of every section heading, even
+ * at 390 px, with the full meaning for screen readers.
+ */
+export function MembersOnly() {
+  return (
+    <span
+      className="cq-caption shrink-0 text-end whitespace-nowrap text-(--cq-text-tertiary)"
+      data-members-only
+    >
+      Members only
+      <span className="sr-only">: shown to signed-in Capital Q members</span>
+    </span>
   );
 }
 
@@ -322,7 +338,9 @@ export function IntelligenceSection({
               Strongest areas: {detail.strengths.join(", ")}
             </p>
           )}
-          <p className="cq-caption text-(--cq-text-tertiary)">
+          {/* As legible as any metadata on the card, and never clipped: it
+              is what keeps the biggest word on the card honest. */}
+          <p className="cq-body-sm text-(--cq-text-secondary)">
             {TRUTH_WORDS.Q_INFERENCE}, not a verified fact or a recommendation.
           </p>
         </div>

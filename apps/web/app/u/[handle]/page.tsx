@@ -15,8 +15,6 @@ import {
 import { qrSvg } from "@/features/q-card/qr";
 import { PublicCardView } from "@/features/q-card/public-card-view";
 
-export const dynamic = "force-dynamic";
-
 /**
  * `/@handle` (BIZ-004; reached through a rewrite to `/u/[handle]`): an
  * organisation's -- or, since 2026-10-22, a person's -- public Q identity, value before any sign-in -- most often
