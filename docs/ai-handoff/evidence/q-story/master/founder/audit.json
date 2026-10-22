@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-10-22T13:01:29.948Z",
+  "recordedAt": "2026-10-22T13:49:56.924Z",
   "voice": "pFZP5JQG7iQjIQuC4Bku",
   "model": "eleven_v4_turbo",
   "probe": {
@@ -17,46 +17,46 @@
       }
     ],
     "format": {
-      "duration": "265.966667"
+      "duration": "265.899675"
     }
   },
   "bytes": {
-    "master": 25187244,
-    "share": 6068254
+    "master": 25031104,
+    "share": 6063844
   },
   "story": {
     "narrator": "RENDERED",
-    "preloadMs": 992,
+    "preloadMs": 1100,
     "offsets": {
       "median": -90,
-      "p95": -58,
+      "p95": -57,
       "count": 113
     },
     "offsetsByKind": {
       "stage": {
-        "median": -89,
-        "p95": -58,
+        "median": -88,
+        "p95": -57,
         "count": 81
       },
       "mood": {
         "median": -68,
-        "p95": -59,
+        "p95": -60,
         "count": 8
       },
       "navigate": {
-        "median": 839,
-        "p95": 839,
+        "median": 746,
+        "p95": 746,
         "count": 2
       },
       "light": {
         "median": -102,
-        "p95": -59,
+        "p95": -75,
         "count": 11
       }
     },
     "frames": {
-      "count": 12808,
-      "long": 295
+      "count": 12454,
+      "long": 273
     },
     "fallbacks": 0,
     "fallbackCues": [],
@@ -71,7 +71,7 @@
   "devBadgeSamples": 0,
   "ocrFrames": 532,
   "ocrHits": [],
-  "overlayBoxesChecked": 177,
+  "overlayBoxesChecked": 162,
   "overlayClutter": [],
   "defects": 0
 }
