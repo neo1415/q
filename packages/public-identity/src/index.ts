@@ -15,11 +15,22 @@ export {
   DEFAULT_FIELD_SCOPES,
   NAME_FIELD,
   fitFieldScopes,
+  isNetworkOnly,
   projectCardFields,
   readStoredScopes,
   type CardAudience,
   type CardScopesReading,
+  type CardSectionDetails,
 } from "./domain/card.js";
+export {
+  companySections,
+  investorTeamSection,
+  type CompanySectionInputs,
+  type SectionClaim,
+  type SectionDocument,
+  type SectionInvestability,
+  type SectionRaise,
+} from "./domain/sections.js";
 export {
   HANDLE_REFUSALS,
   HandleUnavailableError,

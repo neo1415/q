@@ -634,6 +634,16 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "the invitee's own pending invitations, shown where they land with Accept and Decline (the team.invitation.* actions); Q offers joining, never takes it",
   ),
   "api/http/team.ts GET INVITATION_PREVIEW_PATH": PUBLIC,
+  // Organisation administration reads (owner/admin backend).
+  "api/http/organisation-admin.ts GET ME_CAPABILITIES_PATH": exempt(
+    "the web's own gating read: which controls to show; every action is still enforced on the server, and Q already runs under the same capabilities",
+  ),
+  "api/http/organisation-admin.ts GET ORGANISATION_ACTIVITY_PATH": exempt(
+    "an admin's accountability view of the organisation (organisation.activity.view); not a person's action, and giving Q a reader over other members' activity is not decided",
+  ),
+  "api/http/organisation-admin.ts GET ORGANISATION_MEMBER_SUMMARY_PATH": exempt(
+    "an admin's view of one member (organisation.activity.view); not a person's action, and giving Q a reader over other members' activity is not decided",
+  ),
 
   "api/http/q-cards.ts GET cardPath": cap("tool.get_q_card"),
   "api/http/q-cards.ts GET `${PUBLIC_HANDLES_PATH}/:handle`": PUBLIC,
@@ -964,11 +974,21 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
     "development-only page (design review, fictional data)",
   ),
   "/dev/crm": exempt("development-only page"),
+  "/dev/work-review": exempt(
+    "development-only page (design review, fictional data)",
+  ),
+  "/dev/discovery-review": exempt(
+    "development-only page (design review, fictional data)",
+  ),
+  "/dev/account-review": exempt(
+    "development-only page (design review, fictional data)",
+  ),
   "/dev/presence": exempt("development-only page"),
   "/dev/work": exempt("development-only page"),
   "/dev/briefing": exempt("development-only page"),
   "/dev/q-nav": exempt("development-only page"),
   "/dev/instant-nav": exempt("development-only page (instant-nav harness)"),
+  "/dev/q-story": exempt("development-only page (Q Story storyboard)"),
   "/dev/instant-nav/company/[id]": exempt(
     "development-only page (instant-nav harness)",
   ),
@@ -983,11 +1003,15 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/dev/workforce": exempt("development-only page"),
   "/dev/deal-close": exempt("development-only page"),
   "/dev/gateq-v2": exempt("development-only page"),
+  "/dev/gateq-review": exempt(
+    "development-only page (design review, fictional data)",
+  ),
   "/dev/canvas": exempt("development-only page"),
   "/dev/founder-docs": exempt("development-only page"),
   "/dev/relationships": exempt("development-only page"),
   "/dev/brand-preview": exempt("development-only page"),
   "/dev/q-cards": exempt("development-only page"),
+  "/dev/q-card-identity": exempt("development-only page"),
   "/dev/q-room": exempt("development-only page"),
   "/dev/results": exempt("development-only page"),
   "/dev/rehearsal-video": exempt("development-only page"),

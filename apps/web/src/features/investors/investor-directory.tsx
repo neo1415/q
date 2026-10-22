@@ -6,7 +6,10 @@ import { useState } from "react";
 import { cx } from "@capital-q/ui";
 import { Check, DoorOpen, Pause, Search } from "@capital-q/ui/icons";
 
-import { RequestToConnect } from "@/features/network/request-to-connect";
+import {
+  RequestToConnect,
+  type ConnectPorts,
+} from "@/features/network/request-to-connect";
 import {
   CrmSheet,
   CrmToastProvider,
@@ -106,20 +109,25 @@ export function ReachTag({ reach }: { readonly reach: Reach }) {
 
 export function InvestorDirectory({
   entries,
+  connectPorts,
 }: {
   readonly entries: readonly DirectoryEntry[];
+  /** Design review only (/dev/discovery-review): the request's reads, given. */
+  readonly connectPorts?: ConnectPorts | undefined;
 }) {
   return (
     <CrmToastProvider>
-      <Directory entries={entries} />
+      <Directory entries={entries} connectPorts={connectPorts} />
     </CrmToastProvider>
   );
 }
 
 function Directory({
   entries,
+  connectPorts,
 }: {
   readonly entries: readonly DirectoryEntry[];
+  readonly connectPorts: ConnectPorts | undefined;
 }) {
   const t = useT();
   const [type, setType] = useState<(typeof TYPES)[number]>("All");
@@ -208,7 +216,11 @@ function Directory({
         </ul>
       )}
       {open === null ? null : (
-        <InvestorSheet entry={open} onClose={() => setOpen(null)} />
+        <InvestorSheet
+          entry={open}
+          onClose={() => setOpen(null)}
+          connectPorts={connectPorts}
+        />
       )}
     </div>
   );
@@ -287,9 +299,11 @@ function Card({
 function InvestorSheet({
   entry,
   onClose,
+  connectPorts,
 }: {
   readonly entry: DirectoryEntry;
   readonly onClose: () => void;
+  readonly connectPorts: ConnectPorts | undefined;
 }) {
   const t = useT();
   const sub = [
@@ -384,6 +398,7 @@ function InvestorSheet({
           <RequestToConnect
             investorOrganisationId={entry.investorOrganisationId}
             investorName={entry.name}
+            ports={connectPorts}
           />
           <span className="cq-caption text-(--cq-text-tertiary)">
             {t(

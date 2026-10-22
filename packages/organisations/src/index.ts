@@ -159,4 +159,39 @@ export {
   type OutboundEmailSender,
 } from "./infrastructure/invitation-mailer.js";
 
+// Organisation administration: capabilities, activity feed, member summaries.
+export {
+  OrganisationActivityQueryError,
+  OrganisationMemberNotFoundError,
+} from "./domain/errors.js";
+export {
+  activityKindOf,
+  decodeActivityCursor,
+  describeAction,
+  encodeActivityCursor,
+  kindPatterns,
+  PRIVATE_ACTION_PATTERNS,
+  Q_EXECUTED_ACTION_TYPES,
+} from "./domain/activity.js";
+export type {
+  ActivityFilter,
+  ActivityPerson,
+  ActivityRecord,
+  MemberRecord,
+  OrganisationAdminStore,
+  ResolvedResource,
+  ResourceRef,
+  RoleSpan,
+  SentInvitation,
+  TouchedRelationship,
+} from "./application/organisation-admin-ports.js";
+export {
+  createOrganisationAdminService,
+  ORGANISATION_ACTIVITY_VIEW_CAPABILITY,
+  PROBED_CAPABILITIES,
+  type OrganisationAdminService,
+  type OrganisationAdminServiceDependencies,
+} from "./application/organisation-admin-service.js";
+export { createPostgresOrganisationAdminStore } from "./infrastructure/postgres-organisation-admin-store.js";
+
 export const PACKAGE_NAME = "@capital-q/organisations" as const;

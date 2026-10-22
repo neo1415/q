@@ -209,6 +209,30 @@ export function DiscoverInvestors({
   /** Each investor's Q Card as a participant reads it (what they publish). */
   readonly cards?: ReadonlyMap<string, PublicCardDto | null>;
 }) {
+  const entries = directoryEntries(items, gates, cards);
+  return (
+    <div className="flex flex-col gap-4" data-qp-anchor="fdr.03.discover.list">
+      <p className="cq-body text-(--cq-text-secondary)">
+        {(translate ?? ((english: string) => english))(
+          "Investors who chose to be discoverable. Open one to see what they look for and how to reach them.",
+        )}
+      </p>
+      <Notes notes={notes} t={translate} />
+      <InvestorDirectory entries={entries} />
+    </div>
+  );
+}
+
+/**
+ * The directory's cards from what each investor publishes, in the
+ * server's order. Exported so the design review (/dev/discovery-review)
+ * builds its cards exactly as Discover does.
+ */
+export function directoryEntries(
+  items: readonly DiscoveredInvestorDto[],
+  gates: ReadonlyMap<string, InvestorGateFitDto>,
+  cards: ReadonlyMap<string, PublicCardDto | null>,
+): DirectoryEntry[] {
   // Q Pitch v6 (founder track): the three closest matches on what each
   // investor publishes, marked so the tour can light them in turn.
   const matches = closestMatches(
@@ -217,7 +241,7 @@ export function DiscoverInvestors({
   );
   // ADR 0023: each card opens a sheet with what they look for and the one
   // way to reach them. Order is the server's; nothing here ranks.
-  const entries: DirectoryEntry[] = items.map((item) => {
+  return items.map((item) => {
     const gate = gates.get(item.investorOrganisationId) ?? null;
     const mandate = publishedMandate(
       cards.get(item.investorOrganisationId) ?? null,
@@ -242,15 +266,4 @@ export function DiscoverInvestors({
       anchor: matches.get(item.investorOrganisationId),
     };
   });
-  return (
-    <div className="flex flex-col gap-4" data-qp-anchor="fdr.03.discover.list">
-      <p className="cq-body text-(--cq-text-secondary)">
-        {(translate ?? ((english: string) => english))(
-          "Investors who chose to be discoverable. Open one to see what they look for and how to reach them.",
-        )}
-      </p>
-      <Notes notes={notes} t={translate} />
-      <InvestorDirectory entries={entries} />
-    </div>
-  );
 }

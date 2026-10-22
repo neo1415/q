@@ -59,6 +59,8 @@ export type FakeBehaviour =
       readonly kind: "FAIL";
       readonly failureClass: ModelFailureClass;
       readonly retryAfterMs?: number | undefined;
+      /** The account cannot serve until a person acts (402, quota spent). */
+      readonly accountExhausted?: boolean | undefined;
       /** The adapter's own safe wording; the vendor payload goes on `cause`. */
       readonly message?: string | undefined;
       readonly cause?: unknown;
@@ -222,6 +224,9 @@ export function createFakeModelProvider(
                 failureClass: behaviour.failureClass,
                 providerCode: options.code,
                 retryAfterMs: behaviour.retryAfterMs,
+                ...(behaviour.accountExhausted === true
+                  ? { accountExhausted: true }
+                  : {}),
                 cause: behaviour.cause,
               },
             );

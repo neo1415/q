@@ -201,4 +201,6 @@ export {
 export type { SetInvestorVisibilityCommand } from "./application/set-investor-visibility.js";
 export { createSetInvestorVisibility } from "./application/set-investor-visibility.js";
 
+export { createPostgresInvestorTeamRead } from "./infrastructure/postgres-team-read.js";
+
 export const PACKAGE_NAME = "@capital-q/investors" as const;

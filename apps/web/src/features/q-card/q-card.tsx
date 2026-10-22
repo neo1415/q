@@ -108,7 +108,7 @@ export function QCard({
         </div>
 
         <div className="flex min-w-0 flex-col gap-1">
-          <Name className="line-clamp-2 text-[clamp(1.35rem,4.2vw,2rem)] leading-tight font-bold break-words">
+          <Name className="line-clamp-2 text-[clamp(1.35rem,4.2vw,2rem)] leading-tight font-semibold tracking-tight break-words">
             {name}
           </Name>
           {descriptor === null || descriptor.length === 0 ? null : (

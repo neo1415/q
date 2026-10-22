@@ -294,6 +294,7 @@ export function createPublicIdentityService(
           cover: images?.cover ?? null,
         },
         audience,
+        facts.details,
       ),
       verified: [
         ...(facts.verified.organisation

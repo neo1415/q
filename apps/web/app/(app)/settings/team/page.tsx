@@ -3,11 +3,7 @@ import type { Metadata } from "next";
 import { getTeam, listCompanyClaims } from "@capital-q/api-client";
 
 import { apiSession, resolveOwnContext } from "@/features/q/context";
-import { AccountColumn, AccountHead } from "@/features/settings/account-layout";
-import { CompanyClaims } from "@/features/team/company-claims";
-import { TeamError } from "@/features/team/settings-nav";
-import { TeamPage } from "@/features/team/team-page";
-import { QSection } from "@/features/q/q-section";
+import { TeamSettingsView } from "@/features/team/team-settings-view";
 import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Team" };
@@ -41,17 +37,6 @@ export default async function TeamSettingsPage() {
       ? team.organisation.name
       : null;
   return (
-    <AccountColumn>
-      <QSection id="team" kind="TEAM" label={t("your team")}>
-        <AccountHead
-          title={t("Team")}
-          back={{ href: "/settings", label: t("Settings") }}
-        />
-        {team === null ? <TeamError /> : <TeamPage initial={team} />}
-        <div className="pt-3.5">
-          <CompanyClaims initial={claims} companyName={claimsFor} />
-        </div>
-      </QSection>
-    </AccountColumn>
+    <TeamSettingsView t={t} team={team} claims={claims} claimsFor={claimsFor} />
   );
 }

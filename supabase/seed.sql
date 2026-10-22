@@ -20,6 +20,7 @@
 insert into permissions.capabilities (code, description) values
   ('organisation.view',        'View the organisation profile and membership context.'),
   ('organisation.admin',       'Administer the organisation: members, roles and settings.'),
+  ('organisation.activity.view', 'See the organisation''s activity feed and member summaries: who acted for it, under whose authority. Never anyone''s Q conversations or memory.'),
   ('company.create',           'Create the canonical company for the active organisation.'),
   ('company.view',             'Read the organisation-private canonical company profile.'),
   ('company.edit',             'Edit the canonical company profile.'),
@@ -90,6 +91,7 @@ select r.id, c.id, 'ALLOW'
     on (r.code, c.code) in (
       ('organisation_admin',  'organisation.view'),
       ('organisation_admin',  'organisation.admin'),
+      ('organisation_admin',  'organisation.activity.view'),
       ('organisation_member', 'organisation.view'),
       ('organisation_admin',  'company.create'),
       ('organisation_admin',  'company.view'),
