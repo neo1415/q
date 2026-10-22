@@ -347,6 +347,7 @@ describe("Q Story trigger", () => {
       "tell me your story",
       "Tell us your story please",
       "present Capital Q to us",
+      "Hey Q, pitch yourself",
     ]) {
       expect(classifyStoryTrigger(said)).toEqual({ kind: "STORY" });
     }

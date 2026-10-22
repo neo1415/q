@@ -354,3 +354,19 @@ describe("Q Story audio bank (budgeted preload)", () => {
     }
   });
 });
+
+describe("Q Story offer under a 'what is Capital Q?' answer", () => {
+  it("finds the person's own question just before Q's answer", async () => {
+    const { askedBefore } =
+      await import("@/features/q-pitch/story/story-offer");
+    const turns = [
+      { kind: "PERSON", id: "p1", text: "show me deals" },
+      { kind: "Q", id: "q1", text: "…" },
+      { kind: "PERSON", id: "p2", text: "What is Capital Q?" },
+      { kind: "Q", id: "q2", text: "Capital Q is…" },
+    ];
+    expect(askedBefore(turns, "q2")).toBe("What is Capital Q?");
+    expect(askedBefore(turns, "q1")).toBe("show me deals");
+    expect(askedBefore(turns, "nope")).toBeNull();
+  });
+});

@@ -6,6 +6,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { RESUME_KEY } from "./resume";
 import { markQPitchRunning } from "./tour-presence";
+import { markStoryAvailable } from "./story/story-offer";
 import type { TourSubject } from "./subject-model";
 import type { TourChoice } from "./tour-host";
 
@@ -115,6 +116,12 @@ export function QPitchEntry({
     }
   }
   const holding = started !== null && !ended;
+  // Q Pitch is on here (the server mounted this entry): Q may offer the
+  // story under a "what is Capital Q?" answer.
+  useEffect(() => {
+    markStoryAvailable(true);
+    return () => markStoryAvailable(false);
+  }, []);
   useEffect(() => {
     markQPitchRunning(holding);
     return () => markQPitchRunning(false);
