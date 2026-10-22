@@ -369,7 +369,7 @@ def deck():
             '<div class="wordmark">Capital <i>Q</i></div>'
             '<div class="big" style="font-size:64px">What’s your <em>Q Card?</em></div>'
             '<p class="lede">Capital Q’s own Q Card: capital-q-hq · capital-qweb-production.up.railway.app</p>'
-            '<div class="meta">Data room: this deck, and the financial model 2026–2028 on request.</div>'
+            '<div class="meta">Data room: this deck; on request, the financial model 2026–2028, cap table, certificate of incorporation summary, shareholder agreement summary and board composition note.</div>'
             "</div>",
         )
     )
