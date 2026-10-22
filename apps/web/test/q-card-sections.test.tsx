@@ -151,16 +151,14 @@ describe("the company card's sections", () => {
     const raise = section(container, "raise");
     expect(within(raise).getByText("$1.5M")).toBeTruthy();
     expect(within(raise).getByText("Two new corridors.")).toBeTruthy();
-    expect(within(raise).getByText("Shown to Capital Q members")).toBeTruthy();
+    expect(within(raise).getByText("Members only")).toBeTruthy();
     expect(within(raise).getByText(/Seed round · SAFE/)).toBeTruthy();
     expect(
       within(section(container, "team")).getByText("Amina Otieno"),
     ).toBeTruthy();
     // The public numbers section carries no members marker.
     expect(
-      within(section(container, "numbers")).queryByText(
-        "Shown to Capital Q members",
-      ),
+      within(section(container, "numbers")).queryByText("Members only"),
     ).toBeNull();
   });
 
@@ -315,6 +313,6 @@ describe("a person's card (owner 2026-10-22)", () => {
         .getByRole("link", { name: "@savanna" })
         .getAttribute("href"),
     ).toBe("/@savanna");
-    expect(within(focus).getByText("Shown to Capital Q members")).toBeTruthy();
+    expect(within(focus).getByText("Members only")).toBeTruthy();
   });
 });

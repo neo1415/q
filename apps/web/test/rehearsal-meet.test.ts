@@ -121,9 +121,9 @@ describe("Q and rehearsals", () => {
 
 describe("progress between rehearsals", () => {
   it("says how the score moved since last time", () => {
-    expect(progressWords(78, 70)).toBe("Up 8 since last time (70)");
-    expect(progressWords(60, 70)).toBe("Down 10 since last time (70)");
-    expect(progressWords(70, 70)).toBe("Same as last time (70)");
+    expect(progressWords(78, 70)).toBe("Up 0.8 since last time (7.0)");
+    expect(progressWords(60, 70)).toBe("Down 1.0 since last time (7.0)");
+    expect(progressWords(70, 70)).toBe("Same as last time (7.0)");
   });
 });
 

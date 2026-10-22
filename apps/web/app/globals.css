@@ -5266,37 +5266,13 @@
 }
 
 @layer components {
-  .cq-charcoal {
-    --cq-primary-action: var(--cq-charcoal);
-    --cq-primary-action-hover: var(--cq-charcoal-hover);
-    --cq-on-primary-action: var(--cq-on-charcoal);
-    --cq-tile: var(--cq-charcoal);
-    --cq-on-tile: var(--cq-on-charcoal);
-  }
   /*
-   * Work's options (2026-10-21): gold (Tasks, How Q is handling it) and
-   * near-black (What Q did). The same re-pointing as .cq-charcoal, plus
-   * the mark of the person's own move (`--cq-move`, `--cq-move-soft`),
-   * which the warm-charcoal pages keep on the accent.
+   * The prototypes' option tones (warm charcoal, gold, near-black) are not
+   * the brand (founder, 2026-10-21): pages that carry .cq-charcoal,
+   * .cq-gold or .cq-ink keep Capital Q's black-and-gold brand — the brand
+   * accent for the primary action, ink for tiles — so those scopes set
+   * nothing here.
    */
-  .cq-gold {
-    --cq-primary-action: var(--cq-gold-action);
-    --cq-primary-action-hover: var(--cq-gold-action-hover);
-    --cq-on-primary-action: var(--cq-on-gold-action);
-    --cq-tile: var(--cq-gold-action);
-    --cq-on-tile: var(--cq-on-gold-action);
-    --cq-move: var(--cq-gold-action);
-    --cq-move-soft: var(--cq-gold-action-soft);
-  }
-  .cq-ink {
-    --cq-primary-action: var(--cq-ink-action);
-    --cq-primary-action-hover: var(--cq-ink-action-hover);
-    --cq-on-primary-action: var(--cq-on-ink-action);
-    --cq-tile: var(--cq-ink-action);
-    --cq-on-tile: var(--cq-on-ink-action);
-    --cq-move: var(--cq-ink-action);
-    --cq-move-soft: var(--cq-ink-action-soft);
-  }
   /* The Q Daily being prepared: a bar that travels, never a made-up percent. */
   @keyframes cq-daily-indeterminate {
     from {

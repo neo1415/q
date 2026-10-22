@@ -2,7 +2,7 @@
 
 **For the owner.** These are the questions investors are likely to ask about the product once Q has told Capital Q's story (`Q_STORY_VERBATIM.txt`), with the answer Q gives to each one. Q answers them instantly from a prepared bank, with no AI call, by meaning rather than exact wording. Every question carries at least two other phrasings in the code.
 
-- **Source of truth:** `packages/q-pitch/src/qa-bank.ts`, `qa-bank-product.ts` and `qa-bank-founder.ts`. This document was generated from them on 2026-10-21. If they disagree, the code wins: regenerate this document rather than editing it by hand.
+- **Source of truth:** `packages/q-pitch/src/qa-bank.ts`, `qa-bank-product.ts` and `qa-bank-founder.ts`. This document was generated from them on 2026-10-21 and regenerated with the retrieval round. If they disagree, the code wins: regenerate this document rather than editing it by hand.
 - **Rules every answer follows (enforced by tests):**
   - plain, spoken words, with no engineering terms;
   - honest about stage: pre-seed and bootstrapping;
@@ -23,14 +23,15 @@
 6. **Go-to-market and how both sides will grow**, beyond the FDN waitlist and demos. (`qa.go-to-market`, `qa.cold-start`)
 7. **Roadmap dates and order.** (`qa.roadmap`)
 8. **Integrations.** Two-way sync with Affinity, Salesforce, HubSpot or DealCloud; importing an existing pipeline; Slack or Teams; any outside access for a fund's data team. (`qa.integrations`)
-9. **Mobile.** Whether there is, or will be, a native mobile app. No bank entry yet; Q falls back to normal answering.
+9. **Mobile.** Whether there is, or will be, a native mobile app. Q says only that Capital Q runs in the web browser. (`qa.mobile`)
 10. **Languages** beyond the certified English, French and Spanish start requests. (`qa.languages`)
 11. **Validation of the scores** against real fundraising outcomes, and any audit for bias by founder gender, ethnicity or geography. (`qa.validation`, `qa.bias`)
 12. **Measured time saved** and time to the first useful result for a real user. (`qa.time-saved`)
 13. **Real usage today:** whether any real investors or founders use the product. Q currently says only "pre-seed, no traction claimed". (`qa.stage`)
 14. **FDN's relationship to deal flow:** whether FDN invests in, or gets a first look at, companies on the platform, and how conflicts are handled. No bank entry yet, because there is no source.
 15. **Team.** Who the team is. (`qa.team`)
-16. **Data hosting location** and data-residency or data-protection commitments, for example GDPR or Nigeria's data protection rules. No bank entry yet.
+16. **Data-protection commitments** by country, for example GDPR or Nigeria's data protection rules. Q states only what the hosting decision records: data is kept in the EU, with services in the Netherlands. (`qa.data-location`)
+17. **Valuation and funding history, market size, unit economics and margins.** These were the knowledge pack's UNKNOWN entries; Q says it doesn't know and won't estimate. (`qa.valuation`, `qa.market-size`, `qa.unit-economics`)
 
 ## Notes on scope
 
@@ -38,11 +39,21 @@
 - **Voice:** the spoken presentation, live video rehearsals and the full live-meeting journey are **not certified** (manifest, "Short of the v6 definition of done"). Q says so whenever voice, rehearsals or meetings come up.
 - **Wording changes to earlier entries:** the original answers used "canonical", "provenance", "deterministic", "visibility scope" and "server/database". They were reworded in plain English and kept the same meaning.
 
-## What Capital Q is and who it's for (9)
+## How Q decides to answer from the bank
+
+1. **Exact wording.** A question asked as stored, ignoring small words, plurals and synonyms but keeping negations such as "can't", gets that entry's answer.
+2. **Meaning.** Otherwise Q scores the question against every entry's wordings. It keeps the name "Q" and "Capital Q", and keeps question words such as who, what and where in short questions.
+3. **Margin.** The best entry must lead the runner-up by at least 10% of its own score. A close call, or a question below the threshold, goes to normal Q instead of a guessed prepared answer.
+
+## What Capital Q is and who it's for (10)
 
 **Q: What is Capital Q?**
 A: Capital Q is an AI-native investment intelligence operating system for private capital. It helps investors find, understand and act on the companies that fit their mandate, and helps founders become investable and reach the investors most likely to back them. It is not a marketplace, a directory or a CRM: its product is trusted investment intelligence.
 _Sources: docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_Decision_Log.txt Decision #001; docs/product-sources/text/Real_CAPITAL_Q_PRODUCT_SPECIFICATION.txt 3.1. Bank id `qa.what-is-it`._
+
+**Q: What is Q?**
+A: I'm Q, the investment analyst inside Capital Q. I learn each investor's mandate and each business's story, assess companies on their evidence, match the two, answer questions and do the work you approve. I'm an analyst, not the source of truth, and the decisions stay with you.
+_Sources: docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_Decision_Log.txt Decision #9; packages/q-pitch/src/investor-v6.ts opening. Bank id `qa.what-is-q`._
 
 **Q: What problem are you solving?**
 A: Private capital runs on information asymmetry. Every business presents itself differently, so investors start from scratch each time and spend too long searching and screening, while good companies are missed. Founders, for their part, cannot see what stops them from raising or which investors genuinely fit them. Capital Q standardises the picture and reduces that asymmetry.
@@ -292,11 +303,15 @@ _Sources: docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_D
 A: Capital Q is built never to give investment, legal, tax or accounting advice: I inform, and the decisions and terms are between you and the founder. Questions of licensing and regulation in particular markets are for the founders and their counsel; I won't state a position I don't have a source for.
 _Sources: docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_Decision_Log.txt Decision #75; docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_Decision_Log.txt Decision #154. Bank id `qa.advice`._
 
-## Trust, data and security (7)
+## Trust, data and security (8)
 
 **Q: Is my data private? Who can see what?**
 A: Every piece of information carries a setting for who may see it, and that is enforced on our side at every layer, not just hidden on screen. Founder-private material never reaches an investor, and never quietly changes how an investor ranks or sees a company. What Q knows is not the same as what you may see: Q filters by permission before it reasons, and a data room opens only when the founder shares it.
 _Sources: docs/architecture/15_Capital_Q_Security_Architecture.md context firewall; docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_Decision_Log.txt Q knowledge vs data room. Bank id `qa.privacy`._
+
+**Q: Where is my data stored?**
+A: Capital Q is built to keep data in the European Union: keeping it there is a requirement of the architecture, and the services run in the Netherlands. Formal data-protection commitments for particular countries are for the founders to confirm.
+_Sources: docs/adr/0014-railway-replaces-render-for-node-services.md region. Bank id `qa.data-location`._
 
 **Q: Who owns the data?**
 A: Users own what they bring: profiles, documents, financials, videos and evidence. Capital Q owns the intelligence it produces, such as assessments and briefs, which is why nobody can simply edit them. People keep control of their own information and can take it with them.
@@ -348,7 +363,7 @@ _Sources: docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_D
 A: The defensibility is in the trusted structure, not the model: one trusted record per company and investor, evidence and its origin on every fact, a proprietary assessment framework, and relationship history that compounds with use. Generic AI tools can summarise a deck; they cannot hold a permissioned, comparable, evidence-labelled record that both sides trust.
 _Sources: docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_Decision_Log.txt Decision #85; docs/ai-handoff/LANDING-PROMISES.md LP-25. Bank id `qa.moat`._
 
-## Live, roadmap, business and the company (12)
+## Live, roadmap, business and the company (16)
 
 **Q: What is live today and what is still planned?**
 A: Each part of the product is marked in our certification record as live or not yet, and I describe it only that way. Recorded as live and verified on the product: matching, Discover, company profiles, diligence, documents, the CRM and pipeline, GateQ, my work for you and the Q Daily. Not yet certified: the spoken presentation, live video rehearsals and the full live-meeting journey. Illustrative moments in a story are illustrations, not product claims, and a rehearsal shown in a tour is a prepared exchange.
@@ -397,6 +412,22 @@ _Sources: docs/ai-handoff/LANDING-PROMISES.md capture notes (FDN Capital Partner
 **Q: What are you raising?**
 A: Capital Q's record states a USD 2 million raise. That is the founders' own claim, shown as a claim like anyone else's, and the terms are for the founders to discuss directly.
 _Sources: Capital Q company record (raise: founder claim). Bank id `qa.ask`._
+
+**Q: What is Capital Q's valuation?**
+A: Capital Q's funding history and valuation haven't been given to me as approved company material, so I don't know them and won't estimate them. The raise is stated as USD 2 million, as the founders' own claim. The founders can answer the rest directly.
+_Sources: docs/specs/q-pitch/story/INVESTOR-QA.md questions Q cannot answer; Capital Q company record (raise: founder claim). Bank id `qa.valuation`._
+
+**Q: How big is the market?**
+A: Capital Q's market size hasn't been given to me as approved company material, so I won't put a number on it. I'd rather leave it to the founders than invent one.
+_Sources: docs/specs/q-pitch/story/INVESTOR-QA.md questions Q cannot answer. Bank id `qa.market-size`._
+
+**Q: What are your unit economics?**
+A: Unit economics and margins haven't been given to me as approved company material, so I don't know them and won't estimate them. The founders can take you through them.
+_Sources: docs/specs/q-pitch/story/INVESTOR-QA.md questions Q cannot answer. Bank id `qa.unit-economics`._
+
+**Q: Is there a mobile app?**
+A: Capital Q runs in the web browser. Whether there will be a dedicated phone app isn't in my sources, so I won't promise one; the founders can tell you.
+_Sources: CLAUDE.md Repository Architecture (apps/web). Bank id `qa.mobile`._
 
 ## Founder-side questions (8)
 

@@ -1669,6 +1669,10 @@ export {
   TURN_READER_V56,
   V56_FIT_EXCLUDE_SHOWN,
 } from "./prompts/tasks/turn-reader.v56.js";
+export {
+  TURN_READER_V57,
+  V57_WHAT_IS_CAPITAL_Q,
+} from "./prompts/tasks/turn-reader.v57.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 
 export {

@@ -26,8 +26,12 @@ export type TourVoice = "LIVE" | "STANDARD";
 
 export async function openTourVoice(
   current: () => QSessionValue | null,
+  /**
+   * Ends the wait (engine audit, 21 Oct): a tour or story that ended while
+   * the line was opening must never go on to open a paid voice line.
+   */
+  signal: AbortSignal = new AbortController().signal,
 ): Promise<TourVoice> {
-  const never = new AbortController().signal;
   const liveNow = () => {
     const voice = current()?.voice;
     return (
@@ -46,28 +50,33 @@ export async function openTourVoice(
     // A cold answer can take a few seconds; the person has just pressed
     // Start and sees "Opening Q's voice…" meanwhile.
     if ((await liveAvailabilityFor(5_000)) !== true) return "STANDARD";
+    if (signal.aborted) return "STANDARD";
     void session.talk({ greeting: TOUR_GREETING }).catch(() => undefined);
     const opened = performance.now();
     // Opening a line is a server action, and those run one at a time per
     // tab (production 15 Oct: queued behind page reads). If it is not up
     // in time the tour starts in the standard voice, and the line takes
     // over the narration whenever it comes up (the narrator briefs it).
-    while (!liveNow() && performance.now() - opened < 20_000) {
-      await abortableWait(POLL_MS, never);
+    while (
+      !signal.aborted &&
+      !liveNow() &&
+      performance.now() - opened < 20_000
+    ) {
+      await abortableWait(POLL_MS, signal);
     }
     if (!liveNow()) return "STANDARD";
     // Let the one-sentence greeting play out before the first line.
     const from = performance.now();
     let heard = false;
     let lastSound = from;
-    while (performance.now() - from < 15_000) {
+    while (!signal.aborted && performance.now() - from < 15_000) {
       const speaking = current()?.voice.client.state === "Q_SPEAKING";
       if (speaking) {
         heard = true;
         lastSound = performance.now();
       } else if (heard && performance.now() - lastSound > 900) break;
       else if (!heard && performance.now() - from > 8_000) break;
-      await abortableWait(POLL_MS, never);
+      await abortableWait(POLL_MS, signal);
     }
   }
   return "LIVE";

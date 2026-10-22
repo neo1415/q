@@ -372,3 +372,18 @@ export async function speakRehearsalTurns(
     }
   }
 }
+
+/** A bank answer in Q's standard voice, or its reading time without one. */
+export async function answerAloud(
+  text: string,
+  signal: AbortSignal,
+): Promise<void> {
+  const started = Date.now();
+  const spoken = await standardVoiceLine(
+    spokenPart(text),
+    "FEMALE",
+    signal,
+  ).catch(() => false);
+  if (!spoken)
+    await abortableWait(readingMs(text) - (Date.now() - started), signal);
+}

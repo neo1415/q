@@ -1,5 +1,40 @@
 # Capital Q — Current shared engineering state
 
+## Speed / quality / Q Story integration — 21 October 2026, 21:05 UTC (Claude coordinator)
+
+**Integration branch:** `speed/q-oct20`, which is NOT build/int-rc. It merged build/int-rc at 13b170a3. Draft PR #267 into build/int-rc is used for Linux CI.
+
+- **Last fully green CI:** 75b6b4cf. Newer heads are running; GitGuardian false positive incident 38820384, which the owner is leaving alone.
+- **Nothing is deployed:** production is still `93c336aeb` on all four Railway services. Railway's platform build outage started 07:24 UTC today; builds are returning in stages.
+- **Owner OK is required** before merging into build/int-rc or deploying.
+
+**Merged into speed/q-oct20 (each reviewed, built and tested locally):**
+
+- arrival round 1;
+- onboarding #275 + #285;
+- artifacts #277/#283/#288/#290 (single working line, document progress, CLS 0, neutral cards, progressive findings);
+- turn latency #282/#287 and rounds 6–7 (first words: one-company 1.2 s; web search, known company, 7.8 → 1.2 s; the per-person, per-scope "what Q knows" read cache);
+- voices/meetings #274/#293 (ElevenLabs key under both names; the face starts when a person joins);
+- meeting face #280/#295 (greeting, MEETING_HOST_TURN v6, camera mode behind config);
+- instant navigation #286/#292 (code-first context resolution, modal on every page);
+- Q Story: the story verbatim (`docs/specs/q-pitch/story/`), plan `docs/specs/q-pitch/Q-STORY-PLAN-2026-10-21.md`, investor Q&A #294/#296 (94 entries), presence figures #297.
+
+**Binding owner directions today:**
+
+- Q IS GOLD (black_gold preset; the blue base tokens are the alternative preset);
+- what Q knows, Q knows;
+- time to first word matters, not total length;
+- never cut important work for speed;
+- the story words are verbatim.
+
+**Credentials:** the Supabase management token and Railway workspace token supplied 21 Oct work. They belong in the environment secrets. **Do not revoke them.** Reading production secret values from Railway is refused by the sandbox, so provider keys must be environment secrets.
+
+**Open on the owner:**
+
+- Gemini returns 402 in this environment; check billing. Lane 4 is adding a provider cool-down regardless.
+- Meeting: the Google Workspace "Capital Q" account (tomorrow), `CQ_MEETING_FACE_ID` (Darius `r4ba1277e4fb`, or `rccbeedfc684` on Phoenix-4.5), and raising the face length in both places together.
+- 16 investor-Q&A facts (`docs/specs/q-pitch/story/INVESTOR-QA.md`).
+
 ## Chosen designs release — 20 October 2026, 22:00 UTC (Claude)
 
 The founder-chosen redesign is integrated on `claude/friendly-feynman-q9haun` and pushed to `build/int-rc`, `recovery/2026-09-12-8y2j4w` and `recovery/2026-09-12` (93c336aeb).

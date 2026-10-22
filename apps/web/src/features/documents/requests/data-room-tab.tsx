@@ -92,6 +92,8 @@ function FolderAccessTag({ card }: { readonly card: FolderCard }) {
   );
 }
 
+export type DataRoomFolderLoaded = Loaded;
+
 type Loaded = {
   readonly folder: FolderAccessDto;
   readonly access: readonly DocumentAccessDto[];
@@ -174,16 +176,28 @@ export function DataRoomTab({
   companyId,
   view,
   items,
+  initialFolder,
 }: {
   readonly companyId: string;
   /** Null when the room could not be read. */
   readonly view: DataRoomOwnerView | null;
   readonly items: readonly RequestInboxItem[];
+  /**
+   * A folder shown open with who can open it, already read (the design
+   * review page; the real page reads it when a folder is opened).
+   */
+  readonly initialFolder?: (Loaded & { readonly code: string }) | undefined;
 }) {
   const t = useT();
   const router = useRouter();
-  const [openCode, setOpenCode] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [openCode, setOpenCode] = useState<string | null>(
+    initialFolder?.code ?? null,
+  );
+  const [loaded, setLoaded] = useState<Loaded | null>(
+    initialFolder === undefined
+      ? null
+      : { folder: initialFolder.folder, access: initialFolder.access },
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);

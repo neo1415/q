@@ -30,6 +30,19 @@ import { useT } from "@/features/i18n/language";
 
 type Standing = KybDto["standing"];
 
+/** Design review only: the step shown and what is typed in. */
+export type KybReview = {
+  readonly step: number;
+  readonly person?: { readonly nameOnId: string; readonly role: string };
+  readonly organisation?: {
+    readonly legalName: string;
+    readonly registrationNumber: string;
+    readonly jurisdictionCode: string;
+    readonly registeredAddress: string;
+    readonly websiteUrl: string;
+  };
+};
+
 /** One line per part, in words; never a raw status. */
 function standingWords(
   standing: Standing,
@@ -116,7 +129,17 @@ type StepKey = "WHO" | "COMPANY" | "SEND";
  * each. Verification is not an endorsement, and nothing here is shown to
  * investors except the result.
  */
-export function KybSection({ kyb }: { readonly kyb: KybDto }) {
+export function KybSection({
+  kyb,
+  review,
+}: {
+  readonly kyb: KybDto;
+  /**
+   * Design review only (/dev/account-review): opens on this step with
+   * these details typed in.
+   */
+  readonly review?: KybReview | undefined;
+}) {
   const t = useT();
   const parts = verifyParts(kyb);
   const optional = personVerificationOptional(kyb);
@@ -184,20 +207,22 @@ export function KybSection({ kyb }: { readonly kyb: KybDto }) {
             Capital Q needs this today. Verifying yourself adds your own check
             beside it.
           </p>
-          <VerifySteps kyb={kyb} parts={parts} />
+          <VerifySteps kyb={kyb} parts={parts} review={review} />
         </details>
       </div>
     );
   }
-  return <VerifySteps kyb={kyb} parts={parts} />;
+  return <VerifySteps kyb={kyb} parts={parts} review={review} />;
 }
 
 function VerifySteps({
   kyb,
   parts,
+  review,
 }: {
   readonly kyb: KybDto;
   readonly parts: ReturnType<typeof verifyParts>;
+  readonly review: KybReview | undefined;
 }) {
   const t = useT();
   const toast = useAccountToast();
@@ -211,7 +236,9 @@ function VerifySteps({
     ...(parts.organisation ? (["COMPANY"] as const) : []),
     "SEND",
   ];
-  const [at, setAt] = useState(0);
+  const [at, setAt] = useState(() =>
+    Math.max(0, Math.min(steps.length - 1, review?.step ?? 0)),
+  );
   const step = steps[at] ?? "SEND";
   const [organisation, setOrganisation] = useState({
     legalName: auto ? (submission.legalName ?? "") : "",
@@ -219,8 +246,13 @@ function VerifySteps({
     jurisdictionCode: auto ? (submission.jurisdictionCode ?? "") : "",
     registeredAddress: "",
     websiteUrl: auto ? (submission.websiteUrl ?? "") : "",
+    ...review?.organisation,
   });
-  const [person, setPerson] = useState({ nameOnId: "", role: "" });
+  const [person, setPerson] = useState({
+    nameOnId: "",
+    role: "",
+    ...review?.person,
+  });
   const [organisationFile, setOrganisationFile] = useState<File | null>(null);
   const [personFile, setPersonFile] = useState<File | null>(null);
   const [phase, setPhase] = useState<"idle" | "pending" | "done">("idle");

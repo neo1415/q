@@ -88,7 +88,11 @@ function violations(): string[] {
       if (match[1] !== undefined) continue;
       const target = resolveImport(path, match[3] ?? "");
       if (target === undefined || directive(target) !== "client") continue;
-      const rest = source.slice((match.index ?? 0) + match[0].length);
+      // Block comments are not code: "see PlanBoard." in a doc comment is
+      // no call.
+      const rest = source
+        .slice((match.index ?? 0) + match[0].length)
+        .replace(/\/\*[\s\S]*?\*\//g, "");
       for (const raw of (match[2] ?? "").split(",")) {
         const item = raw.trim();
         if (item === "" || item.startsWith("type ")) continue;

@@ -170,6 +170,11 @@ import {
 } from "./named-company-fact.js";
 import { CHAINED_GET_TOOL, chainedCompanyOf } from "./chained-read.js";
 import { outputSplitOf } from "./output-split.js";
+import {
+  EXTRAS_ELSEWHERE_NOTE,
+  extrasMessages,
+  joinExtras,
+} from "./parallel-extras.js";
 import { createReadCache, type ReadCache } from "./read-cache.js";
 export { outputSplitOf, type OutputSplit } from "./output-split.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
@@ -1670,6 +1675,13 @@ export type ModelGatewayQAnswerDependencies = {
    * Absent: one per seam. A test passes its own to control the clock.
    */
   readonly readCache?: ReadCache | undefined;
+  /**
+   * Owner 2026-10-22: on typed turns a second call writes the findings and
+   * cards while the first writes the answer (parallel-extras.ts). It reads
+   * the whole context again, so input spend per turn roughly doubles.
+   * Absent: one call writes both.
+   */
+  readonly parallelExtras?: boolean | undefined;
   readonly context?: QAuthorisedContextPort | undefined;
   /** The Tool Registry's port (CQ-Q-007). Absent: no tool is offered. */
   readonly tools?: QToolPort | undefined;
@@ -4545,6 +4557,7 @@ export function createModelGatewayQAnswer(
         () =>
           clientActionBlocks.some((block) => block.kind === "UI_INTENT") ||
           seenText.includes('"answerCards":{') ||
+          extrasSeen.includes('"answerCards":{') ||
           runFits.read(request.runId).length >= 2,
       );
       /** One whole sentence through the guards and out; see the note above. */
@@ -4633,11 +4646,18 @@ export function createModelGatewayQAnswer(
         }
         takeSentence(last);
       };
+      /** Set once the turn knows whether its extras are written apart. */
+      let onAnswerBegins: (() => void) | null = null;
+      /** What the extras' writer has written so far (parallel-extras.ts). */
+      let extrasSeen = "";
       const onTextDelta = (fragment: string): void => {
         seenText += fragment;
         for (const raw of liveFindings.push(seenText)) showLive(raw);
         const fresh = partial.push(seenText);
         if (fresh.length > 0) {
+          // Prose means this round is answering, not reaching for a tool:
+          // the extras' writer starts now, beside it.
+          onAnswerBegins?.();
           seenAnswer += fresh;
           for (const sentence of cutter.push(fresh)) {
             takeSentence(sentence);
@@ -5610,6 +5630,26 @@ export function createModelGatewayQAnswer(
                 : TOOLS_FIRST_NOTE,
             ];
 
+      // Owner 2026-10-22: typed answers have their findings and cards
+      // written beside them (parallel-extras.ts). Not spoken (three
+      // findings at most, and the speculation gate), not a document.
+      const splitExtras =
+        dependencies.parallelExtras === true &&
+        request.spoken !== true &&
+        request.writingDocument !== true &&
+        request.turnUnread !== true;
+      // Before the tools-first note, which stays last where there is one.
+      if (splitExtras) {
+        messages =
+          offered.length === 0
+            ? [...messages, EXTRAS_ELSEWHERE_NOTE]
+            : [
+                ...messages.slice(0, -1),
+                EXTRAS_ELSEWHERE_NOTE,
+                ...messages.slice(-1),
+              ];
+      }
+
       if (ownProfileCall !== null) {
         toolCalls.push(ownProfileCall);
       }
@@ -5654,6 +5694,69 @@ export function createModelGatewayQAnswer(
       type AnswerResult = Awaited<
         ReturnType<typeof gateway.execute<CompanyAnalystV26Result>>
       >;
+
+      /**
+       * The extras' writer for the round that is answering. Started from
+       * that round's own messages, so it reads exactly what the answer's
+       * writer reads; cancelled when the round turns out not to be the
+       * answer (one more round is asked), and with the run.
+       */
+      let roundMessages: readonly ModelMessage[] | null = null;
+      let extras: {
+        readonly started: number;
+        readonly read: readonly ModelMessage[];
+        readonly stop: AbortController;
+        readonly result: Promise<AnswerResult | null>;
+      } | null = null;
+      let extrasFindings = createPartialFindingsReader();
+      const cancelExtras = (): void => {
+        extras?.stop.abort();
+        extras = null;
+        extrasSeen = "";
+      };
+      const startExtras = (): void => {
+        if (!splitExtras || extras !== null || roundMessages === null) return;
+        const read = extrasMessages(roundMessages);
+        const stop = new AbortController();
+        const started = Date.now();
+        extrasFindings = createPartialFindingsReader();
+        modelCalls += 1;
+        const result = gateway
+          .execute<CompanyAnalystV26Result>(
+            { ...base, messages: read, output: rendered.output },
+            {
+              ...options,
+              signal:
+                request.signal === undefined
+                  ? stop.signal
+                  : AbortSignal.any([request.signal, stop.signal]),
+              onTextDelta: (fragment: string): void => {
+                if (stop.signal.aborted) return;
+                extrasSeen += fragment;
+                for (const raw of extrasFindings.push(extrasSeen)) {
+                  showLive(raw);
+                }
+              },
+            },
+          )
+          .catch((error: unknown): null => {
+            if (!stop.signal.aborted) {
+              logger?.warn(
+                {
+                  qRunId: request.runId,
+                  failure: isModelGatewayError(error)
+                    ? error.failureClass
+                    : "UNKNOWN",
+                },
+                "the extras' call failed; the answer goes without its findings and cards",
+              );
+            }
+            return null;
+          });
+        extras = { started, read, stop, result };
+      };
+      onAnswerBegins = startExtras;
+      const currentExtras = (): typeof extras => extras;
 
       try {
         let final: AnswerResult | undefined;
@@ -5803,6 +5906,10 @@ export function createModelGatewayQAnswer(
             calls < Q_TOOL_LOOP_MAX_CALLS
           ) {
             modelCalls += 1;
+            // A round that began answering and was asked again: its extras
+            // were for an answer nobody gets.
+            cancelExtras();
+            roundMessages = messages;
             // Visible stages: the model is now working on the answer.
             if (rounds === 0) void stageOnce(writingStage);
             let result: Awaited<
@@ -5862,6 +5969,7 @@ export function createModelGatewayQAnswer(
                 );
                 break;
               }
+              cancelExtras();
               throw error;
             }
             took(`round${String(rounds)}`);
@@ -6348,14 +6456,77 @@ export function createModelGatewayQAnswer(
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;
           void stageOnce(writingStage);
-          final = await gateway.execute<CompanyAnalystV26Result>(
+          // This call is the answer, so its extras start with it.
+          cancelExtras();
+          roundMessages = messages;
+          const answering = gateway.execute<CompanyAnalystV26Result>(
             { ...base, messages, output: rendered.output },
             options,
           );
+          startExtras();
+          final = await answering.catch((error: unknown) => {
+            cancelExtras();
+            throw error;
+          });
           if (final.output.kind !== "STRUCTURED") {
             return { kind: "FAILED", diagnosticCode: "INTERNAL_ERROR" };
           }
           analyst = final.output.value;
+        }
+
+        // The extras, joined to the answer after the pair checks.
+        let extrasUsage: AnswerResult | null = null;
+        let extrasJoin: string | null = null;
+        // An answer that arrived without streaming prose (an adapter that
+        // does not stream) never started its extras: they are written now,
+        // after it, rather than lost.
+        if (
+          currentExtras() === null &&
+          splitExtras &&
+          !analyst.declined &&
+          analyst.clarifyingQuestions.length === 0 &&
+          analyst.findings.length === 0 &&
+          analyst.answerCards === null &&
+          analyst.comparisonCards === null
+        ) {
+          startExtras();
+        }
+        // Read through a function: it is set in callbacks, which the
+        // compiler's narrowing does not follow.
+        const pending = currentExtras();
+        if (pending !== null) {
+          const written = await pending.result;
+          took("extras");
+          extrasUsage = written;
+          const value =
+            written === null
+              ? null
+              : written.output.kind === "STRUCTURED"
+                ? written.output.value
+                : (() => {
+                    const accepted = acceptStructuredOutput(
+                      written.output.text,
+                      ANALYST_RESULT_SCHEMA,
+                      {
+                        invalidListItems: "DROP",
+                        lenientFields: ANALYST_LENIENT_FIELDS,
+                        unknownRootKeys: "DROP",
+                      },
+                    );
+                    return accepted.ok ? accepted.value : null;
+                  })();
+          const joined = joinExtras(analyst, value, pending.read);
+          analyst = joined.value;
+          extrasJoin = joined.join;
+          if (joined.ungrounded > 0) {
+            logger?.warn(
+              { qRunId: request.runId, ungrounded: joined.ungrounded },
+              "findings stating a number neither writer was given were left out",
+            );
+          }
+        }
+        if (request.signal?.aborted === true) {
+          return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
         }
 
         // The last surface before a person reads it (CQ-Q-023). Capital Q
@@ -6958,11 +7129,14 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
           promptBundleVersion: rendered.bundle.bundleVersion,
           routingPolicyCode: final.routingPolicyCode,
           latencyMs: final.latencyMs,
+          // Both writers' spend, when the extras were written apart.
           usage: {
-            inputTokens: final.usage.inputTokens,
-            outputTokens: final.usage.outputTokens,
+            inputTokens:
+              final.usage.inputTokens + (extrasUsage?.usage.inputTokens ?? 0),
+            outputTokens:
+              final.usage.outputTokens + (extrasUsage?.usage.outputTokens ?? 0),
           },
-          costUsd: final.cost.amount,
+          costUsd: final.cost.amount + (extrasUsage?.cost.amount ?? 0),
           promptCharacters: rendered.characters,
           toolsOffered: offered.map((tool) => tool.definition.name),
           toolCalls,
@@ -6999,6 +7173,11 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
             // Round 5: the answer's output, and which parts it went to.
             outputTokens: final.usage.outputTokens,
             outputSplit: outputSplitOf(analyst),
+            // Owner 2026-10-22: findings and cards written apart, and what
+            // that second call cost.
+            extrasJoin,
+            extrasOutputTokens: extrasUsage?.usage.outputTokens ?? null,
+            extrasCostUsd: extrasUsage?.cost.amount ?? null,
           },
           "q answer produced",
         );

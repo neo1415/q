@@ -1,23 +1,15 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-
-import { buttonClassName } from "@capital-q/ui/button";
-import { EmptyState } from "@capital-q/ui/states";
 
 import { getKyb } from "@capital-q/api-client";
 
-import { AccountToastProvider } from "@/features/settings/account-kit";
-import { AccountColumn, AccountHead } from "@/features/settings/account-layout";
 import { apiSession, resolveOwnContext } from "@/features/q/context";
-import { KybSection } from "@/features/reviews/kyb-form";
 import {
   loadCompanyVerification,
   type VerificationNotice,
 } from "@/features/verification/verification-actions";
-import { VerificationStandings } from "@/features/verification/verification-standings";
+import { VerificationView } from "@/features/verification/verification-view";
 import { personVerificationOptional } from "@/features/verification/verify-state";
-import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Verification" };
@@ -79,80 +71,15 @@ export default async function VerificationPage({
       : null;
 
   return (
-    <AccountToastProvider>
-      <AccountColumn width="form">
-        <QSection id="verification" kind="VERIFICATION" label="verification">
-          <AccountHead title={t("Verification")} />
-          {fromSetup && kyb !== null ? (
-            <p className="mt-0 mb-4 text-sm text-(--cq-text-secondary)">
-              {t(
-                "Your setup is done. Verifying now lets Capital Q show you as verified sooner.",
-              )}{" "}
-              <Link href={skipTo} className="underline underline-offset-4">
-                {t("Skip for now")}
-              </Link>
-            </p>
-          ) : null}
-          {kyb === null ? null : (
-            <section aria-label={t("Verify you and your organisation")}>
-              <KybSection kyb={kyb} />
-              {optional ? (
-                <p className="mt-3 text-xs text-(--cq-text-tertiary)">
-                  {t(
-                    `${kyb.organisationName ?? "Your organisation"} is verified and confirmed you as part of it. Nothing more is needed from you. Verification is not an endorsement.`,
-                  )}
-                </p>
-              ) : null}
-            </section>
-          )}
-          {kyb !== null ? null : loaded?.ok === true ? (
-            <VerificationStandings
-              verification={loaded.value}
-              notice={notice}
-            />
-          ) : loaded !== null ||
-            (context.kind === "NONE" && context.unavailable === true) ? (
-            <EmptyState
-              title={t("Verification couldn't load.")}
-              description={t(
-                "Nothing is wrong with your setup. Capital Q didn't answer just now; try again in a moment.",
-              )}
-              action={
-                <Link
-                  href="/verification"
-                  className={buttonClassName("secondary")}
-                >
-                  {t("Try again")}
-                </Link>
-              }
-            />
-          ) : context.kind === "INVESTOR" ? null : (
-            <EmptyState
-              title={t("Verification belongs to a company.")}
-              description={t(
-                "Founders ask Capital Q to verify their identity and their organisation once their company is set up.",
-              )}
-              action={
-                <Link href="/home" className={buttonClassName("secondary")}>
-                  {t("Go to Home")}
-                </Link>
-              }
-            />
-          )}
-          {context.kind === "NONE" ? null : (
-            <p className="mt-8 text-[13px] text-(--cq-text-secondary)">
-              {t("Disagree with a verification decision?")}{" "}
-              <Link
-                href="/reviews?subject=VERIFICATION_DECISION"
-                className="underline underline-offset-4"
-              >
-                {t("Ask a person to review it")}
-              </Link>
-              .
-            </p>
-          )}
-        </QSection>
-      </AccountColumn>
-    </AccountToastProvider>
+    <VerificationView
+      t={t}
+      side={context.kind}
+      unavailable={context.kind === "NONE" && context.unavailable === true}
+      kyb={kyb}
+      loaded={loaded}
+      notice={notice}
+      fromSetup={fromSetup}
+      skipTo={skipTo}
+    />
   );
 }

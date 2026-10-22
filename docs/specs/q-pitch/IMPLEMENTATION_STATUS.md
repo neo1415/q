@@ -105,6 +105,23 @@ Audited what `packages/q-pitch/src/` actually implements, against the rows above
 - **Saved and passed** (LP-44), **Q Card**, and **notifications and approvals**.
 - **Fictional companies with videos as the examples:** scenes 2–3 use whatever the mandate ranking returns (currently Duplo, Bumpa and MedTrail, which are not fictional). Q Pitch must not rig the ranking.
 
+## Q Story v7 (21 Oct, Lane S1 / `qstory/engine`)
+
+Plan: [`Q-STORY-PLAN-2026-10-21.md`](Q-STORY-PLAN-2026-10-21.md). Evidence: [`docs/ai-handoff/evidence/q-story/`](../../ai-handoff/evidence/q-story/README.md). Nothing here is a certified demo claim.
+
+| ID    | Item                                                                                                          | Status      | Evidence / notes                                                                                                                                           |
+| ----- | ------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| QS-01 | Beat table: 56 verbatim beats, v3 delivery tags kept apart from the words, cues on word indices               | TESTED      | `packages/q-pitch/src/story/beats.ts`; `test/story.test.ts` rebuilds the story and compares it with `Q_STORY_VERBATIM.txt` (one changed word fails)        |
+| QS-02 | Word-clock cue engine (audio clock master, cue 120 ms ahead), verifier with SAFE_FALLBACK                     | TESTED      | `cue-engine.ts`, web `story-player.ts`; package and web tests                                                                                              |
+| QS-03 | ElevenLabs pre-render with timestamps (alignment JSON, budget guard, verbatim check on the audio)             | IMPLEMENTED | `scripts/q-pitch/render-story.mjs`; dry run 5,358 characters ≈ $1.61. **BLOCKED on a key**: no ElevenLabs key in the S1 environment; no audio rendered yet |
+| QS-04 | Live-voice fallback (GPT-Live speaks each beat with its delivery brief) and silent fallback                   | IMPLEMENTED | `story-narrators.ts`. The live path is not browser-verified (no live line in the harness)                                                                  |
+| QS-05 | Story mode: scrim and moods, karaoke captions, highlight pulse, montage, artifacts, presence, #51 screenshots | IMPLEMENTED | `story-host.tsx`, `story-stage.tsx`, `story.css`; recorded in the `/dev/story` harness (fictional data)                                                    |
+| QS-06 | Preload (audio, alignment, decoded pictures, route prefetch, next two beats warm); no reads during playback   | IMPLEMENTED | `story-preload.ts`; harness preload measured in `metrics.json`                                                                                             |
+| QS-07 | Beat-level controls, QA-bank interruption and "carry on"                                                      | TESTED      | Typed commands and bank answers; the voice line's questions are not routed to the story yet                                                                |
+| QS-08 | Triggers: Q_PITCH start → story; the Q Pitch page option; "What is Capital Q?" brief                          | IMPLEMENTED | `tour-start.ts` and `atlas.ts`. The brief classifier is in `story/trigger.ts`; wiring it into Q's turn reader awaits the coordinator                       |
+| QS-G1 | Q Card (#48-49)                                                                                               | PLANNED     | Shown as a roadmap-labelled stage card until the owner confirms option (a)                                                                                 |
+| QS-G2 | GateQ score and rank (#44)                                                                                    | PLANNED     | The inbox list is lit; no score or re-sort is shown                                                                                                        |
+
 ## Dependencies
 
 | Depends on                                                      | Status                                                            | Notes                                                                           |
