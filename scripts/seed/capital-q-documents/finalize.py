@@ -41,7 +41,9 @@ DOCS = [
     ),
     ("capital-q-board-composition-note.pdf", "Board composition note", "GOVERNANCE", PDF, "ON_REQUEST", "corporate"),
 ]
-# A copy of the Q Story master (docs/ai-handoff/evidence/q-story/master/q-story-master-720p.mp4).
+# A copy of the Q Story INVESTOR edition 720p share copy (branch
+# qstory/editions-card, docs/ai-handoff/evidence/q-story/master/investor/).
+# PROVISIONAL: S1's final take replaces it; re-run this script then.
 VIDEO_NAME = "capital-q-pitch-video.mp4"
 
 
@@ -51,6 +53,9 @@ def sha256(path):
 
 def stamp(path, title):
     reader = PdfReader(path)
+    # Idempotent: re-stamping changes the bytes, and the seed pins sha256.
+    if reader.metadata and reader.metadata.get("/Subject") == WATERMARK:
+        return len(reader.pages)
     writer = PdfWriter(clone_from=reader)
     writer.add_metadata(
         {
@@ -91,13 +96,15 @@ def main(out_dir):
         "watermark": WATERMARK,
         "documents": entries,
         "pitchVideo": {
-            "$comment": "Q genuinely pitching Capital Q: a copy of the Q Story master, not a founder video. Upload through /pitch/new (founder session and stream provider) with the audience below.",
+            "$comment": "Q genuinely pitching Capital Q: a copy of the Q Story INVESTOR edition, not a founder video. PROVISIONAL until S1 delivers the final take (David's photo on the Q Card, scrim fix); its frames still carry 'Internal rehearsal' until the owner approves the cut. Upload through /pitch/new (founder session and stream provider) with the audience below.",
+            "final": False,
             "file": VIDEO_NAME,
-            "source": "docs/ai-handoff/evidence/q-story/master/q-story-master-720p.mp4",
+            "source": "qstory/editions-card:docs/ai-handoff/evidence/q-story/master/investor/q-story-master-720p.mp4",
             "mime": "video/mp4",
             "bytes": (out_dir / VIDEO_NAME).stat().st_size,
             "sha256": sha256(out_dir / VIDEO_NAME),
-            "title": "Capital Q — the Q Story",
+            "title": "Capital Q — the story, for investors",
+            "caption": "Q, Capital Q's AI investment analyst, tells the Capital Q story over the real product. Demonstration data.",
             "audience": "Everyone on Capital Q",
             "uploadPath": "/pitch/new",
         },
