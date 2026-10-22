@@ -235,10 +235,15 @@ export function StoryHost({
       setStarting(true);
       setNarrationVoice(withVoice);
       let narrator: StoryNarrator;
-      if (withVoice && assets.rendered && assets.context !== null) {
+      if (
+        withVoice &&
+        assets.rendered &&
+        assets.context !== null &&
+        assets.bank !== null
+      ) {
         // The press is the gesture that lets the decoded audio play.
         await assets.context.resume();
-        narrator = renderedNarrator(assets.context, assets.buffers);
+        narrator = renderedNarrator(assets.context, assets.bank);
       } else if (
         withVoice &&
         (await openTourVoice(
@@ -299,13 +304,16 @@ export function StoryHost({
                 }
                 return landed;
               }
-              case "light":
-                return lightSection(
+              case "light": {
+                const lit = await lightSection(
                   act.anchor,
                   {},
                   signal,
                   ACT_BUDGET_MS.light,
                 );
+                if (lit) clearCaptionBand();
+                return lit;
+              }
               case "unlight":
                 unlightAll();
                 return true;
@@ -501,13 +509,34 @@ function useViewport(): Viewport | null {
   return useSyncExternalStore(subscribeViewport, viewportSnapshot, () => null);
 }
 
+/** Where the caption band starts (its top edge), or the viewport bottom. */
+function captionBandTop(): number {
+  const band = document.querySelector<HTMLElement>(".cq-story-captions");
+  return band?.getBoundingClientRect().top ?? window.innerHeight;
+}
+
+/**
+ * The caption band is reserved space (coordinator, 22 Oct): once a section
+ * is lit, scroll it so its bottom clears the band, keeping its top in view.
+ */
+function clearCaptionBand(): void {
+  const element = document.querySelector<HTMLElement>("[data-qp-lit]");
+  if (element === null) return;
+  const box = element.getBoundingClientRect();
+  const limit = captionBandTop() - 16;
+  if (box.bottom <= limit) return;
+  const by = Math.min(box.bottom - limit, Math.max(0, box.top - 72));
+  if (by > 1) window.scrollBy({ top: by, behavior: "smooth" });
+}
+
 /** The page dimmed everywhere but around the lit section (even-odd). */
 function spotlightPath(lit: Rect, view: Viewport): string {
   const pad = 10;
   const x = Math.max(0, lit.x - pad);
   const y = Math.max(0, lit.y - pad);
   const w = Math.min(view.w - x, lit.w + pad * 2);
-  const h = Math.min(view.h - y, lit.h + pad * 2);
+  // Never into the caption band: the band is the words' place.
+  const h = Math.max(0, Math.min(captionBandTop() - y, lit.h + pad * 2));
   return `path(evenodd, "M0 0H${String(view.w)}V${String(view.h)}H0Z M${String(x)} ${String(y)}h${String(w)}v${String(h)}h-${String(w)}Z")`;
 }
 
@@ -612,7 +641,7 @@ function StoryOverlay({
   }, []);
   const woke = moodNow === "WAKE";
   const viewport = useViewport();
-  const centreStage = !woke || snapshot.beat.n >= 55;
+  const centreStage = !woke;
   // Docked on product beats: in the caption band, beside its own words
   // (the band has no page text under it), so Q never covers the page.
   const docked =
@@ -644,13 +673,16 @@ function StoryOverlay({
     };
   }, []);
 
-  // Typed words: story commands, then the QA bank, else Q as usual.
+  // Words, typed or said: story commands first, then the investor QA bank
+  // (answered at once, in plain words, and Q offers to carry on from the
+  // same beat), else Q as usual. No model call for either.
   const qa = useMemo(() => buildQaIndex("INVESTOR"), []);
   const [answer, setAnswer] = useState<QaEntry | null>(null);
+  const [asked, setAsked] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const speaking = useRef<AbortController | null>(null);
-  useEffect(() => {
-    const release = setTypedInterceptor((text) => {
+  const hear = useCallback(
+    (text: string, from: "TYPED" | "VOICE"): boolean => {
       const command = parseStoryCommand(
         text,
         player.snapshot().index,
@@ -658,6 +690,7 @@ function StoryOverlay({
       );
       if (command !== null) {
         setNotice(null);
+        setAsked(false);
         if (command.kind === "END") onExit();
         else if (command.kind === "CAPTIONS")
           onCaptions(command.on ?? !captions);
@@ -680,20 +713,65 @@ function StoryOverlay({
         return true;
       }
       const entry = qa.answer(text);
-      if (entry === null) return false;
+      if (entry === null) {
+        // A spoken question the bank does not hold: the story pauses and
+        // Q's own live line answers it; then the offer to carry on.
+        if (from === "VOICE") {
+          player.interrupt();
+          setAnswer(null);
+          setAsked(true);
+          return true;
+        }
+        return false;
+      }
       player.interrupt();
+      setAsked(false);
       setAnswer(entry);
       speaking.current?.abort();
       const controller = new AbortController();
       speaking.current = controller;
-      void answerAloud(entry.answer, controller.signal);
+      // Spoken questions are answered by the live line itself; typed ones
+      // in Q's standard voice.
+      if (from === "TYPED") void answerAloud(entry.answer, controller.signal);
       return true;
-    });
+    },
+    [player, qa, onExit, onCaptions, onMuted, captions, muted],
+  );
+  useEffect(() => {
+    const release = setTypedInterceptor((text) => hear(text, "TYPED"));
     return () => {
       release();
       speaking.current?.abort();
     };
-  }, [player, qa, onExit, onCaptions, onMuted, captions, muted]);
+  }, [hear]);
+
+  // Spoken interruption (plan §4; control-channel's rules): the person's
+  // own lines on Q's open voice line. While the story's audio is playing,
+  // a line counts only when the mic reports echo cancellation, so Q's own
+  // narration can never steer the story. Lines from before the story
+  // started are ignored.
+  const session = useQSessionOptional();
+  const spoken = session?.spoken;
+  const heardLines = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (spoken === undefined) return;
+    if (heardLines.current === null) {
+      heardLines.current = new Set(spoken.map((line) => line.id));
+      return;
+    }
+    for (const line of spoken) {
+      if (heardLines.current.has(line.id)) continue;
+      heardLines.current.add(line.id);
+      if (line.role !== "user") continue;
+      const text = line.text.trim().slice(0, 600);
+      if (text.length === 0) continue;
+      const playingNow = player.snapshot().phase === "PLAYING";
+      const echoSafe = session?.voice.client.echoCancelled?.() ?? false;
+      if (playingNow && !echoSafe) continue;
+      // After this render: hearing updates the overlay's own state.
+      queueMicrotask(() => hear(text, "VOICE"));
+    }
+  }, [spoken, player, hear, session]);
 
   const { beat, word } = snapshot;
   // The caption is the line being spoken, lit word by word.
@@ -703,7 +781,23 @@ function StoryOverlay({
     snapshot.phase === "PAUSED" || snapshot.phase === "INTERRUPTED";
   return (
     <>
-      <div className="cq-story-scrim" data-mood={moodNow} aria-hidden />
+      {/* Q, the narrator, always on screen. Centre stage in the story acts,
+          inside the scrim: the scrim's night is the surface the particles
+          read (QSwarm's surfaceIsDark), so no shape is drawn behind Q, only
+          a faint gold bloom. Docked in the caption band on product beats.
+          Two placements, two elements (a resize would be a layout shift). */}
+      <div className="cq-story-scrim" data-mood={moodNow} aria-hidden>
+        {docked === null ? (
+          // Re-keyed when the scrim turns from night to day: the particles
+          // read their surface once, at mount.
+          <div
+            key={moodNow === "DAY" ? "centre-day" : "centre-night"}
+            className="cq-story-presence"
+          >
+            <QSwarm state={playing ? "SPEAKING" : "IDLE"} pixels={160} />
+          </div>
+        ) : null}
+      </div>
       {/* Product beats: the page dims around the lit section, so the gold
           breathing highlight is the one thing to look at. */}
       <div
@@ -716,38 +810,24 @@ function StoryOverlay({
         }
         aria-hidden
       />
+      {docked === null ? null : (
+        <div
+          key="docked"
+          className="cq-story-presence"
+          data-docked=""
+          style={{
+            transform: `translate3d(${String(docked.x)}px, ${String(docked.y)}px, 0)`,
+          }}
+          aria-hidden
+        >
+          <QSwarm state={playing ? "SPEAKING" : "IDLE"} pixels={56} />
+        </div>
+      )}
       <StoryStage
         stage={stageNow}
         mood={moodNow === "OFF" ? "STORY" : moodNow}
         beside={beside}
       />
-      {/* Q, the narrator, always on screen: centre stage in the story
-          acts, docked beside the page on product beats. Lane S4's
-          particles form the cued figures at the larger size. */}
-      <div
-        // Centre and docked are two placements, never one box resized
-        // (a resize is a layout shift): each is its own element.
-        key={docked === null ? "centre" : "docked"}
-        className="cq-story-presence"
-        data-docked={docked === null ? undefined : ""}
-        data-surface={woke ? "page" : "stage"}
-        style={
-          docked === null
-            ? undefined
-            : {
-                transform: `translate3d(${String(docked.x)}px, ${String(docked.y)}px, 0)`,
-              }
-        }
-        aria-hidden
-      >
-        {/* Keyed by its surface: the presence reads light or dark from
-            the backing behind it once, at mount. */}
-        <QSwarm
-          key={woke ? "page" : "stage"}
-          state={playing ? "SPEAKING" : "IDLE"}
-          pixels={docked === null ? 160 : 56}
-        />
-      </div>
       {captions && !done && word >= 0 ? (
         // One place, always: a bottom band with its own soft scrim. The
         // line is keyed, so a new line is a new element (CLS 0).
@@ -781,6 +861,24 @@ function StoryOverlay({
           </p>
         );
       })()}
+      {asked && answer === null ? (
+        <div className="cq-story-answer" role="status">
+          <p className="cq-story-kicker">Paused for your question</p>
+          <p>
+            Q is answering. When you are ready, I&apos;ll carry on from here.
+          </p>
+          <button
+            type="button"
+            className="cq-story-btn cq-story-btn-primary"
+            onClick={() => {
+              setAsked(false);
+              player.resume();
+            }}
+          >
+            Carry on
+          </button>
+        </div>
+      ) : null}
       {answer !== null ? (
         <div className="cq-story-answer" role="status">
           <p className="cq-story-kicker">{answer.question}</p>
@@ -791,6 +889,7 @@ function StoryOverlay({
             onClick={() => {
               speaking.current?.abort();
               setAnswer(null);
+              setAsked(false);
               player.resume();
             }}
           >

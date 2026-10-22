@@ -8,7 +8,7 @@ import {
   type TourActor,
 } from "../scene-evidence.js";
 import { INVESTOR_V6_LEDGER } from "../investor-v6.js";
-import { PREMIERE_CERTIFICATION_LEDGER } from "../premiere.js";
+import { PREMIERE_CERTIFICATION_LEDGER } from "../premiere-ledger.js";
 import type {
   CertificationEntry,
   CertificationLedger,

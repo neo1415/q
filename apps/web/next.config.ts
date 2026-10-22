@@ -67,6 +67,19 @@ const nextConfig: NextConfig = {
         headers: [{ key: "X-Frame-Options", value: "DENY" }],
       },
       {
+        // Q Story media: content-hashed clip and alignment names
+        // (scripts/q-pitch/hash-story-media.mjs) never change, so they are
+        // cached for good; index.json, which names them, is not matched.
+        source:
+          "/story-media/:voice([A-Za-z0-9]{8,40})/:file(beat-\\d{2}\\.[0-9a-f]{10}\\.(?:mp3|json))",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
         // GateQ embed (spec §1): the one page another site may frame.
         source: "/g/:publicId/embed",
         headers: [

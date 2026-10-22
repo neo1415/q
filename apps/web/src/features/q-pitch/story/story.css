@@ -130,11 +130,15 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
 [data-reserved] {
   visibility: hidden;
 }
+/* The photographers' credit sits above the grid's top-right corner,
+   small, clear of the caption band. */
 .cq-story-credit {
-  grid-column: 1 / -1;
+  position: absolute;
+  top: -22px;
+  right: 0;
+  margin: 0;
   font-size: 0.6875rem;
   opacity: 0.6;
-  text-align: end;
 }
 
 /* A floating panel: on the Q stage, or beside the page once the app wakes. */
@@ -189,15 +193,13 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   pointer-events: none;
   transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
 }
-/* Its backing is the scene's own colour (nearly invisible on the scrim),
-   so the particles draw for the surface they are actually seen on. */
-.cq-story-presence[data-surface="stage"] {
-  border-radius: var(--cq-radius-circle);
-  background: color-mix(in oklch, var(--cq-night-canvas) 52%, transparent);
-}
-.cq-story-presence[data-surface="page"] {
-  border-radius: var(--cq-radius-circle);
-  background: color-mix(in oklch, var(--cq-canvas) 60%, transparent);
+/* No shape behind Q: at most a faint gold bloom (Q's own light). */
+.cq-story-presence {
+  background-image: radial-gradient(
+    circle,
+    color-mix(in oklch, var(--cq-gold-light) 14%, transparent) 0,
+    transparent 70%
+  );
 }
 .cq-story-presence[data-docked] {
   left: 0;
@@ -305,6 +307,7 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
 }
 
 .cq-story-montage {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;

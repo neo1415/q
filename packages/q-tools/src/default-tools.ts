@@ -9,6 +9,7 @@ import { createGetCapitalObjectiveTool } from "./tools/get-capital-objective.js"
 import { createGetCompanyTool } from "./tools/get-company.js";
 import { createProfileMaterialTools } from "./tools/profile-material.js";
 import { createCompanyDocumentTools } from "./tools/company-documents.js";
+import { createReadAttachedDocumentTool } from "./tools/attached-documents.js";
 import { createExtractPublicWebTool } from "./tools/extract-public-web.js";
 import { createGetInvestorMandateTool } from "./tools/get-investor-mandate.js";
 import { createLookupPublicProfileTool } from "./tools/lookup-public-profile.js";
@@ -200,6 +201,10 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ...createProfileMaterialTools(ports.profileMaterial),
     // R0: a data-room document found by meaning, opened and read.
     ...createCompanyDocumentTools(ports),
+    // Lane 8: what they attached to Q, read as them.
+    ...(ports.attachedDocuments === undefined
+      ? []
+      : [createReadAttachedDocumentTool(ports.attachedDocuments)]),
     // R34: the relationship chat, read and prepared for approval.
     ...(ports.chat === undefined || ports.relationships === undefined
       ? []

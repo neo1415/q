@@ -1,0 +1,7 @@
+{
+  "project": "desktop",
+  "uploadToSendLiveMs": 706,
+  "sendToFirstWordsMs": 754,
+  "uploadToFirstWordsMs": 1811,
+  "note": "Fixture upload (600 ms) and fake model (250 ms); the server's own read is timed in model-gateway q-answer-attached-document.test.ts."
+}

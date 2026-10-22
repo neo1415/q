@@ -797,6 +797,7 @@ import { createOwnCalls } from "./composition/own-calls.js";
 import { createOwnDiligence } from "./composition/own-diligence.js";
 import { createProfileMaterial } from "./composition/profile-material.js";
 import { createMaterialDocumentReads } from "./composition/material-documents.js";
+import { createAttachedDocumentReads } from "./composition/attached-documents.js";
 // end ADMIN block
 // ADMIN-3 block
 import {
@@ -3281,6 +3282,20 @@ const qTools = createQTools({
     evidenceDocuments: createEvidenceDocumentsPort(
       researchComposition.evidence,
     ),
+    // Lane 8: what they attached to Q, authorised by Evidence as them.
+    attachedDocuments: createAttachedDocumentReads({
+      sql: database.sql,
+      get: (actor, documentId) =>
+        researchComposition.evidence.getDocumentWithVersion({
+          actor,
+          documentId: DocumentIdSchema.parse(documentId),
+        }),
+      list: (actor, limit) =>
+        researchComposition.evidence.listDocumentsWithVersions({
+          actor,
+          page: { limit },
+        }),
+    }),
     relationshipMail: createRelationshipMailPort(integrations),
     ...(inboundEmailService === undefined
       ? {}

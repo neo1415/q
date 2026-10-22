@@ -131,6 +131,14 @@ export const QScreenContextSchema = z
      * resolve for them is dropped silently. It grants nothing.
      */
     manifest: QPageManifestSchema.optional(),
+    /**
+     * Lane 8: documents the person attached in Q's composer, newest last.
+     * Ids only, never authority: each is read solely through
+     * read_attached_document, which reads it as the asker through the
+     * Evidence service (document.view in their own organisation) and
+     * refuses one that is not theirs.
+     */
+    attachedDocumentIds: z.array(UuidSchema).min(1).max(5).optional(),
   })
   .strict();
 export type QScreenContext = z.infer<typeof QScreenContextSchema>;

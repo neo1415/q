@@ -64,6 +64,8 @@ export type {
   ProposalPlainStatus,
   ApprovalInboxPort,
   EvidenceDocumentsPort,
+  AttachedDocumentsPort,
+  AttachedDocumentIdentity,
   OwnRecordKind,
   OwnRecordsPort,
   RecordChange,
@@ -711,6 +713,16 @@ export {
   OPEN_COMPANY_DOCUMENT,
   READ_COMPANY_DOCUMENT,
 } from "./tools/company-documents.js";
+export {
+  ATTACHED_TEXT_MAX_CHARS,
+  READ_ATTACHED_DOCUMENT,
+  ReadAttachedDocumentInputSchema,
+  ReadAttachedDocumentOutputSchema,
+  boundedPages,
+  createReadAttachedDocumentTool,
+  type ReadAttachedDocumentInput,
+  type ReadAttachedDocumentOutput,
+} from "./tools/attached-documents.js";
 // Explore (E1-E5, ADR 0055).
 export {
   EXPLORE_PITCHES_LIKE,

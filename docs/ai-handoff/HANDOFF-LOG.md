@@ -921,8 +921,6 @@ Next:
 - The founder picks options for the remaining pages (the gallery artifact is in the session).
 - Rotate the Railway and Supabase tokens pasted in chat, and add them as environment secrets.
 
-<<<<<<< HEAD
-
 ## 21 October 2026, 21:05 UTC — Claude coordinator (speed + Q Story)
 
 - **Integrated** 25+ lane PRs into `speed/q-oct20`, each reviewed against the docs and the owner's intent before merging. Several were sent back: the stage checklist became a single line, findings were restored to 3, red card tint removed, context navigation built, onboarding stages restored.
@@ -946,7 +944,6 @@ Next:
   - prettier check.
 - **No app code changed.** No provider calls apart from a Pexels search through `packages/q-daily`'s port; the photos are not committed.
 - **Flags for the owner** (in STORYBOARD.md): product first appears at 4:28 of 7:55; GateQ score/rank gap (§8.3); the shipped nav differs from the plan's list; a Q Card component exists; story-mode scrim vs ADR 0017.
-  \=======
 
 ## Q Story S6: the Q Card — 22 October 2026 (Claude, branch `qstory/qcard`, PR into `speed/q-oct20`)
 
@@ -988,4 +985,32 @@ Evidence stage: **code + local checks only**. Not merged, not deployed. No migra
   - The amount committed in the raise is not shown.
   - The anonymous read is not cached yet.
 
-> > > > > > > origin/qstory/qcard
+## Q Card polish and public-read cache — 22 October 2026 (Claude, `qstory/qcard-polish`)
+
+Evidence stage: **code + local checks only**.
+
+- **Coordinator review items:**
+  - (a) and (b): one right-aligned "Members only" marker. It sits on every section heading and at the "Additional information" heading, never under a value.
+  - (c): Q's-reading caption raised to body-small secondary.
+- **Cache:** the anonymous `/@handle` read is cached for 30 seconds and tagged `q-card-public` / `q-card:<handle>`. A signed-in read is never cached.
+  - `updateTag` runs on a card save and on a handle claim.
+  - `connection()` replaces `force-dynamic`, which forced no-store.
+  - Test: `apps/web/test/q-card-public-cache.test.ts`.
+
+## 2026-10-22 — Claude, lane 8: Q reads attached documents (`speed/q-uploads`, PR into `speed/q-oct20`)
+
+- **Fixed:** Send is now live on a finished attachment alone, and held while one uploads. Drag-and-drop and several files work. A WorkingLine shows "Reading <file>".
+- **Built:** one attachments store for the Q page and the dock.
+  - Ids ride `screen.attachedDocumentIds` on the turn and its follow-ups; "New chat" clears them.
+  - The new tool `read_attached_document` reads each one as the asker through Evidence (`document.view`).
+  - It waits up to 12 s for the pipeline's pages. A short document is read whole; a long one by its opening plus pages matched by FTS.
+  - It finds earlier uploads by name.
+  - The model-gateway prefetch puts the pages into the prompt as USER_CLAIM / DOCUMENT_SUPPORTED facts, cited by page.
+- **No migration.** Nothing is persisted beyond the existing document.
+- **Lane 4:** the `index.ts` edit is an isolated commit; lane 4 was told before it was made.
+- **Evidence:** `docs/ai-handoff/evidence/q-uploads/`.
+- **Not done:**
+  - onboarding was left on its own working upload path;
+  - no OCR for images (they say plainly that they can't be read);
+  - no full-stack or live run.
+    \=======

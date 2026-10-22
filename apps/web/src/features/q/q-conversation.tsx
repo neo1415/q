@@ -57,10 +57,6 @@ import {
   takeAcceptedDeckOffer,
 } from "@/features/onboarding-conversation/deck-offer";
 
-import {
-  materialUploadCompleteAction,
-  materialUploadTargetAction,
-} from "../onboarding-kit/material-actions";
 import { QAperture, QLumen, useStageApertureSize } from "../q-aperture";
 import { nextSpokenPiece } from "../voice/spoken-progress";
 import { useQSpeech } from "../voice/use-q-speech";
@@ -68,6 +64,14 @@ import { VoiceMenu } from "../voice/voice-menu";
 import { expectDocument } from "@/features/documents/document-ready";
 import { failureMessage, recoveryHint, type QTurn } from "./conversation";
 import { interceptTyped } from "./typed-intercept";
+import {
+  attachToQ,
+  attachmentQuestion,
+  markAttachmentsSent,
+  Q_ATTACH_ACCEPT,
+  useQAttachments,
+} from "./q-attachments";
+import { WorkingLine } from "@/components/working/working-line";
 import { CardsControls } from "./cards/cards-controls";
 import { announceQGestures } from "@/features/q-swarm/q-gestures";
 import { announceQSaid } from "@/features/q-swarm/q-said";
@@ -365,50 +369,17 @@ export function QConversationPanel({
   const closeArtifact = session.closeArtifact;
 
   /**
-   * Attaching a document to this conversation (QX-001 §5): permission,
-   * then the bytes straight into private storage, then the server checks
-   * what landed. A founder's file belongs to their company; anyone else's
-   * to their organisation's own documents (owner 2026-10-17: everyone can
-   * upload from the box; reading it into answers comes later).
+   * Attaching a document to this conversation (QX-001 §5; lane 8): the
+   * shared attachments store uploads it, the server reads it as it lands,
+   * and the next question carries it to Q, who answers from it. A
+   * founder's file belongs to their company; anyone else's to their
+   * organisation's own documents.
    */
-  const [attachments, setAttachments] = useState<readonly string[]>([]);
-  const attach = async (file: File) => {
-    const companyId = context.companyId;
-    setAttachments((current) => [...current, `${file.name} · uploading`]);
-    const target = await materialUploadTargetAction({
-      ...(companyId === undefined ? {} : { companyId }),
-      documentType: "UNCLASSIFIED",
-      filename: file.name,
-      mimeType: file.type || "application/octet-stream",
-      sizeBytes: file.size,
-    });
-    const settle = (note: string) => {
-      setAttachments((current) =>
-        current.map((entry) =>
-          entry === `${file.name} · uploading`
-            ? `${file.name} · ${note}`
-            : entry,
-        ),
-      );
-    };
-    if (!target.ok) {
-      settle(target.message);
-      return;
-    }
-    const put = await fetch(target.value.url, {
-      method: target.value.method,
-      headers: target.value.headers,
-      body: file,
-    });
-    if (!put.ok) {
-      settle("could not be uploaded");
-      return;
-    }
-    const completed = await materialUploadCompleteAction(
-      target.value.uploadSessionId,
-    );
-    settle(completed.ok ? "attached" : completed.message);
-  };
+  const attached = useQAttachments();
+  const attach = useCallback(
+    (file: File) => attachToQ(file, context.companyId),
+    [context.companyId],
+  );
 
   // --- Talking --------------------------------------------------------------
 
@@ -835,7 +806,15 @@ export function QConversationPanel({
   // answer (it brings the cards up, or moves on) and goes no further; a
   // question of its own is answered as asked.
   const submitTyped = useCallback(
-    async (text: string) => {
+    async (typed: string) => {
+      // Lane 8: Send on an attached document alone asks about it.
+      const text = attachmentQuestion(typed);
+      if (text.length === 0) return;
+      if (text !== typed.trim()) {
+        await qAsk(text);
+        markAttachmentsSent();
+        return;
+      }
       if (interceptTyped(text)) return;
       if (typedOpenerAnswer(text, lineOpen)) return;
       if (lineOpen) {
@@ -843,6 +822,7 @@ export function QConversationPanel({
         return;
       }
       await qAsk(text);
+      markAttachmentsSent();
     },
     [lineOpen, sendText, qAsk],
   );
@@ -1804,9 +1784,24 @@ export function QConversationPanel({
                   ? { onVoice: () => void talk(), voiceLabel: "Talk with Q" }
                   : {})}
                 placeholder={voice.active ? "Type instead" : "Message Q"}
-                attachments={attachments}
+                attachments={attached.attachments}
+                {...(attached.status === null
+                  ? {}
+                  : {
+                      attachmentStatus: (
+                        <WorkingLine
+                          label={t(attached.status)}
+                          active
+                          data-q-attachment-reading=""
+                        />
+                      ),
+                    })}
                 {...(connected
-                  ? { onAttach: attach, attachLabel: "Attach a document" }
+                  ? {
+                      onAttach: attach,
+                      attachLabel: "Attach a document",
+                      attachAccept: Q_ATTACH_ACCEPT,
+                    }
                   : {})}
                 {...(connected ? { onSubmit: submitTyped } : {})}
               />
