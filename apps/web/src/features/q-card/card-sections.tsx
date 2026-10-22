@@ -8,6 +8,8 @@ import type {
   TruthClass,
 } from "@capital-q/contracts";
 
+import { Check, ICON_STROKE } from "@capital-q/ui/icons";
+
 import { compactMoneyText, moneyText } from "@/features/company/money-text";
 
 import { cardFieldValue } from "./card-content";
@@ -85,6 +87,12 @@ export function metricText(metric: CardMetric): string {
   return fraction === undefined ? grouped : `${grouped}.${fraction}`;
 }
 
+/** Support a third party or Capital Q itself checked: marked with a tick too. */
+const STRONG: ReadonlySet<EvidenceStatus> = new Set([
+  "EXTERNALLY_VERIFIED",
+  "PLATFORM_VERIFIED",
+]);
+
 /** The truth line under a number: how it's supported, then what it is. */
 export function truthLine(item: {
   readonly truthClass: TruthClass;
@@ -108,6 +116,7 @@ export function CardSection({
   label,
   title,
   members,
+  empty,
   children,
 }: {
   readonly id: string;
@@ -115,9 +124,26 @@ export function CardSection({
   readonly title?: string | undefined;
   /** The content is the members' (network_visible) projection. */
   readonly members?: boolean | undefined;
-  readonly children: ReactNode;
+  /** Nothing this visitor may see: one quiet row, the same words always. */
+  readonly empty?: boolean | undefined;
+  readonly children?: ReactNode;
 }) {
   const heading = `card-${id}-heading`;
+  if (empty === true) {
+    return (
+      <section
+        id={`card-${id}`}
+        aria-labelledby={heading}
+        data-card-section={id}
+        className="flex min-h-11 scroll-mt-20 items-center justify-between gap-4 py-4 first:pt-0 last:pb-0"
+      >
+        <h2 id={heading} className="cq-label text-(--cq-text-secondary)">
+          {label}
+        </h2>
+        <NotShared what={label.toLowerCase()} />
+      </section>
+    );
+  }
   return (
     <section
       id={`card-${id}`}
@@ -125,7 +151,7 @@ export function CardSection({
       data-card-section={id}
       className="flex scroll-mt-20 flex-col gap-3 py-6 first:pt-0 last:pb-0"
     >
-      <div className="flex items-baseline justify-between gap-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 id={heading} className="cq-label text-(--cq-text-secondary)">
           {label}
         </h2>
@@ -146,13 +172,8 @@ export function CardSection({
 /** One quiet line for a section with nothing this visitor may see. */
 export function NotShared({ what }: { readonly what: string }) {
   return (
-    <p
-      className="cq-body-sm flex min-h-11 items-center rounded-lg border border-dashed border-(--cq-border) px-4 text-(--cq-text-tertiary)"
-      data-card-empty
-    >
-      <span>
-        Not shared yet<span className="sr-only">: {what}</span>
-      </span>
+    <p className="cq-body-sm text-(--cq-text-tertiary)" data-card-empty>
+      Not shared yet<span className="sr-only">: {what}</span>
     </p>
   );
 }
@@ -168,14 +189,10 @@ export function NumbersSection({
       id={CARD_SECTION_IDS.numbers}
       label="Numbers"
       members={field?.scope === "network_visible"}
+      empty={detail === null}
     >
-      {detail === null ? (
-        <NotShared what="numbers" />
-      ) : (
-        <dl
-          className="grid grid-cols-1 gap-x-8 sm:grid-cols-2"
-          data-card-metrics
-        >
+      {detail === null ? null : (
+        <dl className="grid grid-cols-2 gap-x-5 sm:gap-x-8" data-card-metrics>
           {detail.metrics.map((metric, index) => (
             <div
               key={`${metric.label}-${index}`}
@@ -196,8 +213,18 @@ export function NumbersSection({
               <dd className="cq-numeric order-1 text-[1.75rem] leading-tight font-semibold tracking-tight text-(--cq-text-primary)">
                 {metricText(metric)}
               </dd>
-              <dd className="cq-caption order-3 text-(--cq-text-tertiary)">
-                {truthLine(metric)}
+              <dd
+                className={`cq-caption order-3 flex items-start gap-1 ${STRONG.has(metric.evidenceStatus) ? "text-(--cq-text-secondary)" : "text-(--cq-text-tertiary)"}`}
+              >
+                {STRONG.has(metric.evidenceStatus) ? (
+                  <Check
+                    aria-hidden="true"
+                    size={13}
+                    strokeWidth={ICON_STROKE}
+                    className="mt-0.5 shrink-0 text-(--cq-positive)"
+                  />
+                ) : null}
+                <span>{truthLine(metric)}</span>
               </dd>
             </div>
           ))}
@@ -218,10 +245,9 @@ export function RaiseSection({
       id={CARD_SECTION_IDS.raise}
       label="The raise"
       members={field?.scope === "network_visible"}
+      empty={detail === null}
     >
-      {detail === null ? (
-        <NotShared what="the raise" />
-      ) : (
+      {detail === null ? null : (
         <div className="flex flex-col gap-3" data-card-raise>
           <div className="flex flex-col gap-0.5">
             <p className="cq-numeric text-[2rem] leading-tight font-semibold tracking-tight text-(--cq-text-primary)">
@@ -271,12 +297,11 @@ export function IntelligenceSection({
       id={CARD_SECTION_IDS.intelligence}
       label="Intelligence"
       members={field?.scope === "network_visible"}
+      empty={detail === null}
     >
-      {detail === null ? (
-        <NotShared what="intelligence" />
-      ) : (
+      {detail === null ? null : (
         <div className="flex flex-col gap-2" data-card-intelligence>
-          <p className="cq-title-sm text-(--cq-text-primary)">
+          <p className="text-[1.75rem] leading-tight font-semibold tracking-tight text-(--cq-text-primary)">
             {detail.status === "ASSESSED"
               ? (detail.band ?? "Assessed")
               : "Not enough evidence yet"}
@@ -311,13 +336,12 @@ export function RelationshipsSection({
       id={CARD_SECTION_IDS.relationships}
       label="Relationships"
       members={field?.scope === "network_visible"}
+      empty={detail === null}
     >
-      {detail === null ? (
-        <NotShared what="relationships" />
-      ) : (
+      {detail === null ? null : (
         <>
           <ol
-            className="flex flex-wrap gap-x-6 gap-y-3"
+            className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4"
             data-card-relationships
           >
             {detail.stages.map((stage) => (
@@ -355,10 +379,9 @@ export function TeamSection({
       id={CARD_SECTION_IDS.team}
       label="Team"
       members={field?.scope === "network_visible"}
+      empty={detail === null}
     >
-      {detail === null ? (
-        <NotShared what="team" />
-      ) : (
+      {detail === null ? null : (
         <ul className="grid grid-cols-1 gap-x-8 sm:grid-cols-2" data-card-team>
           {detail.members.map((member, index) => (
             <li
@@ -391,6 +414,7 @@ export function DocumentsSection({
       id={CARD_SECTION_IDS.documents}
       label="Documents on request"
       members={field?.scope === "network_visible"}
+      empty={detail === null}
     >
       <ul
         className="flex flex-col divide-y divide-(--cq-border-subtle)"

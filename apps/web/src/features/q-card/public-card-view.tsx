@@ -35,7 +35,6 @@ import {
   CardSection,
   DocumentsSection,
   IntelligenceSection,
-  NotShared,
   NumbersSection,
   RaiseSection,
   RelationshipsSection,
@@ -165,6 +164,8 @@ export function PublicCardView({
         ? undefined
         : byKey("deploymentState");
   const company = card.subjectType === "COMPANY";
+  const storyEmpty =
+    tagline === null && status === undefined && location === undefined;
   const more = facts.filter(
     (field) =>
       !GLANCE_KEYS.has(field.key) &&
@@ -313,12 +314,12 @@ export function PublicCardView({
         className="flex flex-col divide-y divide-(--cq-border-subtle) rounded-2xl border border-(--cq-border-subtle) bg-(--cq-surface) px-5 py-6 sm:px-8 sm:py-8"
         data-card-dossier
       >
-        <CardSection id={CARD_SECTION_IDS.story} label="Story">
-          {tagline === null &&
-          status === undefined &&
-          location === undefined ? (
-            <NotShared what="story" />
-          ) : (
+        <CardSection
+          id={CARD_SECTION_IDS.story}
+          label="Story"
+          empty={storyEmpty}
+        >
+          {storyEmpty ? null : (
             <>
               {tagline === null ? null : (
                 <div className="cq-body text-(--cq-text-primary)">
