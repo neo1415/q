@@ -210,6 +210,14 @@ export function StoryHost({
   }, [actor, router, pathFor]);
 
   const [player, setPlayer] = useState<StoryPlayer | null>(null);
+  // Cancels a voice line still opening when the story is left (audit).
+  // Made in the effect, so a Strict Mode remount gets a fresh one.
+  const opening = useRef(new AbortController());
+  useEffect(() => {
+    const controller = new AbortController();
+    opening.current = controller;
+    return () => controller.abort();
+  }, []);
   const [starting, setStarting] = useState(false);
   const stage = useMemo(() => createStore<StageState>(EMPTY_STAGE), []);
   const mood = useMemo(() => createStore<Mood>("OFF"), []);
@@ -233,7 +241,10 @@ export function StoryHost({
         narrator = renderedNarrator(assets.context, assets.buffers);
       } else if (
         withVoice &&
-        (await openTourVoice(() => sessionRef.current)) === "LIVE"
+        (await openTourVoice(
+          () => sessionRef.current,
+          opening.current.signal,
+        )) === "LIVE"
       ) {
         narrator = liveNarrator(liveLine(() => sessionRef.current));
       } else {
