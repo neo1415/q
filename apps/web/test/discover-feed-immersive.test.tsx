@@ -646,6 +646,15 @@ describe("tap to pause (founder directive, 2026-09-27)", () => {
 
   it("leaves taps on the rail and the overlay to their own controls", async () => {
     const { container } = await renderFeed();
+    // Let the feed settle before the element claims to be playing: the
+    // heading shows before the pitch's own playback update has rendered, and
+    // on a loaded runner the clicks below flushed that update, whose player
+    // effect then paused the "playing" video (one pause, 505-file run with
+    // two workers, 2026-10-22).
+    await waitFor(() => expect(play).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
     const video = activeVideo(container);
     Object.defineProperty(video, "paused", {
       configurable: true,
