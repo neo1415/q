@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { attachedDocumentFacts } from "../src/q/attached-document-fact.js";
+import {
+  ATTACHED_FACTS_MAX_CHARS,
+  attachedDocumentFacts,
+  attachedDocumentsWithin,
+} from "../src/q/attached-document-fact.js";
 
 /**
  * Lane 8: an attached document becomes facts the first answer is made
@@ -54,5 +58,26 @@ describe("attached document facts", () => {
     expect(fact?.statement).toContain("never guess");
     expect(fact?.evidenceStatus).toBe("NO_EVIDENCE");
     expect(attachedDocumentFacts({ status: "NONE" })).toEqual([]);
+  });
+
+  it("keeps everything attached inside one prompt budget, each document framed", () => {
+    const big = (title: string) =>
+      attachedDocumentFacts({
+        status: "READ",
+        title,
+        pageCount: 9,
+        whole: false,
+        pages: Array.from({ length: 9 }, (_, i) => ({
+          page: i + 1,
+          text: "w ".repeat(1_500),
+        })),
+      });
+    const kept = attachedDocumentsWithin([big("Pack A"), big("Pack B"), []]);
+    const total = kept.reduce((sum, fact) => sum + fact.statement.length, 0);
+    expect(total).toBeLessThanOrEqual(ATTACHED_FACTS_MAX_CHARS);
+    // Both documents keep their frame; the cut says the rest can be read.
+    expect(kept.some((f) => f.statement.includes('"Pack A"'))).toBe(true);
+    expect(kept.some((f) => f.statement.includes('"Pack B"'))).toBe(true);
+    expect(kept.at(-1)?.statement).toContain("read_attached_document");
   });
 });

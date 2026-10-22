@@ -14,6 +14,14 @@ import type { AuthorisedFact } from "@capital-q/q-core";
 /** A fact's statement bound (q-core TEXT_MAX is 8 000), with room for the frame. */
 const STATEMENT_MAX = 7_900;
 
+/**
+ * What all attached documents may add to one turn's prompt, together
+ * (lane 4: the prompt is already ~29k characters). The read hands the
+ * pages that answer the question first when a document is long; anything
+ * past this is left to read_attached_document, which the model can call.
+ */
+export const ATTACHED_FACTS_MAX_CHARS = 8_000;
+
 type Read = {
   readonly status?: unknown;
   readonly title?: unknown;
@@ -36,6 +44,40 @@ function pagesOf(value: unknown): { page: number; text: string }[] {
     return typeof page === "number" && typeof words === "string"
       ? [{ page, text: words }]
       : [];
+  });
+}
+
+/**
+ * The documents' facts inside ATTACHED_FACTS_MAX_CHARS, shared fairly: each
+ * document keeps its frame (a status line always fits), and its pages are
+ * cut at its share, with a line saying the rest is there to read.
+ */
+export function attachedDocumentsWithin(
+  documents: readonly (readonly AuthorisedFact[])[],
+): AuthorisedFact[] {
+  const present = documents.filter((facts) => facts.length > 0);
+  if (present.length === 0) return [];
+  const share = Math.floor(ATTACHED_FACTS_MAX_CHARS / present.length);
+  return present.flatMap((facts) => {
+    let room = share;
+    const kept: AuthorisedFact[] = [];
+    for (const fact of facts) {
+      if (room <= 0) break;
+      if (fact.statement.length <= room) {
+        kept.push(fact);
+        room -= fact.statement.length;
+        continue;
+      }
+      const cut = fact.statement.slice(0, Math.max(room - 120, 0)).trim();
+      if (cut.length > 0) {
+        kept.push({
+          ...fact,
+          statement: `${cut}…\n(More of this document is there to read with read_attached_document.)`,
+        });
+      }
+      room = 0;
+    }
+    return kept;
   });
 }
 

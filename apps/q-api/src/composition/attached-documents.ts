@@ -20,7 +20,7 @@ import type { ActorContext } from "@capital-q/security";
  */
 
 /** Whole when this short; otherwise the pages that answer the question. */
-const WHOLE_CHARS = 14_000;
+const WHOLE_CHARS = 6_000;
 /** Pages a long document is read by, beside its first. */
 const MATCHED_PAGES = 6;
 const OTHERS_MAX = 10;
