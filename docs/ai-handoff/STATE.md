@@ -1,5 +1,23 @@
 # Capital Q — Current shared engineering state
 
+## DEPLOYED 77068698d — 22 October 2026, 22:21 UTC (Claude coordinator, owner's go)
+
+- **Railway:** all four services are SUCCESS at `77068698d` (`speed/q-oct20` = `build/int-rc` = both `recovery/*`). CI was green on the same tree before the int-rc visibility fix merge; that fix was checked locally with web tsc, eslint and its tests.
+- **Hosted migrations applied:** 20261228214500, 20261229090000 and 20261229100000; hosted is now at 252/252.
+- **Live checks:**
+  - sign-in 200; api and q-api /health/ready 200;
+  - protected pages 307 to sign-in; /dev pages 404; story media served with immutable caching;
+  - smoke 8/8 (founder.maji-loop);
+  - Q Pitch page shows the Everyone/Investors/Founders picker;
+  - "pitch to an investor" typed in Q starts the investor edition (live);
+  - attachment-only Send enabled, and Q answers from the document (live).
+- **Incident:** from 17:37 to about 22:35 UTC every model call failed. OpenAI returned AUTHENTICATION (the key on Railway was revoked) and Gemini returned PERMANENT. The cool-down marked both providers failing, so Q answered "Q isn't available". OpenAI is succeeding again since 22:35; Gemini was still PERMANENT at 22:24, unverified since.
+- **Not done:**
+  - the hosted Capital Q seed (needs SUPABASE_SECRET_KEY);
+  - David's /pitch/new upload;
+  - Zino's headshot and the team's emails;
+  - the Q Pitch page intro still says "internal rehearsal until the owner approves" (stale copy).
+
 ## speed/q-oct20 ready to deploy — 22 October 2026, 07:52 UTC (Claude coordinator)
 
 - **CI fully green** at `0be7ce681`, run 39740513923 on #267 (build, typecheck, format+lint, test, pgTAP including 521 person_q_card and 984, quality).
