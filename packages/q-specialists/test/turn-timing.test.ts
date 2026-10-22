@@ -250,13 +250,33 @@ function timedModel(
           providerReference: undefined,
         };
       }
-      calls.push(`answer:${String(answerTokens)}`);
+      // Owner 2026-10-22: findings and cards may be written by a second
+      // call beside the answer (parallel-extras.ts). Then the answer's
+      // writer leaves them out, and the extras' writer writes only them.
+      const answerWriter = seen.includes("A second writer");
+      const extrasWriter = seen.includes("Another writer");
+      // Findings and cards are about half the object (round 5b split:
+      // typed 48%, comparison 64%, spoken 55%); gestures and the rest stay
+      // with the answer.
+      const extrasShare = Math.min(0.64, 1 - answerShare - 0.15);
+      calls.push(
+        `${extrasWriter ? "extras" : "answer"}:${String(answerTokens)}`,
+      );
       // About four characters a token: the answer is most of the object.
       const sentence =
         "Northwind Ledger declares a seed stage and steady revenue growth. ";
-      const answer = sentence
-        .repeat(Math.max(1, Math.round((answerTokens * 4 * answerShare) / 66)))
-        .trim();
+      const answer = extrasWriter
+        ? "Northwind Ledger declares a seed stage."
+        : sentence
+            .repeat(
+              Math.max(1, Math.round((answerTokens * 4 * answerShare) / 66)),
+            )
+            .trim();
+      const findingsShare = answerWriter
+        ? 0
+        : extrasWriter
+          ? extrasShare
+          : 1 - answerShare;
       const value = {
         answer,
         responseShape: "ANALYTICAL",
@@ -264,10 +284,13 @@ function timedModel(
         // 400 characters each, inside the statement limit), each valid.
         findings: Array.from(
           {
-            length: Math.max(
-              2,
-              Math.round((answerTokens * 4 * (1 - answerShare)) / 520),
-            ),
+            length:
+              findingsShare === 0
+                ? 0
+                : Math.max(
+                    2,
+                    Math.round((answerTokens * 4 * findingsShare) / 520),
+                  ),
           },
           (_, index) => ({
             type: ["FACT", "RISK", "STRENGTH", "GAP"][index % 4] ?? "FACT",
@@ -279,7 +302,22 @@ function timedModel(
             basis: [],
           }),
         ),
-        missingEvidence: [],
+        // What stays with the answer's writer when the extras go apart:
+        // gestures and the rest, as gaps of the same size.
+        missingEvidence: answerWriter
+          ? Array.from(
+              {
+                length: Math.max(
+                  1,
+                  Math.round(
+                    (answerTokens * 4 * (1 - answerShare - extrasShare)) / 300,
+                  ),
+                ),
+              },
+              (_, index) =>
+                `Gap ${String(index + 1)}: ${"unknown ".repeat(34)}`.trim(),
+            )
+          : [],
         contradictions: [],
         insufficientEvidence: false,
         recommendation: null,
@@ -626,7 +664,10 @@ export const JOURNEYS: readonly Journey[] = [
   },
 ];
 
-export async function timeJourney(journey: Journey): Promise<Timing> {
+export async function timeJourney(
+  journey: Journey,
+  options: { readonly parallelExtras?: boolean } = {},
+): Promise<Timing> {
   const runId = randomUUID();
   const conversationId = randomUUID();
   const calls: string[] = [];
@@ -788,6 +829,7 @@ export async function timeJourney(journey: Journey): Promise<Timing> {
     }),
     deltas,
     logger: silent,
+    parallelExtras: options.parallelExtras === true,
   });
   const turns: QTurnReader = {
     read: async () => {
@@ -1029,5 +1071,53 @@ describe("turn timing harness", () => {
       "reader",
       "answer:1100",
     ]);
+  }, 600_000);
+
+  it("owner 2026-10-22: findings and cards written beside the answer finish the turn sooner", async () => {
+    const typed = [
+      "typed question about one company",
+      "comparison of two companies",
+      "public web search by name",
+    ].map((name) => {
+      const found = JOURNEYS.find((one) => one.name === name);
+      if (found === undefined) throw new Error(`no journey ${name}`);
+      return found;
+    });
+    for (const journey of typed) {
+      await timeJourney(journey);
+      await timeJourney(journey, { parallelExtras: true });
+    }
+    const pairs: { one: Timing; two: Timing }[] = [];
+    for (const journey of typed) {
+      pairs.push({
+        one: await timeJourney(journey),
+        two: await timeJourney(journey, { parallelExtras: true }),
+      });
+    }
+    console.log(
+      [
+        "",
+        "| journey | complete, one call | complete, two calls | first finding, one call | first finding, two calls | model calls |",
+        "| --- | --- | --- | --- | --- | --- |",
+        ...pairs.map(
+          ({ one, two }) =>
+            `| ${one.journey} | ${ms(one.completeMs)} | ${ms(two.completeMs)} | ${ms(one.firstFindingMs)} | ${ms(two.firstFindingMs)} | ${String(one.modelCalls)} → ${String(two.modelCalls)} |`,
+        ),
+        "",
+      ].join("\n"),
+    );
+    for (const { one, two } of pairs) {
+      // One more call, the extras', and the answer still says as much.
+      expect(two.modelCalls).toBe(one.modelCalls + 1);
+      expect(two.calls.some((c) => c.startsWith("extras:"))).toBe(true);
+      expect(two.stored.join(" ")).toContain("Northwind Ledger declares");
+      // Findings still arrive, and the turn is done sooner.
+      expect(two.firstFindingMs).not.toBeNull();
+      expect(two.completeMs).toBeLessThan(one.completeMs * 0.9);
+      // The first words are not delayed by the second writer.
+      expect(two.firstWordsMs ?? Infinity).toBeLessThan(
+        (one.firstWordsMs ?? 0) + 300,
+      );
+    }
   }, 600_000);
 });

@@ -154,6 +154,7 @@ function build(options: {
   readonly script: readonly FakeBehaviour[];
   readonly tools?: QToolPort | undefined;
   readonly context?: QAuthorisedContextPort | undefined;
+  readonly parallelExtras?: boolean | undefined;
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -247,6 +248,9 @@ function build(options: {
     transactions: { run: (work) => work({} as never) },
     tools: options.tools,
     ...(options.context === undefined ? {} : { context: options.context }),
+    ...(options.parallelExtras === undefined
+      ? {}
+      : { parallelExtras: options.parallelExtras }),
     logger,
   });
   const request: QAnswerRequest = {
@@ -2225,5 +2229,208 @@ describe("a re-render ask never reaches the public web", () => {
         false,
       );
     }
+  });
+});
+
+describe("findings and cards written beside the answer (owner 2026-10-22)", () => {
+  const finding = (statement: string) => ({
+    type: "FACT",
+    statement,
+    truthClass: "USER_CLAIM",
+    evidenceStatus: "SELF_REPORTED",
+    confidence: "MODERATE",
+    basis: ["F1"],
+  });
+  const findingBlocks = (completed: readonly unknown[]): string[] =>
+    (
+      (
+        completed[0] as {
+          message: {
+            blocks?: { kind: string; finding?: { statement: string } }[];
+          };
+        }
+      ).message.blocks ?? []
+    )
+      .filter((block) => block.kind === "FINDING")
+      .map((block) => block.finding?.statement ?? "");
+
+  it("is off unless switched on: one call writes both", async () => {
+    const { seam, alpha, request } = build({
+      script: [{ kind: "JSON", value: analystResult("Answer.") }],
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(alpha.calls).toHaveLength(1);
+    const prompt = alpha.calls[0]?.request.messages
+      .map((m) => m.content)
+      .join("\n");
+    expect(prompt).not.toContain("A second writer");
+  });
+
+  it("a second call writes the findings from the same messages, and they join the answer", async () => {
+    const { seam, alpha, request, completed, live } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: analystResult("Northwind declares a seed stage."),
+        },
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Seed stage."),
+            findings: [finding("Northwind declares a seed stage.")],
+          },
+        },
+      ],
+      parallelExtras: true,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(alpha.calls).toHaveLength(2);
+    const [answerCall, extrasCall] = alpha.calls.map((c) => c.request);
+    const answerPrompt = answerCall?.messages.map((m) => m.content).join("\n");
+    const extrasPrompt = extrasCall?.messages.map((m) => m.content).join("\n");
+    expect(answerPrompt).toContain("A second writer");
+    expect(answerPrompt).not.toContain("Another writer");
+    expect(extrasPrompt).toContain("Another writer");
+    expect(extrasPrompt).not.toContain("A second writer");
+    // Everything else the two writers read is the same.
+    expect(extrasCall?.messages.slice(0, -1)).toEqual(
+      answerCall?.messages.filter(
+        (m) => !m.content.includes("A second writer"),
+      ),
+    );
+    expect(findingBlocks(completed)).toEqual([
+      "Northwind declares a seed stage.",
+    ]);
+    // Shown as written, before the message.
+    expect(live).toHaveLength(1);
+    expect(live[0]?.before).toBe(0);
+    // The extras' writer said one sentence nobody reads.
+    expect(
+      (completed[0] as { message: { text: string } }).message.text,
+    ).not.toContain("Seed stage.");
+    expect(seam.lastObservation()?.modelCalls).toBe(2);
+  });
+
+  it("starts the extras as a tool turn's answering round begins, after the reads", async () => {
+    const tools = toolPort([GET_COMPANY], (p) =>
+      succeeded(p, { name: "Northwind" }),
+    );
+    const { seam, alpha, request, completed } = build({
+      script: [
+        call("c1"),
+        { kind: "JSON", value: analystResult("Northwind is at seed.") },
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Seed."),
+            findings: [finding("Northwind is at seed.")],
+          },
+        },
+      ],
+      tools,
+      parallelExtras: true,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(alpha.calls).toHaveLength(3);
+    const extrasCall = alpha.calls[2]?.request;
+    // It read the tool's result, and holds no tools.
+    expect(extrasCall?.messages.some((m) => m.role === "TOOL")).toBe(true);
+    expect(extrasCall?.tools).toHaveLength(0);
+    // The tools-first note stays last for the answer's writer.
+    expect(alpha.calls[0]?.request.messages.at(-1)?.content).toContain(
+      "LOOK IT UP FIRST",
+    );
+    expect(findingBlocks(completed)).toEqual(["Northwind is at seed."]);
+  });
+
+  it("an answer that asks a question back keeps no extras", async () => {
+    const { seam, request, completed } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Which company do you mean?"),
+            clarifyingQuestions: [
+              { question: "Which company do you mean?", why: "Two match." },
+            ],
+          },
+        },
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Seed."),
+            findings: [finding("Northwind declares a seed stage.")],
+          },
+        },
+      ],
+      parallelExtras: true,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(findingBlocks(completed)).toEqual([]);
+  });
+
+  it("leaves out a finding stating a number neither writer was given", async () => {
+    const { seam, request, completed, logLines } = build({
+      script: [
+        { kind: "JSON", value: analystResult("Revenue grew 40% last year.") },
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Growth."),
+            findings: [
+              finding("Revenue grew 40% last year."),
+              finding("Revenue reached $7.3M."),
+            ],
+          },
+        },
+      ],
+      parallelExtras: true,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(findingBlocks(completed)).toEqual(["Revenue grew 40% last year."]);
+    expect(logLines.join("\n")).toContain("neither writer was given");
+  });
+
+  it("a failed extras call still answers, and says so in the log", async () => {
+    const { seam, request, completed, logLines } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: analystResult("Northwind declares a seed stage."),
+        },
+        { kind: "FAIL", failureClass: "INVALID_REQUEST" },
+      ],
+      parallelExtras: true,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(findingBlocks(completed)).toEqual([]);
+    expect(
+      (completed[0] as { message: { text: string } }).message.text,
+    ).toContain("Northwind declares a seed stage.");
+    expect(logLines.join("\n")).toContain("the extras' call failed");
+  });
+
+  it("counts both writers' tokens and cost", async () => {
+    const usage = {
+      inputTokens: 1000,
+      cachedInputTokens: 0,
+      outputTokens: 100,
+    };
+    const { seam, request } = build({
+      script: [
+        { kind: "JSON", value: analystResult("Answer."), usage },
+        {
+          kind: "JSON",
+          value: { ...analystResult("x"), findings: [finding("Answer.")] },
+          usage,
+        },
+      ],
+      parallelExtras: true,
+    });
+    await seam.answer(request);
+    expect(seam.lastObservation()?.usage).toEqual({
+      inputTokens: 2000,
+      outputTokens: 200,
+    });
   });
 });
