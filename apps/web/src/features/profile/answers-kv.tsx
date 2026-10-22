@@ -50,6 +50,7 @@ export function AnswersKvSection({
   savedToast,
   saveNote,
   emptyText,
+  initiallyEditing = false,
 }: {
   readonly id: string;
   readonly title: string;
@@ -65,6 +66,8 @@ export function AnswersKvSection({
   readonly savedToast: string;
   readonly saveNote?: string | undefined;
   readonly emptyText: string;
+  /** Design review only (/dev/account-review): opens in its edit form. */
+  readonly initiallyEditing?: boolean | undefined;
 }) {
   const t = useT();
   const toast = useAccountToast();
@@ -77,8 +80,14 @@ export function AnswersKvSection({
       }),
     [journey, editable],
   );
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<Draft>({});
+  const [editing, setEditing] = useState(initiallyEditing);
+  const [draft, setDraft] = useState<Draft>(() =>
+    initiallyEditing
+      ? Object.fromEntries(
+          steps.map((s) => [s.stepKey, editable?.responses[s.stepKey] ?? null]),
+        )
+      : {},
+  );
   const [phase, setPhase] = useState<"idle" | "pending" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
 

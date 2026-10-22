@@ -49,6 +49,10 @@ export type CardFieldChoice = {
   readonly label: string;
   /** How the owner's current value reads; null when not added yet. */
   readonly value?: string | null | undefined;
+  /** For a section: what it puts on the card, in place of one value. */
+  readonly hint?: string | undefined;
+  /** A section only members may see; "everyone" is not offered (or accepted). */
+  readonly networkOnly?: boolean | undefined;
 };
 
 /**
@@ -391,7 +395,7 @@ function ScopeForm({
         </h3>
         <p className="cq-caption text-(--cq-text-secondary)">
           {t(
-            "The name is always shown. Choose who sees each field: nobody, people signed in to Capital Q, or everyone with the link. Your raise and financials stay private and can't go on a card.",
+            "The name is always shown. Choose who sees each field: nobody, people signed in to Capital Q, or everyone with the link. Your numbers, raise and other sections stay off until you add them; each number shows how it's supported.",
           )}
         </p>
       </div>
@@ -412,7 +416,12 @@ function ScopeForm({
                   <span className="cq-body-sm text-(--cq-text-primary)">
                     {field.label}
                   </span>
-                  {field.value === undefined ? null : (
+                  {field.hint !== undefined ? (
+                    <span className="cq-caption text-(--cq-text-tertiary)">
+                      {field.hint}
+                      {field.networkOnly === true ? " Members only." : null}
+                    </span>
+                  ) : field.value === undefined ? null : (
                     <span className="cq-caption truncate text-(--cq-text-tertiary)">
                       {field.value ?? "Not added yet"}
                     </span>
@@ -437,9 +446,11 @@ function ScopeForm({
                   <option value="network_visible">
                     {AUDIENCE_WORDS.network_visible}
                   </option>
-                  <option value="public_external">
-                    {AUDIENCE_WORDS.public_external}
-                  </option>
+                  {field.networkOnly === true ? null : (
+                    <option value="public_external">
+                      {AUDIENCE_WORDS.public_external}
+                    </option>
+                  )}
                 </select>
               </div>
             </li>

@@ -108,6 +108,44 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/**
+ * The anchor's element, as soon as the page renders it: answered by a
+ * MutationObserver on the next change (about a frame), not a 100 ms poll
+ * (engine audit, 21 Oct). Null when it never appears within `waitMs`.
+ */
+function waitForAnchor(
+  anchor: string,
+  signal: AbortSignal,
+  waitMs: number,
+): Promise<HTMLElement | null> {
+  const found = anchorElement(anchor);
+  if (found !== null || signal.aborted) return Promise.resolve(found);
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (element: HTMLElement | null) => {
+      if (done) return;
+      done = true;
+      observer.disconnect();
+      clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      resolve(element);
+    };
+    const observer = new MutationObserver(() => {
+      const element = anchorElement(anchor);
+      if (element !== null) finish(element);
+    });
+    const onAbort = () => finish(null);
+    const timer = setTimeout(() => finish(anchorElement(anchor)), waitMs);
+    signal.addEventListener("abort", onAbort, { once: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-qp-anchor", "open", "aria-expanded", "class"],
+    });
+  });
+}
+
 /** A card's move into the spotlight (its layout animation is 380 ms). */
 const TAP_SETTLE_MS = 450;
 
@@ -125,12 +163,7 @@ export async function lightSection(
   signal: AbortSignal,
   waitMs: number = ANCHOR_WAIT_MS,
 ): Promise<boolean> {
-  const until = Date.now() + waitMs;
-  let element = anchorElement(anchor);
-  while (element === null && !signal.aborted && Date.now() < until) {
-    await sleep(100, signal);
-    element = anchorElement(anchor);
-  }
+  let element = await waitForAnchor(anchor, signal, waitMs);
   if (element === null || signal.aborted) return false;
   if (options.open === true) {
     const tap = tapOf(anchor, element);

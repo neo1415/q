@@ -165,6 +165,9 @@ async function frames(viewport, colorScheme, beats, label) {
   let at = 1;
   for (const [beat, settleMs, name] of beats) {
     while (at < beat) {
+      // The controls step back while the story plays: wake them first,
+      // as a person would by moving the pointer.
+      await page.mouse.move(400 + (at % 2) * 40, 300);
       await page.getByRole("button", { name: "Next beat" }).click();
       at += 1;
     }

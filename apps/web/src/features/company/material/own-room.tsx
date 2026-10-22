@@ -163,12 +163,24 @@ export function lensCandidates(
   return out;
 }
 
+/**
+ * Design review only (/dev/gateq-review): the lens it opens on and the
+ * API's answers, given by relationship id ("none": not yet connected), so
+ * nothing is read and no setting is saved.
+ */
+export type OwnRoomDemo = {
+  readonly lens: Lens;
+  readonly previews: Readonly<Record<string, DataRoomPreviewDto>>;
+};
+
 export function OwnRoom({
   companyId,
   view,
+  demo,
 }: {
   readonly companyId: string;
   readonly view: DataRoomOwnerView;
+  readonly demo?: OwnRoomDemo | undefined;
 }) {
   const t = useT();
   const [documents, setDocuments] = useState(view.documents);
@@ -179,20 +191,22 @@ export function OwnRoom({
     setDocuments(view.documents);
   }
   const [outline, setOutline] = useState(view.outlineBeforeConnection ?? false);
-  const [lens, setLens] = useState<Lens>("NOT_YET");
+  const [lens, setLens] = useState<Lens>(demo?.lens ?? "NOT_YET");
   const [chosen, setChosen] = useState<Readonly<Record<Lens, string | null>>>({
     CONNECTED: null,
     NOT_YET: null,
     REQUESTED: null,
   });
-  const [preview, setPreview] = useState<DataRoomPreviewDto | null>(null);
+  const [preview, setPreview] = useState<DataRoomPreviewDto | null>(
+    () => demo?.previews["none"] ?? null,
+  );
   const [failed, setFailed] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [editing, setEditing] = useState<DataRoomOwnerDocument | null>(null);
   const [loading, startLoading] = useTransition();
   const [saving, startSaving] = useTransition();
   const seq = useRef(0);
-  const loadedOnce = useRef(false);
+  const loadedOnce = useRef(demo !== undefined);
 
   const candidates = lensCandidates(lens, preview, view.requests);
   const target =
@@ -203,6 +217,10 @@ export function OwnRoom({
         null);
 
   const load = (relationshipId: string | null) => {
+    if (demo !== undefined) {
+      setPreview(demo.previews[relationshipId ?? "none"] ?? null);
+      return;
+    }
     const mine = seq.current + 1;
     seq.current = mine;
     startLoading(async () => {
@@ -255,6 +273,7 @@ export function OwnRoom({
       ),
     );
     setEditing(null);
+    if (demo !== undefined) return;
     startSaving(async () => {
       const result = await setLevelAction({
         companyId,
@@ -284,6 +303,7 @@ export function OwnRoom({
   const toggleOutline = () => {
     const next = !outline;
     setOutline(next);
+    if (demo !== undefined) return;
     startSaving(async () => {
       const result = await setOutlineAction({
         companyId,

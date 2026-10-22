@@ -1,214 +1,61 @@
 {
-  "recordedAt": "2026-10-21T20:31:21.824Z",
+  "recordedAt": "2026-10-22T01:10:13.308Z",
   "base": "http://127.0.0.1:3200",
   "path": "/dev/story",
   "viewport": {
     "width": 1280,
     "height": 800
   },
-  "wallMs": 453030,
-  "narrator": "FALLBACK",
-  "preloadMs": 447,
+  "wallMs": 395249,
+  "narrator": "RENDERED",
+  "preloadMs": 1108,
   "offsets": {
-    "median": -92,
-    "p95": 17,
-    "count": 150
+    "median": -93,
+    "p95": -74,
+    "count": 165
   },
   "offsetsByKind": {
     "stage": {
-      "median": -92,
+      "median": -89,
       "p95": -76,
-      "count": 120
+      "count": 116
     },
     "mood": {
       "median": -93,
-      "p95": -69,
+      "p95": -76,
       "count": 8
     },
     "navigate": {
-      "median": 316,
-      "p95": 748,
+      "median": 12,
+      "p95": 199,
       "count": 7
     },
     "light": {
-      "median": -107,
-      "p95": -96,
-      "count": 14
+      "median": -108,
+      "p95": -99,
+      "count": 21
     }
   },
   "frames": {
-    "count": 26217,
-    "long": 63
+    "count": 23267,
+    "long": 12
   },
-  "fallbacks": 14,
+  "fallbacks": 13,
   "beat": 56,
   "phase": "DONE",
   "cls": {
-    "cls": 0.6096789900302886,
+    "cls": 0.0007978515625,
     "shifts": [
       {
-        "value": 0.00006349325180053711,
-        "at": 37721,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.01163935546875,
-        "at": 63273,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.0006375,
-        "at": 73799,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.004032127380371093,
-        "at": 89126,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.024266357421875002,
-        "at": 113080,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.00545166015625,
-        "at": 119404,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.00866465711593628,
-        "at": 131523,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.026757888793945313,
-        "at": 138853,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.026656631469726563,
-        "at": 142821,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.008528526544570923,
-        "at": 158291,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.0000737548828125,
-        "at": 171384,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.012301027584075929,
-        "at": 172806,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.003401252746582031,
-        "at": 181375,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.000732513427734375,
-        "at": 224039,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.0005441421508789062,
-        "at": 234648,
-        "path": "/dev/story"
-      },
-      {
-        "value": 0.01815264587402344,
-        "at": 285142,
-        "path": "/dev/story/profile?tab=diligence"
-      },
-      {
-        "value": 0.01618707275390625,
-        "at": 286126,
-        "path": "/dev/story/profile?tab=diligence"
-      },
-      {
-        "value": 0.0025795608520507818,
-        "at": 294674,
-        "path": "/dev/story/gateq?view=inbox-detail"
-      },
-      {
+        "sources": ["span.hidden.sm:inline-flex"],
         "value": 0.00039892578125,
-        "at": 298860,
+        "at": 258761,
         "path": "/dev/story/gateq?view=gate"
       },
       {
-        "value": 0.052509594726562504,
-        "at": 302476,
-        "path": "/dev/story/gateq?view=gate"
-      },
-      {
+        "sources": ["span.hidden.sm:inline-flex"],
         "value": 0.00039892578125,
-        "at": 312753,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.030871060180664062,
-        "at": 312956,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.030871060180664062,
-        "at": 314151,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.038115966796875,
-        "at": 331920,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.00126287841796875,
-        "at": 338918,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.013253906250000001,
-        "at": 366333,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.012533203125,
-        "at": 379610,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.093061279296875,
-        "at": 395103,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.067265625,
-        "at": 396720,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.06033636474609375,
-        "at": 406624,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.0138556640625,
-        "at": 410944,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.01676385498046875,
-        "at": 412374,
-        "path": "/dev/story/gateq?view=inbox"
-      },
-      {
-        "value": 0.007510512828826904,
-        "at": 436847,
+        "at": 272143,
         "path": "/dev/story/gateq?view=inbox"
       }
     ]

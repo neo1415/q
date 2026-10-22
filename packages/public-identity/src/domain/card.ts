@@ -1,6 +1,8 @@
 import {
+  type CardDetail,
   COMPANY_CARD_FIELDS,
   INVESTOR_CARD_FIELDS,
+  NETWORK_ONLY_CARD_FIELDS,
   QCardFieldScopesSchema,
   type PublicCardField,
   type QCardField,
@@ -74,6 +76,23 @@ export const DEFAULT_FIELD_SCOPES: Readonly<
   },
 };
 
+const NETWORK_ONLY: ReadonlySet<string> = new Set(NETWORK_ONLY_CARD_FIELDS);
+
+/** A section that may reach members only, never anyone with the link. */
+export function isNetworkOnly(key: QCardField): boolean {
+  return NETWORK_ONLY.has(key);
+}
+
+/**
+ * A section's content per audience scope. Content whose own rows carry a
+ * scope (claims, data room levels) is built twice: what may be shown to
+ * anyone, and what may be shown to members. A section the owner made
+ * public then never carries an item its row keeps to members.
+ */
+export type CardSectionDetails = Readonly<
+  Record<string, Readonly<Partial<Record<QCardScope, CardDetail | null>>>>
+>;
+
 export type CardScopesReading =
   | { readonly ok: true; readonly scopes: QCardFieldScopes }
   | { readonly ok: false; readonly fields: readonly string[] };
@@ -88,7 +107,13 @@ export function fitFieldScopes(
   requested: QCardFieldScopes,
 ): CardScopesReading {
   const allowed = new Set<string>(CARD_FIELDS[subjectType]);
-  const misplaced = Object.keys(requested).filter((key) => !allowed.has(key));
+  const misplaced = Object.entries(requested)
+    .filter(
+      ([key, scope]) =>
+        !allowed.has(key) ||
+        (scope === "public_external" && NETWORK_ONLY.has(key)),
+    )
+    .map(([key]) => key);
   if (misplaced.length > 0) return { ok: false, fields: misplaced };
   return {
     ok: true,
@@ -107,7 +132,10 @@ export function readStoredScopes(
   const scopes: Partial<Record<QCardField, QCardScope>> = {};
   for (const [key, scope] of Object.entries(parsed.data)) {
     if (allowed.has(key) && scope !== undefined) {
-      scopes[key as QCardField] = scope;
+      // Never wider than a section may go, whatever was stored.
+      scopes[key as QCardField] = NETWORK_ONLY.has(key)
+        ? "network_visible"
+        : scope;
     }
   }
   return { ...scopes, ...PINNED_TO_NAME(subjectType) };
@@ -121,13 +149,16 @@ export type CardAudience = "PUBLIC" | "PARTICIPANT";
  * PUBLIC (anyone with the link) sees public_external fields only. A
  * PARTICIPANT (a signed-in Capital Q person) additionally sees
  * network_visible ones. A field with no value is left out -- unknown is
- * not shown as blank on a public page, and never as zero.
+ * not shown as blank on a public page, and never as zero. A section's
+ * structured detail travels only beside its own field, under that field's
+ * scope: a detail with no field never reaches anyone.
  */
 export function projectCardFields(
   subjectType: QCardSubjectType,
   scopes: QCardFieldScopes,
   facts: Readonly<Record<string, string | null | undefined>>,
   audience: CardAudience,
+  details: CardSectionDetails = {},
 ): PublicCardField[] {
   const fields: PublicCardField[] = [];
   const name = NAME_FIELD[subjectType];
@@ -135,9 +166,20 @@ export function projectCardFields(
     if (wanted === "network_visible" && audience !== "PARTICIPANT") break;
     for (const key of CARD_FIELDS[subjectType]) {
       if (key === name || scopes[key] !== wanted) continue;
+      if (wanted === "public_external" && NETWORK_ONLY.has(key)) continue;
       const value = facts[key];
       if (typeof value !== "string" || value.trim().length === 0) continue;
-      fields.push({ key, value: value.slice(0, 2048), scope: wanted });
+      const sectioned = details[key];
+      const detail = sectioned?.[wanted];
+      // A section shows only with content built for this very scope.
+      if (sectioned !== undefined && (detail === null || detail === undefined))
+        continue;
+      fields.push({
+        key,
+        value: value.slice(0, 2048),
+        scope: wanted,
+        ...(detail === null || detail === undefined ? {} : { detail }),
+      });
     }
   }
   return fields;

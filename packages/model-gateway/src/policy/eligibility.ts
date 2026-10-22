@@ -226,6 +226,8 @@ export function planRoute(
   const modelIds = [...policy.preferredModels, ...policy.fallbackModels];
   const decisions: ModelCandidateDecision[] = [];
   const eligible: EligibleCandidate[] = [];
+  /** Eligible but rate-limited a moment ago: used only if nothing else is. */
+  const deferred: EligibleCandidate[] = [];
 
   modelIds.forEach((modelId, candidateIndex) => {
     const model = catalog.modelById.get(modelId);
@@ -259,10 +261,12 @@ export function planRoute(
       decide("PROVIDER_UNCONFIGURED");
       return;
     }
-    if (
-      input.health.state(provider.code, model.modelCode, input.now) ===
-      "TEMPORARILY_FAILING"
-    ) {
+    const health = input.health.state(
+      provider.code,
+      model.modelCode,
+      input.now,
+    );
+    if (health === "TEMPORARILY_FAILING") {
       decide("PROVIDER_TEMPORARILY_FAILING");
       return;
     }
@@ -368,7 +372,7 @@ export function planRoute(
       return;
     }
     decide(synthetic ? "ELIGIBLE_SYNTHETIC_DEMO" : "ELIGIBLE");
-    eligible.push({
+    (health === "BACKING_OFF" ? deferred : eligible).push({
       candidateIndex,
       provider,
       model,
@@ -378,7 +382,13 @@ export function planRoute(
     });
   });
 
-  return { policy, decisions, eligible };
+  // A model backing off after a 429 is the last resort, never the end of
+  // the road: with nothing else eligible it is tried (round 8).
+  return {
+    policy,
+    decisions,
+    eligible: eligible.length > 0 ? [...eligible, ...deferred] : deferred,
+  };
 }
 
 function strongerQuality(

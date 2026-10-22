@@ -9,10 +9,10 @@ Branch `qstory/engine`, recorded with `scripts/q-pitch/record-story.mjs` in Chro
   - These are the real page components with their fictional fixtures.
   - No service is read and no model is called.
   - `/dev/*` returns 404 in production.
-- **Narrator:** silent (fixture timings).
-  - No ElevenLabs key was in this environment, so no render exists yet.
-  - Cues follow the same master-clock contract a render uses. The offsets below are measured against that clock.
-  - Once `render-story.mjs` has run with a key, re-record to measure against the real audio.
+- **Build:** a production build (`next build` + `next start`, with `CQ_REVIEW_PAGES=1` for `/dev/*`), so there is no dev badge.
+- **Brand:** the harness applies the default black-and-gold preset (`PublicBrandStyle`). Q is gold.
+- **Narrator:** RENDERED. It plays S5's ElevenLabs render (voice `EXAVITQu4vr4xnSDxMaL`, `eleven_v3_conversational`, forced-alignment word timings, `apps/web/public/story-media/`), decoded before Start. The AudioContext clock is the master clock.
+  - Playwright's video has no sound track. S5's `rendered/story-rendered-desktop.mp4` carries the sound.
 - **Not recorded here:** the signed-in production app (`/home?qpitch=story`).
   - Run the same script with `--path "/home?qpitch=story&new=1" --state <storage-state.json>` against a deployed build.
 
@@ -28,38 +28,41 @@ Branch `qstory/engine`, recorded with `scripts/q-pitch/record-story.mjs` in Chro
   - safe fallbacks;
   - preload time.
 
-## Results (run 1, 20:31 UTC, `d9868fa2` + harness)
+## Results: run 6 (final, 22 Oct 01:10 UTC, `62044b81d`, production build, gold, real audio)
 
-The whole story ran: 56 beats, 7 min 33 s wall time, phase DONE.
+The whole story ran: 56 beats, 6 min 35 s, phase DONE.
 
-**Cue-to-word offset.** Negative means the act landed before its word.
+**Cue-to-word offset** on the audio clock. Negative means the act landed before its word.
 
-| Acts     | Count |      Median |         p95 |
-| -------- | ----: | ----------: | ----------: |
-| all      |   150 |      -92 ms |      +17 ms |
-| stage    |   120 |      -92 ms |      -76 ms |
-| mood     |     8 |      -93 ms |      -69 ms |
-| light    |    14 |     -107 ms |      -96 ms |
-| navigate |     7 | **+316 ms** | **+748 ms** |
+| Acts     | Count |  Median |     p95 |
+| -------- | ----: | ------: | ------: |
+| all      |   165 |  −93 ms |  −74 ms |
+| stage    |   116 |  −89 ms |  −76 ms |
+| mood     |     8 |  −93 ms |  −76 ms |
+| light    |    21 | −108 ms |  −99 ms |
+| navigate |     7 |  +12 ms | +199 ms |
 
-**Navigation lands late on the dev server.** It runs unoptimised and compiles on demand, even after a warm-up; production builds prefetch. Re-measure on a production build.
+Navigation is the one act that can land after its word. Its ack waits for the route to be visible, and it arrives on the word's first syllables at p95.
 
-**Frames.** 26,217 seen while playing; 63 over 50 ms (0.24%).
+**Frames.** 23,267 seen while playing; 12 over 50 ms (0.05%).
 
-**Safe fallbacks: 14.**
+**CLS: 0.0008, and 0 from the story.**
 
-- The harness pages do not render every live marker: the Discover card and its "Decide" rail, the sidebar nav selectors, the Q dock, and the relationship brief in `crm?view=record`.
-- Discover's dev page also opened after the navigation budget once.
-- The words went on every time, as designed.
+- Both shifts are `span.hidden.sm:inline-flex` in the GateQ page's own header, 0.0004 each, on `/dev/story/gateq?view=gate` and `?view=inbox`. That is GateQ's markup, not the story's.
+- The story's earlier overlay sources are all gone: the caption box, re-centring stage blocks, the standing label and the presence placement.
 
-**CLS: 0.61. Not 0. Open.**
+**Safe fallbacks: 13.** The harness pages do not render some live markers: the Discover card's "Decide" rail, the sidebar nav selectors, the Q dock, and the relationship brief. The words went on every time. Re-check on the signed-in app.
 
-| Source                                                     |   CLS | Cause                                                                                                                                                     |
-| ---------------------------------------------------------- | ----: | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/dev/story/gateq?view=inbox`                              | 0.386 | The dev page's own load                                                                                                                                   |
-| `/dev/story`                                               | 0.134 | Story overlay: captions grow upward from a bottom anchor; centred stage blocks re-centre when a label appears; the mismatch chips switch layout at step 5 |
-| `gateq?view=gate`, `profile?tab=diligence`, `inbox-detail` |  0.09 | Page loads                                                                                                                                                |
+**Preload: 1.1 s**: 56 decoded audio beats, alignment, 20 pictures and 8 screenshots.
 
-Fixes for the overlay causes are in progress. The recorder now attributes each shift to its element.
+## Earlier runs (for comparison)
 
-**Preload: 447 ms.** Harness, no audio render: pictures and screenshots only.
+| Run | Build            | Narrator     | All cues (median / p95) | Navigate (median / p95) | Long frames | CLS                 |
+| --- | ---------------- | ------------ | ----------------------- | ----------------------- | ----------- | ------------------- |
+| 1   | dev, blue        | fixture      | −92 / +17 ms            | +316 / +748 ms          | 63 / 26,217 | 0.61                |
+| 4   | production, gold | fixture      | −96 / −65 ms            | +28 / +183 ms           | 8 / 26,785  | 0.022               |
+| 6   | production, gold | **rendered** | −93 / −74 ms            | +12 / +199 ms           | 12 / 23,267 | 0.0008 (GateQ page) |
+
+## Review frames
+
+`review/07-montage.png`, `review/36-mandate.png`, `review/44-gateq-inbox.png` and `review/49-q-card.png`: production build, gold, desktop 1440×900.

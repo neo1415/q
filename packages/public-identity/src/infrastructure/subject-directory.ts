@@ -1,6 +1,11 @@
 import { INVESTOR_MANDATE_CARD_FIELDS } from "@capital-q/contracts";
 
 import type { SubjectDirectory, SubjectFacts } from "../application/ports.js";
+import {
+  companySections,
+  investorTeamSection,
+  type CompanySectionInputs,
+} from "../domain/sections.js";
 
 /**
  * The directory the apps compose (BIZ-004): each owning context's public,
@@ -40,6 +45,28 @@ export type InvestorMandateCardFacts = Readonly<
 >;
 
 export type SubjectDirectoryPorts = {
+  /**
+   * The card's richer sections (Q Story S6): each owning context's rows
+   * for one company, read server-side. Optional; absent, no section shows.
+   * Only rows that could ever reach a member may be read in (claims at
+   * network_visible or wider, listed data room levels).
+   */
+  readonly findCompanySections?:
+    | ((subject: {
+        readonly tenantId: string;
+        readonly organisationId: string;
+        readonly companyId: string;
+      }) => Promise<CompanySectionInputs>)
+    | undefined;
+  /** The firm's people and their titles, for an investor card's team. */
+  readonly findInvestorTeam?:
+    | ((subject: {
+        readonly tenantId: string;
+        readonly investorOrganisationId: string;
+      }) => Promise<
+        readonly { readonly name: string; readonly role: string | null }[]
+      >)
+    | undefined;
   /**
    * Founder design 2026-09-28: the investor's active mandate as named
    * facts a card may show. Optional; absent, those fields are never set.
@@ -86,6 +113,17 @@ export function createSubjectDirectory(
             companyId: subject.subjectId,
           })
           .catch(() => ({ organisation: false, founderIdentity: false }));
+        // A failed section read shows no section; the card still works.
+        const sectionInputs =
+          (await ports
+            .findCompanySections?.({
+              tenantId: company.tenantId,
+              organisationId: company.organisationId,
+              companyId: subject.subjectId,
+            })
+            .catch(() => null)) ?? null;
+        const sections =
+          sectionInputs === null ? null : companySections(sectionInputs);
         return {
           tenantId: company.tenantId,
           organisationId: company.organisationId,
@@ -98,7 +136,9 @@ export function createSubjectDirectory(
             headquartersCountry: company.headquartersCountry,
             websiteUrl: company.websiteUrl,
             foundedDate: company.foundedDate,
+            ...sections?.facts,
           },
+          ...(sections === null ? {} : { details: sections.details }),
           verified,
         };
       }
@@ -108,6 +148,14 @@ export function createSubjectDirectory(
         (await ports
           .findInvestorMandateFacts?.(subject.subjectId)
           .catch(() => ({}))) ?? {};
+      const people =
+        (await ports
+          .findInvestorTeam?.({
+            tenantId: investor.tenantId,
+            investorOrganisationId: subject.subjectId,
+          })
+          .catch(() => null)) ?? null;
+      const team = people === null ? null : investorTeamSection(people);
       return {
         tenantId: investor.tenantId,
         organisationId: investor.organisationId,
@@ -125,7 +173,9 @@ export function createSubjectDirectory(
               mandate[key] ?? null,
             ]),
           ),
+          ...team?.facts,
         },
+        ...(team === null ? {} : { details: team.details }),
         // The investors context's own presentation state; anything other
         // than unverified is Capital Q's decision about the organisation.
         verified: {

@@ -21,6 +21,15 @@ Conflicts with the blueprint are listed in §8 for owner sign-off.
 
 ---
 
+## 0. Q IS GOLD (owner, 2026-10-21, binding)
+
+- Q's colour is **gold**: the product's default brand preset `black_gold` (`packages/contracts/src/http/brand-theme.ts` `DEFAULT_BRAND_PRESET`; palette in `apps/web/src/features/brand-theme/brand-presets.ts`).
+  - Light: bronze `#8a6a12`.
+  - Dark and stage: champagne `#e2b858` / gold `#c9a227` on near-black ink.
+- The base tokens in `packages/ui/src/tokens/tokens.css` (hue 258, blue) are the alternative **"Capital Q blue"** preset. They are NOT Q's colour; don't change them.
+- **Every story frame, harness page, screenshot and video renders with the `black_gold` preset applied.** A blue Q in any evidence means the preset wasn't applied: a bug, not a design.
+- `docs/design/ux-direction-2026-09.md` §5.2 (accent hue 258) predates the brand board and is superseded on colour.
+
 ## 1. How it is built: three roles, one clock
 
 The owner asked for "one that talks, one that follows everything it says, one that makes sure it makes no mistake". These are three roles, never three models deciding live.

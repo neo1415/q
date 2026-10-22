@@ -265,3 +265,108 @@ describe("Q Story presence figures (lane S4)", () => {
     expect([...STORY_FIGURES].sort()).toEqual([...PRESENCE_FIGURE_IDS].sort());
   });
 });
+
+describe("Q Story Q Card (#48-49)", () => {
+  it("the demonstration company's card parses under the public card contract, every section filled", async () => {
+    const { STORY_QCARD } =
+      await import("@/features/q-pitch/story/story-qcard");
+    const keys = STORY_QCARD.fields.map((field) => field.key);
+    for (const key of [
+      "tractionMetrics",
+      "currentRaise",
+      "investabilitySummary",
+      "relationshipSummary",
+    ]) {
+      expect(keys).toContain(key);
+    }
+    expect(STORY_QCARD.demoAttested).toEqual(STORY_QCARD.verified);
+  });
+});
+
+describe("Q Story audio bank (budgeted preload)", () => {
+  it("decodes the next beats ahead, two fetches at a time, and lets old beats go", async () => {
+    const { StoryAudioBank, AUDIO_AHEAD } =
+      await import("@/features/q-pitch/story/story-audio-bank");
+    let inFlight = 0;
+    let peak = 0;
+    const fetched: string[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = ((url: string) => {
+      fetched.push(url);
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      return new Promise((resolve) =>
+        setTimeout(() => {
+          inFlight -= 1;
+          resolve(new Response(new ArrayBuffer(8)));
+        }, 5),
+      );
+    }) as typeof fetch;
+    const context = {
+      decodeAudioData: (bytes: ArrayBuffer) =>
+        Promise.resolve({ length: bytes.byteLength } as unknown as AudioBuffer),
+    } as unknown as AudioContext;
+    try {
+      const bank = new StoryAudioBank(context, (n) =>
+        n <= 56
+          ? `/story-media/v/beat-${String(n).padStart(2, "0")}.0123456789.mp3`
+          : null,
+      );
+      bank.window(1);
+      await bank.ready(1 + AUDIO_AHEAD, 1_000);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(fetched).toHaveLength(AUDIO_AHEAD + 1);
+      expect(peak).toBeLessThanOrEqual(2);
+      bank.window(10);
+      await bank.ready(13, 1_000);
+      expect(bank.get(1)).toBeNull();
+      expect(bank.get(10)).not.toBeNull();
+      // A beat that never arrives in time: null, the narrator plays silence.
+      globalThis.fetch = () => new Promise(() => undefined);
+      expect(await bank.ready(30, 20)).toBeNull();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  it("the render index names hashed clips, and every name is served immutable", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const index = JSON.parse(
+      readFileSync(
+        fileURLToPath(
+          new URL(
+            "../public/story-media/EXAVITQu4vr4xnSDxMaL/index.json",
+            import.meta.url,
+          ),
+        ),
+        "utf8",
+      ),
+    ) as {
+      complete: boolean;
+      files: Record<string, { audio: string; alignment: string }>;
+    };
+    expect(index.complete).toBe(true);
+    expect(Object.keys(index.files)).toHaveLength(STORY_BEATS.length);
+    for (const entry of Object.values(index.files)) {
+      expect(entry.audio).toMatch(/^beat-\d{2}\.[0-9a-f]{10}\.mp3$/u);
+      expect(entry.alignment).toMatch(/^beat-\d{2}\.[0-9a-f]{10}\.json$/u);
+    }
+  });
+});
+
+describe("Q Story offer under a 'what is Capital Q?' answer", () => {
+  it("finds the person's own question just before Q's answer", async () => {
+    const { askedBefore } =
+      await import("@/features/q-pitch/story/story-offer");
+    const turns = [
+      { kind: "PERSON", id: "p1", text: "show me deals" },
+      { kind: "Q", id: "q1", text: "…" },
+      { kind: "PERSON", id: "p2", text: "What is Capital Q?" },
+      { kind: "Q", id: "q2", text: "Capital Q is…" },
+    ];
+    expect(askedBefore(turns, "q2")).toBe("What is Capital Q?");
+    expect(askedBefore(turns, "q1")).toBe("show me deals");
+    expect(askedBefore(turns, "nope")).toBeNull();
+  });
+});

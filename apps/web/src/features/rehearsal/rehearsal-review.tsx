@@ -29,6 +29,7 @@ import {
   lengthWords,
 } from "./meet";
 import { momentTurn } from "./review-moments";
+import { outOfTen } from "./rehearsals-home";
 import { ReviewRefresh } from "./review-refresh";
 import { useT } from "@/features/i18n/language";
 
@@ -47,13 +48,17 @@ const DIFFICULTY_WORDS = {
   TOUGH: "tough difficulty",
 } as const;
 
-/** "Up 8 since last time": both scores are code-computed. */
+/**
+ * "Up 0.8 since last time": both scores are code-computed, and written out
+ * of 10 like the rehearsals list, so one rehearsal reads the same anywhere.
+ */
 export function progressWords(score: number, previous: number): string {
-  const change = score - previous;
-  if (change === 0) return `Same as last time (${String(previous)})`;
+  const change = Math.round(score) - Math.round(previous);
+  const before = outOfTen(previous);
+  if (change === 0) return `Same as last time (${before})`;
   return change > 0
-    ? `Up ${String(change)} since last time (${String(previous)})`
-    : `Down ${String(-change)} since last time (${String(previous)})`;
+    ? `Up ${outOfTen(change)} since last time (${before})`
+    : `Down ${outOfTen(-change)} since last time (${before})`;
 }
 
 export function lobbyHref(rehearsal: Pick<QRehearsalDto, "counterpart">) {
@@ -97,10 +102,10 @@ function ScoreBlock({
         ) : (
           <>
             <span className="text-[52px] leading-none font-semibold tracking-[-0.03em] text-(--cq-text-primary) tabular-nums">
-              {score}
+              {outOfTen(score)}
               <small className="text-base font-normal tracking-normal text-(--cq-text-tertiary)">
                 {" "}
-                / 100
+                / 10
               </small>
             </span>
             <span className="mt-1 text-xs text-(--cq-text-tertiary)">
@@ -154,20 +159,31 @@ function Writing() {
 
 export function RehearsalReview({
   rehearsal,
+  initialNote,
 }: {
   readonly rehearsal: QRehearsalDto;
+  /**
+   * The "what to improve" note shown picked, its line lit (the design
+   * review page); absent: none until the person picks one.
+   */
+  readonly initialNote?: number | undefined;
 }) {
   const t = useT();
   const name = rehearsal.counterpart.name;
   const review = rehearsal.review;
-  const [picked, setPicked] = useState<number | null>(null);
-  const [lit, setLit] = useState<number | null>(null);
-  const lines = useRef(new Map<number, HTMLLIElement>());
-
   const improve = (review?.wentWrong ?? []).map((item) => ({
     ...item,
     line: momentTurn(item.moment, rehearsal.turns),
   }));
+  const [picked, setPicked] = useState<number | null>(
+    initialNote !== undefined && improve[initialNote] !== undefined
+      ? initialNote
+      : null,
+  );
+  const [lit, setLit] = useState<number | null>(
+    initialNote === undefined ? null : (improve[initialNote]?.line ?? null),
+  );
+  const lines = useRef(new Map<number, HTMLLIElement>());
 
   const pick = (index: number, line: number | null) => {
     setPicked(index);

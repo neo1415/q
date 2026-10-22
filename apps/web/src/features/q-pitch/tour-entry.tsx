@@ -6,6 +6,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { RESUME_KEY } from "./resume";
 import { markQPitchRunning } from "./tour-presence";
+import { markStoryAvailable } from "./story/story-offer";
 import type { TourSubject } from "./subject-model";
 import type { TourChoice } from "./tour-host";
 
@@ -13,13 +14,7 @@ import type { TourChoice } from "./tour-host";
 type EntryChoice = TourChoice | "story";
 type Start = { readonly tour: EntryChoice; readonly chapter: string | null };
 function choiceOf(value: string | null): EntryChoice | null {
-  return value === "story" ||
-    value === "pilot" ||
-    value === "premiere" ||
-    value === "short" ||
-    value === "atlas" ||
-    value === "founder-v6" ||
-    value === "investor-v6"
+  return value === "story" || value === "founder-v6" || value === "investor-v6"
     ? value
     : null;
 }
@@ -65,9 +60,10 @@ function readStart(search: string): Start | null {
 }
 
 /**
- * Starts a Q Pitch rehearsal when the page is opened with `?qpitch=pilot`
- * (the certified pilot), `?qpitch=premiere` (the r3 cut, internal only) or
- * `?qpitch=short` (two minutes), optionally `&chapter=<id>` (Feature Atlas).
+ * Starts Q Pitch when the page is opened with `?qpitch=story` (the v7
+ * story, its own host) or a v6 track (`?qpitch=investor-v6`,
+ * `?qpitch=founder-v6`), optionally `&chapter=<id>`. The v5 tours (pilot,
+ * premiere, short, atlas) are retired.
  * The host's code loads only then. Once started, the tour lives in the
  * application layout, so it survives route changes until "End tour".
  *
@@ -120,6 +116,12 @@ export function QPitchEntry({
     }
   }
   const holding = started !== null && !ended;
+  // Q Pitch is on here (the server mounted this entry): Q may offer the
+  // story under a "what is Capital Q?" answer.
+  useEffect(() => {
+    markStoryAvailable(true);
+    return () => markStoryAvailable(false);
+  }, []);
   useEffect(() => {
     markQPitchRunning(holding);
     return () => markQPitchRunning(false);

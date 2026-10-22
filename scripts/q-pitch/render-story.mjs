@@ -37,7 +37,14 @@
  * printed or written.
  */
 import { execFileSync } from "node:child_process";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  readFile,
+  readdir,
+  rename as renameFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -228,6 +235,18 @@ function clampGap(file, words, targetMs) {
   return cut;
 }
 
+// Served names are content-hashed (hash-story-media.mjs): work on plain
+// names here, and hash again at the end, so a re-render gets new names.
+for (const name of await readdir(outDir).catch(() => [])) {
+  const plain = /^(beat-\d{2})\.[0-9a-f]{10}\.(mp3|json)$/u.exec(name);
+  if (plain !== null) {
+    await renameFile(
+      path.join(outDir, name),
+      path.join(outDir, `${plain[1]}.${plain[2]}`),
+    );
+  }
+}
+
 let spentChars = 0;
 let model = previous.model ?? models[0];
 if (!alignOnly) model = models[0];
@@ -331,4 +350,9 @@ await writeFile(
 );
 console.log(
   `This run: ${String(spentChars)} characters, about $${((spentChars / 1000) * usdPer1k).toFixed(2)}.`,
+);
+execFileSync(
+  process.execPath,
+  [path.join(root, "scripts/q-pitch/hash-story-media.mjs"), "--voice", voice],
+  { stdio: "inherit" },
 );

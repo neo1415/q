@@ -17,6 +17,7 @@ import {
   ANSWER_PDF_MIN_CHARS,
 } from "@/features/documents/answer-pdf";
 import { useT } from "@/features/i18n/language";
+import { StoryOffer } from "@/features/q-pitch/story/story-offer";
 
 /**
  * One Q reply as a chat row (founder direction A, 2026-09-28; ADR 0018).
@@ -234,6 +235,8 @@ export function QAnswer({
           onOpenArtifact={onOpenArtifact}
         />
       ) : null}
+      {/* Q Story: "what is Capital Q?" asked alone, the story one tap away. */}
+      {turn.streaming ? null : <StoryOffer turnId={turn.id} />}
       {/* Artifacts live (audit 2026-10-15 §4): drawn inline in the thread
           (Chat view, the Q sheet) counts as drawn, as on the Q stage, so
           "as the table shows" stands here too. The newest answer mounts

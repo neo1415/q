@@ -11,11 +11,14 @@ import {
   FIXTURE_ALIGNMENTS,
   MONTAGE_PICTURES,
   STORY_BEATS,
+  STORY_CLAIMS,
+  STORY_LEDGER,
   STORY_PICTURES,
   STORY_PRODUCT_BEAT,
   STORY_ROUTES,
   STORY_TITLE,
   StoryBeatSchema,
+  certifyStory,
   classifyStoryTrigger,
   fixtureAlignment,
   msAtWord,
@@ -344,6 +347,7 @@ describe("Q Story trigger", () => {
       "tell me your story",
       "Tell us your story please",
       "present Capital Q to us",
+      "Hey Q, pitch yourself",
     ]) {
       expect(classifyStoryTrigger(said)).toEqual({ kind: "STORY" });
     }
@@ -367,5 +371,82 @@ describe("Q Story trigger", () => {
     ]) {
       expect(classifyStoryTrigger(said)).toBeNull();
     }
+  });
+});
+
+describe("Q Story claims and gate", () => {
+  const SAVANNA = {
+    role: "INVESTOR" as const,
+    account: "investor.savanna-seed@fictional.capitalq.local",
+  };
+  const NOW = "2026-10-22T00:00:00Z";
+
+  it("gives every beat a standing: Acts 0-3 narrative, product beats claims or demonstration", () => {
+    for (const b of STORY_BEATS) {
+      const claim = STORY_CLAIMS[b.n];
+      expect(claim, `beat ${String(b.n)}`).toBeDefined();
+      if (b.act <= 3) expect(claim?.kind).toBe("NARRATIVE");
+    }
+    for (const n of [44, 45, 46, 47, 48, 49]) {
+      const claim = STORY_CLAIMS[n];
+      expect(
+        claim?.kind === "DEMONSTRATION" ||
+          (claim?.kind === "PRODUCT" && claim.demonstration),
+      ).toBe(true);
+    }
+  });
+
+  it("names only claims a ledger entry allows", () => {
+    const allowed = new Set(
+      STORY_LEDGER.flatMap((e) => e.claimsAllowed.map((c) => c.claimId)),
+    );
+    for (const claim of Object.values(STORY_CLAIMS)) {
+      if (claim.kind !== "PRODUCT") continue;
+      for (const id of claim.claimIds) expect(allowed.has(id), id).toBe(true);
+    }
+  });
+
+  it("stays an internal rehearsal until the owner approves, even when every claim holds", () => {
+    const rehearsal = certifyStory({
+      now: NOW,
+      actor: SAVANNA,
+      staleFeatureIds: [],
+      ownerApproved: false,
+    });
+    expect(rehearsal.problems).toEqual([]);
+    expect(rehearsal.audience).toBe("INTERNAL_REHEARSAL");
+    expect(rehearsal.certifiedProductBeats).toBe(rehearsal.productBeats);
+    expect(rehearsal.demonstrationBeats).toContain(46);
+    expect(
+      certifyStory({
+        now: NOW,
+        actor: SAVANNA,
+        staleFeatureIds: [],
+        ownerApproved: true,
+      }).audience,
+    ).toBe("AUDIENCE");
+  });
+
+  it("refuses another actor and stale features", () => {
+    const other = certifyStory({
+      now: NOW,
+      actor: {
+        role: "INVESTOR",
+        account: "investor.other@fictional.capitalq.local",
+      },
+      staleFeatureIds: [],
+      ownerApproved: true,
+    });
+    expect(other.audience).toBe("INTERNAL_REHEARSAL");
+    expect(
+      other.problems.every((p) => p.reason === "ACTOR_NOT_CERTIFIED"),
+    ).toBe(true);
+    const stale = certifyStory({
+      now: NOW,
+      actor: SAVANNA,
+      staleFeatureIds: ["INV6-GATEQ"],
+      ownerApproved: true,
+    });
+    expect(stale.problems.map((p) => p.beat)).toEqual([41, 42]);
   });
 });

@@ -260,6 +260,7 @@ export function createModelGateway(
     failures: meter.createCounter("q.model.failures"),
     attempts: meter.createCounter("q.model.attempts"),
     fallbacks: meter.createCounter("q.model.fallbacks"),
+    providerCoolDowns: meter.createCounter("q.model.provider_cool_downs"),
     /** Requests that also asked the next model after hedgeAfterMs (L1). */
     hedges: meter.createCounter("q.model.hedges"),
     rateLimits: meter.createCounter("q.model.rate_limits"),
@@ -598,16 +599,49 @@ export function createModelGateway(
             clock.now(),
           );
         } else {
+          const at = clock.now();
+          const before = health.state(
+            provider.code,
+            candidate.model.modelCode,
+            at,
+          );
+          const exhausted =
+            outcome.kind === "FAILURE" &&
+            outcome.cause instanceof ModelProviderFailure &&
+            outcome.cause.accountExhausted;
           health.recordFailure(
             provider.code,
             candidate.model.modelCode,
             failureClass,
-            clock.now(),
+            at,
             latencyMs,
+            exhausted,
             outcome.kind === "FAILURE" &&
-              outcome.cause instanceof ModelProviderFailure &&
-              outcome.cause.accountExhausted,
+              outcome.cause instanceof ModelProviderFailure
+              ? outcome.cause.retryAfterMs
+              : undefined,
           );
+          const after = health.state(
+            provider.code,
+            candidate.model.modelCode,
+            at,
+          );
+          // Round 8: said once, as the provider or model is set aside (not
+          // on every turn that then skips it), and counted.
+          if (before === "HEALTHY" && after !== "HEALTHY") {
+            metrics.providerCoolDowns.add(1, { ...labels, state: after });
+            logger?.warn(
+              {
+                ...labels,
+                failureClass,
+                accountExhausted: exhausted,
+                state: after,
+              },
+              after === "BACKING_OFF"
+                ? "model provider rate-limited; backing off this model"
+                : "model provider set aside; routing to the fallback",
+            );
+          }
         }
         span.setAttribute("q.model.result", result);
         span.setAttribute("q.model.latency_ms", latencyMs);

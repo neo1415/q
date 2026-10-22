@@ -66,16 +66,21 @@ export function FirstStageReport({
   report,
   delegationId,
   laneId,
+  initialStep,
 }: {
   readonly report: QWorkReportDto;
   readonly delegationId: string;
   readonly laneId: string;
+  /** A step whose send sheet starts open (the design review page). */
+  readonly initialStep?: ReportStep | undefined;
 }) {
   const t = useT();
   const order = stepOrder(report.recommendation);
   const rows = useMemo(() => findingRows(report), [report]);
-  const [step, setStep] = useState<ReportStep | null>(null);
-  const [text, setText] = useState("");
+  const [step, setStep] = useState<ReportStep | null>(initialStep ?? null);
+  const [text, setText] = useState(() =>
+    initialStep === undefined ? "" : draftFor(initialStep, report),
+  );
   const [phase, setPhase] = useState<Phase>("draft");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);

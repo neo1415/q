@@ -6,3 +6,4 @@ export * from "./controls.js";
 export * from "./trigger.js";
 export * from "./preload.js";
 export * from "./pictures.js";
+export * from "./claims.js";

@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { getMyUsage, listQWork } from "@capital-q/api-client";
-import { buttonClassName } from "@capital-q/ui/button";
-import { ErrorState } from "@capital-q/ui/states";
 
-import { UsageStory, type UsagePeriod } from "@/features/billing/usage-story";
-import { AccountColumn, AccountHead } from "@/features/settings/account-layout";
+import type { UsagePeriod } from "@/features/billing/usage-story";
+import { UsageView } from "@/features/billing/usage-view";
 import { qApiSession } from "@/features/q/context";
-import { QSection } from "@/features/q/q-section";
 import { serverT } from "@/features/i18n/server";
 
 export const metadata: Metadata = { title: "Usage · Settings" };
@@ -39,38 +35,5 @@ export default async function UsagePage({
             .then((list) => list.items)
             .catch(() => null),
         ]);
-  return (
-    <AccountColumn>
-      <QSection id="usage" kind="BILLING" label="usage">
-        <AccountHead
-          title={t("Work Q did for you")}
-          back={{ href: "/settings", label: t("Settings") }}
-          sub={t(
-            "Usage told as the work it paid for. Totals are at the bottom.",
-          )}
-        />
-        {usage === null ? (
-          <ErrorState
-            title={t("Usage couldn't load")}
-            description={t("Nothing is charged either way.")}
-            action={
-              <Link
-                href="/settings/usage"
-                className={buttonClassName("secondary", "compact")}
-              >
-                {t("Try again")}
-              </Link>
-            }
-          />
-        ) : (
-          <UsageStory
-            usage={usage}
-            work={work}
-            period={period}
-            planName={usage.plan?.name ?? null}
-          />
-        )}
-      </QSection>
-    </AccountColumn>
-  );
+  return <UsageView t={t} usage={usage} work={work} period={period} />;
 }
