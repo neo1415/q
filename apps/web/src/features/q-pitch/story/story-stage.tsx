@@ -405,9 +405,13 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
         </div>
       );
     case "wordmark":
+      // #34, the title card in every edition (owner, 22 Oct): the name in
+      // the brand's gold, and the line beneath it in title case.
       return (
-        <div className="cq-story-centre">
+        <div className="cq-story-centre cq-story-title">
           <p className="cq-story-wordmark">Capital Q</p>
+          <span className="cq-story-title-rule" aria-hidden />
+          <p className="cq-story-tagline">Home of Private Capital</p>
         </div>
       );
     case "top-three":

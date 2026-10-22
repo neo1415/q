@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
-import { classifyStoryTrigger } from "@capital-q/q-pitch";
+import { classifyStoryTrigger, type StoryEditionId } from "@capital-q/q-pitch";
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { useQSessionOptional } from "@/features/q/q-session";
@@ -40,8 +40,9 @@ export const STORY_START_HREF = "/home?qpitch=story&new=1";
  * on arrival, no second press. Each ask is a new address, so asking again
  * after the story ended starts it again.
  */
-export function storyAskedHref(): string {
-  return `${STORY_START_HREF}&start=${Date.now().toString(36)}`;
+export function storyAskedHref(edition: StoryEditionId = "FULL"): string {
+  const cut = edition === "FULL" ? "" : `&edition=${edition.toLowerCase()}`;
+  return `${STORY_START_HREF}${cut}&start=${Date.now().toString(36)}`;
 }
 
 /**
@@ -55,8 +56,9 @@ export function useStoryTrigger(active: boolean): void {
   useEffect(() => {
     if (!active) return;
     return setTypedInterceptor((text) => {
-      if (classifyStoryTrigger(text)?.kind !== "STORY") return false;
-      router.push(storyAskedHref());
+      const asked = classifyStoryTrigger(text);
+      if (asked?.kind !== "STORY") return false;
+      router.push(storyAskedHref(asked.edition));
       return true;
     });
   }, [active, router]);
@@ -78,8 +80,9 @@ export function useStoryTrigger(active: boolean): void {
       if (heard.current.has(line.id)) continue;
       heard.current.add(line.id);
       if (line.role !== "user") continue;
-      if (classifyStoryTrigger(line.text)?.kind === "STORY") {
-        router.push(storyAskedHref());
+      const asked = classifyStoryTrigger(line.text);
+      if (asked?.kind === "STORY") {
+        router.push(storyAskedHref(asked.edition));
         return;
       }
     }

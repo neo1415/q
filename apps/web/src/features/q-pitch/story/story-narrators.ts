@@ -1,6 +1,7 @@
 import {
   renderText,
   type BeatAlignment,
+  type StoryAudioWindow,
   type StoryBeat,
 } from "@capital-q/q-pitch";
 
@@ -55,6 +56,8 @@ export const BEAT_AUDIO_WAIT_MS = 1_500;
 export function renderedNarrator(
   context: AudioContext,
   bank: StoryAudioBank,
+  /** Cut parts of an edition: where each sits in its beat's clip. */
+  windows: ReadonlyMap<number, StoryAudioWindow> = new Map(),
 ): StoryNarrator {
   const gain = context.createGain();
   gain.connect(context.destination);
@@ -78,6 +81,7 @@ export function renderedNarrator(
       bank.window(beat.n);
       const decoded = await bank.ready(beat.n, BEAT_AUDIO_WAIT_MS);
       if (signal.aborted) return;
+      const cut = decoded === null ? undefined : windows.get(beat.n);
       const buffer = decoded ?? silence(alignment.durationMs);
       await new Promise<void>((resolve) => {
         const node = context.createBufferSource();
@@ -103,7 +107,8 @@ export function renderedNarrator(
           },
           { once: true },
         );
-        node.start(startAt);
+        if (cut === undefined) node.start(startAt);
+        else node.start(startAt, cut.offsetMs / 1000, cut.durationMs / 1000);
       });
     },
     clock: () =>

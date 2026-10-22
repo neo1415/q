@@ -108,6 +108,8 @@ export async function preloadStory(input: {
   readonly signal?: AbortSignal;
   readonly voice?: string;
   readonly pathFor?: StoryPathFor;
+  /** The beats in play order (an edition's); default: all 56. */
+  readonly order?: readonly number[];
 }): Promise<StoryAssets> {
   const started = performance.now();
   const voice = input.voice ?? STORY_VOICE;
@@ -149,6 +151,8 @@ export async function preloadStory(input: {
           const audio = id === undefined ? undefined : files[id]?.audio;
           return audio === undefined ? null : mediaUrl(audio);
         });
+  const order = input.order ?? STORY_BEATS.map((beat) => beat.n);
+  bank?.follow(order);
   const firstBeats = new Map<number, AudioBuffer | null>();
   if (bank !== null && Object.keys(files).length > 0) {
     for (const beat of STORY_BEATS) {
@@ -163,7 +167,7 @@ export async function preloadStory(input: {
         }
       });
     }
-    for (let n = 1; n <= AUDIO_AHEAD; n += 1) {
+    for (const n of order.slice(0, AUDIO_AHEAD)) {
       tasks.push(async () => {
         firstBeats.set(n, await bank.load(n));
       });

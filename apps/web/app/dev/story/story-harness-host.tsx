@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useSyncExternalStore } from "react";
 
-import type { StoryRoute } from "@capital-q/q-pitch";
+import type { StoryEditionId, StoryRoute } from "@capital-q/q-pitch";
 
 const StoryHost = dynamic(
   () => import("@/features/q-pitch/story/story-host").then((m) => m.StoryHost),
@@ -51,6 +51,21 @@ function filmOnce(): boolean {
   return filmLatch;
 }
 
+/** `?edition=investor|founder`: one of the story's cuts. Read once too. */
+let editionLatch: StoryEditionId | null = null;
+function editionOnce(): StoryEditionId {
+  if (editionLatch === null) {
+    const asked = new URLSearchParams(window.location.search).get("edition");
+    editionLatch =
+      asked === "investor"
+        ? "INVESTOR"
+        : asked === "founder"
+          ? "FOUNDER"
+          : "FULL";
+  }
+  return editionLatch;
+}
+
 export function StoryHarnessHost() {
   const voice = useSyncExternalStore(
     noSubscription,
@@ -58,6 +73,11 @@ export function StoryHarnessHost() {
     () => undefined,
   );
   const film = useSyncExternalStore(noSubscription, filmOnce, () => false);
+  const edition = useSyncExternalStore(
+    noSubscription,
+    editionOnce,
+    () => "FULL" as const,
+  );
   return (
     <StoryHost
       account="harness"
@@ -65,6 +85,7 @@ export function StoryHarnessHost() {
       harness={HARNESS}
       voice={voice}
       film={film}
+      edition={edition}
       onExit={() => undefined}
     />
   );

@@ -221,7 +221,9 @@ export class StoryPlayer {
       const alignment =
         beat === undefined ? undefined : this.#alignments.get(beat.n);
       if (beat === undefined || alignment === undefined) continue;
-      for (const route of warmRoutes(index)) this.#acts.warm(route);
+      for (const route of warmRoutes(index, 2, this.#beats)) {
+        this.#acts.warm(route);
+      }
       this.#cues = scheduleBeat(beat, alignment);
       this.#clock = new BeatCueClock(this.#cues);
       const controller = new AbortController();

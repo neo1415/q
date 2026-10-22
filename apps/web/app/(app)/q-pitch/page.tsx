@@ -71,7 +71,7 @@ export default async function QPitchPage({
         </p>
 
         <h2 className="mt-8 cq-title text-(--cq-text-primary)">
-          {t("Guided tours")}
+          {t("Who is it for?")}
         </h2>
         <ul className="mt-3 flex flex-col gap-3">
           {options.map((option) => (
