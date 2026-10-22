@@ -768,7 +768,8 @@ function StoryOverlay({
       const playingNow = player.snapshot().phase === "PLAYING";
       const echoSafe = session?.voice.client.echoCancelled?.() ?? false;
       if (playingNow && !echoSafe) continue;
-      hear(text, "VOICE");
+      // After this render: hearing updates the overlay's own state.
+      queueMicrotask(() => hear(text, "VOICE"));
     }
   }, [spoken, player, hear, session]);
 
