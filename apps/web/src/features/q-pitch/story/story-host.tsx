@@ -673,13 +673,16 @@ function StoryOverlay({
     };
   }, []);
 
-  // Typed words: story commands, then the QA bank, else Q as usual.
+  // Words, typed or said: story commands first, then the investor QA bank
+  // (answered at once, in plain words, and Q offers to carry on from the
+  // same beat), else Q as usual. No model call for either.
   const qa = useMemo(() => buildQaIndex("INVESTOR"), []);
   const [answer, setAnswer] = useState<QaEntry | null>(null);
+  const [asked, setAsked] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const speaking = useRef<AbortController | null>(null);
-  useEffect(() => {
-    const release = setTypedInterceptor((text) => {
+  const hear = useCallback(
+    (text: string, from: "TYPED" | "VOICE"): boolean => {
       const command = parseStoryCommand(
         text,
         player.snapshot().index,
@@ -687,6 +690,7 @@ function StoryOverlay({
       );
       if (command !== null) {
         setNotice(null);
+        setAsked(false);
         if (command.kind === "END") onExit();
         else if (command.kind === "CAPTIONS")
           onCaptions(command.on ?? !captions);
@@ -709,20 +713,64 @@ function StoryOverlay({
         return true;
       }
       const entry = qa.answer(text);
-      if (entry === null) return false;
+      if (entry === null) {
+        // A spoken question the bank does not hold: the story pauses and
+        // Q's own live line answers it; then the offer to carry on.
+        if (from === "VOICE") {
+          player.interrupt();
+          setAnswer(null);
+          setAsked(true);
+          return true;
+        }
+        return false;
+      }
       player.interrupt();
+      setAsked(false);
       setAnswer(entry);
       speaking.current?.abort();
       const controller = new AbortController();
       speaking.current = controller;
-      void answerAloud(entry.answer, controller.signal);
+      // Spoken questions are answered by the live line itself; typed ones
+      // in Q's standard voice.
+      if (from === "TYPED") void answerAloud(entry.answer, controller.signal);
       return true;
-    });
+    },
+    [player, qa, onExit, onCaptions, onMuted, captions, muted],
+  );
+  useEffect(() => {
+    const release = setTypedInterceptor((text) => hear(text, "TYPED"));
     return () => {
       release();
       speaking.current?.abort();
     };
-  }, [player, qa, onExit, onCaptions, onMuted, captions, muted]);
+  }, [hear]);
+
+  // Spoken interruption (plan §4; control-channel's rules): the person's
+  // own lines on Q's open voice line. While the story's audio is playing,
+  // a line counts only when the mic reports echo cancellation, so Q's own
+  // narration can never steer the story. Lines from before the story
+  // started are ignored.
+  const session = useQSessionOptional();
+  const spoken = session?.spoken;
+  const heardLines = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (spoken === undefined) return;
+    if (heardLines.current === null) {
+      heardLines.current = new Set(spoken.map((line) => line.id));
+      return;
+    }
+    for (const line of spoken) {
+      if (heardLines.current.has(line.id)) continue;
+      heardLines.current.add(line.id);
+      if (line.role !== "user") continue;
+      const text = line.text.trim().slice(0, 600);
+      if (text.length === 0) continue;
+      const playingNow = player.snapshot().phase === "PLAYING";
+      const echoSafe = session?.voice.client.echoCancelled?.() ?? false;
+      if (playingNow && !echoSafe) continue;
+      hear(text, "VOICE");
+    }
+  }, [spoken, player, hear, session]);
 
   const { beat, word } = snapshot;
   // The caption is the line being spoken, lit word by word.
@@ -812,6 +860,24 @@ function StoryOverlay({
           </p>
         );
       })()}
+      {asked && answer === null ? (
+        <div className="cq-story-answer" role="status">
+          <p className="cq-story-kicker">Paused for your question</p>
+          <p>
+            Q is answering. When you are ready, I&apos;ll carry on from here.
+          </p>
+          <button
+            type="button"
+            className="cq-story-btn cq-story-btn-primary"
+            onClick={() => {
+              setAsked(false);
+              player.resume();
+            }}
+          >
+            Carry on
+          </button>
+        </div>
+      ) : null}
       {answer !== null ? (
         <div className="cq-story-answer" role="status">
           <p className="cq-story-kicker">{answer.question}</p>
@@ -822,6 +888,7 @@ function StoryOverlay({
             onClick={() => {
               speaking.current?.abort();
               setAnswer(null);
+              setAsked(false);
               player.resume();
             }}
           >
