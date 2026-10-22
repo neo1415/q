@@ -6,22 +6,23 @@ import {
   STORY_ROUTES,
   STORY_SCREENS,
   alignmentFits,
-  beatAlignmentPath,
-  beatAudioPath,
+  STORY_ASSET_ROOT,
   screenPath,
   voiceIndexPath,
   type BeatAlignment,
 } from "@capital-q/q-pitch";
 import { z } from "zod";
 
+import { AUDIO_AHEAD, StoryAudioBank } from "./story-audio-bank";
 import { storyPath, type StoryPathFor } from "./story-pages";
 
 /**
- * Preload everything on entry (plan §1, "game the system"): the render's
- * audio and alignment (decoded), every picture and screenshot (decoded
+ * Preload on entry (plan §1, "game the system"): every beat's timings, the
+ * first beats' audio (decoded), every picture and screenshot (decoded
  * Image objects, held so the browser keeps them), and every story route
- * (router.prefetch). The story starts only once this resolves, so nothing
- * is fetched from the database and no model is called while it plays.
+ * (router.prefetch). The rest of the audio follows a few beats ahead
+ * through the budgeted controller (story-audio-bank.ts). Nothing is
+ * fetched from the database and no model is called while the story plays.
  *
  * Static files only, same origin. A missing render is not an error: the
  * story then plays on fixture timings with the live or silent narrator.
@@ -30,17 +31,28 @@ import { storyPath, type StoryPathFor } from "./story-pages";
 /** Q's own voice ("Sarah"), the render's folder (scripts/q-pitch/render-story.mjs). */
 export const STORY_VOICE = "EXAVITQu4vr4xnSDxMaL";
 
+/** The render's index: which beats exist, by their content-hashed names. */
+const MEDIA_FILE = /^beat-\d{2}\.[0-9a-f]{10}\.(?:mp3|json)$/u;
 const IndexSchema = z.object({
   version: z.string(),
   voice: z.string(),
   complete: z.boolean(),
+  files: z
+    .record(
+      z.string(),
+      z.object({
+        audio: z.string().regex(MEDIA_FILE),
+        alignment: z.string().regex(MEDIA_FILE),
+      }),
+    )
+    .default({}),
 });
 
 export type StoryAssets = {
   /** By beat number; every beat has one (rendered, else fixture). */
   readonly alignments: ReadonlyMap<number, BeatAlignment>;
-  /** Decoded audio by beat number; empty without a complete render. */
-  readonly buffers: ReadonlyMap<number, AudioBuffer>;
+  /** The budgeted audio controller; null without a complete render. */
+  readonly bank: StoryAudioBank | null;
   readonly context: AudioContext | null;
   /** Picture and screenshot files that decoded (the rest fall back). */
   readonly images: ReadonlyMap<string, HTMLImageElement>;
@@ -96,10 +108,12 @@ export async function preloadStory(input: {
     const path = (input.pathFor ?? storyPath)(route);
     if (path !== null) input.prefetch(path);
   }
-  const index = await fetch(voiceIndexPath(voice), { cache: "force-cache" })
+  // The index is the one file fetched fresh: it names the hashed clips.
+  const index = await fetch(voiceIndexPath(voice), { cache: "no-cache" })
     .then(async (r) => (r.ok ? IndexSchema.parse(await r.json()) : null))
     .catch(() => null);
-  const rendered = index?.complete === true;
+  const files = index?.complete === true ? index.files : {};
+  const mediaUrl = (file: string) => `${STORY_ASSET_ROOT}/${voice}/${file}`;
   const context =
     typeof AudioContext === "undefined"
       ? null
@@ -107,39 +121,43 @@ export async function preloadStory(input: {
 
   const images = new Map<string, HTMLImageElement>();
   const alignments = new Map<number, BeatAlignment>();
-  const buffers = new Map<number, AudioBuffer>();
-  const files = [
+  const pictures = [
     ...STORY_PICTURES.map((p) => p.file),
     ...STORY_SCREENS.map(screenPath),
   ];
   const tasks: (() => Promise<void>)[] = [
-    ...files.map((file) => async () => {
+    ...pictures.map((file) => async () => {
       const image = await decodeImage(file);
       if (image !== null) images.set(file, image);
     }),
   ];
-  if (rendered && context !== null) {
+  // Every beat's timings (small JSON, immutable) before Start; audio only
+  // for the first beats, the rest through the budgeted controller.
+  const bank =
+    context === null
+      ? null
+      : new StoryAudioBank(context, (n) => {
+          const id = STORY_BEATS[n - 1]?.id;
+          const audio = id === undefined ? undefined : files[id]?.audio;
+          return audio === undefined ? null : mediaUrl(audio);
+        });
+  const firstBeats = new Map<number, AudioBuffer | null>();
+  if (bank !== null && Object.keys(files).length > 0) {
     for (const beat of STORY_BEATS) {
+      const file = files[beat.id]?.alignment;
+      if (file === undefined) continue;
       tasks.push(async () => {
-        const [alignment, audio] = await Promise.all([
-          fetch(beatAlignmentPath(voice, beat), { cache: "force-cache" })
-            .then(async (r) => BeatAlignmentSchema.parse(await r.json()))
-            .catch(() => null),
-          fetch(beatAudioPath(voice, beat), { cache: "force-cache" })
-            .then((r) => (r.ok ? r.arrayBuffer() : null))
-            .then((bytes) =>
-              bytes === null ? null : context.decodeAudioData(bytes),
-            )
-            .catch(() => null),
-        ]);
-        if (
-          alignment !== null &&
-          audio !== null &&
-          alignmentFits(beat, alignment)
-        ) {
+        const alignment = await fetch(mediaUrl(file), { cache: "force-cache" })
+          .then(async (r) => BeatAlignmentSchema.parse(await r.json()))
+          .catch(() => null);
+        if (alignment !== null && alignmentFits(beat, alignment)) {
           alignments.set(beat.n, alignment);
-          buffers.set(beat.n, audio);
         }
+      });
+    }
+    for (let n = 1; n <= AUDIO_AHEAD; n += 1) {
+      tasks.push(async () => {
+        firstBeats.set(n, await bank.load(n));
       });
     }
   }
@@ -155,18 +173,20 @@ export async function preloadStory(input: {
     }),
     6,
   );
-  // A partial render never mixes voices mid-story: all beats or none.
-  const complete = rendered && buffers.size === STORY_BEATS.length;
-  if (!complete) {
-    buffers.clear();
-    alignments.clear();
-  }
+  // A partial render never mixes voices mid-story: every beat's timings
+  // and the first beats' audio, or the fallback narrators for all of it.
+  const complete =
+    bank !== null &&
+    alignments.size === STORY_BEATS.length &&
+    [...firstBeats.values()].every((buffer) => buffer !== null) &&
+    firstBeats.size === AUDIO_AHEAD;
+  if (!complete) alignments.clear();
   for (const fixture of FIXTURE_ALIGNMENTS) {
     if (!alignments.has(fixture.beat)) alignments.set(fixture.beat, fixture);
   }
   return {
     alignments,
-    buffers,
+    bank: complete ? bank : null,
     context: complete
       ? context
       : (void context?.close().catch(() => undefined), null),

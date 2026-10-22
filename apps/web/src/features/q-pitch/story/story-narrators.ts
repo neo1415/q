@@ -5,6 +5,7 @@ import {
 } from "@capital-q/q-pitch";
 
 import type { LiveNarration } from "../narrator";
+import type { StoryAudioBank } from "./story-audio-bank";
 
 /**
  * Q Story narrators (plan §1, Narrator). Whichever plays, its clock is the
@@ -48,9 +49,12 @@ export type StoryNarrator = {
 /** A beat's audio starts this far ahead, so the first word's cue leads it too. */
 const START_LEAD_S = 0.16;
 
+/** How long a beat's audio may still be loading before it plays as silence. */
+export const BEAT_AUDIO_WAIT_MS = 1_500;
+
 export function renderedNarrator(
   context: AudioContext,
-  buffers: ReadonlyMap<number, AudioBuffer>,
+  bank: StoryAudioBank,
 ): StoryNarrator {
   const gain = context.createGain();
   gain.connect(context.destination);
@@ -58,16 +62,24 @@ export function renderedNarrator(
   let source: AudioBufferSourceNode | null = null;
   const latency = () =>
     (context.outputLatency || 0) + (context.baseLatency || 0);
+  /** A beat's length in silence: same clock, same pause, no voice. */
+  const silence = (ms: number) =>
+    context.createBuffer(
+      1,
+      Math.max(1, Math.round((ms / 1000) * context.sampleRate)),
+      context.sampleRate,
+    );
   return {
     kind: "RENDERED",
     resumesInPlace: true,
-    play: (beat, alignment, signal) =>
-      new Promise<void>((resolve) => {
-        const buffer = buffers.get(beat.n);
-        if (buffer === undefined || signal.aborted) {
-          resolve();
-          return;
-        }
+    play: async (beat, alignment, signal) => {
+      startAt = -1;
+      // The budgeted controller keeps the next beats decoding ahead.
+      bank.window(beat.n);
+      const decoded = await bank.ready(beat.n, BEAT_AUDIO_WAIT_MS);
+      if (signal.aborted) return;
+      const buffer = decoded ?? silence(alignment.durationMs);
+      await new Promise<void>((resolve) => {
         const node = context.createBufferSource();
         node.buffer = buffer;
         node.connect(gain);
@@ -92,8 +104,8 @@ export function renderedNarrator(
           { once: true },
         );
         node.start(startAt);
-        void alignment;
-      }),
+      });
+    },
     clock: () =>
       startAt < 0
         ? Number.NaN

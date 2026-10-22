@@ -403,5 +403,231 @@
     "totalChars": 5353,
     "usdPer1kEstimate": 0.3,
     "thisRunUsdEstimate": 1.61
+  },
+  "files": {
+    "beat-01": {
+      "audio": "beat-01.ca1d424e4b.mp3",
+      "alignment": "beat-01.ef27ed55e2.json"
+    },
+    "beat-02": {
+      "audio": "beat-02.5118a03eb5.mp3",
+      "alignment": "beat-02.d1581209eb.json"
+    },
+    "beat-03": {
+      "audio": "beat-03.5fcf5b8d12.mp3",
+      "alignment": "beat-03.fd0f1e3f4a.json"
+    },
+    "beat-04": {
+      "audio": "beat-04.ffe0de175d.mp3",
+      "alignment": "beat-04.71f84e42aa.json"
+    },
+    "beat-05": {
+      "audio": "beat-05.42bf9dbb77.mp3",
+      "alignment": "beat-05.70090ebab5.json"
+    },
+    "beat-06": {
+      "audio": "beat-06.e5397831d7.mp3",
+      "alignment": "beat-06.21f5ca904e.json"
+    },
+    "beat-07": {
+      "audio": "beat-07.96fbce5886.mp3",
+      "alignment": "beat-07.dadeb83eec.json"
+    },
+    "beat-08": {
+      "audio": "beat-08.7d55fc8f6e.mp3",
+      "alignment": "beat-08.766afe38b5.json"
+    },
+    "beat-09": {
+      "audio": "beat-09.d1cb440bc9.mp3",
+      "alignment": "beat-09.d5b0764a68.json"
+    },
+    "beat-10": {
+      "audio": "beat-10.fef51f51c8.mp3",
+      "alignment": "beat-10.aebcfe8aae.json"
+    },
+    "beat-11": {
+      "audio": "beat-11.9310bf3cc9.mp3",
+      "alignment": "beat-11.68e68ad364.json"
+    },
+    "beat-12": {
+      "audio": "beat-12.e0350bdf64.mp3",
+      "alignment": "beat-12.fe891eb470.json"
+    },
+    "beat-13": {
+      "audio": "beat-13.d8ea8cd28d.mp3",
+      "alignment": "beat-13.cae5808028.json"
+    },
+    "beat-14": {
+      "audio": "beat-14.83b89c912c.mp3",
+      "alignment": "beat-14.180912439c.json"
+    },
+    "beat-15": {
+      "audio": "beat-15.eb496bced4.mp3",
+      "alignment": "beat-15.d5c320749d.json"
+    },
+    "beat-16": {
+      "audio": "beat-16.ebbbe3cfab.mp3",
+      "alignment": "beat-16.cfdf54695c.json"
+    },
+    "beat-17": {
+      "audio": "beat-17.4b3c740a3e.mp3",
+      "alignment": "beat-17.047755273a.json"
+    },
+    "beat-18": {
+      "audio": "beat-18.5c6b023322.mp3",
+      "alignment": "beat-18.d18ab7eed9.json"
+    },
+    "beat-19": {
+      "audio": "beat-19.5a2e364562.mp3",
+      "alignment": "beat-19.b30755ff76.json"
+    },
+    "beat-20": {
+      "audio": "beat-20.b210215311.mp3",
+      "alignment": "beat-20.d22d41ecc3.json"
+    },
+    "beat-21": {
+      "audio": "beat-21.b1e9bb3f58.mp3",
+      "alignment": "beat-21.e8c62108f1.json"
+    },
+    "beat-22": {
+      "audio": "beat-22.ca261b8c35.mp3",
+      "alignment": "beat-22.df0060cbbb.json"
+    },
+    "beat-23": {
+      "audio": "beat-23.e96d28a193.mp3",
+      "alignment": "beat-23.7ea57750b0.json"
+    },
+    "beat-24": {
+      "audio": "beat-24.74df1104ec.mp3",
+      "alignment": "beat-24.347194292c.json"
+    },
+    "beat-25": {
+      "audio": "beat-25.e4b2b5167d.mp3",
+      "alignment": "beat-25.0317fa384f.json"
+    },
+    "beat-26": {
+      "audio": "beat-26.3a8efa6cf7.mp3",
+      "alignment": "beat-26.8183ee638d.json"
+    },
+    "beat-27": {
+      "audio": "beat-27.cfd2947d56.mp3",
+      "alignment": "beat-27.48b4bd02b2.json"
+    },
+    "beat-28": {
+      "audio": "beat-28.0bed22090c.mp3",
+      "alignment": "beat-28.c652504c9e.json"
+    },
+    "beat-29": {
+      "audio": "beat-29.e4d1d4b1e4.mp3",
+      "alignment": "beat-29.d9113da2ed.json"
+    },
+    "beat-30": {
+      "audio": "beat-30.429732b7c9.mp3",
+      "alignment": "beat-30.51b0c2b330.json"
+    },
+    "beat-31": {
+      "audio": "beat-31.c52fa6bdc8.mp3",
+      "alignment": "beat-31.a32215d989.json"
+    },
+    "beat-32": {
+      "audio": "beat-32.0980131f6e.mp3",
+      "alignment": "beat-32.7f0d189286.json"
+    },
+    "beat-33": {
+      "audio": "beat-33.3eda781aa3.mp3",
+      "alignment": "beat-33.bb8734523e.json"
+    },
+    "beat-34": {
+      "audio": "beat-34.7de14d7be4.mp3",
+      "alignment": "beat-34.7b344641b9.json"
+    },
+    "beat-35": {
+      "audio": "beat-35.ae068d532c.mp3",
+      "alignment": "beat-35.67a58540d3.json"
+    },
+    "beat-36": {
+      "audio": "beat-36.0ee2636198.mp3",
+      "alignment": "beat-36.4528aebd50.json"
+    },
+    "beat-37": {
+      "audio": "beat-37.cbf87168ff.mp3",
+      "alignment": "beat-37.cbc9cb365a.json"
+    },
+    "beat-38": {
+      "audio": "beat-38.8afaf32e41.mp3",
+      "alignment": "beat-38.a644d0692d.json"
+    },
+    "beat-39": {
+      "audio": "beat-39.e23bc70601.mp3",
+      "alignment": "beat-39.8c3b2cfc9e.json"
+    },
+    "beat-40": {
+      "audio": "beat-40.4cb7abef8f.mp3",
+      "alignment": "beat-40.dd389ac472.json"
+    },
+    "beat-41": {
+      "audio": "beat-41.34269fc98b.mp3",
+      "alignment": "beat-41.d049088380.json"
+    },
+    "beat-42": {
+      "audio": "beat-42.fd95d352df.mp3",
+      "alignment": "beat-42.445eba7b67.json"
+    },
+    "beat-43": {
+      "audio": "beat-43.de42134376.mp3",
+      "alignment": "beat-43.c18f387865.json"
+    },
+    "beat-44": {
+      "audio": "beat-44.ac0a080c42.mp3",
+      "alignment": "beat-44.5e6f4eb3bc.json"
+    },
+    "beat-45": {
+      "audio": "beat-45.75d813acad.mp3",
+      "alignment": "beat-45.a9a461a731.json"
+    },
+    "beat-46": {
+      "audio": "beat-46.0e62cf936f.mp3",
+      "alignment": "beat-46.8e973f085d.json"
+    },
+    "beat-47": {
+      "audio": "beat-47.ce617a4da0.mp3",
+      "alignment": "beat-47.57bdc15568.json"
+    },
+    "beat-48": {
+      "audio": "beat-48.73e5f27b83.mp3",
+      "alignment": "beat-48.ecbc2d060c.json"
+    },
+    "beat-49": {
+      "audio": "beat-49.8ab6e1b253.mp3",
+      "alignment": "beat-49.f8e808daf2.json"
+    },
+    "beat-50": {
+      "audio": "beat-50.7b214a2865.mp3",
+      "alignment": "beat-50.15a1783eab.json"
+    },
+    "beat-51": {
+      "audio": "beat-51.3265931aaf.mp3",
+      "alignment": "beat-51.e75562c698.json"
+    },
+    "beat-52": {
+      "audio": "beat-52.d89598071a.mp3",
+      "alignment": "beat-52.b4e22842cb.json"
+    },
+    "beat-53": {
+      "audio": "beat-53.0fc199cc95.mp3",
+      "alignment": "beat-53.581c00dc23.json"
+    },
+    "beat-54": {
+      "audio": "beat-54.3df6dabc1d.mp3",
+      "alignment": "beat-54.32d902035b.json"
+    },
+    "beat-55": {
+      "audio": "beat-55.34b9f91063.mp3",
+      "alignment": "beat-55.6fa8954ca7.json"
+    },
+    "beat-56": {
+      "audio": "beat-56.d2643c874b.mp3",
+      "alignment": "beat-56.a9a24e4e3f.json"
+    }
   }
 }

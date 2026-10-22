@@ -235,10 +235,15 @@ export function StoryHost({
       setStarting(true);
       setNarrationVoice(withVoice);
       let narrator: StoryNarrator;
-      if (withVoice && assets.rendered && assets.context !== null) {
+      if (
+        withVoice &&
+        assets.rendered &&
+        assets.context !== null &&
+        assets.bank !== null
+      ) {
         // The press is the gesture that lets the decoded audio play.
         await assets.context.resume();
-        narrator = renderedNarrator(assets.context, assets.buffers);
+        narrator = renderedNarrator(assets.context, assets.bank);
       } else if (
         withVoice &&
         (await openTourVoice(
