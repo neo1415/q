@@ -354,6 +354,22 @@ function finished(
   };
 }
 
+/**
+ * A Gemini refusal that only a person can lift: payment required (402), or
+ * a 429 that says the quota or billing allowance itself is spent (a daily
+ * or plan quota), not a per-minute rate.
+ */
+export function geminiAccountExhausted(
+  status: number,
+  message: string,
+): boolean {
+  if (status === 402) return true;
+  return (
+    status === 429 &&
+    /billing|exceeded your current quota|per ?day|PerDay|prepay/iu.test(message)
+  );
+}
+
 function classify(status: number): ModelFailureClass {
   if (status === 401 || status === 403) return "AUTHENTICATION";
   if (status === 429) return "RATE_LIMIT";
@@ -381,6 +397,11 @@ function normalizeError(error: unknown): ModelProviderFailure {
         failureClass,
         providerCode: GOOGLE_PROVIDER_CODE,
         providerStatus: error.status,
+        // The account, not the request (hosted 2026-10-21: 402 on every
+        // call): set aside until someone pays or the quota resets.
+        ...(geminiAccountExhausted(error.status, error.message)
+          ? { accountExhausted: true }
+          : {}),
         cause: error,
       },
     );

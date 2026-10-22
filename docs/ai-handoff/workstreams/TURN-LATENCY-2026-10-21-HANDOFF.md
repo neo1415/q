@@ -226,3 +226,23 @@ Harness, before → after:
 - The gateway test "a later turn's same read is not made again; 'check again' reads anew" counts the reads at the port.
 
 Known cost: the lowercase-name candidates can search one or two phrases that name no company. These are indexed reads during the reading; no stage shows unless a company matched.
+
+## Round 8 (22 October 2026): a provider that cannot answer is skipped
+
+The live check found both Gemini keys in the cloud environment answering 402 Payment Required.
+
+| Change                                                                                          | Status                                         | Evidence                                                                                                                                                                                                                                              |
+| ----------------------------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gemini 402, or a 429 whose quota itself is spent (billing, daily quota), counts as the account  | DONE                                           | `geminiAccountExhausted` (providers/google.ts): `accountExhausted: true`. Before, it was a plain PERMANENT and nothing set the provider aside, so every turn paid a failed first attempt.                                                             |
+| An exhausted account skips every model on that provider for 10 minutes                          | DONE (existing breaker, now reached by Gemini) | Test: after a 402, the next turn makes **zero** calls to the failing provider and goes straight to the fallback (`gateway.test.ts`).                                                                                                                  |
+| A refused key (401/403, after the adapter tried its other keys) skips that model for 10 minutes | DONE                                           | Model-scoped, because a refusal can be one model's (`account-exhausted.test.ts`).                                                                                                                                                                     |
+| A 429 backs that one model off at once                                                          | DONE                                           | For its Retry-After, or 15 s, capped at 60 s. While backing off, the model is tried only when no other eligible model is left (new `BACKING_OFF` health state; `eligibility.ts` defers it), so one rate limit never strands a turn. Tests cover both. |
+| Logged once, with a metric                                                                      | DONE                                           | The gateway warns once as a provider or model goes from healthy to set aside ("model provider set aside; routing to the fallback"), and counts it in `q.model.provider_cool_downs`.                                                                   |
+
+Which task classes route to Gemini first (from the source-controlled routing migrations, latest wins):
+
+- **`fast_classification.v1` → `gemini-3.5-flash-lite` first**, with a 2 s hedge to gpt-5.6-luna (`20261110000000`, `20261207163000`). This serves the turn reader, the skim, the decision reader and the router/argument readers, so it runs on nearly every turn.
+- **Image generation → `gemini-3.1-flash-lite-image`** (`20261215090000`): document and deck pictures.
+- **Everything else → `gpt-5.6-luna` first** (`20261008130000`, `ui_translation.v1`): normal dialogue, extraction, taxonomy, evidence synthesis, comparison, deep investigation, UI translation.
+
+So with a 402 key in production, the reading of every turn paid a failed Gemini call before luna, and pictures failed. After this change it is one failed call per process every 10 minutes. The owner should still fix Gemini billing: the reader's measured 1.2 s p50 was on flash-lite.
