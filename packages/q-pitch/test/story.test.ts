@@ -17,6 +17,7 @@ import {
   STORY_PRODUCT_BEAT,
   STORY_ROUTES,
   STORY_TITLE,
+  STORY_VERSION,
   StoryBeatSchema,
   certifyStory,
   classifyStoryTrigger,
@@ -29,6 +30,7 @@ import {
   scheduleBeat,
   storyManifest,
   storyRoutes,
+  storyOwnerApproved,
   storyText,
   subtitleForm,
   warmRoutes,
@@ -383,6 +385,20 @@ describe("Q Story trigger", () => {
 });
 
 describe("Q Story claims and gate", () => {
+  it("is approved only by a recorded owner yes for this exact cut", () => {
+    expect(storyOwnerApproved()).toBe(false);
+    const yes = {
+      approvedBy: "owner",
+      at: "2026-10-22T04:00:00Z",
+      storyVersion: STORY_VERSION,
+    };
+    expect(storyOwnerApproved(yes)).toBe(true);
+    expect(storyOwnerApproved({ ...yes, storyVersion: "story-v6" })).toBe(
+      false,
+    );
+    expect(storyOwnerApproved({ ...yes, approvedBy: "" })).toBe(false);
+  });
+
   const SAVANNA = {
     role: "INVESTOR" as const,
     account: "investor.savanna-seed@fictional.capitalq.local",

@@ -41,18 +41,30 @@ function voiceOf(search: string): string | undefined {
   return voice !== null && VOICE_ID.test(voice) ? voice : undefined;
 }
 
+/**
+ * `?film=1`: the recorded master (film type sizes, no controls). Read once
+ * per page load: the story's own moves leave the parameter behind.
+ */
+let filmLatch: boolean | null = null;
+function filmOnce(): boolean {
+  filmLatch ??= new URLSearchParams(window.location.search).get("film") === "1";
+  return filmLatch;
+}
+
 export function StoryHarnessHost() {
   const voice = useSyncExternalStore(
     noSubscription,
     () => voiceOf(window.location.search),
     () => undefined,
   );
+  const film = useSyncExternalStore(noSubscription, filmOnce, () => false);
   return (
     <StoryHost
       account="harness"
       role="INVESTOR"
       harness={HARNESS}
       voice={voice}
+      film={film}
       onExit={() => undefined}
     />
   );

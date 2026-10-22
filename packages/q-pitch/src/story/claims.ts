@@ -14,7 +14,7 @@ import type {
   CertificationLedger,
   CertificationStatus,
 } from "../script.js";
-import { STORY_BEATS, type StoryBeat } from "./beats.js";
+import { STORY_BEATS, STORY_VERSION, type StoryBeat } from "./beats.js";
 
 /**
  * What each story beat claims about the product (CLAUDE.md: every
@@ -130,6 +130,34 @@ export type StoryGateEnvironment = {
   /** The owner approved the story for an audience (blueprint §15). */
   readonly ownerApproved: boolean;
 };
+
+/**
+ * The owner's approval of the story for an audience, as a record: who,
+ * when, and which cut. Null until given. Approval is of one cut: a new
+ * STORY_VERSION needs it again, so a re-cut story is never shown to an
+ * audience on an old yes. The gate reads it (storyOwnerApproved); the
+ * "Internal rehearsal" stamp is never removed by hand.
+ */
+export const StoryOwnerApprovalSchema = z
+  .object({
+    approvedBy: z.string().min(1),
+    at: z.iso.datetime(),
+    storyVersion: z.string().min(1),
+  })
+  .strict();
+export type StoryOwnerApproval = z.infer<typeof StoryOwnerApprovalSchema>;
+
+export const STORY_OWNER_APPROVAL: StoryOwnerApproval | null = null;
+
+export function storyOwnerApproved(
+  approval: StoryOwnerApproval | null = STORY_OWNER_APPROVAL,
+): boolean {
+  return (
+    approval !== null &&
+    StoryOwnerApprovalSchema.safeParse(approval).success &&
+    approval.storyVersion === STORY_VERSION
+  );
+}
 
 export type StoryClaimProblem = {
   readonly beat: number;

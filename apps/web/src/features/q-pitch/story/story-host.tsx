@@ -20,6 +20,7 @@ import {
   TourActorSchema,
   buildQaIndex,
   certifyStory,
+  storyOwnerApproved,
   DEMONSTRATION_LABEL,
   STORY_CLAIMS,
   parseStoryCommand,
@@ -189,6 +190,7 @@ export function StoryHost({
   harness,
   voice,
   autostart = false,
+  film = false,
 }: {
   readonly account: string;
   readonly role: "INVESTOR" | "FOUNDER";
@@ -206,6 +208,8 @@ export function StoryHost({
    * (the ask was a gesture on this page); else the one Start press.
    */
   readonly autostart?: boolean;
+  /** The recorded master (harness `?film=1`): film type sizes, no controls. */
+  readonly film?: boolean;
 }) {
   const router = useRouter();
   const pathFor = harness?.pathFor ?? storyPath;
@@ -225,10 +229,16 @@ export function StoryHost({
           now: new Date().toISOString(),
           actor: parsed.data,
           staleFeatureIds: [],
-          ownerApproved: false,
+          ownerApproved: storyOwnerApproved(),
         })
       : null;
   }, [account, role]);
+  useEffect(() => {
+    if (!film) return;
+    const root = document.documentElement;
+    root.setAttribute("data-story-film", "");
+    return () => root.removeAttribute("data-story-film");
+  }, [film]);
   const session = useQSessionOptional();
   const sessionRef = useRef(session);
   useEffect(() => {
@@ -709,6 +719,7 @@ function StoryOverlay({
   const stageNow = useSyncExternalStore(stage.subscribe, stage.get, stage.get);
   const moodNow = useSyncExternalStore(mood.subscribe, mood.get, mood.get);
   const done = snapshot.phase === "DONE";
+  const aperture = stageNow.visual === "aperture";
 
   // After the last laugh, a few seconds of quiet; then the question.
   const [closing, setClosing] = useState(false);
@@ -918,11 +929,17 @@ function StoryOverlay({
         {docked === null ? (
           // Re-keyed when the scrim turns from night to day: the particles
           // read their surface once, at mount.
+          // Large at the centre on the opening and the close (the
+          // aperture): Q is who says "Hi. I'm Q.", from the first frame.
           <div
-            key={moodNow === "DAY" ? "centre-day" : "centre-night"}
+            key={`${moodNow === "DAY" ? "centre-day" : "centre-night"}${aperture ? "-aperture" : ""}`}
             className="cq-story-presence"
+            data-aperture={aperture ? "" : undefined}
           >
-            <QSwarm state={playing ? "SPEAKING" : "IDLE"} pixels={160} />
+            <QSwarm
+              state={playing ? "SPEAKING" : "IDLE"}
+              pixels={aperture ? 320 : 160}
+            />
           </div>
         ) : null}
       </div>

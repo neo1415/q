@@ -574,11 +574,6 @@ function Visual({ stage }: { readonly stage: StageState }): ReactNode {
       return (
         <div className="cq-story-centre">
           <div className="cq-story-stopwatch" data-step={step}>
-            <span className="cq-story-pages" aria-hidden>
-              <i />
-              <i />
-              <i />
-            </span>
             <p className="cq-story-type" key={step >= 2 ? "after" : "before"}>
               {step >= 2 ? "Minutes" : "Weeks · months · years"}
             </p>

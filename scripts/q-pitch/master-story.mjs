@@ -222,7 +222,7 @@ await context.addInitScript((banned) => {
 
 const videoStart = Date.now();
 const page = await context.newPage();
-await page.goto(`${base}/dev/story?voice=${voice}`, {
+await page.goto(`${base}/dev/story?voice=${voice}&film=1`, {
   waitUntil: "networkidle",
 });
 await page.waitForFunction(
