@@ -44,7 +44,7 @@ function sourceName(source: string): string {
     [/GateQ_Product_Feature/u, "GateQ specification"],
     [/LANDING-PROMISES/u, "Capital Q landing page"],
     [/INVESTIQ-METHODOLOGY/u, "InvestIQ methodology"],
-    [/knowledge-pack/u, "Q's knowledge pack (unknowns)"],
+    [/qa-bank/u, "Q's investor Q&A (what is not known)"],
     [/Recommendation_Architecture/u, "Recommendation architecture"],
   ];
   const name = names.find(([pattern]) => pattern.test(path))?.[1];

@@ -48,14 +48,6 @@ export {
   type ShortRehearsalOutcome,
   type ShortRehearsalPlan,
 } from "./q2q-rehearsal.js";
-export {
-  CAPITAL_Q_KNOWLEDGE_PACK,
-  KnowledgePackSchema,
-  PackEntrySchema,
-  packEntriesFor,
-  type KnowledgePack,
-  type PackEntry,
-} from "./knowledge-pack.js";
 export { PREMIERE_CERTIFICATION_LEDGER } from "./premiere-ledger.js";
 export * from "./step-commands.js";
 export * from "./step-graph.js";
