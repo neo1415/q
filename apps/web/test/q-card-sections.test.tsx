@@ -336,3 +336,39 @@ describe("demonstration data (owner 2026-10-22)", () => {
     expect(container.querySelector("[data-demonstration-data]")).toBeNull();
   });
 });
+
+describe("team faces (owner 2026-10-22)", () => {
+  it("shows a member's own photo when the card carries it, initials otherwise", () => {
+    const { container } = render(
+      <PublicCardView
+        card={card("PARTICIPANT", [
+          {
+            ...TEAM,
+            detail: {
+              kind: "TEAM",
+              members: [
+                {
+                  name: "David Nwankwo",
+                  role: "Founder & CEO",
+                  photoUrl: "https://storage.test/david.webp?sig=1",
+                },
+                { name: "Captain Zino Mario", role: "Co-founder" },
+              ],
+            },
+          },
+        ])}
+      />,
+    );
+    const david = container.querySelector('[data-card-member="David Nwankwo"]');
+    expect(david?.querySelector("img")?.getAttribute("src")).toBe(
+      "https://storage.test/david.webp?sig=1",
+    );
+    const zino = container.querySelector(
+      '[data-card-member="Captain Zino Mario"]',
+    );
+    expect(zino?.querySelector("img")).toBeNull();
+    expect(zino?.querySelector("[data-member-initials]")?.textContent).toBe(
+      "ZM",
+    );
+  });
+});

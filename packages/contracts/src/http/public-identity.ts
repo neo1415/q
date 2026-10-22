@@ -316,6 +316,11 @@ export const CardDetailSchema = z.discriminatedUnion("kind", [
             .object({
               name: z.string().min(1).max(120),
               role: z.string().min(1).max(120).nullable(),
+              /**
+               * The person's own profile photo, a short-lived signed URL,
+               * only for a member with an account; absent: initials.
+               */
+              photoUrl: z.string().url().nullable().optional(),
             })
             .strict(),
         )

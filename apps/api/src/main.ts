@@ -19,6 +19,7 @@ import {
   createCompanyClaims,
   createPlatformCompanyPublishing,
   createPostgresCompanyAffiliationRead,
+  createPostgresCompanyCardTeamRead,
 } from "@capital-q/companies";
 import {
   createApplicationMaterials,
@@ -2198,6 +2199,7 @@ const cardInvestability = createPostgresInvestabilityStore({
 const cardPipeline = createPostgresCompanyPipelineCounts({ sql: database.sql });
 const cardDataRoom = createPostgresDataRoom();
 const cardInvestorTeam = createPostgresInvestorTeamRead({ sql: database.sql });
+const cardTeam = createPostgresCompanyCardTeamRead({ sql: database.sql });
 
 // A person's own Q Card (owner 2026-10-22): their basics, where they work
 // now (a company first, else an investor organisation), and Capital Q's
@@ -2275,7 +2277,7 @@ const cardSubjects = createSubjectDirectory({
           .current([companyId], INVESTABILITY_METHOD_VERSION)
           .then((views) => views.get(companyId) ?? null),
         cardPipeline.byState(companyId),
-        companyTeamProjection.teamForNetwork({ tenantId, companyId }),
+        cardTeam.current({ tenantId, companyId }),
         cardDataRoom.documentsOf(database.sql, companyId),
         cardDataRoom.folders(database.sql),
       ]);
@@ -2319,10 +2321,25 @@ const cardSubjects = createSubjectDirectory({
               assessedAt: iq.assessedAt,
             },
       pipeline,
-      team: team.map((member) => ({
-        name: member.name,
-        role: member.businessTitle ?? (member.isFounder ? "Founder" : null),
-      })),
+      // Each member's own profile photo follows their name (named-images
+      // rule); the team section reaches members only. Bound late: the image
+      // service is composed below. A failed signature shows initials.
+      team: await Promise.all(
+        team.map(async (member) => ({
+          name: member.name,
+          role: member.role,
+          photoUrl:
+            member.userId === null
+              ? null
+              : await profileImages
+                  .cardImageUrls({
+                    subjectType: "PERSON",
+                    subjectId: member.userId,
+                  })
+                  .then((images) => images.photo)
+                  .catch(() => null),
+        })),
+      ),
       documents: documents.map((doc) => ({
         title: doc.title,
         category: folderLabel.get(doc.folderCode) ?? null,

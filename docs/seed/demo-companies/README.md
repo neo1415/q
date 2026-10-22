@@ -56,7 +56,7 @@ Source: `supabase/seed-assets/demo-companies/companies.json`, one fixture shared
    - no SKIP you didn't expect.
 3. Apply: the same command with `--apply`. It runs one transaction per company and is safe to run again; a second run plans nothing.
 4. Scores: the workers recompute on the outbox events the seed writes (`evidence.claim.changed`, `core.company.updated`). The 30-minute sweep is the backstop.
-5. Photos: upload David's headshot (`supabase/seed-assets/capital-q-team/david-founder.jpg`, on branch `seed/team-photos`) through the profile UI, which re-encodes it, as David's photo and, if wanted, Capital Q's logo. Zino's is pending from the owner. No photo of a real person is fetched from the web.
+5. Photos: David's own photo is seeded with `--photo david=supabase/seed-assets/capital-q-team/david-founder.jpg` (needs `--person david=<email>`, plus `SUPABASE_URL` and `SUPABASE_SECRET_KEY` for the upload). It is re-encoded by the product's own processor, uploaded first, and recorded as his READY avatar. It then shows on Capital Q's Q Card team section (members only) and on his own card. Alternatively, upload David's headshot (`supabase/seed-assets/capital-q-team/david-founder.jpg`, on branch `seed/team-photos`) through the profile UI, which re-encodes it, as David's photo and, if wanted, Capital Q's logo. Zino's is pending from the owner. No photo of a real person is fetched from the web.
 
 ## Local rehearsal (no Docker)
 
