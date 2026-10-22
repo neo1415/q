@@ -1,0 +1,407 @@
+{
+  "version": "story-v7.1",
+  "voice": "EXAVITQu4vr4xnSDxMaL",
+  "model": "eleven_v3_conversational",
+  "beats": {
+    "beat-03": {
+      "chars": 29,
+      "durationMs": 2351,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.905
+    },
+    "beat-26": {
+      "chars": 40,
+      "durationMs": 3082,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.358,
+      "silenceCutMs": 1660
+    },
+    "beat-56": {
+      "chars": 153,
+      "durationMs": 11233,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.613
+    },
+    "beat-01": {
+      "chars": 19,
+      "durationMs": 1881,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.175
+    },
+    "beat-02": {
+      "chars": 80,
+      "durationMs": 5251,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.728
+    },
+    "beat-04": {
+      "chars": 26,
+      "durationMs": 1646,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.547
+    },
+    "beat-05": {
+      "chars": 19,
+      "durationMs": 1959,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.665
+    },
+    "beat-06": {
+      "chars": 88,
+      "durationMs": 7393,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.834
+    },
+    "beat-07": {
+      "chars": 31,
+      "durationMs": 2038,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.947
+    },
+    "beat-08": {
+      "chars": 79,
+      "durationMs": 4206,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.617
+    },
+    "beat-09": {
+      "chars": 39,
+      "durationMs": 3004,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.51
+    },
+    "beat-10": {
+      "chars": 103,
+      "durationMs": 6844,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.505
+    },
+    "beat-11": {
+      "chars": 44,
+      "durationMs": 3396,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.531
+    },
+    "beat-12": {
+      "chars": 135,
+      "durationMs": 10266,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.521
+    },
+    "beat-13": {
+      "chars": 159,
+      "durationMs": 11886,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.511
+    },
+    "beat-14": {
+      "chars": 127,
+      "durationMs": 8281,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.467
+    },
+    "beat-15": {
+      "chars": 66,
+      "durationMs": 3004,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.656
+    },
+    "beat-16": {
+      "chars": 153,
+      "durationMs": 10371,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.527
+    },
+    "beat-17": {
+      "chars": 41,
+      "durationMs": 2769,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.672
+    },
+    "beat-18": {
+      "chars": 103,
+      "durationMs": 7001,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.572
+    },
+    "beat-19": {
+      "chars": 254,
+      "durationMs": 17319,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.531
+    },
+    "beat-20": {
+      "chars": 47,
+      "durationMs": 2691,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.572
+    },
+    "beat-21": {
+      "chars": 135,
+      "durationMs": 9639,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.613
+    },
+    "beat-22": {
+      "chars": 180,
+      "durationMs": 11076,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.476
+    },
+    "beat-23": {
+      "chars": 146,
+      "durationMs": 9953,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.481
+    },
+    "beat-24": {
+      "chars": 46,
+      "durationMs": 4989,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.839
+    },
+    "beat-25": {
+      "chars": 70,
+      "durationMs": 7967,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.656
+    },
+    "beat-27": {
+      "chars": 63,
+      "durationMs": 7706,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.758
+    },
+    "beat-28": {
+      "chars": 105,
+      "durationMs": 6269,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.57
+    },
+    "beat-29": {
+      "chars": 109,
+      "durationMs": 7967,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.586
+    },
+    "beat-30": {
+      "chars": 79,
+      "durationMs": 6113,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.658
+    },
+    "beat-31": {
+      "chars": 143,
+      "durationMs": 11546,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.574
+    },
+    "beat-32": {
+      "chars": 69,
+      "durationMs": 5564,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.552
+    },
+    "beat-33": {
+      "chars": 22,
+      "durationMs": 1306,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.94
+    },
+    "beat-34": {
+      "chars": 18,
+      "durationMs": 836,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.075
+    },
+    "beat-35": {
+      "chars": 131,
+      "durationMs": 8908,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.662
+    },
+    "beat-36": {
+      "chars": 107,
+      "durationMs": 9169,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.663
+    },
+    "beat-37": {
+      "chars": 47,
+      "durationMs": 3239,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.804
+    },
+    "beat-38": {
+      "chars": 45,
+      "durationMs": 3239,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.8
+    },
+    "beat-39": {
+      "chars": 55,
+      "durationMs": 3161,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.63
+    },
+    "beat-40": {
+      "chars": 83,
+      "durationMs": 6191,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.542
+    },
+    "beat-41": {
+      "chars": 142,
+      "durationMs": 8281,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.54
+    },
+    "beat-42": {
+      "chars": 42,
+      "durationMs": 3631,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.873
+    },
+    "beat-43": {
+      "chars": 140,
+      "durationMs": 9482,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.524
+    },
+    "beat-44": {
+      "chars": 270,
+      "durationMs": 17789,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.496
+    },
+    "beat-45": {
+      "chars": 304,
+      "durationMs": 19566,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.508
+    },
+    "beat-46": {
+      "chars": 106,
+      "durationMs": 8202,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.566
+    },
+    "beat-47": {
+      "chars": 105,
+      "durationMs": 7811,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.658
+    },
+    "beat-48": {
+      "chars": 122,
+      "durationMs": 9169,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.699
+    },
+    "beat-49": {
+      "chars": 121,
+      "durationMs": 8438,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.562
+    },
+    "beat-50": {
+      "chars": 25,
+      "durationMs": 2691,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.775
+    },
+    "beat-51": {
+      "chars": 86,
+      "durationMs": 8202,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.617
+    },
+    "beat-52": {
+      "chars": 77,
+      "durationMs": 6113,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.552
+    },
+    "beat-53": {
+      "chars": 198,
+      "durationMs": 13166,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.531
+    },
+    "beat-54": {
+      "chars": 112,
+      "durationMs": 7889,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 0.52
+    },
+    "beat-55": {
+      "chars": 15,
+      "durationMs": 1149,
+      "model": "eleven_v3_conversational",
+      "timing": "forced-alignment",
+      "alignmentLoss": 1.195
+    }
+  },
+  "complete": true,
+  "ledger": {
+    "thisRunChars": 284,
+    "totalChars": 5353,
+    "usdPer1kEstimate": 0.3,
+    "thisRunUsdEstimate": 0.09
+  }
+}
