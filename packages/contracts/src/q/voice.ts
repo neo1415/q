@@ -125,6 +125,12 @@ export const CreateQSpeechRequestSchema = z
      */
     text: z.string().trim().min(1).max(Q_SPEECH_MAX_CHARS),
     voice: QVoiceChoiceSchema.default("FEMALE"),
+    /**
+     * Q Story only (owner, 22 Oct): inside the story, Q's spoken answers
+     * use the story narrator's voice, so a viewer hears one voice. Scoped
+     * to the story; Q's own voice everywhere else is `voice`.
+     */
+    presenter: z.literal("STORY").optional(),
   })
   .strict();
 export type CreateQSpeechRequest = z.infer<typeof CreateQSpeechRequestSchema>;

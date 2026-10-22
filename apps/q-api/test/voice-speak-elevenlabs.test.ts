@@ -14,6 +14,7 @@ import type { QVoiceChoice } from "@capital-q/contracts";
 import {
   createElevenLabsSpeechRelay,
   createElevenLabsSpeechSynthesis,
+  STORY_VOICE_ID,
 } from "../src/voice/providers/elevenlabs-speak.js";
 import { SpeechSynthesisError } from "../src/voice/synthesis.js";
 
@@ -486,6 +487,22 @@ describe("the ElevenLabs one-way synthesiser", () => {
     expect(spoken.audio).toEqual(AUDIO);
     expect(calls[0]?.url).toContain("output_format=mp3_44100_128");
     expect(calls[0]?.key).toBe(KEY);
+  });
+
+  it("speaks a Q Story answer in the story's narrator, and only when asked", async () => {
+    const { fetch: fetchFake, calls } = recordingFetch(mp3Response);
+    const speech = createElevenLabsSpeechSynthesis({
+      apiKey: KEY,
+      fetch: fetchFake,
+    });
+    await speech.synthesise({
+      text: "Hi.",
+      voice: "FEMALE",
+      presenter: "STORY",
+    });
+    await speech.synthesise({ text: "Hi.", voice: "FEMALE" });
+    expect(calls[0]?.url).toContain(`/text-to-speech/${STORY_VOICE_ID}/`);
+    expect(calls[1]?.url).toContain(`/text-to-speech/${FEMALE_VOICE_ID}/`);
   });
 
   it("tells a caller only whether asking again is worth it", async () => {

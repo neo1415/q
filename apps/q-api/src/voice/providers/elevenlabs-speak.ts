@@ -84,6 +84,13 @@ const VOICE_IDS: Readonly<Record<QVoiceChoice, string>> = {
 };
 
 /**
+ * The Q Story narrator ("Lily", the owner's pick, 22 Oct): the voice the
+ * story's rendered narration is in, so Q's answers inside the story are
+ * the same voice. Story mode only; `VOICE_IDS` stays Q's own voice.
+ */
+export const STORY_VOICE_ID = "pFZP5JQG7iQjIQuC4Bku";
+
+/**
  * REHEARSE: the voices a person Q plays in a rehearsal speaks with --
  * ElevenLabs premade voices, none of them Q's own, so the other person
  * never sounds like Q. One is chosen per counterpart, steadily, from the
@@ -114,6 +121,7 @@ export function personaVoiceId(voice: QVoiceChoice, seed: string): string {
 
 const ALL_VOICE_IDS: ReadonlySet<string> = new Set([
   ...Object.values(VOICE_IDS),
+  STORY_VOICE_ID,
   ...PERSONA_VOICE_IDS.MALE,
   ...PERSONA_VOICE_IDS.FEMALE,
   // REHEARSE: the persona voice catalog, synced from the account.
@@ -479,7 +487,11 @@ export function createElevenLabsSpeechSynthesis(
         const attempt = await firstAudio(
           (s) =>
             doFetch(
-              streamUrl(request.voice, ONE_WAY_OUTPUT_FORMAT),
+              streamUrl(
+                request.voice,
+                ONE_WAY_OUTPUT_FORMAT,
+                request.presenter === "STORY" ? STORY_VOICE_ID : undefined,
+              ),
               elevenLabsRequest(options.apiKey, model, text, undefined, s),
             ),
           signal,

@@ -34,8 +34,11 @@ import { storyPath, type StoryPathFor } from "./story-pages";
  */
 export const STORY_VOICE = "pFZP5JQG7iQjIQuC4Bku";
 
-/** The render's index: which beats exist, by their content-hashed names. */
-const MEDIA_FILE = /^beat-\d{2}\.[0-9a-f]{10}\.(?:mp3|json)$/u;
+/**
+ * The render's index: which beats exist (and the live story's closing
+ * question), by their content-hashed names.
+ */
+const MEDIA_FILE = /^(?:beat-\d{2}|closing)\.[0-9a-f]{10}\.(?:mp3|json)$/u;
 const IndexSchema = z.object({
   version: z.string(),
   voice: z.string(),
@@ -60,6 +63,8 @@ export type StoryAssets = {
   /** Picture and screenshot files that decoded (the rest fall back). */
   readonly images: ReadonlyMap<string, HTMLImageElement>;
   readonly rendered: boolean;
+  /** "Do you have any questions?" in the narrator's voice, if rendered. */
+  readonly closing: string | null;
   readonly ms: number;
 };
 
@@ -195,6 +200,10 @@ export async function preloadStory(input: {
       : (void context?.close().catch(() => undefined), null),
     images,
     rendered: complete,
+    closing:
+      complete && files["closing"] !== undefined
+        ? mediaUrl(files["closing"].audio)
+        : null,
     ms: Math.round(performance.now() - started),
   };
 }

@@ -347,10 +347,17 @@ describe("Q Story audio bank (budgeted preload)", () => {
       files: Record<string, { audio: string; alignment: string }>;
     };
     expect(index.complete).toBe(true);
-    expect(Object.keys(index.files)).toHaveLength(STORY_BEATS.length);
+    // Every beat, and the live ending's question ("closing").
+    expect(Object.keys(index.files).sort()).toEqual(
+      [...STORY_BEATS.map((beat) => beat.id), "closing"].sort(),
+    );
     for (const entry of Object.values(index.files)) {
-      expect(entry.audio).toMatch(/^beat-\d{2}\.[0-9a-f]{10}\.mp3$/u);
-      expect(entry.alignment).toMatch(/^beat-\d{2}\.[0-9a-f]{10}\.json$/u);
+      expect(entry.audio).toMatch(
+        /^(?:beat-\d{2}|closing)\.[0-9a-f]{10}\.mp3$/u,
+      );
+      expect(entry.alignment).toMatch(
+        /^(?:beat-\d{2}|closing)\.[0-9a-f]{10}\.json$/u,
+      );
     }
   });
 });

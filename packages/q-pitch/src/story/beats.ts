@@ -1100,3 +1100,10 @@ export function spokenForm(word: string): string {
 
 /** The beat the plan calls "the product part": "And there is." */
 export const STORY_PRODUCT_BEAT = 33;
+
+/**
+ * The live story's ending (owner, 22 Oct): after the last laugh, a few
+ * seconds of quiet, then Q asks this aloud and listens. Not in the film.
+ */
+export const STORY_CLOSING_QUESTION = "Do you have any questions?";
+export const STORY_CLOSING_QUIET_MS = 2_500;

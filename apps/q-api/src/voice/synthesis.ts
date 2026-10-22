@@ -19,6 +19,8 @@ export type SpeechSynthesisRequest = {
   /** Already bounded by the contract before it reaches here. */
   readonly text: string;
   readonly voice: QVoiceChoice;
+  /** The Q Story narrator's voice, for answers inside the story only. */
+  readonly presenter?: "STORY" | undefined;
   /** Abandons the request; the caller owns the deadline. */
   readonly signal?: AbortSignal | undefined;
 };

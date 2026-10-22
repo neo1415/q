@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Q Story media: content-hashed file names (immutable caching). Each beat's
- * audio and alignment are renamed `beat-NN.<sha256:10>.{mp3,json}` and
+ * (and the closing question's) audio and alignment are renamed `beat-NN.<sha256:10>.{mp3,json}` and
  * index.json lists the names under `files`, so a re-render gets new names
  * and a cached old clip can never play against a new script. index.json
  * itself keeps its name (it is the one file fetched fresh).
@@ -29,7 +29,12 @@ const indexPath = path.join(dir, "index.json");
 const index = JSON.parse(await readFile(indexPath, "utf8"));
 const names = await readdir(dir);
 const files = {};
-for (const id of Object.keys(index.beats).sort()) {
+// The beats, and the live story's closing question when it was rendered.
+const ids = [
+  ...Object.keys(index.beats).sort(),
+  ...(index.closing === undefined ? [] : ["closing"]),
+];
+for (const id of ids) {
   const entry = {};
   for (const ext of ["mp3", "json"]) {
     const current = names.find((name) =>

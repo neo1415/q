@@ -628,6 +628,10 @@
     "beat-56": {
       "audio": "beat-56.ec72306934.mp3",
       "alignment": "beat-56.b3148d736e.json"
+    },
+    "closing": {
+      "audio": "closing.90afdb5a0f.mp3",
+      "alignment": "closing.d51240688d.json"
     }
   },
   "closing": {

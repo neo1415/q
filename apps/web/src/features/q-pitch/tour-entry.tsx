@@ -6,13 +6,18 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { RESUME_KEY } from "./resume";
 import { markQPitchRunning } from "./tour-presence";
-import { markStoryAvailable } from "./story/story-offer";
+import { markStoryAvailable, useStoryTrigger } from "./story/story-offer";
 import type { TourSubject } from "./subject-model";
 import type { TourChoice } from "./tour-host";
 
 /** v7: the story track (`?qpitch=story`) has its own host. */
 type EntryChoice = TourChoice | "story";
-type Start = { readonly tour: EntryChoice; readonly chapter: string | null };
+type Start = {
+  readonly tour: EntryChoice;
+  readonly chapter: string | null;
+  /** Asked for in words: the story starts on arrival (`&start=`). */
+  readonly autostart?: boolean;
+};
 function choiceOf(value: string | null): EntryChoice | null {
   return value === "story" || value === "founder-v6" || value === "investor-v6"
     ? value
@@ -53,6 +58,7 @@ function readStart(search: string): Start | null {
       : {
           tour,
           chapter: chapter !== null && CHAPTER.test(chapter) ? chapter : null,
+          autostart: params.has("start"),
         };
   const resumed = start ?? readResume();
   lastRead = { search, start: resumed };
@@ -116,6 +122,7 @@ export function QPitchEntry({
     }
   }
   const holding = started !== null && !ended;
+  useStoryTrigger(!holding);
   // Q Pitch is on here (the server mounted this entry): Q may offer the
   // story under a "what is Capital Q?" answer.
   useEffect(() => {
@@ -136,7 +143,14 @@ export function QPitchEntry({
     setEnded(true);
   };
   if (started.tour === "story") {
-    return <StoryHost account={account} role={role} onExit={exit} />;
+    return (
+      <StoryHost
+        account={account}
+        role={role}
+        onExit={exit}
+        autostart={started.autostart === true}
+      />
+    );
   }
   return (
     <QPitchHost

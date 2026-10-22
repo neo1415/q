@@ -71,7 +71,7 @@ const nextConfig: NextConfig = {
         // (scripts/q-pitch/hash-story-media.mjs) never change, so they are
         // cached for good; index.json, which names them, is not matched.
         source:
-          "/story-media/:voice([A-Za-z0-9]{8,40})/:file(beat-\\d{2}\\.[0-9a-f]{10}\\.(?:mp3|json))",
+          "/story-media/:voice([A-Za-z0-9]{8,40})/:file((?:beat-\\d{2}|closing)\\.[0-9a-f]{10}\\.(?:mp3|json))",
         headers: [
           {
             key: "Cache-Control",

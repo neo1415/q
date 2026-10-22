@@ -468,7 +468,11 @@ export function registerQVoiceRoutes(
         ? input.voice
         : "FEMALE";
       try {
-        const spoken = await speech.synthesise({ text: input.text, voice });
+        const spoken = await speech.synthesise({
+          text: input.text,
+          voice,
+          presenter: input.presenter,
+        });
         spokenLines.add(1, { voice });
         return (
           reply

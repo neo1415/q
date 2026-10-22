@@ -242,11 +242,21 @@ function speechMuted(): boolean {
 const speechCache = new Map<string, Promise<Blob | null>>();
 const SPEECH_CACHE_MAX = 32;
 
-function fetchSpeech(text: string, voice: QVoiceChoice): Promise<Blob | null> {
+/**
+ * Q's voice for one line: the person's choice, or "STORY", the Q Story
+ * narrator's voice, for answers inside the story only (one voice there).
+ */
+export type SpeechVoice = QVoiceChoice | "STORY";
+
+function fetchSpeech(text: string, voice: SpeechVoice): Promise<Blob | null> {
   return fetch("/api/q-speech", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text, voice }),
+    body: JSON.stringify(
+      voice === "STORY"
+        ? { text, voice: "FEMALE", presenter: "STORY" }
+        : { text, voice },
+    ),
   })
     .then(async (response) => {
       if (!response.ok) return null;
@@ -261,7 +271,7 @@ function fetchSpeech(text: string, voice: QVoiceChoice): Promise<Blob | null> {
  * line at the voice gateway), so it plays as soon as its turn comes. Only
  * lines the tour is about to say, in the same request a play would make.
  */
-export function prefetchStandardVoice(text: string, voice: QVoiceChoice): void {
+export function prefetchStandardVoice(text: string, voice: SpeechVoice): void {
   if (!voiceOn || speechMuted()) return;
   const key = `${voice}|${text}`;
   if (speechCache.has(key)) return;
@@ -280,7 +290,7 @@ export function prefetchStandardVoice(text: string, voice: QVoiceChoice): void {
  */
 export async function standardVoiceLine(
   text: string,
-  voice: QVoiceChoice,
+  voice: SpeechVoice,
   signal: AbortSignal,
 ): Promise<boolean> {
   if (!voiceOn || speechMuted() || signal.aborted) return false;
@@ -377,13 +387,12 @@ export async function speakRehearsalTurns(
 export async function answerAloud(
   text: string,
   signal: AbortSignal,
+  voice: SpeechVoice = "FEMALE",
 ): Promise<void> {
   const started = Date.now();
-  const spoken = await standardVoiceLine(
-    spokenPart(text),
-    "FEMALE",
-    signal,
-  ).catch(() => false);
+  const spoken = await standardVoiceLine(spokenPart(text), voice, signal).catch(
+    () => false,
+  );
   if (!spoken)
     await abortableWait(readingMs(text) - (Date.now() - started), signal);
 }

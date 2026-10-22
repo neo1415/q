@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 let search = "";
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(search),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 // The host itself is not under test: a stub that names the tour it was given.
 vi.mock("next/dynamic", () => ({

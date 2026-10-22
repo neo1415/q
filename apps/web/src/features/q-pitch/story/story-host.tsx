@@ -15,6 +15,8 @@ import {
 import {
   ACT_BUDGET_MS,
   STORY_BEATS,
+  STORY_CLOSING_QUESTION,
+  STORY_CLOSING_QUIET_MS,
   TourActorSchema,
   buildQaIndex,
   certifyStory,
@@ -98,6 +100,39 @@ function createStore<T>(initial: T) {
 const frame = () =>
   new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
+/** One rendered clip, through the story's audio clock. False if it failed. */
+async function playClip(
+  context: AudioContext,
+  url: string,
+  signal: AbortSignal,
+): Promise<boolean> {
+  try {
+    const bytes = await (
+      await fetch(url, { cache: "force-cache" })
+    ).arrayBuffer();
+    const buffer = await context.decodeAudioData(bytes);
+    if (signal.aborted) return true;
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(context.destination);
+    await new Promise<void>((resolve) => {
+      const stop = () => {
+        source.stop();
+        resolve();
+      };
+      signal.addEventListener("abort", stop, { once: true });
+      source.onended = () => {
+        signal.removeEventListener("abort", stop);
+        resolve();
+      };
+      source.start();
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function moodBefore(index: number): Mood {
   let mood: Mood = "OFF";
   for (const beat of STORY_BEATS.slice(0, index)) {
@@ -153,6 +188,7 @@ export function StoryHost({
   onExit,
   harness,
   voice,
+  autostart = false,
 }: {
   readonly account: string;
   readonly role: "INVESTOR" | "FOUNDER";
@@ -164,6 +200,12 @@ export function StoryHost({
   readonly harness?: { readonly pathFor: StoryPathFor } | undefined;
   /** A rendered voice set other than Q's own (the harness's `?voice=`). */
   readonly voice?: string | undefined;
+  /**
+   * Asked for in words ("Hey Q, pitch yourself", the chip): starts with
+   * voice as soon as it is ready, when the browser lets the audio play
+   * (the ask was a gesture on this page); else the one Start press.
+   */
+  readonly autostart?: boolean;
 }) {
   const router = useRouter();
   const pathFor = harness?.pathFor ?? storyPath;
@@ -215,6 +257,41 @@ export function StoryHost({
   }, [actor, router, pathFor, voice]);
 
   const [player, setPlayer] = useState<StoryPlayer | null>(null);
+  const voiceChosen = useRef(false);
+  // Ended by the person (End, a command): never followed by the question.
+  const exited = useRef(false);
+  const mutedRef = useRef(false);
+
+  // The ending, live only: Q asks once, aloud, and listens. On a line the
+  // person does not have open yet, the line itself asks (its first words)
+  // and then listens; with one open, the narrator's own recorded question
+  // plays and the open line hears the answer. Captions only: nothing aloud.
+  const askClosing = useCallback(
+    async (signal: AbortSignal) => {
+      if (
+        !voiceChosen.current ||
+        mutedRef.current ||
+        exited.current ||
+        signal.aborted
+      ) {
+        return;
+      }
+      const current = sessionRef.current;
+      if (current !== null && !current.voice.active) {
+        await current
+          .talk({ greeting: STORY_CLOSING_QUESTION })
+          .catch(() => undefined);
+        return;
+      }
+      const clip = assets?.closing ?? null;
+      const context = assets?.context ?? null;
+      if (clip !== null && context !== null) {
+        if (await playClip(context, clip, signal)) return;
+      }
+      await answerAloud(STORY_CLOSING_QUESTION, signal, "STORY");
+    },
+    [assets],
+  );
   // Cancels a voice line still opening when the story is left (audit).
   // Made in the effect, so a Strict Mode remount gets a fresh one.
   const opening = useRef(new AbortController());
@@ -239,6 +316,7 @@ export function StoryHost({
       if (assets === null) return;
       setStarting(true);
       setNarrationVoice(withVoice);
+      voiceChosen.current = withVoice;
       let narrator: StoryNarrator;
       if (
         withVoice &&
@@ -363,8 +441,27 @@ export function StoryHost({
     [assets, mood, stage, pathFor],
   );
 
+  // Asked for in words: with voice, as soon as it is ready, when the
+  // browser lets the audio play; otherwise the Start press as usual.
+  const autostarted = useRef(false);
+  useEffect(() => {
+    if (!autostart || !actor || autostarted.current) return;
+    if (assets === null || player !== null) return;
+    autostarted.current = true;
+    const context = assets.context;
+    queueMicrotask(() => {
+      void (async () => {
+        await context?.resume().catch(() => undefined);
+        if (context === null || context.state === "running") {
+          await begin(true);
+        }
+      })();
+    });
+  }, [autostart, actor, assets, player, begin]);
+
   useEffect(() => {
     player?.setMuted(muted);
+    mutedRef.current = muted;
   }, [player, muted]);
 
   useEffect(() => {
@@ -461,7 +558,9 @@ export function StoryHost({
       onMuted={(on) => {
         setMuted(on);
       }}
+      onClosing={askClosing}
       onExit={() => {
+        exited.current = true;
         player.end();
         onExit();
       }}
@@ -586,6 +685,7 @@ function StoryOverlay({
   onCaptions,
   muted,
   onMuted,
+  onClosing,
   onExit,
 }: {
   readonly player: StoryPlayer;
@@ -597,6 +697,8 @@ function StoryOverlay({
   readonly onCaptions: (on: boolean) => void;
   readonly muted: boolean;
   readonly onMuted: (on: boolean) => void;
+  /** The live ending: Q's question, after the quiet (see askClosing). */
+  readonly onClosing: (signal: AbortSignal) => Promise<void>;
   readonly onExit: () => void;
 }) {
   const snapshot: StorySnapshot = useSyncExternalStore(
@@ -607,6 +709,21 @@ function StoryOverlay({
   const stageNow = useSyncExternalStore(stage.subscribe, stage.get, stage.get);
   const moodNow = useSyncExternalStore(mood.subscribe, mood.get, mood.get);
   const done = snapshot.phase === "DONE";
+
+  // After the last laugh, a few seconds of quiet; then the question.
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    if (!done) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setClosing(true);
+      void onClosing(controller.signal);
+    }, STORY_CLOSING_QUIET_MS);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [done, onClosing]);
 
   // Story mode on the document: chrome dims, the pulse breathes.
   useEffect(() => {
@@ -723,6 +840,8 @@ function StoryOverlay({
         // A spoken question the bank does not hold: the story pauses and
         // Q's own live line answers it; then the offer to carry on.
         if (from === "VOICE") {
+          // After the story, the open line answers it; nothing to pause.
+          if (player.snapshot().phase === "DONE") return true;
           player.interrupt();
           setAnswer(null);
           setAsked(true);
@@ -738,7 +857,10 @@ function StoryOverlay({
       speaking.current = controller;
       // Spoken questions are answered by the live line itself; typed ones
       // in Q's standard voice.
-      if (from === "TYPED") void answerAloud(entry.answer, controller.signal);
+      if (from === "TYPED") {
+        // In the narrator's voice: one voice inside the story.
+        void answerAloud(entry.answer, controller.signal, "STORY");
+      }
       return true;
     },
     [player, qa, onExit, onCaptions, onMuted, captions, muted],
@@ -903,10 +1025,10 @@ function StoryOverlay({
           </button>
         </div>
       ) : null}
-      {done ? (
+      {done && closing ? (
         <div className="cq-story-answer" role="status">
-          <p className="cq-story-kicker">The story is over</p>
-          <p>Ask me anything about Capital Q: type your question below.</p>
+          <p className="cq-story-kicker">{STORY_CLOSING_QUESTION}</p>
+          <p>Ask me aloud, or type your question below.</p>
           <button type="button" className="cq-story-btn" onClick={onExit}>
             Close
           </button>
