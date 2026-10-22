@@ -1,0 +1,75 @@
+{
+  "recordedAt": "2026-10-22T11:11:32.430Z",
+  "voice": "pFZP5JQG7iQjIQuC4Bku",
+  "model": "eleven_v4_turbo",
+  "probe": {
+    "programs": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 1920,
+        "height": 1080,
+        "r_frame_rate": "30/1"
+      },
+      {
+        "codec_name": "aac",
+        "r_frame_rate": "0/0"
+      }
+    ],
+    "format": {
+      "duration": "265.933008"
+    }
+  },
+  "bytes": {
+    "master": 28755135,
+    "share": 6325283
+  },
+  "story": {
+    "narrator": "RENDERED",
+    "preloadMs": 1328,
+    "offsets": {
+      "median": -62,
+      "p95": 22,
+      "count": 112
+    },
+    "offsetsByKind": {
+      "stage": {
+        "median": -51,
+        "p95": 26,
+        "count": 80
+      },
+      "mood": {
+        "median": -64,
+        "p95": -30,
+        "count": 8
+      },
+      "navigate": {
+        "median": 606,
+        "p95": 606,
+        "count": 2
+      },
+      "light": {
+        "median": -105,
+        "p95": -75,
+        "count": 11
+      }
+    },
+    "frames": {
+      "count": 6099,
+      "long": 1408
+    },
+    "fallbacks": 0,
+    "fallbackCues": [],
+    "beat": 34,
+    "phase": "DONE"
+  },
+  "cls": 0,
+  "shifts": 0,
+  "audioStarts": 35,
+  "clips": 34,
+  "pageTextHits": [],
+  "devBadgeSamples": 0,
+  "ocrFrames": 532,
+  "ocrHits": [],
+  "defects": 0
+}
