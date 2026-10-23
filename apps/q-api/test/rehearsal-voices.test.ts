@@ -1,7 +1,10 @@
 import { createDefaultPromptRegistry } from "@capital-q/q-core";
 import { describe, expect, it } from "vitest";
 
-import type { RehearsalService } from "../src/composition/rehearsals.js";
+import {
+  localLanguageLine,
+  type RehearsalService,
+} from "../src/composition/rehearsals.js";
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
 import {
@@ -12,6 +15,7 @@ import {
 
 import {
   accentForPlace,
+  localLanguageFor,
   catalogVoice,
   pickVoice,
   shapeForAge,
@@ -794,9 +798,16 @@ describe("how the person Q plays talks (row 12, INVESTOR_TWIN_TURN v11)", () => 
     expect(
       createDefaultPromptRegistry().getActive("INVESTOR_TWIN_TURN").definition
         .version,
-    ).toBe(11);
+    ).toBe(12);
     expect(template).toContain('"Speaks like" line');
     expect(template).toContain("code-switch");
+  });
+
+  it("v12: greets in the local language once, in its own script, substance in English", () => {
+    expect(template).toContain('"Local language" line');
+    expect(template).toContain("own script");
+    expect(template).toContain("never transliterated");
+    expect(template).toContain("everything that matters stays in English");
   });
 
   it("forbids caricature, stereotype and spelled-out accents", () => {
@@ -830,5 +841,60 @@ describe("warming a persona's library voice before its first line", () => {
     relay.warm?.(SPEC);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(fake.seen).toHaveLength(2);
+  });
+});
+
+describe("where a persona is from, read right (2026-10-23 audit)", () => {
+  it("never reads a US state code as a country", () => {
+    expect(accentForPlace("Boston, MA")).toBe("american");
+    expect(accentForPlace("Denver, CO")).toBe("american");
+    expect(accentForPlace("Wilmington, DE")).toBe("american");
+    expect(accentForPlace("Boise, ID")).toBe("american");
+    expect(accentForPlace("Nashville, TN")).toBe("american");
+  });
+
+  it("still reads a known city first, and an ISO code on its own", () => {
+    expect(accentForPlace("Riyadh, SA")).toBe("arabic");
+    expect(accentForPlace("Casablanca, MA")).toBe("arabic");
+    expect(accentForPlace("Lagos, NG")).toBe("nigerian");
+    expect(accentForPlace("SA")).toBe("arabic");
+    expect(accentForPlace("Istanbul, Türkiye")).toBe("turkish");
+  });
+
+  it("tells the turn prompt the language and script, or nothing", () => {
+    expect(localLanguageLine("Riyadh, Saudi Arabia")).toBe(
+      "\nLocal language: Arabic (write it in Arabic script).",
+    );
+    expect(localLanguageLine("London, United Kingdom")).toBe("");
+    expect(localLanguageLine(null)).toBe("");
+  });
+
+  it("names the language a persona greets in, and its script", () => {
+    expect(localLanguageFor("Riyadh, Saudi Arabia")).toEqual({
+      language: "Arabic",
+      script: "Arabic script",
+    });
+    expect(localLanguageFor("Lagos, Nigeria")?.language).toBe("Yoruba");
+    expect(localLanguageFor("Kano, Nigeria")?.language).toBe("Hausa");
+    expect(localLanguageFor("Nigeria")?.language).toBe("Nigerian Pidgin");
+    expect(localLanguageFor("Bengaluru, India")?.script).toBe("Devanagari");
+    // English-speaking or unknown: no local language, never a guess.
+    expect(localLanguageFor("London, United Kingdom")).toBeNull();
+    expect(localLanguageFor(null)).toBeNull();
+  });
+
+  it("gives an Arabic-speaking persona a choice of Arabic voices, not one", () => {
+    const picks = Array.from({ length: 40 }, (_, i) =>
+      personaVoiceFor({
+        seed: `INVESTOR_ORGANISATION:${String(i)}`,
+        voice: "MALE",
+        basedIn: "Riyadh, Saudi Arabia",
+        ageGroup: null,
+        patience: "TYPICAL",
+      }),
+    );
+    // Was one voice (Fahad) for every Arabic-speaking man.
+    expect(new Set(picks.map((pick) => pick?.voiceId)).size).toBeGreaterThan(3);
+    for (const pick of picks) expect(pick?.accent).toBe("arabic");
   });
 });

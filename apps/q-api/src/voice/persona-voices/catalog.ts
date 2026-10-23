@@ -61,6 +61,7 @@ export type AccentKey =
   | "italian"
   | "indonesian"
   | "arabic"
+  | "turkish"
   | "russian"
   | "german"
   | "dutch"
@@ -85,6 +86,7 @@ export const ACCENT_LABELS: Readonly<Record<AccentKey, string>> = {
   italian: "Italian-accented English",
   indonesian: "Indonesian-accented English",
   arabic: "Arabic-accented English",
+  turkish: "Turkish-accented English",
   russian: "Russian-accented English",
   german: "German-accented English",
   dutch: "Dutch-accented English",
@@ -93,6 +95,14 @@ export const ACCENT_LABELS: Readonly<Record<AccentKey, string>> = {
   latin_american: "Latin American-accented English",
   brazilian: "Brazilian-accented English",
 };
+
+/** "City, ST": the two-letter US state codes (lower case). */
+const US_STATE_CODES: ReadonlySet<string> = new Set(
+  (
+    "al ak az ar ca co ct de fl ga hi id il in ia ks ky la me md ma mi mn ms " +
+    "mo mt ne nv nh nj nm ny nc nd oh ok or pa ri sc sd tn tx ut vt va wa wv wi wy dc"
+  ).split(" "),
+);
 
 const isAccentKey = (value: string): value is AccentKey =>
   Object.hasOwn(ACCENT_LABELS, value);
@@ -109,6 +119,7 @@ const LANGUAGE_ACCENT_KEYS: Readonly<
 > = {
   zh: { "hong kong cantonese": "cantonese", "": "chinese" },
   ar: { "": "arabic" },
+  tr: { "": "turkish" },
   hi: { "": "indian" },
   ta: { "": "indian" },
   ru: { "": "russian" },
@@ -139,6 +150,7 @@ const REGIONAL_FALLBACK: Readonly<Record<AccentKey, readonly AccentKey[]>> = {
   korean: ["japanese"],
   indonesian: ["singaporean"],
   arabic: ["indian"],
+  turkish: ["arabic"],
   russian: ["german"],
   german: ["dutch"],
   dutch: ["german"],
@@ -392,6 +404,17 @@ const PLACE_TO_ACCENT: ReadonlyMap<string, AccentKey> = new Map([
   ]),
   ...group("italian", ["italian", "italy", "it", "milan", "rome"]),
   ...group("indonesian", ["indonesian", "indonesia", "id", "jakarta"]),
+  ...group("turkish", [
+    "turkish",
+    "turk",
+    "turkey",
+    "turkiye",
+    "türkiye",
+    "tr",
+    "istanbul",
+    "ankara",
+    "izmir",
+  ]),
   ...group("arabic", [
     "arabic",
     "arab",
@@ -644,11 +667,21 @@ export function accentForPlace(
     .map(normalise)
     .filter((part) => part.length > 0)
     .reverse();
-  for (const part of parts) {
+  // 2026-10-23: a two-letter part is a code only when nothing longer is
+  // known ("Boston, MA" was Morocco, "Denver, CO" Colombia); after a city
+  // it is a US state when it is one.
+  const named = parts.filter((part) => part.length > 2);
+  for (const part of named) {
     const direct = PLACE_TO_ACCENT.get(part);
     if (direct !== undefined) return direct;
     const key = part.replace(/ /gu, "_");
     if (isAccentKey(key)) return key;
+  }
+  for (const part of parts) {
+    if (part.length !== 2) continue;
+    if (named.length > 0 && US_STATE_CODES.has(part)) return "american";
+    const coded = PLACE_TO_ACCENT.get(part);
+    if (coded !== undefined) return coded;
   }
   // "Greater London Area", "Dubai Internet City": a known name inside.
   for (const part of parts) {
@@ -834,4 +867,67 @@ export function shapeForAge(
     };
   }
   return settings;
+}
+
+/**
+ * 2026-10-23 (owner: "maybe even speaking the local language occasionally"):
+ * the language a persona greets in, from where they are based, with the
+ * script it is written in so the multilingual voice says it properly.
+ * Null for English-speaking places and unknown ones: unknown stays unknown.
+ */
+export type LocalLanguage = {
+  readonly language: string;
+  readonly script: string;
+};
+
+const LOCAL_LANGUAGE: Readonly<Partial<Record<AccentKey, LocalLanguage>>> = {
+  arabic: { language: "Arabic", script: "Arabic script" },
+  turkish: { language: "Turkish", script: "Latin script" },
+  indian: { language: "Hindi", script: "Devanagari" },
+  chinese: { language: "Mandarin", script: "simplified Chinese characters" },
+  cantonese: {
+    language: "Cantonese",
+    script: "traditional Chinese characters",
+  },
+  japanese: { language: "Japanese", script: "Japanese script" },
+  korean: { language: "Korean", script: "Hangul" },
+  italian: { language: "Italian", script: "Latin script" },
+  indonesian: { language: "Indonesian", script: "Latin script" },
+  russian: { language: "Russian", script: "Cyrillic" },
+  german: { language: "German", script: "Latin script" },
+  dutch: { language: "Dutch", script: "Latin script" },
+  french: { language: "French", script: "Latin script" },
+  spanish: { language: "Spanish", script: "Latin script" },
+  latin_american: { language: "Spanish", script: "Latin script" },
+  brazilian: { language: "Portuguese", script: "Latin script" },
+};
+
+/** Nigeria's main languages by city; Pidgin where no city says otherwise. */
+const NIGERIAN_CITY_LANGUAGE: readonly [RegExp, string][] = [
+  [
+    /\b(lagos|ibadan|abeokuta|ogun|oyo|osun|ondo|ekiti|ilorin|ikeja|lekki)\b/iu,
+    "Yoruba",
+  ],
+  [
+    /\b(kano|kaduna|katsina|sokoto|zaria|maiduguri|bauchi|jos|abuja)\b/iu,
+    "Hausa",
+  ],
+  [/\b(enugu|onitsha|owerri|aba|awka|nsukka|umuahia)\b/iu, "Igbo"],
+];
+
+export function localLanguageFor(
+  place: string | null | undefined,
+): LocalLanguage | null {
+  const accent = accentForPlace(place);
+  if (accent === null) return null;
+  if (accent === "nigerian") {
+    const found = NIGERIAN_CITY_LANGUAGE.find(([test]) =>
+      test.test(place ?? ""),
+    );
+    return {
+      language: found?.[1] ?? "Nigerian Pidgin",
+      script: "Latin script",
+    };
+  }
+  return LOCAL_LANGUAGE[accent] ?? null;
 }

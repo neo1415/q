@@ -83,6 +83,7 @@ import { externalSimulation } from "./external-presentation.js";
 import { scenarioFor } from "./external-scenarios.js";
 import type { DemoRehearsalAccess } from "./demo-rehearsal-access.js";
 import type { ExternalSubjectResolver } from "./external-resolve.js";
+import { localLanguageFor } from "../voice/persona-voices/catalog.js";
 import type { ExternalSubjectStore } from "./external-subjects.js";
 import type { ExternalRehearsalLatency } from "./external-rehearsal-latency.js";
 import {
@@ -2197,6 +2198,8 @@ export function createRehearsalService(dependencies: {
         (place === null
           ? ""
           : `\nSpeaks like: someone who lives and works in ${place}.`) +
+        // v12 (2026-10-23): the language they greet in, in its own script.
+        localLanguageLine(place) +
         (closingSoon
           ? "\nMeeting time is almost over. In character, courteously acknowledge that you need to leave shortly. Close naturally in one or two sentences, without another question."
           : ""),
@@ -3222,4 +3225,15 @@ export function createRehearsalComposer(dependencies: {
         ),
       ),
   };
+}
+
+/**
+ * INVESTOR_TWIN_TURN v12: the language the person greets in, from where
+ * they are based ("" when English or unknown: unknown stays unknown).
+ */
+export function localLanguageLine(place: string | null): string {
+  const local = localLanguageFor(place);
+  return local === null
+    ? ""
+    : `\nLocal language: ${local.language} (write it in ${local.script}).`;
 }

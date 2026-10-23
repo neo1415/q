@@ -1,0 +1,65 @@
+[
+  {
+    "persona": "saudi-family-office",
+    "basedIn": "Riyadh, Saudi Arabia",
+    "localLanguage": "Local language: Arabic (write it in Arabic script).",
+    "voice": "Ali - calm & Deep Arabic Saudi Narrator (ar/saudi/male)",
+    "accent": "arabic",
+    "line": "السلام عليكم, good to connect with you. I see you're raising for Nixo out of West Africa and the Gulf, which is an interesting footprint—perhaps we could start with how you manage the operational split between two such different markets.",
+    "mood": "WARM",
+    "intensity": "NORMAL",
+    "settings": {
+      "stability": 0.5,
+      "similarity_boost": 0.85,
+      "style": 0.25,
+      "speed": 0.98,
+      "use_speaker_boost": true
+    },
+    "model": "eleven_v4_turbo",
+    "modelMs": 1558,
+    "ttsFirstByteMs": 4021,
+    "characters": 237
+  },
+  {
+    "persona": "nigerian-angel",
+    "basedIn": "Lagos, Nigeria",
+    "localLanguage": "Local language: Yoruba (write it in Latin script).",
+    "voice": "Bukola - Gentle, Clear and Warm (en/nigerian/female)",
+    "accent": "nigerian",
+    "line": "E kaaro, nice to connect with you, let's dive straight in.",
+    "mood": "WARM",
+    "intensity": "NORMAL",
+    "settings": {
+      "stability": 0.5,
+      "similarity_boost": 0.85,
+      "style": 0.25,
+      "speed": 0.98,
+      "use_speaker_boost": true
+    },
+    "model": "eleven_v4_turbo",
+    "modelMs": 1694,
+    "ttsFirstByteMs": 6845,
+    "characters": 58
+  },
+  {
+    "persona": "london-vc-partner",
+    "basedIn": "London, United Kingdom",
+    "localLanguage": null,
+    "voice": "Frederick Surrey - Smooth and Velvety (en/british/male)",
+    "accent": "british",
+    "line": "Morning, thanks for making the time. Let's dive straight in, you're looking at a three million seed for Nixo, right? Walk me through why invoicing and payments in West Africa and the Gulf sit in the same wedge.",
+    "mood": "NEUTRAL",
+    "intensity": "NORMAL",
+    "settings": {
+      "stability": 0.65,
+      "similarity_boost": 0.85,
+      "style": 0,
+      "speed": 1,
+      "use_speaker_boost": true
+    },
+    "model": "eleven_v4_turbo",
+    "modelMs": 1380,
+    "ttsFirstByteMs": 4380,
+    "characters": 210
+  }
+]
