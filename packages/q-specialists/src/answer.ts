@@ -1492,6 +1492,10 @@ export function createSpecialistQAnswer(
       return { content: `Which company should the ${noun} be about?` };
     }
 
+    // Owner 2026-10-23: the document is under way from here, before the
+    // research behind it, so the voice line knows it is durable work and
+    // never cancels it when the person carries on talking.
+    await showStage(request, "PREPARING_DOCUMENT");
     const context = {
       actor: request.actor,
       runId: request.runId,

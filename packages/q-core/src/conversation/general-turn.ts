@@ -24,8 +24,9 @@ import { reduceConversation, type ConversationState } from "./state.js";
 /**
  * Whether the answer path may go to the public web for this turn.
  *
- * EXPLICIT: they asked for something real, current or public — research
- * is offered and, if the model does not reach for it, run. ONLY_IF_EMPTY:
+ * EXPLICIT: they asked for something real, current or public, or asked
+ * about a company or person not theirs by name — research starts beside
+ * the reads of Capital Q's own records, never after them. ONLY_IF_EMPTY:
  * a question about their own records — Capital Q's authorised context
  * first, and the web only if that came back empty, said out loud as a
  * change of source. OFFERED: they asked Q to do something, or are
@@ -88,17 +89,21 @@ export function researchDirectiveFor(
   ) {
     return NO_RESEARCH;
   }
-  // Asking about somebody else by name is a question for Capital Q's own
-  // records first; the public web only if they hold nothing, because a
-  // company Capital Q does not hold usually exists in the world.
+  // Asking about somebody else by name asks Capital Q's own records and the
+  // public web together (owner 2026-10-23: "search Capital Q's database
+  // AND the web in parallel, not one then the other"). Records-first left
+  // a company Capital Q holds thinly ("tell me about Zino Aviation and its
+  // team") answered from that thin record, with the web never asked.
+  // A question about their own records that names someone ("what did we
+  // discuss about Tensorgate?") stays records-first: the web adds nothing
+  // to what they discussed (speed lane C, live 2026-10-12).
   if (
     environment.aboutNamedOther === true &&
     reading.kind === "QUESTION_TO_Q" &&
-    reading.question?.kind !== "REAL_WORLD_EXAMPLE" &&
-    reading.question?.kind !== "PUBLIC_FACTS"
+    reading.question?.kind !== "THEIR_OWN_RECORDS"
   ) {
     return environment.available && !isExhausted(state.failures, "RESEARCH")
-      ? { mode: "ONLY_IF_EMPTY", announceSourceChange: false }
+      ? { mode: "EXPLICIT", announceSourceChange: false }
       : NO_RESEARCH;
   }
   const ownRecords =

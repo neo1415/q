@@ -45,6 +45,8 @@ function harnessPath(route: StoryRoute): string {
 }
 
 const HARNESS = { pathFor: harnessPath };
+/** `?stills=1`: as any viewer but the certified demo actor sees it. */
+const STILLS = { pathFor: harnessPath, live: false };
 const VOICE_ID = /^[A-Za-z0-9]{8,40}$/u;
 
 /** `?voice=<id>`: another rendered voice set, for a one-command re-record. */
@@ -61,6 +63,13 @@ let filmLatch: boolean | null = null;
 function filmOnce(): boolean {
   filmLatch ??= new URLSearchParams(window.location.search).get("film") === "1";
   return filmLatch;
+}
+
+let stillsLatch: boolean | null = null;
+function stillsOnce(): boolean {
+  stillsLatch ??=
+    new URLSearchParams(window.location.search).get("stills") === "1";
+  return stillsLatch;
 }
 
 /** `?edition=investor|founder`: one of the story's cuts. Read once too. */
@@ -85,6 +94,7 @@ export function StoryHarnessHost() {
     () => undefined,
   );
   const film = useSyncExternalStore(noSubscription, filmOnce, () => false);
+  const stills = useSyncExternalStore(noSubscription, stillsOnce, () => false);
   const edition = useSyncExternalStore(
     noSubscription,
     editionOnce,
@@ -94,7 +104,7 @@ export function StoryHarnessHost() {
     <StoryHost
       account={HARNESS_ACCOUNT}
       role="INVESTOR"
-      harness={HARNESS}
+      harness={stills ? STILLS : HARNESS}
       voice={voice}
       film={film}
       edition={edition}

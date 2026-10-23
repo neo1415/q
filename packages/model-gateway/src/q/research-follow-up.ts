@@ -122,3 +122,22 @@ export function publicResearchFollowUp(input: {
   }
   return null;
 }
+
+/**
+ * A pronoun question straight after an answer drawn from public sources
+ * ("what did those sources say about their funding?"): a follow-up on what
+ * was just found, answered from what this person already read rather than
+ * by a fresh search started ahead of the model (owner 2026-10-23).
+ */
+export function followsUpPublicSources(input: {
+  readonly history: readonly QConversationMessage[];
+  readonly question: string;
+  readonly aboutNamedOther: boolean;
+}): boolean {
+  if (input.aboutNamedOther || !PRONOUN.test(input.question)) return false;
+  const turn = lastTurn(input.history);
+  return (
+    turn !== null &&
+    (turn.answer.blocks ?? []).some((block) => block.kind === "PUBLIC_SOURCE")
+  );
+}

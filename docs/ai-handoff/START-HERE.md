@@ -4,6 +4,8 @@
 
 **Continuity (2026-10-11):** Codex Cloud is completing the current demo release; Claude Code may continue immediately from the prominent latest status in STATE.md. Shared handoff files and branch SHAs govern continuity; no model-specific memory or replacement application.
 
+> **Latest handover (23 Oct 2026):** read [`HANDOFF-2026-10-23.md`](HANDOFF-2026-10-23.md) first: the deployed state, the workers in flight, the owner decisions and the open items.
+
 ## Q Pitch — canonical specification (all agents)
 
 - **Read first:** before starting or modifying Q Pitch, demo identities, scripted tours, navigation, narration or showcase features, read `docs/specs/q-pitch/Q_PITCH_MASTER_BLUEPRINT.md`.

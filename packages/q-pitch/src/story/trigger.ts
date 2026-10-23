@@ -31,6 +31,8 @@ const STORY = new RegExp(
   `^(?:(?:q|hey q|ok|okay|please|can you|could you|would you)\\s+)*(?:(?:present|pitch|demo|introduce)\\s+(?:us\\s+|me\\s+)?(?:${NAME}|yourself)|(?:tell|show)\\s+(?:me|us)\\s+(?:your|the)\\s+story|(?:tell|show)\\s+(?:me|us)\\s+the\\s+capital ?q\\s+story|give\\s+(?:me|us)\\s+(?:the|your)\\s+pitch|pitch)(?:\\s+(?:to|for)\\s+(?:an?\\s+|the\\s+)?(investors?|founders?|business(?:es)?|companies|company|everyone|everybody|all))?(?:\\s+(?:please|now|to me|to us))*$`,
   "u",
 );
+const BARE =
+  /^(?:(?:q|hey q|ok|okay|please|can you|could you|would you)\s+)*pitch(?:\s+(?:please|now))*$/u;
 const BRIEF = new RegExp(
   `^(?:(?:q|hey q|ok|so)\\s+)*(?:what\\s+is|what\\s+s|whats)\\s+${NAME}$`,
   "u",
@@ -47,9 +49,9 @@ export function classifyStoryTrigger(text: string): StoryTrigger | null {
   const said = normaliseCommand(text);
   if (said.length === 0 || said.length > 80) return null;
   const story = STORY.exec(said);
-  // "pitch" alone is not an ask; "pitch to an investor" is.
-  const bare = /(?:^|\s)pitch$/u.test(said);
-  if (story !== null && !(bare && story[1] === undefined)) {
+  // "pitch" alone is not an ask; "pitch to an investor" and "give me the
+  // pitch" are.
+  if (story !== null && !BARE.test(said)) {
     return { kind: "STORY", edition: audience(story[1]) };
   }
   if (BRIEF.test(said)) {

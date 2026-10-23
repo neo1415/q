@@ -422,7 +422,10 @@ import {
   createQTurnReader,
   type QReceiptPort,
 } from "@capital-q/model-gateway/q";
-import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
+import {
+  createGoogleModelProvider,
+  geminiEnabled,
+} from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 import {
@@ -1093,7 +1096,9 @@ const qStream = createQRunStreamService({
 // The keys are revealed here, once, and handed to the adapters.
 const providerSecrets = config.secrets.modelProviders;
 const providers: ModelProvider[] = [];
-if (providerSecrets.google !== undefined) {
+// Owner 2026-10-23: Gemini is unpaid; off unless CQ_GEMINI_ENABLED=1.
+const gemini = geminiEnabled(process.env);
+if (providerSecrets.google !== undefined && gemini) {
   providers.push(
     createGoogleModelProvider({
       apiKey: providerSecrets.google.reveal(),
@@ -3852,10 +3857,10 @@ const memoryLearner = createMemoryLearner({
 // provider credit, so budgets cap it per document, per organisation per
 // day and across Capital Q per day. The image bucket is private and needs
 // the server's storage key; without it no picture is made.
-// Gemini first: the founder funds a billed Gemini account for pictures;
-// the small OpenAI top-up is only the fallback.
+// Gemini first only when CQ_GEMINI_ENABLED=1 (it is unpaid since
+// 2026-10-23); otherwise pictures are made by OpenAI.
 const imageProviders: ImageProvider[] = [];
-if (providerSecrets.google !== undefined) {
+if (providerSecrets.google !== undefined && gemini) {
   imageProviders.push(
     createGoogleImageProvider({ apiKey: providerSecrets.google.reveal() }),
   );

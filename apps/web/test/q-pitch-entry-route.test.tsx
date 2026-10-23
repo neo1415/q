@@ -12,13 +12,20 @@ vi.mock("next/dynamic", () => ({
   default: () =>
     function Host({
       tour,
+      edition,
       onExit,
     }: {
-      readonly tour: string;
+      readonly tour?: string;
+      readonly edition?: string;
       readonly onExit: () => void;
     }) {
       return (
-        <button type="button" data-host={tour} onClick={onExit}>
+        <button
+          type="button"
+          data-host={tour ?? "story"}
+          data-edition={edition}
+          onClick={onExit}
+        >
           End tour
         </button>
       );
@@ -71,5 +78,21 @@ describe("the Q Pitch entry follows client navigation", () => {
     search = "qpitch=investor-v6";
     view.rerender(<QPitchEntry account="a" role="INVESTOR" />);
     expect(document.querySelector("[data-host]")).not.toBeNull();
+  });
+
+  it("a new ask while the story is up starts the cut asked for", () => {
+    search = "qpitch=story&new=1&edition=investor&start=a1";
+    const view = render(<QPitchEntry account="a" role="FOUNDER" />);
+    const edition = () =>
+      document.querySelector("[data-host]")?.getAttribute("data-edition");
+    expect(edition()).toBe("INVESTOR");
+    // The story moves on to a page without the parameter...
+    search = "";
+    view.rerender(<QPitchEntry account="a" role="FOUNDER" />);
+    expect(edition()).toBe("INVESTOR");
+    // ...then "pitch yourself to founders": a new address, a new token.
+    search = "qpitch=story&new=1&edition=founder&start=b2";
+    view.rerender(<QPitchEntry account="a" role="FOUNDER" />);
+    expect(edition()).toBe("FOUNDER");
   });
 });

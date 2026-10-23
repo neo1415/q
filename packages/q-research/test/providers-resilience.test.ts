@@ -81,6 +81,64 @@ describe("indexes in a row", () => {
   });
 });
 
+describe("a provider whose key is refused rests (production 2026-10-23)", () => {
+  const hit = {
+    url: "https://example.com/zino",
+    title: "Zino Aviation",
+    snippet: "Zino Aviation flies charter.",
+    publishedAt: null,
+    relevance: 0.9,
+  };
+  const refused = () => {
+    let asked = 0;
+    const provider = scripted("scrapingbee", () => {
+      asked += 1;
+      return Promise.reject(
+        new ResearchProviderFailure({
+          providerCode: "scrapingbee",
+          failureClass: "AUTHENTICATION",
+          status: 401,
+        }),
+      );
+    });
+    return { provider, asked: () => asked };
+  };
+  const working = scripted("tavily", () =>
+    Promise.resolve({ hits: [hit], latencyMs: 3 }),
+  );
+
+  it("is not asked again for ten minutes while the others answer, in parallel and in a row", async () => {
+    for (const parallelSearch of [true, false]) {
+      let clock = 0;
+      const dead = refused();
+      const merged = createFallbackResearchProvider({
+        providers: [dead.provider, working],
+        parallelSearch,
+        now: () => clock,
+      });
+      expect((await merged.search(request, {})).hits).toHaveLength(1);
+      expect(dead.asked()).toBe(1);
+      clock += 60_000;
+      expect((await merged.search(request, {})).hits).toHaveLength(1);
+      expect(dead.asked()).toBe(1);
+      clock += 10 * 60_000;
+      await merged.search(request, {});
+      expect(dead.asked()).toBe(2);
+    }
+  });
+
+  it("is still asked when every provider is resting", async () => {
+    const dead = refused();
+    const merged = createFallbackResearchProvider({
+      providers: [dead.provider],
+      now: () => 0,
+    });
+    await expect(merged.search(request, {})).rejects.toThrow();
+    await expect(merged.search(request, {})).rejects.toThrow();
+    expect(dead.asked()).toBe(2);
+  });
+});
+
 describe("a short memory for public reads", () => {
   it("reads the vendor once for the same query, and again when asked for a fresh read", async () => {
     let calls = 0;

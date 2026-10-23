@@ -36,6 +36,10 @@ import {
   warmRoutes,
   wordAt,
   wordsFromCharacters,
+  STORY_STILL_ROUTES,
+  isDemonstrationClaim,
+  stillClaims,
+  stillPath,
   type ElevenLabsAlignment,
   type StoryBeat,
 } from "../src/index.js";
@@ -342,6 +346,39 @@ describe("Q Story controls", () => {
     expect(parseStoryCommand("end the story", 2)).toEqual({ kind: "END" });
   });
 
+  it("hears the owner's controls, typed or said (23 Oct)", () => {
+    const pause = { kind: "MOVE", move: { kind: "PAUSE" } };
+    expect(parseStoryCommand("stop", 5)).toEqual(pause);
+    expect(parseStoryCommand("Q, stop.", 5)).toEqual(pause);
+    expect(parseStoryCommand("pause", 5)).toEqual(pause);
+    expect(parseStoryCommand("go back", 5)).toEqual({
+      kind: "MOVE",
+      move: { kind: "STEP", step: 5 },
+    });
+    for (const said of ["next", "skip"]) {
+      expect(parseStoryCommand(said, 5)).toEqual({
+        kind: "MOVE",
+        move: { kind: "STEP", step: 7 },
+      });
+    }
+    expect(parseStoryCommand("resume", 5)).toEqual({
+      kind: "MOVE",
+      move: { kind: "RESUME" },
+    });
+    for (const said of [
+      "start over",
+      "Start again",
+      "restart",
+      "from the top",
+      "Hey Q, start over please",
+    ]) {
+      expect(parseStoryCommand(said, 20)).toEqual({
+        kind: "MOVE",
+        move: { kind: "STEP", step: 1 },
+      });
+    }
+  });
+
   it("treats a question as a question", () => {
     expect(parseStoryCommand("how do you score companies?", 3)).toBeNull();
     expect(parseStoryCommand("what comes next for founders", 3)).toBeNull();
@@ -375,11 +412,23 @@ describe("Q Story trigger", () => {
       ["pitch Capital Q to a business", "FOUNDER"],
       ["pitch to everyone", "FULL"],
       ["pitch yourself", "FULL"],
+      // The owner's own asks on production (23 Oct).
+      ["Hey Q, pitch yourself.", "FULL"],
+      ["pitch Capital Q", "FULL"],
+      ["present Capital Q", "FULL"],
+      ["give me the pitch", "FULL"],
+      ["Q, give us your pitch please", "FULL"],
+      ["can you pitch yourself?", "FULL"],
+      ["pitch yourself to everyone", "FULL"],
+      ["pitch yourself to investors", "INVESTOR"],
+      ["pitch yourself to founders", "FOUNDER"],
+      ["pitch Capital Q to businesses", "FOUNDER"],
     ];
     for (const [said, edition] of cases) {
       expect(classifyStoryTrigger(said)).toEqual({ kind: "STORY", edition });
     }
     expect(classifyStoryTrigger("pitch")).toBeNull();
+    expect(classifyStoryTrigger("Hey Q, pitch please")).toBeNull();
   });
 
   it("answers 'What is Capital Q?' in two sentences and offers the story", () => {
@@ -469,6 +518,45 @@ describe("Q Story claims and gate", () => {
         ownerApproved: true,
       }).audience,
     ).toBe("AUDIENCE");
+  });
+
+  it("on stills, every product beat is demonstration and claims nothing live", () => {
+    const stills = stillClaims();
+    for (const b of STORY_BEATS) {
+      const live = STORY_CLAIMS[b.n];
+      const still = stills[b.n];
+      if (live?.kind === "PRODUCT") {
+        expect(still, `beat ${String(b.n)}`).toEqual({ kind: "DEMONSTRATION" });
+      } else {
+        expect(still).toEqual(live);
+      }
+      expect(isDemonstrationClaim(still)).toBe(
+        live?.kind === "PRODUCT" || isDemonstrationClaim(live),
+      );
+    }
+    const gate = (ownerApproved: boolean) =>
+      certifyStory(
+        {
+          now: NOW,
+          actor: {
+            role: "FOUNDER",
+            account: "founder.other@fictional.capitalq.local",
+          },
+          staleFeatureIds: [],
+          ownerApproved,
+        },
+        stills,
+      );
+    expect(gate(true)).toMatchObject({ problems: [], productBeats: 0 });
+    expect(gate(true).audience).toBe("AUDIENCE");
+    // The owner's approval still decides: no yes, still a rehearsal.
+    expect(gate(false).audience).toBe("INTERNAL_REHEARSAL");
+    // Every page the story opens has a still.
+    for (const route of STORY_ROUTES) {
+      if (route === "home") continue;
+      expect(STORY_STILL_ROUTES).toContain(route);
+      expect(stillPath(route)).toBe(`/story-media/pages/${route}.jpg`);
+    }
   });
 
   it("refuses another actor and stale features", () => {
