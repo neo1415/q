@@ -1,3 +1,4 @@
+import { readyToSendLine } from "@capital-q/app-actions";
 import { z } from "zod";
 
 import {
@@ -83,10 +84,8 @@ export function createExpressInterestAction(dependencies: {
     }),
     // Outward: the founders receive it, so it is "ready to send", and the
     // note is shown in full, exactly as it will be sent.
-    proposed: (payload) =>
-      payload.note === undefined
-        ? `I've prepared an expression of interest in ${payload.companyName}. Ready to send: approve on the card, or tell me to go ahead.`
-        : `I've prepared an expression of interest in ${payload.companyName} with this note: "${payload.note}" Ready to send: approve on the card, or tell me what to change in the note first.`,
+    proposed: (payload, summary) =>
+      readyToSendLine(summary, payload.note ?? null),
     confirm: (payload, result) =>
       result.alreadyExpressed
         ? `Your organisation had already expressed interest in ${payload.companyName}; nothing new was sent.`

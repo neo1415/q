@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readyToSendLine } from "@capital-q/app-actions";
 
 import {
   QActionTypeSchema,
@@ -82,6 +83,7 @@ export function createRespondToInterestAction(dependencies: {
             summary: `Decline ${payload.investorName}'s interest`,
             preview: `${payload.investorName} will see that your company has not taken this forward. No reason is recorded or shared.`,
           },
+    proposed: (_payload, summary) => readyToSendLine(summary, null),
     confirm: (payload, result) =>
       result.alreadyAnswered
         ? `That interest from ${payload.investorName} had already been answered; nothing changed.`

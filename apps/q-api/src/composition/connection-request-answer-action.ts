@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readyToSendLine } from "@capital-q/app-actions";
 
 import {
   ChatMessageBodySchema,
@@ -107,6 +108,11 @@ export function createConnectionRequestAnswerAction(dependencies: {
             ? `You and ${payload.companyName} will be connected. It is not an investment, and nothing else is shared.`
             : `You and ${payload.companyName} will be connected, then this message is sent to them as you:\n\n${payload.openingMessage}`,
     }),
+    proposed: (payload, summary) =>
+      readyToSendLine(
+        summary,
+        payload.decision === "ACCEPTED" ? payload.openingMessage : null,
+      ),
     confirm: (payload, result) =>
       result.alreadyAnswered
         ? `${payload.companyName}'s request had already been answered; nothing changed.`

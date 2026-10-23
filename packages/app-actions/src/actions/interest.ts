@@ -30,6 +30,7 @@ import {
 import {
   cardOnlyIf,
   defineAppAction,
+  readyToSendLine,
   portMissing,
   type AnyAppAction,
 } from "../define.js";
@@ -118,6 +119,8 @@ const EXPRESS_INTEREST = defineAppAction<
           preview: `${names.counterpart} is told you're interested.${note}`,
         };
   },
+  proposed: (input, summary) =>
+    readyToSendLine(summary, input.input.note ?? null),
   done: () => "Done. They know you're interested.",
   http: {
     method: "POST",
@@ -223,6 +226,7 @@ function answerInterest(decision: "ACCEPTED" | "DECLINED"): AnyAppAction {
                 : `${who} is told you're not taking it forward. No reason is shared.`,
           };
     },
+    proposed: (_input, summary) => readyToSendLine(summary, null),
     done: () => (accept ? "Done. You accepted." : "Done. You declined."),
     http: {
       method: "POST",
@@ -288,6 +292,7 @@ const CONNECTION_REQUEST = defineAppAction<
           summary: `Send ${names.counterpart} a connection request`,
           preview: `${names.counterpart} is asked to connect.`,
         },
+  proposed: (_input, summary) => readyToSendLine(summary, null),
   done: () => "Done. Your request is sent.",
   http: {
     method: "POST",
@@ -378,6 +383,7 @@ function answerConnection(decision: "ACCEPTED" | "DECLINED"): AnyAppAction {
                 : `${who} is told you're not taking it forward. No reason is shared.`,
           };
     },
+    proposed: (_input, summary) => readyToSendLine(summary, null),
     done: () => (accept ? "Done. You accepted." : "Done. You declined."),
     http: {
       method: "POST",

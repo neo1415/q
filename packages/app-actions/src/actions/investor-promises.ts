@@ -26,6 +26,7 @@ import {
 
 import {
   defineAppAction,
+  readyToSendLine,
   portMissing,
   refusal,
   relationshipTarget,
@@ -231,6 +232,11 @@ const SEND_QUESTIONS = defineAppAction<
       preview: body,
     };
   },
+  proposed: (input, summary) =>
+    readyToSendLine(
+      summary,
+      diligenceQuestionsText(input.input.questions).body,
+    ),
   done: (out) =>
     out.outcome === "OK"
       ? out.value.via === "DILIGENCE_REQUEST"

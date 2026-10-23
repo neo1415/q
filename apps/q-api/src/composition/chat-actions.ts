@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readyToSendLine } from "@capital-q/app-actions";
 
 import {
   ChatMessageBodySchema,
@@ -118,6 +119,9 @@ export function createChatMessageSendAction(dependencies: {
           ? payload.body
           : `${payload.body}\n\n(shares one of your documents)`,
     }),
+    // Outward: the message in full, ready to send (coordinator 2026-10-23,
+    // live: "Message Ledgerfold. Not saved yet" showed no words).
+    proposed: (payload, summary) => readyToSendLine(summary, payload.body),
     confirm: (payload, result) =>
       result.alreadySent
         ? `That message to ${payload.counterpartName} was already sent; nothing was posted twice.`

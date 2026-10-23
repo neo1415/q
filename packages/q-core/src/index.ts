@@ -421,6 +421,10 @@ export {
   type TurnMeetingPrep,
   TurnReaderV58ResultSchema,
   type TurnReaderV58Result,
+  TURN_READER_V60_SCHEMA_VERSION,
+  TURN_BOARD_ASKS,
+  TurnReaderV60ResultSchema,
+  type TurnReaderV60Result,
   QUESTION_KINDS_V58,
   TurnQuestionV58Schema,
   type QuestionKindV58,
@@ -1741,6 +1745,7 @@ export {
 export {
   TURN_READER_V60,
   V60_ANSWERING_INTEREST,
+  V60_BOARD_ASK,
   V60_ASKING_IS_NOT_OPEN,
   V60_SCREENS_ANY_LANGUAGE,
 } from "./prompts/tasks/turn-reader.v60.js";
