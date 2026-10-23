@@ -22,6 +22,7 @@ import {
   comparesAsTable,
   focusForSaid,
   playbackSteps,
+  spokenLine,
   topicMovedOn,
 } from "../src/features/q/answer-canvas-logic";
 import { boardTimeline, groupByDay } from "../src/features/q/board-timeline";
@@ -160,6 +161,75 @@ describe("the card Q is talking about (C2)", () => {
     expect(result.current.said).toBe("Atlas Ledger fits the sector.");
     act(() => announceQSaid("That's the three."));
     expect(result.current.focus).toBe(2);
+  });
+});
+
+describe("the line under the cards belongs to this turn (F-11)", () => {
+  const card = {
+    ...(demoTop(1).cards[0] as NonNullable<
+      ReturnType<typeof demoTop>["cards"][number]
+    >),
+    name: "Kora",
+    fit: { score: 8.8, measured: 4, of: 5 },
+    reasons: ["Seed in Nigeria, your stage and geography."],
+  };
+
+  it("says the card's insight with its number, never the method or its scale", () => {
+    const line = spokenLine({
+      ...card,
+      said: "Kora is strong on stage and sector, partial on traction; team not known yet. Capital Q mandate fit 8.8 out of 10, 4 of 5 measures known; not a quality score. 2 sources. (Capital Q scale: strong 10, partial 4, mismatch 0.)",
+    });
+    expect(line).toBe(
+      "Kora, 8.8 on mandate fit: strong on stage and sector, partial on traction; team not known yet.",
+    );
+    expect(line).not.toMatch(/scale|out of 10|quality score/u);
+  });
+
+  it("a method line with no insight falls back to the card's first reason", () => {
+    expect(
+      spokenLine({
+        ...card,
+        said: "Kora. Capital Q mandate fit 8.8 out of 10, 4 of 5 measures known; not a quality score. No source documents yet. (Capital Q scale: strong 10, partial 4, mismatch 0.)",
+      }),
+    ).toBe(
+      "Kora, 8.8 on mandate fit: Seed in Nigeria, your stage and geography.",
+    );
+  });
+
+  it("a later exchange over the same cards shows its own line and does not walk them again", () => {
+    vi.useFakeTimers();
+    const block = demoTop(3);
+    const { result, rerender } = renderHook(
+      ({ closing, exchange }: { closing: string; exchange: string }) =>
+        useAnswerPlayback(block, "a1", closing, false, exchange),
+      { initialProps: { closing: "Want them side by side?", exchange: "a1" } },
+    );
+    expect(result.current.focus).toBe(0);
+    const first = result.current.said;
+    rerender({ closing: "Kora leads on traction.", exchange: "a2" });
+    expect(result.current.said).toBe("Kora leads on traction.");
+    expect(result.current.focus).toBe(-1);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(result.current.said).toBe("Kora leads on traction.");
+    expect(result.current.said).not.toBe(first);
+  });
+
+  it("the closing streaming in never restarts the walk-through", () => {
+    vi.useFakeTimers();
+    const block = demoTop(3);
+    const { result, rerender } = renderHook(
+      ({ closing }: { closing: string }) =>
+        useAnswerPlayback(block, "a1", closing, false),
+      { initialProps: { closing: "Want" } },
+    );
+    act(() => {
+      vi.advanceTimersByTime(playbackSteps(block, "").at(0)?.ms ?? 0);
+    });
+    expect(result.current.focus).toBe(1);
+    rerender({ closing: "Want them side by side?" });
+    expect(result.current.focus).toBe(1);
   });
 });
 

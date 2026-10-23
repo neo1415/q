@@ -226,3 +226,103 @@ describe("DISCOVER_COMPANIES order FIT (owner 2026-10-23: never the first by nam
     ).toBe("NAME");
   });
 });
+
+describe("DISCOVER_COMPANIES raising (F-10): only companies stating a current raise", () => {
+  const ids = Array.from(
+    { length: 60 },
+    (_, i) => `e0000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
+  );
+  // Every seventh states a raise; the rest have none they may see.
+  const stating = new Set(ids.filter((_, i) => i % 7 === 0));
+  const everyoneVisible = {
+    canDisclose: () => Promise.reject(new Error("not used")),
+    evaluateMany: (requests: readonly { resource: unknown }[]) =>
+      Promise.resolve(
+        requests.map((request) => ({
+          outcome: "ALLOW" as const,
+          resource: request.resource,
+          requestedAccess: "view" as const,
+          grantedAccess: "view" as const,
+          reasonCode: "NETWORK_VISIBLE" as const,
+          via: { kind: "INTRINSIC" as const },
+        })),
+      ),
+  };
+  const catalog: CompanyCatalogPort = {
+    find: () =>
+      Promise.resolve({
+        candidates: ids.map((companyId, i) => ({
+          companyId,
+          name: `Company ${String(i + 1).padStart(2, "0")}`,
+          stageCode: "seed",
+          headquartersCountry: "NG",
+          shortDescription: null,
+          sectors: ["Fintech"],
+        })),
+        sectors: [{ code: "fintech", name: "Fintech" }],
+        unknownSectors: [],
+      }),
+  };
+  const batches: number[] = [];
+  const companyRaise = {
+    raisesFor: (_actor: unknown, companyIds: readonly string[]) => {
+      batches.push(companyIds.length);
+      return Promise.resolve(
+        new Map(
+          companyIds.map((id) => [
+            id,
+            stating.has(id)
+              ? {
+                  source: "SHARED_OBJECTIVE",
+                  money: { amount: "2000000", currency: "USD" },
+                }
+              : { source: "NONE", money: null },
+          ]),
+        ),
+      );
+    },
+  } as never;
+
+  it("keeps only the companies stating a raise, reads every match in batches, and counts both", async () => {
+    batches.length = 0;
+    const outcome = await port({
+      companyCatalog: catalog,
+      disclosure: everyoneVisible as never,
+      companyRaise,
+    }).execute(
+      {
+        callId: "r1",
+        name: "discover_companies",
+        arguments: { sectors: ["fintech"], limit: 24, raising: true },
+      },
+      contextFor(actorA, networkPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    const data = (outcome.result as { data: Record<string, unknown> }).data;
+    const companies = data["companies"] as { companyId: string }[];
+    expect(companies.map((c) => c.companyId)).toEqual([...stating]);
+    expect(data["total"]).toBe(stating.size);
+    expect(data["raising"]).toEqual({ filter: "APPLIED", matched: 60 });
+    expect(batches).toEqual([50, 10]);
+  });
+
+  it("raises that cannot be read keep and drop nothing, and say so", async () => {
+    const outcome = await port({
+      companyCatalog: catalog,
+      disclosure: everyoneVisible as never,
+      companyRaise: {
+        raisesFor: () => Promise.reject(new Error("down")),
+      } as never,
+    }).execute(
+      {
+        callId: "r2",
+        name: "discover_companies",
+        arguments: { sectors: ["fintech"], limit: 5, raising: true },
+      },
+      contextFor(actorA, networkPlan),
+    );
+    const data = (outcome.result as { data: Record<string, unknown> }).data;
+    expect((data["companies"] as unknown[]).length).toBe(5);
+    expect(data["raising"]).toEqual({ filter: "UNAVAILABLE", matched: 60 });
+  });
+});

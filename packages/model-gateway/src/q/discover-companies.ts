@@ -64,6 +64,11 @@ type Catalog = {
   /** How many matched (FIT counts them all); a floor when `atLeast`. */
   readonly total: number | null;
   readonly atLeast: boolean;
+  /**
+   * Raising now: APPLIED when only companies stating a current raise were
+   * kept, `matched` of them before that; null when not asked or not read.
+   */
+  readonly raising: { readonly matched: number } | null;
 };
 
 export type DiscoveryAnswer = {
@@ -84,6 +89,10 @@ function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
     readonly order?: unknown;
     readonly total?: unknown;
     readonly totalAtLeast?: unknown;
+    readonly raising?: {
+      readonly filter?: unknown;
+      readonly matched?: unknown;
+    };
   } | null;
   if (data === null || !Array.isArray(data.companies)) return null;
   return {
@@ -97,6 +106,11 @@ function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
     order: data.order === "FIT" ? "FIT" : "NAME",
     total: typeof data.total === "number" ? data.total : null,
     atLeast: data.totalAtLeast === true,
+    raising:
+      data.raising?.filter === "APPLIED" &&
+      typeof data.raising.matched === "number"
+        ? { matched: data.raising.matched }
+        : null,
   };
 }
 
@@ -221,9 +235,19 @@ function scoreOf(fit: RunFit): number {
  * raise, and that for the rest it is unknown. A company with no raise on
  * record is never said not to be raising (unknown stays unknown).
  */
-function raisingNote(ask: DiscoverAsk, shown: readonly RunFit[]): string {
+function raisingNote(
+  ask: DiscoverAsk,
+  shown: readonly RunFit[],
+  /** The catalog already kept only companies stating a current raise. */
+  filtered: boolean,
+): string {
   if (ask.raising !== true) return "";
   const stated = shown.filter((fit) => cardRaiseWords(fit) !== null);
+  if (filtered) {
+    return stated.length === 0
+      ? ""
+      : ` The raises they state: ${listed(stated.map((fit) => `${fit.name}, ${cardRaiseWords(fit) ?? ""}`))}.`;
+  }
   const rest = shown.length - stated.length;
   if (stated.length === 0) {
     return " None of them states a current raise on Capital Q, so whether they're raising now is unknown.";
@@ -292,12 +316,39 @@ export async function runCompanyDiscovery(input: {
         // and returns the best; never the first companies by name.
         limit: fitWanted ? DISCOVER_FIT_MAX : count,
         ...(fitWanted ? { order: "FIT" } : {}),
+        ...(ask.raising === true ? { raising: true } : {}),
       },
       "q-discover-companies",
     ),
   );
   if (catalog === null) return null;
   const kind = kindWords(ask, catalog);
+  // F-10: a list filtered to companies stating a current raise says so, and
+  // how many it left out as unknown.
+  const raised = catalog.raising;
+  const raisingRest =
+    raised === null
+      ? ""
+      : raised.matched > (catalog.total ?? catalog.companies.length)
+        ? ` The other ${counted(raised.matched - (catalog.total ?? catalog.companies.length))} you can see haven't shared a raise with you, so whether they're raising is unknown.`
+        : "";
+  const listKind = raised === null ? kind : `${kind} stating a current raise`;
+  const seen = raised === null ? " you can see" : "";
+
+  if (catalog.companies.length === 0 && catalog.raising !== null) {
+    // F-10: none of the matches states a raise. That is unknown, never
+    // "not raising".
+    return {
+      text:
+        catalog.raising.matched === 0
+          ? `I can't find any ${kind} on Capital Q that you can see right now.`
+          : `None of the ${counted(catalog.raising.matched)} ${kind} you can see on Capital Q states a current raise, so I can't tell you which are raising now. That isn't the same as not raising: they just haven't shared one with you.`,
+      block: null,
+      basis: "NAME",
+      shown: 0,
+      calls,
+    };
+  }
 
   if (catalog.companies.length === 0) {
     const unknown =
@@ -352,7 +403,7 @@ export async function runCompanyDiscovery(input: {
     const chosen = fits.slice(0, count);
     const block = fitSweepCardsBlock(
       chosen,
-      `${capitalised(kind)}: fit against your mandate`,
+      `${capitalised(listKind)}: fit against your mandate`,
     );
     if (block !== null) {
       const named = block.cards.map((card) =>
@@ -370,25 +421,25 @@ export async function runCompanyDiscovery(input: {
       const matched = floor
         ? `At least ${String(total)}`
         : capitalised(counted(total));
-      const one = kind.replace(/companies/u, "company");
+      const one = listKind.replace(/companies/u, "company");
       const head =
         total < count && ask.count !== null
           ? total === 1
-            ? `Capital Q has only one ${one} you can see: ${listed(named)}.`
-            : `Capital Q has only ${counted(total)} ${kind} you can see, ranked by fit with your mandate: ${listed(named)}.`
+            ? `Capital Q has only one ${one}${seen}: ${listed(named)}.`
+            : `Capital Q has only ${counted(total)} ${listKind}${seen}, ranked by fit with your mandate: ${listed(named)}.`
           : ask.count !== null
             ? `${
                 block.cards.length < count
-                  ? `Only ${counted(block.cards.length)} of the ${kind} you can see could be scored. `
+                  ? `Only ${counted(block.cards.length)} of the ${listKind}${seen} could be scored. `
                   : ""
-              }Ranked by fit with your mandate, the strongest ${kind}: ${listed(named)}.`
+              }Ranked by fit with your mandate, the strongest ${listKind}: ${listed(named)}.`
             : total === 1
-              ? `Capital Q has only one ${one} you can see: ${listed(named)}.`
+              ? `Capital Q has only one ${one}${seen}: ${listed(named)}.`
               : block.cards.length === total
-                ? `${matched} ${kind} on Capital Q, ranked by fit with your mandate: ${listed(named)}.`
-                : `${matched} ${kind} on Capital Q; ranked by fit with your mandate, the top ${counted(block.cards.length)}: ${listed(named)}.`;
+                ? `${matched} ${listKind} on Capital Q, ranked by fit with your mandate: ${listed(named)}.`
+                : `${matched} ${listKind} on Capital Q; ranked by fit with your mandate, the top ${counted(block.cards.length)}: ${listed(named)}.`;
       return {
-        text: `${head}${raisingNote(ask, chosen)} ${block.cards.length === 1 ? "It's" : "They're"} on screen.`,
+        text: `${head}${raisingNote(ask, chosen, raised !== null)}${raisingRest} ${block.cards.length === 1 ? "It's" : "They're"} on screen.`,
         block,
         basis: "FIT",
         shown: block.cards.length,
@@ -399,11 +450,11 @@ export async function runCompanyDiscovery(input: {
 
   const chosen = catalog.companies.slice(0, count);
   const names = chosen.map((company) => company.name);
-  const block = catalogBlock(chosen, capitalised(kind));
+  const block = catalogBlock(chosen, capitalised(listKind));
   const fewer = chosen.length < count;
   const head = fewer
-    ? `Capital Q has only ${counted(chosen.length)} ${chosen.length === 1 ? kind.replace(/companies/u, "company") : kind} you can see: ${listed(names)}.`
-    : `Here are ${counted(chosen.length)} ${kind} on Capital Q: ${listed(names)}.`;
+    ? `Capital Q has only ${counted(chosen.length)} ${chosen.length === 1 ? listKind.replace(/companies/u, "company") : listKind}${seen}: ${listed(names)}.`
+    : `Here are ${counted(chosen.length)} ${listKind} on Capital Q: ${listed(names)}.`;
   const basis = byName
     ? " In name order, as you asked."
     : noMandate
@@ -414,9 +465,11 @@ export async function runCompanyDiscovery(input: {
           ? " They're listed by name, not ranked."
           : " You don't have a mandate to rank against yet, so these are by name, not a judgement of which is best.";
   const raising =
-    ask.raising === true
-      ? " Whether they're raising now isn't on record for these, so I can't confirm it."
-      : "";
+    raised !== null
+      ? raisingRest
+      : ask.raising === true
+        ? " I couldn't check which of them are raising just now, so I can't confirm it for these."
+        : "";
   return {
     text: `${head}${basis}${raising} They're on screen.`,
     block,

@@ -586,4 +586,7 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   Others: "آخرون",
   "spent this month": "أُنفق هذا الشهر",
   "this month": "هذا الشهر",
+  // F-29: a change card's before and after.
+  Was: "كان",
+  "(no change)": "(دون تغيير)",
 };

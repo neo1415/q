@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Fragment,
   useEffect,
   useMemo,
   useRef,
@@ -53,7 +54,7 @@ import { retryHeldAction, sendHeldAsIsAction } from "./held-actions";
 import { jobLine, jobsInProgress } from "./job-state";
 import { noticesRead, refreshNotices } from "./notice-store";
 import type { NoticeGroup } from "./notice-groups";
-import { readPlan } from "./plan-words";
+import { readChanges, readPlan } from "./plan-words";
 import { usePrepared } from "./use-prepared";
 import {
   answerWorkAction,
@@ -985,6 +986,8 @@ export function ApprovalDetail({
   const plan = readPlan(view.action.preview);
   const chat = isChatSend(view.action.actionType);
   const email = view.action.actionType === "email.send";
+  // F-29: a change to fields (the mandate) reads as before and after.
+  const changes = chat || email ? null : readChanges(view.action.preview);
   const canDecide = view.canDecide && phase === "idle";
   const who = name ?? null;
   const verb = chat || email ? "Approve and send" : "Approve";
@@ -1062,7 +1065,49 @@ export function ApprovalDetail({
           “{theirs.length > 240 ? `${theirs.slice(0, 240)}…` : theirs}”
         </p>
       )}
-      {plan.quote !== null ? (
+      {changes !== null ? (
+        <MessageBox label="What changes">
+          <dl
+            className="m-0 mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 cq-body-sm"
+            data-approval-changes
+          >
+            {changes.map((change) => (
+              <Fragment key={change.label}>
+                <dt className="text-(--cq-text-tertiary)">{t(change.label)}</dt>
+                <dd className="m-0 flex flex-col gap-0.5">
+                  {change.unchanged ? (
+                    <span className="text-(--cq-text-primary)">
+                      {change.after}{" "}
+                      <span className="text-(--cq-text-tertiary)">
+                        {t("(no change)")}
+                      </span>
+                    </span>
+                  ) : (
+                    <>
+                      {change.before === null ? null : (
+                        <span className="text-(--cq-text-secondary)">
+                          <span className="text-(--cq-text-tertiary)">
+                            {t("Was")}{" "}
+                          </span>
+                          {change.before}
+                        </span>
+                      )}
+                      <span className="text-(--cq-text-primary)">
+                        {change.before === null ? null : (
+                          <span className="text-(--cq-text-tertiary)">
+                            {t("Now")}{" "}
+                          </span>
+                        )}
+                        {change.after}
+                      </span>
+                    </>
+                  )}
+                </dd>
+              </Fragment>
+            ))}
+          </dl>
+        </MessageBox>
+      ) : plan.quote !== null ? (
         editing && chat && relationshipId !== null ? (
           <EditOwnReply
             initial={plan.quote}
