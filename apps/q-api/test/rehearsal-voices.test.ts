@@ -11,6 +11,7 @@ import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
 import {
   createRehearsalAwareTurn,
+  restOf,
   PERSONA_FILLER_AFTER_MS,
   PERSONA_FILLERS,
 } from "../src/voice/rehearsal-turn.js";
@@ -961,5 +962,77 @@ describe("emotion per sentence (R5, INVESTOR_TWIN_TURN v13)", () => {
       [],
     );
     expect(readTurn(base)?.beats).toEqual([]);
+  });
+});
+
+describe("the persona's first sentence goes out while the rest is written (R7)", () => {
+  type Say = RehearsalService["say"];
+  const full = "Lovely to hear. Now, what does churn look like by cohort?";
+  it("says the first sentence before the reply is done, then only the rest, and no filler", async () => {
+    const heard: { text: string; at: number }[] = [];
+    const started = Date.now();
+    const say: Say = (_a, _r, _s, _signal, options) => {
+      setTimeout(() => options?.onFirstPiece?.("Lovely to hear."), 5);
+      return new Promise((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              kind: "OK",
+              rehearsal: {
+                turns: [
+                  { from: "THEM", text: full, at: "2026-10-23T10:00:00.000Z" },
+                ],
+              },
+            } as unknown as Awaited<ReturnType<Say>>),
+          60,
+        ),
+      );
+    };
+    const turn = createRehearsalAwareTurn({
+      rehearsals: { say } as unknown as RehearsalService,
+      fallback: () => Promise.resolve({ kind: "NOTHING" }),
+      fillerAfterMs: 30,
+    });
+    const speaker: VoiceSpeaker = {
+      providerConversationId: "dg_x",
+      isOpen: true,
+      speak: async (text) => {
+        if (typeof text === "string") {
+          heard.push({ text, at: Date.now() - started });
+          return;
+        }
+        for await (const part of text) {
+          heard.push({ text: part, at: Date.now() - started });
+        }
+      },
+      close: () => undefined,
+    };
+    const outcome = await turn(
+      {
+        voiceSessionId: "v-stream",
+        actor: {},
+        thread: { rehearsal: { rehearsalId: "r1" } },
+      } as unknown as VoiceSessionBinding,
+      [{ role: "user", content: "We grow forty percent a month." }],
+      new AbortController().signal,
+      speaker,
+    );
+    expect(outcome.kind).toBe("SPOKEN");
+    expect(heard.map((h) => h.text)).toEqual([
+      "Lovely to hear.",
+      " Now, what does churn look like by cohort?",
+    ]);
+    // The first sentence before the reply was done (60 ms), no filler (30 ms).
+    expect(heard[0]?.at ?? Infinity).toBeLessThan(50);
+  });
+
+  it("says the whole real line after the first when code changed it", () => {
+    expect(restOf(full, "Lovely to hear.")).toBe(
+      "Now, what does churn look like by cohort?",
+    );
+    expect(restOf("Let me stop you there. Go on.", "Lovely to hear.")).toBe(
+      "Let me stop you there. Go on.",
+    );
+    expect(restOf("Lovely to hear.", "Lovely to hear.")).toBe("");
   });
 });

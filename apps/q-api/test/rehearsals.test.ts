@@ -329,7 +329,7 @@ function setup(
       );
       return Promise.resolve(outage.persona ? null : PERSONA);
     },
-    turn: (_a, variables, views, signal) => {
+    turn: (_a, variables, views, signal, onTextDelta) => {
       if (outage.hang) {
         // A model that never answers: only the deadline ends it.
         return new Promise((resolve) => {
@@ -376,27 +376,39 @@ function setup(
           beats: [],
         });
       }
-      return Promise.resolve({
-        line:
-          variables.cue === "HAND_RAISED" ? "Go ahead." : "What's retention?",
-        move: variables.cue === "HAND_RAISED" ? "YIELD" : "QUESTION",
-        // On Tough the founder's bad answer reads as rude.
-        appraisal: variables.difficulty === "TOUGH" ? "RUDE" : "NEUTRAL",
-        mood: variables.difficulty === "TOUGH" ? "ANGRY" : "SKEPTICAL",
-        intensity: variables.difficulty === "TOUGH" ? "RAISED" : "NORMAL",
-        reaction: variables.cue === "SILENCE" ? "SIGH" : null,
-        conclusion: null,
-        presence: views.camera === null ? null : looks.next,
-        askedToSee: looks.asked(variables.rehearsal),
-        wantsToEnd: looks.wantsToEnd(variables.rehearsal),
-        onlyNoise: looks.onlyNoise(variables.rehearsal),
-        screenNote: views.screen === null ? null : looks.screenNote,
-        // v13: one beat per sentence when the model sends them.
-        beats:
-          variables.cue === "HAND_RAISED" || variables.difficulty === "TOUGH"
-            ? []
-            : [{ mood: "SKEPTICAL", intensity: "NORMAL" }],
-      });
+      const reply: NonNullable<Awaited<ReturnType<RehearsalComposer["turn"]>>> =
+        {
+          line:
+            variables.cue === "HAND_RAISED"
+              ? "Go ahead."
+              : variables.rehearsal.includes("cohorts")
+                ? "Forty percent a month is strong, well done. Now, what does retention look like by cohort?"
+                : "What's retention?",
+          move: variables.cue === "HAND_RAISED" ? "YIELD" : "QUESTION",
+          // On Tough the founder's bad answer reads as rude.
+          appraisal: variables.difficulty === "TOUGH" ? "RUDE" : "NEUTRAL",
+          mood: variables.difficulty === "TOUGH" ? "ANGRY" : "SKEPTICAL",
+          intensity: variables.difficulty === "TOUGH" ? "RAISED" : "NORMAL",
+          reaction: variables.cue === "SILENCE" ? "SIGH" : null,
+          conclusion: null,
+          presence: views.camera === null ? null : looks.next,
+          askedToSee: looks.asked(variables.rehearsal),
+          wantsToEnd: looks.wantsToEnd(variables.rehearsal),
+          onlyNoise: looks.onlyNoise(variables.rehearsal),
+          screenNote: views.screen === null ? null : looks.screenNote,
+          // v13: one beat per sentence when the model sends them.
+          beats:
+            variables.cue === "HAND_RAISED" || variables.difficulty === "TOUGH"
+              ? []
+              : [{ mood: "SKEPTICAL", intensity: "NORMAL" }],
+        };
+      // R7: a streaming model hands its raw JSON over as it writes it.
+      if (onTextDelta !== undefined) {
+        const raw = JSON.stringify(reply);
+        for (let i = 0; i < raw.length; i += 7)
+          onTextDelta(raw.slice(i, i + 7));
+      }
+      return Promise.resolve(reply);
     },
     review: (_a, variables) => {
       if (outage.reviews > 0) {
@@ -671,6 +683,77 @@ describe("rehearsals", () => {
     expect(
       hand.kind === "OK" ? hand.rehearsal.turns.at(-1)?.beats : "x",
     ).toBeUndefined();
+  });
+
+  it("hands the first sentence on while the model writes, only when nothing will change it (R7)", async () => {
+    const { service } = setup();
+    const rehearsal = await startWith(service);
+    const pieces: string[] = [];
+    const onFirstPiece = (piece: string) => pieces.push(piece);
+    const said = await service.say(
+      actor(FOUNDER),
+      rehearsal.id,
+      { text: "We grow 40% a month across all our cohorts." },
+      undefined,
+      { onFirstPiece },
+    );
+    expect(pieces).toEqual(["Forty percent a month is strong, well done."]);
+    // The kept line begins with exactly what was handed on.
+    expect(
+      said.kind === "OK" &&
+        said.rehearsal.turns.at(-1)?.text.startsWith(pieces[0] ?? "?"),
+    ).toBe(true);
+    // Too few words to be sure it is not noise: said whole, never early.
+    await service.say(
+      actor(FOUNDER),
+      rehearsal.id,
+      { text: "Yes." },
+      undefined,
+      {
+        onFirstPiece,
+      },
+    );
+    // A raised hand is answered by code.
+    await service.say(
+      actor(FOUNDER),
+      rehearsal.id,
+      { cue: "HAND_RAISED" },
+      undefined,
+      { onFirstPiece },
+    );
+    expect(pieces).toHaveLength(1);
+  });
+
+  it("never hands a first sentence on when a warning is due: TOUGH and rude (R7)", async () => {
+    const { service } = setup();
+    const started = await service.start(actor(FOUNDER), {
+      kind: "INVESTOR_ORGANISATION",
+      id: INVESTOR,
+      difficulty: "TOUGH",
+    });
+    if (started.kind !== "OK") throw new Error(started.kind);
+    const rehearsal = started.rehearsal;
+    const pieces: string[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      await service.say(
+        actor(FOUNDER),
+        rehearsal.id,
+        { text: "That is none of your business, frankly, cohorts or not." },
+        undefined,
+        { onFirstPiece: (piece) => pieces.push(piece) },
+      );
+    }
+    const turns = await service.get(actor(FOUNDER), rehearsal.id);
+    const said =
+      turns.kind === "OK"
+        ? turns.rehearsal.turns
+            .filter((t) => t.from === "THEM")
+            .map((t) => t.text)
+        : [];
+    // Whatever was handed on early is exactly how a line that was kept began.
+    for (const piece of pieces) {
+      expect(said.some((line) => line.startsWith(piece))).toBe(true);
+    }
   });
 
   it("keeps nothing of a reply the person spoke over", async () => {

@@ -37,6 +37,7 @@ import {
   createPostgresArrivalProbe,
 } from "./composition/arrival-snapshot.js";
 import { createQApiGateQCompanyProjectionPort } from "./composition/gateq-projection.js";
+import { rehearsalWeb } from "./composition/rehearsal-web.js";
 import {
   createPostgresTaxonomyAssignmentRepository,
   createPostgresTaxonomyReferenceRepository,
@@ -5761,35 +5762,14 @@ const rehearsals = createRehearsalService({
         ],
       };
     },
-    publicWeb: async (_actor, name, kind) => {
-      const provider = researchComposition.provider;
-      if (provider === undefined) return { text: "", sources: [] };
-      const result = await provider.search(
-        {
-          query:
-            `"${name.trim()}" ${kind === "COMPANY" ? "startup founder" : "investor"}`.slice(
-              0,
-              200,
-            ),
-          maxResults: 5,
-          freshness: "ANY",
-          includeDomains: [],
-        },
-        { signal: AbortSignal.timeout(12_000) },
-      );
-      const hits = result.hits.filter((hit) => hit.url.startsWith("https://"));
-      return {
-        text: hits
-          .map((hit) => `${hit.title ?? hit.url}: ${hit.snippet ?? ""}`)
-          .join("\n"),
-        sources: hits.map((hit) => ({
-          kind: "PUBLIC_WEB" as const,
-          label: (hit.title ?? hit.url).slice(0, 200),
-          url: hit.url.slice(0, 2048),
-          excerpt: (hit.snippet ?? "").slice(0, 600),
-        })),
-      };
-    },
+    // R1 (2026-10-23): three searches together and the most telling
+    // pages read in full (rehearsal-web.ts), not one search's snippets.
+    publicWeb: async (_actor, name, kind) =>
+      rehearsalWeb(
+        researchComposition.provider,
+        name,
+        kind === "COMPANY" ? "COMPANY" : "INVESTOR_ORGANISATION",
+      ),
     ownMaterial: async (actor) => {
       const companyId = await runtimeDependencies.ownCompany(actor);
       if (companyId === null || actor.organisationId === undefined) {
