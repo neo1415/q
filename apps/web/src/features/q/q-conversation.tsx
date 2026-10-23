@@ -80,7 +80,7 @@ import { plainFromMarkdown, QMarkdown } from "./markdown";
 import { HideFromQ } from "./hide-from-q";
 import { QWorkingSlot, StageLine } from "./stage-line";
 import { QAnswer } from "./q-answer";
-import { boardTimeline } from "./board-timeline";
+import { boardCountOf, boardTimeline } from "./board-timeline";
 import { QBoardTimeline } from "./q-board-timeline";
 import { useResultShelf, withShelf } from "./result-shelf";
 import {
@@ -706,13 +706,12 @@ export function QConversationPanel({
   // reconnect moved the page to another conversation.
   const shelf = useResultShelf();
   const boardTurns = useMemo(() => withShelf(turns, shelf), [turns, shelf]);
-  // C4: what the Board holds, less the answer still on the stage; it
-  // counts up as an answer flies into it.
-  const boardCount = Math.max(
-    0,
-    boardTimeline(boardTurns).filter(
-      (entry) => !boardMarks.dismissed.includes(entry.id),
-    ).length - (objectShown ? 1 : 0),
+  // C4 / F-37: what the Board holds, less a Board entry on the stage.
+  const [stageObject, setStageObject] = useState<string | null>(null);
+  const boardCount = boardCountOf(
+    boardTimeline(boardTurns),
+    boardMarks.dismissed,
+    stageObject,
   );
   const [boardBump, setBoardBump] = useState(0);
   const onBoardLanded = useCallback(() => {
@@ -1276,6 +1275,7 @@ export function QConversationPanel({
                         )
                       }
                       onShowingChange={setObjectShown}
+                      onStageObjectChange={setStageObject}
                       onCardsShowingChange={setStageCards}
                       turns={turns}
                       captions={captions || voice.active}

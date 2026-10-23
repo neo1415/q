@@ -58,6 +58,11 @@ export function replyParts(
         // Shown once, where it is decided (the approval, exact payload).
         break;
       case "ARTIFACT_REFERENCE":
+        // F-35 (QA 2026-10-23): a document Q made is drawn once. Where the
+        // stage draws the answer's objects, it is the stage's (and "Shown
+        // recently" brings it back); the thread names it in words.
+        if (picturesInline) inline.push(block);
+        break;
       case "UI_INTENT":
       case "COMPARISON":
       case "COMPARISON_CARDS":

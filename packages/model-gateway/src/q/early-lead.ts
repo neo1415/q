@@ -161,31 +161,6 @@ export function comparisonLead(
 }
 
 /**
- * Owner 2026-10-21 (time to the first word): a question about one company
- * Capital Q holds opens with what that company declares, said the moment
- * the model is asked, instead of waiting for the model's first sentence
- * (or, for a web question, for the web). One sentence, from its own
- * profile; null when the profile declares neither stage nor place, so
- * nothing is said for the sake of saying something.
- */
-export function profileLead(profile: DeclaredProfile): string | null {
-  const stage =
-    profile.currentStageCode === null
-      ? null
-      : `${stageWords(profile.currentStageCode)}-stage`;
-  const where = [
-    profile.headquartersCity,
-    profile.headquartersCountry === null
-      ? null
-      : countryWords(profile.headquartersCountry),
-  ].filter((part): part is string => part !== null);
-  if (stage === null && where.length === 0) return null;
-  const kind = stage === null ? "a company" : `a ${stage} company`;
-  const place = where.length === 0 ? "" : ` based in ${where.join(", ")}`;
-  return `${profile.canonicalName} is ${kind}${place}, by its own account on Capital Q.`;
-}
-
-/**
  * The line said as a public-web search starts, when nothing has been said
  * yet: what Q is doing at that moment, in a few words, and true because
  * the call is being made. Streamed to the person, never stored with the

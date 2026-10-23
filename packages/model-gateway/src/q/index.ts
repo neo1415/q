@@ -13,7 +13,6 @@ import {
   asksForComparison,
   asksForPipelineSummary,
   comparisonLead,
-  profileLead,
   researchLead,
   pipelineLead,
 } from "./early-lead.js";
@@ -4624,28 +4623,10 @@ export function createModelGatewayQAnswer(
             ? pipelineLead(outcome.result.data, latest.content)
             : null;
         }
-        if (!asksForComparison(latest.content)) {
-          // One company named, already read in full by this run: its own
-          // declared profile opens the answer (first word, owner 10-21).
-          const named = [...runCompanies.read(request.runId).profiles].filter(
-            ([, name]) => containsCompanyName(latest.content, name),
-          );
-          if (named.length !== 1) return null;
-          const [companyId] = named[0] ?? [];
-          if (companyId === undefined) return null;
-          const outcome = await tools
-            .execute(
-              {
-                callId: "q-early-lead-profile",
-                name: "get_company",
-                arguments: { companyId },
-              },
-              toolContext,
-            )
-            .catch(() => null);
-          const profile = profileOf(outcome);
-          return profile === null ? null : profileLead(profile);
-        }
+        // F-45 (QA 2026-10-23): a question about one company is not opened
+        // with a fixed line of its declared stage and place; the answer's
+        // own first sentence, written for this question, leads.
+        if (!asksForComparison(latest.content)) return null;
         // The named companies this run already read in full (prepare's
         // named-visible reads): read again from the run's own kept reads.
         const named = [...runCompanies.read(request.runId).profiles].filter(

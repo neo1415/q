@@ -216,6 +216,26 @@ describe("the line under the cards belongs to this turn (F-11)", () => {
     expect(result.current.said).not.toBe(first);
   });
 
+  it("in a text turn the caption is one short line, never a card's stored line (phone)", () => {
+    vi.useFakeTimers();
+    const block = demoTop(3);
+    const { result, rerender } = renderHook(
+      ({ closing }: { closing: string }) =>
+        useAnswerPlayback(block, "a1", closing, false),
+      { initialProps: { closing: "Want them side by side?" } },
+    );
+    const lines = new Set(block.cards.map((card) => spokenLine(card)));
+    expect(result.current.said).toBe("Want them side by side?");
+    act(() => {
+      vi.advanceTimersByTime(playbackSteps(block, "").at(0)?.ms ?? 0);
+    });
+    expect(lines.has(result.current.said)).toBe(false);
+    act(() => result.current.choose(1));
+    expect(result.current.said).toBe("Want them side by side?");
+    rerender({ closing: "word ".repeat(40) });
+    expect(result.current.said).toBe("");
+  });
+
   it("the closing streaming in never restarts the walk-through", () => {
     vi.useFakeTimers();
     const block = demoTop(3);
