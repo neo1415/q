@@ -128,6 +128,7 @@ import { TURN_READER_V54 } from "./tasks/turn-reader.v54.js";
 import { TURN_READER_V55 } from "./tasks/turn-reader.v55.js";
 import { TURN_READER_V56 } from "./tasks/turn-reader.v56.js";
 import { TURN_READER_V57 } from "./tasks/turn-reader.v57.js";
+import { TURN_READER_V58 } from "./tasks/turn-reader.v58.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEMORY_EXTRACTOR_V2 } from "./tasks/memory-extractor.v2.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
@@ -160,12 +161,14 @@ import { DECK_EXTRACTION_V1 } from "./tasks/deck-extraction.v1.js";
 import { PITCH_SECTION_EXTRACTION_V1 } from "./tasks/pitch-section-extraction.v1.js";
 import { SPOKEN_REPLY_V1 } from "./tasks/spoken-reply.v1.js";
 import { SMALL_TALK_V1 } from "./tasks/small-talk.v1.js";
+import { CALL_PREP_V1 } from "./tasks/call-prep.v1.js";
 import { CONVERSATION_RECALL_V1 } from "./tasks/conversation-recall.v1.js";
 import { TURN_SKIM_V1 } from "./tasks/turn-skim.v1.js";
 import { TURN_SKIM_V2 } from "./tasks/turn-skim.v2.js";
 import { TURN_SKIM_V3 } from "./tasks/turn-skim.v3.js";
 import { TURN_SKIM_V4 } from "./tasks/turn-skim.v4.js";
 import { TURN_SKIM_V5 } from "./tasks/turn-skim.v5.js";
+import { TURN_SKIM_V6 } from "./tasks/turn-skim.v6.js";
 import { PERSON_BRIEF_READER_V1 } from "./tasks/person-brief-reader.v1.js";
 import { BRIEFING_COMMAND_V1 } from "./tasks/briefing-command.v1.js";
 // AUTO block (ADR 0030)
@@ -524,6 +527,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_READER_V55,
     TURN_READER_V56,
     TURN_READER_V57,
+    TURN_READER_V58,
     MEMORY_EXTRACTOR_V1,
     MEMORY_EXTRACTOR_V2,
     MEETING_NOTES_V1,
@@ -632,12 +636,14 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     PITCH_SECTION_EXTRACTION_V1,
     SPOKEN_REPLY_V1,
     SMALL_TALK_V1,
+    CALL_PREP_V1,
     CONVERSATION_RECALL_V1,
     TURN_SKIM_V1,
     TURN_SKIM_V2,
     TURN_SKIM_V3,
     TURN_SKIM_V4,
     TURN_SKIM_V5,
+    TURN_SKIM_V6,
     PERSON_BRIEF_READER_V1,
     BRIEFING_COMMAND_V1,
     GATEQ_DOSSIER_SYNTHESIS_V1,

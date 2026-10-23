@@ -205,6 +205,7 @@ describe("v56 excludeShown on the answer path", () => {
       count: 3,
       previous: false,
       excludeShown: true,
+      mandateRelevant: false,
     });
     // Nothing about authorization changes: the same plan and actor.
     expect(delegated?.plan).toBe(req.plan);

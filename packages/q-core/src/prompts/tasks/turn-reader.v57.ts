@@ -27,7 +27,7 @@ export const TURN_READER_V57: PromptDefinition<
 > = {
   ...TURN_READER_V56,
   version: 57,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Q Story (owner 2026-10-21): v56 plus one Q PITCH exception -- a bare 'what is Capital Q?' (asking only what it is) is an ordinary question with no tool, answered briefly; showing, presenting, pitching or telling the story (and 'yes, show me' after Q offered) stays NAVIGATE Q_PITCH. Read by meaning in any language; schema unchanged.",
   effectiveFrom: "2026-10-21",

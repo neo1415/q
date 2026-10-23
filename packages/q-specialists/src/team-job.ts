@@ -196,6 +196,19 @@ export function goAheadGoal(
   return goal.length >= 3 ? goal : null;
 }
 
+/**
+ * A waiting job's card summary in a sentence of Q's: never an internal
+ * name ("Q's team:" is how the card labels it, live 2026-10-23), and never
+ * its own end punctuation, so the line has one full stop.
+ */
+export function waitingWork(summary: string): string {
+  return summary
+    .trim()
+    .replace(/^Q['’]s team:\s*/iu, "")
+    .replace(/[.!?…]+$/u, "")
+    .trim();
+}
+
 const ANSWER_HERE =
   "I can answer it here from what Capital Q holds instead, if that helps.";
 
@@ -209,7 +222,7 @@ export function teamJobLine(outcome: TeamJobOutcome): string {
       const first = outcome.waiting[0];
       return first === undefined
         ? `Work like this is already waiting for your approval, so I haven't planned another. ${PLAN_ANYWAY_QUESTION}`
-        : `Something like this is already waiting for you: ${first}. ${PLAN_ANYWAY_QUESTION}`;
+        : `Something like this is already waiting for you: ${waitingWork(first)}. ${PLAN_ANYWAY_QUESTION}`;
     }
     case "NOT_PLANNED":
       return `I couldn't turn that into a plan I can carry out, so nothing has started. Tell me who it's about and what you want at the end (a memo, a growth plan, questions for the founder) and I'll plan it. ${ANSWER_HERE}`;

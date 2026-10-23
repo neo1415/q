@@ -12,6 +12,7 @@ import {
   PLAIN_QUESTION_FOCUS,
   toolFocusOf,
 } from "./tool-focus.js";
+import { callPrepLine, type QCallPrepPort } from "./call-prep.js";
 import {
   TEAM_JOB_KINDS,
   goAheadGoal,
@@ -364,7 +365,7 @@ import {
   namedRecordRequestOf,
   ownCounterpartWithin,
 } from "./named-record-request.js";
-import type { TurnReference, TurnSkimResult } from "@capital-q/q-core";
+import type { TurnReference } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
   startPendingDecision,
@@ -395,18 +396,19 @@ import {
 import {
   analystResultBlocks,
   askedSubjects,
-  companyNameCandidates,
   provenanceLine,
   type QTurnReader,
+  type QTurnSkim,
   type QTurnSkimmer,
 } from "@capital-q/model-gateway/q";
 
 /**
- * A question or a lookup, by its shape ("tell me about…", "who is…",
- * "find…", "…?"): only the shape of the words a holding line may be said
- * for, never whether to research (that is the reading's).
+ * A speed hint only (owner 2026-10-23: "the model decides; a hint can only
+ * speed things up"): words shaped as a question or a lookup. It starts the
+ * nameless holding line early and decides nothing else -- never whom Q
+ * looks into, never whether to research.
  */
-const ASKS_ABOUT =
+const ASKS_SOMETHING =
   /^(tell me|who|what|what's|whats|where|when|how|why|is|are|does|do|find|search|look up|lookup|show me|give me|any|latest|news|research|check)\b|\?\s*$/iu;
 
 /**
@@ -786,6 +788,11 @@ export type SpecialistQAnswerDependencies = {
   readonly delegation?: QDelegationPort | undefined;
   /** Several kinds of work at once: the lead Q plans a team job. */
   readonly teamJob?: QTeamJobPort | undefined;
+  /**
+   * Owner 2026-10-23: a call with one named counterpart (TURN_READER v58
+   * meetingPrep), prepared in the answer. Absent: answered as before.
+   */
+  readonly callPrep?: QCallPrepPort | undefined;
   /**
    * Their own readiness gaps as the opening lines of "what should I do
    * next?", or null when there are none (or no company of theirs).
@@ -2539,7 +2546,7 @@ export function createSpecialistQAnswer(
     string,
     {
       readonly messageId: string;
-      readonly skim: Promise<TurnSkimResult | null>;
+      readonly skim: Promise<QTurnSkim | null>;
     }
   >();
   const skimInput = (
@@ -2765,22 +2772,25 @@ export function createSpecialistQAnswer(
       lastShownEntityId: lastShownEntityId(history),
     }) ?? null;
 
-  /** Turns already given a holding line, so a re-read never says it twice. */
-  const heldRuns = new Set<string>();
-  const sayHolding = (request: QAnswerRequest, words: string): void => {
+  /**
+   * Turns already given a holding line, and whether it named anyone, so a
+   * re-read never says it twice: the quick hint's nameless line may give
+   * way once to the line naming whom the skim understood, never the other
+   * way round.
+   */
+  const heldRuns = new Map<string, "HINT" | "NAMED">();
+  const sayHolding = (request: QAnswerRequest, name: string | null): void => {
     const deltas = dependencies.deltas;
-    if (deltas === undefined || heldRuns.has(request.runId)) return;
+    if (deltas === undefined) return;
+    const held = heldRuns.get(request.runId);
+    if (held === "NAMED" || (held === "HINT" && name === null)) return;
     if (request.writingDocument === true || request.askedAction !== undefined) {
       return;
     }
     if (request.plan.screen?.route === "ONBOARDING") return;
-    if (!ASKS_ABOUT.test(words.trim())) return;
-    const named = companyNameCandidates(words);
-    const name = named.length === 1 ? named[0] : undefined;
-    if (name === undefined) return;
-    heldRuns.add(request.runId);
+    heldRuns.set(request.runId, name === null ? "HINT" : "NAMED");
     while (heldRuns.size > PREREADS_MAX) {
-      const oldest = heldRuns.values().next().value;
+      const oldest = heldRuns.keys().next().value;
       if (oldest === undefined) break;
       heldRuns.delete(oldest);
     }
@@ -2788,7 +2798,10 @@ export function createSpecialistQAnswer(
       runId: request.runId,
       tenantId: request.tenantId,
       messageId: QMessageIdSchema.parse(randomUUID()),
-      text: `Looking into ${name.slice(0, 60)} now. `,
+      text:
+        name === null
+          ? "Looking into that now. "
+          : `Looking into ${name.slice(0, 60)} now. `,
       holding: true,
     });
   };
@@ -3765,13 +3778,12 @@ export function createSpecialistQAnswer(
       const oldest = lastActionsByActor.keys().next().value;
       if (oldest !== undefined) lastActionsByActor.delete(oldest);
     }
-    // Owner 2026-10-23 ("it doesn't need to find every single thing
-    // before it starts talking"; live: 4.5 s to the first word, ~3 s of it
-    // the turn's reading): a question that names one company or person
-    // hears that Q is on it as the turn arrives. Only words true whatever
-    // the reading decides -- Q looks into what it was asked about either
-    // way -- and a holding line: the answer's own words replace it.
-    sayHolding(request, latest.content);
+    // Owner 2026-10-23: a cheap signal may start something early for speed
+    // but never decide what Q does. Words shaped as a question or a lookup
+    // hear, as the turn arrives, a line that names no one and is true of
+    // whatever the reading decides; whom Q is looking into is named only
+    // from a model's understanding (the skim's, below), which replaces it.
+    if (ASKS_SOMETHING.test(latest.content.trim())) sayHolding(request, null);
     const readingFirst = (async () => {
       const ready = early === undefined ? null : await early;
       const earlyRead =
@@ -3812,6 +3824,35 @@ export function createSpecialistQAnswer(
           ? preskim.skim
           : skimmer.skim(skimInput(request, history, latest));
     if (skimming !== null) {
+      // Owner 2026-10-23 ("it doesn't need to find every single thing
+      // before it starts talking"; live: 4.5 s to the first word, ~3 s of
+      // it the turn's reading): when the quick first read (a model, by
+      // meaning) understands whom the turn is about (TURN_SKIM v6
+      // `subject`, or the one it reads a person search for), they hear that
+      // Q is on it before the full reading lands. The name is the skim's
+      // understanding, never one guessed from the words' capitals or a list
+      // of question words (owner: a word list never decides). A holding
+      // line: the answer's own words replace it.
+      let readingLanded = false;
+      void readingFirst.then(
+        () => {
+          readingLanded = true;
+        },
+        () => {
+          readingLanded = true;
+        },
+      );
+      void skimming.then(
+        (skimmed) => {
+          const name =
+            skimmed?.subject?.name ??
+            (skimmed?.kind === "PERSON_SEARCH" ? skimmed.person?.name : null);
+          if (!readingLanded && typeof name === "string") {
+            sayHolding(request, name.trim().slice(0, 60));
+          }
+        },
+        () => undefined,
+      );
       const skimStarted = Date.now();
       const skimmed = await Promise.race([
         readingFirst.then(() => null),
@@ -4230,6 +4271,33 @@ export function createSpecialistQAnswer(
         reference.sameFor,
       );
       if (again !== null) return again;
+    }
+    // Getting ready for a call with one named counterpart (TURN_READER v58
+    // meetingPrep, by meaning) is prepared now, in the answer, ahead of
+    // any team job (owner 2026-10-23: Q offered to plan it instead). When
+    // it cannot be prepared, the turn goes on as before.
+    const prepFor =
+      read === null || read.confidence === "LOW" || read.addressedToQ === false
+        ? null
+        : (read.meetingPrep?.counterpart ?? null);
+    if (dependencies.callPrep !== undefined && prepFor !== null) {
+      const startedAt = Date.now();
+      const prep = await dependencies.callPrep.prepare(request, {
+        counterpart: prepFor,
+        said: latest.content,
+      });
+      logger?.info(
+        {
+          qRunId: request.runId,
+          prepared: prep !== null,
+          waiting: prep?.waiting.length ?? 0,
+          prepMs: Date.now() - startedAt,
+        },
+        "q prepared a call",
+      );
+      if (prep !== null) {
+        return recordAnswer(request, conversationId, callPrepLine(prep));
+      }
     }
     // Work handed to Q's team -- read from meaning (TURN_READER v49
     // teamJob), or a sentence naming three kinds of work as a fast path --
@@ -4844,7 +4912,11 @@ export function createSpecialistQAnswer(
       ...(spoken ? { spoken: true } : {}),
       ...(read === null
         ? {}
-        : { turnKind: read.kind, aboutNamedOther: read.aboutNamedOther }),
+        : {
+            turnKind: read.kind,
+            aboutNamedOther: read.aboutNamedOther,
+            namedOther: read.namedOther ?? null,
+          }),
       ...(read?.question?.kind === undefined
         ? {}
         : { questionKind: read.question.kind }),
@@ -4869,6 +4941,8 @@ export function createSpecialistQAnswer(
               ranking: read.question.discover?.ranking ?? "NONE",
               mandateRelevant: read.question.discover?.mandateRelevant ?? false,
               previous: read.question.discover?.previous ?? false,
+              // v58: they asked for companies raising now.
+              raising: read.question.discover?.raising === true,
             },
           }
         : {}),
@@ -4880,6 +4954,18 @@ export function createSpecialistQAnswer(
               previous: read.question.discover?.previous ?? false,
               // v56: past the companies already shown ("three new ones").
               excludeShown: read.question.excludeShown === true,
+              // Ranked against their mandate, as the reader understood it.
+              mandateRelevant: read.question.discover?.mandateRelevant === true,
+            },
+          }
+        : {}),
+      // v58: which investors their own company should approach.
+      ...(read?.kind === "QUESTION_TO_Q" &&
+      read.question?.kind === "INVESTOR_PROSPECTS"
+        ? {
+            investorProspects: {
+              text: read.question.text,
+              count: read.question.count ?? null,
             },
           }
         : {}),

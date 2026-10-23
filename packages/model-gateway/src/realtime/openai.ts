@@ -120,6 +120,11 @@ export function createOpenAIRealtimeProvider(options: {
                     // mid-sentence (founder live 2026-10-07).
                     interrupt_response: false,
                   },
+                  // The provider filters the microphone before its turn
+                  // detector and transcriber hear it (production 2026-10-23:
+                  // "Laughter Tell me about Halyard" from a person who never
+                  // laughed: the transcriber named background noise).
+                  noise_reduction: { type: "near_field" },
                   ...(request.transcribeInput === true
                     ? {
                         transcription: {

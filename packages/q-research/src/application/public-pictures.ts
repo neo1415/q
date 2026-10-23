@@ -174,8 +174,12 @@ export function createPublicPictureSearch(input: {
         const imageHost = judgePublicUrl(image);
         if (imageHost.ok && NOT_OF_THEM.test(imageHost.domain)) continue;
         // One picture a site: two from the same page say the same thing.
-        if (pages.has(page.domain)) continue;
+        // One showing of an image: the same photo on two of their sites
+        // (live 2026-10-23: one Wix image on academy. and www. showed twice).
+        const sameImage = image.split("?")[0] ?? image;
+        if (pages.has(page.domain) || pages.has(sameImage)) continue;
         pages.add(page.domain);
+        pages.add(sameImage);
         candidates.push({
           imageUrl: image,
           pageUrl: page.url,

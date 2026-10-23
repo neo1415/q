@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { DiscoveryService } from "@capital-q/discovery";
 
@@ -13,6 +13,7 @@ import {
   COMPANY_A,
   COMPANY_B_NETWORK,
   contextFor,
+  fakeMandates,
   fakePorts,
   MARKERS,
   planFor,
@@ -135,6 +136,158 @@ describe("find_prospective_investors", () => {
     expect(data.notes.join(" ")).toContain("not evidence of interest");
     // Nothing of the company's private description travelled.
     expect(JSON.stringify(outcome)).not.toContain(MARKERS.founder);
+  });
+
+  it("Context Firewall: never reads an investor's private mandate for a founder (owner 2026-10-23)", async () => {
+    const PRIVATE = "PRIVATE-MANDATE-THESIS-7f3c";
+    const mandateRead = vi.fn(() =>
+      Promise.reject(new Error(`mandate read: ${PRIVATE}`)),
+    );
+    const mandates = {
+      findCanonicalInvestorMandate: mandateRead,
+      getMandate: mandateRead,
+      listActiveMandates: mandateRead,
+    };
+    const discovery = {
+      sideFor: () => Promise.resolve("FOUNDER"),
+      discoverCompanies: () => Promise.reject(new Error("not used")),
+      discoverInvestors: () =>
+        Promise.resolve({
+          rankingVersion: "discovery.v1",
+          items: [
+            {
+              investorOrganisationId: LONDON_ANGEL,
+              displayName: "Thames Angels",
+              investorType: "ANGEL",
+              hqCountry: "GB",
+              publicDescription: "Early cheques for UK founders.",
+              websiteUrl: null,
+              deploymentState: "ACTIVELY_INVESTING",
+            },
+          ],
+          notes: ["RANKED_ON_DECLARED_PROFILE_ONLY"],
+          nextCursor: null,
+        }),
+    } as unknown as DiscoveryService;
+    const port = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(
+          fakePorts({
+            discovery,
+            mandates: mandates as unknown as ReturnType<typeof fakeMandates>,
+          }),
+        ),
+      ),
+    });
+    const outcome = await port.execute(
+      call({ companyId: COMPANY_A }),
+      contextFor(actorA, founderPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(mandateRead).not.toHaveBeenCalled();
+    expect(JSON.stringify(outcome)).not.toContain(PRIVATE);
+    expect(JSON.stringify(outcome)).toContain(
+      "no investor's private mandate is read",
+    );
+  });
+
+  it("ranks a published sector match over a fintech fund for a water company (owner 2026-10-23, Maji Loop)", async () => {
+    // Profile ranking alone puts the fintech fund first (same country,
+    // stage, deploying); their published gates say whose sector it is.
+    const FINTECH = LONDON_ANGEL;
+    const CLIMATE = NAIROBI_VC;
+    const gate = (
+      investorOrganisationId: string,
+      label: string,
+      standing: "MET" | "NOT_MET",
+    ) => ({
+      investorOrganisationId,
+      publicId: `g-${investorOrganisationId.slice(0, 4)}`,
+      title: "Gate",
+      acceptingApplications: true,
+      criteria: [
+        {
+          label,
+          requiredness: "REQUIRED" as const,
+          dimension: "TAXONOMY" as const,
+          standing,
+        },
+        {
+          label: "Seed",
+          requiredness: "REQUIRED" as const,
+          dimension: "STAGE" as const,
+          standing: "MET" as const,
+        },
+      ],
+    });
+    const forOwnCompany = vi.fn(() =>
+      Promise.resolve([
+        gate(FINTECH, "Fintech", "NOT_MET"),
+        gate(CLIMATE, "Clean energy; energy access", "MET"),
+      ]),
+    );
+    const discovery = {
+      sideFor: () => Promise.resolve("FOUNDER"),
+      discoverCompanies: () => Promise.reject(new Error("not used")),
+      discoverInvestors: () =>
+        Promise.resolve({
+          rankingVersion: "discovery.v1",
+          items: [
+            {
+              investorOrganisationId: FINTECH,
+              displayName: "Savanna Seed Partners",
+              investorType: "VC",
+              hqCountry: "GB",
+              publicDescription: null,
+              websiteUrl: null,
+              deploymentState: "ACTIVELY_INVESTING",
+            },
+            {
+              investorOrganisationId: CLIMATE,
+              displayName: "Pan-African Climate Development Fund",
+              investorType: "DFI",
+              hqCountry: "KE",
+              publicDescription: null,
+              websiteUrl: null,
+              deploymentState: "ACTIVELY_INVESTING",
+            },
+          ],
+          notes: [],
+          nextCursor: null,
+        }),
+    } as unknown as DiscoveryService;
+    const port = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(
+          fakePorts({ discovery, investorGates: { forOwnCompany } }),
+        ),
+      ),
+    });
+    const outcome = await port.execute(
+      call({ companyId: COMPANY_A }),
+      contextFor(actorA, founderPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    const data = (
+      outcome.result as {
+        data: {
+          prospects: {
+            name: string;
+            sector?: { fit: string; focus: string | null };
+          }[];
+        };
+      }
+    ).data;
+    expect(data.prospects.map((p) => [p.name, p.sector?.fit])).toEqual([
+      ["Pan-African Climate Development Fund", "MATCH"],
+      ["Savanna Seed Partners", "MISMATCH"],
+    ]);
+    expect(data.prospects[1]?.sector?.focus).toBe("Fintech");
+    // Gates are read for every candidate before the list is cut.
+    expect(forOwnCompany).toHaveBeenCalledWith(actorA, COMPANY_A, [
+      FINTECH,
+      CLIMATE,
+    ]);
   });
 
   it("compares a public company on what the conversation cited, and never counts the unknown against anyone", async () => {

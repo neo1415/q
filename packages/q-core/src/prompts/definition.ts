@@ -131,6 +131,8 @@ export const PROMPT_IDS = [
   "GATEQ_DOSSIER_SYNTHESIS",
   /** Owner live 2026-10-17: a follow-up answered from what Q already showed. */
   "CONVERSATION_RECALL",
+  /** Owner 2026-10-23: a call with one named counterpart, prepared in the answer. */
+  "CALL_PREP",
 ] as const;
 export type PromptId = (typeof PROMPT_IDS)[number];
 
@@ -209,6 +211,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   CONVERSATION_RECALL: "conversation-recall",
   TURN_SKIM: "turn-skim",
   PERSON_BRIEF_READER: "person-brief-reader",
+  CALL_PREP: "call-prep",
 };
 
 export type PromptKind = "CHARTER" | "TASK";
