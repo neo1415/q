@@ -155,6 +155,25 @@ describe("relationship.interest.express", () => {
     expect(described.preview).toMatch(/not a commitment to invest/);
   });
 
+  it("says it is ready to send and shows the note in full, never 'Not saved yet' (outward action)", () => {
+    const { action } = fakes();
+    const proposed = action.proposed;
+    expect(proposed).toBeDefined();
+    const withNote = proposed?.({
+      ...payload,
+      note: "Your B2B payments model fits our seed fintech mandate in West Africa.",
+    });
+    expect(withNote).toContain(
+      'with this note: "Your B2B payments model fits our seed fintech mandate in West Africa."',
+    );
+    expect(withNote).toContain("Ready to send: approve on the card");
+    const without = proposed?.(payload);
+    expect(without).toContain("Ready to send");
+    for (const line of [withNote, without]) {
+      expect(line).not.toContain("Not saved yet");
+    }
+  });
+
   it("authorises with the command's own question, and refuses when it says no", async () => {
     const yes = fakes();
     expect(await yes.action.authorize(payload, INVESTOR)).toEqual({

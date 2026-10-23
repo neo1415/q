@@ -98,6 +98,27 @@ const DECLARED: readonly DeclaredAction[] = [
   ...(PERSON_ACTIONS as readonly DeclaredAction[]),
 ];
 
+/**
+ * Kinds the other side receives (an interest, an answer, a message, an
+ * email, an invite, a request): a card still waiting reads "ready to
+ * send". Profile and record edits keep "Not saved yet".
+ */
+const OUTWARD_ACTION_TYPES: ReadonlySet<string> = new Set([
+  "relationship.interest.express",
+  "relationship.interest.respond",
+  "relationship.connection_request.send",
+  "relationship.connection_request.respond",
+  "email.send",
+  "email.inbound.reply",
+  "review.request",
+  "app.chat.message.send",
+  "app.diligence.document.request",
+  "app.diligence.document.share",
+  "app.diligence.questions.send",
+  "app.schedule.meeting.book",
+  "app.schedule.proposal.accept",
+]);
+
 function cardOnlyAction(action: DeclaredAction): boolean {
   return (
     (action.consequence !== undefined &&
@@ -324,22 +345,31 @@ export function createConversationApprovalPort(
   ): Promise<readonly ConversationProposal[]> => {
     const { actor } = context;
     const messages = await messagesOf(context);
-    const seen = new Map<string, string>();
+    const seen = new Map<
+      string,
+      { readonly summary: string; readonly actionType: string }
+    >();
     for (const message of messages) {
       for (const block of message.blocks ?? []) {
         if (block.kind === "ACTION_PROPOSAL") {
-          seen.set(block.proposal.proposalId, block.proposal.summary);
+          seen.set(block.proposal.proposalId, {
+            summary: block.proposal.summary,
+            actionType: block.proposal.actionType,
+          });
         }
       }
     }
     const proposals: ConversationProposal[] = [];
-    for (const [proposalId, summary] of [...seen].slice(-PROPOSALS_MAX)) {
+    for (const [proposalId, { summary, actionType }] of [...seen].slice(
+      -PROPOSALS_MAX,
+    )) {
       const view = await viewOf(actor, proposalId, context.correlationId);
       if (view === null) continue;
       proposals.push({
         proposalId,
         summary,
         status: plainProposalStatus(view),
+        ...(OUTWARD_ACTION_TYPES.has(actionType) ? { outward: true } : {}),
       });
     }
     return proposals;

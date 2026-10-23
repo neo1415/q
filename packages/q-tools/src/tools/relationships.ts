@@ -580,7 +580,7 @@ export const ProposeExpressInterestInputSchema = z
         "Or the company's name as the person said it, from any page; Capital Q finds it among companies they can see.",
       ),
     note: InterestNoteSchema.optional().describe(
-      "A short note to the founders, sent with the interest, when they asked to say something (a call next week, a question): in their voice, up to 1000 characters. Only the company's founders see it.",
+      "A short note to the founders, sent with the interest, when they asked to say something (a call next week, a question): in their voice, up to 1000 characters, saying why they are interested: their declared mandate against what the company does and its stage, from what you have read. Never generic. Only the company's founders see it.",
     ),
   })
   .strict()
