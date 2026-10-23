@@ -18,6 +18,9 @@ import {
  * mandates, prior interest or fit evidence is available". It is answered
  * by code from the investors already interested and the likely fits from
  * what investors publish, never from an investor's private mandate.
+ *
+ * Maji Loop sells water from solar kiosks: a fintech fund is not a fit,
+ * whatever its country and stage, and is never said to be one.
  */
 
 const COMPANY = "0a000000-0000-4000-8000-000000000001";
@@ -25,21 +28,66 @@ const KESTREL = "1a000000-0000-4000-8000-000000000001";
 const SAVANNA = "1b000000-0000-4000-8000-000000000002";
 const RIFT = "1c000000-0000-4000-8000-000000000003";
 const DELTA = "1d000000-0000-4000-8000-000000000004";
+const CLIMATE = "1e000000-0000-4000-8000-000000000005";
 
+const required = (
+  label: string,
+  dimension: string,
+  standing: "MET" | "NOT_MET" | "UNKNOWN",
+) => ({ label, required: true, dimension, standing });
+
+/** In the prospect tool's order: published sector match, unknown, mismatch. */
 const prospects = [
   {
-    investorOrganisationId: SAVANNA,
-    name: "Savanna Seed Partners",
+    investorOrganisationId: CLIMATE,
+    name: "Pan-African Climate Development Fund",
+    investorType: "DFI",
+    hqCountry: "KE",
+    publicDescription:
+      "Climate finance for energy and water access in East Africa.",
+    deploymentState: "ACTIVELY_INVESTING",
+    reasons: [
+      { kind: "SAME_COUNTRY", detail: "based in the same country (KE)" },
+      { kind: "DEPLOYING", detail: "says it is actively investing" },
+    ],
+    label: "likely fit, not evidence of interest",
+    gate: {
+      title: "Climate gate",
+      acceptingApplications: true,
+      criteria: [
+        required("Clean energy; energy access", "TAXONOMY", "MET"),
+        required("Seed to Series A", "STAGE", "MET"),
+      ],
+    },
+    sector: { fit: "MATCH", focus: "Clean energy; energy access" },
+  },
+  {
+    investorOrganisationId: RIFT,
+    name: "Rift Valley Seed Fund",
     investorType: "VC",
     hqCountry: "KE",
-    publicDescription: "Seed cheques for East African fintech.",
-    deploymentState: "ACTIVELY_INVESTING",
+    publicDescription: null,
+    deploymentState: "SELECTIVE",
     reasons: [
       { kind: "SAME_COUNTRY", detail: "based in the same country (KE)" },
       {
         kind: "TYPICAL_STAGE",
         detail: "vc investors typically back seed companies",
       },
+      { kind: "DEPLOYING", detail: "says it is investing selectively" },
+    ],
+    label: "likely fit, not evidence of interest",
+    gate: null,
+  },
+  {
+    investorOrganisationId: SAVANNA,
+    name: "Savanna Seed Partners",
+    investorType: "VC",
+    hqCountry: "KE",
+    publicDescription: null,
+    deploymentState: "ACTIVELY_INVESTING",
+    reasons: [
+      { kind: "SAME_COUNTRY", detail: "based in the same country (KE)" },
       { kind: "DEPLOYING", detail: "says it is actively investing" },
     ],
     label: "likely fit, not evidence of interest",
@@ -47,44 +95,11 @@ const prospects = [
       title: "Savanna gate",
       acceptingApplications: true,
       criteria: [
-        { label: "Seed", required: true, standing: "MET" },
-        { label: "Fintech", required: true, standing: "MET" },
+        required("Fintech", "TAXONOMY", "NOT_MET"),
+        required("Seed", "STAGE", "MET"),
       ],
     },
-  },
-  {
-    investorOrganisationId: KESTREL,
-    name: "Kestrel Capital",
-    investorType: "ANGEL_NETWORK",
-    hqCountry: "NG",
-    publicDescription: null,
-    reasons: [
-      {
-        kind: "TYPICAL_STAGE",
-        detail: "angel network investors typically back seed companies",
-      },
-    ],
-    label: "likely fit, not evidence of interest",
-    gate: null,
-  },
-  {
-    investorOrganisationId: RIFT,
-    name: "Rift Valley Ventures",
-    investorType: "VC",
-    hqCountry: "KE",
-    publicDescription: null,
-    reasons: [
-      { kind: "SAME_COUNTRY", detail: "based in the same country (KE)" },
-    ],
-    label: "likely fit, not evidence of interest",
-    gate: {
-      title: "Rift gate",
-      acceptingApplications: true,
-      criteria: [
-        { label: "Series A", required: true, standing: "NOT_MET" },
-        { label: "Revenue", required: true, standing: "UNKNOWN" },
-      ],
-    },
+    sector: { fit: "MISMATCH", focus: "Fintech" },
   },
 ] as const;
 
@@ -117,35 +132,53 @@ function outcome(name: string, data: unknown): QToolCallOutcome {
 }
 
 describe("which investors a founder should talk to first", () => {
-  it("puts investors already interested first, then likely fits, each once; declined interest is left out", () => {
-    const picks = pickProspects(interests, prospects, 3, "seed");
+  it("puts interest first, then a sector match; a fintech fund is left out for a water company", () => {
+    const picks = pickProspects(interests, prospects, 3);
     expect(picks.map((p) => [p.name, p.kind])).toEqual([
       ["Kestrel Capital", "INTERESTED"],
-      ["Savanna Seed Partners", "LIKELY_FIT"],
-      ["Rift Valley Ventures", "LIKELY_FIT"],
+      ["Pan-African Climate Development Fund", "LIKELY_FIT"],
+      ["Rift Valley Seed Fund", "LIKELY_FIT"],
     ]);
-    // Analyst lines, from the records: the interest event itself...
+  });
+
+  it("says why from the record: the interest event, or what they publish, never a generic inference", () => {
+    const picks = pickProspects(interests, prospects, 3);
     expect(picks[0]?.why).toBe(
       "they approached you first, expressing interest on 19 Oct, and are still waiting for your answer, so reply to them before you pitch anyone cold",
     );
-    // ...or what they say they back, how that meets this company, and
-    // their published gate.
     expect(picks[1]?.why).toBe(
-      "they say they back \u201cSeed cheques for East African fintech\u201d; they are based in Kenya, as you are; venture capital investors like them typically back companies at seed, where you are; you meet every required criterion on their published gate",
+      "their published gate looks for Clean energy; energy access, which is your sector; they describe their focus as “Climate finance for energy and water access in East Africa”; they are based in Kenya, as you are; they say they are actively investing; you meet the other required criteria on their published gate",
     );
-    expect(picks[2]?.why).toMatch(/you miss 1 of the 2 required criteria/u);
+    // Rift publishes no sector: nothing is claimed about it, and its
+    // stage reason (a generic inference about VCs) is never said.
+    expect(picks[2]?.why).toBe(
+      "they are based in Kenya, as you are; they say they are investing selectively",
+    );
+    for (const pick of picks) {
+      expect(pick.why).not.toMatch(/typically back/u);
+    }
+  });
+
+  it("names a sector mismatch only when nothing better is left, and says it is a stretch", () => {
+    const savanna = prospects[2];
+    const picks = pickProspects([], [savanna], 3);
+    expect(picks.map((p) => p.name)).toEqual(["Savanna Seed Partners"]);
+    expect(picks[0]?.why).toMatch(
+      /^their published gate looks for Fintech, which is not your sector, so this is a stretch/u,
+    );
   });
 
   it("names them with a why each and says which are interest and which are likely fit", () => {
     const picks = pickProspects(interests, prospects, 3);
     const text = investorProspectsText(picks, 3);
     expect(text).toMatch(
-      /^Talk to Kestrel Capital, Savanna Seed Partners and Rift Valley Ventures first\./u,
+      /^Talk to Kestrel Capital, Pan-African Climate Development Fund and Rift Valley Seed Fund first\./u,
     );
     expect(text).toContain("Kestrel Capital: They approached you first");
     expect(text).toContain(
       "The others are likely fits from what each publishes, not interest they have shown.",
     );
+    expect(text).not.toContain("Savanna");
   });
 
   it("says so plainly when there is nobody to name", () => {
@@ -157,7 +190,7 @@ describe("which investors a founder should talk to first", () => {
     expect(block?.shape).toBe("RANKED");
     expect(block?.cards.map((card) => card.subject)).toEqual([
       { kind: "INVESTOR_ORGANISATION", investorOrganisationId: KESTREL },
-      { kind: "INVESTOR_ORGANISATION", investorOrganisationId: SAVANNA },
+      { kind: "INVESTOR_ORGANISATION", investorOrganisationId: CLIMATE },
       { kind: "INVESTOR_ORGANISATION", investorOrganisationId: RIFT },
     ]);
     expect(block?.cards.map((card) => card.view)).toEqual([

@@ -62,9 +62,15 @@ type Prospect = {
     readonly acceptingApplications: boolean;
     readonly criteria: readonly {
       readonly required: boolean;
+      readonly dimension?: string | undefined;
       readonly standing: "MET" | "NOT_MET" | "UNKNOWN";
     }[];
   } | null;
+  /** Their published sector against this company (from their gate). */
+  readonly sector?: {
+    readonly fit: "MATCH" | "MISMATCH" | "UNKNOWN";
+    readonly focus: string | null;
+  };
 };
 
 /** One investor to approach, with the one line that says why. */
@@ -133,16 +139,22 @@ function sentence(text: string): string {
 /** What their published gate says about this company, in a few words. */
 function gateWords(gate: Prospect["gate"]): string | null {
   if (gate === null || gate === undefined) return null;
-  const required = gate.criteria.filter((c) => c.required);
+  // The sector is said on its own (sectorClause); these are the rest.
+  const required = gate.criteria.filter(
+    (c) =>
+      c.required &&
+      c.dimension !== "TAXONOMY" &&
+      c.dimension !== "EXCLUDED_TAXONOMY",
+  );
   if (required.length === 0) return null;
   const met = required.filter((c) => c.standing === "MET").length;
   const missed = required.filter((c) => c.standing === "NOT_MET").length;
   if (missed > 0) {
-    return `you miss ${String(missed)} of the ${String(required.length)} required criteria on their published gate`;
+    return `you miss ${String(missed)} of the other ${String(required.length)} required criteria on their published gate`;
   }
   return met === required.length
-    ? `you meet every required criterion on their published gate`
-    : `you meet ${String(met)} of the ${String(required.length)} required criteria on their published gate; the rest are not known yet`;
+    ? `you meet the other required criteria on their published gate`
+    : `you meet ${String(met)} of the other ${String(required.length)} required criteria on their published gate; the rest are not known yet`;
 }
 
 /** Their own words for what they back, quoted as they published them. */
@@ -186,7 +198,6 @@ function countryName(code: string | null): string | null {
 function reasonClause(
   reason: Prospect["reasons"][number],
   one: Prospect,
-  stage: string | null,
 ): string | null {
   switch (reason.kind) {
     case "SAME_COUNTRY": {
@@ -195,13 +206,10 @@ function reasonClause(
         ? "they are based where you are"
         : `they are based in ${country}, as you are`;
     }
-    case "TYPICAL_STAGE": {
-      const kind = typeWords(one.investorType)?.toLowerCase();
-      const at = stage === null ? "your stage" : `${stage.replace(/_/gu, " ")}`;
-      return kind === undefined
-        ? `investors like them typically back companies at ${at}`
-        : `${kind} investors like them typically back companies at ${at}, where you are`;
-    }
+    // A generic inference about investors of their type, not something
+    // they published or did (owner 2026-10-23): never said.
+    case "TYPICAL_STAGE":
+      return null;
     case "DEPLOYING":
       return one.deploymentState === "SELECTIVE"
         ? "they say they are investing selectively"
@@ -211,15 +219,31 @@ function reasonClause(
   }
 }
 
-function prospectWhy(one: Prospect, stage: string | null): string {
+/** Their published sector against this company, said honestly. */
+function sectorClause(sector: Prospect["sector"]): string | null {
+  if (sector === undefined || sector.focus === null) return null;
+  if (sector.fit === "MATCH") {
+    return `their published gate looks for ${sector.focus}, which is your sector`;
+  }
+  if (sector.fit === "MISMATCH") {
+    return `their published gate looks for ${sector.focus}, which is not your sector, so this is a stretch`;
+  }
+  return null;
+}
+
+function prospectWhy(one: Prospect): string {
   const focus = focusOf(one.publicDescription);
   const clauses = one.reasons
-    .map((reason) => reasonClause(reason, one, stage))
+    .map((reason) => reasonClause(reason, one))
     .filter((clause): clause is string => clause !== null)
     .slice(0, 2);
+  const sector = sectorClause(one.sector);
   const gate = gateWords(one.gate);
   const parts = [
-    ...(focus === null ? [] : [`they say they back \u201c${focus}\u201d`]),
+    ...(sector === null ? [] : [sector]),
+    ...(focus === null
+      ? []
+      : [`they describe their focus as \u201c${focus}\u201d`]),
     ...clauses,
     ...(gate === null ? [] : [gate]),
   ];
@@ -237,8 +261,6 @@ export function pickProspects(
   interests: readonly Interest[],
   prospects: readonly Prospect[],
   count: number,
-  /** The company's own stage code, as the prospect list compared it. */
-  stage: string | null = null,
 ): ProspectPick[] {
   const picks: ProspectPick[] = [];
   const seen = new Set<string>();
@@ -265,10 +287,15 @@ export function pickProspects(
       why: interestWhy(one, focusOf(profile?.publicDescription)),
     });
   }
-  for (const one of prospects) {
+  // A published sector that is not theirs is named only when nothing
+  // better is left (owner 2026-10-23), and then said to be a stretch.
+  const better = prospects.filter((one) => one.sector?.fit !== "MISMATCH");
+  const stretch = prospects.filter((one) => one.sector?.fit === "MISMATCH");
+  const fill = picks.length + better.length > 0 ? better : stretch;
+  for (const one of fill) {
     if (picks.length >= count || seen.has(one.investorOrganisationId)) continue;
     seen.add(one.investorOrganisationId);
-    const why = prospectWhy(one, stage);
+    const why = prospectWhy(one);
     picks.push({
       investorOrganisationId: one.investorOrganisationId,
       name: one.name,
@@ -384,10 +411,7 @@ export async function runInvestorProspects(input: {
           .catch(() => null)
       : Promise.resolve(null),
   ]);
-  const prospectData = dataOf(prospected) as {
-    prospects?: unknown;
-    compared?: { stageCode?: unknown };
-  } | null;
+  const prospectData = dataOf(prospected) as { prospects?: unknown } | null;
   // Without the ranking there is nothing honest to say by code: the full
   // path answers instead.
   if (prospectData === null || !Array.isArray(prospectData.prospects)) {
@@ -399,11 +423,7 @@ export async function runInvestorProspects(input: {
     ? (interestData.interests as Interest[])
     : [];
   const asked = Math.min(COUNT_MAX, Math.max(1, ask.count ?? COUNT_DEFAULT));
-  const stage =
-    typeof prospectData.compared?.stageCode === "string"
-      ? prospectData.compared.stageCode
-      : null;
-  const picks = pickProspects(interests, prospects, asked, stage);
+  const picks = pickProspects(interests, prospects, asked);
   return {
     text: investorProspectsText(picks, asked),
     block: prospectCardsBlock(picks),

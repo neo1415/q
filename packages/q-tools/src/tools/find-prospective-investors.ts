@@ -98,6 +98,8 @@ const ProspectSchema = z
               .object({
                 label: z.string(),
                 required: z.boolean(),
+                /** What the rule is about: TAXONOMY is their sector. */
+                dimension: z.string().optional(),
                 standing: z.enum(["MET", "NOT_MET", "UNKNOWN"]),
               })
               .strict(),
@@ -106,6 +108,21 @@ const ProspectSchema = z
       })
       .strict()
       .nullable()
+      .optional(),
+    /**
+     * Owner 2026-10-23 (Maji Loop, water, was told a fintech fund fits):
+     * whether the sector the investor publishes on their gate is this
+     * company's. MATCH and MISMATCH come only from their published gate,
+     * checked against the company by GateQ; UNKNOWN when they publish no
+     * sector. Never their private mandate.
+     */
+    sector: z
+      .object({
+        fit: z.enum(["MATCH", "MISMATCH", "UNKNOWN"]),
+        /** The sector rule as they published it, by its label. */
+        focus: z.string().nullable(),
+      })
+      .strict()
       .optional(),
   })
   .strict();
@@ -149,10 +166,46 @@ function gateWords(gate: InvestorGateFitDto | undefined) {
         criteria: gate.criteria.map((criterion) => ({
           label: criterion.label,
           required: criterion.requiredness === "REQUIRED",
+          dimension: criterion.dimension,
           standing: criterion.standing,
         })),
       };
 }
+
+type SectorFit = "MATCH" | "MISMATCH" | "UNKNOWN";
+
+/**
+ * Their published sector against this company, from their gate only: a
+ * sector rule the company meets is a match; one it fails, or a sector
+ * they rule out that it is in, is a mismatch; no sector rule, or none
+ * decided, is not known (never counted against anyone).
+ */
+export function sectorOf(gate: InvestorGateFitDto | undefined): {
+  readonly fit: SectorFit;
+  readonly focus: string | null;
+} {
+  const rules = gate?.criteria.filter((c) => c.dimension === "TAXONOMY") ?? [];
+  const excluded =
+    gate?.criteria.filter((c) => c.dimension === "EXCLUDED_TAXONOMY") ?? [];
+  const focus =
+    rules.length === 0 ? null : rules.map((rule) => rule.label).join("; ");
+  if (excluded.some((rule) => rule.standing === "NOT_MET")) {
+    return { fit: "MISMATCH", focus };
+  }
+  if (rules.some((rule) => rule.standing === "MET")) {
+    return { fit: "MATCH", focus };
+  }
+  if (rules.length > 0 && rules.every((rule) => rule.standing === "NOT_MET")) {
+    return { fit: "MISMATCH", focus };
+  }
+  return { fit: "UNKNOWN", focus };
+}
+
+const SECTOR_ORDER: Readonly<Record<SectorFit, number>> = {
+  MATCH: 0,
+  UNKNOWN: 1,
+  MISMATCH: 2,
+};
 
 export function createFindProspectiveInvestorsTool(
   ports: QToolPorts,
@@ -285,9 +338,11 @@ export function createFindProspectiveInvestorsTool(
           publicDescription: item.publicDescription,
           websiteUrl: item.websiteUrl,
         })),
-      ).slice(0, input.limit ?? LIMIT_DEFAULT);
+      );
       // Q.05: published gates, only for the person's own company (the
       // grant proved ownership); a described company is never checked.
+      // Read for every candidate before the cut, so a sector match found
+      // on a gate can lift an investor the profile ranking put lower.
       const gates =
         grant.source === "CAPITAL_Q_RECORD" &&
         input.companyId !== undefined &&
@@ -304,11 +359,26 @@ export function createFindProspectiveInvestorsTool(
               ).map((gate) => [gate.investorOrganisationId, gate]),
             )
           : new Map<string, InvestorGateFitDto>();
+      // A published sector the company is in comes first, then those
+      // that publish none, then those whose sector it is not (owner
+      // 2026-10-23); the profile ranking orders each group.
+      const ordered = ranked
+        .map((prospect, at) => ({
+          prospect,
+          at,
+          sector: sectorOf(gates.get(prospect.investorOrganisationId)),
+        }))
+        .sort(
+          (a, b) =>
+            SECTOR_ORDER[a.sector.fit] - SECTOR_ORDER[b.sector.fit] ||
+            a.at - b.at,
+        )
+        .slice(0, input.limit ?? LIMIT_DEFAULT);
       return {
         fitVersion: PROSPECT_FIT_VERSION,
         companySource: grant.source,
         compared,
-        prospects: ranked.map((prospect) => ({
+        prospects: ordered.map(({ prospect, sector }) => ({
           investorOrganisationId: prospect.investorOrganisationId,
           name: prospect.displayName,
           investorType: prospect.investorType,
@@ -319,6 +389,9 @@ export function createFindProspectiveInvestorsTool(
           reasons: prospect.reasons.map((reason) => ({ ...reason })),
           label: "likely fit, not evidence of interest" as const,
           gate: gateWords(gates.get(prospect.investorOrganisationId)),
+          ...(sector.fit === "UNKNOWN" && sector.focus === null
+            ? {}
+            : { sector }),
         })),
         notes:
           slate.items.length === 0
