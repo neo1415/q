@@ -716,6 +716,8 @@ function toProblem(
       code: "INVALID_REQUEST",
       requestId,
       detail: error.message,
+      // QA F-52: the stable code Q holds the answer on.
+      errors: [{ path: "value", code: error.code, message: error.message }],
     });
   }
   // A published step names a target nobody registered (or similar wiring

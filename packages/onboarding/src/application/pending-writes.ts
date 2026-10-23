@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { DatabaseExecutor } from "@capital-q/database";
 
+import { ONBOARDING_CONTEXT_REQUIRED_CODE } from "../domain/errors.js";
 import { canonicalise } from "../domain/idempotency.js";
 
 /**
@@ -159,6 +160,9 @@ export async function drainPendingWrites(
  */
 export function isTransientOnboardingFailure(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return true;
+  // QA F-52: an answer that waits for its firm or company to be set up is
+  // held and saved once it is, never refused for good.
+  if (waitsForContext(error)) return true;
   const status = (error as { readonly status?: unknown }).status;
   if (typeof status === "number") {
     // 409 VERSION_CONFLICT: the session moved under us; retry later. Any
@@ -184,4 +188,27 @@ export function failureCode(error: unknown): string {
     if (name === "AbortError" || name === "TimeoutError") return "TIMEOUT";
   }
   return "UPSTREAM_UNAVAILABLE";
+}
+
+/**
+ * QA F-52: the refusal says the firm or company this answer belongs to is
+ * not set up yet (an error, or a batch refusal's problem shape).
+ */
+export function waitsForContext(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if (Reflect.get(error, "code") === ONBOARDING_CONTEXT_REQUIRED_CODE) {
+    return true;
+  }
+  const problem: unknown = Reflect.get(error, "problem") ?? error;
+  if (typeof problem !== "object" || problem === null) return false;
+  const errors: unknown = Reflect.get(problem, "errors");
+  return (
+    Array.isArray(errors) &&
+    errors.some(
+      (item: unknown) =>
+        typeof item === "object" &&
+        item !== null &&
+        Reflect.get(item, "code") === ONBOARDING_CONTEXT_REQUIRED_CODE,
+    )
+  );
 }

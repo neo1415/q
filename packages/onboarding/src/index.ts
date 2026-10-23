@@ -62,6 +62,7 @@ export {
 export {
   ONBOARDING_RUNTIME_FAULTS,
   ONBOARDING_STATE_REASONS,
+  ONBOARDING_CONTEXT_REQUIRED_CODE,
   OnboardingContextRequiredError,
   OnboardingDefinitionConflictError,
   OnboardingDefinitionInvalidError,
@@ -327,6 +328,7 @@ export {
   drainPendingWrites,
   failureCode,
   isTransientOnboardingFailure,
+  waitsForContext,
   pendingReplayKey,
   sameResponseValue,
   type DrainPorts,
