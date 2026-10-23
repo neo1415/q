@@ -165,6 +165,27 @@ function researchOutcome(
   };
 }
 
+/** The research service's verdict on whether each page is about them. */
+function withMatch(
+  outcome: QToolCallOutcome,
+  subjectMatch: "MATCH" | "POSSIBLE" | "NONE",
+): QToolCallOutcome {
+  if (!outcome.result.ok) return outcome;
+  const data = outcome.result.data as {
+    readonly sources: readonly Record<string, unknown>[];
+  };
+  return {
+    ...outcome,
+    result: {
+      ok: true,
+      data: {
+        ...data,
+        sources: data.sources.map((source) => ({ ...source, subjectMatch })),
+      },
+    },
+  };
+}
+
 function toolPort(
   offered: readonly QOfferedTool[],
   script: (proposal: QToolProposal) => QToolCallOutcome,
@@ -1873,12 +1894,16 @@ describe("Capital Q and the public web together (owner 2026-10-23)", () => {
 
 describe("whom the web and pictures are for is the reader's, never a guess from the words (production 2026-10-23)", () => {
   /** One turn, read as EXPLICIT research, with what it asked recorded. */
-  async function turn(said: string, reading: Record<string, unknown>) {
+  async function turn(
+    said: string,
+    reading: Record<string, unknown>,
+    earlierAsked?: string,
+  ) {
     const asked: string[] = [];
     const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
       researchOutcome(p, "Zino Aviation flies charter."),
     );
-    const { seam, request, answerBlocks } = build({
+    const { seam, request, answerBlocks, messages } = build({
       script: [
         { kind: "JSON", value: analystResult("Zino Aviation flies charter.") },
       ],
@@ -1899,6 +1924,17 @@ describe("whom the web and pictures are for is the reader's, never a guess from 
         },
       },
     });
+    // What they asked before, as their own words (a name may leave Capital
+    // Q only when they said it).
+    if (earlierAsked !== undefined) {
+      messages.unshift({
+        ...messages[0],
+        id: randomUUID(),
+        role: "USER",
+        content: earlierAsked,
+        createdAt: new Date(Date.now() - 120_000).toISOString(),
+      } as QConversationMessage);
+    }
     expect((await seam.answer({ ...request, ...reading })).kind).toBe(
       "ANSWERED",
     );
@@ -1915,7 +1951,7 @@ describe("whom the web and pictures are for is the reader's, never a guess from 
   }
 
   it('"Yes" to an offer about Zino: searched and pictured as Zino, never as "Yes"', async () => {
-    const yes = await turn("Yes", ABOUT_ZINO);
+    const yes = await turn("Yes", ABOUT_ZINO, "Tell me about Zino Aviation");
     expect(yes.entityName).toBe("Zino Aviation");
     expect(yes.pictured).toEqual(["Zino Aviation"]);
   });
@@ -2029,11 +2065,123 @@ describe("a subject the public web knows nothing about is searched and said once
   });
 });
 
+describe("someone they only pointed at is not searched for on the web (production 2026-10-23)", () => {
+  const INVESTORS_LIST =
+    "Here are the investors you're talking to: 1. Savanna Seed Partners, 2. Harbourline Capital, 3. Northwind Ventures.";
+  const ABOUT_SAVANNA = {
+    aboutNamedOther: true,
+    namedOther: { name: "Savanna Seed Partners", kind: "COMPANY" },
+  } as const;
+
+  async function ask(said: string) {
+    const spoken: string[] = [];
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      researchOutcome(p, "Savanna Seed Partners backs pre-seed fintech."),
+    );
+    const { seam, request } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: analystResult(
+            "They may pass because your stage is later than their pre-seed focus.",
+          ),
+        },
+      ],
+      tools: tools.port,
+      earlierQ: INVESTORS_LIST,
+      userText: said,
+      subjects: [],
+      read: {
+        // As the reader's EXPLICIT for a turn about someone else.
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      said: spoken,
+    });
+    expect((await seam.answer({ ...request, ...ABOUT_SAVANNA })).kind).toBe(
+      "ANSWERED",
+    );
+    return {
+      searches: tools.executed.filter(
+        (one) => one.proposal.name === "research_public_web",
+      ),
+      spoken,
+    };
+  }
+
+  it('"Why might the top one pass on us?" after their investors list: answered from records, no web', async () => {
+    const turn = await ask("Why might the top one pass on us?");
+    expect(turn.searches).toEqual([]);
+    expect(turn.spoken.join(" ")).not.toContain("public");
+  });
+
+  it("named in their own words, the same question is searched by that name", async () => {
+    const turn = await ask("Why might Savanna Seed Partners pass on us?");
+    expect(turn.searches).toHaveLength(1);
+    expect(
+      (turn.searches[0]?.proposal.arguments as { entityName?: unknown })
+        .entityName,
+    ).toBe("Savanna Seed Partners");
+  });
+});
+
 describe("pictures of who the turn names, from public pages (owner 2026-10-23)", () => {
+  // QA F-17 (2026-10-23): the search found nothing about them, and
+  // pictures from reddit and a token's site were still shown.
+  it("shows no picture at all when the web search found no page about them", async () => {
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      withMatch(researchOutcome(p, "A forum thread."), "NONE"),
+    );
+    const { seam, request, answerBlocks } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Nothing public on Zino Aviation."),
+            visual: "PICTURE",
+            pictureQuery: "Zino Aviation",
+          },
+        },
+      ],
+      tools: tools.port,
+      userText: "Who runs Zino Aviation?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () =>
+          Promise.resolve([
+            {
+              imageUrl: "https://i.redd.it/zino.jpg",
+              pageUrl: "https://www.reddit.com/r/aviation/zino_aviation",
+              domain: "reddit.com",
+              title: "Zino Aviation thread",
+            },
+          ]),
+      },
+    });
+    expect((await seam.answer({ ...request, ...ABOUT_ZINO })).kind).toBe(
+      "ANSWERED",
+    );
+    expect(
+      answerBlocks.filter(
+        (block) => (block as { kind?: string }).kind === "PICTURE",
+      ),
+    ).toEqual([]);
+  });
+
   it("looks for them beside the web search and shows them after the words, credited to their pages", async () => {
     const asked: { name: string; userText: string }[] = [];
     const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
-      researchOutcome(p, "Zino Aviation flies charter."),
+      withMatch(researchOutcome(p, "Zino Aviation flies charter."), "MATCH"),
     );
     const { seam, request, answerBlocks } = build({
       script: [

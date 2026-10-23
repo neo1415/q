@@ -141,3 +141,25 @@ export function followsUpPublicSources(input: {
     (turn.answer.blocks ?? []).some((block) => block.kind === "PUBLIC_SOURCE")
   );
 }
+
+/**
+ * Whether every word of a name is the person's own (this message or one of
+ * their earlier ones). A public search may carry only their words or an
+ * authorised public identity (CQ-Q-RESEARCH-001 §9), so a subject they only
+ * pointed at ("the top one", after Q's list) cannot be searched by name, and
+ * their pointing words name no one (production 2026-10-23: "Why might the
+ * top one pass on us?" searched those words and found "Mountain pass").
+ */
+export function namedInTheirWords(
+  name: string,
+  theirWords: readonly string[],
+): boolean {
+  const tokens = (text: string) =>
+    text
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((token) => token.length > 0);
+  const said = new Set(theirWords.flatMap(tokens));
+  const wanted = tokens(name);
+  return wanted.length > 0 && wanted.every((token) => said.has(token));
+}

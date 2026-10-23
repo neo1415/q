@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   followsUpPublicSources,
+  namedInTheirWords,
   publicResearchFollowUp,
   type SelectedCompany,
 } from "./research-follow-up.js";
@@ -1041,6 +1042,20 @@ const ALREADY_SEARCHED_NOTE: ModelMessage = {
   content:
     "Earlier in this conversation Capital Q searched the public web for this same subject and found nothing about them, and the person was told so; the result above is that same search, not a new one. Do not say again that public sources found nothing, and do not offer to search again. Answer from Capital Q's records and the conversation; if there is nothing more to add, say so in a few words.",
 };
+
+/**
+ * Whether a public-web outcome holds a page about whom it searched for
+ * (QA F-17): a source the research service matched to the named subject.
+ */
+function webMatchedSubject(outcome: QToolCallOutcome | null): boolean {
+  if (outcome === null || !outcome.result.ok) return false;
+  const sources = (
+    outcome.result.data as {
+      readonly sources?: readonly { readonly subjectMatch?: unknown }[];
+    }
+  ).sources;
+  return (sources ?? []).some((source) => source.subjectMatch === "MATCH");
+}
 
 /** How long a subject's empty public search stands for its conversation. */
 const SEARCHED_EMPTY_TTL_MS = 30 * 60_000;
@@ -4181,11 +4196,31 @@ export function createModelGatewayQAnswer(
         latest.content,
         earlier.some((message) => message.role === "Q"),
       );
-      const research: Awaited<QAnswerRequest["research"]> = reRender
-        ? { mode: "NEVER", announceSourceChange: false }
-        : request.research === undefined
-          ? undefined
-          : await request.research;
+      /**
+       * A turn about someone they did not name in their own words ("Why
+       * might the top one pass on us?", after Q listed their investors):
+       * the public web cannot be asked about them by name (only the
+       * person's words leave Capital Q), and their pointing words name no
+       * one -- production 2026-10-23 searched them and narrated Wikipedia's
+       * "Mountain pass". Capital Q's records answer it; no web this turn.
+       */
+      const pointedAtOnly =
+        request.aboutNamedOther === true &&
+        request.namedOther !== undefined &&
+        request.namedOther !== null &&
+        !namedInTheirWords(request.namedOther.name, [
+          latest.content,
+          ...earlier
+            .filter((message) => message.role === "USER")
+            .slice(-3)
+            .map((message) => message.content),
+        ]);
+      const research: Awaited<QAnswerRequest["research"]> =
+        reRender || pointedAtOnly
+          ? { mode: "NEVER", announceSourceChange: false }
+          : request.research === undefined
+            ? undefined
+            : await request.research;
       took("reading");
       // A question to Q (fallback) keeps the web in the model's hands even
       // when nothing forces a search (web search 2026-10-06: "three
@@ -5791,8 +5826,11 @@ export function createModelGatewayQAnswer(
               publicSources.push(source);
             }
           }
+          // QA F-17: pictures only of someone the lookup found.
+          const foundThem =
+            found.result.card !== null || found.result.candidates.length > 0;
           let pictures =
-            lanePictures === null
+            lanePictures === null || !foundThem
               ? []
               : publicPictureBlocks(
                   (await settledWithin(lanePictures, PICTURE_WAIT_MS)) ?? [],
@@ -5817,6 +5855,7 @@ export function createModelGatewayQAnswer(
             ""
           ).trim();
           if (
+            foundThem &&
             pictures.length === 0 &&
             organisation.length > 0 &&
             dependencies.publicPictures !== undefined &&
@@ -7997,8 +8036,15 @@ export function createModelGatewayQAnswer(
         // L-13: a picture only when the analyst asked for one, searched
         // with words composed from the person's own (never sent as the
         // model wrote them), and bounded so it cannot hold the turn.
+        // QA F-17 (2026-10-23): when the turn's web search found no page
+        // about them, no picture is theirs -- none at all, neither from
+        // public pages (reddit, a token's logo were shown) nor a stock
+        // illustration.
+        const webFoundThem =
+          earlyWeb === null ||
+          webMatchedSubject(await settledWithin(earlyWeb.outcome, 0));
         const fromPages =
-          webPictures === null
+          webPictures === null || !webFoundThem
             ? []
             : publicPictureBlocks(
                 (await settledWithin(webPictures, PICTURE_WAIT_MS)) ?? [],
@@ -8006,7 +8052,7 @@ export function createModelGatewayQAnswer(
               );
         // A stock illustration only where no public picture of them was found.
         const picture =
-          fromPages.length > 0
+          fromPages.length > 0 || !webFoundThem
             ? null
             : await pictureBlock({
                 result: analyst,
