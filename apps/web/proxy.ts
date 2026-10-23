@@ -36,6 +36,7 @@ export const config = {
     "/join/:path*",
     // AUTO (ADR 0030): Q's work.
     "/work/:path*",
+    "/board/:path*",
     // DAILY: The Q Daily reader.
     "/daily/:path*",
     "/gateway/:path*",

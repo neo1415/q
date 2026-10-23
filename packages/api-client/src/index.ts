@@ -546,6 +546,13 @@ export {
   listRelationshipViews,
   saveRelationshipView,
 } from "./relationship-views.js";
+// The work board (owner 2026-10-23).
+export {
+  addBoardItem,
+  listBoard,
+  moveBoardItem,
+  updateBoardItem,
+} from "./board.js";
 // CRM private notes (S3, 2026-10-15).
 export {
   addRelationshipNote,

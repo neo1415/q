@@ -52,6 +52,7 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   "/discover/saved",
   "/discover/saved/compare",
   "/discover/yours",
+  "/board",
   "/documents",
   "/explore",
   "/find",

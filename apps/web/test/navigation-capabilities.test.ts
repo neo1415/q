@@ -18,7 +18,11 @@ import { WORK_DATA_ROOM_HREF, workTabs } from "../src/features/work/work-tabs";
  * completeness test in q-tools), so a screen added to the navigation
  * without a destination fails here.
  */
-const EXCLUDED: Readonly<Record<string, string>> = {};
+const EXCLUDED: Readonly<Record<string, string>> = {
+  // Owner 2026-10-23: Work's Board tab (tab.work-board); Q reads and
+  // changes the board with my_board, and opens it from Work's tab strip.
+  "/board": "a Work tab, operated as tab.work-board",
+};
 
 describe("every navigation screen is a screen Q can open", () => {
   it("maps each navigation href to a Q destination, or states why not", () => {

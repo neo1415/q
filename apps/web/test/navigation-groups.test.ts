@@ -64,11 +64,12 @@ describe("the sidebar's groups", () => {
 
 /** Owner-approved 2026-10-18: Work's tabs, each at its own address. */
 describe("Work's tabs", () => {
-  it("are Tasks, Documents, Pitch (a founder's), Rehearsals and The Q Daily", () => {
+  it("are Tasks, Board, Documents, Pitch (a founder's), Rehearsals and The Q Daily", () => {
     const of = (side: "COMPANY" | "INVESTOR" | "NONE") =>
       workTabs(side).map((tab) => `${tab.label} ${tab.href}`);
     expect(of("COMPANY")).toEqual([
       "Tasks /work",
+      "Board /board",
       "Documents /documents",
       "Pitch /pitch",
       "Rehearsals /rehearsals",
@@ -76,6 +77,7 @@ describe("Work's tabs", () => {
     ]);
     expect(of("INVESTOR")).toEqual([
       "Tasks /work",
+      "Board /board",
       "Documents /documents",
       "Rehearsals /rehearsals",
       "The Q Daily /daily",
@@ -83,6 +85,7 @@ describe("Work's tabs", () => {
     // Rehearsals are for founders and investors, as the old entry was.
     expect(of("NONE")).toEqual([
       "Tasks /work",
+      "Board /board",
       "Documents /documents",
       "The Q Daily /daily",
     ]);

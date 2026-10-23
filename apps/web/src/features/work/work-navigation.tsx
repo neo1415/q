@@ -38,6 +38,7 @@ export function WorkNavigation({
     ref,
     ids: {
       "tab.work-tasks": '[data-work-tab="tasks"]',
+      "tab.work-board": '[data-work-tab="board"]',
       "tab.work-documents": '[data-work-tab="documents"]',
       "tab.work-pitch": '[data-work-tab="pitch"]',
       "tab.work-rehearsals": '[data-work-tab="rehearsals"]',
