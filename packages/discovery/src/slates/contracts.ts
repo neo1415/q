@@ -77,6 +77,9 @@ export const REFRESH_REASONS = [
   "GENERATOR_VERSION_CHANGED",
   "NO_CURRENT_SLATE",
   "SLATE_EXPIRED",
+  // Owner 2026-10-23: the investor reached the end of the slate; the next
+  // one is built from the candidate rotation's next window.
+  "SLATE_CONTINUED",
   "SCHEDULED",
   "MANUAL",
 ] as const;
@@ -120,6 +123,13 @@ export const SlateDiagnosticsSchema = z
     reranked: z.number().int().min(0).optional(),
     rerankSuppressed: z.number().int().min(0).optional(),
     rerankExplorationSlots: z.number().int().min(0).optional(),
+    /**
+     * Owner 2026-10-23: which window of the candidate rotation this slate
+     * was built from, of how many (candidates/window.ts). The feed goes on
+     * to the next window at the end of this one.
+     */
+    candidateWindow: z.number().int().min(0).optional(),
+    candidateWindows: z.number().int().min(1).optional(),
     buildDurationMs: z.number().int().min(0),
   })
   .strict();
@@ -261,6 +271,12 @@ export const SlateCursorSchema = z
      * The Discover filters' fingerprint the page was read under; absent
      * for an unfiltered scroll. A request with other filters starts again.
      */
+    /**
+     * Owner 2026-10-23: the slate's last item was served and the next
+     * window is being built (`SLATE_CONTINUED`); the page after this one
+     * comes from the slate that follows it, not from this one again.
+     */
+    n: z.literal(1).optional(),
     /** Authorized explicit Unicorn selection snapshot; no score values. */
     u: z
       .string()

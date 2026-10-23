@@ -514,7 +514,7 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
         "GEOGRAPHY_REGION_OVERLAP",
       ]);
       for (const c of r.candidates) {
-        expect(c.provenance.generatorVersion).toBe("structured-mandate.v5");
+        expect(c.provenance.generatorVersion).toBe("structured-mandate.v6");
         expect(c.provenance.taxonomyVersion).not.toBeNull();
         expect(c.eligibility.decision).toBe("ELIGIBLE");
       }
@@ -691,7 +691,7 @@ describe("@capital-q/discovery structured candidates against local PostgreSQL", 
           adjacent.includes(candidate) ? ["STAGE_ADJACENT"] : ["STAGE_OVERLAP"],
         );
         expect(candidate.provenance.generatorVersion).toBe(
-          "structured-mandate.v5",
+          "structured-mandate.v6",
         );
       }
     });

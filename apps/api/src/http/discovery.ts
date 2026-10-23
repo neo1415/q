@@ -350,6 +350,9 @@ export function registerDiscoveryRoutes(
         }),
         notes: served.notes,
         nextCursor: served.nextCursor,
+        ...(served.continuesFrom === undefined
+          ? {}
+          : { continuesFrom: served.continuesFrom }),
         unverifiableExclusions: served.unverifiableExclusions,
         excludingRules: served.excludingRules,
         discoverableCount: served.discoverableCount,

@@ -107,6 +107,9 @@ export function createRecommendationRefreshHandler(
         actor,
         mode: job.data.mode,
         mandateId: key.mandateId,
+        // Owner 2026-10-23: the investor reached the end of the slate; the
+        // next one reads the candidate rotation's next window.
+        continuation: claimed.reason === "SLATE_CONTINUED",
       });
     } catch (error: unknown) {
       await requests.release(claimed.id, "RETRY", "BUILD_ERROR");

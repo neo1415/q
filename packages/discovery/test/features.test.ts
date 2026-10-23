@@ -257,7 +257,7 @@ function inputs(
           ? null
           : {
               sourceClass: "STRUCTURED_CANDIDATE_PROVENANCE",
-              generatorVersion: "structured-mandate.v5",
+              generatorVersion: "structured-mandate.v6",
               reasonCodes: ["STAGE_OVERLAP"],
             },
       semantic:
@@ -687,7 +687,7 @@ describe("feature computation (pure)", () => {
       eligibilityDecision: "ELIGIBLE" as const,
       candidateProvenance: {
         structured: {
-          generatorVersion: "structured-mandate.v5" as const,
+          generatorVersion: "structured-mandate.v6" as const,
           reasonCodes: ["STAGE_OVERLAP" as const],
         },
         semantic: null,
@@ -1244,7 +1244,7 @@ const candidate = (
   structured: structured
     ? {
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v5",
+        generatorVersion: "structured-mandate.v6",
         matchedDimensions: ["STAGE"],
         reasonCodes: ["STAGE_OVERLAP"],
         matchedNodes: [],
@@ -1302,7 +1302,7 @@ describe("feature service", () => {
     const [both, semanticOnly, structuredOnly] = r.snapshots;
     expect(both?.candidateProvenance).toEqual({
       structured: {
-        generatorVersion: "structured-mandate.v5",
+        generatorVersion: "structured-mandate.v6",
         reasonCodes: ["STAGE_OVERLAP"],
       },
       semantic: {

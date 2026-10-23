@@ -451,7 +451,7 @@ function collectingQueue(): RefreshQueue & {
 
 const VERSIONS = {
   eligibilityPolicyVersion: "eligibility.v4" as const,
-  structuredGeneratorVersion: "structured-mandate.v5" as const,
+  structuredGeneratorVersion: "structured-mandate.v6" as const,
   semanticGeneratorVersion: "semantic-mandate.v1" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
   rankerVersion: RANKER_VERSION,
@@ -483,7 +483,7 @@ async function publishedSlate(
       featureSnapshotFingerprint: "a".repeat(64),
       candidateProvenance: {
         structured: {
-          generatorVersion: "structured-mandate.v5",
+          generatorVersion: "structured-mandate.v6",
           reasonCodes: ["STAGE_OVERLAP"],
         },
         semantic: null,
@@ -775,7 +775,7 @@ describe("a deploy with newer pipeline versions rebuilds the slates the old one 
 
     const bumped = {
       ...same,
-      structuredGeneratorVersion: "structured-mandate.v6",
+      structuredGeneratorVersion: "structured-mandate.v7",
     };
     expect(
       await requestRebuildsForVersionDrift({

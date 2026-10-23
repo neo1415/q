@@ -123,6 +123,9 @@ export type InvestorFeed = {
   readonly premiumAccessRequired: boolean;
 };
 
+/** How long the feed waits before asking again for a window still being built. */
+export const CONTINUATION_WAIT_MS = 2_500;
+
 export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
   const {
     transport,
@@ -157,6 +160,14 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
   // every time the index moves.
   const transportRef = useRef(transport);
   const loadingRef = useRef(false);
+  /**
+   * Owner 2026-10-23 (Discover must not hard-cap): at the end of one
+   * window the server builds the next and answers "not yet" with an empty
+   * page and the same cursor. The next ask waits this long, not a tight
+   * loop; `waitTick` wakes the paging effect when the wait is over.
+   */
+  const notBeforeRef = useRef(0);
+  const [waitTick, setWaitTick] = useState(0);
   const restoreAttemptedRef = useRef(false);
   /**
    * One abort scope for the component's life, not one per load.
@@ -181,6 +192,17 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
       .loadSlate(input)
       .then((slate) => {
         if (signal.aborted) return;
+        if (
+          cursor !== null &&
+          slate.items.length === 0 &&
+          slate.nextCursor !== null
+        ) {
+          notBeforeRef.current = Date.now() + CONTINUATION_WAIT_MS;
+          window.setTimeout(
+            () => setWaitTick((tick) => tick + 1),
+            CONTINUATION_WAIT_MS,
+          );
+        }
         dispatch({ type: "PAGE_LOADED", slate });
       })
       .catch((error: unknown) => {
@@ -233,11 +255,12 @@ export function useInvestorFeed(options: UseInvestorFeedOptions): InvestorFeed {
       state.restoreTargetCompanyId !== null && state.nextCursor !== null;
     if (!chasingRestore && !shouldLoadMore(state, loadMoreThreshold)) return;
     if (loadingRef.current || state.nextCursor === null) return;
+    if (Date.now() < notBeforeRef.current) return;
 
     const signal = abortRef.current?.signal;
     if (signal === undefined || signal.aborted) return;
     loadPage(state.nextCursor, signal);
-  }, [state, loadMoreThreshold, loadPage]);
+  }, [state, loadMoreThreshold, loadPage, waitTick]);
 
   const card = activeCard(state);
   const activeCompanyId = card?.companyId ?? null;

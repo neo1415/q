@@ -54,7 +54,7 @@ const structured = (n: number): StructuredCandidate => ({
   companyId: id(n),
   provenance: {
     generatorId: "STRUCTURED_MANDATE",
-    generatorVersion: "structured-mandate.v5",
+    generatorVersion: "structured-mandate.v6",
     matchedDimensions: ["STAGE"],
     reasonCodes: ["STAGE_OVERLAP"],
     matchedNodes: [],
@@ -119,17 +119,18 @@ describe("mergeCandidatePools", () => {
     ]);
   });
 
-  it("is bounded by the pool budget on canonical order", () => {
+  it("is bounded by the pool budget: every structured candidate kept, semantic-only fill the room, canonical order (owner 2026-10-23)", () => {
     const merged = mergeCandidatePools({
       structured: [structured(5), structured(6)],
       semantic: [semantic(1, 0.5), semantic(2, 0.5)],
       poolMax: 3,
     });
     expect(merged.truncated).toBe(true);
+    // Before, the id-order cut dropped id(6), a declared match, for id(2).
     expect(merged.candidates.map((c) => c.companyId)).toEqual([
       id(1),
-      id(2),
       id(5),
+      id(6),
     ]);
   });
 });
@@ -148,7 +149,7 @@ describe("hybrid candidate service", () => {
       Promise.resolve({
         kind: "GENERATED",
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v5",
+        generatorVersion: "structured-mandate.v6",
         eligibilityPolicyVersion: "eligibility.v4",
         context,
         candidates: [structured(1), structured(2)],

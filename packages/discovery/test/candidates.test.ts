@@ -12,6 +12,12 @@ import {
 } from "../src/candidates/ports.js";
 import { createStructuredCandidateService } from "../src/candidates/service.js";
 import {
+  CANDIDATE_WINDOW_TARGET,
+  candidateWindowCount,
+  candidateWindowOf,
+  type CandidateWindow,
+} from "../src/candidates/window.js";
+import {
   countryCodesOf,
   deriveStructuredIntent,
   mergeDimensionHits,
@@ -1091,14 +1097,140 @@ describe("structured candidate service", () => {
     for (const c of r.candidates) {
       expect(c.provenance).toMatchObject({
         generatorId: "STRUCTURED_MANDATE",
-        generatorVersion: "structured-mandate.v5",
+        generatorVersion: "structured-mandate.v6",
         taxonomyVersion: { industry: 1, geography: 1 },
       });
       expect(c.provenance.reasonCodes.length).toBeGreaterThan(0);
       expect("score" in c).toBe(false);
       expect("rank" in c).toBe(false);
     }
-    expect(r.generatorVersion).toBe("structured-mandate.v5");
+    expect(r.generatorVersion).toBe("structured-mandate.v6");
     expect(r.eligibilityPolicyVersion).toBe("eligibility.v4");
+  });
+});
+
+describe("Discover must not hard-cap (owner 2026-10-23)", () => {
+  // 381 companies qualify, as for pre-seed to Series A in production.
+  const many = (): World =>
+    world({
+      companies: Array.from({ length: 381 }, (_, i) =>
+        company(i + 1, { stage: "seed", country: "NG" }),
+      ),
+    });
+  // The rotation the companies port applies in SQL, here over the world.
+  function windowed(w: World): StructuredRetrievalPorts {
+    const base = retrieval(w);
+    const keep = <T extends { readonly companyId: string }>(
+      rows: readonly T[],
+      limit: number,
+      window: CandidateWindow | undefined,
+    ): readonly T[] =>
+      rows
+        .filter(
+          (row) =>
+            window === undefined ||
+            candidateWindowOf(window.seed, row.companyId, window.of) ===
+              window.index,
+        )
+        .slice(0, limit);
+    const qualifying = (
+      stageCodes: readonly string[] | null,
+      countryCodes: readonly string[] | null,
+    ) =>
+      w.companies.filter(
+        (c) =>
+          discoverable(c) &&
+          (stageCodes === null ||
+            (c.stage !== null && stageCodes.includes(c.stage))) &&
+          (countryCodes === null ||
+            (c.country !== null && countryCodes.includes(c.country))),
+      ).length;
+    return {
+      ...base,
+      companies: {
+        byStageCodes: async (codes, limit, window) =>
+          keep(await base.companies.byStageCodes(codes, 10_000), limit, window),
+        byHeadquartersCountries: async (codes, limit, window) =>
+          keep(
+            await base.companies.byHeadquartersCountries(codes, 10_000),
+            limit,
+            window,
+          ),
+        countDiscoverable: ({ stageCodes, countryCodes }) =>
+          Promise.resolve(qualifying(stageCodes, countryCodes)),
+      },
+      taxonomy: {
+        ...base.taxonomy,
+        subjectsByNodes: async (nodeIds, limit, window) =>
+          keep(
+            await base.taxonomy.subjectsByNodes(nodeIds, 10_000),
+            limit,
+            window,
+          ),
+      },
+    };
+  }
+  const windowedService = (w: World) =>
+    createStructuredCandidateService({
+      ports: eligibilityPorts(w),
+      retrieval: windowed(w),
+      eligibility: eligibility(w),
+    });
+  const windowOf = async (w: World, window: number) => {
+    const result = await windowedService(w).generate({ actor: ACTOR, window });
+    if (result.kind !== "GENERATED") throw new Error(result.kind);
+    return result;
+  };
+  const target = companyId(355);
+
+  it("before: an id-ordered cut of 200 never reached the 355th of 381", async () => {
+    const r = await generated(many());
+    expect(r.candidates.length).toBeLessThanOrEqual(CANDIDATE_POOL_MAX);
+    expect(ids(r)).not.toContain(target);
+  });
+
+  it("now: the windows of the rotation reach every one of the 381, each once", async () => {
+    const w = many();
+    const windows = candidateWindowCount(381);
+    expect(windows).toBe(Math.ceil(381 / CANDIDATE_WINDOW_TARGET));
+    const seen = new Map<string, number>();
+    for (let index = 0; index < windows; index += 1) {
+      const r = await windowOf(w, index);
+      expect(r.diagnostics.candidateWindow).toBe(index);
+      expect(r.diagnostics.candidateWindows).toBe(windows);
+      expect(r.diagnostics.truncated).toBe(false);
+      for (const id of ids(r)) {
+        expect(seen.has(id)).toBe(false);
+        seen.set(id, index);
+      }
+    }
+    expect(seen.size).toBe(381);
+    expect(seen.has(target)).toBe(true);
+  });
+
+  it("is reproducible for the same seed, and wraps after the last window", async () => {
+    const w = many();
+    const windows = candidateWindowCount(381);
+    const first = ids(await windowOf(w, 1));
+    expect(ids(await windowOf(w, 1))).toEqual(first);
+    expect(ids(await windowOf(w, 1 + windows))).toEqual(first);
+    // The window a company falls in is fixed by the seed and its id.
+    expect(candidateWindowOf(INVESTOR, target, windows)).toBe(
+      candidateWindowOf(INVESTOR, target, windows),
+    );
+    const placements = Array.from({ length: 381 }, (_, i) =>
+      candidateWindowOf(INVESTOR, companyId(i + 1), windows),
+    );
+    const other = Array.from({ length: 381 }, (_, i) =>
+      candidateWindowOf("another-investor", companyId(i + 1), windows),
+    );
+    // Seeded per investor: another investor's rotation differs.
+    expect(other).not.toEqual(placements);
+  });
+
+  it("one window when few qualify: nothing changes for a small pool", async () => {
+    const r = await windowOf(world(), 3);
+    expect(r.diagnostics.candidateWindows).toBe(1);
+    expect(r.diagnostics.candidateWindow).toBe(0);
   });
 });

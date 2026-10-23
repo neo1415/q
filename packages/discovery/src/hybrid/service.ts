@@ -26,6 +26,8 @@ export type GenerateHybridCandidatesQuery = {
   readonly mandateId?: string | null | undefined;
   readonly limit?: number | undefined;
   readonly topK?: number | undefined;
+  /** The structured rotation's window (candidates/window.ts); absent: the first. */
+  readonly window?: number | undefined;
 };
 
 export type HybridCandidateService = {
@@ -68,6 +70,7 @@ export function createHybridCandidateService(
           actor: query.actor,
           mandateId: query.mandateId,
           limit: poolMax,
+          ...(query.window === undefined ? {} : { window: query.window }),
         }),
         semantic.generate({
           actor: query.actor,

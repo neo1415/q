@@ -15,6 +15,11 @@ import {
 } from "./contracts.js";
 import type { StructuredRetrievalPorts } from "./ports.js";
 import {
+  candidateWindow,
+  candidateWindowCount,
+  type CandidateWindow,
+} from "./window.js";
+import {
   adjacentStageCodes,
   deriveStructuredIntent,
   GEOGRAPHY_VOCABULARY,
@@ -47,6 +52,12 @@ export type GenerateStructuredCandidatesQuery = {
   readonly mandateId?: string | null | undefined;
   /** Pool cap; bounded above by CANDIDATE_POOL_MAX. */
   readonly limit?: number | undefined;
+  /**
+   * Which window of the seeded rotation to retrieve (window.ts), counted
+   * from 0 and taken modulo the windows the qualifying companies need.
+   * Absent: the first.
+   */
+  readonly window?: number | undefined;
 };
 
 export type StructuredCandidateService = {
@@ -135,6 +146,31 @@ export function createStructuredCandidateService(
       const mandate = lookup.mandate;
       const intent = deriveStructuredIntent(mandate);
 
+      // Owner 2026-10-23: never truncate by id. The qualifying companies
+      // are divided into windows of a rotation seeded by the investor, and
+      // this build reads one of them; the feed reaches the rest by walking
+      // the windows (window.ts).
+      const count = retrieval.companies.countDiscoverable;
+      const [byStage, byCountry] =
+        count === undefined
+          ? [0, 0]
+          : await Promise.all([
+              intent.stageCodes.length === 0
+                ? Promise.resolve(0)
+                : count({ stageCodes: intent.stageCodes, countryCodes: null }),
+              intent.countryCodes.length === 0
+                ? Promise.resolve(0)
+                : count({
+                    stageCodes: null,
+                    countryCodes: intent.countryCodes,
+                  }),
+            ]);
+      const windows = candidateWindowCount(Math.max(byStage, byCountry));
+      const window: CandidateWindow | undefined =
+        windows > 1
+          ? candidateWindow(investorOrganisationId, query.window ?? 0, windows)
+          : undefined;
+
       // Each dimension runs on its own; an empty intent for one dimension
       // is simply no hits from it, never a veto over the others.
       const hits: DimensionHit[] = [];
@@ -149,7 +185,11 @@ export function createStructuredCandidateService(
         intent.stageCodes.length === 0
           ? Promise.resolve()
           : retrieval.companies
-              .byStageCodes(intent.stageCodes, CANDIDATE_DIMENSION_LIMIT)
+              .byStageCodes(
+                intent.stageCodes,
+                CANDIDATE_DIMENSION_LIMIT,
+                window,
+              )
               .then((refs) => {
                 for (const ref of refs) {
                   hits.push({
@@ -179,6 +219,7 @@ export function createStructuredCandidateService(
         const refs = await retrieval.companies.byHeadquartersCountries(
           codes,
           CANDIDATE_DIMENSION_LIMIT,
+          window,
         );
         for (const ref of refs) {
           hits.push({ ...ref, dimension: "GEOGRAPHY", reasonCode });
@@ -240,6 +281,7 @@ export function createStructuredCandidateService(
         const found = await retrieval.taxonomy.subjectsByNodes(
           [...asked.keys()].sort(),
           CANDIDATE_DIMENSION_LIMIT,
+          window,
         );
         for (const hit of found) {
           const ask = asked.get(hit.nodeId);
@@ -302,6 +344,7 @@ export function createStructuredCandidateService(
         const refs = await retrieval.companies.byStageCodes(
           adjacent,
           CANDIDATE_DIMENSION_LIMIT,
+          window,
         );
         const fresh = refs.filter((ref) => !already.has(ref.companyId));
         explored = mergeDimensionHits(
@@ -371,6 +414,8 @@ export function createStructuredCandidateService(
         ineligible,
         undetermined,
         chequeSignal,
+        candidateWindow: window?.index ?? 0,
+        candidateWindows: windows,
         durationMs,
       };
       metrics.runs.add(1, { generator: STRUCTURED_GENERATOR_ID });

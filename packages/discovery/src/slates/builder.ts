@@ -75,6 +75,13 @@ export type BuildSlateQuery = {
   readonly mode: "INVESTOR_DISCOVER";
   /** Pins one of the investor's mandates; otherwise the single ACTIVE one. */
   readonly mandateId?: string | null | undefined;
+  /**
+   * Owner 2026-10-23: the investor reached the end of the current slate
+   * (`SLATE_CONTINUED`): build from the rotation's next window. Otherwise
+   * a rebuild reads the window the current slate read, so a refresh never
+   * moves an investor on by itself.
+   */
+  readonly continuation?: boolean | undefined;
 };
 
 export type BuildSlateResult =
@@ -181,6 +188,13 @@ export function slateFingerprint(input: {
    * otherwise claim was still current.
    */
   readonly rerankPolicyVersion: string;
+  /**
+   * Owner 2026-10-23: which window of the candidate rotation, when there
+   * is more than one. Two windows are two slates even when their items
+   * agree, so a continuation is never mistaken for the slate it follows.
+   */
+  readonly candidateWindow?:
+    { readonly index: number; readonly of: number } | undefined;
   readonly items: readonly Pick<
     NewRecommendationItem,
     "companyId" | "rank" | "featureSnapshotFingerprint"
@@ -195,6 +209,9 @@ export function slateFingerprint(input: {
     mode: input.key.mode,
     versions: input.versions,
     rerankPolicyVersion: input.rerankPolicyVersion,
+    ...(input.candidateWindow === undefined || input.candidateWindow.of <= 1
+      ? {}
+      : { candidateWindow: input.candidateWindow }),
     items: input.items.map((i) => [
       i.companyId,
       i.rank,
@@ -271,12 +288,20 @@ export function createSlateBuilder(
 
       let slateId: string | null = null;
       try {
+        // Which window of the candidate rotation (candidates/window.ts):
+        // the current slate's, or the next one after it when the investor
+        // has reached its end. The service takes it modulo the windows.
+        const before = await slates.findCurrent(key);
+        const window =
+          (before?.diagnostics?.candidateWindow ?? 0) +
+          (query.continuation === true && before !== null ? 1 : 0);
         // The pipeline, as REC-002 to REC-005 run it; nothing is re-ranked here.
         const pool = await hybrid.generate({
           actor: query.actor,
           mandateId: mandate.mandateId,
           limit: policy.candidatePoolMax,
           topK: policy.semanticTopK,
+          window,
         });
         if (pool.kind === "NO_ACTIVE_MANDATE") {
           metrics.builds.add(1, { outcome: "NO_ACTIVE_MANDATE" });
@@ -444,6 +469,10 @@ export function createSlateBuilder(
           mandateVersion: mandate.version,
           versions,
           rerankPolicyVersion: reordered.rerankPolicyVersion,
+          candidateWindow: {
+            index: pool.diagnostics.structured.candidateWindow ?? 0,
+            of: pool.diagnostics.structured.candidateWindows ?? 1,
+          },
           items,
         });
 
@@ -511,6 +540,8 @@ export function createSlateBuilder(
           reranked: reordered.diagnostics.moved,
           rerankSuppressed: reordered.diagnostics.suppressed,
           rerankExplorationSlots: reordered.diagnostics.explorationSlots,
+          candidateWindow: pool.diagnostics.structured.candidateWindow ?? 0,
+          candidateWindows: pool.diagnostics.structured.candidateWindows ?? 1,
           buildDurationMs,
         };
         const publishedAt = clock();

@@ -1,3 +1,5 @@
+import type { CandidateWindow } from "./window.js";
+
 /**
  * What structured retrieval reads. Every port answers with canonical
  * identifiers over discovery-classified companies and declared mandate
@@ -25,12 +27,24 @@ export type CompanyStructuredRetrievalPort = {
   readonly byStageCodes: (
     stageCodes: readonly string[],
     limit: number,
+    /** One window of the seeded rotation (window.ts); absent: all, by id. */
+    window?: CandidateWindow,
   ) => Promise<readonly DiscoverableCompanyRef[]>;
   /** Likewise, by headquarters country (ISO 3166-1 alpha-2). */
   readonly byHeadquartersCountries: (
     countryCodes: readonly string[],
     limit: number,
+    window?: CandidateWindow,
   ) => Promise<readonly DiscoverableCompanyRef[]>;
+  /**
+   * How many companies the two retrievals above would find with no limit
+   * (stage codes, or country codes): what the rotation is divided by.
+   * Absent: one window, as before.
+   */
+  readonly countDiscoverable?: (input: {
+    readonly stageCodes: readonly string[] | null;
+    readonly countryCodes: readonly string[] | null;
+  }) => Promise<number>;
 };
 
 /** One ACTIVE company classification under a node the retrieval asked about. */
@@ -60,6 +74,7 @@ export type TaxonomyStructuredRetrievalPort = {
   readonly subjectsByNodes: (
     nodeIds: readonly string[],
     limit: number,
+    window?: CandidateWindow,
   ) => Promise<readonly TaxonomySubjectHit[]>;
   /** The reference hierarchy below a declared node; the taxonomy context owns the depth bound. */
   readonly expandPreference: (
