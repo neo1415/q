@@ -145,8 +145,10 @@ import {
   spokenBeforeCards,
 } from "./fit-cards.js";
 import {
+  asksForRecommendations,
   fitSweepAsk,
   fitSweepAskOfReading,
+  ranksAgainstMandate,
   withReadCount,
   isSingleCompanyQuestion,
   runFitSweep,
@@ -3556,6 +3558,19 @@ export function createModelGatewayQAnswer(
       personFor,
       investorsFor,
       sweepForReading,
+      // Owner 2026-10-23: the investor's own candidates, ranked by fit,
+      // for a recommendation ask and for "rank them" over what nobody
+      // could score.
+      sweepCandidates: (count: number | null) =>
+        sweepable
+          ? sweepFor({
+              scope: "CANDIDATES",
+              place: null,
+              fitAsked: true,
+              count,
+            })
+          : Promise.resolve(null),
+      investorAsking: ownInvestor !== null,
       attention,
     };
   }
@@ -3896,6 +3911,8 @@ export function createModelGatewayQAnswer(
         personFor,
         investorsFor,
         sweepForReading,
+        sweepCandidates,
+        investorAsking,
         attention,
         counterparty,
       } = prepared;
@@ -5201,6 +5218,12 @@ export function createModelGatewayQAnswer(
       // C's receipts (UI acts and moves), read once for the whole turn.
       const screenReceipts: readonly string[] =
         dependencies.uiActReceipts?.(request.actor) ?? [];
+      /**
+       * Owner 2026-10-23: "rank them by my mandate" over companies nobody
+       * could score is answered with the mandate's ranking, said as such;
+       * those cards are not the set just shown, by design.
+       */
+      let rankedPastShown = false;
       const persistAnswer = async (
         content: string,
         /**
@@ -5236,7 +5259,9 @@ export function createModelGatewayQAnswer(
             ],
             {
               asked: latest.content,
-              previous: previousCardCompanyIds(earlier),
+              // "Them" is held to the set just shown, except where the
+              // answer says it is the mandate's ranking instead (below).
+              previous: rankedPastShown ? [] : previousCardCompanyIds(earlier),
             },
           ),
           // A map they asked to see is not replaced by a page they did not.
@@ -5716,17 +5741,45 @@ export function createModelGatewayQAnswer(
           };
         }
       }
+      /**
+       * Owner 2026-10-23 (investor Zino Aviation): "find me three companies
+       * I should look into" got three by name from the catalog. An
+       * investor asking which companies to look into, invest in or
+       * consider is asking for the mandate's ranking: with no sector,
+       * country or stage named, the fit sweep over their candidates
+       * answers; with one, the catalog of that kind ranked by fit.
+       */
+      const recommendationAsk =
+        investorAsking &&
+        request.discoverCompanies !== undefined &&
+        request.discoverCompanies.previous !== true &&
+        asksForRecommendations(request.discoverCompanies.text);
+      const recommendAll =
+        recommendationAsk &&
+        request.discoverCompanies !== undefined &&
+        request.discoverCompanies.sectors.length === 0 &&
+        request.discoverCompanies.countries.length === 0 &&
+        request.discoverCompanies.stages.length === 0;
       // K1 (live 2026-10-09 15:57): companies of a kind are listed from
       // the catalog by code; the analyst is never asked to describe cards.
       // Null (no catalog here): the full path answers.
       if (
+        !recommendAll &&
         request.discoverCompanies !== undefined &&
         request.writingDocument !== true &&
         request.askedAction === undefined &&
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         const discoverStarted = Date.now();
-        const found = await discoverFor(request.discoverCompanies);
+        const found = await discoverFor(
+          recommendationAsk
+            ? {
+                ...request.discoverCompanies,
+                ranking: "FIT",
+                mandateRelevant: true,
+              }
+            : request.discoverCompanies,
+        );
         if (found !== null) {
           const message = await persistCodeAnswer(
             found.text,
@@ -5762,6 +5815,13 @@ export function createModelGatewayQAnswer(
       // same sweep, over exactly those companies.
       const readFit =
         request.fitQuestion ??
+        (recommendAll && request.discoverCompanies !== undefined
+          ? {
+              text: request.discoverCompanies.text,
+              count: request.discoverCompanies.count,
+              previous: false,
+            }
+          : undefined) ??
         (request.discoverCompanies?.previous === true
           ? {
               text: request.discoverCompanies.text,
@@ -5776,13 +5836,40 @@ export function createModelGatewayQAnswer(
         readFit?.excludeShown === true &&
         shownInConversation.length > 0 &&
         !sweptExcludingShown;
-      const sweep =
+      const swept =
         pastShown && readFit !== undefined
           ? await sweepForReading(readFit)
-          : ((await fitSweep) ??
-            (readFit === undefined || sweptAtPrepare
-              ? null
-              : await sweepForReading(readFit)));
+          : recommendAll && readFit !== undefined
+            ? // The reading decides: the words' sweep may have read
+              // "those" or nothing at all.
+              await sweepForReading(readFit)
+            : ((await fitSweep) ??
+              (readFit === undefined || sweptAtPrepare
+                ? null
+                : await sweepForReading(readFit)));
+      /**
+       * Owner 2026-10-23: "rank them, the top three based on my mandate"
+       * after a list nobody could score came back as the same three,
+       * unscored. Ranking against their mandate is the mandate's ranking:
+       * when none of the companies shown can be scored, the sweep over
+       * their candidates answers, and says why it is not those three.
+       */
+      const shownUnscorable =
+        swept !== null &&
+        swept.ask.scope === "PREVIOUS" &&
+        (swept.ask.within?.length ?? 0) > 0 &&
+        ranksAgainstMandate(latest.content) &&
+        (fitSweepCardsBlock(
+          swept.fits,
+          "Fit against your mandate",
+        )?.cards.every((card) => card.fit === null) ??
+          true);
+      const reRanked =
+        shownUnscorable && swept !== null
+          ? await sweepCandidates(swept.ask.count)
+          : null;
+      const sweep =
+        reRanked !== null && reRanked.fits.length > 0 ? reRanked : swept;
       const beyondShown =
         sweep !== null && (sweep.ask.exclude?.length ?? 0) > 0
           ? { count: sweep.ask.count }
@@ -5824,7 +5911,7 @@ export function createModelGatewayQAnswer(
         sweep.ask.fitAsked &&
         // Only the existing structured reading can certify ranking alone.
         // A warmed lexical sweep must not erase a compound question.
-        request.questionKind === "FIT" &&
+        (request.questionKind === "FIT" || recommendAll) &&
         sweep.fits.length > 0 &&
         // Read again on the turn's own reading: the prepare may have been
         // warmed before the turn was read.
@@ -5846,7 +5933,7 @@ export function createModelGatewayQAnswer(
         const block =
           swept === null ? null : asComparison(swept, latest.content);
         if (block !== null) {
-          const text = fitSweepSummary({
+          const summary = fitSweepSummary({
             block,
             scope: sweep.ask.scope,
             place: sweep.ask.place,
@@ -5854,6 +5941,11 @@ export function createModelGatewayQAnswer(
             asked: latest.content,
             beyondShown,
           });
+          const text =
+            sweep === reRanked
+              ? `None of the companies I just listed has enough on record to score against your mandate yet. Ranked by fit with your mandate, these are the strongest. ${summary}`
+              : summary;
+          rankedPastShown = sweep === reRanked;
           const message = await persistCodeAnswer(text, [block]);
           logger?.info(
             {

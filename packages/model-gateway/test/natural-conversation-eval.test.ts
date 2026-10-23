@@ -276,6 +276,11 @@ async function replay(input: {
     readonly get: (actor: unknown) => Promise<unknown>;
     readonly remember: (actor: unknown, data: unknown) => Promise<void>;
   };
+  /** Earlier turns of the conversation, oldest first. */
+  readonly before?: readonly Pick<
+    QConversationMessage,
+    "role" | "content" | "blocks"
+  >[];
   /** What the turn reader read, as the answer seam passes it on. */
   readonly reading?: Pick<
     QAnswerRequest,
@@ -310,6 +315,20 @@ async function replay(input: {
     sleep: () => Promise.resolve(),
   });
   const messages: QConversationMessage[] = [
+    ...(input.before ?? []).map(
+      (turn, index) =>
+        ({
+          id: randomUUID(),
+          tenantId: TENANT,
+          conversationId: conversation,
+          runId: randomUUID(),
+          role: turn.role,
+          content: turn.content,
+          contentType: "TEXT",
+          ...(turn.blocks === undefined ? {} : { blocks: turn.blocks }),
+          createdAt: new Date(Date.now() - 60_000 + index).toISOString(),
+        }) as QConversationMessage,
+    ),
     {
       id: randomUUID() as QConversationMessage["id"],
       tenantId: TENANT as QConversationMessage["tenantId"],
@@ -623,6 +642,143 @@ describe("companies of a kind through the answer path (K1, live 2026-10-09 15:57
     );
     expect(executed).not.toContain("research_public_web");
     expect(Date.now() - started).toBeLessThan(3_000);
+  });
+});
+
+describe("an investor asking what to look into gets the mandate's ranking (owner 2026-10-23)", () => {
+  // Zino Aviation, production 15:19 UTC: read as DISCOVER_COMPANIES with no
+  // ranking, answered with three companies in alphabetical order.
+  const discover = (
+    text: string,
+    count: number | null,
+    sectors: readonly string[] = [],
+  ) => ({
+    questionKind: "DISCOVER_COMPANIES" as const,
+    discoverCompanies: {
+      text,
+      sectors: [...sectors],
+      countries: [],
+      stages: [],
+      count,
+      ranking: "NONE" as const,
+      mandateRelevant: false,
+      previous: false,
+    },
+  });
+  const ranked = async () =>
+    cardsOf(
+      (
+        await replay({
+          question: "Give me the top three companies that fit my mandate",
+          script: [answer("A model answer.")],
+          reading: {
+            questionKind: "FIT",
+            fitQuestion: {
+              text: "Give me the top three companies that fit my mandate",
+              count: 3,
+            },
+          },
+        })
+      ).blocks,
+    ).map((card) => card.name);
+
+  it("the owner's words get the same ranked three as 'top three that fit my mandate', never a list by name", async () => {
+    const expected = await ranked();
+    expect(expected).toHaveLength(3);
+    for (const [words, count] of [
+      [
+        "Can you help me find like... Like three companies that's I should look into",
+        3,
+      ],
+      ["What should I invest in?", 3],
+      ["Find me 3 companies", 3],
+      ["Can you recommend three companies?", 3],
+    ] as const) {
+      const { text, blocks, modelCalls, executed } = await replay({
+        question: words,
+        script: [answer("A model answer.")],
+        reading: discover(words, count),
+      });
+      expect(modelCalls).toBe(0);
+      expect(text).not.toMatch(/listed by name/u);
+      expect(cardsOf(blocks).map((card) => card.name)).toEqual(expected);
+      expect(executed.some((name) => name.startsWith("fit_"))).toBe(true);
+      expect(executed).not.toContain("discover_companies");
+    }
+  });
+
+  it("with a sector named, the catalog of that kind, ranked by fit with the mandate", async () => {
+    const words = "Find me three fintech companies I should look into";
+    const { text, modelCalls } = await replay({
+      question: words,
+      script: [answer("A model answer.")],
+      reading: discover(words, 3, ["fintech"]),
+    });
+    expect(modelCalls).toBe(0);
+    expect(text).toMatch(/Ranked by fit with your mandate/u);
+    expect(text).not.toMatch(/listed by name/u);
+  });
+
+  it("'rank them by my mandate' after a list nobody could score gives the mandate's top three, and says why", async () => {
+    const expected = await ranked();
+    // Three companies Capital Q cannot score (no fit on record).
+    const unscorable = ["Abodeeon Systems", "Abodeio Technologies", "Abodely"];
+    const card = (name: string, index: number) => ({
+      key: `abode-${String(index)}`,
+      name,
+      line: null,
+      hue: index + 1,
+      fit: null,
+      reasons: ["Listed by name."],
+      measures: [],
+      view: null,
+      said: null,
+      sourceCount: 0,
+      subject: {
+        kind: "COMPANY",
+        companyId: `0000aaaa-0000-4000-8000-00000000000${String(index)}`,
+      },
+    });
+    const words =
+      "Oh, can you rank them for me, please? Like I'm talking of the top three based on my mandate";
+    const { text, blocks, modelCalls } = await replay({
+      question: words,
+      before: [
+        { role: "USER", content: "Find me three companies" },
+        {
+          role: "Q",
+          content: `Here are three companies on Capital Q: ${unscorable.join(", ")}. They're listed by name, not ranked.`,
+          blocks: [
+            {
+              kind: "ANSWER_CARDS",
+              shape: "RANKED",
+              title: "Companies on Capital Q",
+              cards: unscorable.map(card),
+              followUps: [],
+            },
+          ] as never,
+        },
+      ],
+      script: [answer("A model answer.")],
+      reading: {
+        questionKind: "FIT",
+        fitQuestion: { text: words, count: 3, previous: true },
+      },
+    });
+    expect(modelCalls).toBe(0);
+    expect(text).toMatch(/None of the companies I just listed/u);
+    expect(text).not.toMatch(/Here are the same three/u);
+    expect(cardsOf(blocks).map((one) => one.name)).toEqual(expected);
+  });
+
+  it("a plain 'show me three fintech companies' is still a catalog list by name", async () => {
+    const words = "Show me three fintech companies";
+    const { text } = await replay({
+      question: words,
+      script: [answer("A model answer.")],
+      reading: discover(words, 3, ["fintech"]),
+    });
+    expect(text).toMatch(/listed by name/u);
   });
 });
 
