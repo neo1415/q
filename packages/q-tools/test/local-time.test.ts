@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { LocalWhenSchema, resolveLocalWhen } from "../src/tools/local-time.js";
+import {
+  LocalWhenSchema,
+  localSpanLabel,
+  resolveLocalWhen,
+  resolveLocalWindow,
+} from "../src/tools/local-time.js";
 
 /**
  * "2 PM tomorrow" resolved by code in the person's zone (live test
@@ -167,5 +172,83 @@ describe('a span from now (live 2026-10-01: "remind me in 2 minutes")', () => {
     expect(
       LocalWhenSchema.safeParse({ day: "today", time: "11:47" }).success,
     ).toBe(true);
+  });
+});
+
+// QA F-21 (2026-10-23): "next Tuesday afternoon" was ignored.
+describe("a part of the day, in their own zone", () => {
+  const friday = new Date("2026-10-23T12:00:00Z"); // 15:00 in Nairobi
+
+  it("is that window on that day: next Tuesday afternoon in Nairobi", () => {
+    expect(
+      resolveLocalWindow(
+        { day: "tuesday", part: "AFTERNOON" },
+        "Africa/Nairobi",
+        friday,
+      ),
+    ).toEqual({
+      kind: "OK",
+      from: new Date("2026-10-27T10:00:00Z"),
+      to: new Date("2026-10-27T14:00:00Z"),
+      timeZone: "Africa/Nairobi",
+    });
+  });
+
+  it("an afternoon already under way today starts now; a morning gone is past", () => {
+    expect(
+      resolveLocalWindow(
+        { day: "today", part: "AFTERNOON" },
+        "Africa/Nairobi",
+        friday,
+      ),
+    ).toMatchObject({ kind: "OK", from: friday });
+    expect(
+      resolveLocalWindow(
+        { day: "today", part: "MORNING" },
+        "Africa/Nairobi",
+        friday,
+      ),
+    ).toEqual({ kind: "PAST" });
+  });
+
+  it("needs their zone, never UTC by accident", () => {
+    expect(
+      resolveLocalWindow(
+        { day: "tuesday", part: "EVENING" },
+        undefined,
+        friday,
+      ),
+    ).toEqual({ kind: "NO_TIME_ZONE" });
+  });
+
+  it("is a time or a part, never both", () => {
+    expect(
+      LocalWhenSchema.safeParse({ day: "tuesday", part: "AFTERNOON" }).success,
+    ).toBe(true);
+    expect(
+      LocalWhenSchema.safeParse({
+        day: "tuesday",
+        time: "14:00",
+        part: "AFTERNOON",
+      }).success,
+    ).toBe(false);
+    expect(LocalWhenSchema.safeParse({ day: "tuesday" }).success).toBe(false);
+  });
+
+  it("is said back plainly", () => {
+    expect(
+      localSpanLabel(
+        new Date("2026-10-27T11:00:00Z"),
+        new Date("2026-10-27T11:30:00Z"),
+        "Africa/Nairobi",
+      ),
+    ).toBe("Tuesday 27 Oct, 2:00–2:30 pm your time (Africa/Nairobi)");
+    expect(
+      localSpanLabel(
+        new Date("2026-10-27T08:30:00Z"),
+        new Date("2026-10-27T09:30:00Z"),
+        "Africa/Nairobi",
+      ),
+    ).toBe("Tuesday 27 Oct, 11:30 am–12:30 pm your time (Africa/Nairobi)");
   });
 });
