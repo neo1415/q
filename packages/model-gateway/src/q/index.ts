@@ -4098,6 +4098,16 @@ export function createModelGatewayQAnswer(
        * what was just found ("what did those sources say?") keeps the
        * model's own call, answered from what this person already read.
        */
+      /**
+       * The message is named before its text exists, so every fragment
+       * that goes out early and the message that is finally stored are
+       * one thing to whoever is reading.
+       */
+      const messageId = QMessageIdSchema.parse(randomUUID());
+      /** When the first words went out, from the turn's start. */
+      let firstPublishedMs: number | null = null;
+      /** The early web search's line was said as the search started. */
+      let researchingSaid = false;
       const earlyWebTool = offered.find(
         (tool) => tool.definition.name === PUBLIC_WEB_TOOL,
       );
@@ -4164,13 +4174,36 @@ export function createModelGatewayQAnswer(
                 },
                 () => undefined,
               );
+              // The first words go out as the search starts (owner
+              // 2026-10-23: "it doesn't need to find every single thing
+              // before it starts talking"), not once the reads and the
+              // prompt behind them are ready (live: 6.4 s).
+              const entity = (
+                call.arguments as { readonly entityName?: unknown }
+              ).entityName;
+              if (
+                request.leadLines === undefined &&
+                readCache.get(call, toolContext) === null
+              ) {
+                firstPublishedMs = Date.now() - startedAt;
+                researchingSaid = true;
+                const delta = {
+                  runId: request.runId,
+                  tenantId: request.tenantId,
+                  messageId,
+                  text: `${researchLead(
+                    typeof entity === "string" ? entity.slice(0, 60) : null,
+                  )} `,
+                };
+                if (gate === null) deltas?.publish(delta);
+                else gate.emit(() => deltas?.publish(delta));
+              }
               logger?.info(
                 {
                   qRunId: request.runId,
-                  entity:
-                    (call.arguments as { readonly entityName?: unknown })
-                      .entityName ?? null,
+                  entity: entity ?? null,
                   personLane: request.personSearch !== undefined,
+                  said: researchingSaid,
                   sinceStartMs: Date.now() - startedAt,
                 },
                 "q early web search started",
@@ -4707,12 +4740,6 @@ export function createModelGatewayQAnswer(
           ? {}
           : { tenantPolicy: dependencies.tenantPolicy }),
       };
-      /**
-       * The message is named before its text exists, so every fragment
-       * that goes out early and the message that is finally stored are
-       * one thing to whoever is reading.
-       */
-      const messageId = QMessageIdSchema.parse(randomUUID());
 
       /**
        * The answer, going out a sentence at a time as the model writes it.
@@ -4791,7 +4818,6 @@ export function createModelGatewayQAnswer(
       /** Code's lead list was the last thing said (see publish below). */
       let leadListOpen = leadLines !== undefined;
       /** When the person got the first sentence, from the seam's start. */
-      let firstPublishedMs: number | null = null;
       /** Out now, or held with the speculation until it is adopted. */
       const send = (delta: Parameters<QLiveDeltaBus["publish"]>[0]): void => {
         if (gate === null) deltas?.publish(delta);
@@ -4815,9 +4841,14 @@ export function createModelGatewayQAnswer(
         });
       };
       /** Code's opening lines, once, before anything else is said. */
+      let leadSaid = false;
       const sayLeadLines = (): void => {
-        if (firstPublishedMs !== null || leadLines === undefined) return;
-        firstPublishedMs = Date.now() - startedAt;
+        // After the early web search's line, code's own opening still
+        // follows it; after anything else, it is past.
+        if (leadSaid || leadLines === undefined) return;
+        if (firstPublishedMs !== null && !researchingSaid) return;
+        leadSaid = true;
+        firstPublishedMs ??= Date.now() - startedAt;
         for (const line of leadLines.split("\n")) {
           const said = line.trim();
           if (said.length === 0) continue;
@@ -4851,7 +4882,8 @@ export function createModelGatewayQAnswer(
         const said =
           earlyLead !== null && leadLines === undefined
             ? "LEAD"
-            : readCache.get(earlyWeb.call, toolContext) === null
+            : !researchingSaid &&
+                readCache.get(earlyWeb.call, toolContext) === null
               ? "RESEARCHING"
               : null;
         if (said === "LEAD" && earlyLead !== null) {
