@@ -427,3 +427,4 @@ export {
   type KnownEntityMatcher,
   type PreparedFollowUpPort,
 } from "./fast-lane.js";
+export { pipelineSummaryLine, type PipelineRow } from "./pipeline-summary.js";
