@@ -77,6 +77,19 @@ const https = (url: string | null): string | null => {
 const NOT_OF_THEM =
   /(^|\.)(dribbble\.com|behance\.net|pinterest\.[a-z.]+|pin\.it|shutterstock\.com|istockphoto\.com|gettyimages\.[a-z.]+|alamy\.com|dreamstime\.com|depositphotos\.com|freepik\.com|vecteezy\.com|123rf\.com|stock\.adobe\.com|unsplash\.com|pexels\.com|pixabay\.com|canva\.com|google\.[a-z.]+|bing\.com|yandex\.[a-z.]+|duckduckgo\.com|logowik\.com|seeklogo\.com|worldvectorlogo\.com|brandfetch\.com)$/u;
 
+/** A title that is only an image's file name ("2298efc2-….jpg"). */
+const FILENAME = /^[\w.-]+\.(jpe?g|png|webp|gif|avif)$/iu;
+
+/** A page address as words: "/2022/09/zino-aviation-takes-off" → "zino aviation takes off". */
+function addressWords(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.hostname} ${parsed.pathname}`.replace(/[/._-]+/gu, " ");
+  } catch {
+    return "";
+  }
+}
+
 /** A gallery, listing or search page rather than one about them. */
 const SEARCH_PAGE =
   /\/(search|tags?|explore|images)(\/|\?|$)|[?&](q|query|search)=/iu;
@@ -140,21 +153,21 @@ export function createPublicPictureSearch(input: {
       const candidates: (PublicPicture & { readonly rank: number })[] = [];
       const pages = new Set<string>();
       for (const hit of hits) {
-        const title = hit.title?.trim() ?? "";
-        if (
-          title.length === 0 ||
-          !(
-            textNamesEntity(name, title) ||
-            (org.length > 0 && textNamesEntity(org, title))
-          )
-        ) {
-          continue;
-        }
         const page = judgePublicUrl(hit.pageUrl);
-        const image = https(hit.imageUrl) ?? https(hit.thumbnailUrl);
-        if (!page.ok || !page.url.startsWith("https://") || image === null) {
+        if (!page.ok) continue;
+        // The page's title and its address both say whom it is about (live
+        // 2026-10-23: a ThisDay photo had no title, the company's own
+        // photos had filenames, while their addresses named them).
+        const title = hit.title?.trim() ?? "";
+        const about = `${title} ${addressWords(page.url)}`;
+        if (!(
+          textNamesEntity(name, about, page.domain) ||
+          (org.length > 0 && textNamesEntity(org, about, page.domain))
+        )) {
           continue;
         }
+        const image = https(hit.imageUrl) ?? https(hit.thumbnailUrl);
+        if (!page.url.startsWith("https://") || image === null) continue;
         if (NOT_OF_THEM.test(page.domain) || SEARCH_PAGE.test(page.url)) {
           continue;
         }
@@ -167,8 +180,12 @@ export function createPublicPictureSearch(input: {
           imageUrl: image,
           pageUrl: page.url,
           domain: page.domain,
-          title: title.slice(0, 200),
-          rank: preference(page.domain, name),
+          // A filename or no title is no description of the picture.
+          title: (FILENAME.test(title) || title.length === 0
+            ? `${org.length > 0 ? org : name}, from ${page.domain}`
+            : title
+          ).slice(0, 200),
+          rank: preference(page.domain, org.length > 0 ? org : name),
         });
       }
       return candidates

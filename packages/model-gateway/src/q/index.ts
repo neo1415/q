@@ -4183,16 +4183,35 @@ export function createModelGatewayQAnswer(
        * company or person, their pictures from public pages are looked for
        * beside it, from the same name; they join the answer after its words.
        */
-      const namedForPictures = (
+      // Whatever the research mode (live 2026-10-23: the picture search
+      // started only with the early web search, so a turn read as their
+      // own records, or a person search, showed no picture at all): the
+      // web search's name, else the person search's, else the one company
+      // or person their words name.
+      const earlyWebName = (
         earlyWeb?.call.arguments as
           { readonly entityName?: unknown } | undefined
       )?.entityName;
+      const namedInWords =
+        request.aboutNamedOther === true
+          ? companyNameCandidates(latest.content)
+          : [];
+      const namedForPictures =
+        typeof earlyWebName === "string"
+          ? earlyWebName
+          : (request.personSearch?.name.trim() ??
+            (namedInWords.length === 1 ? namedInWords[0] : undefined));
       const webPictures =
         dependencies.publicPictures !== undefined &&
-        typeof namedForPictures === "string"
+        !reRender &&
+        typeof namedForPictures === "string" &&
+        namedForPictures.length > 1
           ? dependencies.publicPictures
               .find({
                 name: namedForPictures,
+                ...(request.personSearch?.organization
+                  ? { organisation: request.personSearch.organization }
+                  : {}),
                 userText: latest.content,
                 earlierUserText:
                   toolContext.conversation?.earlierUserText ?? [],
@@ -5493,8 +5512,19 @@ export function createModelGatewayQAnswer(
           // found game art). Where the lookup placed them at an
           // organisation, its pages are asked too (a company's page about
           // its founder, a press interview).
-          const organisation =
-            found.result.card?.subject.organization?.trim() ?? "";
+          // From the matched card, or from the one candidate a name alone
+          // found (live 2026-10-23: "Captain Zino Mario" found one plausible
+          // candidate, Zino Mario-Ghae of Zino Aviation, which a name alone
+          // never makes a confirmed identity, so there was no card).
+          const soleCandidate =
+            found.result.candidates.length === 1
+              ? found.result.candidates[0]
+              : undefined;
+          const organisation = (
+            found.result.card?.subject.organization ??
+            soleCandidate?.organization ??
+            ""
+          ).trim();
           if (
             pictures.length === 0 &&
             organisation.length > 0 &&
