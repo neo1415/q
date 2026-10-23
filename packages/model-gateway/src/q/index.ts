@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   followsUpPublicSources,
+  namedInTheirWords,
   publicResearchFollowUp,
   type SelectedCompany,
 } from "./research-follow-up.js";
@@ -4175,11 +4176,31 @@ export function createModelGatewayQAnswer(
         latest.content,
         earlier.some((message) => message.role === "Q"),
       );
-      const research: Awaited<QAnswerRequest["research"]> = reRender
-        ? { mode: "NEVER", announceSourceChange: false }
-        : request.research === undefined
-          ? undefined
-          : await request.research;
+      /**
+       * A turn about someone they did not name in their own words ("Why
+       * might the top one pass on us?", after Q listed their investors):
+       * the public web cannot be asked about them by name (only the
+       * person's words leave Capital Q), and their pointing words name no
+       * one -- production 2026-10-23 searched them and narrated Wikipedia's
+       * "Mountain pass". Capital Q's records answer it; no web this turn.
+       */
+      const pointedAtOnly =
+        request.aboutNamedOther === true &&
+        request.namedOther !== undefined &&
+        request.namedOther !== null &&
+        !namedInTheirWords(request.namedOther.name, [
+          latest.content,
+          ...earlier
+            .filter((message) => message.role === "USER")
+            .slice(-3)
+            .map((message) => message.content),
+        ]);
+      const research: Awaited<QAnswerRequest["research"]> =
+        reRender || pointedAtOnly
+          ? { mode: "NEVER", announceSourceChange: false }
+          : request.research === undefined
+            ? undefined
+            : await request.research;
       took("reading");
       // A question to Q (fallback) keeps the web in the model's hands even
       // when nothing forces a search (web search 2026-10-06: "three

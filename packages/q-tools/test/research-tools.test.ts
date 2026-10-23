@@ -112,8 +112,9 @@ function recorder() {
 function harness(
   overrides: QToolPortsOverrides = {},
   behaviour?: Parameters<typeof createFakeResearchProvider>[0]["behaviour"],
+  pages: Parameters<typeof createFakeResearchProvider>[0]["pages"] = PAGES,
 ) {
-  const provider = createFakeResearchProvider({ pages: PAGES, behaviour });
+  const provider = createFakeResearchProvider({ pages, behaviour });
   const evidence = recorder();
   const research = createPublicWebResearchService({
     provider,
@@ -189,6 +190,56 @@ function search(
 }
 
 describe("public_web.search", () => {
+  // Production 2026-10-23 (founder, after Q listed their investors): "Why
+  // might the top one pass on us?" was answered with Wikipedia's "Mountain
+  // pass". A page that never names whom the search was about never reaches
+  // the answer, its words or its Sources -- about someone else (gated by the
+  // research service) and about their own company alike.
+  it("leaves out pages that never name whom the search was about", async () => {
+    const { port: p } = harness({ companies: companiesWithWebsite() });
+    const outcome = await search(
+      { query: "Alpha Robotics markets", companyId: COMPANY_A },
+      speaking(contextFor(actorA, founderPlan), "Check our public markets"),
+      p,
+    );
+    const data = (outcome.result as { data: Record<string, unknown> }).data;
+    const urls = (data["sources"] as { url: string }[]).map(
+      (source) => source.url,
+    );
+    expect(urls.length).toBeGreaterThan(0);
+    // Beacon Analytics' profile never names Alpha Robotics.
+    expect(urls).not.toContain(
+      "https://directory.example.org/beacon-analytics",
+    );
+  });
+
+  it("says nothing of pages about others when none is about them", async () => {
+    const MOUNTAIN_PASS = {
+      url: "https://en.wikipedia.org/wiki/Mountain_pass",
+      title: "Mountain pass - Wikipedia",
+      snippet: "A mountain pass is a navigable route through a mountain range.",
+      text: "A mountain pass is a navigable route through a mountain range or over a ridge.",
+      publishedAt: "2026-10-15T00:00:00.000Z",
+    };
+    const { port: p } = harness({}, undefined, [MOUNTAIN_PASS]);
+    const outcome = await search(
+      {
+        query: "Why might Savanna Seed Partners pass on us?",
+        target: "GENERAL",
+        entityName: "Savanna Seed Partners",
+      },
+      speaking(
+        contextFor(actorA, generalPlanA),
+        "Why might Savanna Seed Partners pass on us?",
+      ),
+      p,
+    );
+    const data = (outcome.result as { data: Record<string, unknown> }).data;
+    expect(data["sources"]).toEqual([]);
+    expect(String(data["guidance"])).toContain("do not mention the web");
+    expect(String(data["guidance"])).not.toContain("ask for their website");
+  });
+
   it("keeps general research separate from the founder's selected company", async () => {
     const {
       port: p,

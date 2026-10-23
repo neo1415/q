@@ -182,6 +182,22 @@ describe.skipIf(!LIVE || GEMINI === undefined)(
             lower?.namedOther,
           );
         }
+        // Production 2026-10-23: "the top one" after Q's list is the first
+        // investor listed (code then answers it from records, no web).
+        const top = await read("Why might the top one pass on us?", [
+          { role: "USER", text: "Which investors am I talking to?" },
+          {
+            role: "Q",
+            text: "Here are the investors you're talking to: 1. Savanna Seed Partners, 2. Harbourline Capital, 3. Northwind Ventures.",
+          },
+        ]);
+        if (!/savanna/iu.test(top?.namedOther?.name ?? "")) {
+          miss(
+            "Why might the top one pass on us?",
+            "not Savanna",
+            top?.namedOther,
+          );
+        }
         const captain = await read("Who is Captain Zino Mario?");
         if (
           captain?.namedOther?.kind !== "PERSON" ||

@@ -218,7 +218,7 @@ const GUIDANCE =
 const AMBIGUOUS_GUIDANCE =
   " AMBIGUOUS NAME: these pages describe more than one organisation of that name (see entityResolution.candidates and each source's subjectMatch). Attribute nothing to them: say what you found for each in a few words and ask the person ONE question to tell which they mean (their website, country or sector).";
 const NOT_FOUND_GUIDANCE =
-  " NAME NOT FOUND: none of these pages is about that name. Say you searched and found nothing about it, never guess; ask for their website or one more detail to search with.";
+  " NAME NOT FOUND: no public page found is about that name, and pages that never name them are not shown. When Capital Q's records or the conversation answer the question, answer from them and do not mention the web. Otherwise say once, in a few words, that public sources had nothing on them, and never guess.";
 
 type Grant = {
   readonly subject: ResearchSubject | null;
@@ -412,22 +412,28 @@ export function createResearchPublicWebTool(
           status: outcome.entityResolution.status,
           candidates: [...outcome.entityResolution.candidates],
         },
-        sources: outcome.sources.map((source) => ({
-          index: source.index,
-          url: source.url,
-          domain: source.domain,
-          title: source.title,
-          publishedAt: source.publishedAt,
-          retrievedAt: source.retrievedAt,
-          temporal: source.temporal,
-          excerpt: source.excerpt,
-          extracted: source.extracted,
-          isSubjectWebsite: source.isSubjectWebsite,
-          mentionedCountries: [...source.mentionedCountries],
-          instructionRiskSignals: source.instructionRisk.length,
-          recordedAsEvidence: source.evidenceSourceId !== null,
-          subjectMatch: source.subjectMatch,
-        })),
+        // A page that never names whom the search was about is not a
+        // source on them (production 2026-10-23: "Why might the top one
+        // pass on us?" was answered with Wikipedia's "Mountain pass"): it
+        // never reaches the answer, its words or its Sources.
+        sources: outcome.sources
+          .filter((source) => source.subjectMatch !== "NONE")
+          .map((source) => ({
+            index: source.index,
+            url: source.url,
+            domain: source.domain,
+            title: source.title,
+            publishedAt: source.publishedAt,
+            retrievedAt: source.retrievedAt,
+            temporal: source.temporal,
+            excerpt: source.excerpt,
+            extracted: source.extracted,
+            isSubjectWebsite: source.isSubjectWebsite,
+            mentionedCountries: [...source.mentionedCountries],
+            instructionRiskSignals: source.instructionRisk.length,
+            recordedAsEvidence: source.evidenceSourceId !== null,
+            subjectMatch: source.subjectMatch,
+          })),
         comparison: outcome.comparison.map((note) => ({ ...note })),
         budget: { ...outcome.budget },
         truthClass: "UNKNOWN",
