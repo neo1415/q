@@ -291,7 +291,7 @@ describe("open-web search: a company or person by name, no website", () => {
     expect(outcome.sources.every((s) => s.subjectMatch === "MATCH")).toBe(true);
   });
 
-  it("looks for public professional profiles when the question is about their people (owner 2026-10-23)", async () => {
+  it("searches LinkedIn's public people and company pages beside the general search (owner 2026-10-23)", async () => {
     const index = scriptedIndex("serpapi", [
       { when: "zino aviation", pages: MAI_SOLI_PAGES },
     ]);
@@ -299,24 +299,32 @@ describe("open-web search: a company or person by name, no website", () => {
       provider: index.provider,
       clock: () => NOW,
     });
-    const outcome = await service.research({
+    await service.research({
       actor,
-      runId: "run-zino-team",
+      runId: "run-zino-linkedin",
       correlationId: "cor_test",
-      requestedQuery: "Tell me about Zino Aviation and its team",
+      requestedQuery: "Find the latest news on Zino Aviation",
       entityName: "Zino Aviation",
-      userText: "Tell me about Zino Aviation and its team",
+      userText: "Find the latest news on Zino Aviation",
       subject: null,
     });
-    expect(outcome.status).toBe("OK");
-    expect(index.searches.map((s) => s.query)).toContain(
-      "zino aviation linkedin",
+    const lane = index.searches.filter((s) =>
+      s.includeDomains.some((domain) => domain.startsWith("linkedin.com")),
+    );
+    expect(lane.map((s) => s.includeDomains)).toEqual([
+      ["linkedin.com/in"],
+      ["linkedin.com/company"],
+    ]);
+    expect(lane.every((s) => s.query === "zino aviation")).toBe(true);
+    // The general search is asked too, unrestricted.
+    expect(index.searches.some((s) => s.includeDomains.length === 0)).toBe(
+      true,
     );
   });
 
-  it("adds no profile search when the question is not about people", async () => {
+  it("asks no LinkedIn lane for an open question that names no one", async () => {
     const index = scriptedIndex("serpapi", [
-      { when: "flutterwave", pages: MAI_SOLI_PAGES },
+      { when: "fintech", pages: MAI_SOLI_PAGES },
     ]);
     const service = createPublicWebResearchService({
       provider: index.provider,
@@ -324,16 +332,13 @@ describe("open-web search: a company or person by name, no website", () => {
     });
     await service.research({
       actor,
-      runId: "run-flutterwave",
+      runId: "run-open",
       correlationId: "cor_test",
-      requestedQuery: "Find the latest news on Flutterwave",
-      entityName: "Flutterwave",
-      userText: "Find the latest news on Flutterwave",
+      requestedQuery: "Nigeria fintech seed investors",
+      userText: "Nigeria fintech seed investors",
       subject: null,
     });
-    expect(index.searches.some((s) => s.query.includes("linkedin"))).toBe(
-      false,
-    );
+    expect(index.searches.some((s) => s.includeDomains.length > 0)).toBe(false);
   });
 
   it("looks up a name said in an earlier message ('look her up')", async () => {

@@ -888,6 +888,8 @@ export type QPicturePort = {
 export type QPublicPicturePort = {
   readonly find: (input: {
     readonly name: string;
+    /** For a person: the organisation a public lookup placed them at. */
+    readonly organisation?: string | undefined;
     readonly userText: string;
     readonly earlierUserText: readonly string[];
     readonly signal?: AbortSignal | undefined;

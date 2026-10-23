@@ -204,6 +204,7 @@ function build(options: {
   readonly publicPictures?: Parameters<
     typeof createModelGatewayQAnswer
   >[0]["publicPictures"];
+  readonly webLaneBudgetMs?: number | undefined;
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -295,6 +296,9 @@ function build(options: {
     ...(options.publicPictures === undefined
       ? {}
       : { publicPictures: options.publicPictures }),
+    ...(options.webLaneBudgetMs === undefined
+      ? {}
+      : { webLaneBudgetMs: options.webLaneBudgetMs }),
   });
   const request: QAnswerRequest = {
     runId: RUN as QAnswerRequest["runId"],
@@ -2059,6 +2063,61 @@ describe("a person search runs beside the web search, with their picture (owner 
         source: "PUBLIC_WEB",
         pageUrl: "https://nairametrics.com/2024/05/zino-mario/",
       }),
+    );
+  });
+});
+
+describe("the web lane lands within its budget or is dropped (owner 2026-10-23)", () => {
+  it("answers from Capital Q's records, saying public sources were not checked, when the web does not land in time", async () => {
+    const port: QToolPort = {
+      offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
+      execute: (proposal) =>
+        proposal.name === "research_public_web"
+          ? new Promise<QToolCallOutcome>(() => undefined)
+          : Promise.resolve({
+              callId: proposal.callId,
+              toolName: "company.get",
+              toolVersion: 1,
+              classification: "READ_ONLY",
+              status: "SUCCEEDED",
+              failureCode: null,
+              sensitivity: "PUBLIC",
+              result: { ok: true, data: { canonicalName: "Zino Aviation" } },
+              latencyMs: 1,
+            }),
+    };
+    const { seam, alpha, request } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "g1",
+              name: "get_company",
+              arguments: { companyId: "x" },
+            },
+          ],
+        },
+        { kind: "JSON", value: analystResult("From the records.") },
+      ],
+      tools: port,
+      userText: "Tell me about Zino Aviation",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      webLaneBudgetMs: 50,
+    });
+    expect(
+      (await seam.answer({ ...request, aboutNamedOther: true })).kind,
+    ).toBe("ANSWERED");
+    const finalCall = alpha.calls.at(-1)?.request;
+    expect(finalCall?.messages.at(-1)?.content).toContain(
+      "did not return in time",
     );
   });
 });
