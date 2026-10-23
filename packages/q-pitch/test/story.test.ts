@@ -403,6 +403,31 @@ describe("Q Story trigger", () => {
     }
   });
 
+  it("hears the ask as speech-to-text writes it (voice room, 23 Oct)", () => {
+    const cases: [string, string][] = [
+      ["Hey, cue. Pitch yourself.", "FULL"],
+      ["Hey queue, pitch yourself to founders.", "FOUNDER"],
+      ["Hi Q, pitch yourself.", "FULL"],
+      ["Hey Kyu, pitch yourself.", "FULL"],
+      ["Hey. Pitch yourself.", "FULL"],
+      ["So, pitch yourself.", "FULL"],
+      ["Pitch Capital Queue.", "FULL"],
+      ["Hey Q, present yourself.", "FULL"],
+      ["Hey Q, tell me your story.", "FULL"],
+      ["Okay Q, can you pitch yourself to investors?", "INVESTOR"],
+      ["Hey Q. Can you pitch Capital Q to founders?", "FOUNDER"],
+    ];
+    for (const [said, edition] of cases) {
+      expect(classifyStoryTrigger(said), said).toEqual({
+        kind: "STORY",
+        edition,
+      });
+    }
+    // A question that merely mentions a pitch is still Q's.
+    expect(classifyStoryTrigger("Hey Q, what's in my pitch deck?")).toBeNull();
+    expect(classifyStoryTrigger("Hey cue, pitch me a company")).toBeNull();
+  });
+
   it("picks the cut from the audience asked for", () => {
     const cases: [string, string][] = [
       ["pitch to an investor", "INVESTOR"],

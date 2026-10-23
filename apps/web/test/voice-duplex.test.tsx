@@ -8,6 +8,7 @@ import type {
   QVoiceDuplexToolResult,
   QVoiceDuplexUsageResult,
 } from "@capital-q/contracts";
+import { classifyStoryTrigger } from "@capital-q/q-pitch";
 
 import {
   BARGE_CONFIRM_MS,
@@ -19,6 +20,7 @@ import {
   type DuplexLineEvents,
   type DuplexRelays,
 } from "../src/features/voice/provider/duplex-line";
+import { setHeardInterceptor } from "../src/features/voice/heard-intercept";
 import { LINE_LOST_NOTICE } from "../src/features/voice/provider/line-health";
 
 /**
@@ -915,5 +917,99 @@ describe("the server decides who answers each turn (VOICE-BRAIN)", () => {
     finish(h, "item_1", "Open my pitch deck.");
     await settle();
     expect(h.relays.heard).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * "Hey Q, pitch yourself" said in the voice room (owner, 23 Oct): the live
+ * model answered with a self introduction and the story never started.
+ * The final transcript now goes to the story's trigger before anything
+ * answers it; when it is taken, the line cuts its answer and closes.
+ */
+describe("a spoken story ask is taken before the line answers it", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const ROUTED: QVoiceDuplexCredential = { ...CREDENTIAL, routeTurns: true };
+  const said = (
+    h: ReturnType<typeof harness>,
+    itemId: string,
+    words: string,
+  ) => {
+    h.channel().emit({ type: "input_audio_buffer.speech_started" });
+    h.channel().emit({ type: "input_audio_buffer.speech_stopped" });
+    h.channel().emit({ type: "input_audio_buffer.committed", item_id: itemId });
+    h.channel().emit({
+      type: "conversation.item.input_audio_transcription.completed",
+      item_id: itemId,
+      transcript: words,
+    });
+  };
+
+  it("on a routed line: never sent to Q, and the line closes", async () => {
+    const taken: string[] = [];
+    const release = setHeardInterceptor((words) => {
+      const asked = classifyStoryTrigger(words);
+      if (asked?.kind !== "STORY") return false;
+      taken.push(asked.edition);
+      return true;
+    });
+    const h = harness({
+      credential: ROUTED,
+      heard: () => Promise.resolve({ route: "SMALLTALK" as const }),
+    });
+    await h.line.open();
+    said(h, "item_1", "Hey, cue. Pitch yourself to founders.");
+    await settle();
+    release();
+    expect(taken).toEqual(["FOUNDER"]);
+    expect(h.relays.heard).not.toHaveBeenCalled();
+    expect(h.events.onEnded).toHaveBeenCalledWith("ENDED");
+    expect(h.track.stop).toHaveBeenCalled();
+    expect(h.audio.volume).toBe(0);
+  });
+
+  it("on an unrouted line: the model's answer already under way is cut", async () => {
+    const release = setHeardInterceptor(
+      (words) => classifyStoryTrigger(words)?.kind === "STORY",
+    );
+    const h = harness();
+    await h.line.open();
+    // The model starts its own reply (a self introduction) before the
+    // transcript is final.
+    h.channel().emit({ type: "input_audio_buffer.speech_started" });
+    h.channel().emit({ type: "input_audio_buffer.speech_stopped" });
+    h.channel().emit({ type: "input_audio_buffer.committed", item_id: "u1" });
+    h.channel().emit({ type: "response.created", response: { id: "resp_1" } });
+    h.channel().emit({ type: "output_audio_buffer.started" });
+    h.channel().emit({
+      type: "conversation.item.input_audio_transcription.completed",
+      item_id: "u1",
+      transcript: "Hey Q, pitch yourself.",
+    });
+    await settle();
+    release();
+    expect(h.events.onEnded).toHaveBeenCalledWith("ENDED");
+    expect(h.audio.volume).toBe(0);
+    expect(h.track.stop).toHaveBeenCalled();
+  });
+
+  it("anything else is the line's as before", async () => {
+    const release = setHeardInterceptor(
+      (words) => classifyStoryTrigger(words)?.kind === "STORY",
+    );
+    const h = harness({
+      credential: ROUTED,
+      heard: () => Promise.resolve({ route: "SMALLTALK" as const }),
+    });
+    await h.line.open();
+    said(h, "item_1", "What's in my pitch deck?");
+    await settle();
+    release();
+    expect(h.relays.heard).toHaveBeenCalled();
+    expect(h.events.onEnded).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,7 @@ import { buttonClassName } from "@capital-q/ui/button";
 
 import { useQSessionOptional } from "@/features/q/q-session";
 import { setTypedInterceptor } from "@/features/q/typed-intercept";
+import { setHeardInterceptor } from "@/features/voice/heard-intercept";
 
 /**
  * "What is Capital Q?" asked alone (plan §4): Q answers briefly (turn
@@ -53,19 +54,42 @@ export function storyAskedHref(edition: StoryEditionId = "FULL"): string {
  */
 export function useStoryTrigger(active: boolean): void {
   const router = useRouter();
+  const session = useQSessionOptional();
+  // An open voice line ends when the story starts (owner, 23 Oct): its
+  // model never answers over the story, and its microphone never hears
+  // the story's narration as the person's words.
+  const voiceRef = useRef(session?.voice);
+  useEffect(() => {
+    voiceRef.current = session?.voice;
+  }, [session?.voice]);
   useEffect(() => {
     if (!active) return;
-    return setTypedInterceptor((text) => {
-      const asked = classifyStoryTrigger(text);
+    const start = (said: string, line: "TYPED" | "HEARD"): boolean => {
+      const asked = classifyStoryTrigger(said);
       if (asked?.kind !== "STORY") return false;
+      // A heard ask closes its own line (heard-intercept.ts); a typed one
+      // while a line is open ends it here.
+      const voice = voiceRef.current;
+      if (line === "TYPED" && voice?.active === true) {
+        void voice.client.end().catch(() => undefined);
+      }
       router.push(storyAskedHref(asked.edition));
       return true;
-    });
+    };
+    const releaseTyped = setTypedInterceptor((text) => start(text, "TYPED"));
+    // Said on a voice line: the final transcript, before the line's model
+    // may answer it.
+    const releaseHeard = setHeardInterceptor((said) => start(said, "HEARD"));
+    return () => {
+      releaseTyped();
+      releaseHeard();
+    };
   }, [active, router]);
 
-  // Said aloud on Q's open line: the person's own lines only, each once,
-  // never one from before this page held the trigger.
-  const spoken = useQSessionOptional()?.spoken;
+  // Said aloud on a line that reports the person's words as lines (the
+  // providers that never reach heard-intercept): their own lines only,
+  // each once, never one from before this page held the trigger.
+  const spoken = session?.spoken;
   const heard = useRef<Set<string> | null>(null);
   useEffect(() => {
     if (!active || spoken === undefined) {
@@ -82,6 +106,10 @@ export function useStoryTrigger(active: boolean): void {
       if (line.role !== "user") continue;
       const asked = classifyStoryTrigger(line.text);
       if (asked?.kind === "STORY") {
+        const voice = voiceRef.current;
+        if (voice?.active === true) {
+          void voice.client.end().catch(() => undefined);
+        }
         router.push(storyAskedHref(asked.edition));
         return;
       }
