@@ -1322,6 +1322,157 @@ describe("answer seam tool loop", () => {
       );
     });
 
+    describe("and its published figures beside it (owner 2026-10-23)", () => {
+      const FIGURES: QOfferedTool = {
+        ...GET_COMPANY,
+        toolName: "company.figures.read",
+        definition: { ...GET_COMPANY.definition, name: "read_company_figures" },
+      };
+      const FIGURE = {
+        key: "financial.monthly_revenue",
+        statement:
+          "Monthly recurring revenue was USD 4,800 in September 2026. (Demonstration data, self-reported by the company.)",
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+        lifecycleStatus: "CURRENT",
+      };
+      const withFigures = (figures: (p: QToolProposal) => QToolCallOutcome) =>
+        toolPort([SEARCH, GET_COMPANY, FIGURES], (p) =>
+          p.name === "search_companies"
+            ? {
+                ...succeeded(p, { items: found("Northwind Ledger") }),
+                toolName: "company.search",
+              }
+            : p.name === "read_company_figures"
+              ? figures(p)
+              : succeeded(p, {
+                  companyId: "id-0",
+                  canonicalName: "Northwind Ledger",
+                }),
+        );
+
+      it("reads the figures with the profile, so the answer round holds both", async () => {
+        const tools = withFigures((p) => ({
+          ...succeeded(p, {
+            companyId: "id-0",
+            status: "AVAILABLE",
+            figures: [FIGURE],
+          }),
+          toolName: "company.figures.read",
+        }));
+        const { seam, alpha, request } = build({
+          script: [
+            search("Northwind Ledger"),
+            { kind: "JSON", value: analystResult("USD 4,800, self-reported.") },
+          ],
+          tools,
+        });
+        expect((await seam.answer(request)).kind).toBe("ANSWERED");
+        expect(alpha.calls).toHaveLength(2);
+        expect(tools.executed.map((p) => [p.name, p.arguments])).toEqual([
+          ["search_companies", { query: "Northwind Ledger" }],
+          ["get_company", { companyId: "id-0" }],
+          ["read_company_figures", { companyId: "id-0" }],
+        ]);
+        const second = JSON.stringify(alpha.calls[1]?.request.messages);
+        expect(second).toContain("Capital Q ran get_company");
+        expect(second).toContain("Capital Q ran read_company_figures");
+        expect(second).toContain("SELF_REPORTED");
+      });
+
+      it("starts both reads before either finishes (no added latency)", async () => {
+        let figuresStarted: () => void = () => undefined;
+        const started = new Promise<void>((resolve) => {
+          figuresStarted = resolve;
+        });
+        const executed: string[] = [];
+        const tools: QToolPort = {
+          offer: () => Promise.resolve([SEARCH, GET_COMPANY, FIGURES]),
+          execute: async (p) => {
+            executed.push(p.name);
+            if (p.name === "search_companies") {
+              return {
+                ...succeeded(p, { items: found("Northwind Ledger") }),
+                toolName: "company.search",
+              };
+            }
+            if (p.name === "read_company_figures") {
+              figuresStarted();
+              return {
+                ...succeeded(p, { status: "NONE", figures: [] }),
+                toolName: "company.figures.read",
+              };
+            }
+            // The profile finishes only once the figures read has started:
+            // a sequential chain would never get there.
+            await started;
+            return succeeded(p, { companyId: "id-0" });
+          },
+        };
+        const { seam, request } = build({
+          script: [
+            search("Northwind Ledger"),
+            { kind: "JSON", value: analystResult("ok") },
+          ],
+          tools,
+        });
+        expect((await seam.answer(request)).kind).toBe("ANSWERED");
+        expect(executed).toEqual([
+          "search_companies",
+          "get_company",
+          "read_company_figures",
+        ]);
+      });
+
+      it("answers from the profile alone when the figures read is denied", async () => {
+        const tools = withFigures((p) => ({
+          ...denied(p),
+          toolName: "company.figures.read",
+        }));
+        const { seam, alpha, request, messages } = build({
+          script: [
+            search("Northwind Ledger"),
+            { kind: "JSON", value: analystResult("Northwind is at seed.") },
+          ],
+          tools,
+        });
+        expect((await seam.answer(request)).kind).toBe("ANSWERED");
+        expect(alpha.calls).toHaveLength(2);
+        const second = JSON.stringify(alpha.calls[1]?.request.messages);
+        expect(second).toContain("Capital Q ran get_company");
+        expect(second).not.toContain("Capital Q ran read_company_figures");
+        expect(messages.at(-1)?.content).toBe("Northwind is at seed.");
+      });
+
+      it("never reads the figures twice when the model asks for them anyway", async () => {
+        const tools = withFigures((p) => ({
+          ...succeeded(p, { status: "NONE", figures: [] }),
+          toolName: "company.figures.read",
+        }));
+        const { seam, request } = build({
+          script: [
+            search("Northwind Ledger"),
+            {
+              kind: "TOOL_CALLS",
+              calls: [
+                {
+                  callId: "f",
+                  name: "read_company_figures",
+                  arguments: { companyId: "id-0" },
+                },
+              ],
+            },
+            { kind: "JSON", value: analystResult("none published") },
+          ],
+          tools,
+        });
+        expect((await seam.answer(request)).kind).toBe("ANSWERED");
+        expect(
+          tools.executed.filter((p) => p.name === "read_company_figures"),
+        ).toHaveLength(1);
+      });
+    });
+
     it("never reads the profile twice when the model asks for it anyway", async () => {
       const tools = port(found("Northwind Ledger"));
       const { seam, request } = build({
