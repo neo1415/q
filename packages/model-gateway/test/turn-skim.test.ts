@@ -76,8 +76,8 @@ describe("the turn skim (K)", () => {
         recentTurns: [],
         attribution,
       }),
-      // v6: whom the turn is about; none here.
-    ).toEqual({ ...SKIM, subject: null });
+      // v6: whom the turn is about; none here. v7: not asked to write.
+    ).toEqual({ ...SKIM, subject: null, writes: false });
     expect(skim.requests).toHaveLength(1);
     expect(skim.requests[0]?.taskClass).toBe("FAST_CLASSIFICATION");
     // Its own mark in the usage ledger, apart from the turn reader's.

@@ -87,6 +87,62 @@ describe("GET_COMPANY", () => {
     ).toEqual(["company.view"]);
   });
 
+  it("carries the team as the page shows it, only when the team port admits the reader (QA F-16)", async () => {
+    const asked: { actor: string; companyId: string }[] = [];
+    const team = [
+      {
+        name: "Amina Bello",
+        relationshipType: "team_member",
+        businessTitle: "CEO",
+        isFounder: true,
+        shortBio: null,
+      },
+    ];
+    const { port: withTeam } = port({
+      companyTeam: {
+        teamFor: (actor, company) => {
+          asked.push({ actor: actor.userId, companyId: company.companyId });
+          // The page's rule lives in the composition: here, only the owner.
+          return Promise.resolve(company.companyId === COMPANY_A ? team : null);
+        },
+      },
+    });
+    const own = await withTeam.execute(
+      {
+        callId: "t1",
+        name: "get_company",
+        arguments: { companyId: COMPANY_A },
+      },
+      contextFor(actorA, ownCompanyPlan),
+    );
+    expect(own.result).toMatchObject({ ok: true, data: { team } });
+    const other = await withTeam.execute(
+      {
+        callId: "t2",
+        name: "get_company",
+        arguments: { companyId: COMPANY_B_NETWORK },
+      },
+      contextFor(actorA, ownCompanyPlan),
+    );
+    expect(other.status).toBe("SUCCEEDED");
+    // Not admitted: no team field at all, never an empty team.
+    expect(JSON.stringify(other.result)).not.toContain('"team"');
+    expect(asked.map((a) => a.companyId)).toEqual([
+      COMPANY_A,
+      COMPANY_B_NETWORK,
+    ]);
+    // A private company is refused before any team read.
+    await withTeam.execute(
+      {
+        callId: "t3",
+        name: "get_company",
+        arguments: { companyId: COMPANY_B_PRIVATE },
+      },
+      contextFor(actorA, ownCompanyPlan),
+    );
+    expect(asked).toHaveLength(2);
+  });
+
   it("denies the owner when the capability is missing, with the one enumeration-safe answer", async () => {
     const { port: p } = port({
       authorization: fakeAuthorization({ denyAll: true }),

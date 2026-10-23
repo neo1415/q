@@ -2779,16 +2779,23 @@ export function createSpecialistQAnswer(
    * way round.
    */
   const heldRuns = new Map<string, "HINT" | "NAMED">();
-  const sayHolding = (request: QAnswerRequest, name: string | null): void => {
+  const sayHolding = (
+    request: QAnswerRequest,
+    name: string | null,
+    /** v7 skim: they asked Q to write or send something (QA F-23). */
+    writes = false,
+  ): void => {
     const deltas = dependencies.deltas;
     if (deltas === undefined) return;
     const held = heldRuns.get(request.runId);
-    if (held === "NAMED" || (held === "HINT" && name === null)) return;
+    if (held === "NAMED" || (held === "HINT" && name === null && !writes)) {
+      return;
+    }
     if (request.writingDocument === true || request.askedAction !== undefined) {
       return;
     }
     if (request.plan.screen?.route === "ONBOARDING") return;
-    heldRuns.set(request.runId, name === null ? "HINT" : "NAMED");
+    heldRuns.set(request.runId, name === null && !writes ? "HINT" : "NAMED");
     while (heldRuns.size > PREREADS_MAX) {
       const oldest = heldRuns.keys().next().value;
       if (oldest === undefined) break;
@@ -2798,8 +2805,11 @@ export function createSpecialistQAnswer(
       runId: request.runId,
       tenantId: request.tenantId,
       messageId: QMessageIdSchema.parse(randomUUID()),
-      text:
-        name === null
+      text: writes
+        ? name === null
+          ? "Drafting that now. "
+          : `Drafting that note to ${name.slice(0, 60)} now. `
+        : name === null
           ? "Looking into that now. "
           : `Looking into ${name.slice(0, 60)} now. `,
       holding: true,
@@ -3847,8 +3857,11 @@ export function createSpecialistQAnswer(
           const name =
             skimmed?.subject?.name ??
             (skimmed?.kind === "PERSON_SEARCH" ? skimmed.person?.name : null);
+          const writes = skimmed?.writes === true;
           if (!readingLanded && typeof name === "string") {
-            sayHolding(request, name.trim().slice(0, 60));
+            sayHolding(request, name.trim().slice(0, 60), writes);
+          } else if (!readingLanded && writes) {
+            sayHolding(request, null, true);
           }
         },
         () => undefined,

@@ -70,6 +70,25 @@ export const GetCompanyOutputSchema = z
     companyStatus: CompanyStatusSchema,
     /** OWN: the actor's organisation owns it; SHARED: reached through disclosure. */
     relationToYou: z.enum(["OWN", "SHARED"]),
+    /**
+     * The team as the company's page shows it (QA F-16): the owner, or an
+     * investor the pitch rule admits. Absent when it could not be read for
+     * them; an empty list is a company with no team members recorded.
+     */
+    team: z
+      .array(
+        z
+          .object({
+            name: z.string(),
+            relationshipType: z.string(),
+            businessTitle: z.string().nullable(),
+            isFounder: z.boolean(),
+            shortBio: z.string().nullable(),
+          })
+          .strict(),
+      )
+      .max(50)
+      .optional(),
     /** Profile fields are what the company declared about itself. */
     truthClass: z.literal("USER_CLAIM"),
   })
@@ -88,7 +107,7 @@ export function createGetCompanyTool(ports: QToolPorts): AnyQToolDefinition {
     status: "ACTIVE",
     providerName: "get_company",
     description:
-      "Returns the canonical profile of one company (name, website, founding date, headquarters, stage, descriptions, status) when it is available in this conversation. Call it when the answer depends on company profile facts that were not supplied. Returns an error when the company is not available.",
+      "Returns the canonical profile of one company (name, website, founding date, headquarters, stage, descriptions, status, and its team as the company's page shows it) when it is available in this conversation. Call it when the answer depends on company profile facts that were not supplied. Returns an error when the company is not available.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [capability("company.view")],
@@ -179,13 +198,27 @@ export function createGetCompanyTool(ports: QToolPorts): AnyQToolDefinition {
     // The same projection the founder previews as "what investors will
     // see" (CQ-PRE-REC-001 §33): one field list, shared with the companies
     // context, so the preview and the answer cannot drift apart.
-    execute: (_input, _context, grant) =>
-      Promise.resolve({
+    execute: async (_input, context, grant) => {
+      // The page's team, under the page's own rule (the port applies it);
+      // a failed read is no team field, never an invented or empty team.
+      const team =
+        ports.companyTeam === undefined
+          ? null
+          : await ports.companyTeam
+              .teamFor(context.actor, {
+                tenantId: grant.profile.tenantId,
+                companyId: grant.profile.id,
+                organisationId: grant.profile.organisationId,
+              })
+              .catch(() => null);
+      return {
         ...projectCompanyForNetwork(grant.profile, {
           descriptionMax: DESCRIPTION_MAX,
         }),
         relationToYou: grant.relation,
+        ...(team === null ? {} : { team: [...team].slice(0, 50) }),
         truthClass: "USER_CLAIM",
-      }),
+      };
+    },
   });
 }

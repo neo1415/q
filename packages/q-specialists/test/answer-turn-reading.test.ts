@@ -505,6 +505,36 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(yes.deltas.filter((d) => d.holding === true)).toEqual([]);
   });
 
+  it("says it is drafting the note, to whom the skim understood, at skim time (QA F-23)", async () => {
+    const turn = holding(
+      "Draft a note to the founders of the second company saying I'd like a call next week",
+      {
+        kind: "OTHER",
+        confidence: "HIGH",
+        subject: { name: "Silo Credit", kind: "COMPANY" },
+        writes: true,
+      },
+    );
+    await expect.poll(() => turn.deltas.length).toBeGreaterThan(0);
+    expect(turn.deltas).toEqual([
+      { text: "Drafting that note to Silo Credit now. ", holding: true },
+    ]);
+    turn.land();
+    await turn.answering;
+    // No one understood: still says it is drafting, naming no one.
+    const nameless = holding("draft a note for me", {
+      kind: "OTHER",
+      confidence: "HIGH",
+      writes: true,
+    });
+    await expect.poll(() => nameless.deltas.length).toBeGreaterThan(0);
+    expect(nameless.deltas).toEqual([
+      { text: "Drafting that now. ", holding: true },
+    ]);
+    nameless.land();
+    await nameless.answering;
+  });
+
   it('a "Yes" to an offer about Zino is named only as the skim understood it', async () => {
     const turn = holding("Yes", {
       kind: "OTHER",
