@@ -60,7 +60,7 @@ function storyStanding(
  * story's own pauses between beats. The investor cut is under 4:00, a
  * hard limit.
  */
-const LENGTHS: Readonly<Record<StoryEditionId, string>> = {
+export const STORY_LENGTHS: Readonly<Record<StoryEditionId, string>> = {
   FULL: "About 7 minutes",
   INVESTOR: "Under 4 minutes",
   FOUNDER: "About 4½ minutes",
@@ -75,7 +75,7 @@ export function tourOptions(now: string): readonly TourOption[] {
           ? "story-investor"
           : "story-founder",
     title: STORY_EDITIONS[edition].label,
-    length: LENGTHS[edition],
+    length: STORY_LENGTHS[edition],
     href:
       edition === "FULL"
         ? "/home?qpitch=story&new=1"
