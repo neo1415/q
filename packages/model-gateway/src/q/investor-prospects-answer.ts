@@ -70,6 +70,12 @@ type Prospect = {
   readonly sector?: {
     readonly fit: "MATCH" | "MISMATCH" | "UNKNOWN";
     readonly focus: string | null;
+    /** EXACT: one of the company's own sectors; ADJACENT: a related one. */
+    readonly closeness?: "EXACT" | "ADJACENT" | null;
+    /** Where they published it: their gate, or their Q Card. */
+    readonly source?: "GATE" | "CARD";
+    /** The company's own declared sectors, by name. */
+    readonly yours?: readonly string[];
   };
 };
 
@@ -220,13 +226,35 @@ function reasonClause(
 }
 
 /** Their published sector against this company, said honestly. */
+/**
+ * Their published sector against the company, said exactly as far as it
+ * goes and no further (owner 2026-10-23): a match is named against how the
+ * company is classified, a related sector is "close ... not the same", and
+ * nothing is ever called "your sector" -- the classification is not the
+ * business (Maji Loop sells water; it is classified clean energy).
+ */
 function sectorClause(sector: Prospect["sector"]): string | null {
   if (sector === undefined || sector.focus === null) return null;
+  const said =
+    sector.source === "CARD"
+      ? `their Q Card lists ${sector.focus}`
+      : `their published gate looks for ${sector.focus}`;
+  const yours =
+    sector.yours === undefined || sector.yours.length === 0
+      ? null
+      : sector.yours.join(", ");
   if (sector.fit === "MATCH") {
-    return `their published gate looks for ${sector.focus}, which is your sector`;
+    if (sector.closeness === "EXACT" && yours !== null) {
+      return `${said}, which matches how your company is classified (${yours})`;
+    }
+    if (sector.closeness === "ADJACENT" && yours !== null) {
+      return `${said}, which is close to how your company is classified (${yours}) but not the same`;
+    }
+    // GateQ found the rule met; how closely is not known here.
+    return `you meet the sector rule on their published gate (${sector.focus})`;
   }
   if (sector.fit === "MISMATCH") {
-    return `their published gate looks for ${sector.focus}, which is not your sector, so this is a stretch`;
+    return `${said}, which is not how your company is classified${yours === null ? "" : ` (${yours})`}, so this is a stretch`;
   }
   return null;
 }
