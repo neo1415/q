@@ -77,6 +77,10 @@ const ROUTE: Readonly<Record<QNavigateDestination, string>> = {
  */
 const NOT_BY_NAME: Readonly<Record<string, string>> = {
   "/admin": "platform operators only",
+  // Owner 2026-10-23: a Work tab (tab.work-board); Q reads and changes it
+  // with my_board. Its own destination waits for the reader's next version,
+  // which carries the destination list.
+  "/board": "a Work tab, opened from Work's tab strip",
   // v6: /q-pitch is Q_PITCH's page; its Capital Q pitch page is the
   // founder track's own step, opened by the tour.
   "/q-pitch/capital-q":

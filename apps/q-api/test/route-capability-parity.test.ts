@@ -1108,6 +1108,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/settings/plan": cap("tool.get_my_plan"),
   // AUTO (ADR 0030): Q's work; Q reads the same with list_q_work.
   "/work": cap("navigate.WORK"),
+  // The work board (owner 2026-10-23): a Work tab; Q reads it with my_board.
+  "/board": cap("tool.my_board"),
   "/work/[delegationId]": cap("tool.list_q_work"),
   "/work/[delegationId]/report/[laneId]": DOWNLOAD,
   // DOCS: their documents and brand kit.
