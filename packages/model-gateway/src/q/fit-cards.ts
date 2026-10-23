@@ -12,6 +12,7 @@ import {
   type Money,
   type QAnswerCard,
   type QAnswerCardLevel,
+  type QAnswerCardReasonLevel,
   type QAnswerCardsBlock,
 } from "@capital-q/contracts";
 import { splitSentences, spokenFactsOf } from "@capital-q/q-core";
@@ -241,7 +242,12 @@ function cardOf(fit: RunFit): Omit<QAnswerCard, "key" | "hue"> {
               `${FIT_PARAMETER_LABELS[unknown.parameter]} not known yet`,
             );
   const reasons = [...pros.slice(0, con === null ? 3 : 2)];
-  if (con !== null) reasons.push(con);
+  // F-13: a pro is STRONG; the con is a CAVEAT (a mismatch) or UNKNOWN.
+  const reasonLevels: QAnswerCardReasonLevel[] = reasons.map(() => "STRONG");
+  if (con !== null) {
+    reasons.push(con);
+    reasonLevels.push(mismatch !== null ? "CAVEAT" : "UNKNOWN");
+  }
   const measures = fit.profile.parameters
     .filter((parameter) => parameter.applicable)
     .flatMap((parameter) => {
@@ -272,7 +278,9 @@ function cardOf(fit: RunFit): Omit<QAnswerCard, "key" | "hue"> {
             measured: known.length,
             of: Math.max(known.length, measures.length),
           },
-    reasons: reasons.length > 0 ? reasons : [sentence(band)],
+    ...(reasons.length > 0
+      ? { reasons, reasonLevels }
+      : { reasons: [sentence(band)] }),
     measures,
     view: null,
     said:
