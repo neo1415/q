@@ -303,6 +303,18 @@ function identityTerms(subject: ResearchSubject | null): readonly string[] {
 }
 
 /**
+ * Whether the person asked about people: a team, its founders or leaders,
+ * or who someone is. Decides only one extra phrasing of a search already
+ * asked for, never whether to search.
+ */
+const PEOPLE_WORDS =
+  /\b(?:who\s+is|who's|who\s+are|who\s+runs|who\s+founded|team|founders?|co-?founders?|ceo|cto|cfo|coo|chief|people|leadership|leaders|management|executives?|directors?|board|partners?|staff)\b/iu;
+
+function asksAboutPeople(text: string): boolean {
+  return PEOPLE_WORDS.test(text);
+}
+
+/**
  * The organisation (or person) the pages should be about: the authorised
  * subject, else the name the person gave — only when every word of it is
  * theirs, so a model cannot name somebody to look up.
@@ -599,6 +611,17 @@ export function createPublicWebResearchService(
         planned.push(composed.query);
       };
       plan(command.requestedQuery);
+      // Owner 2026-10-23: who runs a company, or who a person is, is most
+      // often answered by public professional profiles. The index's own
+      // results carry them (LinkedIn's public pages among them); nothing
+      // behind a sign-in is read.
+      if (
+        entity !== null &&
+        aboutSomeoneElse &&
+        asksAboutPeople(command.userText)
+      ) {
+        plan(`${entity.name} linkedin`, false);
+      }
       // The same words without the subject in front, when it was put
       // there: the question may be about the world, not about them.
       plan(command.requestedQuery, false);

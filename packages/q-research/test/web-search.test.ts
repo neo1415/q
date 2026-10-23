@@ -291,6 +291,51 @@ describe("open-web search: a company or person by name, no website", () => {
     expect(outcome.sources.every((s) => s.subjectMatch === "MATCH")).toBe(true);
   });
 
+  it("looks for public professional profiles when the question is about their people (owner 2026-10-23)", async () => {
+    const index = scriptedIndex("serpapi", [
+      { when: "zino aviation", pages: MAI_SOLI_PAGES },
+    ]);
+    const service = createPublicWebResearchService({
+      provider: index.provider,
+      clock: () => NOW,
+    });
+    const outcome = await service.research({
+      actor,
+      runId: "run-zino-team",
+      correlationId: "cor_test",
+      requestedQuery: "Tell me about Zino Aviation and its team",
+      entityName: "Zino Aviation",
+      userText: "Tell me about Zino Aviation and its team",
+      subject: null,
+    });
+    expect(outcome.status).toBe("OK");
+    expect(index.searches.map((s) => s.query)).toContain(
+      "zino aviation linkedin",
+    );
+  });
+
+  it("adds no profile search when the question is not about people", async () => {
+    const index = scriptedIndex("serpapi", [
+      { when: "flutterwave", pages: MAI_SOLI_PAGES },
+    ]);
+    const service = createPublicWebResearchService({
+      provider: index.provider,
+      clock: () => NOW,
+    });
+    await service.research({
+      actor,
+      runId: "run-flutterwave",
+      correlationId: "cor_test",
+      requestedQuery: "Find the latest news on Flutterwave",
+      entityName: "Flutterwave",
+      userText: "Find the latest news on Flutterwave",
+      subject: null,
+    });
+    expect(index.searches.some((s) => s.query.includes("linkedin"))).toBe(
+      false,
+    );
+  });
+
   it("looks up a name said in an earlier message ('look her up')", async () => {
     const index = scriptedIndex("tavily", [
       { when: "aria mustary", pages: MAI_SOLI_PAGES },
