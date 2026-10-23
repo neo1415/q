@@ -257,6 +257,9 @@ describe("Q answers from a document the person attached", () => {
     expect(sent).toContain('ATTACHED BY THEM: \\"Term sheet\\", 2 pages');
     expect(sent).toContain("[p. 1] Series A term sheet for Ajopot.");
     expect(sent).toContain("never verified fact");
+    // Owner 23 Oct: a bare upload is summarised first, not critiqued.
+    expect(sent).toContain('THEY ATTACHED "Term sheet" AND WANT TO KNOW');
+    expect(sent).toContain("Want my read on what's weak?");
     expect(persisted.join("\n")).toContain("(p. 1)");
     // Timed with the fake model: the read adds no model round.
     expect(tookMs).toBeLessThan(5_000);
@@ -280,6 +283,8 @@ describe("Q answers from a document the person attached", () => {
       }),
     ]);
     expect(sentTo(alpha)).toContain("[p. 2] 1x non-participating");
+    // A specific question is answered from it, with no unasked critique.
+    expect(sentTo(alpha)).toContain("Add no critique they did not ask for");
   });
 
   it("a later conversation finds it again by its name", async () => {

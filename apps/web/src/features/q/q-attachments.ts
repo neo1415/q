@@ -200,7 +200,7 @@ export function attachmentQuestion(text: string): string {
     names.length === 1
       ? `"${names[0] ?? ""}"`
       : names.map((n) => `"${n}"`).join(", ");
-  return `I've attached ${named}. Tell me briefly what it is, the two or three things worth knowing, and what I could do next.`;
+  return `I've attached ${named}. Summarise it for me: what it is and its key points.`;
 }
 
 /** The question went: its ready documents stay with the conversation. */
