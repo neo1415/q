@@ -176,6 +176,34 @@ describe("CompanyScores", () => {
     expect(tile?.textContent).toContain("80");
   });
 
+  it("a tile drops an unscored Unicorn Potential from its visible line, never from its name", () => {
+    // Owner QA 23 Oct: "Inv. 58 · Suit. 80 · Un" was cut off on a phone.
+    const unscored = {
+      ...scored,
+      unicornPotential: {
+        status: "INSUFFICIENT_EVIDENCE",
+        overallScore: null,
+        band: null,
+        confidence: "LOW",
+        coverage: 0,
+        stage: null,
+        methodVersion: "unicorn-potential.v1.0.0",
+        inputRulesVersion: "unicorn-inputs.v1",
+        assessedAt: null,
+        pillars: [],
+        up: [],
+        down: [],
+        missing: [],
+        momentum: null,
+        benchmark: "Comparable benchmark unavailable",
+      } satisfies UnicornPotentialDto,
+    };
+    render(<CompanyScores scores={unscored} variant="minimal" />);
+    const tile = document.querySelector('[data-company-scores="minimal"]');
+    expect(tile?.textContent).not.toContain("Unicorn");
+    expect(tile?.getAttribute("aria-label")).toBe(companyScoresLabel(unscored));
+  });
+
   it("cards on one page share one batched read", async () => {
     const calls: string[][] = [];
     const port = (ids: readonly string[]) => {
