@@ -2003,6 +2003,50 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     return { line: stored.at(-1)?.content, delegated: delegated() };
   };
 
+  it("a founder accepting an investor's waiting interest answers it, never an errand that waits for them (QA F-33)", async () => {
+    const asked: (string | null)[] = [];
+    const { value, errands } = port(() => null);
+    const handOver: QHandOverPort = {
+      ...value,
+      answerIncomingInterest: (_request, investor) => {
+        asked.push(investor);
+        return Promise.resolve({
+          status: "PREPARED",
+          awaitingApprovalOf: "Accept Rift Valley Seed Fund's interest",
+        });
+      },
+    };
+    const { answer, stored, delegated } = seam({
+      said: "Reply to Rift Valley Seed Fund: accept their interest and suggest a call next week.",
+      reading: reading("Rift Valley Seed Fund"),
+      outcomes: [],
+      handOver,
+    });
+    await answer.answer(request());
+    expect(asked).toEqual(["Rift Valley Seed Fund"]);
+    expect(errands).toEqual([]);
+    expect(delegated()).toBe(0);
+    const line = stored.at(-1)?.content ?? "";
+    expect(line).toContain("Accept Rift Valley Seed Fund's interest");
+    expect(line).not.toMatch(
+      /hasn't accepted your interest|nothing to accept/u,
+    );
+  });
+
+  it("falls through to the errand when no investor's interest waits on them", async () => {
+    const { value, errands } = port(() => null);
+    const handOver: QHandOverPort = {
+      ...value,
+      answerIncomingInterest: () =>
+        Promise.resolve({
+          status: "NO_PENDING_INTEREST",
+          awaitingApprovalOf: "No investor's interest is waiting.",
+        }),
+    };
+    await run(handOver, null, true);
+    expect(errands).toHaveLength(1);
+  });
+
   it("a request for research, a memo and diligence questions is never answered by accepting a waiting request (live 2026-10-12)", async () => {
     const { value, asked, errands } = port(() => ({
       status: "PREPARED",

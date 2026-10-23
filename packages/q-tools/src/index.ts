@@ -106,6 +106,7 @@ export {
   type ShowInput,
   findRecordByName,
   matchCounterpart,
+  namesOwnScreen,
   spokenNameScore,
   nameSimilarity,
   CONTROL_SCREEN,
@@ -144,6 +145,7 @@ export {
 } from "./tools/onboarding-reminders.js";
 export {
   createGetQCardTool,
+  handleFrom,
   GET_Q_CARD,
   GetQCardInputSchema,
   GetQCardOutputSchema,

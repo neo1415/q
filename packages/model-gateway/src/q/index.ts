@@ -183,6 +183,16 @@ import {
   firstContactOf,
 } from "./first-contact.js";
 import {
+  Q_CARD_CLAIM_TOOL,
+  qCardOfferMessage,
+  qCardOfferOf,
+} from "./q-card-offer.js";
+import {
+  CHAT_INSTEAD_TOOL,
+  chatInsteadMessage,
+  chatInsteadOf,
+} from "./message-channel.js";
+import {
   CHAINED_FIGURES_TOOL,
   CHAINED_GET_TOOL,
   CHAINED_READ_TOOLS,
@@ -7205,6 +7215,13 @@ export function createModelGatewayQAnswer(
             // A first contact prepared by code this round (first-contact.ts).
             let firstContact: Promise<QToolCallOutcome> | null = null;
             let firstContactWithNote = false;
+            /** An email their mailbox could not send, as a Capital Q message instead (QA F-32). */
+            let chatInstead: Promise<QToolCallOutcome> | null = null;
+            /** Their Q Card, prepared for approval when none is made (QA F-34). */
+            let cardOffer: {
+              readonly handle: string;
+              readonly outcome: Promise<QToolCallOutcome>;
+            } | null = null;
             const chainedThisRound: {
               readonly name: string;
               readonly read: Promise<QToolCallOutcome>;
@@ -7291,6 +7308,43 @@ export function createModelGatewayQAnswer(
               // A message or email to a company they are not connected with:
               // the first contact, Express Interest, prepared now for their
               // approval, through its own authorize step (first-contact.ts).
+              const offer = qCardOfferOf(call, outcome);
+              if (
+                offer !== null &&
+                cardOffer === null &&
+                offeredByName.has(Q_CARD_CLAIM_TOOL) &&
+                !proposals.some((other) => other.name === Q_CARD_CLAIM_TOOL) &&
+                calls + chainedThisRound.length + 1 < Q_TOOL_LOOP_MAX_CALLS
+              ) {
+                cardOffer = {
+                  handle: offer.handle,
+                  outcome: callTool(
+                    {
+                      callId: "q-card-offer",
+                      name: Q_CARD_CLAIM_TOOL,
+                      arguments: offer,
+                    },
+                    toolContext,
+                  ),
+                };
+              }
+              const instead = chatInsteadOf(call, outcome);
+              if (
+                instead !== null &&
+                chatInstead === null &&
+                offeredByName.has(CHAT_INSTEAD_TOOL) &&
+                !proposals.some((other) => other.name === CHAT_INSTEAD_TOOL) &&
+                calls + chainedThisRound.length + 1 < Q_TOOL_LOOP_MAX_CALLS
+              ) {
+                chatInstead = callTool(
+                  {
+                    callId: "q-chat-instead",
+                    name: CHAT_INSTEAD_TOOL,
+                    arguments: instead,
+                  },
+                  toolContext,
+                );
+              }
               const contact = firstContactOf(call, outcome);
               if (
                 contact !== null &&
@@ -7455,6 +7509,37 @@ export function createModelGatewayQAnswer(
                     forModelReading(outcome, classificationOf(name)),
                   ),
                 );
+              }
+            }
+            if (cardOffer !== null) {
+              const { handle } = cardOffer;
+              const outcome = await cardOffer.outcome.catch(() => null);
+              if (outcome !== null) {
+                calls += 1;
+                toolCalls.push({
+                  toolName: outcome.toolName,
+                  providerName: Q_CARD_CLAIM_TOOL,
+                  status: outcome.status,
+                  failureCode: outcome.failureCode,
+                  latencyMs: outcome.latencyMs,
+                });
+                const told = qCardOfferMessage(outcome, handle);
+                if (told !== null) chainedResults.push(told);
+              }
+            }
+            if (chatInstead !== null) {
+              const outcome = await chatInstead.catch(() => null);
+              if (outcome !== null) {
+                calls += 1;
+                toolCalls.push({
+                  toolName: outcome.toolName,
+                  providerName: CHAT_INSTEAD_TOOL,
+                  status: outcome.status,
+                  failureCode: outcome.failureCode,
+                  latencyMs: outcome.latencyMs,
+                });
+                const told = chatInsteadMessage(outcome);
+                if (told !== null) chainedResults.push(told);
               }
             }
             if (firstContact !== null) {
