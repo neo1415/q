@@ -990,6 +990,21 @@ describe("code's opening lines (lead 2026-10-03)", () => {
     );
   });
 
+  it("a plain lead line the model says again is said once (live 2026-10-23, Halyard)", () => {
+    const lead =
+      "Halyard Security is a seed-stage company based in Edinburgh, United Kingdom, by its own account on Capital Q.";
+    expect(
+      afterLeadLines(
+        "Halyard Security is a seed-stage company based in Edinburgh, United Kingdom, by its own account on Capital Q. It says it handles passkey rollout for NHS trusts.",
+        lead,
+      ),
+    ).toBe("It says it handles passkey rollout for NHS trusts.");
+    // An answer that does not repeat it is untouched.
+    expect(afterLeadLines("Its model is a per-user licence.", lead)).toBe(
+      "Its model is a per-user licence.",
+    );
+  });
+
   it("the model's follow-on never restarts the list (runs 56f815aa, a69d64a9)", () => {
     const lead = readinessLeadLines(READINESS) ?? "";
     // a69d64a9: the whole list again, its first item unnumbered.
