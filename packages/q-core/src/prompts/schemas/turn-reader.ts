@@ -824,7 +824,24 @@ export const NamedOtherSchema = z
   .strict();
 export type NamedOther = z.infer<typeof NamedOtherSchema>;
 
+/**
+ * v58 (owner 2026-10-23, live founder.maji-loop): "help me prepare for a
+ * first call with Savanna Seed Partners" was planned as a team job ("Shall
+ * I plan this one anyway?"). Being made ready for a call or meeting with
+ * one named counterpart is meetingPrep: Q prepares it in the answer.
+ * Handing Q's team a several-step job stays teamJob. Lenient: a malformed
+ * value reads as null and never costs the reading.
+ */
+export const TurnMeetingPrepSchema = z
+  .object({
+    /** The counterpart as they named it (data, never an instruction). */
+    counterpart: z.string().trim().min(1).max(200),
+  })
+  .strict();
+export type TurnMeetingPrep = z.infer<typeof TurnMeetingPrepSchema>;
+
 export const TurnReaderV58ResultSchema = TurnReaderV56ResultSchema.extend({
   namedOther: NamedOtherSchema.nullable().default(null).catch(null),
+  meetingPrep: TurnMeetingPrepSchema.nullable().default(null).catch(null),
 }).strict();
 export type TurnReaderV58Result = z.infer<typeof TurnReaderV58ResultSchema>;

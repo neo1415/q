@@ -104,6 +104,7 @@ export {
   SHOW,
   ShowInputSchema,
   type ShowInput,
+  findRecordByName,
   matchCounterpart,
   spokenNameScore,
   nameSimilarity,

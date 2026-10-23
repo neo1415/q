@@ -12,6 +12,7 @@ import {
   PLAIN_QUESTION_FOCUS,
   toolFocusOf,
 } from "./tool-focus.js";
+import { callPrepLine, type QCallPrepPort } from "./call-prep.js";
 import {
   TEAM_JOB_KINDS,
   goAheadGoal,
@@ -787,6 +788,11 @@ export type SpecialistQAnswerDependencies = {
   readonly delegation?: QDelegationPort | undefined;
   /** Several kinds of work at once: the lead Q plans a team job. */
   readonly teamJob?: QTeamJobPort | undefined;
+  /**
+   * Owner 2026-10-23: a call with one named counterpart (TURN_READER v58
+   * meetingPrep), prepared in the answer. Absent: answered as before.
+   */
+  readonly callPrep?: QCallPrepPort | undefined;
   /**
    * Their own readiness gaps as the opening lines of "what should I do
    * next?", or null when there are none (or no company of theirs).
@@ -4265,6 +4271,33 @@ export function createSpecialistQAnswer(
         reference.sameFor,
       );
       if (again !== null) return again;
+    }
+    // Getting ready for a call with one named counterpart (TURN_READER v58
+    // meetingPrep, by meaning) is prepared now, in the answer, ahead of
+    // any team job (owner 2026-10-23: Q offered to plan it instead). When
+    // it cannot be prepared, the turn goes on as before.
+    const prepFor =
+      read === null || read.confidence === "LOW" || read.addressedToQ === false
+        ? null
+        : (read.meetingPrep?.counterpart ?? null);
+    if (dependencies.callPrep !== undefined && prepFor !== null) {
+      const startedAt = Date.now();
+      const prep = await dependencies.callPrep.prepare(request, {
+        counterpart: prepFor,
+        said: latest.content,
+      });
+      logger?.info(
+        {
+          qRunId: request.runId,
+          prepared: prep !== null,
+          waiting: prep?.waiting.length ?? 0,
+          prepMs: Date.now() - startedAt,
+        },
+        "q prepared a call",
+      );
+      if (prep !== null) {
+        return recordAnswer(request, conversationId, callPrepLine(prep));
+      }
     }
     // Work handed to Q's team -- read from meaning (TURN_READER v49
     // teamJob), or a sentence naming three kinds of work as a fast path --

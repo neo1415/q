@@ -268,6 +268,7 @@ export {
   type SmallTalkReply,
   type SmallTalkTurn,
 } from "./small-talk.js";
+export { createCallPrepWriter, type CallPrepWriter } from "./call-prep.js";
 export {
   createConversationRecall,
   type ConversationRecall,
