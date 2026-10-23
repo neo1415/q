@@ -13,7 +13,10 @@ import {
   parseDailySpendCapUsd,
   type ModelProvider,
 } from "@capital-q/model-gateway";
-import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
+import {
+  createGoogleModelProvider,
+  geminiEnabled,
+} from "@capital-q/model-gateway/providers/google";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
 
@@ -36,7 +39,11 @@ export function composeWorkerModelGateway(options: {
   const { config } = options;
   const providerSecrets = config.secrets.modelProviders;
   const providers: ModelProvider[] = [];
-  if (providerSecrets.google !== undefined) {
+  // Owner 2026-10-23: Gemini is unpaid; off unless CQ_GEMINI_ENABLED=1.
+  if (
+    providerSecrets.google !== undefined &&
+    geminiEnabled(options.env ?? process.env)
+  ) {
     providers.push(
       createGoogleModelProvider({ apiKey: providerSecrets.google.reveal() }),
     );

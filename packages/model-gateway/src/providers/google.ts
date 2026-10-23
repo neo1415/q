@@ -49,6 +49,21 @@ import type {
 
 export const GOOGLE_PROVIDER_CODE = "google" as const;
 
+/**
+ * Owner 2026-10-23: "I'm not paying for Gemini." Its key alone no longer
+ * registers it: every call to an unpaid account came back 402 and cost a
+ * turn 2-4 s before the fallback answered. Registered only when this is
+ * "1". Unregistered, the routing policies' next eligible model (OpenAI)
+ * is first, with no attempt made on Gemini.
+ */
+export const GEMINI_ENABLED_ENV = "CQ_GEMINI_ENABLED";
+
+export function geminiEnabled(
+  env: Readonly<Record<string, string | undefined>>,
+): boolean {
+  return env[GEMINI_ENABLED_ENV]?.trim() === "1";
+}
+
 export type GoogleModelProviderOptions = {
   readonly apiKey: string;
   /**
