@@ -15,7 +15,9 @@ import {
   externalLiveInstructions,
   identityOf,
   roleFamilyOf,
+  sourcedOrigin,
 } from "../src/composition/external-persona.js";
+import { accentForPlace } from "../src/voice/persona-voices/catalog.js";
 import { createExternalRehearsalLatency } from "../src/composition/external-rehearsal-latency.js";
 
 const subject: ExternalPersonSubject = ExternalPersonSubjectSchema.parse({
@@ -262,5 +264,77 @@ describe("latency board", () => {
       p95: 950,
     });
     expect(board.summary("first_audio_ms").p50).toBeNull();
+  });
+});
+
+describe("where a researched person is from (R2b, owner 2026-10-23)", () => {
+  const known = (phrase: string) => accentForPlace(phrase) !== null;
+  const withBackground = (
+    text: string,
+    assertionClass:
+      "VERIFIED_PUBLIC_FACT" | "PUBLIC_STATEMENT" | "REASONABLE_INFERENCE",
+  ): PersonBrief =>
+    PersonBriefSchema.parse({
+      ...rich,
+      assertions: [a("BACKGROUND", text, assertionClass, [1])],
+    });
+
+  it("reads origin only where a cited source states it", () => {
+    expect(
+      sourcedOrigin(
+        withBackground(
+          "A Saudi businessman and investor",
+          "VERIFIED_PUBLIC_FACT",
+        ),
+        known,
+      ),
+    ).toEqual({ origin: "Saudi", sourceUrl: rich.sources[1]?.url });
+    expect(
+      sourcedOrigin(
+        withBackground("Born in Lagos, she moved", "PUBLIC_STATEMENT"),
+        known,
+      )?.origin,
+    ).toBe("Lagos");
+    expect(
+      sourcedOrigin(
+        withBackground("Nigerian-born operator", "VERIFIED_PUBLIC_FACT"),
+        known,
+      )?.origin,
+    ).toBe("Nigerian");
+    expect(
+      sourcedOrigin(
+        withBackground(
+          "A native of Riyadh who studied in London",
+          "VERIFIED_PUBLIC_FACT",
+        ),
+        known,
+      )?.origin,
+    ).toBe("Riyadh");
+  });
+
+  it("never from an inference, from where they work, or from nothing", () => {
+    // An inference is not a source saying so.
+    expect(
+      sourcedOrigin(
+        withBackground("A Saudi businessman", "REASONABLE_INFERENCE"),
+        known,
+      ),
+    ).toBeNull();
+    // Where they work is the place, not where they are from.
+    expect(
+      sourcedOrigin(
+        withBackground("Partner at a Dubai fund", "VERIFIED_PUBLIC_FACT"),
+        known,
+      ),
+    ).toBeNull();
+    // A phrase that names no known place or nationality stays unknown.
+    expect(
+      sourcedOrigin(
+        withBackground("Born in Springfield", "VERIFIED_PUBLIC_FACT"),
+        known,
+      ),
+    ).toBeNull();
+    expect(sourcedOrigin(rich, known)).toBeNull();
+    expect(sourcedOrigin(null, known)).toBeNull();
   });
 });

@@ -30,6 +30,7 @@ import type {
 } from "../src/voice/provider.js";
 import type { InterviewAgent } from "../src/voice/interview-agent.js";
 import type { LiveBroker } from "../src/voice/live/broker.js";
+import type { QVoiceRoutesDependencies } from "../src/voice/routes.js";
 import type { VoiceTurnHandler } from "../src/voice/turn.js";
 
 /**
@@ -117,6 +118,8 @@ function fakeSpeaker(conversationId: string | undefined): VoiceSpeaker & {
   return speaker;
 }
 
+type QVoiceRehearsals = NonNullable<QVoiceRoutesDependencies["rehearsals"]>;
+
 function buildApp(options: {
   readonly principal: AuthenticatedPrincipal | null;
   readonly context?: ActorContext | undefined;
@@ -124,6 +127,7 @@ function buildApp(options: {
   readonly bindings: VoiceSessionBindings;
   readonly interviewAgent?: InterviewAgent | undefined;
   readonly trialBroker?: LiveBroker | undefined;
+  readonly rehearsals?: QVoiceRehearsals | undefined;
 }): FastifyInstance {
   const security: QApiSecurityDependencies = {
     authenticator: { authenticate: () => Promise.resolve(options.principal) },
@@ -152,6 +156,9 @@ function buildApp(options: {
                 preview: { enabled: false, providers: () => ({}) },
               },
             }),
+        ...(options.rehearsals === undefined
+          ? {}
+          : { rehearsals: options.rehearsals }),
         ...(options.interviewAgent === undefined
           ? {}
           : {
@@ -218,6 +225,55 @@ describe("POST /v1/q/voice/sessions", () => {
       CONTEXT,
     );
     expect(body.sessionToken.length).toBeGreaterThan(0);
+    await app.close();
+  });
+
+  it("opens a trial account's REHEARSAL on the ElevenLabs persona line, never GPT-Live (owner 2026-10-23)", async () => {
+    const provider = fakeProvider();
+    const bindings = createVoiceSessionBindings();
+    const trialBroker: LiveBroker = {
+      enabled: true,
+      maxSessionMs: 600000,
+      open: () => Promise.resolve({ kind: "REFUSED", reason: "OFF" }),
+      delegate: () => Promise.resolve(null),
+      cancel: () => Promise.resolve(null),
+      usage: () => Promise.resolve(null),
+      isTrialUser: (id) => id === CONTEXT.userId,
+      trialFor: () =>
+        Promise.resolve({ allowanceSeconds: 300, remainingSeconds: 300 }),
+      end: () => false,
+      transcript: () => Promise.resolve(null),
+      size: () => 0,
+    };
+    const app = buildApp({
+      principal: PRINCIPAL,
+      context: CONTEXT,
+      provider,
+      bindings,
+      trialBroker,
+      rehearsals: {
+        opening: () =>
+          Promise.resolve({
+            line: "السلام عليكم, good to meet you.",
+            name: "Al Nakheel Family Office",
+            seed: "INVESTOR_ORGANISATION:1",
+          }),
+      },
+    });
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/q/voice/sessions",
+      headers: AUTH,
+      payload: {
+        voice: "MALE",
+        rehearsal: { rehearsalId: "6c1b2a3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d" },
+      },
+    });
+    expect(response.statusCode).toBe(201);
+    const body = response.json<{ liveOnly?: boolean; token: string }>();
+    expect(body.liveOnly).toBeUndefined();
+    // The standard line: a provider credential was issued for it.
+    expect(provider.issued).toHaveLength(1);
     await app.close();
   });
 

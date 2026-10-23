@@ -549,3 +549,53 @@ export function externalOpeningLine(input: {
     600,
   );
 }
+
+/**
+ * Owner 2026-10-23 (R2b, approved): where a researched person is FROM,
+ * only when a cited source says so in words -- "a Saudi businessman",
+ * "Nigerian-born", "born in Riyadh", "a native of Lagos", "a citizen of
+ * Kenya". Never from a name, never from an inference (only verified facts
+ * and their own statements count), never from where they work. The voice
+ * and the local language prefer it over where they are based; null keeps
+ * the place (unknown stays unknown).
+ */
+export type SourcedOrigin = {
+  /** As the source words it ("Saudi", "Riyadh"). */
+  readonly origin: string;
+  /** The source that states it. */
+  readonly sourceUrl: string;
+};
+
+const ORIGIN_PATTERNS: readonly RegExp[] = [
+  /\b[Bb]orn (?:and raised )?in ([A-Z][\p{L}' -]{1,40}?)(?=[,.;)]|\s(?:and|to|in|on|where)\b|$)/u,
+  /\b(?:[Aa] )?native of ([A-Z][\p{L}' -]{1,40}?)(?=[,.;)]|\s(?:and|who|where)\b|$)/u,
+  /\b(?:[Cc]itizen|[Nn]ational) of ([A-Z][\p{L}' -]{1,40}?)(?=[,.;)]|\s(?:and|who|where)\b|$)/u,
+  /\b[Hh]ails from ([A-Z][\p{L}' -]{1,40}?)(?=[,.;)]|\s(?:and|who|where)\b|$)/u,
+  /\b(?:[Nn]ationality|[Cc]itizenship):? ([A-Z][\p{L}' -]{1,30}?)(?=[,.;)]|$)/u,
+  /\b([A-Z][\p{L}]{2,20})-born\b/u,
+  /\b(?:[Aa]n?|[Tt]he) ([A-Z][\p{L}]{2,20}) (?:national|citizen|businessman|businesswoman|entrepreneur|investor|banker|financier|billionaire|executive|venture capitalist|angel investor|philanthropist)\b/u,
+];
+
+export function sourcedOrigin(
+  brief: PersonBrief | null,
+  known: (phrase: string) => boolean,
+): SourcedOrigin | null {
+  if (brief === null || brief.entityKind !== "PERSON") return null;
+  for (const assertion of brief.assertions) {
+    if (
+      assertion.assertionClass !== "VERIFIED_PUBLIC_FACT" &&
+      assertion.assertionClass !== "PUBLIC_STATEMENT"
+    ) {
+      continue;
+    }
+    const source = brief.sources[assertion.sourceRefs[0] ?? -1];
+    if (source === undefined) continue;
+    for (const pattern of ORIGIN_PATTERNS) {
+      const found = pattern.exec(assertion.text)?.[1]?.trim();
+      if (found !== undefined && known(found)) {
+        return { origin: plain(found, 60), sourceUrl: source.url };
+      }
+    }
+  }
+  return null;
+}

@@ -77,13 +77,18 @@ import {
   identityOf,
   NOT_THE_REAL_PERSON_LINE,
   plain,
+  sourcedOrigin,
+  type SourcedOrigin,
 } from "./external-persona.js";
 import { externalEvaluationBasis } from "./external-evaluation.js";
 import { externalSimulation } from "./external-presentation.js";
 import { scenarioFor } from "./external-scenarios.js";
 import type { DemoRehearsalAccess } from "./demo-rehearsal-access.js";
 import type { ExternalSubjectResolver } from "./external-resolve.js";
-import { localLanguageFor } from "../voice/persona-voices/catalog.js";
+import {
+  accentForPlace,
+  localLanguageFor,
+} from "../voice/persona-voices/catalog.js";
 import type { ExternalSubjectStore } from "./external-subjects.js";
 import type { ExternalRehearsalLatency } from "./external-rehearsal-latency.js";
 import {
@@ -2008,36 +2013,54 @@ export function createRehearsalService(dependencies: {
    * counterpart so a spoken turn does not read it again; a failed read is
    * an unknown place (neutral voice, plain English).
    */
-  const places = new Map<string, { at: number; place: string | null }>();
+  const places = new Map<
+    string,
+    { at: number; place: string | null; origin: SourcedOrigin | null }
+  >();
   const PLACE_KEPT_MS = 30 * 60_000;
-  async function placeOf(
+  /**
+   * Where they are based, and (R2b, owner 2026-10-23) where a researched
+   * person is FROM when a cited source states it. The voice and the local
+   * language prefer the sourced origin; the idiom stays with the place.
+   */
+  async function whereFrom(
     actor: ActorContext,
     kind: RehearsalCounterpartKind,
     id: string,
-  ): Promise<string | null> {
+  ): Promise<{ place: string | null; origin: SourcedOrigin | null }> {
     const key = `${actor.tenantId}:${actor.userId}:${kind}:${id}`;
     const kept = places.get(key);
     if (kept !== undefined && now().getTime() - kept.at < PLACE_KEPT_MS) {
-      return kept.place;
+      return kept;
     }
-    const raw =
-      kind === "EXTERNAL_PERSON"
-        ? external === undefined
+    let raw: string | null;
+    let origin: SourcedOrigin | null = null;
+    if (kind === "EXTERNAL_PERSON") {
+      const latest =
+        external === undefined
           ? null
-          : ((await external.subjects.latest(actor, id).catch(() => null))
-              ?.subject.location ?? null)
-        : ((await material.counterpart(actor, kind, id).catch(() => null))
-            ?.basedIn ?? null);
+          : await external.subjects.latest(actor, id).catch(() => null);
+      raw = latest?.subject.location ?? null;
+      origin = sourcedOrigin(
+        latest?.brief ?? null,
+        (phrase) => accentForPlace(phrase) !== null,
+      );
+    } else {
+      raw =
+        (await material.counterpart(actor, kind, id).catch(() => null))
+          ?.basedIn ?? null;
+    }
     // Third-party text is data: one short line, no control characters.
     const place =
       raw === null ? null : plain(raw, 120).replace(/[{}<>[\]]/gu, "");
     const value = place === null || place.length === 0 ? null : place;
-    places.set(key, { at: now().getTime(), place: value });
+    const entry = { at: now().getTime(), place: value, origin };
+    places.set(key, entry);
     if (places.size > 2_000) {
       const oldest = places.keys().next().value;
       if (oldest !== undefined) places.delete(oldest);
     }
-    return value;
+    return entry;
   }
 
   /** One background rebuild after a degraded persona, per subject. */
@@ -2182,10 +2205,11 @@ export function createRehearsalService(dependencies: {
     // needs one, and a gap in answering one costs (QA e22ea609).
     const questionOpen = questionOpenIn(turns);
     const theyAsked = cue === "NONE" && theyAskedIn(turns);
-    const [material_, place] = await Promise.all([
+    const [material_, where] = await Promise.all([
       meetingMaterial(actor, row),
-      placeOf(actor, row.counterpartKind, row.counterpartId),
+      whereFrom(actor, row.counterpartKind, row.counterpartId),
     ]);
+    const place = where.place;
     const variables = {
       viewerRole: row.userRole,
       viewerOrganisation: viewerOrganisation.slice(0, 200),
@@ -2199,7 +2223,7 @@ export function createRehearsalService(dependencies: {
           ? ""
           : `\nSpeaks like: someone who lives and works in ${place}.`) +
         // v12 (2026-10-23): the language they greet in, in its own script.
-        localLanguageLine(place) +
+        localLanguageLine(where.origin?.origin ?? place) +
         (closingSoon
           ? "\nMeeting time is almost over. In character, courteously acknowledge that you need to leave shortly. Close naturally in one or two sentences, without another question."
           : ""),
@@ -2986,7 +3010,7 @@ export function createRehearsalService(dependencies: {
       // the persona rests on. Researched real people included (owner
       // decision 2026-10-21): the accent comes from where they are based,
       // never from a guessed nationality, and an unknown place is neutral.
-      const basedIn = await placeOf(
+      const where = await whereFrom(
         actor,
         row.counterpartKind,
         row.counterpartId,
@@ -2994,7 +3018,8 @@ export function createRehearsalService(dependencies: {
       return {
         seed: `${row.counterpartKind}:${row.counterpartId}`,
         voice: row.voice ?? "MALE",
-        basedIn,
+        // R2b: a sourced origin before where they are based.
+        basedIn: where.origin?.origin ?? where.place,
         patience: persona === null ? null : conductOf(persona).patience,
       };
     },
