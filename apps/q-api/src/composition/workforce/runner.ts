@@ -62,6 +62,12 @@ export function createAgentWorkRunner(dependencies: {
     organisationId: string | null,
   ) => Promise<ActorContext | null>;
   readonly jobsFor: (actor: ActorContext) => WorkforceJobs;
+  /**
+   * Owner 2026-10-23: a finished job's document lands in the conversation
+   * it was asked in (delivery.ts), read back from the job's own results.
+   */
+  readonly deliver?:
+    ((owner: Owner, row: WorkRow) => Promise<unknown>) | undefined;
   readonly workerId?: string | undefined;
   readonly leaseMs?: number | undefined;
   readonly logger?: Logger | undefined;
@@ -216,6 +222,21 @@ export function createAgentWorkRunner(dependencies: {
         endStateOf("STARTED", jobStatus),
         waiting === undefined ? null : waiting.summary,
       );
+      if (dependencies.deliver !== undefined) {
+        // What the steps recorded, as stored: a document made before a
+        // later step stopped is still theirs to read.
+        const [after] = await queue
+          .forOwner(owner, [row.job_id])
+          .catch(() => []);
+        if (after !== undefined) {
+          await dependencies.deliver(owner, after).catch((error: unknown) => {
+            logger?.warn(
+              { err: error, jobId: row.job_id },
+              "workforce delivery failed",
+            );
+          });
+        }
+      }
     } catch (error: unknown) {
       logger?.warn(
         { err: error, jobId: row.job_id, attempt: row.attempts },

@@ -104,6 +104,9 @@ export type WorkforcePortServices = {
         readonly runId: string;
         readonly request: string;
         readonly query: string;
+        /** The job, so deep research's model calls are priced under it. */
+        readonly jobId?: string | undefined;
+        readonly budgetUsd?: number | undefined;
       }) => Promise<ResearchFound>)
     | undefined;
   readonly findSlots: (input: {
@@ -304,6 +307,8 @@ export function createWorkforcePorts(
                 runId: input.runId,
                 request: input.request,
                 query: input.query,
+                jobId: input.jobId,
+                budgetUsd: input.budgetUsd,
               });
             },
           }),

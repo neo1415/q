@@ -15,8 +15,20 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   DraftRedraftResultSchema,
   DraftReviewResultV2Schema,
-  JobPlanResultV6Schema,
+  AnalysisCritiqueResultSchema,
+  AnalysisDocumentResultSchema,
+  JobPlanResultV8Schema,
+  ResearchFactsResultSchema,
+  ResearchPlanResultSchema,
   renderPrompt,
+  type AnalysisCritiqueResult,
+  type AnalysisCritiqueVariables,
+  type AnalysisDocumentResult,
+  type AnalysisWriteVariables,
+  type ResearchFactsResult,
+  type ResearchFactsVariables,
+  type ResearchPlanResult,
+  type ResearchPlanVariables,
   SubstanceCritiqueResultSchema,
   type SubstanceCritiqueResult,
   type SubstanceCritiqueVariables,
@@ -32,7 +44,7 @@ import {
   type DraftReviewResultV2,
   type DraftReviewV2Variables,
   type EtiquettePurpose,
-  type JobPlanResultV6,
+  type JobPlanResultV8,
   type JobPlanVariablesV5,
   type ReplyReaderResult,
   type ReplyReaderVariables,
@@ -65,6 +77,16 @@ export type ReplyVariables = Omit<ReplyReaderVariables, Frame>;
 export type PlanVariables = Omit<JobPlanVariablesV5, Frame>;
 export type CritiqueVariables = Omit<SubstanceCritiqueVariables, Frame>;
 export type DiligenceVariables = Omit<DiligenceQuestionsVariables, Frame>;
+export type ResearchPlanInput = Omit<ResearchPlanVariables, Frame>;
+export type ResearchFactsInput = Omit<ResearchFactsVariables, Frame>;
+export type AnalysisWriteInput = Omit<AnalysisWriteVariables, Frame>;
+export type AnalysisCritiqueInput = Omit<AnalysisCritiqueVariables, Frame>;
+
+/** A deep-work call's result and what it cost (null cost: unpriced). */
+export type Priced<O> = {
+  readonly output: O;
+  readonly costUsd: number | null;
+};
 export type ShortenQuestionsInput = {
   readonly companyName: string;
   /** Only the drafted questions over the send limit, in order. */
@@ -90,6 +112,38 @@ const CRITIQUE = {
   maxOutputTokens: 1_600,
   attemptTimeoutMs: 60_000,
 } as const;
+/** Owner 2026-10-23: deep work's calls, each bounded on its own. */
+export const RESEARCH_PLAN_BUDGET = {
+  maxAttempts: 2,
+  maxEstimatedCostUsd: 0.04,
+  maxOutputTokens: 1_600,
+  attemptTimeoutMs: 45_000,
+} as const;
+export const RESEARCH_FACTS_BUDGET = {
+  maxAttempts: 2,
+  maxEstimatedCostUsd: 0.05,
+  maxOutputTokens: 2_400,
+  attemptTimeoutMs: 60_000,
+} as const;
+/** A whole document in one structured object: room to finish it. */
+export const ANALYSIS_WRITE_BUDGET = {
+  maxAttempts: 2,
+  maxEstimatedCostUsd: 0.45,
+  maxOutputTokens: 8_192,
+  attemptTimeoutMs: 150_000,
+} as const;
+export const ANALYSIS_CRITIQUE_BUDGET = {
+  maxAttempts: 2,
+  maxEstimatedCostUsd: 0.1,
+  maxOutputTokens: 2_400,
+  attemptTimeoutMs: 90_000,
+} as const;
+type DeepBudget =
+  | typeof RESEARCH_PLAN_BUDGET
+  | typeof RESEARCH_FACTS_BUDGET
+  | typeof ANALYSIS_WRITE_BUDGET
+  | typeof ANALYSIS_CRITIQUE_BUDGET;
+
 /** v5 also writes the outcome, prerequisites, reasons and next actions. */
 const PLAN = {
   maxAttempts: 1,
@@ -118,7 +172,8 @@ export type WorkforceModels = {
     who: Who,
     trace: Trace,
     variables: PlanVariables,
-  ) => Promise<JobPlanResultV6 | null>;
+    // The input shape: firstRead may be absent (an older plan, a fake).
+  ) => Promise<z.input<typeof JobPlanResultV8Schema> | null>;
   readonly critique: (
     who: Who,
     trace: Trace,
@@ -139,6 +194,30 @@ export type WorkforceModels = {
     trace: Trace,
     input: ShortenQuestionsInput,
   ) => Promise<readonly string[] | null>;
+  /** Owner 2026-10-23: the focused searches deep research runs. */
+  readonly planResearch: (
+    who: Who,
+    trace: Trace,
+    input: ResearchPlanInput,
+  ) => Promise<Priced<ResearchPlanResult> | null>;
+  /** The dated, sourced facts in one question's public pages. */
+  readonly researchFacts: (
+    who: Who,
+    trace: Trace,
+    input: ResearchFactsInput,
+  ) => Promise<Priced<ResearchFactsResult> | null>;
+  /** An analysis document, or its revision from the review. */
+  readonly writeAnalysis: (
+    who: Who,
+    trace: Trace,
+    input: AnalysisWriteInput,
+  ) => Promise<Priced<AnalysisDocumentResult> | null>;
+  /** A second analyst's verdict on it. */
+  readonly critiqueAnalysis: (
+    who: Who,
+    trace: Trace,
+    input: AnalysisCritiqueInput,
+  ) => Promise<Priced<AnalysisCritiqueResult> | null>;
 };
 
 export function createWorkforceModels(dependencies: {
@@ -151,7 +230,7 @@ export function createWorkforceModels(dependencies: {
 }): WorkforceModels {
   const registry = createDefaultPromptRegistry();
 
-  async function call<V, O>(input: {
+  type CallInput<V, O> = {
     readonly task:
       | "DRAFT_REVIEW"
       | "DRAFT_REDRAFT"
@@ -159,17 +238,33 @@ export function createWorkforceModels(dependencies: {
       | "JOB_PLAN"
       | "SUBSTANCE_CRITIQUE"
       | "DILIGENCE_QUESTIONS"
-      | "DILIGENCE_QUESTIONS_SHORTEN";
+      | "DILIGENCE_QUESTIONS_SHORTEN"
+      | "RESEARCH_PLAN"
+      | "RESEARCH_FACTS"
+      | "ANALYSIS_WRITE"
+      | "ANALYSIS_CRITIQUE";
     readonly taskClass: ModelTextTaskClass;
     readonly who: Who;
     readonly trace: Trace;
     readonly variables: V;
     readonly schema: z.ZodType<O>;
     readonly budget:
-      typeof SMALL | typeof CLASSIFY | typeof PLAN | typeof CRITIQUE;
+      | typeof SMALL
+      | typeof CLASSIFY
+      | typeof PLAN
+      | typeof CRITIQUE
+      | DeepBudget;
     readonly environmentNotes: string;
     readonly etiquette: EtiquettePurpose | null;
-  }): Promise<O | null> {
+  };
+
+  async function call<V, O>(input: CallInput<V, O>): Promise<O | null> {
+    return (await priced(input))?.output ?? null;
+  }
+
+  async function priced<V, O>(
+    input: CallInput<V, O>,
+  ): Promise<Priced<O> | null> {
     try {
       const etiquette =
         input.etiquette === null
@@ -213,7 +308,15 @@ export function createWorkforceModels(dependencies: {
       const parsed = input.schema.safeParse(
         (response.output as { readonly value: unknown }).value,
       );
-      return parsed.success ? parsed.data : null;
+      if (!parsed.success) return null;
+      const amount = (
+        response as { readonly cost?: { readonly amount?: unknown } }
+      ).cost?.amount;
+      return {
+        output: parsed.data,
+        costUsd:
+          typeof amount === "number" && Number.isFinite(amount) ? amount : null,
+      };
     } catch (error: unknown) {
       dependencies.logger?.warn(
         { err: error, task: input.task },
@@ -267,13 +370,13 @@ export function createWorkforceModels(dependencies: {
         etiquette: null,
       }),
     plan: (who, trace, variables) =>
-      call<PlanVariables, JobPlanResultV6>({
+      call<PlanVariables, JobPlanResultV8>({
         task: "JOB_PLAN",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: JobPlanResultV6Schema,
+        schema: JobPlanResultV8Schema,
         budget: PLAN,
         environmentNotes:
           "You are planning, not acting. Code checks every step against what they allowed before anything happens.",
@@ -303,6 +406,58 @@ export function createWorkforceModels(dependencies: {
         budget: SMALL,
         environmentNotes:
           "You are drafting questions for the person's approval. Nothing is sent until they approve.",
+        etiquette: null,
+      }),
+    planResearch: (who, trace, variables) =>
+      priced<ResearchPlanInput, ResearchPlanResult>({
+        task: "RESEARCH_PLAN",
+        taskClass: "STRUCTURED_EXTRACTION",
+        who,
+        trace,
+        variables,
+        schema: ResearchPlanResultSchema,
+        budget: RESEARCH_PLAN_BUDGET,
+        environmentNotes:
+          "You are planning searches, not running them. Code composes every query before anything leaves Capital Q.",
+        etiquette: null,
+      }),
+    researchFacts: (who, trace, variables) =>
+      priced<ResearchFactsInput, ResearchFactsResult>({
+        task: "RESEARCH_FACTS",
+        taskClass: "STRUCTURED_EXTRACTION",
+        who,
+        trace,
+        variables,
+        schema: ResearchFactsResultSchema,
+        budget: RESEARCH_FACTS_BUDGET,
+        environmentNotes:
+          "You are reading public pages, not answering anyone. Code keeps a fact only when its numbers are on its page.",
+        etiquette: null,
+      }),
+    writeAnalysis: (who, trace, variables) =>
+      priced<AnalysisWriteInput, AnalysisDocumentResult>({
+        task: "ANALYSIS_WRITE",
+        taskClass: "EVIDENCE_SYNTHESIS",
+        who,
+        trace,
+        variables,
+        schema: AnalysisDocumentResultSchema,
+        budget: ANALYSIS_WRITE_BUDGET,
+        environmentNotes:
+          "You are writing a document for the person's own team. A second analyst reviews it before it is filed; nothing is sent to anyone.",
+        etiquette: null,
+      }),
+    critiqueAnalysis: (who, trace, variables) =>
+      priced<AnalysisCritiqueInput, AnalysisCritiqueResult>({
+        task: "ANALYSIS_CRITIQUE",
+        taskClass: "STRUCTURED_EXTRACTION",
+        who,
+        trace,
+        variables,
+        schema: AnalysisCritiqueResultSchema,
+        budget: ANALYSIS_CRITIQUE_BUDGET,
+        environmentNotes:
+          "You are reviewing, not writing. Code decides from your verdict whether the document is revised again.",
         etiquette: null,
       }),
     shortenDiligenceQuestions: async (who, trace, input) => {

@@ -101,6 +101,11 @@ export const PROMPT_IDS = [
   "SUBSTANCE_CRITIQUE",
   "DILIGENCE_QUESTIONS",
   "DILIGENCE_QUESTIONS_SHORTEN",
+  /** Owner 2026-10-23: Q as an analyst doing deep work. */
+  "RESEARCH_PLAN",
+  "RESEARCH_FACTS",
+  "ANALYSIS_WRITE",
+  "ANALYSIS_CRITIQUE",
   /** Founder brief J7 2026-10-06: people's words read by meaning. */
   "ONBOARDING_MOVE_READER",
   "PREFERENCE_POLARITY",
@@ -193,6 +198,10 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   SUBSTANCE_CRITIQUE: "substance-critique",
   DILIGENCE_QUESTIONS: "diligence-questions",
   DILIGENCE_QUESTIONS_SHORTEN: "diligence-questions-shorten",
+  RESEARCH_PLAN: "research-plan",
+  RESEARCH_FACTS: "research-facts",
+  ANALYSIS_WRITE: "analysis-write",
+  ANALYSIS_CRITIQUE: "analysis-critique",
   // Founder brief J7.
   ONBOARDING_MOVE_READER: "onboarding-move-reader",
   PREFERENCE_POLARITY: "preference-polarity",

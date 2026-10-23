@@ -49,3 +49,22 @@ export async function withinMonthlyLimit(
   }, 0);
   return !(micros >= Math.round(limitUsd * 1_000_000));
 }
+
+/**
+ * The most one job may spend (owner 2026-10-23: deep work -- a dozen
+ * focused searches, their pages read, a document written, critiqued and
+ * revised -- costs low single-digit dollars; the old $0.50 bought one
+ * keyword search and a generic brief). `Q_WORKFORCE_JOB_CAP_USD`, bounded.
+ * Spending beyond it is never planned; work over it needs the person.
+ */
+export const DEFAULT_WORKFORCE_JOB_CAP_USD = 2.5;
+const JOB_CAP_BOUNDS = { min: 0.5, max: 10 } as const;
+
+export function workforceJobCapUsd(
+  env: Readonly<Record<string, string | undefined>>,
+): number {
+  const raw = env["Q_WORKFORCE_JOB_CAP_USD"]?.trim();
+  const value = raw === undefined || raw.length === 0 ? NaN : Number(raw);
+  if (!Number.isFinite(value)) return DEFAULT_WORKFORCE_JOB_CAP_USD;
+  return Math.min(JOB_CAP_BOUNDS.max, Math.max(JOB_CAP_BOUNDS.min, value));
+}

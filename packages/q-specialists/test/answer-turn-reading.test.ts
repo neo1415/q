@@ -2021,7 +2021,7 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     expect(errands).toEqual([]);
     expect(delegated()).toBe(0);
     expect(stored.at(-1)?.content).toBe(
-      "I've planned this as a job for my team: 4 steps, Research → Documents → Reviewer → Diligence. Sending the questions needs your approval.",
+      "I've planned this in 4 steps: Research → Documents → Reviewer → Diligence. Sending the questions needs your approval.",
     );
   });
 
@@ -2038,7 +2038,7 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     await answer.answer(request());
     expect(delegated()).toBe(0);
     expect(stored.at(-1)?.content).toMatch(
-      /^I couldn't turn that into a plan my team can carry out, so nothing has started\./u,
+      /^I couldn't turn that into a plan I can carry out, so nothing has started\./u,
     );
   });
 
@@ -2119,7 +2119,7 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     expect(delegated()).toBe(0);
     const said = stored.at(-1)?.content ?? "";
     expect(said).toMatch(
-      /^I couldn't plan this for my team just now: something failed on my side/u,
+      /^I couldn't plan this just now: something failed on my side/u,
     );
     expect(said).not.toMatch(/Tell me who it's about/u);
   });
@@ -2148,7 +2148,7 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     expect(goals).toEqual([said]);
     expect(delegated()).toBe(0);
     expect(stored.at(-1)?.content).toMatch(
-      /^Handing work to my team isn't available on your account here, so nothing has started\./u,
+      /^Taking on work like this isn't available on your account here, so nothing has started\./u,
     );
   });
 

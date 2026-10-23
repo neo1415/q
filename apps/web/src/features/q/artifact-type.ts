@@ -8,6 +8,8 @@
  */
 const ARTIFACT_TYPE_LABELS: Readonly<Record<string, string>> = {
   INVESTMENT_BRIEF: "Investment brief",
+  // Owner 2026-10-23: a growth plan, market study or strategy Q wrote.
+  ANALYSIS: "Analysis",
   PITCH_DECK: "Investor deck",
   INVESTOR_MANDATE: "Investment mandate",
   Q_REPORT: "Report",

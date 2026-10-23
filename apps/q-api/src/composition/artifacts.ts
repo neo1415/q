@@ -133,6 +133,9 @@ export function createQArtifacts(dependencies: {
         ...(input.subject === undefined ? {} : { subject: input.subject }),
         artifactType: input.artifactType,
         content: input.content,
+        ...(input.workforce === undefined
+          ? {}
+          : { workforce: input.workforce }),
       });
       return detail.artifact;
     },

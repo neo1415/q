@@ -24,6 +24,12 @@ export type TeamJobPlan = {
 
 export type TeamJobOutcome =
   | { readonly status: "PREPARED" | "ONE_PER_TURN"; readonly plan: TeamJobPlan }
+  /** Owner 2026-10-23: their own deep work, under way with no card. */
+  | {
+      readonly status: "STARTED";
+      readonly plan: TeamJobPlan;
+      readonly firstRead: string | null;
+    }
   | { readonly status: "ALREADY_WAITING"; readonly waiting: readonly string[] }
   | { readonly status: "NOT_PLANNED" | "LIMIT_REACHED" }
   /** This run may not hand work to the team (not offered, or not authorised). */
@@ -56,8 +62,10 @@ const KINDS: readonly RegExp[] = [
 
 // The tool's output is checked again here: it crosses a package boundary.
 const ProposedSchema = z.object({
+  firstRead: z.string().max(700).nullable().optional(),
   status: z.enum([
     "PREPARED",
+    "STARTED",
     "ONE_PER_TURN",
     "NOT_PLANNED",
     "LIMIT_REACHED",
@@ -125,6 +133,13 @@ export function createToolTeamJobPort(dependencies: {
         const parsed = ProposedSchema.safeParse(outcome.result.data);
         if (!parsed.success) return { status: "FAILED" };
         const data = parsed.data;
+        if (data.status === "STARTED" && data.plan != null) {
+          return {
+            status: "STARTED",
+            plan: data.plan,
+            firstRead: data.firstRead ?? null,
+          };
+        }
         if (
           (data.status === "PREPARED" || data.status === "ONE_PER_TURN") &&
           data.plan != null
@@ -210,13 +225,15 @@ export function teamJobLine(outcome: TeamJobOutcome): string {
         : `Something like this is already waiting for you: ${waitingWork(first)}. ${PLAN_ANYWAY_QUESTION}`;
     }
     case "NOT_PLANNED":
-      return `I couldn't turn that into a plan my team can carry out, so nothing has started. Tell me who it's about and what you want at the end (a memo, a meeting brief, questions for the founder) and I'll plan it. ${ANSWER_HERE}`;
+      return `I couldn't turn that into a plan I can carry out, so nothing has started. Tell me who it's about and what you want at the end (a memo, a growth plan, questions for the founder) and I'll plan it. ${ANSWER_HERE}`;
     case "LIMIT_REACHED":
-      return `My team has reached its limit of jobs for now, so I haven't started this one. It can be planned once a running job finishes. ${ANSWER_HERE}`;
+      return `I've reached the limit of work I can take on for you right now, so I haven't started this one. It can start once a running piece of work finishes. ${ANSWER_HERE}`;
     case "UNAVAILABLE":
-      return `Handing work to my team isn't available on your account here, so nothing has started. ${ANSWER_HERE}`;
+      return `Taking on work like this isn't available on your account here, so nothing has started. ${ANSWER_HERE}`;
     case "FAILED":
-      return `I couldn't plan this for my team just now: something failed on my side, and nothing has started. Ask me again in a moment. ${ANSWER_HERE}`;
+      return `I couldn't plan this just now: something failed on my side, and nothing has started. Ask me again in a moment. ${ANSWER_HERE}`;
+    case "STARTED":
+      return startedLine(outcome.plan, outcome.firstRead);
     case "PREPARED":
     case "ONE_PER_TURN":
       break;
@@ -233,7 +250,27 @@ export function teamJobLine(outcome: TeamJobOutcome): string {
   );
   const steps = `${String(outcome.plan.steps.length)} ${outcome.plan.steps.length === 1 ? "step" : "steps"}`;
   return [
-    `I've planned this as a job for my team: ${steps}, ${who.join(" → ")}.`,
+    `I've planned this in ${steps}: ${who.join(" → ")}.`,
     ...needs.map((need) => `${need.replace(/\.$/u, "")}.`),
+  ].join(" ");
+}
+
+/**
+ * Owner 2026-10-23: own deep work under way. Q says what it is doing in
+ * the plan's own words, that the result comes back here, and its first
+ * read meanwhile. No card, no internal names: one Q.
+ */
+function startedLine(plan: TeamJobPlan, firstRead: string | null): string {
+  const doing = plan.summary.trim().replace(/[.\s]+$/u, "");
+  const lead =
+    doing.length === 0
+      ? "On it, starting now."
+      : `On it. Starting now: ${doing.charAt(0).toLowerCase()}${doing.slice(1)}.`;
+  return [
+    lead,
+    "It will be ready in a few minutes and I'll bring it back to this conversation; you can carry on with anything else meanwhile.",
+    ...(firstRead === null || firstRead.trim().length === 0
+      ? []
+      : [`My first read, before the research is in: ${firstRead.trim()}`]),
   ].join(" ");
 }
