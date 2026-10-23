@@ -209,6 +209,7 @@ function HandleForm({
   readonly hint?: string | undefined;
   readonly onSubmit: (handle: string) => Promise<string | null>;
 }) {
+  const t = useT();
   const id = useId();
   const [draft, setDraft] = useState(initial);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -239,7 +240,7 @@ function HandleForm({
             hint ??
             "3 to 30 lowercase letters, digits or hyphens. It becomes your address: /@handle."
           }
-          error={error}
+          error={error === undefined ? undefined : t(error)}
           autoCapitalize="none"
           autoComplete="off"
           spellCheck={false}
@@ -492,7 +493,7 @@ function ScopeForm({
       </label>
       {error === null ? null : (
         <p role="alert" className="cq-body-sm text-(--cq-danger)">
-          {error}
+          {t(error)}
         </p>
       )}
       <div className="flex flex-wrap items-center gap-3">

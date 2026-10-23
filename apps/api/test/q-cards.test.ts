@@ -63,11 +63,13 @@ function service(overrides: Partial<PublicIdentityService> = {}) {
   const calls = {
     audiences: [] as CardAudience[],
     claims: [] as string[],
+    subjects: [] as unknown[],
   };
   const fake: PublicIdentityService = {
     getCard: () => Promise.resolve(CARD),
     claimHandle: (input) => {
       calls.claims.push(input.handle);
+      calls.subjects.push(input.subject);
       return Promise.resolve(CARD);
     },
     updateCard: () => Promise.resolve({ ...CARD, version: 2 }),
@@ -176,7 +178,7 @@ describe("owner card routes", () => {
     const app = buildApp(fake);
     const badType = await app.inject({
       method: "PUT",
-      url: `/v1/q-cards/PERSON/${COMPANY}/handle`,
+      url: `/v1/q-cards/ROBOT/${COMPANY}/handle`,
       payload: { handle: "kivu" },
     });
     expect(badType.statusCode).toBe(422);
@@ -187,6 +189,39 @@ describe("owner card routes", () => {
     });
     expect(extra.statusCode).toBe(422);
     expect(calls.claims).toEqual([]);
+    await app.close();
+  });
+
+  it("claims a person's own card for the signed-in person only (owner 2026-10-23)", async () => {
+    const { fake, calls } = service();
+    const app = buildApp(fake);
+    const own = await app.inject({
+      method: "PUT",
+      url: `/v1/q-cards/PERSON/${CONTEXT.userId}/handle`,
+      payload: { handle: "ada" },
+    });
+    expect(own.statusCode).toBe(200);
+    expect(calls.subjects).toEqual([
+      { subjectType: "PERSON", subjectId: CONTEXT.userId },
+    ]);
+    // Another person's id: 403, and the service is never asked.
+    for (const request of [
+      {
+        method: "PUT" as const,
+        url: `/v1/q-cards/PERSON/${COMPANY}/handle`,
+        payload: { handle: "not-mine" },
+      },
+      {
+        method: "PATCH" as const,
+        url: `/v1/q-cards/PERSON/${COMPANY}`,
+        payload: { indexable: true, expectedVersion: 1 },
+      },
+    ]) {
+      const refused = await app.inject(request);
+      expect(refused.statusCode, request.method).toBe(403);
+      expect(refused.json<{ code: string }>().code).toBe("PERMISSION_DENIED");
+    }
+    expect(calls.claims).toEqual(["ada"]);
     await app.close();
   });
 

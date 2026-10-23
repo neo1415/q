@@ -46,6 +46,7 @@ import type { CompanyService } from "@capital-q/companies";
 import type { InvestorService } from "@capital-q/investors";
 import {
   normaliseHandle,
+  PersonQCardNotYoursError,
   type PublicIdentityService,
 } from "@capital-q/public-identity";
 import { UserIdSchema, type PersonProfile } from "@capital-q/security";
@@ -243,14 +244,33 @@ const InvestorUpdate = z
 const RepresentativeMe = investorBody(
   UpsertMyInvestorRepresentativeRequestSchema,
 );
-// Organisations only: a person's own card is made and changed by that
-// person on their profile, never as an organisation's action.
+// The card page's request: an organisation's card, or the person's own
+// (owner 2026-10-23: every user has their own card). A PERSON subject is
+// only ever the signed-in person (ownCardSubject); Q's tools resolve
+// organisations only (ownSubject), so no organisation action reaches one.
 const QCardSubject = z
   .object({
-    subjectType: QCardSubjectTypeSchema.exclude(["PERSON"]),
+    subjectType: QCardSubjectTypeSchema,
     subjectId: UuidSchema,
   })
   .strict();
+
+/**
+ * The subject a card request may act on. A person's card is theirs alone:
+ * the id named must be the signed-in person's own, refused (403) otherwise,
+ * and the subject used is always the session's id, never the request's.
+ * Organisations are decided by the public-identity service, as before.
+ */
+function ownCardSubject(
+  context: AppActionContext,
+  subject: z.infer<typeof QCardSubject>,
+): z.infer<typeof QCardSubject> {
+  if (subject.subjectType !== "PERSON") return subject;
+  if (subject.subjectId !== context.actor.userId) {
+    throw new PersonQCardNotYoursError();
+  }
+  return { subjectType: "PERSON", subjectId: context.actor.userId };
+}
 const HandleClaim = z
   .object({ subject: QCardSubject, input: ClaimHandleRequestSchema })
   .strict();
@@ -323,17 +343,19 @@ async function ownSubject(
 }
 
 const subjectTargets = (subject: {
-  readonly subjectType: "COMPANY" | "INVESTOR_ORGANISATION";
+  readonly subjectType: "COMPANY" | "INVESTOR_ORGANISATION" | "PERSON";
   readonly subjectId: string;
 }): readonly QSubjectRef[] =>
-  subject.subjectType === "COMPANY"
-    ? [{ kind: "COMPANY", companyId: subject.subjectId }]
-    : [
-        {
-          kind: "INVESTOR_ORGANISATION",
-          investorOrganisationId: subject.subjectId,
-        },
-      ];
+  subject.subjectType === "PERSON"
+    ? [{ kind: "USER", userId: subject.subjectId }]
+    : subject.subjectType === "COMPANY"
+      ? [{ kind: "COMPANY", companyId: subject.subjectId }]
+      : [
+          {
+            kind: "INVESTOR_ORGANISATION",
+            investorOrganisationId: subject.subjectId,
+          },
+        ];
 
 const fromCard = (params: Record<string, string>, body: unknown) => ({
   subject: {
@@ -955,10 +977,10 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     input: HandleClaim,
     output: serviceResult(),
     authorize: servicesDecide,
-    run: (ports, context, input) =>
+    run: async (ports, context, input) =>
       (ports.publicIdentity ?? missing("publicIdentity")).claimHandle({
         actor: context.actor,
-        subject: input.subject,
+        subject: ownCardSubject(context, input.subject),
         handle: input.input.handle,
         correlationId: context.correlationId,
       }),
@@ -1031,16 +1053,14 @@ export const PROFILE_AND_RECORDS: readonly AnyAppAction[] = [
     authorize: servicesDecide,
     run: async (ports, context, input) => {
       const cards = ports.publicIdentity ?? missing("publicIdentity");
+      const subject = ownCardSubject(context, input.subject);
       const current =
         input.atLatest === true
-          ? await cards.getCard({
-              actor: context.actor,
-              subject: input.subject,
-            })
+          ? await cards.getCard({ actor: context.actor, subject })
           : null;
       return cards.updateCard({
         actor: context.actor,
-        subject: input.subject,
+        subject,
         input: {
           ...input.input,
           expectedVersion: current?.version ?? input.input.expectedVersion,
