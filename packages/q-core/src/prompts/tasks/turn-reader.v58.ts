@@ -22,10 +22,25 @@ export const V1_ABOUT_NAMED_OTHER = `ABOUT NAMED OTHER: true when the turn is ab
 export const V58_NAMED_OTHER = `NAMED OTHER: when aboutNamedOther is true, namedOther is that company, organisation or person: name as it should be searched, spelled properly and in full however it was written or heard ("zino aviation" is "Zino Aviation"), and kind COMPANY for a company or organisation, PERSON for a person. Understand who the turn means from what it says and from the recent turns: a turn that points back ("their team", "what about him?", or a yes to Q's offer about them) means the one it points to. namedOther is null when aboutNamedOther is false, when they mean no one in particular, or when you cannot tell who. It is only ever the name of whom the turn is about: never a word of a reply, an agreement, a greeting or a sound, never their own company, never Capital Q.
 `;
 
-if (TURN_READER_V57.template.split(V1_ABOUT_NAMED_OTHER).length !== 2) {
-  throw new Error(
-    "TURN_READER v58 extends v1's ABOUT NAMED OTHER rule, which changed",
-  );
+/**
+ * Lane 4 (shared bump, 2026-10-23): an investor asking which companies to
+ * look into, invest in or meet is asking what suits them -- read by meaning,
+ * so routing needs no phrase list -- and a FIT ranking against their
+ * mandate says so.
+ */
+export const V36_MANDATE_RELEVANT = `mandateRelevant: true when they tie it to their mandate or to themselves.`;
+export const V58_SUITS_THEM = ` Asking which companies they should look at, look into, invest in, consider or meet, or for recommendations or suggestions of companies, is asking what suits them: ranking FIT and mandateRelevant true, whatever the words.`;
+export const V36_FIT_ONLY_PREVIOUS = `for FIT only previous, true when they mean the companies Q just showed, as in "which has the strongest fit" right after a list; otherwise null)`;
+export const V58_FIT_MANDATE = `for FIT only previous, true when they mean the companies Q just showed, as in "which has the strongest fit" right after a list, and mandateRelevant, true when they ask to rank or score against their mandate or for themselves ("rank them for me", "top three based on my mandate"); otherwise null)`;
+
+for (const rule of [
+  V1_ABOUT_NAMED_OTHER,
+  V36_MANDATE_RELEVANT,
+  V36_FIT_ONLY_PREVIOUS,
+]) {
+  if (TURN_READER_V57.template.split(rule).length !== 2) {
+    throw new Error(`TURN_READER v58 extends a rule that changed: ${rule}`);
+  }
 }
 
 export const TURN_READER_V58: PromptDefinition<
@@ -36,7 +51,7 @@ export const TURN_READER_V58: PromptDefinition<
   version: 58,
   status: "ACTIVE",
   changeDescription:
-    "Production 2026-10-23 ('Yes' searched and pictured as a company): v57 plus namedOther {name, kind} -- the company, organisation or person the turn is about, named by the reader from meaning and the recent turns (a yes to an offer about them, 'their team'), null when no one in particular; code searches and pictures only that, never a name guessed from capital letters or word lists.",
+    "Production 2026-10-23 ('Yes' searched and pictured as a company): v57 plus namedOther {name, kind} -- the company, organisation or person the turn is about, named by the reader from meaning and the recent turns (a yes to an offer about them, 'their team'), null when no one in particular; code searches and pictures only that, never a name guessed from capital letters or word lists. Shared with Lane 4: asking which companies to look into, invest in, consider or meet (or for recommendations) is DISCOVER ranking FIT with mandateRelevant true, and a FIT ranking against their mandate or for themselves carries mandateRelevant true -- by meaning, no phrase lists.",
   effectiveFrom: "2026-10-23",
   output: {
     kind: "STRUCTURED",
@@ -44,8 +59,8 @@ export const TURN_READER_V58: PromptDefinition<
     schemaVersion: TURN_READER_V58_SCHEMA_VERSION,
     schema: TurnReaderV58ResultSchema,
   },
-  template: TURN_READER_V57.template.replace(
-    V1_ABOUT_NAMED_OTHER,
-    `${V1_ABOUT_NAMED_OTHER}${V58_NAMED_OTHER}`,
-  ),
+  template: TURN_READER_V57.template
+    .replace(V1_ABOUT_NAMED_OTHER, `${V1_ABOUT_NAMED_OTHER}${V58_NAMED_OTHER}`)
+    .replace(V36_MANDATE_RELEVANT, `${V36_MANDATE_RELEVANT}${V58_SUITS_THEM}`)
+    .replace(V36_FIT_ONLY_PREVIOUS, V58_FIT_MANDATE),
 };

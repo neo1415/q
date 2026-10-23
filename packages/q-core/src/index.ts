@@ -1690,6 +1690,8 @@ export {
   TURN_READER_V58,
   V1_ABOUT_NAMED_OTHER,
   V58_NAMED_OTHER,
+  V58_SUITS_THEM,
+  V58_FIT_MANDATE,
 } from "./prompts/tasks/turn-reader.v58.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 

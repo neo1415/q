@@ -5,7 +5,9 @@ import {
   TURN_READER_V58,
   TurnReaderV58ResultSchema,
   V1_ABOUT_NAMED_OTHER,
+  V58_FIT_MANDATE,
   V58_NAMED_OTHER,
+  V58_SUITS_THEM,
   createDefaultPromptRegistry,
 } from "../src/index.js";
 
@@ -16,15 +18,22 @@ import {
  * guesses no name from capital letters or word lists.
  */
 describe("TURN_READER v58: the reader names whom the turn is about", () => {
-  it("is the active reader, v57 kept whole plus the NAMED OTHER rule", () => {
+  it("is the active reader: v57 plus the NAMED OTHER rule and Lane 4's two mandate sentences", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
     expect(active.definition.version).toBe(58);
     expect(TURN_READER_V57.status).toBe("DEPRECATED");
     expect(TURN_READER_V58.template).toContain(
       `${V1_ABOUT_NAMED_OTHER}${V58_NAMED_OTHER}`,
     );
-    expect(TURN_READER_V58.template.replace(V58_NAMED_OTHER, "")).toBe(
-      TURN_READER_V57.template,
+    expect(TURN_READER_V58.template).toContain(V58_SUITS_THEM);
+    expect(TURN_READER_V58.template).toContain(V58_FIT_MANDATE);
+  });
+
+  it("reads which companies suit an investor by meaning (shared with Lane 4)", () => {
+    expect(V58_SUITS_THEM).toMatch(/ranking FIT and mandateRelevant true/u);
+    expect(V58_SUITS_THEM).toMatch(/whatever the words/u);
+    expect(V58_FIT_MANDATE).toMatch(
+      /and mandateRelevant, true when they ask to rank or score against their mandate/u,
     );
   });
 
