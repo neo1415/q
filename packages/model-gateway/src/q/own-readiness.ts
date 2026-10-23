@@ -179,10 +179,17 @@ function firstSentence(item: string): string {
 }
 
 export function afterLeadLines(text: string, leadLines: string): string {
+  // A numbered item without its number; a plain lead line as it is (live
+  // 2026-10-23: "Halyard Security is a seed-stage company based in
+  // Edinburgh…" was said by code first and then again by the model, and
+  // only numbered items were ever recognised as repeats).
   const items = leadLines
     .split("\n")
-    .map((line) => /^\d+[.)]\s+(.+)$/u.exec(line.trim())?.[1]?.trim())
-    .filter((item): item is string => item !== undefined && item.length > 0);
+    .map((line) => {
+      const trimmed = line.trim();
+      return /^\d+[.)]\s+(.+)$/u.exec(trimmed)?.[1]?.trim() ?? trimmed;
+    })
+    .filter((item) => item.length > 0);
   let rest = text.trimStart();
   for (;;) {
     const unnumbered = rest.replace(/^\d+[.)]\s+/u, "");
