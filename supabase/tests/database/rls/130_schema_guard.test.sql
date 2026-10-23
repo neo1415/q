@@ -307,6 +307,7 @@ insert into rls_inventory (schema_name, table_name, classification, authenticate
   ('recommendation', 'refresh_requests',        'INTERNAL_SERVER_ONLY', '{}'),
   ('recommendation', 'interaction_events',     'INTERNAL_SERVER_ONLY', '{}'),
   ('recommendation', 'interaction_state',      'INTERNAL_SERVER_ONLY', '{}'),
+  ('recommendation', 'fx_reference_rates',     'INTERNAL_SERVER_ONLY', '{}'),
   ('events', 'outbox',                     'INTERNAL_SERVER_ONLY', '{}'),
   ('audit', 'material_actions',            'INTERNAL_SERVER_ONLY', '{}'),
   ('gateq', 'application_contacts', 'INTERNAL_SERVER_ONLY', '{}'),

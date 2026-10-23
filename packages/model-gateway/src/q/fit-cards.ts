@@ -233,7 +233,13 @@ function cardOf(fit: RunFit): Omit<QAnswerCard, "key" | "hue"> {
       ? sentence(mismatch.reason)
       : unknown === undefined
         ? null
-        : sentence(`${FIT_PARAMETER_LABELS[unknown.parameter]} not known yet`);
+        : // Owner 23 Oct 2026: the row's own reason (cheque: "the round is
+          // in GBP and your cheque in EUR"), never a generic "not known".
+          unknown.unknownReason !== undefined
+          ? sentence(unknown.reason)
+          : sentence(
+              `${FIT_PARAMETER_LABELS[unknown.parameter]} not known yet`,
+            );
   const reasons = [...pros.slice(0, con === null ? 3 : 2)];
   if (con !== null) reasons.push(con);
   const measures = fit.profile.parameters

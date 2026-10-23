@@ -220,4 +220,35 @@ describe("R2: Q's company card says the raise the Discover card says", () => {
   it("without the read, the disclosed raise as before", () => {
     expect(cardRaiseWords({ raise: money })).toBe("$4 million");
   });
+
+  // Owner 23 Oct 2026 (Halyard): the card says the row's own reason, not
+  // a generic "Cheque compatibility not known yet" Q then explained wrongly.
+  it("an unknown cheque row says its exact reason on the card", () => {
+    const halyard = fitFixture(
+      "4b1d5a9e-2f1c-4c1e-9a51-0c6b3e2a7d11",
+      "Halyard Security",
+      { STAGE: "STRONG", SECTOR: "STRONG", GEOGRAPHY: "STRONG" },
+    );
+    const data = halyard.result.data as {
+      profile: { parameters: Record<string, unknown>[] };
+    };
+    data.profile.parameters = data.profile.parameters.map((p) =>
+      p["parameter"] === "CHEQUE_SIZE"
+        ? {
+            ...p,
+            reason:
+              "Raising £3M; your cheque is in EUR and no exchange rate is stored, so not compared.",
+            unknownReason: "CURRENCY_DIFFERS_NO_RATE",
+          }
+        : p,
+    );
+    const card = fitSweepCardsBlock(fitsInOutcome(halyard), "Mandate fit")
+      ?.cards[0];
+    expect(card?.reasons).toContain(
+      "Raising £3M; your cheque is in EUR and no exchange rate is stored, so not compared.",
+    );
+    expect(card?.reasons.join(" ")).not.toContain(
+      "Cheque compatibility not known yet",
+    );
+  });
 });

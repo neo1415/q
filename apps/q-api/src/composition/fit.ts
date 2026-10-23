@@ -11,6 +11,7 @@ import type { DatabaseExecutor } from "@capital-q/database";
 import {
   createFitInputSource,
   createFitService,
+  createPostgresFxReferenceRates,
   statedEvidenceFrom,
   type CompanyRaiseReader,
   type EligibilityPorts,
@@ -20,7 +21,11 @@ import {
   type FitProfileItem,
   type FitService,
   type FitStatedEvidence,
+  type FxReferenceRates,
 } from "@capital-q/discovery";
+
+/** How long a read of the stored reference rates is kept (they change daily). */
+const FX_KEEP_MS = 10 * 60 * 1000;
 import type { Logger } from "@capital-q/observability";
 import {
   actorPrincipal,
@@ -141,7 +146,23 @@ export function createFitComposition(
   };
 
   const cards = createPostgresPublicIdentityRepository();
+  // Owner 23 Oct 2026: the latest stored ECB reference rates (written by
+  // the workers' daily fetch; never a provider call here), kept for a few
+  // minutes so a feed of fits reads them once.
+  const fxStore = createPostgresFxReferenceRates({ sql: dependencies.sql });
+  let fxKept: {
+    readonly at: number;
+    readonly rates: Promise<FxReferenceRates | null>;
+  } | null = null;
+  const fxRates = (): Promise<FxReferenceRates | null> => {
+    const now = Date.now();
+    if (fxKept === null || now - fxKept.at > FX_KEEP_MS) {
+      fxKept = { at: now, rates: fxStore.latest().catch(() => null) };
+    }
+    return fxKept.rates;
+  };
   const inputs = createFitInputSource({
+    fxRates,
     sql: dependencies.sql,
     eligibilityPorts: dependencies.eligibilityPorts,
     identities: async (companyIds) => {

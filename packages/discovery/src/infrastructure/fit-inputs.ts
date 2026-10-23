@@ -10,6 +10,7 @@ import type {
 import type { DeclaredFitFacts } from "../fit/observe.js";
 import type { FitCompanyInputs, FitInputSource } from "../fit/service.js";
 import type { FitStatedEvidence } from "../fit/stated.js";
+import type { FxReferenceRates } from "../fx/ecb.js";
 import type { FilterMoney } from "../slates/filters.js";
 
 import { readCurrentFeatureSnapshot } from "./postgres-feature-snapshot-store.js";
@@ -64,6 +65,12 @@ export type FitInputSourceDependencies = {
         companyIds: readonly string[],
       ) => Promise<ReadonlyMap<string, FitStatedEvidence>>)
     | undefined;
+  /**
+   * Owner 23 Oct 2026: the latest stored ECB reference rates, so a round in
+   * another currency than the cheque is compared as an estimate. Reference
+   * data only, read from storage (never a provider call per request).
+   */
+  readonly fxRates?: (() => Promise<FxReferenceRates | null>) | undefined;
 };
 
 const MODE = "INVESTOR_DISCOVER";
@@ -74,39 +81,50 @@ export function createFitInputSource(
   return {
     read: async (query) => {
       const ids = [...query.companyIds];
-      const [mandate, facts, identities, raises, snapshots, models, stated] =
-        await Promise.all([
-          dependencies.eligibilityPorts.mandates.activeMandate({
-            tenantId: query.actor.tenantId,
-            investorOrganisationId: query.investorOrganisationId,
-            mandateId: query.mandateId,
-          }),
-          dependencies.eligibilityPorts.companies.findMany(ids),
-          dependencies.identities(ids),
-          dependencies.raises === undefined
-            ? Promise.resolve(new Map<string, FilterMoney>())
-            : dependencies
-                .raises(query.actor, ids)
-                .catch(() => new Map<string, FilterMoney>()),
-          Promise.all(
-            ids.map((companyId) =>
-              readCurrentFeatureSnapshot(dependencies.sql, {
-                investorOrganisationId: query.investorOrganisationId,
-                mandateId: query.mandateId,
-                companyId,
-                mode: MODE,
-              }),
-            ),
+      const [
+        mandate,
+        facts,
+        identities,
+        raises,
+        snapshots,
+        models,
+        stated,
+        fx,
+      ] = await Promise.all([
+        dependencies.eligibilityPorts.mandates.activeMandate({
+          tenantId: query.actor.tenantId,
+          investorOrganisationId: query.investorOrganisationId,
+          mandateId: query.mandateId,
+        }),
+        dependencies.eligibilityPorts.companies.findMany(ids),
+        dependencies.identities(ids),
+        dependencies.raises === undefined
+          ? Promise.resolve(new Map<string, FilterMoney>())
+          : dependencies
+              .raises(query.actor, ids)
+              .catch(() => new Map<string, FilterMoney>()),
+        Promise.all(
+          ids.map((companyId) =>
+            readCurrentFeatureSnapshot(dependencies.sql, {
+              investorOrganisationId: query.investorOrganisationId,
+              mandateId: query.mandateId,
+              companyId,
+              mode: MODE,
+            }),
           ),
-          businessModelsOf(dependencies.sql, ids, query.mandateId).catch(
-            () => EMPTY_MODELS,
-          ),
-          dependencies.stated === undefined
-            ? Promise.resolve(new Map<string, FitStatedEvidence>())
-            : dependencies
-                .stated(query.actor, ids)
-                .catch(() => new Map<string, FitStatedEvidence>()),
-        ]);
+        ),
+        businessModelsOf(dependencies.sql, ids, query.mandateId).catch(
+          () => EMPTY_MODELS,
+        ),
+        dependencies.stated === undefined
+          ? Promise.resolve(new Map<string, FitStatedEvidence>())
+          : dependencies
+              .stated(query.actor, ids)
+              .catch(() => new Map<string, FitStatedEvidence>()),
+        dependencies.fxRates === undefined
+          ? Promise.resolve(null)
+          : dependencies.fxRates().catch(() => null),
+      ]);
       const fromMandate =
         mandate.kind === "FOUND" ? mandateFacts(mandate.mandate) : {};
       // The mandate's business-model taxonomy preferences (b2b_saas, …) are
@@ -142,14 +160,25 @@ export function createFitInputSource(
           companyPlace: place,
           statedRound: said?.statedRound ?? null,
           round:
-            raise === undefined
-              ? null
-              : {
+            raise !== undefined
+              ? {
                   amount: raise.amount,
                   currency: raise.currency,
                   // A raise the founder declared on their capital objective.
                   evidenceStatus: "SELF_REPORTED",
-                },
+                  source: "SHARED",
+                }
+              : said?.pitchMoney !== null && said?.pitchMoney !== undefined
+                ? {
+                    // Owner 23 Oct 2026: the raise said in a pitch this
+                    // reader may play counts, recorded as from the pitch.
+                    amount: said.pitchMoney.amount,
+                    currency: said.pitchMoney.currency,
+                    evidenceStatus: "SELF_REPORTED",
+                    source: "PITCH",
+                  }
+                : null,
+          fx,
         };
         out.set(companyId, {
           snapshot: snapshots[index] ?? null,
@@ -181,6 +210,14 @@ function mandateFacts(mandate: {
         readonly maxStageCode: string | null;
       }
     | undefined;
+  readonly cheque?:
+    | {
+        readonly currency: string;
+        readonly min?: string | undefined;
+        readonly max?: string | undefined;
+      }
+    | null
+    | undefined;
 }): DeclaredFitFacts {
   const codes = (
     dimension: string,
@@ -193,10 +230,28 @@ function mandateFacts(mandate: {
   const typical = mandate.constraints.find(
     (c) => c.dimension === "cheque.typical" && c.value.kind === "amount",
   );
-  const cheque =
+  // The declared range too (owner 23 Oct 2026): a mandate with a min and
+  // max but no typical cheque is still a cheque size, in its own currency.
+  const range = mandate.cheque ?? null;
+  const typicalAmount =
     typical !== undefined && typical.value.kind === "amount"
-      ? { currency: typical.value.currency, typical: typical.value.amount }
+      ? { currency: typical.value.currency, amount: typical.value.amount }
       : null;
+  const currency = typicalAmount?.currency ?? range?.currency ?? null;
+  const sameCurrency = range !== null && range.currency === currency;
+  const cheque =
+    currency === null
+      ? null
+      : {
+          currency,
+          ...(typicalAmount === null ? {} : { typical: typicalAmount.amount }),
+          ...(sameCurrency && range.min !== undefined
+            ? { min: range.min }
+            : {}),
+          ...(sameCurrency && range.max !== undefined
+            ? { max: range.max }
+            : {}),
+        };
 
   const roles = new Set(
     codes(

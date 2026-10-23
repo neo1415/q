@@ -195,11 +195,36 @@ export const FIT_CONFIG_V4: FitConfig = deepFreeze(
   }),
 );
 
+/**
+ * Fit profile `ranking-config.v6` (owner 23 Oct 2026; v5 is the slate
+ * ranking config): v4's weights, bands, confidence and comparators
+ * unchanged. What changed is how cheque size reads its inputs: a round the
+ * company stated in a pitch this reader may play counts, recorded as from
+ * the pitch; a round in another currency is compared as an ESTIMATE at
+ * the stored, dated ECB reference rate and says so; and an unknown names
+ * its exact reason. Reason sentences are fit-reasons.v2. v4 stays
+ * published, unedited.
+ */
+export const FIT_CONFIG_V6: FitConfig = deepFreeze(
+  FitConfigSchema.parse({
+    ...FIT_CONFIG_V4,
+    version: "ranking-config.v6",
+    label: "6",
+    extends: "ranking-config.v4",
+    reasonTemplatesVersion: "fit-reasons.v2",
+    description:
+      "Initial, heuristic, uncalibrated fit profile, v4's weights and rules: stage, geography, sector, thesis, cheque size, business model, traction, team and round terms, averaged over KNOWN parameters only. Cheque size reads a shared round, or one stated in a pitch the reader may play; across currencies it is an ESTIMATE at the dated ECB reference rate, never exact. Unknown is never zero. Not a probability, not a quality score, never shown as a number.",
+  }),
+);
+
 /** The config new profiles are computed under. */
-export const FIT_CONFIG_CURRENT: FitConfig = FIT_CONFIG_V4;
+export const FIT_CONFIG_CURRENT: FitConfig = FIT_CONFIG_V6;
 
 /** Every published fit config, oldest first; never edited. */
-export const FIT_CONFIGS: readonly FitConfig[] = Object.freeze([FIT_CONFIG_V4]);
+export const FIT_CONFIGS: readonly FitConfig[] = Object.freeze([
+  FIT_CONFIG_V4,
+  FIT_CONFIG_V6,
+]);
 
 export function fitConfigByVersion(version: string): FitConfig | null {
   return FIT_CONFIGS.find((c) => c.version === version) ?? null;
