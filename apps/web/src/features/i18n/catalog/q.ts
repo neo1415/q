@@ -45,6 +45,8 @@ export const Q_AR: Readonly<Record<string, string>> = {
   Chart: "رسم بياني",
   Picture: "صورة",
   "Photo by": "صورة بواسطة",
+  From: "من",
+  "Public image, not a verified identity": "صورة عامة، وليست هوية موثّقة",
   Chats: "المحادثات",
   Checks: "الفحوصات",
   "Close the Board": "إغلاق اللوحة",

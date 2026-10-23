@@ -201,6 +201,9 @@ function build(options: {
     Parameters<typeof createModelGatewayQAnswer>[0]["askerOf"] | undefined;
   /** What Q said earlier in this conversation. */
   readonly earlierQ?: string | undefined;
+  readonly publicPictures?: Parameters<
+    typeof createModelGatewayQAnswer
+  >[0]["publicPictures"];
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -289,6 +292,9 @@ function build(options: {
     tools: options.tools,
     statements: options.statements,
     ...(options.askerOf === undefined ? {} : { askerOf: options.askerOf }),
+    ...(options.publicPictures === undefined
+      ? {}
+      : { publicPictures: options.publicPictures }),
   });
   const request: QAnswerRequest = {
     runId: RUN as QAnswerRequest["runId"],
@@ -1836,5 +1842,88 @@ describe("Capital Q and the public web together (owner 2026-10-23)", () => {
     expect(web.executed.map((p) => p.name)).not.toContain(
       "research_public_web",
     );
+  });
+});
+
+describe("pictures of who the turn names, from public pages (owner 2026-10-23)", () => {
+  it("looks for them beside the web search and shows them after the words, credited to their pages", async () => {
+    const asked: { name: string; userText: string }[] = [];
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      researchOutcome(p, "Zino Aviation flies charter."),
+    );
+    const { seam, request, answerBlocks } = build({
+      script: [
+        { kind: "JSON", value: analystResult("Zino Aviation flies charter.") },
+      ],
+      tools: tools.port,
+      userText: "Who runs Zino Aviation?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: (input) => {
+          asked.push({ name: input.name, userText: input.userText });
+          return Promise.resolve([
+            {
+              imageUrl: "https://cdn.nairametrics.com/zino.jpg",
+              pageUrl: "https://nairametrics.com/2024/05/interview/",
+              domain: "nairametrics.com",
+              title: "Interview: Captain Zino Mario on Zino Aviation",
+            },
+          ]);
+        },
+      },
+    });
+    expect(
+      (await seam.answer({ ...request, aboutNamedOther: true })).kind,
+    ).toBe("ANSWERED");
+    expect(asked).toEqual([
+      { name: "Zino Aviation", userText: "Who runs Zino Aviation?" },
+    ]);
+    const pictures = answerBlocks.filter(
+      (block) => (block as { kind?: string }).kind === "PICTURE",
+    );
+    expect(pictures).toEqual([
+      expect.objectContaining({
+        source: "PUBLIC_WEB",
+        url: "https://cdn.nairametrics.com/zino.jpg",
+        pageUrl: "https://nairametrics.com/2024/05/interview/",
+        credit: {
+          name: "nairametrics.com",
+          url: "https://nairametrics.com/2024/05/interview/",
+        },
+      }),
+    ]);
+  });
+
+  it("looks for none when the turn names no one", async () => {
+    let asked = 0;
+    const tools = toolPort([RESEARCH], (p) => researchOutcome(p, "x"));
+    const { seam, request } = build({
+      script: [{ kind: "JSON", value: analystResult("Markets moved.") }],
+      tools: tools.port,
+      userText: "what moved in fintech this week?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () => {
+          asked += 1;
+          return Promise.resolve([]);
+        },
+      },
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(asked).toBe(0);
   });
 });

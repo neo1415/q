@@ -293,6 +293,34 @@ describe("QResultBlock", () => {
     expect(parses({ caption: "a claim" })).toBe(false);
   });
 
+  it("shows a public page's picture over https from any host, credited to that page (owner 2026-10-23)", () => {
+    const picture = {
+      kind: "PICTURE",
+      url: "https://cdn.nairametrics.com/2024/zino-mario.jpg",
+      alt: "Interview: Captain Zino Mario on Zino Aviation",
+      credit: {
+        name: "nairametrics.com",
+        url: "https://nairametrics.com/2024/05/interview/",
+      },
+      source: "PUBLIC_WEB",
+      pageUrl: "https://nairametrics.com/2024/05/interview/",
+      retrievedAt: "2026-10-23T08:00:00.000Z",
+    };
+    const parses = (change: Record<string, unknown>) =>
+      QResultBlockSchema.safeParse({ ...picture, ...change }).success;
+    expect(parses({})).toBe(true);
+    expect(parses({ url: "http://cdn.nairametrics.com/a.jpg" })).toBe(false);
+    expect(parses({ url: "javascript:alert(1)" })).toBe(false);
+    expect(parses({ pageUrl: "http://nairametrics.com/a" })).toBe(false);
+    // A Pexels block still names only Pexels' own hosts.
+    expect(
+      QResultBlockSchema.safeParse({
+        ...(BLOCK_FIXTURES["PICTURE"] as Record<string, unknown>),
+        url: "https://cdn.nairametrics.com/a.jpg",
+      }).success,
+    ).toBe(false);
+  });
+
   it("treats script-looking text as text, with no executable kind", () => {
     const parsed = QResultBlockSchema.parse({
       kind: "TEXT",

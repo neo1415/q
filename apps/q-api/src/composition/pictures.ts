@@ -2,12 +2,17 @@ import {
   createPexelsPictureProvider,
   type StockPictureProvider,
 } from "@capital-q/model-gateway/images/stock";
-import type { QPicturePort } from "@capital-q/model-gateway/q";
+import type {
+  QPicturePort,
+  QPublicPicturePort,
+} from "@capital-q/model-gateway/q";
 import {
   composeEgressQuery,
+  createPublicPictureSearch,
   isConnective,
   tokenise,
 } from "@capital-q/q-research";
+import { createDetectingImageSearch } from "@capital-q/q-research/providers/images";
 
 /**
  * L-13 (owner ask 2026-10-20): pictures for Q's answers, from Pexels (the
@@ -61,4 +66,33 @@ export function createPexelsQPictures(
   fetchImpl: typeof fetch = fetch,
 ): QPicturePort | undefined {
   return createQPictures(createPexelsPictureProvider(apiKey, fetchImpl));
+}
+
+/**
+ * Owner 2026-10-23: pictures of the company or person a turn names, from
+ * public pages, through the SERP key the web search already uses (its
+ * image results). Unlike a stock illustration this search is about them,
+ * so it carries their name -- the same name, through the same egress
+ * policy, that the turn's web search already sends to the same vendor.
+ * Undefined without a usable key: answers go without these pictures.
+ */
+export function createPublicQPictures(
+  apiKey: string | undefined,
+  logger?: {
+    readonly warn: (
+      fields: Readonly<Record<string, unknown>>,
+      message: string,
+    ) => void;
+  },
+  fetchImpl: typeof fetch = fetch,
+): QPublicPicturePort | undefined {
+  const key = apiKey?.trim();
+  if (key === undefined || key.length < 16 || key.startsWith("disabled")) {
+    return undefined;
+  }
+  const search = createPublicPictureSearch({
+    provider: createDetectingImageSearch({ apiKey: key, fetch: fetchImpl }),
+    ...(logger === undefined ? {} : { logger }),
+  });
+  return { find: (input) => search.find(input) };
 }

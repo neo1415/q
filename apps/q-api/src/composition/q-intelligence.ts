@@ -271,6 +271,8 @@ export type QIntelligenceDependencies = {
   readonly visibility?: QVisibilityNotebook | undefined;
   /** L-13: credited pictures for answers; absent, none are shown. */
   readonly pictures?: ModelGatewayQAnswerDependencies["pictures"];
+  /** Pictures of who a turn names, from public pages; absent, none. */
+  readonly publicPictures?: ModelGatewayQAnswerDependencies["publicPictures"];
   readonly logger?: Logger | undefined;
 };
 
@@ -382,6 +384,9 @@ export function composeQIntelligence(
     ...(dependencies.pictures === undefined
       ? {}
       : { pictures: dependencies.pictures }),
+    ...(dependencies.publicPictures === undefined
+      ? {}
+      : { publicPictures: dependencies.publicPictures }),
     // K Part 4: their own mandate read, kept per actor (Tier A) while D's
     // version for it is current; F's scope key, epoch read per request.
     ownMandateReads: createOwnMandateReads({
