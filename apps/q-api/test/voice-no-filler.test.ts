@@ -26,9 +26,18 @@ import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
 import {
   createVoiceTurnHandler,
+  DURABLE_STAGES,
   SPOKEN_SILENCE_LADDER,
   SPOKEN_WHILE_WORKING_BEATS,
 } from "../src/voice/turn.js";
+
+/**
+ * Every stage of an answer. A document's stages are durable work, handed
+ * off by the line (voice-durable-document.test.ts), not waited on.
+ */
+const ANSWER_STAGES = Q_VISIBLE_STAGES.filter(
+  (stage) => !DURABLE_STAGES.has(stage),
+);
 
 /**
  * No spoken fillers (founder live test 2026-09-27, failure 10; R38).
@@ -159,9 +168,7 @@ describe("nothing is spoken unless it is part of the answer", () => {
       const handle = createVoiceTurnHandler({
         qRuntime: runtime(),
         qStream: stream([
-          ...Q_VISIBLE_STAGES.map((stage) =>
-            event("q.stage.changed", { stage }),
-          ),
+          ...ANSWER_STAGES.map((stage) => event("q.stage.changed", { stage })),
           ...answer.map((text) =>
             event("q.message.delta", { messageId: "m1", text }),
           ),
@@ -235,7 +242,7 @@ describe("while Q works it says where it is, and nothing else (owner 2026-10-20;
         qRuntime: runtime(),
         qStream: slowStream(
           [
-            ...Q_VISIBLE_STAGES.map((stage) =>
+            ...ANSWER_STAGES.map((stage) =>
               event("q.stage.changed", { stage }),
             ),
             event("q.message.delta", { messageId: "m1", text: answer }),
@@ -262,7 +269,7 @@ describe("while Q works it says where it is, and nothing else (owner 2026-10-20;
         voice,
       );
       // Every stage, each two seconds apart: well past any ladder rung.
-      await vi.advanceTimersByTimeAsync((Q_VISIBLE_STAGES.length + 4) * 2_000);
+      await vi.advanceTimersByTimeAsync((ANSWER_STAGES.length + 4) * 2_000);
       await turn;
       const said = voice.spoken.filter((line) => line.length > 0);
       // The answer is said once, last, whole.

@@ -240,7 +240,10 @@ import {
   createPostgresUsageReader,
   monthOf,
 } from "@capital-q/model-gateway";
-import { createGoogleModelProvider } from "@capital-q/model-gateway/providers/google";
+import {
+  createGoogleModelProvider,
+  geminiEnabled,
+} from "@capital-q/model-gateway/providers/google";
 import { createWordsReaders } from "@capital-q/model-gateway/q";
 import { createGroqModelProvider } from "@capital-q/model-gateway/providers/groq";
 import { createOpenAIModelProvider } from "@capital-q/model-gateway/providers/openai";
@@ -675,7 +678,8 @@ const gateq = createGateQService({
  */
 const gateqProviderSecrets = config.secrets.modelProviders;
 const gateqModelProviders: ModelProvider[] = [];
-if (gateqProviderSecrets.google !== undefined) {
+// Owner 2026-10-23: Gemini is unpaid; off unless CQ_GEMINI_ENABLED=1.
+if (gateqProviderSecrets.google !== undefined && geminiEnabled(process.env)) {
   gateqModelProviders.push(
     createGoogleModelProvider({
       apiKey: gateqProviderSecrets.google.reveal(),

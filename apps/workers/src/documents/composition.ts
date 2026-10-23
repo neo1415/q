@@ -14,6 +14,7 @@ import {
   type ImageProvider,
 } from "@capital-q/model-gateway/images";
 import { createGoogleImageProvider } from "@capital-q/model-gateway/images/google";
+import { geminiEnabled } from "@capital-q/model-gateway/providers/google";
 import { createOpenAIImageProvider } from "@capital-q/model-gateway/images/openai";
 import { createPexelsStockPhotoProvider } from "@capital-q/model-gateway/images/stock";
 import type { Logger } from "@capital-q/observability";
@@ -80,11 +81,12 @@ export function composeDocumentJobs(dependencies: {
     logger,
   });
 
-  // Gemini first: the founder funds a billed Gemini account for pictures;
-  // the small OpenAI top-up is only the fallback.
+  // Gemini first only when CQ_GEMINI_ENABLED=1 (it is unpaid since
+  // 2026-10-23); otherwise pictures are made by OpenAI.
   const providers: ImageProvider[] = [];
   const google = dependencies.providerSecrets.google?.reveal();
-  if (usable(google))
+  // Owner 2026-10-23: Gemini is unpaid; off unless CQ_GEMINI_ENABLED=1.
+  if (usable(google) && geminiEnabled(dependencies.env))
     providers.push(createGoogleImageProvider({ apiKey: google }));
   const openai = dependencies.providerSecrets.openai?.reveal();
   if (usable(openai))
