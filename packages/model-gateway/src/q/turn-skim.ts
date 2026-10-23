@@ -4,9 +4,9 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnSkimResultSchema,
+  TurnSkimV6ResultSchema,
   type PromptRegistry,
-  type TurnSkimResult,
+  type TurnSkimV6Result,
   type TurnSkimV3Variables,
 } from "@capital-q/q-core";
 
@@ -62,8 +62,16 @@ export type QTurnSkimInput = {
   readonly signal?: AbortSignal | undefined;
 };
 
+/**
+ * One skim. `subject` (v6) is optional here so a skim without it still
+ * fits; absent is none.
+ */
+export type QTurnSkim = Omit<TurnSkimV6Result, "subject"> & {
+  readonly subject?: TurnSkimV6Result["subject"] | undefined;
+};
+
 export type QTurnSkimmer = {
-  readonly skim: (input: QTurnSkimInput) => Promise<TurnSkimResult | null>;
+  readonly skim: (input: QTurnSkimInput) => Promise<QTurnSkim | null>;
 };
 
 export function createTurnSkimmer(dependencies: {
@@ -102,7 +110,7 @@ export function createTurnSkimmer(dependencies: {
             ).slice(0, 1_500),
           },
         });
-        const response = await dependencies.gateway.execute<TurnSkimResult>(
+        const response = await dependencies.gateway.execute<TurnSkimV6Result>(
           {
             taskClass: "FAST_CLASSIFICATION",
             reasoning: "LOW",
@@ -124,12 +132,12 @@ export function createTurnSkimmer(dependencies: {
             },
           },
           {
-            schema: TurnSkimResultSchema,
+            schema: TurnSkimV6ResultSchema,
             ...(input.signal === undefined ? {} : { signal: input.signal }),
           },
         );
         if (response.output.kind !== "STRUCTURED") return null;
-        const read = TurnSkimResultSchema.safeParse(
+        const read = TurnSkimV6ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return read.success ? read.data : null;

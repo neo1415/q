@@ -186,7 +186,7 @@ import {
   extrasMessages,
   joinExtras,
 } from "./parallel-extras.js";
-import { createReadCache, type ReadCache } from "./read-cache.js";
+import { asksForFresh, createReadCache, type ReadCache } from "./read-cache.js";
 export { outputSplitOf, type OutputSplit } from "./output-split.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
 import {
@@ -279,6 +279,7 @@ export {
 } from "./conversation-context.js";
 export {
   createTurnSkimmer,
+  type QTurnSkim,
   type QTurnSkimInput,
   type QTurnSkimmer,
 } from "./turn-skim.js";
@@ -1014,6 +1015,22 @@ const WEB_BESIDE_RECORDS_NOTE: ModelMessage = {
   content:
     'Capital Q searched the public web for this question, beside its own records; the result is above. Compose from whatever was found. When Capital Q\'s records hold something about them and the public sources do too, give the records first ("In Capital Q: …") and then the public sources ("Public sources also say: …"), naming the site and date for each public fact; keep the two apart and never present a public source as verified. When only one of them holds something, answer from that one. When neither does, say so plainly in one sentence. Never say you cannot search, browse or access the internet: the search ran. If it failed, say so in one sentence, then give what was found.',
 };
+
+/**
+ * Owner 2026-10-23 (Silo Credit: "public search found nothing" in three
+ * answers running): this conversation already searched the public web for
+ * this subject and found nothing, and the person was told. The search is
+ * not run again, and the nothing is not said again.
+ */
+const ALREADY_SEARCHED_NOTE: ModelMessage = {
+  role: "SYSTEM",
+  content:
+    "Earlier in this conversation Capital Q searched the public web for this same subject and found nothing about them, and the person was told so; the result above is that same search, not a new one. Do not say again that public sources found nothing, and do not offer to search again. Answer from Capital Q's records and the conversation; if there is nothing more to add, say so in a few words.",
+};
+
+/** How long a subject's empty public search stands for its conversation. */
+const SEARCHED_EMPTY_TTL_MS = 30 * 60_000;
+const SEARCHED_EMPTY_MAX = 1_000;
 
 /** How long the answer waits for the turn's web search, from its start. */
 const WEB_LANE_BUDGET_MS = 9_000;
@@ -2174,6 +2191,17 @@ export function createModelGatewayQAnswer(
   // tools are reads is the offer's own declaration, per run.
   const singleFlight = createSingleFlight();
   const readCache = dependencies.readCache ?? createReadCache();
+  /**
+   * Subjects a conversation already searched the public web for and found
+   * nothing about (owner 2026-10-23), keyed by tenant, conversation and the
+   * name searched: a new conversation searches, and says so, once. Only an
+   * empty search is kept, never a failure (that is tried again) and never
+   * what was found.
+   */
+  const searchedEmpty = new Map<
+    string,
+    { readonly outcome: QToolCallOutcome; readonly at: number }
+  >();
   const readOnlyByRun = new Map<string, Set<string>>();
   const noteOffer = (
     runId: string,
@@ -4189,6 +4217,8 @@ export function createModelGatewayQAnswer(
         readonly call: ReturnType<typeof researchCallOf>;
         readonly outcome: Promise<QToolCallOutcome>;
         readonly startedAt: number;
+        /** The same subject's earlier empty search in this conversation. */
+        readonly remembered?: true;
         claimed: boolean;
       } | null =
         research?.mode === "EXPLICIT" &&
@@ -4209,6 +4239,37 @@ export function createModelGatewayQAnswer(
         })
           ? (() => {
               const call = researchCallOf(4);
+              const entity = (
+                call.arguments as { readonly entityName?: unknown }
+              ).entityName;
+              const emptyKey =
+                typeof entity === "string"
+                  ? JSON.stringify([
+                      request.tenantId,
+                      latest.conversationId,
+                      entity.trim().toLowerCase(),
+                    ])
+                  : null;
+              const earlier =
+                emptyKey === null || asksForFresh(latest.content)
+                  ? undefined
+                  : searchedEmpty.get(emptyKey);
+              if (
+                earlier !== undefined &&
+                Date.now() - earlier.at < SEARCHED_EMPTY_TTL_MS
+              ) {
+                logger?.info(
+                  { qRunId: request.runId, entity },
+                  "q early web search: this conversation already found nothing on it",
+                );
+                return {
+                  call,
+                  outcome: Promise.resolve(earlier.outcome),
+                  startedAt: Date.now(),
+                  remembered: true as const,
+                  claimed: false,
+                };
+              }
               const stage = earlyWebTool?.visibleStage;
               if (stage !== undefined && stage !== null) void stageOnce(stage);
               took("webStarted");
@@ -4245,6 +4306,20 @@ export function createModelGatewayQAnswer(
                     },
                     "q early web search landed",
                   );
+                  if (emptyKey !== null && data !== null) {
+                    searchedEmpty.delete(emptyKey);
+                    if ((data.sources?.length ?? 0) === 0) {
+                      searchedEmpty.set(emptyKey, {
+                        outcome: settled,
+                        at: Date.now(),
+                      });
+                      while (searchedEmpty.size > SEARCHED_EMPTY_MAX) {
+                        const oldest = searchedEmpty.keys().next().value;
+                        if (oldest === undefined) break;
+                        searchedEmpty.delete(oldest);
+                      }
+                    }
+                  }
                 },
                 () => undefined,
               );
@@ -4252,9 +4327,6 @@ export function createModelGatewayQAnswer(
               // 2026-10-23: "it doesn't need to find every single thing
               // before it starts talking"), not once the reads and the
               // prompt behind them are ready (live: 6.4 s).
-              const entity = (
-                call.arguments as { readonly entityName?: unknown }
-              ).entityName;
               if (
                 request.leadLines === undefined &&
                 readCache.get(call, toolContext) === null
@@ -4955,6 +5027,7 @@ export function createModelGatewayQAnswer(
           earlyLead !== null && leadLines === undefined
             ? "LEAD"
             : !researchingSaid &&
+                earlyWeb.remembered !== true &&
                 readCache.get(earlyWeb.call, toolContext) === null
               ? "RESEARCHING"
               : null;
@@ -6431,7 +6504,9 @@ export function createModelGatewayQAnswer(
             ...(prospectsThin && outcome.result.ok
               ? [PROSPECT_RESEARCH_NOTE]
               : []),
-            WEB_BESIDE_RECORDS_NOTE,
+            earlyWeb?.remembered === true && call === earlyWeb.call
+              ? ALREADY_SEARCHED_NOTE
+              : WEB_BESIDE_RECORDS_NOTE,
           ];
         };
         const writingStage: QVisibleStage =
@@ -7151,6 +7226,15 @@ export function createModelGatewayQAnswer(
           toolCalls.some((call) => call.providerName === "research_public_web")
         ) {
           messages = [...messages, SOURCE_CHANGE_NOTE];
+        }
+        // The model's own call was answered by the remembered empty search
+        // in a tool round: still not said again.
+        if (
+          earlyWeb?.remembered === true &&
+          earlyWeb.claimed &&
+          !messages.includes(ALREADY_SEARCHED_NOTE)
+        ) {
+          messages = [...messages, ALREADY_SEARCHED_NOTE];
         }
         if (analyst === undefined || final === undefined) {
           modelCalls += 1;

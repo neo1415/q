@@ -1938,6 +1938,97 @@ describe("whom the web and pictures are for is the reader's, never a guess from 
   });
 });
 
+describe("a subject the public web knows nothing about is searched and said once per conversation (owner 2026-10-23, Silo Credit)", () => {
+  const ABOUT_SILO = {
+    aboutNamedOther: true,
+    namedOther: { name: "Silo Credit", kind: "COMPANY" },
+  } as const;
+  /** A search that ran and found nothing about them. */
+  const nothingFound = (proposal: QToolProposal): QToolCallOutcome => {
+    const found = researchOutcome(proposal, "");
+    return {
+      ...found,
+      result: {
+        ok: true,
+        data: {
+          status: "NO_RESULTS",
+          query: "silo credit",
+          sources: [],
+          comparison: [],
+          truthClass: "UNKNOWN",
+        },
+      },
+    };
+  };
+
+  async function twoTurns(second: string) {
+    const said: string[] = [];
+    const tools = toolPort([GET_COMPANY, RESEARCH], nothingFound);
+    const built = build({
+      script: [
+        {
+          kind: "JSON",
+          value: analystResult("Nothing public on Silo Credit."),
+        },
+        { kind: "JSON", value: analystResult("From their records only.") },
+      ],
+      tools: tools.port,
+      userText: "Tell me about Silo Credit",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      said,
+    });
+    const first = built.seam.answer({ ...built.request, ...ABOUT_SILO });
+    expect((await first).kind).toBe("ANSWERED");
+    const saidFirst = said.length;
+    built.messages.push({
+      ...built.messages[0],
+      id: randomUUID(),
+      role: "USER",
+      content: second,
+    } as QConversationMessage);
+    expect(
+      (await built.seam.answer({ ...built.request, ...ABOUT_SILO })).kind,
+    ).toBe("ANSWERED");
+    const searches = tools.executed.filter(
+      (one) => one.proposal.name === "research_public_web",
+    );
+    const lastCall = built.alpha.calls.at(-1)?.request;
+    const notes = (lastCall?.messages ?? [])
+      .filter((message) => message.role === "SYSTEM")
+      .map((message) => String(message.content));
+    return { searches, notes, saidSecond: said.slice(saidFirst) };
+  }
+
+  it("does not search again, nor say again that nothing was found", async () => {
+    const turn = await twoTurns("What does Silo Credit do for farmers?");
+    expect(turn.searches).toHaveLength(1);
+    expect(
+      turn.notes.some((note) =>
+        note.includes("Do not say again that public sources found nothing"),
+      ),
+    ).toBe(true);
+    expect(
+      turn.notes.some((note) =>
+        note.includes("When neither does, say so plainly"),
+      ),
+    ).toBe(false);
+    // Nothing said about checking the web on the turn that does not.
+    expect(turn.saidSecond.join(" ")).not.toContain("I'm checking");
+  });
+
+  it("searches again when they ask for the latest", async () => {
+    const turn = await twoTurns("Check again for the latest on Silo Credit");
+    expect(turn.searches).toHaveLength(2);
+  });
+});
+
 describe("pictures of who the turn names, from public pages (owner 2026-10-23)", () => {
   it("looks for them beside the web search and shows them after the words, credited to their pages", async () => {
     const asked: { name: string; userText: string }[] = [];

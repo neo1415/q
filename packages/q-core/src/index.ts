@@ -1537,6 +1537,11 @@ export {
   TurnSkimV3VariablesSchema,
   ARRIVAL_ASPECTS,
   type TurnSkimResult,
+  TURN_SKIM_V6_SCHEMA_VERSION,
+  SkimSubjectSchema,
+  type SkimSubject,
+  TurnSkimV6ResultSchema,
+  type TurnSkimV6Result,
   type TurnSkimVariables,
   type TurnSkimV3Variables,
 } from "./prompts/schemas/turn-skim.js";
@@ -1694,6 +1699,7 @@ export {
   V58_FIT_MANDATE,
 } from "./prompts/tasks/turn-reader.v58.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
+export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 
 export {
   COMPANY_ANALYST_V23,

@@ -472,24 +472,47 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
       confidence: "MEDIUM",
       person: { name: "Zino Aviation", kind: "ORGANIZATION" },
     });
-    await expect.poll(() => turn.deltas.length).toBeGreaterThan(0);
-    // Said while the full reading is still out.
-    expect(turn.deltas[0]).toEqual({
-      text: "Looking into Zino Aviation now. ",
-      holding: true,
-    });
+    await expect.poll(() => turn.deltas.length).toBeGreaterThan(1);
+    // As the turn arrives, a line that names no one (a speed hint); then,
+    // while the full reading is still out, whom the skim understood.
+    expect(turn.deltas.slice(0, 2)).toEqual([
+      { text: "Looking into that now. ", holding: true },
+      { text: "Looking into Zino Aviation now. ", holding: true },
+    ]);
     turn.land();
     await turn.answering;
   });
 
-  it("says no holding line from the words alone: capitals and question words name no one (owner: no keyword triggers)", async () => {
-    for (const said of ["Tell me about Zino Aviation", "Yes", "Who Is It?"]) {
+  it("names no one from the words alone: capitals and question words are a speed hint, never a name (owner 2026-10-23)", async () => {
+    for (const said of ["Tell me about Zino Aviation", "Who Is It?"]) {
       const turn = holding(said, { kind: "OTHER", confidence: "HIGH" });
       await new Promise((resolve) => setTimeout(resolve, 20));
       turn.land();
       await turn.answering;
-      expect(turn.deltas.filter((d) => d.holding === true)).toEqual([]);
+      expect(turn.deltas.filter((d) => d.holding === true)).toEqual([
+        { text: "Looking into that now. ", holding: true },
+      ]);
     }
+    // A reply is no question: nothing is said before it is read.
+    const yes = holding("Yes", { kind: "OTHER", confidence: "HIGH" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    yes.land();
+    await yes.answering;
+    expect(yes.deltas.filter((d) => d.holding === true)).toEqual([]);
+  });
+
+  it('a "Yes" to an offer about Zino is named only as the skim understood it', async () => {
+    const turn = holding("Yes", {
+      kind: "OTHER",
+      confidence: "HIGH",
+      subject: { name: "Zino Aviation", kind: "COMPANY" },
+    });
+    await expect.poll(() => turn.deltas.length).toBeGreaterThan(0);
+    expect(turn.deltas).toEqual([
+      { text: "Looking into Zino Aviation now. ", holding: true },
+    ]);
+    turn.land();
+    await turn.answering;
   });
 
   it("answers 'take me to discover' with a NAVIGATE intent and no model answer (F8)", async () => {

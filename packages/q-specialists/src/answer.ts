@@ -364,7 +364,7 @@ import {
   namedRecordRequestOf,
   ownCounterpartWithin,
 } from "./named-record-request.js";
-import type { TurnReference, TurnSkimResult } from "@capital-q/q-core";
+import type { TurnReference } from "@capital-q/q-core";
 import type { QOwnRecordsPort } from "./own-records-port.js";
 import {
   startPendingDecision,
@@ -397,8 +397,18 @@ import {
   askedSubjects,
   provenanceLine,
   type QTurnReader,
+  type QTurnSkim,
   type QTurnSkimmer,
 } from "@capital-q/model-gateway/q";
+
+/**
+ * A speed hint only (owner 2026-10-23: "the model decides; a hint can only
+ * speed things up"): words shaped as a question or a lookup. It starts the
+ * nameless holding line early and decides nothing else -- never whom Q
+ * looks into, never whether to research.
+ */
+const ASKS_SOMETHING =
+  /^(tell me|who|what|what's|whats|where|when|how|why|is|are|does|do|find|search|look up|lookup|show me|give me|any|latest|news|research|check)\b|\?\s*$/iu;
 
 /**
  * How a specialist reaches Q (CQ-Q-020 §11, §53, §56, §91).
@@ -2530,7 +2540,7 @@ export function createSpecialistQAnswer(
     string,
     {
       readonly messageId: string;
-      readonly skim: Promise<TurnSkimResult | null>;
+      readonly skim: Promise<QTurnSkim | null>;
     }
   >();
   const skimInput = (
@@ -2756,18 +2766,25 @@ export function createSpecialistQAnswer(
       lastShownEntityId: lastShownEntityId(history),
     }) ?? null;
 
-  /** Turns already given a holding line, so a re-read never says it twice. */
-  const heldRuns = new Set<string>();
-  const sayHolding = (request: QAnswerRequest, name: string): void => {
+  /**
+   * Turns already given a holding line, and whether it named anyone, so a
+   * re-read never says it twice: the quick hint's nameless line may give
+   * way once to the line naming whom the skim understood, never the other
+   * way round.
+   */
+  const heldRuns = new Map<string, "HINT" | "NAMED">();
+  const sayHolding = (request: QAnswerRequest, name: string | null): void => {
     const deltas = dependencies.deltas;
-    if (deltas === undefined || heldRuns.has(request.runId)) return;
+    if (deltas === undefined) return;
+    const held = heldRuns.get(request.runId);
+    if (held === "NAMED" || (held === "HINT" && name === null)) return;
     if (request.writingDocument === true || request.askedAction !== undefined) {
       return;
     }
     if (request.plan.screen?.route === "ONBOARDING") return;
-    heldRuns.add(request.runId);
+    heldRuns.set(request.runId, name === null ? "HINT" : "NAMED");
     while (heldRuns.size > PREREADS_MAX) {
-      const oldest = heldRuns.values().next().value;
+      const oldest = heldRuns.keys().next().value;
       if (oldest === undefined) break;
       heldRuns.delete(oldest);
     }
@@ -2775,7 +2792,10 @@ export function createSpecialistQAnswer(
       runId: request.runId,
       tenantId: request.tenantId,
       messageId: QMessageIdSchema.parse(randomUUID()),
-      text: `Looking into ${name.slice(0, 60)} now. `,
+      text:
+        name === null
+          ? "Looking into that now. "
+          : `Looking into ${name.slice(0, 60)} now. `,
       holding: true,
     });
   };
@@ -3752,6 +3772,12 @@ export function createSpecialistQAnswer(
       const oldest = lastActionsByActor.keys().next().value;
       if (oldest !== undefined) lastActionsByActor.delete(oldest);
     }
+    // Owner 2026-10-23: a cheap signal may start something early for speed
+    // but never decide what Q does. Words shaped as a question or a lookup
+    // hear, as the turn arrives, a line that names no one and is true of
+    // whatever the reading decides; whom Q is looking into is named only
+    // from a model's understanding (the skim's, below), which replaces it.
+    if (ASKS_SOMETHING.test(latest.content.trim())) sayHolding(request, null);
     const readingFirst = (async () => {
       const ready = early === undefined ? null : await early;
       const earlyRead =
@@ -3795,10 +3821,11 @@ export function createSpecialistQAnswer(
       // Owner 2026-10-23 ("it doesn't need to find every single thing
       // before it starts talking"; live: 4.5 s to the first word, ~3 s of
       // it the turn's reading): when the quick first read (a model, by
-      // meaning) reads a lookup of one named person or organisation, they
-      // hear that Q is on it before the full reading lands. The name is the
-      // skim's understanding, never one guessed from the words' capitals or
-      // a list of question words (owner: no keyword triggers). A holding
+      // meaning) understands whom the turn is about (TURN_SKIM v6
+      // `subject`, or the one it reads a person search for), they hear that
+      // Q is on it before the full reading lands. The name is the skim's
+      // understanding, never one guessed from the words' capitals or a list
+      // of question words (owner: a word list never decides). A holding
       // line: the answer's own words replace it.
       let readingLanded = false;
       void readingFirst.then(
@@ -3812,7 +3839,8 @@ export function createSpecialistQAnswer(
       void skimming.then(
         (skimmed) => {
           const name =
-            skimmed?.kind === "PERSON_SEARCH" ? skimmed.person?.name : null;
+            skimmed?.subject?.name ??
+            (skimmed?.kind === "PERSON_SEARCH" ? skimmed.person?.name : null);
           if (!readingLanded && typeof name === "string") {
             sayHolding(request, name.trim().slice(0, 60));
           }

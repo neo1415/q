@@ -21,11 +21,12 @@ describe("compound fit meaning in the existing readers", () => {
       V50_FIT,
     );
     expect(TURN_READER_V50.status).toBe("DEPRECATED");
-    expect(registry.getActive("TURN_SKIM").definition).toMatchObject({
-      version: 5,
-      template: TURN_SKIM_V5.template,
-      status: "ACTIVE",
-    });
+    // v6 (subject) keeps v5's compound-fit rule whole.
+    expect(registry.getActive("TURN_SKIM").definition.version).toBe(6);
+    expect(registry.getActive("TURN_SKIM").definition.template).toContain(
+      V5_COMPOUND_FIT,
+    );
+    expect(TURN_SKIM_V5.status).toBe("DEPRECATED");
     expect(TURN_READER_V49.status).toBe("DEPRECATED");
     expect(TURN_SKIM_V4.status).toBe("DEPRECATED");
     expect(TURN_READER_V50.template.split(V50_FIT)).toHaveLength(2);
