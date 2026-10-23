@@ -22,6 +22,17 @@ describe("tavily adapter", () => {
     [new Error("502 Error: upstream"), "UNAVAILABLE", 502],
     [new Error("Request timed out after 20 seconds."), "TIMEOUT", null],
     [new TypeError("fetch failed"), "UNAVAILABLE", null],
+    // Production 2026-10-23: the SDK throws the body's message alone.
+    [
+      new Error("This request exceeds your plan's set usage limit."),
+      "RATE_LIMIT",
+      432,
+    ],
+    [
+      new Error("Unauthorized: missing or invalid API key."),
+      "AUTHENTICATION",
+      401,
+    ],
     ["not even an error", "UNAVAILABLE", null],
   ])("classifies %s as %s", (error, failureClass, status) => {
     expect(classifyTavilyError(error)).toEqual({ failureClass, status });

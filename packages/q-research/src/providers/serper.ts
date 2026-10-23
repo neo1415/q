@@ -103,7 +103,17 @@ export function createSerperResearchProvider(
         error,
       );
     }
-    if (!response.ok) throw failure(classify(response.status), response.status);
+    if (!response.ok) {
+      // Production 2026-10-23: Serper answers a spent account with 400
+      // "Not enough credits", which read as a malformed request. It is
+      // reported as what it is: the account's credit (402), so the key
+      // rests and the operator is told to top it up.
+      const body = await response.text().catch(() => "");
+      if (response.status === 400 && /credit/i.test(body)) {
+        throw failure("RATE_LIMIT", 402);
+      }
+      throw failure(classify(response.status), response.status);
+    }
     try {
       return await response.json();
     } catch (error: unknown) {

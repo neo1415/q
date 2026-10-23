@@ -73,11 +73,34 @@ function statusOf(error: unknown): number | null {
   return match === null ? null : Number.parseInt(match[1] ?? "", 10);
 }
 
+/**
+ * Production 2026-10-23: when Tavily's error body carries a message, the
+ * SDK throws that message alone, with no status ("This request exceeds
+ * your plan's set usage limit", "Unauthorized: missing or invalid API
+ * key"), so a spent plan or a refused key read as UNAVAILABLE. The message
+ * is read for what the status would have said.
+ */
+function statusFromMessage(error: unknown): number | null {
+  if (!(error instanceof Error)) return null;
+  const message = error.message;
+  if (/usage limit|exceeds your plan|plan limit|credits?/i.test(message)) {
+    return 432;
+  }
+  if (
+    /unauthori[sz]ed|invalid api key|missing api key|api key/i.test(message)
+  ) {
+    return 401;
+  }
+  if (/forbidden/i.test(message)) return 403;
+  if (/too many requests|rate limit/i.test(message)) return 429;
+  return null;
+}
+
 export function classifyTavilyError(error: unknown): {
   readonly failureClass: ResearchProviderFailure["failureClass"];
   readonly status: number | null;
 } {
-  const status = statusOf(error);
+  const status = statusOf(error) ?? statusFromMessage(error);
   if (error instanceof Error && /timed out/i.test(error.message)) {
     return { failureClass: "TIMEOUT", status };
   }
