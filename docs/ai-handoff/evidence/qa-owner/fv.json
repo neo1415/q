@@ -1,0 +1,49 @@
+[
+  {
+    "step": 0,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/founder?talk=1",
+    "text": "Continue later\nFounder setup\nUse the form\nCapital Q\n2 of 15 covered\nUse the form\nEnd\nListening\nMute\nType\nUpload\nFemale\nMale\nVolume\nEssentials 1 of 9 · about 2 min left\n11%\nWhat Q has so far\nNem, I have Kiln Payroll noted. I’ll get your company profile ready; it should take about two minutes. In a sentence or two, what does Kiln Payroll do?\nUpload a document\nSkip\nReview what Q knows\nReview as form\nQ\nAsk Q\nFounder private · Your company"
+  },
+  {
+    "step": 1,
+    "said": "Hi Q. I'm Nem, the founder of Kiln Payroll. We build payroll and tax compliance software for small and medium businesses in Lagos, Nigeria.",
+    "ms": 18596,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/founder?talk=1",
+    "fresh": ""
+  },
+  {
+    "step": 2,
+    "said": "We're at seed stage. We're raising one point five million US dollars on a SAFE, and we've committed about two hundred thousand so far.",
+    "ms": 16714,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/founder?talk=1",
+    "fresh": ""
+  },
+  {
+    "step": 3,
+    "said": "We have three hundred and twenty paying businesses, about twelve million naira in monthly recurring revenue, growing roughly fifteen percent month on month.",
+    "ms": 22906,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/founder?talk=1",
+    "fresh": ""
+  },
+  {
+    "step": 4,
+    "said": "There are three of us. I was a product lead at Paystack for four years. My co-founder Tola is our CTO and previously built payroll systems at Flutterwave. Ada runs sales.",
+    "ms": 19942,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/founder?talk=1",
+    "fresh": ""
+  },
+  {
+    "step": 5,
+    "said": "Our website is kilnpayroll dot com. We're based in Lagos and we started in 2024.",
+    "ms": 15350,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/founder?talk=1",
+    "fresh": ""
+  },
+  {
+    "step": 6,
+    "said": "Yes, that's right. What else do you need from me?",
+    "ms": 12352,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/founder?talk=1",
+    "fresh": ""
+  }
+]
