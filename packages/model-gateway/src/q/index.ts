@@ -136,6 +136,7 @@ import {
   containsCompanyName,
   namedCompanySubjects,
   withCardSubjects,
+  type RunRead,
 } from "./card-subjects.js";
 import { stageAbout, stageKey } from "./stage-subjects.js";
 import {
@@ -205,6 +206,10 @@ import {
   extrasMessages,
   joinExtras,
 } from "./parallel-extras.js";
+import {
+  corroboratedPictures,
+  type SearchEvidence,
+} from "./picture-corroboration.js";
 import { asksForFresh, createReadCache, type ReadCache } from "./read-cache.js";
 export { outputSplitOf, type OutputSplit } from "./output-split.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
@@ -1066,24 +1071,18 @@ const ALREADY_SEARCHED_NOTE: ModelMessage = {
 };
 
 /**
- * How sure a public-web outcome is that it found whom it searched for (QA
- * F-17): SURE when a page is matched to them, MAYBE when pages only may be
- * them (a namesake placed elsewhere), NONE when no page names them.
+ * The website Capital Q holds for a company of this name that the run read
+ * (get_company's own output), when it holds one: their own site, against
+ * which a namesake's site is told apart (QA QO-09).
  */
-function webFoundSubject(
-  outcome: QToolCallOutcome | null,
-): "SURE" | "MAYBE" | "NONE" {
-  if (outcome === null || !outcome.result.ok) return "NONE";
-  const sources =
-    (
-      outcome.result.data as {
-        readonly sources?: readonly { readonly subjectMatch?: unknown }[];
-      }
-    ).sources ?? [];
-  if (sources.some((source) => source.subjectMatch === "MATCH")) return "SURE";
-  return sources.some((source) => source.subjectMatch === "POSSIBLE")
-    ? "MAYBE"
-    : "NONE";
+function websiteOnRecord(read: RunRead, name: string): string | null {
+  const wanted = name.trim().toLowerCase();
+  for (const [companyId, companyName] of read.companyNames) {
+    if (companyName.trim().toLowerCase() !== wanted) continue;
+    const website = read.companyFacts.get(companyId)?.website ?? null;
+    if (website !== null && website.trim().length > 0) return website;
+  }
+  return null;
 }
 
 /** How long a subject's empty public search stands for its conversation. */
@@ -5558,6 +5557,14 @@ export function createModelGatewayQAnswer(
       // Public sources this run read, attached to the answer as structured
       // sources (CQ-Q-VOICE-001 R3; R23). Public fields only.
       const publicSources: PublicSourceLike[] = [];
+      /**
+       * Every page this turn's public searches read, with the research's
+       * verdict on whether it is about whom it searched for: the evidence a
+       * picture of them must stand on (QA QO-09).
+       */
+      const webEvidence: SearchEvidence[] = [];
+      /** Whether any public search ran this turn (found anything or not). */
+      let webSearched = false;
       // C's receipts (UI acts and moves), read once for the whole turn.
       const screenReceipts: readonly string[] =
         dependencies.uiActReceipts?.(request.actor) ?? [];
@@ -5940,11 +5947,38 @@ export function createModelGatewayQAnswer(
           // QA F-17: pictures only of someone the lookup found.
           const foundThem =
             found.result.card !== null || found.result.candidates.length > 0;
+          const soleFound =
+            found.result.candidates.length === 1
+              ? found.result.candidates[0]
+              : undefined;
+          const placedAt = (
+            found.result.card?.subject.organization ??
+            soleFound?.organization ??
+            ""
+          ).trim();
+          // QA QO-09: only on a site the lookup found them on, or the own
+          // site of the organisation it placed them at.
+          const theirs = (
+            candidates: Parameters<typeof corroboratedPictures>[0],
+          ) =>
+            corroboratedPictures(candidates, {
+              name: askedName,
+              sources: [
+                ...webEvidence,
+                ...found.sources.map((source) => ({
+                  domain: source.domain,
+                  subjectMatch: "MATCH",
+                })),
+              ],
+              organisations: placedAt.length > 0 ? [placedAt] : [],
+            });
           let pictures =
             lanePictures === null || !foundThem
               ? []
               : publicPictureBlocks(
-                  (await settledWithin(lanePictures, PICTURE_WAIT_MS)) ?? [],
+                  theirs(
+                    (await settledWithin(lanePictures, PICTURE_WAIT_MS)) ?? [],
+                  ),
                   new Date().toISOString(),
                 );
           // A person's name alone often finds namesakes' pictures, which
@@ -5973,18 +6007,20 @@ export function createModelGatewayQAnswer(
             askedName.length > 0
           ) {
             pictures = publicPictureBlocks(
-              (await settledWithin(
-                dependencies.publicPictures.find({
-                  name: askedName,
-                  organisation,
-                  userText: latest.content,
-                  earlierUserText:
-                    toolContext.conversation?.earlierUserText ?? [],
-                  shownText: toolContext.conversation?.earlierQText ?? [],
-                  signal: request.signal,
-                }),
-                PICTURE_WAIT_MS,
-              )) ?? [],
+              theirs(
+                (await settledWithin(
+                  dependencies.publicPictures.find({
+                    name: askedName,
+                    organisation,
+                    userText: latest.content,
+                    earlierUserText:
+                      toolContext.conversation?.earlierUserText ?? [],
+                    shownText: toolContext.conversation?.earlierQText ?? [],
+                    signal: request.signal,
+                  }),
+                  PICTURE_WAIT_MS,
+                )) ?? [],
+              ),
               new Date().toISOString(),
             );
           }
@@ -6532,10 +6568,22 @@ export function createModelGatewayQAnswer(
         ) {
           return;
         }
+        if (outcome.toolName === "public_web.search") webSearched = true;
         const data = outcome.result.data as {
-          sources?: readonly PublicSourceLike[];
+          sources?: readonly (PublicSourceLike & {
+            readonly subjectMatch?: unknown;
+          })[];
         };
         for (const source of data.sources ?? []) {
+          if (typeof source.domain === "string") {
+            webEvidence.push({
+              domain: source.domain,
+              subjectMatch:
+                typeof source.subjectMatch === "string"
+                  ? source.subjectMatch
+                  : null,
+            });
+          }
           // Only a well-formed public source is presentable; anything else
           // stays in the tool transcript as data and is never cited.
           if (
@@ -8230,38 +8278,32 @@ export function createModelGatewayQAnswer(
         // L-13: a picture only when the analyst asked for one, searched
         // with words composed from the person's own (never sent as the
         // model wrote them), and bounded so it cannot hold the turn.
-        // QA F-17 (2026-10-23): when no page the turn's web search found
-        // names them, no picture is theirs -- none at all, neither from
-        // public pages (reddit, a token's logo were shown) nor a stock
-        // illustration. When pages only may be them, their pictures are
-        // shown and said to be uncertain, as a person would (owner: "I'm
-        // not sure, but I found this").
-        const webFound =
-          earlyWeb === null
-            ? "SURE"
-            : webFoundSubject(await settledWithin(earlyWeb.outcome, 0));
-        const webFoundThem = webFound !== "NONE";
+        // QA F-17 and QO-09 (2026-10-23): a picture of whom the turn is
+        // about only where evidence ties its site to them -- their website
+        // on Capital Q, or a site this turn's searches matched to them
+        // (said to be uncertain where those pages only may be them). A
+        // namesake's (LEGO DUPLO on eBay, a bus air-conditioning maker for
+        // "Spheros") never; and never a stock illustration in its place.
+        const namedSubject =
+          typeof namedForPictures === "string" ? namedForPictures : null;
         const fromPages =
-          webPictures === null || !webFoundThem
+          webPictures === null || namedSubject === null
             ? []
             : publicPictureBlocks(
-                ((await settledWithin(webPictures, PICTURE_WAIT_MS)) ?? []).map(
-                  (one) =>
-                    webFound === "MAYBE"
-                      ? {
-                          ...one,
-                          title: `Not sure this is them · ${one.title}`.slice(
-                            0,
-                            200,
-                          ),
-                        }
-                      : one,
+                corroboratedPictures(
+                  (await settledWithin(webPictures, PICTURE_WAIT_MS)) ?? [],
+                  {
+                    name: namedSubject,
+                    website: websiteOnRecord(companiesRead, namedSubject),
+                    sources: webEvidence,
+                    unsearched: !webSearched,
+                  },
                 ),
                 new Date().toISOString(),
               );
-        // A stock illustration only where no public picture of them was found.
+        // A stock illustration only for a turn about no one in particular.
         const picture =
-          fromPages.length > 0 || !webFoundThem
+          fromPages.length > 0 || namedSubject !== null
             ? null
             : await pictureBlock({
                 result: analyst,
