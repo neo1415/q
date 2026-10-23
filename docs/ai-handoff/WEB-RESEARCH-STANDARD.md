@@ -86,6 +86,16 @@ Spend: 14 queries, about $0.07 at list price.
 
 **Recommendation.** Keep every index in parallel, adding Brave. Brave is the fastest measured, finds the company's own site, LinkedIn and Nigerian press for the demo entities, and its news vertical answers in about 0.3 s. On cost, Brave and Serper are the cheapest per query at list prices; SerpApi is the most expensive.
 
+**Production, 23 Oct 08:26 UTC (766067719).**
+- q-api's boot line showed Tavily, SerpApi and ScrapingBee configured, and Bright Data without zones.
+- All three live prompts answered "public sources couldn't be checked": every configured index failed. ScrapingBee's key is dead (401). Tavily and SERP are presumably failing too; the q-api logs will show the class and status.
+- Brave, from this session, answered every query. That is the immediate fix.
+
+**Bright Data zones: not worth setting up now.**
+- Without its SERP and Unlocker zones, Bright Data cannot search. Setting them up adds a third Google SERP and an unblocker for page reads, at extra cost.
+- Brave plus one working Google index (SERP key or Tavily) covers search.
+- Revisit only if page reads are often blocked.
+
 ## Open gaps, in priority order
 
 1. A funding/investors angle in query planning for company questions.
