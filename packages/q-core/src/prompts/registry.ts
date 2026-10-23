@@ -192,6 +192,7 @@ import { INVESTOR_TWIN_TURN_V9 } from "./tasks/investor-twin-turn.v9.js";
 import { INVESTOR_TWIN_TURN_V10 } from "./tasks/investor-twin-turn.v10.js";
 import { INVESTOR_TWIN_TURN_V11 } from "./tasks/investor-twin-turn.v11.js";
 import { INVESTOR_TWIN_TURN_V12 } from "./tasks/investor-twin-turn.v12.js";
+import { INVESTOR_TWIN_TURN_V13 } from "./tasks/investor-twin-turn.v13.js";
 import { MEETING_HOST_TURN_V1 } from "./tasks/meeting-host-turn.v1.js";
 import { MEETING_HOST_TURN_V2 } from "./tasks/meeting-host-turn.v2.js";
 import { MEETING_HOST_TURN_V3 } from "./tasks/meeting-host-turn.v3.js";
@@ -563,7 +564,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     INVESTOR_TWIN_TURN_V9,
     { ...INVESTOR_TWIN_TURN_V10, status: "DEPRECATED" },
     { ...INVESTOR_TWIN_TURN_V11, status: "DEPRECATED" },
-    INVESTOR_TWIN_TURN_V12,
+    { ...INVESTOR_TWIN_TURN_V12, status: "DEPRECATED" },
+    INVESTOR_TWIN_TURN_V13,
     MEETING_HOST_TURN_V1,
     MEETING_HOST_TURN_V2,
     MEETING_HOST_TURN_V3,

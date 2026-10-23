@@ -102,7 +102,13 @@ export function deliverLine(
     readonly intensity: SpeechIntensity;
     readonly reaction: SpeechReaction | null;
   },
+  /** 2026-10-23 (R5): one per spoken sentence, when the feeling moves. */
+  perSentence?: readonly {
+    readonly tone: SpeechTone | null;
+    readonly intensity: SpeechIntensity;
+  }[],
 ): readonly SentencePerformance[] {
+  const own = perSentence?.length === spoken.length ? perSentence : undefined;
   return spoken
     .map((sentence, index): SentencePerformance => ({
       sentence,
@@ -110,8 +116,12 @@ export function deliverLine(
       pauseAfter: false,
       pace: "NORMAL",
       emphasis: [],
-      tone: delivery.tone,
-      intensity: delivery.intensity,
+      // A neutral sentence is neutral (null), not the line's tone.
+      tone: own === undefined ? delivery.tone : (own[index]?.tone ?? null),
+      intensity:
+        own === undefined
+          ? delivery.intensity
+          : (own[index]?.intensity ?? delivery.intensity),
     }))
     .filter(hasCue);
 }

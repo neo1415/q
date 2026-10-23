@@ -373,6 +373,7 @@ function setup(
           wantsToEnd: false,
           onlyNoise: false,
           screenNote: views.screen === null ? null : looks.screenNote,
+          beats: [],
         });
       }
       return Promise.resolve({
@@ -390,6 +391,11 @@ function setup(
         wantsToEnd: looks.wantsToEnd(variables.rehearsal),
         onlyNoise: looks.onlyNoise(variables.rehearsal),
         screenNote: views.screen === null ? null : looks.screenNote,
+        // v13: one beat per sentence when the model sends them.
+        beats:
+          variables.cue === "HAND_RAISED" || variables.difficulty === "TOUGH"
+            ? []
+            : [{ mood: "SKEPTICAL", intensity: "NORMAL" }],
       });
     },
     review: (_a, variables) => {
@@ -648,6 +654,23 @@ describe("rehearsals", () => {
     expect(
       (await service.say(actor(OTHER), rehearsal.id, { text: "hi" })).kind,
     ).toBe("NOT_FOUND");
+  });
+
+  it("keeps the model's per-sentence beats with the line (R5), and none on a coded yield", async () => {
+    const { service } = setup();
+    const rehearsal = await startWith(service);
+    const said = await service.say(actor(FOUNDER), rehearsal.id, {
+      text: "We grow 40% a month.",
+    });
+    const reply = said.kind === "OK" ? said.rehearsal.turns.at(-1) : undefined;
+    expect(reply?.text).toBe("What's retention?");
+    expect(reply?.beats).toEqual([{ mood: "SKEPTICAL", intensity: "NORMAL" }]);
+    const hand = await service.say(actor(FOUNDER), rehearsal.id, {
+      cue: "HAND_RAISED",
+    });
+    expect(
+      hand.kind === "OK" ? hand.rehearsal.turns.at(-1)?.beats : "x",
+    ).toBeUndefined();
   });
 
   it("keeps nothing of a reply the person spoke over", async () => {

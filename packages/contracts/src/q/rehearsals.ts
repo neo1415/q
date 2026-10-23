@@ -189,6 +189,21 @@ export const QRehearsalTurnDtoSchema = z
     /** How loud the played person said it, and any sound before it. */
     intensity: z.enum(["SOFT", "NORMAL", "RAISED"]).optional(),
     reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH", "CRY"]).nullable().optional(),
+    /**
+     * 2026-10-23 (R5): how each sentence of a played line sounds, in
+     * order, when the feeling moves inside the line. Absent: one delivery.
+     */
+    beats: z
+      .array(
+        z
+          .object({
+            mood: z.enum(REHEARSAL_MOODS),
+            intensity: z.enum(["SOFT", "NORMAL", "RAISED"]),
+          })
+          .strict(),
+      )
+      .max(6)
+      .optional(),
   })
   .strict();
 export type QRehearsalTurnDto = z.infer<typeof QRehearsalTurnDtoSchema>;
