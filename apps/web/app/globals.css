@@ -410,6 +410,11 @@
       animation-name: cq-document-ready-fade;
     }
   }
+  /* On a screen with Q's composer, the ready card rises above it: live
+     23 Oct it sat over the Send button. The strip is under 96px tall. */
+  body:has(.cq-q-controls) [data-document-ready-stack] {
+    translate: 0 -96px;
+  }
 
   /* Q room W7: the presence settling to its size on the stage, in CSS so
      the stage needs no animation library at first paint (was Motion).
