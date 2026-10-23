@@ -150,6 +150,72 @@ describe("detecting serp provider", () => {
     expect(calls).toEqual(["google.serper.dev", "serpapi.com", "serpapi.com"]);
   });
 
+  it("tries SerpApi when Serper cannot read the request with the key (production 2026-10-23)", async () => {
+    const calls: string[] = [];
+    const provider = createDetectingSerpProvider({
+      apiKey: "x".repeat(40),
+      fetch: (input) => {
+        const host = new URL(urlOf(input)).host;
+        calls.push(host);
+        return Promise.resolve(
+          host === "google.serper.dev"
+            ? json({ message: "Bad request" }, 400)
+            : json({
+                organic_results: [
+                  { link: "https://example.com/a", title: "A", snippet: "s" },
+                ],
+              }),
+        );
+      },
+    });
+    expect((await provider.search(REQUEST, {})).hits).toHaveLength(1);
+    expect(provider.code).toBe("serpapi");
+  });
+
+  it("reports Serper's spent credit as such, and never as SerpApi refusing the key", async () => {
+    const calls: string[] = [];
+    const provider = createDetectingSerpProvider({
+      apiKey: "x".repeat(40),
+      fetch: (input) => {
+        const host = new URL(urlOf(input)).host;
+        calls.push(host);
+        return Promise.resolve(
+          host === "google.serper.dev"
+            ? json({ message: "Not enough credits", statusCode: 400 }, 400)
+            : json({ error: "Invalid API key." }, 401),
+        );
+      },
+    });
+    const failure = await provider.search(REQUEST, {}).catch((e: unknown) => e);
+    expect(isResearchProviderFailure(failure)).toBe(true);
+    if (isResearchProviderFailure(failure)) {
+      expect(failure.providerCode).toBe("serper");
+      expect(failure.status).toBe(402);
+      expect(failure.failureClass).toBe("RATE_LIMIT");
+    }
+    // A spent account is not the other vendor's key: SerpApi is not asked.
+    expect(calls).toEqual(["google.serper.dev"]);
+  });
+
+  it("keeps Serper's own failure when SerpApi refuses the key too", async () => {
+    const provider = createDetectingSerpProvider({
+      apiKey: "x".repeat(40),
+      fetch: (input) =>
+        Promise.resolve(
+          new URL(urlOf(input)).host === "google.serper.dev"
+            ? json({ message: "Bad request" }, 400)
+            : json({ error: "Invalid API key." }, 401),
+        ),
+    });
+    const failure = await provider.search(REQUEST, {}).catch((e: unknown) => e);
+    expect(isResearchProviderFailure(failure)).toBe(true);
+    if (isResearchProviderFailure(failure)) {
+      expect(failure.providerCode).toBe("serper");
+      expect(failure.failureClass).toBe("VALIDATION");
+    }
+    expect(provider.code).toBe("serper");
+  });
+
   it("uses Serper.dev when that is the key's vendor", async () => {
     const provider = createDetectingSerpProvider({
       apiKey: "x".repeat(40),

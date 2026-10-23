@@ -58,10 +58,14 @@ async function fetchJson(
     });
   }
   if (!response.ok) {
+    // A spent account (Serper: 400 "Not enough credits") is its credit,
+    // not a malformed request.
+    const body = await response.text().catch(() => "");
+    const spent = response.status === 400 && /credit/i.test(body);
     throw new ResearchProviderFailure({
       providerCode,
-      failureClass: classify(response.status),
-      status: response.status,
+      failureClass: spent ? "RATE_LIMIT" : classify(response.status),
+      status: spent ? 402 : response.status,
     });
   }
   try {
@@ -167,8 +171,8 @@ export function createSerpApiImageSearch(
 
 /**
  * One SERP key whose vendor is not known from its name (as
- * serp-detect.ts): Serper.dev first, SerpApi on an authentication
- * failure, and whichever answered is kept.
+ * serp-detect.ts): Serper.dev first, SerpApi when Serper refuses the key
+ * or cannot read the request with it, and whichever answered is kept.
  */
 export function createDetectingImageSearch(
   options: ImageSearchOptions,
@@ -195,7 +199,9 @@ export function createDetectingImageSearch(
           if (
             confirmed ||
             !(error instanceof ResearchProviderFailure) ||
-            error.failureClass !== "AUTHENTICATION" ||
+            error.status === 402 ||
+            (error.failureClass !== "AUTHENTICATION" &&
+              error.failureClass !== "VALIDATION") ||
             active + 1 >= candidates.length
           ) {
             throw error;
