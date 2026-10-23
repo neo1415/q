@@ -10,6 +10,9 @@ import { RESEARCH_BOUNDS } from "../contracts.js";
  *   - the subject's public identity, when policy has authorised it
  *     (a network-visible or public company's name, a declared website's
  *     domain, a public headquarters country, an investor's public name);
+ *   - the name of whom the turn is about, when Q itself showed that name
+ *     to the person in this conversation and they pointed back at it ("the
+ *     top one", "them"): the name only, never other words of Q's;
  *   - short connective words.
  *
  * Anything else the model put in its proposed query — a figure from a deck,
@@ -46,6 +49,14 @@ export type EgressInput = {
    * as the subject of the search. Default true.
    */
   readonly prependIdentity?: boolean | undefined;
+  /**
+   * Names of whom the turn is about that Q showed the person in this
+   * conversation (owner 2026-10-23: "if they say the top one, find out who
+   * the top one is and search that"). Each is checked by `namesShown`
+   * against Q's own earlier words, so a model cannot name somebody new to
+   * look up; each may leave whole, like a public identity.
+   */
+  readonly shownNames?: readonly string[] | undefined;
   /**
    * Deep research (owner 2026-10-23): words read on public pages this run
    * already surfaced (titles and excerpts of sources it searched). They are
@@ -296,7 +307,7 @@ function allowedSet(input: EgressInput): ReadonlySet<string> {
       for (const variant of variants(token)) allowed.add(variant);
     }
   }
-  for (const term of input.publicIdentity) {
+  for (const term of [...input.publicIdentity, ...(input.shownNames ?? [])]) {
     for (const token of tokenise(term)) {
       allowed.add(token);
     }
@@ -311,6 +322,26 @@ function allowedSet(input: EgressInput): ReadonlySet<string> {
     for (const token of RESEARCH_VOCABULARY) allowed.add(token);
   }
   return allowed;
+}
+
+/**
+ * The names among `candidates` that Q itself showed the person: every word
+ * of the name is in Q's earlier messages in this conversation. A name the
+ * reader resolved from "the top one" passes; one nobody said does not.
+ */
+export function namesShown(
+  candidates: readonly (string | null | undefined)[],
+  shownText: readonly string[] | undefined,
+): readonly string[] {
+  if (shownText === undefined || shownText.length === 0) return [];
+  const shown = new Set(shownText.flatMap((text) => tokenise(text)));
+  return candidates.flatMap((candidate) => {
+    const name = candidate?.trim() ?? "";
+    const words = tokenise(name);
+    return words.length > 0 && words.every((word) => shown.has(word))
+      ? [name]
+      : [];
+  });
 }
 
 /** Words from public pages this run already read (deep research). */
@@ -424,7 +455,9 @@ const PRONOUNS = new Set([
 export function composeEgressQuery(input: EgressInput): EgressOutcome {
   const allowed = allowedSet(input);
   const identityTokens = new Set(
-    input.publicIdentity.flatMap((term) => tokenise(term)),
+    [...input.publicIdentity, ...(input.shownNames ?? [])].flatMap((term) =>
+      tokenise(term),
+    ),
   );
   const requested = tokenise(input.requestedQuery);
   const survivors: string[] = [];

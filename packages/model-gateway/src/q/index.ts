@@ -1049,17 +1049,24 @@ const ALREADY_SEARCHED_NOTE: ModelMessage = {
 };
 
 /**
- * Whether a public-web outcome holds a page about whom it searched for
- * (QA F-17): a source the research service matched to the named subject.
+ * How sure a public-web outcome is that it found whom it searched for (QA
+ * F-17): SURE when a page is matched to them, MAYBE when pages only may be
+ * them (a namesake placed elsewhere), NONE when no page names them.
  */
-function webMatchedSubject(outcome: QToolCallOutcome | null): boolean {
-  if (outcome === null || !outcome.result.ok) return false;
-  const sources = (
-    outcome.result.data as {
-      readonly sources?: readonly { readonly subjectMatch?: unknown }[];
-    }
-  ).sources;
-  return (sources ?? []).some((source) => source.subjectMatch === "MATCH");
+function webFoundSubject(
+  outcome: QToolCallOutcome | null,
+): "SURE" | "MAYBE" | "NONE" {
+  if (outcome === null || !outcome.result.ok) return "NONE";
+  const sources =
+    (
+      outcome.result.data as {
+        readonly sources?: readonly { readonly subjectMatch?: unknown }[];
+      }
+    ).sources ?? [];
+  if (sources.some((source) => source.subjectMatch === "MATCH")) return "SURE";
+  return sources.some((source) => source.subjectMatch === "POSSIBLE")
+    ? "MAYBE"
+    : "NONE";
 }
 
 /** How long a subject's empty public search stands for its conversation. */
@@ -2533,6 +2540,12 @@ export function createModelGatewayQAnswer(
         // her up" after naming her): never Q's words.
         earlierUserText: earlier
           .filter((message) => message.role === "USER")
+          .slice(-3)
+          .map((message) => message.content),
+        // What Q said to them, from which only the name of whom they point
+        // at ("the top one") may be searched (owner 2026-10-23).
+        earlierQText: earlier
+          .filter((message) => message.role === "Q")
           .slice(-3)
           .map((message) => message.content),
       },
@@ -4243,12 +4256,12 @@ export function createModelGatewayQAnswer(
         earlier.some((message) => message.role === "Q"),
       );
       /**
-       * A turn about someone they did not name in their own words ("Why
-       * might the top one pass on us?", after Q listed their investors):
-       * the public web cannot be asked about them by name (only the
-       * person's words leave Capital Q), and their pointing words name no
-       * one -- production 2026-10-23 searched them and narrated Wikipedia's
-       * "Mountain pass". Capital Q's records answer it; no web this turn.
+       * A turn about someone nobody in this conversation named: neither the
+       * person nor Q said the name the reader gave. Someone they pointed at
+       * ("Why might the top one pass on us?", after Q listed their
+       * investors) is searched by the name Q showed them (owner 2026-10-23:
+       * "find out who the top one is, get the name, and pass that to the
+       * search"); a name nobody said is not looked up.
        */
       const pointedAtOnly =
         request.aboutNamedOther === true &&
@@ -4258,6 +4271,10 @@ export function createModelGatewayQAnswer(
           latest.content,
           ...earlier
             .filter((message) => message.role === "USER")
+            .slice(-3)
+            .map((message) => message.content),
+          ...earlier
+            .filter((message) => message.role === "Q")
             .slice(-3)
             .map((message) => message.content),
         ]);
@@ -4577,6 +4594,7 @@ export function createModelGatewayQAnswer(
                 userText: latest.content,
                 earlierUserText:
                   toolContext.conversation?.earlierUserText ?? [],
+                shownText: toolContext.conversation?.earlierQText ?? [],
                 signal: request.signal,
               })
               .catch(() => [])
@@ -5865,6 +5883,7 @@ export function createModelGatewayQAnswer(
                   userText: latest.content,
                   earlierUserText:
                     toolContext.conversation?.earlierUserText ?? [],
+                  shownText: toolContext.conversation?.earlierQText ?? [],
                   signal: request.signal,
                 })
                 .catch(() => [])
@@ -5919,6 +5938,7 @@ export function createModelGatewayQAnswer(
                   userText: latest.content,
                   earlierUserText:
                     toolContext.conversation?.earlierUserText ?? [],
+                  shownText: toolContext.conversation?.earlierQText ?? [],
                   signal: request.signal,
                 }),
                 PICTURE_WAIT_MS,
@@ -8086,18 +8106,33 @@ export function createModelGatewayQAnswer(
         // L-13: a picture only when the analyst asked for one, searched
         // with words composed from the person's own (never sent as the
         // model wrote them), and bounded so it cannot hold the turn.
-        // QA F-17 (2026-10-23): when the turn's web search found no page
-        // about them, no picture is theirs -- none at all, neither from
+        // QA F-17 (2026-10-23): when no page the turn's web search found
+        // names them, no picture is theirs -- none at all, neither from
         // public pages (reddit, a token's logo were shown) nor a stock
-        // illustration.
-        const webFoundThem =
-          earlyWeb === null ||
-          webMatchedSubject(await settledWithin(earlyWeb.outcome, 0));
+        // illustration. When pages only may be them, their pictures are
+        // shown and said to be uncertain, as a person would (owner: "I'm
+        // not sure, but I found this").
+        const webFound =
+          earlyWeb === null
+            ? "SURE"
+            : webFoundSubject(await settledWithin(earlyWeb.outcome, 0));
+        const webFoundThem = webFound !== "NONE";
         const fromPages =
           webPictures === null || !webFoundThem
             ? []
             : publicPictureBlocks(
-                (await settledWithin(webPictures, PICTURE_WAIT_MS)) ?? [],
+                ((await settledWithin(webPictures, PICTURE_WAIT_MS)) ?? []).map(
+                  (one) =>
+                    webFound === "MAYBE"
+                      ? {
+                          ...one,
+                          title: `Not sure this is them · ${one.title}`.slice(
+                            0,
+                            200,
+                          ),
+                        }
+                      : one,
+                ),
                 new Date().toISOString(),
               );
         // A stock illustration only where no public picture of them was found.

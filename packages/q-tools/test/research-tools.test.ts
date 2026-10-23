@@ -236,7 +236,10 @@ describe("public_web.search", () => {
     );
     const data = (outcome.result as { data: Record<string, unknown> }).data;
     expect(data["sources"]).toEqual([]);
-    expect(String(data["guidance"])).toContain("do not mention the web");
+    expect(String(data["guidance"])).toContain(
+      "I couldn't find anything about them online",
+    );
+    expect(String(data["guidance"])).toContain("Never describe pages");
     expect(String(data["guidance"])).not.toContain("ask for their website");
   });
 

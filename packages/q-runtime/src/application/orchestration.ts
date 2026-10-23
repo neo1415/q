@@ -575,6 +575,13 @@ export type QToolExecutionContext = {
          * her up"). Never Q's words.
          */
         readonly earlierUserText?: readonly string[] | undefined;
+        /**
+         * What Q said to them earlier in this conversation (a few
+         * messages, most recent last). A tool that sends anything outside
+         * Capital Q may take from it only the name of whom they pointed at
+         * ("the top one"), checked against these words; nothing else.
+         */
+        readonly earlierQText?: readonly string[] | undefined;
       }
     | undefined;
   /**

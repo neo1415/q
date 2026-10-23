@@ -892,6 +892,8 @@ export type QPublicPicturePort = {
     readonly organisation?: string | undefined;
     readonly userText: string;
     readonly earlierUserText: readonly string[];
+    /** What Q said to them: a name in it they pointed at may be searched. */
+    readonly shownText?: readonly string[] | undefined;
     readonly signal?: AbortSignal | undefined;
   }) => Promise<
     readonly {

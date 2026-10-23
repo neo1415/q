@@ -1,4 +1,4 @@
-import { composeEgressQuery } from "../domain/egress.js";
+import { composeEgressQuery, namesShown } from "../domain/egress.js";
 import { textNamesEntity } from "../domain/names.js";
 import { judgePublicUrl } from "../domain/url-safety.js";
 import type { ResearchExecutionContext } from "../ports.js";
@@ -56,6 +56,11 @@ export type PublicPictureSearch = {
     readonly organisation?: string | undefined;
     readonly userText: string;
     readonly earlierUserText?: readonly string[] | undefined;
+    /**
+     * What Q said to them earlier in this conversation: a name in it of
+     * whom they pointed at may be searched (`namesShown`).
+     */
+    readonly shownText?: readonly string[] | undefined;
     readonly max?: number | undefined;
     readonly signal?: AbortSignal | undefined;
   }) => Promise<readonly PublicPicture[]>;
@@ -128,6 +133,7 @@ export function createPublicPictureSearch(input: {
       organisation,
       userText,
       earlierUserText,
+      shownText,
       max,
       signal,
     }) => {
@@ -137,8 +143,10 @@ export function createPublicPictureSearch(input: {
         userText,
         earlierUserText,
         publicIdentity: org.length > 0 ? [org] : [],
+        shownNames: namesShown([name], shownText),
       });
-      // Only a name made wholly of the person's own words is searched.
+      // Only a name made wholly of the person's own words, or one Q showed
+      // them and they pointed at, is searched.
       if (!composed.ok || composed.droppedTokens > 0) return [];
       let hits: readonly PublicImageHit[];
       try {

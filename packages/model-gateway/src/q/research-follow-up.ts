@@ -143,12 +143,11 @@ export function followsUpPublicSources(input: {
 }
 
 /**
- * Whether every word of a name is the person's own (this message or one of
- * their earlier ones). A public search may carry only their words or an
- * authorised public identity (CQ-Q-RESEARCH-001 §9), so a subject they only
- * pointed at ("the top one", after Q's list) cannot be searched by name, and
- * their pointing words name no one (production 2026-10-23: "Why might the
- * top one pass on us?" searched those words and found "Mountain pass").
+ * Whether every word of a name was said in this conversation, by the person
+ * or by Q to them. A public search may carry only those words or an
+ * authorised public identity (CQ-Q-RESEARCH-001 §9), so a name the reader
+ * gave that nobody said is never looked up; one they pointed at ("the top
+ * one", after Q's list) is.
  */
 export function namedInTheirWords(
   name: string,

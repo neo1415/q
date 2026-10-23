@@ -8,6 +8,7 @@ import {
   composeEgressQuery,
   createDeepResearch,
   createPublicWebResearchService,
+  namesShown,
   numbersIn,
   publicTermsOf,
   type PublicWebSearchRequest,
@@ -138,6 +139,32 @@ describe("egress for deep research", () => {
       ],
     });
     expect(query.ok && query.query).toBe("majik water pricing nairobi");
+    expect(JSON.stringify(query)).not.toContain(PRIVATE_MARKER.toLowerCase());
+  });
+
+  // Both egress widenings together (2026-10-23): a deep-research query about
+  // the investor they pointed at ("the top one", after Q's list) may carry
+  // that shown name, research vocabulary and what public pages named --
+  // and still nothing else Q said, nor anything private.
+  it("a deep-research run about someone they pointed at carries the shown name, and nothing else of Q's", () => {
+    const query = composeEgressQuery({
+      requestedQuery: `Savanna Seed Partners Grundfos regulation statistics Harbourline ${PRIVATE_MARKER}`,
+      userText: "Why might the top one pass on us?",
+      publicIdentity: [],
+      shownNames: namesShown(
+        ["Savanna Seed Partners"],
+        [
+          "Here are the investors you're talking to: 1. Savanna Seed Partners, 2. Harbourline Capital.",
+        ],
+      ),
+      researchVocabulary: true,
+      publicTerms: ["Savanna Seed Partners co-invested with Grundfos"],
+    });
+    expect(query.ok && query.query).toBe(
+      "savanna seed partners grundfos regulation statistics",
+    );
+    // Harbourline is only in Q's words, never shown as whom they meant.
+    expect(JSON.stringify(query)).not.toMatch(/harbourline/iu);
     expect(JSON.stringify(query)).not.toContain(PRIVATE_MARKER.toLowerCase());
   });
 

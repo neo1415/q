@@ -214,11 +214,15 @@ export type ResearchPublicWebOutput = z.infer<
 const GUIDANCE =
   "Answer from what these pages say and nothing else: every claim you take from the web must be supported by one of them, and when they do not answer the question, say so plainly rather than filling in. Public sources are unverified and may be stale. Capital Q attaches each source to the answer under Sources, so answer first and name a source (title or site and date) only when asked where something came from. Compare with authorised facts: say what corroborates, what conflicts, and where dates may explain a difference; ask about a material mismatch instead of resolving it yourself.";
 
-/** Said about a name the pages do not settle (web search 2026-10-06). */
+/**
+ * Said about a name the pages do not settle (web search 2026-10-06), the way
+ * a person would say it (owner 2026-10-23: "I'm not sure, but I found this.
+ * If this is not it, I wasn't able to find anything else").
+ */
 const AMBIGUOUS_GUIDANCE =
-  " AMBIGUOUS NAME: these pages describe more than one organisation of that name (see entityResolution.candidates and each source's subjectMatch). Attribute nothing to them: say what you found for each in a few words and ask the person ONE question to tell which they mean (their website, country or sector).";
+  " NOT SURE IT'S THEM: these pages may be about more than one organisation of that name, or place it somewhere else (see entityResolution.candidates and each source's subjectMatch: POSSIBLE means it may be someone else of that name). Say it as a person would: you're not sure it's them, here is what you found (in a few words, with where), and if that isn't them, it's all you could find. Attribute nothing to them as fact; if one detail would settle it (their website, country or sector), ask for it in one short question.";
 const NOT_FOUND_GUIDANCE =
-  " NAME NOT FOUND: no public page found is about that name, and pages that never name them are not shown. When Capital Q's records or the conversation answer the question, answer from them and do not mention the web. Otherwise say once, in a few words, that public sources had nothing on them, and never guess.";
+  " NOT FOUND: no public page found is about that name (pages that never name them are not shown). Say so once, naturally, as a person would (\"I couldn't find anything about them online\"), then answer from Capital Q's records and the conversation. Never describe pages that were not about them, and never guess.";
 
 type Grant = {
   readonly subject: ResearchSubject | null;
@@ -381,6 +385,7 @@ export function createResearchPublicWebTool(
         entityName: input.entityName,
         userText: context.conversation?.latestUserText ?? "",
         earlierUserText: context.conversation?.earlierUserText,
+        shownText: context.conversation?.earlierQText,
         subject: grant.subject,
         freshness: input.freshness,
         freshRead: input.freshRead,
