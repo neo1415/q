@@ -20,6 +20,7 @@ import type {
 } from "@capital-q/contracts";
 
 import type { VoiceState } from "../session";
+import { interceptHeard } from "../heard-intercept";
 import {
   navigationHeardFor,
   navigationHearingDelta,
@@ -1587,6 +1588,13 @@ export class DuplexLine {
       case "conversation.item.input_audio_transcription.completed": {
         const itemId = text(event, "item_id");
         const said = text(event, "transcript")?.trim() ?? "";
+        // "Hey Q, pitch yourself" (owner, 23 Oct): taken by code before
+        // anything answers it. Whatever the model had started is cut and
+        // the line closes, so only what starts is heard.
+        if (said.length > 0 && interceptHeard(said)) {
+          this.close();
+          break;
+        }
         if (itemId !== undefined && said.length > 0) {
           // RECOVERY-2026-10 (C, "stupid fast"): "open X" moves the screen
           // the moment the words are final, beside the routed turn.

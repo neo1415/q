@@ -26,15 +26,22 @@ export const CAPITAL_Q_BRIEF =
 export const CAPITAL_Q_OFFER =
   "Want me to show you? It takes about seven minutes.";
 
-const NAME = "(?:capital ?q|capitalq|capital cue|this platform|this app)";
+const NAME =
+  "(?:capital ?q|capitalq|capital (?:cue|queue|kyu|kew)|this platform|this app)";
+/**
+ * What may come before the ask, typed or as a speech transcript: "Q" is
+ * often written "cue", "queue" or "Kyu" by speech-to-text, and a greeting
+ * comes before it ("Hey, cue. Pitch yourself." live, 23 Oct).
+ */
+const LEAD =
+  "(?:(?:q|cue|queue|kyu|kew|hey|hi|hello|ok|okay|so|alright|please|now|can you|could you|would you|will you)\\s+)*";
 const STORY = new RegExp(
-  `^(?:(?:q|hey q|ok|okay|please|can you|could you|would you)\\s+)*(?:(?:present|pitch|demo|introduce)\\s+(?:us\\s+|me\\s+)?(?:${NAME}|yourself)|(?:tell|show)\\s+(?:me|us)\\s+(?:your|the)\\s+story|(?:tell|show)\\s+(?:me|us)\\s+the\\s+capital ?q\\s+story|give\\s+(?:me|us)\\s+(?:the|your)\\s+pitch|pitch)(?:\\s+(?:to|for)\\s+(?:an?\\s+|the\\s+)?(investors?|founders?|business(?:es)?|companies|company|everyone|everybody|all))?(?:\\s+(?:please|now|to me|to us))*$`,
+  `^${LEAD}(?:(?:present|pitch|demo|introduce)\\s+(?:us\\s+|me\\s+)?(?:${NAME}|yourself)|(?:tell|show)\\s+(?:me|us)\\s+(?:your|the)\\s+story|(?:tell|show)\\s+(?:me|us)\\s+the\\s+capital ?q\\s+story|give\\s+(?:me|us)\\s+(?:the|your)\\s+pitch|pitch)(?:\\s+(?:to|for)\\s+(?:an?\\s+|the\\s+)?(investors?|founders?|business(?:es)?|companies|company|everyone|everybody|all))?(?:\\s+(?:please|now|to me|to us))*$`,
   "u",
 );
-const BARE =
-  /^(?:(?:q|hey q|ok|okay|please|can you|could you|would you)\s+)*pitch(?:\s+(?:please|now))*$/u;
+const BARE = new RegExp(`^${LEAD}pitch(?:\\s+(?:please|now))*$`, "u");
 const BRIEF = new RegExp(
-  `^(?:(?:q|hey q|ok|so)\\s+)*(?:what\\s+is|what\\s+s|whats)\\s+${NAME}$`,
+  `^${LEAD}(?:what\\s+is|what\\s+s|whats)\\s+${NAME}$`,
   "u",
 );
 
