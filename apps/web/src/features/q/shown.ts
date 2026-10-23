@@ -589,15 +589,23 @@ export function livePreviewOf(
   spoken?: LivePreviewOf | null,
 ): LivePreviewOf | null {
   const latest = turns.at(-1);
+  const latestQ = latest?.kind === "Q" ? latest : undefined;
   const preview =
-    latest?.kind === "Q" && latest.streaming
-      ? latest.preview
-      : // The spoken answer is in the thread: its blocks decide now.
-        spoken === null ||
-          spoken === undefined ||
-          turns.some((turn) => turn.id === spoken.messageId)
-        ? undefined
-        : spoken;
+    latestQ?.streaming === true
+      ? latestQ.preview
+      : spoken !== null &&
+          spoken !== undefined &&
+          !turns.some((turn) => turn.id === spoken.messageId)
+        ? // Still being said: the room's preview is what is up.
+          spoken
+        : latestQ !== undefined && latestQ.blocks.length === 0
+          ? // Owner 2026-10-23: the answer landed with no cards of its
+            // own, so the cards put up while Q talked stay; they no
+            // longer clear as it lands. An answer with cards of its own
+            // decides by its blocks, as before.
+            (latestQ.preview ??
+            (spoken?.messageId === latestQ.id ? spoken : undefined))
+          : undefined;
   if (preview === undefined) return null;
   // A summary the person asked for is its own object: its frame goes up
   // even before it names anyone, and over whatever was there.

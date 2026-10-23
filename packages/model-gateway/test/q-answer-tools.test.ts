@@ -2343,6 +2343,51 @@ describe("findings and cards written beside the answer (owner 2026-10-22)", () =
     expect(findingBlocks(completed)).toEqual(["Northwind is at seed."]);
   });
 
+  it("the extras' cards reach the message: the join never clears them (owner 2026-10-23)", async () => {
+    const { seam, request, completed } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: analystResult("Zino Aviation runs charter flights."),
+        },
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Charter."),
+            answerCards: {
+              shape: "RESEARCH",
+              title: "Zino Aviation",
+              cards: [
+                {
+                  name: "Zino Aviation",
+                  line: null,
+                  reasons: ["Runs charter flights."],
+                  measures: [],
+                  view: null,
+                  said: null,
+                  citations: [],
+                },
+              ],
+              followUps: [],
+            },
+          },
+        },
+      ],
+      parallelExtras: true,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const blocks =
+      (
+        completed[0] as {
+          message: {
+            blocks?: { kind: string; cards?: { name: string }[] }[];
+          };
+        }
+      ).message.blocks ?? [];
+    const cards = blocks.find((block) => block.kind === "ANSWER_CARDS");
+    expect(cards?.cards?.map((card) => card.name)).toEqual(["Zino Aviation"]);
+  });
+
   it("an answer that asks a question back keeps no extras", async () => {
     const { seam, request, completed } = build({
       script: [
