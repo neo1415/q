@@ -2234,6 +2234,63 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     );
   });
 
+  it("QO-07: 'Write me a 12-month plan' is started as work, and 'yes' to Q's offer carries their earlier words as the goal", async () => {
+    const goals: string[] = [];
+    const teamJob: QTeamJobPort = {
+      propose: (_request, goal) => {
+        goals.push(goal);
+        return Promise.resolve({
+          status: "STARTED",
+          plan: {
+            summary: "Write your 12-month plan from your pipeline and mandate",
+            steps: [],
+            needsYou: [],
+            cannot: [],
+          },
+          firstRead: "Your pipeline is the place to start.",
+        });
+      },
+    };
+    const direct = seam({
+      said: "Write me a 12-month plan",
+      reading: {
+        ...reading(null),
+        handOver: null,
+        teamJob: true,
+      } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await direct.answer.answer(request());
+    expect(goals).toEqual(["Write me a 12-month plan"]);
+    expect(direct.delegated()).toBe(0);
+    expect(direct.stored.at(-1)?.content).toMatch(
+      /^On it\. Starting now: write your 12-month plan/u,
+    );
+
+    const yes = seam({
+      said: "yes",
+      earlier: [
+        { role: "USER", content: "Write me a 12-month plan" },
+        {
+          role: "Q",
+          content: "Here is a first view... Want me to put it in a document?",
+        },
+      ],
+      reading: {
+        ...reading(null),
+        handOver: null,
+        teamJob: true,
+        workFromEarlier: true,
+      } as TurnReaderResult,
+      outcomes: [],
+      teamJob,
+    });
+    await yes.answer.answer(request());
+    expect(goals.at(-1)).toBe("Write me a 12-month plan\nyes");
+    expect(yes.delegated()).toBe(0);
+  });
+
   it("the same words without the reading's teamJob are answered as before (no magic word)", async () => {
     let proposed = 0;
     const teamJob: QTeamJobPort = {

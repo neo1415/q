@@ -420,6 +420,9 @@ export {
   TurnMeetingPrepSchema,
   type TurnMeetingPrep,
   TurnReaderV58ResultSchema,
+  TURN_READER_V61_SCHEMA_VERSION,
+  TurnReaderV61ResultSchema,
+  type TurnReaderV61Result,
   type TurnReaderV58Result,
   QUESTION_KINDS_V58,
   TurnQuestionV58Schema,
@@ -1407,6 +1410,8 @@ export {
 export {
   ANALYSIS_CRITIQUE_V1,
   ANALYSIS_WRITE_V1,
+  ANALYSIS_WRITE_V2,
+  ANALYSIS_CRITIQUE_V2,
   RESEARCH_FACTS_V1,
   RESEARCH_PLAN_V1,
 } from "./prompts/tasks/analyst.v1.js";
@@ -1744,6 +1749,10 @@ export {
   V60_ASKING_IS_NOT_OPEN,
   V60_SCREENS_ANY_LANGUAGE,
 } from "./prompts/tasks/turn-reader.v60.js";
+export {
+  TURN_READER_V61,
+  V61_DEEP_WORK,
+} from "./prompts/tasks/turn-reader.v61.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 export { TURN_SKIM_V7, V7_WRITES } from "./prompts/tasks/turn-skim.v7.js";

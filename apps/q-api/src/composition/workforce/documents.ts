@@ -93,6 +93,13 @@ export function createWorkforceDocuments(dependencies: {
   readonly analyst?:
     Pick<WorkforceModels, "writeAnalysis" | "critiqueAnalysis"> | undefined;
   readonly now?: (() => number) | undefined;
+  /**
+   * Owner QA 2026-10-23 (QO-07): the person's own context -- an investor's
+   * organisation, mandates and pipeline; a founder's investor pipeline --
+   * read as them (own-context.ts). An analysis is written for them.
+   */
+  readonly ownContext?:
+    ((actor: ActorContext) => Promise<string | null>) | undefined;
 }) {
   /**
    * An ANALYSIS document: the company's own record read as the person
@@ -156,7 +163,10 @@ export function createWorkforceDocuments(dependencies: {
         : request.scope === "NAMED_COMPANY"
           ? request.companyId
           : null;
-    if (request.scope !== "GENERAL" && companyId === null) return unavailable();
+    // An investor's "own" plan has no company of theirs: it is written
+    // from their own context (ownContext) alone, never refused.
+    if (request.scope === "NAMED_COMPANY" && companyId === null)
+      return unavailable();
     const subject: Extract<QSubjectRef, { kind: "COMPANY" }> | null =
       companyId === null ? null : { kind: "COMPANY", companyId };
     const runId = QRunIdSchema.parse(input.qRunId);
@@ -239,6 +249,11 @@ export function createWorkforceDocuments(dependencies: {
         lines.length === 0
           ? "The company's record holds nothing yet; say what is not known."
           : lines.join("\n");
+    }
+    // Whoever it is for: their own context, read as them.
+    const theirs = await dependencies.ownContext?.(actor).catch(() => null);
+    if (theirs != null && theirs.length > 0) {
+      company = `${company}\n\nWHO THIS IS FOR (${input.principalName ?? "the person"}), from their own records:\n${theirs}`;
     }
     const merged = mergeDossiers(input.research ?? []);
     const spend = createSpend(input.budgetUsd);

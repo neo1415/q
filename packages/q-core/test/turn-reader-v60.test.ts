@@ -18,7 +18,7 @@ import {
 describe("TURN_READER v60", () => {
   it("is the active reader, v59 kept whole plus three readings", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(60);
+    expect(active.definition.version).toBe(61);
     expect(TURN_READER_V59.status).toBe("DEPRECATED");
     const added = `${V60_SCREENS_ANY_LANGUAGE}${V60_ASKING_IS_NOT_OPEN}${V60_ANSWERING_INTEREST}`;
     expect(TURN_READER_V60.template).toContain(

@@ -1,7 +1,9 @@
 {
   "entries": {
     "analysis-critique/v1": "a3f0785d9c33b003887cb7a0b98360495e814b71d7ff88736f3edcf4bc7b359b",
+    "analysis-critique/v2": "5b33b446f53147f4b98ff2a08185795f4fc19af63438669d08734a7f650acdb8",
     "analysis-write/v1": "4fddbfc0abfe4ec7df7b07e7b0aaae1ba7663346e253dc0c195b36a3cfad61ac",
+    "analysis-write/v2": "9dd2f0032dbd7a7dbb22f7f0bb9a4a6f7254078675bb447dc8b69e4318b2bb4f",
     "app-action-arguments/v1": "21532d93daad24dc70a9838e3a6c352b902b0a9f213108d507a27d3193f35ec1",
     "app-action-router/v1": "8137f33d99a8fb454a95b730addca2833ae4bd25ed937d8b5b71b827b341bf95",
     "artifact-revision/v1": "48f95a797cc00afd36c1afd6bb57660786dc57df154778a63f10bf626a1a5f0e",
@@ -236,6 +238,7 @@
     "turn-reader/v59": "9994ff387c621efb648a3fae2ed7448593627f187b7493b22b8f9169e6a382d8",
     "turn-reader/v6": "628316302e0c9194a0d7b8f0043307551a07e69d8ceebd295318e6cac4934c9f",
     "turn-reader/v60": "397e2c67a849bb96da8314abe8f7bf191c75bea7c9633c40dc8e2020e80d73af",
+    "turn-reader/v61": "14325ce759389bf5e855d8b310a4a6931362808db2ff1ba6c31d4d2b68f9464a",
     "turn-reader/v7": "35c13812e361ec18765a34dcdb4a3aabd1138bab96d2175667e8959bed7e4fc5",
     "turn-reader/v8": "80daa7662a5c5391f162ba8577e4f717ae22b11b4a724b803a12f29a0b8183c8",
     "turn-reader/v9": "f11ef638ab86a97bcc86119dd659e1b092b5f131462d0bb49f2213c84c8e2b1e",

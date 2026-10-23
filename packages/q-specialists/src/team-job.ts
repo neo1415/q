@@ -209,6 +209,28 @@ export function waitingWork(summary: string): string {
     .trim();
 }
 
+/**
+ * QO-07 (owner QA 2026-10-23): "Write me a 12-month plan" ... "yes". When
+ * the reader says this turn hands over work asked for or offered just
+ * before (TURN_READER v61 workFromEarlier), the job's goal is the person's
+ * own last request before Q's reply, with this turn after it: their words
+ * only, so nothing a model wrote becomes the job (or a research query).
+ */
+export function earlierRequestGoal(
+  history: readonly { readonly role: string; readonly content: string }[],
+  latest: string,
+): string | null {
+  // history ends with this turn; look before it for their last request.
+  for (let index = history.length - 2; index >= 0; index -= 1) {
+    const turn = history[index];
+    if (turn?.role !== "USER") continue;
+    const asked = turn.content.trim();
+    if (asked.length < 3) return null;
+    return `${asked}\n${latest.trim()}`.slice(0, 1_000);
+  }
+  return null;
+}
+
 const ANSWER_HERE =
   "I can answer it here from what Capital Q holds instead, if that helps.";
 

@@ -866,3 +866,15 @@ export const TurnReaderV58ResultSchema = TurnReaderV56ResultSchema.extend({
   meetingPrep: TurnMeetingPrepSchema.nullable().default(null).catch(null),
 }).strict();
 export type TurnReaderV58Result = z.infer<typeof TurnReaderV58ResultSchema>;
+
+/**
+ * v61 (owner QA 2026-10-23, QO-07): workFromEarlier is true when this turn
+ * hands Q work they asked for, or Q offered, a turn or two earlier ("yes",
+ * "go ahead, do it") -- the work is in those earlier words, which code
+ * carries as the job's goal (their own words, never the reader's).
+ */
+export const TURN_READER_V61_SCHEMA_VERSION = 61;
+export const TurnReaderV61ResultSchema = TurnReaderV58ResultSchema.extend({
+  workFromEarlier: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnReaderV61Result = z.infer<typeof TurnReaderV61ResultSchema>;
