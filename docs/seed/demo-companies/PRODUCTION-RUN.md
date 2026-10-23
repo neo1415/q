@@ -95,3 +95,36 @@ node scripts/seed/demo-companies/seed.mjs --hosted --skip songscribe \
 # 3. pitch video at /pitch/new signed in as founder.capitalq@, audience "Everyone on Capital Q"
 # 4. --confirm-deck (same --person args) once Q's hosted deck reading exists
 ```
+
+## Run 2 result (2026-10-23, owner said "go" in-session)
+
+Written to production (all idempotent; a re-run plans "nothing to change"):
+
+- Accounts (auth admin API, email confirmed, no email sent): `zino.mario@`, `daniel.oyeniyi@`, `adeyemi.odunyugbo@fictional.capitalq.local`.
+- `seed.mjs --hosted --skip songscribe` with all four `--person`, both `--photo` and `--documents`, then `--apply`:
+  - Capital Q updated in place (`ee75a7d8…`): 3 fields, the demonstration label, +11 self-reported claims, +6 taxonomy, the raise replaced, the company Q Card, handle `capital-q-hq`.
+  - KUUZA AI: +4 claims, +2 taxonomy, the label. Nothing overwritten.
+  - Team memberships (member role only) with titles; photos for David and Zino (512×512, `READY`); cards `@david-nwankwo` and `@zino-mario`.
+  - The six data-room documents: the deck PUBLIC, the other five ON_REQUEST.
+- `--confirm-deck --apply`: confirmed Q's reading `23364fd4…` of "Pitch deck, Q3 2026" (15 pages, read 08:45 UTC), as David.
+- Profile names (same columns the app's own profile update writes, `version + 1`), from the fixture: David Nwankwo (replacing "Capital Q demo founder"), Captain Zino Mario, Daniel Oyeniyi, Adeyemi Odunyugbo. Without a name, `/u/zino-mario` returned 404; the seed sets no names (gap in `seed.mjs`).
+
+Pitch video: **FAILED, owner decision needed.**
+
+- Uploaded through the real `/pitch/new` flow signed in as David. Media asset `9e3ba15e…` is `PROCESSING_FAILED` at Cloudflare Stream.
+- Cause: the file is 3 min 59 s (238.8 s, H.264/AAC 1280×720). The product's hard limit is 180 s (`packages/media/src/contracts/index.ts` `DEFAULT_PITCH_DURATION_POLICY.hardMaxSeconds`), and it is sent to Stream as `maxDurationSeconds`.
+- The failed record is private (organisation only); "Upload again" on `/pitch/9e3ba15e…` reuses it.
+- Capital Q's existing pitch ("AI presenter, AI-generated", 0:50, NETWORK) is unchanged.
+
+Live verification (Playwright, investor `investor.equator-line@` and David; screenshots in `evidence-2026-10-23/`):
+
+| Check                       | Result                                                                                                                                                                                                                                                                                              |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One Capital Q               | PASS (SQL: one active company; profile 200)                                                                                                                                                                                                                                                         |
+| Demonstration label         | PASS (profile, company card, both person cards)                                                                                                                                                                                                                                                     |
+| Team with photos            | PASS: Team 4 (David Nwankwo Founder, Captain Zino Mario Co-founder, Adeyemi and Daniel Engineering), both photos load; `/u/david-nwankwo` and `/u/zino-mario` 200 with photo                                                                                                                        |
+| Documents at their levels   | PASS (David's data room: all six; ON_REQUEST shown). The investor tab reads "Data room 0" before interest; the deck has its own tab                                                                                                                                                                 |
+| InvestIQ band               | PASS: Investability 75/100 "Strong, low confidence, 17 of 46 factors"; Suitability 60/100                                                                                                                                                                                                           |
+| Q "tell me about Capital Q" | PARTIAL: the bare question is answered about the platform. Naming the company, Q answers from the profile and cites demonstration data, but says it has no authorised record of revenue, customers or raise: the 11 new claims don't reach Q yet (projection lag or a retrieval gap; not diagnosed) |
+| Video plays on profile      | NOT VERIFIABLE HERE: this Chromium has no H.264/MSE (`canPlayType` empty). The existing 0:50 pitch is listed on the Elevator tab                                                                                                                                                                    |
+| Video in Explore            | NOT FOUND in the first 25 feed cards for this investor (likely ranking or mandate; Capital Q is a stage mismatch for this Series A fund)                                                                                                                                                            |
