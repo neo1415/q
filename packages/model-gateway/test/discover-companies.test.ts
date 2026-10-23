@@ -92,7 +92,9 @@ function outcome(
 }
 
 /** The catalog and fit tools as the tool port answers them. */
-function tools(options: { mandate?: boolean; rows?: readonly Row[] } = {}) {
+function tools(
+  options: { mandate?: boolean; rows?: readonly Row[]; ranks?: boolean } = {},
+) {
   const rows = options.rows ?? CATALOG;
   const asked: { name: string; args: Record<string, unknown> }[] = [];
   const port: Pick<QToolPort, "execute"> = {
@@ -103,14 +105,21 @@ function tools(options: { mandate?: boolean; rows?: readonly Row[] } = {}) {
         const sectors = (args["sectors"] as string[] | undefined) ?? [];
         const countries = (args["countries"] as string[] | undefined) ?? [];
         const known = sectors.filter((s) => SECTOR_NAMES[s] !== undefined);
-        const matched = rows
+        // A catalog that ranks (`ranks`) scores every match on the
+        // mandate and returns the best first, with how many matched.
+        const byFit = options.ranks === true && args["order"] === "FIT";
+        const all = rows
           .filter(
             (row) =>
               (sectors.length === 0 || sectors.includes(row.sector)) &&
               (countries.length === 0 || countries.includes(row.country)),
           )
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .slice(0, Number(args["limit"] ?? 10));
+          .sort((a, b) =>
+            byFit
+              ? b.strong - a.strong || a.name.localeCompare(b.name)
+              : a.name.localeCompare(b.name),
+          );
+        const matched = all.slice(0, Number(args["limit"] ?? 10));
         return Promise.resolve(
           outcome(proposal, "discovery.companies", {
             companies:
@@ -124,7 +133,8 @@ function tools(options: { mandate?: boolean; rows?: readonly Row[] } = {}) {
                     shortDescription: `${row.name} does useful things.`,
                     sectors: [SECTOR_NAMES[row.sector] ?? row.sector],
                   })),
-            order: "NAME",
+            order: byFit ? "FIT" : "NAME",
+            ...(byFit ? { total: all.length, totalAtLeast: false } : {}),
             sectors: known.map((code) => ({
               code,
               name: SECTOR_NAMES[code] ?? code,
@@ -191,6 +201,7 @@ async function discover(
     mandate?: boolean;
     investor?: boolean;
     rows?: readonly Row[];
+    ranks?: boolean;
   } = {},
 ) {
   const port = tools(options);
@@ -425,5 +436,49 @@ describe("follow-ups on the cards just shown (K1)", () => {
     const second = answer.block?.cards[1];
     expect(second?.name).toBe("Clearwater");
     expect(second?.subject).toEqual({ kind: "COMPANY", companyId: ID(3) });
+  });
+});
+
+describe("an investor's discovery ranks every match, not the first page by name (owner 2026-10-23)", () => {
+  // Thirty-seven fintech companies; the strongest fit is last by name.
+  const many: readonly Row[] = Array.from({ length: 37 }, (_, i) => ({
+    n: 100 + i,
+    name: i === 36 ? "Zenith Pay" : `Fintech ${String(i + 1).padStart(2, "0")}`,
+    sector: "fintech",
+    country: "NG",
+    strong: i === 36 ? 5 : 1 + (i % 3),
+  }));
+
+  it("asks the catalog for FIT order, reads only the best in full, and says how many matched", async () => {
+    const { answer, asked } = await discover(
+      ask({
+        text: "Which fintech companies suit my mandate",
+        count: null,
+        ranking: "FIT",
+        mandateRelevant: true,
+      }),
+      { rows: many, ranks: true },
+    );
+    const catalogCall = asked.find(
+      (call) => call.name === "discover_companies",
+    );
+    expect(catalogCall?.args["order"]).toBe("FIT");
+    expect(names(answer.block)[0]).toBe("Zenith Pay");
+    // Only the shown page is read for its cards.
+    expect(fitCalls(asked)).toBe(answer.block?.cards.length);
+    expect(answer.text).not.toMatch(/At least/u);
+    expect(answer.text).toMatch(
+      /^37 fintech companies on Capital Q; ranked by fit with your mandate, the top ten: Zenith Pay /u,
+    );
+  });
+
+  it("'top three' over thirty-seven: the strongest leads though it is last by name", async () => {
+    const { answer, asked } = await discover(
+      ask({ text: "top three fintech", ranking: "TOP" }),
+      { rows: many, ranks: true },
+    );
+    expect(names(answer.block)).toHaveLength(3);
+    expect(names(answer.block)[0]).toBe("Zenith Pay");
+    expect(fitCalls(asked)).toBe(3);
   });
 });

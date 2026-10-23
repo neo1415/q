@@ -59,6 +59,11 @@ type Catalog = {
   readonly companies: readonly CatalogCompany[];
   readonly sectors: readonly { readonly code: string; readonly name: string }[];
   readonly unknownSectors: readonly string[];
+  /** FIT: every match was scored on the mandate and these are the best. */
+  readonly order: "NAME" | "FIT";
+  /** How many matched (FIT counts them all); a floor when `atLeast`. */
+  readonly total: number | null;
+  readonly atLeast: boolean;
 };
 
 export type DiscoveryAnswer = {
@@ -72,14 +77,26 @@ export type DiscoveryAnswer = {
 
 function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
   if (outcome === null || !outcome.result.ok) return null;
-  const data = outcome.result.data as Partial<Catalog> | null;
+  const data = outcome.result.data as {
+    readonly companies?: unknown;
+    readonly sectors?: unknown;
+    readonly unknownSectors?: unknown;
+    readonly order?: unknown;
+    readonly total?: unknown;
+    readonly totalAtLeast?: unknown;
+  } | null;
   if (data === null || !Array.isArray(data.companies)) return null;
   return {
-    companies: data.companies,
-    sectors: Array.isArray(data.sectors) ? data.sectors : [],
-    unknownSectors: Array.isArray(data.unknownSectors)
-      ? data.unknownSectors
+    companies: data.companies as readonly CatalogCompany[],
+    sectors: Array.isArray(data.sectors)
+      ? (data.sectors as Catalog["sectors"])
       : [],
+    unknownSectors: Array.isArray(data.unknownSectors)
+      ? (data.unknownSectors as readonly string[])
+      : [],
+    order: data.order === "FIT" ? "FIT" : "NAME",
+    total: typeof data.total === "number" ? data.total : null,
+    atLeast: data.totalAtLeast === true,
   };
 }
 
@@ -271,7 +288,10 @@ export async function runCompanyDiscovery(input: {
         sectors: [...ask.sectors],
         countries: [...ask.countries],
         stages: [...ask.stages],
+        // Owner 2026-10-23: the catalog scores every match on the mandate
+        // and returns the best; never the first companies by name.
         limit: fitWanted ? DISCOVER_FIT_MAX : count,
+        ...(fitWanted ? { order: "FIT" } : {}),
       },
       "q-discover-companies",
     ),
@@ -296,9 +316,12 @@ export async function runCompanyDiscovery(input: {
   let fits: RunFit[] = [];
   let noMandate = false;
   if (fitWanted) {
+    // FIT order: the catalog already scored every match and these are the
+    // best, so only they are read in full for their cards. A catalog that
+    // could not rank (name order) has its first page scored, as before.
     const outcomes = await Promise.all(
       catalog.companies
-        .slice(0, DISCOVER_FIT_MAX)
+        .slice(0, catalog.order === "FIT" ? count : DISCOVER_FIT_MAX)
         .map((company, index) =>
           execute(
             FIT_TOOL,
@@ -339,25 +362,29 @@ export async function runCompanyDiscovery(input: {
       );
       // How many matched: every one retrieved, unless the catalog's
       // bound was reached, when it is a floor.
-      const matched =
-        catalog.companies.length >= DISCOVER_FIT_MAX
-          ? `At least ${String(catalog.companies.length)}`
-          : capitalised(counted(catalog.companies.length));
+      const total = catalog.total ?? catalog.companies.length;
+      const floor =
+        catalog.total === null
+          ? catalog.companies.length >= DISCOVER_FIT_MAX
+          : catalog.atLeast;
+      const matched = floor
+        ? `At least ${String(total)}`
+        : capitalised(counted(total));
       const one = kind.replace(/companies/u, "company");
       const head =
-        catalog.companies.length < count && ask.count !== null
-          ? catalog.companies.length === 1
+        total < count && ask.count !== null
+          ? total === 1
             ? `Capital Q has only one ${one} you can see: ${listed(named)}.`
-            : `Capital Q has only ${counted(catalog.companies.length)} ${kind} you can see, ranked by fit with your mandate: ${listed(named)}.`
+            : `Capital Q has only ${counted(total)} ${kind} you can see, ranked by fit with your mandate: ${listed(named)}.`
           : ask.count !== null
             ? `${
                 block.cards.length < count
                   ? `Only ${counted(block.cards.length)} of the ${kind} you can see could be scored. `
                   : ""
               }Ranked by fit with your mandate, the strongest ${kind}: ${listed(named)}.`
-            : catalog.companies.length === 1
+            : total === 1
               ? `Capital Q has only one ${one} you can see: ${listed(named)}.`
-              : block.cards.length === catalog.companies.length
+              : block.cards.length === total
                 ? `${matched} ${kind} on Capital Q, ranked by fit with your mandate: ${listed(named)}.`
                 : `${matched} ${kind} on Capital Q; ranked by fit with your mandate, the top ${counted(block.cards.length)}: ${listed(named)}.`;
       return {
