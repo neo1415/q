@@ -21,6 +21,7 @@ import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { workforceDeepResearch } from "./composition/workforce/deep-research.js";
 import { createWorkforceDelivery } from "./composition/workforce/delivery.js";
+import { createOwnContextReader } from "./composition/workforce/own-context.js";
 import { createWorkforceDocuments } from "./composition/workforce/documents.js";
 import { createDemoRehearsalAccess } from "./composition/demo-rehearsal-access.js";
 import { createInvestorLink } from "./composition/investor-link.js";
@@ -4666,6 +4667,21 @@ const workforceDocuments = createWorkforceDocuments({
   preparation: qArtifacts.preparation,
   critic: workforceModels.critique,
   analyst: workforceModels,
+  // QO-07: an analysis is written for the person: an investor's
+  // organisation, mandates and pipeline, read as them.
+  ownContext: createOwnContextReader({
+    ownInvestorOrganisation: async (actor) => {
+      if (actor.organisationId === undefined) return null;
+      const found = await ownInvestorOrganisations.findByOrganisation(
+        database.sql,
+        actor.tenantId,
+        actor.organisationId,
+      );
+      return found === null ? null : found.id;
+    },
+    records: ownRecords,
+    relationships: errandRelationships.ownRelationships,
+  }),
   logger,
 });
 const workforceDiligence = createWorkforceDiligence({

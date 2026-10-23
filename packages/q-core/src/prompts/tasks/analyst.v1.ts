@@ -191,7 +191,7 @@ export const ANALYSIS_WRITE_V1: PromptDefinition<
 > = {
   id: "ANALYSIS_WRITE",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "EVIDENCE_SYNTHESIS",
   owner: "q-core",
@@ -251,7 +251,7 @@ export const ANALYSIS_CRITIQUE_V1: PromptDefinition<
 > = {
   id: "ANALYSIS_CRITIQUE",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -269,4 +269,55 @@ export const ANALYSIS_CRITIQUE_V1: PromptDefinition<
     schema: AnalysisCritiqueResultSchema,
   },
   template: ANALYSIS_CRITIQUE_TEMPLATE,
+};
+
+/**
+ * v2 (owner QA 2026-10-23, QO-07): investor Zino's "12-month plan" named
+ * none of his companies. The record now also says WHO THIS IS FOR -- an
+ * investor's organisation, mandates and pipeline, a founder's investors --
+ * and the plan is written for that situation.
+ */
+const ANALYSIS_FOR_THEM = `- Write it for WHO THIS IS FOR (in the record below when given): their own situation, not a template. For an investor, their mandate, the companies in their pipeline by name and where each stands, and what they should do with each; for a founder, their company and the investors they are talking to. A plan that would read the same for anyone else is GENERIC, and wrong. Name only what their record names.
+`;
+
+export const ANALYSIS_WRITE_V2: PromptDefinition<
+  AnalysisWriteVariables,
+  AnalysisDocumentResult
+> = {
+  ...ANALYSIS_WRITE_V1,
+  version: 2,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-23",
+  changeDescription:
+    "Owner QA 2026-10-23 (QO-07): written for WHO THIS IS FOR -- an investor's mandate and named pipeline, a founder's company and investors -- from their own records; a plan that would fit anyone is GENERIC.",
+  template: ANALYSIS_WRITE_V1.template
+    .replace(
+      "- Unknown stays unknown:",
+      `${ANALYSIS_FOR_THEM}- Unknown stays unknown:`,
+    )
+    .replace(
+      "THE COMPANY'S OWN RECORD (read from Capital Q as {{principalName}} may see it; each line says its truth class)",
+      "THE RECORD: THE COMPANY'S OWN AND WHO THIS IS FOR (read from Capital Q as {{principalName}} may see it)",
+    ),
+};
+
+export const ANALYSIS_CRITIQUE_V2: PromptDefinition<
+  AnalysisCritiqueVariables,
+  AnalysisCritiqueResult
+> = {
+  ...ANALYSIS_CRITIQUE_V1,
+  version: 2,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-23",
+  changeDescription:
+    "Owner QA 2026-10-23 (QO-07): GENERIC includes a document that ignores WHO THIS IS FOR -- an investor's mandate and named pipeline, a founder's company and investors -- when the record gives them.",
+  template: ANALYSIS_CRITIQUE_V1.template
+    .replace(
+      "- GENERIC: padding, or advice that would fit any company.",
+      "- GENERIC: padding, or advice that would fit any company or anyone else; or it ignores WHO THIS IS FOR when the record gives it (an investor's mandate and the companies in their pipeline by name; a founder's company and investors).",
+    )
+    .replace(
+      "THE COMPANY'S OWN RECORD\n",
+      "THE RECORD: THE COMPANY'S OWN AND WHO THIS IS FOR\n",
+    ),
 };
