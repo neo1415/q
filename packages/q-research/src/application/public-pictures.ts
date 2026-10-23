@@ -1,4 +1,5 @@
-import { composeEgressQuery, tokenise } from "../domain/egress.js";
+import { composeEgressQuery } from "../domain/egress.js";
+import { textNamesEntity } from "../domain/names.js";
 import { judgePublicUrl } from "../domain/url-safety.js";
 import type { ResearchExecutionContext } from "../ports.js";
 
@@ -62,10 +63,33 @@ const https = (url: string | null): string | null => {
   return verdict.ok && verdict.url.startsWith("https://") ? verdict.url : null;
 };
 
-/** Every word of the name, in the page's title (a namesake check, not a proof). */
-function titleNames(title: string, name: string): boolean {
-  const words = new Set(tokenise(title));
-  return tokenise(name).every((word) => words.has(word));
+/**
+ * Sites whose pictures are not of the company or person (production
+ * 2026-10-23: "latest news on Flutterwave" showed Dribbble design shots):
+ * design galleries, stock libraries, pin boards and search pages.
+ */
+const NOT_OF_THEM =
+  /(^|\.)(dribbble\.com|behance\.net|pinterest\.[a-z.]+|pin\.it|shutterstock\.com|istockphoto\.com|gettyimages\.[a-z.]+|alamy\.com|dreamstime\.com|depositphotos\.com|freepik\.com|vecteezy\.com|123rf\.com|stock\.adobe\.com|unsplash\.com|pexels\.com|pixabay\.com|canva\.com|google\.[a-z.]+|bing\.com|yandex\.[a-z.]+|duckduckgo\.com|logowik\.com|seeklogo\.com|worldvectorlogo\.com|brandfetch\.com)$/u;
+
+/** A gallery, listing or search page rather than one about them. */
+const SEARCH_PAGE =
+  /\/(search|tags?|explore|images)(\/|\?|$)|[?&](q|query|search)=/iu;
+
+/**
+ * Which pictures to show first: the entity's own site, then reference and
+ * professional pages (Wikipedia, LinkedIn), then everything else (news
+ * and the rest), each in the index's order.
+ */
+function preference(domain: string, name: string): number {
+  if (textNamesEntity(name, "", domain)) return 0;
+  if (
+    /(^|\.)(wikipedia\.org|wikimedia\.org|linkedin\.com|licdn\.com)$/u.test(
+      domain,
+    )
+  ) {
+    return 1;
+  }
+  return 2;
 }
 
 export function createPublicPictureSearch(input: {
@@ -99,28 +123,44 @@ export function createPublicPictureSearch(input: {
         );
         return [];
       }
-      const pictures: PublicPicture[] = [];
+      const candidates: (PublicPicture & { readonly rank: number })[] = [];
       const pages = new Set<string>();
       for (const hit of hits) {
-        if (pictures.length >= (max ?? DEFAULT_MAX)) break;
         const title = hit.title?.trim() ?? "";
-        if (title.length === 0 || !titleNames(title, name)) continue;
+        if (title.length === 0 || !textNamesEntity(name, title)) continue;
         const page = judgePublicUrl(hit.pageUrl);
         const image = https(hit.imageUrl) ?? https(hit.thumbnailUrl);
         if (!page.ok || !page.url.startsWith("https://") || image === null) {
           continue;
         }
+        if (NOT_OF_THEM.test(page.domain) || SEARCH_PAGE.test(page.url)) {
+          continue;
+        }
+        const imageHost = judgePublicUrl(image);
+        if (imageHost.ok && NOT_OF_THEM.test(imageHost.domain)) continue;
         // One picture a site: two from the same page say the same thing.
         if (pages.has(page.domain)) continue;
         pages.add(page.domain);
-        pictures.push({
+        candidates.push({
           imageUrl: image,
           pageUrl: page.url,
           domain: page.domain,
           title: title.slice(0, 200),
+          rank: preference(page.domain, name),
         });
       }
-      return pictures;
+      return candidates
+        .map((candidate, order) => ({ candidate, order }))
+        .sort(
+          (a, b) => a.candidate.rank - b.candidate.rank || a.order - b.order,
+        )
+        .slice(0, max ?? DEFAULT_MAX)
+        .map(({ candidate }) => ({
+          imageUrl: candidate.imageUrl,
+          pageUrl: candidate.pageUrl,
+          domain: candidate.domain,
+          title: candidate.title,
+        }));
     },
   };
 }

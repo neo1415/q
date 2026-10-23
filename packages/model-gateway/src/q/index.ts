@@ -4080,9 +4080,9 @@ export function createModelGatewayQAnswer(
        * model's tool round (which took seconds, and was skipped altogether
        * when that round answered without a tool). Same tool, same plan,
        * authorisation and egress policy, and still once per turn: the first
-       * public-web call the model makes is answered by this one. A person
-       * search has its own public lookup (W2) and keeps it, as does a turn
-       * code answers by itself (a company's fact, investors); a follow-up on
+       * public-web call the model makes is answered by this one. A turn
+       * code answers by itself (a company's fact, investors) keeps its own
+       * path; a follow-up on
        * what was just found ("what did those sources say?") keeps the
        * model's own call, answered from what this person already read.
        */
@@ -4095,8 +4095,13 @@ export function createModelGatewayQAnswer(
         claimed: boolean;
       } | null =
         research?.mode === "EXPLICIT" &&
-        request.personSearch === undefined &&
-        !personByCode &&
+        // A person search's own lookup (W2) runs beside it: when the lane
+        // finds no one, the answer has the web already (production
+        // 2026-10-23: "Tell me about Zino Aviation and its team" went to the
+        // lane, found nothing, and asked the web only after a model round:
+        // 9 s to the first word).
+        request.discoverInvestors === undefined &&
+        companyFactAsk === null &&
         provisionalRoute.path === "DEEP_ANALYSIS" &&
         earlyWebTool !== undefined &&
         researchFollowUp() === null &&
@@ -4124,6 +4129,39 @@ export function createModelGatewayQAnswer(
               // Landed (or dropped) later; a turn that ends first must not
               // leave a rejection nobody handles.
               outcome.catch(() => undefined);
+              const webStarted = Date.now();
+              void outcome.then(
+                (settled) => {
+                  const data = settled.result.ok
+                    ? (settled.result.data as {
+                        readonly status?: unknown;
+                        readonly sources?: readonly unknown[];
+                      })
+                    : null;
+                  logger?.info(
+                    {
+                      qRunId: request.runId,
+                      status: data?.status ?? settled.failureCode,
+                      sources: data?.sources?.length ?? 0,
+                      webMs: Date.now() - webStarted,
+                      sinceStartMs: Date.now() - startedAt,
+                    },
+                    "q early web search landed",
+                  );
+                },
+                () => undefined,
+              );
+              logger?.info(
+                {
+                  qRunId: request.runId,
+                  entity:
+                    (call.arguments as { readonly entityName?: unknown })
+                      .entityName ?? null,
+                  personLane: request.personSearch !== undefined,
+                  sinceStartMs: Date.now() - startedAt,
+                },
+                "q early web search started",
+              );
               return { call, outcome, claimed: false };
             })()
           : null;
@@ -4761,14 +4799,32 @@ export function createModelGatewayQAnswer(
         firstPublishedMs = Date.now() - startedAt;
         sendSaid(`${researchLead(named)} `);
       };
-      // The early web search is said as it runs, unless code's own opening
-      // line goes first (it is said as the model is asked).
-      if (
-        earlyWeb !== null &&
-        earlyLead === null &&
-        readCache.get(earlyWeb.call, toolContext) === null
-      ) {
-        sayResearching(earlyWeb.call.arguments);
+      // The early web search is said as it runs; where code has its own
+      // opening line from their records, that line is said now instead,
+      // rather than once the web has landed (production 2026-10-23: the
+      // opening waited for the whole search).
+      if (earlyWeb !== null) {
+        const said =
+          earlyLead !== null && leadLines === undefined
+            ? "LEAD"
+            : readCache.get(earlyWeb.call, toolContext) === null
+              ? "RESEARCHING"
+              : null;
+        if (said === "LEAD" && earlyLead !== null) {
+          leadLines = earlyLead;
+          leadListOpen = true;
+          sayLeadLines();
+        } else if (said === "RESEARCHING") {
+          sayResearching(earlyWeb.call.arguments);
+        }
+        logger?.info(
+          {
+            qRunId: request.runId,
+            said,
+            firstWordMs: firstPublishedMs,
+          },
+          "q early web search first words",
+        );
       }
       const publish = (text: string): void => {
         // Code's opening lines come first on every surface that listens to
@@ -5377,6 +5433,22 @@ export function createModelGatewayQAnswer(
             });
           }
         }
+        // Their picture from public pages, looked for beside the lookup
+        // (owner 2026-10-23): the turn's own picture search when the web
+        // search began with their name, else one for the name they asked.
+        const lanePictures =
+          webPictures ??
+          (dependencies.publicPictures !== undefined && askedName.length > 0
+            ? dependencies.publicPictures
+                .find({
+                  name: askedName,
+                  userText: latest.content,
+                  earlierUserText:
+                    toolContext.conversation?.earlierUserText ?? [],
+                  signal: request.signal,
+                })
+                .catch(() => [])
+            : null);
         const found = await personFor(request.personSearch);
         if (found !== null) {
           for (const source of found.sources) {
@@ -5384,13 +5456,21 @@ export function createModelGatewayQAnswer(
               publicSources.push(source);
             }
           }
-          const message = await persistCodeAnswer(
-            found.text,
-            found.block === null ? [] : [found.block],
-          );
+          const pictures =
+            lanePictures === null
+              ? []
+              : publicPictureBlocks(
+                  (await settledWithin(lanePictures, PICTURE_WAIT_MS)) ?? [],
+                  new Date().toISOString(),
+                );
+          const message = await persistCodeAnswer(found.text, [
+            ...(found.block === null ? [] : [found.block]),
+            ...pictures,
+          ]);
           logger?.info(
             {
               qRunId: request.runId,
+              pictures: pictures.length,
               outcome: found.result.outcome,
               source: found.source,
               confidence: found.result.card?.subject.confidence ?? null,

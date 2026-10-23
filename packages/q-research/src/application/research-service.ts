@@ -19,6 +19,7 @@ import {
   type InstructionRiskCategory,
 } from "../domain/excerpt.js";
 import { countryName, mentionedCountries } from "../domain/geography.js";
+import { textNamesEntity } from "../domain/names.js";
 import {
   mergePlannedHits,
   matchOf,
@@ -300,6 +301,22 @@ function identityTerms(subject: ResearchSubject | null): readonly string[] {
     }
   }
   return terms;
+}
+
+/** Whether a hit is about the named entity (domain/names.ts). */
+function namesEntity(
+  name: string,
+): (hit: {
+  readonly url: string;
+  readonly title: string | null;
+  readonly snippet: string;
+}) => boolean {
+  return (hit) =>
+    textNamesEntity(
+      name,
+      `${hit.title ?? ""} ${hit.snippet} ${hit.url.replace(/[/._-]+/gu, " ")}`,
+      publicDomainOf(hit.url),
+    );
 }
 
 /**
@@ -763,7 +780,15 @@ export function createPublicWebResearchService(
         }
       }
 
-      const safeHits = hits.filter((hit) => judgePublicUrl(hit.url).ok);
+      // A search about someone named keeps only pages that name them
+      // (production 2026-10-23: a celebrity plane crash and a jet-charter
+      // advert answered "Zino Aviation and its team"). Nothing is put in
+      // their place: fewer sources, never padding.
+      const gate =
+        entity !== null && aboutSomeoneElse ? namesEntity(entity.name) : null;
+      const safeHits = hits.filter(
+        (hit) => judgePublicUrl(hit.url).ok && (gate === null || gate(hit)),
+      );
       remember(
         command.runId,
         safeHits.map((hit) => hit.url),
