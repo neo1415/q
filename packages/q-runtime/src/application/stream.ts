@@ -119,6 +119,8 @@ export type QLiveDelta = {
    * be empty). Never merged with another delta.
    */
   readonly preview?: Pick<QArtifactPreview, "subjects" | "layout"> | undefined;
+  /** A holding line said before the turn is read (QMessageDeltaEvent). */
+  readonly holding?: true | undefined;
 };
 
 export type QLiveDeltaListener = (delta: QLiveDelta) => void;
@@ -167,13 +169,27 @@ export type QLiveDeltaBus = {
   readonly subscriberCount: (runId?: QRunId) => number;
 };
 
-export function createInProcessQLiveDeltaBus(): QLiveDeltaBus {
+export function createInProcessQLiveDeltaBus(
+  now: () => number = Date.now,
+): QLiveDeltaBus {
   const listeners = new Map<string, Set<QLiveDeltaListener>>();
+  /**
+   * Each run's holding line, until anything else of the run is said
+   * (owner 2026-10-23): it goes out as the turn arrives, which can be
+   * before the person's stream has connected (live: the stream opened
+   * about a second after the turn was sent), so a late subscriber is
+   * handed it. Bounded and short-lived; never stored.
+   */
+  const holding = new Map<string, { delta: QLiveDelta; at: number }>();
   return {
     subscribe: (runId, listener) => {
       const set = listeners.get(runId) ?? new Set();
       set.add(listener);
       listeners.set(runId, set);
+      const held = holding.get(runId);
+      if (held !== undefined && now() - held.at <= HOLDING_TTL_MS) {
+        listener(held.delta);
+      }
       return () => {
         set.delete(listener);
         if (set.size === 0) {
@@ -186,12 +202,28 @@ export function createInProcessQLiveDeltaBus(): QLiveDeltaBus {
         ? [...listeners.values()].reduce((n, set) => n + set.size, 0)
         : (listeners.get(runId)?.size ?? 0),
     publish: (delta) => {
+      if (delta.holding === true) {
+        holding.delete(delta.runId);
+        holding.set(delta.runId, { delta, at: now() });
+        while (holding.size > HOLDING_MAX) {
+          const oldest = holding.keys().next().value;
+          if (oldest === undefined) break;
+          holding.delete(oldest);
+        }
+      } else {
+        holding.delete(delta.runId);
+      }
       for (const listener of listeners.get(delta.runId) ?? []) {
         listener(delta);
       }
     },
   };
 }
+
+/** How long a holding line waits for its run's stream to connect. */
+const HOLDING_TTL_MS = 60_000;
+/** Runs whose holding line is kept at once. */
+const HOLDING_MAX = 512;
 
 /**
  * The public projector (§26, §117-§119). A stored record becomes a stream
@@ -331,7 +363,11 @@ export function createQRunStreamService(
         sequence: Math.max(cursor, 1),
         occurredAt: new Date().toISOString(),
         type: "q.message.delta",
-        data: { messageId: delta.messageId, text },
+        data: {
+          messageId: delta.messageId,
+          text,
+          ...(delta.holding === true ? { holding: true as const } : {}),
+        },
       });
       if (parsed.success) {
         events.push(parsed.data);

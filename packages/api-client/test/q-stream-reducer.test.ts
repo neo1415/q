@@ -63,6 +63,37 @@ describe("reduceQStream", () => {
     expect(state.terminal).toBe(false);
   });
 
+  it("shows a holding line until the answer's words or its message take its place (owner 2026-10-23)", () => {
+    const HOLD = "123e4567-e89b-12d3-a456-426614174099";
+    const holding = event(
+      "q.message.delta",
+      {
+        messageId: HOLD,
+        text: "Looking into Zino Aviation now. ",
+        holding: true,
+      },
+      3,
+    );
+    let state = reduceQStream(createQStreamState(), started());
+    state = reduceQStream(state, holding);
+    expect(state.partial).toEqual({
+      messageId: HOLD,
+      text: "Looking into Zino Aviation now. ",
+      holding: true,
+    });
+    // The answer's own words replace it.
+    state = reduceQStream(state, delta("Zino Aviation trains pilots. "));
+    expect(state.partial).toEqual({
+      messageId: MSG,
+      text: "Zino Aviation trains pilots. ",
+    });
+    // A message under another id clears it too, when nothing streamed.
+    let quiet = reduceQStream(createQStreamState(), started());
+    quiet = reduceQStream(quiet, holding);
+    quiet = reduceQStream(quiet, completed("Zino Aviation trains pilots.", 4));
+    expect(quiet.partial).toBeNull();
+  });
+
   it("accumulates deltas into a partial buffer that the persisted message replaces", () => {
     let state = reduceQStream(createQStreamState(), started());
     state = reduceQStream(state, delta("Runway is "));

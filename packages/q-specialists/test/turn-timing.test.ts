@@ -1061,11 +1061,13 @@ describe("turn timing harness", () => {
     expect(row("follow-up on what the web said").firstText ?? "").not.toContain(
       "I'm checking",
     );
-    // Not on Capital Q: what Q is checking, said as the search starts
-    // (after the round that composes it), and never stored with the answer.
+    // Not on Capital Q: the first words are said as the turn arrives,
+    // before it is read (owner 2026-10-23: a holding line), and nothing of
+    // them is stored with the answer.
     const unknown = row("public web search, company not");
-    expect(unknown.firstText).toContain("I'm checking what's public on");
-    expect(unknown.firstWordsMs ?? Infinity).toBeLessThan(4_000);
+    expect(unknown.firstText).toBe("Looking into Acme Robotics now. ");
+    expect(unknown.firstWordsMs ?? Infinity).toBeLessThan(2_000);
+    expect(unknown.stored.join(" ")).not.toContain("Looking into");
     expect(unknown.stored.join(" ")).not.toContain("I'm checking");
     // Progressive findings (round 5): the first one is on screen well
     // before the whole object is written.
