@@ -258,7 +258,7 @@ describe("POST /v1/q/voice/sessions", () => {
             name: "Al Nakheel Family Office",
             seed: "INVESTOR_ORGANISATION:1",
           }),
-      } as QVoiceRehearsals,
+      },
     });
     const response = await app.inject({
       method: "POST",
