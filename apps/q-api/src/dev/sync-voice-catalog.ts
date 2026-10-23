@@ -207,7 +207,8 @@ async function main(): Promise<void> {
       .filter((voice): voice is CatalogVoice => voice !== null)
       .filter((voice) => !Q_OWN_VOICES.has(voice.id) && !known.has(voice.id))
       .filter(
-        (voice, index, all) => all.findIndex((v) => v.id === voice.id) === index,
+        (voice, index, all) =>
+          all.findIndex((v) => v.id === voice.id) === index,
       );
     const merged = [...CATALOG_VOICES, ...added].sort((a, b) =>
       `${a.language}|${a.accent}|${a.id}`.localeCompare(
