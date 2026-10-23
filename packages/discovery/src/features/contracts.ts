@@ -98,6 +98,13 @@ export const FEATURE_SOURCE_CLASSES = [
   "INVESTOR_PRIVATE_BEHAVIOR",
   /** Reserved: the Network context's relationship projection. Unused in V1. */
   "RELATIONSHIP_STATE",
+  /**
+   * Owner 23 Oct: the company's current round target (amount and ISO
+   * currency), read only where the company lets this investor see it (its
+   * Q Card's currentRaise scope, or a disclosure of the capital objective
+   * to the investor organisation). Never a private objective, deck or memory.
+   */
+  "DISCLOSED_ROUND_TARGET",
 ] as const;
 export const FeatureSourceClassSchema = z.enum(FEATURE_SOURCE_CLASSES);
 export type FeatureSourceClass = z.infer<typeof FeatureSourceClassSchema>;
@@ -179,8 +186,15 @@ export const FEATURE_MISSING_REASONS = [
   "NO_DECLARED_PREFERENCE",
   /** The mandate's geography preference is the unrestricted node: no narrowing signal. */
   "UNRESTRICTED_PREFERENCE",
-  /** No canonical, discovery-safe raise projection exists (REC-002/REC-003). */
+  /**
+   * Snapshots before cheque v2: no discovery-safe raise projection existed.
+   * Kept so those snapshots stay valid and explainable.
+   */
   "CHEQUE_NOT_COMPUTABLE",
+  /** The company has not shared a round target this investor may see. */
+  "ROUND_TARGET_NOT_SHARED",
+  /** The round and the cheque range are in different currencies: never converted. */
+  "CHEQUE_CURRENCY_MISMATCH",
   /** The candidate was not produced by the semantic generator; nothing is invented. */
   "SEMANTIC_NOT_RETRIEVED",
   /** A projection carried a source class the definition does not accept. */
@@ -400,17 +414,17 @@ export const RECOMMENDATION_FEATURES: readonly RecommendationFeatureDefinition[]
       },
       {
         id: "declared_fit.cheque",
-        version: "v1",
+        version: "v2",
         featureGroup: "DECLARED_FIT",
-        dataType: "number",
+        dataType: "category",
         allowedContexts: INVESTOR_ONLY,
-        sourceClasses: ["DECLARED_MANDATE", "CANONICAL_COMPANY_STATE"],
+        sourceClasses: ["DECLARED_MANDATE", "DISCLOSED_ROUND_TARGET"],
         sensitivity: "CONFIDENTIAL",
         missingPolicy: "PRESERVE_MISSING",
         description:
-          "Cheque compatibility in [0, 1] between the mandate's cheque range and the company's disclosure-safe round target, in one currency. No such projection exists in V1 (the capital objective is organisation-internal), so the value is always MISSING with CHEQUE_NOT_COMPUTABLE. Never zero, never read from a private objective, deck or memory.",
-        categories: [],
-        range: { min: 0, max: 1, direction: "HIGHER_IS_CLOSER" },
+          "cheque-fit.v1, exact decimals, one currency: WITHIN_ROUND when the declared cheque range (open top included) fits inside the company's shared round target; PARTLY_WITHIN_ROUND when the low end fits but the declared top is larger; ABOVE_ROUND when the smallest cheque exceeds the round. NOT_APPLICABLE without a declared range; MISSING with ROUND_TARGET_NOT_SHARED or CHEQUE_CURRENCY_MISMATCH (never converted). Investor-only; never shown to a founder.",
+        categories: ["WITHIN_ROUND", "PARTLY_WITHIN_ROUND", "ABOVE_ROUND"],
+        range: null,
       },
       {
         id: "semantic_fit.mandate_similarity",

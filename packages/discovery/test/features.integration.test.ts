@@ -591,9 +591,10 @@ describe("@capital-q/discovery recommendation features against local PostgreSQL"
         status: "PRESENT",
         value: "EXACT_OVERLAP",
       });
+      // The fixture mandate declares no cheque range: not applicable.
       expect(featureOf(kobo, "declared_fit.cheque")).toMatchObject({
-        status: "MISSING",
-        missingReason: "CHEQUE_NOT_COMPUTABLE",
+        status: "NOT_APPLICABLE",
+        missingReason: "NO_DECLARED_PREFERENCE",
       });
       expect(featureOf(kobo, "semantic_fit.mandate_similarity")).toMatchObject({
         status: "PRESENT",

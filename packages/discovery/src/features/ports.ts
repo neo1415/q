@@ -1,3 +1,5 @@
+import type { ActorContext } from "@capital-q/security";
+
 import type { RecommendationFeatureSnapshot } from "./contracts.js";
 import type {
   CompanyStateProjection,
@@ -62,4 +64,21 @@ export type FeatureSnapshotStore = {
   readonly insertMany: (
     snapshots: readonly RecommendationFeatureSnapshot[],
   ) => Promise<readonly StoredFeatureSnapshotRef[]>;
+};
+
+/**
+ * Owner 23 Oct: each company's current round target as the acting
+ * investor organisation may see it, read as that organisation: only a
+ * company that published `currentRaise` on its Q Card, or disclosed the
+ * capital objective to the organisation, appears. A company absent from
+ * the map has not shared its round with this investor (unknown, never
+ * zero). Absent port: every round is unshared.
+ */
+export type RoundTargetPort = {
+  readonly visibleTo: (
+    actor: ActorContext,
+    companyIds: readonly string[],
+  ) => Promise<
+    ReadonlyMap<string, { readonly amount: string; readonly currency: string }>
+  >;
 };

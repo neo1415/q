@@ -108,6 +108,20 @@ export type MandateSnapshotForEligibility = {
         readonly maxStageCode: string | null;
       }
     | undefined;
+  /**
+   * The mandate's declared cheque range (owner 23 Oct): exact decimal
+   * strings in one ISO currency, each bound optional. Never an eligibility
+   * rule; read only by the investor's own cheque-fit feature, and never
+   * handed to anything a founder sees. Absent: no range declared.
+   */
+  readonly cheque?:
+    | {
+        readonly currency: string;
+        readonly min?: string | undefined;
+        readonly max?: string | undefined;
+      }
+    | null
+    | undefined;
 };
 
 export type ActiveMandateLookup =

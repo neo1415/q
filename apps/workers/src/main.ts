@@ -48,6 +48,10 @@ import {
   Q_INSTRUCTION_NEW_COMPANY_CHANNEL,
   Q_WORK_WAKE_CHANNEL,
 } from "@capital-q/contracts";
+import {
+  companyCardSharesRaise,
+  createPostgresPublicIdentityRepository,
+} from "@capital-q/public-identity";
 import { createRequestDatabaseClient } from "@capital-q/database";
 import {
   createOutboxPublisher,
@@ -614,6 +618,8 @@ if (recommendationEmbedder.missing.length > 0) {
     "embedding runtime not configured: semantic retrieval disabled",
   );
 }
+// Owner 23 Oct: whether a company put its raise on its Q Card.
+const cardRepository = createPostgresPublicIdentityRepository();
 const recommendations = createRecommendationPipeline({
   sql: database.sql,
   transactions: database.transactions,
@@ -652,14 +658,24 @@ const recommendations = createRecommendationPipeline({
           company.tenantId,
           company.id,
         );
-        return objective === null || objective.status !== "ACTIVE"
-          ? null
-          : {
-              objectiveId: objective.id,
-              companyId: objective.companyId,
-              amount: objective.target.amount,
-              currency: objective.target.currency,
-            };
+        if (objective === null || objective.status !== "ACTIVE") return null;
+        // Owner 23 Oct: a raise the company put on its Q Card is visible
+        // to every signed-in investor (both card scopes reach them), read
+        // through public-identity's own repository; a failed read is the
+        // private answer, and the disclosure check then decides.
+        const card = await cardRepository
+          .findCard(database.sql, {
+            subjectType: "COMPANY",
+            subjectId: company.id,
+          })
+          .catch(() => null);
+        return {
+          objectiveId: objective.id,
+          companyId: objective.companyId,
+          amount: objective.target.amount,
+          currency: objective.target.currency,
+          publishedOnCard: companyCardSharesRaise(card),
+        };
       }),
     );
     return found.filter((raise) => raise !== null);

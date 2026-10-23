@@ -524,6 +524,9 @@ importers:
       '@capital-q/platform-admin':
         specifier: workspace:*
         version: link:../../packages/platform-admin
+      '@capital-q/public-identity':
+        specifier: workspace:*
+        version: link:../../packages/public-identity
       '@capital-q/q-actions':
         specifier: workspace:*
         version: link:../../packages/q-actions

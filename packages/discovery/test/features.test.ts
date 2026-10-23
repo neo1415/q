@@ -222,6 +222,7 @@ function inputs(
     readonly structured?: boolean;
     readonly companySourceClass?: string;
     readonly hierarchy?: FeatureInputs["hierarchy"];
+    readonly round?: FeatureInputs["roundTarget"];
   } = {},
 ): FeatureInputs {
   const m = overrides.mandate ?? mandate();
@@ -238,6 +239,7 @@ function inputs(
         overrides.country === undefined ? "NG" : overrides.country,
       version: 1,
     },
+    roundTarget: overrides.round ?? null,
     taxonomy: {
       sourceClass: "CANONICAL_TAXONOMY",
       classifications: overrides.classifications ?? [
@@ -508,7 +510,7 @@ describe("feature computation (pure)", () => {
     });
   });
 
-  it("C/H/J/K: unknown stage, unknown taxonomy, structured-only and cheque are MISSING with a reason, never zero (§19, §64)", () => {
+  it("C/H/J/K: unknown stage, unknown taxonomy and structured-only are MISSING with a reason, never zero; cheque without a declared range is not applicable (§19, §64)", () => {
     const { values } = computeFeatureValues(
       ALL,
       inputs({ stage: null, classifications: [], country: "NG" }),
@@ -524,9 +526,9 @@ describe("feature computation (pure)", () => {
       missingReason: "COMPANY_TAXONOMY_UNKNOWN",
     });
     expect(valueOf(values, "declared_fit.cheque")).toMatchObject({
-      status: "MISSING",
+      status: "NOT_APPLICABLE",
       value: null,
-      missingReason: "CHEQUE_NOT_COMPUTABLE",
+      missingReason: "NO_DECLARED_PREFERENCE",
     });
     expect(valueOf(values, "semantic_fit.mandate_similarity")).toMatchObject({
       status: "MISSING",
@@ -642,11 +644,11 @@ describe("feature computation (pure)", () => {
       status: "MISSING",
       missingReason: "SOURCE_NOT_AUTHORISED",
     });
+    // Cheque reads the mandate and the shared round, never company state.
     expect(valueOf(values, "declared_fit.cheque")).toMatchObject({
-      status: "MISSING",
-      missingReason: "SOURCE_NOT_AUTHORISED",
+      status: "NOT_APPLICABLE",
     });
-    expect(scopeViolations).toBe(3);
+    expect(scopeViolations).toBe(2);
   });
 
   it("U/§63: the investor-private text never enters a value, provenance or fingerprint, and mandate-derived values stay CONFIDENTIAL", () => {
@@ -1584,5 +1586,108 @@ describe("registry order is the snapshot order", () => {
       companyId(1),
       companyId(3),
     ]);
+  });
+});
+
+/**
+ * Owner 23 Oct 2026: "CHEQUE COMPATIBILITY IS NOT AVAILABLE YET" showed
+ * everywhere. A company's round, where it shares it with the investor, is
+ * now compared with the investor's own declared cheque range.
+ */
+describe("declared_fit.cheque v2 (cheque-fit.v1)", () => {
+  const withCheque = (cheque: { min?: string; max?: string }) =>
+    mandate({ cheque: { currency: "USD", ...cheque } });
+  const round = (amount: string, currency = "USD") => ({
+    sourceClass: "DISCLOSED_ROUND_TARGET" as const,
+    amount,
+    currency,
+  });
+  const cheque = (m: MandateSnapshotForEligibility, r = round("1500000")) =>
+    valueOf(
+      computeFeatureValues(ALL, inputs({ mandate: m, round: r })).values,
+      "declared_fit.cheque",
+    );
+
+  it("the whole range fits the round, part of it does, or none of it", () => {
+    expect(cheque(withCheque({ min: "100000", max: "500000" }))).toMatchObject({
+      status: "PRESENT",
+      value: "WITHIN_ROUND",
+    });
+    // An open top end sets no ceiling: the low end decides.
+    expect(cheque(withCheque({ min: "250000" }))).toMatchObject({
+      value: "WITHIN_ROUND",
+    });
+    expect(cheque(withCheque({ min: "500000", max: "3000000" }))).toMatchObject(
+      { value: "PARTLY_WITHIN_ROUND" },
+    );
+    expect(
+      cheque(withCheque({ min: "2000000", max: "5000000" })),
+    ).toMatchObject({ value: "ABOVE_ROUND" });
+    // Exact decimals at the boundary: equal to the round still fits.
+    expect(cheque(withCheque({ min: "1500000.00" }))).toMatchObject({
+      value: "WITHIN_ROUND",
+    });
+    expect(cheque(withCheque({ min: "1500000.01" }))).toMatchObject({
+      value: "ABOVE_ROUND",
+    });
+  });
+
+  it("an unshared round or another currency is unknown, never a mismatch", () => {
+    const m = withCheque({ min: "100000", max: "500000" });
+    expect(
+      valueOf(
+        computeFeatureValues(ALL, inputs({ mandate: m, round: null })).values,
+        "declared_fit.cheque",
+      ),
+    ).toMatchObject({
+      status: "MISSING",
+      value: null,
+      missingReason: "ROUND_TARGET_NOT_SHARED",
+    });
+    expect(cheque(m, round("1500000", "EUR"))).toMatchObject({
+      status: "MISSING",
+      value: null,
+      missingReason: "CHEQUE_CURRENCY_MISMATCH",
+    });
+  });
+
+  it("a snapshot names the policy version, never an amount, a bound or a currency", () => {
+    const value = cheque(withCheque({ min: "123457", max: "987653" }));
+    const said = JSON.stringify(value);
+    for (const secret of ["123457", "987653", "1500000", "USD"]) {
+      expect(said).not.toContain(secret);
+    }
+    expect(value.provenance).toEqual({
+      chequeFitPolicyVersion: "cheque-fit.v1",
+    });
+    expect(value.sensitivity).toBe("CONFIDENTIAL");
+  });
+
+  it("a round carrying another class satisfies nothing and is a scope violation", () => {
+    const { values, scopeViolations } = computeFeatureValues(
+      ALL,
+      inputs({
+        mandate: withCheque({ min: "100000" }),
+        round: { ...round("1500000"), sourceClass: "Q_INFERENCE" as never },
+      }),
+    );
+    expect(valueOf(values, "declared_fit.cheque")).toMatchObject({
+      status: "MISSING",
+      missingReason: "SOURCE_NOT_AUTHORISED",
+    });
+    expect(scopeViolations).toBe(1);
+  });
+
+  it("Context Firewall: the cheque fit exists only for the investor who owns the mandate, never in a founder-facing context", () => {
+    for (const mode of [
+      "FOUNDER_DISCOVER",
+      "SEARCH",
+      "Q_RECOMMENDATION",
+      "GATEQ",
+    ] as const) {
+      expect(() => registry.require("declared_fit.cheque", mode)).toThrow(
+        FeatureContextNotAllowedError,
+      );
+    }
   });
 });

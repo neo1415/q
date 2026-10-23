@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  companyCardSharesRaise,
   createSubjectDirectory,
   DEFAULT_FIELD_SCOPES,
   fitFieldScopes,
@@ -211,5 +212,44 @@ describe("the subject directory", () => {
         subjectId: "00000000-0000-4000-8000-000000000002",
       }),
     ).toBeNull();
+  });
+});
+
+describe("companyCardSharesRaise (owner 23 Oct 2026)", () => {
+  it("an ACTIVE card with a currentRaise scope shares it with signed-in investors", () => {
+    expect(
+      companyCardSharesRaise({
+        status: "ACTIVE",
+        fieldScopes: { currentRaise: "public_external" },
+      }),
+    ).toBe(true);
+    expect(
+      companyCardSharesRaise({
+        status: "ACTIVE",
+        fieldScopes: { currentRaise: "network_visible" },
+      }),
+    ).toBe(true);
+  });
+
+  it("no scope, a revoked card, a malformed record or no card shares nothing", () => {
+    expect(
+      companyCardSharesRaise({
+        status: "ACTIVE",
+        fieldScopes: { canonicalName: "public_external" },
+      }),
+    ).toBe(false);
+    expect(
+      companyCardSharesRaise({
+        status: "REVOKED",
+        fieldScopes: { currentRaise: "public_external" },
+      }),
+    ).toBe(false);
+    expect(
+      companyCardSharesRaise({
+        status: "ACTIVE",
+        fieldScopes: { currentRaise: "founder_private" },
+      }),
+    ).toBe(false);
+    expect(companyCardSharesRaise(null)).toBe(false);
   });
 });

@@ -328,6 +328,7 @@ function Factors({
   readonly title: string;
   readonly factors: readonly ExplanationFactorDto[];
 }) {
+  const t = useT();
   if (factors.length === 0) return null;
   return (
     <div className="flex flex-col gap-1">
@@ -338,7 +339,7 @@ function Factors({
             key={`${factor.dimension}-${factor.reasonCode}`}
             className="cq-body-sm text-(--cq-text-primary)"
           >
-            {factor.label}
+            {t(factor.label)}
           </li>
         ))}
       </ul>

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { deriveStructuredIntent } from "../candidates/structured.js";
+import { CHEQUE_FIT_POLICY_VERSION, chequeFit } from "./cheque.js";
 import { DECLARED_TAXONOMY_SOURCES } from "../eligibility/policy.js";
 import type { MandateSnapshotForEligibility } from "../eligibility/ports.js";
 import type { RecommendationMode } from "../eligibility/contracts.js";
@@ -232,6 +233,20 @@ export type CandidateProvenanceProjection = {
   } | null;
 };
 
+/**
+ * The company's current round target as THIS investor may see it (owner
+ * 23 Oct): present only where the company published it on its Q Card
+ * (currentRaise scope) or disclosed the capital objective to the investor
+ * organisation. Null: not shared with them, which is unknown, never zero.
+ */
+export type RoundTargetProjection = {
+  readonly sourceClass: "DISCLOSED_ROUND_TARGET";
+  /** Exact decimal string. */
+  readonly amount: string;
+  /** ISO 4217. */
+  readonly currency: string;
+};
+
 export type FeatureInputs = {
   readonly mandate: MandateSnapshotForEligibility & {
     readonly sourceClass: "DECLARED_MANDATE";
@@ -243,6 +258,8 @@ export type FeatureInputs = {
       | undefined;
   };
   readonly company: CompanyStateProjection;
+  /** Absent or null: the round is not shared with this investor. */
+  readonly roundTarget?: RoundTargetProjection | null | undefined;
   readonly taxonomy: CompanyTaxonomyProjection;
   readonly hierarchy: PreferenceHierarchyProjection;
   readonly candidate: CandidateProvenanceProjection;
@@ -565,22 +582,68 @@ function computeOne(
       };
     }
     case "declared_fit.cheque": {
+      const round = input.roundTarget ?? null;
       if (
-        !authorised(d, [input.mandate.sourceClass, input.company.sourceClass])
+        !authorised(d, [
+          input.mandate.sourceClass,
+          ...(round === null ? [] : [round.sourceClass]),
+        ])
       ) {
         return {
           value: absent(d, "MISSING", "SOURCE_NOT_AUTHORISED", []),
           scopeViolation: true,
         };
       }
-      // No discovery-safe raise projection exists in V1: the honest value.
-      return {
-        value: absent(d, "MISSING", "CHEQUE_NOT_COMPUTABLE", [
-          "DECLARED_MANDATE",
-          "CANONICAL_COMPANY_STATE",
-        ]),
-        scopeViolation: false,
-      };
+      // Versions only in provenance: never an amount, a currency or a
+      // bound, so a snapshot says how it was computed and nothing more.
+      const provenance = { chequeFitPolicyVersion: CHEQUE_FIT_POLICY_VERSION };
+      const fit = chequeFit(input.mandate.cheque ?? null, round);
+      switch (fit.kind) {
+        case "NO_RANGE":
+          return {
+            value: absent(
+              d,
+              "NOT_APPLICABLE",
+              "NO_DECLARED_PREFERENCE",
+              ["DECLARED_MANDATE"],
+              provenance,
+            ),
+            scopeViolation: false,
+          };
+        case "ROUND_NOT_SHARED":
+          return {
+            value: absent(
+              d,
+              "MISSING",
+              "ROUND_TARGET_NOT_SHARED",
+              ["DECLARED_MANDATE"],
+              provenance,
+            ),
+            scopeViolation: false,
+          };
+        case "CURRENCY_MISMATCH":
+          return {
+            value: absent(
+              d,
+              "MISSING",
+              "CHEQUE_CURRENCY_MISMATCH",
+              ["DECLARED_MANDATE", "DISCLOSED_ROUND_TARGET"],
+              provenance,
+            ),
+            scopeViolation: false,
+          };
+        case "FIT":
+          return {
+            value: present(
+              d,
+              fit.category,
+              ["DECLARED_MANDATE", "DISCLOSED_ROUND_TARGET"],
+              provenance,
+            ),
+            scopeViolation: false,
+          };
+      }
+      break;
     }
     case "semantic_fit.mandate_similarity": {
       const semantic = input.candidate.semantic;

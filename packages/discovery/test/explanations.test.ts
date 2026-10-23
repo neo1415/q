@@ -577,3 +577,61 @@ describe("explaining the current slate (CQ-REC-007R B)", () => {
     ).toEqual({ kind: "REFUSED", refusal: "SNAPSHOT_UNAVAILABLE" });
   });
 });
+
+/**
+ * Owner 23 Oct 2026: "Cheque compatibility is not available yet" showed
+ * everywhere. Cheque is said the way the other criteria are, never with
+ * an amount, and an unknown round is said as unknown, not as a shortcoming.
+ */
+describe("cheque, explained (cheque-fit.v1)", () => {
+  it("names which side of their range the round falls, never an amount", () => {
+    const { matchedFactors, mismatchedFactors } = toExplanationFactors([
+      factor("declared_fit.cheque", "CHEQUE_WITHIN_ROUND"),
+    ]);
+    expect(matchedFactors).toEqual([
+      expect.objectContaining({
+        dimension: "CHEQUE",
+        outcome: "MATCH",
+        label: "Your cheque range fits the round they are raising",
+      }),
+    ]);
+    expect(mismatchedFactors).toEqual([]);
+    const partly = toExplanationFactors([
+      factor("declared_fit.cheque", "CHEQUE_PARTLY_WITHIN_ROUND"),
+    ]);
+    expect(partly.matchedFactors[0]).toMatchObject({ outcome: "PARTIAL" });
+    const above = toExplanationFactors([
+      factor("declared_fit.cheque", "CHEQUE_ABOVE_ROUND"),
+    ]);
+    expect(above.mismatchedFactors[0]).toMatchObject({
+      outcome: "MISMATCH",
+      label: "Your smallest cheque is larger than the round they are raising",
+    });
+    for (const f of [
+      ...partly.matchedFactors,
+      ...above.mismatchedFactors,
+      ...matchedFactors,
+    ]) {
+      expect(f.label).not.toMatch(/\d/);
+    }
+  });
+
+  it("an unshared round or another currency is unknown, said plainly", () => {
+    const { uncertainties, mismatchedFactors } = toExplanationFactors([
+      factor("declared_fit.cheque", "FACTOR_MISSING", {
+        outcome: "MISSING",
+        missingReason: "ROUND_TARGET_NOT_SHARED",
+      }),
+      factor("declared_fit.cheque", "FACTOR_MISSING", {
+        outcome: "MISSING",
+        missingReason: "CHEQUE_CURRENCY_MISMATCH",
+      }),
+    ]);
+    expect(mismatchedFactors).toEqual([]);
+    expect(uncertainties.map((u) => u.label)).toEqual([
+      "Cheque size: this company has not shared its round size with you",
+      "Cheque size: the round is in a different currency from your cheque range, so it was not compared",
+    ]);
+    expect(JSON.stringify(uncertainties)).not.toContain("not available yet");
+  });
+});

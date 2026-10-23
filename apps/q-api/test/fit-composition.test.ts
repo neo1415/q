@@ -22,7 +22,41 @@ const actor = {
 const SHARED = ID(1);
 const PRIVATE = ID(2);
 
-function compose(viewCalls: { n: number }) {
+/**
+ * The database as the fit sees it: empty, except a company's Q Card when a
+ * test publishes one (read through public-identity's own repository).
+ */
+function cardSql(published: ReadonlyMap<string, unknown>) {
+  return ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    if (!strings.join("?").includes("core.shareable_identities")) {
+      return Promise.resolve([]);
+    }
+    const subjectId = values.find(
+      (v): v is string => typeof v === "string" && published.has(v),
+    );
+    if (subjectId === undefined) return Promise.resolve([]);
+    return Promise.resolve([
+      {
+        id: ID(400),
+        tenant_id: ID(5),
+        organisation_id: ID(6),
+        subject_type: "COMPANY",
+        subject_id: subjectId,
+        public_code: "abc123",
+        field_scopes: published.get(subjectId),
+        indexable: false,
+        status: "ACTIVE",
+        version: 1,
+        updated_at: new Date(),
+      },
+    ]);
+  }) as never;
+}
+
+function compose(
+  viewCalls: { n: number },
+  published: ReadonlyMap<string, unknown> = new Map(),
+) {
   const eligibilityPorts = {
     investorSubject: {
       investorOrganisationFor: () =>
@@ -54,7 +88,7 @@ function compose(viewCalls: { n: number }) {
     companies: { findMany: () => Promise.resolve([]) },
   } as unknown as EligibilityPorts;
   return createFitComposition({
-    sql: (() => Promise.resolve([])) as never,
+    sql: cardSql(published),
     eligibilityPorts,
     eligibility: {
       evaluate: (q) =>
@@ -136,6 +170,36 @@ describe("fit composition", () => {
     expect(cheque(SHARED)?.reason).toBe("$2M round; your $300k fits.");
     expect(cheque(PRIVATE)?.outcome).toBe("UNKNOWN");
     expect(cheque(PRIVATE)?.reason).toBe("Round size not shared.");
+  });
+
+  // Owner 23 Oct 2026: a company that put its raise on its Q Card shares
+  // it with every signed-in investor; cheque fit is then known.
+  it("uses a raise the company published on its Q Card, with no disclosure", async () => {
+    const { fit } = compose(
+      { n: 0 },
+      new Map([[PRIVATE, { currentRaise: "public_external" }]]),
+    );
+    const result = await fit.profiles(actor, [PRIVATE]);
+    if (result.kind !== "OK") throw new Error("expected profiles");
+    const cheque = result.items[0]?.assessment.profile.parameters.find(
+      (p) => p.parameter === "CHEQUE_SIZE",
+    );
+    expect(cheque?.outcome).toBe("STRONG");
+    expect(cheque?.reason).toBe("$2M round; your $300k fits.");
+  });
+
+  it("a card that does not show the raise shares nothing", async () => {
+    const { fit } = compose(
+      { n: 0 },
+      new Map([[PRIVATE, { canonicalName: "public_external" }]]),
+    );
+    const result = await fit.profiles(actor, [PRIVATE]);
+    if (result.kind !== "OK") throw new Error("expected profiles");
+    expect(
+      result.items[0]?.assessment.profile.parameters.find(
+        (p) => p.parameter === "CHEQUE_SIZE",
+      )?.outcome,
+    ).toBe("UNKNOWN");
   });
 
   it("top N reads the reader's own lists, and one list failing does not fail it", async () => {

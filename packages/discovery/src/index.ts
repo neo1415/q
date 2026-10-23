@@ -363,12 +363,23 @@ export {
   type FeatureInputs,
   type FeatureRegistry,
   type PreferenceHierarchyProjection,
+  type RoundTargetProjection,
 } from "./features/policy.js";
+export {
+  CHEQUE_FIT_CATEGORIES,
+  CHEQUE_FIT_POLICY_VERSION,
+  chequeFit,
+  type ChequeFit,
+  type ChequeFitCategory,
+  type DeclaredChequeRange,
+  type SharedRoundTarget,
+} from "./features/cheque.js";
 export type {
   CompanyFeatureProjection,
   CompanyFeatureProjectionPort,
   FeatureSnapshotStore,
   PreferenceHierarchyPort,
+  RoundTargetPort,
   StoredFeatureSnapshotRef,
 } from "./features/ports.js";
 export {
@@ -403,6 +414,7 @@ export {
   RANKING_CONFIG_V1,
   RANKING_CONFIG_V2,
   RANKING_CONFIG_V3,
+  RANKING_CONFIG_V5,
   RANKING_CONFIGS,
   RANKING_REASON_CODES,
   RankingConfigError,

@@ -155,6 +155,22 @@ export function readStoredScopes(
   return { ...scopes, ...PINNED_TO_NAME(subjectType) };
 }
 
+/**
+ * Owner 23 Oct 2026: whether a company's Q Card shows its current raise to
+ * every signed-in Capital Q participant. Both card scopes reach them
+ * (network_visible, and public_external, which is wider), so any stored
+ * `currentRaise` scope on an ACTIVE card means yes; a revoked card, a
+ * malformed record or no scope means no.
+ */
+export function companyCardSharesRaise(
+  card: { readonly status: string; readonly fieldScopes: unknown } | null,
+): boolean {
+  if (card === null || card.status !== "ACTIVE") return false;
+  return (
+    readStoredScopes("COMPANY", card.fieldScopes).currentRaise !== undefined
+  );
+}
+
 export type CardAudience = "PUBLIC" | "PARTICIPANT";
 
 /**
