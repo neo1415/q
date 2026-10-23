@@ -195,6 +195,7 @@ export function createBraveResearchProvider(
       return { hits, latencyMs: Math.max(0, Date.now() - startedAt) };
     },
     // Brave searches; it does not read pages. The next provider does.
+    canReadPages: false,
     extract: () =>
       Promise.reject(
         new ResearchProviderFailure({

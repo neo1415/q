@@ -165,6 +165,22 @@ describe("round 5: objects first, words as caption", () => {
     expect(before(words, picture)).toBe(true);
   });
 
+  it("leaves a picture to the stage that draws it, and keeps it where there is none (owner 2026-10-23)", () => {
+    const onStage = render(
+      <QAnswer
+        turn={turn({ blocks: [PICTURE] })}
+        mark={false}
+        picturesInline={false}
+      />,
+    );
+    expect(onStage.container.querySelector("[data-q-picture]")).toBeNull();
+    cleanup();
+    const plain = render(
+      <QAnswer turn={turn({ blocks: [PICTURE] })} mark={false} />,
+    );
+    expect(plain.container.querySelector("[data-q-picture]")).not.toBeNull();
+  });
+
   it("keeps the working line's place after an answer that streamed here lands", () => {
     const working = <p data-working-slot>{" "}</p>;
     const { container, rerender } = render(

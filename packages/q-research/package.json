@@ -29,6 +29,10 @@
       "types": "./dist/providers/brave.d.ts",
       "default": "./dist/providers/brave.js"
     },
+    "./providers/direct-read": {
+      "types": "./dist/providers/direct-read.d.ts",
+      "default": "./dist/providers/direct-read.js"
+    },
     "./providers/images": {
       "types": "./dist/providers/images.d.ts",
       "default": "./dist/providers/images.js"

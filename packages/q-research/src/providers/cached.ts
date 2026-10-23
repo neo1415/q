@@ -63,6 +63,11 @@ export function createCachedResearchProvider(input: {
     get code() {
       return provider.code;
     },
+    // What it cannot do is what the provider cannot do.
+    ...(provider.canSearch === false ? { canSearch: false as const } : {}),
+    ...(provider.canReadPages === false
+      ? { canReadPages: false as const }
+      : {}),
     search: async (request, context) => {
       const key = JSON.stringify([
         request.query.trim().toLowerCase(),

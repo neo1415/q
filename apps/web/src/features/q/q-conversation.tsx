@@ -1347,6 +1347,9 @@ export function QConversationPanel({
                                     <QAnswer
                                       turn={line.turn}
                                       mark={false}
+                                      // The stage around this thread draws
+                                      // the answer's pictures.
+                                      picturesInline={false}
                                       onAsk={sayOrAsk}
                                       onOpenArtifact={showArtifact}
                                     />

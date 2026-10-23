@@ -37,6 +37,7 @@ type Panel = "sources" | "companies" | "investors";
 export function replyParts(
   blocks: readonly QTurnObjectBlock[],
   cardsInline = false,
+  picturesInline = true,
 ): {
   readonly inline: readonly QTurnObjectBlock[];
   readonly companies: readonly QTurnObjectBlock[];
@@ -67,10 +68,15 @@ export function replyParts(
       case "TIMELINE":
       case "ATTENTION":
       case "SUMMARY":
-      case "PICTURE":
         // What the answer produced or needs from the person, and (E4) its
         // laid-out data: in view.
         inline.push(block);
+        break;
+      case "PICTURE":
+        // Drawn once (owner 2026-10-23: the same picture in the thread and
+        // on the stage around it read as broken): where the stage draws it,
+        // the answer leaves it to the stage.
+        if (picturesInline) inline.push(block);
         break;
       case "ANSWER_CARDS":
         // The dock has no stage to draw these. Reuse the card renderer
@@ -133,6 +139,7 @@ export function QAnswer({
   onOpenArtifact,
   mark = true,
   cardsInline = false,
+  picturesInline = true,
   working,
 }: {
   readonly turn: Extract<QTurn, { kind: "Q" }>;
@@ -143,6 +150,8 @@ export function QAnswer({
   readonly mark?: boolean | undefined;
   /** The dock has no separate answer stage. */
   readonly cardsInline?: boolean | undefined;
+  /** False where the stage around the thread draws the answer's pictures. */
+  readonly picturesInline?: boolean | undefined;
   /**
    * Where Q is while it works (round 4/5): one line at the top of the
    * answer, held at its height once the answer lands, so nothing moves.
@@ -152,7 +161,11 @@ export function QAnswer({
   const t = useT();
   const id = useId();
   const [open, setOpen] = useState<Panel | null>(null);
-  const { inline, companies, investors } = replyParts(turn.blocks, cardsInline);
+  const { inline, companies, investors } = replyParts(
+    turn.blocks,
+    cardsInline,
+    picturesInline,
+  );
   const leading = inline.filter((block) => LEADING_KINDS.has(block.kind));
   const trailing = inline.filter((block) => !LEADING_KINDS.has(block.kind));
   // Streamed here in this mount: its working line keeps its height once it
