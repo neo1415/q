@@ -695,7 +695,11 @@ export {
   savedCompanyIds,
   type ThesisPorts,
 } from "./tools/investor-promises.js";
-export type { InvestorGatesPort } from "./ports.js";
+export type {
+  InvestorGatesPort,
+  InvestorSectorFocusPort,
+  SectorRef,
+} from "./ports.js";
 export {
   COACH_MY_DECK,
   createCoachMyDeckTool,
