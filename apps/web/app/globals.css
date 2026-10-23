@@ -1861,6 +1861,13 @@
     color: var(--cq-stage-text);
     font-size: 12px;
     font-weight: 500;
+    /* A 28px chip on the video; the hit area is the 44px WCAG target. */
+    position: relative;
+  }
+  .cq-feed-chip::before {
+    content: "";
+    position: absolute;
+    inset: -8px 0;
   }
   /* No pitch (Discover A): said plainly at the foot of the frame, with the
      company's mark and what Q can speak to instead. */
