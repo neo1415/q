@@ -315,6 +315,11 @@ import {
   attachedDocumentsWithin,
 } from "./attached-document-fact.js";
 import {
+  asksAboutOthersInterest,
+  OTHERS_INTEREST_NOTE,
+  withOthersInterestWithheld,
+} from "./others-interest.js";
+import {
   comparisonFactStatement,
   comparisonSpokenLine,
   withoutCompareOffers,
@@ -4917,6 +4922,12 @@ export function createModelGatewayQAnswer(
             ].join(" "),
           };
         }
+        if (asksAboutOthersInterest(latest.content)) {
+          noteParts = {
+            ...noteParts,
+            turn: [noteParts.turn, OTHERS_INTEREST_NOTE].join(" "),
+          };
+        }
         if (request.aboutNamedOther !== true && alreadyReadNote !== null) {
           noteParts = {
             ...noteParts,
@@ -5526,6 +5537,13 @@ export function createModelGatewayQAnswer(
         const tableHere =
           compareTable !== null &&
           !(given ?? []).some((block) => block.kind === "TABLE");
+        // QA F-44: other investors' interest is withheld, never denied.
+        if (asksAboutOthersInterest(latest.content)) {
+          content = withOthersInterestWithheld(content).slice(
+            0,
+            ANSWER_LIMIT_CHARS,
+          );
+        }
         if (compareTable !== null) {
           const done = withoutCompareOffers(content);
           const spoken = tableHere ? comparisonSpokenLine(compareTable) : null;
