@@ -23,7 +23,7 @@ import type { FitOutcome, FitParameter } from "@capital-q/contracts";
  * new, so every v1 input without them renders exactly as before.
  */
 
-export const FIT_REASON_TEMPLATES_VERSION = "fit-reasons.v2" as const;
+export const FIT_REASON_TEMPLATES_VERSION = "fit-reasons.v3" as const;
 
 /** The key a template is chosen by. NO_PREFERENCE: the mandate declares nothing here. */
 export type FitReasonKey = FitOutcome | "NO_PREFERENCE";
@@ -105,8 +105,12 @@ export const FIT_REASON_TEMPLATES: Readonly<
   // an estimate at the dated ECB rate and says so; an unknown says its
   // exact reason (the currencies, or a round not shared), nothing else.
   CHEQUE_SIZE: {
+    // v3 (owner 23 Oct 2026, Silo Credit): the answer leads with the
+    // result and names the whole cheque and how much of the round it is.
     STRONG: {
       withFacts: [
+        "{roundSize} round, about {roundEstimate} at {rateSource} of {rateDate}; your {yourCheque} cheque fits (up to {chequeShare} of it).",
+        "{roundSize} round; your {yourCheque} cheque fits (up to {chequeShare} of it).",
         "{roundSize} round, about {roundEstimate} at {rateSource} of {rateDate}; your {chequeSize} fits.",
         "{roundSize} round; your {chequeSize} fits.",
       ],
@@ -114,6 +118,8 @@ export const FIT_REASON_TEMPLATES: Readonly<
     },
     PARTIAL: {
       withFacts: [
+        "{roundSize} round, about {roundEstimate} at {rateSource} of {rateDate}; your {yourCheque} cheque is at the edge of it ({chequeShare} of it).",
+        "{roundSize} round; your {yourCheque} cheque is at the edge of it ({chequeShare} of it).",
         "{roundSize} round, about {roundEstimate} at {rateSource} of {rateDate}; your {chequeSize} is at the edge of it.",
         "{roundSize} round; your {chequeSize} is at the edge of it.",
       ],

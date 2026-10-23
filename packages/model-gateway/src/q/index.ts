@@ -310,6 +310,7 @@ import {
   attachedDocumentFacts,
   attachedDocumentsWithin,
 } from "./attached-document-fact.js";
+import { comparisonTableBlock } from "./compare-table.js";
 import {
   attachedDocumentIntent,
   attachedDocumentNote,
@@ -7800,8 +7801,20 @@ export function createModelGatewayQAnswer(
                 withheld: namesReadByRun(companiesRead),
                 signal: request.signal,
               });
+        // Owner 23 Oct 2026: "compare them side by side" is a table, built
+        // by code from this run's authorised reads (profiles and fits).
+        const comparedTable = (modelBlocks ?? []).some(
+          (block) => block.kind === "TABLE",
+        )
+          ? null
+          : comparisonTableBlock({
+              question: latest.content,
+              read: companiesRead,
+              fits: fitsRead,
+            });
         const codeBlocks = [
           ...(builtCards === null ? [] : [builtCards]),
+          ...(comparedTable === null ? [] : [comparedTable]),
           ...fromPages,
           ...(picture === null ? [] : [picture]),
         ];

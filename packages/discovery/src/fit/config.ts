@@ -217,13 +217,30 @@ export const FIT_CONFIG_V6: FitConfig = deepFreeze(
   }),
 );
 
+/**
+ * Fit profile `ranking-config.v7` (owner 23 Oct 2026): v6's weights and
+ * rules unchanged; reason sentences fit-reasons.v3 (the whole cheque and
+ * its share of the round; estimates name the ECB or the market rate; an
+ * unknown says no rate could be fetched). v6 stays published, unedited.
+ */
+export const FIT_CONFIG_V7: FitConfig = deepFreeze(
+  FitConfigSchema.parse({
+    ...FIT_CONFIG_V6,
+    version: "ranking-config.v7",
+    label: "7",
+    extends: "ranking-config.v6",
+    reasonTemplatesVersion: "fit-reasons.v3",
+  }),
+);
+
 /** The config new profiles are computed under. */
-export const FIT_CONFIG_CURRENT: FitConfig = FIT_CONFIG_V6;
+export const FIT_CONFIG_CURRENT: FitConfig = FIT_CONFIG_V7;
 
 /** Every published fit config, oldest first; never edited. */
 export const FIT_CONFIGS: readonly FitConfig[] = Object.freeze([
   FIT_CONFIG_V4,
   FIT_CONFIG_V6,
+  FIT_CONFIG_V7,
 ]);
 
 export function fitConfigByVersion(version: string): FitConfig | null {

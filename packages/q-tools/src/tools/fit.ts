@@ -63,7 +63,7 @@ const GUIDANCE =
  * comparison, whose text has no rows (and sits at the tool bound).
  */
 const CHEQUE_GUIDANCE =
-  "Cheque compatibility is their cheque against the round only: say a [why unknown: …] reason exactly, never another; an [ESTIMATE …] row is approximate, at the rate and date it names.";
+  "Cheque compatibility is their cheque against the round only. Asked whether a round fits their cheque, open with the row's result: Strong match is yes, Partial is partly, Mismatch is no, then its reason sentence as given; never open with no when the row is not a mismatch. Say a [why unknown: …] reason exactly, never another; an [ESTIMATE …] row is approximate, at the rate and date it names.";
 
 const UNICORN_GUIDANCE =
   "If scores.unicornPotential is present, Unicorn Potential is a separate persisted growth-characteristics indicator: repeat only its actual overallScore (or insufficient evidence), explain its twelve pillars, grades, stage weights, coverage, sources and recorded momentum. Use weighted graded pillar sum divided by scored pillar weights, multiplied by 25 and rounded once; never invent an observation or treat unknown as zero. It is not a probability of reaching a $1 billion valuation. If it is absent, do not infer or reconstruct a premium score; say that assessment is unavailable for this account. A visible assessment card is not proof that its details are expanded. When the entitled person asks to open or show the Unicorn Potential assessment or its calculation on the company Overview, call operate_screen with target disclosure.unicorn-potential and act EXPAND before drafting the explanation. EXPAND is idempotent; do not substitute ACTIVATE or assume the panel is already open. Do not say it opened without the client DONE receipt; until confirmed, describe the opening as requested rather than completed.";
@@ -304,7 +304,7 @@ export function createFitTopCandidatesTool(
     id: FIT_TOP_CANDIDATES,
     providerName: "fit_top_candidates",
     description:
-      "Ranks this investor's own candidates (their relationships, the company requests sent to them, and their feed) by fit with their mandate, and returns the top N side by side: each company's score out of 10 (when enough is known), band, confidence and nine parameter rows with reasons, which row each is best on, and how many were left out and why. Call it for 'give me the top three', 'compare my best matches', or 'which should I look at first'. The order is the platform's; explain it, never reorder it. Show it on screen; it is not a document.",
+      "Ranks this investor's own candidates (their relationships, the company requests sent to them, and their feed) by fit with their mandate, and returns the top N side by side: each company's score out of 10 (when enough is known), band, confidence and nine parameter rows with reasons, which row each is best on, and how many were left out and why. Call it for 'give me the top three', 'compare my best matches', or 'which should I look at first'. The order is the platform's; explain it, never reorder it. Show it on screen; it is not a document. Capital Q draws the side-by-side table itself (call read_company_figures for each company too, so its traction row has their numbers): in words, say the two or three differences that matter most, never the whole table.",
     input: FitTopCandidatesInputSchema,
     output: FitTopCandidatesOutputSchema,
     authorize,
