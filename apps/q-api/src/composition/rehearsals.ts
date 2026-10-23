@@ -2461,11 +2461,16 @@ export function createRehearsalService(dependencies: {
       entityKind: record?.subject.entityKind,
     });
     const base = holdingTurn([], "OPENING");
+    // A greeting in their language when they are from (or based) where one
+    // is spoken; the rest of the opening stays as written.
+    const where = await whereFrom(actor, "EXTERNAL_PERSON", id);
+    const greeting =
+      localLanguageFor(where.origin?.origin ?? where.place)?.greeting ?? null;
     return {
       ...base,
       result: {
         ...base.result,
-        line: externalOpeningLine({ scenario, companyName }),
+        line: externalOpeningLine({ scenario, companyName, greeting }),
       },
     };
   }

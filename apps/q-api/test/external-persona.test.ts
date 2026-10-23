@@ -13,10 +13,12 @@ import {
   buildExternalPersona,
   claimsToBeRealPerson,
   externalLiveInstructions,
+  externalOpeningLine,
   identityOf,
   roleFamilyOf,
   sourcedOrigin,
 } from "../src/composition/external-persona.js";
+import { scenarioFor } from "../src/composition/external-scenarios.js";
 import { accentForPlace } from "../src/voice/persona-voices/catalog.js";
 import { createExternalRehearsalLatency } from "../src/composition/external-rehearsal-latency.js";
 
@@ -336,5 +338,29 @@ describe("where a researched person is from (R2b, owner 2026-10-23)", () => {
     ).toBeNull();
     expect(sourcedOrigin(rich, known)).toBeNull();
     expect(sourcedOrigin(null, known)).toBeNull();
+  });
+});
+
+describe("the coded opening of a researched rehearsal (2026-10-23 live)", () => {
+  const scenario = scenarioFor({ displayName: "QInvest", nameVariants: [] });
+  it("greets in their language when one is known, the disclosure unchanged", () => {
+    const line = externalOpeningLine({
+      scenario,
+      companyName: "Souqsheet",
+      greeting: "السلام عليكم",
+    });
+    expect(line.startsWith("السلام عليكم. Thanks for making the time.")).toBe(
+      true,
+    );
+    expect(line).toContain(
+      "this is an AI rehearsal informed by public sources",
+    );
+  });
+  it("opens in English otherwise, exactly as before", () => {
+    expect(
+      externalOpeningLine({ scenario, companyName: "Souqsheet" }).startsWith(
+        "Hello, thanks for making the time.",
+      ),
+    ).toBe(true);
   });
 });

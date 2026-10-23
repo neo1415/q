@@ -541,11 +541,20 @@ export function externalLiveInstructions(input: {
 export function externalOpeningLine(input: {
   readonly scenario: Scenario;
   readonly companyName: string;
+  /**
+   * 2026-10-23 (owner): a fixed greeting in their local language, from
+   * where they are from or based; null opens in English.
+   */
+  readonly greeting?: string | null | undefined;
 }): string {
   const company = plain(input.companyName, 80) || "your company";
   const theme = input.scenario.openingThemes[0] ?? "what the business does";
+  const hello =
+    input.greeting === null || input.greeting === undefined
+      ? "Hello, thanks"
+      : `${input.greeting}. Thanks`;
   return plain(
-    `Hello, thanks for making the time. A quick note first: this is an AI rehearsal informed by public sources, not the real person. To begin, tell me about ${company}, and in particular ${theme}.${input.scenario.quirk === undefined ? "" : ` ${input.scenario.quirk.openingTail}`}`,
+    `${hello} for making the time. A quick note first: this is an AI rehearsal informed by public sources, not the real person. To begin, tell me about ${company}, and in particular ${theme}.${input.scenario.quirk === undefined ? "" : ` ${input.scenario.quirk.openingTail}`}`,
     600,
   );
 }

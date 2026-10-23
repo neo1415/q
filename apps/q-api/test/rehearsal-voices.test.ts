@@ -870,7 +870,7 @@ describe("where a persona is from, read right (2026-10-23 audit)", () => {
   });
 
   it("names the language a persona greets in, and its script", () => {
-    expect(localLanguageFor("Riyadh, Saudi Arabia")).toEqual({
+    expect(localLanguageFor("Riyadh, Saudi Arabia")).toMatchObject({
       language: "Arabic",
       script: "Arabic script",
     });
@@ -878,6 +878,11 @@ describe("where a persona is from, read right (2026-10-23 audit)", () => {
     expect(localLanguageFor("Kano, Nigeria")?.language).toBe("Hausa");
     expect(localLanguageFor("Nigeria")?.language).toBe("Nigerian Pidgin");
     expect(localLanguageFor("Bengaluru, India")?.script).toBe("Devanagari");
+    // A fixed greeting for openings written by code; none for Pidgin.
+    expect(localLanguageFor("Doha, Qatar")?.greeting).toBe("السلام عليكم");
+    expect(localLanguageFor("Lagos, Nigeria")?.greeting).toBe("Ẹ n lẹ́ o");
+    expect(localLanguageFor("Kano, Nigeria")?.greeting).toBe("Sannu");
+    expect(localLanguageFor("Nigeria")?.greeting).toBeNull();
     // English-speaking or unknown: no local language, never a guess.
     expect(localLanguageFor("London, United Kingdom")).toBeNull();
     expect(localLanguageFor(null)).toBeNull();

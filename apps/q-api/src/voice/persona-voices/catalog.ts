@@ -878,41 +878,52 @@ export function shapeForAge(
 export type LocalLanguage = {
   readonly language: string;
   readonly script: string;
+  /**
+   * A plain, time-neutral greeting to a business guest, for openings
+   * written by code (no model writes it); null where none fits.
+   */
+  readonly greeting: string | null;
 };
 
+const local = (
+  language: string,
+  script: string,
+  greeting: string | null,
+): LocalLanguage => ({ language, script, greeting });
+
 const LOCAL_LANGUAGE: Readonly<Partial<Record<AccentKey, LocalLanguage>>> = {
-  arabic: { language: "Arabic", script: "Arabic script" },
-  turkish: { language: "Turkish", script: "Latin script" },
-  indian: { language: "Hindi", script: "Devanagari" },
-  chinese: { language: "Mandarin", script: "simplified Chinese characters" },
-  cantonese: {
-    language: "Cantonese",
-    script: "traditional Chinese characters",
-  },
-  japanese: { language: "Japanese", script: "Japanese script" },
-  korean: { language: "Korean", script: "Hangul" },
-  italian: { language: "Italian", script: "Latin script" },
-  indonesian: { language: "Indonesian", script: "Latin script" },
-  russian: { language: "Russian", script: "Cyrillic" },
-  german: { language: "German", script: "Latin script" },
-  dutch: { language: "Dutch", script: "Latin script" },
-  french: { language: "French", script: "Latin script" },
-  spanish: { language: "Spanish", script: "Latin script" },
-  latin_american: { language: "Spanish", script: "Latin script" },
-  brazilian: { language: "Portuguese", script: "Latin script" },
+  arabic: local("Arabic", "Arabic script", "السلام عليكم"),
+  turkish: local("Turkish", "Latin script", "Merhaba"),
+  indian: local("Hindi", "Devanagari", "नमस्ते"),
+  chinese: local("Mandarin", "simplified Chinese characters", "你好"),
+  cantonese: local("Cantonese", "traditional Chinese characters", "你好"),
+  japanese: local("Japanese", "Japanese script", "こんにちは"),
+  korean: local("Korean", "Hangul", "안녕하세요"),
+  italian: local("Italian", "Latin script", "Buongiorno"),
+  indonesian: local("Indonesian", "Latin script", "Halo"),
+  russian: local("Russian", "Cyrillic", "Здравствуйте"),
+  german: local("German", "Latin script", "Guten Tag"),
+  dutch: local("Dutch", "Latin script", "Goedendag"),
+  french: local("French", "Latin script", "Bonjour"),
+  spanish: local("Spanish", "Latin script", "Hola"),
+  latin_american: local("Spanish", "Latin script", "Hola"),
+  brazilian: local("Portuguese", "Latin script", "Olá"),
 };
 
 /** Nigeria's main languages by city; Pidgin where no city says otherwise. */
-const NIGERIAN_CITY_LANGUAGE: readonly [RegExp, string][] = [
+const NIGERIAN_CITY_LANGUAGE: readonly [RegExp, LocalLanguage][] = [
   [
     /\b(lagos|ibadan|abeokuta|ogun|oyo|osun|ondo|ekiti|ilorin|ikeja|lekki)\b/iu,
-    "Yoruba",
+    local("Yoruba", "Latin script", "Ẹ n lẹ́ o"),
   ],
   [
     /\b(kano|kaduna|katsina|sokoto|zaria|maiduguri|bauchi|jos|abuja)\b/iu,
-    "Hausa",
+    local("Hausa", "Latin script", "Sannu"),
   ],
-  [/\b(enugu|onitsha|owerri|aba|awka|nsukka|umuahia)\b/iu, "Igbo"],
+  [
+    /\b(enugu|onitsha|owerri|aba|awka|nsukka|umuahia)\b/iu,
+    local("Igbo", "Latin script", "Ndewo"),
+  ],
 ];
 
 export function localLanguageFor(
@@ -924,10 +935,7 @@ export function localLanguageFor(
     const found = NIGERIAN_CITY_LANGUAGE.find(([test]) =>
       test.test(place ?? ""),
     );
-    return {
-      language: found?.[1] ?? "Nigerian Pidgin",
-      script: "Latin script",
-    };
+    return found?.[1] ?? local("Nigerian Pidgin", "Latin script", null);
   }
   return LOCAL_LANGUAGE[accent] ?? null;
 }
