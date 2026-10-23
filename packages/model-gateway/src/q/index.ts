@@ -175,6 +175,11 @@ import {
   type CompanyFactAsk,
 } from "./named-company-fact.js";
 import {
+  FIRST_CONTACT_TOOL,
+  firstContactMessage,
+  firstContactOf,
+} from "./first-contact.js";
+import {
   CHAINED_FIGURES_TOOL,
   CHAINED_GET_TOOL,
   CHAINED_READ_TOOLS,
@@ -1138,7 +1143,9 @@ const RESEARCH_NOTE_BRIEF =
 // 9,000 since 2026-10-02 (OWN_DAY_NOTE).
 // 9,400 since RECOVERY-2026-10 B7: what a proposing tool does and where a
 // point comes from (~160 characters), about 100 tokens a turn.
-export const ENVIRONMENT_NOTES_MAX_CHARS = 9_400;
+// 9,800 since 2026-10-23 (VIEWING_NOT_DISCLOSED_NOTE, ~340 characters):
+// a production-sized run would otherwise lose what Q can do again.
+export const ENVIRONMENT_NOTES_MAX_CHARS = 9_800;
 
 /**
  * What Q can do, so it says so rather than claiming it cannot (founder
@@ -1303,6 +1310,16 @@ export const OWN_DAY_NOTE =
 export const SAVE_NOT_VERIFY_NOTE =
   'SAVING IS NOT VERIFYING: when they authorise saving details you found, in any words, prepare one update_company_profile (or update_investor_profile) with every found field now and say once: "I\'ll save these as your stated company details (not independently verified)." A conflicting field: use the best-supported value and name the other in one line. Never argue about verification once they have said to save.';
 
+/**
+ * Viewing is not interest (product rule; owner 2026-10-23: "Who has looked
+ * at my pitch recently?" was answered as if a record were missing).
+ * Investors' browsing, viewing and playing are never disclosed to
+ * founders; what a founder can see is interest and connection requests,
+ * from their own relationships.
+ */
+export const VIEWING_NOT_DISCLOSED_NOTE =
+  "VIEWING IS NOT INTEREST: founders never see who viewed or played their pitch or profile, by design. Asked who looked, say so as how Capital Q works (never as a missing record), then give what they can see: investors who expressed interest or asked to connect, counted from list_incoming_interest or list_my_relationships, never estimated.";
+
 export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
 
@@ -1466,6 +1483,7 @@ export function environmentNoteParts(
   const steady = [
     LIKELY_INTENT_NOTE,
     SAVE_NOT_VERIFY_NOTE,
+    VIEWING_NOT_DISCLOSED_NOTE,
     OWN_DAY_NOTE,
     EXPRESSIVE_NOTE,
     statementsNote,
@@ -6817,6 +6835,8 @@ export function createModelGatewayQAnswer(
                 )
               : null;
             let heldThisRound = 0;
+            // A first contact prepared by code this round (first-contact.ts).
+            let firstContact: Promise<QToolCallOutcome> | null = null;
             const chainedThisRound: {
               readonly name: string;
               readonly read: Promise<QToolCallOutcome>;
@@ -6900,6 +6920,26 @@ export function createModelGatewayQAnswer(
               // The profile and, beside it, the published figures (owner
               // 2026-10-23): both start now and run in parallel, each only
               // when offered, within the loop's call budget.
+              // A message or email to a company they are not connected with:
+              // the first contact, Express Interest, prepared now for their
+              // approval, through its own authorize step (first-contact.ts).
+              const contact = firstContactOf(call, outcome);
+              if (
+                contact !== null &&
+                firstContact === null &&
+                offeredByName.has(FIRST_CONTACT_TOOL) &&
+                !proposals.some((other) => other.name === FIRST_CONTACT_TOOL) &&
+                calls + chainedThisRound.length + 1 < Q_TOOL_LOOP_MAX_CALLS
+              ) {
+                firstContact = callTool(
+                  {
+                    callId: "q-first-contact",
+                    name: FIRST_CONTACT_TOOL,
+                    arguments: contact,
+                  },
+                  toolContext,
+                );
+              }
               const chainedId = chainedCompanyOf(call, outcome);
               for (const name of chainedId === null ? [] : CHAINED_READ_TOOLS) {
                 if (
@@ -7046,6 +7086,21 @@ export function createModelGatewayQAnswer(
                     forModelReading(outcome, classificationOf(name)),
                   ),
                 );
+              }
+            }
+            if (firstContact !== null) {
+              const outcome = await firstContact.catch(() => null);
+              if (outcome !== null) {
+                calls += 1;
+                toolCalls.push({
+                  toolName: outcome.toolName,
+                  providerName: FIRST_CONTACT_TOOL,
+                  status: outcome.status,
+                  failureCode: outcome.failureCode,
+                  latencyMs: outcome.latencyMs,
+                });
+                const told = firstContactMessage(outcome);
+                if (told !== null) chainedResults.push(told);
               }
             }
             messages = [...messages, assistant, ...results, ...chainedResults];

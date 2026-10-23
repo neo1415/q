@@ -8,6 +8,7 @@ import {
   CAPABILITIES_NOTE,
   ENVIRONMENT_NOTES_MAX_CHARS,
   NEXT_STEP_NOTE,
+  VIEWING_NOT_DISCLOSED_NOTE,
   environmentNotesFor,
 } from "../src/q/index.js";
 
@@ -99,5 +100,7 @@ describe("how a reply ends", () => {
     );
     expect(notes).toContain(CAPABILITIES_NOTE);
     expect(notes).toContain(NEXT_STEP_NOTE);
+    // Viewing is not interest: always said, never keyword-triggered.
+    expect(notes).toContain(VIEWING_NOT_DISCLOSED_NOTE);
   });
 });
