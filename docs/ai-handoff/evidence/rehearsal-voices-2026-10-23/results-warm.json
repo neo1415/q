@@ -1,0 +1,65 @@
+[
+  {
+    "persona": "saudi-family-office",
+    "basedIn": "Riyadh, Saudi Arabia",
+    "localLanguage": "Local language: Arabic (write it in Arabic script).",
+    "voice": "Ali - calm & Deep Arabic Saudi Narrator (ar/saudi/male)",
+    "accent": "arabic",
+    "line": "السلام عليكم، and welcome. Good to have you on the call today, let's hear a bit about Nixo and how you see the business developing.",
+    "mood": "WARM",
+    "intensity": "NORMAL",
+    "settings": {
+      "stability": 0.5,
+      "similarity_boost": 0.85,
+      "style": 0.25,
+      "speed": 0.98,
+      "use_speaker_boost": true
+    },
+    "model": "eleven_v4_turbo",
+    "modelMs": 1355,
+    "ttsFirstByteMs": 503,
+    "characters": 131
+  },
+  {
+    "persona": "nigerian-angel",
+    "basedIn": "Lagos, Nigeria",
+    "localLanguage": "Local language: Yoruba (write it in Latin script).",
+    "voice": "Bukola - Gentle, Clear and Warm (en/nigerian/female)",
+    "accent": "nigerian",
+    "line": "Ẹ̀kaàrọ̀, let's dive straight into it. You're looking at three million for a seed, but your focus seems split between West Africa and the Gulf—how does a lean team actually execute on two such different markets without spreading too thin?",
+    "mood": "WARM",
+    "intensity": "NORMAL",
+    "settings": {
+      "stability": 0.5,
+      "similarity_boost": 0.85,
+      "style": 0.25,
+      "speed": 0.98,
+      "use_speaker_boost": true
+    },
+    "model": "eleven_v4_turbo",
+    "modelMs": 1161,
+    "ttsFirstByteMs": 219,
+    "characters": 238
+  },
+  {
+    "persona": "london-vc-partner",
+    "basedIn": "London, United Kingdom",
+    "localLanguage": null,
+    "voice": "Frederick Surrey - Smooth and Velvety (en/british/male)",
+    "accent": "british",
+    "line": "Morning, thanks for making the time. Let's dive straight in – three million seed for invoicing and payments across West Africa and the Gulf is quite a spread, so walk me through why you're tackling those two specific markets at this stage.",
+    "mood": "NEUTRAL",
+    "intensity": "NORMAL",
+    "settings": {
+      "stability": 0.65,
+      "similarity_boost": 0.85,
+      "style": 0,
+      "speed": 1,
+      "use_speaker_boost": true
+    },
+    "model": "eleven_v4_turbo",
+    "modelMs": 1011,
+    "ttsFirstByteMs": 214,
+    "characters": 239
+  }
+]

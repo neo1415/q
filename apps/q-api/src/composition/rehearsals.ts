@@ -37,7 +37,7 @@ import {
   type CounterpartPersonaV5Variables as CounterpartPersonaVariables,
   type RehearsalReviewResult,
   type RehearsalReviewVariables,
-  type RehearsalTurnV8Result as RehearsalTurnResult,
+  type RehearsalTurnV9Result as RehearsalTurnResult,
   type RehearsalTurnV8Variables as RehearsalTurnVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
@@ -77,12 +77,18 @@ import {
   identityOf,
   NOT_THE_REAL_PERSON_LINE,
   plain,
+  sourcedOrigin,
+  type SourcedOrigin,
 } from "./external-persona.js";
 import { externalEvaluationBasis } from "./external-evaluation.js";
 import { externalSimulation } from "./external-presentation.js";
 import { scenarioFor } from "./external-scenarios.js";
 import type { DemoRehearsalAccess } from "./demo-rehearsal-access.js";
 import type { ExternalSubjectResolver } from "./external-resolve.js";
+import {
+  accentForPlace,
+  localLanguageFor,
+} from "../voice/persona-voices/catalog.js";
 import type { ExternalSubjectStore } from "./external-subjects.js";
 import type { ExternalRehearsalLatency } from "./external-rehearsal-latency.js";
 import {
@@ -265,6 +271,16 @@ const StoredTurnSchema = z.object({
   sawScreen: z.boolean().optional(),
   intensity: z.enum(["SOFT", "NORMAL", "RAISED"]).optional(),
   reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH", "CRY"]).nullish(),
+  /** v13 (R5): per-sentence delivery when the feeling moves in the line. */
+  beats: z
+    .array(
+      z.object({
+        mood: z.enum(MOODS),
+        intensity: z.enum(["SOFT", "NORMAL", "RAISED"]),
+      }),
+    )
+    .max(6)
+    .optional(),
   state: z
     .object({
       patience: z.number(),
@@ -290,6 +306,13 @@ export type Turn = {
   /** How loud the played person said it, and any sound before it. */
   readonly intensity?: "SOFT" | "NORMAL" | "RAISED" | undefined;
   readonly reaction?: "LAUGH" | "CHUCKLE" | "SIGH" | "CRY" | null | undefined;
+  /** v13 (R5): how each sentence sounds when the feeling moves in the line. */
+  readonly beats?:
+    | readonly {
+        readonly mood: Mood;
+        readonly intensity: "SOFT" | "NORMAL" | "RAISED";
+      }[]
+    | undefined;
   /** The played person's temperament after this line (code-tracked). */
   readonly state?: Temperament | undefined;
   /** This line was the played person's first or last warning before walking out. */
@@ -317,6 +340,7 @@ export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
       sawScreen: turn.sawScreen === true,
       ...(turn.intensity === undefined ? {} : { intensity: turn.intensity }),
       ...(turn.reaction === undefined ? {} : { reaction: turn.reaction }),
+      ...(turn.beats === undefined ? {} : { beats: turn.beats }),
       ...(turn.state === undefined ? {} : { state: turn.state }),
       ...(turn.warning === 1 || turn.warning === 2
         ? { warning: turn.warning }
@@ -945,6 +969,8 @@ export type RehearsalService = {
     readonly mood: Mood | null;
     readonly intensity: "SOFT" | "NORMAL" | "RAISED";
     readonly reaction: "LAUGH" | "CHUCKLE" | "SIGH" | "CRY" | null;
+    /** v13 (R5): per-sentence delivery, when the feeling moves. */
+    readonly beats?: Turn["beats"];
   } | null>;
 };
 
@@ -1191,6 +1217,7 @@ function toDto(
       sawScreen: turn.sawScreen,
       ...(turn.intensity === undefined ? {} : { intensity: turn.intensity }),
       ...(turn.reaction === undefined ? {} : { reaction: turn.reaction }),
+      ...(turn.beats === undefined ? {} : { beats: [...turn.beats] }),
     })),
     ...(row.counterpartKind === "EXTERNAL_PERSON"
       ? {
@@ -1262,6 +1289,7 @@ export function yieldTo(previous: readonly Turn[]): {
     result: {
       appraisal: "NEUTRAL",
       line: YIELD_LINES[theirs.length % YIELD_LINES.length] ?? "Go ahead.",
+      beats: [],
       move: "YIELD",
       mood: last?.mood ?? "NEUTRAL",
       intensity: last?.intensity === "SOFT" ? "SOFT" : "NORMAL",
@@ -1399,6 +1427,7 @@ function holdingTurn(
     result: {
       appraisal: "NEUTRAL",
       line: cue === "OPENING" ? HOLDING_LINES.OPENING : HOLDING_LINES.TURN,
+      beats: [],
       move: "REMARK",
       mood: "NEUTRAL",
       intensity: "NORMAL",
@@ -2007,36 +2036,65 @@ export function createRehearsalService(dependencies: {
    * counterpart so a spoken turn does not read it again; a failed read is
    * an unknown place (neutral voice, plain English).
    */
-  const places = new Map<string, { at: number; place: string | null }>();
+  const places = new Map<
+    string,
+    { at: number; place: string | null; origin: SourcedOrigin | null }
+  >();
   const PLACE_KEPT_MS = 30 * 60_000;
-  async function placeOf(
+  /**
+   * Where they are based, and (R2b, owner 2026-10-23) where a researched
+   * person is FROM when a cited source states it. The voice and the local
+   * language prefer the sourced origin; the idiom stays with the place.
+   */
+  async function whereFrom(
     actor: ActorContext,
     kind: RehearsalCounterpartKind,
     id: string,
-  ): Promise<string | null> {
+  ): Promise<{ place: string | null; origin: SourcedOrigin | null }> {
     const key = `${actor.tenantId}:${actor.userId}:${kind}:${id}`;
     const kept = places.get(key);
     if (kept !== undefined && now().getTime() - kept.at < PLACE_KEPT_MS) {
-      return kept.place;
+      return kept;
     }
-    const raw =
-      kind === "EXTERNAL_PERSON"
-        ? external === undefined
+    let raw: string | null;
+    let origin: SourcedOrigin | null = null;
+    if (kind === "EXTERNAL_PERSON") {
+      const latest =
+        external === undefined
           ? null
-          : ((await external.subjects.latest(actor, id).catch(() => null))
-              ?.subject.location ?? null)
-        : ((await material.counterpart(actor, kind, id).catch(() => null))
-            ?.basedIn ?? null);
+          : await external.subjects.latest(actor, id).catch(() => null);
+      raw = latest?.subject.location ?? null;
+      // A researched entity that is also a Capital Q investor (QInvest, live
+      // 2026-10-23: no public location) is based where its record says.
+      const orgId = latest?.subject.investorOrganisationId ?? null;
+      if (raw === null && orgId !== null) {
+        raw =
+          (
+            await material
+              .counterpart(actor, "INVESTOR_ORGANISATION", orgId)
+              .catch(() => null)
+          )?.basedIn ?? null;
+      }
+      origin = sourcedOrigin(
+        latest?.brief ?? null,
+        (phrase) => accentForPlace(phrase) !== null,
+      );
+    } else {
+      raw =
+        (await material.counterpart(actor, kind, id).catch(() => null))
+          ?.basedIn ?? null;
+    }
     // Third-party text is data: one short line, no control characters.
     const place =
       raw === null ? null : plain(raw, 120).replace(/[{}<>[\]]/gu, "");
     const value = place === null || place.length === 0 ? null : place;
-    places.set(key, { at: now().getTime(), place: value });
+    const entry = { at: now().getTime(), place: value, origin };
+    places.set(key, entry);
     if (places.size > 2_000) {
       const oldest = places.keys().next().value;
       if (oldest !== undefined) places.delete(oldest);
     }
-    return value;
+    return entry;
   }
 
   /** One background rebuild after a degraded persona, per subject. */
@@ -2181,10 +2239,11 @@ export function createRehearsalService(dependencies: {
     // needs one, and a gap in answering one costs (QA e22ea609).
     const questionOpen = questionOpenIn(turns);
     const theyAsked = cue === "NONE" && theyAskedIn(turns);
-    const [material_, place] = await Promise.all([
+    const [material_, where] = await Promise.all([
       meetingMaterial(actor, row),
-      placeOf(actor, row.counterpartKind, row.counterpartId),
+      whereFrom(actor, row.counterpartKind, row.counterpartId),
     ]);
+    const place = where.place;
     const variables = {
       viewerRole: row.userRole,
       viewerOrganisation: viewerOrganisation.slice(0, 200),
@@ -2197,6 +2256,8 @@ export function createRehearsalService(dependencies: {
         (place === null
           ? ""
           : `\nSpeaks like: someone who lives and works in ${place}.`) +
+        // v12 (2026-10-23): the language they greet in, in its own script.
+        localLanguageLine(where.origin?.origin ?? place) +
         (closingSoon
           ? "\nMeeting time is almost over. In character, courteously acknowledge that you need to leave shortly. Close naturally in one or two sentences, without another question."
           : ""),
@@ -2356,12 +2417,19 @@ export function createRehearsalService(dependencies: {
       category === "RUDE" || step.warning !== null || step.close === "WALK_OUT",
       category === "STRONG" || category === "DIRECT" || category === "ASKED",
     );
+    // v13 beats stand only when code kept the model's own delivery and
+    // words: a temperament override or a warning re-voices the whole line.
+    const kept =
+      delivery.mood === shaped.mood &&
+      delivery.intensity === shaped.intensity &&
+      step.warning === null;
     return {
       result: {
         ...shaped,
         mood: delivery.mood as RehearsalTurnResult["mood"],
         intensity: delivery.intensity,
         reaction: delivery.reaction,
+        beats: kept ? shaped.beats : [],
       },
       sawScreen: screenFrame !== null,
       state: after,
@@ -2434,11 +2502,16 @@ export function createRehearsalService(dependencies: {
       entityKind: record?.subject.entityKind,
     });
     const base = holdingTurn([], "OPENING");
+    // A greeting in their language when they are from (or based) where one
+    // is spoken; the rest of the opening stays as written.
+    const where = await whereFrom(actor, "EXTERNAL_PERSON", id);
+    const greeting =
+      localLanguageFor(where.origin?.origin ?? where.place)?.greeting ?? null;
     return {
       ...base,
       result: {
         ...base.result,
-        line: externalOpeningLine({ scenario, companyName }),
+        line: externalOpeningLine({ scenario, companyName, greeting }),
       },
     };
   }
@@ -2661,6 +2734,9 @@ export function createRehearsalService(dependencies: {
             sawScreen: false,
             intensity: opening.result.intensity,
             reaction: opening.result.reaction,
+            ...(opening.result.beats.length === 0
+              ? {}
+              : { beats: opening.result.beats }),
             state: opening.state,
           },
         ],
@@ -2774,6 +2850,7 @@ export function createRehearsalService(dependencies: {
           sawScreen: answered.sawScreen,
           intensity: result.intensity,
           reaction: result.reaction,
+          ...(result.beats.length === 0 ? {} : { beats: result.beats }),
           ...(answered.state === undefined ? {} : { state: answered.state }),
           ...(warningOf(answered) === undefined
             ? {}
@@ -2983,7 +3060,7 @@ export function createRehearsalService(dependencies: {
       // the persona rests on. Researched real people included (owner
       // decision 2026-10-21): the accent comes from where they are based,
       // never from a guessed nationality, and an unknown place is neutral.
-      const basedIn = await placeOf(
+      const where = await whereFrom(
         actor,
         row.counterpartKind,
         row.counterpartId,
@@ -2991,7 +3068,8 @@ export function createRehearsalService(dependencies: {
       return {
         seed: `${row.counterpartKind}:${row.counterpartId}`,
         voice: row.voice ?? "MALE",
-        basedIn,
+        // R2b: a sourced origin before where they are based.
+        basedIn: where.origin?.origin ?? where.place,
         patience: persona === null ? null : conductOf(persona).patience,
       };
     },
@@ -3014,6 +3092,7 @@ export function createRehearsalService(dependencies: {
             mood: last.mood,
             intensity: last.intensity ?? "NORMAL",
             reaction: last.reaction ?? null,
+            ...(last.beats === undefined ? {} : { beats: last.beats }),
           };
     },
   };
@@ -3222,4 +3301,15 @@ export function createRehearsalComposer(dependencies: {
         ),
       ),
   };
+}
+
+/**
+ * INVESTOR_TWIN_TURN v12: the language the person greets in, from where
+ * they are based ("" when English or unknown: unknown stays unknown).
+ */
+export function localLanguageLine(place: string | null): string {
+  const local = localLanguageFor(place);
+  return local === null
+    ? ""
+    : `\nLocal language: ${local.language} (write it in ${local.script}).`;
 }

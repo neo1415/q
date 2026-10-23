@@ -25,6 +25,14 @@
       "types": "./dist/providers/serper.d.ts",
       "default": "./dist/providers/serper.js"
     },
+    "./providers/brave": {
+      "types": "./dist/providers/brave.d.ts",
+      "default": "./dist/providers/brave.js"
+    },
+    "./providers/images": {
+      "types": "./dist/providers/images.d.ts",
+      "default": "./dist/providers/images.js"
+    },
     "./providers/scrapingbee": {
       "types": "./dist/providers/scrapingbee.d.ts",
       "default": "./dist/providers/scrapingbee.js"

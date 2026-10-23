@@ -109,7 +109,10 @@ import {
   INVESTOR_REVISABLE_STEPS,
 } from "@capital-q/investor-onboarding";
 import { createPexelsPhotos } from "./composition/stock-photos.js";
-import { createPexelsQPictures } from "./composition/pictures.js";
+import {
+  createPexelsQPictures,
+  createPublicQPictures,
+} from "./composition/pictures.js";
 import {
   createOwnPictureReader,
   createSupabaseObjectReader,
@@ -4127,6 +4130,15 @@ const qIntelligence = composeQIntelligence({
   pictures: createPexelsQPictures(
     process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
   ),
+  // Owner 2026-10-23: pictures of who a turn names, from the image results
+  // of the indexes the web search uses (the SERP key and Brave).
+  publicPictures: createPublicQPictures(
+    {
+      serp: process.env.SERPER_API_KEY ?? process.env.SERP_API_KEY,
+      brave: process.env.BRAVE_API ?? process.env.BRAVE_SEARCH_API_KEY,
+    },
+    logger,
+  ),
   arrivalSnapshot: (actor) => arrivalSnapshots.forActor(actor),
   // RECOVERY (C's request): what came of Q's recent screen acts, from the
   // receipts ledger (composed further down; read only once turns run).
@@ -7097,6 +7109,9 @@ const { app, logger: appLogger } = createApp(
                   mood: opening.mood,
                   intensity: opening.intensity,
                   reaction: opening.reaction,
+                  ...(opening.beats === undefined
+                    ? {}
+                    : { beats: [...opening.beats] }),
                 });
               },
             },

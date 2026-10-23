@@ -47,6 +47,19 @@ function firstAt(text: string, name: string): number {
 
 type Candidate = QArtifactPreviewSubject & { readonly id: string };
 
+/**
+ * Q's own product, which Q names about itself ("Capital Q holds no record
+ * of Zino Aviation"). Owner 2026-10-23: asked to search for Zino Aviation,
+ * the screen also put up a card for Capital Q's own company record, which
+ * the run had read as context. A record by this name is a subject only
+ * when the person named it.
+ */
+const PRODUCT_NAME = /^capital\s*q(?:\s+(?:ltd\.?|limited|inc\.?|plc|llc))?$/iu;
+
+export function isProductName(name: string): boolean {
+  return PRODUCT_NAME.test(name.trim());
+}
+
 function candidatesOf(read: RunRead): readonly Candidate[] {
   const out: Candidate[] = [];
   for (const [companyId, name] of read.companyNames) {
@@ -189,8 +202,15 @@ export function createSubjectAnnouncer(input: {
           }
         }
       }
+      const askedFor = new Set(
+        subjectsNamedIn(input.question, read).map(previewKeyOf),
+      );
       for (const one of subjectsNamedIn(sentence, read)) {
         if (named.length >= Q_ARTIFACT_PREVIEW_SUBJECTS_MAX) break;
+        // Q speaking of itself is not a subject the turn is about.
+        if (isProductName(one.name) && !askedFor.has(previewKeyOf(one))) {
+          continue;
+        }
         const id = previewKeyOf(one);
         if (seen.has(id)) continue;
         seen.add(id);

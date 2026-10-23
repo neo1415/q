@@ -140,14 +140,13 @@ export async function preloadStory(input: {
     ...STORY_SCREENS.map(screenPath),
     ...(input.stills === true ? STORY_STILL_ROUTES.map(stillPath) : []),
   ];
-  const tasks: (() => Promise<void>)[] = [
-    ...pictures.map((file) => async () => {
-      const image = await decodeImage(file);
-      if (image !== null) images.set(file, image);
-    }),
-  ];
-  // Every beat's timings (small JSON, immutable) before Start; audio only
-  // for the first beats, the rest through the budgeted controller.
+  // What the start waits for: the first beats' audio and every beat's
+  // timings (small JSON, immutable). Pictures are not among them: the
+  // first word comes within about 2 s of the ask (coordinator, 23 Oct),
+  // and the pictures decode while the opening plays.
+  const tasks: (() => Promise<void>)[] = [];
+  // Audio only for the first beats, the rest through the budgeted
+  // controller.
   const bank =
     context === null
       ? null
@@ -160,6 +159,12 @@ export async function preloadStory(input: {
   bank?.follow(order);
   const firstBeats = new Map<number, AudioBuffer | null>();
   if (bank !== null && Object.keys(files).length > 0) {
+    // The opening's audio first: it is the longest wait.
+    for (const n of order.slice(0, AUDIO_AHEAD)) {
+      tasks.push(async () => {
+        firstBeats.set(n, await bank.load(n));
+      });
+    }
     for (const beat of STORY_BEATS) {
       const file = files[beat.id]?.alignment;
       if (file === undefined) continue;
@@ -170,11 +175,6 @@ export async function preloadStory(input: {
         if (alignment !== null && alignmentFits(beat, alignment)) {
           alignments.set(beat.n, alignment);
         }
-      });
-    }
-    for (const n of order.slice(0, AUDIO_AHEAD)) {
-      tasks.push(async () => {
-        firstBeats.set(n, await bank.load(n));
       });
     }
   }
@@ -190,6 +190,19 @@ export async function preloadStory(input: {
     }),
     6,
   );
+  // After the start's own files, so they never compete with the opening's
+  // audio; the map fills while the story plays (a picture not yet decoded
+  // simply loads on its own).
+  if (input.signal?.aborted !== true) {
+    void pool(
+      pictures.map((file) => async () => {
+        if (input.signal?.aborted === true) return;
+        const image = await decodeImage(file);
+        if (image !== null) images.set(file, image);
+      }),
+      3,
+    );
+  }
   // A partial render never mixes voices mid-story: every beat's timings
   // and the first beats' audio, or the fallback narrators for all of it.
   const complete =

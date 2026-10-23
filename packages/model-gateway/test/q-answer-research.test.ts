@@ -201,6 +201,9 @@ function build(options: {
     Parameters<typeof createModelGatewayQAnswer>[0]["askerOf"] | undefined;
   /** What Q said earlier in this conversation. */
   readonly earlierQ?: string | undefined;
+  readonly publicPictures?: Parameters<
+    typeof createModelGatewayQAnswer
+  >[0]["publicPictures"];
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -289,6 +292,9 @@ function build(options: {
     tools: options.tools,
     statements: options.statements,
     ...(options.askerOf === undefined ? {} : { askerOf: options.askerOf }),
+    ...(options.publicPictures === undefined
+      ? {}
+      : { publicPictures: options.publicPictures }),
   });
   const request: QAnswerRequest = {
     runId: RUN as QAnswerRequest["runId"],
@@ -1835,6 +1841,224 @@ describe("Capital Q and the public web together (owner 2026-10-23)", () => {
     expect((await seam.answer(request)).kind).toBe("ANSWERED");
     expect(web.executed.map((p) => p.name)).not.toContain(
       "research_public_web",
+    );
+  });
+});
+
+describe("pictures of who the turn names, from public pages (owner 2026-10-23)", () => {
+  it("looks for them beside the web search and shows them after the words, credited to their pages", async () => {
+    const asked: { name: string; userText: string }[] = [];
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      researchOutcome(p, "Zino Aviation flies charter."),
+    );
+    const { seam, request, answerBlocks } = build({
+      script: [
+        { kind: "JSON", value: analystResult("Zino Aviation flies charter.") },
+      ],
+      tools: tools.port,
+      userText: "Who runs Zino Aviation?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: (input) => {
+          asked.push({ name: input.name, userText: input.userText });
+          return Promise.resolve([
+            {
+              imageUrl: "https://cdn.nairametrics.com/zino.jpg",
+              pageUrl: "https://nairametrics.com/2024/05/interview/",
+              domain: "nairametrics.com",
+              title: "Interview: Captain Zino Mario on Zino Aviation",
+            },
+          ]);
+        },
+      },
+    });
+    expect(
+      (await seam.answer({ ...request, aboutNamedOther: true })).kind,
+    ).toBe("ANSWERED");
+    expect(asked).toEqual([
+      { name: "Zino Aviation", userText: "Who runs Zino Aviation?" },
+    ]);
+    const pictures = answerBlocks.filter(
+      (block) => (block as { kind?: string }).kind === "PICTURE",
+    );
+    expect(pictures).toEqual([
+      expect.objectContaining({
+        source: "PUBLIC_WEB",
+        url: "https://cdn.nairametrics.com/zino.jpg",
+        pageUrl: "https://nairametrics.com/2024/05/interview/",
+        credit: {
+          name: "nairametrics.com",
+          url: "https://nairametrics.com/2024/05/interview/",
+        },
+      }),
+    ]);
+  });
+
+  it("looks for none when the turn names no one", async () => {
+    let asked = 0;
+    const tools = toolPort([RESEARCH], (p) => researchOutcome(p, "x"));
+    const { seam, request } = build({
+      script: [{ kind: "JSON", value: analystResult("Markets moved.") }],
+      tools: tools.port,
+      userText: "what moved in fintech this week?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () => {
+          asked += 1;
+          return Promise.resolve([]);
+        },
+      },
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(asked).toBe(0);
+  });
+});
+
+describe("a person search runs beside the web search, with their picture (owner 2026-10-23)", () => {
+  const FIND: QOfferedTool = {
+    toolName: "people.find",
+    toolVersion: 1,
+    classification: "READ_ONLY",
+    definition: {
+      name: "find_public_entity",
+      description: "Finds a public person or organisation.",
+      inputJsonSchema: { type: "object", properties: {} },
+    },
+    visibleStage: "SEARCHING_PUBLIC_SOURCES",
+  };
+  const MATCHED = {
+    outcome: "MATCHED",
+    candidates: [],
+    clarifyingQuestion: null,
+    elapsedMs: 900,
+    card: {
+      entityKind: "PERSON",
+      subject: {
+        externalPersonId: "5b0f6d8e-4f6e-5a3b-8c1d-2e3f4a5b6c7d",
+        entityKind: "PERSON",
+        researchStatus: "RESEARCHED",
+        requiresRefresh: false,
+        image: {
+          status: "NOT_ATTACHED",
+          assetUrl: null,
+          attribution: null,
+          licenseNote: null,
+        },
+        quotes: [],
+        displayName: "Zino Mario",
+        nameVariants: ["Zino Mario"],
+        profileUrl: "https://www.zinoaviation.com/",
+        role: "Founder",
+        organization: "Zino Aviation",
+        location: "Lagos, Nigeria",
+        evidenceBundleId: null,
+        briefVersion: 0,
+        confidence: "STRONG",
+      },
+      sources: [
+        {
+          id: null,
+          description: null,
+          evidenceClass: null,
+          url: "https://www.zinoaviation.com/",
+          domain: "zinoaviation.com",
+          title: "Zino Aviation",
+          publishedAt: null,
+          retrievedAt: "2026-10-23T09:00:00Z",
+          provider: "brave",
+        },
+      ],
+      uncertainty: [],
+      attributionLine: "According to zinoaviation.com.",
+      enriching: false,
+      actions: [],
+    },
+  };
+
+  it("starts the web search with the turn and shows their public picture with the card", async () => {
+    const executed: string[] = [];
+    const port: QToolPort = {
+      offer: () => Promise.resolve([FIND, RESEARCH]),
+      execute: (proposal) => {
+        executed.push(proposal.name);
+        if (proposal.name === "research_public_web") {
+          return Promise.resolve(researchOutcome(proposal, "Zino Mario."));
+        }
+        return Promise.resolve({
+          callId: proposal.callId,
+          toolName: "people.find",
+          toolVersion: 1,
+          classification: "READ_ONLY",
+          status: "SUCCEEDED",
+          failureCode: null,
+          sensitivity: "PUBLIC",
+          result: { ok: true, data: { result: MATCHED, source: "WEB" } },
+          latencyMs: 1,
+        });
+      },
+    };
+    const { seam, request, answerBlocks } = build({
+      script: [{ kind: "JSON", value: analystResult("unused") }],
+      tools: port,
+      userText: "Who is Captain Zino Mario?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () =>
+          Promise.resolve([
+            {
+              imageUrl: "https://cdn.nairametrics.com/zino.jpg",
+              pageUrl: "https://nairametrics.com/2024/05/zino-mario/",
+              domain: "nairametrics.com",
+              title: "Zino Mario on building Zino Aviation",
+            },
+          ]),
+      },
+    });
+    const outcome = await seam.answer({
+      ...request,
+      aboutNamedOther: true,
+      questionKind: "PERSON_SEARCH",
+      personSearch: {
+        name: "Captain Zino Mario",
+        entityKind: "PERSON",
+        city: null,
+        country: null,
+        organization: null,
+        role: null,
+        freshSearch: false,
+      },
+    });
+    expect(outcome.kind).toBe("ANSWERED");
+    // The web was asked first, beside the lookup, not after it.
+    expect(executed[0]).toBe("research_public_web");
+    expect(executed).toContain("find_public_entity");
+    expect(answerBlocks).toContainEqual(
+      expect.objectContaining({
+        kind: "PICTURE",
+        source: "PUBLIC_WEB",
+        pageUrl: "https://nairametrics.com/2024/05/zino-mario/",
+      }),
     );
   });
 });

@@ -1,7 +1,12 @@
 import { createDefaultPromptRegistry } from "@capital-q/q-core";
+
+import { readTurn } from "../src/composition/rehearsal-readings.js";
 import { describe, expect, it } from "vitest";
 
-import type { RehearsalService } from "../src/composition/rehearsals.js";
+import {
+  localLanguageLine,
+  type RehearsalService,
+} from "../src/composition/rehearsals.js";
 import type { VoiceSessionBinding } from "../src/voice/bindings.js";
 import type { VoiceSpeaker } from "../src/voice/provider.js";
 import {
@@ -12,6 +17,7 @@ import {
 
 import {
   accentForPlace,
+  localLanguageFor,
   catalogVoice,
   pickVoice,
   shapeForAge,
@@ -794,9 +800,16 @@ describe("how the person Q plays talks (row 12, INVESTOR_TWIN_TURN v11)", () => 
     expect(
       createDefaultPromptRegistry().getActive("INVESTOR_TWIN_TURN").definition
         .version,
-    ).toBe(11);
+    ).toBe(13);
     expect(template).toContain('"Speaks like" line');
     expect(template).toContain("code-switch");
+  });
+
+  it("v12: greets in the local language once, in its own script, substance in English", () => {
+    expect(template).toContain('"Local language" line');
+    expect(template).toContain("own script");
+    expect(template).toContain("never transliterated");
+    expect(template).toContain("everything that matters stays in English");
   });
 
   it("forbids caricature, stereotype and spelled-out accents", () => {
@@ -830,5 +843,123 @@ describe("warming a persona's library voice before its first line", () => {
     relay.warm?.(SPEC);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(fake.seen).toHaveLength(2);
+  });
+});
+
+describe("where a persona is from, read right (2026-10-23 audit)", () => {
+  it("never reads a US state code as a country", () => {
+    expect(accentForPlace("Boston, MA")).toBe("american");
+    expect(accentForPlace("Denver, CO")).toBe("american");
+    expect(accentForPlace("Wilmington, DE")).toBe("american");
+    expect(accentForPlace("Boise, ID")).toBe("american");
+    expect(accentForPlace("Nashville, TN")).toBe("american");
+  });
+
+  it("still reads a known city first, and an ISO code on its own", () => {
+    expect(accentForPlace("Riyadh, SA")).toBe("arabic");
+    expect(accentForPlace("Casablanca, MA")).toBe("arabic");
+    expect(accentForPlace("Lagos, NG")).toBe("nigerian");
+    expect(accentForPlace("SA")).toBe("arabic");
+    expect(accentForPlace("Istanbul, Türkiye")).toBe("turkish");
+  });
+
+  it("tells the turn prompt the language and script, or nothing", () => {
+    expect(localLanguageLine("Riyadh, Saudi Arabia")).toBe(
+      "\nLocal language: Arabic (write it in Arabic script).",
+    );
+    expect(localLanguageLine("London, United Kingdom")).toBe("");
+    expect(localLanguageLine(null)).toBe("");
+  });
+
+  it("names the language a persona greets in, and its script", () => {
+    expect(localLanguageFor("Riyadh, Saudi Arabia")).toMatchObject({
+      language: "Arabic",
+      script: "Arabic script",
+    });
+    expect(localLanguageFor("Lagos, Nigeria")?.language).toBe("Yoruba");
+    expect(localLanguageFor("Kano, Nigeria")?.language).toBe("Hausa");
+    expect(localLanguageFor("Nigeria")?.language).toBe("Nigerian Pidgin");
+    expect(localLanguageFor("Bengaluru, India")?.script).toBe("Devanagari");
+    // A fixed greeting for openings written by code; none for Pidgin.
+    expect(localLanguageFor("Doha, Qatar")?.greeting).toBe("السلام عليكم");
+    expect(localLanguageFor("Lagos, Nigeria")?.greeting).toBe("Ẹ n lẹ́ o");
+    expect(localLanguageFor("Kano, Nigeria")?.greeting).toBe("Sannu");
+    expect(localLanguageFor("Nigeria")?.greeting).toBeNull();
+    // English-speaking or unknown: no local language, never a guess.
+    expect(localLanguageFor("London, United Kingdom")).toBeNull();
+    expect(localLanguageFor(null)).toBeNull();
+  });
+
+  it("gives an Arabic-speaking persona a choice of Arabic voices, not one", () => {
+    const picks = Array.from({ length: 40 }, (_, i) =>
+      personaVoiceFor({
+        seed: `INVESTOR_ORGANISATION:${String(i)}`,
+        voice: "MALE",
+        basedIn: "Riyadh, Saudi Arabia",
+        ageGroup: null,
+        patience: "TYPICAL",
+      }),
+    );
+    // Was one voice (Fahad) for every Arabic-speaking man.
+    expect(new Set(picks.map((pick) => pick?.voiceId)).size).toBeGreaterThan(3);
+    for (const pick of picks) expect(pick?.accent).toBe("arabic");
+  });
+});
+
+describe("emotion per sentence (R5, INVESTOR_TWIN_TURN v13)", () => {
+  it("asks for beats only when the feeling moves inside the line", () => {
+    const template =
+      createDefaultPromptRegistry().getActive("INVESTOR_TWIN_TURN").definition
+        .template;
+    expect(template).toContain("- beats:");
+    expect(template).toContain(
+      "An empty list when the whole line sounds the same",
+    );
+  });
+
+  it("gives each sentence its own tone, a neutral one none", () => {
+    const performed = deliverLine(
+      ["Lovely to meet you.", "Now, where does the money go?", "Fine."],
+      { tone: "WARM", intensity: "NORMAL", reaction: null },
+      [
+        { tone: "WARM", intensity: "NORMAL" },
+        { tone: "SKEPTICAL", intensity: "NORMAL" },
+        { tone: null, intensity: "NORMAL" },
+      ],
+    );
+    // The neutral last sentence has no cue at all, so it is not listed.
+    expect(performed.map((p) => [p.sentence, p.tone])).toEqual([
+      ["Lovely to meet you.", "WARM"],
+      ["Now, where does the money go?", "SKEPTICAL"],
+    ]);
+  });
+
+  it("keeps one delivery when the beats do not line up with the sentences", () => {
+    const performed = deliverLine(
+      ["Lovely to meet you.", "Now, where does the money go?"],
+      { tone: "WARM", intensity: "NORMAL", reaction: null },
+      [{ tone: "ANGRY", intensity: "RAISED" }],
+    );
+    expect(performed.map((p) => p.tone)).toEqual(["WARM", "WARM"]);
+  });
+
+  it("reads beats leniently: anything unreadable means one delivery", () => {
+    const base = { line: "Hi. So?", mood: "WARM", move: "REMARK" };
+    expect(
+      readTurn({
+        ...base,
+        beats: [
+          { mood: "WARM", intensity: "SOFT" },
+          { mood: "SKEPTICAL", intensity: "NORMAL" },
+        ],
+      })?.beats,
+    ).toEqual([
+      { mood: "WARM", intensity: "SOFT" },
+      { mood: "SKEPTICAL", intensity: "NORMAL" },
+    ]);
+    expect(readTurn({ ...base, beats: [{ mood: "GLEEFUL" }] })?.beats).toEqual(
+      [],
+    );
+    expect(readTurn(base)?.beats).toEqual([]);
   });
 });

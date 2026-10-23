@@ -58,6 +58,7 @@ import { QSwarm } from "@/features/q-swarm/q-swarm";
 import { presence } from "@/features/q-swarm/presence-cue";
 import { isLineLive } from "@/features/voice/session";
 
+import { STORY_LENGTHS } from "../atlas";
 import { answerAloud, setNarrationVoice } from "../narrator";
 import { matchSpokenQuestion } from "../qa-match";
 import { lightSection, placeAnchors, unlightAll } from "../section-light";
@@ -619,8 +620,8 @@ export function StoryHost({
       <div className="cq-story-gate" role="dialog" aria-label="Q Story">
         <p className="cq-story-gate-title">Q tells the Capital Q story</p>
         <p>
-          About seven minutes, in Q&apos;s voice. Turn your sound on. You can
-          pause, go back, skip or ask a question at any point.
+          {STORY_LENGTHS[edition]}, in Q&apos;s voice. Turn your sound on. You
+          can pause, go back, skip or ask a question at any point.
         </p>
         <p className="cq-story-gate-meta" aria-live="polite">
           {ready

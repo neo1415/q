@@ -103,7 +103,17 @@ export function createSerperResearchProvider(
         error,
       );
     }
-    if (!response.ok) throw failure(classify(response.status), response.status);
+    if (!response.ok) {
+      // Production 2026-10-23: Serper answers a spent account with 400
+      // "Not enough credits", which read as a malformed request. It is
+      // reported as what it is: the account's credit (402), so the key
+      // rests and the operator is told to top it up.
+      const body = await response.text().catch(() => "");
+      if (response.status === 400 && /credit/i.test(body)) {
+        throw failure("RATE_LIMIT", 402);
+      }
+      throw failure(classify(response.status), response.status);
+    }
     try {
       return await response.json();
     } catch (error: unknown) {
@@ -165,44 +175,52 @@ export function createSerperResearchProvider(
       const startedAt = Date.now();
       const pages: { url: string; title: string | null; text: string }[] = [];
       const failedUrls: string[] = [];
-      for (const url of request.urls) {
-        try {
-          const body = await post(
-            options.scrapeUrl ?? SCRAPE_URL,
-            { url, includeMarkdown: true },
-            context,
-          );
-          const record =
-            body !== null && typeof body === "object"
-              ? (body as {
-                  text?: unknown;
-                  markdown?: unknown;
-                  metadata?: { title?: unknown };
-                })
-              : {};
-          const text =
-            typeof record.markdown === "string" && record.markdown.length > 0
-              ? record.markdown
-              : typeof record.text === "string"
-                ? record.text
-                : "";
-          if (text.length === 0) {
-            failedUrls.push(url);
-            continue;
+      // The pages side by side (WEB-RESEARCH-STANDARD: a read waits for the
+      // slowest page, not for the sum of them), kept in the order asked.
+      const read = await Promise.all(
+        request.urls.map(async (url) => {
+          try {
+            const body = await post(
+              options.scrapeUrl ?? SCRAPE_URL,
+              { url, includeMarkdown: true },
+              context,
+            );
+            const record =
+              body !== null && typeof body === "object"
+                ? (body as {
+                    text?: unknown;
+                    markdown?: unknown;
+                    metadata?: { title?: unknown };
+                  })
+                : {};
+            const text =
+              typeof record.markdown === "string" && record.markdown.length > 0
+                ? record.markdown
+                : typeof record.text === "string"
+                  ? record.text
+                  : "";
+            if (text.length === 0) return { url, page: null };
+            const title = record.metadata?.title;
+            return {
+              url,
+              page: {
+                url,
+                title:
+                  typeof title === "string" && title.length > 0
+                    ? title.slice(0, 300)
+                    : null,
+                text: text.slice(0, 200_000),
+              },
+            };
+          } catch (error: unknown) {
+            if (context.signal?.aborted === true) throw error;
+            return { url, page: null };
           }
-          const title = record.metadata?.title;
-          pages.push({
-            url,
-            title:
-              typeof title === "string" && title.length > 0
-                ? title.slice(0, 300)
-                : null,
-            text: text.slice(0, 200_000),
-          });
-        } catch (error: unknown) {
-          if (context.signal?.aborted === true) throw error;
-          failedUrls.push(url);
-        }
+        }),
+      );
+      for (const { url, page } of read) {
+        if (page === null) failedUrls.push(url);
+        else pages.push(page);
       }
       if (pages.length === 0) throw failure("UNAVAILABLE", null);
       return {

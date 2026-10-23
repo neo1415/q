@@ -715,7 +715,11 @@ export function registerQVoiceRoutes(
       }
       const deepgram = dependencies.deepgram;
       const elevenLabs = dependencies.provider;
+      // A rehearsal is never GPT-Live, trial or not: the person Q plays
+      // speaks in their own ElevenLabs persona voice (owner 2026-10-23,
+      // "fully ElevenLabs"); GPT-Live would answer in Q's own voice.
       const liveOnly =
+        input.rehearsal === undefined &&
         dependencies.live?.broker.isTrialUser(actor.userId) === true;
       const transport = deepgram ?? elevenLabs;
       if (transport === undefined && !liveOnly) {

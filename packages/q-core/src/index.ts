@@ -511,6 +511,8 @@ export { INVESTOR_TWIN_TURN_V8 } from "./prompts/tasks/investor-twin-turn.v8.js"
 export { INVESTOR_TWIN_TURN_V9 } from "./prompts/tasks/investor-twin-turn.v9.js";
 export { INVESTOR_TWIN_TURN_V10 } from "./prompts/tasks/investor-twin-turn.v10.js";
 export { INVESTOR_TWIN_TURN_V11 } from "./prompts/tasks/investor-twin-turn.v11.js";
+export { INVESTOR_TWIN_TURN_V12 } from "./prompts/tasks/investor-twin-turn.v12.js";
+export { INVESTOR_TWIN_TURN_V13 } from "./prompts/tasks/investor-twin-turn.v13.js";
 // MEET-HOST block (ADR 0037)
 export { MEETING_HOST_TURN_V1 } from "./prompts/tasks/meeting-host-turn.v1.js";
 export { MEETING_HOST_TURN_V2 } from "./prompts/tasks/meeting-host-turn.v2.js";
@@ -571,6 +573,12 @@ export {
   RehearsalTurnV8VariablesSchema,
   REHEARSAL_TURN_V8_SCHEMA_VERSION,
   RehearsalTurnV8ResultSchema,
+  REHEARSAL_TURN_V9_SCHEMA_VERSION,
+  RehearsalTurnV9ResultSchema,
+  RehearsalBeatSchema,
+  REHEARSAL_BEATS_MAX,
+  type RehearsalBeat,
+  type RehearsalTurnV9Result,
   RehearsalScreenNoteSchema,
   type RehearsalTurnV8Variables,
   type RehearsalTurnV8Result,

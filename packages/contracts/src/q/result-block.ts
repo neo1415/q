@@ -518,13 +518,24 @@ export type QSummaryBlock = z.infer<typeof QSummaryBlockSchema>;
  * pixel, a private bucket). The credit and the picture's page travel with
  * it because the source's licence asks for attribution.
  */
-export const Q_PICTURE_SOURCES = ["PEXELS"] as const;
+export const Q_PICTURE_SOURCES = ["PEXELS", "PUBLIC_WEB"] as const;
 export type QPictureSource = (typeof Q_PICTURE_SOURCES)[number];
-/** Where each source serves its images, and its pages. */
+/**
+ * Where each source serves its images, and its pages. PUBLIC_WEB (owner
+ * 2026-10-23: a picture of the company or person Q is talking about) is
+ * the one source with no fixed host: an image a public page shows, found
+ * by Capital Q's image search from the name the person said, never an
+ * address a model wrote. Its page is the credit ("From <site>"), and it is
+ * what that page shows, never a verified identity.
+ */
 export const Q_PICTURE_HOSTS: Readonly<
-  Record<QPictureSource, { readonly image: string; readonly page: string }>
+  Record<
+    QPictureSource,
+    { readonly image: string | null; readonly page: string | null }
+  >
 > = {
   PEXELS: { image: "images.pexels.com", page: "www.pexels.com" },
+  PUBLIC_WEB: { image: null, page: null },
 };
 
 function isHttpsOn(value: string, host: string | null): boolean {
@@ -558,6 +569,8 @@ export const QPictureBlockSchema = z
     source: z.enum(Q_PICTURE_SOURCES),
     /** The picture's own page at the source. */
     pageUrl: PictureHttpsUrlSchema,
+    /** PUBLIC_WEB: when Capital Q found it on that page (ISO time). */
+    retrievedAt: z.string().max(40).optional(),
   })
   .strict()
   .refine(

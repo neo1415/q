@@ -428,13 +428,9 @@ export function QSessionProvider({
           ? null
           : live,
       );
-      // The answer has landed: its blocks decide what is shown.
-      setSpokenPreview((live) =>
-        live !== null &&
-        entries.some((entry) => entry.message.messageId === live.messageId)
-          ? null
-          : live,
-      );
+      // The answer has landed. Its preview is kept: livePreviewOf keeps
+      // it up only while the landed answer has no cards of its own
+      // (owner 2026-10-23: the cards cleared as Q began to speak).
       for (const entry of entries) {
         const named = entry.conversationId;
         if (named !== null && named !== shownConversation.current) {
