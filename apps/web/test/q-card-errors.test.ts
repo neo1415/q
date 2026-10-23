@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ApiProblemError } from "@capital-q/api-client";
 
+import { translate } from "../src/features/i18n/messages";
 import { translateQCardError } from "../src/features/q-card/q-card-errors";
 
 const problem = (
@@ -56,6 +57,38 @@ describe("translateQCardError", () => {
     expect(translateQCardError(problem(401, "UNAUTHENTICATED"))).toMatchObject({
       message: expect.stringContaining("Sign in") as unknown,
     });
+  });
+
+  it("tells a person their card is theirs alone, and an organisation it needs an administrator", () => {
+    expect(
+      translateQCardError(problem(403, "PERMISSION_DENIED"), "PERSON"),
+    ).toEqual({
+      ok: false,
+      message: "You can only make or change your own Q Card.",
+    });
+    expect(
+      translateQCardError(problem(403, "PERMISSION_DENIED"), "COMPANY"),
+    ).toMatchObject({
+      message: expect.stringContaining("administrator") as unknown,
+    });
+  });
+
+  it("says each refusal in Arabic, keeping the reference as given", () => {
+    const refused = translateQCardError(
+      problem(422, "VALIDATION_FAILED", undefined, "req_42418488"),
+    );
+    if (refused.ok) throw new Error("expected a refusal");
+    const arabic = translate("ar", refused.message);
+    expect(arabic).toContain("لم يُحفظ أي شيء");
+    expect(arabic).toContain("req_42418488");
+    for (const subject of ["PERSON", "COMPANY"] as const) {
+      const denied = translateQCardError(
+        problem(403, "PERMISSION_DENIED"),
+        subject,
+      );
+      if (denied.ok) throw new Error("expected a refusal");
+      expect(translate("ar", denied.message)).not.toBe(denied.message);
+    }
   });
 
   it("answers an unknown failure without inventing a cause", () => {

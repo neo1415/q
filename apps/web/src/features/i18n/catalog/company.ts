@@ -392,4 +392,28 @@ export const COMPANY_AR: Readonly<Record<string, string>> = {
   "Can open": "يمكنه الفتح",
   "Asked, waiting for you": "طلبه، بانتظارك",
   "Can request": "يمكنه الطلب",
+  // Q Card refusals (2026-10-23): what the card page says when a change
+  // is refused, in the reader's language.
+  "You can only make or change your own Q Card.":
+    "لا يمكنك إنشاء بطاقة Q أو تغييرها إلا لنفسك.",
+  "Only an administrator of your organisation can change its handle or card.":
+    "لا يمكن تغيير معرّف مؤسستك أو بطاقتها إلا لمسؤول فيها.",
+  "Capital Q couldn't accept that change. Nothing was saved.":
+    "لم يتمكن Capital Q من قبول هذا التغيير. لم يُحفظ أي شيء.",
+  "Capital Q couldn't accept that change. Nothing was saved. Reference: {ref}.":
+    "لم يتمكن Capital Q من قبول هذا التغيير. لم يُحفظ أي شيء. المرجع: {ref}.",
+  "Capital Q couldn't save that just now. Try again.":
+    "تعذّر على Capital Q حفظ ذلك الآن. حاول مجدداً.",
+  "Capital Q couldn't save that just now. Try again. Reference: {ref}.":
+    "تعذّر على Capital Q حفظ ذلك الآن. حاول مجدداً. المرجع: {ref}.",
+  "This profile isn't available to you.": "هذا الملف غير متاح لك.",
+  "The card changed since this page was opened. Reload and try again.":
+    "تغيّرت البطاقة منذ فتح هذه الصفحة. أعد التحميل وحاول مجدداً.",
+  "That handle isn't available.": "هذا المعرّف غير متاح.",
+  "That handle is reserved and can't be claimed.":
+    "هذا المعرّف محجوز ولا يمكن اختياره.",
+  "A handle is 3 to 30 lowercase letters, digits or single hyphens, not starting or ending with a hyphen.":
+    "المعرّف من 3 إلى 30 حرفاً لاتينياً صغيراً أو رقماً أو شرطة مفردة، ولا يبدأ بشرطة ولا ينتهي بها.",
+  "That change couldn't be made.": "تعذّر إجراء هذا التغيير.",
+  "Enter a handle first.": "أدخل معرّفاً أولاً.",
 };

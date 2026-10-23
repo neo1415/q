@@ -11,6 +11,18 @@ export class QCardSubjectNotFoundError extends Error {
   }
 }
 
+/**
+ * A person's own Q Card is theirs alone: a request naming another
+ * person's id is refused outright (403), whoever sends it. The subject is
+ * always the signed-in person's own id, taken from the session.
+ */
+export class PersonQCardNotYoursError extends Error {
+  constructor() {
+    super("You can only make or change your own Q Card.");
+    this.name = "PersonQCardNotYoursError";
+  }
+}
+
 export const HANDLE_REFUSALS = ["SHAPE", "RESERVED", "TAKEN"] as const;
 export type HandleRefusal = (typeof HANDLE_REFUSALS)[number];
 

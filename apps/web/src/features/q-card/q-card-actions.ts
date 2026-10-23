@@ -67,7 +67,7 @@ export async function claimHandleAction(
     updateTag(PUBLIC_CARD_TAG);
     return { ok: true, card };
   } catch (error) {
-    return translate(error);
+    return translate(error, subject.data.subjectType);
   }
 }
 
@@ -108,6 +108,6 @@ export async function updateQCardAction(
     );
     return { ok: true, card };
   } catch (error) {
-    return translate(error);
+    return translate(error, subject.data.subjectType);
   }
 }

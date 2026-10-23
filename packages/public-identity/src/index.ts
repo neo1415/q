@@ -42,6 +42,7 @@ export {
   ProfileImageUploadNotFoundError,
   QCardFieldNotAllowedError,
   QCardNotFoundError,
+  PersonQCardNotYoursError,
   QCardSubjectNotFoundError,
   QCardVersionConflictError,
   type HandleRefusal,

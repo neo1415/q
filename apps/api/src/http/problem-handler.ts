@@ -69,6 +69,7 @@ import {
 import type { Logger } from "@capital-q/observability";
 import {
   HandleUnavailableError,
+  PersonQCardNotYoursError,
   ProfileImageRejectedError,
   ProfileImageStorageUnavailableError,
   ProfileImageUploadNotFoundError,
@@ -254,7 +255,9 @@ function toProblem(
   // one that never existed: no access, nothing about why.
   if (
     error instanceof ActorContextDeniedError ||
-    error instanceof PersonProfileNotFoundError
+    error instanceof PersonProfileNotFoundError ||
+    // Another person's own Q Card (BIZ-004): refused, whoever asks.
+    error instanceof PersonQCardNotYoursError
   ) {
     return createProblemDetails({
       code: "PERMISSION_DENIED",
