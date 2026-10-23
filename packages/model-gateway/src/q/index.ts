@@ -175,6 +175,11 @@ import {
   type CompanyFactAsk,
 } from "./named-company-fact.js";
 import {
+  FIRST_CONTACT_TOOL,
+  firstContactMessage,
+  firstContactOf,
+} from "./first-contact.js";
+import {
   CHAINED_FIGURES_TOOL,
   CHAINED_GET_TOOL,
   CHAINED_READ_TOOLS,
@@ -6830,6 +6835,8 @@ export function createModelGatewayQAnswer(
                 )
               : null;
             let heldThisRound = 0;
+            // A first contact prepared by code this round (first-contact.ts).
+            let firstContact: Promise<QToolCallOutcome> | null = null;
             const chainedThisRound: {
               readonly name: string;
               readonly read: Promise<QToolCallOutcome>;
@@ -6913,6 +6920,26 @@ export function createModelGatewayQAnswer(
               // The profile and, beside it, the published figures (owner
               // 2026-10-23): both start now and run in parallel, each only
               // when offered, within the loop's call budget.
+              // A message or email to a company they are not connected with:
+              // the first contact, Express Interest, prepared now for their
+              // approval, through its own authorize step (first-contact.ts).
+              const contact = firstContactOf(call, outcome);
+              if (
+                contact !== null &&
+                firstContact === null &&
+                offeredByName.has(FIRST_CONTACT_TOOL) &&
+                !proposals.some((other) => other.name === FIRST_CONTACT_TOOL) &&
+                calls + chainedThisRound.length + 1 < Q_TOOL_LOOP_MAX_CALLS
+              ) {
+                firstContact = callTool(
+                  {
+                    callId: "q-first-contact",
+                    name: FIRST_CONTACT_TOOL,
+                    arguments: contact,
+                  },
+                  toolContext,
+                );
+              }
               const chainedId = chainedCompanyOf(call, outcome);
               for (const name of chainedId === null ? [] : CHAINED_READ_TOOLS) {
                 if (
@@ -7059,6 +7086,21 @@ export function createModelGatewayQAnswer(
                     forModelReading(outcome, classificationOf(name)),
                   ),
                 );
+              }
+            }
+            if (firstContact !== null) {
+              const outcome = await firstContact.catch(() => null);
+              if (outcome !== null) {
+                calls += 1;
+                toolCalls.push({
+                  toolName: outcome.toolName,
+                  providerName: FIRST_CONTACT_TOOL,
+                  status: outcome.status,
+                  failureCode: outcome.failureCode,
+                  latencyMs: outcome.latencyMs,
+                });
+                const told = firstContactMessage(outcome);
+                if (told !== null) chainedResults.push(told);
               }
             }
             messages = [...messages, assistant, ...results, ...chainedResults];
