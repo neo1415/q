@@ -515,6 +515,50 @@ describe("documents made by a job", () => {
   });
 });
 
+describe("a workforce step's composed document (ANALYSIS)", () => {
+  const workforce = {
+    jobId: "f0000000-0000-4000-8000-0000000000c1",
+    stepKey: "plan",
+    intentSha256: "b".repeat(64),
+  };
+  const input = () => ({
+    actorContext: ACTOR,
+    permittedContextPlan: plan(),
+    qRunId: RUN,
+    subject: { kind: "COMPANY" as const, companyId: COMPANY },
+    artifactType: "ANALYSIS",
+    content: composed("The growth plan."),
+    workforce,
+  });
+
+  it("is filed once per (job, step): a retry returns the first, writing nothing", async () => {
+    const { repository, artifacts } = memory();
+    const svc = createArtifactService({ repository, transactions });
+    const first = await svc.prepareArtifact(input());
+    const again = await svc.prepareArtifact({
+      ...input(),
+      content: composed("A second composition after a crash."),
+    });
+    expect(again.artifact.artifactId).toBe(first.artifact.artifactId);
+    expect(again.artifact.currentVersion).toBe(1);
+    expect(artifacts.size).toBe(1);
+  });
+
+  it("never falls back to a second document when the binding cannot be honoured", async () => {
+    const { repository, artifacts } = memory();
+    const { createForWorkforce: _unsupported, ...ordinaryRepository } =
+      repository;
+    const svc = createArtifactService({
+      repository: ordinaryRepository,
+      transactions,
+    });
+    await expect(svc.prepareArtifact(input())).rejects.toBeInstanceOf(
+      ArtifactAuthorityError,
+    );
+    expect(artifacts.size).toBe(0);
+  });
+});
+
 describe("editing one's own document", () => {
   async function prepared() {
     const { repository } = memory();

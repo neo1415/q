@@ -624,6 +624,8 @@ describe("deep research for the Maji Loop request", () => {
 /** The analysis document port with fakes for authority and filing. */
 function analysisWorld(options: {
   readonly authorised?: boolean;
+  /** An earlier attempt of this step already filed its document. */
+  readonly filedBefore?: { readonly gaps: readonly string[] } | undefined;
   readonly critiques: readonly AnalysisCritiqueResult[];
   readonly drafts: readonly AnalysisDocumentResult[];
 }) {
@@ -634,6 +636,7 @@ function analysisWorld(options: {
   }[] = [];
   const writes: { revision: string; company: string; research: string }[] = [];
   const critiques: unknown[] = [];
+  const bindings: unknown[] = [];
   const companyId = randomUUID();
   const documents = createWorkforceDocuments({
     freshActor: (who) => Promise.resolve(who),
@@ -665,15 +668,34 @@ function analysisWorld(options: {
         ],
       } as never),
     artifacts: {
-      findWorkforceDocument: vi.fn(),
+      findWorkforceDocument: (input: { workforce: unknown }) => {
+        bindings.push(input.workforce);
+        return Promise.resolve(
+          options.filedBefore === undefined
+            ? null
+            : ({
+                artifactId: "33333333-3333-4333-8333-333333333333",
+                status: "READY",
+                currentVersion: 1,
+              } as never),
+        );
+      },
       requestDocument: vi.fn(),
-    },
+    } as never,
     preparation: {
       port: {
+        currentVersion: () =>
+          Promise.resolve({
+            title: MAJI_DRAFT_TWO.title,
+            summary: MAJI_DRAFT_TWO.summary,
+            content: { sections: [], gaps: options.filedBefore?.gaps ?? [] },
+          }),
         prepare: (input: {
           content: { title: string; content: QArtifactContent };
           subject?: unknown;
+          workforce?: unknown;
         }) => {
+          bindings.push(input.workforce);
           filed.push({
             content: input.content.content,
             title: input.content.title,
@@ -726,7 +748,7 @@ function analysisWorld(options: {
     organisationId: actor.organisationId ?? "",
     budgetUsd: 1.2,
   };
-  return { documents, input, filed, writes, critiques, companyId };
+  return { documents, input, filed, writes, critiques, companyId, bindings };
 }
 
 const FAILING: AnalysisCritiqueResult = {
@@ -882,6 +904,36 @@ describe("the analysis is critiqued and really revised", () => {
         gap.startsWith("Reviewer's open point"),
       ),
     ).toBe(true);
+  });
+
+  it("files once per (job, step): a retry after a crash finds the filed document and writes nothing", async () => {
+    const world = analysisWorld({
+      drafts: [MAJI_DRAFT_TWO],
+      critiques: [PASSING],
+      filedBefore: { gaps: ["Reviewer's open point (Market): x"] },
+    });
+    const result = await world.documents(world.input);
+    expect(result).toMatchObject({
+      status: "READY",
+      artifactId: "33333333-3333-4333-8333-333333333333",
+      delivery: { passed: false, openIssues: 1 },
+    });
+    expect(world.writes).toHaveLength(0);
+    expect(world.filed).toHaveLength(0);
+    expect(world.bindings[0]).toMatchObject({
+      jobId: world.input.jobId,
+      stepKey: "plan",
+    });
+  });
+
+  it("files under the (job, step) binding the lookup used", async () => {
+    const world = analysisWorld({
+      drafts: [MAJI_DRAFT_TWO],
+      critiques: [PASSING],
+    });
+    await world.documents(world.input);
+    expect(world.bindings).toHaveLength(2);
+    expect(world.bindings[1]).toEqual(world.bindings[0]);
   });
 
   it("files nothing when the firewall does not authorise the person", async () => {

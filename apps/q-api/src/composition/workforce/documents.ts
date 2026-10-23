@@ -26,6 +26,7 @@ import type {
   WorkforceDocumentResult,
 } from "./jobs.js";
 import {
+  REVIEWER_OPEN_POINT,
   analysisContent,
   mergeDossiers,
   researchText,
@@ -100,6 +101,43 @@ export function createWorkforceDocuments(dependencies: {
    * own document. Founder-private facts reach it only when the person may
    * read them -- their own company -- and it is private to them.
    */
+  /**
+   * The step's document as an earlier attempt filed it. What Q says when it
+   * lands is read back from it: its title and summary, and whether the
+   * reviewer left points open (they are in its "not known" list).
+   */
+  async function resumed(
+    actor: ActorContext,
+    artifactId: string,
+    companyId: string | null,
+  ): Promise<WorkforceDocumentResult> {
+    const current = await dependencies.preparation.port.currentVersion(
+      actor,
+      artifactId,
+    );
+    if (current === null)
+      return {
+        status: "UNAVAILABLE",
+        message: "This analysis can no longer be read as you.",
+      };
+    const open = current.content.gaps.filter((gap) =>
+      gap.startsWith(REVIEWER_OPEN_POINT),
+    ).length;
+    return {
+      status: "READY",
+      artifactId,
+      ...(companyId === null ? {} : { companyId }),
+      delivery: {
+        title: current.title,
+        artifactType: WORKFORCE_ANALYSIS_KIND,
+        summary: current.summary,
+        topRecommendations: [],
+        passed: open === 0,
+        openIssues: open,
+      },
+    };
+  }
+
   async function prepareAnalysis(
     actor: ActorContext,
     input: WorkforceDocumentInput,
@@ -133,6 +171,35 @@ export function createWorkforceDocuments(dependencies: {
       });
     const decision = await authorise(actor);
     if (decision.outcome !== "AUTHORISED") return unavailable();
+    // Filed at most once per (job, step): a retry after a crash finds the
+    // document an earlier attempt filed and neither rewrites nor refiles it.
+    const workforce = {
+      jobId: input.jobId,
+      stepKey: input.stepKey,
+      intentSha256: createHash("sha256")
+        .update(
+          JSON.stringify({
+            request,
+            goal: input.goal,
+            qRunId: input.qRunId,
+            tenantId: actor.tenantId,
+            userId: actor.userId,
+            organisationId: actor.organisationId,
+            companyId,
+          }),
+        )
+        .digest("hex"),
+    };
+    const prior = await dependencies.artifacts.findWorkforceDocument({
+      actorContext: actor,
+      permittedContextPlan: decision.plan,
+      qRunId: runId,
+      ...(subject === null ? {} : { subject }),
+      artifactType: WORKFORCE_ANALYSIS_KIND,
+      workforce,
+    });
+    if (prior !== null && prior.status === "READY" && prior.currentVersion > 0)
+      return resumed(actor, prior.artifactId, companyId);
     // The company's own record, as the person may read it (the firewall
     // filtered it before any model sees it).
     let company =
@@ -230,6 +297,7 @@ export function createWorkforceDocuments(dependencies: {
         summary: written.draft.summary,
         content,
       },
+      workforce,
     });
     dependencies.logger?.info(
       {

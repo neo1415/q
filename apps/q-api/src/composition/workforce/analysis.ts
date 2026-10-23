@@ -28,6 +28,9 @@ import type { Trace, Who, WorkforceModels } from "./models.js";
  * a phrase list.
  */
 
+/** How an open reviewer point starts in a document's "not known" list. */
+export const REVIEWER_OPEN_POINT = "Reviewer's open point";
+
 /** Drafts at most: the first and two revisions. */
 export const ANALYSIS_MAX_DRAFTS = 3;
 
@@ -386,7 +389,7 @@ export function analysisContent(input: {
     ...draft.gaps,
     // Honest when the review did not pass: its open points are named.
     ...review.open.map((issue) =>
-      `Reviewer's open point (${issue.section}): ${issue.problem}`.slice(
+      `${REVIEWER_OPEN_POINT} (${issue.section}): ${issue.problem}`.slice(
         0,
         300,
       ),
