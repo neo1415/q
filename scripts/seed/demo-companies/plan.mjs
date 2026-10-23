@@ -176,7 +176,12 @@ export function planCompany(fixture, spec, state) {
       const current = existing[column] ?? null;
       if (fill ? current === null : current !== value) changes[column] = value;
     }
-    if (!fill && existing.marketplace_visibility !== "network_visible") {
+    // A FILL_GAPS company keeps its founder's visibility unless the owner
+    // made it discoverable (spec.discoverable; owner 2026-10-23).
+    if (
+      (!fill || spec.discoverable === true) &&
+      existing.marketplace_visibility !== "network_visible"
+    ) {
       changes.marketplace_visibility = "network_visible";
     }
   }
@@ -398,11 +403,17 @@ function renderBody(plan, ctx, s, companyId) {
         `${column} = ${column === "founded_date" && value !== null ? `${lit(value)}::date` : lit(value)}`,
     );
     if (plan.label) sets.push("demonstration_data = true");
+    // The event needs at least one field (core.company.updated v1): a
+    // label-only update names the label itself.
+    const changedFields = [
+      ...Object.keys(plan.changes),
+      ...(plan.label ? ["demonstration_data"] : []),
+    ];
     if (sets.length > 0) {
       s.push(
         `update core.companies set ${sets.join(", ")}, version = version + 1 where id = ${lit(companyId)};`,
         audit(ctx, "company.updated", "company", companyId, {
-          changedFields: Object.keys(plan.changes),
+          changedFields,
           demonstrationLabel: plan.label,
         }),
         event(
@@ -412,7 +423,7 @@ function renderBody(plan, ctx, s, companyId) {
           {
             version: 1,
             companyId,
-            changedFields: Object.keys(plan.changes),
+            changedFields,
           },
           "capitalq://api/core/company",
         ),

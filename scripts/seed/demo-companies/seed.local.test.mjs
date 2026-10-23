@@ -243,7 +243,15 @@ test(
       k.short_description,
       "AI simulator and coach for practising sales, customer-service and other workplace conversations.",
     );
-    assert.equal(k.marketplace_visibility, "organisation_private");
+    // Owner 2026-10-23: discoverable, though everything else stays theirs.
+    assert.equal(k.marketplace_visibility, "network_visible");
+    // Every core.company.updated the seed writes names a field (the v1
+    // schema rejects an empty list, and the event would never publish).
+    const updates = await db.read(
+      `select payload->'data'->'changedFields' as fields from events.outbox where event_type = 'core.company.updated'`,
+    );
+    assert.ok(updates.length > 0);
+    for (const u of updates) assert.ok(u.fields.length > 0);
     assert.equal(k.current_stage_code, null);
     assert.equal(k.headquarters_country, null);
     const mrr = await db.read(
@@ -280,7 +288,7 @@ test(
     assert.equal(s.canonical_name, "SongScribe AI");
     assert.equal(s.website_url, "https://www.songscribe.ai");
     assert.match(s.short_description, /^AI music studio/);
-    assert.equal(s.marketplace_visibility, "organisation_private");
+    assert.equal(s.marketplace_visibility, "network_visible");
     assert.equal(s.demonstration_data, true);
     const claims = await db.read(
       `select claim_key, truth_class, evidence_status from evidence.claims where subject_id = '${ids.sCompany}' and lifecycle_status = 'CURRENT' order by claim_key`,
@@ -318,9 +326,9 @@ test(
     const byName = Object.fromEntries(listed.map((r) => [r.canonical_name, r]));
     assert.equal(byName["Capital Q"]?.listed, true);
     assert.equal(byName["Capital Q"]?.discovery_eligible, true);
-    // KUUZA AI and SongScribe AI stay where their founders put them.
-    assert.equal(byName["KUUZA AI"]?.listed ?? false, false);
-    assert.equal(byName["SongScribe AI"]?.listed ?? false, false);
+    // Owner 2026-10-23: KUUZA AI and SongScribe AI are discoverable too.
+    assert.equal(byName["KUUZA AI"]?.listed, true);
+    assert.equal(byName["SongScribe AI"]?.listed, true);
   },
 );
 
@@ -331,7 +339,9 @@ test(
     const [card] = await db.read(
       `select field_scopes from core.shareable_identities where subject_type = 'COMPANY' and subject_id = '${ids.cqCompany}'`,
     );
-    assert.equal(card.field_scopes.tractionMetrics, "public_external");
+    // Figures are network_visible claims, so the card shows them to
+    // members; a public_external scope would read "Not shared yet".
+    assert.equal(card.field_scopes.tractionMetrics, "network_visible");
     assert.equal(card.field_scopes.investabilitySummary, "network_visible");
     const [handle] = await db.read(
       `select handle from core.handles where subject_id = '${ids.cqCompany}' and status = 'ACTIVE'`,

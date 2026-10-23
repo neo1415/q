@@ -220,7 +220,7 @@
       ],
       "governance": "Two founders; board of two founders until the seed round; advisory board being formed.",
       "qCard": {
-        "tractionMetrics": "public_external",
+        "tractionMetrics": "network_visible",
         "currentRaise": "public_external",
         "relationshipSummary": "network_visible",
         "investabilitySummary": "network_visible",
@@ -231,6 +231,7 @@
     {
       "key": "kuuza-ai",
       "mode": "FILL_GAPS",
+      "discoverable": true,
       "match": {
         "names": ["KUUZA AI", "Kuuza AI", "Kuuza"]
       },
@@ -307,6 +308,7 @@
     {
       "key": "songscribe",
       "mode": "FILL_GAPS",
+      "discoverable": true,
       "match": {
         "names": ["Songscribe", "SongScribe", "Song Scribe", "SongScribe AI"]
       },
