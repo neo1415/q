@@ -28,6 +28,12 @@ export function createFallbackResearchProvider(input: {
   /** Each index's deadline in a parallel search. */
   readonly searchTimeoutMs?: number | undefined;
   readonly now?: (() => number) | undefined;
+  /**
+   * Every provider's outcome for every search and page read (production
+   * 2026-10-23: only the last failure of a fan-out was ever logged, so a
+   * dead Tavily and SERP key read as one ScrapingBee 401).
+   */
+  readonly observe?: ((event: ResearchProviderCall) => void) | undefined;
 }): PublicWebResearchProvider {
   const all = input.providers;
   const first = all[0];
@@ -53,6 +59,40 @@ export function createFallbackResearchProvider(input: {
         : COOL_DOWN_MS[error.failureClass];
     if (rest !== undefined) restingUntil.set(provider, now() + rest);
   };
+  const observe = (
+    provider: PublicWebResearchProvider,
+    operation: "search" | "extract",
+    startedAt: number,
+    outcome: { readonly count: number } | { readonly error: unknown },
+  ): void => {
+    if (input.observe === undefined) return;
+    const latencyMs = Math.max(0, Date.now() - startedAt);
+    input.observe(
+      "count" in outcome
+        ? {
+            provider: provider.code,
+            operation,
+            outcome: outcome.count > 0 ? "FOUND" : "EMPTY",
+            count: outcome.count,
+            failureClass: null,
+            status: null,
+            latencyMs,
+          }
+        : {
+            provider: provider.code,
+            operation,
+            outcome: "FAILED",
+            count: 0,
+            failureClass: isResearchProviderFailure(outcome.error)
+              ? outcome.error.failureClass
+              : null,
+            status: isResearchProviderFailure(outcome.error)
+              ? outcome.error.status
+              : null,
+            latencyMs,
+          },
+    );
+  };
   const awake = (): readonly PublicWebResearchProvider[] => {
     const at = now();
     const ready = all.filter(
@@ -67,14 +107,17 @@ export function createFallbackResearchProvider(input: {
   ) => {
     let failure: unknown = null;
     for (const provider of awake()) {
+      const startedAt = Date.now();
       try {
         const result = await provider.search(request, context);
+        observe(provider, "search", startedAt, { count: result.hits.length });
         lastSearch = provider;
         return result;
       } catch (error: unknown) {
+        observe(provider, "search", startedAt, { error });
         if (!isResearchProviderFailure(error)) throw error;
         note(provider, error);
-        failure = error;
+        failure = telling(failure, error);
         if (context.signal?.aborted === true) throw error;
       }
     }
@@ -99,7 +142,19 @@ export function createFallbackResearchProvider(input: {
                   AbortSignal.timeout(timeoutMs),
                 ]),
         };
-        return provider.search(request, own);
+        const startedAt = Date.now();
+        return provider.search(request, own).then(
+          (result) => {
+            observe(provider, "search", startedAt, {
+              count: result.hits.length,
+            });
+            return result;
+          },
+          (error: unknown) => {
+            observe(provider, "search", startedAt, { error });
+            throw error;
+          },
+        );
       }),
     );
     const answered: {
@@ -115,7 +170,7 @@ export function createFallbackResearchProvider(input: {
       } else {
         if (!isResearchProviderFailure(outcome.reason)) throw outcome.reason;
         note(provider, outcome.reason);
-        failure = outcome.reason;
+        failure = telling(failure, outcome.reason);
       }
     }
     const lead = answered[0];
@@ -138,18 +193,57 @@ export function createFallbackResearchProvider(input: {
     extract: async (request, context) => {
       let failure: unknown = null;
       for (const provider of awake()) {
+        const startedAt = Date.now();
         try {
-          return await provider.extract(request, context);
+          const result = await provider.extract(request, context);
+          observe(provider, "extract", startedAt, {
+            count: result.pages.length,
+          });
+          return result;
         } catch (error: unknown) {
+          observe(provider, "extract", startedAt, { error });
           if (!isResearchProviderFailure(error)) throw error;
           note(provider, error);
-          failure = error;
+          failure = telling(failure, error);
           if (context.signal?.aborted === true) throw error;
         }
       }
       throw failure;
     },
   };
+}
+
+/** One provider's outcome for one search or page read, for the log. */
+export type ResearchProviderCall = {
+  readonly provider: string;
+  readonly operation: "search" | "extract";
+  readonly outcome: "FOUND" | "EMPTY" | "FAILED";
+  /** Hits found, or pages read. */
+  readonly count: number;
+  readonly failureClass: ResearchProviderFailureClass | null;
+  readonly status: number | null;
+  readonly latencyMs: number;
+};
+
+/**
+ * Which failure a fan-out reports when every provider failed: the one that
+ * says most about what to fix (a refused key over a rate limit over a
+ * timeout), not whichever provider happened to be last in the list.
+ */
+const FAILURE_WEIGHT: Readonly<Record<ResearchProviderFailureClass, number>> = {
+  AUTHENTICATION: 5,
+  RATE_LIMIT: 4,
+  TIMEOUT: 3,
+  UNAVAILABLE: 2,
+  VALIDATION: 1,
+};
+
+function telling(known: unknown, next: unknown): unknown {
+  if (!isResearchProviderFailure(next)) return known ?? next;
+  if (!isResearchProviderFailure(known)) return next;
+  return FAILURE_WEIGHT[next.failureClass] > FAILURE_WEIGHT[known.failureClass]
+    ? next
+    : known;
 }
 
 /** How long a provider rests after a failure that will not pass by itself. */

@@ -774,6 +774,21 @@ export function createPublicWebResearchService(
         clock(),
         MAX_PER_DOMAIN,
       );
+      // Production 2026-10-23: where a search lost its hits, said once a
+      // research call (the providers' own outcomes are logged by the
+      // fan-out): what was found, what was safe, what will be read.
+      logger?.info(
+        {
+          runId: command.runId,
+          provider: provider.code,
+          queries: requests.length,
+          answered: lists.length,
+          hits: hits.length,
+          safe: safeHits.length,
+          reading: chosen.length,
+        },
+        "public research searched",
+      );
       let pages = new Map<string, { title: string | null; text: string }>();
       let extractCalls = 0;
       if (chosen.length > 0) {
