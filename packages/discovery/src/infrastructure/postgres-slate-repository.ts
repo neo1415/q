@@ -430,7 +430,10 @@ export function createPostgresRefreshRequestStore(options: {
               priority = case when r.status in ('DONE', 'FAILED') then excluded.priority
                               when r.priority = 'HIGH' or excluded.priority = 'HIGH' then 'HIGH'
                               else 'NORMAL' end,
-              reason = excluded.reason,
+              -- A continuation still waiting is never lost to a coalesced
+              -- reason: the investor at the end of the slate waits on it.
+              reason = case when r.status = 'PENDING' and r.reason = 'SLATE_CONTINUED'
+                            then r.reason else excluded.reason end,
               request_sequence = r.request_sequence + 1,
               requested_at = excluded.requested_at,
               attempts = case when r.status in ('DONE', 'FAILED') then 0 else r.attempts end,

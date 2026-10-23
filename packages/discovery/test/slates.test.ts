@@ -97,7 +97,7 @@ const candidate = (n: number): HybridCandidate => ({
   companyId: id(n),
   structured: {
     generatorId: "STRUCTURED_MANDATE",
-    generatorVersion: "structured-mandate.v5",
+    generatorVersion: "structured-mandate.v6",
     matchedDimensions: ["STAGE"],
     reasonCodes: ["STAGE_OVERLAP"],
     matchedNodes: [],
@@ -127,7 +127,7 @@ function pool(
   return {
     kind: "GENERATED",
     poolVersion: "hybrid-candidate-pool.v1",
-    structuredGeneratorVersion: "structured-mandate.v5",
+    structuredGeneratorVersion: "structured-mandate.v6",
     semanticGeneratorVersion: "semantic-mandate.v1",
     eligibilityPolicyVersion: "eligibility.v4",
     context: {
@@ -190,7 +190,7 @@ function rankedCandidate(
     },
     candidateProvenance: {
       structured: {
-        generatorVersion: "structured-mandate.v5",
+        generatorVersion: "structured-mandate.v6",
         reasonCodes: ["STAGE_OVERLAP"],
       },
       semantic: null,
@@ -638,7 +638,7 @@ describe("slate builder (CQ-REC-006)", () => {
       mandateVersion: 1,
       versions: {
         eligibilityPolicyVersion: "eligibility.v4",
-        structuredGeneratorVersion: "structured-mandate.v5",
+        structuredGeneratorVersion: "structured-mandate.v6",
         semanticGeneratorVersion: "semantic-mandate.v1",
         featureSchemaVersion: FEATURE_SCHEMA_VERSION,
         rankerVersion: RANKER_VERSION,
@@ -672,7 +672,7 @@ describe("slate builder (CQ-REC-006)", () => {
     };
     const versions = {
       eligibilityPolicyVersion: "eligibility.v4" as const,
-      structuredGeneratorVersion: "structured-mandate.v5" as const,
+      structuredGeneratorVersion: "structured-mandate.v6" as const,
       semanticGeneratorVersion: "semantic-mandate.v1" as const,
       featureSchemaVersion: FEATURE_SCHEMA_VERSION,
       rankerVersion: RANKER_VERSION,
@@ -745,6 +745,67 @@ describe("slate builder (CQ-REC-006)", () => {
       "REC006_PRIVATE",
     );
     expect(JSON.stringify(d)).not.toContain("REC006_PRIVATE");
+  });
+});
+
+describe("the candidate rotation's windows (owner 2026-10-23: Discover must not hard-cap)", () => {
+  function windowed() {
+    const asked: (number | undefined)[] = [];
+    const hybrid: HybridCandidateService = {
+      generate: (q) => {
+        asked.push(q.window);
+        const base = pool(THREE);
+        if (base.kind !== "GENERATED") throw new Error("unexpected");
+        return Promise.resolve({
+          ...base,
+          diagnostics: {
+            ...base.diagnostics,
+            structured: {
+              ...base.diagnostics.structured,
+              candidateWindow: (q.window ?? 0) % 4,
+              candidateWindows: 4,
+            },
+          },
+        });
+      },
+    };
+    const store = memorySlates({ failPublish: false });
+    const builder = createSlateBuilder({
+      ports: ports(undefined, undefined),
+      hybrid,
+      ranking: {
+        rankCandidates: () => Promise.resolve(rankedResult(RANKED_THREE)),
+      },
+      rerank: realRerank(),
+      snapshots: refsFor(RANKED_THREE),
+      slates: store.repo,
+      transactions,
+      playablePitches: everyPitchPlayable,
+      clock: () => new Date("2026-09-19T10:00:00.000Z"),
+    });
+    return { builder, asked };
+  }
+
+  it("a continuation builds the next window; a plain refresh keeps the window it had", async () => {
+    const { builder, asked } = windowed();
+    const first = await builder.build(query);
+    expect(first.kind).toBe("PUBLISHED");
+    if (first.kind !== "PUBLISHED") return;
+    expect(first.diagnostics).toMatchObject({
+      candidateWindow: 0,
+      candidateWindows: 4,
+    });
+
+    // The same items, the next window: still a new slate, not a no-op.
+    const next = await builder.build({ ...query, continuation: true });
+    expect(next.kind).toBe("PUBLISHED");
+    if (next.kind !== "PUBLISHED") return;
+    expect(next.slate.id).not.toBe(first.slate.id);
+    expect(next.diagnostics).toMatchObject({ candidateWindow: 1 });
+
+    // A refresh for another reason reads the window it is on.
+    await builder.build(query);
+    expect(asked).toEqual([0, 1, 1]);
   });
 });
 

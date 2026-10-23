@@ -83,6 +83,7 @@ export {
   type CompanyCreationRequestStore,
   type CompanyInvestmentProfile,
   type CompanyMarketplaceFacts,
+  type CandidateWindow,
   type CompanyMarketplaceQueryPort,
   type CompanyProfileChanges,
   type CompanyProfileFacts,

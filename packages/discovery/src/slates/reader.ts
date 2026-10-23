@@ -132,6 +132,12 @@ export type SlatePage = {
   readonly notes: readonly SlatePageNote[];
   readonly nextCursor: string | null;
   /**
+   * Owner 2026-10-23: the slate this page goes on from (the previous
+   * window's), when the scroll crossed into the next window. Absent
+   * otherwise.
+   */
+  readonly continuesFrom?: string | undefined;
+  /**
    * Declared hard exclusions V1 cannot evaluate for any company (e.g.
    * `red_flag`), said once per page rather than on every card. They
    * withhold nothing (ADR 0020).
@@ -702,6 +708,7 @@ export function createSlateReadService(
       const notes: SlatePageNote[] = [];
       let slate: RecommendationSlate | null = null;
       let afterRank = 0;
+      let continuesFrom: string | undefined;
       if (cursor !== undefined) {
         const named = await slates.findById(cursor.slateId);
         // Somebody else's slate is indistinguishable from a forged cursor.
@@ -718,6 +725,29 @@ export function createSlateReadService(
           // Other filters than the scroll was read under: pages would not
           // be consistent, so this one starts from the first page.
           notes.push("SLATE_RESTARTED");
+        } else if (cursor.n === 1) {
+          // Owner 2026-10-23: the end of one window of the candidate
+          // rotation. The feed goes on with the slate built after it, from
+          // its first item and without a restart: the investor scrolls on.
+          const next = await slates.findCurrent(key);
+          if (next !== null && next.id !== named.id && servable(next, now)) {
+            slate = next;
+            afterRank = 0;
+            continuesFrom = named.id;
+          } else {
+            // Not built yet: the same cursor comes back, so the screen asks
+            // again a moment later. Never asked again from here: every
+            // request reopens the refresh row, and a second continuation
+            // would skip a window. The one asked at the slate's end stands
+            // (the refresh job retries a failed build).
+            metrics.pages.add(1, { outcome: "CONTINUING" });
+            return {
+              ...empty(notes, named.id, {
+                unverifiableExclusions: unverifiable,
+              }),
+              nextCursor: query.cursor ?? null,
+            };
+          }
         } else if (servable(named, now)) {
           slate = named;
           afterRank = cursor.afterRank;
@@ -893,10 +923,31 @@ export function createSlateReadService(
       );
       const pageItems: readonly RecommendationItem[] = fetched.slice(0, limit);
       const last = pageItems[pageItems.length - 1];
+      // Owner 2026-10-23 (Discover must not hard-cap): at the end of a
+      // slate built from one window of several, the next window is built
+      // and the scroll goes on into it (candidates/window.ts).
+      const continues =
+        fetched.length <= limit &&
+        requester !== undefined &&
+        (slate.diagnostics?.candidateWindows ?? 1) > 1;
+      if (continues) {
+        await requester.request({
+          ...key,
+          reason: "SLATE_CONTINUED",
+          priority: "NORMAL",
+        });
+      }
       const nextCursor =
         fetched.length > limit && last !== undefined
           ? encodeSlateCursor({ v: 1, slateId: slate.id, afterRank: last.rank })
-          : null;
+          : continues
+            ? encodeSlateCursor({
+                v: 1,
+                slateId: slate.id,
+                afterRank: last?.rank ?? afterRank,
+                n: 1,
+              })
+            : null;
 
       if (pageItems.length === 0) {
         metrics.pages.add(1, { outcome: "EMPTY" });
@@ -959,6 +1010,7 @@ export function createSlateReadService(
         items,
         notes,
         nextCursor,
+        ...(continuesFrom === undefined ? {} : { continuesFrom }),
         unverifiableExclusions: unverifiable,
         excludingRules: [],
         discoverableCount: null,

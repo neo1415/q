@@ -70,7 +70,7 @@ const KEY: SlateKey = {
 
 const VERSIONS = {
   eligibilityPolicyVersion: "eligibility.v4" as const,
-  structuredGeneratorVersion: "structured-mandate.v5" as const,
+  structuredGeneratorVersion: "structured-mandate.v6" as const,
   semanticGeneratorVersion: "semantic-mandate.v1" as const,
   featureSchemaVersion: FEATURE_SCHEMA_VERSION,
   rankerVersion: RANKER_VERSION,
@@ -82,7 +82,12 @@ async function publish(
   store: ReturnType<typeof memorySlates>,
   key: SlateKey,
   count: number,
-  options: { readonly expiresAt?: string; readonly publishedAt?: string } = {},
+  options: {
+    readonly expiresAt?: string;
+    readonly publishedAt?: string;
+    /** The candidate rotation's window this slate read, of how many. */
+    readonly window?: { readonly index: number; readonly of: number };
+  } = {},
 ) {
   const slate = await store.repo.beginBuild({
     ...key,
@@ -103,7 +108,7 @@ async function publish(
       featureSnapshotFingerprint: "a".repeat(64),
       candidateProvenance: {
         structured: {
-          generatorVersion: "structured-mandate.v5",
+          generatorVersion: "structured-mandate.v6",
           reasonCodes: ["STAGE_OVERLAP"],
         },
         semantic: null,
@@ -124,6 +129,12 @@ async function publish(
         featureSnapshots: count,
         ranked: count,
         scored: count,
+        ...(options.window === undefined
+          ? {}
+          : {
+              candidateWindow: options.window.index,
+              candidateWindows: options.window.of,
+            }),
         buildDurationMs: 1,
       },
       publishedAt: options.publishedAt ?? "2026-09-19T10:00:00.000Z",
@@ -678,6 +689,69 @@ describe("slate reader (CQ-REC-006)", () => {
  * reachable, so demotion alone was ordering rather than suppression. These
  * cases are about the difference.
  */
+describe("the feed goes on past one slate (owner 2026-10-23: Discover must not hard-cap)", () => {
+  it("at the end of a window it asks for the next and scrolls on into it, appended, never a restart", async () => {
+    const h = harness();
+    const first = await publish(h.store, KEY, 3, {
+      window: { index: 0, of: 4 },
+    });
+    const one = await h.reader.pageCompanies({ actor, limit: 2 });
+    expect(one.items.map((i) => i.companyId)).toEqual([id(1), id(2)]);
+    expect(h.requested).toHaveLength(0);
+
+    // The last page of the window: the next window is asked for, once.
+    const end = await h.reader.pageCompanies({
+      actor,
+      limit: 2,
+      cursor: one.nextCursor,
+    });
+    expect(end.items.map((i) => i.companyId)).toEqual([id(3)]);
+    expect(end.nextCursor).not.toBeNull();
+    expect(h.requested).toHaveLength(1);
+    expect(h.requested[0]).toMatchObject({
+      ...KEY,
+      reason: "SLATE_CONTINUED",
+      priority: "NORMAL",
+    });
+
+    // Not built yet: nothing, the same cursor back, and no second ask
+    // (a second would reopen the refresh row and skip a window).
+    const waiting = await h.reader.pageCompanies({
+      actor,
+      limit: 2,
+      cursor: end.nextCursor,
+    });
+    expect(waiting.items).toEqual([]);
+    expect(waiting.nextCursor).toBe(end.nextCursor);
+    expect(waiting.notes).toEqual([]);
+    expect(h.requested).toHaveLength(1);
+
+    // Built from the next window: the scroll goes on from its first item.
+    const next = await publish(h.store, KEY, 2, {
+      window: { index: 1, of: 4 },
+    });
+    const on = await h.reader.pageCompanies({
+      actor,
+      limit: 2,
+      cursor: end.nextCursor,
+    });
+    expect(on.slateId).toBe(next.id);
+    expect(on.continuesFrom).toBe(first.id);
+    expect(on.notes).toEqual([]);
+    expect(on.items.map((i) => i.companyId)).toEqual([id(1), id(2)]);
+  });
+
+  it("a slate of the only window ends where it ends: no continuation is asked", async () => {
+    const h = harness();
+    await publish(h.store, KEY, 2, { window: { index: 0, of: 1 } });
+    const page = await h.reader.pageCompanies({ actor, limit: 5 });
+    expect(page.items).toHaveLength(2);
+    expect(page.nextCursor).toBeNull();
+    expect(page.continuesFrom).toBeUndefined();
+    expect(h.requested).toHaveLength(0);
+  });
+});
+
 describe("a company this organisation passed on", () => {
   it("3: is never served, including after every higher item is exhausted", async () => {
     const h = harness({ passed: [id(3)] });

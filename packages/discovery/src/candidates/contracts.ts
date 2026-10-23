@@ -64,8 +64,14 @@ export const STRUCTURED_GENERATOR_ID = "STRUCTURED_MANDATE" as const;
  * (exploration: plausibly relevant, lower confidence), then go through the
  * same eligibility and ranking, where the mismatch lowers the rank and is
  * said on the card.
+ *
+ * v6 (owner 2026-10-23, Discover must not hard-cap): every dimension read
+ * `order by id limit 200`, so of 381 qualifying companies the 355th by id
+ * was never a candidate. The qualifying companies are divided into windows
+ * of a rotation seeded by the investor organisation; one build reads one
+ * window, and the feed walks them (candidates/window.ts).
  */
-export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v5" as const;
+export const STRUCTURED_GENERATOR_VERSION = "structured-mandate.v6" as const;
 
 /**
  * Every version a persisted artifact (a feature snapshot's provenance) may
@@ -79,6 +85,8 @@ export const STRUCTURED_GENERATOR_VERSIONS = [
   // v4 must stay readable: slates built before v5 still name it (live
   // 2026-10-02, every Discover load failed until it was listed again).
   "structured-mandate.v4",
+  // v5 stays readable: slates built before v6 name it.
+  "structured-mandate.v5",
   STRUCTURED_GENERATOR_VERSION,
 ] as const;
 
@@ -171,6 +179,9 @@ export const CandidateDiagnosticsSchema = z
     undetermined: z.number().int(),
     /** The cheque seam's word for this run; v1 always reports it as not computable. */
     chequeSignal: z.enum(["COMPUTED", "NOT_COMPUTABLE"]),
+    /** structured-mandate.v6: which window of the rotation was read, of how many (window.ts). */
+    candidateWindow: z.number().int().min(0).optional(),
+    candidateWindows: z.number().int().min(1).optional(),
     durationMs: z.number().int(),
   })
   .strict();

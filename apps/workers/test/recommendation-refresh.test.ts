@@ -231,7 +231,12 @@ describe("recommendation refresh consumer", () => {
     });
     expect(await handle(jobMessage())).toEqual({ kind: "DONE" });
     expect(b.calls).toEqual([
-      { actor: ACTOR, mode: "INVESTOR_DISCOVER", mandateId: MANDATE },
+      {
+        actor: ACTOR,
+        mode: "INVESTOR_DISCOVER",
+        mandateId: MANDATE,
+        continuation: false,
+      },
     ]);
     expect(requests.row?.status).toBe("DONE");
     expect(requests.row?.attempts).toBe(1);

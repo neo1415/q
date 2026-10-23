@@ -313,10 +313,13 @@ export function feedReducer(state: FeedState, action: FeedAction): FeedState {
        * meaningless. Start again, and keep the decisions -- those are
        * about companies, not about an ordering.
        */
+      // Owner 2026-10-23: the slate built after this one, from the next
+      // window of candidates, goes on from it: appended, never a restart.
       const restarted =
         state.slateId !== null &&
         slate.slateId !== null &&
-        slate.slateId !== state.slateId;
+        slate.slateId !== state.slateId &&
+        slate.continuesFrom !== state.slateId;
 
       const items = restarted
         ? slate.items

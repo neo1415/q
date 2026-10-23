@@ -462,8 +462,17 @@ export function createPostgresCompanyMarketplaceQueryPort(options: {
         return [];
       }
       const limit = Math.max(1, Math.min(DISCOVERABLE_LIST_MAX, input.limit));
+      const window =
+        input.window === undefined ||
+        input.window === null ||
+        input.window.of <= 1
+          ? null
+          : input.window;
       // companies_marketplace_stage_idx serves (visibility, stage); the
-      // country predicate walks the same visibility slice.
+      // country predicate walks the same visibility slice. A window keeps
+      // one slice of a seeded rotation, in that rotation's order: never a
+      // truncation by id (owner 2026-10-23: 381 qualified and the 355th by
+      // id was never a candidate).
       const rows = await sql`
         select c.id, c.tenant_id, c.organisation_id, c.company_status,
                c.marketplace_visibility, c.marketplace_readiness_state,
@@ -475,9 +484,34 @@ export function createPostgresCompanyMarketplaceQueryPort(options: {
                 or c.current_stage_code = any(${[...(stages ?? [])]}::text[]))
            and (${countries === null || countries.length === 0}::boolean
                 or c.headquarters_country = any(${[...(countries ?? [])]}::text[]))
-         order by c.id
+           and (${window === null}::boolean
+                or mod(('x' || substr(md5(${window?.seed ?? ""} || c.id::text), 1, 8))::bit(32)::bigint,
+                       ${window?.of ?? 1}::bigint) = ${window?.index ?? 0}::bigint)
+         order by case when ${window === null}::boolean then null
+                       else md5(${window?.seed ?? ""} || c.id::text) end,
+                  c.id
          limit ${limit}`;
       return rows.map(toMarketplaceFacts);
+    },
+    countDiscoverableCompanies: async (input) => {
+      const stages = input.stageCodes;
+      const countries = input.headquartersCountries;
+      if (
+        (stages === null || stages.length === 0) &&
+        (countries === null || countries.length === 0)
+      ) {
+        return 0;
+      }
+      const [row] = await sql<{ readonly count: string }[]>`
+        select count(*)::text as count
+          from core.companies c
+         where c.company_status = 'active'
+           and c.marketplace_visibility = any(${[...DISCOVERABLE_VISIBILITIES]}::text[])
+           and (${stages === null || stages.length === 0}::boolean
+                or c.current_stage_code = any(${[...(stages ?? [])]}::text[]))
+           and (${countries === null || countries.length === 0}::boolean
+                or c.headquarters_country = any(${[...(countries ?? [])]}::text[]))`;
+      return Number(row?.count ?? 0);
     },
     listDiscoverableInvestmentProfiles: async (input) => {
       const ids = input.companyIds;

@@ -391,15 +391,42 @@ export type CompanyMarketplaceQueryPort = {
    * declared classification is network_visible or public_external and
    * whose canonical stage or headquarters country is one of the codes.
    * Either filter may be null (not applied); both null is refused, so no
-   * caller can list the platform. Bounded, ordered by id, cross-tenant by
-   * design: classification chooses candidates, disclosure and readiness
-   * decide each one downstream.
+   * caller can list the platform. Bounded and cross-tenant by design:
+   * classification chooses candidates, disclosure and readiness decide
+   * each one downstream.
+   *
+   * Owner 2026-10-23 (Discover must not hard-cap): with a `window`, only
+   * the companies in that window of a seeded rotation are listed, in the
+   * rotation's order (md5 of the seed and the company id). Every company
+   * is in exactly one window, so a feed that walks the windows reaches
+   * all of them; without one, the order is by id, as before.
    */
   readonly listDiscoverableCompanies: (input: {
     readonly stageCodes: readonly string[] | null;
     readonly headquartersCountries: readonly string[] | null;
     readonly limit: number;
+    readonly window?: CandidateWindow | null | undefined;
   }) => Promise<readonly CompanyMarketplaceFacts[]>;
+  /**
+   * How many companies `listDiscoverableCompanies` would list with no
+   * limit and no window: what a feed divides into windows. Absent: one
+   * window.
+   */
+  readonly countDiscoverableCompanies?: (input: {
+    readonly stageCodes: readonly string[] | null;
+    readonly headquartersCountries: readonly string[] | null;
+  }) => Promise<number>;
+};
+
+/**
+ * One window of a seeded rotation over companies: those whose
+ * md5(seed || id), read as an unsigned 32-bit integer from its first eight
+ * hex digits, leaves `index` modulo `of`. Deterministic for a seed.
+ */
+export type CandidateWindow = {
+  readonly seed: string;
+  readonly index: number;
+  readonly of: number;
 };
 
 /**

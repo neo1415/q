@@ -524,3 +524,43 @@ describe("restoring a position", () => {
     expect(activeCard(state)?.companyId).toBe("c-1");
   });
 });
+
+describe("the feed goes on past one slate (owner 2026-10-23: Discover must not hard-cap)", () => {
+  const NEXT = SLATE_B;
+
+  it("appends the slate built from the next window, keeping the reader's place", () => {
+    const first = loaded([1, 2], { nextCursor: "end-of-window" });
+    const moved = run([{ type: "ADVANCED" }], first);
+    const on = run(
+      [
+        {
+          type: "PAGE_LOADED",
+          slate: slate([7, 8], {
+            slateId: NEXT,
+            continuesFrom: SLATE_A,
+            nextCursor: "next",
+          }),
+        },
+      ],
+      moved,
+    );
+    expect(on.items.map((item) => item.companyId)).toEqual([
+      "c-1",
+      "c-2",
+      "c-7",
+      "c-8",
+    ]);
+    expect(on.index).toBe(moved.index);
+    expect(on.slateId).toBe(NEXT);
+  });
+
+  it("a different slate that does not go on from this one is still a restart", () => {
+    const first = loaded([1, 2], { nextCursor: "c" });
+    const restarted = run(
+      [{ type: "PAGE_LOADED", slate: slate([7], { slateId: NEXT }) }],
+      first,
+    );
+    expect(restarted.items.map((item) => item.companyId)).toEqual(["c-7"]);
+    expect(restarted.index).toBe(0);
+  });
+});

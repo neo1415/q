@@ -11,6 +11,7 @@ import {
 
 import type { StructuredRetrievalPorts } from "../candidates/ports.js";
 import { createNotComputableChequeRetrieval } from "../candidates/ports.js";
+import { candidateWindowOf } from "../candidates/window.js";
 import {
   countryCodesOf,
   GEOGRAPHY_VOCABULARY,
@@ -26,6 +27,9 @@ import { DECLARED_TAXONOMY_SOURCES } from "../eligibility/policy.js";
  * The cheque seam is the V1 "not computable" implementation because no
  * discovery-safe raise projection exists yet.
  */
+
+/** The taxonomy source's own bound on one read (postgres-assignment-repository). */
+const TAXONOMY_WINDOWED_READ_MAX = 2000;
 
 export type DomainCandidatePortDependencies = {
   readonly sql: DatabaseExecutor;
@@ -49,35 +53,63 @@ export function createDomainCandidatePorts(
 
   return {
     companies: {
-      byStageCodes: async (stageCodes, limit) =>
+      byStageCodes: async (stageCodes, limit, window) =>
         refs(
           await companies.listDiscoverableCompanies({
             stageCodes,
             headquartersCountries: null,
             limit,
+            window: window ?? null,
           }),
         ),
-      byHeadquartersCountries: async (countryCodes, limit) =>
+      byHeadquartersCountries: async (countryCodes, limit, window) =>
         refs(
           await companies.listDiscoverableCompanies({
             stageCodes: null,
             headquartersCountries: countryCodes,
             limit,
+            window: window ?? null,
           }),
         ),
+      ...(companies.countDiscoverableCompanies === undefined
+        ? {}
+        : {
+            countDiscoverable: (input: {
+              readonly stageCodes: readonly string[] | null;
+              readonly countryCodes: readonly string[] | null;
+            }) =>
+              companies.countDiscoverableCompanies?.({
+                stageCodes: input.stageCodes,
+                headquartersCountries: input.countryCodes,
+              }) ?? Promise.resolve(0),
+          }),
     },
     taxonomy: {
-      subjectsByNodes: async (nodeIds, limit) => {
+      subjectsByNodes: async (nodeIds, limit, window) => {
         // Declared classifications only (structured-mandate.v2): a Q
         // inference or an extracted suggestion is not what the company
         // is, until a person confirms it (ADR 0006 point 5).
-        const rows = await assignments.listCurrentByNodes(
+        // A window reads every window's worth and keeps its own (the
+        // taxonomy source orders by id and cannot take a rotation).
+        const read = await assignments.listCurrentByNodes(
           sql,
           "COMPANY",
           nodeIds.map((id) => TaxonomyNodeIdSchema.parse(id)),
-          limit,
+          window === undefined
+            ? limit
+            : Math.min(TAXONOMY_WINDOWED_READ_MAX, limit * window.of),
           DECLARED_TAXONOMY_SOURCES,
         );
+        const rows =
+          window === undefined
+            ? read
+            : read
+                .filter(
+                  (row) =>
+                    candidateWindowOf(window.seed, row.subjectId, window.of) ===
+                    window.index,
+                )
+                .slice(0, limit);
         if (rows.length === 0) return [];
         // A classification is not a discovery projection: intersect with
         // the Companies context's discoverable facts so a private or closed

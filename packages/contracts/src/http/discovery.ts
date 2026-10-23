@@ -552,6 +552,12 @@ export const DiscoveryCompanySlateDtoSchema = z
     excludingRules: z.array(MandateRuleCodeDtoSchema).max(16).optional(),
     /** How many companies are discoverable to this investor, when an empty page counted them. */
     discoverableCount: z.number().int().min(0).nullable().optional(),
+    /**
+     * Owner 2026-10-23 (Discover must not hard-cap): this page opens the
+     * slate built after the named one, from the candidate rotation's next
+     * window. The scroll goes on: the page is appended, not a restart.
+     */
+    continuesFrom: UuidSchema.optional(),
   })
   .strict();
 export type DiscoveryCompanySlateDto = z.infer<
