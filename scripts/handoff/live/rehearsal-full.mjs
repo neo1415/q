@@ -104,6 +104,59 @@ report.voice = {
 };
 console.log(JSON.stringify({ voice: report.voice }));
 
+// --voice: one turn on the voice line itself, as the speech provider asks
+// for it (the think endpoint, streamed), timing each piece of text heard.
+// Before R7 the line's first words came only with the whole turn.
+if (process.argv.includes("--voice")) {
+  const thinkToken = voice.json?.thinkToken ?? voice.json?.sessionToken;
+  const said =
+    "Thanks. We have forty paying merchants in Riyadh and Lagos and we grow twenty percent a month, with payback under four months.";
+  const startedAt = Date.now();
+  const response = await fetch(`${QAPI}/v1/q/voice/think/chat/completions`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${thinkToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "capital-q",
+      stream: true,
+      messages: [{ role: "user", content: said }],
+    }),
+    signal: AbortSignal.timeout(90_000),
+  });
+  const pieces = [];
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for await (const bytes of response.body) {
+    buffer += decoder.decode(bytes, { stream: true });
+    let end;
+    while ((end = buffer.indexOf("\n\n")) !== -1) {
+      const event = buffer.slice(0, end).trim();
+      buffer = buffer.slice(end + 2);
+      if (!event.startsWith("data:") || event.includes("[DONE]")) continue;
+      try {
+        const content = JSON.parse(event.slice(5)).choices?.[0]?.delta?.content;
+        if (typeof content === "string" && content.length > 0) {
+          pieces.push({ ms: Date.now() - startedAt, text: content });
+        }
+      } catch {
+        // A keep-alive or a partial event: nothing heard.
+      }
+    }
+  }
+  const doneMs = Date.now() - startedAt;
+  report.voiceTurn = { status: response.status, doneMs, pieces };
+  console.log(
+    JSON.stringify({
+      voiceTurn: response.status,
+      firstWordsMs: pieces[0]?.ms ?? null,
+      doneMs,
+      pieces: pieces.map((p) => [p.ms, p.text.slice(0, 80)]),
+    }),
+  );
+}
+
 for (const text of [
   "Thanks for having me. We build invoicing and payments for SMEs in the Gulf and West Africa, and we're raising a three million dollar seed.",
   "We have forty paying merchants in Riyadh and Lagos, growing twenty percent month on month, and our payback on acquisition is under four months.",
