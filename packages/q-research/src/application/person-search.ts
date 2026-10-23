@@ -368,14 +368,14 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
       // variant, so five queries do not cost five x n calls.
       const assignments: {
         planned: (typeof composed)[number];
-        provider: PublicWebResearchProvider;
+        at: number;
       }[] = [];
       composed.forEach((planned) => {
         const corroborates =
           planned.kind === "EXACT_PLACE" || planned.kind === "VARIANT";
-        providers.forEach((provider, at) => {
+        providers.forEach((_provider, at) => {
           if (at === 0 || corroborates) {
-            assignments.push({ planned, provider });
+            assignments.push({ planned, at });
           }
         });
       });
@@ -402,7 +402,15 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
         overall.signal.addEventListener("abort", () => resolve(), {
           once: true,
         });
-        for (const { planned, provider } of assignments) {
+        const launch = (
+          planned: (typeof composed)[number],
+          at: number,
+        ): void => {
+          const provider = providers[at];
+          if (provider === undefined) {
+            finish();
+            return;
+          }
           const callStart = now();
           const callId = nextCall++;
           inflight.set(callId, {
@@ -468,10 +476,28 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
                   : null,
               });
               settled += 1;
+              // A query only the lead index was given passes to the next
+              // index when the lead fails it (live 2026-10-23: the lead was a
+              // SERP key out of credit, so the LinkedIn query never ran and
+              // "Captain Zino Mario" stayed a name-only lead). Corroborated
+              // queries already run on every index.
+              const leadOnly =
+                planned.kind !== "EXACT_PLACE" && planned.kind !== "VARIANT";
+              if (
+                leadOnly &&
+                !cancelled &&
+                isResearchProviderFailure(error) &&
+                at + 1 < providers.length &&
+                !overall.signal.aborted
+              ) {
+                launch(planned, at + 1);
+                return;
+              }
               finish();
             },
           );
-        }
+        };
+        for (const { planned, at } of assignments) launch(planned, at);
       });
       clearTimeout(overallTimer);
       closed = true;

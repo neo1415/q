@@ -147,6 +147,13 @@ export const QStageChangedEventSchema = event("q.stage.changed", {
 export const QMessageDeltaEventSchema = event("q.message.delta", {
   messageId: QMessageIdSchema,
   text: z.string().min(1).max(Q_STREAM_DELTA_MAX_LENGTH),
+  /**
+   * Owner 2026-10-23 (first words): a holding line said as the turn
+   * arrives ("Looking into Zino Aviation now."), before the turn is read.
+   * Any later delta replaces it and the run's message clears it; it is
+   * never stored (additive).
+   */
+  holding: z.literal(true).optional(),
 });
 
 /**

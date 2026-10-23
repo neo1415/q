@@ -24,6 +24,8 @@ import type {
 export type QStreamPartialMessage = {
   readonly messageId: string;
   readonly text: string;
+  /** A holding line: replaced by any delta, cleared by any message. */
+  readonly holding?: true | undefined;
 };
 
 export type QStreamApprovalState = {
@@ -136,12 +138,19 @@ export function reduceQStream(
       }
       const partial =
         state.partial !== null &&
-        state.partial.messageId === event.data.messageId
+        state.partial.messageId === event.data.messageId &&
+        state.partial.holding !== true
           ? {
               messageId: state.partial.messageId,
               text: state.partial.text + event.data.text,
             }
-          : { messageId: event.data.messageId, text: event.data.text };
+          : {
+              messageId: event.data.messageId,
+              text: event.data.text,
+              ...(event.data.holding === true
+                ? { holding: true as const }
+                : {}),
+            };
       return { ...state, runId, partial };
     }
     case "q.artifact.preview": {
@@ -189,8 +198,12 @@ export function reduceQStream(
         ...applySequence(state, event),
         runId,
         messages: upsert(state.messages, message, (m) => m.messageId),
+        // A holding line gives way to whatever message the run settles on.
         partial:
-          state.partial?.messageId === message.messageId ? null : state.partial,
+          state.partial?.messageId === message.messageId ||
+          state.partial?.holding === true
+            ? null
+            : state.partial,
         preview:
           state.preview?.messageId === message.messageId ? null : state.preview,
         ...(state.preview?.messageId === message.messageId

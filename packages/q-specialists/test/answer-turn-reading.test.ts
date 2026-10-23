@@ -145,6 +145,8 @@ function seam(options: {
   readonly counterpartNames?: readonly string[];
   /** A recording logger (lead 2026-10-03: the route is observable). */
   readonly logger?: Logger;
+  /** What goes out live (owner 2026-10-23: the holding line). */
+  readonly deltas?: { readonly text: string; readonly holding?: true }[];
   /** Waiting lines deferred to the engine's step (lead 2026-10-03). */
   readonly waitingLines?: {
     readonly defer: (
@@ -323,6 +325,22 @@ function seam(options: {
       ? {}
       : { openRecord: options.openRecord }),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
+    ...(options.deltas === undefined
+      ? {}
+      : {
+          deltas: {
+            publish: (delta: { text: string; holding?: true }) => {
+              options.deltas?.push({
+                text: delta.text,
+                ...(delta.holding === true ? { holding: true as const } : {}),
+              });
+            },
+            subscribe: () => () => undefined,
+            subscriberCount: () => 1,
+          } as unknown as NonNullable<
+            Parameters<typeof createSpecialistQAnswer>[0]["deltas"]
+          >,
+        }),
     ...(options.waitingLines === undefined
       ? {}
       : { waitingLines: options.waitingLines }),
@@ -421,6 +439,40 @@ function toolReading(
 }
 
 describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
+  it("says it is looking into the one company or person a question names, before the turn is read (owner 2026-10-23)", async () => {
+    const deltas: { text: string; holding?: true }[] = [];
+    let readAt = -1;
+    const run = seam({
+      said: "Tell me about Zino Aviation and its team",
+      reading: null,
+      read: () => {
+        readAt = deltas.length;
+        return Promise.resolve(null);
+      },
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+      deltas,
+    });
+    await run.answer.answer(request());
+    expect(deltas[0]).toEqual({
+      text: "Looking into Zino Aviation now. ",
+      holding: true,
+    });
+    // Already said when the turn's reading was asked for.
+    expect(readAt).toBe(1);
+  });
+
+  it("says no holding line for words that ask nothing about someone named", async () => {
+    const deltas: { text: string; holding?: true }[] = [];
+    const run = seam({
+      said: "Email Zino Aviation the deck",
+      reading: null,
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+      deltas,
+    });
+    await run.answer.answer(request());
+    expect(deltas.filter((d) => d.holding === true)).toEqual([]);
+  });
+
   it("answers 'take me to discover' with a NAVIGATE intent and no model answer (F8)", async () => {
     const run = seam({
       said: "take me to discover",

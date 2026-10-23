@@ -426,3 +426,22 @@ describe("fast person search under a deadline", () => {
     expect(one?.organization).toBeNull();
   });
 });
+
+describe("a query only the lead index was given passes on when it fails (live 2026-10-23)", () => {
+  it("runs the profile query on the next index when the lead is spent", async () => {
+    const spent = fake("serpapi", { fail: true });
+    const next = fake("tavily", { hits: [SHADI] });
+    // A name alone, as "Who is Captain Zino Mario?": no early winner.
+    const run = await createPersonSearch({ providers: [spent, next] }).search({
+      ...command,
+      place: null,
+      userText: "who is Shadi Qishta?",
+    });
+    const asked = next.requests.map((request) => request.includeDomains);
+    // The lead's profile query (scoped to LinkedIn) reached the next index.
+    expect(
+      asked.some((domains) => domains.some((d) => d.includes("linkedin"))),
+    ).toBe(true);
+    expect(run.result.candidates[0]?.organization ?? null).not.toBeNull();
+  });
+});

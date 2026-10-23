@@ -11,6 +11,7 @@ import {
   createInProcessQRunEventNotifier,
   createQRunStreamService,
   projectPublicStreamEvent,
+  type QLiveDelta,
   type QRunStreamItem,
 } from "../src/application/stream.js";
 import type { QRuntimeRepositories } from "../src/application/ports.js";
@@ -574,5 +575,38 @@ describe("coalesceDeltas", () => {
       ["B ", false],
       ["C", true],
     ]);
+  });
+});
+
+describe("a holding line reaches a stream that connects after it (owner 2026-10-23)", () => {
+  const RUN_ID = "0198f8b2-9c1a-7a3e-8f2b-1c2d3e4f5a6b" as QLiveDelta["runId"];
+  const base = {
+    runId: RUN_ID,
+    tenantId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" as QLiveDelta["tenantId"],
+    messageId:
+      "123e4567-e89b-12d3-a456-426614174099" as QLiveDelta["messageId"],
+  };
+
+  it("hands a late subscriber the run's holding line, until anything else is said", () => {
+    let clock = 0;
+    const bus = createInProcessQLiveDeltaBus(() => clock);
+    bus.publish({
+      ...base,
+      text: "Looking into Zino Aviation now. ",
+      holding: true,
+    });
+    const late: string[] = [];
+    bus.subscribe(RUN_ID, (delta) => late.push(delta.text));
+    expect(late).toEqual(["Looking into Zino Aviation now. "]);
+    bus.publish({ ...base, text: "Zino Aviation trains pilots. " });
+    const later: string[] = [];
+    bus.subscribe(RUN_ID, (delta) => later.push(delta.text));
+    expect(later).toEqual([]);
+    // Nor once it has waited past its time.
+    bus.publish({ ...base, text: "Looking again. ", holding: true });
+    clock += 61_000;
+    const stale: string[] = [];
+    bus.subscribe(RUN_ID, (delta) => stale.push(delta.text));
+    expect(stale).toEqual([]);
   });
 });

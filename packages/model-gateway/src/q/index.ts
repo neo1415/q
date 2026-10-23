@@ -342,6 +342,8 @@ import {
   type QPublicPicturePort,
 } from "./result-blocks.js";
 
+// The names a turn's words give, for the conversation core's first words.
+export { companyNameCandidates } from "./named-company-fact.js";
 export {
   analystResultBlocks,
   askedSubjects,
