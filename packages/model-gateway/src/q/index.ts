@@ -1138,7 +1138,9 @@ const RESEARCH_NOTE_BRIEF =
 // 9,000 since 2026-10-02 (OWN_DAY_NOTE).
 // 9,400 since RECOVERY-2026-10 B7: what a proposing tool does and where a
 // point comes from (~160 characters), about 100 tokens a turn.
-export const ENVIRONMENT_NOTES_MAX_CHARS = 9_400;
+// 9,800 since 2026-10-23 (VIEWING_NOT_DISCLOSED_NOTE, ~340 characters):
+// a production-sized run would otherwise lose what Q can do again.
+export const ENVIRONMENT_NOTES_MAX_CHARS = 9_800;
 
 /**
  * What Q can do, so it says so rather than claiming it cannot (founder
@@ -1303,6 +1305,16 @@ export const OWN_DAY_NOTE =
 export const SAVE_NOT_VERIFY_NOTE =
   'SAVING IS NOT VERIFYING: when they authorise saving details you found, in any words, prepare one update_company_profile (or update_investor_profile) with every found field now and say once: "I\'ll save these as your stated company details (not independently verified)." A conflicting field: use the best-supported value and name the other in one line. Never argue about verification once they have said to save.';
 
+/**
+ * Viewing is not interest (product rule; owner 2026-10-23: "Who has looked
+ * at my pitch recently?" was answered as if a record were missing).
+ * Investors' browsing, viewing and playing are never disclosed to
+ * founders; what a founder can see is interest and connection requests,
+ * from their own relationships.
+ */
+export const VIEWING_NOT_DISCLOSED_NOTE =
+  "VIEWING IS NOT INTEREST: founders never see who viewed or played their pitch or profile, by design. Asked who looked, say so as how Capital Q works (never as a missing record), then give what they can see: investors who expressed interest or asked to connect, counted from list_incoming_interest or list_my_relationships, never estimated.";
+
 export const TURN_UNREAD_NOTE =
   "CAPITAL Q COULD NOT READ WHAT KIND OF REQUEST THIS MESSAGE IS just now, so no document, file, screen change or record change can be started on this turn. If they asked for any of those, say plainly that you could not start it just now and that asking again in a moment should work. Never write a requested document's content into the chat instead, and never say it is done.";
 
@@ -1466,6 +1478,7 @@ export function environmentNoteParts(
   const steady = [
     LIKELY_INTENT_NOTE,
     SAVE_NOT_VERIFY_NOTE,
+    VIEWING_NOT_DISCLOSED_NOTE,
     OWN_DAY_NOTE,
     EXPRESSIVE_NOTE,
     statementsNote,
