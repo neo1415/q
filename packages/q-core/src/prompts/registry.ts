@@ -23,6 +23,8 @@ import {
 import {
   ANALYSIS_CRITIQUE_V1,
   ANALYSIS_WRITE_V1,
+  ANALYSIS_WRITE_V2,
+  ANALYSIS_CRITIQUE_V2,
   RESEARCH_FACTS_V1,
   RESEARCH_PLAN_V1,
 } from "./tasks/analyst.v1.js";
@@ -131,6 +133,7 @@ import { TURN_READER_V57 } from "./tasks/turn-reader.v57.js";
 import { TURN_READER_V58 } from "./tasks/turn-reader.v58.js";
 import { TURN_READER_V59 } from "./tasks/turn-reader.v59.js";
 import { TURN_READER_V60 } from "./tasks/turn-reader.v60.js";
+import { TURN_READER_V61 } from "./tasks/turn-reader.v61.js";
 import { MEMORY_EXTRACTOR_V1 } from "./tasks/memory-extractor.v1.js";
 import { MEMORY_EXTRACTOR_V2 } from "./tasks/memory-extractor.v2.js";
 import { MEETING_NOTES_V1 } from "./tasks/meeting-notes.v1.js";
@@ -533,6 +536,7 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     TURN_READER_V58,
     TURN_READER_V59,
     TURN_READER_V60,
+    TURN_READER_V61,
     MEMORY_EXTRACTOR_V1,
     MEMORY_EXTRACTOR_V2,
     MEETING_NOTES_V1,
@@ -562,6 +566,8 @@ export const PROMPT_DEFINITIONS: readonly PromptDefinition<unknown, unknown>[] =
     RESEARCH_FACTS_V1,
     ANALYSIS_WRITE_V1,
     ANALYSIS_CRITIQUE_V1,
+    ANALYSIS_WRITE_V2,
+    ANALYSIS_CRITIQUE_V2,
     ONBOARDING_MOVE_READER_V1,
     PREFERENCE_POLARITY_V1,
     MEETING_OUTCOME_READER_V1,

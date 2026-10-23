@@ -29,6 +29,7 @@ import {
   deliveryText,
 } from "../src/composition/workforce/delivery.js";
 import { createWorkforceDocuments } from "../src/composition/workforce/documents.js";
+import { createOwnContextReader } from "../src/composition/workforce/own-context.js";
 import {
   createOwnWorkStarter,
   createWorkforceJobBoard,
@@ -626,6 +627,9 @@ function analysisWorld(options: {
   readonly authorised?: boolean;
   /** An earlier attempt of this step already filed its document. */
   readonly filedBefore?: { readonly gaps: readonly string[] } | undefined;
+  /** The person has no company of their own (an investor). */
+  readonly noCompany?: boolean | undefined;
+  readonly ownContext?: string | undefined;
   readonly critiques: readonly AnalysisCritiqueResult[];
   readonly drafts: readonly AnalysisDocumentResult[];
 }) {
@@ -640,7 +644,11 @@ function analysisWorld(options: {
   const companyId = randomUUID();
   const documents = createWorkforceDocuments({
     freshActor: (who) => Promise.resolve(who),
-    ownCompany: () => Promise.resolve({ companyId }),
+    ownCompany: () =>
+      Promise.resolve(options.noCompany === true ? null : { companyId }),
+    ...(options.ownContext === undefined
+      ? {}
+      : { ownContext: () => Promise.resolve(options.ownContext ?? null) }),
     firewall: {
       plan: () =>
         Promise.resolve(
@@ -981,5 +989,65 @@ describe("delivery to the conversation", () => {
     ).toBeLessThanOrEqual(6);
     expect(text).toMatch(/^Your Maji Loop: 12-month growth plan is ready\./u);
     expect(text).toContain("1. Instrument every kiosk");
+  });
+});
+
+describe("QO-07: an investor's plan is written for them", () => {
+  it("reads their organisation, mandates and pipeline as them, and says unknown when a read fails", async () => {
+    const reads: string[] = [];
+    const read = createOwnContextReader({
+      ownInvestorOrganisation: () => Promise.resolve(randomUUID()),
+      records: {
+        read: (_actor, query) => {
+          reads.push(query.record);
+          return query.record === "INVESTOR_MANDATES"
+            ? Promise.reject(new Error("down"))
+            : Promise.resolve({ name: "Zino Aviation Ventures" });
+        },
+      },
+      relationships: () =>
+        Promise.resolve({
+          side: "INVESTOR",
+          items: [
+            {
+              counterpart: { kind: "COMPANY", name: "Maji Loop" },
+              state: "IN_DILIGENCE",
+              stateSince: "2026-10-01T00:00:00.000Z",
+              nextStep: "SCHEDULE_MEETING",
+            },
+          ],
+        } as never),
+    });
+    const text = await read(actor);
+    expect(reads.sort()).toEqual([
+      "INVESTOR_MANDATES",
+      "INVESTOR_ORGANISATION",
+    ]);
+    expect(text).toContain("Zino Aviation Ventures");
+    expect(text).toContain(
+      "Their mandates: none on record or not readable (unknown).",
+    );
+    expect(text).toContain(
+      "- Maji Loop (COMPANY): IN_DILIGENCE since 2026-10-01",
+    );
+  });
+
+  it("an investor's 'own' plan has no company: it is written from their context, never refused", async () => {
+    const world = analysisWorld({
+      drafts: [MAJI_DRAFT_TWO],
+      critiques: [PASSING],
+      noCompany: true,
+      ownContext:
+        "Their pipeline (companies they are talking to):\n- Maji Loop (COMPANY): IN_DILIGENCE since 2026-10-01",
+    });
+    const result = await world.documents(world.input);
+    expect(result.status).toBe("READY");
+    expect(world.writes[0]?.company).toContain(
+      "WHO THIS IS FOR (Amina Wanjiru)",
+    );
+    expect(world.writes[0]?.company).toContain(
+      "- Maji Loop (COMPANY): IN_DILIGENCE",
+    );
+    expect(world.filed[0]?.subject).toBeUndefined();
   });
 });
