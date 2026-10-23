@@ -133,6 +133,11 @@ const browser = await chromium.launch({
   args: [
     "--use-fake-ui-for-media-stream",
     "--use-fake-device-for-media-stream",
+    // FAKE_MIC=<file.wav>: what the "founder" says in the room, played once
+    // as the microphone (a pushback turn to see the face react).
+    ...(process.env.FAKE_MIC
+      ? [`--use-file-for-fake-audio-capture=${process.env.FAKE_MIC}%noloop`]
+      : []),
     "--autoplay-policy=no-user-gesture-required",
     "--ignore-certificate-errors",
   ],

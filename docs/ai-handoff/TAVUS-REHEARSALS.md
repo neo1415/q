@@ -83,3 +83,16 @@ Two rooms, founder.souqsheet × QInvest, interviewer Steve (`rdd4c86e5e1a`, Phoe
   - **Face:** lip-synced, and attentive and composed through the opening, which is a neutral question. Stronger expression would need a pushback turn, which wasn't recorded (the room had no founder speech).
   - **Voice:** whether Tavus used the persona's ElevenLabs voice (Helal) or its stock voice can't be told from speech-to-text. Compare `opening-audio.mp3` here with `../rehearsal-voices-2026-10-23/qinvest-live-opening.mp3` by ear, or read the PAL's `layers.tts` with the Builder key (`GET /v2/pals/p0b233ecff9d`, read-only).
 - **Evidence:** `evidence/tavus-rehearsal-2026-10-23/`, holding `room-joined.png`, `frame-3/8/20.jpg`, `opening-audio.mp3` (first 30 s) and `room.json`. The full 22 MB recording is kept out of git.
+
+### Room 3 (owner "go", 14:15 UTC): a pushback turn, attempted
+
+- **Room:** rehearsal `3d094c3e`, PAL `p25ac0f8b98f`, live 14:15:18 → 14:17:05, **112 s** counted. Ready in 6.6 s.
+- **Setup:** the "founder" was a fake microphone (`FAKE_MIC`, Chromium `--use-file-for-fake-audio-capture`): 28 s of silence, then an evasive answer ("…I'd rather not get into Sharia details. Can we just talk about the valuation?").
+- **Result:** the face again said the opening ("As-salamu alaykum. Thanks for making the time…", per speech-to-text). **The founder's line never reached the rehearsal**: it holds only the opening turn, so there was no pushback and no reaction to see. Not established whether Chromium didn't play the file or Tavus didn't take it (it may have come while the face was still speaking).
+- **Spend so far (3 rooms):** 270 s, about 4.5 Builder minutes, about $1.58 at overage.
+- **Still open:**
+  - Expression on a pushback.
+  - Persona voice vs stock voice (compare by ear, or `GET /v2/pals/<id>` with the Builder key).
+- **Next attempt** (needs a go):
+  - Start the founder line later (about 45 s), after the opening has been spoken.
+  - Check that Daily's mic is live before speaking, or speak through the Tavus interactions channel.
