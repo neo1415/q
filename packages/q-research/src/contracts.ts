@@ -160,6 +160,7 @@ export const RESEARCH_PROVIDER_CODES = [
   "serpapi",
   "serper",
   "scrapingbee",
+  "brave",
   "fake",
 ] as const;
 export type ResearchProviderCode = (typeof RESEARCH_PROVIDER_CODES)[number];

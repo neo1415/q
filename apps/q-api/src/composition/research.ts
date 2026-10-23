@@ -59,6 +59,7 @@ import {
 } from "@capital-q/q-research/providers/brightdata";
 import { createCachedResearchProvider } from "@capital-q/q-research/providers/cached";
 import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
+import { createBraveResearchProvider } from "@capital-q/q-research/providers/brave";
 import { createScrapingBeeResearchProvider } from "@capital-q/q-research/providers/scrapingbee";
 import { createDetectingSerpProvider } from "@capital-q/q-research/providers/serp-detect";
 import { createSerperResearchProvider } from "@capital-q/q-research/providers/serper";
@@ -289,7 +290,7 @@ export function composeResearch(
   });
 
   // Search: every configured index at once (Bright Data when its zones
-  // are named, Tavily, SerpApi), each under its own deadline, merged by
+  // are named, Tavily, SerpApi, Brave), each under its own deadline, merged by
   // canonical URL (web search 2026-10-06: one index alone missed what the
   // other found), so one being rate-limited costs only its own hits.
   // Extraction: the first index that reads pages. A short memory in
@@ -329,6 +330,15 @@ export function composeResearch(
       : [
           createSerperResearchProvider({
             apiKey: dependencies.secrets.serper.reveal(),
+          }),
+        ]),
+    // Brave keeps its own index (owner 2026-10-23): searched beside the
+    // others, merged; it reads no pages, so a page read passes it by.
+    ...(dependencies.secrets.brave === undefined
+      ? []
+      : [
+          createBraveResearchProvider({
+            apiKey: dependencies.secrets.brave.reveal(),
           }),
         ]),
     ...(dependencies.secrets.scrapingBee === undefined
@@ -389,6 +399,7 @@ export function composeResearch(
   const PERSON_INDEX_ORDER = [
     "serper",
     "serpapi",
+    "brave",
     "tavily",
     "brightdata",
     "scrapingbee",

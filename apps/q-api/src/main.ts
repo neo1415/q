@@ -4131,9 +4131,12 @@ const qIntelligence = composeQIntelligence({
     process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
   ),
   // Owner 2026-10-23: pictures of who a turn names, from the image results
-  // of the SERP key the web search uses.
+  // of the indexes the web search uses (the SERP key and Brave).
   publicPictures: createPublicQPictures(
-    process.env.SERPER_API_KEY ?? process.env.SERP_API_KEY,
+    {
+      serp: process.env.SERPER_API_KEY ?? process.env.SERP_API_KEY,
+      brave: process.env.BRAVE_API ?? process.env.BRAVE_SEARCH_API_KEY,
+    },
     logger,
   ),
   arrivalSnapshot: (actor) => arrivalSnapshots.forActor(actor),

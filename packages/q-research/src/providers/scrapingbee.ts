@@ -196,23 +196,32 @@ export function createScrapingBeeResearchProvider(
       const startedAt = Date.now();
       const pages: { url: string; title: string | null; text: string }[] = [];
       const failedUrls: string[] = [];
-      for (const url of request.urls) {
-        try {
-          const response = await get(
-            "/",
-            { url, render_js: options.renderJs === true ? "true" : "false" },
-            context,
-          );
-          const parsed = htmlToText(await response.text());
-          if (parsed.text.length === 0) {
-            failedUrls.push(url);
-            continue;
+      // The pages side by side (WEB-RESEARCH-STANDARD: a read waits for the
+      // slowest page, not for the sum of them), kept in the order asked.
+      const read = await Promise.all(
+        request.urls.map(async (url) => {
+          try {
+            const response = await get(
+              "/",
+              { url, render_js: options.renderJs === true ? "true" : "false" },
+              context,
+            );
+            const parsed = htmlToText(await response.text());
+            return parsed.text.length === 0
+              ? { url, page: null }
+              : {
+                  url,
+                  page: { url, title: parsed.title, text: parsed.text },
+                };
+          } catch (error: unknown) {
+            if (context.signal?.aborted === true) throw error;
+            return { url, page: null };
           }
-          pages.push({ url, title: parsed.title, text: parsed.text });
-        } catch (error: unknown) {
-          if (context.signal?.aborted === true) throw error;
-          failedUrls.push(url);
-        }
+        }),
+      );
+      for (const { url, page } of read) {
+        if (page === null) failedUrls.push(url);
+        else pages.push(page);
       }
       if (pages.length === 0) throw failure("UNAVAILABLE", null);
       return {
