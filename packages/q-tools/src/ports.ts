@@ -389,6 +389,7 @@ export type CompanyFigure = {
   readonly validFrom: string | null;
   readonly truthClass: string;
   readonly evidenceStatus: string;
+  readonly lifecycleStatus: string;
   readonly visibilityScope: string;
   readonly sensitivityClass: string;
 };

@@ -41,7 +41,12 @@ import type {
  * The claims are read in the company's own tenant through the evidence
  * context's query port; the viewer's tenant never widens to it.
  *
- * Truth class and evidence status stay separate fields. A self-reported
+ * Only CURRENT claims: superseded, disputed, contradictory, stale or
+ * withdrawn ones are never returned as today's figure. relationship_shared
+ * claims are not returned at all (none is admitted through a relationship
+ * here); that needs the relationship's own grant, a later step.
+ *
+ * Truth class, evidence status and lifecycle status stay separate fields. A self-reported
  * figure is the company's claim, never verified by being returned. No
  * figure is UNKNOWN, never zero.
  */
@@ -73,6 +78,7 @@ const OutputSchema = z
             asOf: z.string().nullable(),
             truthClass: z.string(),
             evidenceStatus: z.string(),
+            lifecycleStatus: z.literal("CURRENT"),
           })
           .strict(),
       )
@@ -117,7 +123,12 @@ export function shapeCompanyFigures(
   const within = WITHIN[sensitivity];
   const kept = figures
     .filter(
-      (f) => reach.has(f.visibilityScope) && within.has(f.sensitivityClass),
+      (f) =>
+        // Only the current reading: a superseded, disputed, withdrawn or
+        // stale claim is history, never today's figure.
+        f.lifecycleStatus === "CURRENT" &&
+        reach.has(f.visibilityScope) &&
+        within.has(f.sensitivityClass),
     )
     .slice(0, FIGURES_MAX)
     .map((f) => ({
@@ -127,6 +138,7 @@ export function shapeCompanyFigures(
       asOf: f.validFrom,
       truthClass: f.truthClass,
       evidenceStatus: f.evidenceStatus,
+      lifecycleStatus: "CURRENT" as const,
     }));
   return {
     companyId,

@@ -39,6 +39,7 @@ const figure = (over: Partial<CompanyFigure>): CompanyFigure => ({
   validFrom: "2026-09-30",
   truthClass: "USER_CLAIM",
   evidenceStatus: "SELF_REPORTED",
+  lifecycleStatus: "CURRENT",
   visibilityScope: "network_visible",
   sensitivityClass: "PUBLIC",
   ...over,
@@ -73,6 +74,23 @@ const LEAKY: readonly CompanyFigure[] = [
     statement: `Runway ${MARKERS.founder}`,
     visibilityScope: "founder_private",
     sensitivityClass: "PUBLIC",
+  }),
+  // Revoked or withdrawn: history, never today's figure.
+  figure({
+    claimKey: "financial.arr",
+    statement: `Old ARR ${MARKERS.investor}`,
+    lifecycleStatus: "SUPERSEDED",
+  }),
+  figure({
+    claimKey: "traction.growth",
+    statement: `Withdrawn growth ${MARKERS.investor}`,
+    lifecycleStatus: "DISPUTED",
+  }),
+  // Shared with one relationship only: never through this tool.
+  figure({
+    claimKey: "customers.paying_accounts",
+    statement: `Relationship ${MARKERS.crossTenant}`,
+    visibilityScope: "relationship_shared",
   }),
   figure({
     claimKey: "financial.cash",
@@ -127,12 +145,17 @@ describe("read_company_figures", () => {
             asOf: "2026-09-30",
             truthClass: "USER_CLAIM",
             evidenceStatus: "SELF_REPORTED",
+            lifecycleStatus: "CURRENT",
           },
         ],
       },
     });
-    // Private, founder-private and over-sensitive rows never leave the tool.
-    expect(JSON.stringify(outcome)).not.toContain(MARKERS.founder);
+    // Private, founder-private, over-sensitive, superseded, disputed and
+    // relationship-only rows never leave the tool.
+    const text = JSON.stringify(outcome);
+    expect(text).not.toContain(MARKERS.founder);
+    expect(text).not.toContain(MARKERS.investor);
+    expect(text).not.toContain(MARKERS.crossTenant);
   });
 
   it("denies a private company with the one enumeration-safe answer, without reading figures", async () => {
@@ -200,6 +223,62 @@ describe("read_company_figures", () => {
       fakePorts({ companyFigures: fakeFigures([]).port }),
     ).map((t) => t.providerName);
     expect(withPort).toContain("read_company_figures");
+  });
+
+  it("never returns a founder_private claim to an investor", async () => {
+    const { port } = fakeFigures([
+      figure({
+        claimKey: "financial.runway",
+        statement: `Runway ${MARKERS.founder}`,
+        visibilityScope: "founder_private",
+      }),
+    ]);
+    const outcome = await executor(port).execute(
+      call(COMPANY_B_NETWORK),
+      contextFor(actorA, ownCompanyPlan),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "NONE", figures: [] },
+    });
+    expect(JSON.stringify(outcome)).not.toContain(MARKERS.founder);
+  });
+
+  it("never returns another tenant's private claim, whether the company is private or not", async () => {
+    const { port, calls } = fakeFigures([
+      figure({
+        statement: `Private ${MARKERS.crossTenant}`,
+        visibilityScope: "organisation_private",
+        sensitivityClass: "CONFIDENTIAL",
+      }),
+    ]);
+    const visible = await executor(port).execute(
+      call(COMPANY_B_NETWORK),
+      contextFor(actorA, ownCompanyPlan),
+    );
+    expect(JSON.stringify(visible)).not.toContain(MARKERS.crossTenant);
+    const privateCompany = await executor(port).execute(
+      call(COMPANY_B_PRIVATE),
+      contextFor(actorA, ownCompanyPlan),
+    );
+    expect(privateCompany.failureCode).toBe("NOT_AVAILABLE");
+    // The port is only ever asked for the published scopes.
+    for (const c of calls) {
+      expect(c.scopes).toEqual(["network_visible", "public_external"]);
+    }
+  });
+
+  it("never returns a revoked, withdrawn or superseded claim", () => {
+    const shaped = shapeCompanyFigures(
+      COMPANY_B_NETWORK,
+      ["SUPERSEDED", "DISPUTED", "CONTRADICTORY", "STALE", "HISTORICAL"].map(
+        (lifecycleStatus) =>
+          figure({ claimKey: lifecycleStatus, lifecycleStatus }),
+      ),
+      ["network_visible", "public_external"],
+      "NETWORK_VISIBLE",
+    );
+    expect(shaped).toMatchObject({ status: "NONE", figures: [] });
   });
 
   it("keeps a PUBLIC grant to PUBLIC-sensitivity claims", () => {

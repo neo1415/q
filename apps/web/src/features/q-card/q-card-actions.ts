@@ -4,7 +4,6 @@ import { updateTag } from "next/cache";
 import { z } from "zod";
 
 import {
-  ApiProblemError,
   claimHandle,
   updateQCard,
   type ApiSession,
@@ -13,11 +12,14 @@ import { loadWebServerConfig } from "@capital-q/config/web";
 import {
   QCardFieldScopesSchema,
   QCardSubjectTypeSchema,
-  type QCardDto,
 } from "@capital-q/contracts";
 
 import { getSessionAccessToken } from "@/auth/session";
 import { PUBLIC_CARD_TAG, publicCardTag } from "./public-card-data";
+import {
+  translateQCardError as translate,
+  type QCardActionResult,
+} from "./q-card-errors";
 
 /**
  * The Q Card from the profile page (BIZ-004), server side. Claiming a
@@ -26,53 +28,11 @@ import { PUBLIC_CARD_TAG, publicCardTag } from "./public-card-data";
  * the person's own session. Nothing here decides who may do what.
  */
 
-export type QCardActionResult =
-  | { readonly ok: true; readonly card: QCardDto }
-  | { readonly ok: false; readonly message: string };
-
 async function session(): Promise<ApiSession | null> {
   const { apiBaseUrl } = loadWebServerConfig();
   const accessToken = await getSessionAccessToken();
   if (accessToken === null || apiBaseUrl === undefined) return null;
   return { baseUrl: apiBaseUrl, accessToken };
-}
-
-function translate(error: unknown): QCardActionResult {
-  if (error instanceof ApiProblemError) {
-    if (error.status === 409 && error.code === "VERSION_CONFLICT") {
-      return {
-        ok: false,
-        message:
-          "The card changed since this page was opened. Reload and try again.",
-      };
-    }
-    if (error.status === 409 || error.status === 422) {
-      return {
-        ok: false,
-        message: error.problem?.detail ?? "That handle isn't available.",
-      };
-    }
-    if (error.status === 403) {
-      return {
-        ok: false,
-        message:
-          "Only an administrator of your organisation can change its handle or card.",
-      };
-    }
-    if (error.status === 401) {
-      return {
-        ok: false,
-        message: "Your session ended. Sign in again to continue.",
-      };
-    }
-    if (error.status === 404) {
-      return { ok: false, message: "This profile isn't available to you." };
-    }
-  }
-  return {
-    ok: false,
-    message: "Capital Q couldn't save that just now. Try again.",
-  };
 }
 
 const Subject = z.object({

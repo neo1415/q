@@ -3084,6 +3084,7 @@ const qTools = createQTools({
             validFrom: claim.validFrom,
             truthClass: claim.truthClass,
             evidenceStatus: claim.evidenceStatus,
+            lifecycleStatus: claim.lifecycleStatus,
             visibilityScope: claim.visibilityScope,
             sensitivityClass: claim.sensitivityClass,
           }));
