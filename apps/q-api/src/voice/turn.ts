@@ -388,10 +388,39 @@ const held = new WeakMap<VoiceSessionBinding, Held>();
 type LiveRun = {
   readonly runId: QRunRecord["id"];
   readonly correlationId: CorrelationId;
+  /** Stops this line following the run: nothing more of it is said. */
   readonly stop: AbortController;
+  /** Stops the run's engine. Never used on durable work (below). */
+  readonly engine: AbortController;
   /** The spoken utterance the run answers (`utterance.ts`), if any. */
   readonly utterance?: string | undefined;
+  /**
+   * Owner 2026-10-23: the run is making a document (a one-pager, deck,
+   * memo or brief). Durable work outlives the turn that asked for it: a
+   * newer utterance, a barge-in or a delegation's deadline stops the line
+   * following it, never the work. It finishes and lands on their screen
+   * and in the conversation.
+   */
+  durable: boolean;
+  /** Set once the line is following the run: hands it to the room. */
+  handOff: (() => void) | null;
 };
+
+/** The stages of making a document: from the first, the work is durable. */
+export const DURABLE_STAGES: ReadonlySet<string> = new Set([
+  "PREPARING_DOCUMENT",
+  "REVISING_DOCUMENT",
+  "DESIGNING_DOCUMENT",
+  "FINDING_DOCUMENT_IMAGES",
+  "CHECKING_DOCUMENT",
+]);
+
+/** How long the room follows a document handed off by the line. */
+export const DURABLE_FOLLOW_MAX_MS = 15 * 60_000;
+
+/** Said once, as the line hands the document off and takes the next turn. */
+export const DURABLE_HANDOFF_LINE =
+  "I'm making that now. Carry on; it'll appear on your screen when it's ready.";
 const liveRuns = new WeakMap<VoiceSessionBinding, LiveRun>();
 /** ADR 0062: small-talk threads already brought back on this voice session. */
 const smallTalkUsed = new WeakMap<VoiceSessionBinding, Set<string>>();
@@ -725,6 +754,11 @@ export function createVoiceTurnHandler(
   /** Cancel one run, and only that one, whatever the line has moved on to. */
   const stopRun = (binding: VoiceSessionBinding, live: LiveRun): void => {
     if (liveRuns.get(binding) === live) liveRuns.delete(binding);
+    if (live.durable) {
+      // Durable work is never cancelled by the line: it is handed off.
+      live.handOff?.();
+      return;
+    }
     if (stopping.has(live)) return;
     stopping.add(live);
     void qRuntime
@@ -742,6 +776,7 @@ export function createVoiceTurnHandler(
       })
       .finally(() => {
         live.stop.abort();
+        live.engine.abort();
       });
   };
   const supersede = (binding: VoiceSessionBinding, keep?: LiveRun): void => {
@@ -1214,13 +1249,16 @@ export function createVoiceTurnHandler(
       runId,
       correlationId,
       stop: new AbortController(),
+      engine: new AbortController(),
       utterance,
+      durable: false,
+      handOff: null,
     };
     supersede(binding, live);
     liveRuns.set(binding, live);
     if (result.created && orchestration?.autostart === true) {
       void orchestration.orchestrator
-        .start({ actor, runId, correlationId, signal: live.stop.signal })
+        .start({ actor, runId, correlationId, signal: live.engine.signal })
         .catch((error: unknown) => {
           logger.error(
             { err: error, qRunId: runId, correlationId },
@@ -1251,6 +1289,56 @@ export function createVoiceTurnHandler(
     /** The run's stage as it arrives, for the silence ladder (ADR 0062). */
     const silence: SilenceLive = { stage: null, approvalWaiting: false };
     const record = await qStream.authorize(actor, runId, correlationId);
+    /**
+     * Durable work, handed off: the line stops following the run and the
+     * room follows it instead, to its end, so its stages stay true on the
+     * screen and its document lands there. Once, whatever asks for it.
+     */
+    live.handOff = () => {
+      live.handOff = null;
+      if (liveRuns.get(binding) === live) liveRuns.delete(binding);
+      live.stop.abort();
+      const room = dependencies.room;
+      if (room === undefined) return;
+      void (async () => {
+        try {
+          for await (const item of qStream.open({
+            run: record,
+            afterSequence: 0,
+            signal: AbortSignal.timeout(DURABLE_FOLLOW_MAX_MS),
+          })) {
+            if (item.kind === "end") return;
+            const event = item.event;
+            if (event.type === "q.stage.changed") {
+              room.stage?.(actor, {
+                runId,
+                stage: event.data.stage,
+                ...(event.data.about === undefined
+                  ? {}
+                  : { about: event.data.about }),
+              });
+            } else if (event.type === "q.message.completed") {
+              room.publish(actor, {
+                runId,
+                conversationId: thread.conversationId ?? null,
+                source: "VOICE",
+                message: event.data.message,
+              });
+            } else if (
+              event.type === "q.run.completed" ||
+              event.type === "q.run.failed"
+            ) {
+              return;
+            }
+          }
+        } catch (error: unknown) {
+          logger.warn(
+            { err: error, qRunId: runId, correlationId },
+            "a handed-off document was not followed to its end",
+          );
+        }
+      })();
+    };
     async function* answer(): AsyncGenerator<string> {
       for await (const item of qStream.open({
         run: record,
@@ -1476,6 +1564,25 @@ export function createVoiceTurnHandler(
             recoverySettled(binding);
             return;
           case "q.stage.changed":
+            if (DURABLE_STAGES.has(event.data.stage) && !live.durable) {
+              // Owner 2026-10-23: a document is durable work. The line
+              // says so once and is free for the next turn; the room
+              // follows the run to its end.
+              live.durable = true;
+              dependencies.room?.stage?.(actor, {
+                runId,
+                stage: event.data.stage,
+                ...(event.data.about === undefined
+                  ? {}
+                  : { about: event.data.about }),
+              });
+              if (!streamedDeltas) {
+                streamedDeltas = true;
+                yield `${DURABLE_HANDOFF_LINE} `;
+              }
+              live.handOff?.();
+              return;
+            }
             // ADR 0062 (amends R38): the stage is what the silence ladder
             // may say while nothing of the answer has been heard; it is
             // never itself spoken as part of the answer.
