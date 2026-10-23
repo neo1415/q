@@ -23,6 +23,24 @@ html[data-story] [data-qp-anchor][data-qp-lit] {
   will-change: transform;
 }
 
+/* A still of a fictional product page, for any viewer but the demo actor
+   the story is certified on: drawn where the page would be, under the
+   scrim and the stage, so the viewer's own page never shows. */
+.cq-story-still {
+  position: fixed;
+  inset: 0;
+  z-index: var(--cq-z-sheet);
+  pointer-events: none;
+  background: var(--cq-canvas);
+}
+.cq-story-still img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+}
+
 .cq-story-scrim {
   position: fixed;
   inset: 0;

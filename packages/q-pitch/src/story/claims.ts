@@ -103,6 +103,32 @@ export const STORY_CLAIMS: Readonly<Record<number, StoryClaim>> = {
   56: N,
 };
 
+/**
+ * The claims when the story plays its product part as stills (preload.ts,
+ * STORY_STILL_ROUTES): a picture of a fictional page demonstrates the
+ * product, it does not show it live, so every PRODUCT beat is a
+ * DEMONSTRATION beat and is labelled so. The gate then has no live claim
+ * to certify; the owner's approval still decides the audience.
+ */
+export function stillClaims(
+  claims: Readonly<Record<number, StoryClaim>> = STORY_CLAIMS,
+): Readonly<Record<number, StoryClaim>> {
+  return Object.fromEntries(
+    Object.entries(claims).map(([n, claim]) => [
+      n,
+      claim.kind === "PRODUCT" ? D : claim,
+    ]),
+  );
+}
+
+/** The beat shows demonstration data, so it carries the label. */
+export function isDemonstrationClaim(claim: StoryClaim | undefined): boolean {
+  return (
+    claim?.kind === "DEMONSTRATION" ||
+    (claim?.kind === "PRODUCT" && claim.demonstration)
+  );
+}
+
 /** The story's ledger: the certified entries its PRODUCT claims rest on. */
 export const STORY_LEDGER: CertificationLedger = (() => {
   const wanted = new Set(

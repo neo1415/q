@@ -59,6 +59,28 @@ export function screenPath(name: (typeof STORY_SCREENS)[number]): string {
   return `${STORY_ASSET_ROOT}/screens/${name}.jpg`;
 }
 
+/**
+ * The story's product pages as stills, for a viewer the story is not
+ * certified to run live for (any account but the ledger's demo actor):
+ * pictures of the same fictional demo pages, so the story never opens the
+ * viewer's own pages or reads their data. Home is the viewer's own page
+ * already, so it has no still.
+ */
+export type StoryStillRoute = Exclude<StoryRoute, "home">;
+export const STORY_STILL_ROUTES: readonly StoryStillRoute[] = [
+  "discover",
+  "capital-mandate",
+  "company-diligence",
+  "relationship-prep",
+  "gateq-gate",
+  "gateq-application",
+  "gateq-inbox",
+];
+
+export function stillPath(route: StoryStillRoute): string {
+  return `${STORY_ASSET_ROOT}/pages/${route}.jpg`;
+}
+
 export function storyManifest(
   voice: string,
   beats: readonly StoryBeat[] = STORY_BEATS,

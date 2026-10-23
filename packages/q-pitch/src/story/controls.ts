@@ -26,6 +26,8 @@ const CAPTIONS =
 const MUTE = /^(?:mute|unmute|sound (?:on|off))$/u;
 const END =
   /^(?:end|end the story|stop the story|exit|close|that s enough|end tour)$/u;
+const START_OVER =
+  /^(?:start (?:over|again|from the (?:top|beginning|start))|restart(?: the story)?|from the (?:top|beginning|start)|go back to the (?:beginning|start)|play it again)$/u;
 
 export function parseStoryCommand(
   text: string,
@@ -61,6 +63,9 @@ export function parseStoryCommand(
     };
   }
   if (END.test(said)) return { kind: "END" };
+  if (START_OVER.test(said)) {
+    return { kind: "MOVE", move: { kind: "STEP", step: 1 } };
+  }
   const step = parseStepCommand(text);
   if (step === null) return null;
   return { kind: "MOVE", move: resolveStepCommand(step, current, total) };
