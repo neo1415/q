@@ -228,6 +228,97 @@ describe("the card comes up with the sentence that names it", () => {
   });
 });
 
+describe("cards shown for a turn stay through its answer (owner 2026-10-23)", () => {
+  const event = (type: string, data: unknown, sequence: number) =>
+    ({
+      contractVersion: 1,
+      eventId: `0000000${String(sequence)}-0000-4000-8000-000000000000`,
+      runId: RUN,
+      sequence,
+      occurredAt: "2026-10-23T08:00:00.000Z",
+      type,
+      data,
+    }) as never;
+
+  it("an answer that lands with no cards of its own keeps what it put up", () => {
+    const shownWhileTalking = preview("CARD", [BARIDI, "Baridi Health"]);
+    const turns = [
+      person("p1", "Search for Baridi Health"),
+      answer(MSG, "Here is what is public on Baridi Health.", {
+        streaming: false,
+        preview: shownWhileTalking,
+        blocks: [],
+      }),
+    ];
+    expect(livePreviewOf(turns, null)?.subjects[0]?.name).toBe("Baridi Health");
+    // The next question moves on: nothing of the last turn is held up.
+    expect(
+      livePreviewOf([...turns, person("p2", "And MedTrail?")], null),
+    ).toBeNull();
+  });
+
+  it("the stream keeps the preview with its message as it lands and as the run ends", () => {
+    let state = createQStreamState();
+    state = reduceQStream(
+      state,
+      event("q.run.started", { capability: "ANSWER", status: "RUNNING" }, 1),
+    );
+    state = reduceQStream(
+      state,
+      event(
+        "q.artifact.preview",
+        preview("CARD", [BARIDI, "Baridi Health"]),
+        2,
+      ),
+    );
+    state = reduceQStream(
+      state,
+      event("q.message.delta", { messageId: MSG, text: "Baridi leads. " }, 3),
+    );
+    state = reduceQStream(
+      state,
+      event(
+        "q.message.completed",
+        {
+          message: {
+            messageId: MSG,
+            runId: RUN,
+            role: "Q",
+            text: "Baridi leads.",
+            contentType: "TEXT",
+            createdAt: "2026-10-23T08:00:01.000Z",
+            blocks: [],
+          },
+        },
+        4,
+      ),
+    );
+    state = reduceQStream(
+      state,
+      event(
+        "q.run.completed",
+        { status: "COMPLETED", completedAt: "2026-10-23T08:00:02.000Z" },
+        5,
+      ),
+    );
+    const turns = turnsFrom(state, []);
+    const landed = turns.at(-1);
+    expect(landed?.kind === "Q" ? landed.streaming : null).toBe(false);
+    expect(livePreviewOf(turns, null)?.subjects[0]?.name).toBe("Baridi Health");
+  });
+
+  it("on a voice line, the spoken preview stays once its answer is in the thread with no cards", () => {
+    const spoken = preview("CARD", [BARIDI, "Baridi Health"]);
+    const landed = [
+      person("p1", "Search for Baridi Health"),
+      answer(MSG, "Here is what is public.", { streaming: false, blocks: [] }),
+    ];
+    expect(livePreviewOf(landed, null, spoken)?.subjects[0]?.name).toBe(
+      "Baridi Health",
+    );
+  });
+});
+
 describe("pictures: a real logo or photo, else initials, never broken or blank", () => {
   it("tries the photo, then the website's logo, for a company in Q's artifacts", () => {
     expect(

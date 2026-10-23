@@ -5,6 +5,7 @@ import {
   createSubjectAnnouncer,
   previewLayoutFor,
   subjectsNamedIn,
+  isProductName,
 } from "../src/q/artifact-preview.js";
 import { companiesTableBlock } from "../src/q/result-blocks.js";
 
@@ -268,5 +269,49 @@ describe("artifacts live, round 2", () => {
         },
       },
     ]);
+  });
+});
+
+describe("only the subjects the turn is about (owner 2026-10-23)", () => {
+  const OWN = "c0000000-0000-4000-8000-0000000000aa";
+  const ZINO = "c0000000-0000-4000-8000-0000000000ab";
+  const known = (): RunRead => {
+    const one = new RunRead();
+    // The viewer's own company record, read as context, is "Capital Q".
+    one.companyNames.set(OWN, "Capital Q");
+    one.companyNames.set(ZINO, "Zino Aviation");
+    return one;
+  };
+
+  it("never puts up Capital Q's card because Q named itself", () => {
+    const announcer = createSubjectAnnouncer({
+      read: known,
+      question: "Search for Zino Aviation",
+    });
+    const first = announcer.sentence(
+      "Capital Q holds no record of Zino Aviation, so here is what is public.",
+    );
+    expect(first?.subjects.map((one) => one.name)).toEqual(["Zino Aviation"]);
+    expect(announcer.sentence("Capital Q can track it for you.")).toBeNull();
+  });
+
+  it("puts it up when the person asked about Capital Q", () => {
+    const announcer = createSubjectAnnouncer({
+      read: known,
+      question: "Tell me about Capital Q",
+    });
+    expect(
+      announcer
+        .sentence("Capital Q is a private-capital platform.")
+        ?.subjects.map((one) => one.name),
+    ).toEqual(["Capital Q"]);
+  });
+
+  it("knows the product's name in its forms, and nothing else", () => {
+    expect(isProductName("Capital Q")).toBe(true);
+    expect(isProductName("CapitalQ")).toBe(true);
+    expect(isProductName("Capital Q Ltd")).toBe(true);
+    expect(isProductName("Capital Quest")).toBe(false);
+    expect(isProductName("Zino Aviation")).toBe(false);
   });
 });

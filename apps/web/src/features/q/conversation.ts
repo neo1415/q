@@ -373,6 +373,11 @@ export function turnsFrom(
         ...(message.gestures === undefined
           ? {}
           : { gestures: message.gestures }),
+        // What it put up while it streamed (owner 2026-10-23): kept with
+        // the answer, so cards shown for this turn do not clear as it lands.
+        ...(state.landedPreviews?.[message.messageId] === undefined
+          ? {}
+          : { preview: state.landedPreviews[message.messageId] }),
       },
     });
   }

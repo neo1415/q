@@ -62,6 +62,13 @@ export type QStreamState = {
    * the moment that message is persisted (its blocks win).
    */
   readonly preview: QArtifactPreview | null;
+  /**
+   * Owner 2026-10-23: what each persisted message had put up while it
+   * streamed, by message id. A card shown for a turn stays through the
+   * answer: an answer with no cards of its own keeps these on screen
+   * rather than clearing them as it lands.
+   */
+  readonly landedPreviews?: Readonly<Record<string, QArtifactPreview>>;
   readonly findings: readonly QPublicFinding[];
   readonly proposals: readonly QActionProposal[];
   readonly approval: QStreamApprovalState | null;
@@ -186,6 +193,14 @@ export function reduceQStream(
           state.partial?.messageId === message.messageId ? null : state.partial,
         preview:
           state.preview?.messageId === message.messageId ? null : state.preview,
+        ...(state.preview?.messageId === message.messageId
+          ? {
+              landedPreviews: {
+                ...state.landedPreviews,
+                [message.messageId]: state.preview,
+              },
+            }
+          : {}),
       };
     }
     case "q.finding.available":
