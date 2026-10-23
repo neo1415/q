@@ -367,6 +367,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
          * fits?"); the ranking leaves those out. Absent is false.
          */
         readonly excludeShown?: boolean | undefined;
+        /**
+         * The reader read it as ranking against their mandate or for
+         * themselves ("rank them for me", "top three based on my
+         * mandate"). Absent is false.
+         */
+        readonly mandateRelevant?: boolean | undefined;
       }
     | undefined;
   /**

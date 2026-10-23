@@ -117,31 +117,6 @@ const NOT_PLACES = new Set([
   "Them",
 ]);
 
-/**
- * Owner 2026-10-23 (investor Zino Aviation, 15:19 UTC): "can you help me
- * find like three companies that I should look into" was answered with
- * three companies in alphabetical order. Asking which companies to look
- * into, invest in or consider, or for recommendations or suggestions, is
- * asking for the mandate's ranking, whatever the reader made of it.
- */
-const RECOMMEND_CUE =
-  /\b(?:(?:should|could|can|would) (?:i|we) (?:look (?:at|into)|invest(?: in)?|consider|meet|back|fund|talk to|reach out to)|(?:i|we) (?:should|could|ought to|might want to) (?:look (?:at|into)|invest(?: in)?|consider|meet|back|fund)|recommend(?:s|ed|ation|ations)?|suggest(?:s|ed|ion|ions)?|worth (?:a look|looking (?:at|into)|investing in|my time|considering)|(?:what|which|who) (?:should|could) (?:i|we) (?:invest in|back|fund|look (?:at|into))|find (?:me )?(?:\w+ ){0,3}?(?:companies|startups|deals|opportunities)|for me to (?:look (?:at|into)|invest in|consider))\b/iu;
-const RECOMMEND_SET =
-  /\b(?:companies|company|startups|deals|businesses|opportunities|ones|investments?|invest in)\b/iu;
-
-/** They ask which companies they should look at: the mandate's ranking. */
-export function asksForRecommendations(text: string): boolean {
-  const words = text.trim().slice(0, 400);
-  return RECOMMEND_CUE.test(words) && RECOMMEND_SET.test(words);
-}
-
-/** They name their mandate, or themselves, as what to rank against. */
-export function ranksAgainstMandate(text: string): boolean {
-  return /\b(?:mandate|mandates|thesis|criteria|for me|my (?:fund|focus|strategy)|(?:top|best|strongest) (?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)?)\b/iu.test(
-    text,
-  );
-}
-
 /** A profile explanation is not a request for a candidate list. */
 export function isSingleCompanyQuestion(text: string): boolean {
   return (

@@ -145,10 +145,8 @@ import {
   spokenBeforeCards,
 } from "./fit-cards.js";
 import {
-  asksForRecommendations,
   fitSweepAsk,
   fitSweepAskOfReading,
-  ranksAgainstMandate,
   withReadCount,
   isSingleCompanyQuestion,
   runFitSweep,
@@ -5863,20 +5861,20 @@ export function createModelGatewayQAnswer(
       }
       /**
        * Owner 2026-10-23 (investor Zino Aviation): "find me three companies
-       * I should look into" got three by name from the catalog. An
-       * investor asking which companies to look into, invest in or
-       * consider is asking for the mandate's ranking: with no sector,
-       * country or stage named, the fit sweep over their candidates
-       * answers; with one, the catalog of that kind ranked by fit.
+       * I should look into" got three by name from the catalog. What they
+       * want is the turn reader's to understand, never a phrase list: a
+       * DISCOVER reading that ranks by fit with their mandate (ranking FIT
+       * or mandateRelevant), naming no sector, country or stage, is the fit
+       * sweep over the investor's own candidates, not the catalog's first
+       * companies by name. One naming a kind stays the catalog of that
+       * kind, ranked by fit (discover-companies.ts).
        */
-      const recommendationAsk =
+      const recommendAll =
         investorAsking &&
         request.discoverCompanies !== undefined &&
         request.discoverCompanies.previous !== true &&
-        asksForRecommendations(request.discoverCompanies.text);
-      const recommendAll =
-        recommendationAsk &&
-        request.discoverCompanies !== undefined &&
+        (request.discoverCompanies.ranking === "FIT" ||
+          request.discoverCompanies.mandateRelevant) &&
         request.discoverCompanies.sectors.length === 0 &&
         request.discoverCompanies.countries.length === 0 &&
         request.discoverCompanies.stages.length === 0;
@@ -5891,15 +5889,7 @@ export function createModelGatewayQAnswer(
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         const discoverStarted = Date.now();
-        const found = await discoverFor(
-          recommendationAsk
-            ? {
-                ...request.discoverCompanies,
-                ranking: "FIT",
-                mandateRelevant: true,
-              }
-            : request.discoverCompanies,
-        );
+        const found = await discoverFor(request.discoverCompanies);
         if (found !== null) {
           const message = await persistCodeAnswer(
             found.text,
@@ -5978,7 +5968,9 @@ export function createModelGatewayQAnswer(
         swept !== null &&
         swept.ask.scope === "PREVIOUS" &&
         (swept.ask.within?.length ?? 0) > 0 &&
-        ranksAgainstMandate(latest.content) &&
+        // The reader understood it as ranking against their mandate.
+        (request.fitQuestion?.mandateRelevant === true ||
+          request.discoverCompanies?.mandateRelevant === true) &&
         (fitSweepCardsBlock(
           swept.fits,
           "Fit against your mandate",

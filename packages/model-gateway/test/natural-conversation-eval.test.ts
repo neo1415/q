@@ -648,10 +648,14 @@ describe("companies of a kind through the answer path (K1, live 2026-10-09 15:57
 describe("an investor asking what to look into gets the mandate's ranking (owner 2026-10-23)", () => {
   // Zino Aviation, production 15:19 UTC: read as DISCOVER_COMPANIES with no
   // ranking, answered with three companies in alphabetical order.
+  // The turn reader's reading decides, never the words (owner rule
+  // 2026-10-23): these are the readings its contract asks for, and the
+  // phrasings beside them are the eval cases for the reader itself.
   const discover = (
     text: string,
     count: number | null,
     sectors: readonly string[] = [],
+    forMandate = true,
   ) => ({
     questionKind: "DISCOVER_COMPANIES" as const,
     discoverCompanies: {
@@ -660,8 +664,8 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
       countries: [],
       stages: [],
       count,
-      ranking: "NONE" as const,
-      mandateRelevant: false,
+      ranking: forMandate ? ("FIT" as const) : ("NONE" as const),
+      mandateRelevant: forMandate,
       previous: false,
     },
   });
@@ -762,13 +766,45 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
       script: [answer("A model answer.")],
       reading: {
         questionKind: "FIT",
-        fitQuestion: { text: words, count: 3, previous: true },
+        fitQuestion: {
+          text: words,
+          count: 3,
+          previous: true,
+          mandateRelevant: true,
+        },
       },
     });
     expect(modelCalls).toBe(0);
     expect(text).toMatch(/None of the companies I just listed/u);
     expect(text).not.toMatch(/Here are the same three/u);
     expect(cardsOf(blocks).map((one) => one.name)).toEqual(expected);
+
+    // Read as only "rank those", not against the mandate: those it stays.
+    const plain = await replay({
+      question: "Rank them",
+      before: [
+        { role: "USER", content: "Find me three companies" },
+        {
+          role: "Q",
+          content: "Here are three companies on Capital Q.",
+          blocks: [
+            {
+              kind: "ANSWER_CARDS",
+              shape: "RANKED",
+              title: "Companies on Capital Q",
+              cards: unscorable.map(card),
+              followUps: [],
+            },
+          ] as never,
+        },
+      ],
+      script: [answer("A model answer.")],
+      reading: {
+        questionKind: "FIT",
+        fitQuestion: { text: "Rank them", count: 3, previous: true },
+      },
+    });
+    expect(plain.text).not.toMatch(/None of the companies I just listed/u);
   });
 
   it("a plain 'show me three fintech companies' is still a catalog list by name", async () => {
@@ -776,8 +812,20 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
     const { text } = await replay({
       question: words,
       script: [answer("A model answer.")],
-      reading: discover(words, 3, ["fintech"]),
+      reading: discover(words, 3, ["fintech"], false),
     });
+    expect(text).toMatch(/listed by name/u);
+  });
+
+  it("routes on the reading alone: the same words read as a plain list are a plain list", async () => {
+    // No phrase list rescues a reading: what the reader understood decides.
+    const words = "Can you help me find three companies I should look into";
+    const { text, executed } = await replay({
+      question: words,
+      script: [answer("A model answer.")],
+      reading: discover(words, 3, [], false),
+    });
+    expect(executed).toContain("discover_companies");
     expect(text).toMatch(/listed by name/u);
   });
 });

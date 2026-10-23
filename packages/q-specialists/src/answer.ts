@@ -4919,6 +4919,8 @@ export function createSpecialistQAnswer(
               previous: read.question.discover?.previous ?? false,
               // v56: past the companies already shown ("three new ones").
               excludeShown: read.question.excludeShown === true,
+              // Ranked against their mandate, as the reader understood it.
+              mandateRelevant: read.question.discover?.mandateRelevant === true,
             },
           }
         : {}),
