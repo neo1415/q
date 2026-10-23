@@ -1145,3 +1145,13 @@ Evidence stage: **code + local database tests**. Not applied to hosted; the prod
 - Capital Q's contribution-margin statement is reworded to match the documents: revenue less cost of revenue and variable onboarding and support.
 - Re-score (local): unchanged at 76 Strong, Low confidence, 4/8 areas, 15/46 criteria. InvestIQ reads no data-room document except the deck, so governance, legal and diligence stay at 0.
 - Checks: seed tests 12/12.
+
+## Capital Q pitch video seeded — 23 October 2026 (Claude S6, `seed/capital-q-all-documents`)
+
+Evidence stage: **live verified** (hosted read).
+
+- `scripts/seed/demo-companies/pitch.mjs` uploads the owner-approved investor master as David (`founder.capitalq@…`) through the product's own pitch flow, then sets the title, audience NETWORK and AUTHORISED playback.
+- **Incident:** the first run sent the 3:59 master. The provider refused it, because the product's maximum is 180 s, and the refused asset `4e417509…` had already superseded the coordinator's 179 s pitch `104d9721…`. Capital Q had no playable pitch for about 20 minutes.
+- **Fix:** the script now trims a master longer than 180 s to its first 179 s before upload, with a test.
+- **Live now:** `d06108c4…`, READY, 179 s, "Capital Q — the story, for investors", NETWORK, AUTHORISED, moderation ALLOWED. A re-run plans nothing.
+- **Superseded rows, kept:** `104d9721…` (READY), `4e417509…` (PROCESSING_FAILED).

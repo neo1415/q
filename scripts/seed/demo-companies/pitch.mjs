@@ -16,7 +16,9 @@
 // Dry run by default: it reads the current pitch and says what it would do.
 // Idempotent: a READY pitch with this title already live is left alone.
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -51,7 +53,66 @@ export function loadPitchVideo(manifestPath = MANIFEST) {
   if (bytes.byteLength !== video.bytes) {
     throw new Error(`${video.file}: size does not match the manifest`);
   }
-  return { ...video, sizeBytes: video.bytes, bytes };
+  return {
+    ...video,
+    path: join(dirname(manifestPath), video.file),
+    sizeBytes: video.bytes,
+    bytes,
+  };
+}
+
+// The product's hard maximum for a pitch (DEFAULT_PITCH_DURATION_POLICY in
+// @capital-q/media). The stream provider refuses a longer file after the
+// upload, and the refused pitch has by then replaced the live one, so a
+// longer master is trimmed here first, as the 23 Oct live run did by hand.
+export const PITCH_HARD_MAX_SECONDS = 180;
+const TRIM_TO_SECONDS = 179;
+
+export function durationSeconds(path) {
+  return Number(
+    execFileSync("ffprobe", [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "csv=p=0",
+      path,
+    ])
+      .toString()
+      .trim(),
+  );
+}
+
+/** The video as uploaded: the master, or its first 179 s when longer. */
+export function withinPitchLimit(video) {
+  const seconds = durationSeconds(video.path);
+  if (seconds <= PITCH_HARD_MAX_SECONDS) return { ...video, seconds };
+  const out = join(mkdtempSync(join(tmpdir(), "cq-pitch-")), video.file);
+  execFileSync("ffmpeg", [
+    "-v",
+    "error",
+    "-i",
+    video.path,
+    "-t",
+    String(TRIM_TO_SECONDS),
+    "-c:v",
+    "libx264",
+    "-preset",
+    "veryfast",
+    "-crf",
+    "20",
+    "-c:a",
+    "aac",
+    "-movflags",
+    "+faststart",
+    out,
+  ]);
+  const trimmed = durationSeconds(out);
+  if (trimmed > PITCH_HARD_MAX_SECONDS) {
+    throw new Error(`trim left ${trimmed} s`);
+  }
+  return { ...video, path: out, bytes: readFileSync(out), seconds: trimmed };
 }
 
 /** What to do about the company's current pitch. */
@@ -146,7 +207,10 @@ async function main() {
   const email = at === -1 ? undefined : args[at + 1];
   if (!email) throw new Error("--founder <account email> is required");
 
-  const video = loadPitchVideo();
+  const video = withinPitchLimit(loadPitchVideo());
+  console.log(
+    `video: ${video.seconds.toFixed(1)} s, ${video.bytes.byteLength} bytes`,
+  );
   const fixture = JSON.parse(readFileSync(FIXTURE, "utf8"));
   const spec = fixture.companies.find((c) => c.key === "capital-q");
   const orgId = spec.match.organisationId;

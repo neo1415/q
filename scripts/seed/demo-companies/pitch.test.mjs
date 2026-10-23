@@ -2,7 +2,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { loadPitchVideo, pitchStep } from "./pitch.mjs";
+import {
+  durationSeconds,
+  loadPitchVideo,
+  PITCH_HARD_MAX_SECONDS,
+  pitchStep,
+  withinPitchLimit,
+} from "./pitch.mjs";
+
+test("a master over the product's 180 s maximum is trimmed before upload", () => {
+  const video = withinPitchLimit(loadPitchVideo());
+  assert.ok(video.seconds <= PITCH_HARD_MAX_SECONDS);
+  assert.ok(durationSeconds(video.path) <= PITCH_HARD_MAX_SECONDS);
+});
 
 test("the video is the owner-approved file the manifest names", () => {
   const video = loadPitchVideo();
