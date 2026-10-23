@@ -173,14 +173,14 @@ const analyst = (answer: string): FakeBehaviour => ({
   },
 });
 
-function build(said: string, questionKind?: string) {
+function build(
+  said: string,
+  reading?: Readonly<Record<string, unknown>>,
+  answer = "Mizan is in Cairo doing merchant payments at $42,000 MRR; Silo Credit is in Kano lending to agri-dealers at $9,000.",
+) {
   const alpha = createFakeModelProvider({
     code: "alpha",
-    script: [
-      analyst(
-        "Mizan is in Cairo doing merchant payments at $42,000 MRR; Silo Credit is in Kano lending to agri-dealers at $9,000.",
-      ),
-    ],
+    script: [analyst(answer)],
   });
   const gateway = createModelGateway({
     catalog: createStaticModelCatalog(
@@ -287,14 +287,7 @@ function build(said: string, questionKind?: string) {
     actor,
     correlationId: `cor_${run}`,
     capability: "ANSWER",
-    ...(questionKind === undefined
-      ? {}
-      : {
-          questionKind,
-          turnKind: "QUESTION_TO_Q",
-          aboutNamedOther: false,
-          fitQuestion: { text: said, count: 2, previous: true },
-        }),
+    ...(reading ?? {}),
     subjects: [],
     retrieval: { kind: "NOT_CONFIGURED" },
     plan: {
@@ -374,7 +367,16 @@ describe("compare the top two, right after a list of five", () => {
   it("the same, when the turn was read as a fit question (live 23 Oct, run f5415b0c)", async () => {
     const { seam, request, alpha, executed, stored } = build(
       "Compare the top two side by side",
-      "FIT",
+      {
+        questionKind: "FIT",
+        turnKind: "QUESTION_TO_Q",
+        aboutNamedOther: false,
+        fitQuestion: {
+          text: "Compare the top two side by side",
+          count: 2,
+          previous: true,
+        },
+      },
     );
     expect((await seam.answer(request)).kind).toBe("ANSWERED");
     expect(
@@ -390,6 +392,30 @@ describe("compare the top two, right after a list of five", () => {
       "Mizan",
       "Silo Credit",
     ]);
+  });
+
+  // Live 23 Oct 21:49 (run a19bae24): read as a tool request, the model
+  // offered to compare instead of comparing, and no table came.
+  it("the same, when the turn was read as a tool request", async () => {
+    const { seam, request, executed, stored } = build(
+      "Compare the top two side by side",
+      { turnKind: "TOOL_REQUEST", aboutNamedOther: false },
+      // The live reply, word for word in shape.
+      "The top two are Mizan and Silo Credit, tied on mandate fit at 7.6. I can compare their stage, sector, geography, cheque compatibility, thesis and round terms side by side.",
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(
+      executed.filter((call) => call.callId.startsWith("q-compare-")),
+    ).toHaveLength(6);
+    const last = stored.at(-1);
+    const table = (last?.blocks ?? []).find(
+      (block) => Reflect.get(block as object, "kind") === "TABLE",
+    ) as { columns: { label: string }[] } | undefined;
+    expect(table?.columns.map((column) => column.label)).toEqual([
+      "Mizan",
+      "Silo Credit",
+    ]);
+    expect(last?.content).not.toMatch(/\bI can compare\b/iu);
   });
 
   it("an ordinary follow-up reads nothing extra", async () => {

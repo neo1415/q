@@ -320,7 +320,14 @@ import {
   attachedDocumentsWithin,
 } from "./attached-document-fact.js";
 import {
+  asksAboutOthersInterest,
+  OTHERS_INTEREST_NOTE,
+  withOthersInterestWithheld,
+} from "./others-interest.js";
+import {
   comparisonFactStatement,
+  comparisonSpokenLine,
+  withoutCompareOffers,
   comparisonTableBlock,
   compareTargets,
   newestAnswerCards,
@@ -2854,6 +2861,12 @@ export function createModelGatewayQAnswer(
     let compareFacts: readonly AuthorisedFact[] = [];
     /** The companies compared, in order; the table holds only these. */
     let compareIds: readonly string[] = [];
+    /**
+     * The table itself, built once here from the prepare's own reads: a
+     * speculative answer that took the run's reads must not leave the
+     * adopted answer without it (live 23 Oct 21:49, run a19bae24).
+     */
+    let compareTable: QResultBlock | null = null;
     const compareRead = (async (): Promise<void> => {
       if (latest === undefined) return;
       const targets = compareTargets(
@@ -2894,6 +2907,7 @@ export function createModelGatewayQAnswer(
       const statement = table === null ? null : comparisonFactStatement(table);
       if (statement === null) return;
       compareIds = targets;
+      compareTable = table;
       compareFacts = [
         {
           scope: "NETWORK_VISIBLE_DATA",
@@ -3775,6 +3789,7 @@ export function createModelGatewayQAnswer(
       compareFacts,
       compareIds,
       dataRoomFacts,
+      compareTable,
       onScreenDocumentCall,
       onScreenPage,
       onScreenDossier,
@@ -4143,6 +4158,7 @@ export function createModelGatewayQAnswer(
         compareFacts,
         compareIds,
         dataRoomFacts,
+        compareTable,
         onScreenDocumentCall,
         onScreenPage,
         onScreenDossier,
@@ -4974,6 +4990,12 @@ export function createModelGatewayQAnswer(
             ].join(" "),
           };
         }
+        if (asksAboutOthersInterest(latest.content)) {
+          noteParts = {
+            ...noteParts,
+            turn: [noteParts.turn, OTHERS_INTEREST_NOTE].join(" "),
+          };
+        }
         if (request.aboutNamedOther !== true && alreadyReadNote !== null) {
           noteParts = {
             ...noteParts,
@@ -5576,10 +5598,38 @@ export function createModelGatewayQAnswer(
         // INC-1: one card per canonical record across every block, exactly
         // the count asked for, "them" held to the set just shown, and every
         // score labelled mandate fit with how it was made.
+        // Live 23 Oct 2026 (three readings of "compare the top two side by
+        // side", three answer paths, no table): a comparison the prepare
+        // resolved goes out with its table whichever path answered, and is
+        // done, never offered.
+        const tableHere =
+          compareTable !== null &&
+          !(given ?? []).some((block) => block.kind === "TABLE");
+        // QA F-44: other investors' interest is withheld, never denied.
+        if (asksAboutOthersInterest(latest.content)) {
+          content = withOthersInterestWithheld(content).slice(
+            0,
+            ANSWER_LIMIT_CHARS,
+          );
+        }
+        if (compareTable !== null) {
+          const done = withoutCompareOffers(content);
+          const spoken = tableHere ? comparisonSpokenLine(compareTable) : null;
+          content = (
+            spoken === null
+              ? done.length === 0
+                ? content
+                : done
+              : done.length === 0
+                ? spoken
+                : `${spoken}\n\n${done}`
+          ).slice(0, ANSWER_LIMIT_CHARS);
+        }
         const carried = withoutUnaskedMoves(
           withFitIntegrity(
             [
               ...(given ?? []),
+              ...(tableHere && compareTable !== null ? [compareTable] : []),
               ...publicSources.map((source) => ({
                 kind: "PUBLIC_SOURCE" as const,
                 ...publicSourceBlockFields(source),
