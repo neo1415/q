@@ -265,3 +265,99 @@ export function comparisonTableBlock(input: {
     rows,
   };
 }
+
+const COUNT_WORDS: Readonly<Record<string, number>> = {
+  two: 2,
+  both: 2,
+  pair: 2,
+  three: 3,
+  four: 4,
+};
+
+/**
+ * Coordinator 23 Oct 2026 ("compare the top two side by side" after a list
+ * of five: no table, because the follow-up read nothing): the companies a
+ * compare question means, from the cards Q itself showed in its newest
+ * answer. Those it names, in the order named; otherwise the top N it asks
+ * for ("top two", "both", "the first three"), else the top two. Only ids Q
+ * put on screen: never an id from the words, never a guess.
+ */
+export function compareTargets(
+  question: string,
+  cards: readonly { readonly companyId: string; readonly name: string }[],
+): readonly string[] {
+  if (!asksToCompare(question) || cards.length < 2) return [];
+  const lower = question.toLowerCase();
+  const named = cards
+    .map((card) => ({ card, at: lower.indexOf(card.name.toLowerCase()) }))
+    .filter((entry) => entry.card.name.trim().length > 0 && entry.at >= 0)
+    .sort((a, b) => a.at - b.at)
+    .map((entry) => entry.card.companyId);
+  if (named.length >= 2) return [...new Set(named)].slice(0, 4);
+  const word = /\b(two|both|pair|three|four|\d)\b/iu.exec(lower)?.[1];
+  const count =
+    word === undefined
+      ? 2
+      : /^\d$/u.test(word)
+        ? Number(word)
+        : (COUNT_WORDS[word] ?? 2);
+  return cards
+    .map((card) => card.companyId)
+    .filter((id, index, all) => all.indexOf(id) === index)
+    .slice(0, Math.min(Math.max(count, 2), 4));
+}
+
+/** The cards Q showed in its newest answer, in order. */
+export function newestAnswerCards(
+  earlier: readonly {
+    readonly role: string;
+    readonly blocks?: readonly unknown[] | null | undefined;
+  }[],
+): readonly { readonly companyId: string; readonly name: string }[] {
+  for (const message of [...earlier].reverse()) {
+    if (message.role !== "Q") continue;
+    const cards = (message.blocks ?? []).flatMap((block: unknown) => {
+      if (typeof block !== "object" || block === null) return [];
+      if (Reflect.get(block, "kind") !== "ANSWER_CARDS") return [];
+      const list: unknown = Reflect.get(block, "cards");
+      if (!Array.isArray(list)) return [];
+      return list.flatMap((card: unknown) => {
+        if (typeof card !== "object" || card === null) return [];
+        const subject: unknown = Reflect.get(card, "subject");
+        const name: unknown = Reflect.get(card, "name");
+        if (typeof subject !== "object" || subject === null) return [];
+        const id: unknown = Reflect.get(subject, "companyId");
+        return Reflect.get(subject, "kind") === "COMPANY" &&
+          typeof id === "string" &&
+          typeof name === "string"
+          ? [{ companyId: id, name }]
+          : [];
+      });
+    });
+    // The newest answer is the one meant; an older list is not "them".
+    return cards;
+  }
+  return [];
+}
+
+/**
+ * The table as a fact the answer is spoken from: the same cells, so the
+ * words and the table never disagree. Each cell keeps its source label.
+ */
+export function comparisonFactStatement(block: QResultBlock): string | null {
+  if (block.kind !== "TABLE") return null;
+  const names = block.columns.map((column) => column.label);
+  const lines = block.rows.map(
+    (row) =>
+      `${row.label}: ${row.cells
+        .map(
+          (cell, index) =>
+            `${names[index] ?? "?"}: ${cell.length === 0 ? "not known" : cell}`,
+        )
+        .join(" | ")}`,
+  );
+  return `COMPARED SIDE BY SIDE (Capital Q shows this table on their screen): ${names.join(" vs ")}. In words, give the two or three real differences between them (where they are, what they do, their traction numbers, how each fits the mandate), never what they share or the whole table. Company figures are company-stated, never verified.\n${lines.join("\n")}`.slice(
+    0,
+    7_900,
+  );
+}
