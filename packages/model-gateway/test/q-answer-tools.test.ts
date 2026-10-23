@@ -155,6 +155,8 @@ function build(options: {
   readonly tools?: QToolPort | undefined;
   readonly context?: QAuthorisedContextPort | undefined;
   readonly parallelExtras?: boolean | undefined;
+  /** What the person says this turn; "Tell me about my company." by default. */
+  readonly said?: string | undefined;
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -178,7 +180,7 @@ function build(options: {
       conversationId: CONVERSATION as QConversationMessage["conversationId"],
       runId: RUN as QConversationMessage["runId"],
       role: "USER",
-      content: "Tell me about my company.",
+      content: options.said ?? "Tell me about my company.",
       contentType: "TEXT",
       createdAt: new Date().toISOString(),
     },
@@ -1471,6 +1473,58 @@ describe("answer seam tool loop", () => {
           tools.executed.filter((p) => p.name === "read_company_figures"),
         ).toHaveLength(1);
       });
+    });
+
+    it("a company the turn names has its published figures ready before the model is asked", async () => {
+      const FIGURES: QOfferedTool = {
+        ...GET_COMPANY,
+        toolName: "company.figures.read",
+        definition: { ...GET_COMPANY.definition, name: "read_company_figures" },
+      };
+      const statement =
+        "Monthly recurring revenue was USD 6,500 in September 2026. (Demonstration data, self-reported by the company.)";
+      const tools = toolPort([SEARCH, GET_COMPANY, FIGURES], (p) =>
+        p.name === "search_companies"
+          ? {
+              ...succeeded(p, { items: found("Northwind Ledger") }),
+              toolName: "company.search",
+            }
+          : p.name === "read_company_figures"
+            ? {
+                ...succeeded(p, {
+                  companyId: "id-0",
+                  status: "AVAILABLE",
+                  figures: [
+                    {
+                      key: "financial.monthly_revenue",
+                      statement,
+                      truthClass: "USER_CLAIM",
+                      evidenceStatus: "SELF_REPORTED",
+                      lifecycleStatus: "CURRENT",
+                    },
+                  ],
+                }),
+                toolName: "company.figures.read",
+              }
+            : succeeded(p, {
+                companyId: "id-0",
+                canonicalName: "Northwind Ledger",
+              }),
+      );
+      const { seam, alpha, request } = build({
+        said: "What is Northwind Ledger's revenue?",
+        script: [{ kind: "JSON", value: analystResult("USD 6,500 a month.") }],
+        tools,
+      });
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      expect(tools.executed.map((p) => p.name)).toContain(
+        "read_company_figures",
+      );
+      const first = JSON.stringify(alpha.calls[0]?.request.messages);
+      expect(first).toContain(
+        "Northwind Ledger, as the company states it: Monthly recurring revenue was USD 6,500",
+      );
+      expect(first).toContain("SELF_REPORTED");
     });
 
     it("never reads the profile twice when the model asks for it anyway", async () => {

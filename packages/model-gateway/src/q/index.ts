@@ -290,7 +290,11 @@ import {
 } from "./arrival-answer.js";
 import type { QTurnSkimmer } from "./turn-skim.js";
 export { arrivalSnapshotFact };
-import { onScreenCompanyFact, ownCompanySnapshotFact } from "./company-fact.js";
+import {
+  companyFiguresFacts,
+  onScreenCompanyFact,
+  ownCompanySnapshotFact,
+} from "./company-fact.js";
 import { onScreenDocumentFact } from "./document-fact.js";
 import {
   attachedDocumentFacts,
@@ -3237,6 +3241,12 @@ export function createModelGatewayQAnswer(
           "A company on Capital Q this turn names",
         );
         if (fact !== null) namedCompanies.push(fact);
+        // Its published figures, each the company's own statement.
+        const name = (read.data as { readonly canonicalName?: unknown })
+          .canonicalName;
+        if (typeof name === "string") {
+          namedCompanies.push(...companyFiguresFacts(read.figures, name));
+        }
       }
     };
     /**

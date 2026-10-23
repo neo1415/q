@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { QToolCallOutcome, QToolPort } from "@capital-q/q-runtime";
 
+import { companyFiguresFacts } from "../src/q/company-fact.js";
 import {
   companyFactAskOf,
   companyNameCandidates,
@@ -260,5 +261,121 @@ describe("a company this turn names, read ahead of the model (S3a)", () => {
     const excluded = await read("Maji Loop", new Set([MAJI]));
     expect(excluded.result).toBeNull();
     expect(excluded.asked).toEqual(["search_companies"]);
+  });
+});
+
+describe("a named company's published figures, read beside its profile (owner 2026-10-23)", () => {
+  const FIGURE = {
+    key: "financial.monthly_revenue",
+    statement:
+      "Monthly recurring revenue was KES 4.1m in September 2026. (Demonstration data, self-reported by the company.)",
+    value: { kind: "MONEY", amount: "4100000", currency: "KES" },
+    asOf: "2026-09-30",
+    truthClass: "USER_CLAIM",
+    evidenceStatus: "SELF_REPORTED",
+    lifecycleStatus: "CURRENT",
+  };
+  const WITH_FIGURES = new Set([
+    "search_companies",
+    "get_company",
+    "read_company_figures",
+  ]);
+
+  /** The S2b port, plus a figures read that succeeds, is denied or waits. */
+  function figuresPort(figures: "ok" | "denied" | "none") {
+    const base = port();
+    let figuresStarted: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => {
+      figuresStarted = resolve;
+    });
+    const tools: Pick<QToolPort, "execute"> = {
+      execute: async (proposal, context) => {
+        if (proposal.name === "read_company_figures") {
+          base.asked.push(proposal.name);
+          figuresStarted();
+          return figures === "denied"
+            ? outcome(proposal.callId, "company.figures.read", {
+                ok: false,
+                error: { code: "NOT_AVAILABLE" },
+              } as never)
+            : outcome(proposal.callId, "company.figures.read", {
+                ok: true,
+                data: {
+                  companyId: MAJI,
+                  status: figures === "ok" ? "AVAILABLE" : "NONE",
+                  figures: figures === "ok" ? [FIGURE] : [],
+                },
+              });
+        }
+        // The profile finishes only once the figures read has started: a
+        // sequential read would never get here.
+        if (proposal.name === "get_company") await started;
+        return base.tools.execute(proposal, context);
+      },
+    };
+    return { tools, asked: base.asked };
+  }
+
+  const read = (figures: "ok" | "denied" | "none") => {
+    const p = figuresPort(figures);
+    return readNamedVisibleCompany({
+      name: "Maji Loop",
+      exclude: new Set(),
+      tools: p.tools,
+      context: CONTEXT,
+      available: WITH_FIGURES,
+      callIndex: 0,
+    }).then((result) => ({ result, asked: p.asked }));
+  };
+
+  it("reads the profile and the figures in parallel, through the tool port", async () => {
+    const { result, asked } = await read("ok");
+    expect(result?.companyId).toBe(MAJI);
+    // The profile is recorded only after the figures read started.
+    expect(asked).toEqual([
+      "search_companies",
+      "read_company_figures",
+      "get_company",
+    ]);
+    expect(result?.figures).toMatchObject({ figures: [FIGURE] });
+  });
+
+  it("keeps the profile when the figures read is denied, with no figures", async () => {
+    const { result } = await read("denied");
+    expect(result?.companyId).toBe(MAJI);
+    expect(result?.figures).toBeNull();
+    expect(companyFiguresFacts(result?.figures, "Maji Loop")).toEqual([]);
+  });
+
+  it("turns each figure into a fact said as the company's own statement", async () => {
+    const { result } = await read("ok");
+    expect(companyFiguresFacts(result?.figures, "Maji Loop")).toEqual([
+      {
+        scope: "COMPANY_FIGURES",
+        statement: `Maji Loop, as the company states it: ${FIGURE.statement}`,
+        truthClass: "USER_CLAIM",
+        evidenceStatus: "SELF_REPORTED",
+        source: "The company's published figures on Capital Q",
+        asOf: "2026-09-30",
+      },
+    ]);
+  });
+
+  it("makes no fact from nothing published, or from a malformed figure", async () => {
+    expect(
+      companyFiguresFacts((await read("none")).result?.figures, "Maji Loop"),
+    ).toEqual([]);
+    expect(
+      companyFiguresFacts(
+        {
+          figures: [
+            { ...FIGURE, truthClass: "VERIFIED_BY_MAGIC" },
+            { ...FIGURE, statement: "" },
+            "not a figure",
+          ],
+        },
+        "Maji Loop",
+      ),
+    ).toEqual([]);
   });
 });

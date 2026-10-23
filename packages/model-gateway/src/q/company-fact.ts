@@ -1,4 +1,4 @@
-import type { AuthorisedFact } from "@capital-q/q-core";
+import { AuthorisedFactSchema, type AuthorisedFact } from "@capital-q/q-core";
 
 /**
  * The company on the person's screen, read for them before the model is
@@ -103,4 +103,43 @@ export function ownCompanySnapshotFact(
     },
     'Their own company (the one they mean by "my company")',
   );
+}
+
+/** At most this many of one company's figures go to the model. */
+const FIGURES_MAX = 12;
+
+/**
+ * A named company's published figures (owner 2026-10-23), from
+ * read_company_figures' output, one fact each, so the model can cite them.
+ * Each keeps the company's own truth class, evidence status and date: a
+ * self-reported figure is said as the company's statement, never verified.
+ * Anything malformed is dropped rather than repaired; none is no fact.
+ */
+export function companyFiguresFacts(
+  data: unknown,
+  companyName: string,
+): readonly AuthorisedFact[] {
+  if (typeof data !== "object" || data === null) return [];
+  const figures = (data as { readonly figures?: unknown }).figures;
+  if (!Array.isArray(figures)) return [];
+  const facts: AuthorisedFact[] = [];
+  for (const figure of figures.slice(0, FIGURES_MAX) as readonly unknown[]) {
+    if (typeof figure !== "object" || figure === null) continue;
+    const f = figure as Record<string, unknown>;
+    const statement = text(f["statement"]);
+    if (statement === null) continue;
+    const parsed = AuthorisedFactSchema.safeParse({
+      scope: "COMPANY_FIGURES",
+      statement: `${companyName}, as the company states it: ${statement}`.slice(
+        0,
+        2_000,
+      ),
+      truthClass: f["truthClass"],
+      evidenceStatus: f["evidenceStatus"],
+      source: "The company's published figures on Capital Q",
+      ...(text(f["asOf"]) === null ? {} : { asOf: text(f["asOf"]) ?? "" }),
+    });
+    if (parsed.success) facts.push(parsed.data);
+  }
+  return facts;
 }

@@ -102,6 +102,8 @@ export function companyFactAskOf(text: string): CompanyFactAsk | null {
 
 const SEARCH_TOOL = "search_companies";
 const GET_TOOL = "get_company";
+/** Read beside the profile when offered (owner 2026-10-23). */
+const FIGURES_TOOL = "read_company_figures";
 
 export const nameKey = (name: string): string =>
   name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
@@ -513,6 +515,8 @@ export async function readNamedVisibleCompany(input: {
 }): Promise<{
   readonly companyId: string;
   readonly data: unknown;
+  /** read_company_figures' output when it succeeded; null otherwise. */
+  readonly figures: unknown;
   readonly calls: readonly {
     readonly providerName: string;
     readonly outcome: QToolCallOutcome;
@@ -543,20 +547,47 @@ export async function readNamedVisibleCompany(input: {
   const [companyId] = [...exact];
   if (companyId === undefined || input.exclude.has(companyId)) return null;
   input.onFound?.();
-  const got = await tools
-    .execute(
-      {
-        callId: `q-named-visible-get-${String(input.callIndex)}`,
-        name: GET_TOOL,
-        arguments: { companyId },
-      },
-      context,
-    )
-    .catch(() => null);
+  // The profile and its published figures, read in parallel through the
+  // same tool port and plan; a figures read denied or failed adds nothing.
+  const [got, figures] = await Promise.all([
+    tools
+      .execute(
+        {
+          callId: `q-named-visible-get-${String(input.callIndex)}`,
+          name: GET_TOOL,
+          arguments: { companyId },
+        },
+        context,
+      )
+      .catch(() => null),
+    available.has(FIGURES_TOOL)
+      ? tools
+          .execute(
+            {
+              callId: `q-named-visible-figures-${String(input.callIndex)}`,
+              name: FIGURES_TOOL,
+              arguments: { companyId },
+            },
+            context,
+          )
+          .catch(() => null)
+      : Promise.resolve(null),
+  ]);
   if (got !== null) calls.push({ providerName: GET_TOOL, outcome: got });
+  if (figures !== null) {
+    calls.push({ providerName: FIGURES_TOOL, outcome: figures });
+  }
   if (got === null || !got.result.ok) return null;
   if (profileOf(got)?.companyId !== companyId) return null;
-  return { companyId, data: got.result.data, calls };
+  return {
+    companyId,
+    data: got.result.data,
+    figures:
+      figures !== null && figures.status === "SUCCEEDED" && figures.result.ok
+        ? figures.result.data
+        : null,
+    calls,
+  };
 }
 
 /**
