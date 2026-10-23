@@ -31,6 +31,7 @@ import {
 } from "../domain/lifecycle.js";
 import { ownedConversation } from "./access.js";
 import type { QRuntimeDependencies } from "./dependencies.js";
+import { withoutNonSpeechTags } from "../domain/non-speech.js";
 import { appendRunEvent } from "./run-events.js";
 
 export type CreateQRunCommand = {
@@ -338,7 +339,12 @@ export function createCreateQRun(dependencies: QRuntimeDependencies) {
         conversationId: conversation.id,
         runId: run.id,
         role: "USER",
-        content: input.message.text,
+        // A spoken turn is stored as said, without the recogniser's
+        // non-speech tags ("(laughter)"): production 2026-10-23.
+        content:
+          input.modality === "VOICE"
+            ? withoutNonSpeechTags(input.message.text)
+            : input.message.text,
         ...(command.utteranceRef === undefined
           ? {}
           : { utteranceRef: command.utteranceRef }),

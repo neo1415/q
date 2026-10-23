@@ -165,6 +165,7 @@ import {
   namesOnlyCompany,
   profileOf,
   readNamedVisibleCompany,
+  onlyReplyWords,
   runNamedCompanyFact,
   type CompanyFactAnswer,
   type CompanyFactAsk,
@@ -4246,7 +4247,10 @@ export function createModelGatewayQAnswer(
         dependencies.publicPictures !== undefined &&
         !reRender &&
         typeof namedForPictures === "string" &&
-        namedForPictures.length > 1
+        namedForPictures.length > 1 &&
+        // A reply or a filler is no one to picture ("Yes": production
+        // 2026-10-23 showed a stock photo of the word).
+        !onlyReplyWords(namedForPictures)
           ? dependencies.publicPictures
               .find({
                 name: namedForPictures,

@@ -4,6 +4,7 @@ import type { QToolCallOutcome, QToolPort } from "@capital-q/q-runtime";
 
 import {
   companyFactAskOf,
+  onlyReplyWords,
   companyNameCandidates,
   readNamedVisibleCompany,
   runNamedCompanyFact,
@@ -260,5 +261,21 @@ describe("a company this turn names, read ahead of the model (S3a)", () => {
     const excluded = await read("Maji Loop", new Set([MAJI]));
     expect(excluded.result).toBeNull();
     expect(excluded.asked).toEqual(["search_companies"]);
+  });
+});
+
+describe("a reply or a sound is no company (production 2026-10-23)", () => {
+  it("names nothing in an affirmation, a short reply or a recogniser tag", () => {
+    for (const said of ["Yes", "Sure", "Thanks!", "Yes, go on", "Laughter"]) {
+      expect(companyNameCandidates(said)).toEqual([]);
+      expect(onlyReplyWords(said)).toBe(true);
+    }
+  });
+
+  it("still finds the company named after one", () => {
+    expect(companyNameCandidates("Laughter Tell me about Halyard")).toEqual([
+      "Halyard",
+    ]);
+    expect(onlyReplyWords("Tell me about Zino Aviation")).toBe(false);
   });
 });

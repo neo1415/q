@@ -75,7 +75,7 @@ const https = (url: string | null): string | null => {
  * design galleries, stock libraries, pin boards and search pages.
  */
 const NOT_OF_THEM =
-  /(^|\.)(dribbble\.com|behance\.net|pinterest\.[a-z.]+|pin\.it|shutterstock\.com|istockphoto\.com|gettyimages\.[a-z.]+|alamy\.com|dreamstime\.com|depositphotos\.com|freepik\.com|vecteezy\.com|123rf\.com|stock\.adobe\.com|unsplash\.com|pexels\.com|pixabay\.com|canva\.com|google\.[a-z.]+|bing\.com|yandex\.[a-z.]+|duckduckgo\.com|logowik\.com|seeklogo\.com|worldvectorlogo\.com|brandfetch\.com)$/u;
+  /(^|\.)(dribbble\.com|behance\.net|pinterest\.[a-z.]+|pin\.it|shutterstock\.com|istockphoto\.com|gettyimages\.[a-z.]+|alamy\.com|dreamstime\.com|depositphotos\.com|freepik\.com|vecteezy\.com|123rf\.com|stock\.adobe\.com|unsplash\.com|pexels\.com|pixabay\.com|canva\.com|google\.[a-z.]+|bing\.com|yandex\.[a-z.]+|duckduckgo\.com|logowik\.com|seeklogo\.com|worldvectorlogo\.com|brandfetch\.com|ftcdn\.net|rawpixel\.com|pngtree\.com|stocksy\.com|wallpapers\.com|wallpaperaccess\.com|softonic\.com|sftcdn\.net|apkpure\.com|uptodown\.com)$/u;
 
 /** A title that is only an image's file name ("2298efc2-….jpg"). */
 const FILENAME = /^[\w.-]+\.(jpe?g|png|webp|gif|avif)$/iu;

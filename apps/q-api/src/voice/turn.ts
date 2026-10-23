@@ -37,11 +37,12 @@ const ATTENTION_READ_MS = 2_500;
 /** A written answer quoting a counterpart's message (attention.ts notes). */
 const QUOTED_MESSAGE = /\bThey wrote: "/u;
 import { createCorrelationId, type Logger } from "@capital-q/observability";
-import type {
-  QOrchestrator,
-  QRunRecord,
-  QRunStreamService,
-  QRuntimeService,
+import {
+  withoutNonSpeechTags,
+  type QOrchestrator,
+  type QRunRecord,
+  type QRunStreamService,
+  type QRuntimeService,
 } from "@capital-q/q-runtime";
 
 import type { ApprovedContinuation } from "../composition/approved-continuation.js";
@@ -2151,7 +2152,10 @@ export function createVoiceTurnHandler(
     signal,
     speaker,
   ) => {
-    const text = latestUtterance(transcript);
+    const said = latestUtterance(transcript);
+    // Their words without the recogniser's non-speech tags ("Laughter Tell
+    // me about Halyard": production 2026-10-23), before anything reads them.
+    const text = said === null ? null : withoutNonSpeechTags(said);
     if (text === null || signal.aborted) {
       return { kind: "NOTHING" };
     }

@@ -71,6 +71,10 @@ describe("pictureBlock", () => {
       { visual: null, pictureQuery: "baobab tree" },
       { visual: "PICTURE", pictureQuery: null },
       { visual: "PICTURE", pictureQuery: "   " },
+      // A reply is no one to picture (production 2026-10-23: "Yes" drew a
+      // stock '"yes" lettering' image).
+      { visual: "PICTURE", pictureQuery: "Yes" },
+      { visual: "PICTURE", pictureQuery: "sure, thanks!" },
     ]) {
       expect(await pictureBlock({ result, pictures: port, ...PERSON })).toBe(
         null,
