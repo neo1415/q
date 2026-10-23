@@ -521,6 +521,112 @@ describe("schedule tools", () => {
         },
       ]);
     });
+
+    // QA F-21 (2026-10-23): "next Tuesday afternoon" was ignored and the
+    // first free time of the week booked.
+    it("books the first free time inside the afternoon they asked for, and says it back", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-23T12:00:00Z"));
+      const asked: { from?: Date | undefined; to?: Date | undefined }[] = [];
+      const { executor, prepared } = world({
+        findSlots: (_actor, input) => {
+          asked.push({ from: input.from, to: input.to });
+          return Promise.resolve({
+            status: "OK",
+            timeZone: "Africa/Nairobi",
+            slots: [
+              // The morning's free time is not the afternoon.
+              {
+                start: new Date("2026-10-27T06:00:00Z"),
+                end: new Date("2026-10-27T06:30:00Z"),
+              },
+              {
+                start: new Date("2026-10-27T11:00:00Z"),
+                end: new Date("2026-10-27T11:30:00Z"),
+              },
+            ],
+          });
+        },
+      });
+      const outcome = await executor.execute(
+        meetingAt({ day: "tuesday", part: "AFTERNOON" }),
+        contextFor(
+          actorB,
+          withZone(
+            relationshipPlan(base(actorB), RELATIONSHIP),
+            "Africa/Nairobi",
+          ),
+        ),
+      );
+      // 13:00-17:00 in Nairobi (UTC+3) on Tuesday 27 October.
+      expect(asked).toEqual([
+        {
+          from: new Date("2026-10-27T10:00:00Z"),
+          to: new Date("2026-10-27T14:00:00Z"),
+        },
+      ]);
+      expect(outcome.result).toMatchObject({
+        ok: true,
+        data: {
+          status: "PREPARED",
+          awaitingApprovalOf:
+            "Call with Apex, Tuesday 27 Oct, 2:00–2:30 pm your time (Africa/Nairobi), in the afternoon you asked for",
+        },
+      });
+      expect(prepared).toMatchObject([
+        {
+          actionType: "meeting.schedule",
+          payload: {
+            startsAt: "2026-10-27T11:00:00.000Z",
+            durationMinutes: 30,
+            timeZone: "Africa/Nairobi",
+          },
+        },
+      ]);
+    });
+
+    it("an afternoon with no free time is said plainly, nothing prepared", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-10-23T12:00:00Z"));
+      const { executor, prepared } = world({
+        findSlots: () =>
+          Promise.resolve({
+            status: "OK",
+            timeZone: "Africa/Nairobi",
+            slots: [],
+          }),
+      });
+      const outcome = await executor.execute(
+        meetingAt({ day: "tuesday", part: "AFTERNOON" }),
+        contextFor(
+          actorB,
+          withZone(
+            relationshipPlan(base(actorB), RELATIONSHIP),
+            "Africa/Nairobi",
+          ),
+        ),
+      );
+      expect(prepared).toEqual([]);
+      expect(JSON.stringify(outcome.result)).toMatch(
+        /no free 30 minutes in that afternoon/u,
+      );
+    });
+
+    it("a clock time and a part of the day together are refused as input", async () => {
+      const { executor, prepared } = world();
+      const outcome = await executor.execute(
+        meetingAt({ day: "tuesday", time: "14:00", part: "AFTERNOON" }),
+        contextFor(
+          actorB,
+          withZone(
+            relationshipPlan(base(actorB), RELATIONSHIP),
+            "Africa/Nairobi",
+          ),
+        ),
+      );
+      expect(outcome.result.ok).toBe(false);
+      expect(prepared).toEqual([]);
+    });
   });
 
   // Live 2026-10-01: "remind me tomorrow at 9:00" for a founder in Lagos

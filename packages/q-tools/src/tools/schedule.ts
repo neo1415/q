@@ -45,7 +45,9 @@ import {
   localLabel as zonedLabel,
   LocalWhenSchema,
   isUncertainDeviceZone,
+  localSpanLabel,
   resolveLocalWhen,
+  resolveLocalWindow,
   zoneFromWords,
   unresolvedMessage,
   type LocalWhen,
@@ -749,9 +751,20 @@ export function createScheduleTools(
       readonly actor: ActorContext;
       readonly plan: PermittedContextPlan;
     },
+    /**
+     * QA F-21: a call asked for in a part of the day is booked at the first
+     * free time inside it (their own calendar, or their working hours when
+     * none is connected). Without it (a reminder) the window's start.
+     */
+    slotIn?: {
+      readonly relationshipId: string;
+      readonly durationMinutes: number;
+    },
   ): Promise<{
     readonly iso: string;
     readonly timeZone: string | undefined;
+    /** The part of the day they asked for, said back plainly. */
+    readonly asked?: string | undefined;
     /**
      * The zone they named themselves when their profile has none: offered
      * on the card to be kept as theirs, so Q never asks again (owner
@@ -811,6 +824,58 @@ export function createScheduleTools(
         iso: new Date(input.startsAt).toISOString(),
         timeZone: zone,
         ...(toRemember === undefined ? {} : { toRemember }),
+      };
+    }
+    if (input.when.part !== undefined && input.when.time === undefined) {
+      const window = resolveLocalWindow(input.when, zone, now());
+      if (window.kind === "NO_TIME_ZONE") {
+        throw new NoTimeZoneError(unresolvedMessage(window.kind));
+      }
+      if (window.kind !== "OK") {
+        throw new QToolArgumentError(unresolvedMessage(window.kind));
+      }
+      const part = input.when.part.toLowerCase();
+      let start = window.from;
+      let minutes = slotIn?.durationMinutes ?? 30;
+      if (slotIn !== undefined) {
+        const found = await schedule
+          .findSlots(context.actor, {
+            relationshipId: slotIn.relationshipId,
+            durationMinutes: slotIn.durationMinutes,
+            from: window.from,
+            to: window.to,
+            timeZone: window.timeZone,
+          })
+          .catch(() => null);
+        const slots =
+          found === null
+            ? []
+            : found.status === "OK"
+              ? found.slots
+              : (("suggested" in found ? found.suggested?.slots : undefined) ??
+                []);
+        const first = slots.find(
+          (slot) =>
+            slot.start.getTime() >= window.from.getTime() &&
+            slot.start.getTime() + slotIn.durationMinutes * 60_000 <=
+              window.to.getTime(),
+        );
+        if (first === undefined && found?.status === "OK") {
+          throw new QToolArgumentError(
+            `Their calendar has no free ${String(slotIn.durationMinutes)} minutes in that ${part}. Say so plainly and offer another time (find_meeting_times).`,
+          );
+        }
+        if (first !== undefined) start = first.start;
+        minutes = slotIn.durationMinutes;
+      }
+      const end = new Date(start.getTime() + minutes * 60_000);
+      return {
+        iso: start.toISOString(),
+        timeZone: window.timeZone,
+        asked: `${localSpanLabel(start, end, window.timeZone)}, in the ${part} you asked for`,
+        ...(toRemember === undefined || toRemember !== window.timeZone
+          ? {}
+          : { toRemember }),
       };
     }
     const resolved = resolveLocalWhen(input.when, zone, now());
@@ -905,7 +970,10 @@ export function createScheduleTools(
             : await schedule
                 .canSchedule(context.actor, grant.relationshipId)
                 .catch(() => "OK" as const);
-        const at = await instantOf(input, context);
+        const at = await instantOf(input, context, {
+          relationshipId: grant.relationshipId,
+          durationMinutes: input.durationMinutes,
+        });
         if (isCalendarBlock(bookable)) {
           // Autopilot P1 (live 2026-10-04: "I can't set up or book a Google
           // Meet from here. Your meeting with Nixo is still not arranged"):
@@ -928,11 +996,13 @@ export function createScheduleTools(
                 }),
               },
             },
-            labelled(
-              `Propose a call to ${grant.counterpartName}`,
-              at.iso,
-              at.timeZone,
-            ),
+            at.asked === undefined
+              ? labelled(
+                  `Propose a call to ${grant.counterpartName}`,
+                  at.iso,
+                  at.timeZone,
+                )
+              : `Propose a call to ${grant.counterpartName}, ${at.asked}`,
           );
           const fix = await blockedSays(
             schedule,
@@ -967,7 +1037,13 @@ export function createScheduleTools(
               ...(at.timeZone === undefined ? {} : { timeZone: at.timeZone }),
             },
           },
-          labelled(`Call with ${grant.counterpartName}`, at.iso, at.timeZone),
+          at.asked === undefined
+            ? labelled(
+                `Call with ${grant.counterpartName}`,
+                at.iso,
+                at.timeZone,
+              )
+            : `Call with ${grant.counterpartName}, ${at.asked}`,
         );
       },
     }),
