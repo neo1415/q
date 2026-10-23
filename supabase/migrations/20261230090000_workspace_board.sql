@@ -174,7 +174,7 @@ create trigger board_item_events_append_only
 
 -- ---------------------------------------------------------------------------
 -- Exposure: INTERNAL_SERVER_ONLY. RLS on and forced as a second layer; no
--- policy and no grant to anon or authenticated. The server's roles write;
+-- policy, and the browser roles (anon, authenticated) hold nothing. The server's roles write;
 -- no role is granted delete (an account's deletion cascades).
 -- ---------------------------------------------------------------------------
 
