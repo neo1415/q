@@ -370,3 +370,55 @@ export function comparisonFactStatement(block: QResultBlock): string | null {
     7_900,
   );
 }
+
+/**
+ * Live 23 Oct 2026 (run a19bae24): the reply offered "I can compare their
+ * stage, sector, … side by side" while the person had asked for exactly
+ * that. A comparison that was asked for is done, never offered: such
+ * sentences are removed wherever the table goes out.
+ */
+const OFFERS_TO_COMPARE =
+  /[^.!?\n]*\b(?:I can|I could|I'd be happy to|happy to|want me to|shall I|should I|would you like me to|let me know if you'd like me to)\b[^.!?\n]*\bcompar[^.!?\n]*[.!?]?/giu;
+
+export function withoutCompareOffers(text: string): string {
+  return text
+    .replace(OFFERS_TO_COMPARE, "")
+    .replace(/[ \t]{2,}/gu, " ")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
+}
+
+const plainCell = (cell: string | undefined): string =>
+  (cell ?? "").replace(/\s*\(company-stated[^)]*\)/gu, "").trim();
+
+/**
+ * The real differences, said by code from the table's own cells (where
+ * each is, what each does, the traction each states), for an answer whose
+ * words were not spoken from the table. Null when the cells say nothing.
+ */
+export function comparisonSpokenLine(block: QResultBlock): string | null {
+  if (block.kind !== "TABLE") return null;
+  const cellsOf = (label: string) =>
+    block.rows.find((row) => row.label === label)?.cells ?? [];
+  const what = cellsOf("What they do");
+  const where = cellsOf("Based in");
+  const traction = cellsOf("Traction");
+  const parts = block.columns.flatMap((column, index) => {
+    const does = plainCell(what[index]).replace(/\.$/u, "");
+    const place = plainCell(where[index]);
+    const moved = (traction[index] ?? "").trim();
+    const bits = [
+      does.length === 0 ? null : does.charAt(0).toLowerCase() + does.slice(1),
+      place.length === 0 ? null : `based in ${place}`,
+    ].filter((bit): bit is string => bit !== null);
+    if (bits.length === 0 && moved.length === 0) return [];
+    const head =
+      bits.length === 0 ? column.label : `${column.label}: ${bits.join(", ")}`;
+    return [moved.length === 0 ? head : `${head}; traction: ${moved}`];
+  });
+  if (parts.length < 2) return null;
+  return `Side by side, the differences: ${parts.join(". ")}. The full comparison is on screen.`.slice(
+    0,
+    1_200,
+  );
+}
