@@ -639,6 +639,7 @@ export function composeQIntelligence(
       : {
           callPrep: createCallPrepPort({
             ...dependencies.callPrep,
+            ...(logger === undefined ? {} : { logger }),
             write: createCallPrepWriter({
               gateway,
               ...(dependencies.dataPosture === undefined

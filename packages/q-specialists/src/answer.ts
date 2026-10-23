@@ -3949,6 +3949,10 @@ export function createSpecialistQAnswer(
           earlierNotForQ: read.earlierNotForQ ?? false,
           research: (await research).mode,
           tool: read.tool?.kind ?? null,
+          teamJob: read.teamJob ?? false,
+          meetingPrep: read.meetingPrep != null,
+          namedOther: read.namedOther != null,
+          fromShown: read.fromShown?.turn ?? null,
         },
         "q turn read",
       );
@@ -4102,6 +4106,36 @@ export function createSpecialistQAnswer(
           };
     }
     unclearInARow.delete(conversationId);
+    // Getting ready for a call with one named counterpart (TURN_READER v58
+    // meetingPrep, by meaning) is prepared now, in the answer, ahead of
+    // any team job (owner 2026-10-23: Q offered to plan it instead) and of
+    // an answer from what Q already showed (live 20:31: after a list of
+    // investors, the prep was answered as a generic follow-up). When it
+    // cannot be prepared, the turn goes on as before.
+    const prepFor =
+      read === null || read.confidence === "LOW" || read.addressedToQ === false
+        ? null
+        : (read.meetingPrep?.counterpart ?? null);
+    if (dependencies.callPrep !== undefined && prepFor !== null) {
+      const startedAt = Date.now();
+      const prep = await dependencies.callPrep.prepare(request, {
+        counterpart: prepFor,
+        said: latest.content,
+      });
+      logger?.info(
+        {
+          qRunId: request.runId,
+          prepared: prep !== null,
+          waiting: prep?.waiting.length ?? 0,
+          prepMs: Date.now() - startedAt,
+        },
+        "q prepared a call",
+      );
+      if (prep !== null) {
+        speculative.current?.cancel("ACTED");
+        return recordAnswer(request, conversationId, callPrepLine(prep));
+      }
+    }
     // Owner live 2026-10-17 (conversation 971c5a53): the reader found the
     // turn answered by one of Q's own earlier turns here (v54 fromShown).
     // "Show me the cards again" shows that turn's own blocks -- the same
@@ -4271,33 +4305,6 @@ export function createSpecialistQAnswer(
         reference.sameFor,
       );
       if (again !== null) return again;
-    }
-    // Getting ready for a call with one named counterpart (TURN_READER v58
-    // meetingPrep, by meaning) is prepared now, in the answer, ahead of
-    // any team job (owner 2026-10-23: Q offered to plan it instead). When
-    // it cannot be prepared, the turn goes on as before.
-    const prepFor =
-      read === null || read.confidence === "LOW" || read.addressedToQ === false
-        ? null
-        : (read.meetingPrep?.counterpart ?? null);
-    if (dependencies.callPrep !== undefined && prepFor !== null) {
-      const startedAt = Date.now();
-      const prep = await dependencies.callPrep.prepare(request, {
-        counterpart: prepFor,
-        said: latest.content,
-      });
-      logger?.info(
-        {
-          qRunId: request.runId,
-          prepared: prep !== null,
-          waiting: prep?.waiting.length ?? 0,
-          prepMs: Date.now() - startedAt,
-        },
-        "q prepared a call",
-      );
-      if (prep !== null) {
-        return recordAnswer(request, conversationId, callPrepLine(prep));
-      }
     }
     // Work handed to Q's team -- read from meaning (TURN_READER v49
     // teamJob), or a sentence naming three kinds of work as a fast path --

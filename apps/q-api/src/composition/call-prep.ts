@@ -1,4 +1,5 @@
 import type { CallPrepWriter } from "@capital-q/model-gateway/q";
+import type { Logger } from "@capital-q/observability";
 import type { QCallPrepPort } from "@capital-q/q-specialists";
 import type { ActorContext } from "@capital-q/security";
 
@@ -36,6 +37,7 @@ export type CallPrepSources = {
   readonly waiting?:
     ((actor: ActorContext) => Promise<readonly WaitingItem[]>) | undefined;
   readonly write: CallPrepWriter;
+  readonly logger?: Logger | undefined;
 };
 
 export function createCallPrepPort(
@@ -44,10 +46,19 @@ export function createCallPrepPort(
   return {
     prepare: async (request, input) => {
       const actor = request.actor;
+      // Why a prep was not given, for the turn's log (live 2026-10-23).
+      const skipped = (reason: "NO_SIDE" | "NOT_WRITTEN") =>
+        dependencies.logger?.info(
+          { qRunId: request.runId, reason },
+          "call prep not given",
+        );
       try {
         const material = dependencies.material();
         const viewer = await material.viewer(actor);
-        if (viewer === null) return null;
+        if (viewer === null) {
+          skipped("NO_SIDE");
+          return null;
+        }
         const kind =
           viewer.role === "FOUNDER" ? "INVESTOR_ORGANISATION" : "COMPANY";
         const id = await dependencies.findByName(
@@ -55,10 +66,18 @@ export function createCallPrepPort(
           kind,
           input.counterpart,
         );
-        if (id === null) return null;
-        const them = await material.counterpart(actor, kind, id);
-        if (them === null) return null;
-        const relationshipId = them.relationshipId;
+        const them =
+          id === null ? null : await material.counterpart(actor, kind, id);
+        // Live 2026-10-23: a counterpart they cannot open by name (none, or
+        // several as close) is still prepared, from their own record and
+        // the name they said only: nothing of anyone else's is read.
+        if (them === null) {
+          dependencies.logger?.info(
+            { qRunId: request.runId, resolved: id !== null },
+            "call prep: counterpart not on their records; prepared from the name",
+          );
+        }
+        const relationshipId = them?.relationshipId ?? null;
         const [messages, calls, meetings, theirs, own, waitingNow] =
           await Promise.all([
             relationshipId === null
@@ -70,9 +89,11 @@ export function createCallPrepPort(
             relationshipId === null
               ? []
               : material.upcomingMeetings(actor).catch(() => []),
-            material
-              .counterpartMaterial(actor, kind, id)
-              .catch(() => ({ text: "", sources: [] })),
+            them === null || id === null
+              ? { text: "", sources: [] }
+              : material
+                  .counterpartMaterial(actor, kind, id)
+                  .catch(() => ({ text: "", sources: [] })),
             material
               .ownMaterial(actor)
               .catch(() => ({ text: "", sources: [] })),
@@ -84,9 +105,11 @@ export function createCallPrepPort(
           (meeting) => meeting.relationshipId === relationshipId,
         );
         const soFar = [
-          relationshipId === null
-            ? "No relationship on record yet: this would be the first contact."
-            : null,
+          them === null
+            ? "Nothing about them is on record that they can see."
+            : relationshipId === null
+              ? "No relationship on record yet: this would be the first contact."
+              : null,
           booked.length === 0
             ? null
             : `MEETINGS BOOKED:\n${booked
@@ -101,32 +124,44 @@ export function createCallPrepPort(
         ]
           .filter((part): part is string => part !== null)
           .join("\n\n");
+        const name = them?.name ?? input.counterpart.trim().slice(0, 200);
         const prep = await dependencies.write(request, {
           viewerRole: viewer.role,
-          counterpartName: them.name,
-          counterpartProfile: [them.profile, theirs.text]
+          counterpartName: name,
+          counterpartProfile: [them?.profile ?? "", theirs.text]
             .filter((part) => part.trim().length > 0)
             .join("\n\n"),
           soFar,
           ownRecord: own.text,
           said: input.said,
         });
-        if (prep === null) return null;
-        const subject =
-          kind === "COMPANY"
-            ? { kind: "COMPANY" as const, companyId: id }
-            : {
-                kind: "INVESTOR_ORGANISATION" as const,
-                investorOrganisationId: id,
-              };
-        const related = relatedWaiting(input.said, waitingNow, [subject]);
+        if (prep === null) {
+          skipped("NOT_WRITTEN");
+          return null;
+        }
+        const subjects =
+          them === null || id === null
+            ? []
+            : [
+                kind === "COMPANY"
+                  ? { kind: "COMPANY" as const, companyId: id }
+                  : {
+                      kind: "INVESTOR_ORGANISATION" as const,
+                      investorOrganisationId: id,
+                    },
+              ];
+        const related = relatedWaiting(input.said, waitingNow, subjects);
         return {
-          counterpartName: them.name,
+          counterpartName: name,
           ...prep,
           waiting: related.about === "SAME_PEOPLE" ? related.waiting : [],
         };
       } catch (error: unknown) {
         if (request.signal?.aborted === true) throw error;
+        dependencies.logger?.warn(
+          { err: error, qRunId: request.runId },
+          "call prep failed; the turn is answered the usual way",
+        );
         return null;
       }
     },
