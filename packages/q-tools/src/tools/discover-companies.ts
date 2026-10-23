@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-import { UuidSchema } from "@capital-q/contracts";
+import { UuidSchema, type CompanyRaiseView } from "@capital-q/contracts";
 import { actorPrincipal } from "@capital-q/permissions";
+import type { QToolExecutionContext } from "@capital-q/q-runtime";
 
 import {
   allow,
@@ -68,6 +69,12 @@ export const DiscoverCompaniesInputSchema = z
       .describe(
         "NAME: in name order. FIT: every match scored on the investor's own mandate and returned best first (an investor only; otherwise name order).",
       ),
+    raising: z
+      .boolean()
+      .default(false)
+      .describe(
+        "true when they ask for companies raising now: only companies stating a current raise this reader may see are returned.",
+      ),
   })
   .strict();
 export type DiscoverCompaniesInput = z.input<
@@ -98,6 +105,20 @@ export const DiscoverCompaniesOutputSchema = z
      */
     total: z.number().int().min(0).optional(),
     totalAtLeast: z.boolean().optional(),
+    /**
+     * Asked for companies raising now: APPLIED when only companies stating
+     * a current raise were kept (`matched` is how many matched before
+     * that); UNAVAILABLE when raises could not be read, so nothing was
+     * kept or dropped for it. A company with no raise on record is not
+     * "not raising": it is unknown, and only left out of this list.
+     */
+    raising: z
+      .object({
+        filter: z.enum(["APPLIED", "UNAVAILABLE"]),
+        matched: z.number().int().min(0),
+      })
+      .strict()
+      .optional(),
     sectors: z
       .array(z.object({ code: z.string(), name: z.string() }).strict())
       .max(FILTER_MAX),
@@ -109,6 +130,36 @@ export const DiscoverCompaniesOutputSchema = z
 export type DiscoverCompaniesOutput = z.infer<
   typeof DiscoverCompaniesOutputSchema
 >;
+
+/** The raise reader's own batch bound (RAISE_BATCH_MAX). */
+const RAISE_BATCH = 50;
+
+/**
+ * Every company's raise as this reader may see it, read in the raise
+ * reader's batches; null when it cannot be read (absent or failed), so no
+ * company is kept or dropped for a raise nobody could read.
+ */
+async function raisesOf(
+  ports: QToolPorts,
+  actor: QToolExecutionContext["actor"],
+  companyIds: readonly string[],
+): Promise<ReadonlyMap<string, CompanyRaiseView> | null> {
+  const reader = ports.companyRaise;
+  if (reader === undefined) return null;
+  const all = new Map<string, CompanyRaiseView>();
+  try {
+    for (let at = 0; at < companyIds.length; at += RAISE_BATCH) {
+      const batch = await reader.raisesFor(
+        actor,
+        companyIds.slice(at, at + RAISE_BATCH),
+      );
+      for (const [id, view] of batch) all.set(id, view);
+    }
+  } catch {
+    return null;
+  }
+  return all;
+}
 
 export function createDiscoverCompaniesTool(
   ports: QToolPorts,
@@ -168,7 +219,10 @@ export function createDiscoverCompaniesTool(
         stages: input.stages,
         // FIT reads every match it may score; NAME leaves room for the
         // candidates disclosure turns away. Both bounded.
-        limit: byFit ? CATALOG_FIT_SCAN_MAX : Math.min(input.limit * 3, 60),
+        limit:
+          byFit || input.raising
+            ? CATALOG_FIT_SCAN_MAX
+            : Math.min(input.limit * 3, 60),
       });
       const decisions =
         found.candidates.length === 0
@@ -197,12 +251,39 @@ export function createDiscoverCompaniesTool(
       });
       // FIT: every visible match scored on their mandate, best first. A
       // reader who is not an investor, or has no mandate, gets name order.
+      // Raising now: every visible match's raise, read as this reader may
+      // see it (the card's own raise read), before any cut.
+      const raises =
+        input.raising && visible.length > 0
+          ? await raisesOf(
+              ports,
+              context.actor,
+              visible.map((candidate) => candidate.companyId),
+            )
+          : null;
+      const raisingFilter = !input.raising
+        ? null
+        : raises === null
+          ? ("UNAVAILABLE" as const)
+          : ("APPLIED" as const);
+      const eligible =
+        raises === null
+          ? visible
+          : visible.filter((candidate) => {
+              const view = raises.get(candidate.companyId);
+              return (
+                view !== undefined &&
+                view.source !== "NONE" &&
+                view.money !== null &&
+                Number(view.money.amount) > 0
+              );
+            });
       const ranked =
-        byFit && visible.length > 0
+        byFit && eligible.length > 0
           ? await ports.fit
               ?.rank?.(
                 context.actor,
-                visible.map((candidate) => candidate.companyId),
+                eligible.map((candidate) => candidate.companyId),
                 input.limit,
               )
               .catch(() => null)
@@ -210,11 +291,11 @@ export function createDiscoverCompaniesTool(
       const order =
         ranked?.kind === "OK"
           ? ranked.comparison.entries.flatMap((entry) => {
-              const one = visible.find((c) => c.companyId === entry.companyId);
+              const one = eligible.find((c) => c.companyId === entry.companyId);
               return one === undefined ? [] : [one];
             })
           : null;
-      const companies = (order ?? visible)
+      const companies = (order ?? eligible)
         .slice(0, input.limit)
         .map((candidate) => ({
           companyId: candidate.companyId,
@@ -227,12 +308,15 @@ export function createDiscoverCompaniesTool(
       return {
         companies,
         order: order === null ? ("NAME" as const) : ("FIT" as const),
-        ...(order === null
+        ...(order === null && raisingFilter !== "APPLIED"
           ? {}
           : {
-              total: visible.length,
+              total: eligible.length,
               totalAtLeast: found.candidates.length >= CATALOG_FIT_SCAN_MAX,
             }),
+        ...(raisingFilter === null
+          ? {}
+          : { raising: { filter: raisingFilter, matched: visible.length } }),
         sectors: found.sectors.slice(0, FILTER_MAX).map((sector) => ({
           code: sector.code,
           name: sector.name,

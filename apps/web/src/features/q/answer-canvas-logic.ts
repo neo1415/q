@@ -149,6 +149,11 @@ export function fitExplanation(card: QAnswerCard): FitExplanation | null {
 
 const PROVENANCE_SAID =
   /^.{1,60}: mandate fit [\d.]+ out of 10, not a quality score\./u;
+/** Where the method starts in the stored line (fit-integrity.ts). */
+const METHOD_SAID =
+  /\s(?:Capital Q|Q's reading:) mandate fit [\d.]+ out of 10\b/u;
+/** A point scale is method, never a spoken line. */
+const SCALE_SAID = /\((?:Capital Q|Q's reading) scale:/u;
 
 /**
  * What Q says about a card in the walk-through. The stored line for a
@@ -159,7 +164,32 @@ const PROVENANCE_SAID =
  */
 export function spokenLine(card: QAnswerCard): string {
   const said = card.said;
-  if (said !== null && !PROVENANCE_SAID.test(said)) return said;
+  // F-11 (QA 2026-10-23): the stored line now leads with the card's
+  // insight, then the method ("Capital Q mandate fit 8.8 out of 10, ...;
+  // not a quality score. 2 sources. (Capital Q scale: ...)"). Q says the
+  // insight with the number, as a person would; the method and its scale
+  // stay behind "How this score is worked out".
+  const method = said === null ? -1 : said.search(METHOD_SAID);
+  if (said !== null && method > 0 && card.fit !== null) {
+    const lead = said.slice(0, method).trim();
+    const name = card.name.trim();
+    const insight = lead.startsWith(`${name} is `)
+      ? lead.slice(name.length + 4)
+      : lead.startsWith(`${name}: `)
+        ? lead.slice(name.length + 2)
+        : null;
+    if (insight !== null && insight.length > 0) {
+      return `${name}, ${card.fit.score.toFixed(1)} on mandate fit: ${insight}`;
+    }
+  }
+  if (
+    said !== null &&
+    method === -1 &&
+    !PROVENANCE_SAID.test(said) &&
+    !SCALE_SAID.test(said)
+  ) {
+    return said;
+  }
   const reason = card.reasons[0];
   if (card.fit !== null) {
     return `${card.name}, ${card.fit.score.toFixed(1)} on mandate fit${reason === undefined ? "." : `: ${reason}`}`;

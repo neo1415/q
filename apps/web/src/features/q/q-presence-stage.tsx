@@ -474,6 +474,7 @@ export function QPresenceStage({
             // latest exchange over it, never the turn that first showed it.
             asked={askedBefore(turns, captionTurn?.id ?? canvas.item.id)}
             closing={closingLine(captionTurn ?? canvas.turn)}
+            exchangeId={captionTurn?.id ?? canvas.item.id}
             live={live}
             presence={presence(true, true)}
             onCloseAll={() => dismiss(canvas.item)}

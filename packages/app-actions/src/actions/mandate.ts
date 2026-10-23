@@ -11,10 +11,12 @@ import {
   INVESTORS_PATH,
   InvestorMandateDtoSchema,
   InvestorMandateTransitionRequestSchema,
+  MandateChequeRangeSchema,
   UpdateInvestorMandateRequestSchema,
   type QSubjectRef,
 } from "@capital-q/contracts";
 import {
+  chequeRangeOf,
   InvestorMandateIdSchema,
   InvestorOrganisationIdSchema,
   toInvestorMandateDto,
@@ -64,11 +66,29 @@ const Mandate = {
   investorOrganisationId: InvestorOrganisationIdSchema,
   mandateId: InvestorMandateIdSchema,
 };
+/**
+ * F-29 (QA 2026-10-23): the fields being changed as the mandate held them
+ * when Q prepared the card, read by the server, never said by a model.
+ * The card shows before -> after; the update itself never reads them.
+ */
+const MandateBefore = z
+  .object({
+    name: z.string().max(200).nullable().optional(),
+    discoveryMode: z.string().max(64).nullable().optional(),
+    chequeRange: MandateChequeRangeSchema.nullable().optional(),
+    minStageCode: z.string().max(64).nullable().optional(),
+    maxStageCode: z.string().max(64).nullable().optional(),
+    rawMandateText: z.string().max(8000).nullable().optional(),
+  })
+  .strict();
+type MandateBefore = z.infer<typeof MandateBefore>;
+
 const Update = z
   .object({
     ...Mandate,
     input: UpdateInvestorMandateRequestSchema,
     atLatest: z.literal(true).optional(),
+    before: MandateBefore.optional(),
   })
   .strict();
 const Transition = z
@@ -101,36 +121,120 @@ const WORDS: Readonly<Record<string, string>> = {
   rawMandateText: "In your words",
 };
 
-/** The mandate's fields as the card shows them: the values approved. */
-function previewOf(fields: Readonly<Record<string, unknown>>): string {
-  const parts: string[] = [];
+/** Stage and mode codes in words: "pre_seed" is "Pre-seed". */
+function codeWords(code: string): string {
+  const named: Readonly<Record<string, string>> = {
+    pre_seed: "Pre-seed",
+    seed: "Seed",
+    series_a: "Series A",
+    series_b: "Series B",
+    series_c_plus: "Series C+",
+  };
+  const known = named[code];
+  if (known !== undefined) return known;
+  const words = code.replace(/_/gu, " ").toLowerCase();
+  return `${words[0]?.toUpperCase() ?? ""}${words.slice(1)}`;
+}
+
+type Cheque = {
+  readonly currency: string;
+  readonly min?: string | undefined;
+  readonly typical?: string | undefined;
+  readonly max?: string | undefined;
+};
+
+function chequeWords(cheque: Cheque): string {
+  const amount = (value: string) =>
+    Number.isFinite(Number(value))
+      ? Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 })
+      : value;
+  const parts = [
+    cheque.min === undefined ? null : `from ${amount(cheque.min)}`,
+    cheque.typical === undefined ? null : `typically ${amount(cheque.typical)}`,
+    cheque.max === undefined ? null : `up to ${amount(cheque.max)}`,
+  ].filter((part): part is string => part !== null);
+  return parts.length === 0
+    ? cheque.currency
+    : `${cheque.currency} ${parts.join(", ")}`;
+}
+
+const NOT_SET = "Not set";
+
+/**
+ * The mandate's fields as the card shows them: one line per field, the
+ * value approved in full (never cut), and with `before`, what it was:
+ * "Earliest stage: Seed → Pre-seed".
+ */
+function previewOf(
+  fields: Readonly<Record<string, unknown>>,
+  before?: MandateBefore,
+): string {
+  const lines: string[] = [];
+  const line = (
+    label: string,
+    after: string,
+    was: string | null | undefined,
+    known: boolean,
+  ) => {
+    if (!known) {
+      lines.push(`${label}: ${after}`);
+      return;
+    }
+    const shown = was ?? NOT_SET;
+    lines.push(
+      shown === after
+        ? `${label}: ${after} (no change)`
+        : `${label}: ${shown} → ${after}`,
+    );
+  };
+  const asWords = (field: string, value: string) =>
+    field === "minStageCode" ||
+    field === "maxStageCode" ||
+    field === "discoveryMode"
+      ? codeWords(value)
+      : value;
   for (const [field, label] of Object.entries(WORDS)) {
     const value = fields[field];
     if (value !== null && typeof value !== "string") continue;
-    const text = value ?? "cleared";
-    parts.push(
-      `${label}: ${text.length > 120 ? `${text.slice(0, 117)}...` : text}`,
+    const after = value === null ? NOT_SET : asWords(field, value);
+    const key = field as keyof MandateBefore;
+    const was = before?.[key];
+    line(
+      label,
+      after,
+      typeof was === "string" ? asWords(field, was) : null,
+      before !== undefined && key in before,
     );
   }
-  const cheque = fields["chequeRange"] as
-    | {
-        readonly currency: string;
-        readonly min?: string;
-        readonly typical?: string;
-        readonly max?: string;
-      }
-    | null
-    | undefined;
+  const cheque = fields["chequeRange"] as Cheque | null | undefined;
   if (cheque !== undefined) {
-    parts.push(
-      cheque === null
-        ? "Cheque: cleared"
-        : `Cheque: ${cheque.currency} ${[cheque.min, cheque.typical, cheque.max]
-            .filter((value) => value !== undefined)
-            .join(" / ")}`,
+    const was = before?.chequeRange;
+    line(
+      "Cheque",
+      cheque === null ? NOT_SET : chequeWords(cheque),
+      was === null || was === undefined ? null : chequeWords(was),
+      before !== undefined && "chequeRange" in before,
     );
   }
-  return parts.length === 0 ? "Nothing else changes." : parts.join(" · ");
+  return lines.length === 0 ? "Nothing else changes." : lines.join("\n");
+}
+
+/** What the changed fields held, from the mandate as the server read it. */
+function beforeOf(
+  mandate: InvestorMandate,
+  fields: Readonly<Record<string, unknown>>,
+): MandateBefore {
+  const held: MandateBefore = {
+    name: mandate.name,
+    discoveryMode: mandate.discoveryMode,
+    chequeRange: chequeRangeOf(mandate),
+    minStageCode: mandate.minStageCode,
+    maxStageCode: mandate.maxStageCode,
+    rawMandateText: mandate.rawMandateText,
+  };
+  return Object.fromEntries(
+    Object.entries(held).filter(([field]) => fields[field] !== undefined),
+  );
 }
 
 const CREATE = defineAppAction<z.infer<typeof Create>, InvestorMandate>({
@@ -205,7 +309,7 @@ const UPDATE = defineAppAction<z.infer<typeof Update>, InvestorMandate>({
   targets: onInvestor,
   card: (input) => ({
     summary: "Update your mandate",
-    preview: previewOf(input.input),
+    preview: previewOf(input.input, input.before),
   }),
   done: () => "Done. Your mandate is updated.",
   http: { method: "PATCH", path: byId, fromRequest: fromMandate, respond: dto },
@@ -416,16 +520,31 @@ export const MANDATE_ACTIONS: readonly AnyAppAction[] = defineAppActionFamily<
         return refusal("You have no mandate to change yet: create one first.");
       }
       const which = { investorOrganisationId, mandateId: mandate.id };
-      return operation === "UPDATE"
-        ? {
-            operation,
-            input: {
-              ...which,
-              input: { ...filled, expectedVersion: mandate.version },
-              atLatest: true as const,
-            },
-          }
-        : { operation, input: { ...which, input: {} } };
+      if (operation !== "UPDATE") {
+        return { operation, input: { ...which, input: {} } };
+      }
+      // The card's before: the full mandate, as this person may read it.
+      // Unreadable: the card shows the new values alone.
+      const full = await Promise.resolve()
+        .then(() =>
+          ports.investors?.getInvestorMandate({
+            actor: context.actor,
+            investorOrganisationId,
+            mandateId: mandate.id,
+          }),
+        )
+        .catch(() => null);
+      return {
+        operation,
+        input: {
+          ...which,
+          input: { ...filled, expectedVersion: mandate.version },
+          atLatest: true as const,
+          ...(full === null || full === undefined
+            ? {}
+            : { before: beforeOf(full, filled) }),
+        },
+      };
     },
   },
 });

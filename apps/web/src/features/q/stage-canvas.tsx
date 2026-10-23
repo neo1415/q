@@ -22,6 +22,7 @@ export function StageCanvas({
   block,
   asked,
   closing,
+  exchangeId,
   live,
   presence,
   onCloseAll,
@@ -35,13 +36,21 @@ export function StageCanvas({
   readonly block: QAnswerCardsBlock;
   readonly asked: string | undefined;
   readonly closing: string;
+  /** The exchange whose line is over the cards (a later one for a kept set). */
+  readonly exchangeId?: string | undefined;
   readonly live: boolean;
   readonly presence: ReactNode;
   readonly onCloseAll: () => void;
   readonly onAsk?: ((question: string) => void) | undefined;
   readonly onPin?: (() => void) | undefined;
 }) {
-  const playback = useAnswerPlayback(block, answerId, closing, live);
+  const playback = useAnswerPlayback(
+    block,
+    answerId,
+    closing,
+    live,
+    exchangeId ?? answerId,
+  );
   // The spotlight: the card the conversation is about, large; on a live
   // line, also the card Q's own line names (not the timed walk-through).
   const spot = useSpotlight({

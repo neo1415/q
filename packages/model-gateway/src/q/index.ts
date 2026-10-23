@@ -6134,7 +6134,9 @@ export function createModelGatewayQAnswer(
           request.discoverCompanies.mandateRelevant) &&
         request.discoverCompanies.sectors.length === 0 &&
         request.discoverCompanies.countries.length === 0 &&
-        request.discoverCompanies.stages.length === 0;
+        request.discoverCompanies.stages.length === 0 &&
+        // F-10: "raising now" is a filter only the catalog applies.
+        request.discoverCompanies.raising !== true;
       // K1 (live 2026-10-09 15:57): companies of a kind are listed from
       // the catalog by code; the analyst is never asked to describe cards.
       // Null (no catalog here): the full path answers.
