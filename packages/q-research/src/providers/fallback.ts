@@ -7,6 +7,7 @@ import {
 import { canonicalUrlKey } from "../domain/url-safety.js";
 import {
   isResearchProviderFailure,
+  ResearchProviderFailure,
   type PublicWebResearchProvider,
   type ResearchExecutionContext,
 } from "../ports.js";
@@ -93,12 +94,15 @@ export function createFallbackResearchProvider(input: {
           },
     );
   };
-  const awake = (): readonly PublicWebResearchProvider[] => {
+  const awake = (
+    can: "canSearch" | "canReadPages",
+  ): readonly PublicWebResearchProvider[] => {
     const at = now();
-    const ready = all.filter(
+    const able = all.filter((provider) => provider[can] !== false);
+    const ready = able.filter(
       (provider) => (restingUntil.get(provider) ?? 0) <= at,
     );
-    return ready.length > 0 ? ready : all;
+    return ready.length > 0 ? ready : able;
   };
 
   const sequentialSearch: PublicWebResearchProvider["search"] = async (
@@ -106,7 +110,7 @@ export function createFallbackResearchProvider(input: {
     context,
   ) => {
     let failure: unknown = null;
-    for (const provider of awake()) {
+    for (const provider of awake("canSearch")) {
       const startedAt = Date.now();
       try {
         const result = await provider.search(request, context);
@@ -121,7 +125,7 @@ export function createFallbackResearchProvider(input: {
         if (context.signal?.aborted === true) throw error;
       }
     }
-    throw failure;
+    throw failureOr(failure, first);
   };
 
   const parallelSearch: PublicWebResearchProvider["search"] = async (
@@ -129,7 +133,7 @@ export function createFallbackResearchProvider(input: {
     context,
   ) => {
     const started = Date.now();
-    const providers = awake();
+    const providers = awake("canSearch");
     const settled = await Promise.allSettled(
       providers.map((provider) => {
         const own: ResearchExecutionContext = {
@@ -174,7 +178,7 @@ export function createFallbackResearchProvider(input: {
       }
     }
     const lead = answered[0];
-    if (lead === undefined) throw failure;
+    if (lead === undefined) throw failureOr(failure, first);
     lastSearch = lead.provider;
     return {
       hits: mergeHits(answered.map((entry) => entry.result.hits)),
@@ -187,12 +191,13 @@ export function createFallbackResearchProvider(input: {
       return lastSearch.code;
     },
     search:
-      input.parallelSearch === true && all.length > 1
+      input.parallelSearch === true &&
+      all.filter((provider) => provider.canSearch !== false).length > 1
         ? parallelSearch
         : sequentialSearch,
     extract: async (request, context) => {
       let failure: unknown = null;
-      for (const provider of awake()) {
+      for (const provider of awake("canReadPages")) {
         const startedAt = Date.now();
         try {
           const result = await provider.extract(request, context);
@@ -208,9 +213,25 @@ export function createFallbackResearchProvider(input: {
           if (context.signal?.aborted === true) throw error;
         }
       }
-      throw failure;
+      throw failureOr(failure, first);
     },
   };
+}
+
+/** The failure to report: the one met, else that no provider could. */
+function failureOr(
+  failure: unknown,
+  provider: PublicWebResearchProvider,
+): Error {
+  return failure instanceof Error ? failure : cannot(provider);
+}
+
+/** No provider here can do what was asked (none searches, or none reads). */
+function cannot(provider: PublicWebResearchProvider): ResearchProviderFailure {
+  return new ResearchProviderFailure({
+    providerCode: provider.code,
+    failureClass: "VALIDATION",
+  });
 }
 
 /** One provider's outcome for one search or page read, for the log. */

@@ -73,6 +73,13 @@ export type PublicWebResearchProvider = {
     request: PublicWebExtractRequest,
     context: ResearchExecutionContext,
   ) => Promise<PublicWebExtractResult>;
+  /**
+   * What the provider cannot do, so a fan-out passes it by rather than
+   * logging a refusal on every call: Brave searches but reads no pages; a
+   * direct page reader reads but does not search. Absent: both.
+   */
+  readonly canSearch?: false | undefined;
+  readonly canReadPages?: false | undefined;
 };
 
 /** One public LinkedIn page by URL, through a compliant provider. */

@@ -60,6 +60,7 @@ import {
 import { createCachedResearchProvider } from "@capital-q/q-research/providers/cached";
 import { createFallbackResearchProvider } from "@capital-q/q-research/providers/fallback";
 import { createBraveResearchProvider } from "@capital-q/q-research/providers/brave";
+import { createDirectPageReader } from "@capital-q/q-research/providers/direct-read";
 import { createScrapingBeeResearchProvider } from "@capital-q/q-research/providers/scrapingbee";
 import { createDetectingSerpProvider } from "@capital-q/q-research/providers/serp-detect";
 import { createSerperResearchProvider } from "@capital-q/q-research/providers/serper";
@@ -348,10 +349,14 @@ export function composeResearch(
             apiKey: dependencies.secrets.scrapingBee.reveal(),
           }),
         ]),
+    // Last: our own vetted read of the pages a search surfaced, so a page
+    // is read even when every paid reader is spent (live 2026-10-23).
+    createDirectPageReader(),
   ];
   const provider =
     dependencies.provider ??
-    (indexes.length === 0
+    // No index that searches (only the page reader): no research at all.
+    (indexes.every((index) => index.canSearch === false)
       ? undefined
       : createCachedResearchProvider({
           provider: createFallbackResearchProvider({
@@ -416,13 +421,16 @@ export function composeResearch(
   ];
   const personProviders = dependencies.provider
     ? [dependencies.provider]
-    : [...indexes]
+    : indexes
+        .filter((index) => index.canSearch !== false)
         .sort(
           (a, b) =>
             PERSON_INDEX_ORDER.indexOf(a.code) -
             PERSON_INDEX_ORDER.indexOf(b.code),
         )
         .map((index) => createCachedResearchProvider({ provider: index }));
+  // The person lookup searches; the brief also reads pages, so it holds
+  // the page reader too (the lookup passes it by: it does not search).
   const knownStore = createPostgresKnownEntityStore({ sql, transactions });
   const knownIndex = createKnownEntityIndex({ store: knownStore });
   // Warm in the background: until it lands, a lookup is one indexed query.
@@ -452,7 +460,12 @@ export function composeResearch(
           ...(logger === undefined ? {} : { logger }),
         });
   const briefs = createPersonBriefService({
-    providers: personProviders,
+    providers: [
+      ...personProviders,
+      ...indexes
+        .filter((index) => index.canSearch === false)
+        .map((index) => createCachedResearchProvider({ provider: index })),
+    ],
     store: researched,
     ...(reader === undefined
       ? {}

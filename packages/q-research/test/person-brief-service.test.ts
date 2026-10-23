@@ -7,7 +7,10 @@ import {
   type ResearchedEntityStore,
 } from "../src/application/person-brief-service.js";
 import type { KnownEntityRecord } from "../src/application/known-entities.js";
-import type { PublicWebResearchProvider } from "../src/ports.js";
+import {
+  ResearchProviderFailure,
+  type PublicWebResearchProvider,
+} from "../src/ports.js";
 
 const scope = { tenantId: "t1", userId: "u1" };
 const subject = {
@@ -92,6 +95,47 @@ function provider(pageText: string): PublicWebResearchProvider & {
 }
 
 describe("person brief service", () => {
+  it("reads through the next provider when the first is spent (live 2026-10-23)", async () => {
+    const spent: PublicWebResearchProvider = {
+      code: "serper",
+      search: () =>
+        Promise.reject(
+          new ResearchProviderFailure({
+            providerCode: "serper",
+            failureClass: "RATE_LIMIT",
+            status: 402,
+          }),
+        ),
+      extract: () =>
+        Promise.reject(
+          new ResearchProviderFailure({
+            providerCode: "serper",
+            failureClass: "RATE_LIMIT",
+            status: 402,
+          }),
+        ),
+    };
+    const read: string[][] = [];
+    const working = provider("Finance Director at Midmac in Doha.");
+    const service = createPersonBriefService({
+      providers: [
+        spent,
+        {
+          ...working,
+          code: "tavily",
+          extract: (request, context) => {
+            read.push([...request.urls]);
+            return working.extract(request, context);
+          },
+        },
+      ],
+      store: memoryStore(),
+      clock: () => new Date("2026-10-10T00:00:00Z"),
+    });
+    await service.brief({ scope, subject, sources });
+    expect(read).toEqual([[sources[0]?.url]]);
+  });
+
   it("files a versioned brief, reuses it while fresh, and a refresh adds a version", async () => {
     const store = memoryStore();
     const p = provider("Finance Director at Midmac in Doha.");

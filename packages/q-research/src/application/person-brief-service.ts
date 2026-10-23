@@ -7,6 +7,7 @@ import type {
 } from "@capital-q/contracts/q";
 import { PersonBriefSchema } from "@capital-q/contracts/q";
 
+import { RESEARCH_BOUNDS } from "../contracts.js";
 import { boundExcerpt } from "../domain/excerpt.js";
 import {
   admitAssertions,
@@ -20,6 +21,7 @@ import {
   isResearchProviderFailure,
   type PublicWebResearchProvider,
 } from "../ports.js";
+import { createFallbackResearchProvider } from "../providers/fallback.js";
 import type { KnownEntityRecord } from "./known-entities.js";
 
 /**
@@ -92,7 +94,8 @@ export type PersonBriefOutcome = {
 
 const EXTRACT_DEADLINE_MS = 8_000;
 const EXTRA_SEARCH_DEADLINE_MS = 4_000;
-const MAX_PAGES = 4;
+/** As many pages as a research turn reads (it was 4: R1c, lane 5). */
+const MAX_PAGES = RESEARCH_BOUNDS.maxExtractCount;
 
 export function createPersonBriefService(dependencies: {
   readonly providers: readonly PublicWebResearchProvider[];
@@ -144,7 +147,16 @@ export function createPersonBriefService(dependencies: {
         .filter((url) => judgePublicUrl(url).ok)
         .slice(0, MAX_PAGES);
       const pages = new Map<string, string>();
-      const reader = dependencies.providers[0];
+      // Every provider, each passing to the next when it fails or cannot
+      // (live 2026-10-23: the first was a SERP key out of credit, so the
+      // brief read no page and found no statement).
+      const reader =
+        dependencies.providers.length > 1
+          ? createFallbackResearchProvider({
+              providers: dependencies.providers,
+              parallelSearch: true,
+            })
+          : dependencies.providers[0];
       if (reader !== undefined && urls.length > 0) {
         const extracted = await within(
           (signal) => reader.extract({ urls }, { signal }),
