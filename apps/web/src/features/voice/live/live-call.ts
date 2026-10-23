@@ -13,6 +13,7 @@ import {
   releaseVoiceAudio,
   type VoiceAudioOwner,
 } from "../voice-audio";
+import { interceptHeard } from "../heard-intercept";
 import { watchSpokenMove } from "../use-follow-turn";
 import { noteForMove, receiptListener, type MoveOutcome } from "./move";
 import {
@@ -605,6 +606,12 @@ export async function startLiveCall(
     const done = utterance;
     utterance = null;
     if (done === null) return;
+    // "Hey Q, pitch yourself" (owner, 23 Oct): taken by code, and the call
+    // ends, so the model's own answer never plays over what starts.
+    if (interceptHeard(done.text)) {
+      void end();
+      return;
+    }
     keep("USER", done.text);
     options.onTranscript?.({
       key: done.key,
