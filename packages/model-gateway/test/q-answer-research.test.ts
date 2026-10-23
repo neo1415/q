@@ -205,6 +205,8 @@ function build(options: {
     typeof createModelGatewayQAnswer
   >[0]["publicPictures"];
   readonly webLaneBudgetMs?: number | undefined;
+  /** What goes out live, in order. */
+  readonly said?: string[] | undefined;
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -299,6 +301,19 @@ function build(options: {
     ...(options.webLaneBudgetMs === undefined
       ? {}
       : { webLaneBudgetMs: options.webLaneBudgetMs }),
+    ...(options.said === undefined
+      ? {}
+      : {
+          deltas: {
+            publish: (delta: { readonly text: string }) => {
+              options.said?.push(delta.text);
+            },
+            subscribe: () => () => undefined,
+            subscriberCount: () => 1,
+          } as unknown as Parameters<
+            typeof createModelGatewayQAnswer
+          >[0]["deltas"],
+        }),
   });
   const request: QAnswerRequest = {
     runId: RUN as QAnswerRequest["runId"],
@@ -2266,5 +2281,46 @@ describe("a person found only as a candidate is pictured through their organisat
         pageUrl: "https://nairametrics.com/2026/07/19/zino-aviation-ceo/",
       }),
     );
+  });
+});
+
+describe("the first words go out as the web search starts (owner 2026-10-23)", () => {
+  it("says what Q is checking before the records, the prompt or the model", async () => {
+    const said: string[] = [];
+    let webAsked = false;
+    const port: QToolPort = {
+      offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
+      execute: (proposal) => {
+        if (proposal.name === "research_public_web") {
+          webAsked = true;
+          // Nothing is said by the time the search is asked but the line
+          // that announces it.
+          expect(said).toEqual([
+            "I'm checking what's public on Zino Aviation now. ",
+          ]);
+        }
+        return Promise.resolve(researchOutcome(proposal, "Zino Aviation."));
+      },
+    };
+    const { seam, request, alpha } = build({
+      script: [{ kind: "JSON", value: analystResult("From both.") }],
+      tools: port,
+      userText: "Tell me about Zino Aviation and its team",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      said,
+    });
+    expect(
+      (await seam.answer({ ...request, aboutNamedOther: true })).kind,
+    ).toBe("ANSWERED");
+    expect(webAsked).toBe(true);
+    expect(said[0]).toBe("I'm checking what's public on Zino Aviation now. ");
+    expect(alpha.calls.length).toBeGreaterThan(0);
   });
 });
