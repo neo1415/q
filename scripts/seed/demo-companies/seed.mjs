@@ -42,6 +42,7 @@ import {
 import {
   planCompany,
   renderCompanySql,
+  personName,
   renderPersonCardSql,
   renderTeamSql,
   DOCUMENT_BUCKET,
@@ -246,7 +247,7 @@ export async function planAll(
       throw new Error(`unknown person "${person}" in the fixture`);
     }
     const users = await db.read(
-      `select p.id, ac.tenant_id from identity.user_profiles p join auth.users u on u.id = p.auth_user_id left join identity.user_active_contexts c on c.user_id = p.id left join identity.organisation_memberships ac on ac.id = c.membership_id where lower(u.email) = lower(${q(email)}) and p.status = 'active'`,
+      `select p.id, p.display_name, p.headline, ac.tenant_id from identity.user_profiles p join auth.users u on u.id = p.auth_user_id left join identity.user_active_contexts c on c.user_id = p.id left join identity.organisation_memberships ac on ac.id = c.membership_id where lower(u.email) = lower(${q(email)}) and p.status = 'active'`,
     );
     if (users.length !== 1) {
       people.push({
@@ -256,6 +257,16 @@ export async function planAll(
       continue;
     }
     const userId = users[0].id;
+    // Their name as the fixture states it (and a headline only where they
+    // have none): a card or team list must never show a blank name or a
+    // placeholder. Written the way the app's own profile update writes it.
+    const wantedName = personName(fixture.people[person]);
+    const wantedHeadline = fixture.people[person].headline ?? null;
+    const nameSql =
+      users[0].display_name === wantedName &&
+      (wantedHeadline === null || users[0].headline !== null)
+        ? null
+        : `update identity.user_profiles set display_name = ${q(wantedName)}, headline = coalesce(headline, ${wantedHeadline === null ? "null" : q(wantedHeadline)}), version = version + 1, updated_at = now() where id = ${q(userId)} and status = 'active';`;
     // The company they found or join here gives a tenant when they have no
     // organisation of their own yet.
     const home = companies.find(({ plan }) => {
@@ -279,6 +290,7 @@ export async function planAll(
         tenantId,
         handle: null,
         sql: null,
+        nameSql,
         noCard: true,
       });
       continue;
@@ -297,6 +309,7 @@ export async function planAll(
       userId,
       tenantId,
       handle: handles[0]?.handle ?? handle,
+      nameSql,
       sql: renderPersonCardSql({
         seedKey: fixture.seedKey,
         userId,
@@ -534,6 +547,7 @@ export function personHandle(person) {
 
 export async function applyAll(db, planned, { storage } = {}) {
   for (const c of planned.companies) if (c.sql !== null) await db.run(c.sql);
+  for (const p of planned.people) if (p.nameSql) await db.run(p.nameSql);
   for (const p of planned.people) if (p.sql) await db.run(p.sql);
   for (const t of planned.teams ?? []) if (t.sql) await db.run(t.sql);
   for (const photo of planned.photos ?? []) {
@@ -616,7 +630,7 @@ export function describe(planned) {
     lines.push(
       p.skip
         ? `- person ${p.person}: SKIP (${p.skip})`
-        : `- person ${p.person}: ${p.noCard ? "team only (no personal card)" : p.sql === null ? "card already there" : `card @${p.handle}`}`,
+        : `- person ${p.person}: ${p.nameSql ? "set name; " : ""}${p.noCard ? "team only (no personal card)" : p.sql === null ? "card already there" : `card @${p.handle}`}`,
     );
   }
   return lines.join("\n");

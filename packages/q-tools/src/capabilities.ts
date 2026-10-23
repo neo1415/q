@@ -1172,6 +1172,11 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
     "Reads the part of a pitch video they are watching.",
   ),
   tool(
+    "read_company_figures",
+    "RECORDS",
+    "Reads a company's published figures (revenue, growth, customers, margins, raise), each as the company stated it.",
+  ),
+  tool(
     "read_company_pitches",
     "MEDIA",
     "Reads what a company's founders say in its pitch videos (raise, traction, use of funds), with the moment each is said.",

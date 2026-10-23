@@ -95,7 +95,7 @@ insert into identity.user_active_contexts (user_id, membership_id)
   select id, '${ids.davidMembership}' from identity.user_profiles where auth_user_id = '${ids.davidAuth}';
 update identity.user_profiles set display_name = 'David Nwankwo' where auth_user_id = '${ids.davidAuth}';
 update identity.user_profiles set display_name = 'Captain Zino Mario' where auth_user_id = '00000000-0000-4000-8000-00000000a003';
-update identity.user_profiles set display_name = 'Daniel Oyeniyi' where auth_user_id = '00000000-0000-4000-8000-00000000a004';
+-- Daniel has no name yet: the seed sets it from the fixture.
 `;
 
 /** The founder's own KUUZA AI figure, written the way the product writes one. */
@@ -503,7 +503,10 @@ test("idempotent: a second run plans nothing", { skip }, async () => {
   for (const { plan, sql } of again.companies) {
     assert.equal(sql, null, `${plan.key} would change again`);
   }
-  for (const p of again.people) assert.equal(p.sql, null);
+  for (const p of again.people) {
+    assert.equal(p.sql, null);
+    assert.equal(p.nameSql ?? null, null, `${p.person}'s name planned again`);
+  }
 });
 
 test(

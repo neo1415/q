@@ -1196,3 +1196,24 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - **`seed.mjs` profile names:** the script sets no names; they were set by hand this run.
   - **Tokens:** rotate the Supabase token.
 - **Evidence:** `docs/seed/demo-companies/PRODUCTION-RUN.md` and `evidence-2026-10-23/`.
+
+## 2026-10-23 — Q reads company figures; seed sets names (Claude worker S9b, branch `seed/q-claims`)
+
+- **Diagnosis (read-only, production):**
+  - Q never read `evidence.claims`. `get_company` returns only the profile.
+  - Q's knowledge and chunk reads are scoped to the viewer's tenant, and all 65 investor organisations sit in other tenants.
+  - The seeded claims were correct: `network_visible`, `PUBLIC`, `SELF_REPORTED`, `CURRENT`. This was a retrieval gap, not data or lag.
+- **Fix:** `read_company_figures` (`company.figures.read` v1, `packages/q-tools/src/tools/company-figures.ts`).
+  - **Admission:** exactly `get_company`'s.
+  - **Reads:** only claims at `network_visible` or `public_external`, in the company's own tenant. A bound company admitted by another disclosure reason gets `public_external` only.
+  - **Filtering:** every claim must be no more sensitive than the grant. Rows are filtered again in the tool, whatever the port returns.
+  - **Output:** truth class and evidence status are separate fields. NONE means unknown, never zero.
+  - **Wiring:** the port is composed in `apps/q-api/src/main.ts`, reading through `createPostgresClaimQueryPort`, the same read the public card uses.
+  - **Context Firewall:** unchanged.
+- **Seed:** `seed.mjs` sets profile names, and a missing headline, from the fixture.
+- **Checks:**
+  - q-tools: 1808/1808, including 7 new tests. Mutating out the filter fails 3 of them.
+  - Seed local tests: 12/12.
+  - Root tsc: exit 0. q-api tsc: exit 0.
+  - eslint and prettier: clean on the changed files.
+- **Not yet:** deployed and verified live (Q answering about Capital Q with its figures).

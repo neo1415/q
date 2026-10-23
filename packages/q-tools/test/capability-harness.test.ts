@@ -91,6 +91,7 @@ function trappedPorts(): { ports: QToolPorts; touched: () => number } {
     schedule: port(),
     profileChanges: port(),
     pitchMoments: port(),
+    companyFigures: port(),
     explore: port(),
     visibility: port(),
     pendingProposals: {
