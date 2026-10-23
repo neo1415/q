@@ -622,3 +622,48 @@ export function namesOnlyCompany(
     );
   });
 }
+
+/** "Capital Q" (or "CapitalQ", "Capital-Q") named as a word. */
+const CAPITAL_Q_NAMED = /\bcapital[\s-]?q\b/iu;
+/**
+ * Words that ask how to use the platform itself: those keep the platform
+ * reading, whoever asks ("how does Capital Q work", "Capital Q's app").
+ */
+const PLATFORM_USE =
+  /\b(?:how (?:do|does|can|should) (?:i|we|you|it|capital[\s-]?q)\b|work(?:s|ing)?\b|use|using|platform|app|feature|features|setting|settings|account|sign (?:in|up)|log ?in|subscription|pricing|help|support|onboard\w*)/iu;
+
+/**
+ * Owner 2026-10-23 (coordinator-approved disambiguation): Capital Q is also
+ * a company on its own platform. An investor asking about "Capital Q" (its
+ * revenue, its raise, "tell me about Capital Q") means the company, when
+ * that company is discoverable to them; a question about using the
+ * platform, a founder, a member of Capital Q's own team, and onboarding
+ * keep the platform reading. This decides only whether to look the
+ * company up: admission is still get_company's, through the same plan.
+ */
+export function capitalQAsCompanyAsked(input: {
+  readonly text: string;
+  readonly investorSide: boolean;
+  readonly onboarding: boolean;
+}): boolean {
+  return (
+    input.investorSide &&
+    !input.onboarding &&
+    CAPITAL_Q_NAMED.test(input.text) &&
+    !PLATFORM_USE.test(input.text)
+  );
+}
+
+/** The company read is Capital Q itself, reached as someone else's company. */
+export function isCapitalQCompanyRead(data: unknown): boolean {
+  if (typeof data !== "object" || data === null) return false;
+  const read = data as {
+    readonly canonicalName?: unknown;
+    readonly relationToYou?: unknown;
+  };
+  return (
+    typeof read.canonicalName === "string" &&
+    nameKey(read.canonicalName) === nameKey("Capital Q") &&
+    read.relationToYou === "SHARED"
+  );
+}

@@ -159,8 +159,10 @@ import {
   type DiscoveryAnswer,
 } from "./discover-companies.js";
 import {
+  capitalQAsCompanyAsked,
   companyFactAskOf,
   companyNameCandidates,
+  isCapitalQCompanyRead,
   lowercaseNameCandidates,
   namesOnlyCompany,
   profileOf,
@@ -1336,6 +1338,14 @@ export const WRITING_DOCUMENT_NOTE =
  * the model is told exactly which question it is on and never keeps the
  * count itself. The topic is the reader's few words, quoted as data.
  */
+/**
+ * Owner 2026-10-23: an investor asking about "Capital Q" means the company
+ * on the platform. Trusted product copy; the one closing line is the
+ * approved offer of the platform reading.
+ */
+export const CAPITAL_Q_COMPANY_NOTE =
+  'CAPITAL Q THE COMPANY: in this message "Capital Q" means the company Capital Q on the platform, whose profile and published figures are in the facts. Answer about that company as you would any other company: its figures are its own statements, said as "the company reports" or "self-reported", never verified. End the answer with exactly this line: "If you meant the Capital Q platform itself, I can explain how it works."';
+
 export function questionSequenceNote(step: QQuestionSequenceStep): string {
   const about = `about "${step.topic.replace(/["\s]+/g, " ").trim()}"`;
   switch (step.kind) {
@@ -1388,6 +1398,11 @@ export function environmentNoteParts(
      * whose notes are full simply carries no reminder.
      */
     readonly onboardingNudge?: QOnboardingNudge | undefined;
+    /**
+     * "Capital Q" in this message was read as the company on the platform
+     * (an investor asking; its profile and figures are in the facts).
+     */
+    readonly capitalQCompany?: boolean | undefined;
     /**
      * Who Q is with this person (founder direction 2026-09-30): the
      * personality they chose in Settings, or Auto. Trusted product copy.
@@ -1472,6 +1487,7 @@ export function environmentNoteParts(
     // read as chat, or a series cut short, are the bugs these prevent
     // (QX-003F, B1, R35).
     ...(options.turnUnread === true ? [TURN_UNREAD_NOTE] : []),
+    ...(options.capitalQCompany === true ? [CAPITAL_Q_COMPANY_NOTE] : []),
     ...(options.attachedDocument === undefined
       ? []
       : [
@@ -2329,6 +2345,8 @@ export function createModelGatewayQAnswer(
   /** S2: what the wide reads fill in; see `wide` in prepareTurn. */
   type WideReads = {
     readonly namedCompanies: readonly AuthorisedFact[];
+    /** "Capital Q" was read as the company this turn (owner 2026-10-23). */
+    readonly capitalQAsCompany: boolean;
     readonly namedCompanyCalls: readonly QToolCallObservation[];
     readonly ownDay: AuthorisedFact | null;
     readonly ownDayCalls: readonly QToolCallObservation[];
@@ -2340,6 +2358,7 @@ export function createModelGatewayQAnswer(
   };
   const NO_WIDE_READS: WideReads = {
     namedCompanies: [],
+    capitalQAsCompany: false,
     namedCompanyCalls: [],
     ownDay: null,
     ownDayCalls: [],
@@ -3148,6 +3167,8 @@ export function createModelGatewayQAnswer(
      * own records only, then read through get_company under the plan.
      */
     const namedCompanies: AuthorisedFact[] = [];
+    /** "Capital Q" in this turn was read as the company (owner 2026-10-23). */
+    let capitalQAsCompany = false;
     const namedCompanyCalls: QToolCallObservation[] = [];
     /** Companies the own-records read above took, so none is read twice. */
     const namedIds = new Set<string>();
@@ -3201,7 +3222,15 @@ export function createModelGatewayQAnswer(
      */
     const visibleNamedRead = async (own: Promise<void>): Promise<void> => {
       if (counterparty !== undefined) return;
+      // "Capital Q" is never a name candidate (it is the platform's name);
+      // an investor asking about it means the company, read as any other.
+      const capitalQAsked = capitalQAsCompanyAsked({
+        text: latest.content,
+        investorSide: ownInvestor !== null,
+        onboarding: plan.screen?.route === "ONBOARDING",
+      });
       const names = [
+        ...(capitalQAsked ? ["Capital Q"] : []),
         ...companyNameCandidates(latest.content),
         ...lowercaseNameCandidates(latest.content),
       ];
@@ -3236,6 +3265,9 @@ export function createModelGatewayQAnswer(
         }
         if (namedIds.has(read.companyId)) continue;
         namedIds.add(read.companyId);
+        if (capitalQAsked && isCapitalQCompanyRead(read.data)) {
+          capitalQAsCompany = true;
+        }
         const fact = onScreenCompanyFact(
           read.data,
           "A company on Capital Q this turn names",
@@ -3496,6 +3528,7 @@ export function createModelGatewayQAnswer(
         prepareMs["wide"] = Date.now() - wideStarted;
         return {
           namedCompanies,
+          capitalQAsCompany,
           namedCompanyCalls,
           ownDay,
           ownDayCalls,
@@ -4592,6 +4625,7 @@ export function createModelGatewayQAnswer(
             ? {}
             : { questionSequence: request.questionSequence }),
           ...(onboardingNudge === null ? {} : { onboardingNudge }),
+          ...(wideReads.capitalQAsCompany ? { capitalQCompany: true } : {}),
           ...(personality === null ? {} : { personality }),
           ...(language === null ? {} : { language }),
           ...(asker === null ? {} : { asker }),
