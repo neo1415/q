@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   clampCrop,
+  drawRect,
+  fitZoom,
   initialCrop,
   sourceRect,
   zoomTo,
@@ -44,5 +46,39 @@ describe("profile image crop", () => {
     expect(rect.sw).toBeCloseTo(400);
     expect(rect.sx + rect.sw / 2).toBeCloseTo(600);
     expect(zoomTo(zoomed, 9, photo, square).zoom).toBe(3);
+  });
+
+  it("a wide logo can be kept whole: it zooms out to fit, centred", () => {
+    // Owner QA 23 Oct: "Silo Credit" was stored as "ilo C".
+    const wordmark = { width: 1000, height: 250 };
+    const min = fitZoom(wordmark, square);
+    expect(min).toBeCloseTo(0.25);
+    const whole = initialCrop(wordmark, square, min);
+    expect(whole).toEqual({ zoom: min, x: 0, y: 112.5 });
+    // Dragging can't push a fitted axis off centre.
+    expect(
+      clampCrop({ zoom: min, x: 40, y: -60 }, wordmark, square, min),
+    ).toEqual(whole);
+    // Without the logo allowance the zoom stays at cover.
+    expect(clampCrop({ zoom: min, x: 0, y: 0 }, wordmark, square).zoom).toBe(1);
+  });
+
+  it("draws exactly what the frame shows onto the output canvas", () => {
+    const output = { width: 1024, height: 1024 };
+    const cover = initialCrop(photo, square);
+    expect(drawRect(cover, photo, square, output)).toEqual({
+      dx: -256,
+      dy: 0,
+      dw: 1536,
+      dh: 1024,
+    });
+    const wordmark = { width: 1000, height: 250 };
+    const whole = initialCrop(wordmark, square, fitZoom(wordmark, square));
+    expect(drawRect(whole, wordmark, square, output)).toEqual({
+      dx: 0,
+      dy: 384,
+      dw: 1024,
+      dh: 256,
+    });
   });
 });
