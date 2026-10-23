@@ -298,6 +298,11 @@ export {
   READ_COMPANY_PITCHES,
 } from "./tools/pitch-transcripts.js";
 export {
+  createReadCompanyFiguresTool,
+  READ_COMPANY_FIGURES,
+  shapeCompanyFigures,
+} from "./tools/company-figures.js";
+export {
   GET_DISCLOSURE_STATE,
   GetDisclosureStateOutputSchema,
   type GetDisclosureStateOutput,

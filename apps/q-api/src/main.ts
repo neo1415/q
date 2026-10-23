@@ -356,6 +356,7 @@ import {
   waitMaxMsFromEnv,
 } from "@capital-q/communication";
 import {
+  createPostgresClaimQueryPort,
   createPostgresDocumentQueryPort,
   createSupabaseDocumentStorageProvider,
   DocumentIdSchema,
@@ -1400,6 +1401,8 @@ const slateRead = createSlateReadPipeline({
 const pitchMarketplaceFacts = createPostgresCompanyMarketplaceQueryPort({
   sql: database.sql,
 });
+// A company's current claims, read in its own tenant (read_company_figures).
+const companyClaims = createPostgresClaimQueryPort({ sql: database.sql });
 const pitchMedia = createMediaService({
   sql: database.sql,
   transactions: database.transactions,
@@ -3061,6 +3064,31 @@ const qTools = createQTools({
       sql: database.sql,
       knowledge: createPostgresCompanyKnowledge({ sql: database.sql }),
     }),
+    // 2026-10-23: a company's published figures. read_company_figures
+    // admits the company first; this reads only the scopes it is handed,
+    // in the company's own tenant, as the public Q Card does.
+    companyFigures: {
+      current: async (company, scopes) => {
+        const reach = new Set<string>(scopes);
+        const claims = await companyClaims.listCurrentClaims(
+          TenantIdSchema.parse(company.tenantId),
+          { subjectType: "COMPANY", subjectId: company.companyId },
+          {},
+        );
+        return claims
+          .filter((claim) => reach.has(claim.visibilityScope))
+          .map((claim) => ({
+            claimKey: claim.claimKey,
+            statement: claim.statement,
+            structuredValue: claim.structuredValue,
+            validFrom: claim.validFrom,
+            truthClass: claim.truthClass,
+            evidenceStatus: claim.evidenceStatus,
+            visibilityScope: claim.visibilityScope,
+            sensitivityClass: claim.sensitivityClass,
+          }));
+      },
+    },
     // R18: what is said in the pitch around a moment, under the playback rule.
     pitchMoments: {
       momentAround: async (actor, query) => {

@@ -75,6 +75,7 @@ import { createScheduleTools } from "./tools/schedule.js";
 import { createRelationshipTools } from "./tools/relationships.js";
 import { createGetPitchMomentTool } from "./tools/pitch-moment.js";
 import { createReadCompanyPitchesTool } from "./tools/pitch-transcripts.js";
+import { createReadCompanyFiguresTool } from "./tools/company-figures.js";
 import { createExploreTools } from "./tools/explore.js";
 import { createVisibilityTools } from "./tools/visibility.js";
 import { createQDailyTools } from "./tools/daily.js";
@@ -244,6 +245,15 @@ function createUngatedQTools(ports: QToolPorts): readonly AnyQToolDefinition[] {
     ...(ports.pitchMoments?.forCompany === undefined
       ? []
       : [createReadCompanyPitchesTool(ports.pitchMoments)]),
+    // 2026-10-23: a company's published figures, admitted as get_company.
+    ...(ports.companyFigures === undefined
+      ? []
+      : [
+          createReadCompanyFiguresTool({
+            ...ports,
+            companyFigures: ports.companyFigures,
+          }),
+        ]),
     // Explore (ADR 0055): "pitches like X" and "search the network".
     ...(ports.explore === undefined ? [] : createExploreTools(ports.explore)),
     // CQ-BIZ-003: who can see what, and sharing, prepared for approval.

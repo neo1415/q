@@ -378,6 +378,32 @@ export type VisibilityIntelligencePort = {
  * context under exactly the pitch playback rule. Null or a throw: the
  * person may not play this pitch, and there is nothing to read.
  */
+/** The visibility scopes read_company_figures may ever ask for. */
+export type CompanyFigureScope = "network_visible" | "public_external";
+
+/** One current claim about a company, as the evidence context holds it. */
+export type CompanyFigure = {
+  readonly claimKey: string;
+  readonly statement: string;
+  readonly structuredValue: Readonly<Record<string, unknown>> | null;
+  readonly validFrom: string | null;
+  readonly truthClass: string;
+  readonly evidenceStatus: string;
+  readonly visibilityScope: string;
+  readonly sensitivityClass: string;
+};
+
+/**
+ * A company's current claims in its own tenant, at the given scopes only.
+ * The tool decides admission first; the port never widens what it is asked.
+ */
+export type CompanyFiguresPort = {
+  readonly current: (
+    company: { readonly tenantId: string; readonly companyId: string },
+    scopes: readonly CompanyFigureScope[],
+  ) => Promise<readonly CompanyFigure[]>;
+};
+
 export type PitchMomentPort = {
   readonly momentAround: (
     actor: ActorContext,
@@ -539,6 +565,8 @@ export type QToolPorts = {
   readonly profileGaps?: ProfileGapsPort | undefined;
   /** A pitch's transcript around a moment (R18); absent means no pitch tool. */
   readonly pitchMoments?: PitchMomentPort | undefined;
+  /** A company's published figures (2026-10-23); absent means no read_company_figures. */
+  readonly companyFigures?: CompanyFiguresPort | undefined;
   /** Explore (ADR 0055): pitches like X and network search; absent means no Explore tools. */
   readonly explore?: ExploreToolPort | undefined;
   /** Who can see what (CQ-BIZ-003); absent means no visibility tool exists. */
