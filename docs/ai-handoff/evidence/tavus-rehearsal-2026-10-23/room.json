@@ -1,0 +1,22 @@
+{
+  "founder": "founder.souqsheet@fictional.capitalq.local",
+  "counterpart": "INVESTOR_ORGANISATION/b0075742-0000-4000-8000-0000000000c1",
+  "interviewerId": "partner-steve",
+  "rehearsalId": "5991975b-cba5-4cb1-bc63-092ddb692e36",
+  "opening": "السلام عليكم. Thanks for making the time. A quick note first: this is an AI rehearsal informed by public sources, not the real person. To begin, tell me about Souqsheet, and in particular the exact financing structure on the table and whether it is Sharia-compliant. I will ask early how the structure works under Sharia principles, so have that ready.",
+  "video": {
+    "status": 200,
+    "ms": 6330,
+    "mode": "VIDEO"
+  },
+  "recording": {
+    "tracks": 3,
+    "kinds": ["video", "video", "audio"],
+    "seconds": 90
+  },
+  "end": {
+    "status": 200,
+    "ms": 4771
+  },
+  "roomSeconds": 96
+}
