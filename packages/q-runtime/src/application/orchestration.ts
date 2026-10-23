@@ -284,6 +284,15 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   /** The turn reader named someone other than the conversation's subject. */
   readonly aboutNamedOther?: boolean | undefined;
   /**
+   * Whom the turn is about, as the turn reader understood it (v58): the
+   * only name the public web and its pictures are searched by -- never one
+   * guessed from capital letters (production 2026-10-23: "Yes" was).
+   */
+  readonly namedOther?:
+    | { readonly name: string; readonly kind: "COMPANY" | "PERSON" }
+    | null
+    | undefined;
+  /**
    * K8: the reader read a question about something prepared for this turn
    * (their mandate, the record on screen, Q's work for them). The router
    * answers it from that context without a tool round when it is there.
@@ -303,9 +312,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
         readonly countries: readonly string[];
         readonly stages: readonly string[];
         readonly count: number | null;
-        readonly ranking: "NONE" | "FIT" | "TOP";
+        /** NAME: they asked for the list alphabetically or by name. */
+        readonly ranking: "NONE" | "FIT" | "TOP" | "NAME";
         readonly mandateRelevant: boolean;
         readonly previous: boolean;
+        /** They asked for companies raising now. Absent is false. */
+        readonly raising?: boolean | undefined;
       }
     | undefined;
   /**
@@ -341,6 +353,18 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
       }
     | undefined;
   /**
+   * TURN_READER v58 (owner 2026-10-23): which investors their own company
+   * should approach, or which fit it, as the reader read it. Answered by
+   * code from investors' network-visible profiles and the investors
+   * already in touch with them, never from an investor's private mandate.
+   */
+  readonly investorProspects?:
+    | {
+        readonly text: string;
+        readonly count: number | null;
+      }
+    | undefined;
+  /**
    * A FIT question as the reader read it (live 2026-10-09): their question
    * in its words -- the earlier ask when this turn only pressed on it
    * ("still waiting") -- and how many companies it asks for, null when
@@ -358,6 +382,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
          * fits?"); the ranking leaves those out. Absent is false.
          */
         readonly excludeShown?: boolean | undefined;
+        /**
+         * The reader read it as ranking against their mandate or for
+         * themselves ("rank them for me", "top three based on my
+         * mandate"). Absent is false.
+         */
+        readonly mandateRelevant?: boolean | undefined;
       }
     | undefined;
   /**

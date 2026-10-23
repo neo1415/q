@@ -414,6 +414,17 @@ export {
   type TurnQuestionV56,
   TurnReaderV56ResultSchema,
   type TurnReaderV56Result,
+  TURN_READER_V58_SCHEMA_VERSION,
+  NamedOtherSchema,
+  type NamedOther,
+  TurnMeetingPrepSchema,
+  type TurnMeetingPrep,
+  TurnReaderV58ResultSchema,
+  type TurnReaderV58Result,
+  QUESTION_KINDS_V58,
+  TurnQuestionV58Schema,
+  type QuestionKindV58,
+  type TurnQuestionV58,
   TurnFromShownSchema,
   type TurnFromShown,
   TurnReaderV54ResultSchema,
@@ -1492,6 +1503,16 @@ export {
 } from "./prompts/tasks/spoken-reply.v1.js";
 export { BRIEFING_COMMAND_V1 } from "./prompts/tasks/briefing-command.v1.js";
 export { SMALL_TALK_V1 } from "./prompts/tasks/small-talk.v1.js";
+export { CALL_PREP_V1 } from "./prompts/tasks/call-prep.v1.js";
+export {
+  CALL_PREP_SCHEMA_NAME,
+  CALL_PREP_SCHEMA_VERSION,
+  CALL_PREP_UNTRUSTED,
+  CallPrepResultSchema,
+  CallPrepVariablesSchema,
+  type CallPrepResult,
+  type CallPrepVariables,
+} from "./prompts/schemas/call-prep.js";
 export { CONVERSATION_RECALL_V1 } from "./prompts/tasks/conversation-recall.v1.js";
 export {
   CONVERSATION_RECALL_SCHEMA_NAME,
@@ -1532,6 +1553,11 @@ export {
   TurnSkimV3VariablesSchema,
   ARRIVAL_ASPECTS,
   type TurnSkimResult,
+  TURN_SKIM_V6_SCHEMA_VERSION,
+  SkimSubjectSchema,
+  type SkimSubject,
+  TurnSkimV6ResultSchema,
+  type TurnSkimV6Result,
   type TurnSkimVariables,
   type TurnSkimV3Variables,
 } from "./prompts/schemas/turn-skim.js";
@@ -1681,7 +1707,19 @@ export {
   TURN_READER_V57,
   V57_WHAT_IS_CAPITAL_Q,
 } from "./prompts/tasks/turn-reader.v57.js";
+export {
+  TURN_READER_V58,
+  V1_ABOUT_NAMED_OTHER,
+  V58_NAMED_OTHER,
+  V58_RAISING,
+  V58_RANKING_NAME,
+  V58_SUITS_THEM,
+  V58_FIT_MANDATE,
+  V58_MEETING_PREP,
+  V58_INVESTOR_PROSPECTS,
+} from "./prompts/tasks/turn-reader.v58.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
+export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 
 export {
   COMPANY_ANALYST_V23,

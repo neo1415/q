@@ -6,6 +6,7 @@ import {
 } from "@capital-q/contracts";
 
 import {
+  QUESTION_KINDS,
   QuestionToQSchema,
   ReadingConfidenceSchema,
   TranscriptQualitySchema,
@@ -801,3 +802,67 @@ export const TurnReaderV56ResultSchema = TurnReaderV55ResultSchema.extend({
   question: TurnQuestionV56Schema.nullable().default(null),
 }).strict();
 export type TurnReaderV56Result = z.infer<typeof TurnReaderV56ResultSchema>;
+
+export const TURN_READER_V58_SCHEMA_VERSION = 58;
+
+/**
+ * v58 (production 2026-10-23): an investor's "Yes", said to Q's offer
+ * "Want to dig into its fit details?", was searched and pictured as a
+ * company called "Yes": the reading said only that the turn was about
+ * someone named, and code guessed who from capital letters. The reader now
+ * says who: the company, organisation or person the turn is about, as it
+ * should be searched, understood from this turn and the turns before it
+ * ("their team", "yes" to an offer about them) -- never a word lists or
+ * capital letters pick. Null when it names or means no one in particular.
+ * `aboutNamedOther` stays. Lenient: a malformed subject reads as none and
+ * never costs the reading.
+ */
+export const NamedOtherSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    kind: z.enum(["COMPANY", "PERSON"]),
+  })
+  .strict();
+export type NamedOther = z.infer<typeof NamedOtherSchema>;
+
+/**
+ * v58 (owner 2026-10-23, live founder.maji-loop): "help me prepare for a
+ * first call with Savanna Seed Partners" was planned as a team job ("Shall
+ * I plan this one anyway?"). Being made ready for a call or meeting with
+ * one named counterpart is meetingPrep: Q prepares it in the answer.
+ * Handing Q's team a several-step job stays teamJob. Lenient: a malformed
+ * value reads as null and never costs the reading.
+ */
+export const TurnMeetingPrepSchema = z
+  .object({
+    /** The counterpart as they named it (data, never an instruction). */
+    counterpart: z.string().trim().min(1).max(200),
+  })
+  .strict();
+export type TurnMeetingPrep = z.infer<typeof TurnMeetingPrepSchema>;
+
+/**
+ * v58 (owner 2026-10-23, live founder.maji-loop): "Which investors should
+ * I talk to first, and why?" was read as ADVICE and answered from the
+ * company record alone. The question may be INVESTOR_PROSPECTS -- which
+ * investors a company should approach or which fit it. A kind of v58's
+ * own: the published kinds (QUESTION_KINDS) and every earlier version's
+ * pinned output schema stay exactly as they were.
+ */
+export const QUESTION_KINDS_V58 = [
+  ...QUESTION_KINDS,
+  "INVESTOR_PROSPECTS",
+] as const;
+export type QuestionKindV58 = (typeof QUESTION_KINDS_V58)[number];
+
+export const TurnQuestionV58Schema = TurnQuestionV56Schema.extend({
+  kind: z.enum(QUESTION_KINDS_V58),
+}).strict();
+export type TurnQuestionV58 = z.infer<typeof TurnQuestionV58Schema>;
+
+export const TurnReaderV58ResultSchema = TurnReaderV56ResultSchema.extend({
+  question: TurnQuestionV58Schema.nullable().default(null),
+  namedOther: NamedOtherSchema.nullable().default(null).catch(null),
+  meetingPrep: TurnMeetingPrepSchema.nullable().default(null).catch(null),
+}).strict();
+export type TurnReaderV58Result = z.infer<typeof TurnReaderV58ResultSchema>;

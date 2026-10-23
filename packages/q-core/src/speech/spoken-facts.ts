@@ -435,6 +435,13 @@ export function spokenFactsOf(input: {
   readonly text: string;
   readonly blocks: readonly QResultBlock[];
   readonly shown?: readonly QAnswerCard[] | undefined;
+  /**
+   * How many they asked for, as the turn reader understood it. Owner
+   * 2026-10-23: "show me the five companies that best fit my mandate"
+   * was spoken as one, because the words alone read "best fit" as one.
+   * Given, it decides; absent, the words are read as before.
+   */
+  readonly requested?: number | null | undefined;
 }): SpokenFacts | null {
   const seed = seedOf(`${input.asked}\u0000${input.text}`);
   const ranked = input.blocks.find(
@@ -444,7 +451,10 @@ export function spokenFactsOf(input: {
   );
   if (ranked !== undefined) {
     const scored = ranked.cards.filter((card) => card.fit !== null);
-    const requested = requestedCount(input.asked);
+    const requested =
+      input.requested === undefined || input.requested === null
+        ? requestedCount(input.asked)
+        : input.requested;
     const n = Math.min(requested ?? 3, scored.length);
     const said = scored.slice(0, n).map(itemOf);
     const lastScore = said[said.length - 1]?.score ?? null;

@@ -10,6 +10,7 @@ import {
   createConversationRecall,
   createQTurnReader,
   createSmallTalkReply,
+  createCallPrepWriter,
   createTurnSkimmer,
   type QArtifactReviser,
   type QReceiptPort,
@@ -87,6 +88,7 @@ import { createAppActionRouter } from "./app-action-router.js";
 import { createProfileGapReader } from "./profile-gap-reader.js";
 
 import { MANDATE_LABELS } from "./mandate-labels.js";
+import { createCallPrepPort, type CallPrepSources } from "./call-prep.js";
 
 /**
  * Q's intelligence composition (CQ-C5-R1 §6-§12).
@@ -121,6 +123,12 @@ import { MANDATE_LABELS } from "./mandate-labels.js";
 
 export type QIntelligenceDependencies = {
   readonly sql: DatabaseExecutor;
+  /**
+   * Owner 2026-10-23: what a call with one named counterpart is prepared
+   * from (the rehearsal's material, read as them). Absent: such a turn is
+   * answered as before.
+   */
+  readonly callPrep?: Omit<CallPrepSources, "write"> | undefined;
   /** W1: what Q told them on arrival, prepared for every turn of theirs. */
   readonly arrivalSnapshot?:
     | ((actor: QAnswerRequest["actor"]) => Promise<ArrivalSnapshot | null>)
@@ -626,6 +634,20 @@ export function composeQIntelligence(
       tools,
       ...(logger === undefined ? {} : { logger }),
     }),
+    ...(dependencies.callPrep === undefined
+      ? {}
+      : {
+          callPrep: createCallPrepPort({
+            ...dependencies.callPrep,
+            write: createCallPrepWriter({
+              gateway,
+              ...(dependencies.dataPosture === undefined
+                ? {}
+                : { dataPosture: dependencies.dataPosture }),
+              ...(logger === undefined ? {} : { logger }),
+            }),
+          }),
+        }),
     teamJob: createToolTeamJobPort({
       tools,
       ...(logger === undefined ? {} : { logger }),

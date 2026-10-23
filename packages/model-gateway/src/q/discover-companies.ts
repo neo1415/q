@@ -11,7 +11,12 @@ import type {
   QToolPort,
 } from "@capital-q/q-runtime";
 
-import { fitSweepCardsBlock, fitsInOutcome, type RunFit } from "./fit-cards.js";
+import {
+  cardRaiseWords,
+  fitSweepCardsBlock,
+  fitsInOutcome,
+  type RunFit,
+} from "./fit-cards.js";
 
 /**
  * K1 (founder brief 2026-10-09, live 15:57 UTC): "show me three fintech
@@ -29,6 +34,12 @@ export type DiscoverAsk = NonNullable<QAnswerRequest["discoverCompanies"]>;
 
 /** "Show me fintech companies" with no number. */
 export const DISCOVER_DEFAULT_COUNT = 3;
+/**
+ * Owner 2026-10-23: an investor asking for companies of a kind with no
+ * number gets every match up to a page, ranked by fit, with how many
+ * matched; never only three.
+ */
+export const DISCOVER_INVESTOR_PAGE = 10;
 /** Fit is computed for at most this many catalog companies. */
 export const DISCOVER_FIT_MAX = 24;
 
@@ -48,6 +59,11 @@ type Catalog = {
   readonly companies: readonly CatalogCompany[];
   readonly sectors: readonly { readonly code: string; readonly name: string }[];
   readonly unknownSectors: readonly string[];
+  /** FIT: every match was scored on the mandate and these are the best. */
+  readonly order: "NAME" | "FIT";
+  /** How many matched (FIT counts them all); a floor when `atLeast`. */
+  readonly total: number | null;
+  readonly atLeast: boolean;
 };
 
 export type DiscoveryAnswer = {
@@ -61,14 +77,26 @@ export type DiscoveryAnswer = {
 
 function catalogOf(outcome: QToolCallOutcome | null): Catalog | null {
   if (outcome === null || !outcome.result.ok) return null;
-  const data = outcome.result.data as Partial<Catalog> | null;
+  const data = outcome.result.data as {
+    readonly companies?: unknown;
+    readonly sectors?: unknown;
+    readonly unknownSectors?: unknown;
+    readonly order?: unknown;
+    readonly total?: unknown;
+    readonly totalAtLeast?: unknown;
+  } | null;
   if (data === null || !Array.isArray(data.companies)) return null;
   return {
-    companies: data.companies,
-    sectors: Array.isArray(data.sectors) ? data.sectors : [],
-    unknownSectors: Array.isArray(data.unknownSectors)
-      ? data.unknownSectors
+    companies: data.companies as readonly CatalogCompany[],
+    sectors: Array.isArray(data.sectors)
+      ? (data.sectors as Catalog["sectors"])
       : [],
+    unknownSectors: Array.isArray(data.unknownSectors)
+      ? (data.unknownSectors as readonly string[])
+      : [],
+    order: data.order === "FIT" ? "FIT" : "NAME",
+    total: typeof data.total === "number" ? data.total : null,
+    atLeast: data.totalAtLeast === true,
   };
 }
 
@@ -188,6 +216,24 @@ function scoreOf(fit: RunFit): number {
   return shown === null ? -1 : Number(shown);
 }
 
+/**
+ * "Raising a seed round": which of the companies shown state a current
+ * raise, and that for the rest it is unknown. A company with no raise on
+ * record is never said not to be raising (unknown stays unknown).
+ */
+function raisingNote(ask: DiscoverAsk, shown: readonly RunFit[]): string {
+  if (ask.raising !== true) return "";
+  const stated = shown.filter((fit) => cardRaiseWords(fit) !== null);
+  const rest = shown.length - stated.length;
+  if (stated.length === 0) {
+    return " None of them states a current raise on Capital Q, so whether they're raising now is unknown.";
+  }
+  const which = `${listed(stated.map((fit) => `${fit.name} (${cardRaiseWords(fit) ?? ""})`))} ${stated.length === 1 ? "states" : "state"} a current raise`;
+  return rest === 0
+    ? ` ${which}.`
+    : ` ${which}; for the other ${counted(rest)}, whether they're raising now isn't on record.`;
+}
+
 function capitalised(text: string): string {
   return `${text[0]?.toUpperCase() ?? ""}${text.slice(1)}`;
 }
@@ -207,10 +253,22 @@ export async function runCompanyDiscovery(input: {
 }): Promise<DiscoveryAnswer | null> {
   const { ask, tools, context, available } = input;
   if (!available.has(DISCOVER_TOOL) || ask.previous) return null;
-  const count = Math.min(Math.max(ask.count ?? DISCOVER_DEFAULT_COUNT, 1), 10);
+  const count = Math.min(
+    Math.max(
+      ask.count ??
+        (input.investor ? DISCOVER_INVESTOR_PAGE : DISCOVER_DEFAULT_COUNT),
+      1,
+    ),
+    10,
+  );
   const fitAsked =
     ask.ranking === "FIT" || ask.ranking === "TOP" || ask.mandateRelevant;
-  const fitWanted = fitAsked && input.investor && available.has(FIT_TOOL);
+  // Owner 2026-10-23: for an investor a list of companies is ranked by fit
+  // with their mandate by default; it is in name order only when the
+  // reader read that they asked for it so (ranking NAME). "Listed by name,
+  // not ranked" is a database's answer, not an analyst's.
+  const byName = ask.ranking === "NAME";
+  const fitWanted = !byName && input.investor && available.has(FIT_TOOL);
   const calls: QToolCallOutcome[] = [];
   const execute = async (
     name: string,
@@ -230,7 +288,10 @@ export async function runCompanyDiscovery(input: {
         sectors: [...ask.sectors],
         countries: [...ask.countries],
         stages: [...ask.stages],
+        // Owner 2026-10-23: the catalog scores every match on the mandate
+        // and returns the best; never the first companies by name.
         limit: fitWanted ? DISCOVER_FIT_MAX : count,
+        ...(fitWanted ? { order: "FIT" } : {}),
       },
       "q-discover-companies",
     ),
@@ -255,9 +316,12 @@ export async function runCompanyDiscovery(input: {
   let fits: RunFit[] = [];
   let noMandate = false;
   if (fitWanted) {
+    // FIT order: the catalog already scored every match and these are the
+    // best, so only they are read in full for their cards. A catalog that
+    // could not rank (name order) has its first page scored, as before.
     const outcomes = await Promise.all(
       catalog.companies
-        .slice(0, DISCOVER_FIT_MAX)
+        .slice(0, catalog.order === "FIT" ? count : DISCOVER_FIT_MAX)
         .map((company, index) =>
           execute(
             FIT_TOOL,
@@ -296,12 +360,35 @@ export async function runCompanyDiscovery(input: {
           ? card.name
           : `${card.name} at ${String(card.fit.score)}`,
       );
-      const fewer =
-        block.cards.length < count
-          ? `Only ${counted(block.cards.length)} of the ${kind} you can see could be scored. `
-          : "";
+      // How many matched: every one retrieved, unless the catalog's
+      // bound was reached, when it is a floor.
+      const total = catalog.total ?? catalog.companies.length;
+      const floor =
+        catalog.total === null
+          ? catalog.companies.length >= DISCOVER_FIT_MAX
+          : catalog.atLeast;
+      const matched = floor
+        ? `At least ${String(total)}`
+        : capitalised(counted(total));
+      const one = kind.replace(/companies/u, "company");
+      const head =
+        total < count && ask.count !== null
+          ? total === 1
+            ? `Capital Q has only one ${one} you can see: ${listed(named)}.`
+            : `Capital Q has only ${counted(total)} ${kind} you can see, ranked by fit with your mandate: ${listed(named)}.`
+          : ask.count !== null
+            ? `${
+                block.cards.length < count
+                  ? `Only ${counted(block.cards.length)} of the ${kind} you can see could be scored. `
+                  : ""
+              }Ranked by fit with your mandate, the strongest ${kind}: ${listed(named)}.`
+            : total === 1
+              ? `Capital Q has only one ${one} you can see: ${listed(named)}.`
+              : block.cards.length === total
+                ? `${matched} ${kind} on Capital Q, ranked by fit with your mandate: ${listed(named)}.`
+                : `${matched} ${kind} on Capital Q; ranked by fit with your mandate, the top ${counted(block.cards.length)}: ${listed(named)}.`;
       return {
-        text: `${fewer}Ranked by fit with your mandate, the strongest ${kind}: ${listed(named)}. They're on screen.`,
+        text: `${head}${raisingNote(ask, chosen)} ${block.cards.length === 1 ? "It's" : "They're"} on screen.`,
         block,
         basis: "FIT",
         shown: block.cards.length,
@@ -317,13 +404,21 @@ export async function runCompanyDiscovery(input: {
   const head = fewer
     ? `Capital Q has only ${counted(chosen.length)} ${chosen.length === 1 ? kind.replace(/companies/u, "company") : kind} you can see: ${listed(names)}.`
     : `Here are ${counted(chosen.length)} ${kind} on Capital Q: ${listed(names)}.`;
-  const basis = !fitAsked
-    ? " They're listed by name, not ranked."
-    : noMandate || !input.investor
+  const basis = byName
+    ? " In name order, as you asked."
+    : noMandate
       ? " You don't have a mandate to rank against yet, so these are by name, not a judgement of which is best."
-      : " They're listed by name; I couldn't score their fit just now.";
+      : input.investor
+        ? " I couldn't score their fit with your mandate just now, so these are in name order."
+        : !fitAsked
+          ? " They're listed by name, not ranked."
+          : " You don't have a mandate to rank against yet, so these are by name, not a judgement of which is best.";
+  const raising =
+    ask.raising === true
+      ? " Whether they're raising now isn't on record for these, so I can't confirm it."
+      : "";
   return {
-    text: `${head}${basis} They're on screen.`,
+    text: `${head}${basis}${raising} They're on screen.`,
     block,
     basis: fitAsked ? "NAME_UNSCORED" : "NAME",
     shown: chosen.length,

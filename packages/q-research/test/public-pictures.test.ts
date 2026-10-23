@@ -128,6 +128,30 @@ describe("public pictures of who a turn names", () => {
     expect(pictures.map((p) => p.domain)).toEqual(["techcrunch.com"]);
   });
 
+  it("shows one image once, even when two of their sites carry it", async () => {
+    const photo = "https://static.wixstatic.com/media/zino.jpg";
+    const found = index([
+      {
+        imageUrl: `${photo}?w=980`,
+        thumbnailUrl: null,
+        pageUrl: "https://academy.zinoaviation.com/post/pilots",
+        title: "Zino Aviation",
+      },
+      {
+        imageUrl: `${photo}?w=600`,
+        thumbnailUrl: null,
+        pageUrl: "https://www.zinoaviation.com/about",
+        title: "Zino Aviation",
+      },
+    ]);
+    const search = createPublicPictureSearch({ provider: found.provider });
+    const pictures = await search.find({
+      name: "Zino Aviation",
+      userText: "Tell me about Zino Aviation",
+    });
+    expect(pictures).toHaveLength(1);
+  });
+
   it("prefers their own site, then Wikipedia and LinkedIn, then the rest", async () => {
     const at = (pageUrl: string) => ({
       imageUrl: `${pageUrl}photo.jpg`,

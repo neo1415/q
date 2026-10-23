@@ -16,16 +16,17 @@ describe("compound fit meaning in the existing readers", () => {
   it("publishes new versions without rewriting historical prompts", () => {
     const registry = createDefaultPromptRegistry();
     // v52 (lane ml nextSteps) on v51 (decision with work) keeps v50's compound-fit rule.
-    expect(registry.getActive("TURN_READER").definition.version).toBe(57);
+    expect(registry.getActive("TURN_READER").definition.version).toBe(58);
     expect(registry.getActive("TURN_READER").definition.template).toContain(
       V50_FIT,
     );
     expect(TURN_READER_V50.status).toBe("DEPRECATED");
-    expect(registry.getActive("TURN_SKIM").definition).toMatchObject({
-      version: 5,
-      template: TURN_SKIM_V5.template,
-      status: "ACTIVE",
-    });
+    // v6 (subject) keeps v5's compound-fit rule whole.
+    expect(registry.getActive("TURN_SKIM").definition.version).toBe(6);
+    expect(registry.getActive("TURN_SKIM").definition.template).toContain(
+      V5_COMPOUND_FIT,
+    );
+    expect(TURN_SKIM_V5.status).toBe("DEPRECATED");
     expect(TURN_READER_V49.status).toBe("DEPRECATED");
     expect(TURN_SKIM_V4.status).toBe("DEPRECATED");
     expect(TURN_READER_V50.template.split(V50_FIT)).toHaveLength(2);
