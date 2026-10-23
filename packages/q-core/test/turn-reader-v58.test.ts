@@ -10,6 +10,9 @@ import {
   V58_SUITS_THEM,
   V49_TEAM_JOB,
   V58_MEETING_PREP,
+  V46_DISCOVER,
+  V58_INVESTOR_PROSPECTS,
+  QuestionKindSchema,
   createDefaultPromptRegistry,
 } from "../src/index.js";
 
@@ -95,5 +98,51 @@ describe("TURN_READER v58: getting ready for a call is meetingPrep", () => {
     });
     expect(shape.parse({ counterpart: "" })).toBeNull();
     expect(shape.parse("Savanna")).toBeNull();
+  });
+});
+
+/**
+ * Founder investor matching (owner 2026-10-23, live founder.maji-loop):
+ * "Which investors should I talk to first, and why?" is its own question
+ * kind, read by meaning, answered by code from the investors already
+ * interested and network-visible profiles.
+ */
+describe("TURN_READER v58: which investors a company should approach", () => {
+  it("adds INVESTOR_PROSPECTS beside DISCOVER_COMPANIES in the shared v58", () => {
+    expect(TURN_READER_V58.template).toContain(
+      `${V46_DISCOVER}${V58_INVESTOR_PROSPECTS}`,
+    );
+  });
+
+  it("is a question kind of v58's reading only; published kinds are unchanged", () => {
+    const reading = TurnReaderV58ResultSchema.parse({
+      kind: "QUESTION_TO_Q",
+      confidence: "HIGH",
+      transcript: "CLEAR",
+      question: {
+        kind: "INVESTOR_PROSPECTS",
+        text: "Which investors should I talk to first, and why?",
+        count: null,
+      },
+    });
+    expect(reading.question?.kind).toBe("INVESTOR_PROSPECTS");
+    expect(QuestionKindSchema.safeParse("INVESTOR_PROSPECTS").success).toBe(
+      false,
+    );
+  });
+
+  it("reads by meaning, over ADVICE, FIT and DISCOVER_COMPANIES, and leaves region asks alone", () => {
+    expect(V58_INVESTOR_PROSPECTS).toMatch(
+      /by what it means, in any words and any language/u,
+    );
+    expect(V58_INVESTOR_PROSPECTS).toMatch(
+      /Over ADVICE, FIT and DISCOVER_COMPANIES/u,
+    );
+    expect(V58_INVESTOR_PROSPECTS).toContain(
+      "which investors should I talk to first, and why?",
+    );
+    expect(V58_INVESTOR_PROSPECTS).toMatch(
+      /not this kind when they ask about one named investor/u,
+    );
   });
 });

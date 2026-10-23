@@ -6,6 +6,7 @@ import {
   type TurnReaderV55Variables,
   type TurnReaderV58Result,
 } from "../schemas/turn-reader.js";
+import { V46_DISCOVER } from "./turn-reader.v46.js";
 import { V49_TEAM_JOB } from "./turn-reader.v49.js";
 import { TURN_READER_V57 } from "./turn-reader.v57.js";
 
@@ -44,7 +45,20 @@ export const V58_FIT_MANDATE = `for FIT only previous, true when they mean the c
 export const V58_MEETING_PREP = `MEETING PREP: meetingPrep is {"counterpart": the name as they said it} when they want you to get them ready for a call, meeting or pitch with one named investor, firm, company or person -- what to expect, what they will ask, how to come across -- in any words and any language ("help me prepare for my first call with Savanna Seed Partners", "brief me before I meet Kestrel", "what should I expect from the Acme call?", "prépare-moi pour mon appel avec Savanna"). Then teamJob is false: you prepare it now, in your answer. It stays teamJob (and meetingPrep is null) only when they hand the work to your team or ask for several steps of work besides ("get your team to research them, write a memo and prepare me"). Otherwise meetingPrep is null.
 `;
 
+/**
+ * Founder investor matching (shared bump, owner 2026-10-23, live
+ * founder.maji-loop): "Which investors should I talk to first, and why?"
+ * was read as ADVICE about their own company and answered from the
+ * company record alone ("no fit evidence is available"). Which investors a
+ * company should approach is its own question kind, read by meaning; code
+ * answers it from the investors already interested and the likely fits
+ * from what investors publish, never from an investor's private mandate.
+ */
+export const V58_INVESTOR_PROSPECTS = `- INVESTOR_PROSPECTS: they ask, for their own company or raise, which investors to approach, contact, pitch or talk to first, or which investors fit them, suit them or are most likely to back them, by what it means, in any words and any language ("which investors should I talk to first, and why?", "who should I pitch?", "investors that fit us", "who's most likely to fund this round?", "¿a qué inversores debería contactar?"). Q answers it from the investors on Capital Q and those already in touch with them. Over ADVICE, FIT and DISCOVER_COMPANIES whenever what they ask for is investors for their own company. count: how many investors they asked for; null when they named no number. It is not this kind when they ask about one named investor, or only for investors of a region, nationality or kind ("top three Gulf investors").
+`;
+
 for (const rule of [
+  V46_DISCOVER,
   V49_TEAM_JOB,
   V1_ABOUT_NAMED_OTHER,
   V36_MANDATE_RELEVANT,
@@ -63,7 +77,7 @@ export const TURN_READER_V58: PromptDefinition<
   version: 58,
   status: "ACTIVE",
   changeDescription:
-    "Production 2026-10-23 ('Yes' searched and pictured as a company): v57 plus namedOther {name, kind} -- the company, organisation or person the turn is about, named by the reader from meaning and the recent turns (a yes to an offer about them, 'their team'), null when no one in particular; code searches and pictures only that, never a name guessed from capital letters or word lists. Shared with Lane 4: asking which companies to look into, invest in, consider or meet (or for recommendations) is DISCOVER ranking FIT with mandateRelevant true, and a FIT ranking against their mandate or for themselves carries mandateRelevant true -- by meaning, no phrase lists. Shared with Lane 5: being made ready for a call or meeting with one named counterpart is meetingPrep {counterpart} (prepared in the answer, never a team job); handing the team a several-step job stays teamJob.",
+    "Production 2026-10-23 ('Yes' searched and pictured as a company): v57 plus namedOther {name, kind} -- the company, organisation or person the turn is about, named by the reader from meaning and the recent turns (a yes to an offer about them, 'their team'), null when no one in particular; code searches and pictures only that, never a name guessed from capital letters or word lists. Shared with Lane 4: asking which companies to look into, invest in, consider or meet (or for recommendations) is DISCOVER ranking FIT with mandateRelevant true, and a FIT ranking against their mandate or for themselves carries mandateRelevant true -- by meaning, no phrase lists. Shared with Lane 5: being made ready for a call or meeting with one named counterpart is meetingPrep {counterpart} (prepared in the answer, never a team job); handing the team a several-step job stays teamJob. Founder investor matching: which investors a company should approach, talk to first or that fit it is the INVESTOR_PROSPECTS question kind (over ADVICE, FIT and DISCOVER_COMPANIES), answered by code from the investors already interested and network-visible profiles, never an investor's private mandate.",
   effectiveFrom: "2026-10-23",
   output: {
     kind: "STRUCTURED",
@@ -75,5 +89,6 @@ export const TURN_READER_V58: PromptDefinition<
     .replace(V1_ABOUT_NAMED_OTHER, `${V1_ABOUT_NAMED_OTHER}${V58_NAMED_OTHER}`)
     .replace(V36_MANDATE_RELEVANT, `${V36_MANDATE_RELEVANT}${V58_SUITS_THEM}`)
     .replace(V36_FIT_ONLY_PREVIOUS, V58_FIT_MANDATE)
-    .replace(V49_TEAM_JOB, `${V49_TEAM_JOB}${V58_MEETING_PREP}`),
+    .replace(V49_TEAM_JOB, `${V49_TEAM_JOB}${V58_MEETING_PREP}`)
+    .replace(V46_DISCOVER, `${V46_DISCOVER}${V58_INVESTOR_PROSPECTS}`),
 };

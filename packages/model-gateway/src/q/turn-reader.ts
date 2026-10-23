@@ -6,6 +6,7 @@ import {
   renderPrompt,
   TurnReaderV58ResultSchema,
   type PromptRegistry,
+  type QuestionKindV58,
   type TurnReaderV14Result,
   type TurnReaderV15Result,
   type TurnReaderV22Result,
@@ -85,7 +86,9 @@ export type QTurnReading = Omit<
    * reading without it fits; absent is false.
    */
   readonly question:
-    | (NonNullable<TurnReaderV15Result["question"]> & {
+    | (Omit<NonNullable<TurnReaderV15Result["question"]>, "kind"> & {
+        /** v58: INVESTOR_PROSPECTS joins the earlier kinds. */
+        readonly kind: QuestionKindV58;
         readonly excludeShown?: boolean | undefined;
       })
     | null;

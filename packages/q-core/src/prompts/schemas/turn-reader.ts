@@ -6,6 +6,7 @@ import {
 } from "@capital-q/contracts";
 
 import {
+  QUESTION_KINDS,
   QuestionToQSchema,
   ReadingConfidenceSchema,
   TranscriptQualitySchema,
@@ -840,7 +841,27 @@ export const TurnMeetingPrepSchema = z
   .strict();
 export type TurnMeetingPrep = z.infer<typeof TurnMeetingPrepSchema>;
 
+/**
+ * v58 (owner 2026-10-23, live founder.maji-loop): "Which investors should
+ * I talk to first, and why?" was read as ADVICE and answered from the
+ * company record alone. The question may be INVESTOR_PROSPECTS -- which
+ * investors a company should approach or which fit it. A kind of v58's
+ * own: the published kinds (QUESTION_KINDS) and every earlier version's
+ * pinned output schema stay exactly as they were.
+ */
+export const QUESTION_KINDS_V58 = [
+  ...QUESTION_KINDS,
+  "INVESTOR_PROSPECTS",
+] as const;
+export type QuestionKindV58 = (typeof QUESTION_KINDS_V58)[number];
+
+export const TurnQuestionV58Schema = TurnQuestionV56Schema.extend({
+  kind: z.enum(QUESTION_KINDS_V58),
+}).strict();
+export type TurnQuestionV58 = z.infer<typeof TurnQuestionV58Schema>;
+
 export const TurnReaderV58ResultSchema = TurnReaderV56ResultSchema.extend({
+  question: TurnQuestionV58Schema.nullable().default(null),
   namedOther: NamedOtherSchema.nullable().default(null).catch(null),
   meetingPrep: TurnMeetingPrepSchema.nullable().default(null).catch(null),
 }).strict();

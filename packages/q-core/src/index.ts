@@ -421,6 +421,10 @@ export {
   type TurnMeetingPrep,
   TurnReaderV58ResultSchema,
   type TurnReaderV58Result,
+  QUESTION_KINDS_V58,
+  TurnQuestionV58Schema,
+  type QuestionKindV58,
+  type TurnQuestionV58,
   TurnFromShownSchema,
   type TurnFromShown,
   TurnReaderV54ResultSchema,
@@ -1710,6 +1714,7 @@ export {
   V58_SUITS_THEM,
   V58_FIT_MANDATE,
   V58_MEETING_PREP,
+  V58_INVESTOR_PROSPECTS,
 } from "./prompts/tasks/turn-reader.v58.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
