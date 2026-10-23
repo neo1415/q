@@ -172,8 +172,8 @@ describe("CompanyScores", () => {
     expect(tile?.getAttribute("aria-label")).toContain(
       "Investability 58 · based on 15 of 46 factors",
     );
-    expect(tile?.textContent).toContain("58");
-    expect(tile?.textContent).toContain("80");
+    // One clean signal on the tile: the fit with this viewer.
+    expect(tile?.textContent).toBe("Suitability 80");
   });
 
   it("cards on one page share one batched read", async () => {
