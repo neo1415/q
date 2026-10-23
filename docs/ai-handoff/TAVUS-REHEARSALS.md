@@ -65,3 +65,21 @@ These are from the public Tavus pricing page on 23 Oct. The page also lists an o
 - Raven perception (camera analysis, a consent question);
 - per-turn voice tone on Tavus;
 - longer rooms.
+
+## Live test (owner-approved, 23 Oct, production adbbbe2ef)
+
+Two rooms, founder.souqsheet × QInvest, interviewer Steve (`rdd4c86e5e1a`, Phoenix-4). Script: `scripts/handoff/live/rehearsal-video-room.mjs`.
+
+| Room | Rehearsal  | PAL            | Live → ended        | Seconds counted | Outcome                                                                                                                                   |
+| ---- | ---------- | -------------- | ------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `1dd0d05e` | `pb3ad83bcb2c` | 13:40:35 → 13:41:28 | 58              | Opened and ended cleanly. The headless browser sat on Daily's "Enter your name" prompt and never joined, so **no evidence**. Script fixed |
+| 2    | `5991975b` | `p0b233ecff9d` | 13:58:41 → 14:00:15 | 100             | Joined. 90 s recorded: 3 tracks (2 video, 1 audio)                                                                                        |
+
+- **Total:** 158 s, about 2.6 Builder minutes, about $0.92 at the $0.35/min overage (or 2.6 of the 175 included minutes).
+- **Room ready:** in 6.3 s for room 2 (16.5 s for room 1).
+- **What room 2 showed:**
+  - **Tile and disclosure:** the tile reads "QInvest LLC Q rehearsal". The banner reads "This is an AI rehearsal informed by public sources. It is not the real person and does not predict what they would say."
+  - **Speech:** speech-to-text of the recording hears "Not the real QInvest LLC. **Assalamu alaikum.** Thanks for making the time. A quick note first: this is an AI rehearsal informed by public sources, not the real person. To begin, tell me about Souqsheet, and in particular, the exact financing structure on the table and whether it is Sharia compliant…". The first word comes at 0.5 s.
+  - **Face:** lip-synced, and attentive and composed through the opening, which is a neutral question. Stronger expression would need a pushback turn, which wasn't recorded (the room had no founder speech).
+  - **Voice:** whether Tavus used the persona's ElevenLabs voice (Helal) or its stock voice can't be told from speech-to-text. Compare `opening-audio.mp3` here with `../rehearsal-voices-2026-10-23/qinvest-live-opening.mp3` by ear, or read the PAL's `layers.tts` with the Builder key (`GET /v2/pals/p0b233ecff9d`, read-only).
+- **Evidence:** `evidence/tavus-rehearsal-2026-10-23/`, holding `room-joined.png`, `frame-3/8/20.jpg`, `opening-audio.mp3` (first 30 s) and `room.json`. The full 22 MB recording is kept out of git.

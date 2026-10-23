@@ -140,13 +140,36 @@ const browser = await chromium.launch({
 const page = await browser.newPage();
 const joinedAt = Date.now();
 await page.goto(joinUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
-// Daily's prebuilt page may ask for a name / a join click.
+// Daily's prebuilt page asks for a name first (23 Oct run: the room was
+// opened and paid for, but the browser sat on "Enter your name" and never
+// joined), then may show a join button.
+const nameBox = page.getByRole("textbox").first();
+if (
+  await nameBox
+    .waitFor({ state: "visible", timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false)
+) {
+  await nameBox.fill("Rehearsal check");
+  await page
+    .getByRole("button", { name: /continue/i })
+    .first()
+    .click();
+}
 for (const label of [/join/i, /continue/i]) {
   const button = page.getByRole("button", { name: label }).first();
-  if (await button.isVisible().catch(() => false)) {
+  if (
+    await button
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false)
+  ) {
     await button.click().catch(() => undefined);
   }
 }
+await page
+  .screenshot({ path: join(out, "room-joined.png") })
+  .catch(() => undefined);
 // Record every remote stream the page plays, as the browser hears it.
 const recorded = await page.evaluate(async (ms) => {
   const deadline = Date.now() + 45_000;
