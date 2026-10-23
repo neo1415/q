@@ -12,7 +12,11 @@ import {
   isConnective,
   tokenise,
 } from "@capital-q/q-research";
-import { createDetectingImageSearch } from "@capital-q/q-research/providers/images";
+import { createBraveImageSearch } from "@capital-q/q-research/providers/brave";
+import {
+  createDetectingImageSearch,
+  createMergedImageSearch,
+} from "@capital-q/q-research/providers/images";
 
 /**
  * L-13 (owner ask 2026-10-20): pictures for Q's answers, from Pexels (the
@@ -70,14 +74,18 @@ export function createPexelsQPictures(
 
 /**
  * Owner 2026-10-23: pictures of the company or person a turn names, from
- * public pages, through the SERP key the web search already uses (its
- * image results). Unlike a stock illustration this search is about them,
- * so it carries their name -- the same name, through the same egress
- * policy, that the turn's web search already sends to the same vendor.
- * Undefined without a usable key: answers go without these pictures.
+ * public pages, through the image results of the indexes the web search
+ * already uses (the SERP key, and Brave beside it). Unlike a stock
+ * illustration this search is about them, so it carries their name -- the
+ * same name, through the same egress policy, that the turn's web search
+ * already sends to the same vendors. Undefined without a usable key:
+ * answers go without these pictures.
  */
 export function createPublicQPictures(
-  apiKey: string | undefined,
+  keys: {
+    readonly serp?: string | undefined;
+    readonly brave?: string | undefined;
+  },
   logger?: {
     readonly warn: (
       fields: Readonly<Record<string, unknown>>,
@@ -86,12 +94,30 @@ export function createPublicQPictures(
   },
   fetchImpl: typeof fetch = fetch,
 ): QPublicPicturePort | undefined {
-  const key = apiKey?.trim();
-  if (key === undefined || key.length < 16 || key.startsWith("disabled")) {
-    return undefined;
-  }
+  const usable = (key: string | undefined): string | null => {
+    const trimmed = key?.trim();
+    return trimmed === undefined ||
+      trimmed.length < 16 ||
+      trimmed.startsWith("disabled")
+      ? null
+      : trimmed;
+  };
+  const serp = usable(keys.serp);
+  const brave = usable(keys.brave);
+  const providers = [
+    ...(serp === null
+      ? []
+      : [createDetectingImageSearch({ apiKey: serp, fetch: fetchImpl })]),
+    ...(brave === null
+      ? []
+      : [createBraveImageSearch({ apiKey: brave, fetch: fetchImpl })]),
+  ];
+  if (providers.length === 0) return undefined;
   const search = createPublicPictureSearch({
-    provider: createDetectingImageSearch({ apiKey: key, fetch: fetchImpl }),
+    provider:
+      providers.length === 1 && providers[0] !== undefined
+        ? providers[0]
+        : createMergedImageSearch(providers),
     ...(logger === undefined ? {} : { logger }),
   });
   return { find: (input) => search.find(input) };
