@@ -110,6 +110,7 @@ const TASK_NOUN: Readonly<Record<string, string>> = {
   ONE_PAGER: "One-pager",
   MEMO: "Memo",
   INVESTMENT_BRIEF: "Brief",
+  ANALYSIS: "Analysis",
 };
 
 /** A durable task's step, in a few words beside its count. */

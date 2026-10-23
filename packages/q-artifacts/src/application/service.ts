@@ -126,6 +126,11 @@ export type PrepareArtifactInput = {
   readonly artifactType: string;
   /** Already composed, under that plan, by something that cannot write. */
   readonly content: ComposedArtifact;
+  /**
+   * A workforce step's document: filed at most once per (job, step). A
+   * retry after a crash finds the one already filed and writes nothing.
+   */
+  readonly workforce?: WorkforceDocumentBinding | undefined;
 };
 
 export type ReviseArtifactInput = {
@@ -433,20 +438,37 @@ export function createArtifactService(dependencies: {
     prepareArtifact: async (input) => {
       const organisationId = authorise(input);
       const subject = input.subject;
-      const artifact = await transactions.run((tx) =>
-        repository.create(tx, {
-          tenantId: input.actorContext.tenantId,
-          // The owner is the actor's own organisation. Never an argument.
-          organisationId,
-          type: input.artifactType,
-          companyId: subject?.kind === "COMPANY" ? subject.companyId : null,
-          investorOrganisationId:
-            subject?.kind === "INVESTOR_ORGANISATION"
-              ? subject.investorOrganisationId
-              : null,
-          createdByUserId: input.actorContext.userId,
-        }),
+      const fields = {
+        tenantId: input.actorContext.tenantId,
+        // The owner is the actor's own organisation. Never an argument.
+        organisationId,
+        type: input.artifactType,
+        companyId: subject?.kind === "COMPANY" ? subject.companyId : null,
+        investorOrganisationId:
+          subject?.kind === "INVESTOR_ORGANISATION"
+            ? subject.investorOrganisationId
+            : null,
+        createdByUserId: input.actorContext.userId,
+      };
+      const binding =
+        input.workforce === undefined
+          ? undefined
+          : WorkforceDocumentBindingSchema.parse(input.workforce);
+      const claimed = await transactions.run(async (tx) =>
+        binding === undefined
+          ? { artifact: await repository.create(tx, fields), created: true }
+          : await repository.createForWorkforce?.(tx, fields, binding),
       );
+      // A conflicting replay, wrong owner or unsupported repository never
+      // falls back to filing a second document.
+      if (claimed === undefined || claimed === null)
+        throw new ArtifactAuthorityError();
+      const artifact = claimed.artifact;
+      if (!claimed.created && artifact.currentVersion > 0) {
+        // Already filed by an earlier attempt of this step: that version
+        // stands, and nothing is written twice.
+        return detailOf(input.actorContext, artifact);
+      }
 
       try {
         await append({

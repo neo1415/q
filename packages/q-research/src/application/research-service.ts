@@ -125,6 +125,17 @@ export type ResearchCommand = {
   readonly extractCount?: number | undefined;
   readonly includeDomains?: readonly string[] | undefined;
   readonly signal?: AbortSignal | undefined;
+  /**
+   * Deep research (owner 2026-10-23): one focused question of a planned
+   * set. Only `requestedQuery` and `alsoQueries` are searched -- not the
+   * person's whole sentence, the subject's name or the month's news again
+   * for every question of the set.
+   */
+  readonly focused?: boolean | undefined;
+  /** Deep research: words from public pages this run already read (egress.ts). */
+  readonly publicTerms?: readonly string[] | undefined;
+  /** Deep research: research vocabulary may travel (egress.ts). */
+  readonly researchVocabulary?: boolean | undefined;
 };
 
 export type ResearchedSource = {
@@ -605,6 +616,8 @@ export function createPublicWebResearchService(
           publicIdentity: identity,
           prependIdentity: prepend,
           shownNames,
+          publicTerms: command.publicTerms,
+          researchVocabulary: command.researchVocabulary,
         });
       const egress = compose(command.requestedQuery);
       // Plan 2-4 differently-worded queries (web search 2026-10-06: one
@@ -633,16 +646,19 @@ export function createPublicWebResearchService(
         fellBack ||= composed.fellBackToIdentity;
         planned.push(composed.query);
       };
-      plan(command.requestedQuery);
+      const focused = command.focused === true;
+      plan(command.requestedQuery, focused ? false : leadWithSubject);
       // The same words without the subject in front, when it was put
       // there: the question may be about the world, not about them.
-      plan(command.requestedQuery, false);
-      for (const also of command.alsoQueries ?? []) plan(also);
+      if (!focused) plan(command.requestedQuery, false);
+      for (const also of command.alsoQueries ?? [])
+        plan(also, focused ? false : leadWithSubject);
       // Their sentence as they put it, with nothing put in front: a market
       // question is not a question about their own company.
-      plan(searchPhrase(command.userText), false);
+      if (!focused) plan(searchPhrase(command.userText), false);
       // The name with its country, when a name is what is being looked up.
       if (
+        !focused &&
         entity !== null &&
         (aboutSomeoneElse ||
           command.aboutThemselves === true ||
@@ -704,7 +720,7 @@ export function createPublicWebResearchService(
           freshness,
           includeDomains,
         })),
-        ...(freshness === "ANY"
+        ...(freshness === "ANY" && !focused
           ? [
               {
                 query: primary,
@@ -721,7 +737,10 @@ export function createPublicWebResearchService(
         // among LinkedIn's public people and company pages too, beside the
         // general search. Only what the index shows (title, snippet) is
         // used; nothing behind a sign-in is read, ever (LinkedIn's terms).
-        ...(entity !== null && aboutSomeoneElse && includeDomains.length === 0
+        ...(!focused &&
+        entity !== null &&
+        aboutSomeoneElse &&
+        includeDomains.length === 0
           ? LINKEDIN_LANE.map((site) => ({
               query: entity.name,
               maxResults: RESEARCH_BOUNDS.maxRecentResults,

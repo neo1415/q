@@ -475,11 +475,51 @@ export const WorkforceDocumentCritiqueRequestSchema = z
   })
   .strict();
 
+/**
+ * Owner 2026-10-23: open analysis or strategy work ("a full growth plan for
+ * the next 12 months, with market research"), alongside the fixed kinds.
+ * Its sections are chosen for the request; it is written from a research
+ * step's sourced facts and, for OWN_COMPANY, the company's own record read
+ * as the person; it critiques and revises itself before it is filed.
+ * GENERAL: about a market or question, no company record.
+ */
+export const WORKFORCE_ANALYSIS_KIND = "ANALYSIS" as const;
+export const WorkforceAnalysisRequestSchema = z
+  .object({
+    operation: z.literal("PREPARE"),
+    kind: z.literal(WORKFORCE_ANALYSIS_KIND),
+    scope: z.enum(["OWN_COMPANY", "GENERAL"]),
+  })
+  .strict();
+
+/** Analysis about the ONE company the job names; code binds the company. */
+export const WorkforceNamedCompanyAnalysisRequestSchema = z
+  .object({
+    operation: z.literal("PREPARE"),
+    kind: z.literal(WORKFORCE_ANALYSIS_KIND),
+    scope: z.literal("NAMED_COMPANY"),
+    companyId: UuidSchema,
+  })
+  .strict();
+
 export const WorkforceDocumentRequestSchema = z.union([
   WorkforceOwnDocumentRequestSchema,
   WorkforceNamedCompanyDocumentRequestSchema,
   WorkforceDocumentCritiqueRequestSchema,
+  WorkforceAnalysisRequestSchema,
+  WorkforceNamedCompanyAnalysisRequestSchema,
 ]);
+export type WorkforceAnalysisRequest =
+  | z.infer<typeof WorkforceAnalysisRequestSchema>
+  | z.infer<typeof WorkforceNamedCompanyAnalysisRequestSchema>;
+
+export function isWorkforceAnalysisRequest(
+  request: WorkforceDocumentRequest,
+): request is WorkforceAnalysisRequest {
+  return (
+    request.operation === "PREPARE" && request.kind === WORKFORCE_ANALYSIS_KIND
+  );
+}
 export type WorkforceDocumentRequest = z.infer<
   typeof WorkforceDocumentRequestSchema
 >;

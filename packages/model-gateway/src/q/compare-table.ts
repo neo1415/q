@@ -153,6 +153,11 @@ export function comparisonTableBlock(input: {
   readonly question: string;
   readonly read: RunRead;
   readonly fits: readonly RunFit[];
+  /**
+   * The companies a follow-up resolved, in order: only these, never the
+   * other companies a fit sweep in the same run read.
+   */
+  readonly only?: readonly string[] | undefined;
 }): QResultBlock | null {
   if (!asksToCompare(input.question)) return null;
   const fitById = new Map(input.fits.map((fit) => [fit.companyId, fit]));
@@ -169,11 +174,15 @@ export function comparisonTableBlock(input: {
       .indexOf(nameOf(id).toLowerCase());
     return where < 0 ? Number.MAX_SAFE_INTEGER : where;
   };
-  const columns = ids
-    .map((id, index) => ({ id, index }))
-    .sort((a, b) => at(a.id) - at(b.id) || a.index - b.index)
-    .map(({ id }) => id)
-    .slice(0, 8);
+  const only = input.only ?? [];
+  const columns =
+    only.length >= 2
+      ? only.filter((id) => ids.includes(id))
+      : ids
+          .map((id, index) => ({ id, index }))
+          .sort((a, b) => at(a.id) - at(b.id) || a.index - b.index)
+          .map(({ id }) => id)
+          .slice(0, 8);
   if (columns.length < 2) return null;
 
   const facts = (id: string) => input.read.companyFacts.get(id);

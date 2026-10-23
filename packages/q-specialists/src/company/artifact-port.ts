@@ -43,6 +43,14 @@ export type ArtifactPreparationPort = {
       readonly summary: string;
       readonly content: QArtifactContent;
     };
+    /** A workforce step's document: filed at most once per (job, step). */
+    readonly workforce?:
+      | {
+          readonly jobId: string;
+          readonly stepKey: string;
+          readonly intentSha256: string;
+        }
+      | undefined;
   }) => Promise<QArtifactSummary>;
 
   /** Append a version. The previous one is untouched. */

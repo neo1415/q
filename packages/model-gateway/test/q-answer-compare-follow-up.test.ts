@@ -173,7 +173,7 @@ const analyst = (answer: string): FakeBehaviour => ({
   },
 });
 
-function build(said: string) {
+function build(said: string, questionKind?: string) {
   const alpha = createFakeModelProvider({
     code: "alpha",
     script: [
@@ -287,6 +287,14 @@ function build(said: string) {
     actor,
     correlationId: `cor_${run}`,
     capability: "ANSWER",
+    ...(questionKind === undefined
+      ? {}
+      : {
+          questionKind,
+          turnKind: "QUESTION_TO_Q",
+          aboutNamedOther: false,
+          fitQuestion: { text: said, count: 2, previous: true },
+        }),
     subjects: [],
     retrieval: { kind: "NOT_CONFIGURED" },
     plan: {
@@ -296,7 +304,17 @@ function build(said: string) {
       purpose: { capability: "ANSWER", taskClass: "GENERAL_QUESTION" },
       subjects: [],
       screen: { route: "HOME" },
-      scopes: [{ kind: "OWN_Q_CONVERSATION" }],
+      scopes: [
+        { kind: "OWN_Q_CONVERSATION" },
+        // An investor with a mandate: their fit question is swept by code.
+        {
+          kind: "INVESTOR_MANDATE",
+          subject: {
+            kind: "INVESTOR_ORGANISATION",
+            investorOrganisationId: "1c4b9266-350c-409d-9582-04a0f771b8a8",
+          },
+        },
+      ],
       denied: [],
       maxSensitivity: "PUBLIC",
     } as unknown as PermittedContextPlan,
@@ -351,6 +369,27 @@ describe("compare the top two, right after a list of five", () => {
     const traction = table?.rows.find((row) => row.label === "Traction");
     expect(traction?.cells[0]).toContain("$42,000");
     expect(traction?.cells[1]).toContain("$9,000");
+  });
+
+  it("the same, when the turn was read as a fit question (live 23 Oct, run f5415b0c)", async () => {
+    const { seam, request, alpha, executed, stored } = build(
+      "Compare the top two side by side",
+      "FIT",
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(
+      executed.filter((call) => call.callId.startsWith("q-compare-")),
+    ).toHaveLength(6);
+    expect(sentTo(alpha)).toContain("COMPARED SIDE BY SIDE");
+    const blocks = stored.at(-1)?.blocks ?? [];
+    const table = blocks.find(
+      (block) => Reflect.get(block as object, "kind") === "TABLE",
+    ) as { columns: { label: string }[] } | undefined;
+    // The two compared, never the rest of the sweep's companies.
+    expect(table?.columns.map((column) => column.label)).toEqual([
+      "Mizan",
+      "Silo Credit",
+    ]);
   });
 
   it("an ordinary follow-up reads nothing extra", async () => {
