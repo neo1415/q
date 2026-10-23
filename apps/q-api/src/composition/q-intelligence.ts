@@ -210,6 +210,8 @@ export type QIntelligenceDependencies = {
   readonly counterpartNames: (
     request: QAnswerRequest,
   ) => Promise<readonly string[]>;
+  /** A move to their pipeline says what is in it first (coordinator 10-23). */
+  readonly destinationSummary?: SpecialistQAnswerDependencies["destinationSummary"];
   /** W4: a researched entity reachable by name (seed or own research). */
   readonly externalEntities?: SpecialistQAnswerDependencies["externalEntities"];
   /** Instant known-entity lookups: the warm prepared index, in memory. */
@@ -535,6 +537,9 @@ export function composeQIntelligence(
       ? {}
       : { pendingDecisions: dependencies.pendingDecisions }),
     counterpartNames: dependencies.counterpartNames,
+    ...(dependencies.destinationSummary === undefined
+      ? {}
+      : { destinationSummary: dependencies.destinationSummary }),
     ...(dependencies.knownEntities === undefined
       ? {}
       : { knownEntities: dependencies.knownEntities }),
