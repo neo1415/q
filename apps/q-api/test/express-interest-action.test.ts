@@ -159,15 +159,17 @@ describe("relationship.interest.express", () => {
     const { action } = fakes();
     const proposed = action.proposed;
     expect(proposed).toBeDefined();
-    const withNote = proposed?.({
-      ...payload,
-      note: "Your B2B payments model fits our seed fintech mandate in West Africa.",
-    });
-    expect(withNote).toContain(
-      'with this note: "Your B2B payments model fits our seed fintech mandate in West Africa."',
+    const note =
+      "Your B2B payments model fits our seed fintech mandate in West Africa.";
+    const withNote = proposed?.(
+      { ...payload, note },
+      action.describe({ ...payload, note }, []).summary,
     );
-    expect(withNote).toContain("Ready to send: approve on the card");
-    const without = proposed?.(payload);
+    expect(withNote).toContain(`: "${note}"`);
+    expect(withNote).toContain(
+      "Ready to send: approve on the card, or tell me what to change.",
+    );
+    const without = proposed?.(payload, action.describe(payload, []).summary);
     expect(without).toContain("Ready to send");
     for (const line of [withNote, without]) {
       expect(line).not.toContain("Not saved yet");

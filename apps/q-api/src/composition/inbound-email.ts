@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readyToSendLine } from "@capital-q/app-actions";
 
 import {
   EmailAddressSchema,
@@ -86,6 +87,11 @@ export function createInboundReplyAction(dependencies: {
       summary: `Reply to ${payload.toName}, from Capital Q on your behalf`,
       preview: `${ON_BEHALF}\nTo: ${payload.toName} <${payload.to}>\nReplies come back to: ${payload.replyTo}\nSubject: ${payload.subject}\n\n${payload.body}`,
     }),
+    proposed: (payload, summary) =>
+      readyToSendLine(
+        summary,
+        `Subject: ${payload.subject}\n\n${payload.body}`,
+      ),
     confirm: () =>
       "Sent from Capital Q on your behalf. Their answer will come to your Q address.",
     authorize: async (payload, actor) => {
