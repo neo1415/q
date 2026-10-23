@@ -1695,6 +1695,8 @@ export {
   TURN_READER_V58,
   V1_ABOUT_NAMED_OTHER,
   V58_NAMED_OTHER,
+  V58_RAISING,
+  V58_RANKING_NAME,
   V58_SUITS_THEM,
   V58_FIT_MANDATE,
 } from "./prompts/tasks/turn-reader.v58.js";

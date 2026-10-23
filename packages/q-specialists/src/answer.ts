@@ -4908,6 +4908,8 @@ export function createSpecialistQAnswer(
               ranking: read.question.discover?.ranking ?? "NONE",
               mandateRelevant: read.question.discover?.mandateRelevant ?? false,
               previous: read.question.discover?.previous ?? false,
+              // v58: they asked for companies raising now.
+              raising: read.question.discover?.raising === true,
             },
           }
         : {}),

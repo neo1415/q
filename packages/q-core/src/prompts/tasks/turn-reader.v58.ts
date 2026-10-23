@@ -29,6 +29,16 @@ export const V58_NAMED_OTHER = `NAMED OTHER: when aboutNamedOther is true, named
  * mandate says so.
  */
 export const V36_MANDATE_RELEVANT = `mandateRelevant: true when they tie it to their mandate or to themselves.`;
+/**
+ * Lane 4 (coordinator's investor journey, 2026-10-23): for an investor a
+ * list is ranked by fit unless they ask for name order, which the reader
+ * now says (ranking NAME); and "raising a seed round" is read as a wish
+ * for companies raising now (raising), never as a word to match.
+ */
+export const V46_RANKING_OTHERWISE = `TOP when they say top or best without saying on what; NONE otherwise.`;
+export const V58_RANKING_NAME = `TOP when they say top or best without saying on what; NAME only when they ask for the list alphabetically or by name; NONE otherwise.`;
+export const V46_PREVIOUS_SHOWN = `previous: true when they mean companies Q just showed.`;
+export const V58_RAISING = `previous: true when they mean companies Q just showed. raising: true when they ask for companies raising now or with an open round, in any words and any language ("raising a seed round", "currently fundraising"); false otherwise.`;
 export const V58_SUITS_THEM = ` Asking which companies they should look at, look into, invest in, consider or meet, or for recommendations or suggestions of companies, is asking what suits them: ranking FIT and mandateRelevant true, whatever the words.`;
 export const V36_FIT_ONLY_PREVIOUS = `for FIT only previous, true when they mean the companies Q just showed, as in "which has the strongest fit" right after a list; otherwise null)`;
 export const V58_FIT_MANDATE = `for FIT only previous, true when they mean the companies Q just showed, as in "which has the strongest fit" right after a list, and mandateRelevant, true when they ask to rank or score against their mandate or for themselves ("rank them for me", "top three based on my mandate"); otherwise null)`;
@@ -37,6 +47,8 @@ for (const rule of [
   V1_ABOUT_NAMED_OTHER,
   V36_MANDATE_RELEVANT,
   V36_FIT_ONLY_PREVIOUS,
+  V46_RANKING_OTHERWISE,
+  V46_PREVIOUS_SHOWN,
 ]) {
   if (TURN_READER_V57.template.split(rule).length !== 2) {
     throw new Error(`TURN_READER v58 extends a rule that changed: ${rule}`);
@@ -51,7 +63,7 @@ export const TURN_READER_V58: PromptDefinition<
   version: 58,
   status: "ACTIVE",
   changeDescription:
-    "Production 2026-10-23 ('Yes' searched and pictured as a company): v57 plus namedOther {name, kind} -- the company, organisation or person the turn is about, named by the reader from meaning and the recent turns (a yes to an offer about them, 'their team'), null when no one in particular; code searches and pictures only that, never a name guessed from capital letters or word lists. Shared with Lane 4: asking which companies to look into, invest in, consider or meet (or for recommendations) is DISCOVER ranking FIT with mandateRelevant true, and a FIT ranking against their mandate or for themselves carries mandateRelevant true -- by meaning, no phrase lists.",
+    "Production 2026-10-23 ('Yes' searched and pictured as a company): v57 plus namedOther {name, kind} -- the company, organisation or person the turn is about, named by the reader from meaning and the recent turns (a yes to an offer about them, 'their team'), null when no one in particular; code searches and pictures only that, never a name guessed from capital letters or word lists. Shared with Lane 4: asking which companies to look into, invest in, consider or meet (or for recommendations) is DISCOVER ranking FIT with mandateRelevant true, and a FIT ranking against their mandate or for themselves carries mandateRelevant true -- by meaning, no phrase lists. Also Lane 4: ranking NAME when they ask for name order (an investor's other lists are ranked by fit), and raising when they ask for companies raising now.",
   effectiveFrom: "2026-10-23",
   output: {
     kind: "STRUCTURED",
@@ -62,5 +74,7 @@ export const TURN_READER_V58: PromptDefinition<
   template: TURN_READER_V57.template
     .replace(V1_ABOUT_NAMED_OTHER, `${V1_ABOUT_NAMED_OTHER}${V58_NAMED_OTHER}`)
     .replace(V36_MANDATE_RELEVANT, `${V36_MANDATE_RELEVANT}${V58_SUITS_THEM}`)
-    .replace(V36_FIT_ONLY_PREVIOUS, V58_FIT_MANDATE),
+    .replace(V36_FIT_ONLY_PREVIOUS, V58_FIT_MANDATE)
+    .replace(V46_RANKING_OTHERWISE, V58_RANKING_NAME)
+    .replace(V46_PREVIOUS_SHOWN, V58_RAISING),
 };
