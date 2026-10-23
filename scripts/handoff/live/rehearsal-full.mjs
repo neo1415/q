@@ -113,7 +113,16 @@ for (const text of [
     await call("POST", `/v1/q/rehearsals/${rehearsalId}/turns`, { text }),
   );
   const reply = lastThem(turn.json?.rehearsal ?? turn.json);
-  console.log(JSON.stringify({ reply }));
+  const last = (turn.json?.rehearsal ?? turn.json)?.turns
+    ?.filter((t) => t.from === "THEM")
+    .at(-1);
+  console.log(
+    JSON.stringify({
+      reply,
+      mood: last?.mood ?? null,
+      beats: last?.beats ?? null,
+    }),
+  );
   (report.replies ??= []).push(reply);
 }
 
