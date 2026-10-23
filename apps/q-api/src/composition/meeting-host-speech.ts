@@ -160,3 +160,57 @@ export function restAfter(full: string, said: string): string {
   const head = flat(said);
   return line.startsWith(head) ? line.slice(head.length).trim() : "";
 }
+
+/**
+ * 2026-10-23 (rehearsal R7): the same streaming read for a reply with no
+ * `kind`, gated by the caller. `ready` sees the raw output so far and says
+ * whether the first sentence may be said now (true), never (false), or not
+ * yet (null: a field it needs has not arrived). Never throws into the
+ * stream; at most one piece.
+ */
+export function createGatedLineReader(
+  onFirstPiece: (piece: string) => void,
+  ready: (raw: string) => boolean | null,
+): SpokenLineReader {
+  let raw = "";
+  let lineFrom: number | null = null;
+  let said: string | null = null;
+  let done = false;
+  return {
+    feed: (fragment) => {
+      if (done) return;
+      raw += fragment;
+      if (raw.length > 8_000) {
+        done = true;
+        return;
+      }
+      if (lineFrom === null) {
+        const found = /"line"\s*:\s*"/.exec(raw);
+        if (found !== null) lineFrom = found.index + found[0].length;
+      }
+      if (lineFrom === null) return;
+      const line = decodeJsonString(raw, lineFrom);
+      const piece = firstSpeechPiece(line.closed ? `${line.text} ` : line.text);
+      if (piece === null) {
+        if (line.closed) done = true;
+        return;
+      }
+      let go: boolean | null;
+      try {
+        go = ready(raw);
+      } catch {
+        go = false;
+      }
+      if (go === null) return;
+      done = true;
+      if (!go) return;
+      said = piece;
+      try {
+        onFirstPiece(piece);
+      } catch {
+        // The whole line is still said when it is complete.
+      }
+    },
+    said: () => said,
+  };
+}

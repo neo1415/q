@@ -107,34 +107,98 @@ export function createRehearsalAwareTurn(dependencies: {
     }
     const latest = lastUserWords(transcript);
     if (latest === null) return { kind: "NOTHING" };
+    // R7 (2026-10-23): on a line heard as it is spoken, the played line's
+    // first sentence is said as soon as the model has written it (the
+    // service decides when that is safe); the rest follows in the same
+    // utterance. A deferred line (GPT-Live) says everything at once.
+    const streams = speaker.deferred !== true;
+    let firstPiece: string | null = null;
+    let firstArrived: () => void = () => undefined;
+    const first = new Promise<void>((resolve) => {
+      firstArrived = resolve;
+    });
     const saying = dependencies.rehearsals.say(
       binding.actor,
       rehearsal.rehearsalId,
       { text: latest },
       signal,
+      streams
+        ? {
+            onFirstPiece: (piece) => {
+              firstPiece = piece;
+              firstArrived();
+            },
+          }
+        : undefined,
+    );
+    const settled = saying.then(
+      () => "DONE" as const,
+      () => "DONE" as const,
     );
     // A slow reply gets a filler first, on a line that is heard as it is
     // spoken; a deferred line (GPT-Live) says everything at once, so a
-    // filler there would only become part of the answer.
+    // filler there would only become part of the answer. A first sentence
+    // already on its way needs none.
     let filled = false;
-    if (speaker.deferred !== true && fillerAfterMs > 0) {
+    if (streams && fillerAfterMs > 0) {
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const late = await Promise.race([
-        saying.then(
-          () => false,
-          () => false,
-        ),
-        new Promise<boolean>((resolve) => {
-          timer = setTimeout(() => resolve(true), fillerAfterMs);
+      const won = await Promise.race([
+        settled,
+        first.then(() => "FIRST" as const),
+        new Promise<"LATE">((resolve) => {
+          timer = setTimeout(() => resolve("LATE"), fillerAfterMs);
         }),
       ]);
       if (timer !== undefined) clearTimeout(timer);
-      if (late && !signal.aborted) {
+      if (won === "LATE" && !signal.aborted) {
+        // The first sentence may still come while the filler plays.
         filled = true;
         await speaker.speak(
           PERSONA_FILLERS[fillers++ % PERSONA_FILLERS.length] ?? "",
         );
       }
+    } else if (streams) {
+      await Promise.race([settled, first]);
+    }
+    if (firstPiece !== null && !signal.aborted) {
+      const piece = firstPiece ?? "";
+      // The first sentence has no cue of its own (its feeling is not
+      // known yet): the persona's voice as it is.
+      dependencies.performance?.perform(binding.voiceSessionId, []);
+      await speaker.speak(
+        (async function* () {
+          yield piece;
+          const done = await saying;
+          if (signal.aborted || done.kind !== "OK") return;
+          const line = done.rehearsal.turns
+            .filter((turn) => turn.from === "THEM")
+            .at(-1);
+          if (line === undefined) return;
+          spokenAt.set(binding.voiceSessionId, line.at);
+          const rest = restOf(line.text, piece);
+          if (rest.length === 0) return;
+          performRehearsalLine(
+            dependencies.performance,
+            binding.voiceSessionId,
+            {
+              ...line,
+              text: rest,
+              beats:
+                line.beats === undefined
+                  ? undefined
+                  : line.beats.slice(
+                      sentences(line.text).length - sentences(rest).length,
+                    ),
+            },
+          );
+          yield ` ${rest}`;
+        })(),
+      );
+      misses = 0;
+      if (signal.aborted) {
+        return { kind: "INTERRUPTED", path: "Q" } satisfies VoiceTurnOutcome;
+      }
+      return { kind: "SPOKEN", path: "Q" };
     }
     const result = await saying;
     if (signal.aborted) {
@@ -186,4 +250,17 @@ function lastUserWords(
     }
   }
   return null;
+}
+
+/**
+ * What is left to say after the first sentence already said: the rest of
+ * the line when it begins with it; the whole line when it does not (code
+ * changed the line after all), so the person always hears the real line.
+ */
+export function restOf(full: string, said: string): string {
+  const flat = (text: string) => text.replace(/\s+/gu, " ").trim();
+  const line = flat(full);
+  const head = flat(said);
+  if (head.length === 0) return line;
+  return line.startsWith(head) ? line.slice(head.length).trim() : line;
 }

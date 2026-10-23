@@ -30,6 +30,7 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   InvestorPersonaResultSchema,
+  REHEARSAL_APPRAISALS_V4,
   REHEARSAL_DIMENSIONS_FOR,
   RehearsalReviewResultSchema,
   renderPrompt,
@@ -85,6 +86,7 @@ import { externalSimulation } from "./external-presentation.js";
 import { scenarioFor } from "./external-scenarios.js";
 import type { DemoRehearsalAccess } from "./demo-rehearsal-access.js";
 import type { ExternalSubjectResolver } from "./external-resolve.js";
+import { createGatedLineReader } from "./meeting-host-speech.js";
 import {
   accentForPlace,
   localLanguageFor,
@@ -231,6 +233,8 @@ export type RehearsalComposer = {
     variables: Omit<RehearsalTurnVariables, FrameKeys>,
     views: RehearsalViews,
     signal?: AbortSignal,
+    /** R7: the model's raw output as it streams, for the voice line. */
+    onTextDelta?: (fragment: string) => void,
   ) => Promise<RehearsalTurnResult | null>;
   readonly review: (
     actor: ActorContext,
@@ -891,7 +895,15 @@ export type RehearsalService = {
     rehearsalId: string,
     said: RehearsalSay,
     signal?: AbortSignal,
-    options?: { readonly closingSoon: boolean },
+    options?: {
+      readonly closingSoon?: boolean | undefined;
+      /**
+       * R7 (2026-10-23): the played line's first sentence as soon as the
+       * model has written it, when code will not change it (no warning, no
+       * walk-out, no second look). The full line still comes in the result.
+       */
+      readonly onFirstPiece?: ((piece: string) => void) | undefined;
+    },
   ) => Promise<RehearsalResult>;
   /**
    * A frame of the person's shared screen, or (with their consent) their
@@ -2140,6 +2152,7 @@ export function createRehearsalService(dependencies: {
     viewerOrganisation: string,
     signal: AbortSignal | undefined,
     closingSoon = false,
+    onFirstPiece?: (piece: string) => void,
   ): Promise<{
     readonly result: RehearsalTurnResult;
     readonly sawScreen: boolean;
@@ -2288,11 +2301,63 @@ export function createRehearsalService(dependencies: {
         ...(persona.conduct === undefined ? {} : { conduct: persona.conduct }),
       }),
     };
+    // R7: the first sentence goes to the voice line while the model writes
+    // the rest -- only when nothing code does after can change it: an
+    // ordinary turn (not a cue), no second look possible, and (read from
+    // the appraisal the model writes first) no warning or walk-out due.
+    const relookPossible = cameraFrame === null && consent && mayLook;
+    const streamFirst =
+      onFirstPiece !== undefined && cue === "NONE" && !relookPossible;
+    const reader = streamFirst
+      ? createGatedLineReader(
+          (piece) => {
+            const clean = guardedLine(row, withoutWarningTalk(piece));
+            if (clean.trim() === piece.trim()) onFirstPiece(piece);
+          },
+          (raw) => {
+            const appraisal = /"appraisal"\s*:\s*"([A-Z_]+)"/u.exec(raw)?.[1];
+            if (appraisal === undefined) return null;
+            if (
+              !(REHEARSAL_APPRAISALS_V4 as readonly string[]).includes(
+                appraisal,
+              )
+            ) {
+              return false;
+            }
+            const read = appraisal as RehearsalTurnResult["appraisal"];
+            const kind = categoryOf(read, questionOpen, theyAsked);
+            const moved = applyAppraisal(
+              before,
+              stateAppraisalOf(kind, read),
+              row.difficulty,
+              profile,
+              topic,
+            );
+            const ahead = nextTemperament({
+              category: kind,
+              questionOpen,
+              warningsGiven,
+              previous: registerBefore,
+              dodgeStreak,
+              difficulty: row.difficulty,
+              hurt: moved.hurt,
+              theyAskedToEnd: false,
+              modelClose: null,
+              wrappingUp: wrapUp,
+              profile,
+              topic,
+            });
+            // A walk-out replaces the line; a natural close keeps it.
+            return ahead.warning === null && ahead.close !== "WALK_OUT";
+          },
+        )
+      : undefined;
     const first = await composer.turn(
       actor,
       variables,
       { screen: screenFrame, camera: cameraFrame },
       signal,
+      reader?.feed,
     );
     if (first === null) return null;
     // "Can you see this?" (2026-10-01): read by meaning on the turn. With
@@ -2452,7 +2517,16 @@ export function createRehearsalService(dependencies: {
     readonly category?: TurnCategory;
     readonly warning?: 1 | 2;
   }> {
-    const [actor, row, turns, cue, organisation, signal, closingSoon] = args;
+    const [
+      actor,
+      row,
+      turns,
+      cue,
+      organisation,
+      signal,
+      closingSoon,
+      onFirstPiece,
+    ] = args;
     // One deadline for the whole turn, retry included (founder live
     // 2026-10-02: the room sat on "thinking"): past it, the holding line.
     const deadline = new AbortController();
@@ -2462,8 +2536,22 @@ export function createRehearsalService(dependencies: {
       signal === undefined
         ? deadline.signal
         : AbortSignal.any([signal, deadline.signal]);
-    const attempt = () =>
-      reply(actor, row, turns, cue, organisation, within, closingSoon);
+    // Only the first attempt streams: a retry's words are said whole.
+    let streamed = false;
+    const attempt = () => {
+      const stream = streamed ? undefined : onFirstPiece;
+      streamed = true;
+      return reply(
+        actor,
+        row,
+        turns,
+        cue,
+        organisation,
+        within,
+        closingSoon,
+        stream,
+      );
+    };
     try {
       const first = await attempt();
       if (first !== null || signal?.aborted === true) {
@@ -2831,6 +2919,10 @@ export function createRehearsalService(dependencies: {
             viewer.organisationName,
             signal,
             options?.closingSoon,
+            // A few words at least: a reply to noise is thrown away.
+            words.trim().split(/\s+/u).length >= 3
+              ? options?.onFirstPiece
+              : undefined,
           );
       // Spoken over: the person carried on, and their grown words come as
       // the next turn. Nothing of this one is kept.
@@ -3181,6 +3273,7 @@ export function createRehearsalComposer(dependencies: {
     schema: z.ZodType<R>,
     views: RehearsalViews = { screen: null, camera: null },
     signal?: AbortSignal,
+    onTextDelta?: (fragment: string) => void,
   ): Promise<R | null> {
     const language =
       dependencies.languageOf === undefined
@@ -3243,6 +3336,7 @@ export function createRehearsalComposer(dependencies: {
           invalidListItems: "DROP",
           enumFallbacks: REHEARSAL_LABEL_FALLBACKS,
           ...(signal === undefined ? {} : { signal }),
+          ...(onTextDelta === undefined ? {} : { onTextDelta }),
         },
       );
       if (response.output.kind !== "STRUCTURED") return null;
@@ -3276,7 +3370,7 @@ export function createRehearsalComposer(dependencies: {
           ANY_OBJECT,
         ),
       ),
-    turn: async (actor, variables, views, signal) =>
+    turn: async (actor, variables, views, signal, onTextDelta) =>
       readTurn(
         await run(
           actor,
@@ -3287,6 +3381,7 @@ export function createRehearsalComposer(dependencies: {
           ANY_OBJECT,
           views,
           signal,
+          onTextDelta,
         ),
       ),
     review: async (actor, variables) =>
