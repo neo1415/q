@@ -258,6 +258,10 @@ describe("the action registry", () => {
       ],
       ["review.request", "legacy:propose_human_review", "CONSEQUENTIAL"],
       ["verification.kyb.submit", "offer.kyb_submission", "CONSEQUENTIAL"],
+      // The work board (owner 2026-10-23): Q's side is my_board.
+      ["board.item.add", "legacy:my_board", "INSTANT"],
+      ["board.item.update", "legacy:my_board", "INSTANT"],
+      ["board.item.move", "legacy:my_board", "INSTANT"],
       // ADR 0050: how Q speaks for them.
       ["settings.etiquette_guide.save", "set_my_speaking_guide", "INSTANT"],
       // RECOVERY-2026-10: removal deletes every version, so Q prepares it.

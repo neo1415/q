@@ -15,6 +15,7 @@
     "@capital-q/app-actions": "workspace:*",
     "@capital-q/audit": "workspace:*",
     "@capital-q/billing": "workspace:*",
+    "@capital-q/board": "workspace:*",
     "@capital-q/capital": "workspace:*",
     "@capital-q/communication": "workspace:*",
     "@capital-q/companies": "workspace:*",

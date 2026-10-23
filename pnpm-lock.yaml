@@ -189,6 +189,9 @@ importers:
       '@capital-q/billing':
         specifier: workspace:*
         version: link:../../packages/billing
+      '@capital-q/board':
+        specifier: workspace:*
+        version: link:../../packages/board
       '@capital-q/capital':
         specifier: workspace:*
         version: link:../../packages/capital
@@ -601,6 +604,9 @@ importers:
 
   packages/app-actions:
     dependencies:
+      '@capital-q/board':
+        specifier: workspace:*
+        version: link:../board
       '@capital-q/capital':
         specifier: workspace:*
         version: link:../capital

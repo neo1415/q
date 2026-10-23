@@ -33,6 +33,7 @@ import {
   preparedEntityPrewarmLines,
   watchPreparedEntities,
 } from "./composition/prepared-entities.js";
+import { createQApiBoard } from "./composition/board.js";
 import { createAttentionSources } from "./composition/attention-sources.js";
 import {
   createArrivalSnapshots,
@@ -2980,6 +2981,11 @@ const qTools = createQTools({
     work: workPort,
     // WORKFORCE block (J1, J4): a job the lead Q plans, one approval.
     jobs: workforceJobBoard.port,
+    // The work board (owner 2026-10-23): their own items, and Q's work on them.
+    board: createQApiBoard({
+      sql: database.sql,
+      transactions: database.transactions,
+    }),
     // RECOVERY B1: held drafts, stopped jobs, notices, data-room requests,
     // new matches and Q's activity, for "what needs me".
     attention: createAttentionSources({ sql: database.sql }),

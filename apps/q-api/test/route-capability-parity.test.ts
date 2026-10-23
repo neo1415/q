@@ -78,6 +78,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   'api/app.ts GET "/health/live"': HEALTH,
   'api/app.ts GET "/health/ready"': HEALTH,
 
+  // The work board (owner 2026-10-23): read by Q's my_board (LIST); its
+  // writes are declared actions (board.item.*), generated routes.
+  "api/http/board.ts GET BOARD_PATH": cap("tool.my_board"),
+
   "api/http/capital-objectives.ts GET base": cap("tool.get_capital_objective"),
   "api/http/capital-objectives.ts GET `${base}${CAPITAL_OBJECTIVE_CURRENT_SEGMENT}`":
     cap("tool.get_capital_objective"),

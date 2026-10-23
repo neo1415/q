@@ -700,6 +700,7 @@ export function createApp(
       ...(modules.commitments === undefined
         ? {}
         : { commitments: modules.commitments }),
+      ...(modules.board === undefined ? {} : { board: modules.board }),
       ...(modules.capitalRounds === undefined
         ? {}
         : { capitalRounds: modules.capitalRounds }),
