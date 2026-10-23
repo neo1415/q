@@ -1718,6 +1718,10 @@ export {
   V58_MEETING_PREP,
   V58_INVESTOR_PROSPECTS,
 } from "./prompts/tasks/turn-reader.v58.js";
+export {
+  TURN_READER_V59,
+  V59_ACT_ON_IS_NOT_OPEN,
+} from "./prompts/tasks/turn-reader.v59.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 

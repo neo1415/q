@@ -87,7 +87,7 @@ export const TURN_READER_V58: PromptDefinition<
 > = {
   ...TURN_READER_V57,
   version: 58,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Production 2026-10-23 ('Yes' searched and pictured as a company): v57 plus namedOther {name, kind} -- the company, organisation or person the turn is about, named by the reader from meaning and the recent turns (a yes to an offer about them, 'their team'), null when no one in particular; code searches and pictures only that, never a name guessed from capital letters or word lists. Shared with Lane 4: asking which companies to look into, invest in, consider or meet (or for recommendations) is DISCOVER ranking FIT with mandateRelevant true, and a FIT ranking against their mandate or for themselves carries mandateRelevant true -- by meaning, no phrase lists. Shared with Lane 5: being made ready for a call or meeting with one named counterpart is meetingPrep {counterpart} (prepared in the answer, never a team job); handing the team a several-step job stays teamJob. Founder investor matching: which investors a company should approach, talk to first or that fit it is the INVESTOR_PROSPECTS question kind (over ADVICE, FIT and DISCOVER_COMPANIES), answered by code from the investors already interested and network-visible profiles, never an investor's private mandate. Also Lane 4: ranking NAME when they ask for name order (an investor's other lists are ranked by fit), and raising when they ask for companies raising now.",
   effectiveFrom: "2026-10-23",
