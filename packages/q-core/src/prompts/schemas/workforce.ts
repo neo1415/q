@@ -591,7 +591,7 @@ export const JobPlanResultV8Schema = JobPlanResultV6Schema.extend({
    * the work runs: two or three sentences, labelled as a first view, with
    * no figures. Null when there is nothing useful to say yet.
    */
-  firstRead: z.string().trim().min(1).max(700).nullable(),
+  firstRead: z.string().trim().min(1).max(700).nullable().default(null),
 }).strict();
 export type JobPlanResultV8 = z.infer<typeof JobPlanResultV8Schema>;
 

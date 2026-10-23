@@ -1077,7 +1077,7 @@ export const Q_CAPABILITIES: readonly QCapability[] = Object.freeze([
   tool(
     "propose_q_job",
     "RELATIONSHIP",
-    "A one-off piece of work of several steps: Q plans it, each step done by a specialist or a helper with only the tools it needs; work that reaches anyone else waits for one approval and every message passes the reviewer first, while research and a document for themselves start at once.",
+    "A piece of work of several steps Q plans and carries out: anything reaching someone else waits for one approval and every message is reviewed; research and a document for themselves start at once.",
     { approval: "PREPARE_APPROVE", executes: ["q.workforce.job.start"] },
   ),
   tool(

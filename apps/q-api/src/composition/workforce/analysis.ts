@@ -98,7 +98,9 @@ export function analysisText(draft: AnalysisDocumentResult): string {
   return [
     `# ${draft.title}`,
     draft.summary,
-    ...draft.sections.map((section) => `## ${section.heading}\n${section.body}`),
+    ...draft.sections.map(
+      (section) => `## ${section.heading}\n${section.body}`,
+    ),
     `## Top recommendations\n${draft.topRecommendations.map((one, index) => `${String(index + 1)}. ${one}`).join("\n")}`,
     draft.gaps.length === 0
       ? ""
@@ -327,7 +329,8 @@ function split(
     let cut = rest.length;
     if (cut > Q_ARTIFACT_SECTION_BODY_MAX) {
       const at = rest.lastIndexOf("\n", Q_ARTIFACT_SECTION_BODY_MAX);
-      cut = at > Q_ARTIFACT_SECTION_BODY_MAX / 2 ? at : Q_ARTIFACT_SECTION_BODY_MAX;
+      cut =
+        at > Q_ARTIFACT_SECTION_BODY_MAX / 2 ? at : Q_ARTIFACT_SECTION_BODY_MAX;
     }
     parts.push({
       heading: parts.length === 0 ? heading : `${heading} (continued)`,
@@ -355,7 +358,11 @@ export function analysisContent(input: {
     heading: section.heading,
     body: section.body,
     findings: [
-      ...findingsFor(section.body, input.facts, `${input.seed}:${String(index)}`),
+      ...findingsFor(
+        section.body,
+        input.facts,
+        `${input.seed}:${String(index)}`,
+      ),
     ],
   }));
   const cited = new Set(
@@ -379,7 +386,10 @@ export function analysisContent(input: {
     ...draft.gaps,
     // Honest when the review did not pass: its open points are named.
     ...review.open.map((issue) =>
-      `Reviewer's open point (${issue.section}): ${issue.problem}`.slice(0, 300),
+      `Reviewer's open point (${issue.section}): ${issue.problem}`.slice(
+        0,
+        300,
+      ),
     ),
   ].slice(0, 24);
   return {

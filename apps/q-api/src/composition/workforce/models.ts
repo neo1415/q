@@ -172,7 +172,8 @@ export type WorkforceModels = {
     who: Who,
     trace: Trace,
     variables: PlanVariables,
-  ) => Promise<JobPlanResultV8 | null>;
+    // The input shape: firstRead may be absent (an older plan, a fake).
+  ) => Promise<z.input<typeof JobPlanResultV8Schema> | null>;
   readonly critique: (
     who: Who,
     trace: Trace,
@@ -308,14 +309,13 @@ export function createWorkforceModels(dependencies: {
         (response.output as { readonly value: unknown }).value,
       );
       if (!parsed.success) return null;
-      const amount = (response as { readonly cost?: { readonly amount?: unknown } })
-        .cost?.amount;
+      const amount = (
+        response as { readonly cost?: { readonly amount?: unknown } }
+      ).cost?.amount;
       return {
         output: parsed.data,
         costUsd:
-          typeof amount === "number" && Number.isFinite(amount)
-            ? amount
-            : null,
+          typeof amount === "number" && Number.isFinite(amount) ? amount : null,
       };
     } catch (error: unknown) {
       dependencies.logger?.warn(

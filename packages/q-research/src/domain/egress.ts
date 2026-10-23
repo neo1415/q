@@ -270,11 +270,30 @@ export function tokenise(text: string): readonly string[] {
     .filter((token) => token.length > 0);
 }
 
+/**
+ * A word and its plain singular or plural ("kiosk", "kiosks"): the same
+ * word, so allowing one allows the other. Adds no information.
+ */
+function numberVariants(token: string): readonly string[] {
+  if (!/^\p{L}+$/u.test(token) || token.length < 3) return [token];
+  return token.endsWith("s") && token.length > 3
+    ? [token, token.slice(0, -1)]
+    : [token, `${token}s`];
+}
+
+/** Deep research only: everyday research keeps exact words (egress.test). */
+function variantsFor(input: EgressInput): (token: string) => readonly string[] {
+  return input.researchVocabulary === true
+    ? numberVariants
+    : (token) => [token];
+}
+
 function allowedSet(input: EgressInput): ReadonlySet<string> {
   const allowed = new Set<string>(CONNECTIVES);
+  const variants = variantsFor(input);
   for (const token of personTokens(input)) {
     if (!FIGURE_LIKE.test(token)) {
-      allowed.add(token);
+      for (const variant of variants(token)) allowed.add(variant);
     }
   }
   for (const term of input.publicIdentity) {
@@ -284,8 +303,9 @@ function allowedSet(input: EgressInput): ReadonlySet<string> {
   }
   const years = input.researchVocabulary === true;
   for (const token of publicTokens(input)) {
-    if (!FIGURE_LIKE.test(token) || (years && YEAR.test(token)))
-      allowed.add(token);
+    if (!FIGURE_LIKE.test(token))
+      for (const variant of variants(token)) allowed.add(variant);
+    else if (years && YEAR.test(token)) allowed.add(token);
   }
   if (input.researchVocabulary === true) {
     for (const token of RESEARCH_VOCABULARY) allowed.add(token);
@@ -433,8 +453,9 @@ export function composeEgressQuery(input: EgressInput): EgressOutcome {
     input.publicIdentity.some((term) =>
       tokenise(term).every((token) => survivors.includes(token)),
     );
-  const userTokens = new Set(personTokens(input));
-  const pageTokens = new Set(publicTokens(input));
+  const variants = variantsFor(input);
+  const userTokens = new Set(personTokens(input).flatMap(variants));
+  const pageTokens = new Set(publicTokens(input).flatMap(variants));
   const informative = survivors.filter(
     (token) =>
       userTokens.has(token) ||

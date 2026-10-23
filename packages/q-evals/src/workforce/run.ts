@@ -147,7 +147,9 @@ export async function runWorkforceScenario(
     }),
     {
       permitted: new Set(scenario.permitted),
-      budgetUsd: 0.45,
+      // The deployed job cap (Q_WORKFORCE_JOB_CAP_USD, $2.50) less the lead's
+      // own planning; deep research and analysis are budgeted for what they do.
+      budgetUsd: 2.4,
       executors,
       namedCompanyId: scenario.namedCompanyId,
     },

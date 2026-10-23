@@ -90,8 +90,7 @@ export function createWorkforceDocuments(dependencies: {
   readonly logger?: Logger | undefined;
   /** Owner 2026-10-23: the analyst and its reviewer (ANALYSIS documents). */
   readonly analyst?:
-    | Pick<WorkforceModels, "writeAnalysis" | "critiqueAnalysis">
-    | undefined;
+    Pick<WorkforceModels, "writeAnalysis" | "critiqueAnalysis"> | undefined;
   readonly now?: (() => number) | undefined;
 }) {
   /**
@@ -136,7 +135,8 @@ export function createWorkforceDocuments(dependencies: {
     if (decision.outcome !== "AUTHORISED") return unavailable();
     // The company's own record, as the person may read it (the firewall
     // filtered it before any model sees it).
-    let company = "No company record: this analysis is about a market or question, not one company.";
+    let company =
+      "No company record: this analysis is about a market or question, not one company.";
     let companyName: string | null = null;
     if (subject !== null) {
       if (!(await input.canContinue())) return unavailable();

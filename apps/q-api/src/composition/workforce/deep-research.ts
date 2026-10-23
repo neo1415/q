@@ -258,11 +258,7 @@ export function workforceDeepResearch(dependencies: {
       mapLimit(lanes, FACT_CALLS_AT_ONCE, async (question) => {
         const pages = pagesFor(question.lane, sources);
         if (pages.length === 0) return;
-        if (
-          now() >= started + deadlineMs ||
-          !spend.canAfford(0.05)
-        )
-          return;
+        if (now() >= started + deadlineMs || !spend.canAfford(0.05)) return;
         const read = await models.researchFacts(who, trace, {
           request,
           lane: question.lane.slice(0, 40),

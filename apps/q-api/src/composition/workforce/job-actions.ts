@@ -169,7 +169,7 @@ export function createOwnWorkStarter(dependencies: {
   readonly kick?: (() => void) | undefined;
   /** The plan's entitlement for agent work (consumed once per run). */
   readonly allowed?:
-    ((actor: ActorContext, idempotencyKey: string) => Promise<boolean>)
+    | ((actor: ActorContext, idempotencyKey: string) => Promise<boolean>)
     | undefined;
   readonly logger?: Logger | undefined;
 }) {

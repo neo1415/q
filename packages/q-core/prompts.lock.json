@@ -1,5 +1,7 @@
 {
   "entries": {
+    "analysis-critique/v1": "a3f0785d9c33b003887cb7a0b98360495e814b71d7ff88736f3edcf4bc7b359b",
+    "analysis-write/v1": "4fddbfc0abfe4ec7df7b07e7b0aaae1ba7663346e253dc0c195b36a3cfad61ac",
     "app-action-arguments/v1": "21532d93daad24dc70a9838e3a6c352b902b0a9f213108d507a27d3193f35ec1",
     "app-action-router/v1": "8137f33d99a8fb454a95b730addca2833ae4bd25ed937d8b5b71b827b341bf95",
     "artifact-revision/v1": "48f95a797cc00afd36c1afd6bb57660786dc57df154778a63f10bf626a1a5f0e",
@@ -138,6 +140,7 @@
     "job-plan/v5": "182497da4f20a2339b75e56048fbf53e9f69b4be4cd6dee376bbc3b9d09cef99",
     "job-plan/v6": "5613b73f729060139e285c52865918a19918324137b9dfaed171b1003e767fa2",
     "job-plan/v7": "d03a32ce6ef4417c197f17aa124d125ca894bf3afad12195a490ab071a4dbadf",
+    "job-plan/v8": "0c39fe50da2b70c31e04e3e6508037a05cf4412d7b1566d15a2eaec216be57dc",
     "meeting-camera-note/v1": "806c636eb0d9bba8ad84485ba42768b1c0ca777d95c7d470fcde5d00c6b85849",
     "meeting-host-turn/v1": "2ea6d277296cef4af1d2a66a9704f3a2bfc4e197fea1daf1957c5d3095eba6d1",
     "meeting-host-turn/v2": "661daea3885c727a2c5c6208b1936ca5cdfbf2c46b01b0d27a4549b7ace86ff3",
@@ -170,6 +173,8 @@
     "rehearsal-score/v4": "8d6ac63731a78036e100e8bd3c7b6f71f5e8d02caa45ad8dfd4303d48d00452c",
     "rehearsal-score/v5": "6986f28f771e849273f689d58d46531f546c3dba024292b31c1e10144e657831",
     "reply-reader/v1": "624ff96b540f39ab2748f5f2da797a2e8aaaff90ff805e1bbc06feb69aba095e",
+    "research-facts/v1": "5ef9bab265f3c76a2f23a21a89dffcbe73424bc5da757a8dc2a08a79d47bd647",
+    "research-plan/v1": "e8a2c2d4557c03f973c59f5dfe0b929135cf1c42ae26390e858ad65936af7ebd",
     "small-talk/v1": "5ad6a63edb3a8e4931079c9be77b680bd3c7664faeb7523de0c91e2f70689f5e",
     "spoken-reply/v1": "57ee123bf9e5a57f22fc3ccb842c03befd2d6416f01cdbcfb19825e1970731bf",
     "substance-critique/v1": "f423890b7c95ee2b1be2211f418eaabb27b4caa349c9e4adf261a44fc8995c3d",

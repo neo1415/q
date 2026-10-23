@@ -47,10 +47,7 @@ export type AdmittedFact = ProposedFact & {
 };
 
 export type FactRefusal =
-  | "UNKNOWN_SOURCE"
-  | "FIGURE_NOT_IN_SOURCE"
-  | "DUPLICATE"
-  | "EMPTY";
+  "UNKNOWN_SOURCE" | "FIGURE_NOT_IN_SOURCE" | "DUPLICATE" | "EMPTY";
 
 export type DossierSource = {
   readonly index: number;

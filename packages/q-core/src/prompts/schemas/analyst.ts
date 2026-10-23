@@ -131,9 +131,7 @@ export const ResearchFactsResultSchema = z
           .strict(),
       )
       .max(12),
-    followUps: z
-      .array(z.object({ lane: Lane, query: Query }).strict())
-      .max(3),
+    followUps: z.array(z.object({ lane: Lane, query: Query }).strict()).max(3),
   })
   .strict();
 export type ResearchFactsResult = z.infer<typeof ResearchFactsResultSchema>;

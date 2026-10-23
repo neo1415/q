@@ -1074,7 +1074,7 @@ export function createWorkforceJobs(dependencies: {
       cannot: planned.cannot,
       reasoning: grounded.reasoning,
       droppedRefs: droppedRefs + grounded.droppedRefs,
-      firstRead: planned.firstRead,
+      firstRead: planned.firstRead ?? null,
     };
   }
 
