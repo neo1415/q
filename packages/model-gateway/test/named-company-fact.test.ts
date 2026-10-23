@@ -4,7 +4,9 @@ import type { QToolCallOutcome, QToolPort } from "@capital-q/q-runtime";
 
 import { companyFiguresFacts } from "../src/q/company-fact.js";
 import {
+  capitalQAsCompanyAsked,
   companyFactAskOf,
+  isCapitalQCompanyRead,
   companyNameCandidates,
   readNamedVisibleCompany,
   runNamedCompanyFact,
@@ -377,5 +379,55 @@ describe("a named company's published figures, read beside its profile (owner 20
         "Maji Loop",
       ),
     ).toEqual([]);
+  });
+});
+
+describe("Capital Q as the company, not the platform (owner 2026-10-23)", () => {
+  const asked = (text: string, investorSide = true, onboarding = false) =>
+    capitalQAsCompanyAsked({ text, investorSide, onboarding });
+
+  it.each([
+    "Tell me about Capital Q",
+    "What is Capital Q's revenue?",
+    "What are the startup Capital Q's growth numbers?",
+    "Is CapitalQ raising?",
+  ])("an investor's %s is about the company", (text) => {
+    expect(asked(text)).toBe(true);
+  });
+
+  it.each([
+    "How does Capital Q work?",
+    "How do I use Capital Q to find deals?",
+    "What can the Capital Q app do?",
+    "Capital Q account settings",
+    "Tell me about my company",
+  ])("%s keeps the platform reading", (text) => {
+    expect(asked(text)).toBe(false);
+  });
+
+  it("a founder, and onboarding, keep the platform reading", () => {
+    expect(asked("Tell me about Capital Q", false)).toBe(false);
+    expect(asked("Tell me about Capital Q", true, true)).toBe(false);
+  });
+
+  it("takes only Capital Q reached as someone else's company", () => {
+    expect(
+      isCapitalQCompanyRead({
+        canonicalName: "Capital Q",
+        relationToYou: "SHARED",
+      }),
+    ).toBe(true);
+    expect(
+      isCapitalQCompanyRead({
+        canonicalName: "Capital Q",
+        relationToYou: "OWN",
+      }),
+    ).toBe(false);
+    expect(
+      isCapitalQCompanyRead({
+        canonicalName: "Capital Quest",
+        relationToYou: "SHARED",
+      }),
+    ).toBe(false);
   });
 });

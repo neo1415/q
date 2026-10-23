@@ -157,6 +157,8 @@ function build(options: {
   readonly parallelExtras?: boolean | undefined;
   /** What the person says this turn; "Tell me about my company." by default. */
   readonly said?: string | undefined;
+  /** The asker is on an investor's side (their own mandate is in the plan). */
+  readonly investor?: boolean | undefined;
 }) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -268,7 +270,22 @@ function build(options: {
     capability: "ANSWER",
     subjects: [],
     retrieval: { kind: "NOT_CONFIGURED" },
-    plan: plan(),
+    plan:
+      options.investor === true
+        ? ({
+            ...plan(),
+            scopes: [
+              {
+                kind: "INVESTOR_MANDATE",
+                subject: {
+                  kind: "INVESTOR_ORGANISATION",
+                  investorOrganisationId:
+                    "0f000000-0000-4000-8000-0000000000f1",
+                },
+              },
+            ],
+          } as unknown as PermittedContextPlan)
+        : plan(),
   };
   return { seam, alpha, messages, stages, logLines, request, completed, live };
 }
@@ -1525,6 +1542,104 @@ describe("answer seam tool loop", () => {
         "Northwind Ledger, as the company states it: Monthly recurring revenue was USD 6,500",
       );
       expect(first).toContain("SELF_REPORTED");
+    });
+
+    describe("Capital Q, the company on its own platform (owner 2026-10-23)", () => {
+      const FIGURES: QOfferedTool = {
+        ...GET_COMPANY,
+        toolName: "company.figures.read",
+        definition: { ...GET_COMPANY.definition, name: "read_company_figures" },
+      };
+      const REVENUE =
+        "Monthly recurring revenue was USD 4,800 in September 2026. (Demonstration data, self-reported by the company.)";
+      const capitalQ = (relationToYou: "SHARED" | "OWN") =>
+        toolPort([SEARCH, GET_COMPANY, FIGURES], (p) =>
+          p.name === "search_companies"
+            ? {
+                ...succeeded(p, {
+                  items: [{ companyId: "cq", canonicalName: "Capital Q" }],
+                }),
+                toolName: "company.search",
+              }
+            : p.name === "read_company_figures"
+              ? {
+                  ...succeeded(p, {
+                    companyId: "cq",
+                    status: "AVAILABLE",
+                    figures: [
+                      {
+                        key: "financial.monthly_revenue",
+                        statement: REVENUE,
+                        truthClass: "USER_CLAIM",
+                        evidenceStatus: "SELF_REPORTED",
+                        lifecycleStatus: "CURRENT",
+                      },
+                    ],
+                  }),
+                  toolName: "company.figures.read",
+                }
+              : succeeded(p, {
+                  companyId: "cq",
+                  canonicalName: "Capital Q",
+                  relationToYou,
+                }),
+        );
+      const ask = async (
+        said: string,
+        options: { investor: boolean; relation?: "SHARED" | "OWN" },
+      ) => {
+        const tools = capitalQ(options.relation ?? "SHARED");
+        const { seam, alpha, request } = build({
+          said,
+          investor: options.investor,
+          script: [{ kind: "JSON", value: analystResult("answered") }],
+          tools,
+        });
+        expect((await seam.answer(request)).kind).toBe("ANSWERED");
+        return {
+          searched: tools.executed
+            .filter((p) => p.name === "search_companies")
+            .map((p) => (p.arguments as { query: string }).query),
+          first: JSON.stringify(alpha.calls[0]?.request),
+        };
+      };
+
+      it("an investor asking about Capital Q's revenue gets the company's own figures", async () => {
+        const { searched, first } = await ask("What is Capital Q's revenue?", {
+          investor: true,
+        });
+        expect(searched).toContain("Capital Q");
+        expect(first).toContain("Capital Q, as the company states it");
+        expect(first).toContain("USD 4,800");
+        expect(first).toContain("CAPITAL Q THE COMPANY");
+        expect(first).toContain(
+          "If you meant the Capital Q platform itself, I can explain how it works.",
+        );
+      });
+
+      it("a member of Capital Q's own team keeps the platform reading", async () => {
+        const { first } = await ask("Tell me about Capital Q", {
+          investor: true,
+          relation: "OWN",
+        });
+        expect(first).not.toContain("CAPITAL Q THE COMPANY");
+      });
+
+      it("a founder never looks Capital Q up as a company", async () => {
+        const { searched, first } = await ask("Tell me about Capital Q", {
+          investor: false,
+        });
+        expect(searched).not.toContain("Capital Q");
+        expect(first).not.toContain("CAPITAL Q THE COMPANY");
+      });
+
+      it("a question about using the platform keeps the platform reading, even for an investor", async () => {
+        const { searched, first } = await ask("How does Capital Q work?", {
+          investor: true,
+        });
+        expect(searched).not.toContain("Capital Q");
+        expect(first).not.toContain("CAPITAL Q THE COMPANY");
+      });
     });
 
     it("never reads the profile twice when the model asks for it anyway", async () => {
