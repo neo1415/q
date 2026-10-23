@@ -993,3 +993,24 @@ describe("a decision begun beside the turn reading (speculative)", () => {
     expect(seen.read).toBe(0);
   });
 });
+
+describe("something the other side receives, still waiting (coordinator 2026-10-23)", () => {
+  it("reads 'Still ready to send', and 'Not saved yet' stays for edits", () => {
+    const outward = statusLine(
+      "PENDING",
+      "Express interest in Silo Credit",
+      true,
+    );
+    expect(outward).toBe(
+      "Still ready to send: Express interest in Silo Credit. Approve on the card, or tell me what to change.",
+    );
+    expect(outward).not.toContain("Not saved yet");
+    expect(statusLine("PENDING", "Update your raise")).toMatch(
+      /^Not saved yet: /,
+    );
+    // Other statuses read the same either way.
+    expect(
+      statusLine("DECLINED", "Express interest in Silo Credit", true),
+    ).toBe(statusLine("DECLINED", "Express interest in Silo Credit"));
+  });
+});

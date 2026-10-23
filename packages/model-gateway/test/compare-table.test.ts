@@ -3,7 +3,12 @@ import { describe, expect, it } from "vitest";
 import { QResultBlockSchema } from "@capital-q/contracts";
 
 import { RunRead, createRunCompanies } from "../src/q/card-subjects.js";
-import { asksToCompare, comparisonTableBlock } from "../src/q/compare-table.js";
+import {
+  asksToCompare,
+  comparisonTableBlock,
+  compareTargets,
+  newestAnswerCards,
+} from "../src/q/compare-table.js";
 import { fitsInOutcome } from "../src/q/fit-cards.js";
 
 import { fitFixture } from "./fit-fixture.js";
@@ -175,5 +180,52 @@ describe("compare side by side", () => {
     expect(traction?.[0]).not.toContain("full-time staff");
     // A company that published none: only what the fit says, never a zero.
     expect(traction?.[1]).not.toContain("company-stated");
+  });
+});
+
+describe("which companies a compare follow-up means", () => {
+  const cards = [
+    { companyId: MIZAN, name: "Mizan" },
+    { companyId: SILO, name: "Silo Credit" },
+    { companyId: "c3", name: "Kora" },
+  ];
+
+  it("the top two of the newest answer's cards", () => {
+    expect(compareTargets("Compare the top two side by side", cards)).toEqual([
+      MIZAN,
+      SILO,
+    ]);
+    expect(compareTargets("compare the first three", cards)).toEqual([
+      MIZAN,
+      SILO,
+      "c3",
+    ]);
+  });
+
+  it("those it names, in the order named", () => {
+    expect(compareTargets("Kora vs Mizan?", cards)).toEqual(["c3", MIZAN]);
+  });
+
+  it("nothing for a question that is not a comparison, or one card", () => {
+    expect(compareTargets("Tell me more about Mizan", cards)).toEqual([]);
+    expect(compareTargets("compare them", cards.slice(0, 1))).toEqual([]);
+  });
+
+  it("reads cards from Q's newest answer only", () => {
+    const block = (ids: string[]) => ({
+      kind: "ANSWER_CARDS",
+      cards: ids.map((companyId) => ({
+        name: companyId,
+        subject: { kind: "COMPANY", companyId },
+      })),
+    });
+    expect(
+      newestAnswerCards([
+        { role: "Q", blocks: [block(["old"])] },
+        { role: "USER" },
+        { role: "Q", blocks: [block(["a", "b"])] },
+        { role: "USER" },
+      ]).map((card) => card.companyId),
+    ).toEqual(["a", "b"]);
   });
 });

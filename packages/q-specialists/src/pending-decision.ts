@@ -94,6 +94,8 @@ export type PendingDecisionPort = {
       readonly proposalId: string;
       readonly summary: string;
       readonly status: PendingDecisionStatus;
+      /** The other side receives it: waiting reads "ready to send". */
+      readonly outward?: boolean | undefined;
     }[]
   >;
   /** Whether the words decide the question asked (DECISION_READER). */
@@ -262,10 +264,16 @@ function named(summary: string): string {
   return summary.trim().replace(/[.\s]+$/u, "");
 }
 
+/** Something the other side receives, still waiting for their yes. */
+function stillReadyToSend(what: string): string {
+  return `Still ready to send: ${what}. Approve on the card, or tell me what to change.`;
+}
+
 /** What Q says about a change: its engine status, in plain words. */
 export function statusLine(
   status: PendingDecisionStatus,
   summary: string,
+  outward = false,
 ): string {
   const what = named(summary);
   switch (status) {
@@ -282,7 +290,9 @@ export function statusLine(
     case "CHANGED":
       return `That change was altered after it was prepared, so I didn't approve it: ${what}. I can prepare it again for your approval.`;
     case "PENDING":
-      return `Not saved yet: ${what} is waiting for your approval. Tap Approve on the card, or tell me to go ahead.`;
+      return outward
+        ? stillReadyToSend(what)
+        : `Not saved yet: ${what} is waiting for your approval. Tap Approve on the card, or tell me to go ahead.`;
     case "CARD_ONLY":
       return `Not approved yet: ${what}. It involves money, terms or sharing a private document, so it needs your tap on Approve on its card.`;
   }
@@ -311,6 +321,7 @@ type DecisionProposal = {
   readonly proposalId: string;
   readonly summary: string;
   readonly status: PendingDecisionStatus;
+  readonly outward?: boolean | undefined;
 };
 
 /**
@@ -532,7 +543,10 @@ async function concludeWaiting(
     return {
       kind: "ANSWER_THEN",
       before: null,
-      after: `Still waiting for your approval: ${named(only.summary)}.`,
+      after:
+        only.outward === true
+          ? stillReadyToSend(named(only.summary))
+          : `Still waiting for your approval: ${named(only.summary)}.`,
       about: only.summary,
       aboutId: only.proposalId,
     };
@@ -593,21 +607,26 @@ async function concludeWaiting(
     return {
       kind: "ANSWER_THEN",
       before: null,
-      after: `Still waiting for your approval: ${named(only.summary)}.`,
+      after:
+        only.outward === true
+          ? stillReadyToSend(named(only.summary))
+          : `Still waiting for your approval: ${named(only.summary)}.`,
       about: only.summary,
       aboutId: only.proposalId,
     };
   }
   if (read.decision === "YES") {
     const approved = await port.approve(input.context, only.proposalId);
-    const line = approved.line ?? statusLine(approved.status, only.summary);
+    const line =
+      approved.line ??
+      statusLine(approved.status, only.summary, only.outward === true);
     // Anything more they said is answered after the decision.
     return read.remainder === null
       ? { kind: "REPLY", line }
       : { kind: "ANSWER_THEN", before: line, after: null };
   }
   const { status } = await port.decline(input.context, only.proposalId);
-  const line = statusLine(status, only.summary);
+  const line = statusLine(status, only.summary, only.outward === true);
   return read.remainder === null
     ? { kind: "REPLY", line }
     : { kind: "ANSWER_THEN", before: line, after: null };
@@ -762,7 +781,10 @@ async function decideByWords(
         ? await port.approve(input.context, target.proposalId)
         : await port.decline(input.context, target.proposalId);
     // One line per action: its own outcome line when it has one.
-    lines.push(decided.line ?? statusLine(decided.status, target.summary));
+    lines.push(
+      decided.line ??
+        statusLine(decided.status, target.summary, target.outward === true),
+    );
   }
   return { kind: "REPLY", line: lines.join(" ") };
 }
@@ -843,6 +865,6 @@ async function answeredAlready(
       progress ??
       (latest.status === "SAVED"
         ? `Already approved and done: ${named(latest.summary)}.`
-        : statusLine(latest.status, latest.summary)),
+        : statusLine(latest.status, latest.summary, latest.outward === true)),
   };
 }

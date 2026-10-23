@@ -90,7 +90,7 @@ export function firstContactMessage(
   if (withNote) {
     return {
       role: "USER",
-      content: `[Capital Q, not the person] They are not connected with this company yet, and messages open only once both sides are connected, so Capital Q prepared the first step for their approval: "${what}". The note they asked for goes with it, on the same approval card, exactly as drafted. Nothing is sent until they approve. In your answer say, in your own words: you have prepared Express Interest with their note for them to approve, and the founders see the note with the interest. Then give the note in full so they can read it before approving. Do not offer a connection request or ask whether to do this: it is already prepared.`,
+      content: `[Capital Q, not the person] They are not connected with this company yet, and messages open only once both sides are connected, so Capital Q prepared the first step for their approval: "${what}". The note they asked for goes with it, on the same approval card, exactly as drafted, and Capital Q's own line under your answer shows the note in full and says it is ready to send. Nothing is sent until they approve. Do not repeat the note or its status. In your answer say only, in your own words and in one or two sentences, why the note fits: what in their mandate matches what the company does. Do not offer a connection request or ask whether to do this: it is already prepared.`,
     };
   }
   return {

@@ -427,7 +427,7 @@ export const ProposeChatMessageInputSchema = z
   .object({
     ...RelationshipRef,
     body: ChatMessageBodySchema.describe(
-      "The whole message, in the person's voice. Plain text. No claims the evidence does not support.",
+      "The whole message, in the person's voice. Plain text. No claims the evidence does not support. A note to founders they are not yet connected with says why this investor is interested: their declared mandate (stage, sector, geography, cheque) against what the company does and its stage, from what you have read in this conversation. Never generic, never a claim you have not read.",
     ),
     documentId: UuidSchema.optional().describe(
       "Only to share one of the person's own documents, by the id they gave.",

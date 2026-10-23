@@ -51,6 +51,7 @@ export type QActionNarrator = {
           | "targets"
           | "preview"
           | "createdAt"
+          | "payload"
         >
       >,
     approval?: { readonly id: string; readonly expiresAt: string },
@@ -295,17 +296,34 @@ export function createQActionNarrator(dependencies: {
     return `Done: ${sentence(action.summary)}`;
   };
 
+  /** The definition's own line for a new card, from the exact payload. */
+  const definedProposedLine = (
+    action: Parameters<QActionNarrator["proposed"]>[1],
+  ): string | null => {
+    if (action.actionType === undefined || action.payload === undefined) {
+      return null;
+    }
+    const definition = registry.get(action.actionType);
+    if (definition?.proposed === undefined) return null;
+    const payload = definition.payload.safeParse(action.payload);
+    return payload.success ? definition.proposed(payload.data) : null;
+  };
+
   return {
-    proposed: (run, action, approval, options) =>
-      say(
+    proposed: (run, action, approval, options) => {
+      const line =
+        definedProposedLine(action) ??
+        proposedLine(action.summary, keepsCard(action));
+      return say(
         run,
         options?.alreadyWaiting === true
           ? alreadyWaitingLine(action.summary)
           : options?.replaces !== undefined && options.replaces.length > 0
-            ? `${proposedLine(action.summary, keepsCard(action))} ${replacesLine(options.replaces)}`
-            : proposedLine(action.summary, keepsCard(action)),
+            ? `${line} ${replacesLine(options.replaces)}`
+            : line,
         proposalBlocks(action, approval),
-      ),
+      );
+    },
     refused: (run, reason) => say(run, refusedLine(reason)),
     note: (run, line) => say(run, line),
     settled: async (context, outcome) => {

@@ -183,6 +183,13 @@ export type QActionDefinition<P, R> = {
    * model. Absent: the approval summary, prefixed "Done".
    */
   readonly confirm?: ((payload: P, result: R) => string) | undefined;
+  /**
+   * What Q says once the card is prepared, from the exact payload -- never
+   * from a model. An outward action (something the other side receives)
+   * says it is ready to send and shows what will be sent, not "Not saved
+   * yet" (coordinator 2026-10-23). Absent: the summary, "Not saved yet".
+   */
+  readonly proposed?: ((payload: P) => string) | undefined;
 };
 
 /** Erased for the registry; per-definition types stay with the definition. */

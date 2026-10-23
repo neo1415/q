@@ -82,7 +82,7 @@ export const ProposeEmailInputSchema = z
       ),
     subject: EmailSubjectSchema.describe("A short, plain subject line."),
     body: EmailBodySchema.describe(
-      "The whole email, in the person's voice, signed with their name. Plain text. No claims the evidence does not support.",
+      "The whole email, in the person's voice, signed with their name. Plain text. No claims the evidence does not support. A note to founders they are not yet connected with says why this investor is interested: their declared mandate (stage, sector, geography, cheque) against what the company does and its stage, from what you have read in this conversation. Never generic, never a claim you have not read.",
     ),
   })
   .strict()
