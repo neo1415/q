@@ -7109,6 +7109,9 @@ const { app, logger: appLogger } = createApp(
                   mood: opening.mood,
                   intensity: opening.intensity,
                   reaction: opening.reaction,
+                  ...(opening.beats === undefined
+                    ? {}
+                    : { beats: [...opening.beats] }),
                 });
               },
             },

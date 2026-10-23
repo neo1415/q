@@ -1,4 +1,6 @@
 import { createDefaultPromptRegistry } from "@capital-q/q-core";
+
+import { readTurn } from "../src/composition/rehearsal-readings.js";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -798,7 +800,7 @@ describe("how the person Q plays talks (row 12, INVESTOR_TWIN_TURN v11)", () => 
     expect(
       createDefaultPromptRegistry().getActive("INVESTOR_TWIN_TURN").definition
         .version,
-    ).toBe(12);
+    ).toBe(13);
     expect(template).toContain('"Speaks like" line');
     expect(template).toContain("code-switch");
   });
@@ -901,5 +903,63 @@ describe("where a persona is from, read right (2026-10-23 audit)", () => {
     // Was one voice (Fahad) for every Arabic-speaking man.
     expect(new Set(picks.map((pick) => pick?.voiceId)).size).toBeGreaterThan(3);
     for (const pick of picks) expect(pick?.accent).toBe("arabic");
+  });
+});
+
+describe("emotion per sentence (R5, INVESTOR_TWIN_TURN v13)", () => {
+  it("asks for beats only when the feeling moves inside the line", () => {
+    const template =
+      createDefaultPromptRegistry().getActive("INVESTOR_TWIN_TURN").definition
+        .template;
+    expect(template).toContain("- beats:");
+    expect(template).toContain(
+      "An empty list when the whole line sounds the same",
+    );
+  });
+
+  it("gives each sentence its own tone, a neutral one none", () => {
+    const performed = deliverLine(
+      ["Lovely to meet you.", "Now, where does the money go?", "Fine."],
+      { tone: "WARM", intensity: "NORMAL", reaction: null },
+      [
+        { tone: "WARM", intensity: "NORMAL" },
+        { tone: "SKEPTICAL", intensity: "NORMAL" },
+        { tone: null, intensity: "NORMAL" },
+      ],
+    );
+    // The neutral last sentence has no cue at all, so it is not listed.
+    expect(performed.map((p) => [p.sentence, p.tone])).toEqual([
+      ["Lovely to meet you.", "WARM"],
+      ["Now, where does the money go?", "SKEPTICAL"],
+    ]);
+  });
+
+  it("keeps one delivery when the beats do not line up with the sentences", () => {
+    const performed = deliverLine(
+      ["Lovely to meet you.", "Now, where does the money go?"],
+      { tone: "WARM", intensity: "NORMAL", reaction: null },
+      [{ tone: "ANGRY", intensity: "RAISED" }],
+    );
+    expect(performed.map((p) => p.tone)).toEqual(["WARM", "WARM"]);
+  });
+
+  it("reads beats leniently: anything unreadable means one delivery", () => {
+    const base = { line: "Hi. So?", mood: "WARM", move: "REMARK" };
+    expect(
+      readTurn({
+        ...base,
+        beats: [
+          { mood: "WARM", intensity: "SOFT" },
+          { mood: "SKEPTICAL", intensity: "NORMAL" },
+        ],
+      })?.beats,
+    ).toEqual([
+      { mood: "WARM", intensity: "SOFT" },
+      { mood: "SKEPTICAL", intensity: "NORMAL" },
+    ]);
+    expect(readTurn({ ...base, beats: [{ mood: "GLEEFUL" }] })?.beats).toEqual(
+      [],
+    );
+    expect(readTurn(base)?.beats).toEqual([]);
   });
 });

@@ -634,3 +634,27 @@ export const RehearsalTurnV8ResultSchema = RehearsalTurnV7ResultSchema.extend({
   screenNote: RehearsalScreenNoteSchema.nullable(),
 }).strict();
 export type RehearsalTurnV8Result = z.infer<typeof RehearsalTurnV8ResultSchema>;
+
+// ---------------------------------------------------------------------------
+// v13 prompt (owner 2026-10-23, R5): the feeling can move inside a line --
+// a warm greeting, then a skeptical question -- so each sentence may carry
+// its own mood and intensity. Empty when the whole line sounds the same.
+// ---------------------------------------------------------------------------
+
+export const REHEARSAL_TURN_V9_SCHEMA_VERSION = 9;
+
+/** How one sentence of the line sounds, in order. */
+export const RehearsalBeatSchema = z
+  .object({
+    mood: z.enum(REHEARSAL_LINE_MOODS_V4),
+    intensity: z.enum(["SOFT", "NORMAL", "RAISED"]),
+  })
+  .strict();
+export type RehearsalBeat = z.infer<typeof RehearsalBeatSchema>;
+
+export const REHEARSAL_BEATS_MAX = 6;
+
+export const RehearsalTurnV9ResultSchema = RehearsalTurnV8ResultSchema.extend({
+  beats: z.array(RehearsalBeatSchema).max(REHEARSAL_BEATS_MAX),
+}).strict();
+export type RehearsalTurnV9Result = z.infer<typeof RehearsalTurnV9ResultSchema>;

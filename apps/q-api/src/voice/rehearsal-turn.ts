@@ -61,15 +61,30 @@ export function toneOf(mood: QRehearsalTurnDto["mood"]): SpeechTone | null {
 export function performRehearsalLine(
   board: SpeechPerformanceBoard | undefined,
   voiceSessionId: string,
-  turn: Pick<QRehearsalTurnDto, "text" | "mood" | "intensity" | "reaction">,
+  turn: Pick<
+    QRehearsalTurnDto,
+    "text" | "mood" | "intensity" | "reaction" | "beats"
+  >,
 ): void {
+  const spoken = sentences(turn.text);
   board?.perform(
     voiceSessionId,
-    deliverLine(sentences(turn.text), {
-      tone: toneOf(turn.mood),
-      intensity: turn.intensity ?? "NORMAL",
-      reaction: turn.reaction ?? null,
-    }),
+    deliverLine(
+      spoken,
+      {
+        tone: toneOf(turn.mood),
+        intensity: turn.intensity ?? "NORMAL",
+        reaction: turn.reaction ?? null,
+      },
+      // v13 (R5): a sentence's own feeling, only when the beats line up
+      // with the sentences actually spoken; otherwise one delivery.
+      turn.beats !== undefined && turn.beats.length === spoken.length
+        ? turn.beats.map((beat) => ({
+            tone: toneOf(beat.mood),
+            intensity: beat.intensity,
+          }))
+        : undefined,
+    ),
   );
 }
 

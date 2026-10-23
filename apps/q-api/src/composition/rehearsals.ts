@@ -37,7 +37,7 @@ import {
   type CounterpartPersonaV5Variables as CounterpartPersonaVariables,
   type RehearsalReviewResult,
   type RehearsalReviewVariables,
-  type RehearsalTurnV8Result as RehearsalTurnResult,
+  type RehearsalTurnV9Result as RehearsalTurnResult,
   type RehearsalTurnV8Variables as RehearsalTurnVariables,
 } from "@capital-q/q-core";
 import type { ActorContext } from "@capital-q/security";
@@ -271,6 +271,16 @@ const StoredTurnSchema = z.object({
   sawScreen: z.boolean().optional(),
   intensity: z.enum(["SOFT", "NORMAL", "RAISED"]).optional(),
   reaction: z.enum(["LAUGH", "CHUCKLE", "SIGH", "CRY"]).nullish(),
+  /** v13 (R5): per-sentence delivery when the feeling moves in the line. */
+  beats: z
+    .array(
+      z.object({
+        mood: z.enum(MOODS),
+        intensity: z.enum(["SOFT", "NORMAL", "RAISED"]),
+      }),
+    )
+    .max(6)
+    .optional(),
   state: z
     .object({
       patience: z.number(),
@@ -296,6 +306,13 @@ export type Turn = {
   /** How loud the played person said it, and any sound before it. */
   readonly intensity?: "SOFT" | "NORMAL" | "RAISED" | undefined;
   readonly reaction?: "LAUGH" | "CHUCKLE" | "SIGH" | "CRY" | null | undefined;
+  /** v13 (R5): how each sentence sounds when the feeling moves in the line. */
+  readonly beats?:
+    | readonly {
+        readonly mood: Mood;
+        readonly intensity: "SOFT" | "NORMAL" | "RAISED";
+      }[]
+    | undefined;
   /** The played person's temperament after this line (code-tracked). */
   readonly state?: Temperament | undefined;
   /** This line was the played person's first or last warning before walking out. */
@@ -323,6 +340,7 @@ export function normaliseTurns(raw: unknown, role: ViewerRole): Turn[] {
       sawScreen: turn.sawScreen === true,
       ...(turn.intensity === undefined ? {} : { intensity: turn.intensity }),
       ...(turn.reaction === undefined ? {} : { reaction: turn.reaction }),
+      ...(turn.beats === undefined ? {} : { beats: turn.beats }),
       ...(turn.state === undefined ? {} : { state: turn.state }),
       ...(turn.warning === 1 || turn.warning === 2
         ? { warning: turn.warning }
@@ -951,6 +969,8 @@ export type RehearsalService = {
     readonly mood: Mood | null;
     readonly intensity: "SOFT" | "NORMAL" | "RAISED";
     readonly reaction: "LAUGH" | "CHUCKLE" | "SIGH" | "CRY" | null;
+    /** v13 (R5): per-sentence delivery, when the feeling moves. */
+    readonly beats?: Turn["beats"];
   } | null>;
 };
 
@@ -1197,6 +1217,7 @@ function toDto(
       sawScreen: turn.sawScreen,
       ...(turn.intensity === undefined ? {} : { intensity: turn.intensity }),
       ...(turn.reaction === undefined ? {} : { reaction: turn.reaction }),
+      ...(turn.beats === undefined ? {} : { beats: [...turn.beats] }),
     })),
     ...(row.counterpartKind === "EXTERNAL_PERSON"
       ? {
@@ -1268,6 +1289,7 @@ export function yieldTo(previous: readonly Turn[]): {
     result: {
       appraisal: "NEUTRAL",
       line: YIELD_LINES[theirs.length % YIELD_LINES.length] ?? "Go ahead.",
+      beats: [],
       move: "YIELD",
       mood: last?.mood ?? "NEUTRAL",
       intensity: last?.intensity === "SOFT" ? "SOFT" : "NORMAL",
@@ -1405,6 +1427,7 @@ function holdingTurn(
     result: {
       appraisal: "NEUTRAL",
       line: cue === "OPENING" ? HOLDING_LINES.OPENING : HOLDING_LINES.TURN,
+      beats: [],
       move: "REMARK",
       mood: "NEUTRAL",
       intensity: "NORMAL",
@@ -2394,12 +2417,19 @@ export function createRehearsalService(dependencies: {
       category === "RUDE" || step.warning !== null || step.close === "WALK_OUT",
       category === "STRONG" || category === "DIRECT" || category === "ASKED",
     );
+    // v13 beats stand only when code kept the model's own delivery and
+    // words: a temperament override or a warning re-voices the whole line.
+    const kept =
+      delivery.mood === shaped.mood &&
+      delivery.intensity === shaped.intensity &&
+      step.warning === null;
     return {
       result: {
         ...shaped,
         mood: delivery.mood as RehearsalTurnResult["mood"],
         intensity: delivery.intensity,
         reaction: delivery.reaction,
+        beats: kept ? shaped.beats : [],
       },
       sawScreen: screenFrame !== null,
       state: after,
@@ -2704,6 +2734,9 @@ export function createRehearsalService(dependencies: {
             sawScreen: false,
             intensity: opening.result.intensity,
             reaction: opening.result.reaction,
+            ...(opening.result.beats.length === 0
+              ? {}
+              : { beats: opening.result.beats }),
             state: opening.state,
           },
         ],
@@ -2817,6 +2850,7 @@ export function createRehearsalService(dependencies: {
           sawScreen: answered.sawScreen,
           intensity: result.intensity,
           reaction: result.reaction,
+          ...(result.beats.length === 0 ? {} : { beats: result.beats }),
           ...(answered.state === undefined ? {} : { state: answered.state }),
           ...(warningOf(answered) === undefined
             ? {}
@@ -3058,6 +3092,7 @@ export function createRehearsalService(dependencies: {
             mood: last.mood,
             intensity: last.intensity ?? "NORMAL",
             reaction: last.reaction ?? null,
+            ...(last.beats === undefined ? {} : { beats: last.beats }),
           };
     },
   };

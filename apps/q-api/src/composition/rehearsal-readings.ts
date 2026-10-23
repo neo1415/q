@@ -8,6 +8,7 @@ import {
   PERSONA_CEILING,
   PERSONA_LEAVING,
   REHEARSAL_APPRAISALS_V4,
+  REHEARSAL_BEATS_MAX,
   REHEARSAL_CONCLUSIONS,
   REHEARSAL_DIMENSIONS,
   REHEARSAL_LINE_MOODS_V4,
@@ -16,7 +17,7 @@ import {
   type CounterpartPersonaStored,
   type PresenceReading,
   type RehearsalReviewResult,
-  type RehearsalTurnV8Result,
+  type RehearsalTurnV9Result,
 } from "@capital-q/q-core";
 
 /**
@@ -224,7 +225,7 @@ export function readPresence(raw: unknown): PresenceReading | null {
 }
 
 /** A played line: null only when there are no words to say. */
-export function readTurn(raw: unknown): RehearsalTurnV8Result | null {
+export function readTurn(raw: unknown): RehearsalTurnV9Result | null {
   if (!isRecord(raw)) return null;
   const onlyNoise = flag(raw["onlyNoise"], false);
   const line = text(raw["line"], 700, "");
@@ -255,7 +256,28 @@ export function readTurn(raw: unknown): RehearsalTurnV8Result | null {
     wantsToEnd: flag(raw["wantsToEnd"], false),
     onlyNoise,
     screenNote: readScreenNote(raw["screenNote"]),
+    beats: readBeats(raw["beats"]),
   };
+}
+
+/** v13: per-sentence delivery; anything unreadable is left out, never guessed. */
+function readBeats(raw: unknown): RehearsalTurnV9Result["beats"] {
+  if (!Array.isArray(raw)) return [];
+  const beats: RehearsalTurnV9Result["beats"][number][] = [];
+  for (const entry of raw.slice(0, REHEARSAL_BEATS_MAX)) {
+    if (!isRecord(entry)) return [];
+    const mood = labelOrNull(entry["mood"], REHEARSAL_LINE_MOODS_V4);
+    if (mood === null) return [];
+    beats.push({
+      mood,
+      intensity: label(
+        entry["intensity"],
+        ["SOFT", "NORMAL", "RAISED"] as const,
+        "NORMAL",
+      ),
+    });
+  }
+  return beats;
 }
 
 /** P5: Q's note on a shared screen; null when it says nothing. */
