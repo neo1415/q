@@ -1007,7 +1007,7 @@ export function QEmailRow() {
       ) : address.status === "UNAVAILABLE" ? null : (
         <>
           <span
-            className="rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-sm break-all text-(--cq-text-primary)"
+            className="max-w-80 rounded-(--cq-radius-md) border border-(--cq-border-subtle) bg-(--cq-surface) px-3 py-2 text-sm break-all text-(--cq-text-primary)"
             data-q-email-address={address.status}
           >
             {address.address}
