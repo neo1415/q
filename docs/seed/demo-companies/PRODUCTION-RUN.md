@@ -1,6 +1,6 @@
 # Production seed run: findings and plan (2026-10-23)
 
-Status: **not run. Nothing was written to hosted.** This branch, `seed/production-run`, is `origin/speed/q-oct20` (74d90d59) with `origin/seed/zino-photo` merged in, which adds `supabase/seed-assets/capital-q-team/zino-cofounder.jpg`.
+Status: **not run. Nothing was written to hosted.** (Second attempt, 2026-10-23: see "Run 2 findings" at the end.) This branch, `seed/production-run`, is `origin/speed/q-oct20` (74d90d59) with `origin/seed/zino-photo` merged in, which adds `supabase/seed-assets/capital-q-team/zino-cofounder.jpg`.
 
 ## Blocker found
 
@@ -62,3 +62,36 @@ Status: **not run. Nothing was written to hosted.** This branch, `seed/productio
    - Q answering "tell me about Capital Q" and Songscribe;
    - the InvestIQ band.
 9. **Hand back.** Commit the evidence (no secrets), open a PR into `speed/q-oct20`, and message the coordinator.
+
+## Run 2 findings (2026-10-23, second worker)
+
+- **Token:** the new `SUPABASE_ACCESS_TOKEN` works (`GET /v1/projects` → 200; read-only SQL works). `origin/speed/q-oct20` (37599c71) is merged into this branch.
+- **Capital Q (resolved, one only):** company `ee75a7d8-d457-4b59-9ad8-0d64b3026a3d`, organisation `f95c3469-ef29-4574-a508-c1ba1131d842`. So `f95c3469…` is the **organisation** id and the fixture's `match.organisationId` is correct. It is `network_visible`, `demonstration_data=false`.
+- **David:** `founder.capitalq@fictional.capitalq.local` (user profile `7ab32dff…`, display name "Capital Q demo founder") is Capital Q's **only** member. `davidnwankwo14@gmail.com` (profile "David") has no membership in any organisation. Use `--person david=founder.capitalq@fictional.capitalq.local`.
+- **KUUZA AI:** company `866bcc12…`, `organisation_private`, founder-onboarded. The dry run plans additions only.
+- **Songscribe: owner decision needed.** The fixture assumes Songscribe is absent ("Songscribe created once"). It now exists live as **"SongScribe AI"** (company `b3308b98…`, created 2026-10-19 by its founder's own onboarding, `organisation_private`, slug `songscribe-ai`, website `https://www.songscribe.ai`, "AI music studio that turns your story into a finished custom song in about a minute"). The fixture's names don't include "SongScribe AI", so a run as written would **CREATE a second Songscribe**. Adding the name in `CORRECT` mode would instead overwrite the founder's own name, description and visibility with the fixture's different description. Neither is acceptable without the owner, so this run uses the new `--skip songscribe`. Options for the owner: (a) treat it like KUUZA AI (`FILL_GAPS`, add "SongScribe AI" to `match.names`) after checking the fixture's nine figures still describe this product; (b) leave it to its founder.
+- **Dry run (David only, `--skip songscribe`, `--documents`, David photo):** Capital Q `company ee75a7d8…` (no CREATE): fields website_url, short_description, primary_description + demonstration label; claims +11, superseded 0; taxonomy +6; raise replace; card create; handle `capital-q-hq`. KUUZA AI: fields none + label; claims +4; taxonomy +2. Team title for David; David photo 512×512 WebP; data room: deck PUBLIC, five others ON_REQUEST; person card `@david-nwankwo`.
+
+### Blocker (run 2)
+
+The session's permission policy refused the first production write (creating the three team accounts through the auth admin API) as "Modify Shared Resources": the production direction reached that worker as a coordinator message, not from the owner in that session. Nothing was written. A session where the owner states the go-ahead directly can run the exact commands below.
+
+### Exact commands for the run
+
+```
+export NODE_USE_ENV_PROXY=1 SUPABASE_URL=https://vcohxiqsmnkzxnvawgri.supabase.co
+pnpm exec turbo run build --filter=./packages/*   # seed.mjs imports packages/*/dist
+# 1. accounts: POST $SUPABASE_URL/auth/v1/admin/users, email_confirm true, password CQ_SEED_ACCOUNT_PASSWORD
+#    zino.mario@, daniel.oyeniyi@, adeyemi.odunyugbo@fictional.capitalq.local
+# 2. dry run, then the same with --apply
+node scripts/seed/demo-companies/seed.mjs --hosted --skip songscribe \
+  --person david=founder.capitalq@fictional.capitalq.local \
+  --person zino=zino.mario@fictional.capitalq.local \
+  --person daniel=daniel.oyeniyi@fictional.capitalq.local \
+  --person adeyemi=adeyemi.odunyugbo@fictional.capitalq.local \
+  --photo david=supabase/seed-assets/capital-q-team/david-founder.jpg \
+  --photo zino=supabase/seed-assets/capital-q-team/zino-cofounder.jpg \
+  --documents
+# 3. pitch video at /pitch/new signed in as founder.capitalq@, audience "Everyone on Capital Q"
+# 4. --confirm-deck (same --person args) once Q's hosted deck reading exists
+```

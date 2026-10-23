@@ -12,6 +12,7 @@
 //
 //   Person Q Cards for people who already have accounts and agreed:
 //     --person david=<email> --person zino=<email>
+//   Leave a company out of the run: --skip songscribe
 //   Capital Q's data room (business documents only), uploaded by its founder;
 //   then, once Q has read the deck, his confirmation (owner-approved):
 //     --documents        (local rehearsal: add --local-fixture-reading)
@@ -652,6 +653,17 @@ async function main() {
     );
   }
   const fixture = JSON.parse(readFileSync(FIXTURE_PATH, "utf8"));
+  // --skip <key> leaves a company out of this run entirely, e.g. one whose
+  // live record a founder has since onboarded and that needs an owner call.
+  const skipped = args.flatMap((arg, i) =>
+    arg === "--skip" ? [String(args[i + 1])] : [],
+  );
+  for (const key of skipped) {
+    if (!fixture.companies.some((c) => c.key === key)) {
+      throw new Error(`--skip ${key}: no such company in the fixture`);
+    }
+  }
+  fixture.companies = fixture.companies.filter((c) => !skipped.includes(c.key));
   const db = hosted ? hostedDatabase() : localDatabase(url);
   try {
     const planned = await planAll(db, fixture, {
