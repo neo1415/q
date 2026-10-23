@@ -142,6 +142,7 @@ import { stageAbout, stageKey } from "./stage-subjects.js";
 import {
   createRunFits,
   fitAnswerCardsBlock,
+  withPlatformFit,
   fitCardsSummary,
   fitSweepCardsBlock,
   fitSweepSummary,
@@ -329,12 +330,14 @@ import {
   attachedDocumentFacts,
   attachedDocumentsWithin,
 } from "./attached-document-fact.js";
+import { asksChequeFit, chequeFitStatement } from "./cheque-fit-fact.js";
 import {
   asksAboutOthersInterest,
   OTHERS_INTEREST_NOTE,
   withOthersInterestWithheld,
 } from "./others-interest.js";
 import {
+  asksToCompare,
   comparisonFactStatement,
   comparisonSpokenLine,
   withoutCompareOffers,
@@ -383,6 +386,7 @@ import {
 import {
   analystResultBlocks,
   askedSubjects,
+  COMPANIES_TABLE_TITLE,
   findingBlockOf,
   namesReadByRun,
   ownInvestorOrganisationIn,
@@ -3454,7 +3458,10 @@ export function createModelGatewayQAnswer(
       });
       const names = [
         ...(capitalQAsked ? ["Capital Q"] : []),
-        ...companyNameCandidates(latest.content),
+        ...companyNameCandidates(
+          latest.content,
+          asksToCompare(latest.content) ? 4 : 2,
+        ),
         ...lowercaseNameCandidates(latest.content),
       ];
       if (names.length === 0) return;
@@ -3503,6 +3510,68 @@ export function createModelGatewayQAnswer(
           namedCompanies.push(...companyFiguresFacts(read.figures, name));
         }
       }
+    };
+    /**
+     * Owner QA I7 (cheque-fit-fact.ts): "does my cheque fit X's round?"
+     * reads X's computed fit -- the company on screen, or the one the turn
+     * names -- so the cheque row and its dated FX estimate are the answer.
+     */
+    const chequeRead = async (): Promise<void> => {
+      if (
+        ownInvestor === null ||
+        !asksChequeFit(latest.content) ||
+        !prefetchTools.has("fit_profile")
+      ) {
+        return;
+      }
+      const onScreen =
+        counterparty?.kind === "COMPANY" ? counterparty.companyId : null;
+      const known = runCompanies.read(request.runId);
+      const ids = [
+        ...[...namedIds].filter((id) => {
+          const name = known.companyNames.get(id) ?? known.profiles.get(id);
+          return (
+            name !== undefined &&
+            name.length > 0 &&
+            containsCompanyName(latest.content, name)
+          );
+        }),
+        ...(onScreen === null ? [] : [onScreen]),
+      ]
+        .filter((id, index, all) => all.indexOf(id) === index)
+        .slice(0, 2);
+      await Promise.all(
+        ids.map(async (companyId, index) => {
+          const outcome = await tools
+            .execute(
+              {
+                callId: `q-cheque-fit-${String(index)}`,
+                name: "fit_profile",
+                arguments: { companyId },
+              },
+              toolContext,
+            )
+            .catch(() => null);
+          if (outcome === null || !outcome.result.ok) return;
+          const data: unknown = outcome.result.data;
+          const named: unknown =
+            typeof data === "object" && data !== null
+              ? Reflect.get(data, "name")
+              : null;
+          const statement = chequeFitStatement(
+            typeof named === "string" ? named : "this company",
+            data,
+          );
+          if (statement === null) return;
+          namedCompanies.push({
+            scope: "NETWORK_VISIBLE_DATA",
+            statement,
+            truthClass: "Q_INFERENCE",
+            evidenceStatus: "SELF_REPORTED",
+            source: "Capital Q's computed fit against their mandate",
+          });
+        }),
+      );
     };
     /**
      * The Q Daily on their screen, read for them (founder live
@@ -3750,6 +3819,7 @@ export function createModelGatewayQAnswer(
           timed("day", phased("day", dayRead)),
           timed("arrival", phased("arrival", arrivalRead)),
         ]);
+        await timed("cheque", chequeRead());
         prepareMs["wide"] = Date.now() - wideStarted;
         return {
           namedCompanies,
@@ -5614,7 +5684,16 @@ export function createModelGatewayQAnswer(
         // done, never offered.
         const tableHere =
           compareTable !== null &&
-          !(given ?? []).some((block) => block.kind === "TABLE");
+          !(given ?? []).some(
+            (block) =>
+              block.kind === "TABLE" && block.title !== COMPANIES_TABLE_TITLE,
+          );
+        if (tableHere) {
+          given = given?.filter(
+            (block) =>
+              block.kind !== "TABLE" || block.title !== COMPANIES_TABLE_TITLE,
+          );
+        }
         // QA F-44: other investors' interest is withheld, never denied.
         if (asksAboutOthersInterest(latest.content)) {
           content = withOthersInterestWithheld(content).slice(
@@ -8217,7 +8296,11 @@ export function createModelGatewayQAnswer(
           read: companiesRead,
         })?.map((block) =>
           block.kind === "ANSWER_CARDS"
-            ? withCardSubjects(block, companiesRead)
+            ? // QO-06: one fit scale, the platform's, where it computed one.
+              withPlatformFit(
+                withCardSubjects(block, companiesRead),
+                runFits.read(request.runId),
+              )
             : block,
         );
         // Zino live 2026-10-07: a list with scores came back with no cards.
@@ -8287,8 +8370,11 @@ export function createModelGatewayQAnswer(
               });
         // Owner 23 Oct 2026: "compare them side by side" is a table, built
         // by code from this run's authorised reads (profiles and fits).
+        // QO-05: the generic "as each company states it" table yields to
+        // the comparison built from fit, never sits beside it.
         const comparedTable = (modelBlocks ?? []).some(
-          (block) => block.kind === "TABLE",
+          (block) =>
+            block.kind === "TABLE" && block.title !== COMPANIES_TABLE_TITLE,
         )
           ? null
           : comparisonTableBlock({
@@ -8303,10 +8389,18 @@ export function createModelGatewayQAnswer(
           ...fromPages,
           ...(picture === null ? [] : [picture]),
         ];
+        const keptModelBlocks =
+          comparedTable === null
+            ? modelBlocks
+            : modelBlocks?.filter(
+                (block) =>
+                  block.kind !== "TABLE" ||
+                  block.title !== COMPANIES_TABLE_TITLE,
+              );
         const analystBlocks =
           codeBlocks.length === 0
-            ? modelBlocks
-            : [...(modelBlocks ?? []), ...codeBlocks];
+            ? keptModelBlocks
+            : [...(keptModelBlocks ?? []), ...codeBlocks];
         // An answer that was nothing but talk about acting leaves Capital
         // Q's own lines — the revision below, the action's own narration —
         // to say what happened. Alone, it is acknowledged and no more.
