@@ -163,7 +163,7 @@ export function SRow({
         )}
       </div>
       {children === undefined ? null : (
-        <div className="flex flex-none flex-wrap items-center gap-2">
+        <div className="flex max-w-full min-w-0 flex-none flex-wrap items-center gap-2">
           {children}
         </div>
       )}

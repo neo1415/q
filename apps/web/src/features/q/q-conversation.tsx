@@ -1385,6 +1385,7 @@ export function QConversationPanel({
                             session={session}
                             onAct={sayOrAsk}
                             quietWhenIdle
+                            withStop={false}
                           />
                         )
                       }
@@ -1547,7 +1548,12 @@ export function QConversationPanel({
                 {/* E1: the stage layer's place below Q while conversing. */}
                 <RoomBelow />
                 {boardDocked || bigPresence ? null : (
-                  <QNow session={session} onAct={sayOrAsk} quietWhenIdle />
+                  <QNow
+                    session={session}
+                    onAct={sayOrAsk}
+                    quietWhenIdle
+                    withStop={false}
+                  />
                 )}
                 {notices}
               </div>
@@ -1691,7 +1697,12 @@ export function QConversationPanel({
 
                 {boardDocked ? null : (
                   <div className="w-full max-w-(--cq-layout-narrow)">
-                    <QNow session={session} onAct={sayOrAsk} quietWhenIdle />
+                    <QNow
+                      session={session}
+                      onAct={sayOrAsk}
+                      quietWhenIdle
+                      withStop={false}
+                    />
                   </div>
                 )}
                 {notices}
@@ -1829,6 +1840,7 @@ export function QConversationPanel({
                   onAct={sayOrAsk}
                   quietWhenIdle
                   showProgress
+                  withStop={false}
                 />
               </div>
               <QBoardTimeline

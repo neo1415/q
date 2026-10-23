@@ -20,6 +20,7 @@ export function QNow({
   onAct,
   quietWhenIdle = false,
   showProgress = false,
+  withStop = true,
 }: {
   readonly session: QSessionValue;
   /**
@@ -28,6 +29,11 @@ export function QNow({
    * Stacked under the thread, the thread's answer slot already shows it.
    */
   readonly showProgress?: boolean | undefined;
+  /**
+   * False where the screen already has its own Stop beside the composer
+   * (the conversation), so a working Q never shows two Stop buttons.
+   */
+  readonly withStop?: boolean | undefined;
   /**
    * On the stage, an idle "Now" says nothing worth the space (R23): it
    * renders only when something runs, waits or asks.
@@ -74,13 +80,15 @@ export function QNow({
               <TaskProgress current={session.presence.stage} className="mt-1" />
             ) : null}
           </span>
-          <button
-            type="button"
-            className={buttonClassName("quiet", "compact")}
-            onClick={() => void q.stop()}
-          >
-            {t("Stop")}
-          </button>
+          {withStop ? (
+            <button
+              type="button"
+              className={buttonClassName("quiet", "compact")}
+              onClick={() => void q.stop()}
+            >
+              {t("Stop")}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
