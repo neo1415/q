@@ -268,7 +268,10 @@ describe("openai realtime adapter", () => {
         max_output_tokens: number;
         tools: { type: string; name: string }[];
         audio: {
-          input: { turn_detection: { interrupt_response: boolean } };
+          input: {
+            turn_detection: { interrupt_response: boolean };
+            noise_reduction: { type: string };
+          };
           output: { voice: string };
         };
       };
@@ -282,6 +285,11 @@ describe("openai realtime adapter", () => {
     expect(body.session.audio.input.turn_detection.interrupt_response).toBe(
       false,
     );
+    // The microphone is filtered before the transcriber hears it, so noise
+    // is not written down as "Laughter" (production 2026-10-23).
+    expect(body.session.audio.input.noise_reduction).toEqual({
+      type: "near_field",
+    });
     expect(body.session.audio.output.voice).toBe("cedar");
     // Without listening behaviour: the eager detector and no transcriber.
     expect(JSON.stringify(body.session)).toContain('"eagerness":"high"');

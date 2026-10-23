@@ -6,7 +6,7 @@ export const V5_COMPOUND_FIT = `FIT and DISCOVER_COMPANIES apply only when the e
 export const TURN_SKIM_V5: typeof TURN_SKIM_V4 = {
   ...TURN_SKIM_V4,
   version: 5,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "The existing fast skim sends compound list-plus-analysis requests to the normal reader; pure list and ranking requests retain the fast lane.",
   effectiveFrom: "2026-10-13",

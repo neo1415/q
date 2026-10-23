@@ -470,6 +470,8 @@ type Journey = {
   readonly reading: Record<string, unknown>;
   /** What the early skim says (production: FIT for a fit ask). */
   readonly skim?: string;
+  /** Whom the early skim understands the turn to be about (v6). */
+  readonly skimSubject?: string;
   /** Q's earlier reply in this conversation, for a follow-up. */
   readonly before?: string;
   /** "Make me a PDF": exempt from the budget, its stages timed. */
@@ -506,6 +508,8 @@ export type Timing = {
   readonly reads: readonly string[];
   /** The first words streamed. */
   readonly firstText: string | null;
+  /** Holding lines said before the answer, in order, with when. */
+  readonly holding: readonly { readonly text: string; readonly ms: number }[];
 };
 
 const question = (kind: string, text: string) => ({
@@ -557,6 +561,7 @@ export const JOURNEYS: readonly Journey[] = [
   {
     name: "public web search by name",
     said: "What is the latest public news on Northwind Ledger?",
+    skimSubject: "Northwind Ledger",
     spoken: false,
     needs: { companies: [], web: true, cards: false },
     answerTokens: 900,
@@ -571,6 +576,7 @@ export const JOURNEYS: readonly Journey[] = [
     // checking as the web search starts (streamed, never stored).
     name: "public web search, company not on Capital Q",
     said: "What is the latest public news on Acme Robotics?",
+    skimSubject: "Acme Robotics",
     spoken: false,
     needs: { companies: [], web: true, cards: false },
     answerTokens: 900,
@@ -578,6 +584,9 @@ export const JOURNEYS: readonly Journey[] = [
     reading: {
       ...question("FACTUAL", "latest public news on Acme Robotics"),
       kind: "RESEARCH_REQUEST",
+      // v58: whom it is about, as the reader understood it.
+      aboutNamedOther: true,
+      namedOther: { name: "Acme Robotics", kind: "COMPANY" },
     },
   },
   {
@@ -688,6 +697,7 @@ export async function timeJourney(
   let firstVisibleMs: number | null = null;
   let firstWordsMs: number | null = null;
   let firstText: string | null = null;
+  let holding: { text: string; ms: number }[] = [];
   /** The last streamed sentence: the voice has the whole answer to say. */
   let lastWordsMs: number | null = null;
   /** The first finding shown live (q.finding.available). */
@@ -783,6 +793,7 @@ export async function timeJourney(
   const deltas = {
     publish: (delta: QLiveDelta) => {
       if (delta.preview !== undefined) firstVisibleMs ??= at();
+      if (delta.holding === true) holding.push({ text: delta.text, ms: at() });
       if (delta.text.trim().length > 0) {
         lastWordsMs = at();
         if (firstWordsMs === null) {
@@ -855,7 +866,14 @@ export async function timeJourney(
     skim: async () => {
       calls.push("skim");
       await wait(LATENCY.skimMs);
-      return { kind: journey.skim ?? "OTHER", confidence: "HIGH" } as never;
+      return {
+        kind: journey.skim ?? "OTHER",
+        confidence: "HIGH",
+        subject:
+          journey.skimSubject === undefined
+            ? null
+            : { name: journey.skimSubject, kind: "COMPANY" },
+      } as never;
     },
   };
   const answer = createSpecialistQAnswer({
@@ -961,6 +979,7 @@ export async function timeJourney(
     firstVisibleMs = null;
     firstWordsMs = null;
     firstText = null;
+    holding = [];
     lastWordsMs = null;
     firstFindingMs = null;
     started = performance.now();
@@ -992,6 +1011,7 @@ export async function timeJourney(
     stored: stored.map((message) => message.content),
     reads: [...reads],
     firstText,
+    holding,
   };
 }
 
@@ -1061,13 +1081,23 @@ describe("turn timing harness", () => {
     expect(row("follow-up on what the web said").firstText ?? "").not.toContain(
       "I'm checking",
     );
-    // Not on Capital Q: the first words are said as the turn arrives,
-    // before it is read (owner 2026-10-23: a holding line), and nothing of
-    // them is stored with the answer.
+    // Not on Capital Q (owner 2026-10-23): the first words go out as the
+    // turn arrives, naming no one (a speed hint decides nothing); whom Q is
+    // looking into is named at skim time, from the quick first read's
+    // understanding (TURN_SKIM v6), never a name guessed from the words;
+    // nothing of either is stored with the answer.
     const unknown = row("public web search, company not");
-    expect(unknown.firstText).toBe("Looking into Acme Robotics now. ");
-    expect(unknown.firstWordsMs ?? Infinity).toBeLessThan(2_000);
+    expect(unknown.firstText).toBe("Looking into that now. ");
+    expect(unknown.firstWordsMs ?? Infinity).toBeLessThan(500);
+    expect(unknown.holding.map((line) => line.text)).toEqual([
+      "Looking into that now. ",
+      "Looking into Acme Robotics now. ",
+    ]);
+    expect(unknown.holding[1]?.ms ?? Infinity).toBeLessThan(
+      LATENCY.skimMs + 300,
+    );
     expect(unknown.stored.join(" ")).not.toContain("Looking into");
+    expect(unknown.firstWordsMs ?? Infinity).toBeLessThan(2_000);
     expect(unknown.stored.join(" ")).not.toContain("I'm checking");
     // Progressive findings (round 5): the first one is on screen well
     // before the whole object is written.

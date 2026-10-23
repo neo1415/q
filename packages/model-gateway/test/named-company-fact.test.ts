@@ -7,7 +7,6 @@ import {
   capitalQAsCompanyAsked,
   companyFactAskOf,
   isCapitalQCompanyRead,
-  onlyReplyWords,
   companyNameCandidates,
   readNamedVisibleCompany,
   runNamedCompanyFact,
@@ -430,21 +429,5 @@ describe("Capital Q as the company, not the platform (owner 2026-10-23)", () => 
         relationToYou: "SHARED",
       }),
     ).toBe(false);
-  });
-});
-
-describe("a reply or a sound is no company (production 2026-10-23)", () => {
-  it("names nothing in an affirmation, a short reply or a recogniser tag", () => {
-    for (const said of ["Yes", "Sure", "Thanks!", "Yes, go on", "Laughter"]) {
-      expect(companyNameCandidates(said)).toEqual([]);
-      expect(onlyReplyWords(said)).toBe(true);
-    }
-  });
-
-  it("still finds the company named after one", () => {
-    expect(companyNameCandidates("Laughter Tell me about Halyard")).toEqual([
-      "Halyard",
-    ]);
-    expect(onlyReplyWords("Tell me about Zino Aviation")).toBe(false);
   });
 });

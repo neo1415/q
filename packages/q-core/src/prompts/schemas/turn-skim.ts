@@ -178,3 +178,26 @@ export const TurnSkimResultSchema = z
   })
   .strict();
 export type TurnSkimResult = z.infer<typeof TurnSkimResultSchema>;
+
+export const TURN_SKIM_V6_SCHEMA_VERSION = 6;
+
+/**
+ * v6 (owner 2026-10-23: no first-word regression, no keyword triggers): the
+ * skim also says whom the turn is about -- the one company, organisation or
+ * person other than the speaker, understood from the words and the last two
+ * turns -- for every kind. Q's first words ("Looking into <them> now") come
+ * at skim time from this understanding, never from capital letters.
+ * Lenient: a malformed subject reads as none and never costs the skim.
+ */
+export const SkimSubjectSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    kind: z.enum(["COMPANY", "PERSON"]),
+  })
+  .strict();
+export type SkimSubject = z.infer<typeof SkimSubjectSchema>;
+
+export const TurnSkimV6ResultSchema = TurnSkimResultSchema.extend({
+  subject: SkimSubjectSchema.nullable().default(null).catch(null),
+}).strict();
+export type TurnSkimV6Result = z.infer<typeof TurnSkimV6ResultSchema>;

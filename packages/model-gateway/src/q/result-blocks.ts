@@ -1,4 +1,3 @@
-import { onlyReplyWords } from "./named-company-fact.js";
 import { answerCardsBlock, type ModelAnswerCardsLike } from "./answer-cards.js";
 import { randomUUID } from "node:crypto";
 
@@ -971,8 +970,6 @@ export async function pictureBlock(input: {
   if (
     input.result.visual !== "PICTURE" ||
     query.length === 0 ||
-    // Nothing to picture in a reply or a filler (production 2026-10-23).
-    onlyReplyWords(query) ||
     input.pictures === undefined
   ) {
     return null;
