@@ -681,7 +681,7 @@ function analysisWorld(options: {
         );
       },
       requestDocument: vi.fn(),
-    } as never,
+    },
     preparation: {
       port: {
         currentVersion: () =>
