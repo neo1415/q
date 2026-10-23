@@ -310,7 +310,12 @@ import {
   attachedDocumentFacts,
   attachedDocumentsWithin,
 } from "./attached-document-fact.js";
-import { comparisonTableBlock } from "./compare-table.js";
+import {
+  comparisonFactStatement,
+  comparisonTableBlock,
+  compareTargets,
+  newestAnswerCards,
+} from "./compare-table.js";
 import {
   attachedDocumentIntent,
   attachedDocumentNote,
@@ -2776,6 +2781,64 @@ export function createModelGatewayQAnswer(
     })();
     attachmentRead.catch(() => undefined);
     /**
+     * Coordinator 23 Oct 2026: "compare the top two side by side" right
+     * after a list of cards read nothing, so no table. The companies it
+     * means are the ones Q showed (compareTargets); each is read now, in
+     * parallel, through the same tools and plan the model would use: its
+     * profile, its published figures and its fit. The reads feed the
+     * code-built table, and the table is a fact the answer is spoken from.
+     */
+    let compareFacts: readonly AuthorisedFact[] = [];
+    const compareRead = (async (): Promise<void> => {
+      if (latest === undefined) return;
+      const targets = compareTargets(
+        latest.content,
+        newestAnswerCards(earlier),
+      );
+      if (targets.length < 2) return;
+      const { names } = await prefetchToolsRead;
+      const reads = targets.flatMap((companyId, index) =>
+        [
+          { name: "get_company", key: "profile" },
+          { name: "read_company_figures", key: "figures" },
+          { name: "fit_profile", key: "fit" },
+        ]
+          .filter((tool) => names.has(tool.name))
+          .map((tool) =>
+            tools
+              .execute(
+                {
+                  callId: `q-compare-${tool.key}-${String(index)}`,
+                  name: tool.name,
+                  arguments: { companyId },
+                },
+                toolContext,
+              )
+              .catch(() => null),
+          ),
+      );
+      if (reads.length === 0) return;
+      stepStarts(request, "COMPARING_OPPORTUNITIES");
+      await Promise.all(reads);
+      const table = comparisonTableBlock({
+        question: latest.content,
+        read: runCompanies.read(request.runId),
+        fits: runFits.read(request.runId),
+      });
+      const statement = table === null ? null : comparisonFactStatement(table);
+      if (statement === null) return;
+      compareFacts = [
+        {
+          scope: "NETWORK_VISIBLE_DATA",
+          statement,
+          truthClass: "USER_CLAIM",
+          evidenceStatus: "SELF_REPORTED",
+          source: "Capital Q profiles, published figures and computed fit",
+        },
+      ];
+    })();
+    compareRead.catch(() => undefined);
+    /**
      * Q room R1: the whole page on their screen (sections, tab, filters,
      * open windows), sent as ids only and read back here through the read
      * tools the model could call, under the same plan, as the asker. A ref
@@ -3520,6 +3583,7 @@ export function createModelGatewayQAnswer(
       timed("daily", dailyRead),
       timed("document", documentRead),
       timed("attachments", attachmentRead),
+      timed("compare", compareRead),
       timed("page", pageRead),
     ]);
     prepareMs["reads"] = Date.now() - prepareStarted;
@@ -3593,6 +3657,7 @@ export function createModelGatewayQAnswer(
       onScreenDocument,
       attachedDocuments,
       attachedTitles,
+      compareFacts,
       onScreenDocumentCall,
       onScreenPage,
       onScreenDossier,
@@ -3957,6 +4022,7 @@ export function createModelGatewayQAnswer(
         onScreenDocument,
         attachedDocuments,
         attachedTitles,
+        compareFacts,
         onScreenDocumentCall,
         onScreenPage,
         onScreenDossier,
@@ -4614,6 +4680,7 @@ export function createModelGatewayQAnswer(
           ...(onScreenDaily === null ? [] : [onScreenDaily]),
           ...(onScreenDocument === null ? [] : [onScreenDocument]),
           ...attachedDocuments,
+          ...compareFacts,
           ...onScreenPage,
           ...(w.ownDay === null ? [] : [w.ownDay]),
           ...(w.arrival === null ? [] : [w.arrival]),
