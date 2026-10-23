@@ -680,6 +680,7 @@ describe("answer seam: public-web research", () => {
     expect(modelCalls(tools.executed)[0]?.context.conversation).toEqual({
       latestUserText: "Which markets does the public web say we operate in?",
       earlierUserText: [],
+      earlierQText: [],
     });
     expect(stages).toEqual([
       "PREPARING_ANALYSIS",
@@ -2065,7 +2066,7 @@ describe("a subject the public web knows nothing about is searched and said once
   });
 });
 
-describe("someone they only pointed at is not searched for on the web (production 2026-10-23)", () => {
+describe("someone they point at is searched by the name Q showed them (owner 2026-10-23)", () => {
   const INVESTORS_LIST =
     "Here are the investors you're talking to: 1. Savanna Seed Partners, 2. Harbourline Capital, 3. Northwind Ventures.";
   const ABOUT_SAVANNA = {
@@ -2073,7 +2074,10 @@ describe("someone they only pointed at is not searched for on the web (productio
     namedOther: { name: "Savanna Seed Partners", kind: "COMPANY" },
   } as const;
 
-  async function ask(said: string) {
+  async function ask(
+    said: string,
+    about: Record<string, unknown> = ABOUT_SAVANNA,
+  ) {
     const spoken: string[] = [];
     const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
       researchOutcome(p, "Savanna Seed Partners backs pre-seed fintech."),
@@ -2101,9 +2105,7 @@ describe("someone they only pointed at is not searched for on the web (productio
       },
       said: spoken,
     });
-    expect((await seam.answer({ ...request, ...ABOUT_SAVANNA })).kind).toBe(
-      "ANSWERED",
-    );
+    expect((await seam.answer({ ...request, ...about })).kind).toBe("ANSWERED");
     return {
       searches: tools.executed.filter(
         (one) => one.proposal.name === "research_public_web",
@@ -2112,10 +2114,28 @@ describe("someone they only pointed at is not searched for on the web (productio
     };
   }
 
-  it('"Why might the top one pass on us?" after their investors list: answered from records, no web', async () => {
+  // Production 2026-10-23 searched "Why might the top one pass on us?"
+  // and narrated Wikipedia's "Mountain pass". "The top one" is the first
+  // investor Q listed: searched by that name, with the person's words.
+  it('"Why might the top one pass on us?" after their investors list: searched as Savanna Seed Partners', async () => {
     const turn = await ask("Why might the top one pass on us?");
+    expect(turn.searches).toHaveLength(1);
+    const call = turn.searches[0]?.proposal;
+    expect((call?.arguments as { entityName?: unknown }).entityName).toBe(
+      "Savanna Seed Partners",
+    );
+    // The name Q showed them may leave; the tool layer is told what Q said.
+    expect(turn.searches[0]?.context.conversation?.earlierQText).toEqual([
+      INVESTORS_LIST,
+    ]);
+  });
+
+  it("a name nobody in the conversation said is not looked up", async () => {
+    const turn = await ask("Why might the top one pass on us?", {
+      aboutNamedOther: true,
+      namedOther: { name: "Kilimanjaro Ventures", kind: "COMPANY" },
+    });
     expect(turn.searches).toEqual([]);
-    expect(turn.spoken.join(" ")).not.toContain("public");
   });
 
   it("named in their own words, the same question is searched by that name", async () => {
@@ -2176,6 +2196,49 @@ describe("pictures of who the turn names, from public pages (owner 2026-10-23)",
         (block) => (block as { kind?: string }).kind === "PICTURE",
       ),
     ).toEqual([]);
+  });
+
+  // Owner 2026-10-23: "if it's not sure, it can be like, I'm not sure, but
+  // I found this" -- pages that only may be them still show their picture,
+  // said to be uncertain.
+  it("shows a picture from pages that may be them, said to be uncertain", async () => {
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      withMatch(researchOutcome(p, "Zino Aviation, Accra."), "POSSIBLE"),
+    );
+    const { seam, request, answerBlocks } = build({
+      script: [
+        { kind: "JSON", value: analystResult("Maybe this Zino Aviation.") },
+      ],
+      tools: tools.port,
+      userText: "Who runs Zino Aviation?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () =>
+          Promise.resolve([
+            {
+              imageUrl: "https://cdn.example.com/zino-accra.jpg",
+              pageUrl: "https://news.example.com/zino-aviation-accra",
+              domain: "news.example.com",
+              title: "Zino Aviation opens in Accra",
+            },
+          ]),
+      },
+    });
+    expect((await seam.answer({ ...request, ...ABOUT_ZINO })).kind).toBe(
+      "ANSWERED",
+    );
+    const pictures = answerBlocks.filter(
+      (block) => (block as { kind?: string }).kind === "PICTURE",
+    ) as { title?: string; alt?: string; caption?: string }[];
+    expect(pictures).toHaveLength(1);
+    expect(JSON.stringify(pictures[0])).toContain("Not sure this is them");
   });
 
   it("looks for them beside the web search and shows them after the words, credited to their pages", async () => {
