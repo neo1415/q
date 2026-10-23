@@ -123,15 +123,19 @@ describe("call prep from what the founder may see (owner 2026-10-23)", () => {
     );
   });
 
-  it("a name they may not see is not prepared (the turn goes on as before)", async () => {
+  it("a name they may not open is prepared from the name and their own record only", async () => {
     const { port, written } = sources({ found: null });
-    expect(
-      await port.prepare(request, {
-        counterpart: "Hidden Fund",
-        said: "prep me",
-      }),
-    ).toBeNull();
-    expect(written).toEqual([]);
+    const prep = await port.prepare(request, {
+      counterpart: "Hidden Fund",
+      said: "prep me",
+    });
+    expect(prep?.counterpartName).toBe("Hidden Fund");
+    expect(written[0]?.counterpartName).toBe("Hidden Fund");
+    expect(written[0]?.counterpartProfile).toBe("");
+    expect(written[0]?.soFar).toBe(
+      "Nothing about them is on record that they can see.",
+    );
+    expect(written[0]?.ownRecord).toBe("THEIR COMPANY: Maji Loop.");
   });
 
   it("related work already waiting comes back with the prep", async () => {

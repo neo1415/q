@@ -37,6 +37,7 @@ import {
   type QAuthorisedContextPort,
 } from "../src/q/index.js";
 import { firstContactOf } from "../src/q/first-contact.js";
+import { onScreenCompanyFact } from "../src/q/company-fact.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 import { fitFixture } from "./fit-fixture.js";
 
@@ -2944,5 +2945,40 @@ describe("findings and cards written beside the answer (owner 2026-10-22)", () =
       inputTokens: 2000,
       outputTokens: 200,
     });
+  });
+});
+
+describe("a company's team reaches the answer as its page shows it (QA F-16)", () => {
+  it("says the team before the description, and says plainly when none is recorded", () => {
+    const fact = onScreenCompanyFact({
+      canonicalName: "Silo Credit",
+      relationToYou: "SHARED",
+      primaryDescription: "x".repeat(3_000),
+      team: [
+        {
+          name: "Amina Bello",
+          businessTitle: "CEO",
+          isFounder: true,
+          shortBio: "Ran grain trading at a Kano co-op.",
+        },
+        {
+          name: "Tunde Ade",
+          businessTitle: null,
+          isFounder: false,
+          shortBio: null,
+        },
+      ],
+    });
+    expect(fact?.statement).toContain(
+      "Team, as its page shows it (2): Amina Bello (CEO, founder): Ran grain trading at a Kano co-op.; Tunde Ade.",
+    );
+    expect(
+      onScreenCompanyFact({ canonicalName: "Silo Credit", team: [] })
+        ?.statement,
+    ).toContain("No team members are recorded on its page.");
+    // Not read for them: nothing said about a team at all.
+    expect(
+      onScreenCompanyFact({ canonicalName: "Silo Credit" })?.statement,
+    ).not.toContain("Team");
   });
 });

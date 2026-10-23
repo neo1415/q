@@ -35,9 +35,10 @@ export type CallPrep = {
 
 export type QCallPrepPort = {
   /**
-   * Null when the counterpart is not one they may see, or the prep could
-   * not be had: the turn is then answered the usual way. Never throws,
-   * except to pass on a cancellation.
+   * Null when the prep could not be had (no founder or investor side, or
+   * the writer failed): the turn is then answered the usual way. A name
+   * they cannot open is prepared from their own record and the name only.
+   * Never throws, except to pass on a cancellation.
    */
   readonly prepare: (
     request: QAnswerRequest,

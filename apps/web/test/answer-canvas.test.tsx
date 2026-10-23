@@ -70,11 +70,12 @@ const answer = (
 });
 
 describe("layout for 1, 3, 5 and 10 cards (C1)", () => {
-  it("is a row on a desktop up to five, then the focused card beside a grid", () => {
-    expect([1, 3, 5, 10].map((n) => canvasLayout(n, true).layout)).toEqual([
+  it("is a row on a desktop up to four, then the focused card beside a grid", () => {
+    expect([1, 3, 4, 5, 10].map((n) => canvasLayout(n, true).layout)).toEqual([
       "row",
       "row",
       "row",
+      "grid",
       "grid",
     ]);
   });

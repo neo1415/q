@@ -17,7 +17,12 @@ import {
   profileLead,
   researchLead,
   pipelineLead,
+  PIPELINE_NOTE,
 } from "./early-lead.js";
+import {
+  asksWhoCanSeeDataRoom,
+  dataRoomAccessStatement,
+} from "./data-room-access.js";
 import {
   companiesMapAskOf,
   mayDrawCompaniesMap,
@@ -2901,6 +2906,44 @@ export function createModelGatewayQAnswer(
       ];
     })();
     compareRead.catch(() => undefined);
+    // QA F-28: "who can see my data room?" is read by code, as the asker,
+    // from the access editor's own reads (data-room-access.ts).
+    let dataRoomFacts: readonly AuthorisedFact[] = [];
+    const dataRoomRead = (async (): Promise<void> => {
+      if (latest === undefined || !asksWhoCanSeeDataRoom(latest.content)) {
+        return;
+      }
+      const { names } = await prefetchToolsRead;
+      if (!names.has("read_my")) return;
+      const read = (kind: "access" | "requests") =>
+        tools
+          .execute(
+            {
+              callId: `q-data-room-${kind}`,
+              name: "read_my",
+              arguments: { kind },
+            },
+            toolContext,
+          )
+          .then((outcome) => (outcome.result.ok ? outcome.result.data : null))
+          .catch(() => null);
+      const [access, requests] = await Promise.all([
+        read("access"),
+        read("requests"),
+      ]);
+      const statement = dataRoomAccessStatement(access, requests);
+      if (statement === null) return;
+      dataRoomFacts = [
+        {
+          scope: "OWN_RECORDS",
+          statement,
+          truthClass: "VERIFIED",
+          evidenceStatus: "PLATFORM_VERIFIED",
+          source: "Their data room's access settings and requests",
+        },
+      ];
+    })();
+    dataRoomRead.catch(() => undefined);
     /**
      * Q room R1: the whole page on their screen (sections, tab, filters,
      * open windows), sent as ids only and read back here through the read
@@ -3656,6 +3699,7 @@ export function createModelGatewayQAnswer(
       timed("document", documentRead),
       timed("attachments", attachmentRead),
       timed("compare", compareRead),
+      timed("data-room", dataRoomRead),
       timed("page", pageRead),
     ]);
     prepareMs["reads"] = Date.now() - prepareStarted;
@@ -3732,6 +3776,7 @@ export function createModelGatewayQAnswer(
       compareFacts,
       compareIds,
       compareTable,
+      dataRoomFacts,
       onScreenDocumentCall,
       onScreenPage,
       onScreenDossier,
@@ -4100,6 +4145,7 @@ export function createModelGatewayQAnswer(
         compareFacts,
         compareIds,
         compareTable,
+        dataRoomFacts,
         onScreenDocumentCall,
         onScreenPage,
         onScreenDossier,
@@ -4823,6 +4869,7 @@ export function createModelGatewayQAnswer(
           ...(onScreenDocument === null ? [] : [onScreenDocument]),
           ...attachedDocuments,
           ...compareFacts,
+          ...dataRoomFacts,
           ...onScreenPage,
           ...(w.ownDay === null ? [] : [w.ownDay]),
           ...(w.arrival === null ? [] : [w.arrival]),
@@ -4919,6 +4966,9 @@ export function createModelGatewayQAnswer(
             turn: [
               noteParts.turn,
               `This answer already opens with this line, said to them by code from their records: "${earlyLead}" Continue after it with the analysis; do not repeat it or restate its counts.`,
+              ...(asksForPipelineSummary(latest.content)
+                ? [PIPELINE_NOTE]
+                : []),
             ].join(" "),
           };
         }

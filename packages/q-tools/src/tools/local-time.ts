@@ -59,6 +59,12 @@ export const LocalWhenSchema = z
       .describe(
         "Their wall-clock time, HH:MM 24-hour (2 PM is 14:00). Never converted to UTC: Capital Q does that in their time zone. Omit only with inMinutes.",
       ),
+    part: z
+      .enum(["MORNING", "AFTERNOON", "EVENING"])
+      .optional()
+      .describe(
+        "When they named a part of the day instead of a clock time ('next Tuesday afternoon', 'tomorrow morning'): that part, with day or date, and no time. Capital Q books the first free time inside it.",
+      ),
     inMinutes: z
       .number()
       .int()
@@ -73,11 +79,15 @@ export const LocalWhenSchema = z
   .refine(
     (when) =>
       when.inMinutes === undefined
-        ? when.time !== undefined
+        ? (when.time !== undefined) !== (when.part !== undefined)
         : when.time === undefined &&
+          when.part === undefined &&
           when.day === undefined &&
           when.date === undefined,
-    { message: "give a clock time (with day or date), or inMinutes alone" },
+    {
+      message:
+        "give a clock time or a part of the day (with day or date), or inMinutes alone",
+    },
   );
 export type LocalWhen = z.infer<typeof LocalWhenSchema>;
 
@@ -379,6 +389,97 @@ export function resolveLocalWhen(
   if (second !== undefined) return { kind: "REPEATED_BY_CLOCK_CHANGE" };
   if (only.getTime() <= now.getTime()) return { kind: "PAST" };
   return { kind: "OK", instant: only, timeZone };
+}
+
+/**
+ * QA F-21 (2026-10-23): "next Tuesday afternoon" was ignored and the first
+ * free time of the week booked. A part of the day is a window on that day
+ * in their own zone: morning 09:00-12:00, afternoon 13:00-17:00, evening
+ * 17:00-20:00, wall clock. Today's window starts no earlier than now.
+ */
+export const PART_OF_DAY_HOURS: Readonly<
+  Record<NonNullable<LocalWhen["part"]>, readonly [number, number]>
+> = {
+  MORNING: [9, 12],
+  AFTERNOON: [13, 17],
+  EVENING: [17, 20],
+};
+
+export type LocalWindowResolution =
+  | {
+      readonly kind: "OK";
+      readonly from: Date;
+      readonly to: Date;
+      readonly timeZone: string;
+    }
+  | { readonly kind: Exclude<LocalWhenResolution["kind"], "OK"> };
+
+export function resolveLocalWindow(
+  when: LocalWhen,
+  timeZone: string | undefined,
+  now: Date,
+): LocalWindowResolution {
+  if (when.part === undefined) return { kind: "NO_DAY" };
+  const [startHour, endHour] = PART_OF_DAY_HOURS[when.part];
+  const at = (hour: number) =>
+    resolveLocalWhen(
+      {
+        ...(when.day === undefined ? {} : { day: when.day }),
+        ...(when.date === undefined ? {} : { date: when.date }),
+        time: `${String(hour).padStart(2, "0")}:00`,
+      },
+      timeZone,
+      now,
+    );
+  const end = at(endHour);
+  if (end.kind !== "OK") return { kind: end.kind };
+  const start = at(startHour);
+  // A window already under way today starts now.
+  if (start.kind === "PAST") {
+    return { kind: "OK", from: now, to: end.instant, timeZone: end.timeZone };
+  }
+  if (start.kind !== "OK") return { kind: start.kind };
+  return {
+    kind: "OK",
+    from: start.instant,
+    to: end.instant,
+    timeZone: start.timeZone,
+  };
+}
+
+/**
+ * A call's time for the person, plainly: "Tuesday 28 Oct, 2:00–2:30 pm
+ * your time (Africa/Nairobi)".
+ */
+export function localSpanLabel(
+  start: Date,
+  end: Date,
+  timeZone: string,
+): string {
+  try {
+    const day = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      weekday: "long",
+      day: "numeric",
+      month: "short",
+    }).format(start);
+    const clock = (instant: Date) =>
+      new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      })
+        .format(instant)
+        .toLowerCase();
+    const from = clock(start);
+    const to = clock(end);
+    const fromBare = from.replace(/\s?(am|pm)$/u, "");
+    const sameHalf = from.slice(-2) === to.slice(-2);
+    return `${day}, ${sameHalf ? fromBare : from}–${to} your time (${timeZone})`;
+  } catch {
+    return `${start.toISOString()}–${end.toISOString()}`;
+  }
 }
 
 /** One sentence for the model when the words did not name one instant. */

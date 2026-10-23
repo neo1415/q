@@ -29,7 +29,7 @@ export const TURN_SKIM_V6: PromptDefinition<
 > = {
   ...TURN_SKIM_V5,
   version: 6,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Owner 2026-10-23 (first words fast, no keyword triggers): v5 plus subject {name, kind} for every kind -- whom the turn is about, understood from the words and the last two turns, null when no one in particular; Q's holding line names only that.",
   effectiveFrom: "2026-10-23",
