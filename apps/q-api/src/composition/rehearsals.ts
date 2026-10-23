@@ -2041,6 +2041,17 @@ export function createRehearsalService(dependencies: {
           ? null
           : await external.subjects.latest(actor, id).catch(() => null);
       raw = latest?.subject.location ?? null;
+      // A researched entity that is also a Capital Q investor (QInvest, live
+      // 2026-10-23: no public location) is based where its record says.
+      const orgId = latest?.subject.investorOrganisationId ?? null;
+      if (raw === null && orgId !== null) {
+        raw =
+          (
+            await material
+              .counterpart(actor, "INVESTOR_ORGANISATION", orgId)
+              .catch(() => null)
+          )?.basedIn ?? null;
+      }
       origin = sourcedOrigin(
         latest?.brief ?? null,
         (phrase) => accentForPlace(phrase) !== null,
