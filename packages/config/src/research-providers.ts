@@ -20,6 +20,8 @@ export const RESEARCH_PROVIDER_ENV_NAMES = [
   "SERPER_API_KEY",
   "SCRAPING_BEE_API",
   "SCRAPIG_BEE_API",
+  "BRAVE_API",
+  "BRAVE_SEARCH_API_KEY",
 ] as const;
 
 const apiKey = z
@@ -44,6 +46,10 @@ export const researchProviderEnvShape = {
   SCRAPING_BEE_API: apiKey.optional(),
   /** The same key under the name it was first deployed with (a typo kept for compatibility). */
   SCRAPIG_BEE_API: apiKey.optional(),
+  /** Brave Search: its own web index, news and images (owner 2026-10-23). */
+  BRAVE_API: apiKey.optional(),
+  /** The same key under Brave's documented name. */
+  BRAVE_SEARCH_API_KEY: apiKey.optional(),
   /** The SERP API zone (control panel → Zones); search goes through Bright Data only when set. */
   BRIGHT_DATA_SERP_ZONE: zone.optional(),
   /** The Web Unlocker zone; page extraction goes through Bright Data only when set. */
@@ -74,6 +80,8 @@ export type ResearchProviderSecrets = {
   readonly serper?: ProviderCredential | undefined;
   /** ScrapingBee Google search + HTML fetch; absent means that index is skipped. */
   readonly scrapingBee?: ProviderCredential | undefined;
+  /** Brave Search web, news and images; absent means that index is skipped. */
+  readonly brave?: ProviderCredential | undefined;
   /** Companies House; absent means investor research skips it. */
   readonly companiesHouse?: ProviderCredential | undefined;
   /** The contact EDGAR requires; absent means investor research skips it. */
@@ -88,6 +96,7 @@ export type ResearchProviderConfigStatus = {
   readonly serpApi: "configured" | "unconfigured";
   readonly serper: "configured" | "unconfigured";
   readonly scrapingBee: "configured" | "unconfigured";
+  readonly brave: "configured" | "unconfigured";
 };
 
 export function toResearchProviderSecrets(parsed: {
@@ -99,6 +108,8 @@ export function toResearchProviderSecrets(parsed: {
   readonly SERPER_API_KEY?: string | undefined;
   readonly SCRAPING_BEE_API?: string | undefined;
   readonly SCRAPIG_BEE_API?: string | undefined;
+  readonly BRAVE_API?: string | undefined;
+  readonly BRAVE_SEARCH_API_KEY?: string | undefined;
   readonly COMPANIES_HOUSE_API_KEY?: string | undefined;
   readonly SEC_EDGAR_USER_AGENT?: string | undefined;
 }): ResearchProviderSecrets {
@@ -117,6 +128,12 @@ export function toResearchProviderSecrets(parsed: {
         ? undefined
         : new ProviderCredential(
             parsed.SCRAPING_BEE_API ?? parsed.SCRAPIG_BEE_API ?? "",
+          ),
+    brave:
+      (parsed.BRAVE_API ?? parsed.BRAVE_SEARCH_API_KEY) === undefined
+        ? undefined
+        : new ProviderCredential(
+            parsed.BRAVE_API ?? parsed.BRAVE_SEARCH_API_KEY ?? "",
           ),
     serpApi:
       parsed.SERP_API_KEY === undefined
@@ -153,5 +170,6 @@ export function researchProviderConfigStatus(
     serper: secrets.serper === undefined ? "unconfigured" : "configured",
     scrapingBee:
       secrets.scrapingBee === undefined ? "unconfigured" : "configured",
+    brave: secrets.brave === undefined ? "unconfigured" : "configured",
   };
 }

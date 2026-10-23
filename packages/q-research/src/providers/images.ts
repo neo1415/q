@@ -206,3 +206,44 @@ export function createDetectingImageSearch(
     },
   };
 }
+
+/**
+ * Several image indexes asked at once (Brave beside the SERP key), their
+ * hits interleaved by rank, one per image. One index failing costs only
+ * its own hits; all failing is the last failure.
+ */
+export function createMergedImageSearch(
+  providers: readonly PublicImageSearchProvider[],
+): PublicImageSearchProvider {
+  return {
+    code: providers.map((provider) => provider.code).join("+"),
+    searchImages: async (query, context) => {
+      const settled = await Promise.allSettled(
+        providers.map((provider) => provider.searchImages(query, context)),
+      );
+      const lists: (readonly PublicImageHit[])[] = [];
+      let failure: unknown = null;
+      for (const outcome of settled) {
+        if (outcome.status === "fulfilled") lists.push(outcome.value);
+        else failure = outcome.reason;
+      }
+      if (lists.length === 0 && failure !== null) {
+        throw failure instanceof Error
+          ? failure
+          : new Error("every image search failed", { cause: failure });
+      }
+      const seen = new Set<string>();
+      const merged: PublicImageHit[] = [];
+      const longest = Math.max(0, ...lists.map((list) => list.length));
+      for (let rank = 0; rank < longest; rank += 1) {
+        for (const list of lists) {
+          const hit = list[rank];
+          if (hit === undefined || seen.has(hit.imageUrl)) continue;
+          seen.add(hit.imageUrl);
+          merged.push(hit);
+        }
+      }
+      return merged;
+    },
+  };
+}

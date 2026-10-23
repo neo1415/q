@@ -699,6 +699,9 @@ export function createPublicWebResearchService(
                 maxResults: RESEARCH_BOUNDS.maxRecentResults,
                 freshness: "PAST_MONTH" as const,
                 includeDomains,
+                // The month's coverage from the indexes' news verticals
+                // (Brave, Tavily), where recent reporting lives.
+                topic: "NEWS" as const,
               },
             ]
           : []),

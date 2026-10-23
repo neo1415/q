@@ -33,6 +33,8 @@ describe("research provider configuration", () => {
       "SERPER_API_KEY",
       "SCRAPING_BEE_API",
       "SCRAPIG_BEE_API",
+      "BRAVE_API",
+      "BRAVE_SEARCH_API_KEY",
     ]);
     for (const name of RESEARCH_PROVIDER_ENV_NAMES) {
       expect(name.startsWith("NEXT_PUBLIC_")).toBe(false);
@@ -50,6 +52,7 @@ describe("research provider configuration", () => {
       serpApi: "unconfigured",
       serper: "unconfigured",
       scrapingBee: "unconfigured",
+      brave: "unconfigured",
     });
     expect(none.secrets.researchProviders.tavily).toBeUndefined();
 
@@ -63,6 +66,7 @@ describe("research provider configuration", () => {
       serpApi: "unconfigured",
       serper: "unconfigured",
       scrapingBee: "unconfigured",
+      brave: "unconfigured",
     });
     expect(configured.secrets.researchProviders.tavily?.reveal()).toBe(KEY);
   });
@@ -74,6 +78,16 @@ describe("research provider configuration", () => {
     expect(right.secrets.researchProviders.scrapingBee?.reveal()).toBe(KEY);
     const serper = parseQApiConfig({ ...base, SERPER_API_KEY: KEY });
     expect(serper.secrets.researchProviders.serper?.reveal()).toBe(KEY);
+  });
+
+  it("reads Brave under the name it was deployed with and under Brave's own (owner 2026-10-23)", () => {
+    const deployed = parseQApiConfig({ ...base, BRAVE_API: KEY });
+    expect(deployed.secrets.researchProviders.brave?.reveal()).toBe(KEY);
+    const documented = parseQApiConfig({ ...base, BRAVE_SEARCH_API_KEY: KEY });
+    expect(documented.secrets.researchProviders.brave?.reveal()).toBe(KEY);
+    expect(
+      researchProviderConfigStatus(deployed.secrets.researchProviders).brave,
+    ).toBe("configured");
   });
 
   it("rejects a value too short to be a key, without echoing it", () => {

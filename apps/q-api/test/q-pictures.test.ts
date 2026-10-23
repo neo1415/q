@@ -149,30 +149,37 @@ describe("Q pictures withhold every name the run read", () => {
 
 describe("pictures of who a turn names (owner 2026-10-23)", () => {
   it("is off without a usable SERP key, so nothing is searched locally", () => {
-    expect(createPublicQPictures(undefined)).toBeUndefined();
+    expect(createPublicQPictures({})).toBeUndefined();
     expect(
-      createPublicQPictures("disabled-locally-000000000000"),
+      createPublicQPictures({
+        serp: "disabled-locally-000000000000",
+        brave: "disabled-locally-000000000000",
+      }),
     ).toBeUndefined();
   });
 
   it("searches the image results with the name and keeps a page that names them", async () => {
     const asked: string[] = [];
-    const port = createPublicQPictures("k".repeat(32), undefined, (input) => {
-      asked.push(input instanceof Request ? input.url : input.toString());
-      return Promise.resolve(
-        new Response(
-          JSON.stringify({
-            images: [
-              {
-                title: "Zino Aviation | Charter flights",
-                imageUrl: "https://zinoaviation.com/hero.jpg",
-                link: "https://zinoaviation.com/",
-              },
-            ],
-          }),
-        ),
-      );
-    });
+    const port = createPublicQPictures(
+      { serp: "k".repeat(32) },
+      undefined,
+      (input) => {
+        asked.push(input instanceof Request ? input.url : input.toString());
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              images: [
+                {
+                  title: "Zino Aviation | Charter flights",
+                  imageUrl: "https://zinoaviation.com/hero.jpg",
+                  link: "https://zinoaviation.com/",
+                },
+              ],
+            }),
+          ),
+        );
+      },
+    );
     const found = await port?.find({
       name: "Zino Aviation",
       userText: "Tell me about Zino Aviation",
