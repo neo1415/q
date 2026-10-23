@@ -18,8 +18,14 @@
  * this is the narrow English case code can decide without a model.
  */
 
-/** Marks a held recommendation as Q's summary of the person's words. */
-export const PARAPHRASE_RATIONALE_PREFIX = "Q's summary of their words";
+/**
+ * Marks a held recommendation as Q's summary of the person's words. Shown
+ * to them as it is, so it speaks to them (QA F-53, 23 Oct 2026: "from what
+ * they said earlier" read in the third person on their own screen).
+ */
+export const PARAPHRASE_RATIONALE_PREFIX = "Q's summary of your words";
+/** The wording held recommendations were stored with before F-53. */
+const EARLIER_PARAPHRASE_PREFIX = "Q's summary of their words";
 
 /** The rationale kept with a held summary: their original words, as said. */
 export function paraphraseRationale(quote: string): string {
@@ -27,7 +33,10 @@ export function paraphraseRationale(quote: string): string {
 }
 
 export function isParaphraseRationale(rationale: string | null): boolean {
-  return rationale?.startsWith(PARAPHRASE_RATIONALE_PREFIX) === true;
+  return (
+    rationale?.startsWith(PARAPHRASE_RATIONALE_PREFIX) === true ||
+    rationale?.startsWith(EARLIER_PARAPHRASE_PREFIX) === true
+  );
 }
 
 function tokens(text: string): string[] {

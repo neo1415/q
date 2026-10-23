@@ -229,6 +229,9 @@ function decisionsOf(
   return out.slice(0, 40);
 }
 
+/** QA F-49: their message only says a file was added (see the workspace). */
+const ANNOUNCES_UPLOAD = /^I've just (?:uploaded|added)\b/u;
+
 /**
  * Steps a write was refused for this turn, other than an answer held for
  * the person's confirmation (which is progress, not a refusal).
@@ -2626,8 +2629,10 @@ export function createInterviewAgent(
       replyWritten,
       opening || recorded.length > 0 || (heldNote?.applied.length ?? 0) > 0,
       // Code's own words only in English; in any other language the claim
-      // is taken out and the model's reply speaks for itself.
-      codeSpeaksEnglish ? undefined : "",
+      // is taken out and the model's reply speaks for itself. QA F-49: a
+      // file they just added is being read (or waits for their company),
+      // not "not saved": the claim goes, and nothing is said in its place.
+      codeSpeaksEnglish && !ANNOUNCES_UPLOAD.test(utterance) ? undefined : "",
     );
     if (backedReply !== replyWritten) {
       logger.info({}, "interview reply claimed a save nothing backed; removed");

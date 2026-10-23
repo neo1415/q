@@ -35,8 +35,9 @@ import { useUiText } from "../primitives/ui-text.js";
  * separate history.
  */
 
+/** Role-neutral (QA F-53: an investor was asked about "your company"). */
 export const Q_COMPOSER_PLACEHOLDER =
-  "Ask Q about your company, capital, or relationships";
+  "Ask Q about companies, capital or relationships";
 
 /**
  * Lane 8: one attached file as the composer shows it. `ready` means the

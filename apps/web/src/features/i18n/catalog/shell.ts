@@ -121,8 +121,8 @@ export const SHELL_AR: Readonly<Record<string, string>> = {
   "Ready when you are": "جاهز حين تكون جاهزاً",
   "What's on your mind today?": "ما الذي يشغل بالك اليوم؟",
   "Type instead — Q hears this too": "اكتب بدلاً من ذلك — Q يسمع هذا أيضاً",
-  "Ask Q about your company, capital, or relationships":
-    "اسأل Q عن شركتك أو رأس مالك أو علاقاتك",
+  "Ask Q about companies, capital or relationships":
+    "اسأل Q عن الشركات أو رأس المال أو العلاقات",
   "Private to you": "خاص بك",
   "Private to organisation": "خاص بالمؤسسة",
   "Founder private": "خاص بالمؤسس",
