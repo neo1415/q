@@ -421,6 +421,10 @@ export {
   type TurnMeetingPrep,
   TurnReaderV58ResultSchema,
   type TurnReaderV58Result,
+  TURN_READER_V61_SCHEMA_VERSION,
+  TURN_BOARD_ASKS,
+  TurnReaderV61ResultSchema,
+  type TurnReaderV61Result,
   QUESTION_KINDS_V58,
   TurnQuestionV58Schema,
   type QuestionKindV58,
@@ -1744,6 +1748,11 @@ export {
   V60_ASKING_IS_NOT_OPEN,
   V60_SCREENS_ANY_LANGUAGE,
 } from "./prompts/tasks/turn-reader.v60.js";
+export {
+  TURN_READER_V61,
+  V61_BOARD_ASK,
+  V61_INTEREST_WITH_NOTE,
+} from "./prompts/tasks/turn-reader.v61.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 export { TURN_SKIM_V7, V7_WRITES } from "./prompts/tasks/turn-skim.v7.js";
