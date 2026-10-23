@@ -86,9 +86,14 @@ export function createSmallTalkReply(dependencies: {
             qRunId: request.runId,
             correlationId: request.correlationId,
           },
+        },
+        // The signal is an execute option: the request schema is strict, so
+        // a signal in the request body made every live call invalid (live
+        // 2026-10-23, run 3ba29d7d: INVALID_REQUEST, no candidate tried).
+        {
+          schema: SmallTalkResultSchema,
           ...(request.signal === undefined ? {} : { signal: request.signal }),
         },
-        { schema: SmallTalkResultSchema },
       );
       if (response.output.kind !== "STRUCTURED") return null;
       const read = SmallTalkResultSchema.safeParse(response.output.value);

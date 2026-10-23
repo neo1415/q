@@ -138,6 +138,11 @@ function seam(options: {
   readonly teamJob?: QTeamJobPort;
   /** A call with one named counterpart, prepared in the answer (v58). */
   readonly callPrep?: QCallPrepPort;
+  /** A follow-up answered from what Q already showed (v54 fromShown). */
+  readonly conversationRecall?: (
+    request: QAnswerRequest,
+    input: { readonly said: string },
+  ) => Promise<string | null>;
   /** Readiness lead lines for "what should I do next?" (lead 2026-10-03). */
   readonly readinessLead?: (request: QAnswerRequest) => Promise<string | null>;
   /** Their profile's gaps filled by code (TURN_READER v27). */
@@ -359,6 +364,9 @@ function seam(options: {
       : { delegation: options.delegation }),
     ...(options.teamJob === undefined ? {} : { teamJob: options.teamJob }),
     ...(options.callPrep === undefined ? {} : { callPrep: options.callPrep }),
+    ...(options.conversationRecall === undefined
+      ? {}
+      : { conversationRecall: options.conversationRecall }),
     ...(options.readinessLead === undefined
       ? {}
       : { readinessLead: options.readinessLead }),
@@ -5031,6 +5039,62 @@ describe("getting ready for a call is prepared in the answer (owner 2026-10-23, 
       text.endsWith("Want to rehearse it? I'll play Savanna Seed Partners."),
     ).toBe(true);
     expect(text).not.toMatch(/Q['’]s team|\.\.|plan this one anyway/u);
+  });
+
+  it("live 20:31, the three-turn sequence: after a list of investors, the prep is not answered as a follow-up", async () => {
+    const recalled: string[] = [];
+    const asked: string[] = [];
+    const { answer, stored } = seam({
+      said,
+      earlier: [
+        { role: "USER", content: "Which investors should I talk to first" },
+        {
+          role: "Q",
+          content:
+            "Start with Savanna Seed Partners, then Baobab Seed Partners.",
+          blocks: [
+            {
+              kind: "ARTIFACT_REFERENCE",
+              artifactId: QArtifactIdSchema.parse(randomUUID()),
+              type: "Q_REPORT",
+              status: "READY",
+              title: "Investors to talk to first",
+            },
+          ],
+        },
+        { role: "USER", content: "Why might the top one pass on us?" },
+        {
+          role: "Q",
+          content: "Savanna may hesitate because kiosk economics are unproven.",
+        },
+      ],
+      reading: {
+        ...prepReading,
+        teamJob: false,
+        fromShown: { turn: 2, reshow: false },
+      } as unknown as TurnReaderResult,
+      outcomes: [],
+      conversationRecall: (_request, input) => {
+        recalled.push(input.said);
+        return Promise.resolve(
+          "A generic follow-up. Want me to draft the reply to Amara?",
+        );
+      },
+      callPrep: {
+        prepare: (_request, input) => {
+          asked.push(input.counterpart);
+          return Promise.resolve(prep());
+        },
+      },
+    });
+    await answer.answer(request());
+    expect(asked).toEqual(["Savanna Seed Partners"]);
+    expect(recalled).toEqual([]);
+    const text = stored.at(-1)?.content ?? "";
+    expect(text).toContain("**What they'll likely ask**");
+    expect(
+      text.endsWith("Want to rehearse it? I'll play Savanna Seed Partners."),
+    ).toBe(true);
   });
 
   it("work already waiting is one plain line; the prep is given anyway", async () => {

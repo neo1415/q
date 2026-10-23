@@ -79,9 +79,14 @@ export function createCallPrepWriter(dependencies: {
             qRunId: request.runId,
             correlationId: request.correlationId,
           },
+        },
+        // The signal is an execute option: the request schema is strict, so
+        // a signal in the request body made every live call invalid (live
+        // 2026-10-23, run 3ba29d7d: INVALID_REQUEST, no candidate tried).
+        {
+          schema: CallPrepResultSchema,
           ...(request.signal === undefined ? {} : { signal: request.signal }),
         },
-        { schema: CallPrepResultSchema },
       );
       if (response.output.kind !== "STRUCTURED") return null;
       const read = CallPrepResultSchema.safeParse(response.output.value);
