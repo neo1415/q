@@ -145,6 +145,8 @@ function seam(options: {
   readonly counterpartNames?: readonly string[];
   /** A recording logger (lead 2026-10-03: the route is observable). */
   readonly logger?: Logger;
+  /** The quick first read (a model), faked. */
+  readonly turnSkim?: Parameters<typeof createSpecialistQAnswer>[0]["turnSkim"];
   /** What goes out live (owner 2026-10-23: the holding line). */
   readonly deltas?: { readonly text: string; readonly holding?: true }[];
   /** Waiting lines deferred to the engine's step (lead 2026-10-03). */
@@ -325,6 +327,7 @@ function seam(options: {
       ? {}
       : { openRecord: options.openRecord }),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
+    ...(options.turnSkim === undefined ? {} : { turnSkim: options.turnSkim }),
     ...(options.deltas === undefined
       ? {}
       : {
@@ -439,38 +442,54 @@ function toolReading(
 }
 
 describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
-  it("says it is looking into the one company or person a question names, before the turn is read (owner 2026-10-23)", async () => {
+  /** A skim that reads the turn as given, and a reading that lands later. */
+  function holding(said: string, skimmed: Record<string, unknown> | null) {
     const deltas: { text: string; holding?: true }[] = [];
-    let readAt = -1;
+    let landReading: () => void = () => undefined;
     const run = seam({
-      said: "Tell me about Zino Aviation and its team",
+      said,
       reading: null,
-      read: () => {
-        readAt = deltas.length;
-        return Promise.resolve(null);
+      read: () =>
+        new Promise((resolve) => {
+          landReading = () => {
+            resolve(null);
+          };
+        }),
+      turnSkim: {
+        skim: () => Promise.resolve(skimmed as never),
       },
       outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
       deltas,
     });
-    await run.answer.answer(request());
-    expect(deltas[0]).toEqual({
+    const answering = run.answer.answer(request());
+    return { deltas, answering, land: () => landReading() };
+  }
+
+  it("says it is looking into whom the quick first read understood, before the turn is read (owner 2026-10-23)", async () => {
+    const turn = holding("tell me about zino aviation and its team", {
+      kind: "PERSON_SEARCH",
+      // MEDIUM: the person lane is not taken; the answer path goes on.
+      confidence: "MEDIUM",
+      person: { name: "Zino Aviation", kind: "ORGANIZATION" },
+    });
+    await expect.poll(() => turn.deltas.length).toBeGreaterThan(0);
+    // Said while the full reading is still out.
+    expect(turn.deltas[0]).toEqual({
       text: "Looking into Zino Aviation now. ",
       holding: true,
     });
-    // Already said when the turn's reading was asked for.
-    expect(readAt).toBe(1);
+    turn.land();
+    await turn.answering;
   });
 
-  it("says no holding line for words that ask nothing about someone named", async () => {
-    const deltas: { text: string; holding?: true }[] = [];
-    const run = seam({
-      said: "Email Zino Aviation the deck",
-      reading: null,
-      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
-      deltas,
-    });
-    await run.answer.answer(request());
-    expect(deltas.filter((d) => d.holding === true)).toEqual([]);
+  it("says no holding line from the words alone: capitals and question words name no one (owner: no keyword triggers)", async () => {
+    for (const said of ["Tell me about Zino Aviation", "Yes", "Who Is It?"]) {
+      const turn = holding(said, { kind: "OTHER", confidence: "HIGH" });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      turn.land();
+      await turn.answering;
+      expect(turn.deltas.filter((d) => d.holding === true)).toEqual([]);
+    }
   });
 
   it("answers 'take me to discover' with a NAVIGATE intent and no model answer (F8)", async () => {

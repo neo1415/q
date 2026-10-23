@@ -395,19 +395,10 @@ import {
 import {
   analystResultBlocks,
   askedSubjects,
-  companyNameCandidates,
   provenanceLine,
   type QTurnReader,
   type QTurnSkimmer,
 } from "@capital-q/model-gateway/q";
-
-/**
- * A question or a lookup, by its shape ("tell me about…", "who is…",
- * "find…", "…?"): only the shape of the words a holding line may be said
- * for, never whether to research (that is the reading's).
- */
-const ASKS_ABOUT =
-  /^(tell me|who|what|what's|whats|where|when|how|why|is|are|does|do|find|search|look up|lookup|show me|give me|any|latest|news|research|check)\b|\?\s*$/iu;
 
 /**
  * How a specialist reaches Q (CQ-Q-020 §11, §53, §56, §91).
@@ -2767,17 +2758,13 @@ export function createSpecialistQAnswer(
 
   /** Turns already given a holding line, so a re-read never says it twice. */
   const heldRuns = new Set<string>();
-  const sayHolding = (request: QAnswerRequest, words: string): void => {
+  const sayHolding = (request: QAnswerRequest, name: string): void => {
     const deltas = dependencies.deltas;
     if (deltas === undefined || heldRuns.has(request.runId)) return;
     if (request.writingDocument === true || request.askedAction !== undefined) {
       return;
     }
     if (request.plan.screen?.route === "ONBOARDING") return;
-    if (!ASKS_ABOUT.test(words.trim())) return;
-    const named = companyNameCandidates(words);
-    const name = named.length === 1 ? named[0] : undefined;
-    if (name === undefined) return;
     heldRuns.add(request.runId);
     while (heldRuns.size > PREREADS_MAX) {
       const oldest = heldRuns.values().next().value;
@@ -3765,13 +3752,6 @@ export function createSpecialistQAnswer(
       const oldest = lastActionsByActor.keys().next().value;
       if (oldest !== undefined) lastActionsByActor.delete(oldest);
     }
-    // Owner 2026-10-23 ("it doesn't need to find every single thing
-    // before it starts talking"; live: 4.5 s to the first word, ~3 s of it
-    // the turn's reading): a question that names one company or person
-    // hears that Q is on it as the turn arrives. Only words true whatever
-    // the reading decides -- Q looks into what it was asked about either
-    // way -- and a holding line: the answer's own words replace it.
-    sayHolding(request, latest.content);
     const readingFirst = (async () => {
       const ready = early === undefined ? null : await early;
       const earlyRead =
@@ -3812,6 +3792,33 @@ export function createSpecialistQAnswer(
           ? preskim.skim
           : skimmer.skim(skimInput(request, history, latest));
     if (skimming !== null) {
+      // Owner 2026-10-23 ("it doesn't need to find every single thing
+      // before it starts talking"; live: 4.5 s to the first word, ~3 s of
+      // it the turn's reading): when the quick first read (a model, by
+      // meaning) reads a lookup of one named person or organisation, they
+      // hear that Q is on it before the full reading lands. The name is the
+      // skim's understanding, never one guessed from the words' capitals or
+      // a list of question words (owner: no keyword triggers). A holding
+      // line: the answer's own words replace it.
+      let readingLanded = false;
+      void readingFirst.then(
+        () => {
+          readingLanded = true;
+        },
+        () => {
+          readingLanded = true;
+        },
+      );
+      void skimming.then(
+        (skimmed) => {
+          const name =
+            skimmed?.kind === "PERSON_SEARCH" ? skimmed.person?.name : null;
+          if (!readingLanded && typeof name === "string") {
+            sayHolding(request, name.trim().slice(0, 60));
+          }
+        },
+        () => undefined,
+      );
       const skimStarted = Date.now();
       const skimmed = await Promise.race([
         readingFirst.then(() => null),
@@ -4844,7 +4851,11 @@ export function createSpecialistQAnswer(
       ...(spoken ? { spoken: true } : {}),
       ...(read === null
         ? {}
-        : { turnKind: read.kind, aboutNamedOther: read.aboutNamedOther }),
+        : {
+            turnKind: read.kind,
+            aboutNamedOther: read.aboutNamedOther,
+            namedOther: read.namedOther ?? null,
+          }),
       ...(read?.question?.kind === undefined
         ? {}
         : { questionKind: read.question.kind }),

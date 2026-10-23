@@ -414,6 +414,11 @@ export {
   type TurnQuestionV56,
   TurnReaderV56ResultSchema,
   type TurnReaderV56Result,
+  TURN_READER_V58_SCHEMA_VERSION,
+  NamedOtherSchema,
+  type NamedOther,
+  TurnReaderV58ResultSchema,
+  type TurnReaderV58Result,
   TurnFromShownSchema,
   type TurnFromShown,
   TurnReaderV54ResultSchema,
@@ -1681,6 +1686,11 @@ export {
   TURN_READER_V57,
   V57_WHAT_IS_CAPITAL_Q,
 } from "./prompts/tasks/turn-reader.v57.js";
+export {
+  TURN_READER_V58,
+  V1_ABOUT_NAMED_OTHER,
+  V58_NAMED_OTHER,
+} from "./prompts/tasks/turn-reader.v58.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 
 export {

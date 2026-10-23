@@ -801,3 +801,30 @@ export const TurnReaderV56ResultSchema = TurnReaderV55ResultSchema.extend({
   question: TurnQuestionV56Schema.nullable().default(null),
 }).strict();
 export type TurnReaderV56Result = z.infer<typeof TurnReaderV56ResultSchema>;
+
+export const TURN_READER_V58_SCHEMA_VERSION = 58;
+
+/**
+ * v58 (production 2026-10-23): an investor's "Yes", said to Q's offer
+ * "Want to dig into its fit details?", was searched and pictured as a
+ * company called "Yes": the reading said only that the turn was about
+ * someone named, and code guessed who from capital letters. The reader now
+ * says who: the company, organisation or person the turn is about, as it
+ * should be searched, understood from this turn and the turns before it
+ * ("their team", "yes" to an offer about them) -- never a word lists or
+ * capital letters pick. Null when it names or means no one in particular.
+ * `aboutNamedOther` stays. Lenient: a malformed subject reads as none and
+ * never costs the reading.
+ */
+export const NamedOtherSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    kind: z.enum(["COMPANY", "PERSON"]),
+  })
+  .strict();
+export type NamedOther = z.infer<typeof NamedOtherSchema>;
+
+export const TurnReaderV58ResultSchema = TurnReaderV56ResultSchema.extend({
+  namedOther: NamedOtherSchema.nullable().default(null).catch(null),
+}).strict();
+export type TurnReaderV58Result = z.infer<typeof TurnReaderV58ResultSchema>;
