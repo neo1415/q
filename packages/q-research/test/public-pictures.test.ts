@@ -108,6 +108,16 @@ describe("public pictures of who a turn names", () => {
         "https://techcabal.com/2026/10/20/flutterwave/",
         "https://cdn.dribbble.com/userupload/1.png",
       ),
+      // A stock or download CDN image embedded on another page.
+      shot(
+        "https://blog.example.com/flutterwave",
+        "https://t3.ftcdn.net/jpg/01/flutterwave.jpg",
+      ),
+      shot(
+        "https://news.example.com/flutterwave",
+        "https://images.sftcdn.net/images/flutterwave.png",
+      ),
+      shot("https://flutterwave.en.softonic.com/android"),
       shot("https://techcrunch.com/2026/06/17/flutterwave-ma/"),
     ]);
     const search = createPublicPictureSearch({ provider: found.provider });

@@ -74,6 +74,7 @@ export {
   UTTERANCE_REF_PATTERN,
   withoutSupersededUtterances,
 } from "./domain/utterances.js";
+export { withoutNonSpeechTags } from "./domain/non-speech.js";
 export {
   closestByName,
   comparable,

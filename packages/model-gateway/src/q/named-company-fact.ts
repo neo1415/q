@@ -287,6 +287,92 @@ export async function runNamedCompanyFact(input: {
 }
 
 /** Words that start a sentence or name Capital Q itself, never a company. */
+/**
+ * Words that are never what a turn is about: a reply ("Yes", "Sure"),
+ * thanks, a filler, or a transcription's non-speech tag. Exported so a
+ * picture's search words are held to the same rule.
+ */
+export const REPLY_AND_FILLER_WORDS: readonly string[] = [
+  "yes",
+  "yeah",
+  "yep",
+  "yup",
+  "yea",
+  "no",
+  "nope",
+  "nah",
+  "sure",
+  "thanks",
+  "thank",
+  "thx",
+  "cheers",
+  "hello",
+  "great",
+  "good",
+  "cool",
+  "nice",
+  "perfect",
+  "fine",
+  "right",
+  "alright",
+  "absolutely",
+  "definitely",
+  "exactly",
+  "correct",
+  "indeed",
+  "agreed",
+  "awesome",
+  "amazing",
+  "wow",
+  "hmm",
+  "um",
+  "uh",
+  "sorry",
+  "maybe",
+  "perhaps",
+  "also",
+  "but",
+  "now",
+  "then",
+  "well",
+  "actually",
+  "go",
+  "on",
+  "ahead",
+  "ok",
+  "okay",
+  "please",
+  "continue",
+  "more",
+  "again",
+  "let's",
+  "let",
+  "laughter",
+  "laughs",
+  "applause",
+  "music",
+  "noise",
+  "silence",
+  "cough",
+  "coughs",
+  "inaudible",
+  "crosstalk",
+  "sigh",
+  "unintelligible",
+];
+
+/** Search words that are only replies or fillers: nothing to picture. */
+export function onlyReplyWords(text: string): boolean {
+  const words = text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}']+/u)
+    .filter((word) => word.length > 0);
+  return (
+    words.length === 0 ||
+    words.every((word) => REPLY_AND_FILLER_WORDS.includes(word))
+  );
+}
+
 const NOT_COMPANY_WORDS = new Set([
   "i",
   "i'm",
@@ -335,6 +421,11 @@ const NOT_COMPANY_WORDS = new Set([
   "and",
   "so",
   "the",
+  // Replies, thanks, fillers and a recogniser's non-speech tags (production
+  // 2026-10-23: "Yes" was searched as a name and answered with a stock
+  // photo of the word "yes"; "Laughter Tell me about Halyard" named
+  // "Laughter").
+  ...REPLY_AND_FILLER_WORDS,
 ]);
 
 /**
