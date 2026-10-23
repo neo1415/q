@@ -65,6 +65,7 @@ const INTEREST: Interest = {
     "99999999-0000-4000-8000-000000000001",
   ),
   createdAt: UtcTimestampSchema.parse("2026-09-25T10:00:00.000Z"),
+  note: null,
   response: null,
   connection: null,
 };

@@ -128,6 +128,7 @@ export const DISCOVERY_PAGES_AR: Readonly<Record<string, string>> = {
   "Declined. They see a polite no, never a reason you didn’t give.":
     "مرفوض. يرون رفضًا مهذبًا، ولا يرون سببًا لم تذكره.",
   "No note with their interest.": "لا ملاحظة مع اهتمامهم.",
+  "Their note:": "ملاحظتهم:",
   "Looks for:": "يبحث عن:",
   "not on their profile yet": "غير موجود في ملفهم بعد",
   "Nothing waiting for you": "لا شيء بانتظارك",

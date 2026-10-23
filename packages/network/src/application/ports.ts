@@ -199,6 +199,8 @@ export type InterestRepository = {
       readonly expressedByUserId: string;
       readonly expressedInOrganisationId: string;
       readonly relationshipEventId: RelationshipEventId;
+      /** The investor's optional note to the founders (decision B). */
+      readonly note?: string | null | undefined;
     },
   ) => Promise<Interest>;
 };

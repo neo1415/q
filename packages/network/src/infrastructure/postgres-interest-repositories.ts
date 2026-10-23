@@ -51,6 +51,7 @@ const InterestRow = z.object({
   expressed_in_organisation_id: UuidSchema,
   relationship_event_id: RelationshipEventIdSchema,
   created_at: Timestamp,
+  note: z.string().nullable(),
   response_id: InterestResponseIdSchema.nullable(),
   response_decision: z.enum(["ACCEPTED", "DECLINED"]).nullable(),
   responded_at: Timestamp.nullable(),
@@ -73,6 +74,7 @@ function toInterest(row: unknown): Interest {
     expressedInOrganisationId: r.expressed_in_organisation_id,
     relationshipEventId: r.relationship_event_id,
     createdAt: r.created_at,
+    note: r.note,
     response:
       r.response_id === null ||
       r.response_decision === null ||
@@ -96,6 +98,7 @@ function interestSelect(executor: DatabaseExecutor) {
     select i.id, i.tenant_id, i.relationship_id, r.company_id, r.investor_organisation_id,
            i.expressed_by_party, i.status, i.expressed_by_user_id,
            i.expressed_in_organisation_id, i.relationship_event_id, i.created_at,
+           i.note,
            a.id as response_id, a.decision as response_decision, a.created_at as responded_at,
            m.id as match_id, m.status as match_status, m.matched_at
       from network.interests i
@@ -147,12 +150,12 @@ export function createPostgresInterestRepository(): InterestRepository {
       await tx.sql`
         insert into network.interests
           (id, tenant_id, relationship_id, expressed_by_party, expressed_by_user_id,
-           expressed_in_organisation_id, relationship_event_id)
+           expressed_in_organisation_id, relationship_event_id, note)
         values
           (${input.id}, ${input.tenantId}, ${input.relationshipId},
            ${input.expressedByParty ?? "INVESTOR"},
            ${input.expressedByUserId}, ${input.expressedInOrganisationId},
-           ${input.relationshipEventId})`;
+           ${input.relationshipEventId}, ${input.note ?? null})`;
       const rows = await tx.sql`
         ${interestSelect(tx.sql)} where i.id = ${input.id}`;
       return toInterest(rows[0]);

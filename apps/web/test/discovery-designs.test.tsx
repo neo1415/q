@@ -281,6 +281,19 @@ describe("investor interest", () => {
     expect(document.querySelector('[data-response="ACCEPTED"]')).not.toBeNull();
   });
 
+  it("shows the investor's own note, exactly as sent (decision B)", () => {
+    render(
+      <InterestCards
+        items={[{ ...interest, note: "We lead seed rounds in fintech." }]}
+        facts={facts}
+        answer={vi.fn<InterestAnswerPort>()}
+      />,
+    );
+    const note = document.querySelector("[data-interest-note]");
+    expect(note?.textContent).toContain("We lead seed rounds in fintech.");
+    expect(screen.queryByText("No note with their interest.")).toBeNull();
+  });
+
   it("words when, without a clock in the page", () => {
     const now = new Date("2026-10-21T12:00:00.000Z");
     expect(whenWords("2026-10-21T08:00:00.000Z", now)).toBe("Today");

@@ -4531,6 +4531,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Their gate isn’t taking applications right now.",
   "Their interest is waiting for you. Your data room opens once you accept it.",
   "Their note",
+  "Their note:",
   "Their own claims, not verified.",
   "Their pitch states:",
   "Their published bar, not their private thesis.",

@@ -94,6 +94,7 @@ const INTEREST: Interest = {
     "99999999-0000-4000-8000-000000000001",
   ),
   createdAt: UtcTimestampSchema.parse("2026-09-24T10:00:00.000Z"),
+  note: null,
   response: null,
   connection: null,
 };
@@ -353,6 +354,7 @@ describe("POST /v1/network/companies/:companyId/express-interest", () => {
         companyId: COMPANY,
         status: "EXPRESSED",
         expressedAt: INTEREST.createdAt,
+        note: null,
         response: "PENDING",
         respondedAt: null,
         connection: null,
@@ -459,6 +461,7 @@ describe("the company's side (CQ-NET-011)", () => {
         investorOrganisationId: INVESTOR.id,
         investorName: "Apex Ventures",
         investorPhotoUrl: null,
+        note: null,
         investorType: "VC",
         expressedAt: INTEREST.createdAt,
         response: "PENDING",
