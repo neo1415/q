@@ -7,6 +7,8 @@ import {
   V1_ABOUT_NAMED_OTHER,
   V58_FIT_MANDATE,
   V58_NAMED_OTHER,
+  V58_RAISING,
+  V58_RANKING_NAME,
   V58_SUITS_THEM,
   V49_TEAM_JOB,
   V58_MEETING_PREP,
@@ -15,6 +17,7 @@ import {
   QuestionKindSchema,
   createDefaultPromptRegistry,
 } from "../src/index.js";
+import { DiscoverRequestSchema } from "../src/conversation/reading.js";
 
 /**
  * Production 2026-10-23: "Yes", said to Q's offer about a company, was
@@ -40,6 +43,26 @@ describe("TURN_READER v58: the reader names whom the turn is about", () => {
     expect(V58_FIT_MANDATE).toMatch(
       /and mandateRelevant, true when they ask to rank or score against their mandate/u,
     );
+  });
+
+  it("reads name order and 'raising now' by meaning (Lane 4, coordinator's investor journey)", () => {
+    expect(TURN_READER_V58.template).toContain(V58_RANKING_NAME);
+    expect(TURN_READER_V58.template).toContain(V58_RAISING);
+    expect(V58_RANKING_NAME).toMatch(
+      /NAME only when they ask for the list alphabetically or by name/u,
+    );
+    expect(V58_RAISING).toMatch(/in any words and any language/u);
+    const read = DiscoverRequestSchema.parse({
+      sectors: ["fintech"],
+      countries: ["NG"],
+      stages: ["seed"],
+      ranking: "NAME",
+      raising: true,
+    });
+    expect(read.ranking).toBe("NAME");
+    expect(read.raising).toBe(true);
+    // An older reading without the field is not a raising ask.
+    expect(DiscoverRequestSchema.parse({}).raising).toBe(false);
   });
 
   it("asks for the subject from meaning and the recent turns, never from a reply word", () => {

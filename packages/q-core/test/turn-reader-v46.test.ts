@@ -54,6 +54,7 @@ describe("TURN_READER v46", () => {
       ranking: "NONE",
       mandateRelevant: false,
       previous: false,
+      raising: false,
     });
     const plain = TurnReaderV46ResultSchema.parse({
       kind: "QUESTION_TO_Q",

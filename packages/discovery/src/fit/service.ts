@@ -184,6 +184,18 @@ export type FitService = {
   ) => Promise<FitProfilesResult>;
   readonly top: (actor: ActorContext, limit: number) => Promise<FitTopResult>;
   /**
+   * Owner 2026-10-23: companies of a kind (the catalog's matches, already
+   * through hard eligibility and disclosure), every one scored on this
+   * investor's mandate and returned in fit order, the first `limit`. None
+   * is left out for its band: an unscored company is listed after the
+   * scored ones, never dropped. At most FIT_TOP_CANDIDATES_MAX are scored.
+   */
+  readonly rank?: (
+    actor: ActorContext,
+    companyIds: readonly string[],
+    limit: number,
+  ) => Promise<FitTopResult>;
+  /**
    * Q.10: the companies the investor picked (2-4, from Saved), side by
    * side on the same fit as the top three. Each is re-checked for VIEW
    * eligibility first; one they may not see is absent, never named.
@@ -402,6 +414,22 @@ export function createFitService(
           items: result.items,
           sources,
           limit: ids.length,
+          config,
+          computedAt: clock().toISOString(),
+          keepAll: true,
+        }),
+      };
+    },
+    rank: async (actor, companyIds, limit) => {
+      const ids = [...new Set(companyIds)].slice(0, FIT_TOP_CANDIDATES_MAX);
+      const result = await profiles(actor, ids);
+      if (result.kind !== "OK") return result;
+      return {
+        kind: "OK",
+        comparison: buildFitComparison({
+          items: result.items,
+          sources: new Map(ids.map((id) => [id, new Set(["FEED" as const])])),
+          limit,
           config,
           computedAt: clock().toISOString(),
           keepAll: true,

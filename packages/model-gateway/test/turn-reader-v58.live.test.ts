@@ -19,7 +19,7 @@ import { createQTurnReader } from "../src/q/index.js";
  * and (b) Lane 4's mandate cases: an investor asking which companies to look
  * into or invest in is DISCOVER ranking FIT with mandateRelevant true. Run
  * only by `pnpm test:live-model` with CQ_LIVE_MODEL_TESTS=1 and a Gemini
- * key; synthetic sentences only (about 10 short reads).
+ * key; synthetic sentences only (about 13 short reads).
  */
 
 const LIVE = process.env["CQ_LIVE_MODEL_TESTS"] === "1";
@@ -106,6 +106,7 @@ type Read = {
       readonly ranking?: string;
       readonly mandateRelevant?: boolean;
       readonly previous?: boolean;
+      readonly raising?: boolean;
       readonly sectors?: readonly string[];
     } | null;
   } | null;
@@ -203,6 +204,7 @@ describe.skipIf(!LIVE || GEMINI === undefined)(
             readonly count?: number;
             readonly previous?: boolean;
             readonly sector?: string;
+            readonly raising?: boolean;
           },
           recentTurns: readonly Turn[] = [],
         ) => {
@@ -218,7 +220,9 @@ describe.skipIf(!LIVE || GEMINI === undefined)(
             (expected.previous !== undefined &&
               (d?.previous ?? false) !== expected.previous) ||
             (expected.sector !== undefined &&
-              !(d?.sectors ?? []).includes(expected.sector))
+              !(d?.sectors ?? []).includes(expected.sector)) ||
+            (expected.raising !== undefined &&
+              (d?.raising ?? false) !== expected.raising)
           ) {
             miss(said, `expected ${JSON.stringify(expected)}`, q);
           }
@@ -254,6 +258,24 @@ describe.skipIf(!LIVE || GEMINI === undefined)(
           { kind: "FIT", mandateRelevant: true, count: 3, previous: true },
           SHOWN_LIST,
         );
+        // Lane 4: name order and "raising now", by meaning.
+        await fit("List the fintech companies alphabetically", {
+          kind: "DISCOVER_COMPANIES",
+          ranking: "NAME",
+          mandateRelevant: false,
+          sector: "fintech",
+        });
+        await fit("Any fintech companies in Nigeria raising a seed round?", {
+          kind: "DISCOVER_COMPANIES",
+          mandateRelevant: false,
+          sector: "fintech",
+          raising: true,
+        });
+        await fit("Quels startups healthtech lèvent des fonds en ce moment ?", {
+          kind: "DISCOVER_COMPANIES",
+          mandateRelevant: false,
+          raising: true,
+        });
         expect(misses).toEqual([]);
       },
       5 * 60_000,

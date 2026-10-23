@@ -23,14 +23,19 @@ import type { QToolPorts } from "../ports.js";
  * unconfirmed Q inference that may come from a founder's private
  * material), in name order, and decides every candidate through the
  * Permissions context before it is returned: only a NETWORK_VISIBLE or
- * PUBLIC_EXTERNAL disclosure lets one through (ADR-001). It never ranks:
- * fit, when asked for, is the fit tools' own deterministic answer.
+ * PUBLIC_EXTERNAL disclosure lets one through (ADR-001). It never ranks
+ * by itself: with order FIT, every match (up to CATALOG_FIT_SCAN_MAX) is
+ * scored by the fit service on the investor's mandate and the first
+ * `limit` come back in that deterministic order (owner 2026-10-23: never
+ * the first companies by name, then ranked).
  */
 
 export const DISCOVER_COMPANIES = "discovery.companies" as const;
 
 const LIMIT_MAX = 24;
 const FILTER_MAX = 8;
+/** How many matches a FIT order scores (the fit service's own bound). */
+export const CATALOG_FIT_SCAN_MAX = 200;
 
 export const DiscoverCompaniesInputSchema = z
   .object({
@@ -57,6 +62,12 @@ export const DiscoverCompaniesInputSchema = z
       .default([])
       .describe("Company stage codes (pre_seed, seed, series_a, ...)."),
     limit: z.number().int().min(1).max(LIMIT_MAX).default(10),
+    order: z
+      .enum(["NAME", "FIT"])
+      .default("NAME")
+      .describe(
+        "NAME: in name order. FIT: every match scored on the investor's own mandate and returned best first (an investor only; otherwise name order).",
+      ),
   })
   .strict();
 export type DiscoverCompaniesInput = z.input<
@@ -80,7 +91,13 @@ export const DiscoverCompaniesOutputSchema = z
       )
       .max(LIMIT_MAX),
     /** The order the list is in, said to the person as the basis. */
-    order: z.literal("NAME"),
+    order: z.enum(["NAME", "FIT"]),
+    /**
+     * How many companies matched and may be seen, when counted (FIT reads
+     * them all); `totalAtLeast` when the scan's bound was reached.
+     */
+    total: z.number().int().min(0).optional(),
+    totalAtLeast: z.boolean().optional(),
     sectors: z
       .array(z.object({ code: z.string(), name: z.string() }).strict())
       .max(FILTER_MAX),
@@ -106,7 +123,7 @@ export function createDiscoverCompaniesTool(
     status: "ACTIVE",
     providerName: "discover_companies",
     description:
-      'Lists the companies on Capital Q in a sector (taxonomy code, sub-sectors included), head-office country or stage, in name order, from their declared profiles. Call it when the person asks to see companies of a kind ("three fintech companies in Nigeria"). It does not rank: for how they fit a mandate use fit_profile on the ids it returns.',
+      'Lists the companies on Capital Q in a sector (taxonomy code, sub-sectors included), head-office country or stage, from their declared profiles. Call it when the person asks to see companies of a kind ("three fintech companies in Nigeria"). For an investor pass order FIT: every match is scored on their own mandate and the best come first; order NAME lists them by name. Use fit_profile on the ids it returns for the fit detail of each.',
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [],
@@ -144,12 +161,14 @@ export function createDiscoverCompaniesTool(
           truthClass: "USER_CLAIM" as const,
         };
       }
+      const byFit = input.order === "FIT" && ports.fit?.rank !== undefined;
       const found = await catalog.find(context.actor, {
         sectors: input.sectors,
         countries: input.countries.map((code) => code.toUpperCase()),
         stages: input.stages,
-        // Room for candidates disclosure turns away, still bounded.
-        limit: Math.min(input.limit * 3, 60),
+        // FIT reads every match it may score; NAME leaves room for the
+        // candidates disclosure turns away. Both bounded.
+        limit: byFit ? CATALOG_FIT_SCAN_MAX : Math.min(input.limit * 3, 60),
       });
       const decisions =
         found.candidates.length === 0
@@ -162,21 +181,40 @@ export function createDiscoverCompaniesTool(
               })),
             );
       const seen = new Set<string>();
-      const companies = found.candidates
-        .filter((candidate, index) => {
-          const decision = decisions[index];
-          if (
-            decision === undefined ||
-            decision.outcome !== "ALLOW" ||
-            (decision.reasonCode !== "NETWORK_VISIBLE" &&
-              decision.reasonCode !== "PUBLIC_EXTERNAL") ||
-            seen.has(candidate.companyId)
-          ) {
-            return false;
-          }
-          seen.add(candidate.companyId);
-          return true;
-        })
+      const visible = found.candidates.filter((candidate, index) => {
+        const decision = decisions[index];
+        if (
+          decision === undefined ||
+          decision.outcome !== "ALLOW" ||
+          (decision.reasonCode !== "NETWORK_VISIBLE" &&
+            decision.reasonCode !== "PUBLIC_EXTERNAL") ||
+          seen.has(candidate.companyId)
+        ) {
+          return false;
+        }
+        seen.add(candidate.companyId);
+        return true;
+      });
+      // FIT: every visible match scored on their mandate, best first. A
+      // reader who is not an investor, or has no mandate, gets name order.
+      const ranked =
+        byFit && visible.length > 0
+          ? await ports.fit
+              ?.rank?.(
+                context.actor,
+                visible.map((candidate) => candidate.companyId),
+                input.limit,
+              )
+              .catch(() => null)
+          : null;
+      const order =
+        ranked?.kind === "OK"
+          ? ranked.comparison.entries.flatMap((entry) => {
+              const one = visible.find((c) => c.companyId === entry.companyId);
+              return one === undefined ? [] : [one];
+            })
+          : null;
+      const companies = (order ?? visible)
         .slice(0, input.limit)
         .map((candidate) => ({
           companyId: candidate.companyId,
@@ -188,7 +226,13 @@ export function createDiscoverCompaniesTool(
         }));
       return {
         companies,
-        order: "NAME" as const,
+        order: order === null ? ("NAME" as const) : ("FIT" as const),
+        ...(order === null
+          ? {}
+          : {
+              total: visible.length,
+              totalAtLeast: found.candidates.length >= CATALOG_FIT_SCAN_MAX,
+            }),
         sectors: found.sectors.slice(0, FILTER_MAX).map((sector) => ({
           code: sector.code,
           name: sector.name,

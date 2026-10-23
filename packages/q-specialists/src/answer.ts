@@ -4941,6 +4941,8 @@ export function createSpecialistQAnswer(
               ranking: read.question.discover?.ranking ?? "NONE",
               mandateRelevant: read.question.discover?.mandateRelevant ?? false,
               previous: read.question.discover?.previous ?? false,
+              // v58: they asked for companies raising now.
+              raising: read.question.discover?.raising === true,
             },
           }
         : {}),
@@ -4952,6 +4954,8 @@ export function createSpecialistQAnswer(
               previous: read.question.discover?.previous ?? false,
               // v56: past the companies already shown ("three new ones").
               excludeShown: read.question.excludeShown === true,
+              // Ranked against their mandate, as the reader understood it.
+              mandateRelevant: read.question.discover?.mandateRelevant === true,
             },
           }
         : {}),

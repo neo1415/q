@@ -1157,9 +1157,11 @@ describe("turn timing harness", () => {
       // Findings still arrive, and the turn is done sooner.
       expect(two.firstFindingMs).not.toBeNull();
       expect(two.completeMs).toBeLessThan(one.completeMs * 0.9);
-      // The first words are not delayed by the second writer.
+      // The first words are not delayed by the second writer. The margin
+      // is real time (40 ms of scheduling jitter under a loaded run),
+      // read on the harness's scaled clock.
       expect(two.firstWordsMs ?? Infinity).toBeLessThan(
-        (one.firstWordsMs ?? 0) + 300,
+        (one.firstWordsMs ?? 0) + Math.max(300, 40 / SCALE),
       );
     }
   }, 600_000);

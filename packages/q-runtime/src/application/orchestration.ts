@@ -312,9 +312,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
         readonly countries: readonly string[];
         readonly stages: readonly string[];
         readonly count: number | null;
-        readonly ranking: "NONE" | "FIT" | "TOP";
+        /** NAME: they asked for the list alphabetically or by name. */
+        readonly ranking: "NONE" | "FIT" | "TOP" | "NAME";
         readonly mandateRelevant: boolean;
         readonly previous: boolean;
+        /** They asked for companies raising now. Absent is false. */
+        readonly raising?: boolean | undefined;
       }
     | undefined;
   /**
@@ -379,6 +382,12 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
          * fits?"); the ranking leaves those out. Absent is false.
          */
         readonly excludeShown?: boolean | undefined;
+        /**
+         * The reader read it as ranking against their mandate or for
+         * themselves ("rank them for me", "top three based on my
+         * mandate"). Absent is false.
+         */
+        readonly mandateRelevant?: boolean | undefined;
       }
     | undefined;
   /**

@@ -5,6 +5,11 @@ import type { CompanyKnowledgePort } from "@capital-q/discovery";
 import type { CompanyCatalogPort } from "@capital-q/q-tools";
 import { normalizeTaxonomyAlias } from "@capital-q/taxonomy";
 
+/** One knowledge page (KNOWLEDGE_DISCOVER_LIMIT_MAX). */
+const CATALOG_PAGE = 50;
+/** The most matches one catalog read takes, for a fit ranking over all. */
+export const CATALOG_SCAN_MAX = 200;
+
 /**
  * K1 (founder brief 2026-10-09): companies on the network by declared
  * sector, head-office country and stage, for `discovery.companies`.
@@ -97,14 +102,31 @@ export function createPostgresCompanyCatalog(dependencies: {
       ) {
         return { candidates: [], sectors, unknownSectors };
       }
-      const companies = await knowledge.discoverCompanies(actor, {
-        sectorCodes: sectors.map((sector) => sector.code),
-        geographyCodes: geographies.map(
-          (geography) => geography.canonical_code,
-        ),
-        stageCodes: [...query.stages],
-        limit: query.limit,
-      });
+      // Owner 2026-10-23: a fit ranking reads every match, never the first
+      // page by name; the knowledge query pages by keyset, so a limit past
+      // one page reads as many pages as it needs, bounded.
+      const companies: Awaited<
+        ReturnType<typeof knowledge.discoverCompanies>
+      >[number][] = [];
+      const wanted = Math.min(Math.max(query.limit, 1), CATALOG_SCAN_MAX);
+      let after: { name: string; companyId: string } | null = null;
+      while (companies.length < wanted) {
+        const asked = Math.min(CATALOG_PAGE, wanted - companies.length);
+        const page = await knowledge.discoverCompanies(actor, {
+          sectorCodes: sectors.map((sector) => sector.code),
+          geographyCodes: geographies.map(
+            (geography) => geography.canonical_code,
+          ),
+          stageCodes: [...query.stages],
+          limit: asked,
+          after,
+        });
+        companies.push(...page);
+        const last = page.at(-1);
+        // A short page is the last one.
+        if (last === undefined || page.length < asked) break;
+        after = { name: last.name, companyId: last.companyId };
+      }
       // Never their own organisation's company (K1 invariant, proven end to
       // end): a network-visible company of theirs passes disclosure as
       // NETWORK_VISIBLE, so it is removed here, by canonical ownership.

@@ -882,6 +882,31 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     expect(JSON.stringify(result)).not.toContain(ID(3));
   });
 
+  it("rank (owner 2026-10-23): every given company re-checked and scored, the limit kept, one they may not see absent", async () => {
+    const ids = Array.from({ length: 30 }, (_, i) => ID(i + 1));
+    const w = world({
+      reasons: { [ID(30)]: ["COMPANY_NOT_DISCOVERABLE_BY_INVESTOR"] },
+    });
+    const rank = w.service.rank;
+    expect(rank).toBeDefined();
+    const result = await rank?.(actor, [...ids, ID(1)], 5);
+    expect(result?.kind).toBe("OK");
+    if (result?.kind !== "OK") return;
+    // Each once, all through eligibility before any input is read.
+    expect(w.evaluated).toEqual([ids]);
+    expect(w.read).toEqual([ids.slice(0, 29)]);
+    expect(result.comparison.entries).toHaveLength(5);
+    expect(JSON.stringify(result)).not.toContain(ID(30));
+  });
+
+  it("rank refuses a non-investor before reading anything", async () => {
+    const w = world({ investor: false });
+    expect(await w.service.rank?.(actor, [ID(1)], 3)).toEqual({
+      kind: "NOT_INVESTOR",
+    });
+    expect(w.evaluated).toEqual([]);
+  });
+
   it("compare refuses a non-investor before reading anything", async () => {
     const w = world({ investor: false });
     expect(await w.service.compare(actor, [ID(1), ID(2)])).toEqual({

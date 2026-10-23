@@ -30,6 +30,7 @@ const SKIM = {
     ranking: "NONE",
     mandateRelevant: false,
     previous: false,
+    raising: false,
   },
 };
 

@@ -161,8 +161,10 @@ export type QuestionKind = z.infer<typeof QuestionKindSchema>;
  * order, said so). FIT: by fit with their mandate ("which suit my
  * mandate", "strongest fit"). TOP: "top" or "best" without saying on
  * what: fit when they have a mandate, otherwise Q says what it means.
+ * NAME (v58): they asked for the list alphabetically or by name; for an
+ * investor, every other list is ranked by fit with their mandate.
  */
-export const DISCOVER_RANKINGS = ["NONE", "FIT", "TOP"] as const;
+export const DISCOVER_RANKINGS = ["NONE", "FIT", "TOP", "NAME"] as const;
 
 /** What a prepared-context question is about (K8, TURN_READER v47). */
 export const PREPARED_SUBJECTS = [
@@ -190,6 +192,8 @@ export const DiscoverRequestSchema = z
     mandateRelevant: z.boolean().default(false),
     /** About companies Q just showed ("those", "of these"). */
     previous: z.boolean().default(false),
+    /** v58: companies raising now ("raising a seed round"). */
+    raising: z.boolean().default(false),
   })
   .strict();
 export type DiscoverRequest = z.infer<typeof DiscoverRequestSchema>;

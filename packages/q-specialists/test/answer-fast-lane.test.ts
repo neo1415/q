@@ -83,6 +83,7 @@ const DISCOVER: NonNullable<TurnSkimResult["discover"]> = {
   ranking: "NONE",
   mandateRelevant: false,
   previous: false,
+  raising: false,
 };
 
 const SKIM_DISCOVER: TurnSkimResult = {
