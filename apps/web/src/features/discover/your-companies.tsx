@@ -53,6 +53,7 @@ import {
   usePlaybackRate,
   type PlaybackRate,
 } from "./stage/playback-rate";
+import { useCaptionsChoice } from "./stage/captions-choice";
 import { PitchScrubber, SEEK_STEP_SECONDS, seekBy } from "./stage/scrubber";
 import { useT } from "@/features/i18n/language";
 
@@ -392,7 +393,7 @@ export function YourCompaniesFeed({
 
   // Discover v2: one speed, captions choice and options sheet for the tab.
   const [rate, setRate] = usePlaybackRate();
-  const [captionsOn, setCaptionsOn] = useState(true);
+  const [captionsOn, setCaptionsOn] = useCaptionsChoice();
   const [activeVideo, setActiveVideo] = useState<HTMLVideoElement | null>(null);
   const [clearDisplay, setClearDisplay] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
