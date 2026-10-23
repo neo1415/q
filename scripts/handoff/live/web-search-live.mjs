@@ -24,7 +24,9 @@ const ctx = await browser.newContext({
 await ctx.addInitScript(() => {
   try {
     sessionStorage.setItem("cq.splash.seen", "1");
-  } catch {}
+  } catch {
+    // Storage blocked: the splash shows once, which is harmless.
+  }
 });
 const page = await ctx.newPage();
 await page.goto(`${WEB}/auth/sign-in`, {
