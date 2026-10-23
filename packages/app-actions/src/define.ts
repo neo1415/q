@@ -256,6 +256,13 @@ export type AppActionDefinition<In, Out, ToolIn = In> = {
   /** What the approval card says (CONSEQUENTIAL), and Q's line after. */
   readonly card: (input: In, names?: AppActionCardNames) => AppActionCard;
   /**
+   * Outward only (something the other side receives): Q's line once the
+   * card is prepared, from the exact input -- the drafted text in full and
+   * "Ready to send", never "Not saved yet" (coordinator 2026-10-23).
+   * Absent: the card's summary and "Not saved yet".
+   */
+  readonly proposed?: ((input: In, summary: string) => string) | undefined;
+  /**
    * The card's counterpart by name when its input names no target the
    * composition can name (an interest or a request by id): read through
    * the action's own service, as the proposing person, from their own
@@ -354,6 +361,18 @@ export function cardOnlyIf<In>(
 
 /** Erased for the registry; per-action types stay with the action (as q-tools does). */
 export type AnyAppAction = AppActionDefinition<unknown, unknown, unknown>;
+
+/**
+ * The prepared line for something the other side receives (coordinator
+ * 2026-10-23): what it is, the drafted text in full when there is one, and
+ * that it is ready to send -- never "Not saved yet", a profile edit's words.
+ */
+export function readyToSendLine(summary: string, text: string | null): string {
+  const what = summary.trim().replace(/[.\s]+$/u, "");
+  const quoted =
+    text === null || text.trim() === "" ? "" : `: "${text.trim()}"`;
+  return `${what}${quoted}. Ready to send: approve on the card, or tell me what to change.`;
+}
 
 export function defineAppAction<In, Out, ToolIn = In>(
   definition: AppActionDefinition<In, Out, ToolIn>,

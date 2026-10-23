@@ -117,6 +117,10 @@ const OUTWARD_ACTION_TYPES: ReadonlySet<string> = new Set([
   "app.diligence.questions.send",
   "app.schedule.meeting.book",
   "app.schedule.proposal.accept",
+  "chat.message.send",
+  "meeting.schedule",
+  "meeting.reschedule",
+  "meeting.cancel",
 ]);
 
 function cardOnlyAction(action: DeclaredAction): boolean {

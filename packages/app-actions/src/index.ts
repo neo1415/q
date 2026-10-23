@@ -2,6 +2,7 @@ export {
   APP_ACTION_CONSEQUENCES,
   type AppActionConsequence,
   defineAppAction,
+  readyToSendLine,
   defineAppActionFamily,
   isRefusal,
   refusal,

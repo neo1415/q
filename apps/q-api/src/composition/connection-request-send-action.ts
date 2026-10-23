@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readyToSendLine } from "@capital-q/app-actions";
 
 import {
   QActionTypeSchema,
@@ -75,6 +76,7 @@ export function createConnectionRequestSendAction(dependencies: {
       summary: `Send ${payload.investorName} a Connection Request`,
       preview: `${payload.investorName} will receive your company's Connection Request and can accept or decline it. It is not an investment, and nothing private is shared.`,
     }),
+    proposed: (_payload, summary) => readyToSendLine(summary, null),
     confirm: (payload, result) =>
       result.alreadySent
         ? `Your request to ${payload.investorName} was already sent; nothing changed.`

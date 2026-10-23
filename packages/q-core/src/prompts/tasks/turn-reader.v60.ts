@@ -37,7 +37,7 @@ export const TURN_READER_V60: PromptDefinition<
 > = {
   ...TURN_READER_V59,
   version: 60,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QA 2026-10-23: v59 plus three readings by meaning in any language -- F-36 a whole Capital Q screen named in any language is NAVIGATE to it, never a record; F-41 asking about a record Q showed ('tell me more about the second one') is a question, open null; F-33 accepting or declining an investor's interest in their company is answering it, never a hand-over. Schema unchanged.",
   effectiveFrom: "2026-10-23",
