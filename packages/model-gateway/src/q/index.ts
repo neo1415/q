@@ -289,6 +289,11 @@ import {
   attachedDocumentFacts,
   attachedDocumentsWithin,
 } from "./attached-document-fact.js";
+import {
+  attachedDocumentIntent,
+  attachedDocumentNote,
+  type AttachedDocumentIntent,
+} from "./attached-document-intent.js";
 import { reRenderAskOf } from "./re-render.js";
 import {
   manifestFacts,
@@ -1355,6 +1360,17 @@ export function environmentNoteParts(
     readonly language?: string | undefined;
     /** Who is asking: their own company, from their record. */
     readonly asker?: string | undefined;
+    /**
+     * Lane 8: documents they attached, read this turn, and what their
+     * words ask of them (owner 23 Oct: a summary, not a critique, unless
+     * they ask for one). Titles are their own documents', read as them.
+     */
+    readonly attachedDocument?:
+      | {
+          readonly titles: readonly string[];
+          readonly intent: AttachedDocumentIntent;
+        }
+      | undefined;
   } = {},
 ): QEnvironmentNoteParts {
   const factsNote =
@@ -1416,6 +1432,14 @@ export function environmentNoteParts(
     // read as chat, or a series cut short, are the bugs these prevent
     // (QX-003F, B1, R35).
     ...(options.turnUnread === true ? [TURN_UNREAD_NOTE] : []),
+    ...(options.attachedDocument === undefined
+      ? []
+      : [
+          attachedDocumentNote(
+            options.attachedDocument.titles,
+            options.attachedDocument.intent,
+          ),
+        ]),
     ...(options.spoken === true && options.writingDocument !== true
       ? [SPOKEN_TURN_NOTE]
       : []),
@@ -2617,6 +2641,8 @@ export function createModelGatewayQAnswer(
      * about the document with no tool round.
      */
     let attachedDocuments: readonly AuthorisedFact[] = [];
+    /** The titles of those read this turn, for the turn note (23 Oct). */
+    let attachedTitles: readonly string[] = [];
     const attachmentRead = (async (): Promise<void> => {
       const ids = plan.screen?.attachedDocumentIds;
       if (ids === undefined || ids.length === 0) return;
@@ -2644,6 +2670,14 @@ export function createModelGatewayQAnswer(
             .catch(() => null),
         ),
       );
+      attachedTitles = reads.flatMap((outcome) => {
+        if (outcome?.result.ok !== true) return [];
+        const data: unknown = outcome.result.data;
+        if (typeof data !== "object" || data === null) return [];
+        const status: unknown = Reflect.get(data, "status");
+        const title: unknown = Reflect.get(data, "title");
+        return status === "READ" && typeof title === "string" ? [title] : [];
+      });
       attachedDocuments = attachedDocumentsWithin(
         reads.map((outcome) =>
           outcome?.result.ok === true
@@ -3450,6 +3484,7 @@ export function createModelGatewayQAnswer(
       onScreenDailyCall,
       onScreenDocument,
       attachedDocuments,
+      attachedTitles,
       onScreenDocumentCall,
       onScreenPage,
       onScreenDossier,
@@ -3800,6 +3835,7 @@ export function createModelGatewayQAnswer(
         onScreenDailyCall,
         onScreenDocument,
         attachedDocuments,
+        attachedTitles,
         onScreenDocumentCall,
         onScreenPage,
         onScreenDossier,
@@ -4288,6 +4324,16 @@ export function createModelGatewayQAnswer(
           ...(personality === null ? {} : { personality }),
           ...(language === null ? {} : { language }),
           ...(asker === null ? {} : { asker }),
+          // Lane 8 (owner, 23 Oct): a summary first unless they asked
+          // for a critique; read from their words by code.
+          ...(attachedTitles.length === 0
+            ? {}
+            : {
+                attachedDocument: {
+                  titles: attachedTitles,
+                  intent: attachedDocumentIntent(latest.content),
+                },
+              }),
         });
         // S3a (live 2026-10-15, #107): the named company read ahead of the
         // model was looked up again (company.search, company.get: two
