@@ -48,6 +48,13 @@ export {
   type ResearchProviderFailureClass,
 } from "./contracts.js";
 export {
+  createPublicPictureSearch,
+  type PublicImageHit,
+  type PublicImageSearchProvider,
+  type PublicPicture,
+  type PublicPictureSearch,
+} from "./application/public-pictures.js";
+export {
   isResearchProviderFailure,
   ResearchProviderFailure,
   type PublicProfileLookupProvider,

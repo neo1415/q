@@ -329,9 +329,12 @@ import {
   findingBlockOf,
   namesReadByRun,
   ownInvestorOrganisationIn,
+  PICTURE_WAIT_MS,
   pictureBlock,
+  publicPictureBlocks,
   withConversationFindings,
   type QPicturePort,
+  type QPublicPicturePort,
 } from "./result-blocks.js";
 
 export {
@@ -344,8 +347,10 @@ export {
   namesReadByRun,
   PICTURE_WAIT_MS,
   pictureBlock,
+  publicPictureBlocks,
   type QPictureBlock,
   type QPicturePort,
+  type QPublicPicturePort,
 } from "./result-blocks.js";
 export {
   createDiligenceDocumentSummariser,
@@ -1708,6 +1713,11 @@ export type ModelGatewayQAnswerDependencies = {
    * the port. Absent: answers go without pictures.
    */
   readonly pictures?: QPicturePort | undefined;
+  /**
+   * Owner 2026-10-23: pictures of the company or person a turn names, from
+   * public pages, found beside the turn's web search. Absent: none.
+   */
+  readonly publicPictures?: QPublicPicturePort | undefined;
   /**
    * RECOVERY-2026-10 (C's request): what came of Q's recent screen acts,
    * from the receipts the person's browser reported (C's `receiptFacts`:
@@ -4080,6 +4090,28 @@ export function createModelGatewayQAnswer(
               outcome.catch(() => undefined);
               return { call, outcome, claimed: false };
             })()
+          : null;
+      /**
+       * Owner 2026-10-23: when the turn's web search is about one named
+       * company or person, their pictures from public pages are looked for
+       * beside it, from the same name; they join the answer after its words.
+       */
+      const namedForPictures = (
+        earlyWeb?.call.arguments as
+          { readonly entityName?: unknown } | undefined
+      )?.entityName;
+      const webPictures =
+        dependencies.publicPictures !== undefined &&
+        typeof namedForPictures === "string"
+          ? dependencies.publicPictures
+              .find({
+                name: namedForPictures,
+                userText: latest.content,
+                earlierUserText:
+                  toolContext.conversation?.earlierUserText ?? [],
+                signal: request.signal,
+              })
+              .catch(() => [])
           : null;
       /** The early web search is still to be put in front of the model. */
       const earlyWebPending = (): boolean =>
@@ -7256,16 +7288,29 @@ export function createModelGatewayQAnswer(
         // L-13: a picture only when the analyst asked for one, searched
         // with words composed from the person's own (never sent as the
         // model wrote them), and bounded so it cannot hold the turn.
-        const picture = await pictureBlock({
-          result: analyst,
-          pictures: dependencies.pictures,
-          userText: toolContext.conversation?.latestUserText ?? "",
-          earlierUserText: toolContext.conversation?.earlierUserText ?? [],
-          withheld: namesReadByRun(companiesRead),
-          signal: request.signal,
-        });
+        const fromPages =
+          webPictures === null
+            ? []
+            : publicPictureBlocks(
+                (await settledWithin(webPictures, PICTURE_WAIT_MS)) ?? [],
+                new Date().toISOString(),
+              );
+        // A stock illustration only where no public picture of them was found.
+        const picture =
+          fromPages.length > 0
+            ? null
+            : await pictureBlock({
+                result: analyst,
+                pictures: dependencies.pictures,
+                userText: toolContext.conversation?.latestUserText ?? "",
+                earlierUserText:
+                  toolContext.conversation?.earlierUserText ?? [],
+                withheld: namesReadByRun(companiesRead),
+                signal: request.signal,
+              });
         const codeBlocks = [
           ...(builtCards === null ? [] : [builtCards]),
+          ...fromPages,
           ...(picture === null ? [] : [picture]),
         ];
         const analystBlocks =

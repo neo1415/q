@@ -3163,6 +3163,7 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "Proptech",
   "Public",
   "Public company profiles",
+  "Public image, not a verified identity",
   "Public sources, unverified",
   "Public, unverified",
   "Public: anyone with the link can see its declared profile, outside Capital Q. Not the same as visible on the network.",

@@ -109,7 +109,10 @@ import {
   INVESTOR_REVISABLE_STEPS,
 } from "@capital-q/investor-onboarding";
 import { createPexelsPhotos } from "./composition/stock-photos.js";
-import { createPexelsQPictures } from "./composition/pictures.js";
+import {
+  createPexelsQPictures,
+  createPublicQPictures,
+} from "./composition/pictures.js";
 import {
   createOwnPictureReader,
   createSupabaseObjectReader,
@@ -4121,6 +4124,12 @@ const qIntelligence = composeQIntelligence({
   // L-13: credited pictures for answers, from the deck-photo key.
   pictures: createPexelsQPictures(
     process.env.PEXELS_API_KEY ?? process.env.PEXELS_API,
+  ),
+  // Owner 2026-10-23: pictures of who a turn names, from the image results
+  // of the SERP key the web search uses.
+  publicPictures: createPublicQPictures(
+    process.env.SERPER_API_KEY ?? process.env.SERP_API_KEY,
+    logger,
   ),
   arrivalSnapshot: (actor) => arrivalSnapshots.forActor(actor),
   // RECOVERY (C's request): what came of Q's recent screen acts, from the

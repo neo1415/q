@@ -879,6 +879,51 @@ export type QPicturePort = {
   }) => Promise<QPictureBlock | null>;
 };
 
+/**
+ * Pictures of the company or person a turn names, from public pages (owner
+ * 2026-10-23), found by Capital Q's image search from the name the person
+ * said. The port composes the search through the egress policy; the blocks
+ * are built here, by code, and parsed by the contract before they leave.
+ */
+export type QPublicPicturePort = {
+  readonly find: (input: {
+    readonly name: string;
+    readonly userText: string;
+    readonly earlierUserText: readonly string[];
+    readonly signal?: AbortSignal | undefined;
+  }) => Promise<
+    readonly {
+      readonly imageUrl: string;
+      readonly pageUrl: string;
+      readonly domain: string;
+      readonly title: string;
+    }[]
+  >;
+};
+
+/** The pictures found, as PICTURE blocks credited to their pages. */
+export function publicPictureBlocks(
+  found: Awaited<ReturnType<QPublicPicturePort["find"]>>,
+  retrievedAt: string,
+): QPictureBlock[] {
+  const blocks: QPictureBlock[] = [];
+  for (const picture of found) {
+    const parsed = parseQResultBlocks([
+      {
+        kind: "PICTURE",
+        url: picture.imageUrl,
+        alt: picture.title.slice(0, 200),
+        credit: { name: picture.domain.slice(0, 120), url: picture.pageUrl },
+        source: "PUBLIC_WEB",
+        pageUrl: picture.pageUrl,
+        retrievedAt,
+      },
+    ]).blocks[0];
+    if (parsed?.kind === "PICTURE") blocks.push(parsed);
+  }
+  return blocks;
+}
+
 /** Every name a run read, for a picture search to withhold (L-13). */
 export function namesReadByRun(read: {
   readonly companyNames: ReadonlyMap<string, string>;
