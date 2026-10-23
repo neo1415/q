@@ -357,6 +357,16 @@ export function composeResearch(
           provider: createFallbackResearchProvider({
             providers: indexes,
             parallelSearch: true,
+            // Every index's outcome, each search and page read: a fan-out
+            // that failed everywhere names every provider that failed.
+            ...(logger === undefined
+              ? {}
+              : {
+                  observe: (call) =>
+                    call.outcome === "FAILED"
+                      ? logger.warn(call, "public research provider call")
+                      : logger.info(call, "public research provider call"),
+                }),
           }),
         }));
   const profiles =

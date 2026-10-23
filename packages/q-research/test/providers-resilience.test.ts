@@ -139,6 +139,82 @@ describe("a provider whose key is refused rests (production 2026-10-23)", () => 
   });
 });
 
+describe("every provider's outcome is observed (production 2026-10-23)", () => {
+  const failing = (
+    code: PublicWebResearchProvider["code"],
+    failureClass: "AUTHENTICATION" | "TIMEOUT" | "UNAVAILABLE",
+    status: number | null,
+  ) =>
+    scripted(code, () =>
+      Promise.reject(
+        new ResearchProviderFailure({
+          providerCode: code,
+          failureClass,
+          status,
+        }),
+      ),
+    );
+
+  it("names each failed index and reports the most telling failure, not the last", async () => {
+    const calls: {
+      provider: string;
+      outcome: string;
+      failureClass: string | null;
+    }[] = [];
+    const merged = createFallbackResearchProvider({
+      providers: [
+        failing("tavily", "TIMEOUT", null),
+        failing("serpapi", "AUTHENTICATION", 401),
+        failing("scrapingbee", "UNAVAILABLE", 500),
+      ],
+      parallelSearch: true,
+      observe: (call) => calls.push(call),
+    });
+    const failure = await merged.search(request, {}).catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ResearchProviderFailure);
+    expect((failure as ResearchProviderFailure).providerCode).toBe("serpapi");
+    expect(
+      calls.map((call) => [call.provider, call.outcome, call.failureClass]),
+    ).toEqual([
+      ["tavily", "FAILED", "TIMEOUT"],
+      ["serpapi", "FAILED", "AUTHENTICATION"],
+      ["scrapingbee", "FAILED", "UNAVAILABLE"],
+    ]);
+  });
+
+  it("says which index found something and which came back empty", async () => {
+    const calls: { provider: string; outcome: string; count: number }[] = [];
+    const merged = createFallbackResearchProvider({
+      providers: [
+        scripted("tavily", () => Promise.resolve({ hits: [], latencyMs: 1 })),
+        scripted("brave", () =>
+          Promise.resolve({
+            hits: [
+              {
+                url: "https://example.com/a",
+                title: "A",
+                snippet: "a",
+                publishedAt: null,
+                relevance: 1,
+              },
+            ],
+            latencyMs: 1,
+          }),
+        ),
+      ],
+      parallelSearch: true,
+      observe: (call) => calls.push(call),
+    });
+    await merged.search(request, {});
+    expect(
+      calls.map((call) => [call.provider, call.outcome, call.count]),
+    ).toEqual([
+      ["tavily", "EMPTY", 0],
+      ["brave", "FOUND", 1],
+    ]);
+  });
+});
+
 describe("a short memory for public reads", () => {
   it("reads the vendor once for the same query, and again when asked for a fresh read", async () => {
     let calls = 0;
