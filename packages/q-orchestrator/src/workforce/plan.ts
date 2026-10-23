@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  isWorkforceAnalysisRequest,
   WorkforceDocumentRequestSchema,
   type WorkforceDocumentRequest,
   type QAgentExecutor,
@@ -122,13 +123,43 @@ export type PlanBounds = {
    * (`goalSubjects`). Null or absent: a NAMED_COMPANY document is refused.
    */
   readonly namedCompanyId?: string | null | undefined;
+  /** Deep work's step budgets; default DEEP_WORK_STEP_BUDGETS_USD. */
+  readonly deepWork?: DeepWorkStepBudgets | undefined;
 };
+
+/**
+ * Owner 2026-10-23: deep work is budgeted for what it does. A RESEARCH
+ * step plans and runs a dozen focused searches and reads their pages; an
+ * ANALYSIS document is written, critiqued and revised until it passes. A
+ * tenth of a dollar each (the role's default) bought one keyword search
+ * and a generic brief. The job's own cap still bounds the whole plan.
+ */
+export type DeepWorkStepBudgets = {
+  readonly researchUsd: number;
+  readonly analysisUsd: number;
+};
+export const DEEP_WORK_STEP_BUDGETS_USD: DeepWorkStepBudgets = {
+  researchUsd: 0.6,
+  analysisUsd: 1.2,
+};
+
+/** What one step may spend: its role's, or deep work's for research and analysis. */
+export function stepBudgetUsd(
+  role: QAgentRole,
+  document: WorkforceDocumentRequest | undefined,
+  deepWork: DeepWorkStepBudgets = DEEP_WORK_STEP_BUDGETS_USD,
+): number {
+  if (role === "RESEARCH") return deepWork.researchUsd;
+  if (document !== undefined && isWorkforceAnalysisRequest(document))
+    return deepWork.analysisUsd;
+  return AGENT_REGISTRY[STORED_ROLE[role]].budgetUsd;
+}
 
 /** The planner's NAMED_COMPANY request, before code binds the company. */
 const PlannedNamedCompany = z
   .object({
     operation: z.literal("PREPARE"),
-    kind: z.enum(["MEMO", "ONE_PAGER", "INVESTMENT_BRIEF"]),
+    kind: z.enum(["MEMO", "ONE_PAGER", "INVESTMENT_BRIEF", "ANALYSIS"]),
     scope: z.literal("NAMED_COMPANY"),
   })
   .strict();
@@ -256,7 +287,11 @@ export function boundPlan(
       continue;
     }
     const stored = STORED_ROLE[role];
-    const budgetUsd = AGENT_REGISTRY[stored].budgetUsd;
+    const budgetUsd = stepBudgetUsd(
+      role,
+      document?.ok === true ? document.document : undefined,
+      bounds.deepWork,
+    );
     if (spent + budgetUsd > bounds.budgetUsd + 1e-9) {
       refuse("OVER_BUDGET");
       continue;

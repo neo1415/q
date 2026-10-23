@@ -19,6 +19,8 @@ import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
 
 import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
+import { workforceDeepResearch } from "./composition/workforce/deep-research.js";
+import { createWorkforceDelivery } from "./composition/workforce/delivery.js";
 import { createWorkforceDocuments } from "./composition/workforce/documents.js";
 import { createDemoRehearsalAccess } from "./composition/demo-rehearsal-access.js";
 import { createInvestorLink } from "./composition/investor-link.js";
@@ -193,6 +195,7 @@ import {
 } from "./composition/workforce/learning.js";
 import { createWorkforceModels } from "./composition/workforce/models.js";
 import {
+  createOwnWorkStarter,
   createWorkforceJobActions,
   createWorkforceJobBoard,
 } from "./composition/workforce/job-actions.js";
@@ -202,12 +205,12 @@ import {
 } from "./composition/workforce/jobs.js";
 import {
   withinMonthlyLimit,
+  workforceJobCapUsd,
   workforceMonthlyLimitUsd,
 } from "./composition/workforce/limit.js";
 import {
   createWorkforcePorts,
   workforceNotifier,
-  workforceResearch,
 } from "./composition/workforce/ports.js";
 import {
   createPostgresAgentWorkQueue,
@@ -1802,7 +1805,14 @@ const workforcePortsFor = createWorkforcePorts(
           ? {}
           : { qDelegationId: input.qDelegationId }),
       }),
-    research: workforceResearch(researchComposition.research),
+    // Owner 2026-10-23: a RESEARCH step researches like an analyst --
+    // model-planned focused questions side by side, pages read, sourced
+    // facts admitted by code -- not one keyword search.
+    research: workforceDeepResearch({
+      service: researchComposition.research,
+      models: workforceModels,
+      logger,
+    }),
     writeReply: async (input) =>
       (
         await workforceWriter.compose({
@@ -1855,6 +1865,32 @@ const workforceJobsFor = (actor: ActorContext) =>
 const workforceJobBoard = createWorkforceJobBoard({
   jobsFor: workforceJobsFor,
   withinLimit: workforceWithinLimit,
+  budgetUsd: workforceJobCapUsd(process.env),
+  // Owner 2026-10-23: research and a document for the person themselves
+  // starts at once on the durable queue -- no card. Outward work keeps its
+  // approval. The plan's agent-work entitlement is consumed as a card's is.
+  // (The queue, runner and entitlements are composed further down; these
+  // run only when a turn asks.)
+  startOwnWork: createOwnWorkStarter({
+    jobsFor: workforceJobsFor,
+    queue: () => agentWorkQueue,
+    kick: () => {
+      void agentWorkRunner.pass().catch((error: unknown) => {
+        logger.warn({ err: error }, "workforce job runner pass failed");
+      });
+    },
+    allowed: async (actor, idempotencyKey) =>
+      (
+        await entitlements.consume({
+          account: billingAccountOf(actor),
+          feature: FEATURE_DELEGATIONS,
+          idempotencyKey,
+          actorUserId: actor.userId,
+          surface: "Q_ACTION",
+        })
+      ).allowed,
+    logger,
+  }),
   // Q room R5: what already waits for them, and whether their calendar is
   // there, read as them when a job is asked for (composed further down).
   waiting: async (actor) =>
@@ -4563,6 +4599,7 @@ const workforceDocuments = createWorkforceDocuments({
   artifacts: qArtifacts.service,
   preparation: qArtifacts.preparation,
   critic: workforceModels.critique,
+  analyst: workforceModels,
   logger,
 });
 const workforceDiligence = createWorkforceDiligence({
@@ -4622,6 +4659,14 @@ const agentWorkRunner = createAgentWorkRunner({
         )[0]?.auth_user_id ?? null,
     })(owner.userId, organisationId),
   jobsFor: workforceJobsFor,
+  // Owner 2026-10-23: the finished document lands in the conversation.
+  deliver: createWorkforceDelivery({
+    sql: database.sql,
+    transactions: database.transactions,
+    runtime: repositories,
+    notify: workforceNotifier(database.sql),
+    logger,
+  }),
   logger,
 });
 setInterval(() => {

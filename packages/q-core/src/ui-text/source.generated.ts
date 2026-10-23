@@ -344,6 +344,8 @@ export const UI_TEXT_SOURCE: readonly string[] = [
   "An investor must understand the product in one line.",
   "An investor you’re talking to",
   "An investor's private notes",
+  "Analysis",
+  "Analysis for {name}",
   "Analyst (read-only)",
   "Angel",
   "Answer",

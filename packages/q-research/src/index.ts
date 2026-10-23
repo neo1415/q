@@ -71,6 +71,7 @@ export {
   type UrlSafetyVerdict,
 } from "./domain/url-safety.js";
 export {
+  RESEARCH_VOCABULARY,
   composeEgressQuery,
   containsAny,
   isConnective,
@@ -226,3 +227,30 @@ export {
   sourceTally,
   sourceWasRead,
 } from "./application/known-entities.js";
+
+// Deep research (owner 2026-10-23): planned questions side by side, and the
+// dossier's admission rules.
+export {
+  createDeepResearch,
+  DEEP_RESEARCH_BOUNDS,
+  mergeSources,
+  publicTermsOf,
+  type DeepResearch,
+  type DeepResearchCommand,
+  type DeepResearchLaneOutcome,
+  type DeepResearchQuestion,
+  type DeepResearchResult,
+  type DeepResearchSource,
+} from "./application/deep-research.js";
+export {
+  admitFacts,
+  DOSSIER_MAX_FACTS,
+  FACT_KINDS,
+  numbersIn,
+  numbersSupported,
+  type AdmittedFact,
+  type DossierSource,
+  type FactKind,
+  type FactRefusal,
+  type ProposedFact,
+} from "./domain/dossier.js";

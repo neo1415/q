@@ -252,6 +252,16 @@ export type QJobPort = {
          */
         readonly about: "SAME_PEOPLE" | "SAME_KIND";
       }
+    /**
+     * Owner 2026-10-23: the person's own deep work (research and a document
+     * for themselves) started at once, with no card: it is not an outward
+     * or consequential action. firstRead: Q's initial view, said meanwhile.
+     */
+    | {
+        readonly status: "STARTED";
+        readonly plan: QJobPlanView;
+        readonly firstRead: string | null;
+      }
     | { readonly status: "NOT_PLANNED" }
     | { readonly status: "LIMIT_REACHED" }
     /**
@@ -286,12 +296,15 @@ const ProposeQJobOutputSchema = z
   .object({
     status: z.enum([
       "PREPARED",
+      "STARTED",
       "ONE_PER_TURN",
       "NOT_PLANNED",
       "LIMIT_REACHED",
       "ALREADY_WAITING",
       "FAILED",
     ]),
+    /** STARTED: Q's first read of the question, from what it knows. */
+    firstRead: z.string().max(700).nullable().optional(),
     plan: z
       .object({
         summary: z.string(),
@@ -341,7 +354,7 @@ export function createQJobTools(
       owner: "q-tools",
       providerName: "propose_q_job",
       description:
-        "A one-off job of several steps for Q's team ('introduce me to Kestrel Heat and book a call', 'reply to everyone who wrote and set up calls'): the lead Q plans it into steps, each by a specialist or a helper with only its step's tools, as ONE card. Nothing happens until they approve that exact plan; the reviewer checks every message. Call it with their words; say the plan back in a sentence (its outcome), what is missing or not known (missing), then what will need them (needsYou); next is what should come after, for when they ask. ALREADY_WAITING: something already waits for them. SAME_PEOPLE: say what, like a colleague ('two drafts are waiting for Priya and Jonas'); SAME_KIND (they named nobody): say which jobs of this kind wait. Then ask whether to go ahead; call again with proceed true only if they say yes. For a goal that should keep running over time use propose_standing_instruction instead.",
+        "A one-off job of several steps for Q's team ('introduce me to Kestrel Heat and book a call', 'reply to everyone who wrote and set up calls'): the lead Q plans it into steps, each by a specialist or a helper with only its step's tools, as ONE card. Nothing happens until they approve that exact plan; the reviewer checks every message. Work only for themselves (research and a document they asked for, nothing sent to anyone) starts at once with no card: STARTED, say it is under way and when it will be ready, and give firstRead as your first view. Call it with their words; say the plan back in a sentence (its outcome), what is missing or not known (missing), then what will need them (needsYou); next is what should come after, for when they ask. ALREADY_WAITING: something already waits for them. SAME_PEOPLE: say what, like a colleague ('two drafts are waiting for Priya and Jonas'); SAME_KIND (they named nobody): say which jobs of this kind wait. Then ask whether to go ahead; call again with proceed true only if they say yes. For a goal that should keep running over time use propose_standing_instruction instead.",
       classification: "SIDE_EFFECT",
       riskClass: "LOW_RISK_INTERNAL",
       approval: "NONE",
@@ -392,8 +405,13 @@ export function createQJobTools(
         }
         return {
           status: prepared.status,
+          ...(prepared.status === "STARTED"
+            ? { firstRead: prepared.firstRead }
+            : {}),
           plan:
-            prepared.status === "PREPARED" || prepared.status === "ONE_PER_TURN"
+            prepared.status === "PREPARED" ||
+            prepared.status === "ONE_PER_TURN" ||
+            prepared.status === "STARTED"
               ? {
                   summary: prepared.plan.summary,
                   steps: prepared.plan.steps.map((step) => ({

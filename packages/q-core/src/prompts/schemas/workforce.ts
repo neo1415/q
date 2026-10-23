@@ -555,6 +555,46 @@ export const JobPlanResultV6Schema = JobPlanResultV5Schema.extend({
 }).strict();
 export type JobPlanResultV6 = z.infer<typeof JobPlanResultV6Schema>;
 
+/**
+ * v8 (owner 2026-10-23): open ANALYSIS documents (a growth plan, a market
+ * study, a strategy) beside the fixed kinds, and Q's first read -- a short
+ * initial view the person hears while the work runs. A NAMED_COMPANY
+ * analysis carries no company id: code binds it, as for a memo.
+ */
+export const JOB_PLAN_V8_SCHEMA_VERSION = 8;
+export const PlannedAnalysisDocumentSchema = z
+  .object({
+    operation: z.literal("PREPARE"),
+    kind: z.literal("ANALYSIS"),
+    scope: z.enum(["OWN_COMPANY", "GENERAL", "NAMED_COMPANY"]),
+  })
+  .strict();
+export const JobPlanResultV8Schema = JobPlanResultV6Schema.extend({
+  steps: z
+    .array(
+      JobPlanResultV6Schema.shape.steps.element
+        .extend({
+          document: z
+            .union([
+              WorkforceOwnDocumentRequestSchema,
+              PlannedNamedCompanyDocumentSchema,
+              WorkforceDocumentCritiqueRequestSchema,
+              PlannedAnalysisDocumentSchema,
+            ])
+            .optional(),
+        })
+        .strict(),
+    )
+    .max(12),
+  /**
+   * Q's first read of the question, from what it already knows, said while
+   * the work runs: two or three sentences, labelled as a first view, with
+   * no figures. Null when there is nothing useful to say yet.
+   */
+  firstRead: z.string().trim().min(1).max(700).nullable(),
+}).strict();
+export type JobPlanResultV8 = z.infer<typeof JobPlanResultV8Schema>;
+
 // SUBSTANCE_CRITIQUE (2026-10-12): a second specialist's critique of a
 // prepared document, against the evidence it was built from.
 export const SUBSTANCE_CRITIQUE_SCHEMA_NAME = "SubstanceCritiqueResult";

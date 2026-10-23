@@ -46,6 +46,21 @@ export type EgressInput = {
    * as the subject of the search. Default true.
    */
   readonly prependIdentity?: boolean | undefined;
+  /**
+   * Deep research (owner 2026-10-23): words read on public pages this run
+   * already surfaced (titles and excerpts of sources it searched). They are
+   * public by where they came from, so a follow-up query may name what
+   * those pages named (a competitor, a regulator) although the person did
+   * not. Figures among them are still never sent.
+   */
+  readonly publicTerms?: readonly string[] | undefined;
+  /**
+   * Deep research: the generic words of a research question ("statistics",
+   * "regulation", "pricing") may travel. They describe what kind of page is
+   * wanted and say nothing about anyone; on their own they never make a
+   * query informative.
+   */
+  readonly researchVocabulary?: boolean | undefined;
 };
 
 export type EgressOutcome =
@@ -143,9 +158,103 @@ const CONNECTIVES = new Set([
   "african",
 ]);
 
+/**
+ * The vocabulary of a market-research question: kinds of evidence and
+ * kinds of page, never a fact about a person or company. Used only when a
+ * caller asks for it (deep research), as an egress allowance -- it never
+ * decides what is researched; the planner's reading of the request does.
+ */
+export const RESEARCH_VOCABULARY: ReadonlySet<string> = new Set([
+  "size",
+  "sizing",
+  "share",
+  "growth",
+  "trend",
+  "trends",
+  "forecast",
+  "statistics",
+  "data",
+  "survey",
+  "report",
+  "study",
+  "analysis",
+  "industry",
+  "sector",
+  "segment",
+  "segments",
+  "demand",
+  "supply",
+  "access",
+  "households",
+  "household",
+  "population",
+  "urban",
+  "rural",
+  "informal",
+  "settlements",
+  "consumers",
+  "consumer",
+  "users",
+  "competitors",
+  "competition",
+  "competitive",
+  "landscape",
+  "alternatives",
+  "substitutes",
+  "players",
+  "operators",
+  "providers",
+  "startups",
+  "regulation",
+  "regulations",
+  "regulator",
+  "regulatory",
+  "policy",
+  "licensing",
+  "licence",
+  "license",
+  "tariff",
+  "tariffs",
+  "tax",
+  "government",
+  "pricing",
+  "price",
+  "prices",
+  "cost",
+  "costs",
+  "per",
+  "unit",
+  "economics",
+  "margin",
+  "margins",
+  "revenue",
+  "benchmark",
+  "benchmarks",
+  "business",
+  "model",
+  "models",
+  "investment",
+  "investors",
+  "raised",
+  "acquisition",
+  "expansion",
+  "case",
+  "impact",
+  "adoption",
+  "penetration",
+  "annual",
+  "monthly",
+  "daily",
+  "average",
+  "estimate",
+  "estimates",
+]);
+
 /** A figure or money-like token: "2.4m", "$700k", "3,000,000", "USD". */
 const FIGURE_LIKE =
   /^(?:[$£€]|usd|gbp|eur|ngn|kes|zar)?\d[\d.,]*(?:k|m|mn|bn|b|%)?$/i;
+
+const YEAR = /^20[0-3]\d$/u;
 
 /** A joining word ("the", "of"): never a search on its own. */
 export function isConnective(token: string): boolean {
@@ -173,7 +282,20 @@ function allowedSet(input: EgressInput): ReadonlySet<string> {
       allowed.add(token);
     }
   }
+  const years = input.researchVocabulary === true;
+  for (const token of publicTokens(input)) {
+    if (!FIGURE_LIKE.test(token) || (years && YEAR.test(token)))
+      allowed.add(token);
+  }
+  if (input.researchVocabulary === true) {
+    for (const token of RESEARCH_VOCABULARY) allowed.add(token);
+  }
   return allowed;
+}
+
+/** Words from public pages this run already read (deep research). */
+function publicTokens(input: EgressInput): readonly string[] {
+  return (input.publicTerms ?? []).flatMap((text) => tokenise(text));
 }
 
 /** Every word the person wrote this turn and in their earlier messages. */
@@ -291,7 +413,10 @@ export function composeEgressQuery(input: EgressInput): EgressOutcome {
     if (
       allowed.has(token) &&
       !identityTokens.has(token) &&
-      FIGURE_LIKE.test(token)
+      FIGURE_LIKE.test(token) &&
+      // A year dates a research question ("water access 2025"); it is
+      // never a private figure.
+      !(input.researchVocabulary === true && YEAR.test(token))
     ) {
       // A figure the person typed is still not something to search the web for.
       dropped += 1;
@@ -309,8 +434,12 @@ export function composeEgressQuery(input: EgressInput): EgressOutcome {
       tokenise(term).every((token) => survivors.includes(token)),
     );
   const userTokens = new Set(personTokens(input));
+  const pageTokens = new Set(publicTokens(input));
   const informative = survivors.filter(
-    (token) => userTokens.has(token) || identityTokens.has(token),
+    (token) =>
+      userTokens.has(token) ||
+      identityTokens.has(token) ||
+      (pageTokens.has(token) && !CONNECTIVES.has(token)),
   );
   let parts: string[];
   let fellBackToIdentity = false;

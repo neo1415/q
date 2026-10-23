@@ -1389,8 +1389,17 @@ export {
   JOB_PLAN_V5,
   JOB_PLAN_V6,
   JOB_PLAN_V7,
+  JOB_PLAN_V8,
   REPLY_READER_V1,
 } from "./prompts/tasks/workforce.v1.js";
+// Owner 2026-10-23: Q as an analyst doing deep work.
+export {
+  ANALYSIS_CRITIQUE_V1,
+  ANALYSIS_WRITE_V1,
+  RESEARCH_FACTS_V1,
+  RESEARCH_PLAN_V1,
+} from "./prompts/tasks/analyst.v1.js";
+export * from "./prompts/schemas/analyst.js";
 export {
   DRAFT_CHANNELS,
   DRAFT_INTEGRITY_RULES,
@@ -1410,6 +1419,10 @@ export {
   JOB_PLAN_V6_SCHEMA_VERSION,
   JobPlanResultV6Schema,
   type JobPlanResultV6,
+  JOB_PLAN_V8_SCHEMA_VERSION,
+  JobPlanResultV8Schema,
+  PlannedAnalysisDocumentSchema,
+  type JobPlanResultV8,
   JOB_PLAN_V5_UNTRUSTED,
   JobPlanResultV5Schema,
   JobPlanVariablesV5Schema,

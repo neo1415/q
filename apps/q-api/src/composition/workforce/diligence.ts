@@ -112,7 +112,7 @@ export function createWorkforceDiligence(dependencies: {
         conversationId,
         capability: "PREPARE_ACTION",
         message: {
-          text: `Questions for ${card.companyName}, prepared by Q's team for your approval.`.slice(
+          text: `Questions for ${card.companyName}, prepared by Q for your approval.`.slice(
             0,
             1_000,
           ),

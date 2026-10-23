@@ -22,6 +22,7 @@ import {
   type StepResult,
 } from "@capital-q/q-orchestrator";
 import {
+  isWorkforceAnalysisRequest,
   workforceCorrelationId,
   type QAgentRole,
   type WorkforceDocumentRequest,
@@ -29,6 +30,11 @@ import {
 } from "@capital-q/contracts";
 import { stanceDeclines } from "@capital-q/q-core";
 import { z } from "zod";
+
+import {
+  ResearchDossierSchema,
+  type ResearchDossier,
+} from "./deep-research.js";
 
 import type {
   WorkforceDiligenceInput,
@@ -84,6 +90,10 @@ export type WorkforceDocumentInput = {
     { readonly artifactId: string; readonly companyId: string } | undefined;
   /** Whom the work is for, as the critic addresses them. */
   readonly principalName?: string | undefined;
+  /** The job in the person's own words (an ANALYSIS is written to it). */
+  readonly personRequest?: string | undefined;
+  /** ANALYSIS: the research steps it waits on, their admitted facts. */
+  readonly research?: readonly ResearchDossier[] | undefined;
 };
 export type WorkforceDocumentResult =
   | {
@@ -93,8 +103,26 @@ export type WorkforceDocumentResult =
       readonly companyId?: string | undefined;
       /** A critique step's verdict. */
       readonly review?: WorkforceDocumentReview | undefined;
+      /** ANALYSIS: what Q says when it lands (conclusion, top three). */
+      readonly delivery?: WorkforceDocumentDelivery | undefined;
     }
   | { readonly status: "FAILED" | "UNAVAILABLE"; readonly message: string };
+
+/**
+ * Owner 2026-10-23: when deep work finishes, its document lands in the
+ * conversation with Q's summary of the conclusion and the top three
+ * recommendations (the document's own words, written by its author).
+ */
+export type WorkforceDocumentDelivery = {
+  readonly title: string;
+  readonly artifactType: string;
+  readonly summary: string;
+  readonly topRecommendations: readonly string[];
+  /** The second analyst's last verdict passed. */
+  readonly passed: boolean;
+  /** Reviewer findings still open when it was filed (none when passed). */
+  readonly openIssues: number;
+};
 
 export type WorkforceDocumentReview = {
   readonly material: boolean;
@@ -175,8 +203,10 @@ export type WorkforcePorts = {
           readonly runId: string;
           /** The job in the person's words: their request. */
           readonly request: string;
-          /** The step's goal: a proposed query, composed before egress. */
+          /** The step's goal: what must be learned (deep research plans its questions from it). */
           readonly query: string;
+          /** What the step may spend (deep research). */
+          readonly budgetUsd?: number | undefined;
         },
       ) => Promise<ResearchFound>)
     | undefined;
@@ -212,6 +242,8 @@ export type ResearchFound =
         readonly title: string | null;
         readonly domain: string;
       }[];
+      /** Deep research: admitted, sourced facts for the document after it. */
+      readonly dossier?: ResearchDossier | undefined;
     }
   | { readonly status: "UNAVAILABLE"; readonly message: string };
 
@@ -308,9 +340,19 @@ export function createWorkforceExecutors(dependencies: {
               };
             source = { artifactId, companyId };
           }
-          // Only the critic addresses the person by name.
+          // ANALYSIS: the dossiers of the research steps it waits on, as
+          // persisted (re-validated here: the job's stored results are a
+          // trust boundary).
+          const research = step.dependsOn.flatMap((key) => {
+            const parsed = ResearchDossierSchema.safeParse(
+              context.results.get(key)?.outputs?.["dossier"],
+            );
+            return parsed.success ? [parsed.data] : [];
+          });
+          // The critic, and the analyst writing for them, address the
+          // person by name.
           const principalName =
-            source === undefined
+            source === undefined && !isWorkforceAnalysisRequest(request)
               ? undefined
               : await ports.principalName(owner).catch(() => undefined);
           const polling = dependencies.documentPolling ?? {
@@ -332,6 +374,10 @@ export function createWorkforceExecutors(dependencies: {
               request,
               ...(source === undefined ? {} : { source }),
               ...(principalName === undefined ? {} : { principalName }),
+              ...(research.length === 0 ? {} : { research }),
+              ...(dependencies.goal === undefined
+                ? {}
+                : { personRequest: dependencies.goal.slice(0, 4_000) }),
               goal: step.goal,
               jobId: context.jobId,
               stepKey: step.key,
@@ -354,12 +400,18 @@ export function createWorkforceExecutors(dependencies: {
                 };
               return {
                 status: "DONE",
-                summary: documentStepSummary(result.review),
+                summary:
+                  result.delivery === undefined
+                    ? documentStepSummary(result.review)
+                    : analysisStepSummary(result.delivery),
                 outputs: {
                   artifactId: result.artifactId,
                   ...(result.companyId === undefined
                     ? {}
                     : { companyId: result.companyId }),
+                  ...(result.delivery === undefined
+                    ? {}
+                    : { delivery: result.delivery }),
                   ...(result.review === undefined
                     ? {}
                     : {
@@ -557,6 +609,7 @@ export function createWorkforceExecutors(dependencies: {
               runId: context.runId,
               request: (dependencies.goal ?? step.goal).slice(0, 2_000),
               query: step.goal.slice(0, 400),
+              budgetUsd: step.budgetUsd,
             })
             .catch(() => null);
           if (found === null || found.status === "UNAVAILABLE") {
@@ -570,15 +623,20 @@ export function createWorkforceExecutors(dependencies: {
           return {
             status: "DONE",
             summary:
-              found.sources.length === 0
-                ? "Found no public sources for this."
-                : `Found ${plural(found.sources.length, "public source", "public sources")}.`,
+              found.dossier !== undefined
+                ? `Read ${plural(found.dossier.sources.length, "public source", "public sources")} across ${plural(found.dossier.lanes.filter((lane) => lane.status === "OK").length, "line of enquiry", "lines of enquiry")}; kept ${plural(found.dossier.facts.length, "sourced fact", "sourced facts")}.`
+                : found.sources.length === 0
+                  ? "Found no public sources for this."
+                  : `Found ${plural(found.sources.length, "public source", "public sources")}.`,
             outputs: {
               note: {
                 query: found.query,
                 truthClass: "UNKNOWN",
                 sources: found.sources.slice(0, 12),
               },
+              ...(found.dossier === undefined
+                ? {}
+                : { dossier: found.dossier }),
             },
           };
         };
@@ -808,6 +866,15 @@ export function documentStepSummary(
     : `Reviewed the document, ${found} and revised it to version ${String(review.revisedToVersion)}.`;
 }
 
+/** The timeline's line for an ANALYSIS step, in plain words. */
+export function analysisStepSummary(
+  delivery: WorkforceDocumentDelivery,
+): string {
+  return delivery.passed
+    ? `Wrote "${delivery.title.slice(0, 120)}"; a second analyst reviewed it and it passed.`
+    : `Wrote "${delivery.title.slice(0, 120)}"; ${plural(delivery.openIssues, "reviewer point is", "reviewer points are")} still open and noted in it.`;
+}
+
 /** What the lead Q may plan with: the tools its specialists can carry out. */
 export const EXECUTABLE_JOB_TOOLS: readonly string[] = [
   "search_companies",
@@ -882,6 +949,8 @@ export type PlannedJob = {
   readonly reasoning?: WorkforceJobReasoning | undefined;
   /** Evidence references the planner gave that were not facts (dropped). */
   readonly droppedRefs?: number | undefined;
+  /** Owner 2026-10-23: Q's first read, said while the work runs. */
+  readonly firstRead?: string | null | undefined;
 };
 
 export function createWorkforceJobs(dependencies: {
@@ -1005,6 +1074,7 @@ export function createWorkforceJobs(dependencies: {
       cannot: planned.cannot,
       reasoning: grounded.reasoning,
       droppedRefs: droppedRefs + grounded.droppedRefs,
+      firstRead: planned.firstRead,
     };
   }
 

@@ -190,6 +190,11 @@ describe("registry", () => {
         "SUBSTANCE_CRITIQUE",
         "DILIGENCE_QUESTIONS",
         "DILIGENCE_QUESTIONS_SHORTEN",
+        // Owner 2026-10-23: Q as an analyst doing deep work.
+        "RESEARCH_PLAN",
+        "RESEARCH_FACTS",
+        "ANALYSIS_WRITE",
+        "ANALYSIS_CRITIQUE",
       ].sort(),
     );
     for (const id of PROMPT_IDS) {

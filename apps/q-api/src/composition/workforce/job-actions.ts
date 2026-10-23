@@ -123,6 +123,100 @@ export function nextLines(payload: WorkforceJobStartPayload): string[] {
   );
 }
 
+/**
+ * Owner 2026-10-23: tools whose effect stays with the person -- reading
+ * their own records and the public web, preparing a document for them.
+ * A plan made only of these is their own work, not an outward or
+ * consequential action: it starts at once, with no approval card. Any
+ * tool that reaches someone else, books, expresses interest or files a
+ * card keeps the plan on the card (Prepare -> Recommend -> Approve).
+ */
+export const OWN_ACCOUNT_TOOLS: ReadonlySet<string> = new Set([
+  "public_web.search",
+  "documents.own.prepare",
+  "search_companies",
+  "list_my_relationships",
+  "list_messages",
+  "list_schedule",
+  "find_meeting_times",
+]);
+
+/** Whether a plan is the person's own deep work (see OWN_ACCOUNT_TOOLS). */
+export function isOwnAccountWork(payload: WorkforceJobStartPayload): boolean {
+  return (
+    payload.steps.length > 0 &&
+    payload.steps.every(
+      (step) =>
+        step.tools.length > 0 &&
+        step.tools.every((tool) => OWN_ACCOUNT_TOOLS.has(tool)),
+    ) &&
+    payload.permitted.every((tool) => OWN_ACCOUNT_TOOLS.has(tool))
+  );
+}
+
+export type OwnWorkStart =
+  | { readonly outcome: "STARTED"; readonly jobId: string }
+  | { readonly outcome: "NOT_ALLOWED" };
+
+/**
+ * Starts the person's own deep work as durable, leased work -- the same
+ * queue and runner an approved job uses -- without a card. The source is
+ * the run that asked, so asking again in that run never files a second job.
+ */
+export function createOwnWorkStarter(dependencies: {
+  readonly jobsFor: (actor: ActorContext) => WorkforceJobs;
+  readonly queue: () => Pick<AgentWorkQueue, "enqueue">;
+  readonly kick?: (() => void) | undefined;
+  /** The plan's entitlement for agent work (consumed once per run). */
+  readonly allowed?:
+    ((actor: ActorContext, idempotencyKey: string) => Promise<boolean>)
+    | undefined;
+  readonly logger?: Logger | undefined;
+}) {
+  return async (
+    actor: ActorContext,
+    runId: string,
+    payload: WorkforceJobStartPayload,
+  ): Promise<OwnWorkStart | null> => {
+    if (
+      actor.actorType !== "HUMAN" ||
+      payload.ownerUserId !== actor.userId ||
+      !isOwnAccountWork(payload)
+    )
+      return null;
+    if (
+      dependencies.allowed !== undefined &&
+      !(await dependencies.allowed(
+        actor,
+        `${WORKFORCE_JOB_START}:own:${runId}`,
+      ))
+    )
+      return { outcome: "NOT_ALLOWED" };
+    const owner: Owner = { tenantId: actor.tenantId, userId: actor.userId };
+    const filed = await dependencies.jobsFor(actor).file(owner, {
+      goal: payload.goal,
+      budgetUsd: Number(payload.budgetUsd),
+      source: { kind: "JOB", id: runId },
+    });
+    await dependencies.queue().enqueue(owner, {
+      jobId: filed.jobId,
+      plan: payload,
+      trace: {
+        // The runner files the job under this source again: the same job.
+        actionId: runId,
+        runId,
+        organisationId: actor.organisationId ?? undefined,
+      },
+    });
+    dependencies.kick?.();
+    dependencies.logger?.info(
+      { jobId: filed.jobId, qRunId: runId, steps: payload.steps.length },
+      "own-account work started without a card",
+    );
+    return { outcome: "STARTED", jobId: filed.jobId };
+  };
+}
+
 export function planView(
   payload: WorkforceJobStartPayload,
   calendarConnected: boolean | null = null,
@@ -392,12 +486,12 @@ export function createWorkforceJobActions(dependencies: {
       targets: (payload): readonly QSubjectRef[] => [
         { kind: "USER", userId: payload.ownerUserId },
       ],
+      // One Q (CLAUDE.md): the card never names an internal team or agent.
       describe: (payload) => ({
-        summary: cardSummary(`Q's team: ${payload.summary}`),
+        summary: cardSummary(payload.summary),
         preview: preview(payload),
       }),
-      confirm: () =>
-        "On it. You can follow each step under Q's team on your Work page.",
+      confirm: () => "On it. You can follow each step on your Work page.",
       authorize: (payload, actor) =>
         Promise.resolve(
           actor.actorType !== "HUMAN"
@@ -470,6 +564,14 @@ export function createWorkforceJobBoard(dependencies: {
   /** R5: whether their own Google Calendar is connected (stored state only). */
   readonly calendarConnected?:
     ((actor: ActorContext) => Promise<boolean>) | undefined;
+  /** Owner 2026-10-23: own-account work starts at once (createOwnWorkStarter). */
+  readonly startOwnWork?:
+    | ((
+        actor: ActorContext,
+        runId: string,
+        payload: WorkforceJobStartPayload,
+      ) => Promise<OwnWorkStart | null>)
+    | undefined;
 }): { readonly port: QJobPort; readonly proposer: QActionProposer } {
   const now = dependencies.now ?? (() => Date.now());
   const budget = dependencies.budgetUsd ?? DEFAULT_JOB_BUDGET_USD;
@@ -480,6 +582,8 @@ export function createWorkforceJobBoard(dependencies: {
       readonly userId: string;
       readonly payload: WorkforceJobStartPayload;
       readonly at: number;
+      /** Started without a card: nothing for the proposer to file. */
+      readonly started?: boolean | undefined;
     }
   >();
   return {
@@ -491,7 +595,13 @@ export function createWorkforceJobBoard(dependencies: {
         }
         const existing = prepared.get(runId);
         if (existing !== undefined) {
-          return { status: "ONE_PER_TURN", plan: planView(existing.payload) };
+          return existing.started === true
+            ? {
+                status: "STARTED",
+                plan: planView(existing.payload),
+                firstRead: null,
+              }
+            : { status: "ONE_PER_TURN", plan: planView(existing.payload) };
         }
         // R5: like a colleague, look at what is already waiting first.
         const waitingNow =
@@ -594,7 +704,7 @@ export function createWorkforceJobBoard(dependencies: {
         const parsed = WorkforceJobStartPayloadSchema.safeParse({
           ownerUserId: actor.userId,
           goal: goal.slice(0, 2_000),
-          summary: planned.summary.slice(0, 400) || "A job for Q's team",
+          summary: planned.summary.slice(0, 400) || "Work for you",
           steps,
           permitted: [...new Set(steps.flatMap((step) => step.tools))].slice(
             0,
@@ -607,6 +717,33 @@ export function createWorkforceJobBoard(dependencies: {
             : { reasoning: planned.reasoning }),
         });
         if (!parsed.success) return { status: "NOT_PLANNED" };
+        // Owner 2026-10-23: research and a document for themselves is not
+        // an outward or consequential action -- it starts now, no card.
+        if (
+          dependencies.startOwnWork !== undefined &&
+          isOwnAccountWork(parsed.data)
+        ) {
+          const started = await dependencies
+            .startOwnWork(actor, runId, parsed.data)
+            .catch(() => null);
+          if (started?.outcome === "NOT_ALLOWED")
+            return { status: "LIMIT_REACHED" };
+          if (started?.outcome === "STARTED") {
+            prepared.set(runId, {
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              payload: parsed.data,
+              at: now(),
+              started: true,
+            });
+            return {
+              status: "STARTED",
+              plan: planView(parsed.data),
+              firstRead: planned.firstRead ?? null,
+            };
+          }
+          // Not started (a store failed): the card is still a way to do it.
+        }
         prepared.set(runId, {
           tenantId: actor.tenantId,
           userId: actor.userId,
@@ -626,7 +763,8 @@ export function createWorkforceJobBoard(dependencies: {
     proposer: {
       propose: (context) => {
         const entry = prepared.get(context.runId);
-        if (entry === undefined) return Promise.resolve(null);
+        if (entry === undefined || entry.started === true)
+          return Promise.resolve(null);
         prepared.delete(context.runId);
         if (
           entry.tenantId !== context.actor.tenantId ||

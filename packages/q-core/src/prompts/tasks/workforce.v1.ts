@@ -31,6 +31,9 @@ import {
   JobPlanResultV6Schema,
   JOB_PLAN_V6_SCHEMA_VERSION,
   type JobPlanResultV6,
+  JobPlanResultV8Schema,
+  JOB_PLAN_V8_SCHEMA_VERSION,
+  type JobPlanResultV8,
   JobPlanVariablesV5Schema,
   type JobPlanResultV5,
   type JobPlanVariablesV5,
@@ -622,7 +625,7 @@ export const JOB_PLAN_V7: PromptDefinition<
 > = {
   ...JOB_PLAN_V6,
   version: 7,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "A relationship decision stated with the job is recorded only as the person's first next action (tool relationship.outcome.change), never a step; prerequisites are what the outcome depends on that the plan does not produce, never a step's output, and never MET from a pending move (live 2026-10-16).",
   effectiveFrom: "2026-10-16",
@@ -634,6 +637,45 @@ export const JOB_PLAN_V7: PromptDefinition<
     .replace(
       "- Contradictions are kept,",
       "- When the job states a decision about one of their relationships (moving it into diligence, passing, pausing, investing), recording it is their call: make it the first next action with tool relationship.outcome.change, saying what would be recorded. Never plan it as a step, and plan the work they asked for as usual.\n- Contradictions are kept,",
+    ),
+};
+
+/**
+ * v8 (owner 2026-10-23, production 17:47 UTC): asked for "a full growth
+ * plan for Maji Loop ... proper market research ... a document I can
+ * share", the lead planned one search with a keyword string and an
+ * investment brief. Now: RESEARCH is given what must be learned and plans
+ * its own focused searches; an open ANALYSIS document fits work no fixed
+ * kind does; and the lead writes Q's first read for the person.
+ */
+export const JOB_PLAN_V8: PromptDefinition<
+  JobPlanVariablesV5,
+  JobPlanResultV8
+> = {
+  ...JOB_PLAN_V7,
+  version: 8,
+  status: "ACTIVE",
+  changeDescription:
+    "Owner 2026-10-23: open ANALYSIS documents (growth plans, market studies, strategy) with scope OWN_COMPANY, GENERAL or NAMED_COMPANY; a RESEARCH step's goal says what must be learned (it plans its own focused searches); the lead writes a short first read for the person.",
+  effectiveFrom: "2026-10-23",
+  output: {
+    kind: "STRUCTURED",
+    schemaName: JOB_PLAN_SCHEMA_NAME,
+    schemaVersion: JOB_PLAN_V8_SCHEMA_VERSION,
+    schema: JobPlanResultV8Schema,
+  },
+  template: JOB_PLAN_V7.template
+    .replace(
+      "- To have a second specialist critique a prepared document",
+      [
+        "- For analysis or strategy work no fixed kind fits (a growth plan, a market study, a go-to-market or expansion plan, a competitive analysis, a strategy recommendation), plan a DOCUMENTS step with document operation PREPARE, kind ANALYSIS and scope OWN_COMPANY (about the person's own company), NAMED_COMPANY (about the one company the job names) or GENERAL (a market or question, no company). It chooses its own sections, writes every figure with its basis, and has a second analyst critique it and revises it until it passes: never add a CRITIQUE_AND_REVISE step after an ANALYSIS step.",
+        "- When the work needs evidence from outside Capital Q (a market, competitors, regulation, prices, news), plan one RESEARCH step before the document and list it in the document step's dependsOn. Its goal says in plain words what must be learned (for example \"the size and growth of the market for water kiosks in Kenya, who competes and at what price, the alternatives households use, the regulation and the unit economics\"), never a search query: RESEARCH plans its own focused searches and reads the best pages.",
+        "- To have a second specialist critique a prepared document",
+      ].join("\n"),
+    )
+    .replace(
+      "6. Next actions:",
+      "6. First read: firstRead is what you would tell the person straight away, from what you already know, while the work runs: two or three plain sentences, clearly a first view to be tested by the research, with no figures and nothing about their records that the situation does not show. Null when there is nothing useful to say yet.\n7. Next actions:",
     ),
 };
 

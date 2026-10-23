@@ -2,9 +2,12 @@ import type { Logger } from "@capital-q/observability";
 import { createHash } from "node:crypto";
 
 import {
+  isWorkforceAnalysisRequest,
   QRunIdSchema,
+  WORKFORCE_ANALYSIS_KIND,
   type QArtifactSummary,
   type QSubjectRef,
+  type WorkforceAnalysisRequest,
 } from "@capital-q/contracts";
 import { createCorrelationId } from "@capital-q/observability";
 import type { ArtifactService } from "@capital-q/q-artifacts";
@@ -22,6 +25,14 @@ import type {
   WorkforceDocumentInput,
   WorkforceDocumentResult,
 } from "./jobs.js";
+import {
+  analysisContent,
+  mergeDossiers,
+  researchText,
+  sourcesText,
+  writeAnalysisWithReview,
+} from "./analysis.js";
+import { createSpend } from "./deep-research.js";
 import type { WorkforceModels } from "./models.js";
 
 /** The marker a reviewer's revision carries, so a retry never revises twice. */
@@ -77,7 +88,187 @@ export function createWorkforceDocuments(dependencies: {
    * which error stopped it (class and message only, never the content).
    */
   readonly logger?: Logger | undefined;
+  /** Owner 2026-10-23: the analyst and its reviewer (ANALYSIS documents). */
+  readonly analyst?:
+    | Pick<WorkforceModels, "writeAnalysis" | "critiqueAnalysis">
+    | undefined;
+  readonly now?: (() => number) | undefined;
 }) {
+  /**
+   * An ANALYSIS document: the company's own record read as the person
+   * (none for GENERAL), the research steps' admitted facts, written and
+   * reviewed until it passes, then filed as the person's organisation's
+   * own document. Founder-private facts reach it only when the person may
+   * read them -- their own company -- and it is private to them.
+   */
+  async function prepareAnalysis(
+    actor: ActorContext,
+    input: WorkforceDocumentInput,
+    request: WorkforceAnalysisRequest,
+  ): Promise<WorkforceDocumentResult> {
+    const unavailable = (): WorkforceDocumentResult => ({
+      status: "UNAVAILABLE",
+      message: "This analysis cannot be prepared with the current authority.",
+    });
+    const analyst = dependencies.analyst;
+    if (analyst === undefined)
+      return { status: "FAILED", message: "No analyst is available here." };
+    const companyId =
+      request.scope === "OWN_COMPANY"
+        ? ((await dependencies.ownCompany(actor))?.companyId ?? null)
+        : request.scope === "NAMED_COMPANY"
+          ? request.companyId
+          : null;
+    if (request.scope !== "GENERAL" && companyId === null) return unavailable();
+    const subject: Extract<QSubjectRef, { kind: "COMPANY" }> | null =
+      companyId === null ? null : { kind: "COMPANY", companyId };
+    const runId = QRunIdSchema.parse(input.qRunId);
+    const correlationId = createCorrelationId();
+    const authorise = async (who: ActorContext) =>
+      dependencies.firewall.plan({
+        actor: who,
+        runId,
+        correlationId,
+        capability: "ANSWER",
+        subjects: subject === null ? [] : [subject],
+      });
+    const decision = await authorise(actor);
+    if (decision.outcome !== "AUTHORISED") return unavailable();
+    // The company's own record, as the person may read it (the firewall
+    // filtered it before any model sees it).
+    let company = "No company record: this analysis is about a market or question, not one company.";
+    let companyName: string | null = null;
+    if (subject !== null) {
+      if (!(await input.canContinue())) return unavailable();
+      const read = await dependencies.investigate(
+        {
+          company: subject,
+          question: input.goal,
+          preparationMode: "EVIDENCE_ONLY",
+          publicResearch: false,
+        },
+        {
+          actor,
+          runId,
+          correlationId,
+          capability: "ANSWER",
+          plan: decision.plan,
+        },
+      );
+      if (read.blocked !== null || read.companyId !== companyId)
+        return unavailable();
+      companyName = read.companyName ?? null;
+      const lines = [
+        ...(read.companyName == null ? [] : [`Company: ${read.companyName}`]),
+        ...(read.canonicalDescription == null
+          ? []
+          : [`Its own description: ${read.canonicalDescription}`]),
+        ...read.findings.map(
+          (finding) =>
+            `- (${finding.truthClass}, ${finding.evidenceStatus}) ${finding.statement}`,
+        ),
+      ];
+      company =
+        lines.length === 0
+          ? "The company's record holds nothing yet; say what is not known."
+          : lines.join("\n");
+    }
+    const merged = mergeDossiers(input.research ?? []);
+    const spend = createSpend(input.budgetUsd);
+    const today = new Date((dependencies.now ?? Date.now)())
+      .toISOString()
+      .slice(0, 10);
+    const written = await writeAnalysisWithReview({
+      models: analyst,
+      who: { tenantId: actor.tenantId, userId: actor.userId },
+      trace: { jobId: input.jobId, runId: input.runId },
+      spend,
+      canContinue: input.canContinue,
+      inputs: {
+        principalName: input.principalName ?? "the person",
+        request: input.personRequest ?? input.goal,
+        purpose: input.goal,
+        today,
+        company,
+        research: researchText(merged.facts),
+        sources: sourcesText(merged.sources),
+        sourceIndices: new Set(merged.sources.map((source) => source.index)),
+      },
+    });
+    if (written === null)
+      return {
+        status: "FAILED",
+        message: "The analysis could not be written; nothing was filed.",
+      };
+    if (!(await input.canContinue())) return unavailable();
+    const content = analysisContent({
+      draft: written.draft,
+      review: written.review,
+      sources: merged.sources,
+      facts: merged.facts,
+      seed: `${input.jobId}:${input.stepKey}`,
+    });
+    // Filed under a fresh decision, as the person now.
+    const refreshed = await dependencies.freshActor(actor);
+    if (
+      refreshed === null ||
+      refreshed.userId !== actor.userId ||
+      refreshed.tenantId !== actor.tenantId ||
+      refreshed.organisationId !== actor.organisationId
+    )
+      return unavailable();
+    const fresh = await authorise(refreshed);
+    if (fresh.outcome !== "AUTHORISED") return unavailable();
+    const filed = await dependencies.preparation.port.prepare({
+      actorContext: refreshed,
+      permittedContextPlan: fresh.plan,
+      qRunId: runId,
+      ...(subject === null ? {} : { subject }),
+      artifactType: WORKFORCE_ANALYSIS_KIND,
+      content: {
+        title: written.draft.title,
+        summary: written.draft.summary,
+        content,
+      },
+    });
+    dependencies.logger?.info(
+      {
+        jobId: input.jobId,
+        stepKey: input.stepKey,
+        drafts: written.review.drafts,
+        passed: written.review.passes,
+        issuesFound: written.review.found.length,
+        issuesOpen: written.review.open.length,
+        facts: merged.facts.length,
+        spentUsd: Number(spend.spent().toFixed(4)),
+        named: companyName !== null,
+      },
+      "workforce analysis filed",
+    );
+    return {
+      status: "READY",
+      artifactId: filed.artifactId,
+      ...(companyId === null ? {} : { companyId }),
+      review: {
+        material: written.review.found.length > 0,
+        issues: written.review.found.map((issue) => ({
+          kind: issue.kind,
+          section: issue.section,
+          problem: issue.problem,
+        })),
+        revisedToVersion: null,
+      },
+      delivery: {
+        title: written.draft.title,
+        artifactType: WORKFORCE_ANALYSIS_KIND,
+        summary: written.draft.summary,
+        topRecommendations: written.draft.topRecommendations.slice(0, 3),
+        passed: written.review.passes,
+        openIssues: written.review.open.length,
+      },
+    };
+  }
+
   /**
    * The second specialist. It reads the version the person may read now
    * (re-authorised), against the findings the document was built from,
@@ -237,6 +428,9 @@ export function createWorkforceDocuments(dependencies: {
         return unavailable();
       if (request.operation === "CRITIQUE_AND_REVISE") {
         return await critiqueAndRevise(actor, input);
+      }
+      if (isWorkforceAnalysisRequest(request)) {
+        return await prepareAnalysis(actor, input, request);
       }
       if (dependencies.preparation.pipeline?.mode !== "JOB")
         return unavailable();

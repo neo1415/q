@@ -104,7 +104,7 @@ export const AGENT_REGISTRY: Readonly<Record<AgentRole, AgentDefinition>> = {
   DOCUMENTS: {
     role: "DOCUMENTS",
     title: "Documents",
-    does: "Prepares documents from the evidence you may see: your own company's deck, one-pager or memo, or an investment memo on a company the job names, and has a second specialist critique and revise one. Sharing stays yours.",
+    does: "Prepares documents from the evidence you may see: your own company's deck, one-pager or memo; an investment memo on a company the job names; or an open analysis (a growth plan, a market study, a strategy) written from a research step's sourced facts, critiqued and revised until it passes. A second specialist can critique and revise a memo. Sharing stays yours.",
     tools: [
       "list_my_documents",
       "list_uploaded_documents",
@@ -116,7 +116,7 @@ export const AGENT_REGISTRY: Readonly<Record<AgentRole, AgentDefinition>> = {
   RESEARCH: {
     role: "RESEARCH",
     title: "Research",
-    does: "Researches companies and people on Capital Q and the public web, with sources.",
+    does: "Researches the public web like an analyst: plans focused searches for what the job must learn (market size, demand, competitors, alternatives, regulation, prices, news), reads the best pages and keeps dated facts with their sources.",
     tools: ["public_web.search"],
     budgetUsd: 0.1,
   },

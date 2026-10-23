@@ -21,9 +21,12 @@ export {
   type ExecutorAvailability,
 } from "./executors.js";
 export {
+  DEEP_WORK_STEP_BUDGETS_USD,
   MAX_JOB_STEPS,
   STEP_REFUSALS,
   boundPlan,
+  stepBudgetUsd,
+  type DeepWorkStepBudgets,
   planIsValid,
   type BoundStep,
   type PlanBounds,
