@@ -825,6 +825,17 @@ export type SpecialistQAnswerDependencies = {
   readonly counterpartNames?:
     ((request: QAnswerRequest) => Promise<readonly string[]>) | undefined;
   /**
+   * Coordinator 23 Oct 2026: a move to their pipeline says what is in it
+   * first (pipeline-summary.ts), from their own relationships as their side
+   * may see them. Null or absent: the move is said alone.
+   */
+  readonly destinationSummary?:
+    | ((
+        request: QAnswerRequest,
+        destination: QNavigateDestination,
+      ) => Promise<string | null>)
+    | undefined;
+  /**
    * One app action's inputs from the person's words, against the tool's own
    * input schema (APP_ACTION_ARGUMENTS), for a reading that named the
    * action and gave no arguments. Null: their words don't give them.
@@ -2006,11 +2017,18 @@ export function createSpecialistQAnswer(
         { qRunId: request.runId, destination },
         "q is taking the person to a screen",
       );
+      const blocks: QResultBlock[] = [
+        { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } },
+      ];
       return recordAnswer(
         request,
         conversationId,
-        naturalPlaceLine(DESTINATION_LINES[destination], askedIn(history)),
-        [{ kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } }],
+        await withDestinationSummary(
+          request,
+          naturalPlaceLine(DESTINATION_LINES[destination], askedIn(history)),
+          blocks,
+        ),
+        blocks,
       );
     }
     if (
@@ -2111,6 +2129,27 @@ export function createSpecialistQAnswer(
    * code from the person's own words (page-request.ts). Null when the
    * words are not such a request, or name a screen this run cannot open.
    */
+  /** One line of what is there, before the move, when Q has it. */
+  const withDestinationSummary = async (
+    request: QAnswerRequest,
+    said: string,
+    blocks: readonly QResultBlock[],
+  ): Promise<string> => {
+    const moved = blocks.find(
+      (block) => block.kind === "UI_INTENT" && block.intent.kind === "NAVIGATE",
+    );
+    const destination =
+      moved?.kind === "UI_INTENT" && moved.intent.kind === "NAVIGATE"
+        ? moved.intent.destination
+        : null;
+    if (destination === null || dependencies.destinationSummary === undefined)
+      return said;
+    const summary = await dependencies
+      .destinationSummary(request, destination)
+      .catch(() => null);
+    return summary === null ? said : `${summary} ${said}`;
+  };
+
   const pageAnswer = (
     text: string,
     history: readonly QConversationMessage[],
@@ -3680,7 +3719,12 @@ export function createSpecialistQAnswer(
         { qRunId: request.runId, page: paged.log },
         "q opened a page by name",
       );
-      return recordAnswer(request, conversationId, paged.said, paged.blocks);
+      return recordAnswer(
+        request,
+        conversationId,
+        await withDestinationSummary(request, paged.said, paged.blocks),
+        paged.blocks,
+      );
     }
     saidInRun.set(request.runId, latest.content);
     while (saidInRun.size > PREREADS_MAX) {

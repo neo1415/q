@@ -457,6 +457,7 @@ import {
 import {
   createFitQViewer,
   createRecommendationNarrator,
+  pipelineSummaryLine,
 } from "@capital-q/q-specialists";
 import {
   actorPrincipal,
@@ -4302,6 +4303,19 @@ const qIntelligence = composeQIntelligence({
     ownRelationships: errandRelationships.ownRelationships,
     logger,
   }),
+  // Coordinator 23 Oct 2026: "show me my pipeline" says what is in it, in
+  // one line from their own relationships, as it opens it.
+  destinationSummary: async (request, destination) => {
+    if (destination !== "CRM_PIPELINE" && destination !== "RELATIONSHIPS") {
+      return null;
+    }
+    const own = await errandRelationships
+      .ownRelationships?.(request.actor)
+      .catch(() => null);
+    return own === null || own === undefined
+      ? null
+      : pipelineSummaryLine(own.side, own.items);
+  },
   // W4: a researched entity reachable by name (prepared seed or their own
   // research): "take me to Shadi Qishta" shows its identity card.
   knownEntities: preparedEntityMatcher(preparedEntities),
