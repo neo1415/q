@@ -5,10 +5,12 @@ import type { DatabaseExecutor } from "@capital-q/database";
  * rates, as dated reference data for ESTIMATE cross-currency cheque
  * comparisons ("approximately, at the ECB rate of 23 Oct 2026").
  *
- * Fetched once a day by a worker through the provider adapter below and
- * stored (recommendation.fx_reference_rates); no request ever calls the
- * provider. Rates are exact decimal strings, units of quote currency per
- * one euro, as published. A conversion is always an estimate: never
+ * Fetched by a worker through the provider adapters and stored
+ * (recommendation.fx_reference_rates). Owner 23 Oct 2026, later: "if you
+ * don't know something, go to the internet and find it" -- a reader that
+ * finds no current stored set fetches one there and then (fx/live.ts) and
+ * stores it, so a cheque comparison never stops at "no rate". Rates are
+ * decimal strings, units of quote currency per one euro, as published. A conversion is always an estimate: never
  * evidence, never verified, never used where both sides share a currency.
  */
 
@@ -18,9 +20,20 @@ export const ECB_SOURCE_VERSION = "eurofxref-daily.v1" as const;
 export const ECB_DAILY_URL =
   "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
 
+/**
+ * The public market rate feed (exchangerate-api.com's open access, base
+ * EUR, updated daily): the fallback for currencies the ECB does not
+ * publish (NGN, KES, GHS, …) and when the ECB file cannot be reached.
+ */
+export const MARKET_SOURCE = "EXCHANGERATE_API_OPEN" as const;
+export const MARKET_SOURCE_VERSION = "open-er-api-latest.v1" as const;
+export const MARKET_LATEST_URL = "https://open.er-api.com/v6/latest/EUR";
+
+export type FxRateSource = typeof ECB_SOURCE | typeof MARKET_SOURCE;
+
 export type FxReferenceRates = {
-  readonly source: typeof ECB_SOURCE;
-  /** ISO date (YYYY-MM-DD) the ECB set the rates for. */
+  readonly source: FxRateSource;
+  /** ISO date (YYYY-MM-DD) the publisher set the rates for. */
   readonly rateDate: string;
   /** Units of quote currency per one euro, exact decimal strings; EUR is implied 1. */
   readonly perEuro: ReadonlyMap<string, string>;
@@ -116,8 +129,8 @@ export function estimateInCurrency(
 // ---------------------------------------------------------------------------
 
 export type FxReferenceRateStore = {
-  /** The most recent stored set from the ECB, or null when none is stored. */
-  readonly latest: () => Promise<FxReferenceRates | null>;
+  /** The most recent stored set from one source (the ECB by default), or null. */
+  readonly latest: (source?: FxRateSource) => Promise<FxReferenceRates | null>;
   /** Append a published set; a set already stored for its date is a no-op. */
   readonly record: (rates: FxReferenceRates) => Promise<number>;
 };
@@ -127,21 +140,21 @@ export function createPostgresFxReferenceRates(dependencies: {
 }): FxReferenceRateStore {
   const { sql } = dependencies;
   return {
-    latest: async () => {
+    latest: async (source = ECB_SOURCE) => {
       const rows = await sql<
         { rate_date: string; quote_currency: string; rate: string }[]
       >`
         select to_char(rate_date, 'YYYY-MM-DD') as rate_date,
                quote_currency, rate::text as rate
           from recommendation.fx_reference_rates
-         where source = ${ECB_SOURCE}
+         where source = ${source}
            and rate_date = (select max(rate_date)
                               from recommendation.fx_reference_rates
-                             where source = ${ECB_SOURCE})`;
+                             where source = ${source})`;
       const first = rows[0];
       if (first === undefined) return null;
       return {
-        source: ECB_SOURCE,
+        source,
         rateDate: first.rate_date,
         perEuro: new Map(rows.map((row) => [row.quote_currency, row.rate])),
       };
@@ -152,7 +165,9 @@ export function createPostgresFxReferenceRates(dependencies: {
       const inserted = await sql<{ id: string }[]>`
         insert into recommendation.fx_reference_rates
           (source, source_version, rate_date, base_currency, quote_currency, rate)
-        select ${ECB_SOURCE}, ${ECB_SOURCE_VERSION}, ${rates.rateDate}::date,
+        select ${rates.source},
+               ${rates.source === ECB_SOURCE ? ECB_SOURCE_VERSION : MARKET_SOURCE_VERSION},
+               ${rates.rateDate}::date,
                'EUR', quote, rate::numeric
           from unnest(${entries.map(([currency]) => currency)}::text[],
                       ${entries.map(([, rate]) => rate)}::text[]) as t(quote, rate)
@@ -184,6 +199,59 @@ export function createEcbFxRateProvider(dependencies: {
       // A daily file is a few kilobytes; anything far larger is not it.
       if (body.length > 200_000) return null;
       return parseEcbDaily(body);
+    },
+  };
+}
+
+/**
+ * The market feed's JSON, read strictly: success, an update time, and EUR
+ * as the base. Numbers become decimal strings as given (at most 10 places).
+ */
+export function parseMarketLatest(body: unknown): FxReferenceRates | null {
+  if (typeof body !== "object" || body === null) return null;
+  const result: unknown = Reflect.get(body, "result");
+  const base: unknown = Reflect.get(body, "base_code");
+  const updated: unknown = Reflect.get(body, "time_last_update_unix");
+  const rates: unknown = Reflect.get(body, "rates");
+  if (result !== "success" || base !== "EUR") return null;
+  if (typeof updated !== "number" || !Number.isFinite(updated)) return null;
+  if (typeof rates !== "object" || rates === null) return null;
+  const perEuro = new Map<string, string>();
+  for (const [currency, value] of Object.entries(rates)) {
+    if (currency === "EUR") continue;
+    if (!CURRENCY.test(currency)) return null;
+    if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+      return null;
+    }
+    const decimal = value.toFixed(10).replace(/\.?0+$/u, "");
+    if (!RATE.test(decimal)) return null;
+    perEuro.set(currency, decimal);
+  }
+  if (perEuro.size === 0) return null;
+  const rateDate = new Date(updated * 1000).toISOString().slice(0, 10);
+  return { source: MARKET_SOURCE, rateDate, perEuro };
+}
+
+/** The market adapter: one GET of the public EUR-based feed. */
+export function createMarketFxRateProvider(dependencies: {
+  readonly fetch?: typeof fetch | undefined;
+  readonly url?: string | undefined;
+}): FxRateProvider {
+  const doFetch = dependencies.fetch ?? fetch;
+  return {
+    fetchDaily: async () => {
+      const response = await doFetch(dependencies.url ?? MARKET_LATEST_URL, {
+        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) return null;
+      const body = await response.text();
+      if (body.length > 200_000) return null;
+      try {
+        return parseMarketLatest(JSON.parse(body) as unknown);
+      } catch {
+        return null;
+      }
     },
   };
 }

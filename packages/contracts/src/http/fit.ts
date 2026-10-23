@@ -136,7 +136,10 @@ export type FitParameterContext = z.infer<typeof FitParameterContextSchema>;
 export const FIT_CHEQUE_UNKNOWN_REASONS = [
   /** The company has not shared a round size this reader may see. */
   "ROUND_NOT_SHARED",
-  /** Round and cheque are in different currencies and no reference rate is stored. */
+  /**
+   * Round and cheque are in different currencies and no exchange rate could
+   * be had: none stored and none fetched from the internet just now.
+   */
   "CURRENCY_DIFFERS_NO_RATE",
 ] as const;
 export const FitChequeUnknownReasonSchema = z.enum(FIT_CHEQUE_UNKNOWN_REASONS);
@@ -150,8 +153,9 @@ export type FitChequeUnknownReason = z.infer<
  */
 export const FitEstimateSchema = z
   .object({
-    method: z.literal("ECB_REFERENCE_RATE"),
-    /** The ECB reference date the rate was set for (YYYY-MM-DD). */
+    /** The ECB's reference rate, or the public market feed (a currency the ECB does not publish). */
+    method: z.enum(["ECB_REFERENCE_RATE", "MARKET_RATE"]),
+    /** The date the publisher set the rate for (YYYY-MM-DD). */
     rateDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     truthClass: z.literal("ESTIMATE"),
   })

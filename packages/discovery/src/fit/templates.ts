@@ -107,29 +107,29 @@ export const FIT_REASON_TEMPLATES: Readonly<
   CHEQUE_SIZE: {
     STRONG: {
       withFacts: [
-        "{roundSize} round, about {roundEstimate} at the ECB rate of {rateDate}; your {chequeSize} fits.",
+        "{roundSize} round, about {roundEstimate} at {rateSource} of {rateDate}; your {chequeSize} fits.",
         "{roundSize} round; your {chequeSize} fits.",
       ],
       plain: "Your cheque fits their round.",
     },
     PARTIAL: {
       withFacts: [
-        "{roundSize} round, about {roundEstimate} at the ECB rate of {rateDate}; your {chequeSize} is at the edge of it.",
+        "{roundSize} round, about {roundEstimate} at {rateSource} of {rateDate}; your {chequeSize} is at the edge of it.",
         "{roundSize} round; your {chequeSize} is at the edge of it.",
       ],
       plain: "Your cheque is at the edge of their round.",
     },
     MISMATCH: {
       withFacts: [
-        "Raising {roundSize}, about {roundEstimate} at the ECB rate of {rateDate}; your cheque is {chequeSize}.",
-        "Raising {roundSize}, about {roundEstimate} at the ECB rate of {rateDate}; your range is {chequeRange}.",
+        "Raising {roundSize}, about {roundEstimate} at {rateSource} of {rateDate}; your cheque is {chequeSize}.",
+        "Raising {roundSize}, about {roundEstimate} at {rateSource} of {rateDate}; your range is {chequeRange}.",
         "Raising {roundSize}; your range is {chequeRange}.",
       ],
       plain: "Their round is outside your cheque range.",
     },
     UNKNOWN: {
       withFacts: [
-        "Raising {roundOtherCurrency}; your cheque is in {chequeCurrency} and no exchange rate is stored, so not compared.",
+        "Raising {roundOtherCurrency}; your cheque is in {chequeCurrency}, and no exchange rate could be fetched just now to compare them.",
         "Raising {statedRaise}; not shared as a round size, so not scored.",
       ],
       plain: "The company has not shared its round size with you.",

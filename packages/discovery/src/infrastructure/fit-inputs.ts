@@ -66,11 +66,13 @@ export type FitInputSourceDependencies = {
       ) => Promise<ReadonlyMap<string, FitStatedEvidence>>)
     | undefined;
   /**
-   * Owner 23 Oct 2026: the latest stored ECB reference rates, so a round in
-   * another currency than the cheque is compared as an estimate. Reference
-   * data only, read from storage (never a provider call per request).
+   * Owner 23 Oct 2026: the current exchange rate sets (stored, or fetched
+   * from the internet when none is current; fx/live.ts), so a round in
+   * another currency than the cheque is compared as an estimate.
    */
-  readonly fxRates?: (() => Promise<FxReferenceRates | null>) | undefined;
+  readonly fxRates?:
+    | (() => Promise<FxReferenceRates | readonly FxReferenceRates[] | null>)
+    | undefined;
 };
 
 const MODE = "INVESTOR_DISCOVER";
