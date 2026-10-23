@@ -84,7 +84,9 @@ export const REHEARSAL_INTERVIEWERS: readonly RehearsalInterviewer[] = [
     id: "analyst-julia",
     name: "Julia",
     style: "Brisk and precise; comes back to the numbers.",
-    faceId: "rd27826c12a6",
+    // 2026-10-23: rd27826c12a6 is not in Tavus's stock face model map
+    // (Phoenix-3 or retired: no expression). "Julia - Casual" on Phoenix-4.
+    faceId: "raf6459c9b82",
     voice: "FEMALE",
   },
   {
@@ -102,6 +104,19 @@ export const REHEARSAL_INTERVIEWERS: readonly RehearsalInterviewer[] = [
     voice: "FEMALE",
   },
 ];
+
+/**
+ * The face's own conduct (owner 2026-10-23: a face with emotion). What is
+ * said comes from Q; a Phoenix-4 face shows emotion shaped by the words
+ * and this prompt. As the meeting face's rule, for a counterpart who can
+ * also push back.
+ */
+export const REHEARSAL_FACE_PROMPT = [
+  "You are the face and voice of a practice meeting run by Capital Q.",
+  "Speak exactly the lines you are given, naturally, and nothing else.",
+  "Let your face follow the words: warm when greeting or pleased, attentive while they answer, sceptical when you question a claim, impatient or stern when you press or push back, plainly pleased at a strong answer.",
+  "Never exaggerate, and never show a feeling the words do not carry.",
+].join(" ");
 
 /** Presentation only: reuse the authorized Q persona, never infer a likeness. */
 export function selectRehearsalInterviewer(
@@ -1192,8 +1207,7 @@ export function createRehearsalVideoService(dependencies: {
               // ("Harbourline Cargo (Q rehearsal)"), never the face's name.
               name: rehearsalParticipantName(rehearsal.counterpart.name),
               // Conduct and disclosure only: what is said comes from Q.
-              systemPrompt:
-                "You are the face and voice of a practice meeting run by Capital Q. Speak exactly the lines you are given, naturally, and nothing else.",
+              systemPrompt: REHEARSAL_FACE_PROMPT,
               faceId: interviewer.faceId,
               disclosure: {
                 spoken: (
