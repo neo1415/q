@@ -81,10 +81,13 @@ export type DeclaredFitFacts = {
     | null
     | undefined;
   /**
-   * The latest stored ECB reference rates, for an ESTIMATE when the round
-   * and the cheque are in different currencies. Absent: never converted.
+   * Current exchange rate sets, preferred first (the ECB's reference
+   * rates, then the public market feed), for an ESTIMATE when the round
+   * and the cheque are in different currencies. Fetched from the internet
+   * when none is stored (fx/live.ts). Absent: never converted.
    */
-  readonly fx?: FxReferenceRates | null | undefined;
+  readonly fx?:
+    FxReferenceRates | readonly FxReferenceRates[] | null | undefined;
   /** The investor's own declared cheque range. */
   readonly cheque?:
     | {
@@ -324,13 +327,32 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
   const roundAmount = amountOf(round?.amount);
   const fromPitch = round?.source === "PITCH";
   const otherCurrency = round !== null && round.currency !== cheque.currency;
-  // Owner 23 Oct 2026: across currencies, an estimate at the stored ECB
-  // reference rate (never converted without one, never called exact).
-  const fx = d.fx ?? null;
-  const converted =
-    round !== null && otherCurrency && fx !== null
-      ? estimateInCurrency(round.amount, round.currency, cheque.currency, fx)
-      : null;
+  // Owner 23 Oct 2026: across currencies, an estimate at a dated public
+  // rate (the ECB's first, then the market feed for a currency the ECB
+  // does not publish); never called exact.
+  const sets: readonly FxReferenceRates[] =
+    d.fx === null || d.fx === undefined
+      ? []
+      : "perEuro" in d.fx
+        ? [d.fx]
+        : d.fx;
+  let fx: FxReferenceRates | null = null;
+  let converted: string | null = null;
+  if (round !== null && otherCurrency) {
+    for (const set of sets) {
+      const estimate = estimateInCurrency(
+        round.amount,
+        round.currency,
+        cheque.currency,
+        set,
+      );
+      if (estimate !== null) {
+        fx = set;
+        converted = estimate;
+        break;
+      }
+    }
+  }
   const facts = {
     chequeSize:
       cheque.typical === undefined
@@ -341,6 +363,14 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
         ? `${formatMoney(cheque.min, cheque.currency)}–${formatMoney(cheque.max, cheque.currency)}`
         : undefined,
     chequeCurrency: cheque.currency,
+    // The whole declared cheque: the range when they gave one, else the
+    // typical cheque ("$250k–$1M", "€3M").
+    yourCheque:
+      cheque.min !== undefined && cheque.max !== undefined
+        ? `${formatMoney(cheque.min, cheque.currency)}–${formatMoney(cheque.max, cheque.currency)}`
+        : cheque.typical !== undefined
+          ? formatMoney(cheque.typical, cheque.currency)
+          : undefined,
     roundSize:
       round === null
         ? undefined
@@ -354,6 +384,8 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
       converted === null ? undefined : formatMoney(converted, cheque.currency),
     rateDate:
       converted === null || fx === null ? undefined : humanDate(fx.rateDate),
+    rateSource:
+      converted === null || fx === null ? undefined : RATE_WORDS[fx.source],
   };
   if (round === null || roundAmount === null || roundAmount === 0) {
     return {
@@ -385,6 +417,18 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
     return { ...unknownObservation(facts), unknownReason: "ROUND_NOT_SHARED" };
   }
   const share = ref / compared;
+  // "up to 40% of it": the largest declared cheque against the round, in
+  // whole percent; said only when it is a real share of the round.
+  const top =
+    amountOf(cheque.max) ?? amountOf(cheque.typical) ?? amountOf(cheque.min);
+  const topShare = top === null ? null : top / compared;
+  const sharedFacts = {
+    ...facts,
+    chequeShare:
+      topShare === null || topShare <= 0 || topShare > 1
+        ? undefined
+        : `${String(Math.max(1, Math.round(topShare * 100)))}%`,
+  };
   const c = config.comparators;
   const outcome =
     share >= c.chequeShareStrongMin && share <= c.chequeShareStrongMax
@@ -397,12 +441,12 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
     applicable: true,
     evidenceStatus: round.evidenceStatus,
     stale: false,
-    facts,
+    facts: sharedFacts,
     ...(converted === null || fx === null
       ? {}
       : {
           estimate: {
-            method: "ECB_REFERENCE_RATE" as const,
+            method: RATE_METHOD[fx.source],
             rateDate: fx.rateDate,
             truthClass: "ESTIMATE" as const,
           },
@@ -412,10 +456,20 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
       facts.chequeSize ?? facts.chequeRange,
       converted === null || fx === null
         ? null
-        : `Approximately, at the ECB rate of ${humanDate(fx.rateDate)}`,
+        : `Approximately, at ${RATE_WORDS[fx.source]} of ${humanDate(fx.rateDate)}`,
     ),
   };
 }
+
+/** How a rate's source is said: "about €3.5M at the ECB rate of 23 Oct 2026". */
+const RATE_WORDS: Readonly<Record<FxReferenceRates["source"], string>> = {
+  ECB_EUROFXREF: "the ECB rate",
+  EXCHANGERATE_API_OPEN: "the market rate",
+};
+const RATE_METHOD = {
+  ECB_EUROFXREF: "ECB_REFERENCE_RATE",
+  EXCHANGERATE_API_OPEN: "MARKET_RATE",
+} as const;
 
 const MONTHS = [
   "Jan",

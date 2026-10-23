@@ -46,15 +46,15 @@ export async function runEcbRatesTicker(options: {
       if (result.rateDate === null) {
         options.logger.warn(
           {},
-          "ECB reference rates unavailable; keeping the last stored set",
+          "exchange rates unavailable; keeping the last stored set",
         );
       } else if (result.stored > 0) {
-        options.logger.info({ ...result }, "ECB reference rates stored");
+        options.logger.info({ ...result }, "exchange rates stored");
       }
     } catch {
       options.logger.warn(
         {},
-        "ECB reference rates fetch failed; retrying next interval",
+        "exchange rates fetch failed; retrying next interval",
       );
     }
     await sleep(options.intervalMs ?? ECB_RATES_INTERVAL_MS, options.signal);

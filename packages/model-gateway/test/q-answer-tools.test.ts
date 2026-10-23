@@ -36,6 +36,7 @@ import {
   Q_TOOL_LOOP_MAX_ROUNDS,
   type QAuthorisedContextPort,
 } from "../src/q/index.js";
+import { firstContactOf } from "../src/q/first-contact.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 import { fitFixture } from "./fit-fixture.js";
 
@@ -1273,6 +1274,152 @@ describe("answer seam tool loop", () => {
     });
     expect((await once.seam.answer(once.request)).kind).toBe("ANSWERED");
     expect(once.alpha.calls).toHaveLength(2);
+  });
+
+  describe("a note to founders they are not connected with prepares the first contact (owner 2026-10-23)", () => {
+    const tool = (name: string, toolName: string): QOfferedTool => ({
+      ...GET_COMPANY,
+      toolName,
+      classification: "SIDE_EFFECT",
+      definition: { ...GET_COMPANY.definition, name },
+    });
+    const CHAT = tool("propose_chat_message", "relationship.chat.propose");
+    const INTEREST = tool(
+      "propose_express_interest",
+      "relationship.interest.express.propose",
+    );
+    const NOTE = "Hi Anchor team, I'd like a call next week about your API.";
+    const run = async (options: {
+      chat: "NOT_CONNECTED" | "NOT_AVAILABLE" | "PREPARED";
+      interest?: "PREPARED" | "DENIED";
+      offerInterest?: boolean;
+    }) => {
+      const tools = toolPort(
+        options.offerInterest === false ? [CHAT] : [CHAT, INTEREST],
+        (p) => {
+          if (p.name === "propose_chat_message") {
+            return options.chat === "NOT_AVAILABLE"
+              ? { ...denied(p), toolName: "relationship.chat.propose" }
+              : {
+                  ...succeeded(p, {
+                    status: options.chat,
+                    awaitingApprovalOf:
+                      options.chat === "PREPARED"
+                        ? "Send a message to Anchor"
+                        : "Messages open once you're connected with them: interest expressed and accepted.",
+                  }),
+                  toolName: "relationship.chat.propose",
+                };
+          }
+          return options.interest === "DENIED"
+            ? {
+                ...denied(p),
+                toolName: "relationship.interest.express.propose",
+              }
+            : {
+                ...succeeded(p, {
+                  status: "PREPARED",
+                  awaitingApprovalOf: "Express interest in Anchor",
+                }),
+                toolName: "relationship.interest.express.propose",
+              };
+        },
+      );
+      const { seam, alpha, request } = build({
+        said: "Draft a short note to the founders of Anchor saying I'd like a call next week",
+        script: [
+          {
+            kind: "TOOL_CALLS",
+            calls: [
+              {
+                callId: "c",
+                name: "propose_chat_message",
+                arguments: { counterpartName: "Anchor", body: NOTE },
+              },
+            ],
+          },
+          { kind: "JSON", value: analystResult("prepared") },
+        ],
+        tools,
+      });
+      expect((await seam.answer(request)).kind).toBe("ANSWERED");
+      return {
+        executed: tools.executed.map((p) => [p.name, p.arguments]),
+        second: JSON.stringify(alpha.calls[1]?.request.messages ?? []),
+      };
+    };
+
+    it("prepares Express Interest in the same turn, for approval, and tells the model so", async () => {
+      const { executed, second } = await run({ chat: "NOT_CONNECTED" });
+      expect(executed).toEqual([
+        ["propose_chat_message", { counterpartName: "Anchor", body: NOTE }],
+        // The drafted note travels with the interest, on the same approval.
+        ["propose_express_interest", { company: "Anchor", note: NOTE }],
+      ]);
+      expect(second).toContain("Capital Q prepared the first step");
+      expect(second).toContain("Express interest in Anchor");
+      expect(second).toContain("The note they asked for goes with it");
+      expect(second).toContain("Nothing is sent until they approve");
+    });
+
+    it("never cuts a note longer than an interest note: the interest goes without it", () => {
+      const long = "x".repeat(1001);
+      const outcome = succeeded(
+        { callId: "c", name: "propose_chat_message", arguments: {} },
+        { status: "NOT_CONNECTED" },
+      );
+      expect(
+        firstContactOf(
+          {
+            name: "propose_chat_message",
+            arguments: { counterpartName: "Anchor", body: long },
+          },
+          outcome,
+        ),
+      ).toEqual({ company: "Anchor" });
+      expect(
+        firstContactOf(
+          {
+            name: "propose_email",
+            arguments: { companyId: "c-1", subject: "Hi", body: "  Hello  " },
+          },
+          outcome,
+        ),
+      ).toEqual({ companyId: "c-1", note: "Hello" });
+    });
+
+    it("does the same when there is no relationship yet (not available)", async () => {
+      const { executed } = await run({ chat: "NOT_AVAILABLE" });
+      expect(executed.map(([name]) => name)).toEqual([
+        "propose_chat_message",
+        "propose_express_interest",
+      ]);
+    });
+
+    it("prepares nothing more when the message itself was prepared", async () => {
+      const { executed, second } = await run({ chat: "PREPARED" });
+      expect(executed.map(([name]) => name)).toEqual(["propose_chat_message"]);
+      expect(second).not.toContain("Capital Q prepared the first step");
+    });
+
+    it("says nothing about a first step its own authorize step refused", async () => {
+      const { executed, second } = await run({
+        chat: "NOT_CONNECTED",
+        interest: "DENIED",
+      });
+      expect(executed.map(([name]) => name)).toContain(
+        "propose_express_interest",
+      );
+      expect(second).not.toContain("Capital Q prepared the first step");
+    });
+
+    it("never prepares interest where it is not offered (a founder)", async () => {
+      const { executed } = await run({
+        chat: "NOT_CONNECTED",
+        offerInterest: false,
+      });
+      expect(executed.map(([name]) => name)).toEqual(["propose_chat_message"]);
+    });
   });
 
   describe("a search that found one company has its profile read by code (turn latency row 16)", () => {

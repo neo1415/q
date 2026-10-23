@@ -1196,4 +1196,106 @@ describe("Express Interest against local PostgreSQL", () => {
       expect(row?.n).toBe(0);
     });
   });
+  // -------------------------------------------------------------------------
+  // Decision B (2026-10-23): a note travels with the interest
+  // -------------------------------------------------------------------------
+
+  it("stores the investor's note for the company's founders only: not another investor organisation, not another company, not the history payload", async () => {
+    await withWorld(async (world) => {
+      const { tx, interests, founder, otherFounder, investorRep, companyA } =
+        world;
+      const key = `interest:${randomUUID()}`;
+      const express = (note: string | undefined) =>
+        interests.expressInterest({
+          actor: investorRep,
+          companyId: companyA,
+          surface: "Q_CONVERSATION",
+          ...(note === undefined ? {} : { note }),
+          idempotencyKey: key,
+          correlationId: CORRELATION(),
+        });
+      const first = await express("  We back B2B payments in Lagos.  ");
+      expect(first.interest.note).toBe("We back B2B payments in Lagos.");
+
+      // The same key with the same note is the same answer; another note is
+      // another request, so it is a conflict, never a silent overwrite.
+      expect(
+        (await express("We back B2B payments in Lagos.")).deduplicated,
+      ).toBe(true);
+      await expect(express("Something else.")).rejects.toBeInstanceOf(
+        InterestIdempotencyConflictError,
+      );
+      await expect(express(undefined)).rejects.toBeInstanceOf(
+        InterestIdempotencyConflictError,
+      );
+
+      // The founders read it on their inbox.
+      const inbox = await interests.listIncomingInterest({
+        actor: founder,
+        companyId: companyA,
+      });
+      expect(inbox.map((i) => i.interest.note)).toEqual([
+        "We back B2B payments in Lagos.",
+      ]);
+      // A founder of another company cannot list it at all.
+      await expect(
+        interests.listIncomingInterest({
+          actor: otherFounder,
+          companyId: companyA,
+        }),
+      ).rejects.toBeInstanceOf(InterestNotFoundError);
+
+      // Another investor organisation (same tenant as the investor) sees no
+      // interest, so no note.
+      const otherOrg = await insertOrganisation(
+        tx,
+        investorRep.tenantId,
+        "investment_firm",
+        "Beacon",
+      );
+      await insertInvestor(tx, investorRep.tenantId, otherOrg, "Beacon");
+      const otherInvestor = await resolveActor(
+        tx,
+        await insertMember(
+          tx,
+          investorRep.tenantId,
+          otherOrg,
+          "organisation_member",
+        ),
+      );
+      expect(
+        await interests.getOwnInterest({
+          actor: otherInvestor,
+          companyId: companyA,
+        }),
+      ).toBeNull();
+
+      // The note lives on the interest row only: the shared history event
+      // does not carry it.
+      const events = await history(tx, first.interest.relationshipId);
+      for (const event of events) {
+        expect(JSON.stringify(event.payload)).not.toContain("Lagos");
+      }
+    });
+  });
+
+  it("a blank note is no note, and an interest without one reads null", async () => {
+    await withWorld(async (world) => {
+      const { interests, investorRep, founder, companyA } = world;
+      const result = await interests.expressInterest({
+        actor: investorRep,
+        companyId: companyA,
+        surface: "RECOMMENDATION_FEED",
+        note: "   ",
+        idempotencyKey: `interest:${randomUUID()}`,
+        correlationId: CORRELATION(),
+      });
+      expect(result.interest.note).toBeNull();
+      const [incoming] = await interests.listIncomingInterest({
+        actor: founder,
+        companyId: companyA,
+      });
+      expect(incoming?.interest.note).toBeNull();
+    });
+  });
 });

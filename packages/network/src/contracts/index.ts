@@ -157,6 +157,11 @@ export type Interest = {
   readonly expressedInOrganisationId: string;
   readonly relationshipEventId: RelationshipEventId;
   readonly createdAt: UtcTimestamp;
+  /**
+   * The investor's optional note to the founders (decision B, 2026-10-23).
+   * relationship_shared: for the two parties only, never ranking input.
+   */
+  readonly note: string | null;
   /** Null until the other party answers. */
   readonly response: {
     readonly id: InterestResponseId;
@@ -188,6 +193,7 @@ export function toInterestDto(interest: Interest): InterestDto {
     companyId: interest.companyId,
     status: interest.status,
     expressedAt: interest.createdAt,
+    note: interest.note,
     response: interest.response?.decision ?? "PENDING",
     respondedAt: interest.response?.respondedAt ?? null,
     connection: connectionDto(interest),
@@ -239,6 +245,8 @@ export function toIncomingInterestDto(
     investorName: investor.displayName,
     investorType: investor.investorType,
     expressedAt: interest.createdAt,
+    // Addressed to the founders: the note is theirs to read (decision B).
+    note: interest.note,
     response: interest.response?.decision ?? "PENDING",
     respondedAt: interest.response?.respondedAt ?? null,
     connection: connectionDto(interest),

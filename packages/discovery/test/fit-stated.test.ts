@@ -247,7 +247,9 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
       statedRound: said.statedRound,
     });
     expect(cheque.outcome).toBe("STRONG");
-    expect(cheque.reason).toBe("$4M round; your $250k fits.");
+    expect(cheque.reason).toBe(
+      "$4M round; your $250k cheque fits (up to 6% of it).",
+    );
     expect(cheque.stated).toBeUndefined();
   });
 
@@ -291,7 +293,7 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
     expect(cheque.outcome).toBe("UNKNOWN");
     // The exact reason, as words and as a code Q states (owner 23 Oct).
     expect(cheque.reason).toBe(
-      "Raising €2M; your cheque is in USD and no exchange rate is stored, so not compared.",
+      "Raising €2M; your cheque is in USD, and no exchange rate could be fetched just now to compare them.",
     );
     expect(cheque.unknownReason).toBe("CURRENCY_DIFFERS_NO_RATE");
   });
@@ -419,7 +421,7 @@ describe("cheque fit from the pitch, across currencies (fit-reasons.v2)", () => 
     });
     expect(cheque.outcome).toBe("STRONG");
     expect(cheque.reason).toBe(
-      "$4M (from their pitch) round; your $250k fits.",
+      "$4M (from their pitch) round; your $250k cheque fits (up to 6% of it).",
     );
     expect(cheque.context?.items[0]).toEqual({
       label: "Round",
@@ -443,7 +445,7 @@ describe("cheque fit from the pitch, across currencies (fit-reasons.v2)", () => 
     // £3M / 0.86 per EUR ≈ €3.49M; a €3M cheque is 86% of the round.
     expect(cheque.outcome).toBe("STRONG");
     expect(cheque.reason).toBe(
-      "£3M (from their pitch) round, about €3.5M at the ECB rate of 23 Oct 2026; your €3M fits.",
+      "£3M (from their pitch) round, about €3.5M at the ECB rate of 23 Oct 2026; your €3M cheque fits (up to 86% of it).",
     );
     expect(cheque.estimate).toEqual({
       method: "ECB_REFERENCE_RATE",
@@ -472,7 +474,7 @@ describe("cheque fit from the pitch, across currencies (fit-reasons.v2)", () => 
     expect(cheque.estimate?.truthClass).toBe("ESTIMATE");
   });
 
-  it("without a stored rate the currencies are named, never guessed", () => {
+  it("only if no rate could be had at all (stored or fetched) are the currencies named, never guessed", () => {
     const { cheque } = fitWith({
       ...zino,
       round: {
@@ -485,7 +487,7 @@ describe("cheque fit from the pitch, across currencies (fit-reasons.v2)", () => 
     expect(cheque.outcome).toBe("UNKNOWN");
     expect(cheque.unknownReason).toBe("CURRENCY_DIFFERS_NO_RATE");
     expect(cheque.reason).toBe(
-      "Raising £3M; your cheque is in EUR and no exchange rate is stored, so not compared.",
+      "Raising £3M; your cheque is in EUR, and no exchange rate could be fetched just now to compare them.",
     );
     expect(cheque.context?.open).toBe(
       "Ticket fit: not compared, the round is in GBP and your cheque in EUR",
@@ -519,7 +521,7 @@ describe("what Q reads about cheque fit (owner 23 Oct 2026)", () => {
     });
     const text = fitProfileText("Halyard Security", unknown.profile);
     expect(text).toContain(
-      "[why unknown: CURRENCY_DIFFERS_NO_RATE, the round and your cheque are in different currencies and no exchange rate is stored; the only reason]",
+      "[why unknown: CURRENCY_DIFFERS_NO_RATE, the round and your cheque are in different currencies and no exchange rate could be fetched just now (both rate sources unreachable); the only reason]",
     );
     const estimated = fitWith({
       cheque: { currency: "EUR", typical: "3000000" },
@@ -537,5 +539,62 @@ describe("what Q reads about cheque fit (owner 23 Oct 2026)", () => {
     expect(fitProfileText("Halyard Security", estimated.profile)).toContain(
       "[ESTIMATE: approximately, at the ECB reference rate of 2026-10-23; not exact, not verified]",
     );
+  });
+});
+
+describe("a currency the ECB does not publish (owner 23 Oct 2026: go and find it)", () => {
+  it("a naira round against a dollar cheque is estimated at the market rate, said as such", () => {
+    const { cheque } = fitWith({
+      cheque: { currency: "USD", typical: "250000" },
+      fx: [
+        {
+          source: "ECB_EUROFXREF",
+          rateDate: "2026-10-23",
+          perEuro: new Map([["USD", "1.08"]]),
+        },
+        {
+          source: "EXCHANGERATE_API_OPEN",
+          rateDate: "2026-10-23",
+          perEuro: new Map([
+            ["USD", "1.0812"],
+            ["NGN", "1497.107782"],
+          ]),
+        },
+      ],
+      round: {
+        amount: "1500000000",
+        currency: "NGN",
+        evidenceStatus: "SELF_REPORTED",
+        source: "PITCH",
+      },
+    });
+    // ₦1.5bn ≈ $1.08M at the market rate: a $250k cheque fits.
+    expect(cheque.outcome).toBe("STRONG");
+    expect(cheque.estimate).toEqual({
+      method: "MARKET_RATE",
+      rateDate: "2026-10-23",
+      truthClass: "ESTIMATE",
+    });
+    expect(cheque.reason).toContain("at the market rate of 23 Oct 2026");
+    expect(cheque.unknownReason).toBeUndefined();
+  });
+});
+
+describe("does their round fit my cheque? (Silo Credit, owner 23 Oct 2026)", () => {
+  it("a $2.5M pitch round and a $250k–$1M range: yes, up to 40% of the round", () => {
+    const { cheque } = fitWith({
+      cheque: { currency: "USD", min: "250000", max: "1000000" },
+      round: {
+        amount: "2500000",
+        currency: "USD",
+        evidenceStatus: "SELF_REPORTED",
+        source: "PITCH",
+      },
+    });
+    expect(cheque.outcome).toBe("STRONG");
+    expect(cheque.reason).toBe(
+      "$2.5M (from their pitch) round; your $250k–$1M cheque fits (up to 40% of it).",
+    );
+    expect(cheque.unknownReason).toBeUndefined();
   });
 });

@@ -322,6 +322,8 @@ export {
   DisclosureScopeSchema,
   ExpressInterestRequestSchema,
   ExpressInterestResultDtoSchema,
+  INTEREST_NOTE_MAX,
+  InterestNoteSchema,
   IncomingInterestDtoSchema,
   IncomingInterestListDtoSchema,
   CONNECTION_NOT_ACCEPTED_REASONS,

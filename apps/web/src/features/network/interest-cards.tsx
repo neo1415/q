@@ -305,9 +305,21 @@ function InterestCard({
           {t(whenWords(item.expressedAt))}
         </span>
       </div>
-      <span className="cq-caption text-(--cq-text-tertiary)">
-        {t("No note with their interest.")}
-      </span>
+      {item.note === null || item.note === undefined ? (
+        <span className="cq-caption text-(--cq-text-tertiary)">
+          {t("No note with their interest.")}
+        </span>
+      ) : (
+        // Their own words to the founders (decision B): shown as written,
+        // never translated or rewritten. Only the two parties see it.
+        <blockquote
+          className="cq-body-sm border-l-2 border-(--cq-border) pl-3 whitespace-pre-line text-(--cq-text-primary)"
+          data-interest-note
+        >
+          <span className="sr-only">{t("Their note:")} </span>
+          {item.note}
+        </blockquote>
+      )}
       <div className="flex flex-wrap gap-x-3.5 gap-y-1.5 text-[13px] text-(--cq-text-secondary)">
         <span>
           {t("Looks for:")} {facts.looksFor ?? t("not on their profile yet")}

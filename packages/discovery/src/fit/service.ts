@@ -581,7 +581,7 @@ const UNKNOWN_REASON_WORDS: Readonly<Record<FitChequeUnknownReason, string>> = {
   ROUND_NOT_SHARED:
     "the company has not shared a round size you may see (no Q Card raise, no disclosure, no amount in a pitch you may play)",
   CURRENCY_DIFFERS_NO_RATE:
-    "the round and your cheque are in different currencies and no exchange rate is stored",
+    "the round and your cheque are in different currencies and no exchange rate could be fetched just now (both rate sources unreachable)",
 };
 
 function rowNote(p: FitProfileDto["parameters"][number]): string {
@@ -589,7 +589,7 @@ function rowNote(p: FitProfileDto["parameters"][number]): string {
     return ` [why unknown: ${p.unknownReason}, ${UNKNOWN_REASON_WORDS[p.unknownReason]}; the only reason]`;
   }
   if (p.estimate !== undefined) {
-    return ` [ESTIMATE: approximately, at the ECB reference rate of ${p.estimate.rateDate}; not exact, not verified]`;
+    return ` [ESTIMATE: approximately, at the ${p.estimate.method === "ECB_REFERENCE_RATE" ? "ECB reference rate" : "market rate"} of ${p.estimate.rateDate}; not exact, not verified]`;
   }
   return "";
 }
