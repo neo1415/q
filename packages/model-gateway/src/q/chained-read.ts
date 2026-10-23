@@ -19,6 +19,24 @@ import { itemsOf, nameKey } from "./named-company-fact.js";
  */
 export const CHAINED_SEARCH_TOOL = "search_companies";
 export const CHAINED_GET_TOOL = "get_company";
+/**
+ * The company's published figures, read beside its profile (owner
+ * 2026-10-23: Q answered from the profile and never asked for figures).
+ * Same tool port, authorize step and Context Firewall as the model's own
+ * call; a figures read that is denied or fails is simply left out.
+ */
+export const CHAINED_FIGURES_TOOL = "read_company_figures";
+
+/** What code reads for a company a search found, in parallel. */
+export const CHAINED_READ_TOOLS: readonly string[] = [
+  CHAINED_GET_TOOL,
+  CHAINED_FIGURES_TOOL,
+];
+
+/** One chained read's key: the tool and the company. */
+export function chainedKey(name: string, companyId: string): string {
+  return `${name}|${companyId}`;
+}
 
 /** The company id a search resolved to; null when not exactly one. */
 export function chainedCompanyOf(

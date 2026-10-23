@@ -169,7 +169,13 @@ import {
   type CompanyFactAnswer,
   type CompanyFactAsk,
 } from "./named-company-fact.js";
-import { CHAINED_GET_TOOL, chainedCompanyOf } from "./chained-read.js";
+import {
+  CHAINED_FIGURES_TOOL,
+  CHAINED_GET_TOOL,
+  CHAINED_READ_TOOLS,
+  chainedCompanyOf,
+  chainedKey,
+} from "./chained-read.js";
 import { outputSplitOf } from "./output-split.js";
 import {
   EXTRAS_ELSEWHERE_NOTE,
@@ -790,7 +796,7 @@ export function diagnosticCodeFor(
 const TOOLS_FIRST_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
-    'TAKE THEM THERE. If the person asks to be taken to, shown or to open a page, screen, tab or profile ("take me to relationships", "open Discover", "show me Clearwater"), call open_page for it in this same turn, even when the message also asks a question; then answer the question too. Scrolling or working the page on screen is control_screen. You can always do both; never say you cannot navigate or scroll. SHOW CARDS. When they ask for the top, best, most promising, a shortlist, a ranking, a list or a comparison of companies, investors or relationships ("top three", "which of these make the most sense", "list the people asking to connect"), fill answerCards with one card per company in the answer, as well as the spoken answer. LOOK IT UP FIRST. If the message names a company, organisation or person you have no authorised facts about, look it up now with the tools (search_companies with the name as given; when it finds exactly one company, Capital Q reads its profile for you, otherwise call get_company with the right companyId). ONE LOOKUP TURN. Call every lookup the answer needs in the same turn, side by side: they run at the same time, and each further lookup turn keeps the person waiting seconds longer. If the person asks for public, current, external or web information, or asks you to check or compare what the public web says, call research_public_web now with a short public query (a few words: the subject as named plus what to look for; never a figure, a customer name or an identifier), up to three other phrasings in alsoSearch, and entityName when they named one company or person (a name is enough; no website needed). What is current or specific (an accelerator batch, recent funding, news, a named company, fund or person) is looked up, never answered from memory. Call the tool through the function-calling interface and write nothing else in that turn. THEN ANSWER IN THE SAME TURN. When nothing needs looking up, or once results are in front of you, write the JSON object and nothing else: at minimum {"answer": "...", "responseShape": "CONCISE" or "ANALYTICAL", "insufficientEvidence": true or false}, plus any other field of the schema that applies. Leave out every field you are not certain of the exact shape of: a field in the wrong shape (null for a list, a string where the schema has an object, a renamed key) loses the whole answer, and an absent one costs nothing. Leave out, too, every field that would only be empty, null or false (an empty list, no recommendation, no visual, false): Capital Q fills those in, and each one written keeps the person waiting. Findings with evidence are never left out for that reason. Never reply with prose outside the object, and never reply that you are about to answer.',
+    'TAKE THEM THERE. If the person asks to be taken to, shown or to open a page, screen, tab or profile ("take me to relationships", "open Discover", "show me Clearwater"), call open_page for it in this same turn, even when the message also asks a question; then answer the question too. Scrolling or working the page on screen is control_screen. You can always do both; never say you cannot navigate or scroll. SHOW CARDS. When they ask for the top, best, most promising, a shortlist, a ranking, a list or a comparison of companies, investors or relationships ("top three", "which of these make the most sense", "list the people asking to connect"), fill answerCards with one card per company in the answer, as well as the spoken answer. LOOK IT UP FIRST. If the message names a company, organisation or person you have no authorised facts about, look it up now with the tools (search_companies with the name as given; when it finds exactly one company, Capital Q reads its profile and its published figures for you, otherwise call get_company and read_company_figures with the right companyId). A published figure is the statement of the company itself: say so ("the company reports", "self-reported") and never call it verified. ONE LOOKUP TURN. Call every lookup the answer needs in the same turn, side by side: they run at the same time, and each further lookup turn keeps the person waiting seconds longer. If the person asks for public, current, external or web information, or asks you to check or compare what the public web says, call research_public_web now with a short public query (a few words: the subject as named plus what to look for; never a figure, a customer name or an identifier), up to three other phrasings in alsoSearch, and entityName when they named one company or person (a name is enough; no website needed). What is current or specific (an accelerator batch, recent funding, news, a named company, fund or person) is looked up, never answered from memory. Call the tool through the function-calling interface and write nothing else in that turn. THEN ANSWER IN THE SAME TURN. When nothing needs looking up, or once results are in front of you, write the JSON object and nothing else: at minimum {"answer": "...", "responseShape": "CONCISE" or "ANALYTICAL", "insufficientEvidence": true or false}, plus any other field of the schema that applies. Leave out every field you are not certain of the exact shape of: a field in the wrong shape (null for a list, a string where the schema has an object, a renamed key) loses the whole answer, and an absent one costs nothing. Leave out, too, every field that would only be empty, null or false (an empty list, no recommendation, no visual, false): Capital Q fills those in, and each one written keeps the person waiting. Findings with evidence are never left out for that reason. Never reply with prose outside the object, and never reply that you are about to answer.',
 };
 
 /**
@@ -6335,8 +6341,9 @@ export function createModelGatewayQAnswer(
               call.arguments as { readonly companyId?: unknown } | null
             )?.companyId;
             const kept =
-              call.name === CHAINED_GET_TOOL && typeof companyId === "string"
-                ? chainedReads.get(companyId)
+              CHAINED_READ_TOOLS.includes(call.name) &&
+              typeof companyId === "string"
+                ? chainedReads.get(chainedKey(call.name, companyId))
                 : undefined;
             return kept !== undefined
               ? kept.then((outcome) => ({ ...outcome, callId: call.callId }))
@@ -6670,7 +6677,10 @@ export function createModelGatewayQAnswer(
                 )
               : null;
             let heldThisRound = 0;
-            const chainedThisRound: Promise<QToolCallOutcome>[] = [];
+            const chainedThisRound: {
+              readonly name: string;
+              readonly read: Promise<QToolCallOutcome>;
+            }[] = [];
             for (const [index, call] of proposals.entries()) {
               if (holdWeb && call.name === PUBLIC_WEB_TOOL && ownedFound) {
                 // Answered by their own records: the web is not asked, and
@@ -6747,29 +6757,41 @@ export function createModelGatewayQAnswer(
               // Turn latency row 16: a search that found one company has
               // its profile read now, beside the rest of the round, rather
               // than in a model round of its own (chained-read.ts).
+              // The profile and, beside it, the published figures (owner
+              // 2026-10-23): both start now and run in parallel, each only
+              // when offered, within the loop's call budget.
               const chainedId = chainedCompanyOf(call, outcome);
-              if (
-                chainedId !== null &&
-                !chainedReads.has(chainedId) &&
-                offeredByName.has(CHAINED_GET_TOOL) &&
-                !proposals.some(
-                  (other) =>
-                    other.name === CHAINED_GET_TOOL &&
-                    (other.arguments as { readonly companyId?: unknown } | null)
-                      ?.companyId === chainedId,
-                ) &&
-                calls + chainedThisRound.length < Q_TOOL_LOOP_MAX_CALLS
-              ) {
+              for (const name of chainedId === null ? [] : CHAINED_READ_TOOLS) {
+                if (
+                  chainedId === null ||
+                  chainedReads.has(chainedKey(name, chainedId)) ||
+                  !offeredByName.has(name) ||
+                  proposals.some(
+                    (other) =>
+                      other.name === name &&
+                      (
+                        other.arguments as {
+                          readonly companyId?: unknown;
+                        } | null
+                      )?.companyId === chainedId,
+                  ) ||
+                  calls + chainedThisRound.length >= Q_TOOL_LOOP_MAX_CALLS
+                ) {
+                  continue;
+                }
                 const read = callTool(
                   {
-                    callId: `q-chained-${chainedId}`,
-                    name: CHAINED_GET_TOOL,
+                    callId:
+                      name === CHAINED_GET_TOOL
+                        ? `q-chained-${chainedId}`
+                        : `q-chained-${name}-${chainedId}`,
+                    name,
                     arguments: { companyId: chainedId },
                   },
                   toolContext,
                 );
-                chainedReads.set(chainedId, read);
-                chainedThisRound.push(read);
+                chainedReads.set(chainedKey(name, chainedId), read);
+                chainedThisRound.push({ name, read });
               }
               if (call.name === APPROVE_PENDING_TOOL && outcome.result.ok) {
                 approvalLine =
@@ -6849,33 +6871,39 @@ export function createModelGatewayQAnswer(
               const stageWrite =
                 stage === undefined || stage === null ? null : stageOnce(stage);
               const [read] = await Promise.all([
-                Promise.allSettled(chainedThisRound),
+                Promise.allSettled(chainedThisRound.map((c) => c.read)),
                 stageWrite,
               ]);
-              for (const settled of read) {
+              for (const [index, settled] of read.entries()) {
                 // A chained read that failed is simply not added: the
                 // model can still ask for the profile itself.
                 if (settled.status !== "fulfilled") continue;
+                const name = chainedThisRound[index]?.name ?? CHAINED_GET_TOOL;
                 const outcome = settled.value;
                 calls += 1;
                 toolCalls.push({
                   toolName: outcome.toolName,
-                  providerName: CHAINED_GET_TOOL,
+                  providerName: name,
                   status: outcome.status,
                   failureCode: outcome.failureCode,
                   latencyMs: outcome.latencyMs,
                 });
+                // Figures the firewall denied, or none to read, add
+                // nothing: the profile answer stands on its own.
+                if (
+                  name === CHAINED_FIGURES_TOOL &&
+                  outcome.status !== "SUCCEEDED"
+                ) {
+                  continue;
+                }
                 collectSources(outcome);
                 notePlatformLookup(outcome);
                 noteRecommendationGrounds(outcome);
                 noteFitGrounds(outcome);
                 chainedResults.push(
                   readForYouMessage(
-                    CHAINED_GET_TOOL,
-                    forModelReading(
-                      outcome,
-                      classificationOf(CHAINED_GET_TOOL),
-                    ),
+                    name,
+                    forModelReading(outcome, classificationOf(name)),
                   ),
                 );
               }
