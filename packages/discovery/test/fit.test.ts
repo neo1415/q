@@ -20,6 +20,7 @@ import {
   FIT_CONFIG_CURRENT,
   FIT_CONFIG_V4,
   FIT_CONFIG_V6,
+  FIT_CONFIG_V7,
   FIT_CONFIGS,
   FitConfigSchema,
   fitConfigByVersion,
@@ -116,7 +117,11 @@ describe("fit config ranking-config.v4", () => {
     ).toBeCloseTo(1, 12);
     expect(FIT_CONFIG_V4.extends).toBe("ranking-config.v3");
     // v6 (owner 23 Oct 2026): v4's weights and rules, fit-reasons.v2.
-    expect(FIT_CONFIG_CURRENT).toBe(FIT_CONFIG_V6);
+    // v7 (owner 23 Oct 2026): v6's rules, fit-reasons.v3.
+    expect(FIT_CONFIG_CURRENT).toBe(FIT_CONFIG_V7);
+    expect(fitConfigByVersion("ranking-config.v7")).toBe(FIT_CONFIG_V7);
+    expect(FIT_CONFIG_V7.parameters).toEqual(FIT_CONFIG_V6.parameters);
+    expect(FIT_CONFIG_V7.reasonTemplatesVersion).toBe("fit-reasons.v3");
     expect(fitConfigByVersion("ranking-config.v4")).toBe(FIT_CONFIG_V4);
     expect(fitConfigByVersion("ranking-config.v6")).toBe(FIT_CONFIG_V6);
     expect(FIT_CONFIG_V6.parameters).toEqual(FIT_CONFIG_V4.parameters);

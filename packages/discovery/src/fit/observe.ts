@@ -363,6 +363,14 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
         ? `${formatMoney(cheque.min, cheque.currency)}–${formatMoney(cheque.max, cheque.currency)}`
         : undefined,
     chequeCurrency: cheque.currency,
+    // The whole declared cheque: the range when they gave one, else the
+    // typical cheque ("$250k–$1M", "€3M").
+    yourCheque:
+      cheque.min !== undefined && cheque.max !== undefined
+        ? `${formatMoney(cheque.min, cheque.currency)}–${formatMoney(cheque.max, cheque.currency)}`
+        : cheque.typical !== undefined
+          ? formatMoney(cheque.typical, cheque.currency)
+          : undefined,
     roundSize:
       round === null
         ? undefined
@@ -409,6 +417,18 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
     return { ...unknownObservation(facts), unknownReason: "ROUND_NOT_SHARED" };
   }
   const share = ref / compared;
+  // "up to 40% of it": the largest declared cheque against the round, in
+  // whole percent; said only when it is a real share of the round.
+  const top =
+    amountOf(cheque.max) ?? amountOf(cheque.typical) ?? amountOf(cheque.min);
+  const topShare = top === null ? null : top / compared;
+  const sharedFacts = {
+    ...facts,
+    chequeShare:
+      topShare === null || topShare <= 0 || topShare > 1
+        ? undefined
+        : `${String(Math.max(1, Math.round(topShare * 100)))}%`,
+  };
   const c = config.comparators;
   const outcome =
     share >= c.chequeShareStrongMin && share <= c.chequeShareStrongMax
@@ -421,7 +441,7 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
     applicable: true,
     evidenceStatus: round.evidenceStatus,
     stale: false,
-    facts,
+    facts: sharedFacts,
     ...(converted === null || fx === null
       ? {}
       : {
