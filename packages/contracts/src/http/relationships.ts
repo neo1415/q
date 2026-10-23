@@ -201,9 +201,22 @@ export const NETWORK_COMPANY_INTEREST_PATH =
  * event's source and never widens who may act. There is no field for an
  * organisation, a tenant or a relationship — those are the server's answers.
  */
+/**
+ * An investor's optional note with their Express Interest (decision B,
+ * 2026-10-23): what the founders read with the interest. Shared only
+ * between the two parties of the relationship; never a ranking input.
+ */
+export const INTEREST_NOTE_MAX = 1000;
+export const InterestNoteSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(INTEREST_NOTE_MAX);
+
 export const ExpressInterestRequestSchema = z
   .object({
     surface: z.enum(["RECOMMENDATION_FEED", "COMPANY_PROFILE"]),
+    note: InterestNoteSchema.optional(),
   })
   .strict();
 export type ExpressInterestRequest = z.infer<
@@ -245,6 +258,8 @@ export const InterestDtoSchema = z
     companyId: UuidSchema,
     status: z.enum(["EXPRESSED", "WITHDRAWN"]),
     expressedAt: UtcTimestampSchema,
+    /** Their own note with it (decision B); null or absent when none. */
+    note: InterestNoteSchema.nullable().optional(),
     response: InterestResponseStatusSchema.default("PENDING"),
     respondedAt: UtcTimestampSchema.nullable().default(null),
     connection: ConnectionDtoSchema.nullable().default(null),
@@ -429,6 +444,11 @@ export const IncomingInterestDtoSchema = z
     investorPhotoUrl: z.string().url().nullable().optional(),
     investorType: z.string().min(1).max(64),
     expressedAt: UtcTimestampSchema,
+    /**
+     * The investor's note with the interest, for the founders (decision B);
+     * null when they wrote none. Optional so older clients still parse.
+     */
+    note: InterestNoteSchema.nullable().optional(),
     response: InterestResponseStatusSchema,
     respondedAt: UtcTimestampSchema.nullable(),
     connection: ConnectionDtoSchema.nullable(),

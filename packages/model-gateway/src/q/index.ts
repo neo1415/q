@@ -6838,6 +6838,7 @@ export function createModelGatewayQAnswer(
             let heldThisRound = 0;
             // A first contact prepared by code this round (first-contact.ts).
             let firstContact: Promise<QToolCallOutcome> | null = null;
+            let firstContactWithNote = false;
             const chainedThisRound: {
               readonly name: string;
               readonly read: Promise<QToolCallOutcome>;
@@ -6932,6 +6933,7 @@ export function createModelGatewayQAnswer(
                 !proposals.some((other) => other.name === FIRST_CONTACT_TOOL) &&
                 calls + chainedThisRound.length + 1 < Q_TOOL_LOOP_MAX_CALLS
               ) {
+                firstContactWithNote = "note" in contact;
                 firstContact = callTool(
                   {
                     callId: "q-first-contact",
@@ -7100,7 +7102,7 @@ export function createModelGatewayQAnswer(
                   failureCode: outcome.failureCode,
                   latencyMs: outcome.latencyMs,
                 });
-                const told = firstContactMessage(outcome);
+                const told = firstContactMessage(outcome, firstContactWithNote);
                 if (told !== null) chainedResults.push(told);
               }
             }

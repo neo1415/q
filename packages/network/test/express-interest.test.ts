@@ -190,6 +190,20 @@ describe("idempotency fingerprints", () => {
   });
 });
 
+describe("a note travels with the interest (decision B)", () => {
+  it("keeps the no-note fingerprint unchanged, and a note is part of the request", () => {
+    expect(hashExpressInterestRequest(COMPANY, undefined)).toBe(
+      hashExpressInterestRequest(COMPANY),
+    );
+    expect(hashExpressInterestRequest(COMPANY, "Hello")).not.toBe(
+      hashExpressInterestRequest(COMPANY),
+    );
+    expect(hashExpressInterestRequest(COMPANY, "Hello")).not.toBe(
+      hashExpressInterestRequest(COMPANY, "Hello again"),
+    );
+  });
+});
+
 describe("network.relationship.interest_expressed@1", () => {
   it("is INTERNAL and carries identifiers only", () => {
     const registry = createEventRegistry([...NETWORK_EVENTS]);

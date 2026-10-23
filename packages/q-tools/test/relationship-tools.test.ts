@@ -529,6 +529,37 @@ describe("proposal tools write nothing but a prepared proposal", () => {
     expect(prepared?.payload["companyId"]).toBe(COMPANY_B_NETWORK);
   });
 
+  it("propose_express_interest carries the investor's note into the approved payload (decision B)", async () => {
+    const { port, calls } = fakeRelationships(randomHistory(4));
+    const outcome = await executorWith(port).execute(
+      {
+        callId: "p1note",
+        name: "propose_express_interest",
+        arguments: {
+          companyId: COMPANY_B_NETWORK,
+          note: "  We lead seed rounds in African fintech.  ",
+        },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    // The note is part of what the person approves: changing it is a new approval.
+    expect(calls.prepared[0]?.payload).toMatchObject({
+      companyId: COMPANY_B_NETWORK,
+      note: "We lead seed rounds in African fintech.",
+    });
+    const tooLong = await executorWith(port).execute(
+      {
+        callId: "p1long",
+        name: "propose_express_interest",
+        arguments: { companyId: COMPANY_B_NETWORK, note: "x".repeat(1001) },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(tooLong.status).not.toBe("SUCCEEDED");
+    expect(calls.prepared).toHaveLength(1);
+  });
+
   it("by name from any page (action parity 2026-10-02): 'express interest in beacon analytics' prepares it for that company", async () => {
     const { port: base, calls } = fakeRelationships(randomHistory(4));
     // Beacon is a company they already have a relationship with.

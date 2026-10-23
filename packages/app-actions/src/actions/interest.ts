@@ -92,6 +92,7 @@ const EXPRESS_INTEREST = defineAppAction<
       actor: context.actor,
       companyId: input.companyId,
       surface: input.input.surface,
+      ...(input.input.note === undefined ? {} : { note: input.input.note }),
       idempotencyKey: input.idempotencyKey,
       correlationId: context.correlationId,
     }),
@@ -101,16 +102,22 @@ const EXPRESS_INTEREST = defineAppAction<
   // Named: a standing instruction prepares several at once, and five
   // identical "the company is told" cards could not be told apart (QA
   // 2026-10-03, instruction ff4ceb3f).
-  card: (_input, names) =>
-    names?.counterpart == null
+  card: (input, names) => {
+    // The note is part of what is approved: shown in full on the card.
+    const note =
+      input.input.note === undefined
+        ? ""
+        : ` With your note: "${input.input.note}"`;
+    return names?.counterpart == null
       ? {
           summary: "Express interest",
-          preview: "The company is told you're interested.",
+          preview: `The company is told you're interested.${note}`,
         }
       : {
           summary: `Express interest in ${names.counterpart}`,
-          preview: `${names.counterpart} is told you're interested.`,
-        },
+          preview: `${names.counterpart} is told you're interested.${note}`,
+        };
+  },
   done: () => "Done. They know you're interested.",
   http: {
     method: "POST",

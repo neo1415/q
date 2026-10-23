@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  InterestNoteSchema,
   QActionTypeSchema,
   UuidSchema,
   type QSubjectRef,
@@ -35,6 +36,11 @@ export const ExpressInterestPayloadSchema = z
     companyId: UuidSchema,
     /** Shown to the approver; the binding is the id. */
     companyName: z.string().trim().min(1).max(200),
+    /**
+     * Their note to the founders, sent with the interest (decision B). Part
+     * of the approved payload: a changed note is a new approval.
+     */
+    note: InterestNoteSchema.optional(),
   })
   .strict();
 export type ExpressInterestPayload = z.infer<
@@ -70,7 +76,10 @@ export function createExpressInterestAction(dependencies: {
     // Doc 17 §70: what it means, and that it is not a commitment.
     describe: (payload) => ({
       summary: `Express interest in ${payload.companyName}`,
-      preview: `This tells ${payload.companyName}'s founders your organisation would like to explore the company. It is not a commitment to invest, and it does not connect you or share anything else.`,
+      preview:
+        payload.note === undefined
+          ? `This tells ${payload.companyName}'s founders your organisation would like to explore the company. It is not a commitment to invest, and it does not connect you or share anything else.`
+          : `This tells ${payload.companyName}'s founders your organisation would like to explore the company, with your note: "${payload.note}". Only their founders see the note. It is not a commitment to invest, and it does not connect you or share anything else.`,
     }),
     confirm: (payload, result) =>
       result.alreadyExpressed
@@ -96,6 +105,9 @@ export function createExpressInterestAction(dependencies: {
             actor: context.approver,
             companyId: action.payload.companyId,
             surface: "Q_CONVERSATION",
+            ...(action.payload.note === undefined
+              ? {}
+              : { note: action.payload.note }),
             idempotencyKey: `q-action:${action.idempotencyKey}`,
             correlationId: context.correlationId,
           });

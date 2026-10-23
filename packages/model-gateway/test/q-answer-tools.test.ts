@@ -36,6 +36,7 @@ import {
   Q_TOOL_LOOP_MAX_ROUNDS,
   type QAuthorisedContextPort,
 } from "../src/q/index.js";
+import { firstContactOf } from "../src/q/first-contact.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 import { fitFixture } from "./fit-fixture.js";
 
@@ -1352,11 +1353,39 @@ describe("answer seam tool loop", () => {
       const { executed, second } = await run({ chat: "NOT_CONNECTED" });
       expect(executed).toEqual([
         ["propose_chat_message", { counterpartName: "Anchor", body: NOTE }],
-        ["propose_express_interest", { company: "Anchor" }],
+        // The drafted note travels with the interest, on the same approval.
+        ["propose_express_interest", { company: "Anchor", note: NOTE }],
       ]);
       expect(second).toContain("Capital Q prepared the first step");
       expect(second).toContain("Express interest in Anchor");
+      expect(second).toContain("The note they asked for goes with it");
       expect(second).toContain("Nothing is sent until they approve");
+    });
+
+    it("never cuts a note longer than an interest note: the interest goes without it", () => {
+      const long = "x".repeat(1001);
+      const outcome = succeeded(
+        { callId: "c", name: "propose_chat_message", arguments: {} },
+        { status: "NOT_CONNECTED" },
+      );
+      expect(
+        firstContactOf(
+          {
+            name: "propose_chat_message",
+            arguments: { counterpartName: "Anchor", body: long },
+          },
+          outcome,
+        ),
+      ).toEqual({ company: "Anchor" });
+      expect(
+        firstContactOf(
+          {
+            name: "propose_email",
+            arguments: { companyId: "c-1", subject: "Hi", body: "  Hello  " },
+          },
+          outcome,
+        ),
+      ).toEqual({ companyId: "c-1", note: "Hello" });
     });
 
     it("does the same when there is no relationship yet (not available)", async () => {

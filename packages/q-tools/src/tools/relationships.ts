@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  InterestNoteSchema,
   Q_TASK_CLASSES,
   RelationshipBriefSchema,
   RelationshipStateV2Schema,
@@ -476,6 +477,8 @@ export const ListIncomingInterestOutputSchema = z
             investorName: z.string(),
             investorType: z.string(),
             expressedAt: UtcTimestampSchema,
+            /** The investor's note to the founders with it; null when none. */
+            note: z.string().nullable(),
             answer: z.enum(["PENDING", "ACCEPTED", "DECLINED"]),
             answeredAt: UtcTimestampSchema.nullable(),
           })
@@ -502,7 +505,7 @@ function createListIncomingInterestTool(
     status: "ACTIVE",
     providerName: "list_incoming_interest",
     description:
-      "The investor organisations that have expressed interest in the person's own company, when each did, and whether the company has accepted, declined or not yet answered. Call it when a founder asks who is interested, or before preparing an answer to an interest.",
+      "The investor organisations that have expressed interest in the person's own company, when each did, the note each sent with it (if any, in their own words), and whether the company has accepted, declined or not yet answered. Call it when a founder asks who is interested, or before preparing an answer to an interest.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     requiredCapabilities: [capability("company.interest.view")],
@@ -529,6 +532,7 @@ function createListIncomingInterestTool(
             investorName: item.investorName,
             investorType: item.investorType,
             expressedAt: item.expressedAt,
+            note: item.note ?? null,
             answer: item.response,
             answeredAt: item.respondedAt,
           })),
@@ -575,6 +579,9 @@ export const ProposeExpressInterestInputSchema = z
       .describe(
         "Or the company's name as the person said it, from any page; Capital Q finds it among companies they can see.",
       ),
+    note: InterestNoteSchema.optional().describe(
+      "A short note to the founders, sent with the interest, when they asked to say something (a call next week, a question): in their voice, up to 1000 characters. Only the company's founders see it.",
+    ),
   })
   .strict()
   .refine(
@@ -640,17 +647,24 @@ function createProposeExpressInterestTool(
         companyName: profile.canonicalName,
       });
     },
-    execute: (_input, context, grant) => {
+    execute: (input, context, grant) => {
       const status = relationships.prepareForApproval({
         runId: context.runId,
         tenantId: context.actor.tenantId,
         actorUserId: context.actor.userId,
         actionType: "relationship.interest.express",
-        payload: { companyId: grant.companyId, companyName: grant.companyName },
+        payload: {
+          companyId: grant.companyId,
+          companyName: grant.companyName,
+          ...(input.note === undefined ? {} : { note: input.note }),
+        },
       });
       return Promise.resolve({
         status,
-        awaitingApprovalOf: `Express interest in ${grant.companyName}`,
+        awaitingApprovalOf:
+          input.note === undefined
+            ? `Express interest in ${grant.companyName}`
+            : `Express interest in ${grant.companyName}, with your note to the founders`,
       });
     },
   });

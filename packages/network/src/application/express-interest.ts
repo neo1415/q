@@ -8,9 +8,10 @@ import {
   occurredNow,
 } from "@capital-q/audit";
 import { CompanyIdSchema, type CompanyId } from "@capital-q/companies";
-import type {
-  CorrelationId,
-  RelationshipSourceType,
+import {
+  InterestNoteSchema,
+  type CorrelationId,
+  type RelationshipSourceType,
 } from "@capital-q/contracts";
 import { InvestorOrganisationIdSchema } from "@capital-q/investors";
 import {
@@ -76,6 +77,12 @@ export type ExpressInterestCommand = {
   /** Input, never proof: checked for existence and visibility below. */
   readonly companyId: string;
   readonly surface: InterestSurface;
+  /**
+   * The investor's optional note to the founders (decision B): trimmed,
+   * 1-1000 characters. Part of what the request means, so a retry with a
+   * different note is a different request.
+   */
+  readonly note?: string | undefined;
   readonly idempotencyKey: string;
   readonly correlationId: CorrelationId;
 };
@@ -139,8 +146,15 @@ export function hashInterestIdempotencyKey(key: string): string {
  * the command; the surface is provenance, so a retry that reports a
  * different surface is still the same request.
  */
-export function hashExpressInterestRequest(companyId: string): string {
-  return sha256Hex(JSON.stringify({ companyId }));
+export function hashExpressInterestRequest(
+  companyId: string,
+  note?: string,
+): string {
+  // Without a note the fingerprint is exactly what it always was, so a
+  // stored request keeps its meaning.
+  return sha256Hex(
+    JSON.stringify(note === undefined ? { companyId } : { companyId, note }),
+  );
 }
 
 type Authorised = {
@@ -255,7 +269,13 @@ export function createExpressInterest(
     }
 
     const keyHash = hashInterestIdempotencyKey(command.idempotencyKey);
-    const requestHash = hashExpressInterestRequest(authorised.companyId);
+    // The note as the founders will read it; a blank one is no note.
+    const note = InterestNoteSchema.optional().parse(
+      command.note === undefined || command.note.trim() === ""
+        ? undefined
+        : command.note,
+    );
+    const requestHash = hashExpressInterestRequest(authorised.companyId, note);
     const source = { type: SOURCE_BY_SURFACE[command.surface] };
 
     return transactions.run(async (tx) => {
@@ -343,6 +363,7 @@ export function createExpressInterest(
         expressedByUserId: actor.userId,
         expressedInOrganisationId: authorised.organisationId,
         relationshipEventId: event.id,
+        note: note ?? null,
       });
       await audit.record(tx, {
         ...auditActorFromContext(actor),

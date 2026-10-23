@@ -3589,6 +3589,7 @@ export type Database = {
           expressed_by_user_id: string
           expressed_in_organisation_id: string
           id: string
+          note: string | null
           relationship_event_id: string
           relationship_id: string
           status: string
@@ -3601,6 +3602,7 @@ export type Database = {
           expressed_by_user_id: string
           expressed_in_organisation_id: string
           id?: string
+          note?: string | null
           relationship_event_id: string
           relationship_id: string
           status?: string
@@ -3613,6 +3615,7 @@ export type Database = {
           expressed_by_user_id?: string
           expressed_in_organisation_id?: string
           id?: string
+          note?: string | null
           relationship_event_id?: string
           relationship_id?: string
           status?: string
