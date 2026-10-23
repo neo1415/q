@@ -185,6 +185,46 @@ describe("public pictures of who a turn names", () => {
     expect(pictures.map((p) => p.domain)).toEqual(["nairametrics.com"]);
   });
 
+  it("reads the page's address when the title is empty or a file name, and names a hyphenated surname (live 2026-10-23)", async () => {
+    const found = index([
+      {
+        imageUrl: "https://global.ariseplay.com/amg/thisdaylive/zino.jpg",
+        thumbnailUrl: null,
+        pageUrl:
+          "https://www.thisdaylive.com/index.php/2022/09/09/zino-aviation-takes-off-with-pilot-masterclass/",
+        title: null,
+      },
+      {
+        imageUrl: "https://static.wixstatic.com/media/ad758c_7d.jpg",
+        thumbnailUrl: null,
+        pageUrl: "https://zinoaviation.com/",
+        title: "2298efc2-37a3-4e9b-a295-93837c2a8400.jpg",
+      },
+      {
+        imageUrl: "https://cdn.zoominfo.com/zino.jpg",
+        thumbnailUrl: null,
+        pageUrl: "https://www.zoominfo.com/p/zino/10649437180",
+        title: "Zino Mario-Ghae, Chief Executive Officer",
+      },
+    ]);
+    const search = createPublicPictureSearch({ provider: found.provider });
+    const pictures = await search.find({
+      name: "Captain Zino Mario",
+      organisation: "Zino Aviation",
+      userText: "Who is Captain Zino Mario?",
+      max: 3,
+    });
+    expect(pictures.map((p) => p.domain).sort()).toEqual([
+      "thisdaylive.com",
+      "zinoaviation.com",
+      "zoominfo.com",
+    ]);
+    // A file name is no description: the alt says whose and from where.
+    expect(pictures.find((p) => p.domain === "zinoaviation.com")?.title).toBe(
+      "Zino Aviation, from zinoaviation.com",
+    );
+  });
+
   it("is no pictures, never an error, when the index fails", async () => {
     const search = createPublicPictureSearch({
       provider: {

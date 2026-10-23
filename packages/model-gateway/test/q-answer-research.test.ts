@@ -2121,3 +2121,150 @@ describe("the web lane lands within its budget or is dropped (owner 2026-10-23)"
     );
   });
 });
+
+describe("pictures whatever the research mode (live 2026-10-23)", () => {
+  it("looks for the named company's pictures on a turn read as their own records", async () => {
+    const asked: string[] = [];
+    const port: QToolPort = {
+      offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
+      execute: (proposal) =>
+        Promise.resolve(researchOutcome(proposal, "Zino Aviation.")),
+    };
+    const { seam, request, answerBlocks } = build({
+      script: [{ kind: "JSON", value: analystResult("From the records.") }],
+      tools: port,
+      userText: "Tell me about Zino Aviation and its team",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "ONLY_IF_EMPTY",
+          announceSourceChange: true,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: (input) => {
+          asked.push(input.name);
+          return Promise.resolve([
+            {
+              imageUrl: "https://cdn.nairametrics.com/zino.jpg",
+              pageUrl: "https://nairametrics.com/2026/07/19/zino-aviation-ceo/",
+              domain: "nairametrics.com",
+              title: "Zino Aviation CEO",
+            },
+          ]);
+        },
+      },
+    });
+    expect(
+      (await seam.answer({ ...request, aboutNamedOther: true })).kind,
+    ).toBe("ANSWERED");
+    expect(asked).toEqual(["Zino Aviation"]);
+    expect(answerBlocks).toContainEqual(
+      expect.objectContaining({ kind: "PICTURE", source: "PUBLIC_WEB" }),
+    );
+  });
+});
+
+describe("a person found only as a candidate is pictured through their organisation (live 2026-10-23)", () => {
+  it("asks for pictures with the sole candidate's organisation when the name alone found none", async () => {
+    const asked: { name: string; organisation?: string | undefined }[] = [];
+    const FIND: QOfferedTool = {
+      toolName: "people.find",
+      toolVersion: 1,
+      classification: "READ_ONLY",
+      definition: {
+        name: "find_public_entity",
+        description: "Finds a public person or organisation.",
+        inputJsonSchema: { type: "object", properties: {} },
+      },
+      visibleStage: "SEARCHING_PUBLIC_SOURCES",
+    };
+    const AMBIGUOUS = {
+      outcome: "AMBIGUOUS",
+      candidates: [
+        {
+          displayName: "Zino Mario-Ghae",
+          profileUrl: "https://ng.linkedin.com/in/zino-mario-ghae-091293110",
+          role: "Founder",
+          organization: "Zino Aviation",
+          location: null,
+          confidence: "PLAUSIBLE",
+        },
+      ],
+      clarifyingQuestion: "Which Captain Zino Mario do you mean?",
+      elapsedMs: 900,
+      card: null,
+    };
+    const port: QToolPort = {
+      offer: () => Promise.resolve([FIND]),
+      execute: (proposal) =>
+        Promise.resolve({
+          callId: proposal.callId,
+          toolName: "people.find",
+          toolVersion: 1,
+          classification: "READ_ONLY",
+          status: "SUCCEEDED",
+          failureCode: null,
+          sensitivity: "PUBLIC",
+          result: { ok: true, data: { result: AMBIGUOUS, source: "WEB" } },
+          latencyMs: 1,
+        }),
+    };
+    const { seam, request, answerBlocks } = build({
+      script: [{ kind: "JSON", value: analystResult("unused") }],
+      tools: port,
+      userText: "Who is Captain Zino Mario?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "NEVER",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: (input) => {
+          asked.push({ name: input.name, organisation: input.organisation });
+          return Promise.resolve(
+            input.organisation === undefined
+              ? []
+              : [
+                  {
+                    imageUrl: "https://cdn.nairametrics.com/zino.jpg",
+                    pageUrl:
+                      "https://nairametrics.com/2026/07/19/zino-aviation-ceo/",
+                    domain: "nairametrics.com",
+                    title: "Zino Aviation CEO",
+                  },
+                ],
+          );
+        },
+      },
+    });
+    const outcome = await seam.answer({
+      ...request,
+      questionKind: "PERSON_SEARCH",
+      personSearch: {
+        name: "Captain Zino Mario",
+        entityKind: "PERSON",
+        city: null,
+        country: null,
+        organization: null,
+        role: null,
+        freshSearch: false,
+      },
+    });
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(asked).toEqual([
+      { name: "Captain Zino Mario", organisation: undefined },
+      { name: "Captain Zino Mario", organisation: "Zino Aviation" },
+    ]);
+    expect(answerBlocks).toContainEqual(
+      expect.objectContaining({
+        kind: "PICTURE",
+        pageUrl: "https://nairametrics.com/2026/07/19/zino-aviation-ceo/",
+      }),
+    );
+  });
+});
