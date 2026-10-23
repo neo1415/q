@@ -165,6 +165,27 @@ function researchOutcome(
   };
 }
 
+/** The research service's verdict on whether each page is about them. */
+function withMatch(
+  outcome: QToolCallOutcome,
+  subjectMatch: "MATCH" | "POSSIBLE" | "NONE",
+): QToolCallOutcome {
+  if (!outcome.result.ok) return outcome;
+  const data = outcome.result.data as {
+    readonly sources: readonly Record<string, unknown>[];
+  };
+  return {
+    ...outcome,
+    result: {
+      ok: true,
+      data: {
+        ...data,
+        sources: data.sources.map((source) => ({ ...source, subjectMatch })),
+      },
+    },
+  };
+}
+
 function toolPort(
   offered: readonly QOfferedTool[],
   script: (proposal: QToolProposal) => QToolCallOutcome,
@@ -2108,10 +2129,59 @@ describe("someone they only pointed at is not searched for on the web (productio
 });
 
 describe("pictures of who the turn names, from public pages (owner 2026-10-23)", () => {
+  // QA F-17 (2026-10-23): the search found nothing about them, and
+  // pictures from reddit and a token's site were still shown.
+  it("shows no picture at all when the web search found no page about them", async () => {
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      withMatch(researchOutcome(p, "A forum thread."), "NONE"),
+    );
+    const { seam, request, answerBlocks } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: {
+            ...analystResult("Nothing public on Zino Aviation."),
+            visual: "PICTURE",
+            pictureQuery: "Zino Aviation",
+          },
+        },
+      ],
+      tools: tools.port,
+      userText: "Who runs Zino Aviation?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () =>
+          Promise.resolve([
+            {
+              imageUrl: "https://i.redd.it/zino.jpg",
+              pageUrl: "https://www.reddit.com/r/aviation/zino_aviation",
+              domain: "reddit.com",
+              title: "Zino Aviation thread",
+            },
+          ]),
+      },
+    });
+    expect((await seam.answer({ ...request, ...ABOUT_ZINO })).kind).toBe(
+      "ANSWERED",
+    );
+    expect(
+      answerBlocks.filter(
+        (block) => (block as { kind?: string }).kind === "PICTURE",
+      ),
+    ).toEqual([]);
+  });
+
   it("looks for them beside the web search and shows them after the words, credited to their pages", async () => {
     const asked: { name: string; userText: string }[] = [];
     const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
-      researchOutcome(p, "Zino Aviation flies charter."),
+      withMatch(researchOutcome(p, "Zino Aviation flies charter."), "MATCH"),
     );
     const { seam, request, answerBlocks } = build({
       script: [
