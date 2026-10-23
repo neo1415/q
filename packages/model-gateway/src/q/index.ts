@@ -2789,6 +2789,8 @@ export function createModelGatewayQAnswer(
      * code-built table, and the table is a fact the answer is spoken from.
      */
     let compareFacts: readonly AuthorisedFact[] = [];
+    /** The companies compared, in order; the table holds only these. */
+    let compareIds: readonly string[] = [];
     const compareRead = (async (): Promise<void> => {
       if (latest === undefined) return;
       const targets = compareTargets(
@@ -2824,9 +2826,11 @@ export function createModelGatewayQAnswer(
         question: latest.content,
         read: runCompanies.read(request.runId),
         fits: runFits.read(request.runId),
+        only: targets,
       });
       const statement = table === null ? null : comparisonFactStatement(table);
       if (statement === null) return;
+      compareIds = targets;
       compareFacts = [
         {
           scope: "NETWORK_VISIBLE_DATA",
@@ -3658,6 +3662,7 @@ export function createModelGatewayQAnswer(
       attachedDocuments,
       attachedTitles,
       compareFacts,
+      compareIds,
       onScreenDocumentCall,
       onScreenPage,
       onScreenDossier,
@@ -4023,6 +4028,7 @@ export function createModelGatewayQAnswer(
         attachedDocuments,
         attachedTitles,
         compareFacts,
+        compareIds,
         onScreenDocumentCall,
         onScreenPage,
         onScreenDossier,
@@ -6008,7 +6014,14 @@ export function createModelGatewayQAnswer(
         sweep !== null && (sweep.ask.exclude?.length ?? 0) > 0
           ? { count: sweep.ask.count }
           : undefined;
+      // Live 23 Oct 2026 (run f5415b0c): "compare the top two side by
+      // side", read as a fit question, was answered here by code from the
+      // sweep's scores alone; the compare reads and the table never reached
+      // it. A comparison resolved to its companies goes to the answer that
+      // speaks from the table.
+      const comparing = compareIds.length >= 2;
       if (
+        !comparing &&
         beyondShown !== undefined &&
         sweep !== null &&
         sweep.fits.length === 0 &&
@@ -6041,6 +6054,7 @@ export function createModelGatewayQAnswer(
         };
       }
       if (
+        !comparing &&
         sweep !== null &&
         sweep.ask.fitAsked &&
         // Only the existing structured reading can certify ranking alone.
@@ -7880,6 +7894,7 @@ export function createModelGatewayQAnswer(
               question: latest.content,
               read: companiesRead,
               fits: fitsRead,
+              ...(compareIds.length >= 2 ? { only: compareIds } : {}),
             });
         const codeBlocks = [
           ...(builtCards === null ? [] : [builtCards]),
