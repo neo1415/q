@@ -18,7 +18,8 @@ export const RESEARCH_BOUNDS = {
    * queries, the past-month companion of the first, and one refinement.
    * Each call may fan out to every configured index in parallel.
    */
-  maxSearchCalls: 6,
+  // Up to four phrasings, the month's news and the LinkedIn lane's two.
+  maxSearchCalls: 8,
   /** Distinct queries one research turn plans (web search 2026-10-06). */
   maxPlannedQueries: 4,
   /** Hits one search call may return after merging every index's results. */

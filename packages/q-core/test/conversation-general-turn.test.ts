@@ -137,7 +137,7 @@ describe("research is intentional outside the interview too", () => {
     }
   });
 
-  it("keeps a named fit question on Capital Q's computed answer, their own records records-first, and never searches when research is down", () => {
+  it("keeps a named fit question on Capital Q's computed answer, searches beside their own records, and never searches when research is down", () => {
     const records = read({
       question: {
         kind: "THEIR_OWN_RECORDS",
@@ -149,9 +149,11 @@ describe("research is intentional outside the interview too", () => {
       },
       aboutNamedOther: true,
     });
+    // Owner 2026-10-23: a named other is searched beside their records,
+    // even on a question about their own records.
     expect(directive(records)).toEqual({
-      mode: "ONLY_IF_EMPTY",
-      announceSourceChange: true,
+      mode: "EXPLICIT",
+      announceSourceChange: false,
     });
     const fit = read({
       question: {

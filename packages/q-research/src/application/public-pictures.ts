@@ -48,6 +48,12 @@ export type PublicPictureSearch = {
   readonly find: (input: {
     /** The company or person, as the person named them. */
     readonly name: string;
+    /**
+     * For a person: the organisation a public lookup placed them at. Public
+     * already, so it may travel with their name; a picture's page may name
+     * either (a company's page about its founder).
+     */
+    readonly organisation?: string | undefined;
     readonly userText: string;
     readonly earlierUserText?: readonly string[] | undefined;
     readonly max?: number | undefined;
@@ -104,12 +110,20 @@ export function createPublicPictureSearch(input: {
     | undefined;
 }): PublicPictureSearch {
   return {
-    find: async ({ name, userText, earlierUserText, max, signal }) => {
+    find: async ({
+      name,
+      organisation,
+      userText,
+      earlierUserText,
+      max,
+      signal,
+    }) => {
+      const org = organisation?.trim() ?? "";
       const composed = composeEgressQuery({
-        requestedQuery: name,
+        requestedQuery: org.length > 0 ? `${name} ${org}` : name,
         userText,
         earlierUserText,
-        publicIdentity: [],
+        publicIdentity: org.length > 0 ? [org] : [],
       });
       // Only a name made wholly of the person's own words is searched.
       if (!composed.ok || composed.droppedTokens > 0) return [];
@@ -127,7 +141,15 @@ export function createPublicPictureSearch(input: {
       const pages = new Set<string>();
       for (const hit of hits) {
         const title = hit.title?.trim() ?? "";
-        if (title.length === 0 || !textNamesEntity(name, title)) continue;
+        if (
+          title.length === 0 ||
+          !(
+            textNamesEntity(name, title) ||
+            (org.length > 0 && textNamesEntity(org, title))
+          )
+        ) {
+          continue;
+        }
         const page = judgePublicUrl(hit.pageUrl);
         const image = https(hit.imageUrl) ?? https(hit.thumbnailUrl);
         if (!page.ok || !page.url.startsWith("https://") || image === null) {

@@ -160,6 +160,31 @@ describe("public pictures of who a turn names", () => {
     expect(pictures).toHaveLength(1);
   });
 
+  it("asks with their organisation, and keeps its pages about them (live 2026-10-23)", async () => {
+    const found = index([
+      {
+        imageUrl: "https://mariowiki.com/captain.png",
+        thumbnailUrl: null,
+        pageUrl: "https://www.mariowiki.com/Captain_Toad",
+        title: "Mario encountering Captain Toad",
+      },
+      {
+        imageUrl: "https://cdn.nairametrics.com/zino-ceo.jpg",
+        thumbnailUrl: null,
+        pageUrl: "https://nairametrics.com/2026/07/19/zino-aviation-ceo/",
+        title: "Zino Aviation CEO",
+      },
+    ]);
+    const search = createPublicPictureSearch({ provider: found.provider });
+    const pictures = await search.find({
+      name: "Captain Zino Mario",
+      organisation: "Zino Aviation",
+      userText: "Who is Captain Zino Mario?",
+    });
+    expect(found.queries).toEqual(["captain zino mario zino aviation"]);
+    expect(pictures.map((p) => p.domain)).toEqual(["nairametrics.com"]);
+  });
+
   it("is no pictures, never an error, when the index fails", async () => {
     const search = createPublicPictureSearch({
       provider: {

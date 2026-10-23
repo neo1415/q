@@ -996,7 +996,17 @@ const SOURCE_CHANGE_NOTE: ModelMessage = {
 const WEB_BESIDE_RECORDS_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
-    "Capital Q searched the public web for this question, beside its own records; the result is above. Answer from both: what Capital Q's records hold, and what the public sources say, naming the source (site and date where given) for what comes from them. Public sources are public material of unknown reliability, not verified facts. Never say you cannot search, browse or access the internet: the search ran. If it found nothing relevant or failed, say so in one sentence, then give what was found.",
+    'Capital Q searched the public web for this question, beside its own records; the result is above. Compose from whatever was found. When Capital Q\'s records hold something about them and the public sources do too, give the records first ("In Capital Q: …") and then the public sources ("Public sources also say: …"), naming the site and date for each public fact; keep the two apart and never present a public source as verified. When only one of them holds something, answer from that one. When neither does, say so plainly in one sentence. Never say you cannot search, browse or access the internet: the search ran. If it failed, say so in one sentence, then give what was found.',
+};
+
+/** How long the answer waits for the turn's web search, from its start. */
+const WEB_LANE_BUDGET_MS = 9_000;
+
+/** What the model is told when the web search did not land in its budget. */
+const WEB_LANE_DROPPED_NOTE: ModelMessage = {
+  role: "SYSTEM",
+  content:
+    "The public web search for this question did not return in time. Answer from Capital Q's records, and say in one sentence that public sources were not checked this time.",
 };
 
 /**
@@ -1742,6 +1752,8 @@ export type ModelGatewayQAnswerDependencies = {
    * public pages, found beside the turn's web search. Absent: none.
    */
   readonly publicPictures?: QPublicPicturePort | undefined;
+  /** How long an answer waits for the turn's web search (default 9 s). */
+  readonly webLaneBudgetMs?: number | undefined;
   /**
    * RECOVERY-2026-10 (C's request): what came of Q's recent screen acts,
    * from the receipts the person's browser reported (C's `receiptFacts`:
@@ -4092,6 +4104,7 @@ export function createModelGatewayQAnswer(
       const earlyWeb: {
         readonly call: ReturnType<typeof researchCallOf>;
         readonly outcome: Promise<QToolCallOutcome>;
+        readonly startedAt: number;
         claimed: boolean;
       } | null =
         research?.mode === "EXPLICIT" &&
@@ -4162,7 +4175,7 @@ export function createModelGatewayQAnswer(
                 },
                 "q early web search started",
               );
-              return { call, outcome, claimed: false };
+              return { call, outcome, startedAt: webStarted, claimed: false };
             })()
           : null;
       /**
@@ -4193,6 +4206,18 @@ export function createModelGatewayQAnswer(
       let wideReads: WideReads = withoutWideReads
         ? NO_WIDE_READS
         : await prepared.wide();
+      // The records lane's landing, beside the web lane's (owner
+      // 2026-10-23: both start with the turn; each one's time is logged).
+      logger?.info(
+        {
+          qRunId: request.runId,
+          wide: !withoutWideReads,
+          namedCompanies: wideReads.namedCompanies.length,
+          webStarted: earlyWeb !== null,
+          sinceStartMs: Date.now() - startedAt,
+        },
+        "q records lane landed",
+      );
       const route = answerPathOf({
         turnKind: request.turnKind,
         questionKind: request.questionKind,
@@ -5456,13 +5481,41 @@ export function createModelGatewayQAnswer(
               publicSources.push(source);
             }
           }
-          const pictures =
+          let pictures =
             lanePictures === null
               ? []
               : publicPictureBlocks(
                   (await settledWithin(lanePictures, PICTURE_WAIT_MS)) ?? [],
                   new Date().toISOString(),
                 );
+          // A person's name alone often finds namesakes' pictures, which
+          // the page check drops (live 2026-10-23: "captain zino mario"
+          // found game art). Where the lookup placed them at an
+          // organisation, its pages are asked too (a company's page about
+          // its founder, a press interview).
+          const organisation =
+            found.result.card?.subject.organization?.trim() ?? "";
+          if (
+            pictures.length === 0 &&
+            organisation.length > 0 &&
+            dependencies.publicPictures !== undefined &&
+            askedName.length > 0
+          ) {
+            pictures = publicPictureBlocks(
+              (await settledWithin(
+                dependencies.publicPictures.find({
+                  name: askedName,
+                  organisation,
+                  userText: latest.content,
+                  earlierUserText:
+                    toolContext.conversation?.earlierUserText ?? [],
+                  signal: request.signal,
+                }),
+                PICTURE_WAIT_MS,
+              )) ?? [],
+              new Date().toISOString(),
+            );
+          }
           const message = await persistCodeAnswer(found.text, [
             ...(found.block === null ? [] : [found.block]),
             ...pictures,
@@ -6812,12 +6865,38 @@ export function createModelGatewayQAnswer(
         // of that round was said.
         if (earlyWeb !== null && !earlyWeb.claimed) {
           earlyWeb.claimed = true;
-          const outcome = await earlyWeb.outcome;
+          // The web lands within its own budget or is dropped: the answer
+          // never waits on it past that (owner 2026-10-23).
+          const outcome = await settledWithin(
+            earlyWeb.outcome,
+            (dependencies.webLaneBudgetMs ?? WEB_LANE_BUDGET_MS) -
+              (Date.now() - earlyWeb.startedAt),
+          );
           took("research");
           if (request.signal?.aborted === true) {
             return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
           }
-          landResearch(earlyWeb.call, outcome);
+          if (outcome === null) {
+            logger?.warn(
+              {
+                qRunId: request.runId,
+                budgetMs: dependencies.webLaneBudgetMs ?? WEB_LANE_BUDGET_MS,
+                sinceStartMs: Date.now() - startedAt,
+              },
+              "q early web search dropped: over its budget",
+            );
+            messages = [...messages, WEB_LANE_DROPPED_NOTE];
+            // Recorded as the turn's web call, so nothing asks it again.
+            toolCalls.push({
+              toolName: "public_web.search",
+              providerName: PUBLIC_WEB_TOOL,
+              status: "FAILED",
+              failureCode: "OVER_BUDGET",
+              latencyMs: Date.now() - earlyWeb.startedAt,
+            });
+          } else {
+            landResearch(earlyWeb.call, outcome);
+          }
           analyst = undefined;
           final = undefined;
         }

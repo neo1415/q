@@ -94,13 +94,13 @@ export function researchDirectiveFor(
   // AND the web in parallel, not one then the other"). Records-first left
   // a company Capital Q holds thinly ("tell me about Zino Aviation and its
   // team") answered from that thin record, with the web never asked.
-  // A question about their own records that names someone ("what did we
-  // discuss about Tensorgate?") stays records-first: the web adds nothing
-  // to what they discussed (speed lane C, live 2026-10-12).
+  // That includes a question the reader calls their own records (owner,
+  // 23 Oct, repeated: "ALWAYS in parallel"): "Tell me about Zino Aviation
+  // and its team" from a founder Zino Aviation had contacted was read as
+  // their records, went records-first, and waited 10 s for the web.
   if (
     environment.aboutNamedOther === true &&
-    reading.kind === "QUESTION_TO_Q" &&
-    reading.question?.kind !== "THEIR_OWN_RECORDS"
+    reading.kind === "QUESTION_TO_Q"
   ) {
     return environment.available && !isExhausted(state.failures, "RESEARCH")
       ? { mode: "EXPLICIT", announceSourceChange: false }
