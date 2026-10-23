@@ -9,7 +9,7 @@ import {
   type QResultBlock,
 } from "@capital-q/contracts";
 
-import type { RunRead } from "./card-subjects.js";
+import type { ReadCompanyFigure, RunRead } from "./card-subjects.js";
 import { cardRaiseWords, type RunFit } from "./fit-cards.js";
 
 /**
@@ -51,6 +51,72 @@ function row(profile: FitProfileDto | null, parameter: FitParameter): string {
   if (!found.applicable) return "Your mandate sets no preference";
   if (found.outcome === "UNKNOWN") return `Not known: ${found.reason}`;
   return `${FIT_OUTCOME_LABELS[found.outcome]}: ${found.reason}`;
+}
+
+/** Traction-type figures, in the order an investor reads them. */
+const TRACTION_KEYS: readonly RegExp[] = [
+  /\b(arr|annual(ised|ized)? recurring)\b/iu,
+  /\b(mrr|monthly recurring)\b/iu,
+  /revenue/iu,
+  /growth/iu,
+  /\b(customers?|clients?|users?|merchants?)\b/iu,
+  /margin/iu,
+  /\b(gmv|volume|transactions?)\b/iu,
+];
+
+function tractionRank(figure: ReadCompanyFigure): number {
+  const text = `${figure.key} ${figure.statement}`;
+  const at = TRACTION_KEYS.findIndex((pattern) => pattern.test(text));
+  return at < 0 ? Number.POSITIVE_INFINITY : at;
+}
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+/** "2026-09-30T…" -> "Sep 2026"; null when there is no usable date. */
+function asOfWords(asOf: string | null): string | null {
+  if (asOf === null) return null;
+  const match = /^(\d{4})-(\d{2})/u.exec(asOf);
+  const month = match === null ? undefined : MONTHS[Number(match[2]) - 1];
+  return match === null || month === undefined
+    ? null
+    : `${month} ${match[1] ?? ""}`;
+}
+
+/**
+ * Owner 23 Oct 2026: traction numbers first. The company's own published
+ * figures (read_company_figures), each "company-stated" with its date,
+ * never verified; then the fit's traction reading. Unknown stays empty.
+ */
+function tractionCell(
+  figures: readonly ReadCompanyFigure[] | undefined,
+  fitRow: string,
+): string {
+  const stated = (figures ?? [])
+    .filter((figure) => Number.isFinite(tractionRank(figure)))
+    .sort((a, b) => tractionRank(a) - tractionRank(b))
+    .slice(0, 4)
+    .map((figure) => {
+      const when = asOfWords(figure.asOf);
+      const said = figure.statement
+        .trim()
+        .replace(/[.\s]+$/u, "")
+        .slice(0, 140);
+      return `${said} (company-stated${when === null ? "" : `, ${when}`})`;
+    });
+  return [...stated, ...(fitRow.length === 0 ? [] : [fitRow])].join("; ");
 }
 
 function measures(profile: FitProfileDto | null): {
@@ -151,7 +217,12 @@ export function comparisonTableBlock(input: {
     },
     {
       label: "Traction",
-      cells: columns.map((id) => row(profile(id), "TRACTION")),
+      cells: columns.map((id) =>
+        tractionCell(
+          input.read.companyFigures.get(id),
+          row(profile(id), "TRACTION"),
+        ),
+      ),
     },
     { label: "Team", cells: columns.map((id) => row(profile(id), "TEAM")) },
     {

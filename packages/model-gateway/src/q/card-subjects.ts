@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   PersonSearchResultSchema,
   type QAnswerCard,
@@ -214,7 +216,41 @@ export class RunRead extends Map<string, string> {
    * the record's attached image or initials.
    */
   readonly externals = new Map<string, ReadExternal>();
+  /**
+   * Owner 23 Oct 2026: company id -> the figures read_company_figures
+   * returned (only what the company itself published, CURRENT claims), for
+   * the comparison table's traction row. Company-stated, never verified.
+   */
+  readonly companyFigures = new Map<string, readonly ReadCompanyFigure[]>();
 }
+
+/** One company-stated figure, as read_company_figures returned it. */
+export type ReadCompanyFigure = {
+  readonly key: string;
+  readonly statement: string;
+  readonly asOf: string | null;
+  readonly truthClass: string;
+  readonly evidenceStatus: string;
+};
+
+const READ_COMPANY_FIGURES = "company.figures.read";
+
+const CompanyFiguresReadSchema = z.object({
+  companyId: z.string().uuid(),
+  status: z.enum(["AVAILABLE", "NONE"]),
+  figures: z
+    .array(
+      z.object({
+        key: z.string().min(1).max(120),
+        statement: z.string().max(600),
+        asOf: z.string().nullable(),
+        truthClass: z.string(),
+        evidenceStatus: z.string(),
+        lifecycleStatus: z.literal("CURRENT"),
+      }),
+    )
+    .max(40),
+});
 
 /** A researched person or organisation, as a lookup tool returned it. */
 export type ReadExternal = {
@@ -288,11 +324,18 @@ export function createRunCompanies(limit = 200) {
       const external = outcome.result.ok
         ? externalOf(outcome.result.data)
         : null;
+      const figures =
+        outcome.toolName === READ_COMPANY_FIGURES &&
+        outcome.status === "SUCCEEDED" &&
+        outcome.result.ok
+          ? CompanyFiguresReadSchema.safeParse(outcome.result.data)
+          : null;
       if (
         found.companies.length === 0 &&
         found.investors.length === 0 &&
         !relationship?.success &&
-        external === null
+        external === null &&
+        figures?.success !== true
       )
         return;
       let known = runs.get(runId);
@@ -303,6 +346,18 @@ export function createRunCompanies(limit = 200) {
           const oldest = runs.keys().next().value;
           if (oldest !== undefined) runs.delete(oldest);
         }
+      }
+      if (figures?.success === true) {
+        known.companyFigures.set(
+          figures.data.companyId,
+          figures.data.figures.map((figure) => ({
+            key: figure.key,
+            statement: figure.statement,
+            asOf: figure.asOf,
+            truthClass: figure.truthClass,
+            evidenceStatus: figure.evidenceStatus,
+          })),
+        );
       }
       if (external !== null) {
         const key = nameKey(external.name);

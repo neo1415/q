@@ -304,7 +304,7 @@ export function createFitTopCandidatesTool(
     id: FIT_TOP_CANDIDATES,
     providerName: "fit_top_candidates",
     description:
-      "Ranks this investor's own candidates (their relationships, the company requests sent to them, and their feed) by fit with their mandate, and returns the top N side by side: each company's score out of 10 (when enough is known), band, confidence and nine parameter rows with reasons, which row each is best on, and how many were left out and why. Call it for 'give me the top three', 'compare my best matches', or 'which should I look at first'. The order is the platform's; explain it, never reorder it. Show it on screen; it is not a document. Capital Q draws the side-by-side table itself: in words, say the two or three differences that matter most, never the whole table.",
+      "Ranks this investor's own candidates (their relationships, the company requests sent to them, and their feed) by fit with their mandate, and returns the top N side by side: each company's score out of 10 (when enough is known), band, confidence and nine parameter rows with reasons, which row each is best on, and how many were left out and why. Call it for 'give me the top three', 'compare my best matches', or 'which should I look at first'. The order is the platform's; explain it, never reorder it. Show it on screen; it is not a document. Capital Q draws the side-by-side table itself (call read_company_figures for each company too, so its traction row has their numbers): in words, say the two or three differences that matter most, never the whole table.",
     input: FitTopCandidatesInputSchema,
     output: FitTopCandidatesOutputSchema,
     authorize,

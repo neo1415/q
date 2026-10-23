@@ -193,7 +193,7 @@ export function createFitCompareTool(ports: QToolPorts): AnyQToolDefinition {
     id: FIT_COMPARE,
     providerName: "fit_compare",
     description:
-      "Puts 2 to 4 companies side by side on the investor's own fit (the same score out of 10, band, nine parameter rows and 'best of these' as the top three), by default their most recently saved companies. Call it for 'compare my saved companies' or 'compare X and Y'. The order is the platform's; explain it, never reorder it. Show it with show(SAVED_COMPARISON). Capital Q draws the side-by-side table itself: in words, say the two or three differences that matter most, never the whole table.",
+      "Puts 2 to 4 companies side by side on the investor's own fit (the same score out of 10, band, nine parameter rows and 'best of these' as the top three), by default their most recently saved companies. Call it for 'compare my saved companies' or 'compare X and Y'. The order is the platform's; explain it, never reorder it. Show it with show(SAVED_COMPARISON). Capital Q draws the side-by-side table itself (call read_company_figures for each company too, so its traction row has their numbers): in words, say the two or three differences that matter most, never the whole table.",
     requiredCapabilities: [],
     supportedPurposes: [
       "COMPARISON",

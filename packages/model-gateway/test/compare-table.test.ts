@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { QResultBlockSchema } from "@capital-q/contracts";
 
-import { RunRead } from "../src/q/card-subjects.js";
+import { RunRead, createRunCompanies } from "../src/q/card-subjects.js";
 import { asksToCompare, comparisonTableBlock } from "../src/q/compare-table.js";
 import { fitsInOutcome } from "../src/q/fit-cards.js";
 
@@ -110,5 +110,70 @@ describe("compare side by side", () => {
         fits: fits.slice(0, 1),
       }),
     ).toBeNull();
+  });
+
+  // Owner 23 Oct 2026: traction numbers first, as each company states them.
+  it("the traction row leads with the company's own figures, dated, never verified", () => {
+    const companies = createRunCompanies();
+    companies.note("run-1", {
+      toolName: "company.figures.read",
+      status: "SUCCEEDED",
+      classification: "READ_ONLY",
+      result: {
+        ok: true,
+        data: {
+          companyId: MIZAN,
+          status: "AVAILABLE",
+          figures: [
+            {
+              key: "team.size",
+              statement: "12 full-time staff.",
+              value: null,
+              asOf: "2026-09-01",
+              truthClass: "USER_CLAIM",
+              evidenceStatus: "SELF_REPORTED",
+              lifecycleStatus: "CURRENT",
+            },
+            {
+              key: "revenue.mrr",
+              statement: "Monthly recurring revenue is $42,000.",
+              value: null,
+              asOf: "2026-09-30",
+              truthClass: "USER_CLAIM",
+              evidenceStatus: "SELF_REPORTED",
+              lifecycleStatus: "CURRENT",
+            },
+            {
+              key: "customers.count",
+              statement: "1,200 paying customers",
+              value: null,
+              asOf: null,
+              truthClass: "USER_CLAIM",
+              evidenceStatus: "SELF_REPORTED",
+              lifecycleStatus: "CURRENT",
+            },
+          ],
+        },
+      },
+    } as never);
+    const read = companies.take("run-1");
+    const { read: base, fits } = run();
+    for (const [id, name] of base.companyNames) read.companyNames.set(id, name);
+    for (const [id, facts] of base.companyFacts)
+      read.companyFacts.set(id, facts);
+    const block = comparisonTableBlock({
+      question: "compare Mizan and Silo Credit side by side",
+      read,
+      fits,
+    });
+    if (block?.kind !== "TABLE") throw new Error("no table");
+    const traction = block.rows.find((row) => row.label === "Traction")?.cells;
+    expect(traction?.[0]).toMatch(
+      /^Monthly recurring revenue is \$42,000 \(company-stated, Sep 2026\); 1,200 paying customers \(company-stated\)/u,
+    );
+    // Not a traction figure: not in the traction row.
+    expect(traction?.[0]).not.toContain("full-time staff");
+    // A company that published none: only what the fit says, never a zero.
+    expect(traction?.[1]).not.toContain("company-stated");
   });
 });
