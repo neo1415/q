@@ -266,11 +266,13 @@ export async function planAll(
       );
     });
     const tenantId = users[0].tenant_id ?? home?.plan.ids.tenant ?? null;
-    // A personal Q Card only for a founder the fixture names (David, Zino).
-    const founder = fixture.companies.some((c) =>
-      c.founders.some((f) => f.person === person),
+    // A personal Q Card for everyone the fixture puts on a team, founders
+    // and team alike (owner 2026-10-23: each user has their own card, with
+    // their own name and photo, not the company's).
+    const onTeam = fixture.companies.some((c) =>
+      [...c.founders, ...c.team].some((m) => m.person === person),
     );
-    if (!founder || tenantId === null) {
+    if (!onTeam || tenantId === null) {
       people.push({
         person,
         userId,

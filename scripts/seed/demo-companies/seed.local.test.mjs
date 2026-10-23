@@ -353,10 +353,11 @@ test(
     assert.deepEqual(
       [...person].map((row) => ({ ...row })),
       [
+        { handle: "daniel-oyeniyi", organisation_id: null, own: true },
         { handle: "david-nwankwo", organisation_id: null, own: true },
         { handle: "zino-mario", organisation_id: null, own: true },
       ],
-      "founders only: Daniel joins the team without a personal card",
+      "everyone on the team has their own card, owned by them",
     );
   },
 );
