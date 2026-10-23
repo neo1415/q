@@ -398,6 +398,50 @@ describe("open-web search: a company or person by name, no website", () => {
     );
   });
 
+  it("keeps only pages that name them, and puts nothing in place of the rest (production 2026-10-23)", async () => {
+    const index = scriptedIndex("tavily", [
+      {
+        when: "zino aviation",
+        pages: [
+          {
+            url: "https://www.zinoaviation.com/",
+            title: "Pilot training and consultancy",
+            text: "Founded in 2018 by Captain Zino.",
+          },
+          {
+            url: "https://www.linkedin.com/company/zino-aviation",
+            title: "Zino Aviation | LinkedIn",
+            text: "Aviation management.",
+          },
+          {
+            url: "https://slaynews.com/blue-bloods-star-plane-crash/",
+            title: "Star involved in plane crash",
+            text: "A private aviation accident.",
+          },
+        ],
+      },
+    ]);
+    const service = createPublicWebResearchService({
+      provider: index.provider,
+      clock: () => NOW,
+    });
+    const outcome = await service.research({
+      actor,
+      runId: "run-zino-gate",
+      correlationId: "cor_test",
+      requestedQuery: "Tell me about Zino Aviation and its team",
+      entityName: "Zino Aviation",
+      userText: "Tell me about Zino Aviation and its team",
+      subject: null,
+    });
+    expect(outcome.status).toBe("OK");
+    if (outcome.status !== "OK") return;
+    expect(outcome.sources.map((source) => source.domain).sort()).toEqual([
+      "linkedin.com",
+      "zinoaviation.com",
+    ]);
+  });
+
   it("a name no page mentions is NOT_FOUND, after searching", async () => {
     const index = scriptedIndex("tavily", [
       { when: "qwertyzx", pages: [YC_PAGES[0] as Page] },
