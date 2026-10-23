@@ -6,6 +6,7 @@ import {
 } from "@capital-q/contracts";
 
 import {
+  QUESTION_KINDS,
   QuestionToQSchema,
   ReadingConfidenceSchema,
   TranscriptQualitySchema,
@@ -801,3 +802,27 @@ export const TurnReaderV56ResultSchema = TurnReaderV55ResultSchema.extend({
   question: TurnQuestionV56Schema.nullable().default(null),
 }).strict();
 export type TurnReaderV56Result = z.infer<typeof TurnReaderV56ResultSchema>;
+
+export const TURN_READER_V58_SCHEMA_VERSION = 58;
+
+/**
+ * v58 (owner 2026-10-23): the question may be INVESTOR_PROSPECTS -- which
+ * investors a company should approach or which fit it. A kind of its own
+ * for this version only: the published kinds (QUESTION_KINDS) and every
+ * earlier version's output schema stay exactly as they were pinned.
+ */
+export const QUESTION_KINDS_V58 = [
+  ...QUESTION_KINDS,
+  "INVESTOR_PROSPECTS",
+] as const;
+export type QuestionKindV58 = (typeof QUESTION_KINDS_V58)[number];
+
+export const TurnQuestionV58Schema = TurnQuestionV56Schema.extend({
+  kind: z.enum(QUESTION_KINDS_V58),
+}).strict();
+export type TurnQuestionV58 = z.infer<typeof TurnQuestionV58Schema>;
+
+export const TurnReaderV58ResultSchema = TurnReaderV56ResultSchema.extend({
+  question: TurnQuestionV58Schema.nullable().default(null),
+}).strict();
+export type TurnReaderV58Result = z.infer<typeof TurnReaderV58ResultSchema>;

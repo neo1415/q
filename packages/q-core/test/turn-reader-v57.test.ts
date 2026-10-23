@@ -15,8 +15,9 @@ import {
  */
 describe("TURN_READER v57: what Capital Q is, asked alone, is not Q_PITCH", () => {
   it("is the active reader, v56 kept whole plus one Q PITCH exception", () => {
+    // v58 builds on v57 (turn-reader-v58.test.ts).
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(57);
+    expect(active.definition.version).toBeGreaterThanOrEqual(57);
     expect(TURN_READER_V56.status).toBe("DEPRECATED");
     expect(TURN_READER_V57.template).toContain(
       `${V53_Q_PITCH}${V57_WHAT_IS_CAPITAL_Q}`,

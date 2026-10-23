@@ -341,6 +341,18 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
       }
     | undefined;
   /**
+   * TURN_READER v58 (owner 2026-10-23): which investors their own company
+   * should approach, or which fit it, as the reader read it. Answered by
+   * code from investors' network-visible profiles and the investors
+   * already in touch with them, never from an investor's private mandate.
+   */
+  readonly investorProspects?:
+    | {
+        readonly text: string;
+        readonly count: number | null;
+      }
+    | undefined;
+  /**
    * A FIT question as the reader read it (live 2026-10-09): their question
    * in its words -- the earlier ask when this turn only pressed on it
    * ("still waiting") -- and how many companies it asks for, null when

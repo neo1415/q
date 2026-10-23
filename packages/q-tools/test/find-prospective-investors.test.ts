@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { DiscoveryService } from "@capital-q/discovery";
 
@@ -13,6 +13,7 @@ import {
   COMPANY_A,
   COMPANY_B_NETWORK,
   contextFor,
+  fakeMandates,
   fakePorts,
   MARKERS,
   planFor,
@@ -135,6 +136,59 @@ describe("find_prospective_investors", () => {
     expect(data.notes.join(" ")).toContain("not evidence of interest");
     // Nothing of the company's private description travelled.
     expect(JSON.stringify(outcome)).not.toContain(MARKERS.founder);
+  });
+
+  it("Context Firewall: never reads an investor's private mandate for a founder (owner 2026-10-23)", async () => {
+    const PRIVATE = "PRIVATE-MANDATE-THESIS-7f3c";
+    const mandateRead = vi.fn(() =>
+      Promise.reject(new Error(`mandate read: ${PRIVATE}`)),
+    );
+    const mandates = {
+      findCanonicalInvestorMandate: mandateRead,
+      getMandate: mandateRead,
+      listActiveMandates: mandateRead,
+    };
+    const discovery = {
+      sideFor: () => Promise.resolve("FOUNDER"),
+      discoverCompanies: () => Promise.reject(new Error("not used")),
+      discoverInvestors: () =>
+        Promise.resolve({
+          rankingVersion: "discovery.v1",
+          items: [
+            {
+              investorOrganisationId: LONDON_ANGEL,
+              displayName: "Thames Angels",
+              investorType: "ANGEL",
+              hqCountry: "GB",
+              publicDescription: "Early cheques for UK founders.",
+              websiteUrl: null,
+              deploymentState: "ACTIVELY_INVESTING",
+            },
+          ],
+          notes: ["RANKED_ON_DECLARED_PROFILE_ONLY"],
+          nextCursor: null,
+        }),
+    } as unknown as DiscoveryService;
+    const port = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(
+          fakePorts({
+            discovery,
+            mandates: mandates as unknown as ReturnType<typeof fakeMandates>,
+          }),
+        ),
+      ),
+    });
+    const outcome = await port.execute(
+      call({ companyId: COMPANY_A }),
+      contextFor(actorA, founderPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(mandateRead).not.toHaveBeenCalled();
+    expect(JSON.stringify(outcome)).not.toContain(PRIVATE);
+    expect(JSON.stringify(outcome)).toContain(
+      "no investor's private mandate is read",
+    );
   });
 
   it("compares a public company on what the conversation cited, and never counts the unknown against anyone", async () => {

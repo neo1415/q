@@ -4883,6 +4883,16 @@ export function createSpecialistQAnswer(
             },
           }
         : {}),
+      // v58: which investors their own company should approach.
+      ...(read?.kind === "QUESTION_TO_Q" &&
+      read.question?.kind === "INVESTOR_PROSPECTS"
+        ? {
+            investorProspects: {
+              text: read.question.text,
+              count: read.question.count ?? null,
+            },
+          }
+        : {}),
       ...(readinessLead === null ? {} : { leadLines: readinessLead }),
       // Only a name the reader was given counts (ADR 0040 parity).
       ...(read?.askedAction === undefined ||

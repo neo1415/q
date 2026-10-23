@@ -106,6 +106,9 @@ const QUESTION_AREAS: Readonly<Record<string, readonly string[]>> = {
   // Fit against their mandate: the fit tools and their own standing.
   FIT: ["Records", "Relationships"],
   DISCOVER_COMPANIES: ["Records"],
+  // v58: which investors to approach -- the prospect list and the
+  // investors already interested, should the code answer not run.
+  INVESTOR_PROSPECTS: ["Records", "Relationships"],
   PROGRESS: ["Records", "Relationships"],
   THEIR_OWN_RECORDS: [
     "Records",

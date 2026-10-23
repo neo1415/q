@@ -1,4 +1,7 @@
-import type { TurnReaderResult } from "../prompts/schemas/turn-reader.js";
+import type {
+  QuestionKindV58,
+  TurnReaderResult,
+} from "../prompts/schemas/turn-reader.js";
 import {
   isExhausted,
   shouldNotify,
@@ -58,14 +61,33 @@ export const NO_RESEARCH: ResearchDirective = {
 
 /** A TURN_READER result as the core's full reading, with the rest empty. */
 export function readingFromTurnReader(
-  result: TurnReaderResult,
+  result: Omit<TurnReaderResult, "question"> & {
+    readonly question:
+      | (Omit<NonNullable<TurnReaderResult["question"]>, "kind"> & {
+          readonly kind: QuestionKindV58;
+        })
+      | null;
+  },
 ): ConversationTurnReading {
+  const question = result.question;
   return {
     ...EMPTY_TURN_READING,
     kind: result.kind,
     confidence: result.confidence,
     transcript: result.transcript,
-    question: result.question,
+    // v58: which investors their own company should approach is answered
+    // from Capital Q's own records (interest and published profiles), so
+    // the core treats it as a question about their own records.
+    question:
+      question === null
+        ? null
+        : {
+            ...question,
+            kind:
+              question.kind === "INVESTOR_PROSPECTS"
+                ? "THEIR_OWN_RECORDS"
+                : question.kind,
+          },
   };
 }
 

@@ -194,6 +194,10 @@ import {
   runInvestorDiscovery,
   type InvestorAsk,
 } from "./investor-discovery-answer.js";
+import {
+  runInvestorProspects,
+  type InvestorProspectsAsk,
+} from "./investor-prospects-answer.js";
 export { identityCardBlock } from "./person-search-answer.js";
 export {
   investorCardsBlock,
@@ -3016,6 +3020,15 @@ export function createModelGatewayQAnswer(
         context: toolContext,
         available: prefetchTools,
       }).catch(() => null);
+    // v58: which investors their own company should approach; cards by code.
+    const prospectsFor = (ask: InvestorProspectsAsk, companyId: string) =>
+      runInvestorProspects({
+        ask,
+        companyId,
+        tools,
+        context: toolContext,
+        available: prefetchTools,
+      }).catch(() => null);
     // RECOVERY-2026-10 B1 (live T3): "what needs me" is read from every
     // source through the attention tool, under this run's plan, beside the
     // other reads; the answer is then written from it by code. Read only
@@ -3601,6 +3614,7 @@ export function createModelGatewayQAnswer(
       standingOf,
       personFor,
       investorsFor,
+      prospectsFor,
       sweepForReading,
       // Owner 2026-10-23: the investor's own candidates, ranked by fit,
       // for a recommendation ask and for "rank them" over what nobody
@@ -3954,6 +3968,7 @@ export function createModelGatewayQAnswer(
         standingOf,
         personFor,
         investorsFor,
+        prospectsFor,
         sweepForReading,
         sweepCandidates,
         investorAsking,
@@ -5780,6 +5795,46 @@ export function createModelGatewayQAnswer(
               totalMs: Date.now() - startedAt,
             },
             "q answered an investor discovery",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
+      }
+      // v58 (owner 2026-10-23): which investors their own company should
+      // approach -- investors already interested, then likely fits from
+      // what investors publish -- found by code, never from the company
+      // record alone and never from an investor's private mandate.
+      if (
+        request.investorProspects !== undefined &&
+        prepared.ownCompanyId !== null &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+      ) {
+        const prospectsStarted = Date.now();
+        const found = await prospectsFor(
+          request.investorProspects,
+          prepared.ownCompanyId,
+        );
+        if (found !== null) {
+          const message = await persistCodeAnswer(
+            found.text,
+            found.block === null ? [] : [found.block],
+          );
+          logger?.info(
+            {
+              qRunId: request.runId,
+              shown: found.shown,
+              modelCalls: 0,
+              prepareMs: prepared.prepareMs,
+              prospectsMs: Date.now() - prospectsStarted,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered which investors to approach",
           );
           return {
             kind: "ANSWERED",
