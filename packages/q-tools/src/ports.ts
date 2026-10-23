@@ -674,6 +674,12 @@ export type ConversationProposal = {
   readonly proposalId: string;
   readonly summary: string;
   readonly status: ProposalPlainStatus;
+  /**
+   * The other side receives it (an interest, a message, an invite): still
+   * waiting reads "ready to send", never "not saved" (coordinator
+   * 2026-10-23). Absent: a profile or record edit.
+   */
+  readonly outward?: boolean | undefined;
 };
 
 /** Who is asking, in which run: the composition resolves the conversation from it. */
