@@ -590,6 +590,12 @@ export function livePreviewOf(
 ): LivePreviewOf | null {
   const latest = turns.at(-1);
   const latestQ = latest?.kind === "Q" ? latest : undefined;
+  // Owner 2026-10-23: what the landed answer put up while Q talked.
+  const landed =
+    latestQ === undefined || latestQ.streaming || latestQ.blocks.length > 0
+      ? undefined
+      : (latestQ.preview ??
+        (spoken?.messageId === latestQ.id ? spoken : undefined));
   const preview =
     latestQ?.streaming === true
       ? latestQ.preview
@@ -598,14 +604,14 @@ export function livePreviewOf(
           !turns.some((turn) => turn.id === spoken.messageId)
         ? // Still being said: the room's preview is what is up.
           spoken
-        : latestQ !== undefined && latestQ.blocks.length === 0
-          ? // Owner 2026-10-23: the answer landed with no cards of its
-            // own, so the cards put up while Q talked stay; they no
-            // longer clear as it lands. An answer with cards of its own
-            // decides by its blocks, as before.
-            (latestQ.preview ??
-            (spoken?.messageId === latestQ.id ? spoken : undefined))
-          : undefined;
+        : // The answer landed with no cards of its own: the cards put up
+          // while Q talked stay rather than clearing as it lands. A
+          // summary's or a table's frame is only a placeholder, and
+          // nothing fills it now, so it is not kept. An answer with cards
+          // of its own decides by its blocks, as before.
+          landed?.layout === "SUMMARY" || landed?.layout === "TABLE"
+          ? undefined
+          : landed;
   if (preview === undefined) return null;
   // A summary the person asked for is its own object: its frame goes up
   // even before it names anyone, and over whatever was there.

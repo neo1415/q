@@ -548,3 +548,45 @@ describe("artifacts live, round 2", () => {
     );
   });
 });
+
+describe("a landed answer's frames are settled cards, never a blank panel (owner 2026-10-23)", () => {
+  it("draws no placeholder once the answer is in, and offers a way in", () => {
+    const one = preview("CARD", [BARIDI, "Baridi Health"]);
+    const live = render(<LivePreview preview={one} />);
+    expect(
+      live.container.querySelectorAll(
+        ".animate-pulse, [class*='animate-pulse']",
+      ).length,
+    ).toBeGreaterThan(0);
+    live.unmount();
+    const settled = render(<LivePreview preview={one} settled />);
+    expect(
+      settled.container.querySelectorAll("[class*='animate-pulse']"),
+    ).toHaveLength(0);
+    expect(
+      settled.container.querySelector("[data-q-preview-settled]"),
+    ).not.toBeNull();
+    expect(
+      settled.container.querySelector(`[data-q-preview-open='${BARIDI}']`),
+    ).not.toBeNull();
+    expect(settled.container.textContent).toContain("Baridi Health");
+  });
+
+  it("a landed answer's summary or table frame is not kept: nothing would fill it", () => {
+    for (const layout of ["SUMMARY", "TABLE"] as const) {
+      const turns = [
+        person("p1", "Tell me about Baridi and MedTrail"),
+        answer(MSG, "Both are seed companies.", {
+          streaming: false,
+          preview: preview(
+            layout,
+            [BARIDI, "Baridi Health"],
+            [MEDTRAIL, "MedTrail"],
+          ),
+          blocks: [],
+        }),
+      ];
+      expect(livePreviewOf(turns, null)).toBeNull();
+    }
+  });
+});

@@ -8,6 +8,8 @@ import type {
 import { EntityAvatar } from "@/features/entity/entity-avatar";
 import { useT } from "@/features/i18n/language";
 
+import { cardPagePath, openCardPage } from "./client-actions";
+
 /**
  * Artifacts live (owner 2026-10-20): the card for what Q is saying, up the
  * moment Q names it.
@@ -90,7 +92,21 @@ function Bar({ width }: { readonly width: string }) {
   );
 }
 
-function PreviewCard({ one }: { readonly one: QArtifactPreviewSubject }) {
+function PreviewCard({
+  one,
+  settled,
+}: {
+  readonly one: QArtifactPreviewSubject;
+  /**
+   * Owner 2026-10-23: the answer has landed with no cards of its own, so
+   * nothing will fill this frame. It is the card as it stands: the name,
+   * the picture and a way in, never a placeholder that waits forever (a
+   * tall blank panel on the stage).
+   */
+  readonly settled: boolean;
+}) {
+  const t = useT();
+  const opens = one.subject === null ? null : cardPagePath(one.subject);
   return (
     <li
       className="cq-preview-in flex min-w-0 flex-col gap-3 rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface-raised) p-4"
@@ -112,8 +128,26 @@ function PreviewCard({ one }: { readonly one: QArtifactPreviewSubject }) {
           )}
         </span>
       </div>
-      <Bar width="85%" />
-      <Bar width="60%" />
+      {settled ? (
+        opens === null || one.subject === null ? null : (
+          <button
+            type="button"
+            className="cq-label inline-flex min-h-11 items-center self-start text-(--cq-accent) underline-offset-2 hover:underline"
+            onClick={() => {
+              if (one.subject !== null) openCardPage(one.subject);
+            }}
+            aria-label={`${t("Open")} ${one.name}`}
+            data-q-preview-open={previewKey(one)}
+          >
+            {t("Open")}
+          </button>
+        )
+      ) : (
+        <>
+          <Bar width="85%" />
+          <Bar width="60%" />
+        </>
+      )}
     </li>
   );
 }
@@ -234,8 +268,11 @@ function PreviewSummary({
 
 export function LivePreview({
   preview,
+  settled = false,
 }: {
   readonly preview: QArtifactPreview;
+  /** The answer it belongs to has landed: no frame waits for more. */
+  readonly settled?: boolean | undefined;
 }) {
   const { subjects } = preview;
   const names =
@@ -245,8 +282,9 @@ export function LivePreview({
   return (
     <section
       className="flex w-full flex-col gap-3"
-      aria-busy="true"
+      aria-busy={settled ? "false" : "true"}
       aria-label={names}
+      data-q-preview-settled={settled ? "" : undefined}
       data-q-preview={preview.messageId}
       data-q-preview-layout={preview.layout ?? "CARD"}
     >
@@ -265,7 +303,7 @@ export function LivePreview({
           }`}
         >
           {subjects.map((one) => (
-            <PreviewCard key={previewKey(one)} one={one} />
+            <PreviewCard key={previewKey(one)} one={one} settled={settled} />
           ))}
         </ul>
       )}

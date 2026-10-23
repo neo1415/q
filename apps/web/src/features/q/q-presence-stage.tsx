@@ -451,7 +451,16 @@ export function QPresenceStage({
       )}
 
       {livePreview === null || leaving !== null ? null : (
-        <LivePreview preview={livePreview} />
+        <LivePreview
+          preview={livePreview}
+          // Its answer has landed: the frames are the cards, not waiting.
+          settled={turns.some(
+            (turn) =>
+              turn.id === livePreview.messageId &&
+              turn.kind === "Q" &&
+              !turn.streaming,
+          )}
+        />
       )}
 
       {canvas === null || leaving !== null || previewing ? null : (
