@@ -56,10 +56,27 @@ type Row = {
   readonly lastMessage?: { readonly from?: unknown } | null;
 };
 
+/**
+ * QA F-25 (23 Oct 2026): "Show me my fundraising pipeline" showed three
+ * relationship cards and said the pipeline was empty (the model read the
+ * empty Capital page). Their own pipeline, asked after in any words, is
+ * their relationships.
+ */
+const OWN_PIPELINE =
+  /\b(?:my|our)\s+(?:(?:fundraising|fund-raising|investor|deal|raise|current)\s+)?pipeline\b/iu;
+
 /** The ask is for a summary of their own pipeline or relationships. */
 export function asksForPipelineSummary(text: string): boolean {
-  return PIPELINE_ASK.test(text.replace(/[’]/gu, "'"));
+  const plain = text.replace(/[’]/gu, "'");
+  return PIPELINE_ASK.test(plain) || OWN_PIPELINE.test(plain);
 }
+
+/**
+ * Told to the model with the pipeline lead: the pipeline is the
+ * relationships the lead counted, never the Capital page's records.
+ */
+export const PIPELINE_NOTE =
+  "Their pipeline is these relationships and their states (interest expressed, connected, met, in diligence and so on), as the line above counts them and the cards show them. The Capital section (rounds, money raised, commitments) is a separate record: it being empty never makes the pipeline empty. Never say the pipeline is empty while relationships exist.";
 
 /** The ask compares named things. */
 export function asksForComparison(text: string): boolean {

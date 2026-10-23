@@ -252,3 +252,23 @@ describe("R2: Q's company card says the raise the Discover card says", () => {
     );
   });
 });
+
+// QA F-13 (23 Oct 2026): a caveat was drawn with the same tick as a pass.
+describe("each reason says how much it counts", () => {
+  it("pros are STRONG, a mismatch is a CAVEAT, by position", () => {
+    const card = fitSweepCardsBlock(fitsInOutcome(BARIDI), "Mandate fit")
+      ?.cards[0];
+    expect(card?.reasonLevels).toHaveLength(card?.reasons.length ?? -1);
+    expect(card?.reasonLevels?.at(-1)).toBe("CAVEAT");
+    expect(card?.reasonLevels?.slice(0, -1).every((l) => l === "STRONG")).toBe(
+      true,
+    );
+  });
+
+  it("a measure not known yet is UNKNOWN, never a tick", () => {
+    const card = fitSweepCardsBlock(fitsInOutcome(PORTSIDE), "Mandate fit")
+      ?.cards[0];
+    expect(card?.reasonLevels?.at(-1)).toBe("UNKNOWN");
+    expect(card?.reasons.at(-1)).toMatch(/not known yet/iu);
+  });
+});

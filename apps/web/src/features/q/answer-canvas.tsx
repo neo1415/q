@@ -8,13 +8,17 @@ import { useSyncExternalStore, type ReactNode } from "react";
 import type {
   QAnswerCard,
   QAnswerCardLevel,
+  QAnswerCardReasonLevel,
   QAnswerCardsBlock,
 } from "@capital-q/contracts";
 import {
+  AlertTriangle,
   Check,
   ChevronRight,
+  CircleHelp,
   ICON_SIZE,
   ICON_STROKE,
+  Minus,
   MoreHorizontal,
   Pin,
   X,
@@ -63,6 +67,18 @@ const loadFeatures = () =>
   import("./answer-canvas-motion").then((module) => module.default);
 
 const WIDE_QUERY = "(min-width: 761px)";
+/** F-13: each reason's mark is its shape and a word, never colour alone. */
+const REASON_MARK: Readonly<
+  Record<
+    QAnswerCardReasonLevel,
+    { readonly icon: typeof Check; readonly word: string }
+  >
+> = {
+  STRONG: { icon: Check, word: "Strong" },
+  PARTIAL: { icon: Minus, word: "Partial" },
+  CAVEAT: { icon: AlertTriangle, word: "Caveat" },
+  UNKNOWN: { icon: CircleHelp, word: "Not known yet" },
+};
 const BASIS_LABEL = "Why they fit (from what they publish)";
 function subscribeWide(onChange: () => void): () => void {
   if (typeof window.matchMedia !== "function") return () => undefined;
@@ -426,16 +442,28 @@ function AnswerCard({
         <div className="inner" inert={state !== "focus"}>
           <div className="cq-ac-pad">
             <ul className="cq-ac-why">
-              {card.reasons.map((reason) => (
-                <li key={reason}>
-                  <Check
-                    aria-hidden="true"
-                    size={16}
-                    strokeWidth={ICON_STROKE}
-                  />
-                  <span>{reason}</span>
-                </li>
-              ))}
+              {card.reasons.map((reason, index) => {
+                // F-13: a caveat is never drawn as a tick. Unmarked reasons
+                // (an older server, a model's card) keep the tick.
+                const level = card.reasonLevels?.[index];
+                const Mark =
+                  level === undefined ? Check : REASON_MARK[level].icon;
+                return (
+                  <li key={reason} data-reason-level={level}>
+                    <Mark
+                      aria-hidden="true"
+                      size={16}
+                      strokeWidth={ICON_STROKE}
+                    />
+                    <span>
+                      {level === undefined ? null : (
+                        <span className="sr-only">{`${t(REASON_MARK[level].word)}: `}</span>
+                      )}
+                      {reason}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
             {card.measures.length === 0 ? null : (
               <dl className="cq-ac-params">

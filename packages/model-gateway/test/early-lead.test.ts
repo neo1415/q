@@ -93,3 +93,36 @@ describe("comparisonLead", () => {
     expect(comparisonLead([profile("Tensorgate", "seed", "US")])).toBeNull();
   });
 });
+
+// QA F-25 (23 Oct 2026): "Show me my fundraising pipeline" read the empty
+// Capital page and said the pipeline was empty beside three relationship
+// cards. Their pipeline, asked in any words, opens from the relationships.
+describe("their own pipeline, in any words", () => {
+  it("is a pipeline question", () => {
+    for (const asked of [
+      "Show me my fundraising pipeline.",
+      "what's in my pipeline?",
+      "Show me our investor pipeline",
+    ]) {
+      expect(asksForPipelineSummary(asked)).toBe(true);
+    }
+    expect(asksForPipelineSummary("What is a sales pipeline?")).toBe(false);
+  });
+
+  it("counts the relationships the cards show, never an empty pipeline", () => {
+    const lead = pipelineLead(
+      {
+        relationships: [
+          row("INTEREST_EXPRESSED", "2026-10-05T09:00:00Z"),
+          row("CONNECTED", "2026-10-10T09:00:00Z"),
+          row("CONNECTED", "2026-10-12T09:00:00Z"),
+        ],
+      },
+      "Show me my fundraising pipeline.",
+      NOW,
+    );
+    expect(lead).toBe(
+      "You have 3 relationships on Capital Q: 2 connected and 1 interest expressed.",
+    );
+  });
+});
