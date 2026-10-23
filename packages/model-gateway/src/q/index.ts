@@ -6052,6 +6052,8 @@ export function createModelGatewayQAnswer(
             considered: sweep.considered,
             asked: latest.content,
             beyondShown,
+            // The count as read, so "the five that best fit" names five.
+            requested: sweep.ask.count,
           });
           const text =
             sweep === reRanked

@@ -212,8 +212,46 @@ const fitCalls = (asked: readonly { name: string }[]) =>
   asked.filter((call) => call.name === "fit_profile").length;
 
 describe("DISCOVER_COMPANIES fast path (K1)", () => {
-  it("'Show me three fintech companies': exactly three distinct cards, by name, said so, no fit", async () => {
-    const { answer, asked, ms } = await discover(ask({}));
+  it("an investor's 'show me three fintech companies' is ranked by fit with their mandate (owner 2026-10-23)", async () => {
+    const { answer, asked } = await discover(ask({}));
+    expect(answer.basis).toBe("FIT");
+    expect(names(answer.block)).toEqual(["Clearwater", "Kora", "Paystream"]);
+    expect(answer.text).toBe(
+      "Ranked by fit with your mandate, the strongest fintech companies: Clearwater at 10, Kora at 8.8 and Paystream at 7.6. They're on screen.",
+    );
+    expect(answer.text).not.toMatch(/listed by name/u);
+    expect(fitCalls(asked)).toBeGreaterThan(0);
+  });
+
+  it("by name only when the reader read they asked for it so", async () => {
+    const { answer, asked } = await discover(
+      ask({ text: "List fintech companies alphabetically", ranking: "NAME" }),
+    );
+    expect(names(answer.block)).toEqual(["Ajopot", "Clearwater", "Kora"]);
+    expect(answer.text).toBe(
+      "Here are three fintech companies on Capital Q: Ajopot, Clearwater and Kora. In name order, as you asked. They're on screen.",
+    );
+    expect(fitCalls(asked)).toBe(0);
+  });
+
+  it("'Any fintech companies in Nigeria raising a seed round?': every match ranked, the count said, raise status honest", async () => {
+    const { answer } = await discover(
+      ask({
+        text: "Any fintech companies in Nigeria raising a seed round?",
+        countries: ["NG"],
+        stages: ["seed"],
+        count: null,
+        raising: true,
+      }),
+    );
+    expect(names(answer.block)).toEqual(["Kora", "Paystream", "Ajopot"]);
+    expect(answer.text).toBe(
+      "Three seed fintech companies in Nigeria on Capital Q, ranked by fit with your mandate: Kora at 8.8, Paystream at 7.6 and Ajopot at 6.4. None of them states a current raise on Capital Q, so whether they're raising now is unknown. They're on screen.",
+    );
+  });
+
+  it("a founder's 'Show me three fintech companies': exactly three distinct cards, by name, said so, no fit", async () => {
+    const { answer, asked, ms } = await discover(ask({}), { investor: false });
     expect(names(answer.block)).toEqual(["Ajopot", "Clearwater", "Kora"]);
     expect(
       new Set(
@@ -236,7 +274,7 @@ describe("DISCOVER_COMPANIES fast path (K1)", () => {
     const { answer } = await discover(
       ask({ text: "Give me three companies in the fintech space" }),
     );
-    expect(names(answer.block)).toEqual(["Ajopot", "Clearwater", "Kora"]);
+    expect(names(answer.block)).toEqual(["Clearwater", "Kora", "Paystream"]);
   });
 
   it("'top three fintech' with a mandate: ranked by fit, the basis said", async () => {
@@ -273,11 +311,11 @@ describe("DISCOVER_COMPANIES fast path (K1)", () => {
     );
     expect(names(answer.block)).toEqual(["Drishti Health", "Maji Health"]);
     expect(answer.text).toBe(
-      "Capital Q has only two digital health companies you can see: Drishti Health and Maji Health. They're listed by name, not ranked. They're on screen.",
+      "Capital Q has only two digital health companies you can see, ranked by fit with your mandate: Drishti Health at 7.6 and Maji Health at 6.4. They're on screen.",
     );
   });
 
-  it("'Which fintech companies suit my mandate': fit, three by default", async () => {
+  it("'Which fintech companies suit my mandate': fit, every match up to a page, the count said", async () => {
     const { answer } = await discover(
       ask({
         text: "Which fintech companies suit my mandate",
@@ -287,8 +325,11 @@ describe("DISCOVER_COMPANIES fast path (K1)", () => {
       }),
     );
     expect(answer.basis).toBe("FIT");
-    expect(answer.block?.cards).toHaveLength(3);
+    expect(answer.block?.cards).toHaveLength(5);
     expect(answer.block?.cards.every((card) => card.fit !== null)).toBe(true);
+    expect(answer.text).toMatch(
+      /^Five fintech companies on Capital Q, ranked by fit with your mandate: /u,
+    );
   });
 
   it("'three fintech companies in Nigeria': the country goes to the catalog, said in words", async () => {
@@ -296,9 +337,9 @@ describe("DISCOVER_COMPANIES fast path (K1)", () => {
       ask({ text: "three fintech companies in Nigeria", countries: ["NG"] }),
     );
     expect(asked[0]?.args["countries"]).toEqual(["NG"]);
-    expect(names(answer.block)).toEqual(["Ajopot", "Kora", "Paystream"]);
+    expect(names(answer.block)).toEqual(["Kora", "Paystream", "Ajopot"]);
     expect(answer.text).toMatch(
-      /^Here are three fintech companies in Nigeria on Capital Q:/u,
+      /^Ranked by fit with your mandate, the strongest fintech companies in Nigeria:/u,
     );
   });
 
@@ -311,12 +352,12 @@ describe("DISCOVER_COMPANIES fast path (K1)", () => {
     const one = await discover(ask({ countries: ["ZA"] }));
     expect(names(one.answer.block)).toEqual(["Ledgerfold"]);
     expect(one.answer.text).toMatch(
-      /^Capital Q has only one fintech company in South Africa you can see: Ledgerfold\./u,
+      /^Capital Q has only one fintech company in South Africa you can see: Ledgerfold at [\d.]+\. It's on screen\./u,
     );
     const two = await discover(
       ask({ countries: ["KE"], sectors: ["fintech", "agritech"] }),
     );
-    expect(names(two.answer.block)).toEqual(["Baridi", "Clearwater"]);
+    expect(names(two.answer.block)).toEqual(["Clearwater", "Baridi"]);
     expect(two.answer.text).toMatch(/^Capital Q has only two /u);
   });
 
@@ -350,7 +391,7 @@ describe("DISCOVER_COMPANIES fast path (K1)", () => {
 
 describe("follow-ups on the cards just shown (K1)", () => {
   async function shown(): Promise<readonly QConversationMessage[]> {
-    const { answer } = await discover(ask({}));
+    const { answer } = await discover(ask({ ranking: "NAME" }));
     if (answer.block === null) throw new Error("no cards");
     return [
       { id: "u1", role: "PERSON", content: "Show me three fintech companies" },
@@ -380,7 +421,7 @@ describe("follow-ups on the cards just shown (K1)", () => {
   });
 
   it("'open the second' points at the second card's company", async () => {
-    const { answer } = await discover(ask({}));
+    const { answer } = await discover(ask({ ranking: "NAME" }));
     const second = answer.block?.cards[1];
     expect(second?.name).toBe("Clearwater");
     expect(second?.subject).toEqual({ kind: "COMPANY", companyId: ID(3) });

@@ -632,14 +632,13 @@ describe("companies of a kind through the answer path (K1, live 2026-10-09 15:57
       },
     });
     expect(modelCalls).toBe(0);
-    expect(cardsOf(blocks).map((card) => card.name)).toEqual([
-      "Portside",
-      "Souqsheet",
-      "Termly",
-    ]);
-    expect(text).toBe(
-      "Here are three fintech companies on Capital Q: Portside, Souqsheet and Termly. They're listed by name, not ranked. They're on screen.",
+    // Owner 2026-10-23: an investor's list is ranked by fit with the mandate.
+    expect(cardsOf(blocks)).toHaveLength(3);
+    expect(cardsOf(blocks)[0]?.fit).not.toBeNull();
+    expect(text).toMatch(
+      /^Ranked by fit with your mandate, the strongest fintech companies: /u,
     );
+    expect(text).not.toMatch(/listed by name/u);
     expect(executed).not.toContain("research_public_web");
     expect(Date.now() - started).toBeLessThan(3_000);
   });
@@ -721,6 +720,29 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
     expect(modelCalls).toBe(0);
     expect(text).toMatch(/Ranked by fit with your mandate/u);
     expect(text).not.toMatch(/listed by name/u);
+  });
+
+  it("'show me the five companies that best fit my mandate' names every one it shows, with its score", async () => {
+    // Coordinator's journey 2026-10-23 (investor.savanna-seed): spoken as
+    // "Your best fit: Mizan at 8.8", because the words alone read "best
+    // fit" as one. The reader's count decides.
+    const words = "Show me the five companies that best fit my mandate";
+    const { text, blocks, modelCalls } = await replay({
+      question: words,
+      script: [answer("A model answer.")],
+      reading: {
+        questionKind: "FIT",
+        fitQuestion: { text: words, count: 5, mandateRelevant: true },
+      },
+    });
+    expect(modelCalls).toBe(0);
+    const shown = cardsOf(blocks);
+    expect(shown.length).toBeGreaterThan(1);
+    expect(shown.length).toBeLessThanOrEqual(5);
+    expect(text).not.toMatch(/^Your best fit:/u);
+    for (const card of shown.filter((one) => one.fit !== null)) {
+      expect(text).toContain(card.name);
+    }
   });
 
   it("'rank them by my mandate' after a list nobody could score gives the mandate's top three, and says why", async () => {
@@ -807,14 +829,18 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
     expect(plain.text).not.toMatch(/None of the companies I just listed/u);
   });
 
-  it("a plain 'show me three fintech companies' is still a catalog list by name", async () => {
-    const words = "Show me three fintech companies";
+  it("'list fintech companies alphabetically', read as by name, is a list in name order", async () => {
+    const words = "List three fintech companies alphabetically";
+    const reading = discover(words, 3, ["fintech"], false);
     const { text } = await replay({
       question: words,
       script: [answer("A model answer.")],
-      reading: discover(words, 3, ["fintech"], false),
+      reading: {
+        ...reading,
+        discoverCompanies: { ...reading.discoverCompanies, ranking: "NAME" },
+      },
     });
-    expect(text).toMatch(/listed by name/u);
+    expect(text).toMatch(/In name order, as you asked\./u);
   });
 
   it("routes on the reading alone: the same words read as a plain list are a plain list", async () => {
@@ -825,8 +851,11 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
       script: [answer("A model answer.")],
       reading: discover(words, 3, [], false),
     });
+    // The catalog answers, ranked by fit as every investor list is; the
+    // words did not turn it into the candidate sweep.
     expect(executed).toContain("discover_companies");
-    expect(text).toMatch(/listed by name/u);
+    expect(executed).not.toContain("fit_top_candidates");
+    expect(text).not.toMatch(/listed by name/u);
   });
 });
 

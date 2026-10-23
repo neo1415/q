@@ -404,6 +404,8 @@ export function fitSweepSummary(input: {
    * Said first, and honestly when fewer than that remain.
    */
   readonly beyondShown?: { readonly count: number | null } | undefined;
+  /** How many they asked for, as read (the sweep's count); null: none. */
+  readonly requested?: number | null | undefined;
 }): string {
   const { block, place } = input;
   if (block.shape === "SIDE_BY_SIDE") return comparisonSummary(block);
@@ -439,6 +441,7 @@ export function fitSweepSummary(input: {
     asked: input.asked,
     text: "",
     blocks: [block],
+    requested: input.requested,
   });
   const body =
     facts === null
