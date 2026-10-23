@@ -110,3 +110,17 @@ I19 (voice) and rehearsals were not testable from this sandbox: WebRTC ICE never
 Good in pass 4: Save and Pass respond in about 220 ms on desktop and 390 px; the founder data room explains its access levels clearly; settings are complete and plain-spoken.
 
 Fix PRs from this session (into `speed/q-oct20`): #382 (QO-01, QO-02), #385 (QO-14).
+
+## Retests and new items (23:45–00:05 UTC)
+
+| id         | Finding                                                                                                                                                                                   | Evidence    | Severity                        | Status                                 |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------- | -------------------------------------- |
+| I12 retest | Call prep (Spheros) is now structured and specific, but written from the founder's side for an investor: "What they'll likely ask … You have secured 10 clients, of which two are paying" | r1.json #1  | high                            | to coordinator (lane 5)                |
+| I6 retest  | Compare Ledgerline, Duplo, Anchor: "Ledgerline is the only one with an authorised company profile"; the table shows Ledgerline vs **Ledgerfold**                                          | r1.json #2  | high                            | to coordinator (lane 8, with QO-05/36) |
+| QO-47      | `/auth/sign-up` gives a usable account with **no email verification**: two Gmail addresses went straight to `/welcome`, so anyone can sign up as someone else's address                   | signup runs | high (security, owner decision) | to coordinator                         |
+
+PRs from this session (into `speed/q-oct20`):
+
+- #382: QO-01, QO-02.
+- #385: QO-14, editor plus server `fit: contain`. Stored logos can't be reprocessed because the raw uploads are deleted, so they must be re-uploaded.
+- #390: QO-17 and QO-13.
