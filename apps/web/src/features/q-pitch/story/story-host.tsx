@@ -31,7 +31,14 @@ import {
   storyOwnerApproved,
   DEMONSTRATION_LABEL,
   STORY_CLAIMS,
+  isDemonstrationClaim,
   parseStoryCommand,
+  sameActor,
+  stillClaims,
+  stillPath,
+  type StoryClaim,
+  type StoryRoute,
+  type StoryStillRoute,
   percentiles,
   routeAtBeat,
   subtitleForm,
@@ -218,7 +225,13 @@ export function StoryHost({
    * The design harness (/dev/story, never served in production): the
    * story over the dev review pages' fictional data, with no account.
    */
-  readonly harness?: { readonly pathFor: StoryPathFor } | undefined;
+  readonly harness?:
+    | {
+        readonly pathFor: StoryPathFor;
+        /** false: play as a viewer the story is not certified for (stills). */
+        readonly live?: boolean;
+      }
+    | undefined;
   /** A rendered voice set other than Q's own (the harness's `?voice=`). */
   readonly voice?: string | undefined;
   /**
@@ -235,33 +248,50 @@ export function StoryHost({
   const router = useRouter();
   const cut = STORY_EDITIONS[edition];
   const beats = useMemo(() => editionBeats(cut), [cut]);
-  const pathFor = harness?.pathFor ?? storyPath;
-  const actor = useMemo(
-    () =>
-      harness !== undefined ||
-      TourActorSchema.safeParse({ role, account }).success,
-    [account, role, harness],
+  // Any signed-in account plays the story (owner, 23 Oct). The live product
+  // pages are shown only to the demo actor the story is certified on (and
+  // on the harness's fictional pages); everyone else sees stills of the
+  // same fictional pages, so the story never opens their own pages or
+  // shows their data.
+  const viewer = useMemo(() => {
+    const parsed = TourActorSchema.safeParse({ role, account });
+    return parsed.success ? parsed.data : null;
+  }, [account, role]);
+  const certified = STORY_LEDGER[0]?.actorContext;
+  const live =
+    harness !== undefined
+      ? harness.live !== false
+      : viewer !== null &&
+        certified !== undefined &&
+        sameActor(viewer, certified);
+  const pages = harness?.pathFor ?? storyPath;
+  const pathFor = useMemo<StoryPathFor>(
+    () => (live ? pages : (route) => (route === "home" ? pages(route) : null)),
+    [live, pages],
   );
+  // On stills, a product beat demonstrates the product rather than showing
+  // it live: it is labelled "Demonstration data", and claims nothing live.
+  const claims = useMemo(() => (live ? STORY_CLAIMS : stillClaims()), [live]);
   // The story's certification gate, once (claims per beat; story/claims.ts).
   // Until the owner approves and every product claim holds, the story is
   // an internal rehearsal and says so on screen.
   const gate = useMemo(() => {
-    const parsed = TourActorSchema.safeParse({ role, account });
-    return parsed.success
-      ? certifyStory(
+    const actor = viewer ?? certified;
+    return actor === undefined
+      ? null
+      : certifyStory(
           {
             now: new Date().toISOString(),
-            actor: parsed.data,
+            actor,
             staleFeatureIds: [],
             // This cut's own approval: each edition is its own version.
             ownerApproved: storyOwnerApproved(cut.version),
           },
-          STORY_CLAIMS,
+          claims,
           STORY_LEDGER,
           beats,
-        )
-      : null;
-  }, [account, role, cut, beats]);
+        );
+  }, [viewer, certified, claims, cut, beats]);
   useEffect(() => {
     if (!film) return;
     const root = document.documentElement;
@@ -281,7 +311,6 @@ export function StoryHost({
     total: 1,
   });
   useEffect(() => {
-    if (!actor) return;
     const controller = new AbortController();
     void preloadStory({
       prefetch: (path) => router.prefetch(path),
@@ -290,11 +319,12 @@ export function StoryHost({
       onProgress: setProgress,
       signal: controller.signal,
       order: beats.map((beat) => beat.n),
+      stills: !live,
     }).then((loaded) => {
       if (!controller.signal.aborted) setAssets(loaded);
     });
     return () => controller.abort();
-  }, [actor, router, pathFor, voice, beats]);
+  }, [live, router, pathFor, voice, beats]);
 
   // The edition's timings: a cut part's words from its beat's timings, and
   // where it sits in the beat's clip (editions.ts, cutAlignment).
@@ -358,6 +388,8 @@ export function StoryHost({
   }, []);
   const [starting, setStarting] = useState(false);
   const stage = useMemo(() => createStore<StageState>(EMPTY_STAGE), []);
+  /** The product page shown as a still (not live): null, the page itself. */
+  const still = useMemo(() => createStore<StoryStillRoute | null>(null), []);
   const mood = useMemo(() => createStore<Mood>("OFF"), []);
   const [captions, setCaptions] = useState(true);
   const [muted, setMuted] = useState(false);
@@ -441,6 +473,14 @@ export function StoryHost({
                 await frame();
                 return true;
               case "navigate": {
+                if (!live) {
+                  // A still of the fictional page; Home is their own.
+                  still.set(stillOf(act.route));
+                  if (act.route !== "home") {
+                    await frame();
+                    return true;
+                  }
+                }
                 const landed = await navigate(act, signal);
                 // A page that did land clears an earlier fallback note.
                 if (landed && stage.get().fallback !== null) {
@@ -449,6 +489,8 @@ export function StoryHost({
                 return landed;
               }
               case "light": {
+                // Nothing on a picture to light; the words carry on.
+                if (still.get() !== null) return true;
                 const lit = await lightSection(
                   act.anchor,
                   {},
@@ -485,6 +527,7 @@ export function StoryHost({
             stage.set(EMPTY_STAGE);
             mood.set(moodBefore(index, beats));
             const route = routeAtBeat(index, beats) ?? "home";
+            if (!live) still.set(stillOf(route));
             const path = pathFor(route);
             if (
               path !== null &&
@@ -515,14 +558,14 @@ export function StoryHost({
       await new Promise((resolve) => setTimeout(resolve, OPENING_FORM_MS));
       next.start(0);
     },
-    [assets, timings, beats, mood, stage, pathFor],
+    [assets, timings, beats, mood, stage, still, live, pathFor],
   );
 
   // Asked for in words: with voice, as soon as it is ready, when the
   // browser lets the audio play; otherwise the Start press as usual.
   const autostarted = useRef(false);
   useEffect(() => {
-    if (!autostart || !actor || autostarted.current) return;
+    if (!autostart || autostarted.current) return;
     if (assets === null || player !== null) return;
     autostarted.current = true;
     const context = assets.context;
@@ -534,7 +577,7 @@ export function StoryHost({
         }
       })();
     });
-  }, [autostart, actor, assets, player, begin]);
+  }, [autostart, assets, player, begin]);
 
   useEffect(() => {
     player?.setMuted(muted);
@@ -570,19 +613,6 @@ export function StoryHost({
     };
   }, [player, assets]);
 
-  if (!actor) {
-    return (
-      <div className="cq-story-gate" role="dialog" aria-label="Q Story">
-        <p>
-          Q Story runs only on a fictional demo account. This account is not
-          one, so it has not started.
-        </p>
-        <button type="button" className="cq-story-btn" onClick={onExit}>
-          Close
-        </button>
-      </div>
-    );
-  }
   if (player === null) {
     const ready = assets !== null;
     return (
@@ -630,7 +660,9 @@ export function StoryHost({
         editionProductStep(beats, STORY_PRODUCT_BEAT) ?? STORY_PRODUCT_BEAT
       }
       rehearsal={gate?.audience !== "AUDIENCE"}
+      claims={claims}
       stage={stage}
+      still={still}
       mood={mood}
       captions={captions}
       onCaptions={setCaptions}
@@ -650,12 +682,34 @@ export function StoryHost({
 
 type Store<T> = ReturnType<typeof createStore<T>>;
 
-/** The beat shows demonstration data (story/claims.ts), so it says so. */
-function demonstrationBeat(n: number): boolean {
-  const claim = STORY_CLAIMS[n];
+/** The still that stands for a route (Home has none: it is their own). */
+function stillOf(route: StoryRoute): StoryStillRoute | null {
+  return route === "home" ? null : route;
+}
+
+/** A fictional product page, as a picture where the page would be. */
+function StoryStill({
+  store,
+}: {
+  readonly store: Store<StoryStillRoute | null>;
+}) {
+  const route = useSyncExternalStore(store.subscribe, store.get, store.get);
+  if (route === null) return null;
   return (
-    claim?.kind === "DEMONSTRATION" ||
-    (claim?.kind === "PRODUCT" && claim.demonstration)
+    <div className="cq-story-still" aria-hidden>
+      {/* eslint-disable-next-line @next/next/no-img-element -- static story files, decoded before playback; an optimiser would refetch them mid-story */}
+      <img
+        src={stillPath(route)}
+        alt=""
+        decoding="async"
+        draggable={false}
+        // A still that did not load shows the plain canvas, never a
+        // broken-image mark; the words carry on.
+        onError={(event) => {
+          event.currentTarget.style.visibility = "hidden";
+        }}
+      />
+    </div>
   );
 }
 
@@ -760,7 +814,9 @@ function StoryOverlay({
   player,
   productStep,
   rehearsal,
+  claims,
   stage,
+  still,
   mood,
   captions,
   onCaptions,
@@ -774,7 +830,10 @@ function StoryOverlay({
   readonly productStep: number;
   /** Not certified for an audience: labelled as an internal rehearsal. */
   readonly rehearsal: boolean;
+  /** What each beat claims as it plays here (live or stills). */
+  readonly claims: Readonly<Record<number, StoryClaim>>;
   readonly stage: Store<StageState>;
+  readonly still: Store<StoryStillRoute | null>;
   readonly mood: Store<Mood>;
   readonly captions: boolean;
   readonly onCaptions: (on: boolean) => void;
@@ -1042,6 +1101,7 @@ function StoryOverlay({
           read (QSwarm's surfaceIsDark), so no shape is drawn behind Q, only
           a faint gold bloom. Docked in the caption band on product beats.
           Two placements, two elements (a resize would be a layout shift). */}
+      <StoryStill store={still} />
       <div
         className="cq-story-scrim"
         data-mood={moodNow}
@@ -1117,7 +1177,7 @@ function StoryOverlay({
       {(() => {
         const standing = [
           rehearsal ? "Internal rehearsal" : null,
-          demonstrationBeat(beat.n) ? DEMONSTRATION_LABEL : null,
+          isDemonstrationClaim(claims[beat.n]) ? DEMONSTRATION_LABEL : null,
         ]
           .filter((part) => part !== null)
           .join(" · ");

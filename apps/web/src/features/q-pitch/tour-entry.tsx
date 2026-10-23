@@ -21,6 +21,8 @@ type Start = {
   readonly autostart?: boolean;
   /** The story's cut (`&edition=investor|founder`); default everyone. */
   readonly edition?: StoryEditionId;
+  /** Each ask's own token (`&start=`): a new one starts the story again. */
+  readonly token?: string;
 };
 function editionOf(value: string | null): StoryEditionId {
   return value === "investor"
@@ -71,6 +73,9 @@ function readStart(search: string): Start | null {
           chapter: chapter !== null && CHAPTER.test(chapter) ? chapter : null,
           autostart: params.has("start"),
           edition: editionOf(params.get("edition")),
+          ...(params.get("start") === null
+            ? {}
+            : { token: params.get("start") ?? "" }),
         };
   const resumed = start ?? readResume();
   lastRead = { search, start: resumed };
@@ -85,8 +90,11 @@ function readStart(search: string): Start | null {
  * The host's code loads only then. Once started, the tour lives in the
  * application layout, so it survives route changes until "End tour".
  *
- * Rendered only when the server enabled Q Pitch (CQ_Q_PITCH_TOUR=1). The
- * host still refuses any account that is not a fictional demo account.
+ * Rendered only when the server enabled Q Pitch (CQ_Q_PITCH_TOUR=1), for
+ * any signed-in account (owner, 23 Oct). The story shows the live product
+ * only to the demo actor it is certified on; everyone else sees stills of
+ * the same fictional pages (story-host), never their own data. The v6
+ * tracks' host still runs only on fictional demo accounts.
  */
 const QPitchHost = dynamic(
   () => import("./tour-host").then((m) => m.QPitchHost),
@@ -128,13 +136,22 @@ export function QPitchEntry({
     setSeen(search);
     const asked = readStart(search === "" ? "" : `?${search}`);
     if (asked !== null && started === null) setStarted(asked);
-    else if (asked !== null && ended && search.includes("qpitch=")) {
+    else if (
+      asked !== null &&
+      search.includes("qpitch=") &&
+      // After "End tour", or a new ask while one is up ("pitch yourself to
+      // founders" mid-story starts that cut).
+      (ended || (asked.token !== undefined && asked.token !== started?.token))
+    ) {
       setStarted(asked);
       setEnded(false);
     }
   }
   const holding = started !== null && !ended;
-  useStoryTrigger(!holding);
+  // Always held: a playing story takes its own words first (the
+  // interceptors stack) and passes the rest on, so "pitch yourself" works
+  // at any moment, including over the story's own Start screen.
+  useStoryTrigger(true);
   // Q Pitch is on here (the server mounted this entry): Q may offer the
   // story under a "what is Capital Q?" answer.
   useEffect(() => {
@@ -157,6 +174,7 @@ export function QPitchEntry({
   if (started.tour === "story") {
     return (
       <StoryHost
+        key={started.token ?? "story"}
         account={account}
         role={role}
         onExit={exit}

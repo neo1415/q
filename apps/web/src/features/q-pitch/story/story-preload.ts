@@ -5,9 +5,11 @@ import {
   STORY_PICTURES,
   STORY_ROUTES,
   STORY_SCREENS,
+  STORY_STILL_ROUTES,
   alignmentFits,
   STORY_ASSET_ROOT,
   screenPath,
+  stillPath,
   voiceIndexPath,
   type BeatAlignment,
 } from "@capital-q/q-pitch";
@@ -110,6 +112,8 @@ export async function preloadStory(input: {
   readonly pathFor?: StoryPathFor;
   /** The beats in play order (an edition's); default: all 56. */
   readonly order?: readonly number[];
+  /** The product pages play as stills (not live): decode them too. */
+  readonly stills?: boolean;
 }): Promise<StoryAssets> {
   const started = performance.now();
   const voice = input.voice ?? STORY_VOICE;
@@ -134,6 +138,7 @@ export async function preloadStory(input: {
   const pictures = [
     ...STORY_PICTURES.map((p) => p.file),
     ...STORY_SCREENS.map(screenPath),
+    ...(input.stills === true ? STORY_STILL_ROUTES.map(stillPath) : []),
   ];
   const tasks: (() => Promise<void>)[] = [
     ...pictures.map((file) => async () => {

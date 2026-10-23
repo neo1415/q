@@ -154,15 +154,17 @@ export default async function ApplicationLayout({
             <PitchWarmup />
           ) : null}
           <QSwarmPointer />
-          {/* Q Pitch rehearsal host (QP-F08): off unless the server enables it;
-          the host itself admits only fictional demo accounts. Its subject
-          read streams after the page and never holds the first byte. */}
-          {qPitch &&
-          unfinished === null &&
-          user.email !== null &&
-          (context.kind === "INVESTOR" || context.kind === "FOUNDER") ? (
+          {/* Q Pitch host (QP-F08): off unless the server enables it; then
+          for any signed-in account (owner, 23 Oct). The story shows other
+          accounts stills of fictional pages, never their own; the v6
+          tracks still admit only fictional demo accounts. Its subject read
+          streams after the page and never holds the first byte. */}
+          {qPitch && unfinished === null ? (
             <Suspense fallback={null}>
-              <QPitchEntrySlot account={user.email} role={context.kind} />
+              <QPitchEntrySlot
+                account={user.email ?? ""}
+                role={context.kind === "FOUNDER" ? "FOUNDER" : "INVESTOR"}
+              />
             </Suspense>
           ) : null}
           {/* RECOVERY-2026-10 (C): Q's control of the page -- the route trail,
