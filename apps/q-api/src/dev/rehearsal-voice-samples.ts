@@ -5,7 +5,8 @@
  *
  * Evidence for the rehearsal voices (owner, 2026-10-23): for three sample
  * personas, the ACTIVE INVESTOR_TWIN_TURN prompt writes the opening line
- * (with the Speaks like / Local language lines code adds), the persona
+ * (with the Speaks like / Local language lines code adds; OpenAI as the
+ * gateway routes it, never Gemini), the persona
  * picker chooses the voice from where they are based, and ElevenLabs v4
  * turbo speaks it with the persona's settings and the line's tone. Writes
  * <outDir>/<persona>.mp3 and results.json (text, voice, model, timings,
@@ -122,32 +123,30 @@ async function line(sample: Sample): Promise<{
     variables,
   });
   const started = Date.now();
-  // Gemini's OpenAI-compatible endpoint (the key this environment holds).
-  const response = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${process.env.CQ_SAMPLES_GEMINI_KEY ?? process.env.GEMINI_API_KEY ?? ""}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gemini-3.5-flash-lite",
-        response_format: { type: "json_object" },
-        max_tokens: 600,
-        messages: prompt.messages.map((message, index) => ({
-          role: message.role === "SYSTEM" ? "system" : "user",
-          content:
-            ("content" in message && typeof message.content === "string"
-              ? message.content
-              : "") +
-            (index === prompt.messages.length - 1
-              ? "\n\nAnswer as one JSON object with at least: line, mood, intensity."
-              : ""),
-        })),
-      }),
+  // OpenAI, as the gateway routes the turn (gpt-5.6-luna first). Never
+  // Gemini: unpaid and off in production (owner, 2026-10-23).
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`,
+      "content-type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      model: "gpt-5.6-luna",
+      response_format: { type: "json_object" },
+      max_completion_tokens: 600,
+      messages: prompt.messages.map((message, index) => ({
+        role: message.role === "SYSTEM" ? "system" : "user",
+        content:
+          ("content" in message && typeof message.content === "string"
+            ? message.content
+            : "") +
+          (index === prompt.messages.length - 1
+            ? "\n\nAnswer as one JSON object with at least: line, mood, intensity."
+            : ""),
+      })),
+    }),
+  });
   if (!response.ok) {
     throw new Error(
       `model ${String(response.status)}: ${(await response.text()).slice(0, 200)}`,
