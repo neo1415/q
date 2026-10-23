@@ -75,7 +75,7 @@ describe("lenient rehearsal readings", () => {
     expect(registry.getActive("INVESTOR_PERSONA").definition.version).toBe(6);
     expect(registry.getActive("REHEARSAL_SCORE").definition.version).toBe(5);
     expect(registry.getActive("INVESTOR_TWIN_TURN").definition.version).toBe(
-      11,
+      12,
     );
   });
 
