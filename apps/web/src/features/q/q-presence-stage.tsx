@@ -141,6 +141,7 @@ export function QPresenceStage({
   onAsk,
   onOpenArtifact,
   onShowingChange,
+  onStageObjectChange,
   onCardsShowingChange,
   live = false,
   spokenPreview = null,
@@ -171,6 +172,9 @@ export function QPresenceStage({
   readonly presence: (compact: boolean, mini?: boolean) => ReactNode;
   /** Told when an object starts or stops being shown (the stage stops following newest). */
   readonly onShowingChange?: ((showing: boolean) => void) | undefined;
+  /** The answer whose object is drawn on the stage now; null for none. */
+  readonly onStageObjectChange?:
+    ((answerId: string | null) => void) | undefined;
   /** Told when an answer's cards come on or leave the stage (the wide layout). */
   readonly onCardsShowingChange?: ((cards: boolean) => void) | undefined;
   readonly turns: readonly QTurn[];
@@ -219,7 +223,8 @@ export function QPresenceStage({
   const note = stageNoteOf(items, turns, pick, (item) =>
     isHiddenIn(cards, stageCardRef(item)),
   );
-  const recent = shownRecently(items);
+  // F-35: what is on the stage now is not listed again beside it.
+  const recent = shownRecently(items).filter((item) => item.id !== shown?.id);
   const reopen = (item: ShownItem) =>
     reopenStaged(item.run, latestAnswerRun(turns));
   // Q room R4: the card Q brought into the room, open while the
@@ -238,6 +243,15 @@ export function QPresenceStage({
     room.open !== null && !cards.keys.includes(roomCardKey(room.open))
       ? room.open
       : null;
+  // F-35: a document the room has open is drawn there, not again here.
+  const inRoom =
+    roomOpen?.intent.object === "Q_DOCUMENT" &&
+    shown !== null &&
+    shown.blocks.some(
+      (block) =>
+        block.kind === "ARTIFACT_REFERENCE" &&
+        block.artifactId === roomOpen.intent.id,
+    );
   const latestQ = turns.findLast(
     (turn): turn is Extract<QTurn, { kind: "Q" }> => turn.kind === "Q",
   );
@@ -369,6 +383,10 @@ export function QPresenceStage({
   useEffect(() => {
     onShowingChange?.(showing);
   }, [showing, onShowingChange]);
+  const stageObject = shown !== null && !putAway ? shown.id : null;
+  useEffect(() => {
+    onStageObjectChange?.(stageObject);
+  }, [stageObject, onStageObjectChange]);
   // Owner 2026-10-17: a set kept or brought back gets the same wide
   // layout as a fresh one (the page widened only for the latest answer's
   // own cards, so a restored set was squeezed and its names cut).
@@ -520,7 +538,7 @@ export function QPresenceStage({
         </p>
       )}
 
-      {shown === null || canvas !== null || putAway ? null : (
+      {shown === null || canvas !== null || putAway || inRoom ? null : (
         <section
           aria-labelledby={`${listId}-shown-title`}
           className="flex max-h-[60dvh] w-full flex-col overflow-hidden rounded-(--cq-radius-lg) border border-(--cq-border-subtle) bg-(--cq-surface)"

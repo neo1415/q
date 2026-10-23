@@ -6,7 +6,12 @@ import type { QAnswerCardsBlock } from "@capital-q/contracts";
 
 import { Q_SAID_EVENT, saidText } from "@/features/q-swarm/q-said";
 
-import { focusForSaid, playbackSteps, spokenLine } from "./answer-canvas-logic";
+import {
+  focusForSaid,
+  playbackSteps,
+  shortLine,
+  spokenLine,
+} from "./answer-canvas-logic";
 
 export type AnswerPlayback = {
   /** The card Q is talking about; -1 for the overview. */
@@ -22,9 +27,9 @@ export type AnswerPlayback = {
  *
  * With a live voice line, Q's own lines drive it: each one arrives as a
  * `cq:q-said` event and the card it names comes into focus. Otherwise Q
- * walks through the cards at speaking pace, each card open while its line
- * is shown, and ends on the overview with its closing line. A tap on a
- * card stops the walk-through there.
+ * walks through the cards at speaking pace, each card open in turn, and
+ * ends on the overview; the line is the answer's own short close. A tap
+ * on a card stops the walk-through there.
  *
  * F-11 (QA 2026-10-23): the line belongs to the current exchange. When a
  * later exchange is held over the same cards (`exchangeId` changes), the
@@ -126,7 +131,15 @@ export function useAnswerPlayback(
 
   return {
     focus: state.focus,
-    said: state.said.length > 0 ? state.said : closing,
+    // F-11 (QA 2026-10-23, phone): in a text turn the line is at most one
+    // short human line, the answer's own close; a card's stored line is
+    // never the caption (the card shows its own words). Only a live voice
+    // line puts Q's spoken words here.
+    said: live
+      ? state.said.length > 0
+        ? state.said
+        : closing
+      : shortLine(closing),
     choose: (index) =>
       setState((current) => ({
         ...current,
