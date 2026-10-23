@@ -167,7 +167,9 @@ describe("fit composition", () => {
           (p) => p.parameter === "CHEQUE_SIZE",
         );
     expect(cheque(SHARED)?.outcome).toBe("STRONG");
-    expect(cheque(SHARED)?.reason).toBe("$2M round; your $300k cheque fits (up to 15% of it).");
+    expect(cheque(SHARED)?.reason).toBe(
+      "$2M round; your $300k cheque fits (up to 15% of it).",
+    );
     expect(cheque(PRIVATE)?.outcome).toBe("UNKNOWN");
     expect(cheque(PRIVATE)?.reason).toBe(
       "The company has not shared its round size with you.",
@@ -188,7 +190,9 @@ describe("fit composition", () => {
       (p) => p.parameter === "CHEQUE_SIZE",
     );
     expect(cheque?.outcome).toBe("STRONG");
-    expect(cheque?.reason).toBe("$2M round; your $300k cheque fits (up to 15% of it).");
+    expect(cheque?.reason).toBe(
+      "$2M round; your $300k cheque fits (up to 15% of it).",
+    );
   });
 
   it("a card that does not show the raise shares nothing", async () => {
