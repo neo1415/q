@@ -386,14 +386,24 @@ export {
   ECB_DAILY_URL,
   ECB_SOURCE,
   ECB_SOURCE_VERSION,
+  MARKET_LATEST_URL,
+  MARKET_SOURCE,
   createEcbFxRateProvider,
+  createMarketFxRateProvider,
   createPostgresFxReferenceRates,
   estimateInCurrency,
   parseEcbDaily,
+  parseMarketLatest,
+  type FxRateSource,
   type FxRateProvider,
   type FxReferenceRateStore,
   type FxReferenceRates,
 } from "./fx/ecb.js";
+export {
+  FX_MAX_AGE_DAYS,
+  createLiveFxRates,
+  type LiveFxRates,
+} from "./fx/live.js";
 export {
   CandidateNotRankableError,
   createFeatureService,

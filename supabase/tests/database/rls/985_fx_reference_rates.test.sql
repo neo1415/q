@@ -13,7 +13,7 @@ create extension if not exists pgtap with schema extensions;
 \ir support/fixture.psql
 select pg_temp.rls_setup();
 
-select plan(10);
+select plan(11);
 
 -- Positive ----------------------------------------------------------------------------
 select lives_ok(
@@ -22,6 +22,12 @@ select lives_ok(
      values ('00000000-0000-4000-8000-000000000fa1', 'ECB_EUROFXREF', 'eurofxref-daily.v1',
              '2026-10-23', 'EUR', 'GBP', 0.8612) $$,
   'a dated reference rate is recorded');
+
+select lives_ok(
+  $$ insert into recommendation.fx_reference_rates
+       (source, source_version, rate_date, base_currency, quote_currency, rate)
+     values ('EXCHANGERATE_API_OPEN', 'open-er-api-latest.v1', '2026-10-23', 'EUR', 'NGN', 1497.107782) $$,
+  'the public market feed, for a currency the ECB does not publish');
 
 -- Idempotency --------------------------------------------------------------------------
 select throws_ok(

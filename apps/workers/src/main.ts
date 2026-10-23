@@ -60,6 +60,7 @@ import {
 } from "@capital-q/eventing/publisher";
 import {
   createEcbFxRateProvider,
+  createMarketFxRateProvider,
   createPostgresFxReferenceRates,
   createRecommendationPipeline,
   playablePitchPortFrom,
@@ -1483,6 +1484,13 @@ await Promise.all([
   // cross-currency cheque fit. The only provider call; none per request.
   runEcbRatesTicker({
     provider: createEcbFxRateProvider({}),
+    store: createPostgresFxReferenceRates({ sql: database.sql }),
+    signal: shutdownController.signal,
+    logger,
+  }),
+  // The public market feed too, for currencies the ECB does not publish.
+  runEcbRatesTicker({
+    provider: createMarketFxRateProvider({}),
     store: createPostgresFxReferenceRates({ sql: database.sql }),
     signal: shutdownController.signal,
     logger,

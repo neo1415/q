@@ -11,6 +11,11 @@ import type { DatabaseExecutor } from "@capital-q/database";
 import {
   createFitInputSource,
   createFitService,
+  ECB_SOURCE,
+  MARKET_SOURCE,
+  createEcbFxRateProvider,
+  createLiveFxRates,
+  createMarketFxRateProvider,
   createPostgresFxReferenceRates,
   statedEvidenceFrom,
   type CompanyRaiseReader,
@@ -146,18 +151,26 @@ export function createFitComposition(
   };
 
   const cards = createPostgresPublicIdentityRepository();
-  // Owner 23 Oct 2026: the latest stored ECB reference rates (written by
-  // the workers' daily fetch; never a provider call here), kept for a few
-  // minutes so a feed of fits reads them once.
-  const fxStore = createPostgresFxReferenceRates({ sql: dependencies.sql });
+  // Owner 23 Oct 2026: "if you don't know something, go to the internet
+  // and find it." The current exchange rates: stored when fresh, otherwise
+  // fetched now (the ECB's reference rates, then the public market feed
+  // for currencies the ECB does not publish) and stored for everyone after.
+  // Kept for a few minutes so a feed of fits reads them once.
+  const liveFx = createLiveFxRates({
+    store: createPostgresFxReferenceRates({ sql: dependencies.sql }),
+    providers: [
+      { source: ECB_SOURCE, provider: createEcbFxRateProvider({}) },
+      { source: MARKET_SOURCE, provider: createMarketFxRateProvider({}) },
+    ],
+  });
   let fxKept: {
     readonly at: number;
-    readonly rates: Promise<FxReferenceRates | null>;
+    readonly rates: Promise<readonly FxReferenceRates[]>;
   } | null = null;
-  const fxRates = (): Promise<FxReferenceRates | null> => {
+  const fxRates = (): Promise<readonly FxReferenceRates[]> => {
     const now = Date.now();
     if (fxKept === null || now - fxKept.at > FX_KEEP_MS) {
-      fxKept = { at: now, rates: fxStore.latest().catch(() => null) };
+      fxKept = { at: now, rates: liveFx.current().catch(() => []) };
     }
     return fxKept.rates;
   };

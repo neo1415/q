@@ -8,15 +8,18 @@
 --   comparison stays an estimate, and the same-currency comparison never
 --   reads this table.
 --
--- Written only by the workers' daily fetch (no request ever calls the
--- provider); read only by the server. Append-only per (source, date,
+-- Written by the workers' fetch, and by the server when it finds no
+-- current set (owner 23 Oct 2026: "go to the internet and find it");
+-- read only by the server. Append-only per (source, date,
 -- currency): a correction the ECB publishes later is a new fetch of that
 -- date under a new source_version, never an overwrite.
 
 create table recommendation.fx_reference_rates (
   id              uuid primary key default gen_random_uuid(),
-  -- Who published it and which publication: ECB_EUROFXREF, daily set.
-  source          text not null check (source in ('ECB_EUROFXREF')),
+  -- Who published it: the ECB's daily reference rates, or the public
+  -- market feed (exchangerate-api.com open access) for currencies the ECB
+  -- does not publish.
+  source          text not null check (source in ('ECB_EUROFXREF', 'EXCHANGERATE_API_OPEN')),
   source_version  text not null check (source_version ~ '^[a-z0-9][a-z0-9._-]{0,63}$'),
   -- The ECB's reference date (rates are set about 16:00 CET each TARGET day).
   rate_date       date not null,
@@ -32,7 +35,7 @@ create index fx_reference_rates_latest_idx
   on recommendation.fx_reference_rates (source, rate_date desc, quote_currency);
 
 comment on table recommendation.fx_reference_rates is
-  'ECB daily euro reference rates (units of quote currency per EUR), dated and versioned. Reference data for ESTIMATE cross-currency cheque comparisons only; never evidence, never exact.';
+  'Daily euro exchange rates (units of quote currency per EUR) from the ECB and a public market feed, dated and versioned. Reference data for ESTIMATE cross-currency cheque comparisons only; never evidence, never exact.';
 
 create function recommendation.protect_fx_reference_rates()
 returns trigger

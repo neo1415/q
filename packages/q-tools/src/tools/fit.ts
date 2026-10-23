@@ -63,7 +63,7 @@ const GUIDANCE =
  * comparison, whose text has no rows (and sits at the tool bound).
  */
 const CHEQUE_GUIDANCE =
-  "Cheque compatibility is their cheque against the round only: say a [why unknown: …] reason exactly, never another; an [ESTIMATE …] row is approximate, at the ECB rate of its date.";
+  "Cheque compatibility is their cheque against the round only: say a [why unknown: …] reason exactly, never another; an [ESTIMATE …] row is approximate, at the rate and date it names.";
 
 const UNICORN_GUIDANCE =
   "If scores.unicornPotential is present, Unicorn Potential is a separate persisted growth-characteristics indicator: repeat only its actual overallScore (or insufficient evidence), explain its twelve pillars, grades, stage weights, coverage, sources and recorded momentum. Use weighted graded pillar sum divided by scored pillar weights, multiplied by 25 and rounded once; never invent an observation or treat unknown as zero. It is not a probability of reaching a $1 billion valuation. If it is absent, do not infer or reconstruct a premium score; say that assessment is unavailable for this account. A visible assessment card is not proof that its details are expanded. When the entitled person asks to open or show the Unicorn Potential assessment or its calculation on the company Overview, call operate_screen with target disclosure.unicorn-potential and act EXPAND before drafting the explanation. EXPAND is idempotent; do not substitute ACTIVATE or assume the panel is already open. Do not say it opened without the client DONE receipt; until confirmed, describe the opening as requested rather than completed.";
