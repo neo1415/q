@@ -23,14 +23,15 @@ export type CanvasLayout = {
 };
 
 /**
- * Desktop: up to five in a row (the focused one wide); six or more, the
- * focused card beside a grid of the rest. Phone: one column; from four
+ * Desktop: up to four in a row (the focused one wide); five or more, the
+ * focused card beside a grid of the rest (live 23 Oct: five in a row left
+ * the rest about 170px wide, names broke mid-word). Phone: one column; from four
  * cards, the rest become half-width tiles so the focused card is never
  * pushed off a 390px screen.
  */
 export function canvasLayout(count: number, wide: boolean): CanvasLayout {
   return {
-    layout: wide && count > 5 ? "grid" : "row",
+    layout: wide && count > 4 ? "grid" : "row",
     tiles: !wide && count >= 4,
   };
 }
