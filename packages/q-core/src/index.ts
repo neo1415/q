@@ -417,6 +417,8 @@ export {
   TURN_READER_V58_SCHEMA_VERSION,
   NamedOtherSchema,
   type NamedOther,
+  TurnMeetingPrepSchema,
+  type TurnMeetingPrep,
   TurnReaderV58ResultSchema,
   type TurnReaderV58Result,
   TurnFromShownSchema,
@@ -1497,6 +1499,16 @@ export {
 } from "./prompts/tasks/spoken-reply.v1.js";
 export { BRIEFING_COMMAND_V1 } from "./prompts/tasks/briefing-command.v1.js";
 export { SMALL_TALK_V1 } from "./prompts/tasks/small-talk.v1.js";
+export { CALL_PREP_V1 } from "./prompts/tasks/call-prep.v1.js";
+export {
+  CALL_PREP_SCHEMA_NAME,
+  CALL_PREP_SCHEMA_VERSION,
+  CALL_PREP_UNTRUSTED,
+  CallPrepResultSchema,
+  CallPrepVariablesSchema,
+  type CallPrepResult,
+  type CallPrepVariables,
+} from "./prompts/schemas/call-prep.js";
 export { CONVERSATION_RECALL_V1 } from "./prompts/tasks/conversation-recall.v1.js";
 export {
   CONVERSATION_RECALL_SCHEMA_NAME,
@@ -1692,6 +1704,7 @@ export {
   V58_NAMED_OTHER,
   V58_SUITS_THEM,
   V58_FIT_MANDATE,
+  V58_MEETING_PREP,
 } from "./prompts/tasks/turn-reader.v58.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 

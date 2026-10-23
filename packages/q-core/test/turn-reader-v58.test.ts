@@ -8,6 +8,8 @@ import {
   V58_FIT_MANDATE,
   V58_NAMED_OTHER,
   V58_SUITS_THEM,
+  V49_TEAM_JOB,
+  V58_MEETING_PREP,
   createDefaultPromptRegistry,
 } from "../src/index.js";
 
@@ -64,5 +66,34 @@ describe("TURN_READER v58: the reader names whom the turn is about", () => {
     expect(malformed.namedOther).toBeNull();
     expect(malformed.aboutNamedOther).toBe(true);
     expect(TurnReaderV58ResultSchema.parse(base).namedOther).toBeNull();
+  });
+});
+
+/**
+ * Lane 5 (owner 2026-10-23, live founder.maji-loop): "help me prepare for
+ * a first call with Savanna Seed Partners" is prepared in the answer, not
+ * planned as a team job.
+ */
+describe("TURN_READER v58: getting ready for a call is meetingPrep", () => {
+  it("follows the TEAM JOB rule, in the same v58", () => {
+    expect(TURN_READER_V58.template).toContain(
+      `${V49_TEAM_JOB}${V58_MEETING_PREP}`,
+    );
+  });
+
+  it("reads by meaning, keeps a handed-over job as teamJob", () => {
+    expect(V58_MEETING_PREP).toMatch(/in any words and any language/u);
+    expect(V58_MEETING_PREP).toMatch(/Then teamJob is false/u);
+    expect(V58_MEETING_PREP).toMatch(/hand the work to your team/u);
+  });
+
+  it("meetingPrep is optional and lenient", () => {
+    const shape = TurnReaderV58ResultSchema.shape.meetingPrep;
+    expect(shape.parse(undefined)).toBeNull();
+    expect(shape.parse({ counterpart: "Savanna Seed Partners" })).toEqual({
+      counterpart: "Savanna Seed Partners",
+    });
+    expect(shape.parse({ counterpart: "" })).toBeNull();
+    expect(shape.parse("Savanna")).toBeNull();
   });
 });
