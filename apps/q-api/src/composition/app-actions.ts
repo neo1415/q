@@ -183,6 +183,7 @@ export function createAppActionDefinitions(
               : await options.nameOf(actor, first).catch(() => null);
         return action.card(payload, { counterpart });
       },
+      ...(action.proposed === undefined ? {} : { proposed: action.proposed }),
       confirm: (_payload, result) => result.says,
       authorize: async (payload, actor) => {
         if (actor.actorType !== "HUMAN") {

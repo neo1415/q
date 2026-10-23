@@ -23,6 +23,7 @@ import type {
 
 import {
   defineAppAction,
+  readyToSendLine,
   defineAppActionFamily,
   type AnyAppAction,
 } from "../define.js";
@@ -108,6 +109,7 @@ const SHARE = defineAppAction<
   targets: (input) => [
     { kind: "RELATIONSHIP", relationshipId: input.relationshipId },
   ],
+  proposed: (_input, summary) => readyToSendLine(summary, null),
   card: () => ({
     summary: "Share this document with them",
     preview:
@@ -224,6 +226,8 @@ const REQUEST = defineAppAction<
         ? "The company sees this on their diligence checklist."
         : `With your note: "${input.input.note}"`,
   }),
+  proposed: (input, summary) =>
+    readyToSendLine(summary, input.input.note ?? null),
   done: (out) =>
     out.outcome === "OK"
       ? "Asked. They'll see it on their checklist."

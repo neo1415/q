@@ -25,6 +25,7 @@ import {
 import {
   cardOnlyIf,
   defineAppAction,
+  readyToSendLine,
   portMissing,
   refusal,
   relationshipTarget,
@@ -163,6 +164,7 @@ const BOOK = defineAppAction<
         : `Book a call with ${names.counterpart}`,
     preview: `${input.input.purpose}\n${input.input.startsAt} (${input.input.timeZone}), ${String(input.input.durationMinutes)} minutes`,
   }),
+  proposed: (_input, summary) => readyToSendLine(summary, null),
   done: () => "Booked.",
   http: {
     method: "POST",

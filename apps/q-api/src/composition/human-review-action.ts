@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readyToSendLine } from "@capital-q/app-actions";
 
 import {
   HumanReviewSubjectRefSchema,
@@ -74,6 +75,7 @@ export function createReviewRequestAction(dependencies: {
     result: ReviewRequestResultSchema,
     targets: (payload) => [{ kind: "USER", userId: payload.requesterUserId }],
     describe: describeReviewRequest,
+    proposed: (payload, summary) => readyToSendLine(summary, payload.reason),
     confirm: () =>
       "Done. A person at Capital Q will look at it and you'll get a notice with their answer.",
     authorize: (payload, actor) =>
