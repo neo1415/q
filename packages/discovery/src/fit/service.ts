@@ -18,6 +18,7 @@ import {
   type InvestabilityDto,
   type UnicornPotentialDto,
   type FitCandidateSource,
+  type FitChequeUnknownReason,
   type FitComparisonDto,
   type FitOutcome,
   type FitParameter,
@@ -566,9 +567,31 @@ export function fitProfileText(
   if (options.summaryOnly === true) return head;
   const rows = profile.parameters.map(
     (p) =>
-      `- ${FIT_PARAMETER_LABELS[p.parameter]}: ${p.applicable ? FIT_OUTCOME_LABELS[p.outcome] : "No preference"}. ${p.reason}`,
+      `- ${FIT_PARAMETER_LABELS[p.parameter]}: ${p.applicable ? FIT_OUTCOME_LABELS[p.outcome] : "No preference"}. ${p.reason}${rowNote(p)}`,
   );
   return [head, ...rows].join("\n");
+}
+
+/**
+ * Owner 23 Oct 2026: Q invented why cheque compatibility was unknown. The
+ * row's exact reason travels as a code with its words, and an estimate
+ * says it is one, so Q has nothing to fill in.
+ */
+const UNKNOWN_REASON_WORDS: Readonly<Record<FitChequeUnknownReason, string>> = {
+  ROUND_NOT_SHARED:
+    "the company has not shared a round size you may see (no Q Card raise, no disclosure, no amount in a pitch you may play)",
+  CURRENCY_DIFFERS_NO_RATE:
+    "the round and your cheque are in different currencies and no exchange rate is stored",
+};
+
+function rowNote(p: FitProfileDto["parameters"][number]): string {
+  if (p.unknownReason !== undefined) {
+    return ` [why unknown: ${p.unknownReason}, ${UNKNOWN_REASON_WORDS[p.unknownReason]}; the only reason]`;
+  }
+  if (p.estimate !== undefined) {
+    return ` [ESTIMATE: approximately, at the ECB reference rate of ${p.estimate.rateDate}; not exact, not verified]`;
+  }
+  return "";
 }
 
 /** The comparison as plain text, best first. */

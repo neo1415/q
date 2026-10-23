@@ -19,6 +19,7 @@ import type { RecommendationFeatureSnapshot } from "../src/features/contracts.js
 import {
   FIT_CONFIG_CURRENT,
   FIT_CONFIG_V4,
+  FIT_CONFIG_V6,
   FIT_CONFIGS,
   FitConfigSchema,
   fitConfigByVersion,
@@ -114,8 +115,14 @@ describe("fit config ranking-config.v4", () => {
       FIT_CONFIG_V4.parameters.reduce((s, p) => s + p.weight, 0),
     ).toBeCloseTo(1, 12);
     expect(FIT_CONFIG_V4.extends).toBe("ranking-config.v3");
-    expect(FIT_CONFIG_CURRENT).toBe(FIT_CONFIG_V4);
+    // v6 (owner 23 Oct 2026): v4's weights and rules, fit-reasons.v2.
+    expect(FIT_CONFIG_CURRENT).toBe(FIT_CONFIG_V6);
     expect(fitConfigByVersion("ranking-config.v4")).toBe(FIT_CONFIG_V4);
+    expect(fitConfigByVersion("ranking-config.v6")).toBe(FIT_CONFIG_V6);
+    expect(FIT_CONFIG_V6.parameters).toEqual(FIT_CONFIG_V4.parameters);
+    expect(FIT_CONFIG_V6.comparators).toEqual(FIT_CONFIG_V4.comparators);
+    expect(FIT_CONFIG_V6.reasonTemplatesVersion).toBe("fit-reasons.v2");
+    expect(Object.isFrozen(FIT_CONFIG_V6)).toBe(true);
     expect(fitConfigByVersion("ranking-config.v99")).toBeNull();
   });
 
@@ -1006,6 +1013,7 @@ describe("fit inputs from the investor's own mandate and what the reader may see
       amount: "2000000",
       currency: "USD",
       evidenceStatus: "SELF_REPORTED",
+      source: "SHARED",
     });
     expect(one.get(ID(1))?.snapshot).toBeNull();
     expect(one.get(ID(1))?.line).toBe("Series A · Kenya");

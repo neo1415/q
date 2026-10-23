@@ -42,6 +42,13 @@ const EVIDENCE_VALUE_MAX = 200;
 
 export type FitStatedEvidence = {
   readonly statedRound: NonNullable<DeclaredFitFacts["statedRound"]> | null;
+  /**
+   * The raise said in a pitch this reader may play, as money (owner 23 Oct
+   * 2026: investor-visible material counts toward cheque fit). Null when
+   * no pitch they may play states an amount.
+   */
+  readonly pitchMoney?:
+    { readonly amount: string; readonly currency: string } | null | undefined;
   readonly evidence: readonly FitEvidenceLine[];
   /**
    * The deck facts reached this reader other than as a deck offered to all
@@ -164,6 +171,13 @@ export function statedEvidenceFrom(input: {
     sections.length > 0 && input.deck?.deck?.downloadable !== true;
   return {
     statedRound,
+    pitchMoney:
+      input.raise?.source === "PITCH_CLAIM" && input.raise.money !== null
+        ? {
+            amount: input.raise.money.amount,
+            currency: input.raise.money.currency,
+          }
+        : null,
     evidence: evidence.slice(0, FIT_EVIDENCE_LINES_MAX),
     confidential,
   };

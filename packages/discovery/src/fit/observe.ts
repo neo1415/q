@@ -16,6 +16,7 @@ import {
   type FitInputs,
   type FitObservation,
 } from "./model.js";
+import { estimateInCurrency, type FxReferenceRates } from "../fx/ecb.js";
 
 /**
  * From inputs to observations (B1): deterministic comparators, one per
@@ -67,9 +68,23 @@ export type DeclaredFitFacts = {
 
   /** The round as shared with this reader. */
   readonly round?:
-    | (DeclaredMoney & { readonly evidenceStatus: EvidenceStatus | null })
+    | (DeclaredMoney & {
+        readonly evidenceStatus: EvidenceStatus | null;
+        /**
+         * SHARED: the capital objective, disclosed or on the Q Card. PITCH:
+         * the raise the company stated in a pitch this reader may play
+         * (owner 23 Oct 2026: investor-visible material counts). Absent:
+         * SHARED, as before.
+         */
+        readonly source?: "SHARED" | "PITCH" | undefined;
+      })
     | null
     | undefined;
+  /**
+   * The latest stored ECB reference rates, for an ESTIMATE when the round
+   * and the cheque are in different currencies. Absent: never converted.
+   */
+  readonly fx?: FxReferenceRates | null | undefined;
   /** The investor's own declared cheque range. */
   readonly cheque?:
     | {
@@ -307,6 +322,15 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
   }
   const round = d.round ?? null;
   const roundAmount = amountOf(round?.amount);
+  const fromPitch = round?.source === "PITCH";
+  const otherCurrency = round !== null && round.currency !== cheque.currency;
+  // Owner 23 Oct 2026: across currencies, an estimate at the stored ECB
+  // reference rate (never converted without one, never called exact).
+  const fx = d.fx ?? null;
+  const converted =
+    round !== null && otherCurrency && fx !== null
+      ? estimateInCurrency(round.amount, round.currency, cheque.currency, fx)
+      : null;
   const facts = {
     chequeSize:
       cheque.typical === undefined
@@ -316,36 +340,51 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
       cheque.min !== undefined && cheque.max !== undefined
         ? `${formatMoney(cheque.min, cheque.currency)}–${formatMoney(cheque.max, cheque.currency)}`
         : undefined,
+    chequeCurrency: cheque.currency,
     roundSize:
-      round === null ? undefined : formatMoney(round.amount, round.currency),
+      round === null
+        ? undefined
+        : `${formatMoney(round.amount, round.currency)}${fromPitch ? " (from their pitch)" : ""}`,
     statedRaise: said,
     roundOtherCurrency:
-      round !== null && round.currency !== cheque.currency
+      round !== null && otherCurrency && converted === null
         ? formatMoney(round.amount, round.currency)
         : undefined,
+    roundEstimate:
+      converted === null ? undefined : formatMoney(converted, cheque.currency),
+    rateDate:
+      converted === null || fx === null ? undefined : humanDate(fx.rateDate),
   };
-  // No FX: a round in another currency is not comparable, so it is unknown.
-  if (
-    round === null ||
-    roundAmount === null ||
-    roundAmount === 0 ||
-    round.currency !== cheque.currency
-  ) {
+  if (round === null || roundAmount === null || roundAmount === 0) {
     return {
       ...unknownObservation(facts),
       stated: said !== undefined,
+      unknownReason: "ROUND_NOT_SHARED",
       context: chequeContext(
         d,
         facts.chequeSize ?? facts.chequeRange,
-        round !== null && round.currency !== cheque.currency
-          ? "Ticket fit: not compared, the round is in another currency"
-          : said !== undefined
-            ? "Ticket fit: not scored until the round is formally shared"
-            : "Round amount: not known",
+        said !== undefined
+          ? "Ticket fit: not scored until the round is shared"
+          : "Round amount: not shared with you",
       ),
     };
   }
-  const share = ref / roundAmount;
+  if (otherCurrency && converted === null) {
+    return {
+      ...unknownObservation(facts),
+      unknownReason: "CURRENCY_DIFFERS_NO_RATE",
+      context: chequeContext(
+        d,
+        facts.chequeSize ?? facts.chequeRange,
+        `Ticket fit: not compared, the round is in ${round.currency} and your cheque in ${cheque.currency}`,
+      ),
+    };
+  }
+  const compared = converted === null ? roundAmount : amountOf(converted);
+  if (compared === null || compared === 0) {
+    return { ...unknownObservation(facts), unknownReason: "ROUND_NOT_SHARED" };
+  }
+  const share = ref / compared;
   const c = config.comparators;
   const outcome =
     share >= c.chequeShareStrongMin && share <= c.chequeShareStrongMax
@@ -359,8 +398,47 @@ function observeCheque(d: DeclaredFitFacts, config: FitConfig): FitObservation {
     evidenceStatus: round.evidenceStatus,
     stale: false,
     facts,
-    context: chequeContext(d, facts.chequeSize ?? facts.chequeRange, null),
+    ...(converted === null || fx === null
+      ? {}
+      : {
+          estimate: {
+            method: "ECB_REFERENCE_RATE" as const,
+            rateDate: fx.rateDate,
+            truthClass: "ESTIMATE" as const,
+          },
+        }),
+    context: chequeContext(
+      d,
+      facts.chequeSize ?? facts.chequeRange,
+      converted === null || fx === null
+        ? null
+        : `Approximately, at the ECB rate of ${humanDate(fx.rateDate)}`,
+    ),
   };
+}
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+/** "2026-10-23" -> "23 Oct 2026"; the ISO date itself when malformed. */
+function humanDate(iso: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(iso);
+  const month = match === null ? undefined : MONTHS[Number(match[2]) - 1];
+  return match === null || month === undefined
+    ? iso
+    : `${String(Number(match[3]))} ${month} ${match[1] ?? ""}`;
 }
 
 /**
@@ -383,7 +461,10 @@ function chequeContext(
           {
             label: "Round",
             value: formatMoney(round.amount, round.currency),
-            source: "SHARED" as const,
+            source:
+              round.source === "PITCH"
+                ? ("PITCH" as const)
+                : ("SHARED" as const),
           },
         ]),
     ...(yourCheque === undefined || yourCheque === null

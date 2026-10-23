@@ -13,6 +13,7 @@ import { assessFit } from "../src/fit/model.js";
 import { observeFit, type DeclaredFitFacts } from "../src/fit/observe.js";
 import { statedEvidenceFrom } from "../src/fit/stated.js";
 import { renderFitReason } from "../src/fit/templates.js";
+import { fitProfileText } from "../src/fit/service.js";
 
 /**
  * What a company STATED where the reader may see it, beside the fit (lead
@@ -168,7 +169,7 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
     const withStated = fitWith({ ...MANDATE, statedRound: said.statedRound });
     const without = fitWith(MANDATE);
     expect(withStated.cheque.reason).toBe(
-      "Raising $4M, said in their pitch and deck, minimum cheque $100k; not formally shared, so not scored.",
+      "Raising $4M, said in their pitch and deck, minimum cheque $100k; not shared as a round size, so not scored.",
     );
     expect(withStated.terms.reason).toBe(
       "Post-money SAFE, $30m cap in their deck; whether they need a lead is not stated.",
@@ -181,7 +182,7 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
         { label: "Your cheque", value: "$250k", source: "YOUR_MANDATE" },
         { label: "Minimum cheque", value: "$100k", source: "DECK" },
       ],
-      open: "Ticket fit: not scored until the round is formally shared",
+      open: "Ticket fit: not scored until the round is shared",
     });
     expect(withStated.terms.context).toEqual({
       items: [
@@ -192,7 +193,7 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
     });
     expect(without.cheque.context).toEqual({
       items: [{ label: "Your cheque", value: "$250k", source: "YOUR_MANDATE" }],
-      open: "Round amount: not known",
+      open: "Round amount: not shared with you",
     });
     expect(withStated.cheque.stated).toBe(true);
     expect(withStated.terms.stated).toBe(true);
@@ -258,7 +259,7 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
     expect(
       fitWith({ ...MANDATE, statedRound: said.statedRound }).cheque.reason,
     ).toBe(
-      "Raising $2.5M, said in their pitch; not formally shared, so not scored.",
+      "Raising $2.5M, said in their pitch; not shared as a round size, so not scored.",
     );
   });
 
@@ -288,9 +289,11 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
       },
     });
     expect(cheque.outcome).toBe("UNKNOWN");
+    // The exact reason, as words and as a code Q states (owner 23 Oct).
     expect(cheque.reason).toBe(
-      "Raising €2M, in another currency than your cheque, so not compared.",
+      "Raising €2M; your cheque is in USD and no exchange rate is stored, so not compared.",
     );
+    expect(cheque.unknownReason).toBe("CURRENCY_DIFFERS_NO_RATE");
   });
 
   it("no pitch: the confirmed deck alone", () => {
@@ -319,7 +322,10 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
     expect(said.statedRound).toBeNull();
     expect(said.evidence).toEqual([]);
     const { cheque, terms } = fitWith({ ...MANDATE, statedRound: null });
-    expect(cheque.reason).toBe("Round size not shared.");
+    expect(cheque.reason).toBe(
+      "The company has not shared its round size with you.",
+    );
+    expect(cheque.unknownReason).toBe("ROUND_NOT_SHARED");
     expect(terms.reason).toBe("Round terms not shared.");
   });
 
@@ -362,8 +368,9 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
   });
 
   it("every sentence an input without stated facts produced before is unchanged", () => {
+    // fit-reasons.v2: the cheque unknown says plainly what is missing.
     expect(renderFitReason("CHEQUE_SIZE", "UNKNOWN", {})).toBe(
-      "Round size not shared.",
+      "The company has not shared its round size with you.",
     );
     expect(renderFitReason("ROUND_TERMS", "UNKNOWN", {})).toBe(
       "Round terms not shared.",
@@ -373,6 +380,162 @@ describe("what a company stated, beside the fit (Tensorgate, 2026-10-12)", () =>
     );
     expect(renderFitReason("ROUND_TERMS", "NO_PREFERENCE", {})).toBe(
       "You have not said whether you lead.",
+    );
+  });
+});
+
+/**
+ * Owner 23 Oct 2026 (Zino Aviation on Halyard Security): "you know how much
+ * I am offering. So what do you mean by you don't know the cheque
+ * compatibility". A raise said in a pitch the investor may play counts,
+ * recorded as from the pitch; a round in another currency is compared as
+ * an ESTIMATE at the stored ECB rate; an unknown says its exact reason.
+ */
+describe("cheque fit from the pitch, across currencies (fit-reasons.v2)", () => {
+  // ECB reference rates for 23 Oct 2026 (units per euro), as stored.
+  const fx = {
+    source: "ECB_EUROFXREF" as const,
+    rateDate: "2026-10-23",
+    perEuro: new Map([
+      ["GBP", "0.86"],
+      ["USD", "1.08"],
+    ]),
+  };
+  const zino: DeclaredFitFacts = {
+    cheque: { currency: "EUR", typical: "3000000" },
+  };
+
+  it("a raise said in their pitch is scored, and says it is from the pitch", () => {
+    const said = statedEvidenceFrom({ raise: pitch("4000000"), deck: null });
+    expect(said.pitchMoney).toEqual({ amount: "4000000", currency: "USD" });
+    const { cheque } = fitWith({
+      ...MANDATE,
+      round: {
+        amount: "4000000",
+        currency: "USD",
+        evidenceStatus: "SELF_REPORTED",
+        source: "PITCH",
+      },
+    });
+    expect(cheque.outcome).toBe("STRONG");
+    expect(cheque.reason).toBe(
+      "$4M (from their pitch) round; your $250k fits.",
+    );
+    expect(cheque.context?.items[0]).toEqual({
+      label: "Round",
+      value: "$4M",
+      source: "PITCH",
+    });
+    expect(cheque.estimate).toBeUndefined();
+  });
+
+  it("Halyard: a £3M round against a €3M cheque is compared approximately, at the ECB rate of the day, as an estimate", () => {
+    const { cheque } = fitWith({
+      ...zino,
+      fx,
+      round: {
+        amount: "3000000",
+        currency: "GBP",
+        evidenceStatus: "SELF_REPORTED",
+        source: "PITCH",
+      },
+    });
+    // £3M / 0.86 per EUR ≈ €3.49M; a €3M cheque is 86% of the round.
+    expect(cheque.outcome).toBe("STRONG");
+    expect(cheque.reason).toBe(
+      "£3M (from their pitch) round, about €3.5M at the ECB rate of 23 Oct 2026; your €3M fits.",
+    );
+    expect(cheque.estimate).toEqual({
+      method: "ECB_REFERENCE_RATE",
+      rateDate: "2026-10-23",
+      truthClass: "ESTIMATE",
+    });
+    expect(cheque.context?.open).toBe(
+      "Approximately, at the ECB rate of 23 Oct 2026",
+    );
+    expect(cheque.unknownReason).toBeUndefined();
+  });
+
+  it("an estimate can also say the cheque is too large for the round", () => {
+    const { cheque } = fitWith({
+      cheque: { currency: "EUR", typical: "3000000" },
+      fx,
+      round: {
+        amount: "1000000",
+        currency: "GBP",
+        evidenceStatus: "SELF_REPORTED",
+      },
+    });
+    // £1M ≈ €1.16M: a €3M cheque is more than the whole round.
+    expect(cheque.outcome).not.toBe("UNKNOWN");
+    expect(cheque.outcome).not.toBe("STRONG");
+    expect(cheque.estimate?.truthClass).toBe("ESTIMATE");
+  });
+
+  it("without a stored rate the currencies are named, never guessed", () => {
+    const { cheque } = fitWith({
+      ...zino,
+      round: {
+        amount: "3000000",
+        currency: "GBP",
+        evidenceStatus: "SELF_REPORTED",
+        source: "PITCH",
+      },
+    });
+    expect(cheque.outcome).toBe("UNKNOWN");
+    expect(cheque.unknownReason).toBe("CURRENCY_DIFFERS_NO_RATE");
+    expect(cheque.reason).toBe(
+      "Raising £3M; your cheque is in EUR and no exchange rate is stored, so not compared.",
+    );
+    expect(cheque.context?.open).toBe(
+      "Ticket fit: not compared, the round is in GBP and your cheque in EUR",
+    );
+  });
+
+  it("the same currency is compared exactly, never as an estimate", () => {
+    const { cheque } = fitWith({
+      ...zino,
+      fx,
+      round: {
+        amount: "5000000",
+        currency: "EUR",
+        evidenceStatus: "SELF_REPORTED",
+      },
+    });
+    expect(cheque.outcome).toBe("STRONG");
+    expect(cheque.estimate).toBeUndefined();
+  });
+});
+
+describe("what Q reads about cheque fit (owner 23 Oct 2026)", () => {
+  it("an unknown carries its exact reason as a code, and an estimate says it is one", () => {
+    const unknown = fitWith({
+      cheque: { currency: "EUR", typical: "3000000" },
+      round: {
+        amount: "3000000",
+        currency: "GBP",
+        evidenceStatus: "SELF_REPORTED",
+      },
+    });
+    const text = fitProfileText("Halyard Security", unknown.profile);
+    expect(text).toContain(
+      "[why unknown: CURRENCY_DIFFERS_NO_RATE, the round and your cheque are in different currencies and no exchange rate is stored; the only reason]",
+    );
+    const estimated = fitWith({
+      cheque: { currency: "EUR", typical: "3000000" },
+      fx: {
+        source: "ECB_EUROFXREF",
+        rateDate: "2026-10-23",
+        perEuro: new Map([["GBP", "0.86"]]),
+      },
+      round: {
+        amount: "3000000",
+        currency: "GBP",
+        evidenceStatus: "SELF_REPORTED",
+      },
+    });
+    expect(fitProfileText("Halyard Security", estimated.profile)).toContain(
+      "[ESTIMATE: approximately, at the ECB reference rate of 2026-10-23; not exact, not verified]",
     );
   });
 });

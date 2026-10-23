@@ -2,6 +2,8 @@ import {
   FIT_PARAMETERS,
   FitProfileDtoSchema,
   type EvidenceStatus,
+  type FitChequeUnknownReason,
+  type FitEstimate,
   type FitBand,
   type FitConfidence,
   type FitHardRuleDto,
@@ -39,6 +41,10 @@ export type FitObservation = {
   readonly stated?: boolean | undefined;
   /** Known values beside the row, with sources, and what is still open. */
   readonly context?: FitParameterContext | undefined;
+  /** CHEQUE_SIZE: why it is UNKNOWN, as a code Q states exactly. */
+  readonly unknownReason?: FitChequeUnknownReason | undefined;
+  /** CHEQUE_SIZE: compared across currencies at a dated reference rate. */
+  readonly estimate?: FitEstimate | undefined;
 };
 
 export type FitInputs = {
@@ -128,6 +134,12 @@ export function assessFit(
       applicable: o.applicable,
       ...(!known && o.stated === true ? { stated: true } : {}),
       ...(o.context === undefined ? {} : { context: o.context }),
+      ...(o.applicable &&
+      o.outcome === "UNKNOWN" &&
+      o.unknownReason !== undefined
+        ? { unknownReason: o.unknownReason }
+        : {}),
+      ...(known && o.estimate !== undefined ? { estimate: o.estimate } : {}),
     });
   }
 

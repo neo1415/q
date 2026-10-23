@@ -169,7 +169,10 @@ describe("fit composition", () => {
     expect(cheque(SHARED)?.outcome).toBe("STRONG");
     expect(cheque(SHARED)?.reason).toBe("$2M round; your $300k fits.");
     expect(cheque(PRIVATE)?.outcome).toBe("UNKNOWN");
-    expect(cheque(PRIVATE)?.reason).toBe("Round size not shared.");
+    expect(cheque(PRIVATE)?.reason).toBe(
+      "The company has not shared its round size with you.",
+    );
+    expect(cheque(PRIVATE)?.unknownReason).toBe("ROUND_NOT_SHARED");
   });
 
   // Owner 23 Oct 2026: a company that put its raise on its Q Card shares

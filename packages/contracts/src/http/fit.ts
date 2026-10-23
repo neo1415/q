@@ -129,6 +129,35 @@ export const FitParameterContextSchema = z
   .strict();
 export type FitParameterContext = z.infer<typeof FitParameterContextSchema>;
 
+/**
+ * Why a cheque row is UNKNOWN, as a code (owner 23 Oct 2026: Q invented a
+ * reason). Q and the panel state exactly this, never another.
+ */
+export const FIT_CHEQUE_UNKNOWN_REASONS = [
+  /** The company has not shared a round size this reader may see. */
+  "ROUND_NOT_SHARED",
+  /** Round and cheque are in different currencies and no reference rate is stored. */
+  "CURRENCY_DIFFERS_NO_RATE",
+] as const;
+export const FitChequeUnknownReasonSchema = z.enum(FIT_CHEQUE_UNKNOWN_REASONS);
+export type FitChequeUnknownReason = z.infer<
+  typeof FitChequeUnknownReasonSchema
+>;
+
+/**
+ * A cheque comparison made across currencies at a dated reference rate:
+ * approximate, an ESTIMATE, never verified (owner 23 Oct 2026).
+ */
+export const FitEstimateSchema = z
+  .object({
+    method: z.literal("ECB_REFERENCE_RATE"),
+    /** The ECB reference date the rate was set for (YYYY-MM-DD). */
+    rateDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    truthClass: z.literal("ESTIMATE"),
+  })
+  .strict();
+export type FitEstimate = z.infer<typeof FitEstimateSchema>;
+
 export const FitParameterResultDtoSchema = z
   .object({
     parameter: FitParameterSchema,
@@ -152,6 +181,10 @@ export const FitParameterResultDtoSchema = z
     stated: z.literal(true).optional(),
     /** Known values beside the row, with their sources (CHEQUE_SIZE, ROUND_TERMS). */
     context: FitParameterContextSchema.optional(),
+    /** CHEQUE_SIZE on an UNKNOWN row: the exact reason, as a code. */
+    unknownReason: FitChequeUnknownReasonSchema.optional(),
+    /** CHEQUE_SIZE compared across currencies: an estimate, and how. */
+    estimate: FitEstimateSchema.optional(),
   })
   .strict();
 export type FitParameterResultDto = z.infer<typeof FitParameterResultDtoSchema>;

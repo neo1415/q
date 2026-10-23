@@ -59,6 +59,8 @@ import {
   createPgmqEventDispatcher,
 } from "@capital-q/eventing/publisher";
 import {
+  createEcbFxRateProvider,
+  createPostgresFxReferenceRates,
   createRecommendationPipeline,
   playablePitchPortFrom,
   createRefreshRequester,
@@ -185,6 +187,7 @@ import { composeWorkerPresence } from "./presence/composition.js";
 import { runGmailReplyPoller } from "./integrations/gmail-poller.js";
 import { runScheduleTicker } from "./integrations/schedule-ticker.js";
 import { composeWorkerDaily, runDailyTicker } from "./daily/composition.js";
+import { runEcbRatesTicker } from "./fx/ecb-rates.js";
 import { loadGoogleWorkspaceConfig } from "@capital-q/config/google-workspace";
 import {
   composeSchedule,
@@ -1473,6 +1476,14 @@ await Promise.all([
   // DEF-A9 / F-D10: old run checkpoints and unlinked voice turns, hourly.
   runRetentionTicker({
     transactions: database.transactions,
+    signal: shutdownController.signal,
+    logger,
+  }),
+  // Owner 23 Oct 2026: ECB daily reference rates, for estimated
+  // cross-currency cheque fit. The only provider call; none per request.
+  runEcbRatesTicker({
+    provider: createEcbFxRateProvider({}),
+    store: createPostgresFxReferenceRates({ sql: database.sql }),
     signal: shutdownController.signal,
     logger,
   }),

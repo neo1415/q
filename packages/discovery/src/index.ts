@@ -383,6 +383,18 @@ export type {
   StoredFeatureSnapshotRef,
 } from "./features/ports.js";
 export {
+  ECB_DAILY_URL,
+  ECB_SOURCE,
+  ECB_SOURCE_VERSION,
+  createEcbFxRateProvider,
+  createPostgresFxReferenceRates,
+  estimateInCurrency,
+  parseEcbDaily,
+  type FxRateProvider,
+  type FxReferenceRateStore,
+  type FxReferenceRates,
+} from "./fx/ecb.js";
+export {
   CandidateNotRankableError,
   createFeatureService,
   type ComputeFeaturesQuery,
@@ -756,6 +768,7 @@ export { createPostgresCompanySectorsPort } from "./infrastructure/postgres-filt
 export {
   FIT_CONFIG_CURRENT,
   FIT_CONFIG_V4,
+  FIT_CONFIG_V6,
   FIT_CONFIGS,
   FitConfigSchema,
   fitConfigByVersion,
