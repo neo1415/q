@@ -24,8 +24,19 @@ const HONORIFICS = new Set([
  * name's words without titles ("Captain") or joining words ("of").
  */
 export function nameWords(name: string): readonly string[] {
-  return tokenise(name).filter(
+  return wordsOf(name).filter(
     (word) => !HONORIFICS.has(word) && !isConnective(word),
+  );
+}
+
+/**
+ * Words with hyphens split too (live 2026-10-23: "Zino Mario-Ghae, Chief
+ * Executive Officer" did not name "Zino Mario" while "mario-ghae" stayed
+ * one word).
+ */
+function wordsOf(text: string): readonly string[] {
+  return tokenise(text).flatMap((token) =>
+    token.split("-").filter((part) => part.length > 0),
   );
 }
 
@@ -40,7 +51,7 @@ export function textNamesEntity(
 ): boolean {
   const words = nameWords(name);
   if (words.length === 0) return true;
-  const seen = new Set(tokenise(text));
+  const seen = new Set(wordsOf(text));
   if (words.every((word) => seen.has(word))) return true;
   const joined = words.join("");
   const bare = domain?.toLowerCase().replace(/[^a-z0-9]/gu, "") ?? "";
