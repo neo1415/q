@@ -59,7 +59,13 @@ const prospects = [
         required("Seed to Series A", "STAGE", "MET"),
       ],
     },
-    sector: { fit: "MATCH", focus: "Clean energy; energy access" },
+    sector: {
+      fit: "MATCH",
+      focus: "Clean energy; energy access",
+      closeness: "EXACT",
+      source: "GATE",
+      yours: ["Clean Energy", "Energy Access"],
+    },
   },
   {
     investorOrganisationId: RIFT,
@@ -99,7 +105,13 @@ const prospects = [
         required("Seed", "STAGE", "MET"),
       ],
     },
-    sector: { fit: "MISMATCH", focus: "Fintech" },
+    sector: {
+      fit: "MISMATCH",
+      focus: "Fintech",
+      closeness: null,
+      source: "GATE",
+      yours: ["Clean Energy", "Energy Access"],
+    },
   },
 ] as const;
 
@@ -147,7 +159,7 @@ describe("which investors a founder should talk to first", () => {
       "they approached you first, expressing interest on 19 Oct, and are still waiting for your answer, so reply to them before you pitch anyone cold",
     );
     expect(picks[1]?.why).toBe(
-      "their published gate looks for Clean energy; energy access, which is your sector; they describe their focus as “Climate finance for energy and water access in East Africa”; they are based in Kenya, as you are; they say they are actively investing; you meet the other required criteria on their published gate",
+      "their published gate looks for Clean energy; energy access, which matches how your company is classified (Clean Energy, Energy Access); they describe their focus as “Climate finance for energy and water access in East Africa”; they are based in Kenya, as you are; they say they are actively investing; you meet the other required criteria on their published gate",
     );
     // Rift publishes no sector: nothing is claimed about it, and its
     // stage reason (a generic inference about VCs) is never said.
@@ -164,8 +176,28 @@ describe("which investors a founder should talk to first", () => {
     const picks = pickProspects([], [savanna], 3);
     expect(picks.map((p) => p.name)).toEqual(["Savanna Seed Partners"]);
     expect(picks[0]?.why).toMatch(
-      /^their published gate looks for Fintech, which is not your sector, so this is a stretch/u,
+      /^their published gate looks for Fintech, which is not how your company is classified \(Clean Energy, Energy Access\), so this is a stretch/u,
     );
+  });
+
+  it("says a related sector is close, never the same, and reads a published card", () => {
+    const close = {
+      ...prospects[1],
+      sector: {
+        fit: "MATCH",
+        focus: "Energy",
+        closeness: "ADJACENT",
+        source: "CARD",
+        yours: ["Clean Energy", "Energy Access"],
+      },
+    } as const;
+    const [pick] = pickProspects([], [close], 1);
+    expect(pick?.why).toMatch(
+      /^their Q Card lists Energy, which is close to how your company is classified \(Clean Energy, Energy Access\) but not the same/u,
+    );
+    for (const p of pickProspects(interests, [...prospects, close], 5)) {
+      expect(p.why).not.toMatch(/your sector/u);
+    }
   });
 
   it("names them with a why each and says which are interest and which are likely fit", () => {

@@ -37,6 +37,7 @@ import {
   createPostgresArrivalProbe,
 } from "./composition/arrival-snapshot.js";
 import { createQApiGateQCompanyProjectionPort } from "./composition/gateq-projection.js";
+import { createInvestorSectorFocusPort } from "./composition/investor-sector-focus.js";
 import { rehearsalWeb } from "./composition/rehearsal-web.js";
 import {
   createPostgresTaxonomyAssignmentRepository,
@@ -2647,15 +2648,16 @@ const readinessService = createReadinessService({
 // Q.05 (2026-10-07): investors' published gates, checked against the
 // founder's OWN company (resolved here, never from the model or client),
 // for "which investors fit us?". Published gates are public by design.
+const ownCompanyProjection = createQApiGateQCompanyProjectionPort({
+  sql: database.sql,
+  companies: createPostgresCompanyMarketplaceQueryPort({ sql: database.sql }),
+  assignments: createPostgresTaxonomyAssignmentRepository(),
+  reference: createPostgresTaxonomyReferenceRepository(),
+  capital,
+});
 const investorGateFits = createInvestorGateFits({
   policies: createPostgresGatewayPolicyPort({ sql: database.sql }),
-  companies: createQApiGateQCompanyProjectionPort({
-    sql: database.sql,
-    companies: createPostgresCompanyMarketplaceQueryPort({ sql: database.sql }),
-    assignments: createPostgresTaxonomyAssignmentRepository(),
-    reference: createPostgresTaxonomyReferenceRepository(),
-    capital,
-  }),
+  companies: ownCompanyProjection,
 });
 const investorGatesPort: InvestorGatesPort = {
   forOwnCompany: async (actor, companyId, investorOrganisationIds) => {
@@ -2670,6 +2672,13 @@ const investorGatesPort: InvestorGatesPort = {
     });
   },
 };
+// Owner 2026-10-23: the sectors investors publish on their Q Card, as a
+// participant sees them, beside the founder's own declared sectors.
+const investorSectorFocusPort = createInvestorSectorFocusPort({
+  ownCompany: (actor) => runtimeDependencies.ownCompany(actor),
+  projection: ownCompanyProjection,
+  cards: publicIdentity,
+});
 const appActionPorts: OwnReadPorts = {
   // D (2026-10-11): meeting time proposals, booked through the schedule
   // service as the accepting person once an acceptance is recorded.
@@ -3004,6 +3013,7 @@ const qTools = createQTools({
     fit: fitComposition.fit,
     // Q.05: published gates for the founder's own company.
     investorGates: investorGatesPort,
+    investorSectorFocus: investorSectorFocusPort,
     ...(researchComposition.research === undefined
       ? {}
       : { research: researchComposition.research }),

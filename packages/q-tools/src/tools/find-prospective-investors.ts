@@ -17,7 +17,7 @@ import {
   type AnyQToolDefinition,
 } from "../definition.js";
 import { actorWideScope, boundScopeFor } from "../plan.js";
-import type { QToolPorts } from "../ports.js";
+import type { QToolPorts, SectorRef } from "../ports.js";
 
 /**
  * FIND_PROSPECTIVE_INVESTORS — `investor.prospects` v1 (CQ-QX-007,
@@ -119,8 +119,19 @@ const ProspectSchema = z
     sector: z
       .object({
         fit: z.enum(["MATCH", "MISMATCH", "UNKNOWN"]),
-        /** The sector rule as they published it, by its label. */
+        /** The sector focus as they published it, by its label or names. */
         focus: z.string().nullable(),
+        /**
+         * How close a match is: EXACT when they publish one of the
+         * company's own declared sectors, ADJACENT when theirs is a parent,
+         * child or sibling of one; null when it cannot be told (never
+         * overstated as exact).
+         */
+        closeness: z.enum(["EXACT", "ADJACENT"]).nullable().optional(),
+        /** Where it was published: their gate, or their Q Card. */
+        source: z.enum(["GATE", "CARD"]).optional(),
+        /** The company's own declared sectors, by name, for the sentence. */
+        yours: z.array(z.string()).max(8).optional(),
       })
       .strict()
       .optional(),
@@ -201,11 +212,90 @@ export function sectorOf(gate: InvestorGateFitDto | undefined): {
   return { fit: "UNKNOWN", focus };
 }
 
-const SECTOR_ORDER: Readonly<Record<SectorFit, number>> = {
-  MATCH: 0,
-  UNKNOWN: 1,
-  MISMATCH: 2,
+type Closeness = "EXACT" | "ADJACENT";
+
+type SectorJudgement = {
+  readonly fit: SectorFit;
+  readonly focus: string | null;
+  readonly closeness?: Closeness | null;
+  readonly source?: "GATE" | "CARD";
+  readonly yours?: readonly string[];
 };
+
+/** How close their sectors are to the company's own: same, related, or not. */
+export function closenessOf(
+  theirs: readonly SectorRef[],
+  ours: readonly SectorRef[],
+): Closeness | null {
+  const codes = new Set(
+    ours.map((one) => one.code).filter((c): c is string => c !== null),
+  );
+  const parents = new Set(
+    ours.map((one) => one.parent).filter((c): c is string => c !== null),
+  );
+  const known = theirs.filter((one) => one.code !== null);
+  if (known.some((one) => codes.has(one.code ?? ""))) return "EXACT";
+  const related = known.some(
+    (one) =>
+      parents.has(one.code ?? "") ||
+      (one.parent !== null &&
+        (codes.has(one.parent) || parents.has(one.parent))),
+  );
+  return related ? "ADJACENT" : null;
+}
+
+/**
+ * Their published sector against this company: the gate decides when it
+ * has a sector rule (GateQ checked it against the company); otherwise the
+ * sectors on their Q Card as a participant may see them, compared with the
+ * company's own declared sectors. Nothing published, or nothing the
+ * taxonomy knows on either side, is not known -- never a mismatch.
+ */
+export function judgeSector(input: {
+  readonly gate: InvestorGateFitDto | undefined;
+  readonly card: readonly SectorRef[];
+  readonly company: readonly SectorRef[];
+  readonly resolve: (names: readonly string[]) => readonly SectorRef[];
+}): SectorJudgement {
+  const yours = input.company.map((one) => one.name).slice(0, 8);
+  const gated = sectorOf(input.gate);
+  if (gated.fit === "MATCH") {
+    const names = (gated.focus ?? "").split(/;\s*/u).filter(Boolean);
+    return {
+      ...gated,
+      source: "GATE",
+      yours,
+      closeness:
+        input.company.length === 0
+          ? null
+          : closenessOf(input.resolve(names), input.company),
+    };
+  }
+  if (gated.fit === "MISMATCH") return { ...gated, source: "GATE", yours };
+  if (input.card.length > 0) {
+    const focus = input.card.map((one) => one.name).join("; ");
+    const known = input.card.some((one) => one.code !== null);
+    if (input.company.length === 0 || !known) {
+      return { fit: "UNKNOWN", focus, source: "CARD", yours };
+    }
+    const closeness = closenessOf(input.card, input.company);
+    return closeness === null
+      ? { fit: "MISMATCH", focus, source: "CARD", yours }
+      : { fit: "MATCH", focus, closeness, source: "CARD", yours };
+  }
+  return gated;
+}
+
+/** The judgement as the output carries it (its own list of names). */
+function sectorOut({ yours, ...rest }: SectorJudgement) {
+  return yours === undefined ? rest : { ...rest, yours: [...yours] };
+}
+
+/** Exact matches first, then related ones, then unknown, then not theirs. */
+function sectorRank(sector: SectorJudgement): number {
+  if (sector.fit === "MATCH") return sector.closeness === "EXACT" ? 0 : 1;
+  return sector.fit === "UNKNOWN" ? 2 : 3;
+}
 
 export function createFindProspectiveInvestorsTool(
   ports: QToolPorts,
@@ -359,6 +449,27 @@ export function createFindProspectiveInvestorsTool(
               ).map((gate) => [gate.investorOrganisationId, gate]),
             )
           : new Map<string, InvestorGateFitDto>();
+      // Their Q Card's published sectors (participant audience) and the
+      // company's own declared sectors: only for the person's own company.
+      const focus =
+        grant.source === "CAPITAL_Q_RECORD" &&
+        input.companyId !== undefined &&
+        ports.investorSectorFocus !== undefined
+          ? await ports.investorSectorFocus
+              .forOwnCompany(
+                context.actor,
+                input.companyId,
+                ranked.map((p) => p.investorOrganisationId),
+              )
+              .catch(() => null)
+          : null;
+      const cards = new Map(
+        (focus?.investors ?? []).map((one) => [
+          one.investorOrganisationId,
+          one.sectors,
+        ]),
+      );
+      const resolve = ports.investorSectorFocus?.resolve ?? (() => [] as const);
       // A published sector the company is in comes first, then those
       // that publish none, then those whose sector it is not (owner
       // 2026-10-23); the profile ranking orders each group.
@@ -366,12 +477,15 @@ export function createFindProspectiveInvestorsTool(
         .map((prospect, at) => ({
           prospect,
           at,
-          sector: sectorOf(gates.get(prospect.investorOrganisationId)),
+          sector: judgeSector({
+            gate: gates.get(prospect.investorOrganisationId),
+            card: cards.get(prospect.investorOrganisationId) ?? [],
+            company: focus?.company ?? [],
+            resolve,
+          }),
         }))
         .sort(
-          (a, b) =>
-            SECTOR_ORDER[a.sector.fit] - SECTOR_ORDER[b.sector.fit] ||
-            a.at - b.at,
+          (a, b) => sectorRank(a.sector) - sectorRank(b.sector) || a.at - b.at,
         )
         .slice(0, input.limit ?? LIMIT_DEFAULT);
       return {
@@ -391,7 +505,7 @@ export function createFindProspectiveInvestorsTool(
           gate: gateWords(gates.get(prospect.investorOrganisationId)),
           ...(sector.fit === "UNKNOWN" && sector.focus === null
             ? {}
-            : { sector }),
+            : { sector: sectorOut(sector) }),
         })),
         notes:
           slate.items.length === 0

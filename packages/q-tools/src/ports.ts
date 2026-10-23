@@ -12,6 +12,38 @@ export type InvestorGatesPort = {
     investorOrganisationIds: readonly string[],
   ) => Promise<readonly InvestorGateFitDto[]>;
 };
+
+/** A sector as the taxonomy knows it; code null when a name is not one. */
+export type SectorRef = {
+  readonly code: string | null;
+  readonly name: string;
+  /** Its parent sector's code ("energy" for clean energy); null at the top. */
+  readonly parent: string | null;
+};
+
+/**
+ * Owner 2026-10-23: what investors publish about their sector focus, as a
+ * founder may see it, beside the founder's own company's declared sectors.
+ * `investors` is each investor's Q Card `mandateSectors` at the audience
+ * an authenticated participant is (network-visible or public scope only):
+ * a field the investor did not put on their card for that audience is
+ * absent, and their mandate itself is never read. `resolve` maps sector
+ * names (a gate rule's label) onto the taxonomy.
+ */
+export type InvestorSectorFocusPort = {
+  readonly forOwnCompany: (
+    actor: ActorContext,
+    companyId: string,
+    investorOrganisationIds: readonly string[],
+  ) => Promise<{
+    readonly company: readonly SectorRef[];
+    readonly investors: readonly {
+      readonly investorOrganisationId: string;
+      readonly sectors: readonly SectorRef[];
+    }[];
+  }>;
+  readonly resolve: (names: readonly string[]) => readonly SectorRef[];
+};
 import type { ExploreToolPort } from "./tools/explore.js";
 import type { CapitalObjectiveQueryPort } from "@capital-q/capital";
 import type { CompanyQueryPort } from "@capital-q/companies";
@@ -528,6 +560,12 @@ export type QToolPorts = {
    * Absent: prospects carry no gate.
    */
   readonly investorGates?: InvestorGatesPort | undefined;
+  /**
+   * Owner 2026-10-23: investors' published sector focus (their Q Card, as
+   * a participant may see it) and the founder's own declared sectors.
+   * Absent: sector comes from published gates alone.
+   */
+  readonly investorSectorFocus?: InvestorSectorFocusPort | undefined;
   readonly research?: PublicWebResearchService | undefined;
   /** W2: fast identity lookup of a named person or organisation; absent means no such tool. */
   readonly people?: PersonLookup | undefined;

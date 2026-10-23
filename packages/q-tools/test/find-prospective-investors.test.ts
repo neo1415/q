@@ -8,6 +8,10 @@ import {
   createQToolRegistry,
 } from "../src/index.js";
 import {
+  closenessOf,
+  judgeSector,
+} from "../src/tools/find-prospective-investors.js";
+import {
   actorA,
   actorB,
   COMPANY_A,
@@ -346,5 +350,175 @@ describe("find_prospective_investors", () => {
     );
     expect(outcome.status).not.toBe("SUCCEEDED");
     expect(calls).toHaveLength(0);
+  });
+});
+
+/**
+ * Owner 2026-10-23: the sectors investors publish on their Q Card (as a
+ * participant sees them) and on their gate, against the company's own
+ * declared sectors; a related sector is never called the same one.
+ */
+describe("published sector, exact or close", () => {
+  // Maji Loop: classified clean energy and energy access (both under energy).
+  const CLEAN = {
+    code: "clean_energy",
+    name: "Clean Energy",
+    parent: "energy",
+  };
+  const ACCESS = {
+    code: "energy_access",
+    name: "Energy Access",
+    parent: "energy",
+  };
+  const MAJI = [CLEAN, ACCESS];
+  const FINTECH = {
+    code: "fintech",
+    name: "Fintech",
+    parent: "financial_services",
+  };
+  const ENERGY = { code: "energy", name: "Energy", parent: null };
+  const WATER = { code: null, name: "Water", parent: null };
+  const resolve = (names: readonly string[]) =>
+    names.map((name) =>
+      /clean energy/iu.test(name)
+        ? CLEAN
+        : /energy access/iu.test(name)
+          ? ACCESS
+          : { code: null, name, parent: null },
+    );
+
+  it("tells an exact sector from a related one, and from none", () => {
+    expect(closenessOf([CLEAN], MAJI)).toBe("EXACT");
+    expect(closenessOf([ENERGY], MAJI)).toBe("ADJACENT");
+    expect(closenessOf([FINTECH], MAJI)).toBeNull();
+    expect(closenessOf([WATER], MAJI)).toBeNull();
+  });
+
+  it("reads a published card: fintech is a mismatch, energy is close, an unknown name is not known", () => {
+    const judge = (
+      card:
+        | typeof MAJI
+        | readonly (typeof FINTECH | typeof ENERGY | typeof WATER)[],
+    ) => judgeSector({ gate: undefined, card, company: MAJI, resolve });
+    expect(judge([FINTECH])).toMatchObject({
+      fit: "MISMATCH",
+      focus: "Fintech",
+      source: "CARD",
+    });
+    expect(judge([ENERGY])).toMatchObject({
+      fit: "MATCH",
+      closeness: "ADJACENT",
+      source: "CARD",
+    });
+    expect(judge([CLEAN])).toMatchObject({
+      fit: "MATCH",
+      closeness: "EXACT",
+    });
+    expect(judge([WATER])).toMatchObject({ fit: "UNKNOWN", focus: "Water" });
+    // Without the company's own sectors nothing is judged against it.
+    expect(
+      judgeSector({ gate: undefined, card: [FINTECH], company: [], resolve })
+        .fit,
+    ).toBe("UNKNOWN");
+  });
+
+  it("lets a published gate decide over the card, and says how close its rule is", () => {
+    const gate = {
+      investorOrganisationId: LONDON_ANGEL,
+      publicId: "g",
+      title: "Gate",
+      acceptingApplications: true,
+      criteria: [
+        {
+          label: "Clean energy; energy access",
+          requiredness: "REQUIRED" as const,
+          dimension: "TAXONOMY" as const,
+          standing: "MET" as const,
+        },
+      ],
+    };
+    expect(
+      judgeSector({ gate, card: [FINTECH], company: MAJI, resolve }),
+    ).toMatchObject({
+      fit: "MATCH",
+      closeness: "EXACT",
+      source: "GATE",
+      yours: ["Clean Energy", "Energy Access"],
+    });
+  });
+
+  it("ranks by the card when there is no gate: close above unknown, fintech last", async () => {
+    const discovery = {
+      sideFor: () => Promise.resolve("FOUNDER"),
+      discoverCompanies: () => Promise.reject(new Error("not used")),
+      discoverInvestors: () =>
+        Promise.resolve({
+          rankingVersion: "discovery.v1",
+          items: [LONDON_ANGEL, NAIROBI_VC, QUIET].map((id, at) => ({
+            investorOrganisationId: id,
+            displayName: ["Fintech Fund", "Energy Fund", "Quiet Fund"][at],
+            investorType: "VC",
+            hqCountry: "GB",
+            publicDescription: null,
+            websiteUrl: null,
+            deploymentState: "ACTIVELY_INVESTING",
+          })),
+          notes: [],
+          nextCursor: null,
+        }),
+    } as unknown as DiscoveryService;
+    const forOwnCompany = vi.fn(() =>
+      Promise.resolve({
+        company: MAJI,
+        investors: [
+          { investorOrganisationId: LONDON_ANGEL, sectors: [FINTECH] },
+          { investorOrganisationId: NAIROBI_VC, sectors: [ENERGY] },
+        ],
+      }),
+    );
+    const port = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(
+          fakePorts({
+            discovery,
+            investorSectorFocus: { forOwnCompany, resolve },
+          }),
+        ),
+      ),
+    });
+    const outcome = await port.execute(
+      call({ companyId: COMPANY_A }),
+      contextFor(actorA, founderPlan),
+    );
+    const data = (
+      outcome.result as {
+        data: {
+          prospects: {
+            name: string;
+            sector?: { fit: string; closeness?: string | null };
+          }[];
+        };
+      }
+    ).data;
+    expect(
+      data.prospects.map((p) => [
+        p.name,
+        p.sector?.fit ?? "UNKNOWN",
+        p.sector?.closeness ?? null,
+      ]),
+    ).toEqual([
+      ["Energy Fund", "MATCH", "ADJACENT"],
+      ["Quiet Fund", "UNKNOWN", null],
+      ["Fintech Fund", "MISMATCH", null],
+    ]);
+    // Only for their own company, with every candidate's id.
+    expect(forOwnCompany).toHaveBeenCalledTimes(1);
+    const [actor, companyId, ids] = forOwnCompany.mock.calls[0] as unknown as [
+      unknown,
+      string,
+      string[],
+    ];
+    expect([actor, companyId]).toEqual([actorA, COMPANY_A]);
+    expect([...ids].sort()).toEqual([LONDON_ANGEL, NAIROBI_VC, QUIET].sort());
   });
 });
