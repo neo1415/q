@@ -437,6 +437,32 @@ export type CompanyFiguresPort = {
   ) => Promise<readonly CompanyFigure[]>;
 };
 
+/**
+ * A company's team as its page shows it (ADR 0041's allow-listed
+ * projection, QA F-16 2026-10-23). The composition applies the page's own
+ * rule: the owning organisation, or an investor the pitch rule admits;
+ * anyone else reads null, never an empty team.
+ */
+export type CompanyTeamPort = {
+  readonly teamFor: (
+    actor: ActorContext,
+    company: {
+      readonly tenantId: string;
+      readonly companyId: string;
+      readonly organisationId: string;
+    },
+  ) => Promise<
+    | readonly {
+        readonly name: string;
+        readonly relationshipType: string;
+        readonly businessTitle: string | null;
+        readonly isFounder: boolean;
+        readonly shortBio: string | null;
+      }[]
+    | null
+  >;
+};
+
 export type PitchMomentPort = {
   readonly momentAround: (
     actor: ActorContext,
@@ -606,6 +632,8 @@ export type QToolPorts = {
   readonly pitchMoments?: PitchMomentPort | undefined;
   /** A company's published figures (2026-10-23); absent means no read_company_figures. */
   readonly companyFigures?: CompanyFiguresPort | undefined;
+  /** A company's team as its page shows it (QA F-16); absent means get_company carries no team. */
+  readonly companyTeam?: CompanyTeamPort | undefined;
   /** Explore (ADR 0055): pitches like X and network search; absent means no Explore tools. */
   readonly explore?: ExploreToolPort | undefined;
   /** Who can see what (CQ-BIZ-003); absent means no visibility tool exists. */

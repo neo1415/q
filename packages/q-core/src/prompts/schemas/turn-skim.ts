@@ -201,3 +201,17 @@ export const TurnSkimV6ResultSchema = TurnSkimResultSchema.extend({
   subject: SkimSubjectSchema.nullable().default(null).catch(null),
 }).strict();
 export type TurnSkimV6Result = z.infer<typeof TurnSkimV6ResultSchema>;
+
+export const TURN_SKIM_V7_SCHEMA_VERSION = 7;
+
+/**
+ * v7 (QA F-23, live 2026-10-23: "draft a note to the founders" was silent
+ * for 16 s): the skim also says whether the turn asks Q to write, draft or
+ * send something to someone, so Q's first words ("Drafting that note to
+ * <them> now") come at skim time. Read by meaning in any language;
+ * lenient: a malformed value reads as false and never costs the skim.
+ */
+export const TurnSkimV7ResultSchema = TurnSkimV6ResultSchema.extend({
+  writes: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnSkimV7Result = z.infer<typeof TurnSkimV7ResultSchema>;

@@ -423,7 +423,7 @@ describe("an arrival follow-up is answered by code, with no tool and no model ro
     expect(alpha.calls.length).toBeGreaterThan(0);
   });
 
-  it("does not guess between two items without a name", () => {
+  it("does not guess between two items without a name, nor ask: the answer path takes it (QA F-24)", () => {
     const first = SNAPSHOT.items[0];
     if (first === undefined) throw new Error("fixture");
     const two = {
@@ -437,9 +437,7 @@ describe("an arrival follow-up is answered by code, with no tool and no model ro
         },
       ],
     } as ArrivalSnapshot;
-    expect(arrivalFollowUpAnswer("what's the request?", two)?.text).toContain(
-      "Which one",
-    );
+    expect(arrivalFollowUpAnswer("what's the request?", two)).toBeNull();
     expect(
       arrivalFollowUpAnswer("what's the request from Halyard?", two)?.itemKey,
     ).toBe("other");
@@ -474,15 +472,16 @@ describe("an arrival follow-up is answered by code, with no tool and no model ro
         `and ${String(first.counterpart?.name)}?`,
       ])?.itemKey,
     ).toBe(first.key);
-    // Two named in that turn, or none at all: still asks.
+    // Two named in that turn, or none at all: never a guess and never
+    // "which one" (QA F-24): the answer path reads them all.
     for (const earlier of [
       [`Halyard and ${String(first.counterpart?.name)}`],
       ["good morning"],
       [],
     ]) {
       expect(
-        arrivalFollowUpAnswer("what's the request?", two, earlier)?.text,
-      ).toContain("Which one");
+        arrivalFollowUpAnswer("what's the request?", two, earlier),
+      ).toBeNull();
     }
   });
 });
@@ -690,7 +689,7 @@ describe("several items from one counterpart are one target (A3)", () => {
     expect(said).toContain("Could we do Thursday 3pm");
   });
 
-  it("asks which one only when the counterparts differ", () => {
+  it("never asks which one: several counterparts and none named go to the answer path (QA F-24)", () => {
     const other = {
       ...THREE.items[0],
       key: "z",
@@ -700,9 +699,13 @@ describe("several items from one counterpart are one target (A3)", () => {
       ...THREE,
       items: [...THREE.items, other],
     });
-    expect(arrivalFollowUpAnswer("what's the request?", mixed)?.text).toBe(
-      "Which one do you mean: Maji Loop or Halyard?",
-    );
+    expect(arrivalFollowUpAnswer("what's the request?", mixed)).toBeNull();
+    expect(
+      arrivalFollowUpAnswer(
+        "Who has shown interest in us, and what do they want?",
+        mixed,
+      ),
+    ).toBeNull();
     expect(
       arrivalFollowUpAnswer("what's the request from Halyard?", mixed)?.itemKey,
     ).toBe("z");
