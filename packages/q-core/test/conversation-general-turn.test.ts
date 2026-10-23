@@ -116,22 +116,67 @@ describe("research is intentional outside the interview too", () => {
     ).toEqual({ mode: "ONLY_IF_EMPTY", announceSourceChange: true });
   });
 
-  it("reads a named company from Capital Q first, and the web only if Capital Q holds nothing", () => {
-    expect(
-      directive(
-        read({
-          question: {
-            kind: "ADVICE",
-            text: "what do you make of Acme?",
-            about: [],
-            count: null,
-            discover: null,
-            subject: null,
-          },
-          aboutNamedOther: true,
-        }),
-      ),
-    ).toEqual({ mode: "ONLY_IF_EMPTY", announceSourceChange: false });
+  it("asks Capital Q and the public web together about a named company or person (owner 2026-10-23)", () => {
+    for (const kind of ["ADVICE", "OPTIONS", "PUBLIC_FACTS"] as const) {
+      expect(
+        directive(
+          read({
+            question: {
+              kind,
+              text: "tell me about Zino Aviation and its team",
+              about: [],
+              count: null,
+              discover: null,
+              subject: null,
+            },
+            aboutNamedOther: true,
+          }),
+        ),
+        kind,
+      ).toEqual({ mode: "EXPLICIT", announceSourceChange: false });
+    }
+  });
+
+  it("keeps a named fit question on Capital Q's computed answer, their own records records-first, and never searches when research is down", () => {
+    const records = read({
+      question: {
+        kind: "THEIR_OWN_RECORDS",
+        text: "what did we discuss about Tensorgate?",
+        about: [],
+        count: null,
+        discover: null,
+        subject: null,
+      },
+      aboutNamedOther: true,
+    });
+    expect(directive(records)).toEqual({
+      mode: "ONLY_IF_EMPTY",
+      announceSourceChange: true,
+    });
+    const fit = read({
+      question: {
+        kind: "FIT",
+        text: "does Zino Aviation fit my mandate?",
+        about: [],
+        count: null,
+        discover: null,
+        subject: null,
+      },
+      aboutNamedOther: true,
+    });
+    expect(directive(fit).mode).toBe("NEVER");
+    const named = read({
+      question: {
+        kind: "ADVICE",
+        text: "what do you make of Acme?",
+        about: [],
+        count: null,
+        discover: null,
+        subject: null,
+      },
+      aboutNamedOther: true,
+    });
+    expect(directive(named, false).mode).toBe("NEVER");
   });
 
   it("never runs on an answer, an aside or noise, nor when research is down", () => {

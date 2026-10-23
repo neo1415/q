@@ -195,7 +195,12 @@ export function createFakeModelProvider(
               emit(context, json);
             } else {
               emit(context, json.slice(0, behaviour.hold.afterChars));
-              await behaviour.hold.until;
+              // A caller that stops listening stops the writing, as an
+              // SDK honouring abort would.
+              await Promise.race([
+                behaviour.hold.until,
+                waitForAbort(context.signal),
+              ]);
               emit(context, json.slice(behaviour.hold.afterChars));
             }
             return {

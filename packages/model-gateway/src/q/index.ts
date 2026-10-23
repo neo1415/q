@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  followsUpPublicSources,
   publicResearchFollowUp,
   type SelectedCompany,
 } from "./research-follow-up.js";
@@ -974,6 +975,18 @@ const SOURCE_CHANGE_NOTE: ModelMessage = {
   role: "SYSTEM",
   content:
     "What Capital Q holds about this person was not enough for their question, so public web sources were read. Say so in a few words before using them (\"What you've shared with me doesn't cover that, so this is from public sources\"), and keep what they told you apart from what the web says.",
+};
+
+/**
+ * Owner 2026-10-23 ("it keeps giving one excuse or another"): once the
+ * public web has been read for the turn, the answer is written from it and
+ * from Capital Q's records together. Q never says it cannot search; a
+ * search that found nothing or failed is said in one sentence.
+ */
+const WEB_BESIDE_RECORDS_NOTE: ModelMessage = {
+  role: "SYSTEM",
+  content:
+    "Capital Q searched the public web for this question, beside its own records; the result is above. Answer from both: what Capital Q's records hold, and what the public sources say, naming the source (site and date where given) for what comes from them. Public sources are public material of unknown reliability, not verified facts. Never say you cannot search, browse or access the internet: the search ran. If it found nothing relevant or failed, say so in one sentence, then give what was found.",
 };
 
 /**
@@ -3978,6 +3991,99 @@ export function createModelGatewayQAnswer(
           (request.turnKind === undefined ||
             request.turnKind === "QUESTION_TO_Q") &&
           asksWhatNeedsThem(latest.content));
+      /**
+       * The public-web call code makes for this turn: the person's own words
+       * (or, for a follow-up, the subject it points back to), with the
+       * further phrasings planned by the research service.
+       */
+      const researchFollowUp = () =>
+        publicResearchFollowUp({
+          history: earlier,
+          question: latest.content,
+          aboutNamedOther: request.aboutNamedOther === true,
+          selected: selectedForResearch(),
+        });
+      const researchCallOf = (maxSources: number) => {
+        const followUp = researchFollowUp();
+        // Someone not theirs, named once in their own words: searched as
+        // that name (pages checked to be about them, their public profiles
+        // looked for), and attached to no record of theirs.
+        const named =
+          request.aboutNamedOther === true
+            ? companyNameCandidates(latest.content)
+            : [];
+        const query = latest.content.trim().slice(0, 200);
+        return {
+          callId: "q-research",
+          name: PUBLIC_WEB_TOOL,
+          arguments: {
+            ...(followUp ??
+              (named.length === 1 && named[0] !== undefined
+                ? { target: "GENERAL", query, entityName: named[0] }
+                : { query })),
+            maxSources,
+          },
+        };
+      };
+      /**
+       * Owner 2026-10-23: "search Capital Q's database AND the web IN
+       * PARALLEL, not one then the other." On a turn that asks for something
+       * real, current or public, or about a company or person not theirs
+       * (EXPLICIT), the public web is asked as soon as the turn is read,
+       * beside every read of Capital Q's own records, instead of after the
+       * model's tool round (which took seconds, and was skipped altogether
+       * when that round answered without a tool). Same tool, same plan,
+       * authorisation and egress policy, and still once per turn: the first
+       * public-web call the model makes is answered by this one. A person
+       * search has its own public lookup (W2) and keeps it, as does a turn
+       * code answers by itself (a company's fact, investors); a follow-up on
+       * what was just found ("what did those sources say?") keeps the
+       * model's own call, answered from what this person already read.
+       */
+      const earlyWebTool = offered.find(
+        (tool) => tool.definition.name === PUBLIC_WEB_TOOL,
+      );
+      const earlyWeb: {
+        readonly call: ReturnType<typeof researchCallOf>;
+        readonly outcome: Promise<QToolCallOutcome>;
+        claimed: boolean;
+      } | null =
+        research?.mode === "EXPLICIT" &&
+        request.personSearch === undefined &&
+        !personByCode &&
+        provisionalRoute.path === "DEEP_ANALYSIS" &&
+        earlyWebTool !== undefined &&
+        researchFollowUp() === null &&
+        !followsUpPublicSources({
+          history: earlier,
+          question: latest.content,
+          aboutNamedOther: request.aboutNamedOther === true,
+        })
+          ? (() => {
+              const call = researchCallOf(4);
+              const stage = earlyWebTool?.visibleStage;
+              if (stage !== undefined && stage !== null) void stageOnce(stage);
+              took("webStarted");
+              // As callTool below: a speculative answer runs only reads.
+              const outcome = (async () => {
+                if (
+                  gate !== null &&
+                  !gate.adopted() &&
+                  earlyWebTool?.classification !== "READ_ONLY"
+                ) {
+                  await gate.ready();
+                }
+                return tools.execute(call, toolContext);
+              })();
+              // Landed (or dropped) later; a turn that ends first must not
+              // leave a rejection nobody handles.
+              outcome.catch(() => undefined);
+              return { call, outcome, claimed: false };
+            })()
+          : null;
+      /** The early web search is still to be put in front of the model. */
+      const earlyWebPending = (): boolean =>
+        earlyWeb !== null && !earlyWeb.claimed;
       let wideReads: WideReads = withoutWideReads
         ? NO_WIDE_READS
         : await prepared.wide();
@@ -4577,6 +4683,15 @@ export function createModelGatewayQAnswer(
         firstPublishedMs = Date.now() - startedAt;
         sendSaid(`${researchLead(named)} `);
       };
+      // The early web search is said as it runs, unless code's own opening
+      // line goes first (it is said as the model is asked).
+      if (
+        earlyWeb !== null &&
+        earlyLead === null &&
+        readCache.get(earlyWeb.call, toolContext) === null
+      ) {
+        sayResearching(earlyWeb.call.arguments);
+      }
       const publish = (text: string): void => {
         // Code's opening lines come first on every surface that listens to
         // the stream (voice parity, lead 2026-10-03: a spoken "what should
@@ -4738,6 +4853,36 @@ export function createModelGatewayQAnswer(
         // `followUps`) is left out, not a reason to regenerate the answer.
         unknownRootKeys: "DROP",
       };
+      /**
+       * While the turn's web search runs, a tool round that begins writing
+       * prose is answering without what the web found: it is stopped at its
+       * first words (nothing of it is said), and the answer is written once,
+       * after the web result lands, by the call that holds no tools (a
+       * retrieved page never precedes a round that holds tools).
+       */
+      let roundStop: AbortController | null = null;
+      const roundOptions =
+        (): ModelGatewayExecuteOptions<CompanyAnalystV26Result> => {
+          if (!earlyWebPending()) {
+            roundStop = null;
+            return options;
+          }
+          const stop = new AbortController();
+          roundStop = stop;
+          return {
+            ...options,
+            signal:
+              request.signal === undefined
+                ? stop.signal
+                : AbortSignal.any([request.signal, stop.signal]),
+            onTextDelta: (fragment: string): void => {
+              if (fragment.trim().length > 0) stop.abort();
+            },
+          };
+        };
+      /** The round was stopped because it began answering (above). */
+      const roundStoppedForWeb = (): boolean =>
+        roundStop?.signal.aborted === true && request.signal?.aborted !== true;
 
       // The message and its durable completion event commit together
       // (CQ-Q-009 §16-§18): the event carries the persisted message, so a
@@ -5834,22 +5979,8 @@ export function createModelGatewayQAnswer(
             researchTool.visibleStage === null
               ? null
               : stageOnce(researchTool.visibleStage);
-          const followUp = publicResearchFollowUp({
-            history: earlier,
-            question: latest.content,
-            aboutNamedOther: request.aboutNamedOther === true,
-            selected: selectedForResearch(),
-          });
-          const call = {
-            callId: "q-research",
-            name: "research_public_web",
-            // The service plans further phrasings from the person's words.
-            arguments: {
-              ...(followUp ?? { query: latest.content.trim().slice(0, 200) }),
-              // Enough pages to answer from, not only to compare.
-              maxSources: prospectsThin ? 5 : 4,
-            },
-          };
+          // Enough pages to answer from, not only to compare.
+          const call = researchCallOf(prospectsThin ? 5 : 4);
           took("beforeResearch");
           if (readCache.get(call, toolContext) === null) {
             sayResearching(call.arguments);
@@ -5859,6 +5990,13 @@ export function createModelGatewayQAnswer(
             stageWrite,
           ]);
           took("research");
+          landResearch(call, outcome);
+        };
+        /** A public-web result code fetched, put in front of the model. */
+        const landResearch = (
+          call: { readonly name: string },
+          outcome: QToolCallOutcome,
+        ): void => {
           toolCalls.push({
             toolName: outcome.toolName,
             providerName: call.name,
@@ -5873,13 +6011,20 @@ export function createModelGatewayQAnswer(
             ...(prospectsThin && outcome.result.ok
               ? [PROSPECT_RESEARCH_NOTE]
               : []),
+            WEB_BESIDE_RECORDS_NOTE,
           ];
         };
         const writingStage: QVisibleStage =
           request.writingDocument === true
             ? "PREPARING_DOCUMENT"
             : "PREPARING_ANALYSIS";
-        if (offered.length > 0) {
+        // The companies the turn names were read by code, beside the web
+        // search already running: the answer is written from both in one
+        // call, with no tool round in front of it (a round would only
+        // answer without the web, and every round pays the whole prompt).
+        const readsAndWebSuffice =
+          earlyWebPending() && wideReads.namedCompanies.length > 0;
+        if (offered.length > 0 && !readsAndWebSuffice) {
           took("prepare");
           let rounds = 0;
           let calls = 0;
@@ -5890,6 +6035,19 @@ export function createModelGatewayQAnswer(
            */
           const chainedReads = new Map<string, Promise<QToolCallOutcome>>();
           const runCall = (call: ModelToolCall): Promise<QToolCallOutcome> => {
+            // The model's first public-web call is the search already
+            // running for this turn: answered by it, not asked again.
+            if (
+              call.name === PUBLIC_WEB_TOOL &&
+              earlyWeb !== null &&
+              !earlyWeb.claimed
+            ) {
+              earlyWeb.claimed = true;
+              return earlyWeb.outcome.then((outcome) => ({
+                ...outcome,
+                callId: call.callId,
+              }));
+            }
             // Said only when the web is really asked (not answered from
             // what this person already read).
             if (
@@ -5988,9 +6146,16 @@ export function createModelGatewayQAnswer(
                   // K7: one stable order, so the cached prefix holds.
                   tools: stableToolOrder(offered),
                 },
-                options,
+                roundOptions(),
               );
             } catch (error: unknown) {
+              if (roundStoppedForWeb()) {
+                logger?.info(
+                  { qRunId: request.runId, rounds },
+                  "q round began answering while the web search ran; answered once the web lands",
+                );
+                break;
+              }
               // Groq validates a model's tool call against the declared
               // schema and refuses the whole request when the model got it
               // wrong (tool_use_failed) — including on turns that never
@@ -6483,6 +6648,21 @@ export function createModelGatewayQAnswer(
         // research tool; the prospects fallback is code's decision, from
         // the platform's own thin result, so code takes it from the run's
         // offer.
+        // The turn's web search, begun with the turn, joins what Capital Q's
+        // own records returned. A round that answered without it (an
+        // adapter that does not stream) is answered again with it; nothing
+        // of that round was said.
+        if (earlyWeb !== null && !earlyWeb.claimed) {
+          earlyWeb.claimed = true;
+          const outcome = await earlyWeb.outcome;
+          took("research");
+          if (request.signal?.aborted === true) {
+            return { kind: "FAILED", diagnosticCode: "RUN_CANCELLED" };
+          }
+          landResearch(earlyWeb.call, outcome);
+          analyst = undefined;
+          final = undefined;
+        }
         const researchTool = researchToolNow();
         if (
           analyst === undefined &&

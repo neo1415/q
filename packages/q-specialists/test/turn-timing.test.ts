@@ -349,7 +349,7 @@ function timedModel(
 const TOOL_NAMES: Readonly<Record<string, string>> = {
   search_companies: "company.search",
   get_company: "company.get",
-  research_public_web: "research.public_web",
+  research_public_web: "public_web.search",
   discovery_slate: "discovery.slate",
 };
 
@@ -397,8 +397,19 @@ function toolPort(onRead?: (what: string) => void): QToolPort {
       onRead?.(`${proposal.name}:${proposal.callId}`);
       if (proposal.name === "research_public_web") {
         await wait(LATENCY.webMs);
+        // A well-formed source, as the research service returns it, so an
+        // answer drawn from it cites it (a PUBLIC_SOURCE block).
         return outcome(proposal, {
-          sources: [{ title: "public page about Northwind Ledger" }],
+          sources: [
+            {
+              index: 1,
+              url: "https://news.example.com/northwind-ledger",
+              domain: "news.example.com",
+              title: "public page about Northwind Ledger",
+              publishedAt: null,
+              retrievedAt: "2026-10-23T08:00:00.000Z",
+            },
+          ],
         });
       }
       await wait(LATENCY.readMs);

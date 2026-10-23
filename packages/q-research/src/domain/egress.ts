@@ -131,6 +131,9 @@ const CONNECTIVES = new Set([
   "announcement",
   "announcements",
   "profile",
+  // Public professional profiles are what a search for a team finds
+  // (owner 2026-10-23); the word names a site, nothing about anyone.
+  "linkedin",
   "overview",
   "history",
   "2024",
