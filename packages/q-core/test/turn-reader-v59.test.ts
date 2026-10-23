@@ -14,9 +14,9 @@ import {
  * Asking Q to act for a record's people is never a request to open it.
  */
 describe("TURN_READER v59: acting on a record is not opening it", () => {
-  it("is the active reader, v58 kept whole plus one REFERENCE rule", () => {
+  it("v58 kept whole plus one REFERENCE rule (v60 is active)", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(59);
+    expect(active.definition.version).toBe(60);
     expect(TURN_READER_V58.status).toBe("DEPRECATED");
     expect(TURN_READER_V59.template).toContain(
       `${TURN_READER_V40_REFERENCES}${V59_ACT_ON_IS_NOT_OPEN}`,

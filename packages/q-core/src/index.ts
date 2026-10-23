@@ -1725,6 +1725,12 @@ export {
   TURN_READER_V59,
   V59_ACT_ON_IS_NOT_OPEN,
 } from "./prompts/tasks/turn-reader.v59.js";
+export {
+  TURN_READER_V60,
+  V60_ANSWERING_INTEREST,
+  V60_ASKING_IS_NOT_OPEN,
+  V60_SCREENS_ANY_LANGUAGE,
+} from "./prompts/tasks/turn-reader.v60.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 export { TURN_SKIM_V7, V7_WRITES } from "./prompts/tasks/turn-skim.v7.js";

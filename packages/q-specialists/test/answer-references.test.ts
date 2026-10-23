@@ -471,6 +471,24 @@ describe("opening the one record a turn points at (Zino live 2026-10-04)", () =>
     expect(chat.delegated()).toBe(0);
   });
 
+  it("'Tell me more about the second one.' is a question: answered, never opened (QA F-41)", async () => {
+    const chat = conversation({ openRecord });
+    const before = opened.length;
+    await chat.say("Tell me more about the second one.", {
+      ...BASE,
+      kind: "QUESTION_TO_Q",
+      reference: {
+        open: "COMPANY",
+        name: "Nixo",
+        shown: 2,
+        retryLast: false,
+        sameFor: null,
+      },
+    });
+    expect(opened).toHaveLength(before);
+    expect(chat.delegated()).toBe(1);
+  });
+
   it("'open my chat with Nixo' from any page opens that chat; an investor's company first", async () => {
     const chat = conversation({ openRecord });
     const said = await chat.say("Open my chat with Nixo.", {
@@ -709,16 +727,22 @@ describe("a question about the page already on screen is answered, not re-opened
     expect(last?.content).toBe("An answer.");
   });
 
-  it("still opens it when they ask to open it, or when they are elsewhere", async () => {
+  it("still opens it when they ask to open it; a question asked elsewhere is answered (QA F-41)", async () => {
     const here = conversation({ openRecord: opener });
-    const opened = await here.say("Open Ledgerfold", read, LEDGERFOLD);
+    const opened = await here.say(
+      "Open Ledgerfold",
+      { ...read, kind: "TOOL_REQUEST" } as unknown as QTurnReading,
+      LEDGERFOLD,
+    );
     expect(here.delegated()).toBe(0);
     expect(opened?.blocks?.[0]).toMatchObject({
       kind: "UI_INTENT",
       intent: { kind: "OPEN_RECORD_PAGE", id: LEDGERFOLD },
     });
+    // Asking about it never moves them (QA F-41: the move lost the
+    // conversation); the answer path answers with the record bound.
     const elsewhere = conversation({ openRecord: opener });
     await elsewhere.say("What does Ledgerfold do?", read);
-    expect(elsewhere.delegated()).toBe(0);
+    expect(elsewhere.delegated()).toBe(1);
   });
 });

@@ -1,0 +1,73 @@
+import type { ModelMessage, ModelToolCall } from "@capital-q/contracts";
+import type { QToolCallOutcome } from "@capital-q/q-runtime";
+
+/**
+ * The Capital Q conversation, not their mailbox (QA F-32, live 2026-10-23):
+ * a reply drafted to Savanna, a connected investor, then "Send it to
+ * them", came back "Connect Gmail in Settings". With a relationship on
+ * Capital Q the message goes through its own conversation, with approval;
+ * email is for when they ask for an email.
+ *
+ * So when an email to one of their relationships comes back
+ * MAILBOX_NOT_CONNECTED, code prepares the same words as a message in that
+ * relationship's conversation, in the same round, through the chat tool's
+ * own authorize step (which refuses where messages are not open: then the
+ * first-contact path applies). It only prepares: one approval card with the
+ * exact text, nothing sent until the person approves.
+ */
+export const CHAT_INSTEAD_TOOL = "propose_chat_message";
+const EMAIL_TOOL = "propose_email";
+
+type ChatArguments = (
+  | { readonly relationshipId: string }
+  | { readonly companyId: string }
+  | { readonly investorOrganisationId: string }
+  | { readonly counterpartName: string }
+) & { readonly body: string };
+
+/** The chat message's arguments for an email their mailbox could not send; null otherwise. */
+export function chatInsteadOf(
+  call: Pick<ModelToolCall, "name" | "arguments">,
+  outcome: QToolCallOutcome,
+): ChatArguments | null {
+  if (call.name !== EMAIL_TOOL || !outcome.result.ok) return null;
+  const status = (outcome.result.data as { readonly status?: unknown } | null)
+    ?.status;
+  if (status !== "MAILBOX_NOT_CONNECTED") return null;
+  const args = call.arguments ?? {};
+  const body = typeof args["body"] === "string" ? args["body"].trim() : "";
+  if (body.length === 0) return null;
+  for (const key of [
+    "relationshipId",
+    "companyId",
+    "investorOrganisationId",
+    "counterpartName",
+  ] as const) {
+    const value = args[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return { [key]: value.trim(), body } as ChatArguments;
+    }
+  }
+  // A reply to an inbound email has no relationship conversation to use.
+  return null;
+}
+
+/** What the model is told once Capital Q prepared the message instead. */
+export function chatInsteadMessage(
+  outcome: QToolCallOutcome,
+): ModelMessage | null {
+  if (!outcome.result.ok) return null;
+  const data = outcome.result.data as {
+    readonly status?: unknown;
+    readonly awaitingApprovalOf?: unknown;
+  } | null;
+  if (data?.status !== "PREPARED") return null;
+  const what =
+    typeof data.awaitingApprovalOf === "string"
+      ? data.awaitingApprovalOf
+      : "A message to them";
+  return {
+    role: "USER",
+    content: `[Capital Q, not the person] Their mailbox is not connected, and they are on Capital Q with this relationship, so Capital Q prepared the same words as a message in their Capital Q conversation, for their approval: "${what}". Nothing is sent until they approve. In your answer say, in your own words, that it is ready to send through Capital Q and waits for their approval. Do not tell them to connect Gmail or mention email unless they asked for an email.`,
+  };
+}

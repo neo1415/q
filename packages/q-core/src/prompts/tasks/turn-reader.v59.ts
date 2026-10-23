@@ -32,7 +32,7 @@ export const TURN_READER_V59: PromptDefinition<
 > = {
   ...TURN_READER_V58,
   version: 59,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Coordinator live test 2026-10-23: v58 plus one REFERENCE rule -- asking Q to write, draft or send a note, message or email to a record's people (or to express interest, ask for a call, request a document) is a request to act, never to open the record: open is null; name/shown still identify it. Read by meaning in any language; schema unchanged.",
   effectiveFrom: "2026-10-23",

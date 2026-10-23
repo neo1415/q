@@ -26,9 +26,9 @@ import { DiscoverRequestSchema } from "../src/conversation/reading.js";
  * guesses no name from capital letters or word lists.
  */
 describe("TURN_READER v58: the reader names whom the turn is about", () => {
-  it("v57 plus the NAMED OTHER rule (v59 is active) and Lane 4's two mandate sentences", () => {
+  it("v57 plus the NAMED OTHER rule (v60 is active) and Lane 4's two mandate sentences", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(59);
+    expect(active.definition.version).toBe(60);
     expect(TURN_READER_V57.status).toBe("DEPRECATED");
     expect(TURN_READER_V58.template).toContain(
       `${V1_ABOUT_NAMED_OTHER}${V58_NAMED_OTHER}`,

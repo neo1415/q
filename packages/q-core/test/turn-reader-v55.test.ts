@@ -18,7 +18,7 @@ import {
 describe("TURN_READER v55: the page's controls, chosen by meaning", () => {
   it("sits on top of v54 (SHOWN and fromShown kept) under the active v56; v54 is deprecated", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(59);
+    expect(active.definition.version).toBe(60);
     expect(TURN_READER_V54.status).toBe("DEPRECATED");
     expect(TURN_READER_V55.template).toContain(V54_FROM_SHOWN);
     expect(TURN_READER_V55.template.replace(V55_SCREEN_CONTROLS, "")).toBe(

@@ -4255,7 +4255,15 @@ export function createSpecialistQAnswer(
       read !== null && read.confidence !== "LOW"
         ? (read.reference ?? null)
         : null;
-    if (reference !== null && reference.open !== null) {
+    // A question about a record is answered, never opened (QA F-41, live
+    // 2026-10-23: "Tell me more about the second one" opened its page and
+    // the conversation moved with it). The reading's own kind decides: a
+    // question to Q or a request to look something up is answered with
+    // the record bound as a note; the record opens only for a turn that
+    // asks Q to do something or answers Q.
+    const asksAboutIt =
+      read?.kind === "QUESTION_TO_Q" || read?.kind === "RESEARCH_REQUEST";
+    if (reference !== null && reference.open !== null && !asksAboutIt) {
       const opened = await openReferenced(
         request,
         conversationId,
