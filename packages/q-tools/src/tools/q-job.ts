@@ -261,6 +261,8 @@ export type QJobPort = {
         readonly status: "STARTED";
         readonly plan: QJobPlanView;
         readonly firstRead: string | null;
+        /** The started job, so a board item can follow it (owner 2026-10-23). */
+        readonly jobId?: string | undefined;
       }
     | { readonly status: "NOT_PLANNED" }
     | { readonly status: "LIMIT_REACHED" }

@@ -874,6 +874,9 @@ export const Q_INSTANT_ACTION_TOOLS = [
   "revise_my_document",
   // Q room W5: a typed edit of their own private draft, a new version.
   "edit_my_document",
+  // The work board (owner 2026-10-23): their own items, revisioned with
+  // their history kept; moved or removed back from the board itself.
+  "my_board",
   // AUTO block (ADR 0030): inside an approved delegation, the person's own
   // word -- stop, a time they chose, away/back -- acts at once.
   "stop_q_work",
