@@ -96,3 +96,17 @@ Good in pass 3: new investor feed is on-mandate (Ledgerfold first); IC memo docu
 | UI U1–U10       | U3 0, U4 1, U5 1, U6 1, U7 1, U9 1                                                                                                     | 5/12 = 42%  |
 
 I19 (voice) and rehearsals were not testable from this sandbox: WebRTC ICE never connects through the HTTPS-only proxy.
+
+## Pass 4 (23:20–23:45 UTC): founder pages, Arabic, Discover interaction
+
+| id    | Finding                                                                                                                                                                                                              | Evidence                       | Severity           | Suspected cause                                                                         | Status                      |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------------ | --------------------------------------------------------------------------------------- | --------------------------- |
+| QO-42 | Founder Discover, investor cards: Zino shows "Pre-seed, Seed and Series A. Enterprise Software and Fintech · Africa, UK, US" and, beside it, "Stage / Sector / Geography: not known yet" for a seed Nigerian fintech | /discover (founder)            | medium             | the three checks read only a GateQ gate, not the published focus shown on the same card | to coordinator              |
+| QO-43 | Discover keeps 4 `<video>` elements with `preload="auto"`, all fully buffered (readyState 4), the playing one `muted=false`                                                                                          | feed.mjs on desktop and 390 px | medium (data, LCP) | CLAUDE.md: one preload controller, tiered budget, one active muted player               | to coordinator              |
+| QO-44 | Founder profile "Traction and raise": Target "Not added" (said $1.5m), no customer count or MRR (said 320, NGN 12m)                                                                                                  | /profile (founder)             | high               | same as QO-26/QO-38: onboarding answers kept as summaries, not fields                   | to coordinator              |
+| QO-45 | Language "Automatic" with an Arabic browser (`ar-EG`) still renders English                                                                                                                                          | LOCALE=ar-EG pages             | low                | Automatic follows the account, not the browser                                          | open (verify intent)        |
+| QO-46 | `/home` opened fresh shows "Listening" (the live voice session starts on page load, before the person asks)                                                                                                          | ar /home, m_home               | medium (privacy)   | the stage resumes the live session on load                                              | to coordinator (with QO-12) |
+
+Good in pass 4: Save and Pass respond in about 220 ms on desktop and 390 px; the founder data room explains its access levels clearly; settings are complete and plain-spoken.
+
+Fix PRs from this session (into `speed/q-oct20`): #382 (QO-01, QO-02), #385 (QO-14).

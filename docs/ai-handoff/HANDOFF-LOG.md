@@ -1217,3 +1217,14 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - Root tsc: exit 0. q-api tsc: exit 0.
   - eslint and prettier: clean on the changed files.
 - **Not yet:** deployed and verified live (Q answering about Capital Q with its figures).
+
+## 2026-10-23 21:20–23:45 UTC — Claude Code, owner-account QA (session_01PN5eKvDzKV5Qp1pvqP9jMB)
+
+- Browser QA on production as the owner's investor account (approved by the owner in-session), plus two new accounts made through `/auth/sign-up` (founder "Kiln Payroll", investor "Harbourline Ventures"; both fictional companies). No outward action approved or sent (checked in `network.relationship_events`).
+- Findings QO-01…QO-46 with evidence: `docs/ai-handoff/evidence/qa-owner/FINDINGS.md` on `qa/owner-accounts`. Reported to the coordinator (session_01SxtUYQjYXwv8hH5D5RGfsK) three times.
+- PRs into `speed/q-oct20`:
+  - #382: attention in plain words, one held draft per person;
+  - #385: logos kept whole and transparent.
+  - Both have gates green; neither is merged or deployed.
+- Not testable from the cloud sandbox: live voice and rehearsals. WebRTC ICE never connects through the HTTPS-only proxy.
+- Worst open items: QO-23 (deck not read: filename keyword classifier), QO-10/QO-40 (no save-to-Work), QO-27/28/29 (investor mandate saved wrong; feed blocked), QO-05/33/36 (entity resolution), QO-09 (LEGO picture).
