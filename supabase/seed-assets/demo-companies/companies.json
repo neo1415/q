@@ -306,12 +306,12 @@
     },
     {
       "key": "songscribe",
-      "mode": "CORRECT",
+      "mode": "FILL_GAPS",
       "match": {
-        "names": ["Songscribe", "SongScribe", "Song Scribe"]
+        "names": ["Songscribe", "SongScribe", "Song Scribe", "SongScribe AI"]
       },
       "canonicalName": "Songscribe",
-      "handle": "songscribe",
+      "handle": null,
       "websiteUrl": null,
       "headquartersCity": null,
       "headquartersCountry": null,
@@ -321,8 +321,6 @@
       "primaryDescription": "Songscribe is an AI co-writer for musicians. Artists start from an idea, a voice note or a hook; Songscribe suggests lyrics, rhymes, structure and melody, keeps every draft, and leaves the artist in control of what is theirs. It is sold as a consumer subscription with a free tier.",
       "taxonomy": {
         "industry": ["Media & Entertainment"],
-        "business_model": ["Consumer Subscription", "Freemium"],
-        "customer_type": ["Consumer"],
         "technology": ["Artificial Intelligence", "Natural Language Processing"]
       },
       "claims": [
@@ -335,38 +333,6 @@
             "amount": "3200",
             "currency": "USD",
             "asOf": "2026-09-30"
-          }
-        },
-        {
-          "key": "customers.paying_accounts",
-          "type": "customers",
-          "statement": "410 songwriters paid for a subscription in September 2026.",
-          "value": {
-            "kind": "COUNT",
-            "value": 410,
-            "asOf": "2026-09-30"
-          }
-        },
-        {
-          "key": "traction.active_users",
-          "type": "traction",
-          "statement": "8,600 songwriters were active in September 2026.",
-          "value": {
-            "kind": "COUNT",
-            "value": 8600,
-            "asOf": "2026-09-30"
-          }
-        },
-        {
-          "key": "traction.growth",
-          "type": "traction",
-          "statement": "Paying songwriters grew 41% from June to September 2026 (290 to 410).",
-          "value": {
-            "kind": "PERCENT",
-            "metric": "PAYING_CUSTOMERS",
-            "value": 41,
-            "periodStart": "2026-06-30",
-            "periodEnd": "2026-09-30"
           }
         },
         {
@@ -399,60 +365,14 @@
             "currency": "USD",
             "asOf": "2026-09-30"
           }
-        },
-        {
-          "key": "financial.contribution_margin",
-          "type": "financial",
-          "statement": "Contribution margin was 38% in Q3 2026 (subscription revenue less model, hosting and app-store costs).",
-          "value": {
-            "kind": "PERCENT",
-            "value": 38,
-            "asOf": "2026-09-30"
-          }
-        },
-        {
-          "key": "market.size",
-          "type": "market",
-          "truthClass": "ESTIMATE",
-          "statement": "Estimated annual spend by independent songwriters and home studios in Africa on songwriting and music-production software: USD 300 million.",
-          "value": {
-            "kind": "MONEY",
-            "amount": "300000000",
-            "currency": "USD",
-            "evidenceCapturedAt": "2026-09-30"
-          }
         }
       ],
-      "founders": [
-        {
-          "person": "excel",
-          "title": "Co-founder"
-        },
-        {
-          "person": "zino",
-          "title": "Co-founder"
-        }
-      ],
+      "founders": [],
       "team": [],
-      "raise": {
-        "stageCode": "pre_seed",
-        "instrumentCode": "safe",
-        "target": {
-          "amount": "750000",
-          "currency": "USD"
-        },
-        "targetCloseDate": "2027-02-28",
-        "useOfFunds": "Melody generation, a mobile app, and artist partnerships in Lagos, Nairobi and Johannesburg."
-      },
+      "raise": null,
       "documents": ["Pitch deck, Q3 2026", "Subscriber metrics, Q3 2026"],
       "governance": null,
-      "qCard": {
-        "tractionMetrics": "public_external",
-        "currentRaise": "public_external",
-        "relationshipSummary": "network_visible",
-        "investabilitySummary": "network_visible",
-        "team": "network_visible"
-      }
+      "qCard": null
     }
   ],
   "$commentBackgrounds": "Background lines are roles the owner stated, nothing more: no dates, employers or career history are invented for real people. Their own backgrounds replace these when they supply them."

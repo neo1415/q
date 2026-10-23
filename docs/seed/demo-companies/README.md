@@ -20,10 +20,11 @@ Source: `supabase/seed-assets/demo-companies/companies.json`, one fixture shared
 - Only missing figures are added.
 - Its visibility, stage and HQ stay the founder's.
 
-**Songscribe (CORRECT; real company; its owners agreed).**
+**Songscribe (FILL_GAPS; owner, 23 Oct: "fill in the gaps").**
 
-- An AI songwriting assistant. Founders: Excel Chukwu and Zino Mario.
-- HQ and website are unknown, so they stay unknown.
+- It exists live as **SongScribe AI**, onboarded by its founder on 2026-10-19: an AI music studio that turns a story into a finished custom song. It is matched by that name and nothing its founder entered is overwritten (name, description, website, private visibility).
+- Only figures that fit that product are added: monthly revenue, gross margin, team size and the raise target. The earlier fixture's songwriter-subscription figures (paying and active songwriters, their growth, subscription contribution margin, songwriting-software market size) contradicted it and were dropped, as were the subscription business model and consumer-only customer type.
+- No raise record, Q Card, handle or team is created on the founder's private company.
 
 **Figures.** Every figure is a claim with truth class `USER_CLAIM` (`ESTIMATE` for market size) and evidence status `SELF_REPORTED`, at `network_visible`. Its statement ends "(Demonstration data, self-reported by the company.)", so Q cites it as such.
 
@@ -38,7 +39,7 @@ Source: `supabase/seed-assets/demo-companies/companies.json`, one fixture shared
 
 **Q Cards.**
 
-- Company handles: `capital-q-hq` (`capital-q` and `capitalq` are reserved platform handles) and `songscribe`.
+- Company handles: `capital-q-hq` (`capital-q` and `capitalq` are reserved platform handles) (Songscribe gets none: it is the founder's private company).
 - Numbers and raise are public. Relationships, Q's reading and team are members only.
 - A person's own card only for an existing account named with `--person`: handle `david-nwankwo` or `zino-mario`, created as that person.
 
@@ -82,7 +83,7 @@ Source: `supabase/seed-assets/demo-companies/companies.json`, one fixture shared
   - claims self-reported only, and no verification;
   - wrong figures and raise superseded;
   - KUUZA AI gap-fill only;
-  - Songscribe created once;
+  - SongScribe AI gap-fill only;
   - listed to Q;
   - Q Cards;
   - idempotent;

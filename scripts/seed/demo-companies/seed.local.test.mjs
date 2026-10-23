@@ -51,10 +51,13 @@ const ids = {
   kTenant: "00000000-0000-4000-8000-00000000b002",
   kOrg: "00000000-0000-4000-8000-00000000d002",
   kCompany: "00000000-0000-4000-8000-00000000c002",
+  sTenant: "00000000-0000-4000-8000-00000000b003",
+  sOrg: "00000000-0000-4000-8000-00000000d003",
+  sCompany: "00000000-0000-4000-8000-00000000c003",
   davidMembership: "00000000-0000-4000-8000-00000000e001",
 };
 
-/** A platform with a WRONG Capital Q and a founder-entered KUUZA AI. */
+/** A platform with a WRONG Capital Q, and KUUZA AI and SongScribe AI as their founders entered them. */
 const SETUP = `
 insert into auth.users (id, email) values
   ('${ids.ownerAuth}', 'owner@example.invalid'),
@@ -64,12 +67,13 @@ insert into auth.users (id, email) values
 insert into identity.platform_admins (user_id, role)
   select id, 'platform_owner' from identity.user_profiles where auth_user_id = '${ids.ownerAuth}';
 
-insert into identity.tenants (id, name) values ('${ids.cqTenant}', 'Capital Q'), ('${ids.kTenant}', 'KUUZA AI');
+insert into identity.tenants (id, name) values ('${ids.cqTenant}', 'Capital Q'), ('${ids.kTenant}', 'KUUZA AI'), ('${ids.sTenant}', 'SongScribe AI');
 insert into identity.organisations (id, tenant_id, organisation_type, display_name, slug)
   values ('${CAPITAL_Q_ORG}', '${ids.cqTenant}', 'company', 'Capital Q', 'capital-q-org'),
-         ('${ids.kOrg}', '${ids.kTenant}', 'company', 'KUUZA AI', 'kuuza-ai-org');
+         ('${ids.kOrg}', '${ids.kTenant}', 'company', 'KUUZA AI', 'kuuza-ai-org'),
+         ('${ids.sOrg}', '${ids.sTenant}', 'company', 'SongScribe AI', 'songscribe-ai-org');
 insert into identity.tenant_organisations (tenant_id, organisation_id)
-  values ('${ids.cqTenant}', '${CAPITAL_Q_ORG}'), ('${ids.kTenant}', '${ids.kOrg}');
+  values ('${ids.cqTenant}', '${CAPITAL_Q_ORG}'), ('${ids.kTenant}', '${ids.kOrg}'), ('${ids.sTenant}', '${ids.sOrg}');
 
 -- Capital Q exists with WRONG data: wrong stage, wrong country, private.
 insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug, headquarters_country, current_stage_code, short_description, marketplace_visibility)
@@ -78,6 +82,10 @@ insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug
 -- KUUZA AI as its founder entered it, with a figure of their own.
 insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug, short_description, marketplace_visibility)
   values ('${ids.kCompany}', '${ids.kTenant}', '${ids.kOrg}', 'KUUZA AI', 'kuuza-ai', 'AI simulator and coach for practising sales, customer-service and other workplace conversations.', 'organisation_private');
+
+-- SongScribe AI as its founder onboarded it (live since 2026-10-19).
+insert into core.companies (id, tenant_id, organisation_id, canonical_name, slug, website_url, short_description, marketplace_visibility)
+  values ('${ids.sCompany}', '${ids.sTenant}', '${ids.sOrg}', 'SongScribe AI', 'songscribe-ai', 'https://www.songscribe.ai', 'AI music studio that turns your story into a finished custom song in about a minute.', 'organisation_private');
 
 -- David: an account and a current membership at Capital Q.
 insert into identity.organisation_memberships (id, tenant_id, organisation_id, user_id, membership_status, joined_at)
@@ -260,24 +268,43 @@ test(
 );
 
 test(
-  "Songscribe is created once, with its founders and its raise",
+  "SongScribe AI keeps everything its founder entered; only fitting gaps are filled",
   { skip },
   async () => {
     const rows = await db.read(
-      "select * from core.companies where canonical_name = 'Songscribe'",
+      "select * from core.companies where lower(canonical_name) like 'song%scribe%'",
     );
-    assert.equal(rows.length, 1);
-    const [founders] = await db.read(
-      `select structured_value from evidence.claims where subject_id = '${rows[0].id}' and claim_key = 'team.founders'`,
+    assert.equal(rows.length, 1, "never a second Songscribe");
+    const [s] = rows;
+    assert.equal(s.id, ids.sCompany);
+    assert.equal(s.canonical_name, "SongScribe AI");
+    assert.equal(s.website_url, "https://www.songscribe.ai");
+    assert.match(s.short_description, /^AI music studio/);
+    assert.equal(s.marketplace_visibility, "organisation_private");
+    assert.equal(s.demonstration_data, true);
+    const claims = await db.read(
+      `select claim_key, truth_class, evidence_status from evidence.claims where subject_id = '${ids.sCompany}' and lifecycle_status = 'CURRENT' order by claim_key`,
     );
     assert.deepEqual(
-      founders.structured_value.founders.map((f) => f.name),
-      ["Excel Chukwu", "Captain Zino Mario"],
+      claims.map((c) => c.claim_key),
+      [
+        "capital.raise_target",
+        "financial.gross_margin",
+        "financial.monthly_revenue",
+        "team.employee_count",
+      ],
     );
-    const [raise] = await db.read(
-      `select target_amount::text as amount, currency_code from core.capital_objectives where company_id = '${rows[0].id}' and status = 'ACTIVE'`,
-    );
-    assert.deepEqual(raise, { amount: "750000", currency_code: "USD" });
+    assert.ok(claims.every((c) => c.evidence_status === "SELF_REPORTED"));
+    // No raise record, no public card, no handle, no team on a founder's
+    // private company: the seed only adds figures.
+    for (const query of [
+      `select 1 from core.capital_objectives where company_id = '${ids.sCompany}'`,
+      `select 1 from core.shareable_identities where subject_id = '${ids.sCompany}'`,
+      `select 1 from core.handles where subject_id = '${ids.sCompany}'`,
+      `select 1 from identity.organisation_memberships where organisation_id = '${ids.sOrg}'`,
+    ]) {
+      assert.equal((await db.read(query)).length, 0, query);
+    }
   },
 );
 
@@ -291,9 +318,9 @@ test(
     const byName = Object.fromEntries(listed.map((r) => [r.canonical_name, r]));
     assert.equal(byName["Capital Q"]?.listed, true);
     assert.equal(byName["Capital Q"]?.discovery_eligible, true);
-    assert.equal(byName["Songscribe"]?.listed, true);
-    // KUUZA AI stays where its founder put it.
+    // KUUZA AI and SongScribe AI stay where their founders put them.
     assert.equal(byName["KUUZA AI"]?.listed ?? false, false);
+    assert.equal(byName["SongScribe AI"]?.listed ?? false, false);
   },
 );
 

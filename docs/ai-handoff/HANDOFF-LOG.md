@@ -1173,3 +1173,26 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - David uploads the pitch video at /pitch/new after deploy;
   - the voice hybrid decision, or fix the Speech Engine id;
   - rotate the Railway and Supabase tokens.
+
+## 2026-10-23 — Production seed run (Claude worker S9b, branch `seed/production-run`, PR #333)
+
+- **Hosted writes, owner "go" in-session:**
+  - 3 team accounts: `zino.mario@`, `daniel.oyeniyi@`, `adeyemi.odunyugbo@fictional.capitalq.local`. Confirmed; no email sent.
+  - **Capital Q** (`ee75a7d8…`, organisation `f95c3469…`) corrected in place: 11 self-reported claims, taxonomy, the raise, Q Card, `capital-q-hq`, demonstration label.
+  - **Team:** David is `founder.capitalq@fictional.capitalq.local`. David, Zino, Daniel and Adeyemi are members, with titles and names. David and Zino have photos and the cards `@david-nwankwo` and `@zino-mario`.
+  - **Documents:** all six; deck PUBLIC, the other five ON_REQUEST. Deck reading `23364fd4…` confirmed.
+  - **KUUZA AI:** gaps filled.
+  - **SongScribe AI:** gaps filled only, with the 4 figures that fit its product.
+  - **Pitch video:** trimmed to 179 s (the product max is 180 s; the original is 3:59). Uploaded through `/pitch/new` as David: asset `104d9721…` READY, NETWORK.
+- **Live verified:**
+  - one Capital Q;
+  - Team 4 with photos; both person cards 200;
+  - documents at their levels;
+  - InvestIQ 75/100;
+  - "2 videos" on the profile; Stream playback request 200.
+- **Open:**
+  - **Q and the new claims:** Q answers from the Capital Q profile but says it has no authorised record of revenue, customers or raise. The new claims don't reach it yet: projection lag or a retrieval gap, not diagnosed.
+  - **Explore:** Capital Q was not in the first 25 cards for `investor.equator-line` (a Series A fund).
+  - **`seed.mjs` profile names:** the script sets no names; they were set by hand this run.
+  - **Tokens:** rotate the Supabase token.
+- **Evidence:** `docs/seed/demo-companies/PRODUCTION-RUN.md` and `evidence-2026-10-23/`.
