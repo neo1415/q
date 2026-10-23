@@ -23,6 +23,8 @@ import {
   selectRehearsalInterviewer,
   type RehearsalVideoStore,
   type VideoSessionRow,
+  REHEARSAL_FACE_PROMPT,
+  REHEARSAL_INTERVIEWERS,
 } from "../src/composition/rehearsal-video.js";
 import type { RehearsalResult } from "../src/composition/rehearsals.js";
 import {
@@ -1788,5 +1790,31 @@ describe("durable provider allocation checkpoint", () => {
     expect(harness.rehearsals.rows.get(REHEARSAL_ID)?.dto.status).toBe(
       "ACTIVE",
     );
+  });
+});
+
+describe("a face that shows emotion (owner 2026-10-23, Tavus in rehearsals)", () => {
+  it("asks the face to follow the feeling of the words, never more", async () => {
+    const harness = setup();
+    await startVideo(harness);
+    const prompt = harness.tavus.calls.pals[0]?.input.systemPrompt ?? "";
+    expect(prompt).toBe(REHEARSAL_FACE_PROMPT);
+    expect(prompt).toContain("Let your face follow the words");
+    expect(prompt).toContain("sceptical when you question a claim");
+    expect(prompt).toContain("never show a feeling the words do not carry");
+  });
+
+  it("uses only Phoenix-4 stock faces (they express emotion; Phoenix-3 does not)", () => {
+    // From Tavus's stock face model map (docs.tavus.io, read 2026-10-23):
+    // Steve - Professional, Julia - Casual, Raj - Business, Mary - Business.
+    const PHOENIX_4 = new Set([
+      "rdd4c86e5e1a",
+      "raf6459c9b82",
+      "re6220ec0195",
+      "r55e6793f10f",
+    ]);
+    for (const interviewer of REHEARSAL_INTERVIEWERS) {
+      expect(PHOENIX_4.has(interviewer.faceId), interviewer.id).toBe(true);
+    }
   });
 });

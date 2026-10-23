@@ -6484,9 +6484,9 @@ const rehearsalVideo = createRehearsalVideoService({
   bridgePath: qRehearsalVideoBridgeBasePath,
   eventsPath: qRehearsalVideoEventsBasePath,
   // REHEARSE: the face speaks in the persona's ElevenLabs voice, matched
-  // to the face's gender. Off unless "on" (UNVERIFIED LIVE: no paid room
-  // has run with it yet).
-  ...(process.env.CQ_REHEARSAL_VIDEO_PERSONA_VOICE === "on"
+  // to the face's gender (UNVERIFIED LIVE: no paid room has run with it
+  // yet; CQ_REHEARSAL_VIDEO_PERSONA_VOICE=off turns it off).
+  ...(process.env.CQ_REHEARSAL_VIDEO_PERSONA_VOICE !== "off"
     ? {
         ttsVoice: async (
           actor: ActorContext,

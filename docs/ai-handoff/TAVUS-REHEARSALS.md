@@ -25,7 +25,11 @@ Rehearsals already have a Tavus video mode: `apps/q-api/src/composition/rehearsa
   - There is no emotion flag.
 - **Emotion tags** (`<emotion value=…/>`) are documented for Echo mode only. They are unconfirmed with a custom-LLM stream, so they are not used.
 - **Today the rehearsal PAL prompt is flat:** "Speak exactly the lines you are given, naturally, and nothing else." The face therefore has little to express from.
-- **Unknown:** which Phoenix version the four interviewer faces (`rdd4c86e5e1a`, `rd27826c12a6`, `re6220ec0195`, `r55e6793f10f`) are on. A read-only `GET /v2/faces?face_type=system&verbose=true` answers it at no minute cost.
+- **Resolved without spend** (Tavus's public stock face model map, `docs.tavus.io/sections/faces/stock-face-model-map.md`, read 2026-10-23; no Tavus key in this sandbox for the API read):
+  - Steve `rdd4c86e5e1a`, Raj `re6220ec0195` and Mary `r55e6793f10f` are **Phoenix-4**, with no 4.5 version of those looks.
+  - Julia `rd27826c12a6` is **not in the map** (Phoenix-3 or retired), so she moves to "Julia - Casual" on Phoenix-4, `raf6459c9b82`.
+  - Phoenix-4.5 "Pro" ids exist for other looks, for example Victor - Office `rb1d65103218` and Rose - Business `rf1bd7e252de`. They are not used until the plan is confirmed to include 4.5.
+  - `docs/seed/tavus-20/plan.json` (pitch-video seed, not this lane) still names `rd27826c12a6`.
 
 ## 3. Cost against the Builder plan
 
