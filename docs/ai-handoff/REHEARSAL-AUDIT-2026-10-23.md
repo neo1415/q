@@ -104,3 +104,14 @@ R5 emotion per sentence, R7 streaming the persona turn.
   **Helal**, a Levantine Arabic male library voice.
 - That opening in that voice is in `evidence/rehearsal-voices-2026-10-23/qinvest-live-opening.mp3`.
   Speech-to-text hears "Assalamualaikum. Thanks for making the time…" (265 characters).
+
+### R7 measured live (cbbc52521, 23 Oct, after 11:35 UTC)
+
+Method: `rehearsal-full.mjs --voice` runs one voice-line turn through the think endpoint (streamed) against QInvest. Before R7, the line's first words arrived only when the turn finished, so "turn done" is the old figure.
+
+| Founder    | First words       | Turn done (= before R7) | Saved                                                                          |
+| ---------- | ----------------- | ----------------------- | ------------------------------------------------------------------------------ |
+| souqsheet  | 1 772 ms          | 2 599 ms                | 827 ms                                                                         |
+| tallyloom  | 1 572 ms          | 2 393 ms                | 821 ms                                                                         |
+| clinicrest | 1 546 ms          | 2 469 ms                | 923 ms                                                                         |
+| kazikit    | 3 152 ms (filler) | 3 211 ms                | not streamed: the gate held, most likely because a warning was due (by design) |
