@@ -310,9 +310,7 @@ function build(options: {
             },
             subscribe: () => () => undefined,
             subscriberCount: () => 1,
-          } as unknown as Parameters<
-            typeof createModelGatewayQAnswer
-          >[0]["deltas"],
+          },
         }),
   });
   const request: QAnswerRequest = {
