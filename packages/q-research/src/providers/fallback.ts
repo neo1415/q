@@ -1,5 +1,6 @@
 import {
   RESEARCH_BOUNDS,
+  type ResearchProviderFailureClass,
   type PublicWebSearchHit,
   type PublicWebSearchResult,
 } from "../contracts.js";
@@ -26,27 +27,53 @@ export function createFallbackResearchProvider(input: {
   readonly parallelSearch?: boolean | undefined;
   /** Each index's deadline in a parallel search. */
   readonly searchTimeoutMs?: number | undefined;
+  readonly now?: (() => number) | undefined;
 }): PublicWebResearchProvider {
-  const providers = input.providers;
-  const first = providers[0];
+  const all = input.providers;
+  const first = all[0];
   if (first === undefined) {
     throw new Error("a fallback research provider needs at least one provider");
   }
   const timeoutMs = input.searchTimeoutMs ?? RESEARCH_BOUNDS.searchTimeoutMs;
+  const now = input.now ?? Date.now;
   let lastSearch: PublicWebResearchProvider = first;
+  /**
+   * Production 2026-10-23: a provider whose key was refused (ScrapingBee,
+   * 401 on every search) was asked again on every search and every page
+   * read. A refused key rests for a while and a rate limit for a minute;
+   * the others carry on. When every provider is resting, all are asked.
+   */
+  const restingUntil = new Map<PublicWebResearchProvider, number>();
+  const note = (provider: PublicWebResearchProvider, error: unknown) => {
+    if (!isResearchProviderFailure(error)) return;
+    // 402: the account's credit is spent, which passes no sooner.
+    const rest =
+      error.status === 402
+        ? COOL_DOWN_MS.AUTHENTICATION
+        : COOL_DOWN_MS[error.failureClass];
+    if (rest !== undefined) restingUntil.set(provider, now() + rest);
+  };
+  const awake = (): readonly PublicWebResearchProvider[] => {
+    const at = now();
+    const ready = all.filter(
+      (provider) => (restingUntil.get(provider) ?? 0) <= at,
+    );
+    return ready.length > 0 ? ready : all;
+  };
 
   const sequentialSearch: PublicWebResearchProvider["search"] = async (
     request,
     context,
   ) => {
     let failure: unknown = null;
-    for (const provider of providers) {
+    for (const provider of awake()) {
       try {
         const result = await provider.search(request, context);
         lastSearch = provider;
         return result;
       } catch (error: unknown) {
         if (!isResearchProviderFailure(error)) throw error;
+        note(provider, error);
         failure = error;
         if (context.signal?.aborted === true) throw error;
       }
@@ -59,6 +86,7 @@ export function createFallbackResearchProvider(input: {
     context,
   ) => {
     const started = Date.now();
+    const providers = awake();
     const settled = await Promise.allSettled(
       providers.map((provider) => {
         const own: ResearchExecutionContext = {
@@ -86,6 +114,7 @@ export function createFallbackResearchProvider(input: {
         answered.push({ provider, result: outcome.value });
       } else {
         if (!isResearchProviderFailure(outcome.reason)) throw outcome.reason;
+        note(provider, outcome.reason);
         failure = outcome.reason;
       }
     }
@@ -103,16 +132,17 @@ export function createFallbackResearchProvider(input: {
       return lastSearch.code;
     },
     search:
-      input.parallelSearch === true && providers.length > 1
+      input.parallelSearch === true && all.length > 1
         ? parallelSearch
         : sequentialSearch,
     extract: async (request, context) => {
       let failure: unknown = null;
-      for (const provider of providers) {
+      for (const provider of awake()) {
         try {
           return await provider.extract(request, context);
         } catch (error: unknown) {
           if (!isResearchProviderFailure(error)) throw error;
+          note(provider, error);
           failure = error;
           if (context.signal?.aborted === true) throw error;
         }
@@ -121,6 +151,12 @@ export function createFallbackResearchProvider(input: {
     },
   };
 }
+
+/** How long a provider rests after a failure that will not pass by itself. */
+const COOL_DOWN_MS: Partial<Record<ResearchProviderFailureClass, number>> = {
+  AUTHENTICATION: 10 * 60_000,
+  RATE_LIMIT: 60_000,
+};
 
 /**
  * Hits from several indexes as one list: interleaved by rank so no index
