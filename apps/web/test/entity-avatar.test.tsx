@@ -96,6 +96,21 @@ describe("EntityAvatar (founder ask 2026-10-04)", () => {
         ?.getAttribute("data-entity-avatar-state"),
     ).toBe("image");
   });
+
+  it("draws a company's own picture whole, as a logo, never cropped", () => {
+    // Live 23 Oct: a wordmark cropped to a circle read "lo C".
+    const { container } = render(
+      <EntityAvatar kind="company" name="Silo Credit" src={SIGNED} />,
+    );
+    const img = container.querySelector("img");
+    if (img !== null) fireEvent.load(img);
+    expect(img?.className).toContain("object-contain");
+    expect(
+      container
+        .querySelector("[data-entity-avatar]")
+        ?.getAttribute("data-entity-avatar-state"),
+    ).toBe("logo");
+  });
 });
 
 describe("EntityAvatar visibility", () => {
