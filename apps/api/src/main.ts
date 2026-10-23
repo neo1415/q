@@ -115,6 +115,7 @@ import {
   createPostgresCapitalObjectiveTimes,
   createPostgresCapitalObjectiveRepository,
 } from "@capital-q/capital";
+import { createBoardService } from "@capital-q/board";
 import { createResultsReader } from "@capital-q/results";
 import {
   createPostgresUnicornPotentialStore,
@@ -364,7 +365,11 @@ import { createChatSafetyAudit } from "./chat-safety-audit.js";
 import { createDiscoverFilterFacts } from "./discover-filter-facts.js";
 import { createApiCompanyRaiseReader } from "./company-raise.js";
 import { createRaiseSharing, storedPitchSections } from "./pitch-claims.js";
-import { createQWorkPagePort, createWorkforceJobPort } from "./q-work-port.js";
+import {
+  createBoardJobStatusPort,
+  createQWorkPagePort,
+  createWorkforceJobPort,
+} from "./q-work-port.js";
 import { createProductionEventRegistry } from "./event-registry.js";
 import { createInvestorCardFacts } from "./investor-card-facts.js";
 import { createSupabaseRequestAuthenticator } from "./security/supabase-authenticator.js";
@@ -1658,6 +1663,16 @@ const interests = createInterestService({
 });
 
 /**
+ * The work board (owner 2026-10-23): the person's own items, the same
+ * service Q's board tools call; an item whose Q job is DONE moves to DONE.
+ */
+const board = createBoardService({
+  sql: database.sql,
+  transactions: database.transactions,
+  jobStatus: createBoardJobStatusPort(database.sql),
+});
+
+/**
  * Commitments (spec 6.6.14-6.6.15): stated by one side, confirmed by the
  * other, each relationship counted once; history through Network's own
  * appender.
@@ -2931,6 +2946,7 @@ const { app, logger } = createApp(config, security, {
   interests,
   connections,
   commitments,
+  board,
   capitalRounds,
   outcomes,
   deal,
