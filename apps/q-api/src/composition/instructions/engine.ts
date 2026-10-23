@@ -3467,10 +3467,11 @@ export function createInstructionEngine(
           code === undefined
             ? "my plan had no reply to them"
             : REFUSAL_WORDS[code].reason;
-        // The codes themselves, so the person (and we) can see why.
+        // The codes go to the log and the step's reason, never into the
+        // person's words (owner QA 23 Oct: "(BELOW_THE_BAR)" in their list).
         const detail =
           codes.length === 0 ? "NO_REPLY_PLANNED" : codes.join(", ");
-        const words = `${name}'s message is waiting for a reply. I couldn't answer it on my own: ${why} (${detail}). Reply in the chat, or tell me what to say and I'll send it.`;
+        const words = `${name}'s message is waiting for a reply. I couldn't answer it on my own: ${why}. Reply in the chat, or tell me what to say and I'll send it.`;
         logger?.info(
           { instructionId: row.id, relationshipId: id, codes: detail },
           "standing instruction reply waiting on the person",

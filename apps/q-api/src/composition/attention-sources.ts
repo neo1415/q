@@ -1,6 +1,15 @@
 import type { QAttentionItem } from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { AttentionPort } from "@capital-q/q-tools";
+import { HELD_REASON_WHY } from "./workforce/review.js";
+
+/** A stored hold reason in the person's words; an unknown code says nothing. */
+function heldWhy(reason: string | null): string | null {
+  const entry = Object.entries(HELD_REASON_WHY).find(
+    ([code]) => code === reason,
+  );
+  return entry?.[1] ?? null;
+}
 
 /**
  * RECOVERY-2026-10 B1: the "what needs you" sources no tool port holds,
@@ -34,37 +43,47 @@ export function createAttentionSources(dependencies: {
               created_at: Date;
             }[]
           >`
-            select o.draft_id, o.job_id, d.counterpart_name, o.reason, o.created_at
-              from q_runtime.workforce_draft_outcomes o
-              join q_runtime.workforce_drafts d on d.id = o.draft_id
-             where o.user_id = ${actor.userId}
-               and o.tenant_id = ${actor.tenantId}
-               and o.outcome = 'HELD'
-               and not exists (
-                 select 1 from q_runtime.workforce_draft_outcomes later
-                  where later.draft_id = o.draft_id
-                    and later.outcome in ('SENT', 'OFFERED'))
-             order by o.created_at desc
+            select draft_id, job_id, counterpart_name, reason, created_at
+              from (
+                -- One item per person: a message redrafted five times is
+                -- one held message, not five (owner QA 23 Oct: 5x Tensorgate).
+                select distinct on (coalesce(d.counterpart_name, o.job_id::text))
+                       o.draft_id, o.job_id, d.counterpart_name, o.reason,
+                       o.created_at
+                  from q_runtime.workforce_draft_outcomes o
+                  join q_runtime.workforce_drafts d on d.id = o.draft_id
+                 where o.user_id = ${actor.userId}
+                   and o.tenant_id = ${actor.tenantId}
+                   and o.outcome = 'HELD'
+                   and not exists (
+                     select 1 from q_runtime.workforce_draft_outcomes later
+                      where later.draft_id = o.draft_id
+                        and later.outcome in ('SENT', 'OFFERED'))
+                 order by coalesce(d.counterpart_name, o.job_id::text),
+                          o.created_at desc
+              ) latest
+             order by created_at desc
              limit 20`;
-          return rows.map((row): QAttentionItem => ({
-            key: `held:${row.draft_id}`,
-            source: "HELD_DRAFT",
-            title:
-              row.counterpart_name === null
-                ? "Q held back a draft for you to look at"
-                : `Q held back a draft to ${row.counterpart_name.slice(0, 120)}`,
-            ...(row.reason === null
-              ? {}
-              : ({
-                  note: `Why: ${row.reason}`,
-                } satisfies Partial<QAttentionItem>)),
-            entity: { kind: "JOB", id: row.job_id },
-            ...(row.counterpart_name === null
-              ? {}
-              : { counterpart: row.counterpart_name.slice(0, 120) }),
-            since: new Date(row.created_at).toISOString(),
-            decidable: true,
-          }));
+          return rows.map((row): QAttentionItem => {
+            const why = heldWhy(row.reason);
+            return {
+              key: `held:${row.draft_id}`,
+              source: "HELD_DRAFT",
+              title:
+                row.counterpart_name === null
+                  ? "Q held back a draft for you to look at"
+                  : `Q held back a draft to ${row.counterpart_name.slice(0, 120)}`,
+              ...(why === null
+                ? {}
+                : ({ note: `It ${why}.` } satisfies Partial<QAttentionItem>)),
+              entity: { kind: "JOB", id: row.job_id },
+              ...(row.counterpart_name === null
+                ? {}
+                : { counterpart: row.counterpart_name.slice(0, 120) }),
+              since: new Date(row.created_at).toISOString(),
+              decidable: true,
+            };
+          });
         },
       ],
       AGENT_BLOCKED: [
