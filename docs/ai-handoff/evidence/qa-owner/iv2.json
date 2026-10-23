@@ -1,0 +1,16 @@
+[
+  {
+    "step": 1,
+    "said": "Qualified.",
+    "ms": 8245,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/investor",
+    "fresh": "Essentials 9 of 9\n100%\nQualified.\nThanks, that's on your record: inbound: Qualified. Are there sectors you'd rather not see? We can come back to this if you'd rather skip it."
+  },
+  {
+    "step": 2,
+    "said": "We are actively investing.",
+    "ms": 8267,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/investor",
+    "fresh": "We are actively investing.\nI haven't saved that yet. Are there sectors you'd rather not see? We can come back to this if you'd rather skip it."
+  }
+]

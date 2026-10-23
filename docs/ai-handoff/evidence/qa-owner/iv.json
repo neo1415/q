@@ -1,0 +1,37 @@
+[
+  {
+    "step": 1,
+    "said": "I'm a partner at Harbourline Ventures, an early-stage fund in London. We invest in B2B software and fintech across West Africa and the UK.",
+    "ms": 8270,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/investor",
+    "fresh": "You\nI'm a partner at Harbourline Ventures, an early-stage fund in London. We invest in B2B software and fintech across West Africa and the UK.\nQ is working\nSaving your how you invest, firm and more"
+  },
+  {
+    "step": 2,
+    "said": "Pre-seed and seed. Cheques from 250 thousand to 1.5 million pounds, typically 600 thousand. We lead or co-lead.",
+    "ms": 9269,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/investor",
+    "fresh": "Essentials 6 of 9 · about 1 min left\n67%\nGot it, saved: how you invest: Venture capital fund; firm: Harbourline Ventures; your role: Partner; stages: Pre-seed, Seed, Series A; sectors: Enterprise Software, Fintech; geography: UK. I'll look at your public sources and bring back what I find for you to confirm. Which currency do you write cheques in?\nPre-seed and seed. Cheques from 250 thousand to 1.5 million pounds, typically 600 thousand. We lead or co-lead.\nThanks, that's on your record: cheque currency: Pound sterling; minimum cheque: £250,000; typical cheque: £600,000; maximum cheque: £1.5 million; lead or follow: Lead rounds, Co-invest alongside a lead. Public sources had nothing useful on the company, so we'll carry on here. Are you deploying capital right now?\nActively investing\nSelective\nPaused\nExploring only\nInvestor private · Your organisation"
+  },
+  {
+    "step": 3,
+    "said": "We never invest in crypto trading, gambling or tobacco. We like regulated fintech and companies with paying customers.",
+    "ms": 10273,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/investor",
+    "fresh": "We never invest in crypto trading, gambling or tobacco. We like regulated fintech and companies with paying customers.\nNoted and saved: rather not see: Gambling, Tobacco, Speculative crypto; excluded sectors: We never invest in crypto trading, gambling or tobacco; regulated markets: Regulated markets are a plus; revenue expectations: Revenue expected. Are you deploying capital right now?"
+  },
+  {
+    "step": 4,
+    "said": "Our website is harbourline dot vc. Yes, that's all correct.",
+    "ms": 15287,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/investor",
+    "fresh": "Essentials 8 of 9 · about 1 min left\n89%\nOur website is harbourline dot vc. Yes, that's all correct.\nYour website is queued for a public-source review; nothing from it will be used until you confirm it. How should founders reach you: only by invitation, through a qualified screen, or openly?\nClosed\nQualified\nOpen"
+  },
+  {
+    "step": 5,
+    "said": "Show me my feed.",
+    "ms": 9261,
+    "url": "https://capital-qweb-production.up.railway.app/onboarding/investor",
+    "fresh": "Show me my feed.\nYour feed is the next step, but I still need one onboarding detail first: should founders reach you only through invitation, through a qualified screen, or openly?"
+  }
+]
