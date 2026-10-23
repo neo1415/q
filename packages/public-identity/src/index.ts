@@ -14,6 +14,7 @@ export {
   CARD_FIELDS,
   DEFAULT_FIELD_SCOPES,
   NAME_FIELD,
+  companyCardSharesRaise,
   fitFieldScopes,
   isNetworkOnly,
   projectCardFields,

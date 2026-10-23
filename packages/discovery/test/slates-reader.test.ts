@@ -617,7 +617,7 @@ describe("slate reader (CQ-REC-006)", () => {
     const none = await h.reader.pageCompanies({ actor });
     expect(none).toEqual({
       slateId: null,
-      rankingVersion: "ranking-config.v3",
+      rankingVersion: "ranking-config.v5",
       items: [],
       notes: ["RECOMMENDATIONS_REFRESHING"],
       nextCursor: null,

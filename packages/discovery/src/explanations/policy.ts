@@ -39,6 +39,9 @@ const OUTCOME_BY_REASON: Readonly<Record<string, ExplanationOutcome>> = {
   TAXONOMY_RELATED: "PARTIAL",
   TAXONOMY_MISMATCH: "MISMATCH",
   SEMANTIC_SIMILARITY_PRESENT: "MATCH",
+  CHEQUE_WITHIN_ROUND: "MATCH",
+  CHEQUE_PARTLY_WITHIN_ROUND: "PARTIAL",
+  CHEQUE_ABOVE_ROUND: "MISMATCH",
   FACTOR_MISSING: "UNKNOWN",
   FACTOR_NOT_APPLICABLE: "NOT_APPLICABLE",
 };
@@ -57,7 +60,7 @@ const ALIGNED_LABEL: Readonly<Record<ExplanationDimension, string>> = {
   GEOGRAPHY: "Based in a country your mandate names",
   TAXONOMY: "Sector matches a sector your mandate names",
   SEMANTIC: "What the business does reads close to your mandate",
-  CHEQUE: "Cheque size is compatible",
+  CHEQUE: "Your cheque range fits the round they are raising",
 };
 
 const PARTIAL_LABEL: Readonly<Record<ExplanationDimension, string>> = {
@@ -65,7 +68,7 @@ const PARTIAL_LABEL: Readonly<Record<ExplanationDimension, string>> = {
   GEOGRAPHY: "Based in a region your mandate names, not a named country",
   TAXONOMY: "Sector sits under a sector your mandate names, not an exact match",
   SEMANTIC: "What the business does is loosely related to your mandate",
-  CHEQUE: "Cheque size is partly compatible",
+  CHEQUE: "Your smaller cheques fit the round; your largest is bigger than it",
 };
 
 const MISMATCH_LABEL: Readonly<Record<ExplanationDimension, string>> = {
@@ -73,7 +76,7 @@ const MISMATCH_LABEL: Readonly<Record<ExplanationDimension, string>> = {
   GEOGRAPHY: "Based outside the geographies your mandate names",
   TAXONOMY: "Sector is not one your mandate names",
   SEMANTIC: "What the business does reads far from your mandate",
-  CHEQUE: "Cheque size does not fit",
+  CHEQUE: "Your smallest cheque is larger than the round they are raising",
 };
 
 /**
@@ -87,7 +90,12 @@ const MISSING_LABEL: Readonly<Record<string, string>> = {
   COMPANY_TAXONOMY_UNKNOWN: "This company has not declared a sector",
   NO_DECLARED_PREFERENCE: "Your mandate does not name one",
   UNRESTRICTED_PREFERENCE: "Your mandate is open on this",
-  CHEQUE_NOT_COMPUTABLE: "Cheque compatibility is not available yet",
+  // Snapshots ranked before cheque v2 carry this; said as what it was.
+  CHEQUE_NOT_COMPUTABLE: "Not compared in this ranking",
+  ROUND_TARGET_NOT_SHARED:
+    "This company has not shared its round size with you",
+  CHEQUE_CURRENCY_MISMATCH:
+    "The round is in a different currency from your cheque range, so it was not compared",
   SEMANTIC_NOT_RETRIEVED: "No description-level comparison was made",
   SOURCE_NOT_AUTHORISED: "Not available for this comparison",
 };

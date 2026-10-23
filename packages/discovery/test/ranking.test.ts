@@ -30,6 +30,7 @@ import {
   RANKING_CONFIG_V1,
   RANKING_CONFIG_V2,
   RANKING_CONFIG_V3,
+  RANKING_CONFIG_V5,
   RANKING_CONFIGS,
   RankingConfigError,
   RankingConfigSchema,
@@ -276,13 +277,14 @@ const EXACT: Company = {
   structured: true,
 };
 
-describe("ranking-config.v3", () => {
-  it("v3 is v2 with the stage mapping bound to declared_fit.stage v2; v2 is v1 with geography v2; older configs stay published, unedited, and refuse today's registry", () => {
-    expect(RANKING_CONFIG_CURRENT).toBe(RANKING_CONFIG_V3);
+describe("ranking-config.v5", () => {
+  it("v4 is v3 plus cheque v2 as an active factor; v3 is v2 with stage v2; v2 is v1 with geography v2; older configs stay published, unedited, and refuse today's registry", () => {
+    expect(RANKING_CONFIG_CURRENT).toBe(RANKING_CONFIG_V5);
     expect(RANKING_CONFIGS.map((c) => c.version)).toEqual([
       "ranking-config.v1",
       "ranking-config.v2",
       "ranking-config.v3",
+      "ranking-config.v5",
     ]);
     const factor = (c: RankingConfig, id: string) =>
       c.factors.find((f) => f.featureId === id)?.featureVersion;
@@ -308,6 +310,22 @@ describe("ranking-config.v3", () => {
         /declared_fit\.stage is registered at v2, not v1/,
       );
     }
+    expect(() => validateRankingConfig(RANKING_CONFIG_V3, registry)).toThrow(
+      /declared_fit\.cheque/,
+    );
+    // v4 adds exactly the cheque factor, at the same weight; nothing else.
+    expect(
+      RANKING_CONFIG_V5.factors.filter(
+        (f) => f.featureId !== "declared_fit.cheque",
+      ),
+    ).toEqual(RANKING_CONFIG_V3.factors);
+    expect(
+      RANKING_CONFIG_V5.factors.find(
+        (f) => f.featureId === "declared_fit.cheque",
+      ),
+    ).toMatchObject({ featureVersion: "v2", weight: 1, group: "DECLARED_FIT" });
+    expect(RANKING_CONFIG_V5.tieBreak).toEqual(RANKING_CONFIG_V3.tieBreak);
+    expect(Object.isFrozen(RANKING_CONFIG_V5)).toBe(true);
   });
 
   it("is valid against the registry, frozen, uncalibrated and accounts for every registered feature", () => {
@@ -337,15 +355,10 @@ describe("ranking-config.v3", () => {
         featureVersion: "v1",
         role: "GATE_ONLY",
       },
-      {
-        featureId: "declared_fit.cheque",
-        featureVersion: "v1",
-        role: "NOT_COMPUTABLE",
-      },
     ]);
     // Print the complete production config for review (§94).
     console.info(
-      `[REC-005 ranking-config.v3] ${JSON.stringify(RANKING_CONFIG_CURRENT)}`,
+      `[REC-005 ranking-config.v5] ${JSON.stringify(RANKING_CONFIG_CURRENT)}`,
     );
   });
 
@@ -499,11 +512,13 @@ describe("scoring and ordering", () => {
     const b = byN(ranked, 2);
     expect(b.internalScore).toBe(1);
     expect(b.diagnostics).toMatchObject({
-      configuredWeight: 4,
+      // Cheque (v4) is configured; with no declared range it is not
+      // applicable and contributes nothing, never a zero.
+      configuredWeight: 5,
       availableWeight: 3,
       presentFactorCount: 3,
       missingFactorCount: 1,
-      factorCoverage: 0.75,
+      factorCoverage: 0.6,
     });
     const semanticFactor = b.factors.find(
       (f) => f.featureId === "semantic_fit.mandate_similarity",
@@ -613,7 +628,7 @@ describe("scoring and ordering", () => {
     expect(r.diagnostics).toMatchObject({
       presentFactorCount: 1,
       missingFactorCount: 3,
-      factorCoverage: 0.25,
+      factorCoverage: 0.2,
     });
     expect(r.candidateProvenance.structured).toBeNull();
   });
@@ -740,7 +755,7 @@ describe("scoring and ordering", () => {
     const v2 = byN(rank([c], testV2), 30);
     expect(v1.internalScore).toBeCloseTo(1 / 3, 12);
     expect(v2.internalScore).toBeCloseTo(3 / 5, 12);
-    expect(v1.rankingConfigVersion).toBe("ranking-config.v3");
+    expect(v1.rankingConfigVersion).toBe("ranking-config.v5");
     expect(v2.rankingConfigVersion).toBe("ranking-config.test-v2");
     expect(RANKING_CONFIG_CURRENT.factors.every((f) => f.weight === 1)).toBe(
       true,
@@ -781,7 +796,7 @@ describe("scoring and ordering", () => {
       rank: 1,
       rankerId: RANKER_ID,
       rankerVersion: RANKER_VERSION,
-      rankingConfigVersion: "ranking-config.v3",
+      rankingConfigVersion: "ranking-config.v5",
       featureSchemaVersion: FEATURE_SCHEMA_VERSION,
       featureSnapshot: {
         fingerprint: snapshotFor(EXACT).fingerprint,
@@ -824,19 +839,23 @@ describe("golden matching scenarios (doc 19 §179–§180)", () => {
   };
   const D: Company = { ...EXACT, n: 43, evidenceDocuments: 0 };
 
-  it("GM-01: the exact company is the top candidate; cheque stays MISSING and is not faked", () => {
+  it("GM-01: the exact company is the top candidate; with no declared cheque range, cheque is not applicable and is not faked", () => {
     const ranked = rank([B, C, A]);
     expect(ranked[0]?.companyId).toBe(companyId(1));
     const cheque = snapshotFor(A).features.find(
       (f) => f.featureId === "declared_fit.cheque",
     );
     expect(cheque).toMatchObject({
-      status: "MISSING",
-      missingReason: "CHEQUE_NOT_COMPUTABLE",
+      status: "NOT_APPLICABLE",
+      missingReason: "NO_DECLARED_PREFERENCE",
     });
+    // Configured since v4, it contributes nothing when not applicable.
     expect(
-      byN(ranked, 1).factors.some((f) => f.featureId === "declared_fit.cheque"),
-    ).toBe(false);
+      byN(ranked, 1).factors.find((f) => f.featureId === "declared_fit.cheque"),
+    ).toMatchObject({
+      outcome: "NOT_APPLICABLE",
+      reasonCode: "FACTOR_NOT_APPLICABLE",
+    });
   });
 
   it("CQ-REC-GEO-001: a mandate that named Nigeria as a taxonomy node ranks an NG company GEOGRAPHY_COUNTRY_ALIGNED, not GEOGRAPHY_MISMATCH", () => {
@@ -1272,14 +1291,14 @@ describe("ranking service", () => {
     expect(result.diagnostics).toMatchObject({
       rankerId: "DETERMINISTIC",
       rankerVersion: "deterministic-ranker.v1",
-      rankingConfigVersion: "ranking-config.v3",
+      rankingConfigVersion: "ranking-config.v5",
       candidates: 2,
       scored: 2,
       unscored: 0,
     });
     expect(result.ranked.map((r) => r.rankingConfigVersion)).toEqual([
-      "ranking-config.v3",
-      "ranking-config.v3",
+      "ranking-config.v5",
+      "ranking-config.v5",
     ]);
     expect(result.ranked).toEqual(
       rankSnapshots(

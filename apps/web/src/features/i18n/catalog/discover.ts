@@ -1,5 +1,20 @@
 /** Arabic for Discover and Explore (feed, filters, saved, passed, compare). */
 export const DISCOVER_AR: Readonly<Record<string, string>> = {
+  // Cheque fit in a slate's explanation (owner 23 Oct 2026, cheque-fit.v1).
+  "Your cheque range fits the round they are raising":
+    "نطاق شيكاتك يتناسب مع الجولة التي يجمعونها",
+  "Your smaller cheques fit the round; your largest is bigger than it":
+    "شيكاتك الأصغر تتناسب مع الجولة؛ وأكبرها أكبر منها",
+  "Your smallest cheque is larger than the round they are raising":
+    "أصغر شيك لديك أكبر من الجولة التي يجمعونها",
+  "Cheque size: this company has not shared its round size with you":
+    "حجم الشيك: لم تشارك هذه الشركة حجم جولتها معك",
+  "Cheque size: the round is in a different currency from your cheque range, so it was not compared":
+    "حجم الشيك: الجولة بعملة مختلفة عن نطاق شيكاتك، لذلك لم تتم المقارنة",
+  "Cheque size: not compared in this ranking":
+    "حجم الشيك: لم تتم المقارنة في هذا الترتيب",
+  "Cheque size: your mandate does not name one":
+    "حجم الشيك: تفويضك لا يحدد حجماً",
   // Why a company is here (reason rows), evidence of a raise, and the
   // exclusion notes; {stage}/{country}/{rules} are filled in at runtime.
   Location: "الموقع",

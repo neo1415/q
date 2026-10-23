@@ -26,6 +26,10 @@ import {
   actorPrincipal,
   type DisclosureAccessService,
 } from "@capital-q/permissions";
+import {
+  companyCardSharesRaise,
+  createPostgresPublicIdentityRepository,
+} from "@capital-q/public-identity";
 import type { FitQViewer } from "@capital-q/q-specialists";
 import {
   createPostgresInvestabilityStore,
@@ -136,6 +140,7 @@ export function createFitComposition(
     return out;
   };
 
+  const cards = createPostgresPublicIdentityRepository();
   const inputs = createFitInputSource({
     sql: dependencies.sql,
     eligibilityPorts: dependencies.eligibilityPorts,
@@ -190,16 +195,40 @@ export function createFitComposition(
         (o): o is NonNullable<typeof o> => o !== null && o.status === "ACTIVE",
       );
       if (objectives.length === 0) return out;
-      // The raise is founder_private until shared: ask for THIS reader.
-      const decisions = await dependencies.disclosure.evaluateMany(
-        objectives.map((o) => ({
-          principal: actorPrincipal(actor),
-          resource: { type: "capital_objective" as const, id: o.id },
-          requestedAccess: "view" as const,
-        })),
+      // Owner 23 Oct: a raise the company put on its Q Card reaches every
+      // signed-in investor; read through public-identity's own repository,
+      // and a failed read is the private answer.
+      const published = await Promise.all(
+        objectives.map((o) =>
+          cards
+            .findCard(dependencies.sql, {
+              subjectType: "COMPANY",
+              subjectId: o.companyId,
+            })
+            .then(companyCardSharesRaise)
+            .catch(() => false),
+        ),
+      );
+      // Otherwise the raise is founder_private until shared: ask for THIS
+      // reader.
+      const asked = objectives.filter((_, index) => published[index] !== true);
+      const decisions =
+        asked.length === 0
+          ? []
+          : await dependencies.disclosure.evaluateMany(
+              asked.map((o) => ({
+                principal: actorPrincipal(actor),
+                resource: { type: "capital_objective" as const, id: o.id },
+                requestedAccess: "view" as const,
+              })),
+            );
+      const disclosed = new Set(
+        asked
+          .filter((_, index) => decisions[index]?.outcome === "ALLOW")
+          .map((o) => o.id),
       );
       objectives.forEach((o, index) => {
-        if (decisions[index]?.outcome === "ALLOW") {
+        if (published[index] === true || disclosed.has(o.id)) {
           out.set(o.companyId, {
             amount: o.target.amount,
             currency: o.target.currency,

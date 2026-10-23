@@ -477,7 +477,7 @@ describe("a company becoming discoverable reaches every CURRENT slate", () => {
     semanticGeneratorVersion: null,
     featureSchemaVersion: "recommendation-features.v1",
     rankerVersion: "deterministic-ranker.v1",
-    rankingConfigVersion: "ranking-config.v3",
+    rankingConfigVersion: "ranking-config.v5",
     taxonomyVersion: null,
     generationFingerprint: null,
     itemCount: 0,

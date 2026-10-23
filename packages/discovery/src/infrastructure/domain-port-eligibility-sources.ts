@@ -109,6 +109,19 @@ export function createDomainEligibilityPorts(
       minStageCode: snapshot.stage.minStageCode,
       maxStageCode: snapshot.stage.maxStageCode,
     },
+    // The declared range, for the investor's own cheque fit only.
+    cheque:
+      snapshot.cheque === null
+        ? null
+        : {
+            currency: snapshot.cheque.currency,
+            ...(snapshot.cheque.min === undefined
+              ? {}
+              : { min: snapshot.cheque.min }),
+            ...(snapshot.cheque.max === undefined
+              ? {}
+              : { max: snapshot.cheque.max }),
+          },
   });
 
   const readActiveMandate = async ({

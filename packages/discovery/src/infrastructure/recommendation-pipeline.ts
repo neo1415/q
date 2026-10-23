@@ -12,10 +12,7 @@ import {
   type RelationshipQueryPort,
 } from "@capital-q/network";
 import type { Logger } from "@capital-q/observability";
-import {
-  organisationPrincipal,
-  type DisclosureAccessService,
-} from "@capital-q/permissions";
+import type { DisclosureAccessService } from "@capital-q/permissions";
 import {
   createPostgresTaxonomyAssignmentRepository,
   createPostgresTaxonomyReferenceRepository,
@@ -75,6 +72,7 @@ import {
   createPostgresSuitabilityRecorder,
 } from "./postgres-company-scores.js";
 import { createFitInputSource } from "./fit-inputs.js";
+import { createVisibleRaises } from "./visible-raises.js";
 import type { SlatePolicy } from "../slates/contracts.js";
 import type { RefreshRequestStore, SlateRepository } from "../slates/ports.js";
 import {
@@ -141,6 +139,13 @@ export type RecommendationPipelineDependencies = {
           readonly companyId: string;
           readonly amount: string;
           readonly currency: string;
+          /**
+           * Owner 23 Oct: the company put `currentRaise` on its Q Card
+           * (network_visible or public_external), which every signed-in
+           * investor may see. Absent or false: only a disclosure of the
+           * objective to the investor organisation shows it.
+           */
+          readonly publishedOnCard?: boolean | undefined;
         }[]
       >)
     | undefined;
@@ -395,12 +400,15 @@ export function createRecommendationPipeline(
     taxonomy,
   });
   const snapshots = createPostgresFeatureSnapshotStore({ sql });
+  const currentRaises = dependencies.currentRaises;
+  const visibleRaises = createVisibleRaises({ currentRaises, disclosure });
   const features = createFeatureService({
     registry: createFeatureRegistry(),
     ports: eligibilityPorts,
     companies: featurePorts.companies,
     hierarchy: featurePorts.hierarchy,
     store: snapshots,
+    roundTargets: { visibleTo: visibleRaises },
     clock,
     logger,
   });
@@ -430,7 +438,6 @@ export function createRecommendationPipeline(
   // REC-009R: the same state, asked at serving time. Demotion to the tail
   // orders a slate; only this keeps a passed company out of a page.
   const suppression = createProactiveSuppression({ signals });
-  const currentRaises = dependencies.currentRaises;
   const fitOrdering = createFitOrdering({
     clock,
     // fit-order.v2: Investability after explicit fit; Suitability recorded.
@@ -451,31 +458,12 @@ export function createRecommendationPipeline(
         : {
             raises: async (actor, companyIds) => {
               const out = new Map<string, FilterMoney>();
-              if (actor.organisationId === undefined) return out;
-              const raises = await currentRaises(companyIds);
-              if (raises.length === 0) return out;
-              const principal = organisationPrincipal({
-                tenantId: actor.tenantId,
-                organisationId: actor.organisationId,
-              });
-              const decisions = await disclosure.evaluateMany(
-                raises.map((raise) => ({
-                  principal,
-                  resource: {
-                    type: "capital_objective" as const,
-                    id: raise.objectiveId,
-                  },
-                  requestedAccess: "view" as const,
-                })),
-              );
-              raises.forEach((raise, index) => {
-                if (decisions[index]?.outcome === "ALLOW") {
-                  out.set(raise.companyId, {
-                    amount: raise.amount,
-                    currency: raise.currency,
-                  });
-                }
-              });
+              for (const [companyId, raise] of await visibleRaises(
+                actor,
+                companyIds,
+              )) {
+                out.set(companyId, raise);
+              }
               return out;
             },
           }),

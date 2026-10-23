@@ -55,6 +55,10 @@ export const RANKING_REASON_CODES = [
   "TAXONOMY_RELATED",
   "TAXONOMY_MISMATCH",
   "SEMANTIC_SIMILARITY_PRESENT",
+  /** cheque-fit.v1 (ranking-config.v5): the round and the declared range. */
+  "CHEQUE_WITHIN_ROUND",
+  "CHEQUE_PARTLY_WITHIN_ROUND",
+  "CHEQUE_ABOVE_ROUND",
   /** A factor's feature was MISSING; the factor did not contribute. */
   "FACTOR_MISSING",
   /** A factor's feature was NOT_APPLICABLE; the factor did not contribute. */
@@ -318,8 +322,58 @@ export const RANKING_CONFIG_V3: RankingConfig = deepFreeze(
   }),
 );
 
+/**
+ * `ranking-config.v5` (owner 23 Oct 2026; v4 is the fit profile's own
+ * config in fit/config.ts, never a slate ordering): v3's weights, maps and
+ * tie-break, unchanged, plus `declared_fit.cheque` v2 as an active factor
+ * at the same weight as the other declared criteria. A round the company
+ * has not shared, or one in another currency, is MISSING and does not
+ * contribute (never zero); only a smallest cheque larger than the whole
+ * round is a soft mismatch. v3 stays published, unedited.
+ */
+export const RANKING_CONFIG_V5: RankingConfig = deepFreeze(
+  RankingConfigSchema.parse({
+    ...RANKING_CONFIG_V3,
+    version: "ranking-config.v5",
+    factors: [
+      ...RANKING_CONFIG_V3.factors,
+      {
+        featureId: "declared_fit.cheque",
+        featureVersion: "v2",
+        group: "DECLARED_FIT",
+        weight: 1,
+        normalization: {
+          kind: "CATEGORY_MAP",
+          map: {
+            WITHIN_ROUND: {
+              value: 1,
+              polarity: "POSITIVE",
+              reasonCode: "CHEQUE_WITHIN_ROUND",
+            },
+            PARTLY_WITHIN_ROUND: {
+              value: 0.75,
+              polarity: "POSITIVE",
+              reasonCode: "CHEQUE_PARTLY_WITHIN_ROUND",
+            },
+            ABOVE_ROUND: {
+              value: 0,
+              polarity: "SOFT_MISMATCH",
+              reasonCode: "CHEQUE_ABOVE_ROUND",
+            },
+          },
+        },
+      },
+    ],
+    inactiveFeatures: RANKING_CONFIG_V3.inactiveFeatures.filter(
+      (feature) => feature.featureId !== "declared_fit.cheque",
+    ),
+    description:
+      "Initial, heuristic, uncalibrated ordering for INVESTOR_DISCOVER, identical in weights and maps to v3, plus cheque (v2: the company's shared round against the declared cheque range, one currency, exact decimals) at the same weight: stage, geography, taxonomy, semantic similarity and cheque, averaged over the factors that are present. Missing factors (a round not shared, another currency) do not contribute and are not zero; the eligibility gate is never weighted. Not a probability, not a quality score, not a public number.",
+  }),
+);
+
 /** The config new slates are ranked under. Valid against today's registry. */
-export const RANKING_CONFIG_CURRENT: RankingConfig = RANKING_CONFIG_V3;
+export const RANKING_CONFIG_CURRENT: RankingConfig = RANKING_CONFIG_V5;
 
 /**
  * Every published config, oldest first. A published version is never
@@ -332,6 +386,7 @@ export const RANKING_CONFIGS: readonly RankingConfig[] = Object.freeze([
   RANKING_CONFIG_V1,
   RANKING_CONFIG_V2,
   RANKING_CONFIG_V3,
+  RANKING_CONFIG_V5,
 ]);
 
 function deepFreeze<T>(value: T): T {

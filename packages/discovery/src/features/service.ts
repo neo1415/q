@@ -26,6 +26,7 @@ import type {
   CompanyFeatureProjectionPort,
   FeatureSnapshotStore,
   PreferenceHierarchyPort,
+  RoundTargetPort,
 } from "./ports.js";
 
 /**
@@ -106,6 +107,8 @@ export type FeatureServiceDependencies = {
   readonly companies: CompanyFeatureProjectionPort;
   readonly hierarchy: PreferenceHierarchyPort;
   readonly store: FeatureSnapshotStore;
+  /** Owner 23 Oct: the round each company shares with this investor. */
+  readonly roundTargets?: RoundTargetPort | undefined;
   readonly clock?: (() => Date) | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -224,11 +227,26 @@ export function createFeatureService(
 
       // Two batch reads for the whole pool, never one per feature.
       const intent = deriveStructuredIntent(mandate);
-      const [projections, expanded] = await Promise.all([
+      // The round is read only when the mandate declares a cheque range
+      // (nothing else reads it), as the acting investor organisation; a
+      // failed read is the private answer: no round shared.
+      const declaresCheque =
+        mandate.cheque !== null &&
+        mandate.cheque !== undefined &&
+        (mandate.cheque.min !== undefined || mandate.cheque.max !== undefined);
+      const [projections, expanded, rounds] = await Promise.all([
         companies.projectMany(ordered.map((c) => c.companyId)),
         hierarchy.expand(intent.taxonomyNodeIds),
+        declaresCheque && dependencies.roundTargets !== undefined
+          ? dependencies.roundTargets
+              .visibleTo(
+                query.actor,
+                ordered.map((c) => c.companyId),
+              )
+              .catch(() => new Map<string, never>())
+          : Promise.resolve(new Map<string, never>()),
       ]);
-      queries += 2;
+      queries += declaresCheque ? 3 : 2;
 
       const snapshots: RecommendationFeatureSnapshot[] = [];
       let withoutProjection = 0;
@@ -271,6 +289,16 @@ export function createFeatureService(
         const computed = computeFeatureValues(definitions, {
           mandate: { ...mandate, sourceClass: "DECLARED_MANDATE" },
           company: projection.state,
+          roundTarget: (() => {
+            const round = rounds.get(candidate.companyId);
+            return round === undefined
+              ? null
+              : {
+                  sourceClass: "DISCLOSED_ROUND_TARGET" as const,
+                  amount: round.amount,
+                  currency: round.currency,
+                };
+          })(),
           taxonomy: projection.taxonomy,
           hierarchy: expanded,
           candidate: provenance,
