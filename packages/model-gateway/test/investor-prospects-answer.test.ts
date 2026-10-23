@@ -33,10 +33,14 @@ const prospects = [
     investorType: "VC",
     hqCountry: "KE",
     publicDescription: "Seed cheques for East African fintech.",
+    deploymentState: "ACTIVELY_INVESTING",
     reasons: [
-      { kind: "SAME_COUNTRY", detail: "Based in Kenya, where you operate" },
-      { kind: "TYPICAL_STAGE", detail: "Invests at seed, your stage" },
-      { kind: "DEPLOYING", detail: "Says it is actively investing" },
+      { kind: "SAME_COUNTRY", detail: "based in the same country (KE)" },
+      {
+        kind: "TYPICAL_STAGE",
+        detail: "vc investors typically back seed companies",
+      },
+      { kind: "DEPLOYING", detail: "says it is actively investing" },
     ],
     label: "likely fit, not evidence of interest",
     gate: {
@@ -54,7 +58,12 @@ const prospects = [
     investorType: "ANGEL_NETWORK",
     hqCountry: "NG",
     publicDescription: null,
-    reasons: [{ kind: "TYPICAL_STAGE", detail: "Invests at seed, your stage" }],
+    reasons: [
+      {
+        kind: "TYPICAL_STAGE",
+        detail: "angel network investors typically back seed companies",
+      },
+    ],
     label: "likely fit, not evidence of interest",
     gate: null,
   },
@@ -64,7 +73,9 @@ const prospects = [
     investorType: "VC",
     hqCountry: "KE",
     publicDescription: null,
-    reasons: [{ kind: "SAME_COUNTRY", detail: "Based in Kenya" }],
+    reasons: [
+      { kind: "SAME_COUNTRY", detail: "based in the same country (KE)" },
+    ],
     label: "likely fit, not evidence of interest",
     gate: {
       title: "Rift gate",
@@ -107,18 +118,20 @@ function outcome(name: string, data: unknown): QToolCallOutcome {
 
 describe("which investors a founder should talk to first", () => {
   it("puts investors already interested first, then likely fits, each once; declined interest is left out", () => {
-    const picks = pickProspects(interests, prospects, 3);
+    const picks = pickProspects(interests, prospects, 3, "seed");
     expect(picks.map((p) => [p.name, p.kind])).toEqual([
       ["Kestrel Capital", "INTERESTED"],
       ["Savanna Seed Partners", "LIKELY_FIT"],
       ["Rift Valley Ventures", "LIKELY_FIT"],
     ]);
-    expect(picks[0]?.why).toMatch(
-      /expressed interest on 19 Oct and are waiting for your answer/u,
+    // Analyst lines, from the records: the interest event itself...
+    expect(picks[0]?.why).toBe(
+      "they approached you first, expressing interest on 19 Oct, and are still waiting for your answer, so reply to them before you pitch anyone cold",
     );
-    // A one-line why from what each publishes, and its published gate.
+    // ...or what they say they back, how that meets this company, and
+    // their published gate.
     expect(picks[1]?.why).toBe(
-      "Based in Kenya, where you operate; Invests at seed, your stage; you meet every required criterion on their published gate",
+      "they say they back \u201cSeed cheques for East African fintech\u201d; they are based in Kenya, as you are; venture capital investors like them typically back companies at seed, where you are; you meet every required criterion on their published gate",
     );
     expect(picks[2]?.why).toMatch(/you miss 1 of the 2 required criteria/u);
   });
@@ -129,7 +142,7 @@ describe("which investors a founder should talk to first", () => {
     expect(text).toMatch(
       /^Talk to Kestrel Capital, Savanna Seed Partners and Rift Valley Ventures first\./u,
     );
-    expect(text).toContain("Kestrel Capital: They expressed interest");
+    expect(text).toContain("Kestrel Capital: They approached you first");
     expect(text).toContain(
       "The others are likely fits from what each publishes, not interest they have shown.",
     );

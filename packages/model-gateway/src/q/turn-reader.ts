@@ -120,6 +120,14 @@ export type QTurnReading = Omit<
   readonly teamJob?: boolean | undefined;
   /** v52: they ask what to do next, what is missing, or how ready they are. */
   readonly nextSteps?: boolean | undefined;
+  /**
+   * v58: whom the turn is about -- the company, organisation or person, as
+   * the reader understood it from the words and the recent turns. The only
+   * name the public web and pictures are searched by.
+   */
+  readonly namedOther?: TurnReaderV58Result["namedOther"] | undefined;
+  /** v58: they want to be made ready for a call with one named counterpart. */
+  readonly meetingPrep?: TurnReaderV58Result["meetingPrep"] | undefined;
   /** v55: the page control (a listed id) they ask to open or show now. */
   readonly control?: string | null | undefined;
   /** v54: the turn is answered by this earlier turn of Q's (SHOWN). */
@@ -268,6 +276,10 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "control",
   // v54: a malformed pointer back costs the pointer, never the reading.
   "fromShown",
+  // v58: a malformed subject costs the subject, never the reading.
+  "namedOther",
+  // v58: a malformed counterpart costs the prep, never the reading.
+  "meetingPrep",
 ];
 
 /** One control of the page on screen, as the reader is told of it (v55). */

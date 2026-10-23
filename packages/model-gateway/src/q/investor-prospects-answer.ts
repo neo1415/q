@@ -53,7 +53,11 @@ type Prospect = {
   readonly investorType: string | null;
   readonly hqCountry: string | null;
   readonly publicDescription: string | null;
-  readonly reasons: readonly { readonly detail: string }[];
+  readonly deploymentState?: string | null;
+  readonly reasons: readonly {
+    readonly kind: string;
+    readonly detail: string;
+  }[];
   readonly gate?: {
     readonly acceptingApplications: boolean;
     readonly criteria: readonly {
@@ -115,6 +119,10 @@ function listOf(names: readonly string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1] ?? ""}`;
 }
 
+function clip(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
 function sentence(text: string): string {
   const trimmed = text.trim().replace(/[.;,\s]+$/u, "");
   return trimmed.length === 0
@@ -137,6 +145,89 @@ function gateWords(gate: Prospect["gate"]): string | null {
     : `you meet ${String(met)} of the ${String(required.length)} required criteria on their published gate; the rest are not known yet`;
 }
 
+/** Their own words for what they back, quoted as they published them. */
+function focusOf(description: string | null | undefined): string | null {
+  const text = description
+    ?.replace(/\s+/gu, " ")
+    .trim()
+    .replace(/[.\s]+$/u, "");
+  if (text === undefined || text.length < 8) return null;
+  return text.length > 110 ? `${text.slice(0, 107).trimEnd()}…` : text;
+}
+
+/**
+ * Why approach them first, as an analyst would put it: the interest event
+ * itself, or what they say they back, then how that meets this company
+ * and their published gate. Every clause is read from a record; nothing
+ * is a stock line.
+ */
+function interestWhy(one: Interest, focus: string | null): string {
+  const event =
+    one.answer === "ACCEPTED"
+      ? `they approached you first, expressing interest on ${day(one.expressedAt)}, and you accepted, so this is a conversation already under way rather than a cold approach`
+      : `they approached you first, expressing interest on ${day(one.expressedAt)}, and are still waiting for your answer, so reply to them before you pitch anyone cold`;
+  return focus === null
+    ? event
+    : `${event}; they describe their focus as \u201c${focus}\u201d`;
+}
+
+const REGIONS = new Intl.DisplayNames(["en"], { type: "region" });
+
+function countryName(code: string | null): string | null {
+  if (code === null || !/^[A-Za-z]{2}$/u.test(code)) return null;
+  try {
+    return REGIONS.of(code.toUpperCase()) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** One clause per reason, from the reason's kind and the investor's own fields. */
+function reasonClause(
+  reason: Prospect["reasons"][number],
+  one: Prospect,
+  stage: string | null,
+): string | null {
+  switch (reason.kind) {
+    case "SAME_COUNTRY": {
+      const country = countryName(one.hqCountry);
+      return country === null
+        ? "they are based where you are"
+        : `they are based in ${country}, as you are`;
+    }
+    case "TYPICAL_STAGE": {
+      const kind = typeWords(one.investorType)?.toLowerCase();
+      const at = stage === null ? "your stage" : `${stage.replace(/_/gu, " ")}`;
+      return kind === undefined
+        ? `investors like them typically back companies at ${at}`
+        : `${kind} investors like them typically back companies at ${at}, where you are`;
+    }
+    case "DEPLOYING":
+      return one.deploymentState === "SELECTIVE"
+        ? "they say they are investing selectively"
+        : "they say they are actively investing";
+    default:
+      return reason.detail.trim().length === 0 ? null : reason.detail.trim();
+  }
+}
+
+function prospectWhy(one: Prospect, stage: string | null): string {
+  const focus = focusOf(one.publicDescription);
+  const clauses = one.reasons
+    .map((reason) => reasonClause(reason, one, stage))
+    .filter((clause): clause is string => clause !== null)
+    .slice(0, 2);
+  const gate = gateWords(one.gate);
+  const parts = [
+    ...(focus === null ? [] : [`they say they back \u201c${focus}\u201d`]),
+    ...clauses,
+    ...(gate === null ? [] : [gate]),
+  ];
+  return parts.length === 0
+    ? "what they publish matches your company"
+    : parts.join("; ");
+}
+
 /**
  * Who to approach first: investors already interested (accepted, then
  * waiting on the founder), then likely fits in the prospect ranking's
@@ -146,6 +237,8 @@ export function pickProspects(
   interests: readonly Interest[],
   prospects: readonly Prospect[],
   count: number,
+  /** The company's own stage code, as the prospect list compared it. */
+  stage: string | null = null,
 ): ProspectPick[] {
   const picks: ProspectPick[] = [];
   const seen = new Set<string>();
@@ -169,26 +262,13 @@ export function pickProspects(
       kind: "INTERESTED",
       line: typeWords(profile?.investorType ?? one.investorType),
       about: profile?.publicDescription ?? null,
-      why:
-        one.answer === "ACCEPTED"
-          ? `they expressed interest on ${day(one.expressedAt)} and you accepted, so the conversation is already open`
-          : `they expressed interest on ${day(one.expressedAt)} and are waiting for your answer`,
+      why: interestWhy(one, focusOf(profile?.publicDescription)),
     });
   }
   for (const one of prospects) {
     if (picks.length >= count || seen.has(one.investorOrganisationId)) continue;
     seen.add(one.investorOrganisationId);
-    const reasons = one.reasons
-      .map((reason) => reason.detail.trim())
-      .filter((detail) => detail.length > 0)
-      .slice(0, 2);
-    const gate = gateWords(one.gate);
-    const why = [
-      reasons.length === 0
-        ? "what they publish matches your company"
-        : reasons.join("; "),
-      ...(gate === null ? [] : [gate]),
-    ].join("; ");
+    const why = prospectWhy(one, stage);
     picks.push({
       investorOrganisationId: one.investorOrganisationId,
       name: one.name,
@@ -243,7 +323,7 @@ export function prospectCardsBlock(
     about: pick.about === null ? null : pick.about.slice(0, 160),
     hue: (at % 7) + 1,
     fit: null,
-    reasons: [sentence(pick.why).slice(0, 160)],
+    reasons: [clip(sentence(pick.why), 160)],
     measures: [],
     view: pick.kind === "INTERESTED" ? "Has shown interest" : "Likely fit",
     said: null,
@@ -304,7 +384,10 @@ export async function runInvestorProspects(input: {
           .catch(() => null)
       : Promise.resolve(null),
   ]);
-  const prospectData = dataOf(prospected) as { prospects?: unknown } | null;
+  const prospectData = dataOf(prospected) as {
+    prospects?: unknown;
+    compared?: { stageCode?: unknown };
+  } | null;
   // Without the ranking there is nothing honest to say by code: the full
   // path answers instead.
   if (prospectData === null || !Array.isArray(prospectData.prospects)) {
@@ -316,7 +399,11 @@ export async function runInvestorProspects(input: {
     ? (interestData.interests as Interest[])
     : [];
   const asked = Math.min(COUNT_MAX, Math.max(1, ask.count ?? COUNT_DEFAULT));
-  const picks = pickProspects(interests, prospects, asked);
+  const stage =
+    typeof prospectData.compared?.stageCode === "string"
+      ? prospectData.compared.stageCode
+      : null;
+  const picks = pickProspects(interests, prospects, asked, stage);
   return {
     text: investorProspectsText(picks, asked),
     block: prospectCardsBlock(picks),

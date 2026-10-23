@@ -73,6 +73,15 @@ function analystResult(
   };
 }
 
+/**
+ * The turn reader's reading of a turn about Zino Aviation (v58): whom it is
+ * about, by meaning -- the only name the web and pictures are searched by.
+ */
+const ABOUT_ZINO = {
+  aboutNamedOther: true,
+  namedOther: { name: "Zino Aviation", kind: "COMPANY" },
+} as const;
+
 const RESEARCH: QOfferedTool = {
   toolName: "public_web.search",
   toolVersion: 1,
@@ -1738,7 +1747,7 @@ describe("Capital Q and the public web together (owner 2026-10-23)", () => {
       subjects: [],
       read: EXPLICIT,
     });
-    const answering = seam.answer({ ...request, aboutNamedOther: true });
+    const answering = seam.answer({ ...request, ...ABOUT_ZINO });
     // The record is read while the web search is still running.
     await expect.poll(() => web.order).toContain("end:get_company");
     expect(web.order).not.toContain("end:research_public_web");
@@ -1788,7 +1797,7 @@ describe("Capital Q and the public web together (owner 2026-10-23)", () => {
       subjects: [],
       read: EXPLICIT,
     });
-    const answering = seam.answer({ ...request, aboutNamedOther: true });
+    const answering = seam.answer({ ...request, ...ABOUT_ZINO });
     await expect.poll(() => web.executed.length).toBeGreaterThan(0);
     web.finish();
     expect((await answering).kind).toBe("ANSWERED");
@@ -1811,7 +1820,7 @@ describe("Capital Q and the public web together (owner 2026-10-23)", () => {
       subjects: [],
       read: EXPLICIT,
     });
-    const answering = seam.answer({ ...request, aboutNamedOther: true });
+    const answering = seam.answer({ ...request, ...ABOUT_ZINO });
     await expect.poll(() => alpha.calls.length).toBeGreaterThan(0);
     web.finish();
     expect((await answering).kind).toBe("ANSWERED");
@@ -1862,6 +1871,73 @@ describe("Capital Q and the public web together (owner 2026-10-23)", () => {
   });
 });
 
+describe("whom the web and pictures are for is the reader's, never a guess from the words (production 2026-10-23)", () => {
+  /** One turn, read as EXPLICIT research, with what it asked recorded. */
+  async function turn(said: string, reading: Record<string, unknown>) {
+    const asked: string[] = [];
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      researchOutcome(p, "Zino Aviation flies charter."),
+    );
+    const { seam, request, answerBlocks } = build({
+      script: [
+        { kind: "JSON", value: analystResult("Zino Aviation flies charter.") },
+      ],
+      tools: tools.port,
+      userText: said,
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: (input) => {
+          asked.push(input.name);
+          return Promise.resolve([]);
+        },
+      },
+    });
+    expect((await seam.answer({ ...request, ...reading })).kind).toBe(
+      "ANSWERED",
+    );
+    const web = tools.executed.find(
+      (one) => one.proposal.name === "research_public_web",
+    );
+    return {
+      pictured: asked,
+      entityName: (
+        web?.proposal.arguments as { entityName?: unknown } | undefined
+      )?.entityName,
+      blocks: answerBlocks,
+    };
+  }
+
+  it('"Yes" to an offer about Zino: searched and pictured as Zino, never as "Yes"', async () => {
+    const yes = await turn("Yes", ABOUT_ZINO);
+    expect(yes.entityName).toBe("Zino Aviation");
+    expect(yes.pictured).toEqual(["Zino Aviation"]);
+  });
+
+  it('"Yes" the reader names no one for: no named search and no pictures at all', async () => {
+    const yes = await turn("Yes", { aboutNamedOther: true, namedOther: null });
+    expect(yes.entityName).toBeUndefined();
+    expect(yes.pictured).toEqual([]);
+    const capitalised = await turn("Yes Absolutely Go Ahead", {
+      aboutNamedOther: false,
+    });
+    expect(capitalised.entityName).toBeUndefined();
+    expect(capitalised.pictured).toEqual([]);
+  });
+
+  it("a name written in lowercase is found as the reader understood it", async () => {
+    const lower = await turn("tell me about zino aviation", ABOUT_ZINO);
+    expect(lower.entityName).toBe("Zino Aviation");
+    expect(lower.pictured).toEqual(["Zino Aviation"]);
+  });
+});
+
 describe("pictures of who the turn names, from public pages (owner 2026-10-23)", () => {
   it("looks for them beside the web search and shows them after the words, credited to their pages", async () => {
     const asked: { name: string; userText: string }[] = [];
@@ -1896,9 +1972,9 @@ describe("pictures of who the turn names, from public pages (owner 2026-10-23)",
         },
       },
     });
-    expect(
-      (await seam.answer({ ...request, aboutNamedOther: true })).kind,
-    ).toBe("ANSWERED");
+    expect((await seam.answer({ ...request, ...ABOUT_ZINO })).kind).toBe(
+      "ANSWERED",
+    );
     expect(asked).toEqual([
       { name: "Zino Aviation", userText: "Who runs Zino Aviation?" },
     ]);
@@ -2125,9 +2201,9 @@ describe("the web lane lands within its budget or is dropped (owner 2026-10-23)"
       },
       webLaneBudgetMs: 50,
     });
-    expect(
-      (await seam.answer({ ...request, aboutNamedOther: true })).kind,
-    ).toBe("ANSWERED");
+    expect((await seam.answer({ ...request, ...ABOUT_ZINO })).kind).toBe(
+      "ANSWERED",
+    );
     const finalCall = alpha.calls.at(-1)?.request;
     expect(finalCall?.messages.at(-1)?.content).toContain(
       "did not return in time",
@@ -2169,9 +2245,9 @@ describe("pictures whatever the research mode (live 2026-10-23)", () => {
         },
       },
     });
-    expect(
-      (await seam.answer({ ...request, aboutNamedOther: true })).kind,
-    ).toBe("ANSWERED");
+    expect((await seam.answer({ ...request, ...ABOUT_ZINO })).kind).toBe(
+      "ANSWERED",
+    );
     expect(asked).toEqual(["Zino Aviation"]);
     expect(answerBlocks).toContainEqual(
       expect.objectContaining({ kind: "PICTURE", source: "PUBLIC_WEB" }),
@@ -2314,9 +2390,9 @@ describe("the first words go out as the web search starts (owner 2026-10-23)", (
       },
       said,
     });
-    expect(
-      (await seam.answer({ ...request, aboutNamedOther: true })).kind,
-    ).toBe("ANSWERED");
+    expect((await seam.answer({ ...request, ...ABOUT_ZINO })).kind).toBe(
+      "ANSWERED",
+    );
     expect(webAsked).toBe(true);
     expect(said[0]).toBe("I'm checking what's public on Zino Aviation now. ");
     expect(alpha.calls.length).toBeGreaterThan(0);

@@ -310,6 +310,11 @@ export {
   type QHandOverPort,
 } from "./hand-over.js";
 export {
+  callPrepLine,
+  type CallPrep,
+  type QCallPrepPort,
+} from "./call-prep.js";
+export {
   createToolTeamJobPort,
   TEAM_JOB_KINDS,
   teamJobLine,

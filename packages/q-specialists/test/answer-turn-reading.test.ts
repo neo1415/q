@@ -47,6 +47,7 @@ import {
   unknownScreenLine,
 } from "../src/answer.js";
 import { workKindsAsked, type QTeamJobPort } from "../src/team-job.js";
+import type { CallPrep, QCallPrepPort } from "../src/call-prep.js";
 import {
   createToolProfileGapsPort,
   type QProfileGapsPort,
@@ -135,6 +136,8 @@ function seam(options: {
   readonly delegation?: QDelegationPort;
   /** Several kinds of work at once: a team job (live 2026-10-12). */
   readonly teamJob?: QTeamJobPort;
+  /** A call with one named counterpart, prepared in the answer (v58). */
+  readonly callPrep?: QCallPrepPort;
   /** Readiness lead lines for "what should I do next?" (lead 2026-10-03). */
   readonly readinessLead?: (request: QAnswerRequest) => Promise<string | null>;
   /** Their profile's gaps filled by code (TURN_READER v27). */
@@ -145,6 +148,8 @@ function seam(options: {
   readonly counterpartNames?: readonly string[];
   /** A recording logger (lead 2026-10-03: the route is observable). */
   readonly logger?: Logger;
+  /** The quick first read (a model), faked. */
+  readonly turnSkim?: Parameters<typeof createSpecialistQAnswer>[0]["turnSkim"];
   /** What goes out live (owner 2026-10-23: the holding line). */
   readonly deltas?: { readonly text: string; readonly holding?: true }[];
   /** Waiting lines deferred to the engine's step (lead 2026-10-03). */
@@ -325,6 +330,7 @@ function seam(options: {
       ? {}
       : { openRecord: options.openRecord }),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
+    ...(options.turnSkim === undefined ? {} : { turnSkim: options.turnSkim }),
     ...(options.deltas === undefined
       ? {}
       : {
@@ -352,6 +358,7 @@ function seam(options: {
       ? {}
       : { delegation: options.delegation }),
     ...(options.teamJob === undefined ? {} : { teamJob: options.teamJob }),
+    ...(options.callPrep === undefined ? {} : { callPrep: options.callPrep }),
     ...(options.readinessLead === undefined
       ? {}
       : { readinessLead: options.readinessLead }),
@@ -439,38 +446,54 @@ function toolReading(
 }
 
 describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
-  it("says it is looking into the one company or person a question names, before the turn is read (owner 2026-10-23)", async () => {
+  /** A skim that reads the turn as given, and a reading that lands later. */
+  function holding(said: string, skimmed: Record<string, unknown> | null) {
     const deltas: { text: string; holding?: true }[] = [];
-    let readAt = -1;
+    let landReading: () => void = () => undefined;
     const run = seam({
-      said: "Tell me about Zino Aviation and its team",
+      said,
       reading: null,
-      read: () => {
-        readAt = deltas.length;
-        return Promise.resolve(null);
+      read: () =>
+        new Promise((resolve) => {
+          landReading = () => {
+            resolve(null);
+          };
+        }),
+      turnSkim: {
+        skim: () => Promise.resolve(skimmed as never),
       },
       outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
       deltas,
     });
-    await run.answer.answer(request());
-    expect(deltas[0]).toEqual({
+    const answering = run.answer.answer(request());
+    return { deltas, answering, land: () => landReading() };
+  }
+
+  it("says it is looking into whom the quick first read understood, before the turn is read (owner 2026-10-23)", async () => {
+    const turn = holding("tell me about zino aviation and its team", {
+      kind: "PERSON_SEARCH",
+      // MEDIUM: the person lane is not taken; the answer path goes on.
+      confidence: "MEDIUM",
+      person: { name: "Zino Aviation", kind: "ORGANIZATION" },
+    });
+    await expect.poll(() => turn.deltas.length).toBeGreaterThan(0);
+    // Said while the full reading is still out.
+    expect(turn.deltas[0]).toEqual({
       text: "Looking into Zino Aviation now. ",
       holding: true,
     });
-    // Already said when the turn's reading was asked for.
-    expect(readAt).toBe(1);
+    turn.land();
+    await turn.answering;
   });
 
-  it("says no holding line for words that ask nothing about someone named", async () => {
-    const deltas: { text: string; holding?: true }[] = [];
-    const run = seam({
-      said: "Email Zino Aviation the deck",
-      reading: null,
-      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
-      deltas,
-    });
-    await run.answer.answer(request());
-    expect(deltas.filter((d) => d.holding === true)).toEqual([]);
+  it("says no holding line from the words alone: capitals and question words name no one (owner: no keyword triggers)", async () => {
+    for (const said of ["Tell me about Zino Aviation", "Yes", "Who Is It?"]) {
+      const turn = holding(said, { kind: "OTHER", confidence: "HIGH" });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      turn.land();
+      await turn.answering;
+      expect(turn.deltas.filter((d) => d.holding === true)).toEqual([]);
+    }
   });
 
   it("answers 'take me to discover' with a NAVIGATE intent and no model answer (F8)", async () => {
@@ -4908,5 +4931,144 @@ describe("explicit document revision cannot become opening the document", () => 
     await run.answer.answer(request());
     expect(opened()).toBe(1);
     expect(run.delegated()).toBe(0);
+  });
+});
+
+describe("getting ready for a call is prepared in the answer (owner 2026-10-23, TURN_READER v58)", () => {
+  const said = "Help me prepare for a first call with Savanna Seed Partners";
+  // The live reading: the old reader said teamJob; v58 says meetingPrep.
+  const prepReading = {
+    kind: "QUESTION_TO_Q",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: true,
+    tool: null,
+    handOver: null,
+    teamJob: true,
+    meetingPrep: { counterpart: "Savanna Seed Partners" },
+  } as unknown as TurnReaderResult;
+  const prep = (waiting: readonly string[] = []): CallPrep => ({
+    counterpartName: "Savanna Seed Partners",
+    whoTheyAre: "A seed fund based in Nairobi",
+    soFar: "This would be the first contact",
+    questions: [
+      {
+        question: "Why now?",
+        answer: "Your record shows pilots with 3 co-ops",
+      },
+      { question: "Who pays?", answer: "The co-ops, per your deck" },
+      {
+        question: "How big is it?",
+        answer: "Your record doesn't size the market yet: have it ready",
+      },
+    ],
+    weakSpots: [
+      {
+        spot: "No churn figure",
+        handle: "Say so and give the pilot retention you have",
+      },
+    ],
+    ask: "Ask for a second meeting with their partner",
+    waiting,
+  });
+
+  it("prepares it now, ahead of a team job, and offers the rehearsal", async () => {
+    const asked: string[] = [];
+    const planned: string[] = [];
+    const callPrep: QCallPrepPort = {
+      prepare: (_request, input) => {
+        asked.push(input.counterpart);
+        return Promise.resolve(prep());
+      },
+    };
+    const teamJob: QTeamJobPort = {
+      propose: (_request, goal) => {
+        planned.push(goal);
+        return Promise.resolve({ status: "NOT_PLANNED" });
+      },
+    };
+    const { answer, stored } = seam({
+      said,
+      reading: prepReading,
+      outcomes: [],
+      callPrep,
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(asked).toEqual(["Savanna Seed Partners"]);
+    expect(planned).toEqual([]);
+    const text = stored.at(-1)?.content ?? "";
+    expect(text).toContain("**What they'll likely ask**\n1. Why now?");
+    expect(text).toContain("**Weak spots**");
+    expect(text).toContain(
+      "**Your ask**\nAsk for a second meeting with their partner.",
+    );
+    expect(
+      text.endsWith("Want to rehearse it? I'll play Savanna Seed Partners."),
+    ).toBe(true);
+    expect(text).not.toMatch(/Q['’]s team|\.\.|plan this one anyway/u);
+  });
+
+  it("work already waiting is one plain line; the prep is given anyway", async () => {
+    const callPrep: QCallPrepPort = {
+      prepare: () =>
+        Promise.resolve(
+          prep([
+            "Q's team: Prepare for the Savanna Seed Partners call without booking it.",
+          ]),
+        ),
+    };
+    const { answer, stored } = seam({
+      said,
+      reading: prepReading,
+      outcomes: [],
+      callPrep,
+    });
+    await answer.answer(request());
+    const text = stored.at(-1)?.content ?? "";
+    expect(text).toContain(
+      "Related work is already waiting for your approval: Prepare for the Savanna Seed Partners call without booking it.",
+    );
+    expect(text).toContain("**Who they are**");
+    expect(text).not.toMatch(/Q['’]s team|\.\.|anyway\?/u);
+  });
+
+  it("a counterpart that cannot be prepared goes on as before (the team job here)", async () => {
+    const planned: string[] = [];
+    const callPrep: QCallPrepPort = { prepare: () => Promise.resolve(null) };
+    const teamJob: QTeamJobPort = {
+      propose: (_request, goal) => {
+        planned.push(goal);
+        return Promise.resolve({ status: "NOT_PLANNED" });
+      },
+    };
+    const { answer } = seam({
+      said,
+      reading: prepReading,
+      outcomes: [],
+      callPrep,
+      teamJob,
+    });
+    await answer.answer(request());
+    expect(planned).toEqual([said]);
+  });
+
+  it("a LOW reading is never prepared", async () => {
+    const asked: string[] = [];
+    const callPrep: QCallPrepPort = {
+      prepare: (_request, input) => {
+        asked.push(input.counterpart);
+        return Promise.resolve(prep());
+      },
+    };
+    const { answer } = seam({
+      said,
+      reading: { ...prepReading, confidence: "LOW" },
+      outcomes: [],
+      callPrep,
+    });
+    await answer.answer(request()).catch(() => undefined);
+    expect(asked).toEqual([]);
   });
 });

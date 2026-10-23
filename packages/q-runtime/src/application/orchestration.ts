@@ -284,6 +284,15 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
   /** The turn reader named someone other than the conversation's subject. */
   readonly aboutNamedOther?: boolean | undefined;
   /**
+   * Whom the turn is about, as the turn reader understood it (v58): the
+   * only name the public web and its pictures are searched by -- never one
+   * guessed from capital letters (production 2026-10-23: "Yes" was).
+   */
+  readonly namedOther?:
+    | { readonly name: string; readonly kind: "COMPANY" | "PERSON" }
+    | null
+    | undefined;
+  /**
    * K8: the reader read a question about something prepared for this turn
    * (their mandate, the record on screen, Q's work for them). The router
    * answers it from that context without a tool round when it is there.

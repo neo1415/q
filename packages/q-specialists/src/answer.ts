@@ -12,6 +12,7 @@ import {
   PLAIN_QUESTION_FOCUS,
   toolFocusOf,
 } from "./tool-focus.js";
+import { callPrepLine, type QCallPrepPort } from "./call-prep.js";
 import {
   TEAM_JOB_KINDS,
   goAheadGoal,
@@ -395,19 +396,10 @@ import {
 import {
   analystResultBlocks,
   askedSubjects,
-  companyNameCandidates,
   provenanceLine,
   type QTurnReader,
   type QTurnSkimmer,
 } from "@capital-q/model-gateway/q";
-
-/**
- * A question or a lookup, by its shape ("tell me about…", "who is…",
- * "find…", "…?"): only the shape of the words a holding line may be said
- * for, never whether to research (that is the reading's).
- */
-const ASKS_ABOUT =
-  /^(tell me|who|what|what's|whats|where|when|how|why|is|are|does|do|find|search|look up|lookup|show me|give me|any|latest|news|research|check)\b|\?\s*$/iu;
 
 /**
  * How a specialist reaches Q (CQ-Q-020 §11, §53, §56, §91).
@@ -786,6 +778,11 @@ export type SpecialistQAnswerDependencies = {
   readonly delegation?: QDelegationPort | undefined;
   /** Several kinds of work at once: the lead Q plans a team job. */
   readonly teamJob?: QTeamJobPort | undefined;
+  /**
+   * Owner 2026-10-23: a call with one named counterpart (TURN_READER v58
+   * meetingPrep), prepared in the answer. Absent: answered as before.
+   */
+  readonly callPrep?: QCallPrepPort | undefined;
   /**
    * Their own readiness gaps as the opening lines of "what should I do
    * next?", or null when there are none (or no company of theirs).
@@ -2767,17 +2764,13 @@ export function createSpecialistQAnswer(
 
   /** Turns already given a holding line, so a re-read never says it twice. */
   const heldRuns = new Set<string>();
-  const sayHolding = (request: QAnswerRequest, words: string): void => {
+  const sayHolding = (request: QAnswerRequest, name: string): void => {
     const deltas = dependencies.deltas;
     if (deltas === undefined || heldRuns.has(request.runId)) return;
     if (request.writingDocument === true || request.askedAction !== undefined) {
       return;
     }
     if (request.plan.screen?.route === "ONBOARDING") return;
-    if (!ASKS_ABOUT.test(words.trim())) return;
-    const named = companyNameCandidates(words);
-    const name = named.length === 1 ? named[0] : undefined;
-    if (name === undefined) return;
     heldRuns.add(request.runId);
     while (heldRuns.size > PREREADS_MAX) {
       const oldest = heldRuns.values().next().value;
@@ -3765,13 +3758,6 @@ export function createSpecialistQAnswer(
       const oldest = lastActionsByActor.keys().next().value;
       if (oldest !== undefined) lastActionsByActor.delete(oldest);
     }
-    // Owner 2026-10-23 ("it doesn't need to find every single thing
-    // before it starts talking"; live: 4.5 s to the first word, ~3 s of it
-    // the turn's reading): a question that names one company or person
-    // hears that Q is on it as the turn arrives. Only words true whatever
-    // the reading decides -- Q looks into what it was asked about either
-    // way -- and a holding line: the answer's own words replace it.
-    sayHolding(request, latest.content);
     const readingFirst = (async () => {
       const ready = early === undefined ? null : await early;
       const earlyRead =
@@ -3812,6 +3798,33 @@ export function createSpecialistQAnswer(
           ? preskim.skim
           : skimmer.skim(skimInput(request, history, latest));
     if (skimming !== null) {
+      // Owner 2026-10-23 ("it doesn't need to find every single thing
+      // before it starts talking"; live: 4.5 s to the first word, ~3 s of
+      // it the turn's reading): when the quick first read (a model, by
+      // meaning) reads a lookup of one named person or organisation, they
+      // hear that Q is on it before the full reading lands. The name is the
+      // skim's understanding, never one guessed from the words' capitals or
+      // a list of question words (owner: no keyword triggers). A holding
+      // line: the answer's own words replace it.
+      let readingLanded = false;
+      void readingFirst.then(
+        () => {
+          readingLanded = true;
+        },
+        () => {
+          readingLanded = true;
+        },
+      );
+      void skimming.then(
+        (skimmed) => {
+          const name =
+            skimmed?.kind === "PERSON_SEARCH" ? skimmed.person?.name : null;
+          if (!readingLanded && typeof name === "string") {
+            sayHolding(request, name.trim().slice(0, 60));
+          }
+        },
+        () => undefined,
+      );
       const skimStarted = Date.now();
       const skimmed = await Promise.race([
         readingFirst.then(() => null),
@@ -4230,6 +4243,33 @@ export function createSpecialistQAnswer(
         reference.sameFor,
       );
       if (again !== null) return again;
+    }
+    // Getting ready for a call with one named counterpart (TURN_READER v58
+    // meetingPrep, by meaning) is prepared now, in the answer, ahead of
+    // any team job (owner 2026-10-23: Q offered to plan it instead). When
+    // it cannot be prepared, the turn goes on as before.
+    const prepFor =
+      read === null || read.confidence === "LOW" || read.addressedToQ === false
+        ? null
+        : (read.meetingPrep?.counterpart ?? null);
+    if (dependencies.callPrep !== undefined && prepFor !== null) {
+      const startedAt = Date.now();
+      const prep = await dependencies.callPrep.prepare(request, {
+        counterpart: prepFor,
+        said: latest.content,
+      });
+      logger?.info(
+        {
+          qRunId: request.runId,
+          prepared: prep !== null,
+          waiting: prep?.waiting.length ?? 0,
+          prepMs: Date.now() - startedAt,
+        },
+        "q prepared a call",
+      );
+      if (prep !== null) {
+        return recordAnswer(request, conversationId, callPrepLine(prep));
+      }
     }
     // Work handed to Q's team -- read from meaning (TURN_READER v49
     // teamJob), or a sentence naming three kinds of work as a fast path --
@@ -4844,7 +4884,11 @@ export function createSpecialistQAnswer(
       ...(spoken ? { spoken: true } : {}),
       ...(read === null
         ? {}
-        : { turnKind: read.kind, aboutNamedOther: read.aboutNamedOther }),
+        : {
+            turnKind: read.kind,
+            aboutNamedOther: read.aboutNamedOther,
+            namedOther: read.namedOther ?? null,
+          }),
       ...(read?.question?.kind === undefined
         ? {}
         : { questionKind: read.question.kind }),

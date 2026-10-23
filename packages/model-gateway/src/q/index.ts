@@ -169,7 +169,6 @@ import {
   namesOnlyCompany,
   profileOf,
   readNamedVisibleCompany,
-  onlyReplyWords,
   runNamedCompanyFact,
   type CompanyFactAnswer,
   type CompanyFactAsk,
@@ -268,6 +267,7 @@ export {
   type SmallTalkReply,
   type SmallTalkTurn,
 } from "./small-talk.js";
+export { createCallPrepWriter, type CallPrepWriter } from "./call-prep.js";
 export {
   createConversationRecall,
   type ConversationRecall,
@@ -4138,6 +4138,13 @@ export function createModelGatewayQAnswer(
        * (or, for a follow-up, the subject it points back to), with the
        * further phrasings planned by the research service.
        */
+      /**
+       * Whom the turn is about, as the turn reader understood it (v58), when
+       * it is someone other than them: the only name this turn's public web
+       * search and its pictures are made for.
+       */
+      const namedOther =
+        request.aboutNamedOther === true ? (request.namedOther ?? null) : null;
       const researchFollowUp = () =>
         publicResearchFollowUp({
           history: earlier,
@@ -4147,21 +4154,20 @@ export function createModelGatewayQAnswer(
         });
       const researchCallOf = (maxSources: number) => {
         const followUp = researchFollowUp();
-        // Someone not theirs, named once in their own words: searched as
-        // that name (pages checked to be about them, their public profiles
-        // looked for), and attached to no record of theirs.
-        const named =
-          request.aboutNamedOther === true
-            ? companyNameCandidates(latest.content)
-            : [];
+        // Someone not theirs, as the turn reader understood whom the turn
+        // is about (v58): searched as that name (pages checked to be about
+        // them, their public profiles looked for), and attached to no record
+        // of theirs. Never a name guessed from the words' capital letters
+        // (production 2026-10-23: "Yes" was searched as a company).
+        const named = namedOther?.name ?? null;
         const query = latest.content.trim().slice(0, 200);
         return {
           callId: "q-research",
           name: PUBLIC_WEB_TOOL,
           arguments: {
             ...(followUp ??
-              (named.length === 1 && named[0] !== undefined
-                ? { target: "GENERAL", query, entityName: named[0] }
+              (named !== null
+                ? { target: "GENERAL", query, entityName: named }
                 : { query })),
             maxSources,
           },
@@ -4303,29 +4309,23 @@ export function createModelGatewayQAnswer(
       // Whatever the research mode (live 2026-10-23: the picture search
       // started only with the early web search, so a turn read as their
       // own records, or a person search, showed no picture at all): the
-      // web search's name, else the person search's, else the one company
-      // or person their words name.
+      // web search's name, else the person search's, else whom the turn
+      // reader understood the turn to be about. Only ever a name a model
+      // read by meaning, never one guessed from the words (production
+      // 2026-10-23: "Yes" drew a stock picture of the word).
       const earlyWebName = (
         earlyWeb?.call.arguments as
           { readonly entityName?: unknown } | undefined
       )?.entityName;
-      const namedInWords =
-        request.aboutNamedOther === true
-          ? companyNameCandidates(latest.content)
-          : [];
       const namedForPictures =
         typeof earlyWebName === "string"
           ? earlyWebName
-          : (request.personSearch?.name.trim() ??
-            (namedInWords.length === 1 ? namedInWords[0] : undefined));
+          : (request.personSearch?.name.trim() ?? namedOther?.name);
       const webPictures =
         dependencies.publicPictures !== undefined &&
         !reRender &&
         typeof namedForPictures === "string" &&
-        namedForPictures.length > 1 &&
-        // A reply or a filler is no one to picture ("Yes": production
-        // 2026-10-23 showed a stock photo of the word).
-        !onlyReplyWords(namedForPictures)
+        namedForPictures.length > 1
           ? dependencies.publicPictures
               .find({
                 name: namedForPictures,
@@ -4958,7 +4958,7 @@ export function createModelGatewayQAnswer(
         const named =
           typeof entity === "string" && entity.trim().length > 1
             ? entity.trim().slice(0, 60)
-            : (companyNameCandidates(latest.content)[0] ?? null);
+            : (namedOther?.name ?? null);
         firstPublishedMs = Date.now() - startedAt;
         sendSaid(`${researchLead(named)} `);
       };

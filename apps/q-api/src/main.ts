@@ -300,6 +300,7 @@ import {
   createPostgresRehearsalStore,
   createRehearsalComposer,
   createRehearsalService,
+  type RehearsalMaterial,
   type Sourced,
 } from "./composition/rehearsals.js";
 import {
@@ -474,6 +475,7 @@ import { Q_ACTION_EVENTS } from "@capital-q/q-actions/events";
 import { createContextFirewall } from "@capital-q/q-firewall";
 import {
   createQTools,
+  findRecordByName,
   readOwnThesis,
   type DocumentStudioPort,
   type InvestorGatesPort,
@@ -4153,6 +4155,27 @@ const arrivalSnapshots = createArrivalSnapshots({
   daily: (actor) => dailyStore.latest(actor.userId, actor.tenantId),
 });
 const qIntelligence = composeQIntelligence({
+  // Owner 2026-10-23: a call with one named counterpart, prepared in the
+  // answer from the rehearsal's own material (read as them); the name is
+  // matched only among records they may already see, as open_page does.
+  callPrep: {
+    material: () => rehearsalMaterial,
+    findByName: (actor, kind, name) =>
+      findRecordByName(
+        {
+          companies,
+          disclosure,
+          discovery: rehearsalDiscovery,
+          investorFeed,
+          relationships: errandRelationships,
+        },
+        actor,
+        kind,
+        name,
+      ),
+    waiting: async (actor) =>
+      await qActions.listPendingApprovals({ actor, limit: 20 }),
+  },
   // Owner 2026-10-22: findings and cards beside the answer, at about twice
   // the input tokens a typed turn; CQ_Q_PARALLEL_EXTRAS=off for one call.
   parallelExtras: process.env.CQ_Q_PARALLEL_EXTRAS !== "off",
@@ -5613,6 +5636,274 @@ const externalRehearsalLatency = createExternalRehearsalLatency(
     logger.info({ metric, ms }, "external rehearsal latency");
   },
 );
+// The rehearsal's material, read as the person: also what Q prepares a
+// call from (owner 2026-10-23), so both see exactly the same.
+const rehearsalMaterial: RehearsalMaterial = {
+  viewer: async (actor) => {
+    const companyId = await runtimeDependencies.ownCompany(actor);
+    if (companyId !== null) {
+      const profile = await companies
+        .findCanonicalCompanyProfile(CompanyIdSchema.parse(companyId))
+        .catch(() => null);
+      return profile === null
+        ? null
+        : { role: "FOUNDER", organisationName: profile.canonicalName };
+    }
+    const firmId = await runtimeDependencies.ownInvestorOrganisation(actor);
+    if (firmId === null) return null;
+    const firm = await investors
+      .findCanonicalInvestorOrganisation(
+        InvestorOrganisationIdSchema.parse(firmId),
+      )
+      .catch(() => null);
+    return firm === null
+      ? null
+      : { role: "INVESTOR", organisationName: firm.displayName };
+  },
+  counterpart: async (actor, kind, id) => {
+    if (kind === "INVESTOR_ORGANISATION") {
+      const [relationship, seen] = await Promise.all([
+        errandRelationships.withInvestor(actor, id).catch(() => null),
+        rehearsalDiscovery.findInvestor(actor, id).catch(() => null),
+      ]);
+      if (relationship === null && seen === null) return null;
+      const name =
+        seen?.displayName ??
+        (
+          await investors
+            .findCanonicalInvestorOrganisation(
+              InvestorOrganisationIdSchema.parse(id),
+            )
+            .catch(() => null)
+        )?.displayName ??
+        null;
+      if (name === null) return null;
+      const profile = [
+        `Name: ${name}`,
+        seen === null ? null : `Type: ${seen.investorType}`,
+        seen?.hqCountry == null ? null : `Based in: ${seen.hqCountry}`,
+        seen?.deploymentState == null
+          ? null
+          : `Deploying: ${seen.deploymentState}`,
+        seen?.publicDescription == null
+          ? null
+          : `In their own words: ${seen.publicDescription}`,
+        relationship === null
+          ? null
+          : `Where things stand with you: ${relationship.state}`,
+      ]
+        .filter((line): line is string => line !== null)
+        .join("\n");
+      return {
+        name,
+        profile,
+        relationshipId: relationship?.relationshipId ?? null,
+        basedIn: seen?.hqCountry ?? null,
+      };
+    }
+    const companyId = CompanyIdSchema.safeParse(id);
+    if (!companyId.success) return null;
+    const [relationship, visible] = await Promise.all([
+      errandRelationships.withCompany(actor, id).catch(() => null),
+      subjectView.canView(actor, { type: "company", id }).catch(() => false),
+    ]);
+    if (relationship === null && !visible) return null;
+    const company = await companies
+      .findCanonicalCompanyProfile(companyId.data)
+      .catch(() => null);
+    if (company === null) return null;
+    // The declared, network-projected fields only (no financials).
+    const profile = [
+      `Company: ${company.canonicalName}`,
+      company.currentStageCode === null
+        ? null
+        : `Stage: ${company.currentStageCode}`,
+      company.headquartersCountry === null
+        ? null
+        : `Based in: ${company.headquartersCity ?? ""} ${company.headquartersCountry}`,
+      company.websiteUrl === null ? null : `Website: ${company.websiteUrl}`,
+      company.shortDescription === null
+        ? null
+        : `In their words: ${company.shortDescription}`,
+      company.primaryDescription === null
+        ? null
+        : `About: ${company.primaryDescription.slice(0, 2_000)}`,
+      relationship === null
+        ? null
+        : `Where things stand with you: ${relationship.state}`,
+    ]
+      .filter((line): line is string => line !== null)
+      .join("\n");
+    return {
+      basedIn:
+        company.headquartersCountry === null
+          ? null
+          : [company.headquartersCity, company.headquartersCountry]
+              .filter((part) => part !== null && part.length > 0)
+              .join(", "),
+      name: company.canonicalName,
+      profile,
+      relationshipId: relationship?.relationshipId ?? null,
+    };
+  },
+  theirMessages: async (actor, relationshipId) => {
+    const read = await chat.readForQ({ actor, relationshipId, limit: 60 });
+    return read.messages
+      .filter((message) => message.from === "OTHER_SIDE")
+      .flatMap((message) =>
+        message.text === null ? [] : [`${message.senderName}: ${message.text}`],
+      )
+      .join("\n");
+  },
+  theirCalls: async (actor, relationshipId) => {
+    const meetings = (await schedule.listMeetings(actor, relationshipId)) ?? [];
+    const calls = await Promise.all(
+      meetings
+        .slice(0, 5)
+        .map((meeting) =>
+          meetingAssistant.read(actor, meeting.id).catch(() => null),
+        ),
+    );
+    return calls
+      .flatMap((call) => call?.transcript ?? [])
+      .map((line) => `${line.speaker ?? "Someone"}: ${line.text}`)
+      .join("\n");
+  },
+  counterpartMaterial: async (actor, kind, id) => {
+    if (kind !== "COMPANY") return { text: "", sources: [] };
+    const [pitch, known, uploaded] = await Promise.all([
+      transcriptText(actor, id, "Their pitch video"),
+      knowledgeText(
+        id,
+        ["network_visible", "public_external"],
+        "What Capital Q shows of them",
+      ),
+      // Only a deck they made visible to the network or the public.
+      uploadedDeckText(id, ["network_visible", "public_external"]).catch(
+        () => "",
+      ),
+    ]);
+    return {
+      text: [
+        pitch.text,
+        known.text,
+        uploaded.length === 0 ? "" : `THEIR DECK:\n${uploaded}`,
+      ]
+        .filter((t) => t.length > 0)
+        .join("\n\n"),
+      sources: [
+        ...pitch.sources,
+        ...known.sources,
+        ...(uploaded.length === 0
+          ? []
+          : [{ kind: "DECK" as const, label: "Their deck", url: null }]),
+      ],
+    };
+  },
+  // R1 (2026-10-23): three searches together and the most telling
+  // pages read in full (rehearsal-web.ts), not one search's snippets.
+  publicWeb: async (_actor, name, kind) =>
+    rehearsalWeb(
+      researchComposition.provider,
+      name,
+      kind === "COMPANY" ? "COMPANY" : "INVESTOR_ORGANISATION",
+    ),
+  ownMaterial: async (actor) => {
+    const companyId = await runtimeDependencies.ownCompany(actor);
+    if (companyId === null || actor.organisationId === undefined) {
+      return { text: "", sources: [] };
+    }
+    const [company, pitch, known, decks, uploaded] = await Promise.all([
+      companies
+        .findCanonicalCompanyProfile(CompanyIdSchema.parse(companyId))
+        .catch(() => null),
+      transcriptText(actor, companyId, "Your pitch video").catch(() => ({
+        text: "",
+        sources: [],
+      })),
+      // Their own company's records, except anyone's personal notes.
+      knowledgeText(
+        companyId,
+        [
+          "organisation_private",
+          "founder_private",
+          "relationship_shared",
+          "specifically_shared",
+          "network_visible",
+          "public_external",
+        ],
+        "Your company record",
+      ).catch(() => ({ text: "", sources: [] })),
+      database.sql<{ content: unknown }[]>`
+        select v.content from artifacts.artifacts a
+          join artifacts.artifact_versions v
+            on v.artifact_id = a.id and v.tenant_id = a.tenant_id
+         where a.tenant_id = ${actor.tenantId}
+           and a.organisation_id = ${actor.organisationId}
+           and a.type = 'PITCH_DECK' and a.archived_at is null
+         order by v.created_at desc limit 1`.catch(() => []),
+      // A deck they uploaded, in every scope but someone's personal notes.
+      uploadedDeckText(companyId, [
+        "organisation_private",
+        "founder_private",
+        "relationship_shared",
+        "specifically_shared",
+        "network_visible",
+        "public_external",
+      ]).catch(() => ""),
+    ]);
+    // The deck Q made, else the one they uploaded.
+    const deck =
+      decks[0] === undefined
+        ? uploaded
+        : contentWords(decks[0].content).join(" ");
+    return {
+      text: [
+        company === null
+          ? null
+          : `THEIR COMPANY: ${company.canonicalName}. ${company.shortDescription ?? ""} ${company.primaryDescription?.slice(0, 1_500) ?? ""}`,
+        pitch.text || null,
+        deck.length === 0 ? null : `THEIR DECK:\n${deck.slice(0, 5_000)}`,
+        known.text || null,
+      ]
+        .filter((t): t is string => t !== null && t.trim().length > 0)
+        .join("\n\n"),
+      sources: [
+        { kind: "OWN_COMPANY", label: "Your company profile", url: null },
+        ...pitch.sources,
+        ...(deck.length === 0
+          ? []
+          : [{ kind: "DECK" as const, label: "Your deck", url: null }]),
+        ...known.sources,
+      ],
+    };
+  },
+  relationships: async (actor) => {
+    const own = await errandRelationships.ownRelationships?.(actor);
+    if (own === null || own === undefined) return [];
+    return own.items
+      .filter((item) => item.state !== "DECLINED")
+      .map((item) => ({
+        relationshipId: item.relationshipId,
+        kind:
+          item.counterpart.kind === "COMPANY"
+            ? ("COMPANY" as const)
+            : ("INVESTOR_ORGANISATION" as const),
+        id: item.counterpart.id,
+        name: item.counterpart.name,
+        state: item.state,
+      }));
+  },
+  upcomingMeetings: async (actor) =>
+    (await schedule.upcomingMeetings(actor))
+      .filter((meeting) => meeting.status !== "CANCELLED")
+      .map((meeting) => ({
+        meetingId: meeting.id,
+        relationshipId: meeting.relationshipId,
+        startsAt: meeting.startsAt,
+        purpose: meeting.purpose,
+      })),
+};
 const rehearsals = createRehearsalService({
   external: {
     subjects: externalSubjects,
@@ -5626,275 +5917,7 @@ const rehearsals = createRehearsalService({
     demoAccess: createDemoRehearsalAccess(database.sql),
   },
   store: createPostgresRehearsalStore(database.sql),
-  material: {
-    viewer: async (actor) => {
-      const companyId = await runtimeDependencies.ownCompany(actor);
-      if (companyId !== null) {
-        const profile = await companies
-          .findCanonicalCompanyProfile(CompanyIdSchema.parse(companyId))
-          .catch(() => null);
-        return profile === null
-          ? null
-          : { role: "FOUNDER", organisationName: profile.canonicalName };
-      }
-      const firmId = await runtimeDependencies.ownInvestorOrganisation(actor);
-      if (firmId === null) return null;
-      const firm = await investors
-        .findCanonicalInvestorOrganisation(
-          InvestorOrganisationIdSchema.parse(firmId),
-        )
-        .catch(() => null);
-      return firm === null
-        ? null
-        : { role: "INVESTOR", organisationName: firm.displayName };
-    },
-    counterpart: async (actor, kind, id) => {
-      if (kind === "INVESTOR_ORGANISATION") {
-        const [relationship, seen] = await Promise.all([
-          errandRelationships.withInvestor(actor, id).catch(() => null),
-          rehearsalDiscovery.findInvestor(actor, id).catch(() => null),
-        ]);
-        if (relationship === null && seen === null) return null;
-        const name =
-          seen?.displayName ??
-          (
-            await investors
-              .findCanonicalInvestorOrganisation(
-                InvestorOrganisationIdSchema.parse(id),
-              )
-              .catch(() => null)
-          )?.displayName ??
-          null;
-        if (name === null) return null;
-        const profile = [
-          `Name: ${name}`,
-          seen === null ? null : `Type: ${seen.investorType}`,
-          seen?.hqCountry == null ? null : `Based in: ${seen.hqCountry}`,
-          seen?.deploymentState == null
-            ? null
-            : `Deploying: ${seen.deploymentState}`,
-          seen?.publicDescription == null
-            ? null
-            : `In their own words: ${seen.publicDescription}`,
-          relationship === null
-            ? null
-            : `Where things stand with you: ${relationship.state}`,
-        ]
-          .filter((line): line is string => line !== null)
-          .join("\n");
-        return {
-          name,
-          profile,
-          relationshipId: relationship?.relationshipId ?? null,
-          basedIn: seen?.hqCountry ?? null,
-        };
-      }
-      const companyId = CompanyIdSchema.safeParse(id);
-      if (!companyId.success) return null;
-      const [relationship, visible] = await Promise.all([
-        errandRelationships.withCompany(actor, id).catch(() => null),
-        subjectView.canView(actor, { type: "company", id }).catch(() => false),
-      ]);
-      if (relationship === null && !visible) return null;
-      const company = await companies
-        .findCanonicalCompanyProfile(companyId.data)
-        .catch(() => null);
-      if (company === null) return null;
-      // The declared, network-projected fields only (no financials).
-      const profile = [
-        `Company: ${company.canonicalName}`,
-        company.currentStageCode === null
-          ? null
-          : `Stage: ${company.currentStageCode}`,
-        company.headquartersCountry === null
-          ? null
-          : `Based in: ${company.headquartersCity ?? ""} ${company.headquartersCountry}`,
-        company.websiteUrl === null ? null : `Website: ${company.websiteUrl}`,
-        company.shortDescription === null
-          ? null
-          : `In their words: ${company.shortDescription}`,
-        company.primaryDescription === null
-          ? null
-          : `About: ${company.primaryDescription.slice(0, 2_000)}`,
-        relationship === null
-          ? null
-          : `Where things stand with you: ${relationship.state}`,
-      ]
-        .filter((line): line is string => line !== null)
-        .join("\n");
-      return {
-        basedIn:
-          company.headquartersCountry === null
-            ? null
-            : [company.headquartersCity, company.headquartersCountry]
-                .filter((part) => part !== null && part.length > 0)
-                .join(", "),
-        name: company.canonicalName,
-        profile,
-        relationshipId: relationship?.relationshipId ?? null,
-      };
-    },
-    theirMessages: async (actor, relationshipId) => {
-      const read = await chat.readForQ({ actor, relationshipId, limit: 60 });
-      return read.messages
-        .filter((message) => message.from === "OTHER_SIDE")
-        .flatMap((message) =>
-          message.text === null
-            ? []
-            : [`${message.senderName}: ${message.text}`],
-        )
-        .join("\n");
-    },
-    theirCalls: async (actor, relationshipId) => {
-      const meetings =
-        (await schedule.listMeetings(actor, relationshipId)) ?? [];
-      const calls = await Promise.all(
-        meetings
-          .slice(0, 5)
-          .map((meeting) =>
-            meetingAssistant.read(actor, meeting.id).catch(() => null),
-          ),
-      );
-      return calls
-        .flatMap((call) => call?.transcript ?? [])
-        .map((line) => `${line.speaker ?? "Someone"}: ${line.text}`)
-        .join("\n");
-    },
-    counterpartMaterial: async (actor, kind, id) => {
-      if (kind !== "COMPANY") return { text: "", sources: [] };
-      const [pitch, known, uploaded] = await Promise.all([
-        transcriptText(actor, id, "Their pitch video"),
-        knowledgeText(
-          id,
-          ["network_visible", "public_external"],
-          "What Capital Q shows of them",
-        ),
-        // Only a deck they made visible to the network or the public.
-        uploadedDeckText(id, ["network_visible", "public_external"]).catch(
-          () => "",
-        ),
-      ]);
-      return {
-        text: [
-          pitch.text,
-          known.text,
-          uploaded.length === 0 ? "" : `THEIR DECK:\n${uploaded}`,
-        ]
-          .filter((t) => t.length > 0)
-          .join("\n\n"),
-        sources: [
-          ...pitch.sources,
-          ...known.sources,
-          ...(uploaded.length === 0
-            ? []
-            : [{ kind: "DECK" as const, label: "Their deck", url: null }]),
-        ],
-      };
-    },
-    // R1 (2026-10-23): three searches together and the most telling
-    // pages read in full (rehearsal-web.ts), not one search's snippets.
-    publicWeb: async (_actor, name, kind) =>
-      rehearsalWeb(
-        researchComposition.provider,
-        name,
-        kind === "COMPANY" ? "COMPANY" : "INVESTOR_ORGANISATION",
-      ),
-    ownMaterial: async (actor) => {
-      const companyId = await runtimeDependencies.ownCompany(actor);
-      if (companyId === null || actor.organisationId === undefined) {
-        return { text: "", sources: [] };
-      }
-      const [company, pitch, known, decks, uploaded] = await Promise.all([
-        companies
-          .findCanonicalCompanyProfile(CompanyIdSchema.parse(companyId))
-          .catch(() => null),
-        transcriptText(actor, companyId, "Your pitch video").catch(() => ({
-          text: "",
-          sources: [],
-        })),
-        // Their own company's records, except anyone's personal notes.
-        knowledgeText(
-          companyId,
-          [
-            "organisation_private",
-            "founder_private",
-            "relationship_shared",
-            "specifically_shared",
-            "network_visible",
-            "public_external",
-          ],
-          "Your company record",
-        ).catch(() => ({ text: "", sources: [] })),
-        database.sql<{ content: unknown }[]>`
-          select v.content from artifacts.artifacts a
-            join artifacts.artifact_versions v
-              on v.artifact_id = a.id and v.tenant_id = a.tenant_id
-           where a.tenant_id = ${actor.tenantId}
-             and a.organisation_id = ${actor.organisationId}
-             and a.type = 'PITCH_DECK' and a.archived_at is null
-           order by v.created_at desc limit 1`.catch(() => []),
-        // A deck they uploaded, in every scope but someone's personal notes.
-        uploadedDeckText(companyId, [
-          "organisation_private",
-          "founder_private",
-          "relationship_shared",
-          "specifically_shared",
-          "network_visible",
-          "public_external",
-        ]).catch(() => ""),
-      ]);
-      // The deck Q made, else the one they uploaded.
-      const deck =
-        decks[0] === undefined
-          ? uploaded
-          : contentWords(decks[0].content).join(" ");
-      return {
-        text: [
-          company === null
-            ? null
-            : `THEIR COMPANY: ${company.canonicalName}. ${company.shortDescription ?? ""} ${company.primaryDescription?.slice(0, 1_500) ?? ""}`,
-          pitch.text || null,
-          deck.length === 0 ? null : `THEIR DECK:\n${deck.slice(0, 5_000)}`,
-          known.text || null,
-        ]
-          .filter((t): t is string => t !== null && t.trim().length > 0)
-          .join("\n\n"),
-        sources: [
-          { kind: "OWN_COMPANY", label: "Your company profile", url: null },
-          ...pitch.sources,
-          ...(deck.length === 0
-            ? []
-            : [{ kind: "DECK" as const, label: "Your deck", url: null }]),
-          ...known.sources,
-        ],
-      };
-    },
-    relationships: async (actor) => {
-      const own = await errandRelationships.ownRelationships?.(actor);
-      if (own === null || own === undefined) return [];
-      return own.items
-        .filter((item) => item.state !== "DECLINED")
-        .map((item) => ({
-          relationshipId: item.relationshipId,
-          kind:
-            item.counterpart.kind === "COMPANY"
-              ? ("COMPANY" as const)
-              : ("INVESTOR_ORGANISATION" as const),
-          id: item.counterpart.id,
-          name: item.counterpart.name,
-          state: item.state,
-        }));
-    },
-    upcomingMeetings: async (actor) =>
-      (await schedule.upcomingMeetings(actor))
-        .filter((meeting) => meeting.status !== "CANCELLED")
-        .map((meeting) => ({
-          meetingId: meeting.id,
-          relationshipId: meeting.relationshipId,
-          startsAt: meeting.startsAt,
-          purpose: meeting.purpose,
-        })),
-  },
+  material: rehearsalMaterial,
   composer: createRehearsalComposer({
     gateway: modelGateway,
     dataPosture: demoDataPosture,
