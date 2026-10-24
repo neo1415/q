@@ -15,6 +15,7 @@ import {
   type RunRead,
 } from "./card-subjects.js";
 import { cardRaiseWords, type RunFit } from "./fit-cards.js";
+import { companyNameCandidates } from "./named-company-fact.js";
 
 /**
  * Owner 23 Oct 2026 ("compare the top two side by side" came back as two
@@ -34,6 +35,27 @@ const COMPARE =
 
 export function asksToCompare(question: string): boolean {
   return COMPARE.test(question);
+}
+
+/**
+ * "Which is better, Anchor or Afyascan?", "Anchor or Afyascan: which fits
+ * better?": a choice between named companies, in words COMPARE does not
+ * hold (coordinator 24 Oct, live on bbb4b677: no reader comparison, so
+ * nothing was compared and a web namesake answered for Anchor).
+ */
+const WHICH_BETTER =
+  /\b(?:which|who)\b[^?]*\b(?:better|stronger|best|more promising|fits? (?:me |my mandate )?(?:better|best)|should I (?:back|pick|choose|go with))\b|\b(?:better|stronger)\b[^?]*\bor\b/iu;
+
+/**
+ * The companies a comparison names in its words, when the turn reader gave
+ * no comparison: the capitalised names, at least two, else none. Only
+ * search terms: each is read only when a search under the plan finds
+ * exactly one Capital Q company of exactly that name.
+ */
+export function namesToCompare(question: string): readonly string[] {
+  if (!COMPARE.test(question) && !WHICH_BETTER.test(question)) return [];
+  const names = companyNameCandidates(question, 4);
+  return names.length >= 2 ? names : [];
 }
 
 const STAGE_WORDS = (code: string | null | undefined): string =>
@@ -419,7 +441,7 @@ export function comparisonFactStatement(
         )
         .join(" | ")}`,
   );
-  return `COMPARED SIDE BY SIDE (Capital Q shows this table on their screen): ${names.join(" vs ")}. In words, give the two or three real differences between them (where they are, what they do, their traction numbers, how each fits the mandate), never what they share or the whole table. Say the one or two key figures from the Traction row as numbers (for example each one's monthly revenue), never "self-reported figures" without them. Company figures are company-stated, never verified.${verdictLine(block, fits)}\n${lines.join("\n")}`.slice(
+  return `COMPARED SIDE BY SIDE (Capital Q shows this table on their screen): ${names.join(" vs ")}. These are Capital Q's own records of ${names.join(" and ")}: a public web page about another company or thing of the same name is not them, so never describe them from one. In words, give the two or three real differences between them (where they are, what they do, their traction numbers, how each fits the mandate), never what they share or the whole table. Say the one or two key figures from the Traction row as numbers (for example each one's monthly revenue), never "self-reported figures" without them. Company figures are company-stated, never verified.${verdictLine(block, fits)}\n${lines.join("\n")}`.slice(
     0,
     7_900,
   );
