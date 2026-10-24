@@ -85,6 +85,7 @@ import {
   reviewLines,
   stillNeeded,
   taxonomyProposal,
+  composerHint,
   pendingQuestion,
   redrawnThread,
   welcomeBack,
@@ -728,6 +729,11 @@ export function QOnboardingWorkspace({
           setTurns((current) => [...restored, ...unsent, ...current]);
         }
         if (pending !== null) {
+          // Q is asking that line, about a step this screen cannot name
+          // after a reload: the composer's hint stays neutral rather than
+          // the form step's ("example.com" under "Are you deploying
+          // capital?", live 24 Oct).
+          setQAsking([]);
           return pending;
         }
         return actions
@@ -1768,20 +1774,7 @@ export function QOnboardingWorkspace({
             chip.optionKey === undefined ||
             narrowedTo.includes(chip.optionKey),
         );
-  // Q asked about something other than the form's current step: the
-  // step's own hint ("example.com") would contradict Q's question.
-  const askingElsewhere =
-    prompt !== null && qAsking !== null && !qAsking.includes(prompt.stepKey);
-  const composerPlaceholder =
-    prompt === null
-      ? undefined
-      : askingElsewhere
-        ? "Type your answer"
-        : prompt.control === "chips" ||
-            prompt.control === "multi_chips" ||
-            prompt.control === "confirm"
-          ? "Or say it in your own words"
-          : prompt.placeholder;
+  const composerPlaceholder = composerHint(prompt, qAsking);
 
   return (
     <div

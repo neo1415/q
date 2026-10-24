@@ -10,6 +10,7 @@ import {
   acknowledgeValue,
   gapValue,
   hasFindingsFrom,
+  composerHint,
   pendingQuestion,
   redrawnThread,
   progressLines,
@@ -659,5 +660,25 @@ describe("a reload redraws the thread once (QA F-50)", () => {
     expect(redrawnThread(turns, null)).toEqual(turns);
     const theirs = turns.slice(0, 2);
     expect(redrawnThread(theirs, "anything")).toEqual(theirs);
+  });
+});
+
+describe("the composer's hint follows Q's question (live 24 Oct)", () => {
+  const website = {
+    stepKey: "I0.website",
+    control: "text" as const,
+    placeholder: "example.com",
+  };
+
+  it("is the step's own hint while Q asks that step", () => {
+    expect(composerHint(website, ["I0.website"])).toBe("example.com");
+    expect(composerHint(website, null)).toBe("example.com");
+  });
+
+  it("stays neutral when Q asks another step, or one a reload cannot name", () => {
+    expect(composerHint(website, ["I1.deployment_status"])).toBe(
+      "Type your answer",
+    );
+    expect(composerHint(website, [])).toBe("Type your answer");
   });
 });
