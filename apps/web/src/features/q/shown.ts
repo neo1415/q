@@ -312,20 +312,38 @@ export function subjectOf(item: Pick<ShownItem, "blocks">): ItemSubject {
 
 /**
  * Words in a person's question that point back at what is on screen:
- * "them", "their", "those", "it", "the second one", "all three". Only
- * the person's words are read this way -- Q's own prose uses pronouns
- * about anything -- and only to keep an object, never to show one.
+ * "them", "those", "the second one", "all three". Only the person's
+ * words are read this way -- Q's own prose uses pronouns about anything --
+ * and only to keep an object, never to show one. QA F-105 (24 Oct 2026):
+ * "it", "its", "they" and "their" are in nearly every question ("how can I
+ * make it better?") and kept a stale card over unrelated answers, so they
+ * point back at nothing here.
  */
 const POINTS_BACK =
-  /\b(?:them|they|their|theirs|those|these|it|its|this one|that one|both|each of|all (?:three|four|five)|the (?:two|three|four|five)|the (?:first|second|third|fourth|fifth|last)|number (?:one|two|three|four|five|\d))\b/u;
+  /\b(?:them|those|these|this one|that one|both|each of|all (?:three|four|five)|the (?:two|three|four|five)|the (?:first|second|third|fourth|fifth|last)|number (?:one|two|three|four|five|\d))\b/u;
 
 /** True when this answer (or the question it answers) is about the object. */
 export function refersTo(
   subject: ItemSubject,
   answer: Extract<QTurn, { kind: "Q" }>,
   question: string | undefined,
+  /**
+   * QA F-105: whether the object is the one on the stage now. Q's own
+   * words and references, and the person's "them" or "the second one",
+   * only keep what is up; an object already gone comes back only when
+   * the person names it (or its kind) themselves.
+   */
+  onStage = true,
 ): boolean {
   if (subject.answeredOnce) return false;
+  if (!onStage) {
+    if (question === undefined) return false;
+    const asked = ` ${folded(question)} `;
+    return (
+      subject.names.some((name) => asked.includes(` ${name} `)) ||
+      subject.kindWords.some((word) => asked.includes(` ${word} `))
+    );
+  }
   // Structured first: the run's own authorised subject references.
   for (const block of answer.blocks) {
     const one =
@@ -513,11 +531,19 @@ export function stageOf(
     // leave the stage rather than sit over it.
     if (writtenOut(one.turn)) return { item: null, why: "NONE" };
     // The one the person reopened first, then newest first: the most
-    // recent object the conversation is on.
+    // recent object the conversation is on. What was up before this
+    // answer is kept by any reference to it; an object already gone only
+    // by the person naming it (QA F-105).
+    const before = stageOf(
+      items,
+      turns.slice(0, turns.indexOf(one.turn)),
+      reopened,
+    ).item;
     const ordered = [...items].reverse();
     if (reopenedItem !== undefined) ordered.unshift(reopenedItem);
     for (const item of ordered) {
-      if (refersTo(subjectOf(item), one.turn, one.question)) {
+      const up = before !== null && item.run === before.run;
+      if (refersTo(subjectOf(item), one.turn, one.question, up)) {
         return { item, why: "KEPT" };
       }
     }
