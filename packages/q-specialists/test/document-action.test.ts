@@ -1693,3 +1693,110 @@ describe("the first task is a task", () => {
     expect(boardItemsMeant("work on the first item", items)).toEqual(["doc"]);
   });
 });
+
+/** F-78b, F-79 (QA, live 18d7884c4). */
+describe("nothing saved from nothing, and a described task is that task", () => {
+  it("'save that plan' after a planning failure saves nothing and says so", async () => {
+    const added: unknown[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items: [] }),
+      add: (_actor, item) => {
+        added.push(item);
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    const s = seam({
+      history: [
+        message("USER", "Write me a 12-month plan"),
+        message(
+          "Q",
+          "I couldn't plan this just now: something failed on my side, and nothing has started. Ask me again in a moment.",
+        ),
+        message("USER", "Save that plan to my board."),
+      ],
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        boardAsk: "SAVE",
+        namedOther: null,
+      },
+      board,
+    });
+    await s.run();
+    expect(added).toEqual([]);
+    expect(s.prepared).toHaveLength(0);
+    expect(s.stored[0]?.content).toMatch(/^There's nothing to save yet/u);
+  });
+
+  it("'the first logistics task' is the first task about logistics, or none", () => {
+    const items = [
+      {
+        id: "old",
+        kind: "TASK",
+        title: "Prepare for a call with the founder of the top one",
+        status: "TODO",
+      },
+      {
+        id: "l1",
+        kind: "TASK",
+        title: "Map the logistics partners in Lagos",
+        status: "TODO",
+      },
+    ];
+    expect(boardItemsMeant("Work on the first logistics task", items)).toEqual([
+      "l1",
+    ]);
+    expect(boardItemsMeant("Work on the first hiring task", items)).toEqual([]);
+    expect(boardItemsMeant("Work on the first task", items)).toEqual(["old"]);
+  });
+
+  it("asks which task when none on the board fits what they described", async () => {
+    const worked: unknown[] = [];
+    const board: BoardKeeper = {
+      list: () =>
+        Promise.resolve({
+          items: [
+            {
+              id: "old",
+              kind: "TASK",
+              title: "Prepare for a call with the founder of the top one",
+              status: "TODO" as const,
+            },
+          ],
+        }),
+      add: () => Promise.resolve({ outcome: "OK", replayed: false }),
+      work: (_r, ids) => {
+        worked.push(ids);
+        return Promise.resolve({
+          status: "STARTED",
+          working: [],
+          firstRead: null,
+          waiting: [],
+        });
+      },
+    };
+    const s = seam({
+      history: [message("USER", "Work on the first logistics task")],
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        boardAsk: "WORK",
+        namedOther: null,
+      },
+      board,
+    });
+    await s.run();
+    expect(worked).toEqual([]);
+    expect(s.stored[0]?.content).toBe(
+      "I couldn't find that task on your board. Which one do you mean? In To do: “Prepare for a call with the founder of the top one”.",
+    );
+  });
+});
