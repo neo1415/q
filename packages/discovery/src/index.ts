@@ -809,6 +809,7 @@ export {
   type ObserveFitInput,
 } from "./fit/observe.js";
 export {
+  FIT_RANK_CANDIDATES_MAX,
   FIT_TOP_CANDIDATES_MAX,
   buildFitComparison,
   companyScoresText,

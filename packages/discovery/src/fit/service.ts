@@ -188,7 +188,7 @@ export type FitService = {
    * through hard eligibility and disclosure), every one scored on this
    * investor's mandate and returned in fit order, the first `limit`. None
    * is left out for its band: an unscored company is listed after the
-   * scored ones, never dropped. At most FIT_TOP_CANDIDATES_MAX are scored.
+   * scored ones, never dropped. At most FIT_RANK_CANDIDATES_MAX are scored.
    */
   readonly rank?: (
     actor: ActorContext,
@@ -220,6 +220,12 @@ const NO_MANDATE: ReadonlySet<EligibilityReasonCode> = new Set([
 ]);
 
 export const FIT_TOP_CANDIDATES_MAX = 200;
+/**
+ * F-82 (2026-10-24): rank scores every match of a kind on the network, so
+ * its bound covers the whole catalog (463 listed live), never a first page
+ * by name. Eligibility, inputs and scores are each one set-based read.
+ */
+export const FIT_RANK_CANDIDATES_MAX = 1000;
 
 export function createFitService(
   dependencies: FitServiceDependencies,
@@ -421,7 +427,7 @@ export function createFitService(
       };
     },
     rank: async (actor, companyIds, limit) => {
-      const ids = [...new Set(companyIds)].slice(0, FIT_TOP_CANDIDATES_MAX);
+      const ids = [...new Set(companyIds)].slice(0, FIT_RANK_CANDIDATES_MAX);
       const result = await profiles(actor, ids);
       if (result.kind !== "OK") return result;
       return {
