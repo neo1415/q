@@ -897,7 +897,17 @@ export function createOnboardingPort(input: {
           ...optionsNamedIn(input.journeyType, resolved.step, said),
         ]),
     ]);
-    const kept = resolved.value.optionKeys.filter((key) => named.has(key));
+    const words = [
+      answer.quote,
+      ...input.personTurns.filter((said) => quoteOccursIn(answer.quote, said)),
+    ];
+    // A choice they named in part keeps too (live 24 Oct: "never crypto,
+    // gambling or tobacco" lost Speculative crypto because only Gambling and
+    // Tobacco were named in full). By the choice's own distinctive words.
+    const partly = partlyNamedOptions(resolved.step, named, words);
+    const kept = resolved.value.optionKeys.filter(
+      (key) => named.has(key) || partly.has(key),
+    );
     return kept.length === 0 || kept.length === resolved.value.optionKeys.length
       ? resolved
       : { ...resolved, value: { type: "MULTI_SELECT", optionKeys: kept } };
@@ -3667,6 +3677,58 @@ const SAVED_AFTER: Readonly<Record<string, readonly string[]>> = {
  * Every choice of a single- or multi-select step their words name, by its
  * label, key or the journey's aliases (case and plural aside).
  */
+/**
+ * Choices whose label they named in part: a word of the label (three
+ * letters or more) said as a whole word, when no choice they named in full
+ * shares it. "crypto" names Speculative crypto beside Gambling and Tobacco;
+ * "Series A" never names Series B, which shares only "series" with it. The
+ * vocabulary's own labels compared with their words, nothing else.
+ */
+export function partlyNamedOptions(
+  step: { readonly configuration: unknown },
+  namedInFull: ReadonlySet<string>,
+  texts: readonly string[],
+): ReadonlySet<string> {
+  const options =
+    (
+      step.configuration as {
+        readonly options?: readonly {
+          readonly optionKey?: string;
+          readonly label?: string;
+        }[];
+      }
+    ).options ?? [];
+  const wordsOf = (label: string) =>
+    normalisedWords(label)
+      .trim()
+      .split(" ")
+      .filter((word) => word.length >= 3);
+  const taken = new Set(
+    options
+      .filter((option) => namedInFull.has(option.optionKey ?? ""))
+      .flatMap((option) => wordsOf(option.label ?? "")),
+  );
+  const said = texts.map(normalisedWords).join(" ");
+  const partly = new Set<string>();
+  for (const option of options) {
+    const key = option.optionKey ?? "";
+    if (key.length === 0 || namedInFull.has(key)) continue;
+    const distinctive = wordsOf(option.label ?? "").filter(
+      (word) => !taken.has(word),
+    );
+    if (
+      distinctive.some((word) =>
+        [word, `${word}s`, word.replace(/s$/u, "")].some((form) =>
+          said.includes(` ${form} `),
+        ),
+      )
+    ) {
+      partly.add(key);
+    }
+  }
+  return partly;
+}
+
 export function optionsNamedIn(
   journeyType: "founder" | "investor",
   step: { readonly stepKey: string; readonly configuration: unknown },
