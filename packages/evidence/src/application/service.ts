@@ -36,6 +36,7 @@ import {
 } from "./evidence-item-use-cases.js";
 import {
   createAdvanceVersionProcessingState,
+  createClassifyDocumentContent,
   createCompleteDocumentProcessing,
   createRegisterProcessingRun,
   createResolveProcessingTarget,
@@ -220,6 +221,10 @@ export type DocumentProcessingService = {
   >;
   /** ob2: an organisation's own unpaged document as text, from its artifact. */
   readonly readOwnDocumentText: ReturnType<typeof createReadOwnDocumentText>;
+  /** QA QO-23: an unclassified document filed by what it says. */
+  readonly classifyDocumentContent: ReturnType<
+    typeof createClassifyDocumentContent
+  >;
 };
 
 export type DocumentProcessingServiceOptions = Omit<
@@ -247,5 +252,6 @@ export function createDocumentProcessingService(
     findDocumentExtraction: createFindDocumentExtraction(dependencies),
     backfillDocumentPages: createBackfillDocumentPages(dependencies),
     readOwnDocumentText: createReadOwnDocumentText(dependencies),
+    classifyDocumentContent: createClassifyDocumentContent(dependencies),
   };
 }

@@ -33,10 +33,7 @@ import { QMark } from "@capital-q/ui/q-mark";
 import { QStateIndicator } from "@capital-q/ui/q-state";
 import { InlineNotice, Progress } from "@capital-q/ui/states";
 
-import {
-  classifyOnboardingUpload,
-  onboardingDocumentTreatment,
-} from "@capital-q/onboarding/documents";
+import { onboardingDocumentTreatment } from "@capital-q/onboarding/documents";
 
 import type { TaxonomyCandidateView } from "../onboarding-kit/client";
 import {
@@ -1500,8 +1497,6 @@ export function QOnboardingWorkspace({
     qSubject !== undefined && "companyId" in qSubject
       ? qSubject.companyId
       : undefined;
-  /** An upload whose name says nothing: the person says what it is first. */
-  const [askKind, setAskKind] = useState<File | null>(null);
   /**
    * QA F-49 (23 Oct 2026): a deck dropped in before the company is named
    * came back "We couldn't accept that file" (nothing to file it under yet).
@@ -1514,15 +1509,11 @@ export function QOnboardingWorkspace({
   } | null>(null);
   const uploadWhileTalking = useCallback(
     async (file: File, chosenType?: string) => {
-      // Lane ob1: filed by its name (never its bytes). Only a deck or a
-      // company or product profile is read during onboarding; anything
-      // else is private: acknowledged and recorded by its details only.
-      const documentType = chosenType ?? classifyOnboardingUpload(file.name);
-      if (documentType === "UNCLASSIFIED" && chosenType === undefined) {
-        setAskKind(file);
-        return;
-      }
-      setAskKind(null);
+      // QA QO-23: filed by what it says, never by its name. It goes up
+      // unclassified (unless they said what it is) and the reading files it
+      // from its opening pages. Only a deck or a company or product profile
+      // is then read during onboarding; anything else stays private.
+      const documentType = chosenType ?? "UNCLASSIFIED";
       if (qSubject === undefined) {
         waitingFile.current = { file, chosenType };
         setUploadNote(
@@ -1533,11 +1524,6 @@ export function QOnboardingWorkspace({
         else await say(held);
         return;
       }
-      const readable =
-        onboardingDocumentTreatment({
-          documentType,
-          sensitivityClass: "CONFIDENTIAL",
-        }) === "READ_FOR_COVERAGE";
       setUploadNote(`Uploading ${file.name}`);
       const target = await materialUploadTargetAction({
         ...(companyIdForUpload === undefined
@@ -1573,24 +1559,12 @@ export function QOnboardingWorkspace({
         setUploadNote(done.message);
         return;
       }
-      if (!readable) {
-        // Private material: never waited on, never read back. Q is told
-        // it arrived, by its name only, so it can say what is outstanding.
-        setUploadNote(null);
-        await actions.refresh();
-        const private_ = `I've just uploaded ${file.name}. It's a private document: just note that I've shared it, don't read it, and tell me what's still outstanding.`;
-        if (voiceActive) {
-          setUploadNote(`${file.name} is kept private.`);
-          setHeldUpload(private_);
-        } else {
-          await say(private_);
-        }
-        return;
-      }
       setUploadNote(`Reading ${file.name}`);
       // Wait for the reading to land (bounded), then let Q take it from there.
       const startedAt = Date.now();
       let ready = false;
+      /** What its reading filed it as (QA QO-23). */
+      let filedAs: string | undefined;
       while (Date.now() - startedAt < 120_000) {
         // Every second while a deck is usually read, then every three: Q
         // takes it up as soon as it lands, not up to 3 s after (owner
@@ -1603,6 +1577,7 @@ export function QOnboardingWorkspace({
         const item = listed.value.find((f) => f.id === done.value.documentId);
         if (item !== undefined && item.state === "ready") {
           ready = true;
+          filedAs = item.documentType;
           break;
         }
         if (item !== undefined && item.state === "unreadable") {
@@ -1612,9 +1587,21 @@ export function QOnboardingWorkspace({
       }
       setUploadNote(null);
       await actions.refresh();
-      const told = ready
-        ? `I've just uploaded ${file.name}. Read back what you found in it and check it with me.`
-        : `I've just uploaded ${file.name}; it's still being read. Say you're reading it now and will show what you found in a minute, then carry on.`;
+      const kind = filedAs ?? documentType;
+      const readable =
+        onboardingDocumentTreatment({
+          documentType: kind,
+          sensitivityClass: "CONFIDENTIAL",
+        }) === "READ_FOR_COVERAGE";
+      const told = !ready
+        ? `I've just uploaded ${file.name}; it's still being read. Say you're reading it now and will show what you found in a minute, then carry on.`
+        : readable
+          ? `I've just uploaded ${file.name}. Read back what you found in it and check it with me.`
+          : kind === "UNCLASSIFIED"
+            ? `I've just uploaded ${file.name}. Its first pages didn't make clear what kind of document it is, so it's kept private and not read: ask me what it is.`
+            : // Private material, by what it says: never read back. Q is
+              // told it arrived, by its name only.
+              `I've just uploaded ${file.name}. It's a private document: just note that I've shared it, don't read it, and tell me what's still outstanding.`;
       // Typed or spoken, Q hears about it the same way (founder
       // walkthrough F2): the upload is part of the conversation, not a
       // detour to the company page.
@@ -1623,7 +1610,11 @@ export function QOnboardingWorkspace({
         // over the line (founder live 2026-10-05: "it interrupts itself"):
         // it is shown in place, and the person's tap hands it to Q.
         setUploadNote(
-          ready ? `${file.name} is read.` : `${file.name} is still being read.`,
+          !ready
+            ? `${file.name} is still being read.`
+            : readable
+              ? `${file.name} is read.`
+              : `${file.name} is kept private.`,
         );
         setHeldUpload(told);
       } else {
@@ -1819,40 +1810,6 @@ export function QOnboardingWorkspace({
       ) : (
         <CoverageSummary coverage={coverage} />
       )}
-      {askKind === null ? null : (
-        <div
-          role="group"
-          aria-label={`What is ${askKind.name}?`}
-          className="flex flex-wrap items-center gap-2"
-          data-q-upload-kind
-        >
-          <span className="cq-body-sm text-(--cq-text-secondary)">
-            What is {askKind.name}?
-          </span>
-          <Button
-            size="compact"
-            variant="secondary"
-            onClick={() => void uploadWhileTalking(askKind, "PITCH_DECK")}
-          >
-            {t("Pitch deck")}
-          </Button>
-          <Button
-            size="compact"
-            variant="secondary"
-            onClick={() => void uploadWhileTalking(askKind, "COMPANY_PROFILE")}
-          >
-            {t("Company or product profile")}
-          </Button>
-          <Button
-            size="compact"
-            variant="quiet"
-            onClick={() => void uploadWhileTalking(askKind, "OTHER")}
-          >
-            {t("Something private")}
-          </Button>
-        </div>
-      )}
-
       <ol className="flex flex-col gap-4" aria-live="polite">
         {greeting === null ? null : (
           <QLine key="greeting" id="greeting" kind="Q" text={greeting} />

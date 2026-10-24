@@ -340,7 +340,6 @@ export {
 } from "./application/pending-writes.js";
 export { createPostgresPendingWriteRepository } from "./infrastructure/postgres-pending-write-repository.js";
 export {
-  classifyOnboardingUpload,
   ONBOARDING_READABLE_DOCUMENT_TYPES,
   onboardingDocumentTreatment,
   type OnboardingDocumentTreatment,

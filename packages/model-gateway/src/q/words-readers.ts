@@ -7,11 +7,14 @@ import type { Logger } from "@capital-q/observability";
 import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
+  DocumentKindReaderResultSchema,
   MeetingOutcomeReaderResultSchema,
   OnboardingMoveReaderResultSchema,
   PreferencePolarityResultSchema,
   renderPrompt,
   UtteranceCheckResultSchema,
+  type DocumentKind,
+  type DocumentKindReaderResult,
   type MeetingOutcomeReaderResult,
   type OnboardingMove,
   type OnboardingMoveReaderResult,
@@ -48,6 +51,17 @@ const CLASSIFY = {
   attemptTimeoutMs: 6_000,
 } as const;
 
+/**
+ * An upload's kind (QO-23): once per document, not per turn, and the
+ * opening pages are the input, so the ceiling is a cent rather than a
+ * third of one. Off the person's path: it runs while the file is read.
+ */
+const CLASSIFY_DOCUMENT = {
+  ...CLASSIFY,
+  maxEstimatedCostUsd: 0.01,
+  attemptTimeoutMs: 8_000,
+} as const;
+
 export type WordsReaders = {
   /** A setup reply's conversational move; null: not read. */
   readonly onboardingMove: (
@@ -80,6 +94,14 @@ export type WordsReaders = {
     who: WordsWho,
     input: { readonly question: string; readonly utterance: string },
   ) => Promise<UtteranceCheckResult["answer"] | null>;
+  /**
+   * What kind of document an upload is, from its opening text (QA QO-23);
+   * null: not read. UNSURE is a reading: the caller leaves it unclassified.
+   */
+  readonly documentKind: (
+    who: WordsWho,
+    input: { readonly filename: string; readonly opening: string },
+  ) => Promise<DocumentKind | null>;
 };
 
 export function createWordsReaders(dependencies: {
@@ -95,10 +117,12 @@ export function createWordsReaders(dependencies: {
       | "ONBOARDING_MOVE_READER"
       | "PREFERENCE_POLARITY"
       | "MEETING_OUTCOME_READER"
-      | "UTTERANCE_CHECK",
+      | "UTTERANCE_CHECK"
+      | "DOCUMENT_KIND_READER",
     who: WordsWho,
     variables: V,
     schema: z.ZodType<O>,
+    budget: typeof CLASSIFY | typeof CLASSIFY_DOCUMENT = CLASSIFY,
   ): Promise<O | null> {
     try {
       const rendered = renderPrompt<V>(registry, {
@@ -116,7 +140,7 @@ export function createWordsReaders(dependencies: {
           ...(dependencies.dataPosture === undefined
             ? {}
             : { dataPosture: dependencies.dataPosture }),
-          budget: CLASSIFY,
+          budget,
           messages: [...rendered.messages],
           output: rendered.output,
           attribution: {
@@ -219,6 +243,27 @@ export function createWordsReaders(dependencies: {
         UtteranceCheckResultSchema,
       );
       return result?.answer ?? null;
+    },
+
+    documentKind: async (who, input) => {
+      // Enough to tell a deck from accounts, and inside FAST_CLASSIFICATION's
+      // cost ceiling on a standard-priced model, not only the cheapest.
+      const opening = input.opening.trim().slice(0, 4_000);
+      if (opening.length === 0) return null;
+      const result = await read<
+        Record<string, unknown>,
+        DocumentKindReaderResult
+      >(
+        "DOCUMENT_KIND_READER",
+        who,
+        {
+          filename: input.filename.trim().slice(0, 255) || "untitled",
+          opening,
+        },
+        DocumentKindReaderResultSchema,
+        CLASSIFY_DOCUMENT,
+      );
+      return result?.kind ?? null;
     },
   };
 }

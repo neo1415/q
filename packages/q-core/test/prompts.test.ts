@@ -121,6 +121,8 @@ describe("registry", () => {
         "PREFERENCE_POLARITY",
         "MEETING_OUTCOME_READER",
         "UTTERANCE_CHECK",
+        // QA QO-23: an upload's kind from its opening pages.
+        "DOCUMENT_KIND_READER",
         // ADR 0012: what a conversation taught Q about the person.
         "MEMORY_EXTRACTOR",
         // Founder direction 2026-09-29: Q's notes on a call it attended.

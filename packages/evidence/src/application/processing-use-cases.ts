@@ -4,6 +4,7 @@ import {
   ContractValidationError,
   CausationIdSchema,
   CorrelationIdSchema,
+  DocumentTypeSchema,
 } from "@capital-q/contracts";
 import { TenantIdSchema } from "@capital-q/security";
 
@@ -23,6 +24,10 @@ import {
   DocumentNotFoundError,
   DocumentVersionNotFoundError,
 } from "../domain/errors.js";
+import {
+  defaultDocumentSensitivity,
+  strongestSensitivity,
+} from "../domain/sensitivity.js";
 import { documentReadyEvent } from "../events/index.js";
 import type { EvidenceProcessingDependencies } from "./dependencies.js";
 
@@ -389,6 +394,66 @@ export function createCompleteDocumentProcessing(
         ),
       );
       return { emitted: true };
+    });
+  };
+}
+
+const ClassifyDocumentContentInputSchema = z
+  .object({
+    tenantId: z.string().uuid(),
+    documentId: z.string().uuid(),
+    /** What its opening pages say it is. Never UNCLASSIFIED. */
+    documentType: DocumentTypeSchema.exclude(["UNCLASSIFIED"]),
+  })
+  .strict();
+export type ClassifyDocumentContentInput = z.input<
+  typeof ClassifyDocumentContentInputSchema
+>;
+
+/**
+ * QA QO-23: a document nobody classified is filed by what its opening pages
+ * say, before it is announced ready, so every reader of the ready event
+ * (onboarding's review, the deck reader) sees what it really is.
+ *
+ * Only an UNCLASSIFIED document is filed: a type a person chose is theirs
+ * and is never overwritten by a reading. Sensitivity only ever rises, to
+ * the new type's floor (management accounts become highly confidential and
+ * onboarding never reads them); it never falls. Sharing is untouched: a
+ * document filed as a deck stays visible to its organisation only until a
+ * person opens it to investors.
+ */
+export function createClassifyDocumentContent(
+  dependencies: EvidenceProcessingDependencies,
+) {
+  const { transactions, repositories } = dependencies;
+  return async (
+    input: ClassifyDocumentContentInput,
+  ): Promise<{ readonly filed: boolean }> => {
+    const parsed = ClassifyDocumentContentInputSchema.parse(input);
+    const tenantId = TenantIdSchema.parse(parsed.tenantId);
+    return transactions.run(async (tx) => {
+      const document = await (
+        repositories.documents.findForProcessing ??
+        repositories.documents.findInTenant
+      )(tx.sql, tenantId, parsed.documentId as never);
+      if (document === null) {
+        throw new DocumentNotFoundError();
+      }
+      if (document.documentType !== "UNCLASSIFIED") return { filed: false };
+      const filed = await repositories.documents.updateDetails(tx, {
+        tenantId,
+        documentId: document.id,
+        expectedVersion: document.version,
+        changes: {
+          documentType: parsed.documentType,
+          sensitivityClass: strongestSensitivity(
+            document.sensitivityClass,
+            defaultDocumentSensitivity(parsed.documentType),
+          ),
+        },
+      });
+      // A concurrent change (the person filed it themselves) wins.
+      return { filed };
     });
   };
 }

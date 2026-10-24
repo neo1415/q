@@ -1124,6 +1124,22 @@ const documents =
             outbox: createOutboxWriter({ registry }),
             storage,
           }),
+          // QA QO-23: an unclassified upload filed by what its opening
+          // pages say, on FAST_CLASSIFICATION; without a model it stays
+          // unclassified (never guessed from its name).
+          ...(modelProviders.length === 0
+            ? {}
+            : {
+                documentKind: (input) =>
+                  createWordsReaders({
+                    gateway: modelGateway,
+                    dataPosture: demoDataPosture,
+                    logger,
+                  }).documentKind(
+                    { tenantId: input.tenantId, userId: input.userId },
+                    { filename: input.filename, opening: input.opening },
+                  ),
+              }),
           storage,
           // Derived chunks are written by the same worker, after the
           // extraction is recorded and before the run completes.

@@ -111,6 +111,8 @@ export const PROMPT_IDS = [
   "PREFERENCE_POLARITY",
   "MEETING_OUTCOME_READER",
   "UTTERANCE_CHECK",
+  /** QA QO-23 2026-10-23: an upload's kind from its opening pages. */
+  "DOCUMENT_KIND_READER",
   /** Founder brief B4 2026-10-05 (ADR 0052): Q's view beside a computed fit. */
   "FIT_Q_VIEW",
   /** Overnight A5 2026-10-06: a pitch deck into the twelve standard sections. */
@@ -207,6 +209,7 @@ export const PROMPT_SLUGS: Readonly<Record<PromptId, string>> = {
   PREFERENCE_POLARITY: "preference-polarity",
   MEETING_OUTCOME_READER: "meeting-outcome-reader",
   UTTERANCE_CHECK: "utterance-check",
+  DOCUMENT_KIND_READER: "document-kind-reader",
   SMALL_TALK: "small-talk",
   CONVERSATION_RECALL: "conversation-recall",
   TURN_SKIM: "turn-skim",

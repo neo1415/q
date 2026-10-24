@@ -19,6 +19,8 @@ import { TaskFrameSchema } from "./common.js";
  *                            it out, would rather avoid it, or neither.
  *   MEETING_OUTCOME_READER   what a call's agreed lines say it led to.
  *   UTTERANCE_CHECK          one closed yes/no question about a sentence.
+ *   DOCUMENT_KIND_READER     what kind of document an upload is, from its
+ *                            opening pages (QA QO-23: never its file name).
  */
 
 // ---------------------------------------------------------------------------
@@ -164,3 +166,59 @@ export const UtteranceCheckResultSchema = z
   .object({ answer: z.enum(["YES", "NO", "UNSURE"]) })
   .strict();
 export type UtteranceCheckResult = z.infer<typeof UtteranceCheckResultSchema>;
+
+// ---------------------------------------------------------------------------
+// DOCUMENT_KIND_READER
+// ---------------------------------------------------------------------------
+
+export const DOCUMENT_KIND_READER_SCHEMA_NAME = "DocumentKindReaderResult";
+export const DOCUMENT_KIND_READER_SCHEMA_VERSION = 1;
+
+/**
+ * What an upload is, by what it says (QA QO-23, 23 Oct 2026: a deck named
+ * "kiln-payroll-deck.pdf" was filed as management accounts by a file-name
+ * word list and never read). The kinds are Capital Q's document types, so
+ * code maps a reading straight onto the record; UNSURE leaves it
+ * unclassified, which nothing reads during setup.
+ */
+export const DOCUMENT_KINDS = [
+  "PITCH_DECK",
+  "COMPANY_PROFILE",
+  "PRODUCT",
+  "FINANCIAL_MODEL",
+  "MANAGEMENT_ACCOUNTS",
+  "FINANCIAL",
+  "LEGAL",
+  "CORPORATE",
+  "GOVERNANCE",
+  "COMMERCIAL",
+  "CUSTOMER",
+  "OPERATIONAL",
+  "FUND_DECK",
+  "INVESTMENT_THESIS",
+  "LP_LETTER",
+  "OTHER",
+  "UNSURE",
+] as const;
+export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
+
+export const DocumentKindReaderVariablesSchema = z
+  .object({
+    ...TaskFrameSchema,
+    /** The uploaded file's name. UNTRUSTED, and only a hint. */
+    filename: z.string().trim().min(1).max(255),
+    /** The document's opening text, as extracted. UNTRUSTED. */
+    opening: z.string().trim().min(1).max(8_000),
+  })
+  .strict();
+export type DocumentKindReaderVariables = z.infer<
+  typeof DocumentKindReaderVariablesSchema
+>;
+export const DOCUMENT_KIND_READER_UNTRUSTED = ["filename", "opening"] as const;
+
+export const DocumentKindReaderResultSchema = z
+  .object({ kind: z.enum(DOCUMENT_KINDS) })
+  .strict();
+export type DocumentKindReaderResult = z.infer<
+  typeof DocumentKindReaderResultSchema
+>;

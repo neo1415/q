@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  classifyOnboardingUpload,
   drainPendingWrites,
   isTransientOnboardingFailure,
   onboardingDocumentTreatment,
@@ -68,29 +67,6 @@ describe("documents during onboarding (ob1)", () => {
         sensitivityClass: "HIGHLY_CONFIDENTIAL",
       }),
     ).toBe("METADATA_ONLY");
-  });
-
-  it("files uploads by name; sensitive names win over deck names; silence is unclassified", () => {
-    expect(classifyOnboardingUpload("Harbourline Seed Deck v3.pdf")).toBe(
-      "PITCH_DECK",
-    );
-    expect(classifyOnboardingUpload("harbourline_one-pager.pdf")).toBe(
-      "COMPANY_PROFILE",
-    );
-    expect(
-      classifyOnboardingUpload("Deck appendix - management accounts 2025.xlsx"),
-    ).toBe("MANAGEMENT_ACCOUNTS");
-    expect(classifyOnboardingUpload("Cap table Oct.xlsx")).toBe("CORPORATE");
-    expect(classifyOnboardingUpload("Shareholders Agreement.pdf")).toBe(
-      "CORPORATE",
-    );
-    expect(classifyOnboardingUpload("Customer contract - Dangote.pdf")).toBe(
-      "LEGAL",
-    );
-    expect(classifyOnboardingUpload("FY26 financial model.xlsx")).toBe(
-      "FINANCIAL_MODEL",
-    );
-    expect(classifyOnboardingUpload("scan_0042.pdf")).toBe("UNCLASSIFIED");
   });
 });
 

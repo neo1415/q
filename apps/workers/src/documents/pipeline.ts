@@ -4,9 +4,11 @@ import {
   CausationIdSchema,
   CorrelationIdSchema,
   createJobSchema,
+  DocumentTypeSchema,
 } from "@capital-q/contracts";
 import type {
   DocumentProcessingService,
+  ExtractedBlock,
   PrivateDocumentStorageProvider,
 } from "@capital-q/evidence";
 import { ProcessDocumentJob } from "@capital-q/evidence/jobs";
@@ -67,8 +69,47 @@ export type DocumentChunkingPort = {
   ) => Promise<BuildChunkSetResult>;
 };
 
+/**
+ * QA QO-23: what kind of document an unclassified upload is, read from its
+ * opening text by a small governed model call (never its file name). Null
+ * or UNSURE leaves it unclassified, which onboarding does not read.
+ */
+export type DocumentKindPort = (input: {
+  readonly tenantId: string;
+  readonly userId: string | null;
+  readonly filename: string;
+  readonly opening: string;
+}) => Promise<string | null>;
+
+/** The opening text the kind is read from: enough to tell, and no more. */
+const OPENING_CHARACTERS = 4_000;
+
+export function openingTextOf(blocks: readonly ExtractedBlock[]): string {
+  const parts: string[] = [];
+  let length = 0;
+  for (const block of blocks) {
+    const text =
+      block.kind === "list"
+        ? block.items.join("\n")
+        : block.kind === "table" || block.kind === "spreadsheet_range"
+          ? block.rows.map((row) => row.join(" | ")).join("\n")
+          : block.kind === "slide"
+            ? [block.title ?? "", block.text].join("\n")
+            : block.kind === "page_break"
+              ? ""
+              : block.text;
+    if (text.trim().length === 0) continue;
+    parts.push(text.trim());
+    length += text.length + 1;
+    if (length >= OPENING_CHARACTERS) break;
+  }
+  return parts.join("\n").slice(0, OPENING_CHARACTERS);
+}
+
 export type DocumentPipelineOptions = {
   readonly evidence: DocumentProcessingService;
+  /** QA QO-23: files an unclassified upload by its content; absent: not filed. */
+  readonly documentKind?: DocumentKindPort | undefined;
   readonly storage: PrivateDocumentStorageProvider;
   readonly scanner: MalwareScanner;
   readonly malwarePolicy: MalwarePolicy;
@@ -418,6 +459,54 @@ export function createDocumentProcessingPipeline(
         },
         "document chunk set settled",
       );
+    }
+
+    // --- Filed by what it says (QA QO-23) ----------------------------------
+    // Before the document is announced ready, so every reader of the ready
+    // event sees its real kind. Only an organisation's unclassified document
+    // the uploader did not mark highly confidential: a type a person chose is
+    // theirs, and what they marked as highly confidential no model reads. A
+    // reading that fails leaves it unclassified; it never fails the job.
+    if (
+      options.documentKind !== undefined &&
+      document.documentType === "UNCLASSIFIED" &&
+      document.ownerOrganisationId !== null &&
+      document.sensitivityClass !== "HIGHLY_CONFIDENTIAL" &&
+      document.sensitivityClass !== "RESTRICTED"
+    ) {
+      const opening = openingTextOf(result.output.blocks);
+      if (opening.trim().length > 0) {
+        try {
+          const kind = DocumentTypeSchema.exclude(["UNCLASSIFIED"]).safeParse(
+            await options.documentKind({
+              tenantId,
+              userId: document.createdByUserId,
+              filename: version.originalFilename,
+              opening,
+            }),
+          );
+          if (kind.success) {
+            const { filed } = await evidence.classifyDocumentContent({
+              tenantId,
+              documentId: document.id,
+              documentType: kind.data,
+            });
+            logger.info(
+              { msgId: message.msgId, runId: run.id, kind: kind.data, filed },
+              "document filed by its content",
+            );
+          }
+        } catch (error: unknown) {
+          logger.warn(
+            {
+              msgId: message.msgId,
+              runId: run.id,
+              failure: error instanceof Error ? error.name : "unknown",
+            },
+            "document kind not read; left unclassified",
+          );
+        }
+      }
     }
 
     const correlationId = CorrelationIdSchema.parse(
