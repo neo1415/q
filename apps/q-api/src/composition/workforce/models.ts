@@ -509,13 +509,17 @@ export function createWorkforceModels(dependencies: {
       );
       if (result === null) return null;
       const draft = result.output;
+      const sections = draft.sections.filter(
+        (section) => section.heading !== "" && section.body !== "",
+      );
+      if (sections.length === 0) return null;
       return {
         costUsd: result.costUsd,
         output: {
           title: draft.title.slice(0, 150),
           summary: draft.summary.slice(0, 600),
           // Long bodies are kept whole: the filed document splits them.
-          sections: draft.sections.slice(0, 16).map((section) => ({
+          sections: sections.slice(0, 16).map((section) => ({
             heading: section.heading.slice(0, 120),
             body: section.body,
           })),

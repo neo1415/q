@@ -304,7 +304,7 @@ export const ResearchFactsResultV2Schema = z.object({
     .array(
       z.object({
         statement: z.string().trim().min(1).max(800),
-        figure: z.string().trim().min(1).max(200).nullable().catch(null),
+        figure: z.string().trim().min(1).max(400).nullable().catch(null),
         asOf: z.string().trim().min(1).max(120).nullable().catch(null),
         source: z.number().int().min(1).max(500),
         kind: z.enum(RESEARCH_FACT_KINDS).catch("FACT"),
@@ -321,12 +321,14 @@ export type ResearchFactsResultV2 = z.infer<typeof ResearchFactsResultV2Schema>;
 export const ANALYSIS_WRITE_V3_SCHEMA_VERSION = 3;
 export const AnalysisDocumentResultV3Schema = z.object({
   title: z.string().trim().min(1).max(400),
-  summary: z.string().trim().min(1).max(2_000),
+  summary: z.string().trim().min(1).max(6_000),
+  // An empty heading or body (live: sections.3.body too_small) costs that
+  // section alone: code drops it, never the draft.
   sections: z
     .array(
       z.object({
-        heading: z.string().trim().min(1).max(300),
-        body: z.string().trim().min(1).max(16_000),
+        heading: z.string().trim().max(300).catch(""),
+        body: z.string().trim().max(40_000).catch(""),
       }),
     )
     .min(3)

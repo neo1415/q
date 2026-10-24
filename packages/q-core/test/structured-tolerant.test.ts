@@ -141,6 +141,79 @@ describe("tolerant deep-work results", () => {
     if (parsed.success) expect(parsed.data.issues[0]?.kind).toBe("GENERIC");
   });
 
+  // The exact paths q-api logged as refused, 14:56-14:58 UTC on 9ff4a1118.
+  it("accepts each path refused live", () => {
+    const longKey =
+      "research_the_west_africa_logistics_market_and_comparable_seed_rounds_for_the_portfolio";
+    const step = (key: string, extra: Record<string, unknown>) => ({
+      key,
+      role: "RESEARCH",
+      goal: "Learn the market",
+      tools: ["public_web.search"],
+      dependsOn: [],
+      why: "Evidence first.",
+      evidence: [],
+      ...extra,
+    });
+    const plan = {
+      summary: "Review the portfolio",
+      outcome: "A review.",
+      steps: [
+        // steps.0.key (too long, off-format); steps.0.fallbackFor missing
+        step(`${longKey} (Phase-1)`, {}),
+        // steps.1.dependsOn.0 too_big; steps.1.fallbackFor:invalid_type
+        step("Write review", {
+          dependsOn: [`${longKey} (Phase-1)`],
+          fallbackFor: 0,
+        }),
+      ],
+    };
+    expect(JobPlanResultV9Schema.safeParse(plan).success).toBe(false);
+    const parsed = JobPlanResultV10Schema.safeParse(plan);
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    const normal = normalisePlanV10(parsed.data);
+    expect(normal.steps).toHaveLength(2);
+    expect(normal.steps[1]?.dependsOn).toEqual([normal.steps[0]?.key]);
+    expect(normal.steps[1]?.fallbackFor).toBeNull();
+    expect(JobPlanResultV9Schema.safeParse(normal).success).toBe(true);
+
+    // facts.0.figure too_big; facts.1.kind invalid_value
+    const facts = ResearchFactsResultV2Schema.safeParse({
+      facts: [
+        {
+          statement: "a",
+          figure: "f".repeat(1_000),
+          asOf: null,
+          source: 1,
+          kind: "FIGURE",
+        },
+        { statement: "b", figure: null, asOf: null, source: 2, kind: "OTHER" },
+      ],
+      followUps: [],
+    });
+    expect(facts.success).toBe(true);
+    if (facts.success) {
+      expect(facts.data.facts).toHaveLength(2);
+      expect(facts.data.facts[0]?.figure).toBeNull();
+      expect(facts.data.facts[1]?.kind).toBe("FACT");
+    }
+
+    // summary too_big; sections.3.body too_small
+    const draft = AnalysisDocumentResultV3Schema.safeParse({
+      title: "Portfolio review",
+      summary: "s".repeat(4_000),
+      sections: [1, 2, 3, 4].map((n) => ({
+        heading: `Section ${String(n)}`,
+        body: n === 4 ? "" : "body",
+      })),
+      topRecommendations: ["a"],
+      gaps: [],
+    });
+    expect(draft.success).toBe(true);
+    if (draft.success) expect(draft.data.sections[3]?.body).toBe("");
+  });
+
   it("still refuses an answer without its core", () => {
     expect(JobPlanResultV10Schema.safeParse({ summary: "x" }).success).toBe(
       false,

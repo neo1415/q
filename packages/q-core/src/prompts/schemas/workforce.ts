@@ -644,7 +644,9 @@ export type JobPlanResultV9Input = z.input<typeof JobPlanResultV9Schema>;
  * by the gateway and the plan replanned by code, never run.
  */
 export const JOB_PLAN_V10_SCHEMA_VERSION = 10;
-const LooseKey = z.string().trim().min(1).max(60);
+// Live 14:56-14:57 refusals: steps.N.key and steps.N.dependsOn.0 too long or
+// off-format (the model writes descriptive keys). planKey makes them keys.
+const LooseKey = z.string().trim().min(1).max(240);
 const LooseRefs = z.array(z.string().trim().max(120)).max(12).catch([]);
 export const JobPlanResultV10Schema = z.object({
   summary: z.string().trim().min(1).max(800),
