@@ -573,3 +573,52 @@ describe("QO-29: once the essentials are in, making the mandate live is asked ne
     expect(world.recordedValue("I11.review")).toBeUndefined();
   });
 });
+
+describe("QO-25: a role is their role now", () => {
+  const role = async (
+    said: string,
+    check: () => Promise<"YES" | "NO" | "UNSURE" | null>,
+  ) => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F4.founder_role",
+      recorded: {
+        "F0.intent": "raising_now",
+        "F1.company_name": "Kiln Payroll (fictional)",
+      },
+    });
+    const turnModel = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                { stepKey: "F4.founder_role", value: "product", quote: said },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted." },
+    ]);
+    await createInterviewAgent({
+      gateway: turnModel.gateway,
+      firewall: firewall(),
+      logger,
+      wordsCheck: check,
+    }).turn({ ...turn(world, said), actor });
+    return world.recordedValue("F4.founder_role");
+  };
+
+  it("a past job is not saved as their role; a current one is", async () => {
+    expect(
+      await role("I was a product lead at Paystack.", () =>
+        Promise.resolve("NO"),
+      ),
+    ).toBeUndefined();
+    expect(
+      await role("I lead product here.", () => Promise.resolve("YES")),
+    ).toEqual({ type: "SINGLE_SELECT", optionKey: "cpo" });
+  });
+});

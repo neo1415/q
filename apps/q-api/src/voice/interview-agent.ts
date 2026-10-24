@@ -757,6 +757,9 @@ export function turnNotesFor(input: {
   }
   // Every turn: the registry's view of what Q does beyond this loop.
   notes.push(ELSEWHERE_NOTE);
+  // QA QO-30 (23 Oct): "Your exclusions are set aside, and the handoff
+  // still needs an explicit yes": the state's own words, said to them.
+  notes.push(PLAIN_WORDS_NOTE);
   // Fitted to the prompt's budget in order: a note that does not fit is
   // left out whole rather than cut mid-sentence, the first one excepted.
   let fitted = "";
@@ -767,6 +770,10 @@ export function turnNotesFor(input: {
   }
   return fitted;
 }
+
+/** Q speaks in their terms, never in its state's. */
+const PLAIN_WORDS_NOTE =
+  "Say things in their terms: never the state's own words (a status such as set aside, held or open, a step's name such as review or handoff, a step key). Say what it means for them: what is saved, what is skipped, what you need from them next.";
 
 /** The firm the investor named, or the one they typed at sign-up. */
 /** A text answer on the record, or "" when there is none. */
