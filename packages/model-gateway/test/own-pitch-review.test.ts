@@ -21,8 +21,10 @@ import {
   createStaticModelCatalog,
 } from "../src/index.js";
 import { createModelGatewayQAnswer } from "../src/q/index.js";
+import { withoutInternalFailureLines } from "../src/q/internal-failure-lines.js";
 import {
   asksAboutOwnPitch,
+  asksOnlyToReviewOwnPitch,
   ownPitchReviewFact,
 } from "../src/q/own-pitch-review.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
@@ -75,21 +77,36 @@ const PITCHES = {
   evidenceStatus: "SELF_REPORTED",
 };
 
-function build(said: string) {
-  const alpha = createFakeModelProvider({
-    code: "alpha",
-    script: [
-      {
-        kind: "TEXT",
-        text: JSON.stringify({
-          answer:
-            "Your opening names the kiosks by 0:06; lead with the litre price.",
-          responseShape: "CONCISE",
-          insufficientEvidence: false,
-        }),
-      },
-    ],
-  });
+const REVISE_TOOL: QOfferedTool = {
+  toolName: "artifact.revise",
+  toolVersion: 1,
+  classification: "PREPARES_ACTION",
+  definition: {
+    name: "revise_my_document",
+    description: "Changes a document Q prepared for the person.",
+    inputJsonSchema: { type: "object", properties: {} },
+  },
+  visibleStage: "PREPARING_DOCUMENT",
+} as unknown as QOfferedTool;
+
+const analystText = (answer: string) => ({
+  kind: "TEXT" as const,
+  text: JSON.stringify({
+    answer,
+    responseShape: "CONCISE",
+    insufficientEvidence: false,
+  }),
+});
+
+function build(
+  said: string,
+  script: Parameters<typeof createFakeModelProvider>[0]["script"] = [
+    analystText(
+      "Your opening names the kiosks by 0:06; lead with the litre price.",
+    ),
+  ],
+) {
+  const alpha = createFakeModelProvider({ code: "alpha", script });
   const gateway = createModelGateway({
     catalog: createStaticModelCatalog(
       testCatalog((s) => ({
@@ -114,8 +131,9 @@ function build(said: string) {
     } as unknown as QConversationMessage,
   ];
   const executed: { name: string; arguments: unknown }[] = [];
+  const persisted: string[] = [];
   const tools: QToolPort = {
-    offer: () => Promise.resolve([PITCHES_TOOL]),
+    offer: () => Promise.resolve([PITCHES_TOOL, REVISE_TOOL]),
     execute: (proposal) => {
       executed.push({ name: proposal.name, arguments: proposal.arguments });
       return Promise.resolve({
@@ -135,13 +153,15 @@ function build(said: string) {
     messages: {
       listForRun: () => Promise.resolve([...messages]),
       listRecentForConversationOfRun: () => Promise.resolve([...messages]),
-      insert: (_tx: unknown, input: { content: string }) =>
-        Promise.resolve({
+      insert: (_tx: unknown, input: { content: string }) => {
+        persisted.push(input.content);
+        return Promise.resolve({
           ...messages[0],
           id: randomUUID(),
           role: "Q",
           content: input.content,
-        } as QConversationMessage),
+        } as QConversationMessage);
+      },
       findById: () => Promise.resolve(null),
     },
     runs: { allocateEventSequence: () => Promise.resolve(2) },
@@ -187,7 +207,7 @@ function build(said: string) {
       maxSensitivity: "NETWORK_VISIBLE",
     } as unknown as PermittedContextPlan,
   } as unknown as QAnswerRequest;
-  return { seam, request, alpha, executed };
+  return { seam, request, alpha, executed, persisted };
 }
 
 const promptOf = (alpha: ReturnType<typeof build>["alpha"]): string =>
@@ -247,5 +267,57 @@ describe("ownPitchReviewFact", () => {
   it("is nothing with no pitch", () => {
     expect(ownPitchReviewFact({ pitches: [] })).toBeNull();
     expect(ownPitchReviewFact(null)).toBeNull();
+  });
+});
+
+describe("QA F-107: a pitch review never becomes a document revision", () => {
+  it("refuses revise_my_document in the live ask, and says no internal failure", async () => {
+    const { seam, request, executed, persisted } = build(LIVE_ASK, [
+      {
+        kind: "TOOL_CALLS",
+        calls: [
+          {
+            callId: "revise",
+            name: "revise_my_document",
+            arguments: { artifactId: "deck", instructions: "tighten" },
+          },
+        ],
+      },
+      analystText(
+        "I couldn't revise the pitch deck because the first document reference was invalid. Open with the problem at 0:00, then the 96 kiosks.",
+      ),
+    ]);
+    await seam.answer(request);
+    expect(executed.map(({ name }) => name)).not.toContain(
+      "revise_my_document",
+    );
+    const said = persisted.join("\n");
+    expect(said).not.toMatch(/document reference/iu);
+    expect(said).toContain("Open with the problem at 0:00");
+  });
+
+  it("a change to a document they ask for is not refused", () => {
+    expect(asksOnlyToReviewOwnPitch(LIVE_ASK)).toBe(true);
+    expect(
+      asksOnlyToReviewOwnPitch("Rewrite my pitch deck from my pitch video"),
+    ).toBe(false);
+  });
+});
+
+describe("withoutInternalFailureLines", () => {
+  it("drops a sentence that reports a tool failure in system words", () => {
+    expect(
+      withoutInternalFailureLines(
+        "I couldn't revise it because the first document reference was invalid. Lead with the problem.",
+      ),
+    ).toBe("Lead with the problem.");
+  });
+  it("keeps everything when nothing reports one, or when all of it does", () => {
+    expect(withoutInternalFailureLines("Lead with the problem.")).toBe(
+      "Lead with the problem.",
+    );
+    expect(withoutInternalFailureLines("The tool call failed.")).toBe(
+      "The tool call failed.",
+    );
   });
 });
