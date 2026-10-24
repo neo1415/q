@@ -72,10 +72,12 @@ function claimLine(claim: ReadinessClaimInput): ReadinessEvidenceLine {
     truthClass: claim.truthClass,
     evidenceStatus: claim.evidenceStatus,
     note:
-      claim.lifecycleStatus === "CURRENT"
-        ? null
-        : claim.lifecycleStatus.toLowerCase(),
-    ref: { kind: "CLAIM", claimId: claim.id },
+      claim.stated === true
+        ? "You told Q this; not yet confirmed"
+        : claim.lifecycleStatus === "CURRENT"
+          ? null
+          : claim.lifecycleStatus.toLowerCase(),
+    ref: claim.stated === true ? null : { kind: "CLAIM", claimId: claim.id },
   };
 }
 
@@ -238,6 +240,12 @@ function base(
   inputs: ReadinessInputs,
 ): SignalResult | null {
   const { team, profile, verification, raise } = inputs;
+  const raiseState: SignalState =
+    raise?.stated === true ? "STATED" : "EVIDENCED";
+  const raiseNote =
+    raise?.stated === true
+      ? "You told Q this; not yet confirmed as your raise"
+      : "Your raise";
   const byType = (types: readonly string[]) =>
     inputs.claims.filter((claim) => types.includes(claim.claimType));
   switch (signal) {
@@ -366,26 +374,27 @@ function base(
       );
     }
     case "raise.target":
-      // The company's own decision, recorded: nothing to evidence.
+      // The company's own decision, recorded: nothing to evidence. Told
+      // in setup but not confirmed yet: stated, and said so (QO-38).
       return raise === null
         ? { state: "MISSING", evidence: [] }
         : {
-            state: "EVIDENCED",
+            state: raiseState,
             evidence: [
-              recordLine(`Target ${raise.target}`, "RAISE", "Your raise"),
+              recordLine(`Target ${raise.target}`, "RAISE", raiseNote),
             ],
           };
     case "raise.use_of_funds":
       return raise?.useOfFunds === true
         ? {
-            state: "EVIDENCED",
-            evidence: [recordLine("Use of funds", "RAISE", "Your raise")],
+            state: raiseState,
+            evidence: [recordLine("Use of funds", "RAISE", raiseNote)],
           }
         : { state: "MISSING", evidence: [] };
     case "raise.terms":
       return raise !== null && (raise.instrument || raise.valuation)
         ? {
-            state: "EVIDENCED",
+            state: raiseState,
             evidence: [
               recordLine(
                 [
@@ -395,7 +404,7 @@ function base(
                   .filter((part) => part !== null)
                   .join(" and "),
                 "RAISE",
-                "Your raise",
+                raiseNote,
               ),
             ],
           }

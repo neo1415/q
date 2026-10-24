@@ -245,7 +245,9 @@ describe("F-52: a new investor's first answer is never lost to the firm not bein
 
     // Before turn two's own answer, the model was told what is kept and
     // why (never "a service is unavailable"), so it asks none of it again.
-    expect(second.seen[0]).toContain("their firm or company is not set up yet");
+    expect(second.seen[0]).toContain(
+      "NOT saved yet because another answer comes first",
+    );
     expect(second.seen[0]).not.toContain("briefly unavailable");
     expect(world.recordedValue("I0.investor_type")).toBeDefined();
     expect(world.recordedValue("I0.organisation_name")).toEqual({
@@ -323,6 +325,76 @@ describe("F-52: an answer kept early never overwrites a newer one", () => {
     expect(world.recordedValue("I2.stages")).toEqual({
       type: "MULTI_SELECT",
       optionKeys: ["pre_seed"],
+    });
+    expect(repository.rows().filter((r) => r.status === "PENDING")).toEqual([]);
+  });
+});
+
+describe("QO-26: a raise amount said before the raise question is saved, not asked again", () => {
+  it("keeps it in their notes and held, then saves it to the amount the turn the step opens", async () => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F1.description",
+      recorded: {
+        "F0.intent": "raising_now",
+        "F1.company_name": "Kiln Payroll (fictional)",
+      },
+      // The journey's branching: the amount opens once they say they raise.
+      opensAfter: { "F6.target_amount": "F6.raising" },
+    });
+    const repository = memoryPendingWrites();
+    let keys = 0;
+    const store = createHeldWritesStore({
+      sql: {} as never,
+      repository,
+      newKey: () =>
+        `30000000-0000-4000-8000-${String(++keys).padStart(12, "0")}`,
+    });
+    const say = (
+      answers: readonly { stepKey: string; value: unknown; quote: string }[],
+    ) =>
+      model([
+        { calls: [{ name: "record_answers", arguments: { answers } }] },
+        { reply: "Noted." },
+      ]);
+    const first = say([
+      {
+        stepKey: "F6.target_amount",
+        value: 1_500_000,
+        quote: "$1.5 million on a SAFE",
+      },
+    ]);
+    await createInterviewAgent({
+      gateway: first.gateway,
+      firewall: firewall(),
+      logger,
+      heldWrites: store,
+    }).turn({
+      ...turn(world, "We're putting together $1.5 million on a SAFE."),
+      actor,
+    });
+    expect(world.recordedValue("F6.target_amount")).toBeUndefined();
+    const notes = world.recordedValue("F7.follow_up");
+    expect(notes?.type === "TEXT" ? notes.text : "").toContain("1.5");
+    expect(
+      repository
+        .rows()
+        .filter((r) => r.status === "PENDING")
+        .map((r) => r.stepKey),
+    ).toEqual(["F6.target_amount"]);
+
+    const second = say([
+      { stepKey: "F6.raising", value: "active", quote: "yes, actively" },
+    ]);
+    await createInterviewAgent({
+      gateway: second.gateway,
+      firewall: firewall(),
+      logger,
+      heldWrites: store,
+    }).turn({ ...turn(world, "Yes, actively raising."), actor });
+    expect(world.recordedValue("F6.target_amount")).toEqual({
+      type: "RANGE",
+      value: "1500000",
     });
     expect(repository.rows().filter((r) => r.status === "PENDING")).toEqual([]);
   });
