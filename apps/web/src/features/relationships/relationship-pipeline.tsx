@@ -34,6 +34,7 @@ import {
   pipelinePresentedRows,
 } from "./pipeline-presentation";
 import { STATE_WORDS } from "./relationship-words";
+import { StageStrip } from "./stage-strip";
 import {
   DEFAULT_PIPELINE_PREFERENCES,
   pipelineHref,
@@ -533,6 +534,11 @@ export function RelationshipPipeline({
       </div>
 
       <div ref={stateRef}>
+        {overview === null || overview === undefined ? null : (
+          <div className="mb-3">
+            <StageStrip counts={overview.counts} needsYou={needsCount} />
+          </div>
+        )}
         <StateChips label={t("Relationship state")} chips={chips} />
       </div>
 

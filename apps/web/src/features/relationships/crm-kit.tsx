@@ -217,7 +217,7 @@ const TAG_TONE: Readonly<Record<TagTone, string>> = {
   dash: "border border-dashed border-(--cq-border) text-(--cq-text-tertiary)",
 };
 
-const STATE_STATUS: Readonly<Record<RelationshipStateV2, StatusTone>> = {
+export const STATE_STATUS: Readonly<Record<RelationshipStateV2, StatusTone>> = {
   INVESTED: "done",
   IN_DILIGENCE: "active",
   MEETING_HELD: "active",
