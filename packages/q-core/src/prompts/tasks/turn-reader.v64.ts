@@ -51,7 +51,7 @@ export const TURN_READER_V64: PromptDefinition<
 > = {
   ...TURN_READER_V63,
   version: 64,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QA F-98 (live 2026-10-24): v63 plus REFERENCE open REHEARSAL -- they ask to rehearse, practise or role-play a meeting, call or pitch with one named investor, company or person, by meaning in any language -- and the MEETING PREP rule says rehearsing is not preparing (meetingPrep null). Code opens the rehearsal through open_page. Also: anyone's 'my pipeline' is the CRM relationships pipeline by meaning -- to see it is NAVIGATE CRM_PIPELINE, a question about it is about the pipeline, never capital, compare or fit (coordinator 2026-10-24).",
   effectiveFrom: "2026-10-24",

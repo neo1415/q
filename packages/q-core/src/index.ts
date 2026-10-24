@@ -1816,6 +1816,10 @@ export {
   V64_REHEARSE_IS_NOT_PREP,
   V64_MY_PIPELINE,
 } from "./prompts/tasks/turn-reader.v64.js";
+export {
+  TURN_READER_V65,
+  V65_CHOICE_IS_COMPARE,
+} from "./prompts/tasks/turn-reader.v65.js";
 export { TURN_SKIM_V5, V5_COMPOUND_FIT } from "./prompts/tasks/turn-skim.v5.js";
 export { TURN_SKIM_V6, V6_SUBJECT } from "./prompts/tasks/turn-skim.v6.js";
 export { TURN_SKIM_V7, V7_WRITES } from "./prompts/tasks/turn-skim.v7.js";
