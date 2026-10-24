@@ -16,7 +16,7 @@ import type {
 } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
-import { createSpecialistQAnswer } from "../src/answer.js";
+import { createSpecialistQAnswer, type BoardKeeper } from "../src/answer.js";
 import type { QSpeculationEvent } from "../src/speculation.js";
 
 /**
@@ -134,6 +134,8 @@ function seam(options: {
   readonly firstSentenceMs?: number;
   /** The early skim, when one is composed. */
   readonly skim?: TurnSkimResult | null;
+  /** Their own work board. */
+  readonly board?: BoardKeeper;
 }) {
   const message: QConversationMessage = {
     id: randomUUID() as QConversationMessage["id"],
@@ -206,6 +208,7 @@ function seam(options: {
     sql: {} as never,
     transactions: { run: (work) => work({} as never) },
     turns,
+    ...(options.board === undefined ? {} : { board: options.board }),
     ...(options.skim === undefined
       ? {}
       : {
@@ -421,5 +424,63 @@ describe("time to Q's first spoken words with speculation (fakes, latency2)", ()
       speculate: true,
     });
     expect(after).toBe(800);
+  });
+});
+
+/**
+ * F-76 (QA, voice-http, live 6b05d53a4): spoken "What's on my board?"
+ * was answered by the speculative answer with the approvals waiting, and
+ * "Add … to my board" heard "Reading Ledgerfold's profile" and added
+ * nothing. A spoken board ask takes the typed path: no speculation, no
+ * holding line about someone, the board itself.
+ */
+describe("a spoken board ask takes the board's own path", () => {
+  function board() {
+    const added: { kind: string; title: string }[] = [];
+    const keeper: BoardKeeper = {
+      list: () =>
+        Promise.resolve({
+          items: [{ title: "Call prep: Anchor", status: "TODO" as const }],
+        }),
+      add: (_actor, item) => {
+        added.push(item);
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    return { keeper, added };
+  }
+
+  it("'What's on my board?' is read from the board; nothing speculative is asked or said", async () => {
+    const { keeper } = board();
+    const run = seam({
+      said: "What's on my board?",
+      reading: QUESTION,
+      board: keeper,
+    });
+    await run.answer.answer(request());
+    expect(run.calls).toHaveLength(0);
+    expect(run.heard).toEqual([]);
+    expect(run.stored).toEqual([
+      "Here's your board.\n\n**To do** (1): Call prep: Anchor.",
+    ]);
+  });
+
+  it("'Add review Basketari's repeat order data to my board' adds it, with no holding line about anyone", async () => {
+    const { keeper, added } = board();
+    const run = seam({
+      said: "Add review Basketari's repeat order data to my board",
+      reading: { ...QUESTION, kind: "TOOL_REQUEST", question: null },
+      board: keeper,
+      skim: {
+        kind: "OTHER",
+        subject: { name: "Ledgerfold" },
+      } as unknown as TurnSkimResult,
+    });
+    await run.answer.answer(request());
+    expect(run.calls).toHaveLength(0);
+    expect(added).toEqual([
+      { kind: "TASK", title: "review Basketari's repeat order data" },
+    ]);
+    expect(run.stored.join(" ")).not.toMatch(/Ledgerfold/u);
   });
 });

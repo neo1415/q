@@ -4498,6 +4498,8 @@ export function createSpecialistQAnswer(
       (request.plan.viewing !== undefined ||
         !request.subjects.some((subject) => subject.kind === "COMPANY")) &&
       !namesWebAddress(latest.content) &&
+      // F-76: their own board is answered from the board, never guessed.
+      !mentionsOwnBoard(latest.content) &&
       request.plan.screen?.route !== "ONBOARDING" &&
       !sequences.has(conversationId);
     const startSpoken = (): void => {
@@ -4642,6 +4644,9 @@ export function createSpecialistQAnswer(
             skimmed?.subject?.name ??
             (skimmed?.kind === "PERSON_SEARCH" ? skimmed.person?.name : null);
           const writes = skimmed?.writes === true;
+          // F-76: "add … to my board" heard "Reading Ledgerfold's
+          // profile": their own board is no one's profile.
+          if (mentionsOwnBoard(latest.content)) return;
           if (!readingLanded && typeof name === "string") {
             sayHolding(request, name.trim().slice(0, 60), writes);
           } else if (!readingLanded && writes) {
@@ -4797,6 +4802,92 @@ export function createSpecialistQAnswer(
     // rather than at the end of the path.
     const misread = readingMisfit(read);
     if (misread !== null) speculative.current?.cancel(misread);
+    // F-76 (QA, spoken): their own board, before anything that waits on a
+    // card or a page, and before a speculative answer can be spoken. A
+    // board ask is never a reply to an outward approval, and nothing
+    // outward holds it. Typed and spoken turns take this same path.
+    const boardWritesDocument = read?.tool?.kind === "PREPARE_DOCUMENT";
+    // Reader v61: "save that plan to my board" / "break it into tasks",
+    // about Q's last answer (nobody else named, no item dictated), is done
+    // by code, whatever the run's purpose or tool offer.
+    const boardAsk: string | null = read?.boardAsk ?? null;
+    // Before reader v63 carries LIST and ADD, their words decide only when
+    // they are unmistakable: "what's on my board?", or an item they put in
+    // quotes (or between "add" and "to my board") for their own board.
+    const listsBoard =
+      boardAsk === "LIST" ||
+      (boardAsk === null && asksWhatIsOnBoard(latest.content));
+    const addsItem =
+      boardAsk === "ADD" ||
+      (boardAsk === "SAVE" && dictatesItem(latest.content)) ||
+      (boardAsk === null &&
+        mentionsOwnBoard(latest.content) &&
+        boardItemFromWords(latest.content) !== null);
+    if (listsBoard && !boardWritesDocument) {
+      const listed = await readBoard(request, conversationId);
+      if (listed !== null) {
+        speculative.current?.cancel("ACTED");
+        remember(
+          conversationId,
+          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
+        );
+        return listed;
+      }
+    }
+    // A new item in their words (v62 ADD; or SAVE of a title they put in
+    // quotes) is a to-do with that title, never Q's last answer (F-72).
+    if (boardAsk === "WORK" && !boardWritesDocument) {
+      const working = await workOnBoard(
+        request,
+        conversationId,
+        latest.content,
+      );
+      if (working !== null) {
+        speculative.current?.cancel("ACTED");
+        remember(
+          conversationId,
+          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
+        );
+        return working;
+      }
+    }
+    if (!boardWritesDocument && addsItem) {
+      const added = await addItemToBoard(
+        request,
+        conversationId,
+        latest.content,
+        history,
+      );
+      if (added !== null) {
+        speculative.current?.cancel("ACTED");
+        remember(
+          conversationId,
+          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
+        );
+        return added;
+      }
+    }
+    if (
+      (read?.boardAsk === "SAVE" || read?.boardAsk === "BREAKDOWN") &&
+      !boardWritesDocument &&
+      (read.namedOther ?? null) === null &&
+      !dictatesItem(latest.content)
+    ) {
+      const saved = await saveAnswerToBoard(
+        request,
+        conversationId,
+        read.boardAsk,
+        history,
+      );
+      if (saved !== null) {
+        speculative.current?.cancel("ACTED");
+        remember(
+          conversationId,
+          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
+        );
+        return saved;
+      }
+    }
     // Owner 2026-10-17 ("open the data room" was slow, sometimes did
     // nothing): the reader chose, by meaning, one tab or section the page
     // on screen registered. Worked here by code -- SELECT_TAB / SCROLL_TO
@@ -5235,83 +5326,6 @@ export function createSpecialistQAnswer(
       (dependencies.appActions?.tools.has(audienceTool) ?? false)
         ? audienceTool
         : null;
-    // Reader v61: "save that plan to my board" / "break it into tasks",
-    // about Q's last answer (nobody else named, no item dictated), is done
-    // by code, whatever the run's purpose or tool offer.
-    const boardAsk: string | null = read?.boardAsk ?? null;
-    // Before reader v63 carries LIST and ADD, their words decide only when
-    // they are unmistakable: "what's on my board?", or an item they put in
-    // quotes (or between "add" and "to my board") for their own board.
-    const listsBoard =
-      boardAsk === "LIST" ||
-      (boardAsk === null && asksWhatIsOnBoard(latest.content));
-    const addsItem =
-      boardAsk === "ADD" ||
-      (boardAsk === "SAVE" && dictatesItem(latest.content)) ||
-      (boardAsk === null &&
-        mentionsOwnBoard(latest.content) &&
-        boardItemFromWords(latest.content) !== null);
-    if (listsBoard && !writingDocument) {
-      const listed = await readBoard(request, conversationId);
-      if (listed !== null) {
-        remember(
-          conversationId,
-          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
-        );
-        return listed;
-      }
-    }
-    // A new item in their words (v62 ADD; or SAVE of a title they put in
-    // quotes) is a to-do with that title, never Q's last answer (F-72).
-    if (boardAsk === "WORK" && !writingDocument) {
-      const working = await workOnBoard(
-        request,
-        conversationId,
-        latest.content,
-      );
-      if (working !== null) {
-        remember(
-          conversationId,
-          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
-        );
-        return working;
-      }
-    }
-    if (!writingDocument && addsItem) {
-      const added = await addItemToBoard(
-        request,
-        conversationId,
-        latest.content,
-        history,
-      );
-      if (added !== null) {
-        remember(
-          conversationId,
-          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
-        );
-        return added;
-      }
-    }
-    if (
-      (read?.boardAsk === "SAVE" || read?.boardAsk === "BREAKDOWN") &&
-      !writingDocument &&
-      (read.namedOther ?? null) === null &&
-      !dictatesItem(latest.content)
-    ) {
-      const saved = await saveAnswerToBoard(
-        request,
-        conversationId,
-        read.boardAsk,
-        history,
-      );
-      if (saved !== null) {
-        remember(
-          conversationId,
-          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
-        );
-        return saved;
-      }
-    }
     if (
       tool !== null &&
       !writingDocument &&
