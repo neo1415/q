@@ -77,6 +77,7 @@ import {
   gapValue,
   isTaxonomySuggestion,
   pickedUp,
+  hasFindingsFrom,
   publicSourceOf,
   progressLines,
   promptFor,
@@ -263,6 +264,11 @@ export function QOnboardingWorkspace({
 }: QOnboardingWorkspaceProps) {
   const t = useT();
   const view = session.raw;
+  /** The latest session, for work that outlives a render (F-69). */
+  const viewRef = useRef(view);
+  useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
   const router = useRouter();
   // The greeting is read once, from persisted state, when the workspace
   // opens — and only after a genuine absence, measured from the session's
@@ -1519,7 +1525,9 @@ export function QOnboardingWorkspace({
         setUploadNote(
           `${file.name} is kept here. I'll read it as soon as your company is set up.`,
         );
-        const held = `I've just added ${file.name}. Keep it until my company is set up: ask me its name first, then read it.`;
+        // QA F-68: Q took "keep it until…" as "not added yet" and told them
+        // to use the upload button. It is added; it waits on the name.
+        const held = `I've added ${file.name}; it's here and waiting. You'll read it the moment my company exists, so ask me the company's name.`;
         if (voiceActive) setHeldUpload(held);
         else await say(held);
         return;
@@ -1585,7 +1593,6 @@ export function QOnboardingWorkspace({
           return;
         }
       }
-      setUploadNote(null);
       await actions.refresh();
       const kind = filedAs ?? documentType;
       const readable =
@@ -1593,10 +1600,33 @@ export function QOnboardingWorkspace({
           documentType: kind,
           sensitivityClass: "CONFIDENTIAL",
         }) === "READ_FOR_COVERAGE";
+      // QA F-69 (24 Oct 2026): "processed" is not "read". The file's text
+      // was ready ~10 s after upload, Q's findings from it ~45 s; told to
+      // read back at the first, Q had nothing and said "add it whenever
+      // you're ready". Q is told to read back only once its findings from
+      // THIS document are in the session (bounded); until then it says it
+      // is reading, and the findings are handed to it when they land.
+      const documentId = done.value.documentId;
+      const foundIn = (): boolean =>
+        hasFindingsFrom(viewRef.current, documentId);
+      const waitForFindings = async (forMs: number): Promise<boolean> => {
+        const waitStarted = Date.now();
+        while (Date.now() - waitStarted < forMs) {
+          if (foundIn()) return true;
+          await new Promise((resolve) => setTimeout(resolve, 2_000));
+          await actions.refresh();
+        }
+        return foundIn();
+      };
+      const found = ready && readable && (await waitForFindings(60_000));
+      setUploadNote(null);
+      const toldRead = `I've just uploaded ${file.name}. Read back what you found in it and check it with me.`;
       const told = !ready
         ? `I've just uploaded ${file.name}; it's still being read. Say you're reading it now and will show what you found in a minute, then carry on.`
         : readable
-          ? `I've just uploaded ${file.name}. Read back what you found in it and check it with me.`
+          ? found
+            ? toldRead
+            : `I've just uploaded ${file.name}; you're still reading it. Say you're reading it now and will show what you found in a minute, then carry on.`
           : kind === "UNCLASSIFIED"
             ? `I've just uploaded ${file.name}. Its first pages didn't make clear what kind of document it is, so it's kept private and not read: ask me what it is.`
             : // Private material, by what it says: never read back. Q is
@@ -1619,6 +1649,16 @@ export function QOnboardingWorkspace({
         setHeldUpload(told);
       } else {
         await say(told);
+      }
+      // The findings, when they land after Q moved on: handed to Q then.
+      if (ready && readable && !found && (await waitForFindings(180_000))) {
+        const landed = `I've finished reading ${file.name}. Read back what you found in it and check it with me.`;
+        if (voiceActive) {
+          setUploadNote(`${file.name} is read.`);
+          setHeldUpload(landed);
+        } else {
+          await say(landed);
+        }
       }
     },
     [companyIdForUpload, qSubject, actions, voiceActive, say],
