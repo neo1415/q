@@ -77,6 +77,7 @@ export function createAppActionBoard(
       readonly actorUserId: string;
       readonly actionType: string;
       readonly payload: unknown;
+      readonly reason?: string | undefined;
       readonly at: number;
     }
   >();
@@ -128,6 +129,7 @@ export function createAppActionBoard(
         return Promise.resolve({
           actionType: QActionTypeSchema.parse(entry.actionType),
           payload: parsed.data,
+          ...(entry.reason === undefined ? {} : { reason: entry.reason }),
         });
       },
     },

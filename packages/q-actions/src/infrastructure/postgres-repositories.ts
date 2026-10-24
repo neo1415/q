@@ -63,6 +63,7 @@ const ActionRow = z.object({
   proposed_payload_hash: QActionPayloadHashSchema,
   summary: z.string(),
   preview: z.string().nullable(),
+  reason: z.string().nullable().optional(),
   status: QActionStatusSchema,
   idempotency_key: z.string(),
   created_at: Timestamp,
@@ -91,6 +92,7 @@ function toAction(row: unknown): QActionRecord {
     payloadHash: r.proposed_payload_hash,
     summary: r.summary,
     preview: r.preview,
+    reason: r.reason ?? null,
     status: r.status,
     idempotencyKey: r.idempotency_key,
     createdAt: r.created_at,
@@ -168,7 +170,7 @@ function selectAction(executor: DatabaseExecutor) {
     select a.id, a.tenant_id, a.run_id, a.organisation_id, a.proposed_by_user_id,
            a.action_type, a.action_version, a.risk_class, a.target_refs,
            a.proposed_payload, a.proposed_payload_hash, a.summary, a.preview,
-           a.status, a.idempotency_key, a.created_at, a.updated_at, a.executed_at,
+           a.reason, a.status, a.idempotency_key, a.created_at, a.updated_at, a.executed_at,
            a.execution_result, a.failure_code, a.retry_permitted,
            a.execution_attempts, a.version
       from q_runtime.actions a`;
@@ -227,12 +229,14 @@ export function createPostgresQActionRepositories(): QActionRepositories {
           insert into q_runtime.actions
             (id, tenant_id, run_id, organisation_id, proposed_by_user_id, action_type,
              action_version, risk_class, target_refs, proposed_payload,
-             proposed_payload_hash, summary, preview, status, idempotency_key)
+             proposed_payload_hash, summary, preview, reason, status,
+             idempotency_key)
           values (${input.id}, ${input.tenantId}, ${input.runId}, ${input.organisationId},
                   ${input.proposedByUserId}, ${input.actionType}, ${input.actionVersion},
                   ${input.riskClass}, ${JSON.stringify(input.targets)}::text::jsonb,
                   ${JSON.stringify(input.payload)}::text::jsonb, ${input.payloadHash},
-                  ${input.summary}, ${input.preview}, 'PROPOSED', ${input.idempotencyKey})`;
+                  ${input.summary}, ${input.preview}, ${input.reason ?? null},
+                  'PROPOSED', ${input.idempotencyKey})`;
         const created = await findAction(tx.sql, input.tenantId, input.id);
         if (created === null) {
           throw new Error("q action insert did not return a row");

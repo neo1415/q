@@ -123,6 +123,19 @@ const ErrandStartResultSchema = z
   .object({ errandId: UuidSchema, relationshipId: UuidSchema })
   .strict();
 
+/**
+ * The card names the action it starts with, not the plan (QA lead
+ * 2026-10-24: "Express interest in Silo Credit", not "Q looks after Silo
+ * Credit for you"); the plan is the preview's numbered steps.
+ */
+export function errandSummary(plan: ErrandStartPayload): string {
+  const who = plan.counterpartName;
+  if (plan.expressInterest) return `Express interest in ${who}`;
+  if (plan.openingMessage !== null) return `Message ${who}`;
+  if (plan.bookCall !== null) return `Book a call with ${who}`;
+  return `Answer ${who}'s questions for you`;
+}
+
 function steps(plan: ErrandStartPayload): string[] {
   const lines: string[] = [];
   if (plan.expressInterest) {
@@ -184,7 +197,7 @@ export function createErrandStartAction(dependencies: {
         ? [{ kind: "COMPANY", companyId: UuidSchema.parse(payload.companyId) }]
         : [{ kind: "RELATIONSHIP", relationshipId: payload.relationshipId }],
     describe: (payload) => ({
-      summary: `Q looks after ${payload.counterpartName} for you`,
+      summary: errandSummary(payload),
       preview: steps(payload)
         .map((line, index) => `${String(index + 1)}. ${line}`)
         .join("\n"),

@@ -12,6 +12,7 @@ import {
 } from "@capital-q/audit";
 import {
   canonicalJsonStringify,
+  Q_ACTION_REASON_MAX_LENGTH,
   Q_CONTRACT_VERSION,
   QActionProposalIdSchema,
   QApprovalIdSchema,
@@ -47,7 +48,11 @@ import {
   type AuthorizationService,
 } from "@capital-q/security";
 
-import type { AnyQActionDefinition, ApprovedQAction } from "../definition.js";
+import type {
+  AnyQActionDefinition,
+  ApprovedQAction,
+  QActionDescription,
+} from "../definition.js";
 import {
   bindingEnvelope,
   hashBindingEnvelope,
@@ -133,6 +138,12 @@ export type ProposeQActionCommand = {
   readonly actionType: string;
   /** Untrusted: validated by the registered definition's schema. */
   readonly payload: unknown;
+  /**
+   * Why Q proposes it, as the model that prepared it wrote it; the
+   * action's own reason (from its payload) is used instead where it has
+   * one. Presentation only: never part of the binding.
+   */
+  readonly reason?: string | undefined;
 };
 
 export type ProposeQActionResult = {
@@ -432,6 +443,7 @@ export function toApprovalView(
       targets: [...action.targets],
       summary: action.summary,
       ...(action.preview === null ? {} : { preview: action.preview }),
+      ...(action.reason === null ? {} : { reason: action.reason }),
       ...(action.executedAt === null ? {} : { executedAt: action.executedAt }),
     },
   });
@@ -912,6 +924,7 @@ export function createQActionService(
       readonly described: {
         readonly summary: string;
         readonly preview?: string | undefined;
+        readonly reason?: string | undefined;
       };
       readonly actionId: QActionProposalId;
       readonly approvalId: QApprovalId;
@@ -963,6 +976,7 @@ export function createQActionService(
       payloadHash,
       summary: described.summary,
       preview: described.preview ?? null,
+      reason: described.reason ?? null,
       idempotencyKey: idempotencyKeyFor(run.id, actionId),
     });
     assertActionTransition(inserted.status, "AWAITING_APPROVAL");
@@ -999,6 +1013,9 @@ export function createQActionService(
             ...(described.preview === undefined
               ? {}
               : { preview: described.preview }),
+            ...(described.reason === undefined
+              ? {}
+              : { reason: described.reason }),
             approval: {
               required: true,
               approval: { approvalId, status: "PENDING" },
@@ -1076,6 +1093,28 @@ export function createQActionService(
     return { action, approval };
   }
 
+  /**
+   * The card's reason: the action's own where it has one, else the one
+   * the model wrote; trimmed and bounded, absent when empty.
+   */
+  const withReason = (
+    described: QActionDescription,
+    written: string | undefined,
+  ): QActionDescription => {
+    const reason = (described.reason ?? written ?? "")
+      .replace(/\s+/gu, " ")
+      .trim();
+    const { reason: _own, ...rest } = described;
+    if (reason.length === 0) return rest;
+    return {
+      ...rest,
+      reason:
+        reason.length <= Q_ACTION_REASON_MAX_LENGTH
+          ? reason
+          : `${reason.slice(0, Q_ACTION_REASON_MAX_LENGTH - 1).trimEnd()}…`,
+    };
+  };
+
   const describedFor = async (
     definition: AnyQActionDefinition,
     payload: unknown,
@@ -1126,11 +1165,9 @@ export function createQActionService(
       });
       throw new QActionNotPermittedError();
     }
-    const described = await describedFor(
-      definition,
-      payload.data,
-      targets,
-      actor,
+    const described = withReason(
+      await describedFor(definition, payload.data, targets, actor),
+      command.reason,
     );
     const now = clock.now();
     const actionId = QActionProposalIdSchema.parse(randomUUID());
@@ -2194,7 +2231,11 @@ export function createQActionService(
         definition,
         payload: next,
         targets,
-        described: await describedFor(definition, next.data, targets, actor),
+        // A revision keeps the reason the card was proposed with.
+        described: withReason(
+          await describedFor(definition, next.data, targets, actor),
+          action.reason ?? undefined,
+        ),
         actionId: QActionProposalIdSchema.parse(randomUUID()),
         approvalId: QApprovalIdSchema.parse(randomUUID()),
         now,

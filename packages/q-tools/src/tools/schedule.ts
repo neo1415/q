@@ -54,6 +54,7 @@ import {
   unresolvedMessage,
   type LocalWhen,
 } from "./local-time.js";
+import { CardReasonSchema, reasonOf } from "./card-reason.js";
 
 /**
  * Meetings and reminders for Q (BIZ-008; R11, R14, R33: "set up a call with
@@ -602,6 +603,7 @@ export const ProposeMeetingInputSchema = z
     timeZone: TimeZone.optional().describe(
       "Only when they named a zone or city for the time (IANA, e.g. America/New_York); otherwise theirs is known.",
     ),
+    reason: CardReasonSchema,
   })
   .strict()
   .refine(exactlyOne, ONE_REF)
@@ -993,12 +995,14 @@ export function createScheduleTools(
       ChatIntelligencePort["prepareForApproval"]
     >[0]["proposal"],
     summary: string,
+    reason?: string,
   ): ChatProposalOutput => ({
     status: chat.prepareForApproval({
       runId: context.runId,
       tenantId: context.actor.tenantId,
       actorUserId: context.actor.userId,
       proposal: entry,
+      reason,
     }),
     awaitingApprovalOf: summary,
   });
@@ -1090,6 +1094,7 @@ export function createScheduleTools(
                   at.timeZone,
                 )
               : `Propose a call to ${grant.counterpartName}, ${at.asked}`,
+            reasonOf(input),
           );
           const fix = await blockedSays(
             schedule,
@@ -1131,6 +1136,7 @@ export function createScheduleTools(
                 at.timeZone,
               )
             : `Call with ${grant.counterpartName}, ${at.asked}`,
+          reasonOf(input),
         );
       },
     }),

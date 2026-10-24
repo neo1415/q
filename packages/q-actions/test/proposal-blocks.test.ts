@@ -51,3 +51,32 @@ describe("proposedLine (owner 2026-10-16)", () => {
     );
   });
 });
+
+// Approval card upgrade (QA lead 2026-10-24): "Why: …" and whom it is for.
+describe("the card says why, and whom it is for", () => {
+  it("carries the reason and the named target with its picture", () => {
+    const blocks = proposalBlocks(
+      { ...(action as object), reason: "You asked to be reminded." } as never,
+      {
+        id: "c888abda-52aa-49ba-92df-80886d7831ff",
+        expiresAt: "2026-10-02T12:43:40.890Z",
+      },
+      {
+        kind: "COMPANY",
+        id: "5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70",
+        photoUrl: null,
+      },
+    );
+    expect(blocks?.[0]).toMatchObject({
+      kind: "ACTION_PROPOSAL",
+      proposal: {
+        reason: "You asked to be reminded.",
+        named: {
+          kind: "COMPANY",
+          id: "5f1f7e2a-0c1d-4b5e-9a7f-2b3c4d5e6f70",
+          photoUrl: null,
+        },
+      },
+    });
+  });
+});

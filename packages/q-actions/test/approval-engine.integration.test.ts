@@ -401,6 +401,58 @@ describe("@capital-q/q-actions against local PostgreSQL", () => {
     }
   }
 
+  // Approval card upgrade (QA lead 2026-10-24): "Why: …" on the card.
+  it("REASON: the model's reason is kept with the card and shown, bounded, and never bound into the payload", async () => {
+    const world = await commitWorld();
+    try {
+      const { founder, service } = world;
+      const run = await synthesisRun(world, founder);
+      const plain = await propose(world, founder, {});
+      const reason =
+        "Seed, Kenya and water all match the investor's published mandate.";
+      const { action, approval } = await service.propose({
+        actor: founder.actor,
+        runId: run.id,
+        correlationId: CORRELATION(),
+        actionType: TEST_CONFIRM_REQUIRED,
+        payload: {
+          companyId: COMPANY,
+          note: `With a reason (#${String(++proposals)})`,
+        },
+        reason: `  ${reason}  `,
+      });
+      expect(action.reason).toBe(reason);
+      // Presentation only: the bound payload never carries it.
+      expect(JSON.stringify(action.payload)).not.toContain(reason);
+      expect(plain.action.reason).toBeNull();
+      const view = await service.getApproval({
+        actor: founder.actor,
+        approvalId: approval.id,
+        correlationId: CORRELATION(),
+      });
+      expect(view.action.reason).toBe(reason);
+      const proposed = (await events(action.runId)).find(
+        (e) => e.event_type === "q.action.proposed",
+      );
+      expect(proposed?.payload).toMatchObject({ proposal: { reason } });
+      // Longer than a card holds: cut, never refused.
+      const long = await service.propose({
+        actor: founder.actor,
+        runId: (await synthesisRun(world, founder)).id,
+        correlationId: CORRELATION(),
+        actionType: TEST_CONFIRM_REQUIRED,
+        payload: {
+          companyId: COMPANY,
+          note: `Long reason (#${String(++proposals)})`,
+        },
+        reason: "x ".repeat(300),
+      });
+      expect(long.action.reason?.length).toBeLessThanOrEqual(200);
+    } finally {
+      await cleanup(world);
+    }
+  });
+
   it("REQUIRED DEMO: propose → persist exact payload + hash → approval → approve → execute once → retry is a no-op", async () => {
     const world = await commitWorld();
     try {

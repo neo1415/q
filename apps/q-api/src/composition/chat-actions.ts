@@ -236,6 +236,7 @@ export function createChatActionBoard(
       tenantId: string;
       actorUserId: string;
       proposal: ChatProposal;
+      reason: string | undefined;
       at: number;
     }
   >();
@@ -256,6 +257,7 @@ export function createChatActionBoard(
         tenantId: entry.tenantId,
         actorUserId: entry.actorUserId,
         proposal: entry.proposal,
+        reason: entry.reason,
         at: now(),
       });
       return "PREPARED";
@@ -277,7 +279,11 @@ export function createChatActionBoard(
         );
         return Promise.resolve(
           parsed.success
-            ? { actionType, payload: parsed.data }
+            ? {
+                actionType,
+                payload: parsed.data,
+                ...(entry.reason === undefined ? {} : { reason: entry.reason }),
+              }
             : { refused: "that isn't something I can prepare from here" },
         );
       },

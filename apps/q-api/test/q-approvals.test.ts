@@ -327,7 +327,19 @@ describe("GET /v1/q/approvals/:approvalId", () => {
     });
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
-    expect(response.json()).toEqual(VIEW);
+    // Approval card upgrade (QA lead 2026-10-24): whom it is for, with
+    // their picture (none here), as the pending list names it.
+    expect(response.json()).toEqual({
+      ...VIEW,
+      action: {
+        ...VIEW.action,
+        named: {
+          kind: "COMPANY",
+          id: "f0000000-0000-4000-8000-000000000004",
+          photoUrl: null,
+        },
+      },
+    });
     expect(response.body).not.toContain("sha256:");
     expect(response.body).not.toContain("payloadHash");
     const query = calls.getApproval[0] as { actor: ActorContext };

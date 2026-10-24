@@ -64,6 +64,8 @@ type Prepared = {
     | "relationship.connection_request.respond"
     | "relationship.connection_request.send";
   readonly payload: Readonly<Record<string, string | null>>;
+  /** Why Q proposes it ("Why: …" on the card). */
+  readonly reason?: string | undefined;
   readonly at: number;
 };
 
@@ -142,6 +144,7 @@ export function createRelationshipActionBoard(
                   ? RELATIONSHIP_CONNECTION_REQUEST_SEND
                   : RELATIONSHIP_INTEREST_RESPOND,
           payload: parsed.data,
+          ...(entry.reason === undefined ? {} : { reason: entry.reason }),
         });
       },
     },

@@ -43,6 +43,11 @@ import type {
 export type QActionDescription = {
   readonly summary: string;
   readonly preview?: string | undefined;
+  /**
+   * Why Q proposes it, where the action knows it from its own payload
+   * ("Why: …" on the card, at most 200 characters). Presentation only.
+   */
+  readonly reason?: string | undefined;
 };
 
 export type QActionAuthorization =

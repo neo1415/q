@@ -608,6 +608,7 @@ describe("R35: the company on screen in Discover", () => {
   const PITCH = "66666666-0000-4000-8000-000000000001";
   const decided: { type: string; companyId: string }[] = [];
   const expressed: string[] = [];
+  const reasons: (string | undefined)[] = [];
   const screenPorts = fakePorts({
     companies,
     capital,
@@ -618,6 +619,7 @@ describe("R35: the company on screen in Discover", () => {
       mayExpressInterest: () => Promise.resolve(true),
       prepareForApproval: (entry) => {
         expressed.push(entry.payload.companyId ?? "");
+        reasons.push(entry.reason);
         return "PREPARED";
       },
     },
@@ -714,6 +716,24 @@ describe("R35: the company on screen in Discover", () => {
     ]);
     // Express Interest is only prepared: the person approves it.
     expect(expressed).toEqual([NORTHWIND]);
+  });
+
+  // Approval card upgrade (QA lead 2026-10-24): the model's "Why: …"
+  // travels beside the payload to the card, never inside it.
+  it("carries the model's reason for the card beside the interest, not in it", async () => {
+    expressed.length = 0;
+    reasons.length = 0;
+    const why = "Seed and Kenya match your mandate.";
+    expect(
+      (
+        await run("propose_express_interest", {
+          companyId: NORTHWIND,
+          reason: why,
+        })
+      ).result,
+    ).toMatchObject({ ok: true, data: { status: "PREPARED" } });
+    expect(expressed).toEqual([NORTHWIND]);
+    expect(reasons).toEqual([why]);
   });
 
   it("never acts on a company that is neither on screen nor asked about", async () => {

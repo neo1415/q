@@ -37,6 +37,7 @@ import type {
   QToolPorts,
   RelationshipIntelligencePort,
 } from "../ports.js";
+import { CardReasonSchema, reasonOf } from "./card-reason.js";
 
 /**
  * Relationship intelligence (CQ-Q-030; doc 25 §122: "what happened with
@@ -582,6 +583,7 @@ export const ProposeExpressInterestInputSchema = z
     note: InterestNoteSchema.optional().describe(
       "A short note to the founders, sent with the interest, when they asked to say something (a call next week, a question): in their voice, up to 1000 characters, saying why they are interested: their declared mandate against what the company does and its stage, from what you have read. Never generic. Only the company's founders see it.",
     ),
+    reason: CardReasonSchema,
   })
   .strict()
   .refine(
@@ -695,6 +697,7 @@ function createProposeExpressInterestTool(
           companyName: grant.companyName,
           ...(input.note === undefined ? {} : { note: input.note }),
         },
+        reason: reasonOf(input),
       });
       return Promise.resolve({
         status,
@@ -775,6 +778,7 @@ export const ProposeInterestAnswerInputSchema = z
       .describe(
         "ACCEPTED connects both sides; DECLINED does not take it forward.",
       ),
+    reason: CardReasonSchema,
   })
   .strict();
 export type ProposeInterestAnswerInput = z.output<
@@ -978,6 +982,7 @@ function createProposeInterestAnswerTool(
           decision: input.decision,
           investorName: chosen.investorName,
         },
+        reason: reasonOf(input),
       });
       return {
         status,

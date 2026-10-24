@@ -1,9 +1,11 @@
 import {
   QActionProposalSchema,
   Q_CONTRACT_VERSION,
+  type NamedPicture,
   type QResponseMessage,
   type QResultBlock,
   type QRunId,
+  type QSubjectRef,
 } from "@capital-q/contracts";
 import type { DatabaseExecutor, TransactionManager } from "@capital-q/database";
 import type { Logger } from "@capital-q/observability";
@@ -50,6 +52,7 @@ export type QActionNarrator = {
           | "riskClass"
           | "targets"
           | "preview"
+          | "reason"
           | "createdAt"
           | "payload"
         >
@@ -102,6 +105,8 @@ function sentence(text: string): string {
 export function proposalBlocks(
   action: Parameters<QActionNarrator["proposed"]>[1],
   approval: Parameters<QActionNarrator["proposed"]>[2],
+  /** Whom it is aimed at, with their picture; undefined: not looked up. */
+  named?: NamedPicture | null,
 ): readonly QResultBlock[] | undefined {
   if (
     approval === undefined ||
@@ -125,6 +130,10 @@ export function proposalBlocks(
     ...(action.preview === undefined || action.preview === null
       ? {}
       : { preview: action.preview }),
+    ...(action.reason === undefined || action.reason === null
+      ? {}
+      : { reason: action.reason }),
+    ...(named === undefined ? {} : { named }),
     approval: {
       required: true,
       approval: { approvalId: approval.id, status: "PENDING" },
@@ -192,6 +201,17 @@ export function createQActionNarrator(dependencies: {
         readonly heldFor: (actionId: string) => boolean;
         readonly hold: (actionId: string, line: string) => void;
       }
+    | undefined;
+  /**
+   * Approval card upgrade (QA lead 2026-10-24): whom a new card is aimed
+   * at (its first such target), with their picture under the viewer's
+   * scope, as QPendingApproval.named. Absent: not shown.
+   */
+  readonly named?:
+    | ((
+        targets: readonly QSubjectRef[],
+        run: QRunRef,
+      ) => Promise<NamedPicture | null>)
     | undefined;
   /** Whether a kind keeps its card's Approve (never approved by words). */
   readonly cardOnly?:
@@ -312,7 +332,13 @@ export function createQActionNarrator(dependencies: {
   };
 
   return {
-    proposed: (run, action, approval, options) => {
+    proposed: async (run, action, approval, options) => {
+      const named =
+        dependencies.named === undefined || action.targets === undefined
+          ? undefined
+          : await dependencies
+              .named(action.targets, run)
+              .catch(() => undefined);
       const line =
         definedProposedLine(action) ??
         proposedLine(action.summary, keepsCard(action));
@@ -323,7 +349,7 @@ export function createQActionNarrator(dependencies: {
           : options?.replaces !== undefined && options.replaces.length > 0
             ? `${line} ${replacesLine(options.replaces)}`
             : line,
-        proposalBlocks(action, approval),
+        proposalBlocks(action, approval, named),
       );
     },
     refused: (run, reason) => say(run, refusedLine(reason)),
