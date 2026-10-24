@@ -44,11 +44,13 @@ import {
   type ResponseValues,
 } from "@capital-q/onboarding";
 import {
+  OrganisationIdSchema,
   resolveHumanActorContext,
   type ActorContext,
   type OrganisationId,
 } from "@capital-q/security";
 import {
+  findOwnFirmWorkspace,
   investorMayReuseWorkspace,
   readInvestorWorkspaceFacts,
 } from "./workspace.js";
@@ -815,11 +817,25 @@ async function bootstrapInvestor(
       ? actor.context
       : null;
 
+  // Their own firm of this name, set up before (another session, or a
+  // context now on their company), is the same firm, never a second one.
+  // Only their own memberships: nobody joins a firm by typing its name.
+  const ownFirm =
+    reusable === null && actor.principal !== undefined
+      ? await findOwnFirmWorkspace(context.tx.sql, actor.userId, name)
+      : null;
+
   let actorContext: ActorContext;
   if (reusable !== null) {
     // An existing member acts in their explicit active context. Nobody joins
     // an organisation by typing its name.
     actorContext = reusable;
+  } else if (ownFirm !== null) {
+    actorContext = await resolveInvestorContext(
+      services,
+      actor,
+      OrganisationIdSchema.parse(ownFirm),
+    );
   } else {
     if (actor.principal === undefined) {
       throw new OnboardingContextRequiredError();

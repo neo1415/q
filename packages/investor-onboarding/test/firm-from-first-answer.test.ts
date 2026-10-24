@@ -77,6 +77,8 @@ const answer = (
 function context(
   current: readonly OnboardingResponse[],
   bound: string[],
+  /** The person's own firm of this name, already set up (null: none). */
+  ownFirm: string | null = null,
 ): OnboardingWriteContext {
   const session = {
     id: "a1000000-0000-4000-8000-000000000001",
@@ -86,7 +88,11 @@ function context(
     version: 1,
   };
   return {
-    tx: { sql: {} },
+    // The only read: the person's own firm workspace of this name.
+    tx: {
+      sql: () =>
+        Promise.resolve(ownFirm === null ? [] : [{ organisation_id: ownFirm }]),
+    },
     actor: {
       userId: USER,
       context: null,
@@ -163,6 +169,21 @@ describe("the firm from the first answers that name it", () => {
       DEPLOYING,
     );
     expect(calls).toEqual(["createOrganisation", "createInvestorOrganisation"]);
+    expect(bound).toEqual([INVESTOR]);
+  });
+});
+
+describe("one firm per person and name", () => {
+  it("a second session with the same firm name reuses their own firm, never a second one", async () => {
+    const { services, calls } = fakes();
+    const bound: string[] = [];
+    await target(INVESTOR_WRITE_TARGETS.deploymentStatus, services).apply(
+      context([NAME, TYPE], bound, ORG),
+      DEPLOYING,
+    );
+    // Their organisation is reused; only its investor profile is looked up
+    // (and here, as in a half-finished earlier session, created once).
+    expect(calls).not.toContain("createOrganisation");
     expect(bound).toEqual([INVESTOR]);
   });
 });

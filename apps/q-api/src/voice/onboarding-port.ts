@@ -129,6 +129,7 @@ export type HeldOnboardingWrites = {
   readonly drain?:
     | ((ports: {
         readonly currentValue: (stepKey: string) => Promise<unknown>;
+        readonly answeredAt?: (stepKey: string) => Promise<Date | null>;
         readonly submit: (write: PendingWrite) => Promise<void>;
       }) => Promise<DrainResult>)
     | undefined;
@@ -2219,6 +2220,54 @@ export function createOnboardingPort(input: {
     }
   };
 
+  /** Replays held changes (lane ob1) through the ordinary submit. */
+  const replayHeldWrites = async (): Promise<DrainResult | null> => {
+    const drain = input.held?.drain;
+    if (drain === undefined) return null;
+    return drain({
+      currentValue: async (stepKey) => {
+        const view = await fresh();
+        return view.responses.find((r) => r.stepKey === stepKey)?.value ?? null;
+      },
+      answeredAt: async (stepKey) => {
+        const at = (await current()).responses.find(
+          (r) => r.stepKey === stepKey,
+        )?.createdAt;
+        return at === undefined ? null : new Date(at);
+      },
+      submit: async (write) => {
+        // Validated again: the held row is data, not a trusted value.
+        const value = OnboardingResponseValueSchema.parse(write.response.value);
+        const response = {
+          value,
+          ...(write.response.note === undefined
+            ? {}
+            : { note: write.response.note }),
+          channel: "CONVERSATION" as const,
+        };
+        trusted = false;
+        readAt = null;
+        latest = await settle(
+          await onFreshVersion((version) =>
+            submitOnboardingResponse(
+              input.session,
+              input.onboardingSessionId,
+              {
+                stepKey: write.stepKey,
+                response,
+                expectedSessionVersion: version,
+              },
+              // Derived from the held row and the version it targets: a
+              // retried replay of the same version replays, not repeats.
+              pendingReplayKey(write.id, version),
+            ),
+          ),
+        );
+        written.push(write.stepKey);
+      },
+    });
+  };
+
   return {
     ownerUserId: input.ownerUserId,
     state,
@@ -2934,6 +2983,13 @@ export function createOnboardingPort(input: {
           results[index] = await safely(answer);
         }
       }
+      // QA F-52: what was kept until the firm or company existed is saved
+      // the turn it comes to exist, not one turn later. Held rows older
+      // than an answer this turn saved directly are settled, never written
+      // over it (the drain compares when each was given).
+      if (input.held !== undefined && written.length > writtenBefore) {
+        await replayHeldWrites().catch(() => null);
+      }
       return results;
     },
     view: () => latest,
@@ -3002,50 +3058,7 @@ export function createOnboardingPort(input: {
       }
       return null;
     },
-    replayHeld: async () => {
-      const drain = input.held?.drain;
-      if (drain === undefined) return null;
-      return drain({
-        currentValue: async (stepKey) => {
-          const view = await fresh();
-          return (
-            view.responses.find((r) => r.stepKey === stepKey)?.value ?? null
-          );
-        },
-        submit: async (write) => {
-          // Validated again: the held row is data, not a trusted value.
-          const value = OnboardingResponseValueSchema.parse(
-            write.response.value,
-          );
-          const response = {
-            value,
-            ...(write.response.note === undefined
-              ? {}
-              : { note: write.response.note }),
-            channel: "CONVERSATION" as const,
-          };
-          trusted = false;
-          readAt = null;
-          latest = await settle(
-            await onFreshVersion((version) =>
-              submitOnboardingResponse(
-                input.session,
-                input.onboardingSessionId,
-                {
-                  stepKey: write.stepKey,
-                  response,
-                  expectedSessionVersion: version,
-                },
-                // Derived from the held row and the version it targets: a
-                // retried replay of the same version replays, not repeats.
-                pendingReplayKey(write.id, version),
-              ),
-            ),
-          );
-          written.push(write.stepKey);
-        },
-      });
-    },
+    replayHeld: () => replayHeldWrites(),
     affirmedParaphrases: async () => {
       const latest = input.personTurns[0];
       if (latest === undefined || readBackReplyOf(latest) !== "AFFIRM") {

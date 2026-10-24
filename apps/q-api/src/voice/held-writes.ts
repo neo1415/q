@@ -3,6 +3,7 @@ import {
   drainPendingWrites,
   failureCode,
   isTransientOnboardingFailure,
+  waitsForContext,
   type DrainResult,
   type PendingWrite,
   type PendingWriteRepository,
@@ -32,6 +33,7 @@ export type HeldWritesStore = {
      */
     readonly drain: (ports: {
       readonly currentValue: (stepKey: string) => Promise<unknown>;
+      readonly answeredAt?: (stepKey: string) => Promise<Date | null>;
       readonly submit: (write: PendingWrite) => Promise<void>;
     }) => Promise<DrainResult>;
   };
@@ -65,11 +67,16 @@ export function createHeldWritesStore(dependencies: {
         drainPendingWrites({
           pending: () => repository.listPending(sql, sessionId, userId),
           currentValue: ports.currentValue,
+          ...(ports.answeredAt === undefined
+            ? {}
+            : { answeredAt: ports.answeredAt }),
           submit: ports.submit,
           classify: (error) =>
-            isTransientOnboardingFailure(error)
-              ? { kind: "TRANSIENT", code: failureCode(error) }
-              : { kind: "REFUSED", code: failureCode(error) },
+            waitsForContext(error)
+              ? { kind: "WAITING", code: failureCode(error) }
+              : isTransientOnboardingFailure(error)
+                ? { kind: "TRANSIENT", code: failureCode(error) }
+                : { kind: "REFUSED", code: failureCode(error) },
           settle: (id, status, code) =>
             repository.settle(sql, id, status, code),
           recordAttempt: (id, code) => repository.recordAttempt(sql, id, code),

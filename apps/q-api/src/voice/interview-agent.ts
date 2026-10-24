@@ -607,6 +607,7 @@ export function turnNotesFor(input: {
         readonly applied: readonly string[];
         readonly refused: readonly string[];
         readonly stillPending: readonly string[];
+        readonly waiting?: readonly string[];
       }
     | undefined;
 }): string {
@@ -640,6 +641,11 @@ export function turnNotesFor(input: {
     if (held.stillPending.length > 0) {
       notes.push(
         `Still held and NOT saved yet (a service is briefly unavailable): ${list(held.stillPending)}. Never say these are saved, and do not ask them again.`,
+      );
+    }
+    if ((held.waiting ?? []).length > 0) {
+      notes.push(
+        `Kept from what they told you, NOT saved yet because their firm or company is not set up yet: ${list(held.waiting ?? [])}. They save by themselves once it is. Never say these are saved, never ask them again, and ask only for what setting it up still needs.`,
       );
     }
   }
@@ -1420,13 +1426,15 @@ export function createInterviewAgent(
       replay === null ||
       replay.applied.length +
         replay.refused.length +
-        replay.stillPending.length ===
+        replay.stillPending.length +
+        replay.waiting.length ===
         0
         ? undefined
         : {
             applied: replay.applied.map(questionOf),
             refused: replay.refused.map((r) => questionOf(r.stepKey)),
             stillPending: replay.stillPending.map(questionOf),
+            waiting: replay.waiting.map(questionOf),
           };
     await settleKnownAnswers(port, input.journeyType);
     await prefillFromSignup();
