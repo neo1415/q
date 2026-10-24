@@ -16,6 +16,7 @@ import {
 } from "../q/ui-act-controller";
 import { noteToLine } from "./line-cards";
 import { destinationPath } from "./destinations";
+import { qPitchHoldsVoice } from "@/features/q-pitch/tour-presence";
 import type { VoiceSessionClient } from "./session";
 
 /**
@@ -88,7 +89,13 @@ export function performTurnChain(
       : turn.clientAction === undefined || turn.clientAction === null
         ? []
         : [turn.clientAction];
-  const path = destinationPath(turn.navigate);
+  // F-61: a story the browser already started from the same words (its
+  // interceptors hear them first) is not started again by the server's
+  // Q_PITCH, which would replace a cut they asked for with the full one.
+  const path =
+    turn.navigate === "Q_PITCH" && qPitchHoldsVoice()
+      ? null
+      : destinationPath(turn.navigate);
   // Every move gets its receipt, even to where they already are (VERIFIED
   // at once): the GPT-Live voice waits for it before it speaks.
   if (path !== null && typeof window !== "undefined") {
