@@ -354,7 +354,7 @@ A: Users own what they bring: profiles, documents, financials, videos and eviden
 _Sources: docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_Decision_Log.txt Decision #49; docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_Decision_Log.txt Decision #151. Bank id `qa.data-ownership`._
 
 **Q: Can I delete my data?**
-A: Yes, with care for context. You can delete, withdraw sharing, archive, or close your account. Your personal private information can be forgotten, but you can't erase another party's legitimate record of a relationship, and withdrawing access can't recall a copy someone already downloaded.
+A: Yes, with care for context. You can withdraw sharing and archive what you've added. Closing your whole account isn't something you can do yourself in the product yet. Your personal private information can be forgotten, but you can't erase another party's legitimate record of a relationship, and withdrawing access can't recall a copy someone already downloaded.
 _Sources: docs/product-sources/text/Real_PADL_-_Capital_Q_Product_Architecture_Decision_Log.txt Decision #151. Bank id `qa.deletion`._
 
 **Q: Is my data used to train AI models?**

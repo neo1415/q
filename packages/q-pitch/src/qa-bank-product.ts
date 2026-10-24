@@ -797,7 +797,7 @@ export const PRODUCT_QA_ENTRIES: readonly QaEntry[] = [
       "how long do you keep records",
     ],
     answer:
-      "Yes, with care for context. You can delete, withdraw sharing, archive, or close your account. Your personal private information can be forgotten, but you can't erase another party's legitimate record of a relationship, and withdrawing access can't recall a copy someone already downloaded.",
+      "Yes, with care for context. You can withdraw sharing and archive what you've added. Closing your whole account isn't something you can do yourself in the product yet. Your personal private information can be forgotten, but you can't erase another party's legitimate record of a relationship, and withdrawing access can't recall a copy someone already downloaded.",
     sources: [`${PADL} Decision #151`],
   },
   {
