@@ -275,25 +275,35 @@ export function withDeckReadings(
       parsed.message.data,
     );
     if (documentId === null) return inner(message);
-    try {
-      await readDeckDocument(
-        options,
-        documentId,
-        `cor_deck_${parsed.message.id}`,
-      );
-    } catch (error: unknown) {
+    // QA F-69 speed (24 Oct): the deck was read first and the founder's own
+    // review only after it, two model calls in a row: ~45 s from upload to
+    // Q's findings. They are independent (the review reads the version's
+    // passages, not this reading), so they run together. A reading that
+    // fails is not retried by redelivery any more, which would run the
+    // review twice and duplicate its proposals: it raises the same alert and
+    // the heal loop (runDeckReadingHeal) reads the deck again.
+    const deck = readDeckDocument(
+      options,
+      documentId,
+      `cor_deck_${parsed.message.id}`,
+    ).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    const outcome = await inner(message);
+    const failed = await deck;
+    if (failed !== null) {
       options.logger.error(
         {
           msgId: message.msgId,
           readCount: message.readCount,
-          err: error,
+          err: failed,
           alert: "DECK_READING_FAILED",
         },
-        "deck reading not written; retrying",
+        "deck reading not written; the heal loop reads it again",
       );
-      return { kind: "RETRY", errorCode: "DECK_READING_FAILED" };
     }
-    return inner(message);
+    return outcome;
   };
 }
 

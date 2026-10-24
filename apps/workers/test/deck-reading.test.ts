@@ -66,6 +66,10 @@ function harness(
     readonly model?: "ok" | "empty";
     readonly insert?: "ok" | "throws";
     readonly spentUsd?: number;
+    /** The deck read holds until this resolves (F-69 speed). */
+    readonly readGate?: Promise<void>;
+    /** What the wrapped handler records when it runs. */
+    readonly order?: string[];
   } = {},
 ) {
   const logger = createRecordingLogger();
@@ -113,14 +117,19 @@ function harness(
     criteria: { clear: false, strong: false, exceptional: false, note: null },
   }));
   const handle = withDeckReadings(
-    () => Promise.resolve({ kind: "DONE" } as MessageOutcome),
+    () => {
+      behaviour.order?.push("review");
+      return Promise.resolve({ kind: "DONE" } as MessageOutcome);
+    },
     {
       registry,
       sql: fake as unknown as DatabaseExecutor,
       reader: {
-        read: (input) => {
+        read: async (input) => {
           asked.push({ pages: input.pages, passages: input.passages });
-          return Promise.resolve(behaviour.model === "empty" ? null : sections);
+          await behaviour.readGate;
+          behaviour.order?.push("deck");
+          return behaviour.model === "empty" ? null : sections;
         },
       },
       chunks: {
@@ -249,17 +258,33 @@ describe("deck readings", () => {
     });
   });
 
-  it("retries and alerts at error level when the reading cannot be stored", async () => {
+  it("alerts at error level when the reading cannot be stored, and leaves the re-read to the heal loop", async () => {
     // The production failure (Q.08, 2026-10-07): the insert threw on every
-    // delivery and only a warning was logged.
+    // delivery and only a warning was logged. The alert stays an error; the
+    // message is not redelivered (that would run the founder's review twice,
+    // F-69 speed), runDeckReadingHeal reads the deck again.
     const h = harness(true, { insert: "throws" });
-    expect(await h.handle(ready())).toEqual({
-      kind: "RETRY",
-      errorCode: "DECK_READING_FAILED",
-    });
+    expect(await h.handle(ready())).toEqual({ kind: "DONE" });
     expect(
       h.logger.lines.find((line) => line.level === "error")?.fields,
     ).toMatchObject({ alert: "DECK_READING_FAILED" });
+  });
+
+  it("F-69 speed: the founder's review runs alongside the deck read, never after it", async () => {
+    let open = (): void => undefined;
+    const readGate = new Promise<void>((resolve) => {
+      open = resolve;
+    });
+    const order: string[] = [];
+    const h = harness(true, { readGate, order });
+    const handled = h.handle(ready());
+    // The review has run while the deck read is still waiting.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(order).toEqual(["review"]);
+    open();
+    expect(await handled).toEqual({ kind: "DONE" });
+    expect(order).toEqual(["review", "deck"]);
+    expect(h.stored).toHaveLength(1);
   });
 
   it("names ready decks still unread after ten minutes", async () => {
