@@ -2076,7 +2076,7 @@ describe("a subject the public web knows nothing about is searched and said once
     ).toBe(true);
     expect(
       turn.notes.some((note) =>
-        note.includes("When neither does, say so plainly"),
+        note.includes("Never mention, list or describe public results"),
       ),
     ).toBe(false);
     // Nothing said about checking the web on the turn that does not.
@@ -2386,7 +2386,7 @@ describe("pictures of who the turn names, from public pages (owner 2026-10-23)",
         } as QToolCallOutcome);
       },
     };
-    const { seam, request, answerBlocks } = build({
+    const { seam, request, answerBlocks, alpha } = build({
       script: [
         {
           kind: "TOOL_CALLS",
@@ -2441,6 +2441,12 @@ describe("pictures of who the turn names, from public pages (owner 2026-10-23)",
         (block) => (block as { kind?: string }).kind === "PICTURE",
       ),
     ).toEqual([]);
+    // Owner 2026-10-24: Q never narrates results that are not about them.
+    // LEGO's page never reaches the answer's model, nor its Sources.
+    for (const call of alpha.calls) {
+      expect(JSON.stringify(call.request.messages)).not.toContain("lego.com");
+    }
+    expect(JSON.stringify(answerBlocks)).not.toContain("lego.com");
   });
 
   it("looks for them beside the web search and shows them after the words, credited to their pages", async () => {
