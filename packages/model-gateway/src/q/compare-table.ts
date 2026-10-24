@@ -9,7 +9,11 @@ import {
   type QResultBlock,
 } from "@capital-q/contracts";
 
-import type { ReadCompanyFigure, RunRead } from "./card-subjects.js";
+import {
+  containsCompanyName,
+  type ReadCompanyFigure,
+  type RunRead,
+} from "./card-subjects.js";
 import { cardRaiseWords, type RunFit } from "./fit-cards.js";
 
 /**
@@ -174,7 +178,23 @@ export function comparisonTableBlock(input: {
       .indexOf(nameOf(id).toLowerCase());
     return where < 0 ? Number.MAX_SAFE_INTEGER : where;
   };
-  const only = input.only ?? [];
+  // O-I6 (live 23 Oct): "Compare Ledgerline, Duplo and Anchor" showed
+  // Ledgerline vs Ledgerfold, a company the run read for another reason.
+  // When the question names two or more companies the run read, the table
+  // is those and only those.
+  const namedInQuestion = ids
+    .filter((id) => {
+      const name = nameOf(id);
+      return name !== "Company" && containsCompanyName(input.question, name);
+    })
+    // In the order the person named them.
+    .sort((a, b) => at(a) - at(b));
+  const only =
+    (input.only ?? []).length >= 2
+      ? (input.only ?? [])
+      : namedInQuestion.length >= 2
+        ? namedInQuestion
+        : [];
   const columns =
     only.length >= 2
       ? only.filter((id) => ids.includes(id))
