@@ -2350,8 +2350,12 @@ export function createSpecialistQAnswer(
     // Deep work still under way: its document does not exist yet, so the
     // board keeps the job itself, linked, and it moves to Done with its
     // document when the work finishes. Never its opening line as a file.
-    if (startsTeamJob(work.answer)) {
-      return keepRunningJob(request, conversationId, board, work);
+    // Batch 8 (I13): the job's own card on that turn says it is still
+    // under way (WORK_IN_PROGRESS, its job id) while no document has come;
+    // read by structure, with the opening line as the fallback.
+    const running = runningWork(work);
+    if (running !== null || startsTeamJob(work.answer)) {
+      return keepRunningJob(request, conversationId, board, work, running);
     }
     // "Break it into tasks" right after "save that plan": the document is
     // already on their board (Q's own confirmation carries it).
@@ -2467,22 +2471,29 @@ export function createSpecialistQAnswer(
   ): Promise<QAnswerOutcome> {
     const planned = await teamJob.propose(request, words);
     const line = teamJobLine(planned);
+    const blocks = teamJobBlocks(planned);
     if (planned.status !== "STARTED") {
       return recordAnswer(
         request,
         conversationId,
         `${line} Nothing has gone on your board, since nothing started.`,
+        blocks,
       );
     }
+    // The started job itself, as the team job reports it (batch 8: the
+    // latest-job read can miss a job queued a moment ago).
     const job =
-      board.latestRunningJob === undefined
-        ? null
-        : await board.latestRunningJob(request.actor).catch(() => null);
+      planned.jobId !== undefined
+        ? { jobId: planned.jobId }
+        : board.latestRunningJob === undefined
+          ? null
+          : await board.latestRunningJob(request.actor).catch(() => null);
     if (job === null || board.linkJob === undefined) {
       return recordAnswer(
         request,
         conversationId,
         `${line} When it's ready, ask me and I'll put it on your board.`,
+        blocks,
       );
     }
     const title = workTitle({
@@ -2512,8 +2523,9 @@ export function createSpecialistQAnswer(
       request,
       conversationId,
       kept.outcome === "OK"
-        ? `${line} It's on your board as “${title}”, in Doing; it moves to Done, with its document, when the work finishes.`
+        ? `${line} I've also put it on your board as “${title}”, in Doing; it moves to Done, with its document, when the work finishes.`
         : `${line} I couldn't put it on your board just now; ask me once it's ready.`,
+      blocks,
     );
   }
 
@@ -2523,11 +2535,13 @@ export function createSpecialistQAnswer(
     conversationId: QConversationMessage["conversationId"],
     board: BoardKeeper,
     work: NonNullable<ReturnType<typeof substantiveAnswer>>,
+    known: { readonly jobId: string } | null = null,
   ): Promise<QAnswerOutcome> {
     const job =
-      board.latestRunningJob === undefined || board.linkJob === undefined
+      known ??
+      (board.latestRunningJob === undefined || board.linkJob === undefined
         ? null
-        : await board.latestRunningJob(request.actor).catch(() => null);
+        : await board.latestRunningJob(request.actor).catch(() => null));
     if (job === null || board.linkJob === undefined) {
       return recordAnswer(
         request,
@@ -2569,6 +2583,30 @@ export function createSpecialistQAnswer(
         ? `I've put “${title}” on your board. I'm still working on it, so it's in Doing; it moves to Done, with its document, when the work finishes.`
         : `I couldn't add “${title}” to your board just now. Ask me again in a moment.`,
     );
+  }
+
+  /**
+   * The job still under way on the turn that answered their ask: a
+   * WORK_IN_PROGRESS card on Q's messages of that turn, and no document
+   * delivered on them yet. Null: nothing running there.
+   */
+  function runningWork(work: {
+    readonly message: QConversationMessage;
+    readonly all: readonly QConversationMessage[];
+  }): { readonly jobId: string } | null {
+    const at = work.all.indexOf(work.message);
+    const askedAt = work.all
+      .slice(0, at)
+      .findLastIndex((m) => m.role === "USER");
+    const latestUser = work.all.findLastIndex((m) => m.role === "USER");
+    const turn = work.all
+      .slice(askedAt + 1, latestUser < 0 ? work.all.length : latestUser)
+      .filter((m) => m.role === "Q");
+    const blocks = turn.flatMap((m) => m.blocks ?? []);
+    if (blocks.some((block) => block.kind === "ARTIFACT_REFERENCE"))
+      return null;
+    const card = blocks.findLast((block) => block.kind === "WORK_IN_PROGRESS");
+    return card?.kind === "WORK_IN_PROGRESS" ? { jobId: card.jobId } : null;
   }
 
   /** The conversation up to one answer, and the ask after it. */
@@ -5372,10 +5410,11 @@ export function createSpecialistQAnswer(
         /^\s*(?:please\s+|can you\s+|could you\s+)?(?:write|draft|make|create|prepare|build|put together)\b/iu.test(
           latest.content,
         ));
+    // A document asked for in the same breath is the work itself (batch 8
+    // F11: "write a plan and save it" read with a document request too).
     if (
       savesToBoard &&
       asksNewWork &&
-      !boardWritesDocument &&
       dependencies.teamJob !== undefined &&
       dependencies.board !== undefined
     ) {

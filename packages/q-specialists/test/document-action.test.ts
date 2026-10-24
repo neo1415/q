@@ -2017,3 +2017,141 @@ describe("saving work that has to start first, or never started", () => {
     expect(s.stored[0]?.content).toMatch(/^There's nothing to save yet/u);
   });
 });
+
+/** Batch 8 re-score: I13 (save while the job runs) and F11 (compound reply). */
+describe("saving deep work by its job", () => {
+  const JOB = "77777777-2222-4333-8444-555555555555";
+  const DOC = "66666666-2222-4333-8444-555555555555";
+  const PLAN = {
+    summary: "A 12-month growth plan",
+    steps: [{ who: "Research", does: "Reads the market" }],
+    cannot: [],
+    needsYou: [],
+  };
+  const reading = (teamJob = false): QTurnReading => ({
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: null,
+    boardAsk: "SAVE",
+    namedOther: null,
+    teamJob,
+  });
+  function keeper() {
+    const added: { kind: string; title: string; refId?: string }[] = [];
+    const linked: string[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items: [] }),
+      add: (_actor, item) => {
+        added.push(item);
+        return Promise.resolve({
+          outcome: "OK",
+          replayed: false,
+          value: { id: "item-1" },
+        });
+      },
+      // The latest-job read finds nothing (a job queued a moment ago).
+      latestRunningJob: () => Promise.resolve(null),
+      linkJob: (_actor, _item, jobId) => {
+        linked.push(jobId);
+        return Promise.resolve({ outcome: "OK" });
+      },
+    };
+    return { board, added, linked };
+  }
+  const wip = {
+    kind: "WORK_IN_PROGRESS" as const,
+    jobId: JOB,
+    title: "A 12-month growth plan",
+  };
+
+  it("I13: a save while the job's card shows it under way keeps that job, linked, even past a later message", async () => {
+    const { board, added, linked } = keeper();
+    const s = seam({
+      history: [
+        message("USER", "Write me a 12-month growth plan for Maji Loop"),
+        {
+          ...message("Q", "On it. Starting now: a 12-month growth plan."),
+          blocks: [wip],
+        },
+        message("Q", "The research step is done; the draft is next."),
+        message("USER", "Save that plan to my board."),
+      ],
+      reading: reading(),
+      board,
+    });
+    await s.run();
+    expect(s.prepared).toHaveLength(0);
+    expect(added).toEqual([
+      expect.objectContaining({ kind: "WORK_JOB", refId: JOB }),
+    ]);
+    expect(linked).toEqual([JOB]);
+  });
+
+  it("once the document has come, the save keeps the document", async () => {
+    const { board, added } = keeper();
+    const s = seam({
+      history: [
+        message("USER", "Write me a 12-month growth plan"),
+        {
+          ...message("Q", "On it. Starting now: a 12-month growth plan."),
+          blocks: [wip],
+        },
+        {
+          ...message("Q", "Your 12-month growth plan is ready."),
+          blocks: [
+            wip,
+            {
+              kind: "ARTIFACT_REFERENCE",
+              artifactId: QArtifactIdSchema.parse(DOC),
+              type: "Q_REPORT",
+              status: "READY",
+              title: "12-month growth plan",
+            },
+          ],
+        },
+        message("USER", "Save that plan to my board."),
+      ],
+      reading: reading(),
+      board,
+    });
+    await s.run();
+    expect(added).toEqual([
+      expect.objectContaining({ kind: "DOCUMENT", refId: DOC }),
+    ]);
+  });
+
+  it("F11: 'write … and save it' says both, linking the job the team job started", async () => {
+    const { board, added, linked } = keeper();
+    const s = seam({
+      history: [
+        message("USER", "Write a 12-month growth plan and save it to my board"),
+      ],
+      reading: reading(true),
+      board,
+      teamJob: {
+        propose: () =>
+          Promise.resolve({
+            status: "STARTED",
+            plan: PLAN,
+            firstRead: null,
+            jobId: JOB,
+          }),
+      },
+    });
+    await s.run();
+    expect(added).toEqual([
+      expect.objectContaining({ kind: "WORK_JOB", refId: JOB }),
+    ]);
+    expect(linked).toEqual([JOB]);
+    expect(s.stored[0]?.content).toMatch(/^On it\. Starting now/u);
+    expect(s.stored[0]?.content).toMatch(
+      /I've also put it on your board as “12-month growth plan”, in Doing/u,
+    );
+    expect(s.stored[0]?.blocks).toEqual([
+      expect.objectContaining({ kind: "WORK_IN_PROGRESS", jobId: JOB }),
+    ]);
+  });
+});
