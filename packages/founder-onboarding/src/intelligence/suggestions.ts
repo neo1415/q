@@ -164,12 +164,30 @@ function matchingOptions(
  * The step's own response value for a candidate, or null when the reading
  * does not land unambiguously in the step's vocabulary.
  */
+/**
+ * QA F-51 (23 Oct 2026): a deck reading proposed "No moat stated." and "No
+ * website stated." for the founder to Keep. An absence is a gap to fill,
+ * never a fact to keep: such clauses are taken out of a proposal, and a
+ * proposal that was nothing else is not made (unknown stays unknown).
+ */
+const ABSENCE_CLAUSE =
+  /^(?:(?:there\s+is\s+)?(?:no|none)\b[^;.]*\b(?:stated|mentioned|provided|given|found|specified|disclosed|described|listed|shown|included|identified)\b|[^;.]*\b(?:not|isn't|is\s+not|wasn't|was\s+not|does\s+not|doesn't)\s+(?:explicitly\s+)?(?:state|stated|mention|mentioned|provide|provided|specify|specified|disclose|disclosed|describe|described|give|given|list|listed|include|included)\b|(?:n\/a|not\s+applicable|unknown|none)\b)[^;.]*[;.]?$/iu;
+
+export function withoutAbsences(text: string): string {
+  return text
+    .split(/(?<=[;.])\s+/u)
+    .filter((clause) => !ABSENCE_CLAUSE.test(clause.trim()))
+    .join(" ")
+    .replace(/^[;,\s]+|[;,\s]+$/gu, "")
+    .trim();
+}
+
 export function structuredValueFor(
   key: FounderFactKey,
   value: string,
 ): OnboardingResponseValue | null {
   if (FREE_TEXT_KEYS.has(key)) {
-    const text = value.trim();
+    const text = withoutAbsences(value.trim());
     return text.length === 0 ? null : { type: "TEXT", text };
   }
   const single = SINGLE_SELECT_KEYS.get(key);

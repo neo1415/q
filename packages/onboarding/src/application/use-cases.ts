@@ -368,6 +368,21 @@ function batchRefusalOf(
       errors: [],
     };
   }
+  // QA F-52: an answer that needs the firm or company before it can land
+  // is refused alone, never the whole batch: the firm's own name in the
+  // same turn commits, and Q holds this answer until the firm exists.
+  if (error instanceof OnboardingContextRequiredError) {
+    return {
+      detail: error.message.slice(0, 400),
+      errors: [
+        {
+          path: "value",
+          code: error.code,
+          message: error.message.slice(0, 400),
+        },
+      ],
+    };
+  }
   return null;
 }
 

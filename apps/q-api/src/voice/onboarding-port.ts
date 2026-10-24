@@ -31,6 +31,7 @@ import {
 import {
   deriveOnboardingCoverage,
   isTransientOnboardingFailure,
+  waitsForContext,
   clausesOf,
   negatedMention,
   pendingReplayKey,
@@ -84,6 +85,13 @@ import {
 } from "./paraphrase-confirmation.js";
 
 /**
+ * QA F-52: what Q is told about an answer held until the firm or company
+ * exists ("firm context isn't active yet" was said to a new investor).
+ */
+const HELD_FOR_FIRM_REASON =
+  "Kept, and saved automatically as soon as their firm or company is set up (for an investor: the firm's name and how they invest; for a founder: the company's name). Nothing is lost and it need not be asked again. Say it is kept, never mention 'context' or a record not being active, and ask for whichever of those is still missing.";
+
+/**
  * What the loop is told when it tries to fill an upload step with words.
  * It answers the loop's real question (what now?) so it stops retrying:
  * nothing is wrong, nothing more is needed this turn.
@@ -121,6 +129,7 @@ export type HeldOnboardingWrites = {
   readonly drain?:
     | ((ports: {
         readonly currentValue: (stepKey: string) => Promise<unknown>;
+        readonly answeredAt?: (stepKey: string) => Promise<Date | null>;
         readonly submit: (write: PendingWrite) => Promise<void>;
       }) => Promise<DrainResult>)
     | undefined;
@@ -1314,8 +1323,9 @@ export function createOnboardingPort(input: {
             question: (
               SPOKEN_QUESTIONS[step.stepKey] ?? step.configuration.prompt
             ).slice(0, 400),
-            reason:
-              "Not saved yet: the service is briefly unavailable. Their answer is held and will be saved automatically; nothing is lost. Tell them plainly it is not saved yet, do not ask it again, and carry on.",
+            reason: waitsForContext(error)
+              ? HELD_FOR_FIRM_REASON
+              : "Not saved yet: the service is briefly unavailable. Their answer is held and will be saved automatically; nothing is lost. Tell them plainly it is not saved yet, do not ask it again, and carry on.",
           };
         } catch {
           // The hold itself failed: report the original failure honestly.
@@ -1886,7 +1896,8 @@ export function createOnboardingPort(input: {
             sessionId: input.onboardingSessionId,
             stepKey: resolved.step.stepKey,
             value: resolved.value,
-            rationale: `from what they said earlier: "${answer.quote.slice(0, 120)}"`,
+            // Shown to them as it is (QA F-53): it speaks to them.
+            rationale: `From what you said earlier: "${answer.quote.slice(0, 120)}"`,
             runId: input.runId ?? null,
           });
           return done({
@@ -2086,6 +2097,26 @@ export function createOnboardingPort(input: {
               detail: null,
               errors: [],
             };
+            // QA F-52: a fact that waits for the firm or company to be set
+            // up is held and saved as soon as it is, never refused.
+            if (input.held !== undefined && waitsForContext({ problem })) {
+              try {
+                await input.held.hold(stepKey, {
+                  value: item.value,
+                  ...(item.plan.note === undefined
+                    ? {}
+                    : { note: item.plan.note }),
+                });
+                return {
+                  stepKey,
+                  outcome: "HELD_FOR_RETRY",
+                  question: questionOf(item.plan.step),
+                  reason: HELD_FOR_FIRM_REASON,
+                };
+              } catch {
+                // The hold itself failed: refused below, honestly.
+              }
+            }
             if (offPath({ problem })) {
               const kept = await keepOffPath(
                 item.plan.step,
@@ -2187,6 +2218,54 @@ export function createOnboardingPort(input: {
       // Not recordable yet (another step first): Q asks as before.
       return false;
     }
+  };
+
+  /** Replays held changes (lane ob1) through the ordinary submit. */
+  const replayHeldWrites = async (): Promise<DrainResult | null> => {
+    const drain = input.held?.drain;
+    if (drain === undefined) return null;
+    return drain({
+      currentValue: async (stepKey) => {
+        const view = await fresh();
+        return view.responses.find((r) => r.stepKey === stepKey)?.value ?? null;
+      },
+      answeredAt: async (stepKey) => {
+        const at = (await current()).responses.find(
+          (r) => r.stepKey === stepKey,
+        )?.createdAt;
+        return at === undefined ? null : new Date(at);
+      },
+      submit: async (write) => {
+        // Validated again: the held row is data, not a trusted value.
+        const value = OnboardingResponseValueSchema.parse(write.response.value);
+        const response = {
+          value,
+          ...(write.response.note === undefined
+            ? {}
+            : { note: write.response.note }),
+          channel: "CONVERSATION" as const,
+        };
+        trusted = false;
+        readAt = null;
+        latest = await settle(
+          await onFreshVersion((version) =>
+            submitOnboardingResponse(
+              input.session,
+              input.onboardingSessionId,
+              {
+                stepKey: write.stepKey,
+                response,
+                expectedSessionVersion: version,
+              },
+              // Derived from the held row and the version it targets: a
+              // retried replay of the same version replays, not repeats.
+              pendingReplayKey(write.id, version),
+            ),
+          ),
+        );
+        written.push(write.stepKey);
+      },
+    });
   };
 
   return {
@@ -2904,6 +2983,13 @@ export function createOnboardingPort(input: {
           results[index] = await safely(answer);
         }
       }
+      // QA F-52: what was kept until the firm or company existed is saved
+      // the turn it comes to exist, not one turn later. Held rows older
+      // than an answer this turn saved directly are settled, never written
+      // over it (the drain compares when each was given).
+      if (input.held !== undefined && written.length > writtenBefore) {
+        await replayHeldWrites().catch(() => null);
+      }
       return results;
     },
     view: () => latest,
@@ -2972,50 +3058,7 @@ export function createOnboardingPort(input: {
       }
       return null;
     },
-    replayHeld: async () => {
-      const drain = input.held?.drain;
-      if (drain === undefined) return null;
-      return drain({
-        currentValue: async (stepKey) => {
-          const view = await fresh();
-          return (
-            view.responses.find((r) => r.stepKey === stepKey)?.value ?? null
-          );
-        },
-        submit: async (write) => {
-          // Validated again: the held row is data, not a trusted value.
-          const value = OnboardingResponseValueSchema.parse(
-            write.response.value,
-          );
-          const response = {
-            value,
-            ...(write.response.note === undefined
-              ? {}
-              : { note: write.response.note }),
-            channel: "CONVERSATION" as const,
-          };
-          trusted = false;
-          readAt = null;
-          latest = await settle(
-            await onFreshVersion((version) =>
-              submitOnboardingResponse(
-                input.session,
-                input.onboardingSessionId,
-                {
-                  stepKey: write.stepKey,
-                  response,
-                  expectedSessionVersion: version,
-                },
-                // Derived from the held row and the version it targets: a
-                // retried replay of the same version replays, not repeats.
-                pendingReplayKey(write.id, version),
-              ),
-            ),
-          );
-          written.push(write.stepKey);
-        },
-      });
-    },
+    replayHeld: () => replayHeldWrites(),
     affirmedParaphrases: async () => {
       const latest = input.personTurns[0];
       if (latest === undefined || readBackReplyOf(latest) !== "AFFIRM") {

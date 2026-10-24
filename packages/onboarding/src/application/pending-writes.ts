@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { DatabaseExecutor } from "@capital-q/database";
 
+import { ONBOARDING_CONTEXT_REQUIRED_CODE } from "../domain/errors.js";
 import { canonicalise } from "../domain/idempotency.js";
 
 /**
@@ -75,12 +76,23 @@ export function sameResponseValue(a: unknown, b: unknown): boolean {
 /** Failure classes a replay distinguishes. Transient keeps the row; refused settles it. */
 export type ReplayFailure =
   | { readonly kind: "TRANSIENT"; readonly code: string }
-  | { readonly kind: "REFUSED"; readonly code: string };
+  | { readonly kind: "REFUSED"; readonly code: string }
+  /**
+   * Kept, but not because anything is down: the answer waits for its firm
+   * or company to be set up (QA F-52). The drain carries on past it.
+   */
+  | { readonly kind: "WAITING"; readonly code: string };
 
 export type DrainPorts = {
   readonly pending: () => Promise<readonly PendingWrite[]>;
   /** The step's current answer value on the record, or null when none. */
   readonly currentValue: (stepKey: string) => Promise<unknown>;
+  /**
+   * When the step's current answer was given, or null when none. A held
+   * change older than the answer on the record was overtaken by a newer
+   * answer (said again once the firm existed) and is never written over it.
+   */
+  readonly answeredAt?: (stepKey: string) => Promise<Date | null>;
   /** Submit through the ordinary validated path; throws on failure. */
   readonly submit: (write: PendingWrite) => Promise<void>;
   readonly classify: (error: unknown) => ReplayFailure;
@@ -99,57 +111,90 @@ export type DrainResult = {
   readonly refused: readonly { stepKey: string; code: string }[];
   /** Steps still held because the dependency is still down. */
   readonly stillPending: readonly string[];
+  /** Steps still held until their firm or company is set up. */
+  readonly waiting: readonly string[];
 };
 
 /**
- * Replays every held change once, oldest first. Stops at the first
- * transient failure (the dependency is still down; hammering it helps
- * nobody) and leaves the rest held. Never throws for a replay failure.
+ * Replays every held change, oldest first. Stops at the first transient
+ * failure (the dependency is still down; hammering it helps nobody) and
+ * leaves the rest held. A change waiting on its firm or company is kept
+ * and the drain carries on, and it is tried again after a pass that saved
+ * something, so the order they were held in does not matter. Never throws
+ * for a replay failure.
  */
 export async function drainPendingWrites(
   ports: DrainPorts,
 ): Promise<DrainResult> {
-  const held = await ports.pending();
   const applied: string[] = [];
   const refused: { stepKey: string; code: string }[] = [];
   const stillPending: string[] = [];
+  let waiting: PendingWrite[];
   let down = false;
-  for (const write of held) {
-    if (down) {
-      stillPending.push(write.stepKey);
-      continue;
-    }
-    try {
-      const current = await ports.currentValue(write.stepKey);
-      if (
-        current !== null &&
-        sameResponseValue(current, write.response.value)
-      ) {
-        // The original attempt landed after all: settle, write nothing.
-        await ports.settle(write.id, "APPLIED", null);
-        applied.push(write.stepKey);
+  let open = await ports.pending();
+  // Each pass after the first only follows progress: at most one pass a row.
+  for (;;) {
+    const appliedBefore = applied.length;
+    waiting = [];
+    for (const write of open) {
+      if (down) {
+        stillPending.push(write.stepKey);
         continue;
       }
-      await ports.submit(write);
-      await ports.settle(write.id, "APPLIED", null);
-      applied.push(write.stepKey);
-    } catch (error: unknown) {
-      const failure = ports.classify(error);
-      if (failure.kind === "REFUSED") {
-        await ports
-          .settle(write.id, "REFUSED", failure.code)
-          .catch(() => undefined);
-        refused.push({ stepKey: write.stepKey, code: failure.code });
-      } else {
-        await ports
-          .recordAttempt(write.id, failure.code)
-          .catch(() => undefined);
-        stillPending.push(write.stepKey);
-        down = true;
+      try {
+        const current = await ports.currentValue(write.stepKey);
+        if (
+          current !== null &&
+          sameResponseValue(current, write.response.value)
+        ) {
+          // The original attempt landed after all: settle, write nothing.
+          await ports.settle(write.id, "APPLIED", null);
+          applied.push(write.stepKey);
+          continue;
+        }
+        if (current !== null && ports.answeredAt !== undefined) {
+          const at = await ports.answeredAt(write.stepKey);
+          if (at !== null && at.getTime() > write.createdAt.getTime()) {
+            // Their newer answer stands: settled, never written over it.
+            await ports.settle(write.id, "APPLIED", null);
+            continue;
+          }
+        }
+        await ports.submit(write);
+        await ports.settle(write.id, "APPLIED", null);
+        applied.push(write.stepKey);
+      } catch (error: unknown) {
+        const failure = ports.classify(error);
+        if (failure.kind === "REFUSED") {
+          await ports
+            .settle(write.id, "REFUSED", failure.code)
+            .catch(() => undefined);
+          refused.push({ stepKey: write.stepKey, code: failure.code });
+        } else {
+          await ports
+            .recordAttempt(write.id, failure.code)
+            .catch(() => undefined);
+          if (failure.kind === "WAITING") {
+            waiting.push(write);
+          } else {
+            stillPending.push(write.stepKey);
+            down = true;
+          }
+        }
       }
     }
+    if (down || waiting.length === 0 || applied.length === appliedBefore) {
+      break;
+    }
+    open = waiting;
   }
-  return { applied, refused, stillPending };
+  const kept = waiting.map((w) => w.stepKey);
+  return {
+    applied,
+    refused,
+    stillPending: down ? [...stillPending, ...kept] : stillPending,
+    waiting: down ? [] : kept,
+  };
 }
 
 /**
@@ -159,6 +204,9 @@ export async function drainPendingWrites(
  */
 export function isTransientOnboardingFailure(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return true;
+  // QA F-52: an answer that waits for its firm or company to be set up is
+  // held and saved once it is, never refused for good.
+  if (waitsForContext(error)) return true;
   const status = (error as { readonly status?: unknown }).status;
   if (typeof status === "number") {
     // 409 VERSION_CONFLICT: the session moved under us; retry later. Any
@@ -184,4 +232,27 @@ export function failureCode(error: unknown): string {
     if (name === "AbortError" || name === "TimeoutError") return "TIMEOUT";
   }
   return "UPSTREAM_UNAVAILABLE";
+}
+
+/**
+ * QA F-52: the refusal says the firm or company this answer belongs to is
+ * not set up yet (an error, or a batch refusal's problem shape).
+ */
+export function waitsForContext(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if (Reflect.get(error, "code") === ONBOARDING_CONTEXT_REQUIRED_CODE) {
+    return true;
+  }
+  const problem: unknown = Reflect.get(error, "problem") ?? error;
+  if (typeof problem !== "object" || problem === null) return false;
+  const errors: unknown = Reflect.get(problem, "errors");
+  return (
+    Array.isArray(errors) &&
+    errors.some(
+      (item: unknown) =>
+        typeof item === "object" &&
+        item !== null &&
+        Reflect.get(item, "code") === ONBOARDING_CONTEXT_REQUIRED_CODE,
+    )
+  );
 }

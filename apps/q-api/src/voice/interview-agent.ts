@@ -229,6 +229,9 @@ function decisionsOf(
   return out.slice(0, 40);
 }
 
+/** QA F-49: their message only says a file was added (see the workspace). */
+const ANNOUNCES_UPLOAD = /^I've just (?:uploaded|added)\b/u;
+
 /**
  * Steps a write was refused for this turn, other than an answer held for
  * the person's confirmation (which is progress, not a refusal).
@@ -604,6 +607,7 @@ export function turnNotesFor(input: {
         readonly applied: readonly string[];
         readonly refused: readonly string[];
         readonly stillPending: readonly string[];
+        readonly waiting?: readonly string[];
       }
     | undefined;
 }): string {
@@ -637,6 +641,11 @@ export function turnNotesFor(input: {
     if (held.stillPending.length > 0) {
       notes.push(
         `Still held and NOT saved yet (a service is briefly unavailable): ${list(held.stillPending)}. Never say these are saved, and do not ask them again.`,
+      );
+    }
+    if ((held.waiting ?? []).length > 0) {
+      notes.push(
+        `Kept from what they told you, NOT saved yet because their firm or company is not set up yet: ${list(held.waiting ?? [])}. They save by themselves once it is. Never say these are saved, never ask them again, and ask only for what setting it up still needs.`,
       );
     }
   }
@@ -1417,13 +1426,15 @@ export function createInterviewAgent(
       replay === null ||
       replay.applied.length +
         replay.refused.length +
-        replay.stillPending.length ===
+        replay.stillPending.length +
+        replay.waiting.length ===
         0
         ? undefined
         : {
             applied: replay.applied.map(questionOf),
             refused: replay.refused.map((r) => questionOf(r.stepKey)),
             stillPending: replay.stillPending.map(questionOf),
+            waiting: replay.waiting.map(questionOf),
           };
     await settleKnownAnswers(port, input.journeyType);
     await prefillFromSignup();
@@ -2626,8 +2637,10 @@ export function createInterviewAgent(
       replyWritten,
       opening || recorded.length > 0 || (heldNote?.applied.length ?? 0) > 0,
       // Code's own words only in English; in any other language the claim
-      // is taken out and the model's reply speaks for itself.
-      codeSpeaksEnglish ? undefined : "",
+      // is taken out and the model's reply speaks for itself. QA F-49: a
+      // file they just added is being read (or waits for their company),
+      // not "not saved": the claim goes, and nothing is said in its place.
+      codeSpeaksEnglish && !ANNOUNCES_UPLOAD.test(utterance) ? undefined : "",
     );
     if (backedReply !== replyWritten) {
       logger.info({}, "interview reply claimed a save nothing backed; removed");

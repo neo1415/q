@@ -1502,6 +1502,16 @@ export function QOnboardingWorkspace({
       : undefined;
   /** An upload whose name says nothing: the person says what it is first. */
   const [askKind, setAskKind] = useState<File | null>(null);
+  /**
+   * QA F-49 (23 Oct 2026): a deck dropped in before the company is named
+   * came back "We couldn't accept that file" (nothing to file it under yet).
+   * It waits here, in this tab, and goes up by itself the moment the
+   * company exists; Q is told so, and asks for the name.
+   */
+  const waitingFile = useRef<{
+    readonly file: File;
+    readonly chosenType?: string | undefined;
+  } | null>(null);
   const uploadWhileTalking = useCallback(
     async (file: File, chosenType?: string) => {
       // Lane ob1: filed by its name (never its bytes). Only a deck or a
@@ -1513,6 +1523,16 @@ export function QOnboardingWorkspace({
         return;
       }
       setAskKind(null);
+      if (qSubject === undefined) {
+        waitingFile.current = { file, chosenType };
+        setUploadNote(
+          `${file.name} is kept here. I'll read it as soon as your company is set up.`,
+        );
+        const held = `I've just added ${file.name}. Keep it until my company is set up: ask me its name first, then read it.`;
+        if (voiceActive) setHeldUpload(held);
+        else await say(held);
+        return;
+      }
       const readable =
         onboardingDocumentTreatment({
           documentType,
@@ -1594,7 +1614,7 @@ export function QOnboardingWorkspace({
       await actions.refresh();
       const told = ready
         ? `I've just uploaded ${file.name}. Read back what you found in it and check it with me.`
-        : `I've just uploaded ${file.name}; it's still being read. Carry on and come back to it when it's ready.`;
+        : `I've just uploaded ${file.name}; it's still being read. Say you're reading it now and will show what you found in a minute, then carry on.`;
       // Typed or spoken, Q hears about it the same way (founder
       // walkthrough F2): the upload is part of the conversation, not a
       // detour to the company page.
@@ -1610,8 +1630,15 @@ export function QOnboardingWorkspace({
         await say(told);
       }
     },
-    [companyIdForUpload, actions, voiceActive, say],
+    [companyIdForUpload, qSubject, actions, voiceActive, say],
   );
+  // F-49: the waiting file goes up once there is somewhere to file it.
+  useEffect(() => {
+    const waiting = waitingFile.current;
+    if (waiting === null || qSubject === undefined) return;
+    waitingFile.current = null;
+    void uploadWhileTalking(waiting.file, waiting.chosenType);
+  }, [qSubject, uploadWhileTalking]);
 
   // Q takes the person somewhere, or leaves them with the form: followed
   // once per turn, never twice.
@@ -1921,7 +1948,7 @@ export function QOnboardingWorkspace({
                       className="block cq-caption text-(--cq-text-secondary)"
                       data-suggestion-note
                     >
-                      {item.suggestion.rationale}
+                      {secondPerson(item.suggestion.rationale)}
                     </span>
                   )}
                 </span>
@@ -2664,4 +2691,14 @@ function ProgressStrip({
       />
     </div>
   );
+}
+
+/**
+ * QA F-53 (23 Oct 2026): a note stored before Q spoke to the person ("from
+ * what they said earlier") is shown to them in the second person.
+ */
+function secondPerson(note: string): string {
+  return note
+    .replace(/^from what they said earlier/iu, "From what you said earlier")
+    .replace(/^Q's summary of their words/u, "Q's summary of your words");
 }

@@ -70,6 +70,12 @@ export type WorldOptions = {
    */
   readonly refuseUntil?: Readonly<Record<string, string>> | undefined;
   /**
+   * The firm or company is not set up until every one of these steps is
+   * answered: any other step is refused as the service does before then
+   * (OnboardingContextRequiredError, QA F-52).
+   */
+  readonly setUpBy?: readonly string[] | undefined;
+  /**
    * Refuse to set aside a step that holds an answer, as the real journey
    * does (STEP_NOT_ELIGIBLE). Opt-in: the clears path's tests predate it.
    */
@@ -146,6 +152,12 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     ]),
   );
   const setAside = new Set<string>();
+  /** When each answer was given in this run (seeded answers: NOW). */
+  const answeredAt = new Map<string, string>();
+  const answer = (stepKey: string, value: OnboardingResponseValue) => {
+    held.set(stepKey, value);
+    answeredAt.set(stepKey, new Date().toISOString());
+  };
   /** Notes kept with the current response, by step. */
   const notes = new Map<string, string>();
   const tried: string[] = [];
@@ -225,7 +237,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
         value,
         sourceModality: "TYPED_TEXT",
         note: notes.get(stepKey) ?? null,
-        createdAt: NOW,
+        createdAt: answeredAt.get(stepKey) ?? NOW,
       })),
       pendingQuestions: [],
     }) as unknown as OnboardingSessionView;
@@ -414,7 +426,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
         return Promise.resolve(refusal("suggestion"));
       }
       suggestion.status = "ACCEPTED";
-      held.set(suggestion.stepKey, suggestion.value);
+      answer(suggestion.stepKey, suggestion.value);
       tried.push(suggestion.stepKey);
       version += 1;
       return Promise.resolve(Response.json(view()));
@@ -490,6 +502,34 @@ export function investorSession(options: WorldOptions): InvestorWorld {
           ),
         );
       }
+      const setUpBy = options.setUpBy ?? [];
+      if (
+        setUpBy.length > 0 &&
+        !setUpBy.includes(body.stepKey) &&
+        setUpBy.some((key) => !held.has(key))
+      ) {
+        const message =
+          "This is kept and saved once the firm or company is set up; its name comes first.";
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              type: "urn:capitalq:problem:invalid-request",
+              title: "The request is not valid.",
+              status: 400,
+              code: "INVALID_REQUEST",
+              requestId: "req_test",
+              detail: message,
+              errors: [
+                { path: "value", code: "onboarding_context_required", message },
+              ],
+            }),
+            {
+              status: 400,
+              headers: { "content-type": "application/problem+json" },
+            },
+          ),
+        );
+      }
       const needs = options.refuseUntil?.[body.stepKey];
       if (needs !== undefined && !held.has(needs)) {
         return Promise.resolve(refusal(needs.split(".").at(-1) ?? needs));
@@ -533,7 +573,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
           ),
         );
       }
-      held.set(body.stepKey, body.response.value);
+      answer(body.stepKey, body.response.value);
       if (body.response.note === undefined) notes.delete(body.stepKey);
       else notes.set(body.stepKey, body.response.note);
       version += 1;
@@ -616,7 +656,7 @@ export function investorSession(options: WorldOptions): InvestorWorld {
     recordedValue: (stepKey) => held.get(stepKey),
     recordedNote: (stepKey) => notes.get(stepKey),
     record: (stepKey, value) => {
-      held.set(stepKey, value);
+      answer(stepKey, value);
       version += 1;
     },
     skippedSteps: () => [...setAside],
