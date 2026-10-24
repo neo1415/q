@@ -260,3 +260,20 @@ describe("live Arabic check 2026-10-16: no English half-sentences", () => {
     );
   });
 });
+
+describe("Automatic follows the device (QO-45)", () => {
+  it("picks the first of the browser's languages, by tag then primary language", async () => {
+    const { deviceLanguageOf, uiLanguageOf } =
+      await import("../src/features/i18n/messages");
+    expect(uiLanguageOf("AUTO", "ar-EG,ar;q=0.9,en;q=0.8")).toBe("ar-EG");
+    expect(uiLanguageOf(null, ["fr-FR", "en"])).toBe("fr-FR");
+    // Quality decides the order, not the position.
+    expect(deviceLanguageOf("en;q=0.5,ar;q=0.9")).toBe("ar");
+    // English in any region is English; nothing usable is English.
+    expect(deviceLanguageOf("en-GB,ar;q=0.5")).toBe("en");
+    expect(deviceLanguageOf("*")).toBe("en");
+    expect(uiLanguageOf("AUTO")).toBe("en");
+    // A saved language is never overridden by the device.
+    expect(uiLanguageOf("en", "ar-EG")).toBe("en");
+  });
+});
