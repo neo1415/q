@@ -288,6 +288,21 @@ export type RelationshipIntelligencePort = {
     actor: ActorContext,
     companyId: string,
   ) => Promise<boolean>;
+  /**
+   * Their organisation's own interest in a company, when it already
+   * exists (QA QO-39): when it was expressed and where it stands, read as
+   * the actor. Null: none. Absent: never read.
+   */
+  readonly ownInterest?:
+    | ((
+        actor: ActorContext,
+        companyId: string,
+      ) => Promise<{
+        readonly expressedAt: string;
+        readonly response: "PENDING" | "ACCEPTED" | "DECLINED";
+        readonly connected: boolean;
+      } | null>)
+    | undefined;
   /** The answer command's own authorisation; writes nothing. */
   readonly mayAnswerInterest: (
     actor: ActorContext,

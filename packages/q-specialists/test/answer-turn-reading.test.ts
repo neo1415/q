@@ -557,6 +557,59 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     await turn.answering;
   });
 
+  it("F-36: the Arabic 'افتح صفحة الاكتشاف' read as NAVIGATE DISCOVER opens Discover (the move words are only known in English)", async () => {
+    const run = seam({
+      said: "افتح صفحة الاكتشاف",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "DISCOVER",
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(0);
+    expect(run.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "DISCOVER" },
+      },
+    ]);
+  });
+
+  it("F-34: 'Show me my Q Card and the share link' is answered from the card, never only a move to the profile", async () => {
+    const run = seam({
+      said: "Show me my Q Card and the share link.",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "PROFILE",
+        visibility: null,
+      }),
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    expect(
+      run.stored.flatMap((message) => message.blocks ?? []),
+    ).not.toContainEqual(expect.objectContaining({ kind: "UI_INTENT" }));
+  });
+
+  it("a statement in English naming no page still never moves them", async () => {
+    const run = seam({
+      said: "I'm looking at Discover right now.",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "DISCOVER",
+        visibility: null,
+      }),
+      outcomes: [{ kind: "ANSWERED", messageId: randomUUID() } as never],
+    });
+    await run.answer.answer(request());
+    expect(
+      run.stored.flatMap((message) => message.blocks ?? []),
+    ).not.toContainEqual(expect.objectContaining({ kind: "UI_INTENT" }));
+  });
+
   it("answers 'take me to discover' with a NAVIGATE intent and no model answer (F8)", async () => {
     const run = seam({
       said: "take me to discover",
@@ -684,7 +737,7 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(run.stored[0]?.blocks ?? []).toEqual([]);
   });
 
-  it("opens the third card on screen for 'the third company on the list' (voice-cards)", async () => {
+  it("answers 'tell me about the third company on the list' and never moves them (QA F-41); 'open the third one' opens it", async () => {
     const ids = [
       "11111111-1111-4111-8111-111111111111",
       "22222222-2222-4222-8222-222222222222",
@@ -729,15 +782,12 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
       ],
     });
     await run.answer.answer(request());
-    // Talked about from its card and opened; never only `Opening "…".`
-    expect(run.stored[0]?.content).toMatch(/^Tensorgate\b/u);
-    expect(run.stored[0]?.content).not.toMatch(/Opening "/u);
-    expect(run.stored[0]?.blocks).toEqual([
-      {
-        kind: "UI_INTENT",
-        intent: { kind: "OPEN_RECORD_PAGE", page: "COMPANY", id: ids[2] },
-      },
-    ]);
+    // A question about the card: the answer path answers it, with the
+    // record bound; nothing opens and the conversation stays (QA F-41).
+    expect(run.delegated()).toBe(1);
+    expect(
+      run.stored.flatMap((message) => message.blocks ?? []),
+    ).not.toContainEqual(expect.objectContaining({ kind: "UI_INTENT" }));
   });
 
   it("a screen Capital Q does not have is said not to exist and the nearest offered; nobody is moved (live test 2026-09-27 #5)", async () => {

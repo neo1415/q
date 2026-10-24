@@ -599,8 +599,17 @@ function createProposeExpressInterestTool(
 ): AnyQToolDefinition {
   return defineQTool<
     ProposeExpressInterestInput,
-    ProposalOutput,
-    { readonly companyId: string; readonly companyName: string }
+    ExpressInterestProposalOutput,
+    {
+      readonly companyId: string;
+      readonly companyName: string;
+      /** Their interest already exists (QO-39): said, nothing prepared. */
+      readonly already?: {
+        readonly expressedAt: string;
+        readonly response: "PENDING" | "ACCEPTED" | "DECLINED";
+        readonly connected: boolean;
+      };
+    }
   >({
     id: PROPOSE_EXPRESS_INTEREST,
     version: 1,
@@ -618,7 +627,7 @@ function createProposeExpressInterestTool(
     owner: "q-tools",
     visibleStage: "WAITING_FOR_APPROVAL",
     input: ProposeExpressInterestInputSchema,
-    output: ProposalOutputSchema,
+    output: ExpressInterestProposalOutputSchema,
     authorize: async (input, { actor, plan }) => {
       // By id: a company this run's plan targets. By name (action parity
       // 2026-10-02, from any page): one company they can already see, by
@@ -636,7 +645,25 @@ function createProposeExpressInterestTool(
             );
       if (companyId === null) return deny("NOT_AVAILABLE");
       if (!(await relationships.mayExpressInterest(actor, companyId))) {
-        return deny("NOT_AVAILABLE");
+        // Already expressed (QA QO-39, live 2026-10-23: "express interest
+        // in Ledgerfold with a note" opened the page; it was sent on 5
+        // Oct and Q never said so): when, and where it stands, read as
+        // them. Anything else stays the one refusal.
+        const already = await relationships
+          .ownInterest?.(actor, companyId)
+          .catch(() => null);
+        const named =
+          already == null
+            ? null
+            : await ports.companies.findCanonicalCompanyProfile(
+                CompanyIdSchema.parse(companyId),
+              );
+        if (already == null || named == null) return deny("NOT_AVAILABLE");
+        return allow("NETWORK_VISIBLE", {
+          companyId,
+          companyName: named.canonicalName,
+          already,
+        });
       }
       const profile = await ports.companies.findCanonicalCompanyProfile(
         CompanyIdSchema.parse(companyId),
@@ -648,6 +675,16 @@ function createProposeExpressInterestTool(
       });
     },
     execute: (input, context, grant) => {
+      if (grant.already !== undefined) {
+        return Promise.resolve({
+          status: "ALREADY_EXPRESSED" as const,
+          awaitingApprovalOf: alreadyExpressedLine(
+            grant.companyName,
+            grant.already,
+            input.note ?? null,
+          ),
+        });
+      }
       const status = relationships.prepareForApproval({
         runId: context.runId,
         tenantId: context.actor.tenantId,
@@ -668,6 +705,51 @@ function createProposeExpressInterestTool(
       });
     },
   });
+}
+
+/** Express Interest's result: prepared, or already expressed (QO-39). */
+export const ExpressInterestProposalOutputSchema = z
+  .object({
+    /**
+     * PREPARED / ONE_PER_TURN as any proposal. ALREADY_EXPRESSED: their
+     * organisation's interest exists; nothing was prepared, and
+     * `awaitingApprovalOf` says when and where it stands, to say as it is.
+     */
+    status: z.enum(["PREPARED", "ONE_PER_TURN", "ALREADY_EXPRESSED"]),
+    awaitingApprovalOf: z.string(),
+  })
+  .strict();
+export type ExpressInterestProposalOutput = z.infer<
+  typeof ExpressInterestProposalOutputSchema
+>;
+
+/** "5 Oct", in UTC: a date said, never a time zone guessed. */
+function dayMonth(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? "earlier"
+    : `on ${date.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}`;
+}
+
+/** What Q says when their interest already exists (QA QO-39). */
+export function alreadyExpressedLine(
+  companyName: string,
+  already: {
+    readonly expressedAt: string;
+    readonly response: "PENDING" | "ACCEPTED" | "DECLINED";
+    readonly connected: boolean;
+  },
+  note: string | null,
+): string {
+  const when = dayMonth(already.expressedAt);
+  const quoted = note === null ? "" : ` Your note: "${note}".`;
+  if (already.connected || already.response === "ACCEPTED") {
+    return `You already expressed interest in ${companyName} ${when}, and you're connected. Want me to send them a message instead?${quoted}`;
+  }
+  if (already.response === "DECLINED") {
+    return `You already expressed interest in ${companyName} ${when}; they haven't taken it forward, so nothing new was prepared.`;
+  }
+  return `You already expressed interest in ${companyName} ${when}; they haven't answered yet, so nothing new was prepared. Messages open once they accept.${quoted}`;
 }
 
 export const ProposeInterestAnswerInputSchema = z

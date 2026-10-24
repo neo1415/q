@@ -414,6 +414,16 @@ export function createRelationshipIntelligencePort(dependencies: {
       ),
     mayExpressInterest: (actor, companyId) =>
       interests.mayExpressInterest({ actor, companyId }),
+    // QO-39: their own interest, when it already exists, as they read it.
+    ownInterest: async (actor, companyId) => {
+      const interest = await interests.getOwnInterest({ actor, companyId });
+      if (interest === null || interest.status !== "EXPRESSED") return null;
+      return {
+        expressedAt: interest.createdAt,
+        response: interest.response?.decision ?? "PENDING",
+        connected: interest.connection?.status === "ACTIVE",
+      };
+    },
     mayAnswerInterest: (actor, interestId) =>
       interests.mayRespondToInterest({ actor, interestId }),
     prepareForApproval: board.prepareForApproval,

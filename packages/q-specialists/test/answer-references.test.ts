@@ -746,3 +746,66 @@ describe("a question about the page already on screen is answered, not re-opened
     expect(elsewhere.delegated()).toBe(1);
   });
 });
+
+describe("an asked action or question is never turned into a page move (QA 2026-10-23, live v60)", () => {
+  const LEDGERFOLD = "84b9641f-b618-4fa3-8b35-1d19b1c71d82";
+  // An opener that would open anything: only the gate decides.
+  const always: QOpenRecordPort = {
+    open: (_request, target) =>
+      Promise.resolve({
+        kind: "OPEN_RECORD_PAGE",
+        page: target.page,
+        id: LEDGERFOLD,
+      }),
+  };
+  const reading = (
+    open: "COMPANY" | "INVESTOR",
+    name: string,
+    kind: string = "TOOL_REQUEST",
+  ) =>
+    ({
+      ...BASE,
+      kind,
+      reference: { open, name, shown: null, retryLast: false, sameFor: null },
+    }) as unknown as QTurnReading;
+
+  for (const [finding, said, read] of [
+    [
+      "F-33",
+      "Reply to Rift Valley Seed Fund: accept their interest and suggest a call next week.",
+      reading("INVESTOR", "Rift Valley Seed Fund"),
+    ],
+    [
+      "QO-39",
+      "Express interest in Ledgerfold with this note: 'Hi team, I back early fintech in Lagos and would love to learn more.'",
+      reading("COMPANY", "Ledgerfold"),
+    ],
+    [
+      "F-41",
+      "Tell me more about the second one.",
+      reading("COMPANY", "Ledgerfold"),
+    ],
+  ] as const) {
+    it(`${finding}: "${said.slice(0, 40)}…" reaches the answer, not a move`, async () => {
+      const chat = conversation({ openRecord: always });
+      const reply = await chat.say(said, read);
+      expect(chat.delegated()).toBe(1);
+      expect(reply?.blocks ?? []).not.toContainEqual(
+        expect.objectContaining({ kind: "UI_INTENT" }),
+      );
+    });
+  }
+
+  it("still opens what they ask to open", async () => {
+    const chat = conversation({ openRecord: always });
+    const reply = await chat.say(
+      "Open Ledgerfold.",
+      reading("COMPANY", "Ledgerfold"),
+    );
+    expect(chat.delegated()).toBe(0);
+    expect(reply?.blocks?.[0]).toMatchObject({
+      kind: "UI_INTENT",
+      intent: { kind: "OPEN_RECORD_PAGE", id: LEDGERFOLD },
+    });
+  });
+});

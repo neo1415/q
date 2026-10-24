@@ -603,6 +603,43 @@ describe("proposal tools write nothing but a prepared proposal", () => {
     expect(calls.prepared).toHaveLength(1);
   });
 
+  it("says when their interest was already expressed, and prepares nothing new (QA QO-39)", async () => {
+    const { port: base, calls } = fakeRelationships(randomHistory(5), {
+      mayExpress: false,
+    });
+    const port: RelationshipIntelligencePort = {
+      ...base,
+      ownInterest: () =>
+        Promise.resolve({
+          expressedAt: "2026-10-05T09:00:00.000Z",
+          response: "ACCEPTED" as const,
+          connected: true,
+        }),
+    };
+    const outcome = await executorWith(port).execute(
+      {
+        callId: "p1a",
+        name: "propose_express_interest",
+        arguments: {
+          companyId: COMPANY_B_NETWORK,
+          note: "Hi team, I back early fintech in Lagos.",
+        },
+      },
+      contextFor(actorB, investorPlan),
+    );
+    expect(outcome.status).toBe("SUCCEEDED");
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "ALREADY_EXPRESSED" },
+    });
+    const said = JSON.stringify(outcome.result);
+    expect(said).toContain("You already expressed interest in");
+    expect(said).toContain("on 5 Oct");
+    expect(said).toContain("Want me to send them a message instead?");
+    expect(said).toContain("Hi team, I back early fintech in Lagos.");
+    expect(calls.prepared).toEqual([]);
+  });
+
   it("prepares nothing when the command itself would refuse", async () => {
     const { port, calls } = fakeRelationships(randomHistory(5), {
       mayExpress: false,
@@ -875,5 +912,89 @@ describe("a founder's Connection Request by name (action parity 2026-10-02)", ()
     );
     expect(nobody.status).toBe("DENIED");
     expect(unseen.asked).toEqual([]);
+  });
+
+  it("'Draft a connection request to Zino Aviation' picks the one of several same-named organisations they may ask (QA QO-33)", async () => {
+    const twins = [
+      "2b000000-0000-4000-8000-0000000000b1",
+      "2b000000-0000-4000-8000-0000000000b2",
+      "2b000000-0000-4000-8000-0000000000b3",
+    ];
+    const { port: base, calls } = fakeRelationships(randomHistory(8));
+    const asked: string[] = [];
+    const port: RelationshipIntelligencePort = {
+      ...base,
+      // Only the listed, discoverable one takes requests.
+      mayRequestConnection: (_actor, id) => {
+        asked.push(id);
+        return Promise.resolve(id === twins[1]);
+      },
+    };
+    const executor = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(
+          fakePorts({
+            relationships: port,
+            discovery: {
+              discoverInvestors: () =>
+                Promise.resolve({
+                  items: twins.map((investorOrganisationId) => ({
+                    investorOrganisationId,
+                    displayName: "Zino Aviation",
+                  })),
+                }),
+            } as never,
+          }),
+        ),
+      ),
+    });
+    const outcome = await executor.execute(
+      {
+        callId: "cr4",
+        name: "propose_connection_request",
+        arguments: { investor: "Zino Aviation" },
+      },
+      contextFor(actorA, plan),
+    );
+    expect(outcome.result).toMatchObject({
+      ok: true,
+      data: { status: "PREPARED" },
+    });
+    expect(calls.prepared[0]?.payload).toMatchObject({
+      investorOrganisationId: twins[1],
+      investorName: "Zino Aviation",
+    });
+    // None of them may be asked: still the one refusal.
+    const none = {
+      ...port,
+      mayRequestConnection: () => Promise.resolve(false),
+    };
+    const refused = createQToolExecutor({
+      registry: createQToolRegistry(
+        createDefaultQTools(
+          fakePorts({
+            relationships: none,
+            discovery: {
+              discoverInvestors: () =>
+                Promise.resolve({
+                  items: twins.map((investorOrganisationId) => ({
+                    investorOrganisationId,
+                    displayName: "Zino Aviation",
+                  })),
+                }),
+            } as never,
+          }),
+        ),
+      ),
+    });
+    const no = await refused.execute(
+      {
+        callId: "cr5",
+        name: "propose_connection_request",
+        arguments: { investor: "Zino Aviation" },
+      },
+      contextFor(actorA, plan),
+    );
+    expect(no.status).toBe("DENIED");
   });
 });

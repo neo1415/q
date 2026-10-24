@@ -341,6 +341,7 @@ import {
   cannotOpenLine,
   cardAt,
   cardsOnScreen,
+  asksToGo,
   ordinalOf,
   pageRequestOf,
   takenBack,
@@ -951,6 +952,28 @@ export type QVisibilityNotebook = {
     readonly visibility: "network_visible" | "organisation_private";
   }) => void;
 };
+
+/**
+ * Whether a turn may be answered by a move alone (QA 2026-10-23, F-33 /
+ * F-41 / F-34 / QO-39: "accept their interest...", "tell me more about
+ * the second one", "show me my Q Card and the share link", "express
+ * interest in Ledgerfold with this note" were each answered by opening a
+ * page, and the ask was lost). Only words that ask to go somewhere are a
+ * move; a question or an action is answered, and the answer may open a
+ * page beside its words through its own tool. Words in a script with no
+ * Latin letters are taken as the reading says: the move words are only
+ * known in English, and the reading is by meaning in any language (F-36).
+ */
+function onlyAMove(text: string): boolean {
+  return (
+    asksToGo(text) ||
+    /\bopen(?:ed|ing|s)?\b/iu.test(text) ||
+    !/\p{Script=Latin}/u.test(text)
+  );
+}
+
+/** Their own Q Card, asked about: read and offered by the answer, never a page move (F-34). */
+const NAMES_Q_CARD = /\bq[\s-]?card\b/iu;
 
 /** The person's latest words in this conversation, for varied wording. */
 function askedIn(history: readonly QConversationMessage[]): string {
@@ -1990,11 +2013,11 @@ export function createSpecialistQAnswer(
       }
       // The reader's move is followed only when their words ask for that
       // page (live 2026-10-09: statements and negations moved the screen).
+      const words = askedIn(history);
       if (
-        !wordsNamePage(askedIn(history), {
-          kind: "DESTINATION",
-          destination,
-        })
+        (!wordsNamePage(words, { kind: "DESTINATION", destination }) &&
+          /\p{Script=Latin}/u.test(words)) ||
+        NAMES_Q_CARD.test(words)
       ) {
         logger?.info(
           { qRunId: request.runId, destination },
@@ -2123,6 +2146,9 @@ export function createSpecialistQAnswer(
     const navigable = manifestOf(capabilities).navigate;
     if (navigable.length === 0) return null;
     const position = ordinalOf(text);
+    // "Tell me (more) about the second one" is a question: answered with
+    // the record bound, never a move (QA F-41).
+    if (position !== null && !asksToGo(text)) return null;
     if (position !== null) {
       const block = cardsOnScreen(history);
       const card = block === null ? null : cardAt(block, position);
@@ -2396,7 +2422,9 @@ export function createSpecialistQAnswer(
     // An open request ("open the second one") or a correction of what was
     // opened ("not that investor, the second one"); "explain the second
     // one" is a question, answered with the binding as a note instead.
-    if (ordinalOf(text) === null && !ask.correction) return null;
+    if ((ordinalOf(text) === null || !asksToGo(text)) && !ask.correction) {
+      return null;
+    }
     // Q's own company cards: the existing card path talks about the card.
     if (
       resolved.via === "Q_ANSWER" &&
@@ -3645,7 +3673,9 @@ export function createSpecialistQAnswer(
         onScreenTab.blocks,
       );
     }
-    const byName = await namedRecordAnswer(request, latest.content);
+    const byName = NAMES_Q_CARD.test(latest.content)
+      ? null
+      : await namedRecordAnswer(request, latest.content);
     // W4: none of their relationships, but a researched entity they can
     // reach by name: its identity card in focus.
     if (byName === null || byName.log === "NOT_FOUND") {
@@ -4297,7 +4327,12 @@ export function createSpecialistQAnswer(
     // asks Q to do something or answers Q.
     const asksAboutIt =
       read?.kind === "QUESTION_TO_Q" || read?.kind === "RESEARCH_REQUEST";
-    if (reference !== null && reference.open !== null && !asksAboutIt) {
+    if (
+      reference !== null &&
+      reference.open !== null &&
+      !asksAboutIt &&
+      onlyAMove(latest.content)
+    ) {
       const opened = await openReferenced(
         request,
         conversationId,

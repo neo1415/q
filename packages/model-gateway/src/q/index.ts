@@ -8034,7 +8034,13 @@ export function createModelGatewayQAnswer(
           // A reply that asks them something ("Would you like me to…?")
           // is waiting on them; a could-not line after it contradicts the
           // question (QA run 4e3b1903).
-          !asksThePerson(statusTalk?.text ?? guarded.text)
+          !asksThePerson(statusTalk?.text ?? guarded.text) &&
+          // QA 2026-10-23: the could-not line was appended in English
+          // after the model's own reply in Arabic ("لم أستطع فتح صفحة
+          // الاكتشاف"). The checks above read English words only, so a
+          // reply in another script is taken as its own account of what
+          // happened, in the person's language.
+          !repliedInOtherScript(statusTalk?.text ?? guarded.text)
             ? couldNotDoLine(parityGap)
             : null;
         if (couldNot !== null) {
@@ -8591,6 +8597,11 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
  * that it did not, and why, by the kind of miss -- never a status line in
  * place of an answer, and never a claim that anything changed.
  */
+/** A reply written without Latin letters (Arabic, Amharic, Chinese...). */
+function repliedInOtherScript(text: string): boolean {
+  return /\p{L}/u.test(text) && !/\p{Script=Latin}/u.test(text);
+}
+
 export function couldNotDoLine(gap: string): string {
   switch (gap) {
     case "DECLARED_NOT_OFFERED":
@@ -8603,7 +8614,9 @@ export function couldNotDoLine(gap: string): string {
       // Not "I couldn't tell which action" (QA 2026-10-03, run 18eb8420):
       // nothing was done, and the one question that moves it is asked --
       // including handing the work over for Q to keep doing.
-      return "Nothing was prepared or changed yet. What should I take on: one thing now, or should I work on it for you over time? Say which, and I'll prepare it for your approval.";
+      // Never a canned "what should I take on?" (QA 2026-10-23): what
+      // happened, plainly, and what Q will do next.
+      return "I didn't get that done, so nothing was prepared or changed. Tell me again what you'd like and I'll prepare it for your approval.";
   }
 }
 

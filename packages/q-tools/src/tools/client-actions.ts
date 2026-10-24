@@ -483,6 +483,32 @@ export function matchCounterpart(
 }
 
 /**
+ * The records that bear exactly the name a spoken name best matches, in
+ * the order given (their own relationships first). Production holds
+ * duplicates with one name (QA QO-33: twelve "Zino Aviation" investor
+ * organisations), which matchCounterpart rightly calls ambiguous; the
+ * caller then keeps the one its own rule admits. Empty when the best
+ * match is not shared by an identical name.
+ */
+export function sameNamedBest(
+  name: string,
+  candidates: readonly { readonly id: string; readonly name: string }[],
+): readonly { readonly id: string; readonly name: string }[] {
+  const scored = candidates.map((candidate) => ({
+    candidate,
+    score: spokenNameScore(name, candidate.name),
+  }));
+  const best = Math.max(0, ...scored.map((entry) => entry.score));
+  if (best < NAME_MATCH_FLOOR) return [];
+  const top = scored.filter((entry) => entry.score === best);
+  const key = nameKey(top[0]?.candidate.name ?? "");
+  return top.every((entry) => nameKey(entry.candidate.name) === key) &&
+    top.length > 1
+    ? top.map((entry) => entry.candidate)
+    : [];
+}
+
+/**
  * Every record of a kind this person may already see, by name: their own
  * relationships, their own Saves and Passes, and what the network shows
  * them (network-visible companies; the investors Discover lists to a
