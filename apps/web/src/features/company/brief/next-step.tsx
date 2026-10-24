@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import type {
   DataRoomView,
@@ -11,6 +11,7 @@ import type {
 import { Button, buttonClassName } from "@capital-q/ui/button";
 
 import { ExpressInterest } from "@/features/network/express-interest";
+import { useDockAvoid } from "@/features/q-dock/dock-avoid";
 import { useT } from "@/features/i18n/language";
 
 import { ProfilePass } from "../company-profile-parts";
@@ -210,11 +211,10 @@ export function NextStepRibbon({
         </section>
       )}
       {!phone ? null : (
-        <div
+        <PhoneDock
           key={`dock-${String(moved)}`}
-          className="cq-brief-dock"
-          data-moved={moved > 0 ? "" : undefined}
-          data-next-step-dock={step.kind}
+          moved={moved > 0}
+          kind={step.kind}
         >
           <p className="dt">
             <span>
@@ -223,9 +223,37 @@ export function NextStepRibbon({
             <b>{step.title}</b>
           </p>
           {primary("dock")}
-        </div>
+        </PhoneDock>
       )}
     </>
+  );
+}
+
+/**
+ * The phone's next-step bar, registered with the Q dock so the dock never
+ * sits on its text or button (QA F-87, live 24 Oct: the Q bubble covered
+ * "Next step 1 of 5"). Its own component so a re-keyed bar registers again.
+ */
+function PhoneDock({
+  moved,
+  kind,
+  children,
+}: {
+  readonly moved: boolean;
+  readonly kind: string;
+  readonly children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDockAvoid(ref);
+  return (
+    <div
+      ref={ref}
+      className="cq-brief-dock"
+      data-moved={moved ? "" : undefined}
+      data-next-step-dock={kind}
+    >
+      {children}
+    </div>
   );
 }
 
