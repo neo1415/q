@@ -179,10 +179,10 @@ async function interestFacts(
     investorGates(session, ids),
     discoverInvestors(session).catch(() => null),
   ]);
-  const reasons = new Map(
+  const listed = new Map(
     (slate?.items ?? []).map((item) => [
       item.investorOrganisationId.toLowerCase(),
-      item.reasons,
+      item,
     ]),
   );
   return new Map(
@@ -196,7 +196,8 @@ async function interestFacts(
           looksFor: looksForSentence(publishedMandate(cards.get(id) ?? null)),
           matches: dimensionMatches(
             gateFor(gates, id),
-            reasons.get(id.toLowerCase()) ?? [],
+            listed.get(id.toLowerCase())?.reasons ?? [],
+            listed.get(id.toLowerCase())?.publishedFit,
           ),
         },
       ];

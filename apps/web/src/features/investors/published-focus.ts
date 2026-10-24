@@ -3,6 +3,7 @@ import type {
   InvestorGateFitDto,
   PublicCardDto,
   PublicCardField,
+  PublishedFitDto,
 } from "@capital-q/contracts";
 
 import { cardListItems, fieldsForAudience } from "../q-card/card-content";
@@ -138,17 +139,26 @@ const OF_REASON: Readonly<
   GEOGRAPHY_MATCH: "GEOGRAPHY",
 };
 
+const OF_PUBLISHED: Readonly<Record<MatchDimension, keyof PublishedFitDto>> = {
+  STAGE: "stage",
+  SECTOR: "sector",
+  GEOGRAPHY: "geography",
+};
+
 /**
  * Stage, sector and geography in four words each. A dimension the gate
  * checks reads from the founder's standing on its criteria: all met is a
  * match, none met is not, some met is partly, and any criterion the
  * founder's profile cannot answer (with none failed) is not known yet. A
- * dimension the gate does not check is a match only where Discover's
- * public-profile reasons say so; anything else is not known yet.
+ * dimension the gate does not check reads from what their Q Card
+ * publishes against the founder's own company, as the API compared it
+ * (QO-42), else from Discover's public-profile reasons; anything else is
+ * not known yet.
  */
 export function dimensionMatches(
   gate: InvestorGateFitDto | null,
   reasons: readonly DiscoveryReasonDto[],
+  published?: PublishedFitDto,
 ): Readonly<Record<MatchDimension, MatchState>> {
   const out: Record<MatchDimension, MatchState> = {
     STAGE: "unk",
@@ -170,6 +180,11 @@ export function dimensionMatches(
           : met === 0
             ? "no"
             : "part";
+      continue;
+    }
+    const onCard = published?.[OF_PUBLISHED[dimension]] ?? "UNKNOWN";
+    if (onCard !== "UNKNOWN") {
+      out[dimension] = onCard === "MET" ? "ok" : "no";
       continue;
     }
     if (reasons.some((reason) => OF_REASON[reason.kind] === dimension)) {

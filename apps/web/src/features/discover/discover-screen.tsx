@@ -259,7 +259,7 @@ export function directoryEntries(
       focus: focusLine(mandate),
       looksFor: looksForSentence(mandate),
       cheque: mandate.cheque,
-      matches: dimensionMatches(gate, item.reasons),
+      matches: dimensionMatches(gate, item.reasons, item.publishedFit),
       reach: reachOf(item.inboundPreference, gate),
       gateHref: gateHref(gate),
       where,

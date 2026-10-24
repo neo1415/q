@@ -24,6 +24,7 @@ import {
   DISCOVERY_INVESTOR_CARD_PATH,
   DiscoveredInvestorCardDtoSchema,
   type PublicCardDto,
+  type PublishedFitDto,
   type YourCompanyLabel,
   type YourCompanyPitchItemDto,
   type FeedCompanySummaryDto,
@@ -43,6 +44,7 @@ import {
 import { namedImageKey, type NamedImages } from "@capital-q/public-identity";
 import type { ActorContext } from "@capital-q/security";
 
+import { publishedFitOf, type FounderFacts } from "../published-fit.js";
 import {
   getActorContext,
   requireActorContextHook,
@@ -148,7 +150,17 @@ export type DiscoveryRoutesDependencies = ActorContextDependencies & {
   readonly investorCard?:
     | ((investorOrganisationId: string) => Promise<PublicCardDto | null>)
     | undefined;
+  /**
+   * QO-42: the reader's OWN company as GateQ qualifies it (stage, country,
+   * classifications), resolved by the server from the actor. Null: they
+   * have none. Absent, or with no card reader: no published fit is sent.
+   */
+  readonly founderFacts?:
+    ((actor: ActorContext) => Promise<FounderFacts | null>) | undefined;
 };
+
+/** Card reads at once for one slate page (each is a projection read). */
+const CARD_READS_AT_ONCE = 8;
 
 /**
  * Whether this viewer may play this pitch: the media service's own
@@ -611,21 +623,63 @@ export function registerDiscoveryRoutes(
     }
   };
 
+  // QO-42: each investor's published card against the founder's own
+  // company, only for investors this slate already returned to them.
+  const publishedFits = async (
+    actor: ActorContext,
+    investorOrganisationIds: readonly string[],
+  ): Promise<ReadonlyMap<string, PublishedFitDto>> => {
+    const { founderFacts, investorCard } = dependencies;
+    if (
+      founderFacts === undefined ||
+      investorCard === undefined ||
+      investorOrganisationIds.length === 0
+    ) {
+      return new Map();
+    }
+    const founder = await founderFacts(actor).catch(() => null);
+    if (founder === null) return new Map();
+    const fits = new Map<string, PublishedFitDto>();
+    for (
+      let at = 0;
+      at < investorOrganisationIds.length;
+      at += CARD_READS_AT_ONCE
+    ) {
+      const ids = investorOrganisationIds.slice(at, at + CARD_READS_AT_ONCE);
+      const cards = await Promise.all(
+        ids.map((id) => investorCard(id).catch(() => null)),
+      );
+      ids.forEach((id, index) => {
+        fits.set(id, publishedFitOf(cards[index] ?? null, founder));
+      });
+    }
+    return fits;
+  };
+
   app.get(
     DISCOVERY_INVESTORS_PATH,
     { onRequest: withContext },
     async (request, reply) => {
       const page = pageOf(request);
+      const actor = getActorContext(request);
       const slate = await service.discoverInvestors({
-        actor: getActorContext(request),
+        actor,
         limit: page.limit,
         cursor: page.cursor,
       });
+      const fits = await publishedFits(
+        actor,
+        slate.items.map((item) => item.investorOrganisationId),
+      );
       const items = await Promise.all(
-        slate.items.map(async ({ rank: _rank, ...item }) => ({
-          ...item,
-          ...(await imagesOf(item.investorOrganisationId)),
-        })),
+        slate.items.map(async ({ rank: _rank, ...item }) => {
+          const publishedFit = fits.get(item.investorOrganisationId);
+          return {
+            ...item,
+            ...(await imagesOf(item.investorOrganisationId)),
+            ...(publishedFit === undefined ? {} : { publishedFit }),
+          };
+        }),
       );
       void reply.header("Cache-Control", "no-store");
       return DiscoveryInvestorSlateDtoSchema.parse({
