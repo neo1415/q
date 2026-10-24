@@ -65,6 +65,12 @@ export type PrivateDocumentStorageProvider = {
     readonly object: StoredObjectRef;
     readonly body: Uint8Array;
     readonly contentType: string;
+    /**
+     * How long a reader may keep the bytes. Absent: never cached
+     * (extraction artifacts). An object whose key never changes (a
+     * processed picture) may be kept for good.
+     */
+    readonly cacheControl?: string | undefined;
   }) => Promise<void>;
   /** Idempotent: deleting an object that is already gone is success. */
   readonly deleteObject: (object: StoredObjectRef) => Promise<void>;

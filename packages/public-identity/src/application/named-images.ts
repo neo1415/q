@@ -11,6 +11,7 @@ import {
   type ProfileImageStorage,
   type ProfileImageSubject,
 } from "./profile-images.js";
+import { reuseSignedPictureUrls } from "./signed-url-reuse.js";
 
 /**
  * Pictures for the people and organisations a list names (founder
@@ -95,7 +96,12 @@ export function createNamedImageReader(dependencies: {
   /** Absent: no picture is ever signed; every list reads as initials. */
   readonly storage?: ProfileImageStorage | undefined;
 }): NamedImageReader {
-  const { sql, store, storage } = dependencies;
+  const { sql, store } = dependencies;
+  // One signed URL per picture while it lasts (signed-url-reuse.ts).
+  const storage =
+    dependencies.storage === undefined
+      ? undefined
+      : reuseSignedPictureUrls(dependencies.storage);
 
   const sign = async (
     keys: readonly string[],
