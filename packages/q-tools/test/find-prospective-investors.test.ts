@@ -106,12 +106,15 @@ type Prospect = {
 
 describe("find_prospective_investors", () => {
   it("ranks a founder's own company against network-visible profiles, with reasons, labelled likely fit", async () => {
-    const { port } = withNetwork();
+    const { port, calls } = withNetwork();
     const outcome = await port.execute(
       call({ companyId: COMPANY_A }),
       contextFor(actorA, founderPlan),
     );
     expect(outcome.status).toBe("SUCCEEDED");
+    // QO-31: the whole candidate set, never the profile ranking's first
+    // page, so a newly onboarded investor reaches the published-sector order.
+    expect(calls[0]).toMatchObject({ wholeCandidateSet: true });
     const data = (
       outcome.result as {
         data: {

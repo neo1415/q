@@ -360,6 +360,24 @@ describe("the investor slate", () => {
 });
 
 describe("paging", () => {
+  it("QO-31: a founder's prospect list may read the whole candidate set, with no next page; every other read keeps its bounded page", async () => {
+    const many = Array.from({ length: 80 }, (_value, index) =>
+      investor(`cccccccc-2222-4000-8000-${String(index).padStart(12, "0")}`),
+    );
+    const service = createDiscoveryService({
+      repository: repository({ investors: many }),
+    });
+    const whole = await service.discoverInvestors({
+      actor: ACTOR,
+      wholeCandidateSet: true,
+    });
+    expect(whole.items).toHaveLength(80);
+    expect(whole.nextCursor).toBeNull();
+    const page = await service.discoverInvestors({ actor: ACTOR, limit: 500 });
+    expect(page.items).toHaveLength(50);
+    expect(page.nextCursor).not.toBeNull();
+  });
+
   it("bounds the page and hands back a keyset cursor, never an offset", async () => {
     const many = Array.from({ length: 5 }, (_value, index) =>
       company(`aaaaaaaa-1111-4000-8000-00000000000${String(index)}`),
