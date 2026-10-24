@@ -807,6 +807,42 @@ describe("what exists, and the parity gap", () => {
     );
   });
 
+  it("says no could-not line after a reply that will remember what they asked it to (QA 2026-10-24)", async () => {
+    const asked = async (said: string, answer: string) => {
+      const { seam, request, persisted } = build(
+        { status: "SUCCEEDED", data: CONNECTED },
+        undefined,
+        {},
+        { said, answer },
+      );
+      // The reader named an offered action the model rightly did not call.
+      await seam.answer({
+        ...request,
+        turnKind: "TOOL_REQUEST",
+        askedAction: "get_q_daily",
+      });
+      return persisted.join("\n");
+    };
+    const remembered = await asked(
+      "Remember: I pass on gambling businesses.",
+      "I'll remember that you pass on gambling businesses.",
+    );
+    expect(remembered).toContain("I'll remember that");
+    expect(remembered).not.toContain("I didn't prepare that");
+    // A task to do later is not a thing to remember about them.
+    const task = await asked(
+      "Remember to send Kestrel my deck tomorrow.",
+      "I'll remember to send it.",
+    );
+    expect(task).toContain("I didn't prepare that, so nothing was changed.");
+    // Asked to remember, but the reply does not say it will.
+    const silent = await asked(
+      "Remember: I pass on gambling businesses.",
+      "Gambling is outside most impact mandates.",
+    );
+    expect(silent).toContain("I didn't prepare that, so nothing was changed.");
+  });
+
   it("never says a change was made beside the line that says nothing was (Zino run 50159909)", async () => {
     const { seam, request, persisted } = build(
       { status: "SUCCEEDED", data: CONNECTED },

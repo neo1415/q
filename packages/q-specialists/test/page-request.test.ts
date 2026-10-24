@@ -47,6 +47,9 @@ const TABLE: readonly (readonly [string, string])[] = [
   ["take me to the capital q tour", "Q_PITCH"],
   ["open my board", "BOARD"],
   ["Show me my fundraising pipeline.", "CRM_PIPELINE"],
+  // QA 2026-10-24: "show my X" (no "me") is the same page request.
+  ["Show my pipeline", "CRM_PIPELINE"],
+  ["show our investors", "INVESTORS"],
   ["take me to my work board", "BOARD"],
   // Lane ov 2026-10-16: the CRM by its name and its tabs.
   ["open the CRM", "RELATIONSHIPS"],
@@ -165,6 +168,9 @@ describe("a page asked for by name (voice-cards)", () => {
       "What's on the explore page?",
       "Q, I wasn't talking to you. Take me to Discover.",
       "tell me about Discover",
+      "show my latest metrics",
+      "show my pipeline by stage",
+      "show them my deck",
     ]) {
       expect(pageRequestOf(said), said).toBeNull();
     }

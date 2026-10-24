@@ -1192,6 +1192,44 @@ describe("answer seam tool loop", () => {
     expect(seam.lastObservation()?.toolCalls[0]?.status).toBe("DENIED");
   });
 
+  it("never puts more calls in one round than one assistant message may carry", async () => {
+    // QA 2026-10-24 ("show my pipeline"): one call, then nine in the next
+    // round -- inside the turn's budget of ten, but the ninth made the
+    // next request one the gateway's own schema refuses, and the run failed.
+    const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
+    const nine: FakeBehaviour = {
+      kind: "TOOL_CALLS",
+      calls: Array.from({ length: MODEL_TOOL_CALLS_MAX + 1 }, (_v, i) => ({
+        callId: `n${String(i)}`,
+        name: "get_company",
+        arguments: { companyId: `n-${String(i)}` },
+      })),
+    };
+    expect(1 + MODEL_TOOL_CALLS_MAX + 1).toBeLessThanOrEqual(
+      Q_TOOL_LOOP_MAX_CALLS,
+    );
+    const { seam, alpha, request } = build({
+      script: [
+        call("first", { companyId: "first" }),
+        nine,
+        { kind: "JSON", value: analystResult("capped") },
+      ],
+      tools,
+    });
+    const outcome = await seam.answer(request);
+    expect(outcome.kind).toBe("ANSWERED");
+    expect(tools.executed).toHaveLength(1 + MODEL_TOOL_CALLS_MAX);
+    for (const sent of alpha.calls) {
+      for (const message of sent.request.messages) {
+        if (message.role === "ASSISTANT") {
+          expect(message.toolCalls?.length ?? 0).toBeLessThanOrEqual(
+            MODEL_TOOL_CALLS_MAX,
+          );
+        }
+      }
+    }
+  });
+
   it("bounds rounds and calls, then finishes with one structured call without tools", async () => {
     const tools = toolPort([GET_COMPANY], (p) => succeeded(p, {}));
     // Each round proposes as many distinct calls as a reply may carry; together

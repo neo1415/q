@@ -33,6 +33,7 @@ import {
 import {
   MODEL_TOOLS_MAX,
   isCalendarBlock,
+  MODEL_TOOL_CALLS_MAX,
   MODEL_TOOL_RESULT_MAX_CHARS,
   QClientActionToolResultSchema,
   QShowCalendarConnectIntentSchema,
@@ -7509,9 +7510,13 @@ export function createModelGatewayQAnswer(
             }
             rounds += 1;
             took(`round${String(rounds)}`);
+            // Also never more than one assistant message may carry: the
+            // round's own message goes back in the next request, and a
+            // ninth call made that request one the gateway refuses (QA
+            // 2026-10-24, "show my pipeline": 1 + 9 calls, run FAILED).
             const proposed = result.output.calls.slice(
               0,
-              Q_TOOL_LOOP_MAX_CALLS - calls,
+              Math.min(MODEL_TOOL_CALLS_MAX, Q_TOOL_LOOP_MAX_CALLS - calls),
             );
             const assistant: ModelMessage = {
               role: "ASSISTANT",
@@ -8385,6 +8390,15 @@ export function createModelGatewayQAnswer(
           // reply in another script is taken as its own account of what
           // happened, in the person's language.
           !repliedInOtherScript(statusTalk?.text ?? guarded.text) &&
+          // QA 2026-10-24: "Remember: I pass on gambling businesses." was
+          // answered "I'll remember that…" and then "I didn't prepare
+          // that…": what they tell Q to remember is kept from their words
+          // (the memory write gate), with no tool to call, so a reply
+          // that says it will remember is the whole answer.
+          !rememberedAsAsked(
+            latest.content,
+            statusTalk?.text ?? guarded.text,
+          ) &&
           // No action named and the turn answered with what was asked for
           // (QA F-71: "Show my pipeline" answered with findings and cards,
           // then "I didn't get that done…"): an answer, not a miss.
@@ -8965,6 +8979,20 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
 /** A reply written without Latin letters (Arabic, Amharic, Chinese...). */
 function repliedInOtherScript(text: string): boolean {
   return /\p{L}/u.test(text) && !/\p{Script=Latin}/u.test(text);
+}
+
+/**
+ * They asked Q to remember something about themselves or how they work
+ * ("Remember: I pass on gambling", "please remember that I…"), not to do
+ * something later ("remember to send…", which is a task), and the reply
+ * says it will.
+ */
+const REMEMBER_ASKED =
+  /^\s*(?:(?:hey|ok|okay)\s+)?(?:q[,:\s]+)?(?:please\s+)?(?:remember|note|keep\s+in\s+mind|don['’]t\s+forget)\b(?!\s+to\b)/iu;
+const REMEMBER_SAID =
+  /\b(?:i['’]ll|i\s+will|i['’]ve|i\s+have)\s+(?:remember|noted|note|keep\s+(?:that|it)\s+in\s+mind)/iu;
+export function rememberedAsAsked(said: string, reply: string): boolean {
+  return REMEMBER_ASKED.test(said) && REMEMBER_SAID.test(reply);
 }
 
 export function couldNotDoLine(gap: string): string {
