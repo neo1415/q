@@ -28,17 +28,14 @@ export type CarriedApproval = {
  * since answered something else, in another run, without naming the card.
  * The card leaves the screen on its own; the approval itself still waits,
  * is listed under Needs you on Work, and "go ahead" or "cancel that" still
- * decides it on the server.
+ * decides it on the server. `at` is the last answer that showed the card.
  */
 export function movedOn(
   history: readonly QMessage[],
-  runId: string,
+  at: number,
   proposal: Pick<QActionProposal, "summary">,
 ): boolean {
-  const at = history.findLastIndex(
-    (message) => message.role === "Q" && message.runId === runId,
-  );
-  if (at < 0) return false;
+  const shownBy = history[at]?.runId;
   const summary = proposal.summary
     .trim()
     .replace(/[.\s]+$/u, "")
@@ -48,9 +45,40 @@ export function movedOn(
     .some(
       (message) =>
         message.role === "Q" &&
-        message.runId !== runId &&
+        message.runId !== shownBy &&
         !(message.text ?? "").toLowerCase().includes(summary),
     );
+}
+
+/**
+ * The last answer in this conversation that showed the approval's card,
+ * and the card it showed. F-106 (2026-10-24): the same change asked for
+ * again is answered "That's ready: … It's waiting for your yes" with the
+ * card it already has, recorded by an earlier run (perhaps in another
+ * conversation). That answer shows the card, so the card is found by its
+ * approval wherever it was shown, not only in the run that first made it.
+ */
+function lastShown(
+  history: readonly QMessage[],
+  item: QPendingApproval,
+): { readonly at: number; readonly proposal: QActionProposal } | null {
+  for (let at = history.length - 1; at >= 0; at -= 1) {
+    const message = history[at];
+    if (message?.role !== "Q") continue;
+    for (const block of message.blocks ?? []) {
+      if (block.kind !== "ACTION_PROPOSAL") continue;
+      const required = block.proposal.approval;
+      const approvalId = required.required
+        ? required.approval?.approvalId
+        : undefined;
+      const same =
+        approvalId === undefined
+          ? block.proposal.runId === item.runId
+          : approvalId === item.approvalId;
+      if (same) return { at, proposal: block.proposal };
+    }
+  }
+  return null;
 }
 
 export function carriedApproval(
@@ -59,20 +87,27 @@ export function carriedApproval(
   pending: readonly QPendingApproval[],
 ): CarriedApproval | null {
   if (conversationId === null) return null;
-  const mine = pending
-    .filter((item) => item.conversationId === conversationId)
-    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt));
-  for (const item of mine) {
-    const proposal = [...history]
-      .reverse()
-      .filter((message) => message.runId === item.runId)
-      .flatMap((message) =>
-        (message.role === "Q" ? (message.blocks ?? []) : []).flatMap((block) =>
-          block.kind === "ACTION_PROPOSAL" ? [block.proposal] : [],
-        ),
-      )
-      .at(0);
-    if (proposal !== undefined && !movedOn(history, item.runId, proposal)) {
+  // Asked for here, or shown here since: the newest shown first.
+  const shown = pending
+    .flatMap((item) => {
+      const found = lastShown(history, item);
+      if (found === null) return [];
+      // Another conversation's change is carried here only when an answer
+      // here showed it again.
+      if (
+        item.conversationId !== conversationId &&
+        history[found.at]?.runId === item.runId
+      ) {
+        return [];
+      }
+      return [{ item, ...found }];
+    })
+    .sort(
+      (a, b) =>
+        b.at - a.at || b.item.requestedAt.localeCompare(a.item.requestedAt),
+    );
+  for (const { item, at, proposal } of shown) {
+    if (!movedOn(history, at, proposal)) {
       return {
         approval: {
           approvalId: item.approvalId,

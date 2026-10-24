@@ -152,6 +152,14 @@ export function alreadyWaitingLine(summary: string): string {
   return `That's ready: ${sentence(summary).replace(/\.$/u, "")}. It's waiting for your yes.`;
 }
 
+/**
+ * A waiting change whose card could not be put in this answer: where it
+ * waits, never "ready" or "tap Approve on the card" with no card shown.
+ */
+export function noCardLine(summary: string): string {
+  return `${sentence(summary).replace(/\.$/u, "")} is waiting for your approval under Needs you.`;
+}
+
 /** The older cards a new one replaced, named, and that they no longer wait. */
 export function replacesLine(replaced: readonly string[]): string {
   const names = replaced.map((summary) =>
@@ -339,17 +347,25 @@ export function createQActionNarrator(dependencies: {
           : await dependencies
               .named(action.targets, run)
               .catch(() => undefined);
-      const line =
-        definedProposedLine(action) ??
-        proposedLine(action.summary, keepsCard(action));
+      const blocks = proposalBlocks(action, approval, named);
+      // F-106: "ready" and "tap Approve on the card" only beside a card.
+      if (blocks === undefined) {
+        return say(run, noCardLine(action.summary));
+      }
+      const defined = definedProposedLine(action);
+      const line = defined ?? proposedLine(action.summary, keepsCard(action));
       return say(
         run,
         options?.alreadyWaiting === true
-          ? alreadyWaitingLine(action.summary)
+          ? // Batch 9 ("draft a reply… then send it"): something the other
+            // side receives says plainly that it waits on their approval,
+            // with its text -- "Ready to send: approve on the card" -- the
+            // same card or not. Saying "send it" grants no delegation.
+            (defined ?? alreadyWaitingLine(action.summary))
           : options?.replaces !== undefined && options.replaces.length > 0
             ? `${line} ${replacesLine(options.replaces)}`
             : line,
-        proposalBlocks(action, approval, named),
+        blocks,
       );
     },
     refused: (run, reason) => say(run, refusedLine(reason)),

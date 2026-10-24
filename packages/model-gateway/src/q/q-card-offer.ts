@@ -49,3 +49,89 @@ export function qCardOfferMessage(
     content: `[Capital Q, not the person] They have no Q Card yet, so Capital Q prepared one for their approval with the handle @${handle}, from their organisation's name. Nothing is made until they approve. In your answer say, in your own words and in one or two sentences: there is no Q Card yet, you have prepared one at @${handle} for them to approve on the card, and they can ask for another handle. Do not ask what to take on.`,
   };
 }
+
+/**
+ * What get_q_card read this turn, for code's own reply (QA, batch 9):
+ * "Show me my Q Card and the share link" was answered "Understood." -- the
+ * model's words were all approval talk, removed because the engine narrates
+ * the prepared claim, and nothing was left. Unclaimed, the reply says so
+ * with the address the card would have; claimed, it gives the card's
+ * whole address exactly as the tool returned it (F-85).
+ */
+export type QCardRead = {
+  readonly status: "SAVED" | "NOT_MADE";
+  readonly handle: string | null;
+  readonly publicUrl: string | null;
+  readonly suggestedHandle: string | null;
+  readonly suggestedUrl: string | null;
+};
+
+const text = (value: unknown): string | null =>
+  typeof value === "string" && value.length > 0 ? value : null;
+/** Only an absolute https address is quoted (F-85). */
+const httpsUrl = (value: unknown): string | null => {
+  const url = text(value);
+  return url !== null && /^https:\/\/[^\s]+$/u.test(url) ? url : null;
+};
+
+export function qCardReadOf(
+  call: Pick<ModelToolCall, "name">,
+  outcome: QToolCallOutcome,
+): QCardRead | null {
+  if (call.name !== READ_TOOL || !outcome.result.ok) return null;
+  const data = outcome.result.data as Record<string, unknown> | null;
+  if (data?.["status"] !== "SAVED" && data?.["status"] !== "NOT_MADE") {
+    return null;
+  }
+  return {
+    status: data["status"],
+    handle: text(data["handle"]),
+    publicUrl: httpsUrl(data["publicUrl"]),
+    suggestedHandle: text(data["suggestedHandle"]),
+    suggestedUrl: httpsUrl(data["suggestedUrl"]),
+  };
+}
+
+/** Code's own line about their card; never just "Understood.". */
+export function qCardLine(read: QCardRead): string {
+  if (read.status === "SAVED") {
+    if (read.publicUrl !== null) {
+      return `Your Q Card is live. Share this link: ${read.publicUrl}`;
+    }
+    return "Your Q Card is saved, but it has no handle yet, so there is no link to share. Claim a handle to give it one.";
+  }
+  if (read.suggestedHandle === null) {
+    return "You don't have a Q Card yet. Tell me the handle you want and I'll prepare it for your approval.";
+  }
+  const at = read.suggestedUrl === null ? "" : ` at ${read.suggestedUrl}`;
+  return `You don't have a Q Card yet, so there is no link to share. Claiming @${read.suggestedHandle} makes it${at}: approve the claim on the card, or ask for another handle.`;
+}
+
+/** A sentence about their card, its handle, link or approval. */
+const ABOUT_CARD =
+  /\bq\s*card\b|@[a-z0-9][a-z0-9-]*|\bhandle\b|\bapprov|\blink\b/iu;
+
+/**
+ * The answer with the card's link, from the tool's own read:
+ *
+ * - it already quotes the address: as written;
+ * - unclaimed: its sentences about the card give way to code's line (no
+ *   card yet, the handle and the address it would have);
+ * - saved: the link is added after the words.
+ */
+export function withQCardLink(answer: string, read: QCardRead): string {
+  const trimmed = answer.trim();
+  const url = read.status === "SAVED" ? read.publicUrl : read.suggestedUrl;
+  if (url !== null && trimmed.includes(url)) return trimmed;
+  if (read.status === "SAVED") {
+    if (trimmed.length === 0 || read.publicUrl === null) {
+      return trimmed.length === 0 ? qCardLine(read) : trimmed;
+    }
+    return `${trimmed}\n\nShare this link: ${read.publicUrl}`;
+  }
+  const rest = (trimmed.match(/[^.!?\n]+[.!?]*\s*/gu) ?? [])
+    .filter((sentence) => !ABOUT_CARD.test(sentence))
+    .join("")
+    .trim();
+  return rest.length === 0 ? qCardLine(read) : `${rest}\n\n${qCardLine(read)}`;
+}
