@@ -18,6 +18,7 @@ import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
  */
 
 import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
+import { createFounderStatedReader } from "./composition/founder-stated.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { workforceDeepResearch } from "./composition/workforce/deep-research.js";
 import { createWorkforceDelivery } from "./composition/workforce/delivery.js";
@@ -2674,6 +2675,9 @@ const gateqInbox = gateqInboxActionsPort(
 // room's cards and the Blueprint. Founder-private: the company is the
 // actor's own (server-resolved); inputs are read through each context's
 // own service as the founder. Closures: services composed further down.
+const founderStated = createFounderStatedReader({
+  summaries: ownOnboardingSummaries,
+});
 const readinessService = createReadinessService({
   store: createPostgresReadinessStore({ sql: database.sql }),
   ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
@@ -2690,6 +2694,9 @@ const readinessService = createReadinessService({
       throw error;
     }
   }),
+  // QA QO-38: what they told Q in setup, shown as stated where the record
+  // holds nothing (a raise not yet confirmed, customers).
+  stated: founderStated,
   followUps: readinessFollowUps({
     listFollowUps: (raw) => onboardingRevisions.runtime.listFollowUps(raw),
     answerFollowUp: (raw) => onboardingRevisions.runtime.answerFollowUp(raw),
@@ -5943,28 +5950,29 @@ const rehearsalMaterial: RehearsalMaterial = {
     if (companyId === null || actor.organisationId === undefined) {
       return { text: "", sources: [] };
     }
-    const [company, pitch, known, decks, uploaded] = await Promise.all([
-      companies
-        .findCanonicalCompanyProfile(CompanyIdSchema.parse(companyId))
-        .catch(() => null),
-      transcriptText(actor, companyId, "Your pitch video").catch(() => ({
-        text: "",
-        sources: [],
-      })),
-      // Their own company's records, except anyone's personal notes.
-      knowledgeText(
-        companyId,
-        [
-          "organisation_private",
-          "founder_private",
-          "relationship_shared",
-          "specifically_shared",
-          "network_visible",
-          "public_external",
-        ],
-        "Your company record",
-      ).catch(() => ({ text: "", sources: [] })),
-      database.sql<{ content: unknown }[]>`
+    const [company, pitch, known, decks, uploaded, team, raise, stated] =
+      await Promise.all([
+        companies
+          .findCanonicalCompanyProfile(CompanyIdSchema.parse(companyId))
+          .catch(() => null),
+        transcriptText(actor, companyId, "Your pitch video").catch(() => ({
+          text: "",
+          sources: [],
+        })),
+        // Their own company's records, except anyone's personal notes.
+        knowledgeText(
+          companyId,
+          [
+            "organisation_private",
+            "founder_private",
+            "relationship_shared",
+            "specifically_shared",
+            "network_visible",
+            "public_external",
+          ],
+          "Your company record",
+        ).catch(() => ({ text: "", sources: [] })),
+        database.sql<{ content: unknown }[]>`
         select v.content from artifacts.artifacts a
           join artifacts.artifact_versions v
             on v.artifact_id = a.id and v.tenant_id = a.tenant_id
@@ -5972,16 +5980,53 @@ const rehearsalMaterial: RehearsalMaterial = {
            and a.organisation_id = ${actor.organisationId}
            and a.type = 'PITCH_DECK' and a.archived_at is null
          order by v.created_at desc limit 1`.catch(() => []),
-      // A deck they uploaded, in every scope but someone's personal notes.
-      uploadedDeckText(companyId, [
-        "organisation_private",
-        "founder_private",
-        "relationship_shared",
-        "specifically_shared",
-        "network_visible",
-        "public_external",
-      ]).catch(() => ""),
-    ]);
+        // A deck they uploaded, in every scope but someone's personal notes.
+        uploadedDeckText(companyId, [
+          "organisation_private",
+          "founder_private",
+          "relationship_shared",
+          "specifically_shared",
+          "network_visible",
+          "public_external",
+        ]).catch(() => ""),
+        // QA QO-38: the team and raise on their record, and what they told Q
+        // in setup that is not on it yet ("record doesn't show customers").
+        companyService
+          .getCompanyTeamFacts({
+            actor,
+            companyId: CompanyIdSchema.parse(companyId),
+          })
+          .catch(() => null),
+        capitalService
+          .getCurrentCapitalObjective({
+            actor,
+            companyId: CompanyIdSchema.parse(companyId),
+          })
+          .catch(() => null),
+        founderStated(actor, companyId).catch(() => null),
+      ]);
+    const recordLines = [
+      team === null
+        ? null
+        : [
+            team.founderCount === null
+              ? null
+              : `${String(team.founderCount)} founders`,
+            team.fullTimeFounderCount === null
+              ? null
+              : `${String(team.fullTimeFounderCount)} full-time`,
+            team.teamSize === null ? null : `team of ${String(team.teamSize)}`,
+          ]
+            .filter((part) => part !== null)
+            .join(", "),
+      raise === null
+        ? null
+        : `Raise: ${raise.target.amount} ${raise.target.currency}`,
+    ].filter((line): line is string => line !== null && line.length > 0);
+    // A stated raise only when none is recorded: the record wins.
+    const statedLines = (stated?.lines ?? []).filter(
+      (line) => raise === null || !line.startsWith("Raise:"),
+    );
     // The deck Q made, else the one they uploaded.
     const deck =
       decks[0] === undefined
@@ -5995,6 +6040,12 @@ const rehearsalMaterial: RehearsalMaterial = {
         pitch.text || null,
         deck.length === 0 ? null : `THEIR DECK:\n${deck.slice(0, 5_000)}`,
         known.text || null,
+        recordLines.length === 0
+          ? null
+          : `ON THEIR RECORD:\n${recordLines.join("\n")}`,
+        statedLines.length === 0
+          ? null
+          : `THEY TOLD Q IN SETUP (their own words, not yet confirmed; say so if you use it):\n${statedLines.join("\n")}`,
       ]
         .filter((t): t is string => t !== null && t.trim().length > 0)
         .join("\n\n"),
