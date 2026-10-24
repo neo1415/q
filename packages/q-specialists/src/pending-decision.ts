@@ -207,6 +207,31 @@ export function isReplyToCard(
 }
 
 /**
+ * Whether a turn is about the one waiting card (QA F-89): it names the
+ * card's counterpart, or it is a reply to Q (by the turn reader's
+ * reading) that points at the card, decides in clear words, or asks for
+ * nothing else. A
+ * request in its own right that names someone else, or no one, is its own
+ * turn. Unread turns keep the decision reading alone.
+ */
+export function aboutTheCard(
+  read: DecisionReading,
+  turn: PendingTurnReading | null | undefined,
+  utterance: string,
+  card: { readonly summary: string },
+): boolean {
+  if (namedIn(utterance, [card]) !== null) return true;
+  if (turn === undefined || turn === null) return true;
+  if (turn.namesAction || !REPLY_KINDS.has(turn.kind)) return false;
+  return (
+    read.pointsAtIt === true ||
+    read.onlyDecision === true ||
+    read.explicit === true ||
+    read.asksSomethingElse !== true
+  );
+}
+
+/**
  * A yes that approves this card as it is: nothing but the decision, a
  * decision in clear words, or a yes followed by something else to answer
  * ("yes, and what's next?") -- never one asking for something different.
@@ -261,7 +286,11 @@ export type PendingDecisionOutcome =
     };
 
 function named(summary: string): string {
-  return summary.trim().replace(/[.\s]+$/u, "");
+  // A demo record's "(fictional)" marker is never said (QA F-62).
+  return summary
+    .replace(/\s*\(fictional\)/giu, "")
+    .trim()
+    .replace(/[.\s]+$/u, "");
 }
 
 /** Something the other side receives, still waiting for their yes. */
@@ -533,6 +562,14 @@ async function concludeWaiting(
       ? { ...heard, remainder: null }
       : heard;
   if (read === null || read.decision === "UNRELATED") {
+    return { kind: "NONE" };
+  }
+  // QA F-89 (U10): a waiting card takes only a turn about it. "Reply to
+  // Zino Aviation: accept their interest" was followed by "Still waiting
+  // for your approval: Message Savanna Seed Partners", and an "Add … to my
+  // board" was held beside the approval for Mizan. Anything else is
+  // answered as any other turn, with the card still waiting.
+  if (only !== undefined && !aboutTheCard(read, turn, input.utterance, only)) {
     return { kind: "NONE" };
   }
   // "Sounds good, but change the date": not this card as it is. The turn

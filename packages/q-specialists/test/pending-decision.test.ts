@@ -392,6 +392,19 @@ describe("only a reply to the card decides it (lead 2026-10-03, run ad0b0067)", 
         const outcome = await decidePending(value, said(utterance, turn));
         expect(calls.approve).toEqual([]);
         expect(calls.decline).toEqual([]);
+        // QA F-89: a request in its own right that is not about this card
+        // is its own turn, answered as any other. "We've decided not to
+        // proceed…" restates this card ("Decide not to proceed"): the same
+        // change asked again, said to be ready.
+        const restates = utterance.startsWith("We've decided");
+        if (
+          !restates &&
+          turn !== null &&
+          (turn.namesAction || turn.kind !== "ANSWER")
+        ) {
+          expect(outcome).toEqual({ kind: "NONE" });
+          continue;
+        }
         expect(outcome).toEqual(
           decision === "YES"
             ? {
@@ -410,6 +423,50 @@ describe("only a reply to the card decides it (lead 2026-10-03, run ad0b0067)", 
       }
     },
   );
+
+  // QA F-89 (U10), live 2026-10-24: one waiting card held unrelated asks.
+  it.each([
+    [
+      "Reply to Zino Aviation: accept their interest and suggest a call next week.",
+      "Message Savanna Seed Partners (fictional)",
+    ],
+    [
+      "Add 'Prep data room for seed round' to my board",
+      "Express interest in Mizan",
+    ],
+  ] as const)(
+    "%s, with '%s' waiting: its own turn, the card still waiting",
+    async (utterance, summary) => {
+      for (const decision of ["YES", "NO"] as const) {
+        const { value, calls } = port({
+          proposals: [{ proposalId: "w1", summary, status: "PENDING" }],
+          reading: { decision, remainder: null, asksSomethingElse: true },
+        });
+        const outcome = await decidePending(value, said(utterance, request));
+        expect(outcome).toEqual({ kind: "NONE" });
+        expect(calls.approve).toEqual([]);
+        expect(calls.decline).toEqual([]);
+      }
+    },
+  );
+
+  it("a request naming the waiting card's counterpart is still about it", async () => {
+    const { value } = port({
+      proposals: [
+        {
+          proposalId: "w1",
+          summary: "Message Savanna Seed Partners (fictional)",
+          status: "PENDING",
+        },
+      ],
+      reading: { decision: "YES", remainder: null },
+    });
+    const outcome = await decidePending(
+      value,
+      said("Send the message to Savanna now", request),
+    );
+    expect(outcome.kind).not.toBe("NONE");
+  });
 
   it.each([
     ["yes, go ahead", request],

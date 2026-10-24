@@ -79,6 +79,7 @@ function actionFakes(options: { readonly allow?: boolean } = {}) {
   return {
     claims,
     action: createHandleClaimAction({
+      webOrigin: "https://app.capitalq.test",
       publicIdentity,
       subjects,
       authorization,
