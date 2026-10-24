@@ -308,70 +308,6 @@ function subjectKey(subject: QSubjectRef): string {
  * - it names nobody at all: waiting jobs of the same kind (this action
  *   type), so two near-identical jobs are not planned side by side.
  */
-/** Words that say what the work is about, not how it is asked for. */
-function workWords(text: string): Set<string> {
-  return new Set(
-    text
-      .toLowerCase()
-      .replace(/^q['’]s team:\s*/u, "")
-      .split(/[^\p{L}\p{N}-]+/u)
-      .filter((word) => word.length >= 4 && !GENERIC_WORDS.has(word)),
-  );
-}
-
-const GENERIC_WORDS: ReadonlySet<string> = new Set([
-  "with",
-  "from",
-  "that",
-  "this",
-  "these",
-  "those",
-  "your",
-  "their",
-  "them",
-  "they",
-  "have",
-  "will",
-  "about",
-  "into",
-  "what",
-  "when",
-  "then",
-  "been",
-  "just",
-  "like",
-  "also",
-  "some",
-  "more",
-  "please",
-  "could",
-  "would",
-  "make",
-  "write",
-  "prepare",
-  "create",
-  "draft",
-  "help",
-  "give",
-  "need",
-  "want",
-  "short",
-  "quick",
-  "today",
-  "work",
-  "jobs",
-  "team",
-]);
-
-/** Whether a waiting job's own words share at least a third of the request's work. */
-function sameWork(goal: string, summary: string): boolean {
-  const asked = workWords(goal);
-  if (asked.size === 0) return false;
-  const theirs = workWords(summary);
-  const shared = [...asked].filter((word) => theirs.has(word)).length;
-  return shared > 0 && shared * 3 >= asked.size;
-}
-
 export function relatedWaiting(
   goal: string,
   waiting: readonly WaitingItem[],
@@ -388,18 +324,9 @@ export function relatedWaiting(
   const pick = (items: readonly WaitingItem[]) =>
     items.map((item) => item.summary.slice(0, 200)).slice(0, 5);
   if (keys.size === 0 && names.size === 0) {
-    // Same kind means the same work, not any job (QA F-70, live 2026-10-24:
-    // "Write me a short 12-month growth plan for my company" was told a
-    // call prep for Savanna "is already waiting"). A waiting job counts
-    // only when its own words share the request's work.
     return {
       about: "SAME_KIND",
-      waiting: pick(
-        waiting.filter(
-          (item) =>
-            item.actionType === actionType && sameWork(goal, item.summary),
-        ),
-      ),
+      waiting: pick(waiting.filter((item) => item.actionType === actionType)),
     };
   }
   return {
