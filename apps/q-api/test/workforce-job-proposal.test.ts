@@ -13,6 +13,8 @@ import {
   needsYouFor,
   plannedFrom,
   relatedWaiting,
+  waitingSameWork,
+  type WaitingItem,
 } from "../src/composition/workforce/job-actions.js";
 import {
   createWorkforceJobs,
@@ -100,6 +102,8 @@ function asPlanV5(plan: JobPlanResultV2): JobPlanResultV5 {
 function world(
   withinLimit: boolean | (() => Promise<boolean>) = true,
   plan: JobPlanResultV2 | null | readonly JobPlanResultV2[] = PLAN,
+  /** What already waits for their approval (the Approval Engine's list). */
+  waiting?: readonly WaitingItem[],
 ) {
   const checkLimit = () =>
     typeof withinLimit === "function"
@@ -150,6 +154,9 @@ function world(
   const board = createWorkforceJobBoard({
     jobsFor,
     withinLimit: checkLimit,
+    ...(waiting === undefined
+      ? {}
+      : { waiting: () => Promise.resolve(waiting) }),
   });
   // Recovery D3: approval enqueues; the durable runner carries it out.
   const queue = createInMemoryAgentWorkQueue();
@@ -569,60 +576,100 @@ describe("Q as a colleague on work (Q room R5)", () => {
     });
   });
 
-  it("a request naming nobody reports waiting jobs of the same kind, by structure (W4b; 2026-10-24)", () => {
-    const followUp = { outward: ["chat.message.send"], targets: [] };
+  it("the same work is the same outward action on the same record, never two plans about nobody (F-84)", () => {
+    const followUp = {
+      outward: ["chat.message.send"],
+      targets: [`relationship:${KESTREL_REL}`],
+    };
     const withPlans = byIds.map((item) =>
       item.actionType === "q.workforce.job.start"
         ? { ...item, plan: followUp }
         : item,
     );
-    // Same outward action, neither about a record: the same work.
+    // Same outward action, same record: the same work.
     expect(
-      relatedWaiting(
-        "follow up with everyone who wrote",
+      waitingSameWork(
+        {
+          outward: ["chat.message.send"],
+          targets: [`relationship:${KESTREL_REL}`],
+        },
         withPlans,
-        [],
-        "q.workforce.job.start",
-        { outward: ["chat.message.send"], targets: [] },
       ),
-    ).toEqual({
-      about: "SAME_KIND",
-      waiting: ["Q's team: Follow up with three investors"],
-    });
-    // A different outward action, or no plan yet: nothing is held.
+    ).toEqual(["Q's team: Follow up with three investors"]);
+    // Same action about no record (F-84 live: "market research" held by
+    // "warehouse controls"), a different action, or own work: none.
     expect(
-      relatedWaiting(
-        "follow up with everyone who wrote",
+      waitingSameWork(
+        { outward: ["chat.message.send"], targets: [] },
         withPlans,
-        [],
-        "q.workforce.job.start",
-        { outward: ["schedule.meeting.book"], targets: [] },
-      ).waiting,
+      ),
     ).toEqual([]);
     expect(
-      relatedWaiting("follow up with everyone who wrote", byIds).waiting,
+      waitingSameWork(
+        {
+          outward: ["schedule.meeting.book"],
+          targets: [`relationship:${KESTREL_REL}`],
+        },
+        withPlans,
+      ),
     ).toEqual([]);
+    expect(
+      waitingSameWork(
+        { outward: [], targets: [`relationship:${KESTREL_REL}`] },
+        withPlans,
+      ),
+    ).toEqual([]);
+    // A card that is not a job: its action type is the outward action.
+    expect(
+      waitingSameWork(
+        { outward: ["message.send"], targets: [`relationship:${KESTREL_REL}`] },
+        byIds,
+      ),
+    ).toEqual(["Send the intro note we drafted last week"]);
   });
 
-  it("asks before starting when work is already waiting, and plans once told to go ahead", async () => {
-    const base = world();
-    const board = createWorkforceJobBoard({
-      jobsFor: () => {
-        throw new Error("must not plan before asking");
-      },
-      waiting: () => Promise.resolve(waiting),
-    });
-    const first = await board.port.prepare(
+  it("plans first, and never holds work because a waiting card names the same people (F-84)", async () => {
+    // Named alike, but nothing about what either would do: not held.
+    const named = world(true, PLAN, waiting);
+    const first = await named.board.port.prepare(
       actor,
       "run-w1",
       "Follow up with Priya and Jonas",
     );
-    expect(first).toEqual({
+    expect(first.status).toBe("PREPARED");
+    expect(named.plans()).toBe(1);
+
+    // The plan expresses interest in Kestrel, and a card expressing
+    // interest in Kestrel is waiting: the same work, asked about first.
+    const kestrel = world(true, PLAN, [
+      {
+        summary: "Express interest in Kestrel Heat",
+        actionType: "relationship.interest.express",
+        targets: [{ kind: "COMPANY", companyId: KESTREL }],
+      },
+    ]);
+    const held = await kestrel.board.port.prepare(
+      actor,
+      "run-w2",
+      "Express interest in Kestrel Heat",
+      { subjects: [{ kind: "COMPANY", companyId: KESTREL }] } as never,
+    );
+    expect(held).toEqual({
       status: "ALREADY_WAITING",
-      waiting: [waiting[0]?.summary, waiting[1]?.summary],
+      waiting: ["Express interest in Kestrel Heat"],
       about: "SAME_PEOPLE",
     });
-    expect(base.plans()).toBe(0);
+    // Told to go ahead: planned and offered.
+    const ahead = await kestrel.board.port.prepare(
+      actor,
+      "run-w3",
+      "Express interest in Kestrel Heat",
+      {
+        proceed: true,
+        subjects: [{ kind: "COMPANY", companyId: KESTREL }],
+      } as never,
+    );
+    expect(ahead.status).toBe("PREPARED");
   });
 
   it("says what will need them, with the calendar when it is not connected", async () => {

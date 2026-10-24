@@ -307,13 +307,14 @@ export function planShape(
 }
 
 /**
- * Same work by structure: both take at least one same outward action, and
- * they are about the same records (or neither is about any record). Own
- * work (no outward action) is never the same work as anything.
+ * Same work by structure: both take at least one same outward action AND
+ * are about at least one same record. Own work (no outward action) is
+ * never the same work as anything, and two plans about no record are not
+ * the same work either (F-84, live 2026-10-24: "market research" was held
+ * by a waiting "warehouse controls" card because both named nobody).
  */
 export function sameWork(a: PlanShape, b: PlanShape): boolean {
   if (!a.outward.some((tool) => b.outward.includes(tool))) return false;
-  if (a.targets.length === 0 && b.targets.length === 0) return true;
   return a.targets.some((target) => b.targets.includes(target));
 }
 
@@ -325,6 +326,41 @@ export type WaitingItem = {
   /** A waiting job card's plan shape, read by code from its payload. */
   readonly plan?: PlanShape | undefined;
 };
+
+/**
+ * F-84 (live 2026-10-24): what waiting work a NEW PLAN is the same as, by
+ * structure only, once it is planned. A waiting job card is compared by
+ * its own plan's shape; any other card by what it is (its action type is
+ * the outward action a plan's tool of the same name prepares) and the
+ * records it is aimed at. Never by the words of either: "IC memo on
+ * Ledgerfold" (their own document) was held by "Message Ledgerfold", and
+ * the founder's growth plan by "Accept Zino's interest", because a name
+ * appeared in both summaries.
+ */
+export function waitingSameWork(
+  plan: PlanShape,
+  waiting: readonly WaitingItem[],
+): readonly string[] {
+  if (plan.outward.length === 0) return [];
+  return waiting
+    .filter((item) => {
+      const shape: PlanShape =
+        item.plan ??
+        ({
+          outward:
+            item.actionType === undefined ||
+            item.actionType === WORKFORCE_JOB_START
+              ? []
+              : [item.actionType],
+          targets: (item.targets ?? []).map((target) =>
+            subjectKey(target).toLowerCase(),
+          ),
+        } satisfies PlanShape);
+      return sameWork(plan, shape);
+    })
+    .map((item) => item.summary.slice(0, 200))
+    .slice(0, 5);
+}
 
 function subjectKey(subject: QSubjectRef): string {
   switch (subject.kind) {
@@ -676,22 +712,11 @@ export function createWorkforceJobBoard(dependencies: {
           dependencies.waiting === undefined
             ? []
             : await dependencies.waiting(actor).catch(() => []);
-        const related =
-          options?.proceed === true || dependencies.waiting === undefined
-            ? null
-            : relatedWaiting(goal, waitingNow, options?.subjects ?? []);
-        // Work about the same people as something waiting: asked first,
-        // before anything is planned.
-        if (
-          related !== null &&
-          related.about === "SAME_PEOPLE" &&
-          related.waiting.length > 0
-        )
-          return {
-            status: "ALREADY_WAITING",
-            waiting: related.waiting,
-            about: "SAME_PEOPLE",
-          };
+        // F-84: nothing is held before it is planned. Whether it is the same
+        // work as a waiting card depends on what it would do, which only the
+        // plan says (below); words naming the same people are not that.
+        const checkWaiting =
+          options?.proceed !== true && dependencies.waiting !== undefined;
         const owner = { tenantId: actor.tenantId, userId: actor.userId };
         if (dependencies.withinLimit !== undefined) {
           const room = await dependencies.withinLimit(owner).catch(() => null);
@@ -789,29 +814,19 @@ export function createWorkforceJobBoard(dependencies: {
         if (!parsed.success) return { status: "NOT_PLANNED" };
         // Their own work (research, a document for them) is never held by
         // what waits for approval: nothing it does can cross a waiting card.
-        // Only a plan that would itself be a card is checked against them.
-        // A goal naming nobody matched every waiting job of this kind (live
-        // 2026-10-24: "Write me a short 12-month growth plan for my company"
-        // was held by "Prepare for the first call with Savanna Seed
-        // Partners"). Their own work (research, a document for them) is
-        // never held by it: nothing it does can cross a waiting card. Only
-        // a plan that would itself be a card is.
+        // Only a plan that would itself be a card is checked, by structure:
+        // the same outward action on the same record as a waiting card.
         const ownWork = isOwnAccountWork(parsed.data);
-        if (!ownWork && related !== null && related.about === "SAME_KIND") {
-          // Same work by structure (S9b, 2026-10-24): the same outward
-          // action on the same records as a waiting card's own plan.
-          const same = relatedWaiting(
-            goal,
-            waitingNow,
-            options?.subjects ?? [],
-            WORKFORCE_JOB_START,
+        if (!ownWork && checkWaiting) {
+          const same = waitingSameWork(
             planShape(parsed.data, options?.subjects ?? []),
+            waitingNow,
           );
-          if (same.waiting.length > 0)
+          if (same.length > 0)
             return {
               status: "ALREADY_WAITING",
-              waiting: same.waiting,
-              about: "SAME_KIND",
+              waiting: same,
+              about: "SAME_PEOPLE",
             };
         }
         // Owner 2026-10-23: research and a document for themselves is not
