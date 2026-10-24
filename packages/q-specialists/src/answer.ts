@@ -1269,6 +1269,21 @@ export function nameInAsk(question: string): string | null {
 }
 
 /**
+ * F-95 (live 24 Oct 2026, "Write me an IC memo on Ledgerfold"): who a piece
+ * of work is about, named right after the kind of work in the ask ("memo
+ * on Ledgerfold", "plan for Maji Loop"). Null when the ask names no one.
+ */
+export function workSubjectInAsk(question: string): string | null {
+  const found =
+    /\b(?:memo|plan|analysis|brief|summary|prep|report|questions|deck|one-pager)\s+(?:on|about|for|of)\s+((?:\p{Lu}[\p{L}\d&'.-]*)(?:\s+(?:\p{Lu}[\p{L}\d&'.-]*|of|and|&))*)/u.exec(
+      question,
+    )?.[1];
+  // "…on Ledgerfold I can share": the pronoun is not part of the name.
+  const name = found?.replace(/(?:\s+(?:of|and|&|I))+$/u, "").trim();
+  return name === undefined || name.length < 2 ? null : name;
+}
+
+/**
  * Their own work board, by its words: "my board", "my work board", "my
  * to-dos", "mon tableau", "mi tablero". Offering and a guard only: it
  * names the board tool for a turn the reader left without a board ask
@@ -2570,7 +2585,12 @@ export function createSpecialistQAnswer(
     return (
       own?.company?.names.find(
         (name) => name.length > 1 && said.includes(name.toLowerCase()),
-      ) ?? null
+      ) ??
+      // F-95 (live 24 Oct, "Write me an IC memo on Ledgerfold"): the answer
+      // held no card or reference, and the memo was titled "Memo". The name
+      // as they said it in the ask, after the kind of work, is who it is
+      // about.
+      workSubjectInAsk(question)
     );
   }
 
