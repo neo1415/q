@@ -549,7 +549,13 @@ export function verdictSentence(verdict: ComparisonVerdict): string {
  * to it. What follows is the model's own reading.
  */
 export function ledByVerdict(text: string, verdict: ComparisonVerdict): string {
-  const sentences = text.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/gu) ?? [text];
+  // Live 24 Oct (9ff4a1118): "$1.8 million" was cut at its decimal point.
+  // A sentence ends at . ! or ? followed by space and a capital (or a
+  // quote or bracket), never inside a number or an abbreviation's tail.
+  const sentences = text
+    .trim()
+    .split(/(?<=[.!?])\s+(?=[\p{Lu}"'“‘([])/u)
+    .filter((sentence) => sentence.length > 0);
   const [first, ...rest] = sentences;
   const names = (sentence: string, name: string) =>
     containsCompanyName(sentence, name);
@@ -557,7 +563,7 @@ export function ledByVerdict(text: string, verdict: ComparisonVerdict): string {
     first !== undefined &&
     names(first, verdict.other) &&
     !names(first, verdict.leader);
-  const body = (competing ? rest : sentences).join("").trim();
+  const body = (competing ? rest : sentences).join(" ").trim();
   const lead = verdictSentence(verdict);
   return body.startsWith(lead) ? body : `${lead} ${body}`.trim();
 }

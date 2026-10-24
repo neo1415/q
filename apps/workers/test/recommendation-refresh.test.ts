@@ -477,7 +477,7 @@ describe("a company becoming discoverable reaches every CURRENT slate", () => {
     mandateVersion: 1,
     mode: "INVESTOR_DISCOVER" as const,
     status: "CURRENT" as const,
-    eligibilityPolicyVersion: "eligibility.v4",
+    eligibilityPolicyVersion: "eligibility.v5",
     structuredGeneratorVersion: "structured-mandate.v4",
     semanticGeneratorVersion: null,
     featureSchemaVersion: "recommendation-features.v1",

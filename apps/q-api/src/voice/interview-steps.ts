@@ -9,7 +9,7 @@ import {
   FOUNDER_INTERVIEW_CUES,
 } from "@capital-q/founder-onboarding";
 import {
-  INVESTOR_DEFINITION_V1,
+  INVESTOR_DEFINITION_CURRENT,
   INVESTOR_INTERVIEW_CUES,
 } from "@capital-q/investor-onboarding";
 import type { OnboardingStepManifest } from "@capital-q/onboarding";
@@ -346,7 +346,7 @@ export function signupContextFromToken(accessToken: string): {
 export function definitionFor(journey: "founder" | "investor") {
   return journey === "founder"
     ? FOUNDER_DEFINITION_CURRENT
-    : INVESTOR_DEFINITION_V1;
+    : INVESTOR_DEFINITION_CURRENT;
 }
 
 export function optionsOf(

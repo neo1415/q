@@ -48,6 +48,8 @@ export type CompanyEligibilityFactsPort = {
 export type CompanyClassification = {
   readonly nodeId: string;
   readonly vocabularyCode: string;
+  /** The node's code in its vocabulary (a red flag names an industry by it). */
+  readonly canonicalCode: string;
   readonly source: string;
 };
 

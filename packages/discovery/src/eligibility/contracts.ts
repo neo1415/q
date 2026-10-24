@@ -42,8 +42,14 @@ import { z } from "zod";
  * v4 (founder 2026-10-05): a relationship the investor is engaging in
  * (interest expressed, connected, met, in diligence, paused, invested)
  * keeps the company eligible; PASSED (unless reopened) and DECLINED close it.
+ *
+ * v5 (QO-28b, 2026-10-24): a red-flag hard exclusion that names an industry
+ * (gambling, tobacco, weapons, adult content, speculative crypto) is read
+ * against the company's declared industry, like a taxonomy exclusion: a
+ * declared match excludes; no declared industry stays UNKNOWN and never
+ * withholds (ADR 0020). Before, every red flag was not evaluable.
  */
-export const ELIGIBILITY_POLICY_VERSION = "eligibility.v4" as const;
+export const ELIGIBILITY_POLICY_VERSION = "eligibility.v5" as const;
 
 /**
  * Every eligibility policy version a persisted artifact may name (feature
@@ -55,6 +61,7 @@ export const ELIGIBILITY_POLICY_VERSIONS = [
   "eligibility.v1",
   "eligibility.v2",
   "eligibility.v3",
+  "eligibility.v4",
   ELIGIBILITY_POLICY_VERSION,
 ] as const;
 

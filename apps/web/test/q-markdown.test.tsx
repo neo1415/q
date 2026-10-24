@@ -201,3 +201,14 @@ describe("Q markdown aloud", () => {
     expect(spoken).not.toContain("https://");
   });
 });
+
+describe("QMarkdown direction (QA U8)", () => {
+  it("lets the answer's own script set its direction", () => {
+    const { container } = render(
+      <QMarkdown text="الشركة الثانية هي Ajopot." />,
+    );
+    expect(
+      container.querySelector("[data-q-markdown]")?.getAttribute("dir"),
+    ).toBe("auto");
+  });
+});

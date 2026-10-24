@@ -410,3 +410,24 @@ describe("code decides who a comparison leads with", () => {
     );
   });
 });
+
+// Live 24 Oct 2026 (9ff4a1118): the lead was right, but the sentence after
+// it read "8 million round fits…": the splitter cut "$1.8" at its point.
+describe("the verdict keeps the model's numbers whole", () => {
+  it("never splits inside a number", () => {
+    expect(
+      ledByVerdict(
+        "Afyascan is the better-supported fit on the evidence currently available. Afyascan's $1.8 million round fits your $250,000–$1 million range; Anchor's round size is still unknown.",
+        {
+          leader: "Anchor",
+          other: "Afyascan",
+          leaderScore: "7.6",
+          otherScore: "7",
+          level: false,
+        },
+      ),
+    ).toBe(
+      "On Capital Q's mandate fit, Anchor leads: 7.6 against Afyascan's 7. Afyascan's $1.8 million round fits your $250,000–$1 million range; Anchor's round size is still unknown.",
+    );
+  });
+});

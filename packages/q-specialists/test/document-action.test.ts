@@ -1801,3 +1801,84 @@ describe("nothing saved from nothing, and a described task is that task", () => 
     );
   });
 });
+
+/** Live 9ff4a1118: the call-prep answer carried no blocks at all. */
+describe("a saved call prep with no blocks", () => {
+  it("is titled with the counterpart they named in the ask", async () => {
+    const added: { kind: string; title: string }[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items: [] }),
+      add: (_actor, request) => {
+        added.push(request);
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    const s = seam({
+      history: [
+        message(
+          "USER",
+          "Help me prepare for a call with Savanna Seed Partners",
+        ),
+        message("Q", "Lead with your traction, then ask about their pacing."),
+        message("USER", "Save that call prep to my board"),
+      ],
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        boardAsk: "SAVE",
+        namedOther: null,
+      },
+      board,
+    });
+    await s.run();
+    expect(added.map((one) => one.title)).toEqual([
+      "Call prep: Savanna Seed Partners",
+    ]);
+  });
+
+  it("an honest line when the planner fails", async () => {
+    const board: BoardKeeper = {
+      list: () =>
+        Promise.resolve({
+          items: [
+            {
+              id: "t1",
+              kind: "TASK",
+              title: "Map logistics partners",
+              status: "TODO" as const,
+            },
+          ],
+        }),
+      add: () => Promise.resolve({ outcome: "OK", replayed: false }),
+      work: () =>
+        Promise.resolve({
+          status: "FAILED",
+          working: [],
+          firstRead: null,
+          waiting: [],
+        }),
+    };
+    const s = seam({
+      history: [message("USER", "Work on the first task on my board")],
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        boardAsk: "WORK",
+        namedOther: null,
+      },
+      board,
+    });
+    await s.run();
+    expect(s.stored[0]?.content).toBe(
+      "I couldn't plan that task: the planning step failed on my side, so nothing has started and the item stays in To do.",
+    );
+  });
+});

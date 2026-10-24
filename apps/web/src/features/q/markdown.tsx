@@ -780,7 +780,9 @@ export function QMarkdown({
   readonly className?: string | undefined;
 }) {
   return (
-    <div className={cx("cq-md", className)} data-q-markdown>
+    // dir="auto": an answer in Arabic reads right to left even in an
+    // English interface (QA U8, live 24 Oct: it was laid out left to right).
+    <div className={cx("cq-md", className)} dir="auto" data-q-markdown>
       <Blocks
         blocks={parseMarkdown(text, streaming)}
         streaming={streaming}
