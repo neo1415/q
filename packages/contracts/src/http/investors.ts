@@ -82,7 +82,12 @@ const WebsiteUrlSchema = z
   .url()
   .refine((value) => /^https?:\/\//i.test(value), {
     message: "expected an http(s) URL",
-  });
+  })
+  // Stored with a lower-case scheme: a typed "Https://" showed as
+  // "Https://site.com" on the profile (owner QA 23 Oct).
+  .transform((value) =>
+    value.replace(/^https?:\/\//i, (scheme) => scheme.toLowerCase()),
+  );
 const PublicDescriptionSchema = z
   .string()
   .trim()
