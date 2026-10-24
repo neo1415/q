@@ -79,6 +79,8 @@ function context(
   bound: string[],
   /** The person's own firm of this name, already set up (null: none). */
   ownFirm: string | null = null,
+  /** Another firm of this name on Capital Q, visible to the network. */
+  visibleFirm: string | null = null,
 ): OnboardingWriteContext {
   const session = {
     id: "a1000000-0000-4000-8000-000000000001",
@@ -90,8 +92,16 @@ function context(
   return {
     // The only read: the person's own firm workspace of this name.
     tx: {
-      sql: () =>
-        Promise.resolve(ownFirm === null ? [] : [{ organisation_id: ownFirm }]),
+      sql: (parts: TemplateStringsArray) =>
+        Promise.resolve(
+          parts.join("?").includes("marketplace_visibility")
+            ? visibleFirm === null
+              ? []
+              : [{ display_name: visibleFirm }]
+            : ownFirm === null
+              ? []
+              : [{ organisation_id: ownFirm }],
+        ),
     },
     actor: {
       userId: USER,
@@ -185,5 +195,20 @@ describe("one firm per person and name", () => {
     // (and here, as in a half-finished earlier session, created once).
     expect(calls).not.toContain("createOrganisation");
     expect(bound).toEqual([INVESTOR]);
+  });
+});
+
+describe("one firm per real firm", () => {
+  it("a firm already on Capital Q under that name is not set up again: they are told how to join", async () => {
+    const { services, calls } = fakes();
+    await expect(
+      target(INVESTOR_WRITE_TARGETS.deploymentStatus, services).apply(
+        context([NAME, TYPE], [], null, "Haddad Desert Ventures"),
+        DEPLOYING,
+      ),
+    ).rejects.toMatchObject({
+      issues: [expect.objectContaining({ code: "firm_already_on_capital_q" })],
+    });
+    expect(calls).not.toContain("createOrganisation");
   });
 });

@@ -50,6 +50,7 @@ import {
   type OrganisationId,
 } from "@capital-q/security";
 import {
+  existingVisibleFirm,
   findOwnFirmWorkspace,
   investorMayReuseWorkspace,
   readInvestorWorkspaceFacts,
@@ -839,6 +840,20 @@ async function bootstrapInvestor(
   } else {
     if (actor.principal === undefined) {
       throw new OnboardingContextRequiredError();
+    }
+    // One firm per real firm: a name already on Capital Q is joined, not
+    // set up a second time (the company journey's F3 rule, for firms).
+    const existing = await existingVisibleFirm(
+      context.tx.sql,
+      name,
+      actor.userId,
+    );
+    if (existing !== null) {
+      invalid(
+        "value.text",
+        "firm_already_on_capital_q",
+        `${existing} is already on Capital Q. If you work there, ask someone on its team to invite you instead of setting it up again. If yours is a different firm, add what sets its name apart.`,
+      );
     }
     const membership = await services.organisations.createOrganisation({
       principal: actor.principal,

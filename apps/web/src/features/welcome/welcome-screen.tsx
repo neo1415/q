@@ -59,6 +59,26 @@ import { useT } from "@/features/i18n/language";
  * must not wait on a provider. The name is the only thing that varies,
  * and only when Capital Q already has one.
  */
+/**
+ * The name Q greets them by: the first word of their name, as Q says it in
+ * setup (QA F-48, 24 Oct: "Hi Ama Mensah" here, "Ama" in the interview).
+ * A first word that is also their organisation's first word may not be a
+ * given name ("Audit" for "Audit Ridge Capital"), so no name is used.
+ */
+export function greetingNameOf(
+  knownName: string | null,
+  knownOrganisation: string | null,
+): string | null {
+  const first = knownName?.trim().split(/\s+/)[0] ?? "";
+  if (first.length < 2 || first.length > 40) return null;
+  const organisationFirst =
+    knownOrganisation?.trim().split(/\s+/)[0]?.toLocaleLowerCase() ?? "";
+  return organisationFirst.length > 0 &&
+    organisationFirst === first.toLocaleLowerCase()
+    ? null
+    : first;
+}
+
 function introduction(
   knownName: string | null,
   journey: RegistrationJourney | null,
@@ -124,7 +144,10 @@ export function WelcomeScreen({
   const [leaving, setLeaving] = useState<string | null>(null);
 
   // Said and shown in the reader's language (live 2026-10-16: English).
-  const lines = introduction(knownName, journey).map(t);
+  const lines = introduction(
+    greetingNameOf(knownName, knownOrganisation),
+    journey,
+  ).map(t);
   const spoken = lines.join(" ");
 
   /**

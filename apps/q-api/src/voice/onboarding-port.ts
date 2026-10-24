@@ -20,11 +20,13 @@ import {
 } from "@capital-q/contracts";
 import {
   FOUNDER_COVERAGE_PROFILE,
+  FOUNDER_STEPS,
   FOUNDER_UTTERANCE_ALIASES,
 } from "@capital-q/founder-onboarding";
 import {
   INVESTOR_CONCEPT_FAMILIES,
   INVESTOR_COVERAGE_PROFILE,
+  INVESTOR_STEPS,
   INVESTOR_UTTERANCE_ALIASES,
   investorPlausibility,
 } from "@capital-q/investor-onboarding";
@@ -326,6 +328,16 @@ export function settleFamilies(
 }
 
 export function createOnboardingPort(input: {
+  /**
+   * One closed question about their words, read by meaning (J7). Absent:
+   * nothing is read, and lists they gave before are kept (QO-27).
+   */
+  readonly wordsCheck?:
+    | ((
+        question: string,
+        words: string,
+      ) => Promise<"YES" | "NO" | "UNSURE" | null>)
+    | undefined;
   readonly session: ApiSession;
   readonly onboardingSessionId: string;
   readonly journeyType: "investor" | "founder";
@@ -411,6 +423,22 @@ export function createOnboardingPort(input: {
    */
   let readAt: number | null = null;
   const written: string[] = [];
+  /** QO-25: the steps that hold their role now, and the reading of it. */
+  const ROLE_NOW_STEPS: ReadonlySet<string> = new Set([
+    FOUNDER_STEPS.founderRole,
+    INVESTOR_STEPS.businessTitle,
+  ]);
+  const ROLE_NOW_QUESTION =
+    "Do these words state the person's role today, in their own current company or firm (not a past job)?";
+  /** QO-27: whether their words replace a list they gave before; null: unread. */
+  const REPLACES_QUESTION =
+    "Do these words replace what they said before for this (a correction such as 'not X, Y' or 'only Y'), rather than add to it?";
+  const replacesEarlier = async (
+    quote: string,
+  ): Promise<"YES" | "NO" | "UNSURE" | null> =>
+    quote.trim().length === 0 || input.wordsCheck === undefined
+      ? null
+      : input.wordsCheck(REPLACES_QUESTION, quote).catch(() => null);
   /** The steps this turn's answers are for, so a sibling in it counts. */
   const turnSteps = new Set<string>();
   /**
@@ -722,7 +750,23 @@ export function createOnboardingPort(input: {
           const step = steps.get(key);
           return step !== undefined && !isPlatformReference(step);
         });
+        // QA QO-29 (23 Oct): an investor at 9 of 9 essentials saw "Finish
+        // your mandate" in Discover; the feed waited on a "Looks right" at
+        // the end of every optional question, and the chip was gone after a
+        // reload. Once nothing essential is missing, making the mandate live
+        // is asked next: still their own yes (activation is consequential),
+        // never assumed.
+        const reviewKey = INVESTOR_STEPS.review;
+        const readyToReview =
+          input.journeyType === "investor" &&
+          view.session.status !== "COMPLETED" &&
+          eligibleKeys.has(reviewKey) &&
+          !answeredKeys.has(reviewKey) &&
+          !coverage.next.some((n) => n.reason === "ESSENTIAL_MISSING");
         return [
+          ...(readyToReview
+            ? [{ stepKey: reviewKey, reason: "CONFIRM_PROPOSAL" as const }]
+            : []),
           // Asked as the question it is, not as a value on offer.
           ...unlocking.map((stepKey) => ({
             stepKey,
@@ -804,6 +848,39 @@ export function createOnboardingPort(input: {
     suffix === null
       ? undefined
       : [...steps.keys()].find((key) => key.endsWith(`.${suffix}`));
+
+  /**
+   * QA QO-27 (23 Oct): "pre-seed and seed" saved with Series A added. When
+   * their own English words name some of a list's choices exactly, a choice
+   * the model added beside them is its inference and is dropped; when their
+   * words name none ("early stage"), the model's reading stands, checked as
+   * before. Kept to lists: one choice is checked below.
+   */
+  const namedOnly = (
+    resolved: Extract<Resolved, { ok: true }>,
+    answer: Answer,
+  ): Extract<Resolved, { ok: true }> => {
+    if (
+      resolved.value.type !== "MULTI_SELECT" ||
+      resolved.note !== undefined ||
+      answer.basis === "DELEGATED" ||
+      !turnIsEnglish(answer.quote)
+    ) {
+      return resolved;
+    }
+    const named = new Set([
+      ...optionsNamedIn(input.journeyType, resolved.step, answer.quote),
+      ...input.personTurns
+        .filter((said) => quoteOccursIn(answer.quote, said))
+        .flatMap((said) => [
+          ...optionsNamedIn(input.journeyType, resolved.step, said),
+        ]),
+    ]);
+    const kept = resolved.value.optionKeys.filter((key) => named.has(key));
+    return kept.length === 0 || kept.length === resolved.value.optionKeys.length
+      ? resolved
+      : { ...resolved, value: { type: "MULTI_SELECT", optionKeys: kept } };
+  };
 
   type Resolved =
     | {
@@ -952,10 +1029,27 @@ export function createOnboardingPort(input: {
           value: { type: "TEXT", text: ownWordsFor(unmatched.join(", ")) },
         };
       }
+      // QA QO-27 (23 Oct): "West Africa" said after "the UK" replaced the
+      // UK. A list they already gave keeps what they said before unless
+      // their words replace it, read by meaning; unsure keeps both.
+      const before = (await current()).responses.find(
+        (response) => response.stepKey === step.stepKey,
+      )?.value;
+      const earlier =
+        before?.type === "RESOURCE_REFERENCE"
+          ? before.resourceIds.filter((id) => !ids.includes(id))
+          : [];
+      const keepEarlier =
+        earlier.length > 0 &&
+        c.maxItems > 1 &&
+        (await replacesEarlier(answer.quote ?? "")) !== "YES";
       value = {
         type: "RESOURCE_REFERENCE",
         resourceType: "TAXONOMY_NODE",
-        resourceIds: ids.slice(0, c.maxItems),
+        resourceIds: (keepEarlier ? [...earlier, ...ids] : ids).slice(
+          0,
+          c.maxItems,
+        ),
       };
     } else if (
       c.stepType === "single_select" ||
@@ -1889,8 +1983,25 @@ export function createOnboardingPort(input: {
     if (confirming?.configuration.stepType === "confirmation") {
       return { kind: "CONFIRM", step: confirming, value: answer.value };
     }
-    const resolved = await (warmed.get(answer) ?? resolve(answer));
-    if (!resolved.ok) return done(resolved.result);
+    const resolvedRaw = await (warmed.get(answer) ?? resolve(answer));
+    if (!resolvedRaw.ok) return done(resolvedRaw.result);
+    const resolved = namedOnly(resolvedRaw, answer);
+    // QA QO-25 (23 Oct): "I was a product lead at Paystack" saved their
+    // role as Product; they are the CEO. A role is their role now: words
+    // about a past job are read by meaning and not recorded as it.
+    if (
+      ROLE_NOW_STEPS.has(resolved.step.stepKey) &&
+      answer.basis !== "DELEGATED" &&
+      (answer.quote ?? "").trim().length > 0 &&
+      (await input.wordsCheck?.(ROLE_NOW_QUESTION, answer.quote ?? "")) === "NO"
+    ) {
+      return done({
+        stepKey: resolved.step.stepKey,
+        outcome: "REJECTED",
+        reason:
+          "Those words describe a past role, not their role now, so nothing was recorded. Keep it as their background and ask what their role is today.",
+      });
+    }
     const verbatimMatch =
       verbatim !== null &&
       resolved.value.type === "SINGLE_SELECT" &&
