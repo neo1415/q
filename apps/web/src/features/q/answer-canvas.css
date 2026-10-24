@@ -100,6 +100,10 @@
 .cq-ac-cards[data-layout="spotlight"] {
   display: flex;
   flex-direction: column;
+  /* Stretch, not the grid's "start": the spotlight's 100%-wide card needs
+     a sized parent, or the column collapses to its border (QA F-97, live
+     24 Oct: "tell me about the second one" left a 4px bar). */
+  align-items: stretch;
   gap: 12px;
 }
 .cq-ac-spot .cq-ac-card {
