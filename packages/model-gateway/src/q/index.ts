@@ -6181,10 +6181,10 @@ export function createModelGatewayQAnswer(
        * I should look into" got three by name from the catalog. What they
        * want is the turn reader's to understand, never a phrase list: a
        * DISCOVER reading that ranks by fit with their mandate (ranking FIT
-       * or mandateRelevant), naming no sector, country or stage, is the fit
-       * sweep over the investor's own candidates, not the catalog's first
-       * companies by name. One naming a kind stays the catalog of that
-       * kind, ranked by fit (discover-companies.ts).
+       * or mandateRelevant), naming no sector, country or stage, is ranked
+       * by fit with their mandate, never the catalog's first companies by
+       * name. F-60: the catalog's fit ranking answers it (below); the fit
+       * sweep over their own candidates only when the catalog cannot.
        */
       const recommendAll =
         investorAsking &&
@@ -6197,18 +6197,52 @@ export function createModelGatewayQAnswer(
         request.discoverCompanies.stages.length === 0 &&
         // F-10: "raising now" is a filter only the catalog applies.
         request.discoverCompanies.raising !== true;
+      /**
+       * F-60 (QA 2026-10-23, savanna-seed): typed "five best fits" and
+       * spoken "three that fit my mandate" ranked different companies at
+       * the same moment: one reading reached the catalog's fit ranking
+       * (every visible match), the other the fit sweep over the investor's
+       * own candidates only. One ranking truth: an investor's unscoped ask
+       * for the companies that fit them best -- a DISCOVER reading with no
+       * filters, or a FIT question about no company in particular and not
+       * about the cards shown -- is the catalog's fit ranking, the same
+       * fit service's scores over every match. The sweep answers only
+       * when the catalog cannot.
+       */
+      const unscopedFit =
+        investorAsking &&
+        request.discoverCompanies === undefined &&
+        request.fitQuestion !== undefined &&
+        request.fitQuestion.previous !== true &&
+        request.fitQuestion.excludeShown !== true &&
+        request.aboutNamedOther !== true &&
+        (request.namedOther ?? null) === null;
+      const catalogAsk =
+        request.discoverCompanies ??
+        (unscopedFit && request.fitQuestion !== undefined
+          ? {
+              text: request.fitQuestion.text,
+              sectors: [],
+              countries: [],
+              stages: [],
+              count: request.fitQuestion.count,
+              ranking: "FIT" as const,
+              mandateRelevant: true,
+              previous: false,
+              raising: false,
+            }
+          : undefined);
       // K1 (live 2026-10-09 15:57): companies of a kind are listed from
       // the catalog by code; the analyst is never asked to describe cards.
       // Null (no catalog here): the full path answers.
       if (
-        !recommendAll &&
-        request.discoverCompanies !== undefined &&
+        catalogAsk !== undefined &&
         request.writingDocument !== true &&
         request.askedAction === undefined &&
         (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
       ) {
         const discoverStarted = Date.now();
-        const found = await discoverFor(request.discoverCompanies);
+        const found = await discoverFor(catalogAsk);
         if (found !== null) {
           const message = await persistCodeAnswer(
             found.text,
@@ -6218,7 +6252,7 @@ export function createModelGatewayQAnswer(
             {
               qRunId: request.runId,
               basis: found.basis,
-              asked: request.discoverCompanies.count,
+              asked: catalogAsk.count,
               cards: found.shown,
               toolCalls: found.calls.length,
               modelCalls: 0,
@@ -6295,6 +6329,55 @@ export function createModelGatewayQAnswer(
           "Fit against your mandate",
         )?.cards.every((card) => card.fit === null) ??
           true);
+      // F-60: the mandate's ranking is the catalog's, as for any unscoped
+      // ask, so "rank them by my mandate" names the same companies as
+      // "top three that fit my mandate". The sweep is the fallback.
+      if (
+        shownUnscorable &&
+        swept !== null &&
+        investorAsking &&
+        request.writingDocument !== true &&
+        request.askedAction === undefined &&
+        (request.turnKind === undefined || request.turnKind === "QUESTION_TO_Q")
+      ) {
+        const ranked = await discoverFor({
+          text: latest.content,
+          sectors: [],
+          countries: [],
+          stages: [],
+          count: swept.ask.count,
+          ranking: "FIT",
+          mandateRelevant: true,
+          previous: false,
+          raising: false,
+        });
+        if (
+          ranked !== null &&
+          ranked.basis === "FIT" &&
+          ranked.block !== null
+        ) {
+          rankedPastShown = true;
+          const message = await persistCodeAnswer(
+            `None of the companies I just listed has enough on record to score against your mandate yet. ${ranked.text}`,
+            [ranked.block],
+          );
+          logger?.info(
+            {
+              qRunId: request.runId,
+              cards: ranked.shown,
+              toolCalls: ranked.calls.length,
+              totalMs: Date.now() - startedAt,
+            },
+            "q answered a fit question from the catalog's ranking past unscorable cards",
+          );
+          return {
+            kind: "ANSWERED",
+            messageId: message.id,
+            modelPolicyVersion: "none",
+            promptBundleVersion: rendered.bundle.bundleVersion,
+          };
+        }
+      }
       const reRanked =
         shownUnscorable && swept !== null
           ? await sweepCandidates(swept.ask.count)

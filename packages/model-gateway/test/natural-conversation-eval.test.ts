@@ -706,7 +706,8 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
       expect(text).not.toMatch(/listed by name/u);
       expect(cardsOf(blocks).map((card) => card.name)).toEqual(expected);
       expect(executed.some((name) => name.startsWith("fit_"))).toBe(true);
-      expect(executed).not.toContain("discover_companies");
+      // F-60: one ranking truth, the catalog's fit ranking over every match.
+      expect(executed).toContain("discover_companies");
     }
   });
 
