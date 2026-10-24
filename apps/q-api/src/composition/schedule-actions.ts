@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readyToSendLine } from "@capital-q/app-actions";
 
 import {
   GOOGLE_RECONNECT_PATH,
@@ -393,6 +394,12 @@ export function createMeetingScheduleAction(dependencies: {
       summary: `Call with ${payload.counterpartName}`,
       preview: `${payload.purpose}\n${when(payload.startsAt, payload.timeZone)}, ${String(payload.durationMinutes)} minutes\nGoogle Meet invite to ${payload.counterpartName}'s people`,
     }),
+    // Outward: an invite to their people, ready to send.
+    proposed: (payload, summary) =>
+      readyToSendLine(
+        `${summary}, ${when(payload.startsAt, payload.timeZone)}`,
+        null,
+      ),
     sameIntent: (previous, next) =>
       previous.relationshipId === next.relationshipId &&
       Math.abs(Date.parse(previous.startsAt) - Date.parse(next.startsAt)) <
@@ -502,6 +509,8 @@ export function createMeetingRescheduleAction(dependencies: {
       summary: `Move: ${payload.purpose}`,
       preview: `${payload.purpose}\nNew time: ${when(payload.startsAt)}, ${String(payload.durationMinutes)} minutes`,
     }),
+    proposed: (payload, summary) =>
+      readyToSendLine(`${summary}, new time ${when(payload.startsAt)}`, null),
     confirm: (_payload, result) =>
       result.alreadyDone
         ? "The call was already at that time."
@@ -559,6 +568,7 @@ export function createMeetingCancelAction(dependencies: {
       summary: `Cancel: ${payload.purpose}`,
       preview: `${payload.purpose}\n${when(payload.startsAt)}\nEveryone invited will be told.`,
     }),
+    proposed: (_payload, summary) => readyToSendLine(summary, null),
     confirm: (_payload, result) =>
       result.alreadyDone
         ? "That call was already cancelled."

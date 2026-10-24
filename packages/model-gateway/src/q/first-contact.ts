@@ -30,6 +30,14 @@ import type { QToolCallOutcome } from "@capital-q/q-runtime";
  * connection.
  */
 export const FIRST_CONTACT_TOOL = "propose_express_interest";
+
+/**
+ * What Q says when code prepared the first contact (QO-08): plain, true,
+ * no tool named and no permission asked for what was asked. The card's
+ * own line follows it with the note in full and "Ready to send".
+ */
+export const FIRST_CONTACT_REPLY =
+  "You're not connected with them yet, so I've prepared this as an expression of interest: messages open once the founders accept.";
 export const MESSAGE_TOOLS: ReadonlySet<string> = new Set([
   "propose_chat_message",
   "propose_email",

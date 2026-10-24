@@ -189,7 +189,7 @@ export type QActionDefinition<P, R> = {
    * says it is ready to send and shows what will be sent, not "Not saved
    * yet" (coordinator 2026-10-23). Absent: the summary, "Not saved yet".
    */
-  readonly proposed?: ((payload: P) => string) | undefined;
+  readonly proposed?: ((payload: P, summary: string) => string) | undefined;
 };
 
 /** Erased for the registry; per-definition types stay with the definition. */

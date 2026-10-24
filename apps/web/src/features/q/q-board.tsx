@@ -37,6 +37,7 @@ import { plainFromMarkdown } from "./markdown";
 import { QEvidence } from "./q-evidence";
 import { QResultBlocks } from "./q-result-blocks";
 import { useSubjectNames } from "./blocks/use-subject-names";
+import { keepPinnedDocuments } from "@/features/board/keep-on-board";
 import { useT } from "@/features/i18n/language";
 
 /**
@@ -349,6 +350,27 @@ export function QBoard({
   );
   const objects = compact ? arranged.slice(0, COMPACT_LIMIT) : arranged;
   const more = arranged.length - objects.length;
+
+  // The work board (owner 2026-10-23): a pinned document is kept on the
+  // person's own server board too, once (pins from before included).
+  const pinnedDocuments = arranged.flatMap((object) =>
+    marks.pinned.includes(object.key)
+      ? object.blocks.flatMap((block) =>
+          block.kind === "ARTIFACT_REFERENCE"
+            ? [{ artifactId: block.artifactId, title: block.title }]
+            : [],
+        )
+      : [],
+  );
+  const pinnedSignature = pinnedDocuments
+    .map((document) => document.artifactId)
+    .join(",");
+  useEffect(() => {
+    if (pinnedDocuments.length === 0) return;
+    void keepPinnedDocuments(pinnedDocuments);
+    // The signature names the documents; their titles ride along.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinnedSignature]);
 
   const togglePin = (objectKey: string) => {
     const pinned = marks.pinned.includes(objectKey)

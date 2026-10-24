@@ -1512,6 +1512,7 @@ export * from "./deal-close.js";
 
 export * from "./relationship-pipeline.js";
 export * from "./relationship-views.js";
+export * from "./board.js";
 export * from "./relationship-notes.js";
 export * from "./onboarding-coverage.js";
 export * from "./unicorn-potential.js";

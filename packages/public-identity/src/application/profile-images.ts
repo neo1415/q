@@ -151,7 +151,16 @@ export type ProfileImageProcessor = {
   /** Null when the bytes are not a decodable JPEG, PNG or WebP. */
   readonly process: (
     bytes: Uint8Array,
-    target: { readonly width: number; readonly height: number },
+    target: {
+      readonly width: number;
+      readonly height: number;
+      /**
+       * "cover" fills the frame (a person's photo, a cover); "contain"
+       * keeps the whole image on a transparent margin (an organisation's
+       * logo: owner QA 23 Oct found wordmarks stored as "ilo C").
+       */
+      readonly fit?: "cover" | "contain" | undefined;
+    },
   ) => Promise<ProcessedImage | null>;
 };
 
@@ -498,7 +507,13 @@ export function createProfileImageService(
       const bytes = await readBounded(stream.body, PROFILE_IMAGE_MAX_BYTES);
       if (bytes === null) return refuse("TOO_LARGE");
       const processed = await processor
-        .process(bytes, PROFILE_IMAGE_DIMENSIONS[row.kind])
+        .process(bytes, {
+          ...PROFILE_IMAGE_DIMENSIONS[row.kind],
+          fit:
+            row.kind === "AVATAR" && row.subjectType !== "PERSON"
+              ? "contain"
+              : "cover",
+        })
         .catch(() => null);
       if (processed === null) return refuse("NOT_AN_IMAGE");
       if (processed.sourceWidth < MIN_SOURCE_WIDTH) return refuse("TOO_SMALL");

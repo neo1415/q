@@ -36,7 +36,7 @@ import {
   Q_TOOL_LOOP_MAX_ROUNDS,
   type QAuthorisedContextPort,
 } from "../src/q/index.js";
-import { firstContactOf } from "../src/q/first-contact.js";
+import { FIRST_CONTACT_REPLY, firstContactOf } from "../src/q/first-contact.js";
 import { onScreenCompanyFact } from "../src/q/company-fact.js";
 import { chatInsteadOf } from "../src/q/message-channel.js";
 import { qCardOfferOf } from "../src/q/q-card-offer.js";
@@ -1328,7 +1328,7 @@ describe("answer seam tool loop", () => {
               };
         },
       );
-      const { seam, alpha, request } = build({
+      const { seam, alpha, request, messages } = build({
         said: "Draft a short note to the founders of Anchor saying I'd like a call next week",
         script: [
           {
@@ -1349,6 +1349,7 @@ describe("answer seam tool loop", () => {
       return {
         executed: tools.executed.map((p) => [p.name, p.arguments]),
         second: JSON.stringify(alpha.calls[1]?.request.messages ?? []),
+        reply: messages.at(-1)?.content ?? "",
       };
     };
 
@@ -1363,6 +1364,15 @@ describe("answer seam tool loop", () => {
       expect(second).toContain("Express interest in Anchor");
       expect(second).toContain("The note they asked for goes with it");
       expect(second).toContain("Nothing is sent until they approve");
+    });
+
+    it("replies in code's own words: never names a tool or asks permission for what was asked (QO-08)", async () => {
+      const { reply } = await run({ chat: "NOT_CONNECTED" });
+      expect(reply).toBe(FIRST_CONTACT_REPLY);
+      expect(reply).not.toMatch(/tool|want me to|would you like/iu);
+      // Nothing prepared by code: the model's own answer stands.
+      const { reply: own } = await run({ chat: "PREPARED" });
+      expect(own).not.toBe(FIRST_CONTACT_REPLY);
     });
 
     it("never cuts a note longer than an interest note: the interest goes without it", () => {

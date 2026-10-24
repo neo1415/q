@@ -14,7 +14,6 @@ import {
   asksForComparison,
   asksForPipelineSummary,
   comparisonLead,
-  profileLead,
   researchLead,
   pipelineLead,
   PIPELINE_NOTE,
@@ -180,6 +179,7 @@ import {
 } from "./named-company-fact.js";
 import {
   FIRST_CONTACT_TOOL,
+  FIRST_CONTACT_REPLY,
   firstContactMessage,
   firstContactOf,
 } from "./first-contact.js";
@@ -4750,28 +4750,10 @@ export function createModelGatewayQAnswer(
             ? pipelineLead(outcome.result.data, latest.content)
             : null;
         }
-        if (!asksForComparison(latest.content)) {
-          // One company named, already read in full by this run: its own
-          // declared profile opens the answer (first word, owner 10-21).
-          const named = [...runCompanies.read(request.runId).profiles].filter(
-            ([, name]) => containsCompanyName(latest.content, name),
-          );
-          if (named.length !== 1) return null;
-          const [companyId] = named[0] ?? [];
-          if (companyId === undefined) return null;
-          const outcome = await tools
-            .execute(
-              {
-                callId: "q-early-lead-profile",
-                name: "get_company",
-                arguments: { companyId },
-              },
-              toolContext,
-            )
-            .catch(() => null);
-          const profile = profileOf(outcome);
-          return profile === null ? null : profileLead(profile);
-        }
+        // F-45 (QA 2026-10-23): a question about one company is not opened
+        // with a fixed line of its declared stage and place; the answer's
+        // own first sentence, written for this question, leads.
+        if (!asksForComparison(latest.content)) return null;
         // The named companies this run already read in full (prepare's
         // named-visible reads): read again from the run's own kept reads.
         const named = [...runCompanies.read(request.runId).profiles].filter(
@@ -6648,6 +6630,8 @@ export function createModelGatewayQAnswer(
        * 2026-10-03: one status per card per answer).
        */
       let preparedByTool = false;
+      /** Code prepared the first contact this run (QO-08): the reply is code's, not the model's. */
+      let firstContactPrepared = false;
       let gaps: { readonly status: string; readonly line: string } | null =
         null;
       // The order matters more than the words: a model handed tools and a
@@ -7609,7 +7593,10 @@ export function createModelGatewayQAnswer(
                   latencyMs: outcome.latencyMs,
                 });
                 const told = firstContactMessage(outcome, firstContactWithNote);
-                if (told !== null) chainedResults.push(told);
+                if (told !== null) {
+                  chainedResults.push(told);
+                  firstContactPrepared = true;
+                }
               }
             }
             messages = [...messages, assistant, ...results, ...chainedResults];
@@ -8403,8 +8390,15 @@ export function createModelGatewayQAnswer(
         const cardsShown = (analystBlocks ?? []).some(
           (block) => block.kind === "ANSWER_CARDS",
         );
-        const answerText =
-          builtCards !== null && hasOrphanListItems(artifactSafe.text)
+        // QO-08 (live 2026-10-23): with Express Interest prepared by code
+        // for founders they are not connected with, the model still wrote
+        // "this message tool only drafts notes to connected companies...
+        // want me to?" -- naming a tool and asking permission for what was
+        // asked and already prepared. The reply is code's own line; the
+        // card's line (the note in full, "Ready to send") follows it.
+        const answerText = firstContactPrepared
+          ? FIRST_CONTACT_REPLY
+          : builtCards !== null && hasOrphanListItems(artifactSafe.text)
             ? fitCardsSummary(builtCards)
             : request.spoken === true && cardsShown
               ? spokenBeforeCards(artifactSafe.text)

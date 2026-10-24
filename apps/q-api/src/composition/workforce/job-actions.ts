@@ -584,6 +584,8 @@ export function createWorkforceJobBoard(dependencies: {
       readonly at: number;
       /** Started without a card: nothing for the proposer to file. */
       readonly started?: boolean | undefined;
+      /** The job it started, for a board item that follows it. */
+      readonly jobId?: string | undefined;
     }
   >();
   return {
@@ -600,6 +602,7 @@ export function createWorkforceJobBoard(dependencies: {
                 status: "STARTED",
                 plan: planView(existing.payload),
                 firstRead: null,
+                jobId: existing.jobId,
               }
             : { status: "ONE_PER_TURN", plan: planView(existing.payload) };
         }
@@ -735,11 +738,13 @@ export function createWorkforceJobBoard(dependencies: {
               payload: parsed.data,
               at: now(),
               started: true,
+              jobId: started.jobId,
             });
             return {
               status: "STARTED",
               plan: planView(parsed.data),
               firstRead: planned.firstRead ?? null,
+              jobId: started.jobId,
             };
           }
           // Not started (a store failed): the card is still a way to do it.

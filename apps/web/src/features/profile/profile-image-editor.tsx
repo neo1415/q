@@ -32,8 +32,9 @@ import { accountButton } from "@/features/settings/account-kit";
 
 import {
   clampCrop,
+  drawRect,
+  fitZoom,
   initialCrop,
-  sourceRect,
   zoomTo,
   MAX_ZOOM,
   MIN_ZOOM,
@@ -377,6 +378,10 @@ export function ProfileImageEditor(props: ProfileImageEditorProps) {
           <CropDialog
             key={phase.src}
             kind={props.kind}
+            // A company's or a firm's logo can be kept whole (a wide
+            // wordmark), and keeps its transparency; a person's photo
+            // always fills the frame.
+            fitWhole={props.kind === "AVATAR" && props.subjectType !== "PERSON"}
             label={props.label}
             src={phase.src}
             image={phase.image}
@@ -449,6 +454,7 @@ function capitalise(text: string): string {
 
 function CropDialog({
   kind,
+  fitWhole,
   label,
   src,
   image,
@@ -456,6 +462,7 @@ function CropDialog({
   onCropped,
 }: {
   readonly kind: ProfileImageKind;
+  readonly fitWhole: boolean;
   readonly label: string;
   readonly src: string;
   readonly image: Size;
@@ -468,6 +475,12 @@ function CropDialog({
   const [crop, setCrop] = useState<CropState | null>(null);
   const drag = useRef<{ x: number; y: number; start: CropState } | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const minZoomFor = useCallback(
+    (size: Size) =>
+      fitWhole ? Math.min(MIN_ZOOM, fitZoom(image, size)) : MIN_ZOOM,
+    [fitWhole, image],
+  );
+  const minZoom = frame === null ? MIN_ZOOM : minZoomFor(frame);
 
   // Measure the frame whenever it is laid out (and on resize), keeping the
   // crop. A callback ref, not an effect: the dialog portals its content in
@@ -484,10 +497,11 @@ function CropDialog({
         };
         if (next.width === 0 || next.height === 0) return;
         setFrame(next);
+        // A logo opens whole; a photo opens covering the frame.
         setCrop((current) =>
           current === null
-            ? initialCrop(image, next)
-            : clampCrop(current, image, next),
+            ? initialCrop(image, next, minZoomFor(next))
+            : clampCrop(current, image, next, minZoomFor(next)),
         );
       };
       measure();
@@ -496,7 +510,7 @@ function CropDialog({
       observer.observe(element);
       return () => observer.disconnect();
     },
-    [image],
+    [image, minZoomFor],
   );
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -516,6 +530,7 @@ function CropDialog({
         },
         image,
         frame,
+        minZoom,
       ),
     );
   };
@@ -539,6 +554,7 @@ function CropDialog({
         { zoom: crop.zoom, x: crop.x + move[0], y: crop.y + move[1] },
         image,
         frame,
+        minZoom,
       ),
     );
   };
@@ -556,19 +572,9 @@ function CropDialog({
         setExportError("This browser couldn't prepare the image.");
         return;
       }
-      const { sx, sy, sw, sh } = sourceRect(crop, image, frame);
+      const { dx, dy, dw, dh } = drawRect(crop, image, frame, output);
       context.imageSmoothingQuality = "high";
-      context.drawImage(
-        element,
-        sx,
-        sy,
-        sw,
-        sh,
-        0,
-        0,
-        output.width,
-        output.height,
-      );
+      context.drawImage(element, dx, dy, dw, dh);
       // Re-encoding through a canvas keeps pixels only: no EXIF, no GPS.
       canvas.toBlob(
         (blob) => {
@@ -578,7 +584,9 @@ function CropDialog({
           }
           onCropped(blob);
         },
-        "image/jpeg",
+        // JPEG has no transparency: a logo's clear background would
+        // become black (owner QA 23 Oct), so a logo is kept as PNG.
+        fitWhole ? "image/png" : "image/jpeg",
         0.9,
       );
     };
@@ -654,14 +662,16 @@ function CropDialog({
           <input
             id={`${id}-zoom`}
             type="range"
-            min={MIN_ZOOM}
+            min={minZoom}
             max={MAX_ZOOM}
             step={0.01}
             value={crop?.zoom ?? 1}
             disabled={crop === null}
             onChange={(event) => {
               if (crop === null || frame === null) return;
-              setCrop(zoomTo(crop, Number(event.target.value), image, frame));
+              setCrop(
+                zoomTo(crop, Number(event.target.value), image, frame, minZoom),
+              );
             }}
             className="min-h-11 flex-1 accent-(--cq-accent)"
           />

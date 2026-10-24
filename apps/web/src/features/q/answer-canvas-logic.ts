@@ -197,6 +197,18 @@ export function spokenLine(card: QAnswerCard): string {
   return `${card.name}: ${reason ?? ""}`.trim();
 }
 
+/** The longest line shown under the cards in a text turn. */
+export const SHORT_LINE_MAX = 110;
+
+/**
+ * F-11 (QA 2026-10-23, phone): one short human line or none. A close too
+ * long for one line is not cut mid-thought: the thread already has it.
+ */
+export function shortLine(line: string): string {
+  const text = line.replace(/\s+/gu, " ").trim();
+  return text.length <= SHORT_LINE_MAX ? text : "";
+}
+
 /** "Tied with Ledgerfold on mandate fit (8.0)": said, never implied by order. */
 export function tieLine(
   block: QAnswerCardsBlock,

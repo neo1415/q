@@ -21,6 +21,7 @@ import { PROFILE_IMAGE_ACTIONS } from "./actions/profile-images.js";
 import { PROFILE_AND_RECORDS } from "./actions/records.js";
 import { SCHEDULE_ACTIONS } from "./actions/schedule.js";
 import { SCHEDULE_PROPOSAL_ACTIONS } from "./actions/schedule-proposals.js";
+import { BOARD_ACTIONS } from "./actions/board.js";
 import { SETTINGS_ACTIONS } from "./actions/settings.js";
 import { ETIQUETTE_ACTIONS } from "./actions/etiquette.js";
 import { RELATIONSHIP_VIEW_ACTIONS } from "./actions/relationship-views.js";
@@ -63,6 +64,8 @@ export const APP_ACTIONS: readonly AnyAppAction[] = Object.freeze([
   ...DOCUMENT_MANAGE_ACTIONS,
   ...PROFILE_IMAGE_ACTIONS,
   ...SETTINGS_ACTIONS,
+  // The work board (owner 2026-10-23): the person's own items.
+  ...BOARD_ACTIONS,
   ...ETIQUETTE_ACTIONS,
   ...RELATIONSHIP_VIEW_ACTIONS,
   ...RELATIONSHIP_NOTE_ACTIONS,

@@ -42,8 +42,10 @@ export function createSharpImageProcessor(): ProfileImageProcessor {
       const output = await input
         .rotate()
         .resize(target.width, target.height, {
-          fit: "cover",
+          fit: target.fit ?? "cover",
           position: "centre",
+          // Contain pads with clear pixels; WebP keeps the alpha.
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
         })
         .webp({ quality: 82 })
         .toBuffer({ resolveWithObject: true });

@@ -346,6 +346,7 @@ const AREA_ALIASES: Readonly<Record<string, readonly string[]>> = {
   // Work's tabs keep their own addresses (owner 2026-10-18); the data
   // room is reached from Pitch.
   "/work": [
+    "/board",
     "/documents",
     "/pitch",
     "/company/data-room",

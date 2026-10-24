@@ -866,3 +866,19 @@ export const TurnReaderV58ResultSchema = TurnReaderV56ResultSchema.extend({
   meetingPrep: TurnMeetingPrepSchema.nullable().default(null).catch(null),
 }).strict();
 export type TurnReaderV58Result = z.infer<typeof TurnReaderV58ResultSchema>;
+
+export const TURN_READER_V61_SCHEMA_VERSION = 61;
+
+/**
+ * v61 (work-board lane S1, 2026-10-23): what they ask of their own work
+ * board, by meaning in any language. SAVE: keep something on it (Q's last
+ * answer, a named document or company). BREAKDOWN: Q's last plan or list
+ * as separate tasks (over SAVE when both are asked). WORK: Q starts on
+ * items already there. Null otherwise, including only asking what is on
+ * it. Lenient: a malformed value reads as null and never costs the reading.
+ */
+export const TURN_BOARD_ASKS = ["SAVE", "BREAKDOWN", "WORK"] as const;
+export const TurnReaderV61ResultSchema = TurnReaderV58ResultSchema.extend({
+  boardAsk: z.enum(TURN_BOARD_ASKS).nullable().default(null).catch(null),
+}).strict();
+export type TurnReaderV61Result = z.infer<typeof TurnReaderV61ResultSchema>;
