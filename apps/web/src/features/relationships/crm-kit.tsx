@@ -15,7 +15,9 @@ import {
 
 import type { RelationshipStateV2 } from "@capital-q/contracts";
 import { cx } from "@capital-q/ui";
-import { Check, Clock } from "@capital-q/ui/icons";
+
+import { StatusDot, type StatusTone } from "@/components/status/status-dot";
+import { Check } from "@capital-q/ui/icons";
 import { SheetClose, SheetContent, SheetRoot } from "@capital-q/ui/sheet";
 
 import { STATE_WORDS } from "./relationship-words";
@@ -215,17 +217,17 @@ const TAG_TONE: Readonly<Record<TagTone, string>> = {
   dash: "border border-dashed border-(--cq-border) text-(--cq-text-tertiary)",
 };
 
-const STATE_TONE: Readonly<Record<RelationshipStateV2, TagTone>> = {
-  INVESTED: "positive",
-  IN_DILIGENCE: "accent",
-  MEETING_HELD: "accent",
-  CONNECTED: "stone",
-  INTEREST_EXPRESSED: "dash",
-  DISCOVERED: "dash",
+const STATE_STATUS: Readonly<Record<RelationshipStateV2, StatusTone>> = {
+  INVESTED: "done",
+  IN_DILIGENCE: "active",
+  MEETING_HELD: "active",
+  CONNECTED: "idle",
+  INTEREST_EXPRESSED: "waiting",
+  DISCOVERED: "idle",
   // A pause or a pass is neutral, never an alarm.
-  PAUSED: "stone",
-  PASSED: "stone",
-  DECLINED: "stone",
+  PAUSED: "idle",
+  PASSED: "idle",
+  DECLINED: "idle",
 };
 
 /** A small pill of words: the tone only echoes what the words say. */
@@ -254,7 +256,7 @@ export function Tag({
   );
 }
 
-/** Where a relationship stands, as the designs tag it. */
+/** Where a relationship stands: a dot and its word (status grammar). */
 export function StateTag({
   state,
   label,
@@ -265,18 +267,12 @@ export function StateTag({
 }) {
   const t = useT();
   return (
-    <Tag
-      tone={STATE_TONE[state]}
-      icon={
-        state === "INVESTED" ? (
-          <Check aria-hidden="true" />
-        ) : state === "INTEREST_EXPRESSED" ? (
-          <Clock aria-hidden="true" />
-        ) : null
-      }
-    >
-      <span data-state-tag={state}>{t(label ?? STATE_WORDS[state])}</span>
-    </Tag>
+    <span data-state-tag={state} className="contents">
+      <StatusDot
+        tone={STATE_STATUS[state]}
+        label={t(label ?? STATE_WORDS[state])}
+      />
+    </span>
   );
 }
 

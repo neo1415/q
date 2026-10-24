@@ -168,7 +168,7 @@ describe("Work, Tasks as an inbox with its preview (option 2, 2026-10-21)", () =
       />,
     );
     expect(
-      screen.getByRole("heading", { name: /Needs your yes\s*1/u }),
+      screen.getByRole("heading", { name: /Needs you\s*1 waiting on you/u }),
     ).toBeTruthy();
     // In the queue, and open in the preview beside it.
     expect(
@@ -195,7 +195,7 @@ describe("Work, Tasks as an inbox with its preview (option 2, 2026-10-21)", () =
         "Nothing waits for you. Q will ask when something does.",
       ),
     ).toBeTruthy();
-    expect(screen.getByText("Nothing yet this week.")).toBeTruthy();
+    expect(screen.getByText("Nothing done yet today.")).toBeTruthy();
     expect(
       screen.getByText(/Nothing running\. Give Q a task above/u),
     ).toBeTruthy();
@@ -290,7 +290,7 @@ describe("Work, Tasks as an inbox with its preview (option 2, 2026-10-21)", () =
       />,
     );
     expect(
-      screen.getByRole("heading", { name: /Needs your yes\s*1/u }),
+      screen.getByRole("heading", { name: /Needs you\s*1 waiting on you/u }),
     ).toBeTruthy();
     await settle();
     const detail = document.querySelector("[data-work-detail]");
@@ -381,8 +381,8 @@ describe("Work, Tasks as an inbox with its preview (option 2, 2026-10-21)", () =
       .map((one) => one.textContent ?? "");
     const at = (prefix: string) =>
       headings.findIndex((one) => one.startsWith(prefix));
-    expect(at("Needs your yes")).toBeLessThan(at("Running"));
-    expect(at("Running")).toBeLessThan(at("Done this week"));
+    expect(at("Needs you")).toBeLessThan(at("Moving"));
+    expect(at("Moving")).toBeLessThan(at("Done today"));
   });
 
   it("lays a grant out as what Q does alone and what it asks, keeping the full text", () => {
