@@ -1645,7 +1645,7 @@ export function createSpecialistQAnswer(
 ): SpecialistQAnswer {
   const {
     specialist,
-    delegate,
+    delegate: answerPath,
     repositories,
     sql,
     transactions,
@@ -1654,6 +1654,26 @@ export function createSpecialistQAnswer(
     turns,
   } = dependencies;
   let last: CompanyIntelligenceResult | null = null;
+  /**
+   * U4/F8: a move the words asked for alongside a question, per run; the
+   * answer to the question carries it (QAnswerRequest.leadBlocks).
+   */
+  const movesWithQuestion = new Map<string, readonly QResultBlock[]>();
+  const delegate: typeof answerPath = {
+    ...answerPath,
+    answer: (request) => {
+      const moves = movesWithQuestion.get(request.runId);
+      movesWithQuestion.delete(request.runId);
+      return answerPath.answer(
+        moves === undefined
+          ? request
+          : {
+              ...request,
+              leadBlocks: [...(request.leadBlocks ?? []), ...moves],
+            },
+      );
+    },
+  };
 
   /**
    * The conversation core's state per conversation (CQ-QX-005): what has
@@ -2879,6 +2899,17 @@ export function createSpecialistQAnswer(
         logger?.info(
           { qRunId: request.runId, destination },
           "q did not move: the words do not ask for that page",
+        );
+        return null;
+      }
+      // U4/F8: a move with a question after it goes with the answer.
+      if (questionAfterMove(askedIn(history))) {
+        movesWithQuestion.set(request.runId, [
+          { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } },
+        ]);
+        logger?.info(
+          { qRunId: request.runId, destination },
+          "a screen and a question: the move goes with the answer",
         );
         return null;
       }
@@ -4643,7 +4674,20 @@ export function createSpecialistQAnswer(
       return recordAnswer(request, conversationId, byName.said, byName.blocks);
     }
     const paged = pageAnswer(latest.content, history, capabilities);
-    if (paged !== null) {
+    // U4/F8: "open the data room and tell me what's missing" opened the
+    // page and lost the question. The move goes with the answer instead.
+    if (paged !== null && questionAfterMove(latest.content)) {
+      movesWithQuestion.set(request.runId, paged.blocks);
+      while (movesWithQuestion.size > PREREADS_MAX) {
+        const oldest = movesWithQuestion.keys().next().value;
+        if (oldest === undefined) break;
+        movesWithQuestion.delete(oldest);
+      }
+      logger?.info(
+        { qRunId: request.runId, page: paged.log },
+        "a page and a question: the move goes with the answer",
+      );
+    } else if (paged !== null) {
       logger?.info(
         { qRunId: request.runId, page: paged.log },
         "q opened a page by name",
@@ -6683,6 +6727,19 @@ function alreadyOnScreen(
     (screen.route === "COMPANY" || screen.route === "PITCH") &&
     screen.companyId === intent.id
   );
+}
+
+/**
+ * U4/F8: the words ask for a move and then a question about it ("open the
+ * data room and tell me what's missing", "go to my pipeline, who's
+ * waiting?"): a later clause is a question.
+ */
+export function questionAfterMove(text: string): boolean {
+  const clauses = text
+    .split(/\s*(?:,|;|\band\b|\bthen\b)\s*/iu)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length > 0);
+  return clauses.slice(1).some((clause) => asksAQuestion(clause));
 }
 
 /** A question, not a command to go somewhere. */

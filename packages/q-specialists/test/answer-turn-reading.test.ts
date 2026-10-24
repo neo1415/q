@@ -250,6 +250,7 @@ function seam(options: {
   const events: { type: string; data: unknown }[] = [];
   let delegated = 0;
   const compares: unknown[] = [];
+  const leadBlocks: unknown[] = [];
   const leads: (string | undefined)[] = [];
   let warmed = 0;
   let investigated = 0;
@@ -282,6 +283,7 @@ function seam(options: {
         focuses.push(req.toolFocus);
         namedOthers.push(req.aboutNamedOther);
         compares.push(req.compare);
+        leadBlocks.push(req.leadBlocks);
         capabilities.push(req.capabilities);
         directives.push(
           req.research === undefined ? undefined : await req.research,
@@ -418,6 +420,7 @@ function seam(options: {
     events,
     delegated: () => delegated,
     compares,
+    leadBlocks,
     warmed: () => warmed,
     marked,
     message,
@@ -1086,6 +1089,46 @@ const advice: TurnReaderResult = {
 // TURN_READER v62 (lane 8, 23 Oct 2026): "compare the top two in a table"
 // was answered from what Q had shown, in prose, with no table. A comparison
 // the reader read goes the full way, carrying the reading, in any words.
+// U4/F8 (QA 24 Oct 2026): "open the data room and tell me X" opened the
+// page and lost the question. The move goes with the answer.
+describe("a move with a question after it", () => {
+  it("is answered, carrying the move", async () => {
+    const run = seam({
+      said: "Open my data room and tell me what's missing",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "OWN_DATA_ROOM",
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(1);
+    expect(run.leadBlocks).toEqual([
+      [
+        {
+          kind: "UI_INTENT",
+          intent: { kind: "NAVIGATE", destination: "OWN_DATA_ROOM" },
+        },
+      ],
+    ]);
+  });
+
+  it("a move alone is still only the move", async () => {
+    const run = seam({
+      said: "take me to discover",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "DISCOVER",
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+    await run.answer.answer(request());
+    expect(run.delegated()).toBe(0);
+  });
+});
+
 describe("a comparison the reader read", () => {
   it("is answered in full with the reading, never from what was shown", async () => {
     // A reading carrying v62's compare (the harness takes the v1 shape).
