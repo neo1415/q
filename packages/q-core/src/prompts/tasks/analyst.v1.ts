@@ -28,6 +28,18 @@ import {
   type ResearchFactsVariables,
   type ResearchPlanResult,
   type ResearchPlanVariables,
+  ANALYSIS_CRITIQUE_V3_SCHEMA_VERSION,
+  ANALYSIS_WRITE_V3_SCHEMA_VERSION,
+  AnalysisCritiqueResultV3Schema,
+  AnalysisDocumentResultV3Schema,
+  RESEARCH_FACTS_V2_SCHEMA_VERSION,
+  RESEARCH_PLAN_V2_SCHEMA_VERSION,
+  ResearchFactsResultV2Schema,
+  ResearchPlanResultV2Schema,
+  type AnalysisCritiqueResultV3,
+  type AnalysisDocumentResultV3,
+  type ResearchFactsResultV2,
+  type ResearchPlanResultV2,
 } from "../schemas/analyst.js";
 
 /**
@@ -68,7 +80,7 @@ export const RESEARCH_PLAN_V1: PromptDefinition<
 > = {
   id: "RESEARCH_PLAN",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -122,7 +134,7 @@ export const RESEARCH_FACTS_V1: PromptDefinition<
 > = {
   id: "RESEARCH_FACTS",
   version: 1,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   kind: "TASK",
   taskClass: "STRUCTURED_EXTRACTION",
   owner: "q-core",
@@ -286,7 +298,7 @@ export const ANALYSIS_WRITE_V2: PromptDefinition<
 > = {
   ...ANALYSIS_WRITE_V1,
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   effectiveFrom: "2026-10-23",
   changeDescription:
     "Owner QA 2026-10-23 (QO-07): written for WHO THIS IS FOR -- an investor's mandate and named pipeline, a founder's company and investors -- from their own records; a plan that would fit anyone is GENERIC.",
@@ -307,7 +319,7 @@ export const ANALYSIS_CRITIQUE_V2: PromptDefinition<
 > = {
   ...ANALYSIS_CRITIQUE_V1,
   version: 2,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   effectiveFrom: "2026-10-23",
   changeDescription:
     "Owner QA 2026-10-23 (QO-07): GENERIC includes a document that ignores WHO THIS IS FOR -- an investor's mandate and named pipeline, a founder's company and investors -- when the record gives them.",
@@ -320,4 +332,82 @@ export const ANALYSIS_CRITIQUE_V2: PromptDefinition<
       "THE COMPANY'S OWN RECORD\n",
       "THE RECORD: THE COMPANY'S OWN AND WHO THIS IS FOR\n",
     ),
+};
+
+/**
+ * Tolerant results (live 2026-10-24, batch 5: most deep-work calls refused
+ * as INVALID_MODEL_OUTPUT on one model, none truncated). Same templates,
+ * same variables; results strip unused keys and take longer text that code
+ * clips. See the schemas' note.
+ */
+export const RESEARCH_PLAN_V2: PromptDefinition<
+  ResearchPlanVariables,
+  ResearchPlanResultV2
+> = {
+  ...RESEARCH_PLAN_V1,
+  version: 2,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-24",
+  changeDescription:
+    "Live 2026-10-24: same template; a tolerant result (unused keys stripped, any lane label, longer queries code clips) so a slip in one field never loses the research plan.",
+  output: {
+    kind: "STRUCTURED",
+    schemaName: RESEARCH_PLAN_SCHEMA_NAME,
+    schemaVersion: RESEARCH_PLAN_V2_SCHEMA_VERSION,
+    schema: ResearchPlanResultV2Schema,
+  },
+};
+
+export const RESEARCH_FACTS_V2: PromptDefinition<
+  ResearchFactsVariables,
+  ResearchFactsResultV2
+> = {
+  ...RESEARCH_FACTS_V1,
+  version: 2,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-24",
+  changeDescription:
+    "Live 2026-10-24: same template; a tolerant result (unused keys stripped, longer text code clips, an unknown kind read as FACT, a malformed fact dropped alone) -- code still admits a fact only when its numbers are on its page.",
+  output: {
+    kind: "STRUCTURED",
+    schemaName: RESEARCH_FACTS_SCHEMA_NAME,
+    schemaVersion: RESEARCH_FACTS_V2_SCHEMA_VERSION,
+    schema: ResearchFactsResultV2Schema,
+  },
+};
+
+export const ANALYSIS_WRITE_V3: PromptDefinition<
+  AnalysisWriteVariables,
+  AnalysisDocumentResultV3
+> = {
+  ...ANALYSIS_WRITE_V2,
+  version: 3,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-24",
+  changeDescription:
+    "Live 2026-10-24: v2's template; a tolerant result (unused keys stripped, longer text and more sections that code splits and clips) so a long first draft is not refused whole.",
+  output: {
+    kind: "STRUCTURED",
+    schemaName: ANALYSIS_WRITE_SCHEMA_NAME,
+    schemaVersion: ANALYSIS_WRITE_V3_SCHEMA_VERSION,
+    schema: AnalysisDocumentResultV3Schema,
+  },
+};
+
+export const ANALYSIS_CRITIQUE_V3: PromptDefinition<
+  AnalysisCritiqueVariables,
+  AnalysisCritiqueResultV3
+> = {
+  ...ANALYSIS_CRITIQUE_V2,
+  version: 3,
+  status: "ACTIVE",
+  effectiveFrom: "2026-10-24",
+  changeDescription:
+    "Live 2026-10-24: v2's template; a tolerant result (unused keys stripped, longer findings code clips, an unknown issue kind read as GENERIC, a malformed issue dropped alone).",
+  output: {
+    kind: "STRUCTURED",
+    schemaName: ANALYSIS_CRITIQUE_SCHEMA_NAME,
+    schemaVersion: ANALYSIS_CRITIQUE_V3_SCHEMA_VERSION,
+    schema: AnalysisCritiqueResultV3Schema,
+  },
 };
