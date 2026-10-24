@@ -133,7 +133,7 @@ export function publicTerm(text: string | null | undefined): string | null {
 }
 
 const INVESTOR_TEXT =
-  /\b(?:invest(?:or|ors|ment|ments|ing)?|venture capital|vc|funds?|private equity|angels?|asset management|family offices?)\b/iu;
+  /\b(?:invest(?:s|or|ors|ment|ments|ing)?|venture capital|vc|funds?|private equity|angels?|asset management|family offices?)\b/iu;
 
 function textOf(record: KnownEntityRecord): string {
   const line = record.profile["oneLine"];
@@ -380,6 +380,55 @@ type WebFind = {
   readonly countries: readonly string[];
 };
 
+/**
+ * Coordinator 2026-10-24 (live: "Qatari Investors Group", a listed company,
+ * named as an investor because its name says "Investors"): a page counts
+ * as about an investor only when what it says outside the name is what an
+ * investor does, or the name itself is a specific kind of investor.
+ */
+const INVESTING =
+  /\b(?:invests?\s+in|investing\s+in|venture\s+capital|vc|portfolio\s+compan(?:y|ies)|start-?ups?|early[- ]stage|seed[- ]stage|growth[- ]stage|backs|backing|backed|family\s+offices?|angel\s+(?:investors?|networks?|groups?|syndicates?)|fund\s+of\s+funds|invested\s+in)\b/iu;
+const SPECIFIC_KIND_NAME =
+  /\b(?:family\s+offices?|angels?|ventures?|venture\s+capital|vc|capital\s+partners)\b/iu;
+
+/** Whether the page is about an investor, not only named like one. */
+function aboutAnInvestor(name: string, text: string): boolean {
+  if (SPECIFIC_KIND_NAME.test(name)) return true;
+  const named = name.trim();
+  const rest = named.length === 0 ? text : text.split(named).join(" ");
+  return INVESTING.test(rest);
+}
+
+/**
+ * A page title's parts that are the site's furniture, never a name (live
+ * 2026-10-24: "Home" was named as a firm from "Home - DVC").
+ */
+const FURNITURE =
+  /^(?:home(?:\s*page)?|welcome|about(?:\s+us)?|contact(?:\s+us)?|official\s+(?:site|website)|team|our\s+team|portfolio|news|blog|careers|investors?|login|sign\s+in)$/iu;
+
+const compactName = (text: string): string =>
+  text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
+/** The part of a title that names the organisation, by its own site. */
+function titleName(
+  segments: readonly string[],
+  host: string,
+): string | undefined {
+  const named = segments.filter((part) => !FURNITURE.test(part));
+  const label = compactName(host.replace(/^www\./u, "").split(".")[0] ?? "");
+  if (label.length >= 2) {
+    const own = named.find((part) => {
+      const compact = compactName(part);
+      return (
+        compact.length >= 2 &&
+        (compact.includes(label) || label.includes(compact))
+      );
+    });
+    if (own !== undefined) return own;
+  }
+  return named[0];
+}
+
 const LINKEDIN_COMPANY = /linkedin\.com\/company\/([^/?#]+)/iu;
 const LINKEDIN_PERSON = /linkedin\.com\/in\/([^/?#]+)/iu;
 
@@ -391,7 +440,8 @@ function webFindOf(
 ): WebFind | null {
   const title = (hit.title ?? "").replace(/\s+/gu, " ").trim();
   const text = `${title} ${hit.snippet}`;
-  if (!INVESTOR_TEXT.test(text)) return null;
+  // "invests in", "backs early-stage founders" are what an investor does.
+  if (!INVESTOR_TEXT.test(text) && !INVESTING.test(text)) return null;
   const found = mentionedCountries(text);
   const host = publicDomainOf(hit.url) ?? "";
   const tld = host.split(".").pop() ?? "";
@@ -412,9 +462,15 @@ function webFindOf(
         .trim(),
     )
     .filter((part) => part.length > 0);
-  const first = segments[0];
-  if (first === undefined || first.length > 80) return null;
   const company = LINKEDIN_COMPANY.exec(hit.url)?.[1];
+  const first =
+    company !== undefined || LINKEDIN_PERSON.test(hit.url)
+      ? segments[0]
+      : titleName(segments, host);
+  if (first === undefined || first.length > 80 || FURNITURE.test(first)) {
+    return null;
+  }
+  if (!aboutAnInvestor(first, text)) return null;
   const person = LINKEDIN_PERSON.exec(hit.url)?.[1];
   if (company !== undefined) {
     return {
@@ -626,61 +682,66 @@ export function createCounterpartDiscovery(dependencies: {
             (query, at, all) => query.length > 0 && all.indexOf(query) === at,
           );
         webQuery = phrasings[0] ?? null;
-        const result = await bounded(
-          async (signal) => {
-            const lists = await Promise.all(
-              phrasings.map((query) =>
-                web
-                  .search(
-                    {
-                      query,
-                      maxResults: 6,
-                      freshness: "ANY",
-                      includeDomains: [],
-                    },
-                    { signal },
-                  )
-                  .catch(() => null),
-              ),
-            );
-            const answered = lists.filter(
-              (list): list is NonNullable<typeof list> => list !== null,
-            );
-            if (answered.length === 0) throw new Error("no index answered");
-            const seenUrls = new Set<string>();
-            return {
-              hits: answered
-                .flatMap((list) => list.hits)
-                .filter((hit) => {
-                  if (seenUrls.has(hit.url)) return false;
-                  seenUrls.add(hit.url);
-                  return true;
-                }),
-            };
-          },
-          dependencies.webBudgetMs ?? DISCOVERY_WEB_BUDGET_MS,
-          ask.signal,
-        );
-        if (result === null) {
-          webFailed = true;
-        } else {
-          const knownKeys = new Set<string>();
-          const knownUrls = new Set<string>();
-          for (const record of dependencies.known.list()) {
-            for (const alias of [record.displayName, ...record.aliases]) {
-              knownKeys.add(aliasKeyOf(alias));
-            }
-            if (record.profileUrl !== null) {
-              knownUrls.add(
-                record.profileUrl.replace(/\/+$/u, "").toLowerCase(),
+        const searchAll = (queries: readonly string[]) =>
+          bounded(
+            async (signal) => {
+              const lists = await Promise.all(
+                queries.map((query) =>
+                  web
+                    .search(
+                      {
+                        query,
+                        maxResults: 6,
+                        freshness: "ANY",
+                        includeDomains: [],
+                      },
+                      { signal },
+                    )
+                    .catch(() => null),
+                ),
               );
-            }
+              const answered = lists.filter(
+                (list): list is NonNullable<typeof list> => list !== null,
+              );
+              if (answered.length === 0) throw new Error("no index answered");
+              const seenUrls = new Set<string>();
+              return {
+                hits: answered
+                  .flatMap((list) => list.hits)
+                  .filter((hit) => {
+                    if (seenUrls.has(hit.url)) return false;
+                    seenUrls.add(hit.url);
+                    return true;
+                  }),
+              };
+            },
+            dependencies.webBudgetMs ?? DISCOVERY_WEB_BUDGET_MS,
+            ask.signal,
+          );
+        const knownKeys = new Set<string>();
+        const knownUrls = new Set<string>();
+        for (const record of dependencies.known.list()) {
+          for (const alias of [record.displayName, ...record.aliases]) {
+            knownKeys.add(aliasKeyOf(alias));
           }
-          const seen = new Set<string>();
-          const finds: WebFind[] = [];
-          for (const hit of result.hits) {
+          if (record.profileUrl !== null) {
+            knownUrls.add(record.profileUrl.replace(/\/+$/u, "").toLowerCase());
+          }
+        }
+        const seen = new Set<string>();
+        const finds: WebFind[] = [];
+        const collect = (hits: readonly PublicWebSearchHit[]): void => {
+          for (const hit of hits) {
             const find = webFindOf(hit, web.code, countries, filter);
-            if (find === null || seen.has(find.profileKey)) continue;
+            // One firm found twice (its LinkedIn page and its own site) is
+            // one find: by its name, not only by where it was found.
+            if (
+              find === null ||
+              seen.has(find.profileKey) ||
+              seen.has(aliasKeyOf(find.name))
+            ) {
+              continue;
+            }
             // A kind they asked for is one the page says it is.
             if (!isKind(`${hit.title ?? ""} ${hit.snippet}`, stems)) continue;
             if (
@@ -690,8 +751,39 @@ export function createCounterpartDiscovery(dependencies: {
               continue;
             }
             seen.add(find.profileKey);
+            seen.add(aliasKeyOf(find.name));
             finds.push(find);
           }
+        };
+        const result = await searchAll(phrasings);
+        if (result !== null) collect(result.hits);
+        // Coordinator 2026-10-24 ("three Saudi family offices that back
+        // fintech" found one): short of the count, one more phrasing --
+        // the lists people publish of that kind in that place -- before
+        // answering with what was found.
+        if (picked.length + finds.length < count) {
+          const more = [
+            "list of",
+            kindPhrase,
+            place.length > 0 ? "in" : null,
+            ...place,
+            sector,
+          ]
+            .filter(
+              (part): part is string =>
+                typeof part === "string" && part.length > 0,
+            )
+            .join(" ")
+            .replace(/\s+/gu, " ")
+            .trim();
+          const again = phrasings.includes(more)
+            ? null
+            : await searchAll([more]);
+          if (again !== null) collect(again.hits);
+        }
+        if (result === null && finds.length === 0) {
+          webFailed = true;
+        } else {
           const retrievedAt = new Date(now()).toISOString();
           const made = await Promise.all(
             finds.slice(0, webWanted).map(async (find) => {

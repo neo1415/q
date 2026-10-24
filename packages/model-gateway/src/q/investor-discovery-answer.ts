@@ -143,10 +143,33 @@ export function investorDiscoveryText(
       `${opener.card.subject.displayName} is not a fund, but it can open doors.`,
     );
   }
+  // Coordinator 2026-10-24: short of what they asked for, say plainly how
+  // many were found (the lead says it already when only known firms came).
+  const named = known.length + publicFinds.length;
+  if (publicFinds.length > 0 && named < context.asked) {
+    parts.push(
+      `That's ${NUMBER_WORDS[named] ?? String(named)} of the ${NUMBER_WORDS[context.asked] ?? String(context.asked)} you asked for; I couldn't find more I'd put in front of you.`,
+    );
+  }
   parts.push(
     "This is matched on place and what each is described as; none has said it is interested. Tell me which to look into further.",
   );
   return parts.join(" ");
+}
+
+/** One firm by its name, however it is written ("Doha Tech Angels LLC"). */
+function sameFirm(a: string, b: string): boolean {
+  const key = (name: string) =>
+    name
+      .toLowerCase()
+      .replace(/\([^)]*\)/gu, " ")
+      .replace(
+        /\b(?:llc|ltd|limited|inc|plc|w\.?l\.?l|q\.?p\.?s\.?c|l\.?l\.?c)\b\.?/gu,
+        " ",
+      )
+      .replace(/[^\p{L}\p{N}]+/gu, "");
+  const ka = key(a);
+  return ka.length > 0 && ka === key(b);
 }
 
 /** One block of the cards, each with its fit reasons and a Rehearse action. */
@@ -282,7 +305,15 @@ export async function runInvestorDiscovery(input: {
           kinds: ask.kinds ?? [],
           count: asked,
         });
-  const publicText = investorDiscoveryText(found, {
+  // Coordinator 2026-10-24 (live: Doha Tech Angels named both "On Capital
+  // Q" and "Outside Capital Q"): a firm on Capital Q is named once, there.
+  const outside = found.filter(
+    (one) =>
+      !onCapitalQ.some((pick) =>
+        sameFirm(pick.name, one.card.subject.displayName),
+      ),
+  );
+  const publicText = investorDiscoveryText(outside, {
     regionWords,
     asked,
     outcome: status,
@@ -290,21 +321,27 @@ export async function runInvestorDiscovery(input: {
     kinds: ask.kinds,
     sector: ask.sector,
   });
+  const total =
+    onCapitalQ.length + outside.filter((one) => one.role === "INVESTOR").length;
+  const short =
+    total < asked
+      ? ` That's ${NUMBER_WORDS[total] ?? String(total)} of the ${NUMBER_WORDS[asked] ?? String(asked)} you asked for.`
+      : "";
   const text =
     onCapitalQ.length === 0
       ? publicText
-      : `On Capital Q, ${onCapitalQ.map((pick) => pick.name).join(", ")} ${onCapitalQ.length === 1 ? "is" : "are"} ${label === null ? "a likely fit" : `based where you asked`} from what ${onCapitalQ.length === 1 ? "it publishes" : "they publish"}, not interest shown. ${found.length === 0 ? "Outside Capital Q, the public search found nobody I could name." : `Outside Capital Q: ${publicText}`}`;
+      : `On Capital Q, ${onCapitalQ.map((pick) => pick.name).join(", ")} ${onCapitalQ.length === 1 ? "is" : "are"} ${label === null ? "a likely fit" : `based where you asked`} from what ${onCapitalQ.length === 1 ? "it publishes" : "they publish"}, not interest shown. ${outside.length === 0 ? `Outside Capital Q, the public search found nobody else I could name.${short}` : `Outside Capital Q: ${investorDiscoveryText(outside, { regionWords, asked: Math.max(1, outside.filter((one) => one.role === "INVESTOR").length), outcome: status, aboutMyCompany: ask.aboutMyCompany, kinds: ask.kinds, sector: ask.sector })}${short}`}`;
   return {
     text,
     block: investorCardsBlock(
-      found,
+      outside,
       label === null
         ? "Investors who could fit"
         : `${label} investors who could fit`,
     ),
     networkBlock:
       onCapitalQ.length === 0 ? null : prospectCardsBlock(onCapitalQ),
-    shown: found.length + onCapitalQ.length,
+    shown: outside.length + onCapitalQ.length,
     outcome: onCapitalQ.length > 0 ? "FOUND" : status,
     webSearched: data.webSearched === true,
     calls: networkOutcome === null ? [outcome] : [networkOutcome, outcome],

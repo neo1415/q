@@ -6,6 +6,8 @@ import type {
   QToolProposal,
 } from "@capital-q/q-runtime";
 
+import { IdentityCardSchema } from "@capital-q/contracts/q";
+
 import { runInvestorDiscovery } from "../src/q/investor-discovery-answer.js";
 
 /**
@@ -47,7 +49,45 @@ const prospect = (
   label: "likely fit, not evidence of interest",
 });
 
-function tools(network: readonly ReturnType<typeof prospect>[]) {
+const publicFind = (name: string) => ({
+  card: IdentityCardSchema.parse({
+    entityKind: "ORGANIZATION",
+    subject: {
+      externalPersonId: "5f0c3b8e-1d2a-4c6b-9e7f-0a1b2c3d4e5f",
+      entityKind: "ORGANIZATION",
+      displayName: name,
+      nameVariants: [],
+      profileUrl: null,
+      role: null,
+      organization: null,
+      location: "Qatar",
+      evidenceBundleId: null,
+      briefVersion: 0,
+      confidence: "PLAUSIBLE",
+    },
+    sources: [
+      {
+        url: "https://example.org/firm",
+        domain: "example.org",
+        title: name,
+        publishedAt: null,
+        retrievedAt: "2026-10-24T10:00:00.000Z",
+        provider: "fake",
+      },
+    ],
+    uncertainty: [],
+    enriching: false,
+    actions: ["RESEARCH_FURTHER"],
+  }),
+  role: "INVESTOR",
+  fit: ["Based in Qatar."],
+  source: "WEB",
+});
+
+function tools(
+  network: readonly ReturnType<typeof prospect>[],
+  candidates: readonly ReturnType<typeof publicFind>[] = [],
+) {
   const asked: string[] = [];
   return {
     asked,
@@ -64,8 +104,8 @@ function tools(network: readonly ReturnType<typeof prospect>[]) {
         }
         return Promise.resolve(
           ok(proposal, "people.discover", {
-            outcome: "NONE",
-            candidates: [],
+            outcome: candidates.length === 0 ? "NONE" : "FOUND",
+            candidates,
             countries: ["QA"],
             regionWords: ["Qatari"],
             webSearched: true,
@@ -150,5 +190,40 @@ describe("a discovery of investors reads Capital Q's own beside the public searc
     });
     expect(answer?.text).toContain("Al Thani Family Office");
     expect(answer?.text).not.toContain("Doha Ventures");
+  });
+
+  // Coordinator 2026-10-24, live: Doha Tech Angels was named both "On
+  // Capital Q" and "Outside Capital Q", and a short list never said so.
+  it("names a firm on Capital Q once, there, and says how many of the asked were found", async () => {
+    const t = tools(
+      [
+        prospect(
+          "a1111111-0000-4000-8000-000000000005",
+          "Doha Tech Angels",
+          "QA",
+          "ANGEL_NETWORK",
+        ),
+      ],
+      [publicFind("Doha Tech Angels LLC"), publicFind("DVC")],
+    );
+    const answer = await runInvestorDiscovery({
+      ask: {
+        regions: ["Qatari"],
+        sector: null,
+        stage: null,
+        count: 3,
+        aboutMyCompany: false,
+      },
+      tools: t.port,
+      context,
+      available: new Set(["discover_investors", "find_prospective_investors"]),
+    });
+    const text = answer?.text ?? "";
+    expect(text.split("Doha Tech Angels")).toHaveLength(2);
+    expect(text).toContain("Outside Capital Q: From a public web search");
+    expect(text).toContain("DVC");
+    expect(text).toContain("That's two of the three you asked for.");
+    expect(JSON.stringify(answer?.block)).not.toContain("Doha Tech Angels");
+    expect(answer?.shown).toBe(2);
   });
 });
