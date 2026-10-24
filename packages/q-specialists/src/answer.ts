@@ -18,6 +18,7 @@ import {
   goAheadGoal,
   earlierRequestGoal,
   teamJobLine,
+  teamJobOutcomeOf,
   workKindsAsked,
   type QTeamJobPort,
 } from "./team-job.js";
@@ -1265,7 +1266,9 @@ export function nameInAsk(question: string): string | null {
       question,
     )?.[1];
   const name = found?.replace(/\s+(?:of|and|&)$/u, "").trim();
-  return name === undefined || name.length < 2 ? null : name;
+  return name === undefined || (name.match(/\p{L}/gu)?.length ?? 0) < 3
+    ? null
+    : name;
 }
 
 /**
@@ -2199,7 +2202,14 @@ export function createSpecialistQAnswer(
         "I haven't answered anything in this conversation yet, so there's nothing to keep on your board. Ask me for the plan first, then say save it to my board.",
       );
     }
-    if (producedNothing(work.answer)) {
+    // F-78b: the last work was a plan that failed or never started (the
+    // team job's own outcome line), or another answer of Q's that produced
+    // nothing: there is nothing to keep.
+    const lastWork = teamJobOutcomeOf(work.answer);
+    if (
+      (lastWork !== null && lastWork !== "STARTED") ||
+      (lastWork === null && producedNothing(work.answer))
+    ) {
       return recordAnswer(
         request,
         conversationId,
@@ -2309,6 +2319,70 @@ export function createSpecialistQAnswer(
         ? `I've put “${document.title}” on your board, with its steps as ${tasks} in To do.`
         : `I've put “${document.title}” on your board, with ${tasks} of its ${String(steps.length)} steps in To do; the rest couldn't be added just now.`,
       [document],
+    );
+  }
+
+  /**
+   * "Write a 12-month growth plan and save it to my board" (F-90): Q's own
+   * deep work starts, and the board keeps that job, linked, so it moves to
+   * Done with its document. A plan that does not start saves nothing.
+   */
+  async function startWorkAndKeep(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    words: string,
+    teamJob: QTeamJobPort,
+    board: BoardKeeper,
+  ): Promise<QAnswerOutcome> {
+    const planned = await teamJob.propose(request, words);
+    const line = teamJobLine(planned);
+    if (planned.status !== "STARTED") {
+      return recordAnswer(
+        request,
+        conversationId,
+        `${line} Nothing has gone on your board, since nothing started.`,
+      );
+    }
+    const job =
+      board.latestRunningJob === undefined
+        ? null
+        : await board.latestRunningJob(request.actor).catch(() => null);
+    if (job === null || board.linkJob === undefined) {
+      return recordAnswer(
+        request,
+        conversationId,
+        `${line} When it's ready, ask me and I'll put it on your board.`,
+      );
+    }
+    const title = workTitle({
+      heading: null,
+      question: words,
+      subject: nameInAsk(words),
+    });
+    const kept = await board
+      .add(
+        request.actor,
+        { kind: "WORK_JOB", title, refId: job.jobId },
+        {
+          by: "Q",
+          idempotencyKey: boardKeyOf(request.runId, `job:${job.jobId}`),
+        },
+      )
+      .catch(() => ({ outcome: "REFUSED", code: "FAILED" }) as const);
+    const itemId = kept.outcome === "OK" ? kept.value?.id : undefined;
+    if (itemId !== undefined) {
+      await board
+        .linkJob(request.actor, itemId, job.jobId, {
+          idempotencyKey: boardKeyOf(request.runId, `link:${job.jobId}`),
+        })
+        .catch(() => ({ outcome: "REFUSED" }) as const);
+    }
+    return recordAnswer(
+      request,
+      conversationId,
+      kept.outcome === "OK"
+        ? `${line} It's on your board as “${title}”, in Doing; it moves to Done, with its document, when the work finishes.`
+        : `${line} I couldn't put it on your board just now; ask me once it's ready.`,
     );
   }
 
@@ -2501,6 +2575,8 @@ export function createSpecialistQAnswer(
           return "I couldn't turn that item into work I can carry out for you. Tell me what you want at the end of it (a memo, a list of questions, a short plan) and I'll start.";
         case "NOT_FOUND":
           return "That item isn't open on your board any more, so there's nothing to start. Ask me what's on your board to see what is.";
+        case "FAILED":
+          return "I couldn't plan that task: the planning step failed on my side, so nothing has started and the item stays in To do.";
         default:
           return "I couldn't start on that just now. Ask me again in a moment.";
       }
@@ -2559,7 +2635,10 @@ export function createSpecialistQAnswer(
             : [],
       ),
     );
-    if (referenced.size === 1) {
+    // Live 9ff4a1118: the call-prep answer carried no blocks at all, so
+    // the name they gave in the ask is the subject whenever the answer
+    // shows no one else (one record referenced, or none).
+    if (referenced.size <= 1 && named.length === 0) {
       const asked = nameInAsk(question);
       if (asked !== null) return asked;
     }
@@ -5042,16 +5121,61 @@ export function createSpecialistQAnswer(
         return added;
       }
     }
+    // A save in their words the reader left unread ("save that plan to my
+    // board"): never a request for new work (live 9ff4a1118, F-78b: it
+    // went to the team job and filed a plan from nothing).
+    const savesToBoard =
+      boardAsk === "SAVE" ||
+      boardAsk === "BREAKDOWN" ||
+      (boardAsk === null &&
+        mentionsOwnBoard(latest.content) &&
+        /\b(?:save|keep|pin|file)\b/iu.test(latest.content));
+    // F-90 (QA re-score): "Write a 12-month growth plan and save it to my
+    // board", one turn. The work starts first; the board then keeps the
+    // job itself, linked, never Q's previous answer.
+    const asksNewWork =
+      read !== null &&
+      read.confidence !== "LOW" &&
+      read.addressedToQ !== false &&
+      read.workFromEarlier !== true &&
+      (read.teamJob === true ||
+        workKindsAsked(latest.content) >= TEAM_JOB_KINDS ||
+        // The turn itself asks for the work first ("Write … and save it").
+        /^\s*(?:please\s+|can you\s+|could you\s+)?(?:write|draft|make|create|prepare|build|put together)\b/iu.test(
+          latest.content,
+        ));
     if (
-      (read?.boardAsk === "SAVE" || read?.boardAsk === "BREAKDOWN") &&
+      savesToBoard &&
+      asksNewWork &&
       !boardWritesDocument &&
-      (read.namedOther ?? null) === null &&
+      dependencies.teamJob !== undefined &&
+      dependencies.board !== undefined
+    ) {
+      const started = await startWorkAndKeep(
+        request,
+        conversationId,
+        latest.content,
+        dependencies.teamJob,
+        dependencies.board,
+      );
+      speculative.current?.cancel("ACTED");
+      remember(
+        conversationId,
+        reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
+      );
+      return started;
+    }
+    if (
+      savesToBoard &&
+      !asksNewWork &&
+      !boardWritesDocument &&
+      (read?.namedOther ?? null) === null &&
       !dictatesItem(latest.content)
     ) {
       const saved = await saveAnswerToBoard(
         request,
         conversationId,
-        read.boardAsk,
+        boardAsk === "BREAKDOWN" ? "BREAKDOWN" : "SAVE",
         history,
       );
       if (saved !== null) {
