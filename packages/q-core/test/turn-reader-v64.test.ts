@@ -5,6 +5,7 @@ import {
   TURN_READER_V64,
   TurnReaderV64ResultSchema,
   V64_REHEARSAL_OPEN,
+  V64_MY_PIPELINE,
   V64_REHEARSE_IS_NOT_PREP,
   createDefaultPromptRegistry,
 } from "../src/index.js";
@@ -39,5 +40,18 @@ describe("TURN_READER v64: a rehearsal they ask for is opened, not prepared", ()
         }).reference?.open,
       ).toBe(open);
     }
+  });
+
+  // Coordinator 2026-10-24 (TURN-READER-V64-NOTES.md): an investor's "Show
+  // my pipeline" was answered with capital. By meaning, for anyone.
+  it("reads anyone's 'my pipeline' as the CRM pipeline, never capital, compare or fit", () => {
+    expect(TURN_READER_V64.template).toContain(V64_MY_PIPELINE);
+    expect(V64_MY_PIPELINE).toMatch(/NAVIGATE with destination CRM_PIPELINE/u);
+    expect(V64_MY_PIPELINE).toMatch(/never compare and never fit/u);
+    expect(V64_MY_PIPELINE).toMatch(/what have I committed\?/u);
+    // The founder rule it extends is kept, said once.
+    expect(
+      TURN_READER_V64.template.split('fundraising pipeline" is their').length,
+    ).toBe(2);
   });
 });

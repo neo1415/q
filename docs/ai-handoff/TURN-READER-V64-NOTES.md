@@ -1,6 +1,6 @@
 # TURN_READER v64 — queued notes
 
-Owner: the TURN_READER lane (one owner of reader versions). v63 is live. Nothing here is built yet. Each item goes into v64 only when v64 is needed.
+Owner: the TURN_READER lane (one owner of reader versions). v63 is live. **Built in v64** (branch `fix/reader-v64`): item 1 (`V64_MY_PIPELINE`), folded together with S8's REHEARSAL delta (#442).
 
 ## 1. "My pipeline" is CRM_PIPELINE, decided by meaning (coordinator, 24 Oct 2026)
 
