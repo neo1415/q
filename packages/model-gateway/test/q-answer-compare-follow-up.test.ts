@@ -461,6 +461,26 @@ describe("compare the top two, right after a list of five", () => {
     expect(named).toEqual(expect.arrayContaining([MIZAN, SILO]));
   });
 
+  // TURN_READER v62: the reader decides a comparison, in any words and any
+  // language; words no pattern knows still get the table.
+  it("builds the table from the reader's comparison, whatever the words", async () => {
+    const { seam, request, executed, stored } = build(
+      "Lequel des deux est le meilleur ?",
+      { compare: { count: 2, names: [] } },
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(
+      executed.filter((call) => call.callId.startsWith("q-compare-")),
+    ).toHaveLength(6);
+    const table = (stored.at(-1)?.blocks ?? []).find(
+      (block) => Reflect.get(block as object, "kind") === "TABLE",
+    ) as { columns: { label: string }[] } | undefined;
+    expect(table?.columns.map((column) => column.label)).toEqual([
+      "Mizan",
+      "Silo Credit",
+    ]);
+  });
+
   it("an ordinary follow-up reads nothing extra", async () => {
     const { seam, request, executed } = build("Tell me more about Mizan");
     expect((await seam.answer(request)).kind).toBe("ANSWERED");
