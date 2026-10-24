@@ -6,6 +6,12 @@
  * `{date}` and `{n}`. Names, figures and amounts are never translated.
  */
 export const WORK_DESIGN_AR: Readonly<Record<string, string>> = {
+  // The delegation switch and the stage strip (owner reference design)
+  Partly: "جزئياً",
+  "Saving your change…": "يجري حفظ تغييرك…",
+  "On. Q replies, follows up and books meetings here for you.":
+    "مُفعّل. يردّ Q ويتابع ويحجز الاجتماعات هنا نيابةً عنك.",
+  "Off. Q asks you first again.": "متوقف. سيسألك Q أولاً من جديد.",
   // Status grammar (owner reference design, 24 Oct): Needs you, Moving,
   // Done today; counts inline with their words.
   "waiting on you": "بانتظارك",

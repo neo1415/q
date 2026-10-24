@@ -24,6 +24,7 @@ import { bodyDigest } from "@capital-q/q-core/speech";
 import { cx } from "@capital-q/ui";
 
 import { CountUp } from "@/components/status/count-up";
+import { WordSwitch } from "@/features/settings/account-kit";
 import { CalendarDays, Check, Pause, Pencil, Play } from "@capital-q/ui/icons";
 import { Skeleton } from "@capital-q/ui/states";
 
@@ -67,6 +68,7 @@ import {
   dismissSuggestionAction,
   setPausedAction,
   stopJobAction,
+  setDelegationAction,
 } from "./work-page-actions";
 import {
   BasedOn,
@@ -1917,6 +1919,24 @@ function RunningDetail({
         onFinished();
       } else setStatus(result?.message ?? "Q couldn't stop that just now.");
     });
+  const [delegated, setDelegatedState] = useState(
+    item.delegation?.enabled === true,
+  );
+  const setDelegated = (next: boolean) =>
+    startTransition(async () => {
+      setStatus(null);
+      const result = await setDelegationAction(item.id, next).catch(() => null);
+      if (result?.ok !== true) {
+        setStatus(result?.message ?? "That didn't go through.");
+        return;
+      }
+      setDelegatedState(next);
+      toast(
+        next
+          ? t("On. Q replies, follows up and books meetings here for you.")
+          : t("Off. Q asks you first again."),
+      );
+    });
   const spent = item.spend;
   return (
     <div
@@ -1966,11 +1986,26 @@ function RunningDetail({
         </MessageBox>
       )}
       {item.delegation === null ? null : (
-        <CheckLine>
-          {t(item.delegation.words)}
-          {". "}
-          {item.delegation.enabled ? t("On") : t("Off")}
-        </CheckLine>
+        // "Let Q look after it": a switch that says its state in a word
+        // (owner reference design, 24 Oct). Partly: on, but the work is
+        // paused, so Q acts again only once it resumes. While a change is
+        // saving the switch is disabled and says why on hover.
+        <div className="flex items-center justify-between gap-3">
+          <span className="cq-body-sm text-(--cq-text-secondary)">
+            {t(item.delegation.words)}
+          </span>
+          <span title={pending ? t("Saving your change…") : undefined}>
+            <WordSwitch
+              on={delegated}
+              onChange={(next) => setDelegated(next)}
+              label={t(item.delegation.words)}
+              onWord={state === "PAUSED" ? t("Partly") : t("On")}
+              offWord={t("Off")}
+              disabled={pending}
+              data-work-delegation
+            />
+          </span>
+        </div>
       )}
       {status === null ? null : (
         <p className="m-0 cq-body-sm text-(--cq-text-secondary)" role="status">
