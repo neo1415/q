@@ -82,7 +82,7 @@ export function liveLine(stage: WorkforceLiveStage | null): string {
   switch (stage.stage) {
     case "SEARCHING":
       return stage.questions === null || stage.questions === 0
-        ? "Searching public sources"
+        ? "Researching the question"
         : stage.questions === 1
           ? "Searching 1 line of enquiry"
           : `Searching ${String(stage.questions)} lines of enquiry`;

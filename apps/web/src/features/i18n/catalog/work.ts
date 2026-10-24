@@ -592,7 +592,7 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   // Owner 2026-10-24: a document being made, as the card follows it.
   "Document · being written": "مستند · قيد الكتابة",
   "Planning the work": "تخطيط العمل",
-  "Searching public sources": "البحث في المصادر العامة",
+  "Researching the question": "البحث في السؤال",
   "Searching 1 line of enquiry": "البحث في مسار بحث واحد",
   "Searching {n} lines of enquiry": "البحث في {n} مسارات بحث",
   "Reading public sources": "قراءة المصادر العامة",
