@@ -73,14 +73,20 @@ export class QAccountPausedError extends Error {
   }
 }
 
+/** A streamed turn's overall cap: long turns finish; a stuck one lets go. */
+export const STREAM_MAX_MS = 5 * 60_000;
+
 export function createQInterviewClient(options: {
   readonly baseUrl: string;
   /** A slow model must not hold an HTTP worker open indefinitely. */
   readonly timeoutMs?: number;
+  /** A stream's overall cap; its silence is bounded by `timeoutMs`. */
+  readonly streamMaxMs?: number;
   readonly fetch?: typeof globalThis.fetch;
 }): QInterviewClient {
   const base = options.baseUrl.replace(/\/$/, "");
   const timeoutMs = options.timeoutMs ?? 60_000;
+  const streamMaxMs = options.streamMaxMs ?? STREAM_MAX_MS;
   // Resolved per call, not captured: a test that replaces globalThis.fetch
   // after composition still sees its own double.
   const call: typeof globalThis.fetch =
@@ -135,6 +141,36 @@ export function createQInterviewClient(options: {
     return { signal: controller.signal, clear: () => clearTimeout(timer) };
   };
 
+  /**
+   * A stream's deadline: `timeoutMs` of silence, renewed by every byte the
+   * interviewer sends (its heartbeat comes every few seconds), within an
+   * overall cap. QA F-67 (24 Oct): the whole stream had 60 s; a first
+   * answer saving nine facts ran longer, the stream was cut while the turn
+   * went on to save, and the screen said "I lost the connection to Q".
+   */
+  const streamDeadline = () => {
+    const controller = new AbortController();
+    const abort = () => {
+      controller.abort();
+    };
+    let idle = setTimeout(abort, timeoutMs);
+    idle.unref?.();
+    const cap = setTimeout(abort, streamMaxMs);
+    cap.unref?.();
+    return {
+      signal: controller.signal,
+      touch: () => {
+        clearTimeout(idle);
+        idle = setTimeout(abort, timeoutMs);
+        idle.unref?.();
+      },
+      clear: () => {
+        clearTimeout(idle);
+        clearTimeout(cap);
+      },
+    };
+  };
+
   return {
     turn: async ({ accessToken, request }) => {
       const limit = deadline();
@@ -150,9 +186,10 @@ export function createQInterviewClient(options: {
     },
 
     turnStream: async ({ accessToken, request, onSentence, onStage }) => {
-      // The whole stream is bounded by the same deadline, not only its
-      // first byte: a model that stalls mid-reply still lets go.
-      const limit = deadline();
+      // Bounded by silence, not only its first byte: a model that stalls
+      // mid-reply still lets go, and a long turn that keeps talking is
+      // never cut for being long (overall cap aside).
+      const limit = streamDeadline();
       try {
         const response = await post(
           accessToken,
@@ -170,7 +207,16 @@ export function createQInterviewClient(options: {
           throw new QInterviewUnavailableError("the interviewer sent no body");
         }
         let result: QInterviewTurnResponse | null = null;
-        for await (const frame of sseFrames(response.body)) {
+        // Every byte renews the deadline, heartbeat comments included.
+        const watched = response.body.pipeThrough(
+          new TransformStream<Uint8Array, Uint8Array>({
+            transform: (chunk, controller) => {
+              limit.touch();
+              controller.enqueue(chunk);
+            },
+          }),
+        );
+        for await (const frame of sseFrames(watched)) {
           const data = jsonOrNull(frame.data);
           if (frame.event === Q_INTERVIEW_STREAM_EVENTS.SENTENCE) {
             const sentence = QInterviewSentenceSchema.safeParse(data);
