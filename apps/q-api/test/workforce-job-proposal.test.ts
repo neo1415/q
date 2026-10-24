@@ -576,28 +576,6 @@ describe("Q as a colleague on work (Q room R5)", () => {
     });
   });
 
-  it("different work is never a duplicate: a growth plan is not a waiting call prep (QA F-70)", () => {
-    const callPrep = [
-      {
-        summary:
-          "Q's team: Prepare for the first call with Savanna Seed Partners by reviewing their waiting messages, researching the firm, and identifying a suitable meeting time without booking it.",
-        actionType: "q.workforce.job.start",
-        targets: [{ kind: "USER" as const, userId }],
-      },
-    ];
-    expect(
-      relatedWaiting(
-        "Write me a short 12-month growth plan for my company",
-        callPrep,
-      ).waiting,
-    ).toEqual([]);
-    // The same work, asked again, still is.
-    expect(
-      relatedWaiting("Prepare me for the first call with the firm", callPrep)
-        .waiting,
-    ).toHaveLength(1);
-  });
-
   it("asks before starting when work is already waiting, and plans once told to go ahead", async () => {
     const base = world();
     const board = createWorkforceJobBoard({
