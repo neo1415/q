@@ -416,6 +416,8 @@ describe("type-level guarantees", () => {
           return block.report.readAt;
         case "PICTURE":
           return block.credit.name;
+        case "WORK_IN_PROGRESS":
+          return block.jobId;
         default: {
           const unreachable: never = block;
           return unreachable;

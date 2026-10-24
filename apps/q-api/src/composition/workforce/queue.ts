@@ -1,8 +1,13 @@
-import type { QWorkState } from "@capital-q/contracts";
+import {
+  WorkforceLiveStageSchema,
+  type QWorkState,
+  type WorkforceLiveStage,
+} from "@capital-q/contracts";
 import type { DatabaseExecutor } from "@capital-q/database";
 import type { StepResult } from "@capital-q/q-orchestrator";
 
 import type { WorkforceJobPort } from "@capital-q/app-actions";
+import { z } from "zod";
 
 import type { Owner, WorkforceStore } from "./store.js";
 
@@ -44,6 +49,22 @@ export type WorkRow = {
   readonly updated_at: Date;
   readonly finished_at: Date | null;
 };
+
+/** No step key starts with "_" (planKey; step_key's check). */
+export const LIVE_RESULT_KEY = "_live";
+
+const LiveEntrySchema = z.object({
+  status: z.literal("LIVE"),
+  live: WorkforceLiveStageSchema,
+});
+
+/** The live stage a running job last recorded, re-validated (stored jsonb). */
+export function liveStageOf(
+  row: Pick<WorkRow, "results"> | undefined,
+): WorkforceLiveStage | null {
+  const parsed = LiveEntrySchema.safeParse(row?.results[LIVE_RESULT_KEY]);
+  return parsed.success ? parsed.data.live : null;
+}
 
 /** States a run ends in. QUEUED, RUNNING and RECOVERING are live. */
 export type EndState = Extract<
@@ -89,6 +110,17 @@ export type AgentWorkQueue = {
     stepKey: string,
     result: StepResult,
     runId?: string,
+  ) => Promise<void>;
+  /**
+   * Owner 2026-10-24: where the running document work stands, kept under
+   * LIVE_RESULT_KEY on the row this worker holds (replaced each time; every
+   * reader of results takes finished statuses only, so it is never read as
+   * a step's result).
+   */
+  readonly recordLive?: (
+    jobId: string,
+    workerId: string,
+    live: WorkforceLiveStage,
   ) => Promise<void>;
   /** Ends the row this worker holds. False: it was not this worker's. */
   readonly finish: (
@@ -195,6 +227,15 @@ export function createPostgresAgentWorkQueue(
                outputs: result.outputs,
                runId,
              }),
+           )}::jsonb)
+         where job_id = ${jobId} and locked_by = ${workerId} and state = 'RUNNING'`;
+    },
+
+    recordLive: async (jobId, workerId, live) => {
+      await sql`
+        update q_runtime.agent_work_queue
+           set results = results || jsonb_build_object(${LIVE_RESULT_KEY}::text, ${sql.json(
+             asJson({ status: "LIVE", live }),
            )}::jsonb)
          where job_id = ${jobId} and locked_by = ${workerId} and state = 'RUNNING'`;
     },
@@ -344,6 +385,16 @@ export function createInMemoryAgentWorkQueue(
       const row = rows.find((one) => one.job_id === jobId);
       if (row !== undefined && held(row, workerId)) {
         row.results = { ...row.results, [stepKey]: { ...result, runId } };
+      }
+      return Promise.resolve();
+    },
+    recordLive: (jobId, workerId, live) => {
+      const row = rows.find((one) => one.job_id === jobId);
+      if (row !== undefined && held(row, workerId)) {
+        row.results = {
+          ...row.results,
+          [LIVE_RESULT_KEY]: { status: "LIVE", live },
+        };
       }
       return Promise.resolve();
     },

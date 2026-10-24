@@ -34,6 +34,7 @@ import {
   writeAnalysisWithReview,
 } from "./analysis.js";
 import { createSpend } from "./deep-research.js";
+import { safeReport } from "./live.js";
 import type { WorkforceModels } from "./models.js";
 
 /** The marker a reviewer's revision carries, so a retry never revises twice. */
@@ -266,6 +267,7 @@ export function createWorkforceDocuments(dependencies: {
       trace: { jobId: input.jobId, runId: input.runId },
       spend,
       canContinue: input.canContinue,
+      progress: safeReport(input.progress),
       inputs: {
         principalName: input.principalName ?? "the person",
         request: input.personRequest ?? input.goal,
@@ -283,6 +285,7 @@ export function createWorkforceDocuments(dependencies: {
         message: "The analysis could not be written; nothing was filed.",
       };
     if (!(await input.canContinue())) return unavailable();
+    safeReport(input.progress)({ stage: "FILING" });
     const content = analysisContent({
       draft: written.draft,
       review: written.review,

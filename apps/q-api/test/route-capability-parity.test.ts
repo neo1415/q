@@ -717,6 +717,9 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "q-api/http/workforce.ts GET Q_WORKFORCE_JOB_PATH": exempt(
     "one job's agent record (runs, hand-offs, drafts, grades, timeline) for the workforce page; Q reports its work through list_q_work",
   ),
+  "q-api/http/workforce.ts GET Q_WORKFORCE_JOB_LIVE_PATH": exempt(
+    "the conversation card's own read of where a document Q is making stands (stage, steps done, the filed document); it changes nothing, and Q reports its work through list_q_work",
+  ),
   "q-api/http/work.ts PUT Q_PRESENCE_PATH": cap("tool.set_away"),
   // WORK-58: Q's work page.
   "q-api/http/work.ts GET Q_WORK_SUGGESTIONS_PATH": cap("navigate.WORK"),

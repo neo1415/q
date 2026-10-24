@@ -589,4 +589,26 @@ export const WORK_AR: Readonly<Record<string, string>> = {
   // F-29: a change card's before and after.
   Was: "كان",
   "(no change)": "(دون تغيير)",
+  // Owner 2026-10-24: a document being made, as the card follows it.
+  "Document · being written": "مستند · قيد الكتابة",
+  "Planning the work": "تخطيط العمل",
+  "Searching public sources": "البحث في المصادر العامة",
+  "Searching 1 line of enquiry": "البحث في مسار بحث واحد",
+  "Searching {n} lines of enquiry": "البحث في {n} مسارات بحث",
+  "Reading public sources": "قراءة المصادر العامة",
+  "Reading 1 public source": "قراءة مصدر عام واحد",
+  "Reading {n} public sources": "قراءة {n} مصادر عامة",
+  "Read {n} public sources, kept {n2} sourced facts":
+    "تمت قراءة {n} مصادر عامة، والاحتفاظ بـ{n2} حقائق موثّقة المصدر",
+  "Writing the first draft": "كتابة المسودة الأولى",
+  "Reviewing the first draft": "مراجعة المسودة الأولى",
+  "Reviewing draft {n}": "مراجعة المسودة {n}",
+  "Revising the draft": "تنقيح المسودة",
+  "Revising: draft {n} of {n2}": "التنقيح: المسودة {n} من {n2}",
+  "Filing the document": "حفظ المستند",
+  "Step {n} of {n2}": "الخطوة {n} من {n2}",
+  Progress: "التقدّم",
+  "Sections so far": "الأقسام حتى الآن",
+  "This work stopped before the document was filed.":
+    "توقف هذا العمل قبل حفظ المستند.",
 };

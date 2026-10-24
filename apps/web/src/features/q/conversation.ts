@@ -114,7 +114,9 @@ export type QTurnObjectBlock = Extract<
       // Artifacts live (L-14): a summary Q speaks over.
       | "SUMMARY"
       // L-13: a credited picture of something visual.
-      | "PICTURE";
+      | "PICTURE"
+      // Owner 2026-10-24: a document being made, followed as it is.
+      | "WORK_IN_PROGRESS";
   }
 >;
 
@@ -162,6 +164,7 @@ function objectBlocksOf(
       case "ATTENTION":
       case "SUMMARY":
       case "PICTURE":
+      case "WORK_IN_PROGRESS":
         return true;
       case "UI_INTENT":
         // SHOW_EVIDENCE carries the same references an evidence block
@@ -320,6 +323,41 @@ function isConfirmed(
   );
 }
 
+/**
+ * Owner 2026-10-24: one card per document being made. The reply that
+ * started the work carries the job's card; the message that delivers the
+ * document carries the same job again beside its document. When the
+ * starting card is in this thread, it becomes the document in place, so
+ * the delivery shows its words and no second card. When it is not (an
+ * older thread, read from its middle), the delivery shows the document.
+ */
+export function followWork(turns: QTurn[]): void {
+  const following = new Set<string>();
+  turns.forEach((turn, index) => {
+    if (turn.kind !== "Q") return;
+    const work = turn.blocks.filter(
+      (block) => block.kind === "WORK_IN_PROGRESS",
+    );
+    if (work.length === 0) return;
+    const delivers = turn.blocks.some(
+      (block) => block.kind === "ARTIFACT_REFERENCE",
+    );
+    if (!delivers) {
+      for (const block of work) following.add(block.jobId);
+      return;
+    }
+    const followed = work.some((block) => following.has(block.jobId));
+    turns[index] = {
+      ...turn,
+      blocks: turn.blocks.filter(
+        (block) =>
+          block.kind !== "WORK_IN_PROGRESS" &&
+          !(followed && block.kind === "ARTIFACT_REFERENCE"),
+      ),
+    };
+  });
+}
+
 export function turnsFrom(
   state: QStreamState,
   pending: readonly PendingTurn[],
@@ -408,6 +446,8 @@ export function turnsFrom(
     .map((entry, index) => ({ ...entry, index }))
     .sort((a, b) => (a.at === b.at ? a.index - b.index : a.at < b.at ? -1 : 1))
     .map((entry) => entry.turn);
+
+  followWork(turns);
 
   // Live text, only while the message it belongs to has not been persisted.
   // The reducer already drops deltas for a completed message, so reaching

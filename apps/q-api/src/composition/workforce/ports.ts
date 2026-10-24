@@ -18,6 +18,7 @@ import type {
   WorkforceDiligenceInput,
   WorkforceDiligenceResult,
 } from "./diligence.js";
+import type { LiveReport } from "./live.js";
 import type { Owner } from "./store.js";
 
 /**
@@ -107,6 +108,8 @@ export type WorkforcePortServices = {
         /** The job, so deep research's model calls are priced under it. */
         readonly jobId?: string | undefined;
         readonly budgetUsd?: number | undefined;
+        /** Where the research stands, for the person watching. */
+        readonly progress?: LiveReport | undefined;
       }) => Promise<ResearchFound>)
     | undefined;
   readonly findSlots: (input: {
@@ -309,6 +312,7 @@ export function createWorkforcePorts(
                 query: input.query,
                 jobId: input.jobId,
                 budgetUsd: input.budgetUsd,
+                progress: input.progress,
               });
             },
           }),

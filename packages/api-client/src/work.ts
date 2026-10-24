@@ -33,6 +33,7 @@ import {
   Q_WORKFORCE_JOBS_PATH,
   Q_WORKFORCE_OVERVIEW_PATH,
   qWorkforceJobPath,
+  qWorkforceJobLivePath,
   qWorkforceDraftRetryPath,
   Q_BRIEFING_COMMAND_PATH,
   BriefingCommandResultDtoSchema,
@@ -41,6 +42,7 @@ import {
   WorkforceDraftRetryResultDtoSchema,
   WorkforceJobDetailDtoSchema,
   WorkforceJobListDtoSchema,
+  WorkforceLiveSchema,
   WorkforceOverviewDtoSchema,
 } from "@capital-q/contracts";
 
@@ -325,6 +327,16 @@ export function getWorkforceJob(session: ApiSession, jobId: string) {
     "GET",
     qWorkforceJobPath(jobId),
     WorkforceJobDetailDtoSchema,
+  );
+}
+
+/** Owner 2026-10-24: one job as its document is being made. */
+export function getWorkforceJobLive(session: ApiSession, jobId: string) {
+  return call(
+    session,
+    "GET",
+    qWorkforceJobLivePath(jobId),
+    WorkforceLiveSchema,
   );
 }
 

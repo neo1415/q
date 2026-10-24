@@ -1,3 +1,4 @@
+import type { QResultBlock } from "@capital-q/contracts";
 import type { Logger } from "@capital-q/observability";
 import type { QAnswerRequest, QToolPort } from "@capital-q/q-runtime";
 import { z } from "zod";
@@ -29,6 +30,8 @@ export type TeamJobOutcome =
       readonly status: "STARTED";
       readonly plan: TeamJobPlan;
       readonly firstRead: string | null;
+      /** The started job: the reply's card follows it as it is made. */
+      readonly jobId?: string | undefined;
     }
   | { readonly status: "ALREADY_WAITING"; readonly waiting: readonly string[] }
   | { readonly status: "NOT_PLANNED" | "LIMIT_REACHED" }
@@ -63,6 +66,7 @@ const KINDS: readonly RegExp[] = [
 // The tool's output is checked again here: it crosses a package boundary.
 const ProposedSchema = z.object({
   firstRead: z.string().max(700).nullable().optional(),
+  jobId: z.string().uuid().optional(),
   status: z.enum([
     "PREPARED",
     "STARTED",
@@ -138,6 +142,7 @@ export function createToolTeamJobPort(dependencies: {
             status: "STARTED",
             plan: data.plan,
             firstRead: data.firstRead ?? null,
+            ...(data.jobId === undefined ? {} : { jobId: data.jobId }),
           };
         }
         if (
@@ -312,6 +317,27 @@ export function teamJobLine(outcome: TeamJobOutcome): string {
     `I've planned this in ${steps}: ${who.join(" → ")}.`,
     ...needs.map((need) => `${need.replace(/\.$/u, "")}.`),
   ].join(" ");
+}
+
+/**
+ * Owner 2026-10-24: own deep work under way is a card that follows the job
+ * as the document is made (its stage read from the job as the person), in
+ * the plan's own words until the document has a title. Code's, never a
+ * model's.
+ */
+export function teamJobBlocks(
+  outcome: TeamJobOutcome,
+): readonly QResultBlock[] | undefined {
+  if (outcome.status !== "STARTED" || outcome.jobId === undefined)
+    return undefined;
+  const title = outcome.plan.summary.trim().replace(/[.\s]+$/u, "");
+  return [
+    {
+      kind: "WORK_IN_PROGRESS",
+      jobId: outcome.jobId,
+      title: title.length === 0 ? "Your document" : title.slice(0, 160),
+    },
+  ];
 }
 
 /**

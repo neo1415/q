@@ -35,6 +35,13 @@ export const Q_WORKFORCE_JOB_PATH = "/v1/q/workforce/jobs/:jobId" as const;
 export const qWorkforceJobPath = (jobId: string) =>
   Q_WORKFORCE_JOB_PATH.replace(":jobId", encodeURIComponent(jobId));
 
+/** Owner 2026-10-24: one job as its document is being made (WorkforceLive). */
+export const Q_WORKFORCE_JOB_LIVE_PATH =
+  "/v1/q/workforce/jobs/:jobId/live" as const;
+
+export const qWorkforceJobLivePath = (jobId: string) =>
+  Q_WORKFORCE_JOB_LIVE_PATH.replace(":jobId", encodeURIComponent(jobId));
+
 export const WORKFORCE_AGENT_ROLES = [
   "LEAD",
   "OUTREACH",

@@ -10,6 +10,7 @@ import {
   WorkforceGradeDtoSchema,
 } from "@capital-q/contracts";
 import type {
+  WorkforceLive,
   WorkforceDraftDto,
   WorkforceJobDetailDto,
   WorkforceJobListDto,
@@ -28,7 +29,13 @@ import type {
   WorkforceStore,
 } from "./store.js";
 import { progressOf } from "./progress.js";
-import type { AgentWorkQueue, WorkRow } from "./queue.js";
+import { deliveredDocument } from "./delivery.js";
+import {
+  LIVE_WORK_STATES,
+  liveStageOf,
+  type AgentWorkQueue,
+  type WorkRow,
+} from "./queue.js";
 
 /**
  * The workforce page's reads (founder brief J5, J6): the person's own jobs,
@@ -308,6 +315,43 @@ export function createWorkforcePage(dependencies: {
           rows.length > page.limit && last !== undefined
             ? last.updated_at.toISOString()
             : null,
+      };
+    },
+
+    /**
+     * Owner 2026-10-24: one job as its document is being made, for the
+     * conversation's card: the row the person owns (someone else's job is
+     * the same null as none), its plan's steps done, the stage its work
+     * last recorded, and the document once filed. One row, no model.
+     */
+    live: async (
+      owner: Owner,
+      jobId: string,
+    ): Promise<WorkforceLive | null> => {
+      const work = (await workOf(owner, [jobId])).get(jobId);
+      if (work === undefined) return null;
+      const plan = progressOf(work);
+      const filed = deliveredDocument(work);
+      const working = LIVE_WORK_STATES.includes(work.state);
+      return {
+        jobId: work.job_id,
+        state: working
+          ? "WORKING"
+          : work.state === "COMPLETED"
+            ? "DONE"
+            : "STOPPED",
+        done: plan?.done ?? 0,
+        total: plan?.total ?? 0,
+        stage: liveStageOf(work),
+        document:
+          filed === null
+            ? null
+            : {
+                artifactId: filed.artifactId,
+                type: filed.delivery.artifactType,
+                title: filed.delivery.title.slice(0, 160),
+              },
+        reason: working || work.state === "COMPLETED" ? null : work.reason,
       };
     },
 

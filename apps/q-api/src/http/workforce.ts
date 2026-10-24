@@ -9,6 +9,7 @@ import {
   Q_WORKFORCE_DRAFT_RETRY_PATH,
   WorkforceDraftRetryRequestSchema,
   WorkforceDraftRetryResultDtoSchema,
+  Q_WORKFORCE_JOB_LIVE_PATH,
   Q_WORKFORCE_JOB_PATH,
   Q_WORKFORCE_JOBS_PATH,
   Q_WORKFORCE_OVERVIEW_PATH,
@@ -16,6 +17,7 @@ import {
   WorkforceOverviewDtoSchema,
   WorkforceJobListDtoSchema,
   WorkforceJobListQuerySchema,
+  WorkforceLiveSchema,
 } from "@capital-q/contracts";
 
 import type { HeldRetry } from "../composition/workforce/held-retry.js";
@@ -118,6 +120,25 @@ export function registerWorkforceRoutes(
       if (detail === null) return problem(request, reply, "RESOURCE_NOT_FOUND");
       void reply.header("Cache-Control", "no-store");
       return WorkforceJobDetailDtoSchema.parse(detail);
+    },
+  );
+
+  // Owner 2026-10-24: the conversation's card asks where its document is
+  // every few seconds while it is being made. One row, the person's own.
+  app.get(
+    Q_WORKFORCE_JOB_LIVE_PATH,
+    { onRequest: withContext },
+    async (request, reply) => {
+      const actor = getActorContext(request);
+      const params = JobParams.safeParse(request.params);
+      if (!params.success) return problem(request, reply, "RESOURCE_NOT_FOUND");
+      const live = await page.live(
+        { tenantId: actor.tenantId, userId: actor.userId },
+        params.data.jobId,
+      );
+      if (live === null) return problem(request, reply, "RESOURCE_NOT_FOUND");
+      void reply.header("Cache-Control", "no-store");
+      return WorkforceLiveSchema.parse(live);
     },
   );
 

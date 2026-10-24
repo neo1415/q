@@ -381,6 +381,27 @@
     animation: cq-step-in var(--cq-motion-emphasis) var(--cq-ease) both;
   }
 
+  /* Owner 2026-10-24: a drafted section joins the document being made with
+     a short rise; with reduced motion it is simply there. */
+  @keyframes cq-live-section-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .cq-live-section-in {
+    animation: cq-live-section-in var(--cq-motion-slow) var(--cq-ease) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-live-section-in {
+      animation: none;
+    }
+  }
+
   /* DOCS: a document-ready card rises in from the edge it sits on; with
      reduced motion it only fades (no movement). */
   @keyframes cq-document-ready-in {

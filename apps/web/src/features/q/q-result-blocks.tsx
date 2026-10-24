@@ -38,6 +38,7 @@ import {
 import { subjectHref } from "./blocks/data-block-logic";
 import { useSubjectNames } from "./blocks/use-subject-names";
 import { useWire } from "./use-wire";
+import { WorkInProgressCard } from "./work-live";
 import { wireNow } from "./wire";
 import { useT } from "@/features/i18n/language";
 
@@ -574,6 +575,18 @@ export function QResultBlocks({
             // the answer and the Board. Older versions stay in the viewer.
             return (
               <ArtifactCard
+                key={key}
+                block={block}
+                onOpen={onOpenArtifact}
+                onAsk={onAsk}
+              />
+            );
+
+          case "WORK_IN_PROGRESS":
+            // Owner 2026-10-24: the document being made, as it is made;
+            // it becomes the finished document's card in place.
+            return (
+              <WorkInProgressCard
                 key={key}
                 block={block}
                 onOpen={onOpenArtifact}

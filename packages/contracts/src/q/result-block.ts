@@ -585,6 +585,23 @@ export const QPictureBlockSchema = z
     { message: "the picture's page is at its source", path: ["pageUrl"] },
   );
 
+/**
+ * Owner 2026-10-24: a document Q is making for the person, while it is
+ * being made. Code puts it on the reply that started their own deep work,
+ * and again on the message that delivers it, so the screen shows one card
+ * that follows the job (its live stage is read from the job, under the
+ * person's own authority) and becomes the finished document in place.
+ * Never a model's: a job id grants nothing, the job is read as its owner.
+ */
+export const QWorkInProgressBlockSchema = z
+  .object({
+    kind: z.literal("WORK_IN_PROGRESS"),
+    jobId: UuidSchema,
+    /** What the work is, in the plan's words, until the document has a title. */
+    title: z.string().trim().min(1).max(160),
+  })
+  .strict();
+
 export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QTextBlockSchema,
   QCompanyReferenceBlockSchema,
@@ -607,6 +624,7 @@ export const QResultBlockSchema = z.discriminatedUnion("kind", [
   QAttentionBlockSchema,
   QSummaryBlockSchema,
   QPictureBlockSchema,
+  QWorkInProgressBlockSchema,
 ]);
 
 export type QResultBlock = z.infer<typeof QResultBlockSchema>;

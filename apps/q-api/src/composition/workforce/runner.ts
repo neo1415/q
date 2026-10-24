@@ -11,7 +11,13 @@ import { z } from "zod";
 
 import { plannedFrom } from "./job-actions.js";
 import type { WorkforceJobs } from "./jobs.js";
-import type { AgentWorkQueue, EndState, WorkRow } from "./queue.js";
+import { mergeLive, type LiveReport } from "./live.js";
+import {
+  liveStageOf,
+  type AgentWorkQueue,
+  type EndState,
+  type WorkRow,
+} from "./queue.js";
 import type { Owner, WorkforceStore } from "./store.js";
 
 /**
@@ -152,6 +158,19 @@ export function createAgentWorkRunner(dependencies: {
           });
         }
       }
+      // Owner 2026-10-24: where the document work stands, kept on the row
+      // (a resumed job carries on from what was shown). Writes are
+      // chained so the latest lands last; a failed write is not the work's.
+      let shown = liveStageOf(row);
+      let writing: Promise<void> = Promise.resolve();
+      const progress: LiveReport = (patch) => {
+        if (lost) return;
+        const next = mergeLive(shown, patch, new Date().toISOString());
+        shown = next;
+        writing = writing
+          .then(() => queue.recordLive?.(row.job_id, workerId, next))
+          .catch(() => undefined);
+      };
       const jobs = dependencies.jobsFor(actor);
       const payload: WorkforceJobStartPayload = plan.data;
       const result = await jobs.run(
@@ -173,6 +192,7 @@ export function createAgentWorkRunner(dependencies: {
                 documentContext: {
                   qRunId: row.trace.runId,
                   organisationId: row.trace.organisationId,
+                  progress,
                   canContinue: async () => {
                     if (lost) return false;
                     const kept = await queue
@@ -200,6 +220,8 @@ export function createAgentWorkRunner(dependencies: {
           },
         },
       );
+      // The last stage lands before the row ends (an ended row takes none).
+      await writing;
       if (result.outcome !== "STARTED") {
         await finish(
           endStateOf(result.outcome, "HELD"),

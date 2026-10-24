@@ -435,6 +435,7 @@ export {
   unsubscribePush,
   listWorkforceJobs,
   getWorkforceJob,
+  getWorkforceJobLive,
   retryWorkforceDraft,
   readBriefingCommand,
   getWorkforceOverview,

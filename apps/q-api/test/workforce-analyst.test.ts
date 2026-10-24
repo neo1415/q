@@ -4,7 +4,10 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { QArtifactContent } from "@capital-q/contracts";
+import {
+  WorkforceLiveSchema,
+  type QArtifactContent,
+} from "@capital-q/contracts";
 import type {
   AnalysisCritiqueResult,
   AnalysisDocumentResult,
@@ -16,7 +19,7 @@ import {
   type PublicWebResearchProvider,
 } from "@capital-q/q-research";
 import { boundPlan, registeredExecutors } from "@capital-q/q-orchestrator";
-import { teamJobLine } from "@capital-q/q-specialists";
+import { teamJobBlocks, teamJobLine } from "@capital-q/q-specialists";
 import { ActorContextSchema } from "@capital-q/security";
 
 import { basisProblems } from "../src/composition/workforce/analysis.js";
@@ -45,6 +48,11 @@ import {
 } from "../src/composition/workforce/jobs.js";
 import type { WorkforceModels } from "../src/composition/workforce/models.js";
 import { createInMemoryAgentWorkQueue } from "../src/composition/workforce/queue.js";
+import {
+  mergeLive,
+  type LivePatch,
+} from "../src/composition/workforce/live.js";
+import { createWorkforcePage } from "../src/composition/workforce/page.js";
 import { createOutwardReview } from "../src/composition/workforce/review.js";
 import { createAgentWorkRunner } from "../src/composition/workforce/runner.js";
 import { createInMemoryWorkforceStore } from "../src/composition/workforce/store.js";
@@ -234,6 +242,8 @@ function world(
     notify: () => Promise.resolve(),
     research: (_owner, input) => {
       researchInputs.push(input);
+      input.progress?.({ stage: "SEARCHING", questions: 6 });
+      input.progress?.({ stage: "READING", sources: 9, facts: 4 });
       return Promise.resolve({
         status: "OK",
         query: "kenya water kiosks market size",
@@ -243,6 +253,14 @@ function world(
     },
     documents: (_owner, input) => {
       documentInputs.push(input);
+      input.progress?.({
+        stage: "REVIEWING",
+        draft: 1,
+        drafts: 3,
+        title: MAJI_DRAFT_TWO.title,
+        sections: MAJI_DRAFT_TWO.sections.map((section) => section.heading),
+      });
+      input.progress?.({ stage: "FILING" });
       return Promise.resolve({
         status: "READY",
         artifactId: "11111111-1111-4111-8111-111111111111",
@@ -323,6 +341,145 @@ function world(
     delivered,
   };
 }
+
+describe("the person sees their document being made (owner 2026-10-24)", () => {
+  it("keeps where the work stands on the job, read as its owner, and the filed document when done", async () => {
+    const { board, runner, queue, store, delivered } = world();
+    const prepared = await board.port.prepare(
+      actor,
+      randomUUID(),
+      MAJI_LOOP_REQUEST,
+    );
+    expect(prepared.status).toBe("STARTED");
+    if (prepared.status !== "STARTED" || prepared.jobId === undefined) return;
+    const owner = { tenantId: actor.tenantId, userId: actor.userId };
+    const page = createWorkforcePage({ store, work: queue });
+
+    // Before any worker: queued, nothing to show yet.
+    expect(await page.live(owner, prepared.jobId)).toMatchObject({
+      state: "WORKING",
+      done: 0,
+      stage: null,
+      document: null,
+    });
+
+    await runner.pass();
+    const live = await page.live(owner, prepared.jobId);
+    expect(live).toMatchObject({
+      state: "DONE",
+      document: {
+        artifactId: "11111111-1111-4111-8111-111111111111",
+        type: "ANALYSIS",
+        title: MAJI_DRAFT_TWO.title,
+      },
+      reason: null,
+    });
+    // Each report merged into the last: research's counts are kept
+    // through the writing, with the draft's own headings.
+    expect(live?.stage).toMatchObject({
+      stage: "FILING",
+      questions: 6,
+      sources: 9,
+      facts: 4,
+      title: MAJI_DRAFT_TWO.title,
+      sections: MAJI_DRAFT_TWO.sections.map((section) => section.heading),
+    });
+    expect(live?.done).toBe(live?.total);
+    expect(WorkforceLiveSchema.safeParse(live).success).toBe(true);
+    // The live entry is never read as a step's result.
+    expect(delivered).toHaveLength(1);
+
+    // Someone else's job is the same nothing as no job.
+    expect(
+      await page.live(
+        { tenantId: actor.tenantId, userId: randomUUID() },
+        prepared.jobId,
+      ),
+    ).toBeNull();
+  });
+
+  it("reports drafting, review and each revision with the draft's headings", async () => {
+    const world = analysisWorld({
+      drafts: [MAJI_DRAFT_ONE, MAJI_DRAFT_TWO],
+      critiques: [FAILING, PASSING],
+    });
+    const stages: LivePatch[] = [];
+    const result = await world.documents({
+      ...world.input,
+      progress: (patch) => stages.push(patch),
+    });
+    expect(result.status).toBe("READY");
+    expect(stages.map((one) => one.stage)).toEqual([
+      "DRAFTING",
+      "REVIEWING",
+      "REVISING",
+      "REVIEWING",
+      "FILING",
+    ]);
+    expect(stages[1]).toMatchObject({
+      draft: 1,
+      title: MAJI_DRAFT_ONE.title,
+      sections: MAJI_DRAFT_ONE.sections.map((section) => section.heading),
+    });
+    expect(stages[2]).toMatchObject({ draft: 2, drafts: 3 });
+  });
+
+  it("a report that throws never stops the work", async () => {
+    const world = analysisWorld({
+      drafts: [MAJI_DRAFT_TWO],
+      critiques: [PASSING],
+    });
+    const result = await world.documents({
+      ...world.input,
+      progress: () => {
+        throw new Error("screen gone");
+      },
+    });
+    expect(result.status).toBe("READY");
+  });
+
+  it("merges each report into the last, never losing what was shown", () => {
+    const first = mergeLive(
+      null,
+      { stage: "REVIEWING", draft: 1, sections: ["Market"] },
+      "2026-10-24T17:00:00.000Z",
+    );
+    const next = mergeLive(
+      first,
+      { stage: "REVISING", draft: 2 },
+      "2026-10-24T17:00:05.000Z",
+    );
+    expect(next).toMatchObject({
+      stage: "REVISING",
+      draft: 2,
+      sections: ["Market"],
+      at: "2026-10-24T17:00:05.000Z",
+    });
+  });
+
+  it("puts one card that follows the job on the reply that started it", () => {
+    const plan = {
+      summary: "Research your market and write your growth plan.",
+      steps: [],
+      needsYou: [],
+      cannot: [],
+    };
+    const jobId = randomUUID();
+    expect(
+      teamJobBlocks({ status: "STARTED", plan, firstRead: null, jobId }),
+    ).toEqual([
+      {
+        kind: "WORK_IN_PROGRESS",
+        jobId,
+        title: "Research your market and write your growth plan",
+      },
+    ]);
+    expect(
+      teamJobBlocks({ status: "STARTED", plan, firstRead: null }),
+    ).toBeUndefined();
+    expect(teamJobBlocks({ status: "PREPARED", plan })).toBeUndefined();
+  });
+});
 
 describe("own-account deep work starts with no approval card", () => {
   it("starts at once, runs research then the analysis, and delivers the document", async () => {
@@ -610,6 +767,7 @@ describe("deep research for the Maji Loop request", () => {
     };
     const research = workforceDeepResearch({ service, models });
     if (research === undefined) throw new Error("not composed");
+    const researchStages: LivePatch[] = [];
     const found = await research({
       actor,
       runId: randomUUID(),
@@ -617,8 +775,15 @@ describe("deep research for the Maji Loop request", () => {
       request: MAJI_LOOP_REQUEST,
       query: "Kenya's water kiosk market, competitors, regulation",
       budgetUsd: 0.6,
+      progress: (patch) => researchStages.push(patch),
     });
     expect(found.status).toBe("OK");
+    // The person watching sees the questions, then what was read and kept.
+    expect(researchStages[0]).toEqual({ stage: "SEARCHING", questions: 6 });
+    expect(researchStages.at(-1)).toMatchObject({
+      stage: "READING",
+      facts: 1,
+    });
     if (found.status !== "OK" || found.dossier === undefined) return;
 
     // Firewall: the planner saw the request and the goal, nothing private.
