@@ -857,7 +857,8 @@ export function CardAvatar({
         size={size}
         decorative
         fallback="initials"
-        siteLogo
+        // Owner 2026-10-24: a company card shows the company's logo first.
+        siteLogo="first"
         className="cq-ac-avatar"
       />
     );

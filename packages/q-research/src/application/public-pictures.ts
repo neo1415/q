@@ -104,6 +104,44 @@ const SEARCH_PAGE =
  * professional pages (Wikipedia, LinkedIn), then everything else (news
  * and the rest), each in the index's order.
  */
+/**
+ * What a picture shows, as its title and addresses describe it, for its
+ * place among the pictures of one site (owner 2026-10-24, QO-33: Zino
+ * Aviation's own site gave a cabin-crew marketing shot first): their logo,
+ * then their people, then their product, then anything else, and generic
+ * marketing imagery last. It orders pictures already shown to be of them;
+ * it never decides whether one is shown.
+ */
+const LOGO = /\b(?:logo|logos|logotype|wordmark|brandmark|emblem)\b/iu;
+const PEOPLE =
+  /\b(?:founders?|co-?founders?|ceo|cto|coo|chief|managing director|leadership|leaders|executives?|team|management|board|headshots?|portraits?)\b/iu;
+const PRODUCT =
+  /\b(?:products?|app|apps|platform|dashboard|screenshots?|device)\b/iu;
+const GENERIC_MARKETING =
+  /\b(?:banner|hero|slider|slide|background|bg|stock|welcome|crew|smiling|happy|lifestyle|placeholder|cover)\b/iu;
+
+/** The image file's own path words ("/assets/img/crew-cabin-welcome.jpeg"). */
+function imagePathWords(url: string): string {
+  try {
+    return decodeURIComponent(new URL(url).pathname).replace(
+      /[^\p{L}\p{N}]+/gu,
+      " ",
+    );
+  } catch {
+    return "";
+  }
+}
+
+export function subjectRank(
+  picture: Pick<PublicPicture, "imageUrl" | "title">,
+): number {
+  const described = `${picture.title} ${imagePathWords(picture.imageUrl)}`;
+  if (LOGO.test(described)) return 0;
+  if (PEOPLE.test(described)) return 1;
+  if (GENERIC_MARKETING.test(described)) return 4;
+  return PRODUCT.test(described) ? 2 : 3;
+}
+
 function preference(domain: string, name: string): number {
   if (textNamesEntity(name, "", domain)) return 0;
   if (
@@ -158,8 +196,11 @@ export function createPublicPictureSearch(input: {
         );
         return [];
       }
-      const candidates: (PublicPicture & { readonly rank: number })[] = [];
-      const pages = new Set<string>();
+      const candidates: (PublicPicture & {
+        readonly rank: number;
+        readonly shows: number;
+      })[] = [];
+      const images = new Set<string>();
       for (const hit of hits) {
         const page = judgePublicUrl(hit.pageUrl);
         if (!page.ok) continue;
@@ -181,14 +222,12 @@ export function createPublicPictureSearch(input: {
         }
         const imageHost = judgePublicUrl(image);
         if (imageHost.ok && NOT_OF_THEM.test(imageHost.domain)) continue;
-        // One picture a site: two from the same page say the same thing.
         // One showing of an image: the same photo on two of their sites
         // (live 2026-10-23: one Wix image on academy. and www. showed twice).
         const sameImage = image.split("?")[0] ?? image;
-        if (pages.has(page.domain) || pages.has(sameImage)) continue;
-        pages.add(page.domain);
-        pages.add(sameImage);
-        candidates.push({
+        if (images.has(sameImage)) continue;
+        images.add(sameImage);
+        const candidate = {
           imageUrl: image,
           pageUrl: page.url,
           domain: page.domain,
@@ -198,7 +237,17 @@ export function createPublicPictureSearch(input: {
             : title
           ).slice(0, 200),
           rank: preference(page.domain, org.length > 0 ? org : name),
-        });
+        };
+        // One picture a site, its best: their logo or people before a
+        // marketing shot (QO-33), the search's order otherwise.
+        const shows = subjectRank({ ...candidate, title });
+        const same = candidates.findIndex(
+          (known) => known.domain === page.domain,
+        );
+        if (same < 0) candidates.push({ ...candidate, shows });
+        else if (shows < (candidates[same]?.shows ?? Infinity)) {
+          candidates[same] = { ...candidate, shows };
+        }
       }
       return candidates
         .map((candidate, order) => ({ candidate, order }))

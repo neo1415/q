@@ -510,6 +510,8 @@ export type Timing = {
   readonly firstText: string | null;
   /** Holding lines said before the answer, in order, with when. */
   readonly holding: readonly { readonly text: string; readonly ms: number }[];
+  /** When the quick first read returned, from the turn's start. */
+  readonly skimDoneMs: number | null;
 };
 
 const question = (kind: string, text: string) => ({
@@ -698,6 +700,7 @@ export async function timeJourney(
   let firstWordsMs: number | null = null;
   let firstText: string | null = null;
   let holding: { text: string; ms: number }[] = [];
+  let skimDoneMs: number | null = null;
   /** The last streamed sentence: the voice has the whole answer to say. */
   let lastWordsMs: number | null = null;
   /** The first finding shown live (q.finding.available). */
@@ -866,6 +869,7 @@ export async function timeJourney(
     skim: async () => {
       calls.push("skim");
       await wait(LATENCY.skimMs);
+      skimDoneMs = at();
       return {
         kind: journey.skim ?? "OTHER",
         confidence: "HIGH",
@@ -980,6 +984,7 @@ export async function timeJourney(
     firstWordsMs = null;
     firstText = null;
     holding = [];
+    skimDoneMs = null;
     lastWordsMs = null;
     firstFindingMs = null;
     started = performance.now();
@@ -1012,6 +1017,7 @@ export async function timeJourney(
     reads: [...reads],
     firstText,
     holding,
+    skimDoneMs,
   };
 }
 
@@ -1093,9 +1099,12 @@ describe("turn timing harness", () => {
       "Looking into that now. ",
       "Looking into Acme Robotics now. ",
     ]);
-    expect(unknown.holding[1]?.ms ?? Infinity).toBeLessThan(
-      LATENCY.skimMs + 300,
-    );
+    // Said as the skim returns, not after the full reading: measured from
+    // the skim's own return, so a loaded machine's slower start of the
+    // turn is not counted against it.
+    expect(
+      (unknown.holding[1]?.ms ?? Infinity) - (unknown.skimDoneMs ?? 0),
+    ).toBeLessThan(150);
     expect(unknown.stored.join(" ")).not.toContain("Looking into");
     expect(unknown.firstWordsMs ?? Infinity).toBeLessThan(2_000);
     expect(unknown.stored.join(" ")).not.toContain("I'm checking");
