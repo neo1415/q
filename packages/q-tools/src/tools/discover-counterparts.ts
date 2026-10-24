@@ -76,6 +76,13 @@ export const DiscoverCounterpartsInputSchema = z
       .describe(
         "True when 'this', 'us' or 'our' means the member's own company or raise.",
       ),
+    kinds: z
+      .array(z.string().trim().min(2).max(40))
+      .max(3)
+      .default([])
+      .describe(
+        "The kinds of investor asked for, as said: 'family offices', 'angel networks', 'VCs', 'sovereign funds'. Empty when they named no kind.",
+      ),
   })
   .strict();
 export type DiscoverCounterpartsInput = z.infer<
@@ -155,6 +162,7 @@ export function createDiscoverCounterpartsTool(
         sector: input.sector,
         stage: input.stage,
         count: input.count,
+        kinds: input.kinds,
         signal: context.signal,
       });
       return {

@@ -119,7 +119,6 @@ import {
   knownEntityLaneOf,
   lastShownEntityId,
   type PreparedFollowUpPort,
-  investorDiscoveryLaneOf,
   dailyLaneOf,
   fitRankingLaneOf,
   type KnownEntityMatcher,
@@ -3848,7 +3847,10 @@ export function createSpecialistQAnswer(
     (dependencies.knownEntities === undefined
       ? null
       : knownEntityLaneOf(utterance, dependencies.knownEntities)) ??
-    investorDiscoveryLaneOf(utterance) ??
+    // Owner 2026-10-24 (a word list never decides): which investors to
+    // discover -- the place, kind and sector as said -- is the quick first
+    // read's understanding (TURN_SKIM v8), never a list of place words,
+    // which dropped "family offices" and "fintech" from the ask.
     dailyLaneOf(utterance, lastAnswerShowedCards(history));
 
   /**
@@ -5019,12 +5021,13 @@ export function createSpecialistQAnswer(
     const preskim = preskims.get(request.runId);
     preskims.delete(request.runId);
     const skimmer = dependencies.turnSkim;
+    const skimmable =
+      skimmer !== undefined &&
+      request.speculation === undefined &&
+      request.plan.screen?.route !== "ONBOARDING" &&
+      !sequences.has(conversationId);
     const skimming =
-      skimmer === undefined ||
-      request.speculation !== undefined ||
-      request.plan.screen?.route === "ONBOARDING" ||
-      sequences.has(conversationId) ||
-      !skimUsable(history, latest)
+      !skimmable || !skimUsable(history, latest)
         ? null
         : preskim !== undefined && preskim.messageId === latest.id
           ? preskim.skim
@@ -5091,9 +5094,13 @@ export function createSpecialistQAnswer(
       // the skim reads two turns of text, and "what was the second one?"
       // after a list is a follow-up the reading answers from SHOWN, not
       // a new ranking (owner live 2026-10-17).
+      // A discovery of investors names its own place, kind or sector in
+      // this turn's words (the fast lane checks so): never a follow-up on
+      // what was shown, so it is taken here too.
+      const discovery = lane?.questionKind === "DISCOVER_INVESTORS";
       if (
         lane !== null &&
-        !context.turns.some((turn) => turn.blocks.length > 0) &&
+        (discovery || !context.turns.some((turn) => turn.blocks.length > 0)) &&
         !(await waitingOnThem())
       ) {
         speculative.current?.cancel("KIND");
@@ -5121,6 +5128,48 @@ export function createSpecialistQAnswer(
     // A request to make something must never be dropped because one model
     // was down (B1, 2026-09-25).
     let read = await readingFirst;
+    // Owner's own conversation (2026-10-24): "just find me three Qatari
+    // investors" after other talk was answered as a lookup of their own
+    // company, and as a search built from earlier chatter. When the full
+    // reading says the turn asks which investors, or for public facts or a
+    // real-world example, the quick first read is asked what to discover
+    // (the place, kind and sector as said) -- already running, or now, even
+    // once Q has shown something here, since such an ask names them in its
+    // own words. A reading of anything else pays for no skim.
+    const discoveryShaped =
+      read !== null &&
+      read.tool === null &&
+      (read.kind === "RESEARCH_REQUEST" ||
+        (read.kind === "QUESTION_TO_Q" &&
+          (read.question?.kind === "INVESTOR_PROSPECTS" ||
+            read.question?.kind === "PUBLIC_FACTS" ||
+            read.question?.kind === "REAL_WORLD_EXAMPLE")));
+    if (discoveryShaped && skimmable) {
+      const late = fastLaneOf(
+        await (
+          skimming ?? skimmer.skim(skimInput(request, history, latest))
+        ).catch(() => null),
+        latest.content,
+      );
+      if (
+        late?.questionKind === "DISCOVER_INVESTORS" &&
+        !(await waitingOnThem())
+      ) {
+        speculative.current?.cancel("KIND");
+        logger?.info(
+          { qRunId: request.runId, lane: late.questionKind, late: true },
+          "q fast lane",
+        );
+        return delegate.answer({
+          ...request,
+          research: Promise.resolve(NO_RESEARCH),
+          capabilities: manifestOf(capabilities),
+          turnKind: "QUESTION_TO_Q",
+          ...(spoken ? { spoken: true } : {}),
+          ...late,
+        });
+      }
+    }
     let turnUnread = false;
     if (read === null && request.signal?.aborted !== true) {
       read = await rereadTurn(

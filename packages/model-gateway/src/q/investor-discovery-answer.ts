@@ -11,6 +11,10 @@ import type {
   QToolPort,
 } from "@capital-q/q-runtime";
 
+import {
+  networkInvestorsIn,
+  prospectCardsBlock,
+} from "./investor-prospects-answer.js";
 import { identityCardBlock } from "./person-search-answer.js";
 
 /**
@@ -23,6 +27,7 @@ import { identityCardBlock } from "./person-search-answer.js";
  */
 
 const DISCOVER_TOOL = "discover_investors";
+const NETWORK_TOOL = "find_prospective_investors";
 
 export type InvestorAsk = NonNullable<QAnswerRequest["discoverInvestors"]>;
 
@@ -36,6 +41,8 @@ type Found = {
 export type InvestorDiscoveryAnswer = {
   readonly text: string;
   readonly block: QAnswerCardsBlock | null;
+  /** Capital Q's own investors in that place and of that kind, first. */
+  readonly networkBlock?: QAnswerCardsBlock | null;
   readonly shown: number;
   readonly outcome: "FOUND" | "NONE" | "UNAVAILABLE";
   readonly webSearched: boolean;
@@ -44,9 +51,9 @@ export type InvestorDiscoveryAnswer = {
 
 const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five"] as const;
 
-function listOf(names: readonly string[]): string {
+function listOf(names: readonly string[], joiner = "and"): string {
   if (names.length <= 1) return names[0] ?? "";
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1] ?? ""}`;
+  return `${names.slice(0, -1).join(", ")} ${joiner} ${names[names.length - 1] ?? ""}`;
 }
 
 /** The region as the member said it, for the sentence ("Arab", "Gulf"). */
@@ -79,14 +86,34 @@ export function investorDiscoveryText(
     readonly asked: number;
     readonly outcome: "FOUND" | "NONE" | "UNAVAILABLE";
     readonly aboutMyCompany: boolean;
+    /** The kinds as they said them ("family offices"); none is investors. */
+    readonly kinds?: readonly string[] | undefined;
+    readonly sector?: string | null | undefined;
   },
 ): string {
   const label = regionLabel(context.regionWords);
   const where = label === null ? "" : `${label} `;
   if (found.length === 0) {
-    return context.outcome === "UNAVAILABLE"
-      ? "Public search isn't answering right now, so I can't say either way. Try again in a moment."
-      : `I looked through the investors I know and a public search and found none ${label === null ? "I could name" : `from the ${label} region`} yet. A sector or a country would help me narrow it.`;
+    if (context.outcome === "UNAVAILABLE") {
+      return "Public search isn't answering right now, so I can't say either way. Try again in a moment.";
+    }
+    // Live 2026-10-24: "three Saudi family offices that back fintech" was
+    // told "a sector or a country would help" -- both were said. Say what
+    // was looked for in their words, and ask only for what they left out.
+    const kinds = context.kinds ?? [];
+    const what = kinds.length === 0 ? "investors" : listOf(kinds, "or");
+    const sector = context.sector?.trim() ?? "";
+    const backing = sector.length === 0 ? "" : ` backing ${sector}`;
+    const place = label === null ? "" : ` from the ${label} region`;
+    const next =
+      label === null && sector.length === 0
+        ? " A sector or a country would help me narrow it."
+        : label === null
+          ? " A country or region would help me look in the right place."
+          : sector.length === 0 && kinds.length === 0
+            ? " A sector would help me narrow it."
+            : " I can look more widely, say the wider region or a neighbouring sector, if you'd like.";
+    return `I'm not sure there are none, but I couldn't name any ${what}${backing}${place} yet, from the investors I know or a public search.${next}`;
   }
   const investors = found.filter((one) => one.role === "INVESTOR");
   const openers = found.filter((one) => one.role === "DOOR_OPENER");
@@ -158,9 +185,30 @@ export async function runInvestorDiscovery(input: {
   readonly tools: Pick<QToolPort, "execute">;
   readonly context: QToolExecutionContext;
   readonly available: ReadonlySet<string>;
+  /** Their own company, when they have one: the network ranks against it. */
+  readonly companyId?: string | null | undefined;
 }): Promise<InvestorDiscoveryAnswer | null> {
   const { ask, tools, context, available } = input;
   if (!available.has(DISCOVER_TOOL)) return null;
+  // Owner's own conversation (2026-10-24): investors on Capital Q in that
+  // place are read beside the public search, never after it.
+  const network = available.has(NETWORK_TOOL)
+    ? tools
+        .execute(
+          {
+            callId: "q-discover-network-investors",
+            name: NETWORK_TOOL,
+            arguments: {
+              ...(input.companyId === null || input.companyId === undefined
+                ? {}
+                : { companyId: input.companyId }),
+              limit: 20,
+            },
+          },
+          context,
+        )
+        .catch(() => null)
+    : Promise.resolve(null);
   const outcome = await tools
     .execute(
       {
@@ -173,6 +221,9 @@ export async function runInvestorDiscovery(input: {
           stage: ask.stage,
           count: Math.min(5, Math.max(1, ask.count ?? 3)),
           aboutMyCompany: ask.aboutMyCompany,
+          ...(ask.kinds === undefined || ask.kinds.length === 0
+            ? {}
+            : { kinds: ask.kinds }),
         },
       },
       context,
@@ -183,6 +234,7 @@ export async function runInvestorDiscovery(input: {
     outcome?: unknown;
     candidates?: unknown;
     regionWords?: unknown;
+    countries?: unknown;
     webSearched?: unknown;
   } | null;
   const status =
@@ -205,12 +257,34 @@ export async function runInvestorDiscovery(input: {
     : [];
   const asked = Math.min(5, Math.max(1, ask.count ?? 3));
   const label = regionLabel(regionWords);
-  const text = investorDiscoveryText(found, {
+  const countries = Array.isArray(data.countries)
+    ? data.countries.filter((c): c is string => typeof c === "string")
+    : [];
+  const networkOutcome = await network;
+  // Only where the ask names a place or a kind: "investors" alone is not a
+  // place to filter the network by.
+  const onCapitalQ =
+    networkOutcome === null ||
+    !networkOutcome.result.ok ||
+    (countries.length === 0 && (ask.kinds ?? []).length === 0)
+      ? []
+      : networkInvestorsIn(networkOutcome.result.data, {
+          countries,
+          kinds: ask.kinds ?? [],
+          count: asked,
+        });
+  const publicText = investorDiscoveryText(found, {
     regionWords,
     asked,
     outcome: status,
     aboutMyCompany: ask.aboutMyCompany,
+    kinds: ask.kinds,
+    sector: ask.sector,
   });
+  const text =
+    onCapitalQ.length === 0
+      ? publicText
+      : `On Capital Q, ${onCapitalQ.map((pick) => pick.name).join(", ")} ${onCapitalQ.length === 1 ? "is" : "are"} ${label === null ? "a likely fit" : `based where you asked`} from what ${onCapitalQ.length === 1 ? "it publishes" : "they publish"}, not interest shown. ${found.length === 0 ? "Outside Capital Q, the public search found nobody I could name." : `Outside Capital Q: ${publicText}`}`;
   return {
     text,
     block: investorCardsBlock(
@@ -219,9 +293,11 @@ export async function runInvestorDiscovery(input: {
         ? "Investors who could fit"
         : `${label} investors who could fit`,
     ),
-    shown: found.length,
-    outcome: status,
+    networkBlock:
+      onCapitalQ.length === 0 ? null : prospectCardsBlock(onCapitalQ),
+    shown: found.length + onCapitalQ.length,
+    outcome: onCapitalQ.length > 0 ? "FOUND" : status,
     webSearched: data.webSearched === true,
-    calls: [outcome],
+    calls: networkOutcome === null ? [outcome] : [networkOutcome, outcome],
   };
 }

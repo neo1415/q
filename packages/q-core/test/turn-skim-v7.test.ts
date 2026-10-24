@@ -17,7 +17,7 @@ import {
 describe("TURN_SKIM v7: whether Q is asked to write something", () => {
   it("is the active skim, v6 kept whole plus one field", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_SKIM");
-    expect(active.definition.version).toBe(7);
+    expect(active.definition.version).toBe(8);
     expect(TURN_SKIM_V6.status).toBe("DEPRECATED");
     expect(TURN_SKIM_V7.template).toContain(`${V6_SUBJECT}${V7_WRITES}`);
     expect(TURN_SKIM_V7.template.replace(V7_WRITES, "")).toBe(

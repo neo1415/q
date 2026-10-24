@@ -350,6 +350,11 @@ export type QAnswerRequest = QOrchestrationSubjectContext & {
         readonly stage: string | null;
         readonly count: number | null;
         readonly aboutMyCompany: boolean;
+        /**
+         * The kinds of investor asked for, as said ("family offices",
+         * "angel networks"); absent or empty: any kind (TURN_SKIM v8).
+         */
+        readonly kinds?: readonly string[] | undefined;
       }
     | undefined;
   /**

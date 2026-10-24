@@ -215,3 +215,22 @@ export const TurnSkimV7ResultSchema = TurnSkimV6ResultSchema.extend({
   writes: z.boolean().default(false).catch(false),
 }).strict();
 export type TurnSkimV7Result = z.infer<typeof TurnSkimV7ResultSchema>;
+
+export const TURN_SKIM_V8_SCHEMA_VERSION = 8;
+
+/**
+ * v8 (owner's own conversation, 2026-10-24: "show me three Arab / Qatari
+ * investors", "three Saudi family offices that back fintech", "five Kenyan
+ * angel networks"): a discovery ask may name the kind of investor wanted.
+ * `kinds` are those words as said; the discovery query is built from kind,
+ * place and sector. Lenient: a malformed list reads as none.
+ */
+export const SkimInvestorsV8Schema = SkimInvestorsSchema.extend({
+  kinds: z.array(z.string().trim().min(2).max(40)).max(3).default([]).catch([]),
+}).strict();
+export type SkimInvestorsV8 = z.infer<typeof SkimInvestorsV8Schema>;
+
+export const TurnSkimV8ResultSchema = TurnSkimV7ResultSchema.extend({
+  investors: SkimInvestorsV8Schema.nullable().optional(),
+}).strict();
+export type TurnSkimV8Result = z.infer<typeof TurnSkimV8ResultSchema>;
