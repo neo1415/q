@@ -347,6 +347,9 @@ import {
 import {
   asksToCompare,
   comparisonFactStatement,
+  comparisonVerdict,
+  ledByVerdict,
+  type ComparisonVerdict,
   comparisonSpokenLine,
   withoutCompareOffers,
   comparisonTableBlock,
@@ -2956,6 +2959,8 @@ export function createModelGatewayQAnswer(
      * adopted answer without it (live 23 Oct 21:49, run a19bae24).
      */
     let compareTable: QResultBlock | null = null;
+    /** Who leads on Capital Q's fit, decided here by code (see ledByVerdict). */
+    let compareVerdict: ComparisonVerdict | null = null;
     const compareRead = (async (): Promise<void> => {
       if (latest === undefined) return;
       const fromCards = compareTargets(
@@ -3037,6 +3042,10 @@ export function createModelGatewayQAnswer(
       if (statement === null) return;
       compareIds = targets;
       compareTable = table;
+      compareVerdict =
+        table === null
+          ? null
+          : comparisonVerdict(table, runFits.read(request.runId));
       compareFacts = [
         {
           scope: "NETWORK_VISIBLE_DATA",
@@ -4000,6 +4009,7 @@ export function createModelGatewayQAnswer(
       compareIds,
       dataRoomFacts,
       compareTable,
+      compareVerdict,
       onScreenDocumentCall,
       onScreenPage,
       onScreenDossier,
@@ -4369,6 +4379,7 @@ export function createModelGatewayQAnswer(
         compareIds,
         dataRoomFacts,
         compareTable,
+        compareVerdict,
         onScreenDocumentCall,
         onScreenPage,
         onScreenDossier,
@@ -5773,6 +5784,9 @@ export function createModelGatewayQAnswer(
        * those cards are not the set just shown, by design.
        */
       let rankedPastShown = false;
+      // The comparison's lead, decided by code (prepare's table, or the
+      // model path's own table below when the prepare built none).
+      let answerVerdict: ComparisonVerdict | null = compareVerdict;
       const persistAnswer = async (
         content: string,
         /**
@@ -5815,6 +5829,13 @@ export function createModelGatewayQAnswer(
         // QA F-44: other investors' interest is withheld, never denied.
         if (asksAboutOthersInterest(latest.content)) {
           content = withOthersInterestWithheld(content).slice(
+            0,
+            ANSWER_LIMIT_CHARS,
+          );
+        }
+        // Coordinator 24 Oct: code decides who a comparison leads with.
+        if (answerVerdict !== null) {
+          content = ledByVerdict(content, answerVerdict).slice(
             0,
             ANSWER_LIMIT_CHARS,
           );
@@ -8666,6 +8687,9 @@ export function createModelGatewayQAnswer(
               ...(compareIds.length >= 2 ? { only: compareIds } : {}),
               ...(request.compare === undefined ? {} : { compareAsked: true }),
             });
+        if (answerVerdict === null && comparedTable !== null) {
+          answerVerdict = comparisonVerdict(comparedTable, fitsRead);
+        }
         const codeBlocks = [
           ...(builtCards === null ? [] : [builtCards]),
           ...(comparedTable === null ? [] : [comparedTable]),
