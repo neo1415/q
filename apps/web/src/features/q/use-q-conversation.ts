@@ -656,19 +656,24 @@ export function useQConversation(
 
   // The change still waiting in this conversation, found again whenever
   // the thread settles: its card stays until it is decided (QA 2026-10-01).
+  // F-106: the run that just finished counts too. "That's ready: … It's
+  // waiting for your yes" shows a card an earlier run made; that run never
+  // pauses here, so its card is found only through this lookup.
   const live = runState.approval !== null;
+  const finishedMessages = runState.messages;
   useEffect(() => {
     if (streaming || live || conversationIdState === null) return;
     let current = true;
     const id = conversationIdState;
+    const thread = [...history, ...finishedMessages];
     void pendingQApprovalsAction().then((result) => {
       if (!current || !result.ok) return;
-      setCarried(carriedApproval(id, history, result.value));
+      setCarried(carriedApproval(id, thread, result.value));
     });
     return () => {
       current = false;
     };
-  }, [streaming, live, conversationIdState, history]);
+  }, [streaming, live, conversationIdState, history, finishedMessages]);
 
   // A decision on the open run's proposal. The run resumes on the server
   // after a yes and its remaining events are followed again from the
