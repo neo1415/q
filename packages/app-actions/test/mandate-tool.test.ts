@@ -179,12 +179,65 @@ describe("the mandate change card shows each field before and after (F-29)", () 
     expect(card.preview).not.toContain("...");
   });
 
-  it("a value that is already so says no change; without a readable mandate, the new values alone", async () => {
-    expect((await cardFor({ maxStageCode: "series_a" })).preview).toBe(
-      "Latest stage: Series A (no change)",
+  it("a value that is already so says no change beside one that changes; without a readable mandate, the new values alone", async () => {
+    // F-93: a change of nothing at all is refused (below), never a card.
+    expect(
+      (await cardFor({ minStageCode: "pre_seed", maxStageCode: "series_a" }))
+        .preview,
+    ).toBe(
+      "Earliest stage: Seed → Pre-seed\nLatest stage: Series A (no change)",
     );
     expect((await cardFor({ minStageCode: "pre_seed" }, ports)).preview).toBe(
       "Earliest stage: Pre-seed",
     );
+  });
+});
+
+// QA F-93 (24 Oct 2026): "Change my mandate to also include Ghana." became
+// a card of the mandate's own unchanged words, "(no change)". A change
+// that changes nothing is refused, naming the tool that owns geographies.
+describe("change_my_mandate never prepares a change that changes nothing", () => {
+  const WORDS =
+    "A USD 40m fictional seed fund leading rounds for African fintech.";
+  const reading = {
+    ...ports,
+    investors: {
+      ...(ports as unknown as { investors: object }).investors,
+      getInvestorMandate: () =>
+        Promise.resolve({
+          id: MANDATE,
+          name: "Fund I",
+          discoveryMode: null,
+          minCheque: "100000",
+          maxCheque: "500000",
+          currencyCode: "USD",
+          minStageCode: "seed",
+          maxStageCode: "seed",
+          rawMandateText: WORDS,
+          constraints: [],
+          version: 23,
+        }),
+    },
+  } as unknown as AppActionPorts;
+
+  it("refuses the same words, pointing to propose_profile_answer_change", async () => {
+    const tool = family?.tool;
+    if (tool === undefined) throw new Error("no tool");
+    const said = tool.input.safeParse({ rawMandateText: WORDS });
+    if (!said.success) throw new Error("not parsed");
+    const canonical = await tool.toCanonical(said.data, context, reading);
+    expect(canonical).toHaveProperty("refused");
+    expect(JSON.stringify(canonical)).toContain(
+      "propose_profile_answer_change",
+    );
+  });
+
+  it("still prepares a real change", async () => {
+    const tool = family?.tool;
+    if (tool === undefined) throw new Error("no tool");
+    const said = tool.input.safeParse({ maxStageCode: "series_a" });
+    if (!said.success) throw new Error("not parsed");
+    const canonical = await tool.toCanonical(said.data, context, reading);
+    expect(canonical).toMatchObject({ operation: "UPDATE" });
   });
 });
