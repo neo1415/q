@@ -32,6 +32,7 @@ import { PipelineExport, PipelineSearch, StateChips } from "./pipeline-toolbar";
 import type { RelationshipDigest } from "./relationship-data";
 import { peekClick, RelationshipPeek } from "./relationship-peek";
 import { relationshipHref, STATE_WORDS } from "./relationship-words";
+import { StageStrip } from "./stage-strip";
 import { moreRelationshipDigestsAction } from "./relationships-actions";
 import {
   isOwnStep,
@@ -225,6 +226,14 @@ export function RelationshipsBoard({
     return out;
   }, [rows]);
 
+  // The stage strip reads the same rows as the chips, so the two agree.
+  const stageCounts = useMemo(() => {
+    const out: Partial<Record<RelationshipSummaryDto["state"], number>> = {};
+    for (const row of rows)
+      out[row.item.state] = (out[row.item.state] ?? 0) + 1;
+    return out;
+  }, [rows]);
+
   const needle = query.trim().toLowerCase();
   const filtered = rows.filter(
     (row) =>
@@ -329,6 +338,12 @@ export function RelationshipsBoard({
       </div>
 
       <div ref={filterRef}>
+        <div className="mb-3">
+          <StageStrip
+            counts={stageCounts}
+            needsYou={counts.get("NEEDS_YOU") ?? 0}
+          />
+        </div>
         <StateChips
           label={t("Show")}
           chips={chips.map((key) => ({

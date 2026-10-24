@@ -92,6 +92,10 @@ describe("RelationshipsIndex", () => {
         unread={new Map([[connected.relationshipId, 2]])}
       />,
     );
+    // The list layout carries the same stage strip as Table and Board.
+    expect(document.querySelector("[data-stage-strip]")?.textContent).toBe(
+      "1 awaiting reply · 1 connected · 1 waiting on you",
+    );
     expect(
       screen
         .getByRole("button", { name: "Needs you 1" })
