@@ -8396,6 +8396,11 @@ export function createModelGatewayQAnswer(
         // the could-not line, and the status of earlier changes never
         // stands in for it (lead 2026-10-03, run 9b4ef8d1: "…active and
         // shareable." plus "Nothing is waiting for your approval…").
+        // QA 2026-10-24: the confirmation of a remember ask is said by
+        // code, the same way every time ("You pass on tobacco
+        // businesses." was the model's whole reply on one run, "I'll
+        // remember that…" on the one before).
+        const rememberLine = rememberConfirmation(latest.content);
         const couldNot =
           parityGap !== null &&
           actedLines.length === 0 &&
@@ -8418,12 +8423,9 @@ export function createModelGatewayQAnswer(
           // QA 2026-10-24: "Remember: I pass on gambling businesses." was
           // answered "I'll remember that…" and then "I didn't prepare
           // that…": what they tell Q to remember is kept from their words
-          // (the memory write gate), with no tool to call, so a reply
-          // that says it will remember is the whole answer.
-          !rememberedAsAsked(
-            latest.content,
-            statusTalk?.text ?? guarded.text,
-          ) &&
+          // (the memory write gate), with no tool to call: code says it
+          // will remember (below), and that is the whole answer.
+          rememberLine === null &&
           // No action named and the turn answered with what was asked for
           // (QA F-71: "Show my pipeline" answered with findings and cards,
           // then "I didn't get that done…"): an answer, not a miss.
@@ -8444,6 +8446,7 @@ export function createModelGatewayQAnswer(
             ? [...(approvalLine === null ? [] : [approvalLine]), gapsSaid.line]
             : [
                 ...(approvalLine === null ? [] : [approvalLine]),
+                ...(rememberLine === null ? [] : [rememberLine.line]),
                 // Code's opening lines for this answer, before the model's.
                 ...(leadLines === undefined ? [] : [leadLines]),
                 // Nothing was done: a model line that says it was is
@@ -8454,12 +8457,15 @@ export function createModelGatewayQAnswer(
                 claimsDone(statusTalk?.text ?? guarded.text)
                   ? []
                   : [
-                      leadLines === undefined
-                        ? (statusTalk?.text ?? guarded.text)
-                        : afterLeadLines(
-                            statusTalk?.text ?? guarded.text,
-                            leadLines,
-                          ),
+                      withoutRememberTalk(
+                        leadLines === undefined
+                          ? (statusTalk?.text ?? guarded.text)
+                          : afterLeadLines(
+                              statusTalk?.text ?? guarded.text,
+                              leadLines,
+                            ),
+                        rememberLine,
+                      ),
                     ]),
                 ...(couldNot === null ? [] : [couldNot]),
                 ...actedLines,
@@ -8480,6 +8486,8 @@ export function createModelGatewayQAnswer(
                   : [quietlyNoted(recordedStatements)]),
               ]
         )
+          // A part emptied by the guards above leaves no blank gap.
+          .filter((part) => part.trim().length > 0)
           .join("\n\n")
           .slice(0, ANSWER_LIMIT_CHARS)
           .trim();
@@ -9009,15 +9017,104 @@ function repliedInOtherScript(text: string): boolean {
 /**
  * They asked Q to remember something about themselves or how they work
  * ("Remember: I pass on gambling", "please remember that I…"), not to do
- * something later ("remember to send…", which is a task), and the reply
- * says it will.
+ * something later ("remember to send…", which is a task).
  */
 const REMEMBER_ASKED =
-  /^\s*(?:(?:hey|ok|okay)\s+)?(?:q[,:\s]+)?(?:please\s+)?(?:remember|note|keep\s+in\s+mind|don['’]t\s+forget)\b(?!\s+to\b)/iu;
+  /^\s*(?:(?:hey|ok|okay)\s+)?(?:q[,:\s]+)?(?:please\s+)?(?:remember|keep\s+in\s+mind|don['’]t\s+forget)\b(?!\s+to\b)[\s:,-]*(?:that\b\s*)?/iu;
+/** A sentence of the reply that says it will remember. */
 const REMEMBER_SAID =
   /\b(?:i['’]ll|i\s+will|i['’]ve|i\s+have)\s+(?:remember|noted|note|keep\s+(?:that|it)\s+in\s+mind)/iu;
-export function rememberedAsAsked(said: string, reply: string): boolean {
-  return REMEMBER_ASKED.test(said) && REMEMBER_SAID.test(reply);
+/** A sentence that only acknowledges ("Noted.", "Got it."). */
+const ACK_ONLY =
+  /^(?:noted|got it|understood|will do|of course|sure|okay|ok|done)$/u;
+/** Their words, said back to them: "I pass on" is "you pass on". */
+const SAID_BACK: readonly (readonly [RegExp, string])[] = [
+  [/\bI['’]m\b/gu, "you're"],
+  [/\bI\s+am\b/gu, "you are"],
+  [/\bI['’]ve\b/gu, "you've"],
+  [/\bI['’]d\b/gu, "you'd"],
+  [/\bI['’]ll\b/gu, "you'll"],
+  [/\bwe['’]re\b/giu, "you're"],
+  [/\bI\b/gu, "you"],
+  [/\bmyself\b/giu, "yourself"],
+  [/\bmine\b/giu, "yours"],
+  [/\bmy\b/giu, "your"],
+  [/\bme\b/giu, "you"],
+  [/\bours\b/giu, "yours"],
+  [/\bour\b/giu, "your"],
+  [/\bwe\b/giu, "you"],
+  [/\bus\b/giu, "you"],
+];
+
+/**
+ * The confirmation of a remember ask, from their own words: "I'll remember
+ * that you pass on tobacco businesses." Words that would not read back
+ * plainly (already "you", several sentences, too long) are confirmed
+ * without being repeated. Null when they did not ask Q to remember
+ * something, or asked a question.
+ */
+export function rememberConfirmation(
+  said: string,
+): { readonly line: string; readonly fact: string | null } | null {
+  const asked = REMEMBER_ASKED.exec(said);
+  // A question is answered, not remembered.
+  if (asked === null || said.includes("?")) return null;
+  const words = said
+    .slice(asked[0].length)
+    .trim()
+    .replace(/[.!\s]+$/u, "");
+  // "Remember what I said about Kestrel" asks Q to recall, not to keep.
+  if (
+    /^(?:what|when|where|who|whom|which|how|why|whether|if)\b/iu.test(words)
+  ) {
+    return null;
+  }
+  const plain =
+    words.length > 0 &&
+    words.length <= 200 &&
+    !/[;\n]|[.!]\s/u.test(words) &&
+    !/\b(?:you|your|yours|yourself)\b/iu.test(words);
+  if (!plain) return { line: "I'll remember that.", fact: null };
+  let fact = words;
+  for (const [pattern, swap] of SAID_BACK) fact = fact.replace(pattern, swap);
+  return { line: `I'll remember that ${fact}.`, fact };
+}
+
+/**
+ * The model's reply after code's confirmation: its own "I'll remember…"
+ * and a sentence that only says the fact back are not said twice.
+ */
+export function withoutRememberTalk(
+  text: string,
+  remember: { readonly fact: string | null } | null,
+): string {
+  if (remember === null) return text;
+  const bare = (sentence: string): string =>
+    sentence
+      .toLowerCase()
+      .replace(/’/gu, "'")
+      .replace(/[^\p{L}\p{N}' ]+/gu, " ")
+      .replace(/\s+/gu, " ")
+      .trim();
+  const fact = remember.fact === null ? null : bare(remember.fact);
+  const kept = (sentence: string): boolean =>
+    !REMEMBER_SAID.test(sentence) &&
+    !ACK_ONLY.test(bare(sentence)) &&
+    (fact === null || bare(sentence) !== fact);
+  // Line by line, so the reply's paragraphs and lists keep their shape.
+  return text
+    .split("\n")
+    .map((line) =>
+      line.trim().length === 0
+        ? line
+        : line
+            .split(/(?<=[.!?])[ \t]+/u)
+            .filter(kept)
+            .join(" "),
+    )
+    .join("\n")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
 }
 
 export function couldNotDoLine(gap: string): string {
