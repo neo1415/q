@@ -107,7 +107,7 @@ const ASKS = [
 
 describe("investor discovery on the prepared Qatar five", () => {
   it.each(ASKS)(
-    "answers %o with three investors, cards and Rehearse, no web",
+    "answers %o with three investors and cards, the public search alongside (owner: web runs in parallel)",
     async (ask) => {
       const { tools, context, webCalls } = await world();
       const answer = await runInvestorDiscovery({
@@ -118,7 +118,9 @@ describe("investor discovery on the prepared Qatar five", () => {
       });
       expect(answer).not.toBeNull();
       expect(answer?.shown).toBe(3);
-      expect(webCalls()).toBe(0);
+      // Owner direction: the public search always runs beside Capital Q's
+      // own network (#448), even when the network fills the count.
+      expect(webCalls()).toBeGreaterThan(0);
       const text = answer?.text ?? "";
       expect(text).toMatch(/^Here are three .*investors who could fit this: /u);
       for (const name of ["QInvest", "AlRayan", "Muhannad Taslaq"]) {
