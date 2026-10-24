@@ -3443,12 +3443,17 @@ export function createModelGatewayQAnswer(
      * Ledgerfold") cost the model two tool rounds (company.search, then
      * company.get, ~1.5-2.5 s each) before its first sentence. It is read
      * here instead, through the same two tools and plan: only an exact,
-     * single visible match, after their own records (never twice), and
-     * only when no record is on screen, so "this company" stays the one
-     * they are looking at.
+     * single visible match, after their own records (never twice), on any
+     * page; the record on screen is not read again here.
      */
     const visibleNamedRead = async (own: Promise<void>): Promise<void> => {
-      if (counterparty !== undefined) return;
+      // QO-36 (live 23 Oct, run 98561658): "Compare Ledgerline and Duplo"
+      // asked with a record on screen read neither by name, so whether
+      // Duplo's profile was in the answer depended on the page they were
+      // on. Companies the turn names are read on any page; the one on
+      // screen is never read twice here, and stays "this company".
+      const onScreenId =
+        counterparty?.kind === "COMPANY" ? counterparty.companyId : null;
       // "Capital Q" is never a name candidate (it is the platform's name);
       // an investor asking about it means the company, read as any other.
       const capitalQAsked = capitalQAsCompanyAsked({
@@ -3469,7 +3474,7 @@ export function createModelGatewayQAnswer(
         names.map((name, index) =>
           readNamedVisibleCompany({
             name,
-            exclude: new Set(),
+            exclude: new Set(onScreenId === null ? [] : [onScreenId]),
             tools,
             context: toolContext,
             available: prefetchTools,
