@@ -835,6 +835,7 @@ function eligibility(w: World): EligibilityService {
             classifications: c.nodes.map((n) => ({
               nodeId: n.nodeId,
               vocabularyCode: n.vocabularyCode,
+              canonicalCode: "fixture_node",
               source: "user_selected",
             })),
             permittedToView: c.permitted,
@@ -851,7 +852,7 @@ function eligibility(w: World): EligibilityService {
           mode: "INVESTOR_DISCOVER",
           mandateId: active?.mandateId ?? null,
           taxonomyVersion: null,
-          eligibilityPolicyVersion: "eligibility.v4",
+          eligibilityPolicyVersion: "eligibility.v5",
         },
         results,
       });

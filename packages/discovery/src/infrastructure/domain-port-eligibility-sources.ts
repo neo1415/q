@@ -201,6 +201,7 @@ export function createDomainEligibilityPorts(
           list.push({
             nodeId: r.nodeId,
             vocabularyCode: r.vocabularyCode,
+            canonicalCode: r.canonicalCode,
             source: r.assignmentSource,
           });
           grouped.set(r.subjectId, list);
