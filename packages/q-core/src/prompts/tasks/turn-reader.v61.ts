@@ -38,7 +38,7 @@ export const TURN_READER_V61: PromptDefinition<
 > = {
   ...TURN_READER_V60,
   version: 61,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "2026-10-23: v60 plus two readings by meaning in any language -- work-board lane: boardAsk SAVE | BREAKDOWN | WORK | null for their own work board (BREAKDOWN over SAVE; only asking what is on it is null); QO-08: a note expressing interest to founders they are not connected with is Express Interest with that note, prepared for approval, never a question back.",
   effectiveFrom: "2026-10-23",

@@ -4,7 +4,7 @@ import {
   createDefaultPromptRegistry,
   DEFAULT_COMMUNICATION_PROFILE,
   renderPrompt,
-  TurnReaderV61ResultSchema,
+  TurnReaderV62ResultSchema,
   type PromptRegistry,
   type QuestionKindV58,
   type TurnReaderV14Result,
@@ -15,6 +15,7 @@ import {
   type TurnReaderV55Variables,
   type TurnReaderV58Result,
   type TurnReaderV61Result,
+  type TurnReaderV62Result,
 } from "@capital-q/q-core";
 
 import { isModelGatewayError } from "../errors.js";
@@ -285,6 +286,8 @@ export const TURN_READER_LENIENT_FIELDS: readonly string[] = [
   "meetingPrep",
   // v61: a malformed board ask costs the ask, never the reading.
   "boardAsk",
+  // v62: a malformed hand-back costs the hand-back, never the reading.
+  "workFromEarlier",
 ];
 
 /** One control of the page on screen, as the reader is told of it (v55). */
@@ -389,8 +392,8 @@ export function createQTurnReader(dependencies: {
         });
         const ask = (
           messages: typeof rendered.messages,
-        ): ReturnType<typeof gateway.execute<TurnReaderV61Result>> =>
-          gateway.execute<TurnReaderV61Result>(
+        ): ReturnType<typeof gateway.execute<TurnReaderV62Result>> =>
+          gateway.execute<TurnReaderV62Result>(
             {
               taskClass: "FAST_CLASSIFICATION",
               // A closed classification needs little thought; left unset, a
@@ -406,7 +409,7 @@ export function createQTurnReader(dependencies: {
               attribution: input.attribution,
             },
             {
-              schema: TurnReaderV61ResultSchema,
+              schema: TurnReaderV62ResultSchema,
               // Live 2026-10-13: a reading that wrote a tool's own fields at
               // the root was refused and re-asked (~3.3 s of a ~6 s wait
               // before the answer started). Those keys mean nothing at the
@@ -448,7 +451,7 @@ export function createQTurnReader(dependencies: {
           ]);
         }
         if (response.output.kind !== "STRUCTURED") return null;
-        const parsed = TurnReaderV61ResultSchema.safeParse(
+        const parsed = TurnReaderV62ResultSchema.safeParse(
           (response.output as { readonly value: unknown }).value,
         );
         return parsed.success ? parsed.data : null;

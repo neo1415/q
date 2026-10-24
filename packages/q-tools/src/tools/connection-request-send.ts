@@ -9,7 +9,11 @@ import {
   type AnyQToolDefinition,
 } from "../definition.js";
 import type { QToolPorts, RelationshipIntelligencePort } from "../ports.js";
-import { matchCounterpart, nameableRecords } from "./client-actions.js";
+import {
+  matchCounterpart,
+  sameNamedBest,
+  nameableRecords,
+} from "./client-actions.js";
 
 /**
  * A founder's Connection Request to an investor, by Q (action parity
@@ -100,8 +104,26 @@ export function createProposeConnectionRequestTool(
           ? (seen.find((record) => record.id === input.investorOrganisationId)
               ?.id ?? null)
           : matchCounterpart(input.investor ?? "", seen);
-      const record =
+      let record =
         id === null ? undefined : seen.find((entry) => entry.id === id);
+      // QA QO-33 (live 2026-10-23): several investor organisations share
+      // the one name; the first, in the order they can see them, that this
+      // founder may send a request to is the one meant -- never a refusal
+      // because a duplicate exists.
+      if (record === undefined && input.investor !== undefined) {
+        for (const twin of sameNamedBest(input.investor, seen)) {
+          if (await mayRequest(actor, twin.id).catch(() => false)) {
+            record = twin;
+            break;
+          }
+        }
+        if (record !== undefined) {
+          return allow("NETWORK_VISIBLE", {
+            investorOrganisationId: record.id,
+            investorName: record.name,
+          });
+        }
+      }
       if (record === undefined) return deny("NOT_AVAILABLE");
       if (!(await mayRequest(actor, record.id).catch(() => false))) {
         return deny("NOT_AVAILABLE");

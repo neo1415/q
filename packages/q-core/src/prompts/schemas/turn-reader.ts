@@ -882,3 +882,16 @@ export const TurnReaderV61ResultSchema = TurnReaderV58ResultSchema.extend({
   boardAsk: z.enum(TURN_BOARD_ASKS).nullable().default(null).catch(null),
 }).strict();
 export type TurnReaderV61Result = z.infer<typeof TurnReaderV61ResultSchema>;
+
+export const TURN_READER_V62_SCHEMA_VERSION = 62;
+
+/**
+ * v62 (analyst lane, QO-07, 2026-10-23): whether this turn hands over work
+ * asked for or offered in the last few turns without restating it ("yes",
+ * "go ahead", "do that"); then teamJob is whatever that earlier work is.
+ * Lenient: a malformed value reads as false and never costs the reading.
+ */
+export const TurnReaderV62ResultSchema = TurnReaderV61ResultSchema.extend({
+  workFromEarlier: z.boolean().default(false).catch(false),
+}).strict();
+export type TurnReaderV62Result = z.infer<typeof TurnReaderV62ResultSchema>;
