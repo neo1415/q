@@ -22,14 +22,52 @@ const clip = (parts: readonly string[]): string | null => {
     : joined;
 };
 
-export function createOwnDiligence(dependencies: {
+type OwnDiligenceDependencies = {
   readonly interests: Pick<
     InterestService,
     "listRelationshipsForInvestor" | "listRelationshipsForCompany"
   >;
   readonly diligence: Pick<DiligenceService, "view">;
   readonly ownCompanyId: (actor: ActorContext) => Promise<string | null>;
-}): (actor: ActorContext) => Promise<readonly OwnReadItem[]> {
+};
+
+/**
+ * QO-15 (QA 2026-10-23): an investor asking for their data room requests
+ * is told what they asked each company for and where it stands, from the
+ * same diligence read: "You've asked three companies for documents: Kora
+ * (2 open, 1 answered), …". Null when nothing can be read.
+ */
+export function createDiligenceSummary(
+  dependencies: OwnDiligenceDependencies,
+): (actor: ActorContext) => Promise<string | null> {
+  const areas = createOwnDiligence(dependencies);
+  return async (actor) => {
+    const read = await areas(actor).catch(() => null);
+    if (read === null) return null;
+    if (read.length === 0) {
+      return "You haven't asked any company for documents yet.";
+    }
+    const parts = read.map((item) => {
+      const name = item.title.replace(/^Diligence with /u, "");
+      const open = Number(item.facts["openCount"] ?? 0);
+      const answered = Number(item.facts["answeredCount"] ?? 0);
+      const state = [
+        open > 0 ? `${String(open)} open` : null,
+        answered > 0 ? `${String(answered)} answered` : null,
+      ].filter((part): part is string => part !== null);
+      return `${name} (${state.length === 0 ? "nothing asked yet" : state.join(", ")})`;
+    });
+    const listed =
+      parts.length === 1
+        ? (parts[0] ?? "")
+        : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1) ?? ""}`;
+    return `You've asked ${read.length === 1 ? "one company" : `${String(read.length)} companies`} for documents: ${listed}.`;
+  };
+}
+
+export function createOwnDiligence(
+  dependencies: OwnDiligenceDependencies,
+): (actor: ActorContext) => Promise<readonly OwnReadItem[]> {
   return async (actor) => {
     const companyId = await dependencies.ownCompanyId(actor).catch(() => null);
     const listings =
@@ -60,6 +98,9 @@ export function createOwnDiligence(dependencies: {
           status: view.open ? `${String(open.length)} requests open` : "closed",
           at: listing.projection.stateSince,
           facts: {
+            openCount: open.length,
+            answeredCount: view.requests.filter((r) => r.status === "FULFILLED")
+              .length,
             openRequests: clip(open.map((r) => r.title)),
             answeredRequests: clip(
               view.requests

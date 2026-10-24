@@ -151,6 +151,10 @@ function seam(options: {
   readonly appActions?: QAppActionPort;
   /** Their relationships' counterpart names (lead 2026-10-03). */
   readonly counterpartNames?: readonly string[];
+  /** An investor's own data room requests, with their state (QO-15). */
+  readonly diligenceSummary?: (
+    request: QAnswerRequest,
+  ) => Promise<string | null>;
   /** One line of what a destination holds (coordinator 2026-10-23). */
   readonly destinationSummary?: (
     request: QAnswerRequest,
@@ -387,6 +391,9 @@ function seam(options: {
     ...(options.destinationSummary === undefined
       ? {}
       : { destinationSummary: options.destinationSummary }),
+    ...(options.diligenceSummary === undefined
+      ? {}
+      : { diligenceSummary: options.diligenceSummary }),
     ...(options.counterpartNames === undefined
       ? {}
       : {
@@ -673,6 +680,83 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
       {
         kind: "UI_INTENT",
         intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+      },
+    ]);
+  });
+
+  it("an investor's data room requests open the CRM, said where they are and what they asked (QO-15)", async () => {
+    const ORG = "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3";
+    const subject = {
+      kind: "INVESTOR_ORGANISATION" as const,
+      investorOrganisationId: ORG,
+    };
+    const base = request();
+    const investor: QAnswerRequest = {
+      ...base,
+      plan: PermittedContextPlanSchema.parse({
+        ...base.plan,
+        scopes: [
+          {
+            kind: "INVESTOR_MANDATE",
+            subject,
+            contextLabel: "investor_private",
+            sensitivity: "CONFIDENTIAL",
+            layer: "STRUCTURED_STATE",
+            factCategories: ["INVESTOR_THESIS"],
+            projection: "FULL",
+            rights: {
+              canUseForReasoning: true,
+              canDiscloseExistence: true,
+              canQuote: true,
+              canProvideLink: false,
+            },
+            filter: { tenantId: TENANT, investorOrganisationId: ORG },
+            isEvidence: true,
+          },
+        ],
+      }),
+    };
+    const run = seam({
+      said: "Take me to my data room requests",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "OWN_DATA_ROOM",
+        visibility: null,
+      }),
+      outcomes: [],
+      diligenceSummary: () =>
+        Promise.resolve(
+          "You've asked two companies for documents: Kora (2 open) and Ledgerfold (1 answered).",
+        ),
+    });
+    expect((await run.answer.answer(investor)).kind).toBe("ANSWERED");
+    const said = run.stored[0]?.content ?? "";
+    expect(said).toMatch(
+      /^You've asked two companies for documents: Kora \(2 open\) and Ledgerfold \(1 answered\)\. Your data room requests are on each company's Diligence tab in the CRM/u,
+    );
+    expect(said).not.toMatch(/your data room\./iu);
+    expect(run.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "RELATIONSHIPS" },
+      },
+    ]);
+
+    // A founder's own data room is still theirs.
+    const founder = seam({
+      said: "Take me to my data room",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "OWN_DATA_ROOM",
+        visibility: null,
+      }),
+      outcomes: [],
+    });
+    expect((await founder.answer.answer(request())).kind).toBe("ANSWERED");
+    expect(founder.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "OWN_DATA_ROOM" },
       },
     ]);
   });
