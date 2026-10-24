@@ -117,6 +117,22 @@ describe("explanation factors (CQ-REC-007)", () => {
     expect(buckets.mismatchedFactors[0]?.reasonCode).toBe("TAXONOMY_MISMATCH");
   });
 
+  it("QO-11: a business-model or customer-type match is said as that, never as a sector", () => {
+    const buckets = toExplanationFactors([
+      factor("declared_fit.taxonomy", "BUSINESS_MODEL_ALIGNED"),
+    ]);
+    expect(buckets.matchedFactors[0]?.label).toBe(
+      "Business model matches one your mandate names",
+    );
+    expect(deterministicSummary(buckets)).toMatch(/^Business model matches/u);
+    expect(JSON.stringify(buckets)).not.toMatch(/[Ss]ector/u);
+    expect(
+      toExplanationFactors([
+        factor("declared_fit.taxonomy", "CUSTOMER_TYPE_ALIGNED"),
+      ]).matchedFactors[0]?.label,
+    ).toBe("Customer type matches one your mandate names");
+  });
+
   it("missing evidence is an uncertainty, never a mismatch, and says which kind of absence", () => {
     const unknownCompany = toExplanationFactors([
       factor("declared_fit.stage", "FACTOR_MISSING", {

@@ -244,7 +244,7 @@ describe("DISCOVER_COMPANIES fast path (K1)", () => {
     expect(answer.basis).toBe("FIT");
     expect(names(answer.block)).toEqual(["Clearwater", "Kora", "Paystream"]);
     expect(answer.text).toBe(
-      "Ranked by fit with your mandate, the strongest fintech companies: Clearwater at 10, Kora at 8.8 and Paystream at 7.6. They're on screen.",
+      "Five fintech companies on Capital Q; ranked by fit with your mandate, the top three: Clearwater at 10, Kora at 8.8 and Paystream at 7.6. They're on screen.",
     );
     expect(answer.text).not.toMatch(/listed by name/u);
     expect(fitCalls(asked)).toBeGreaterThan(0);
@@ -311,7 +311,7 @@ describe("DISCOVER_COMPANIES fast path (K1)", () => {
     expect(answer.basis).toBe("FIT");
     expect(names(answer.block)).toEqual(["Clearwater", "Kora", "Paystream"]);
     expect(answer.text).toMatch(
-      /^Ranked by fit with your mandate, the strongest fintech companies: Clearwater at [\d.]+, Kora at [\d.]+ and Paystream at [\d.]+\. They're on screen\.$/u,
+      /^Five fintech companies on Capital Q; ranked by fit with your mandate, the top three: Clearwater at [\d.]+, Kora at [\d.]+ and Paystream at [\d.]+\. They're on screen\.$/u,
     );
     expect(fitCalls(asked)).toBe(5);
   });
@@ -366,7 +366,7 @@ describe("DISCOVER_COMPANIES fast path (K1)", () => {
     expect(asked[0]?.args["countries"]).toEqual(["NG"]);
     expect(names(answer.block)).toEqual(["Kora", "Paystream", "Ajopot"]);
     expect(answer.text).toMatch(
-      /^Ranked by fit with your mandate, the strongest fintech companies in Nigeria:/u,
+      /^Three fintech companies in Nigeria on Capital Q, ranked by fit with your mandate:/u,
     );
   });
 
@@ -532,6 +532,18 @@ describe("raising now (F-10): only the companies stating a current raise, labell
       /haven't shared a raise with you, so whether they're raising is unknown\./u,
     );
     expect(answer.text).not.toMatch(/not raising|aren't raising/u);
+  });
+
+  it("each card keeps what the company declares: sector, stage and country (QO-03)", async () => {
+    const { answer } = await discover(raisingAsk, {
+      rows,
+      ranks: true,
+      raises: true,
+    });
+    expect(answer.block?.cards.map((card) => card.line)).toEqual([
+      "Fintech · seed · Nigeria",
+      "Fintech · seed · Nigeria",
+    ]);
   });
 
   it("none stating one: no cards, and unknown is never 'not raising'", async () => {

@@ -175,18 +175,23 @@ export function kindWords(ask: DiscoverAsk, catalog: Catalog | null): string {
   return `${stage}${sector}companies${place}`;
 }
 
-function catalogCard(
-  company: CatalogCompany,
-): Omit<QAnswerCard, "key" | "hue"> {
+/** "Fintech · seed · Nigeria": what the company declares, as the card's line. */
+function catalogLine(company: CatalogCompany): string {
   const where =
     company.headquartersCountry === null
       ? null
       : countryName(company.headquartersCountry);
   const stage =
     company.stageCode === null ? null : company.stageCode.replace(/_/gu, " ");
-  const line = [company.sectors.slice(0, 2).join(", "), stage, where]
+  return [company.sectors.slice(0, 2).join(", "), stage, where]
     .filter((part): part is string => part !== null && part.length > 0)
     .join(" · ");
+}
+
+function catalogCard(
+  company: CatalogCompany,
+): Omit<QAnswerCard, "key" | "hue"> {
+  const line = catalogLine(company);
   return {
     name: company.name.slice(0, 80),
     line: line.length > 0 ? line.slice(0, 140) : null,
@@ -390,8 +395,19 @@ export async function runCompanyDiscovery(input: {
     const order = new Map(
       catalog.companies.map((company, index) => [company.companyId, index]),
     );
+    // QO-03 (QA 2026-10-23): a fit read alone carries no line, so its card
+    // lost the stage and country the catalog declared; the catalog's line
+    // is the card's.
+    const declared = new Map(
+      catalog.companies.map((company) => [company.companyId, company]),
+    );
     fits = outcomes
       .flatMap((outcome) => (outcome === null ? [] : fitsInOutcome(outcome)))
+      .map((fit) => {
+        const company = declared.get(fit.companyId);
+        const line = company === undefined ? "" : catalogLine(company);
+        return fit.line === null && line.length > 0 ? { ...fit, line } : fit;
+      })
       .sort(
         (a, b) =>
           scoreOf(b) - scoreOf(a) ||
@@ -422,22 +438,21 @@ export async function runCompanyDiscovery(input: {
         ? `At least ${String(total)}`
         : capitalised(counted(total));
       const one = listKind.replace(/companies/u, "company");
+      // QO-03: the head always says what was asked for and how many
+      // matched, then which are shown; the number asked for decides only
+      // how many are shown.
+      const scoredNote =
+        ask.count !== null && block.cards.length < count && total >= count
+          ? ` Only ${counted(block.cards.length)} of them could be scored.`
+          : "";
       const head =
-        total < count && ask.count !== null
-          ? total === 1
-            ? `Capital Q has only one ${one}${seen}: ${listed(named)}.`
-            : `Capital Q has only ${counted(total)} ${listKind}${seen}, ranked by fit with your mandate: ${listed(named)}.`
-          : ask.count !== null
-            ? `${
-                block.cards.length < count
-                  ? `Only ${counted(block.cards.length)} of the ${listKind}${seen} could be scored. `
-                  : ""
-              }Ranked by fit with your mandate, the strongest ${listKind}: ${listed(named)}.`
-            : total === 1
-              ? `Capital Q has only one ${one}${seen}: ${listed(named)}.`
-              : block.cards.length === total
-                ? `${matched} ${listKind} on Capital Q, ranked by fit with your mandate: ${listed(named)}.`
-                : `${matched} ${listKind} on Capital Q; ranked by fit with your mandate, the top ${counted(block.cards.length)}: ${listed(named)}.`;
+        total === 1
+          ? `Capital Q has only one ${one}${seen}: ${listed(named)}.`
+          : total < count && ask.count !== null
+            ? `Capital Q has only ${counted(total)} ${listKind}${seen}, ranked by fit with your mandate: ${listed(named)}.`
+            : block.cards.length === total
+              ? `${matched} ${listKind} on Capital Q, ranked by fit with your mandate: ${listed(named)}.`
+              : `${matched} ${listKind} on Capital Q; ranked by fit with your mandate, the top ${counted(block.cards.length)}: ${listed(named)}.${scoredNote}`;
       return {
         text: `${head}${raisingNote(ask, chosen, raised !== null)}${raisingRest} ${block.cards.length === 1 ? "It's" : "They're"} on screen.`,
         block,

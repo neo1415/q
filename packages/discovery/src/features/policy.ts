@@ -323,6 +323,49 @@ function authorised(
   return tags.every((t) => (d.sourceClasses as readonly string[]).includes(t));
 }
 
+/** The vocabularies a person calls a company's sector. */
+export const SECTOR_VOCABULARIES: readonly string[] = [
+  "industry",
+  "product_category",
+];
+
+/**
+ * How the company's declared sector stands against the sectors the
+ * mandate names: EXACT, DESCENDANT, NONE (it declares a sector and none
+ * overlaps) or UNKNOWN (it declares none). Absent when the mandate names
+ * no sector.
+ */
+function sectorOverlapOf(
+  preferred: readonly {
+    readonly preferredNodeId: string;
+    readonly vocabularyCode: string;
+    readonly descendantNodeIds: readonly string[];
+  }[],
+  declared: readonly {
+    readonly nodeId: string;
+    readonly vocabularyCode: string;
+  }[],
+  carried: ReadonlySet<string>,
+): { readonly sectorOverlap?: string } {
+  const sectors = preferred.filter((n) =>
+    SECTOR_VOCABULARIES.includes(n.vocabularyCode),
+  );
+  if (sectors.length === 0) return {};
+  if (sectors.some((n) => carried.has(n.preferredNodeId))) {
+    return { sectorOverlap: "EXACT" };
+  }
+  if (sectors.some((n) => n.descendantNodeIds.some((id) => carried.has(id)))) {
+    return { sectorOverlap: "DESCENDANT" };
+  }
+  return {
+    sectorOverlap: declared.some((c) =>
+      SECTOR_VOCABULARIES.includes(c.vocabularyCode),
+    )
+      ? "NONE"
+      : "UNKNOWN",
+  };
+}
+
 function declaredClassifications(taxonomy: CompanyTaxonomyProjection) {
   return taxonomy.classifications.filter((c) =>
     (DECLARED_TAXONOMY_SOURCES as readonly string[]).includes(c.source),
@@ -535,6 +578,12 @@ function computeOne(
       }
       const declared = declaredClassifications(input.taxonomy);
       const carried = new Set(declared.map((c) => c.nodeId));
+      // QO-11 (QA 2026-10-23): a business model or customer type the
+      // mandate names is not a sector. The category is computed as before
+      // (any named vocabulary, so the ranking is unchanged); how the
+      // company's own sector stands is kept beside it, so an explanation
+      // never says "sector" for a business-model match.
+      const sectorOverlap = sectorOverlapOf(preferred, declared, carried);
       const exact = preferred.find((n) => carried.has(n.preferredNodeId));
       if (exact !== undefined) {
         return {
@@ -542,6 +591,7 @@ function computeOne(
             preferredNodeId: exact.preferredNodeId,
             matchedNodeId: exact.preferredNodeId,
             vocabularyCode: exact.vocabularyCode,
+            ...sectorOverlap,
           }),
           scopeViolation: false,
         };
@@ -558,6 +608,7 @@ function computeOne(
               preferredNodeId: node.preferredNodeId,
               matchedNodeId: hit,
               vocabularyCode: node.vocabularyCode,
+              ...sectorOverlap,
             }),
             scopeViolation: false,
           };

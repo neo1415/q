@@ -339,6 +339,12 @@ const REASON_DETAILS: Readonly<Record<string, string>> = {
   GEOGRAPHY_REGION_ALIGNED: "It is based in a region the mandate names.",
   TAXONOMY_EXACT: "Its sector is one the mandate names.",
   TAXONOMY_RELATED: "Its sector is related to one the mandate names.",
+  BUSINESS_MODEL_ALIGNED:
+    "Its business model is one the mandate names (its sector is not a match).",
+  CUSTOMER_TYPE_ALIGNED:
+    "The customers it serves are a type the mandate names (its sector is not a match).",
+  TAXONOMY_OTHER_ALIGNED:
+    "It is in a category the mandate names, though not its sector.",
   SEMANTIC_SIMILARITY_PRESENT:
     "What it does reads close to what the mandate describes.",
 };

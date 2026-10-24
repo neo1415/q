@@ -30,6 +30,8 @@ export const DISCOVER_AR: Readonly<Record<string, string>> = {
   "In a region you invest in": "في منطقة تستثمر فيها",
   "A category you named": "فئة حددتها",
   "Close to a category you named": "قريبة من فئة حددتها",
+  "A business model you named": "نموذج عمل حددته",
+  "A customer type you named": "نوع عملاء حددته",
   "Said in their pitch": "قالوه في عرضهم",
   "Said in your pitch": "قلته في عرضك",
   "Your raise": "جولتك",

@@ -636,7 +636,7 @@ describe("companies of a kind through the answer path (K1, live 2026-10-09 15:57
     expect(cardsOf(blocks)).toHaveLength(3);
     expect(cardsOf(blocks)[0]?.fit).not.toBeNull();
     expect(text).toMatch(
-      /^Ranked by fit with your mandate, the strongest fintech companies: /u,
+      /^Three fintech companies on Capital Q, ranked by fit with your mandate: /u,
     );
     expect(text).not.toMatch(/listed by name/u);
     expect(executed).not.toContain("research_public_web");
@@ -706,7 +706,8 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
       expect(text).not.toMatch(/listed by name/u);
       expect(cardsOf(blocks).map((card) => card.name)).toEqual(expected);
       expect(executed.some((name) => name.startsWith("fit_"))).toBe(true);
-      expect(executed).not.toContain("discover_companies");
+      // F-60: one ranking truth, the catalog's fit ranking over every match.
+      expect(executed).toContain("discover_companies");
     }
   });
 
@@ -718,7 +719,7 @@ describe("an investor asking what to look into gets the mandate's ranking (owner
       reading: discover(words, 3, ["fintech"]),
     });
     expect(modelCalls).toBe(0);
-    expect(text).toMatch(/Ranked by fit with your mandate/u);
+    expect(text).toMatch(/ranked by fit with your mandate/u);
     expect(text).not.toMatch(/listed by name/u);
   });
 

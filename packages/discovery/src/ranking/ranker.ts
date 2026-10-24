@@ -70,6 +70,37 @@ export type EnrichedCandidate = {
 };
 
 /** The config's mapping of one present feature value into [0, 1]. */
+/**
+ * QO-11 (QA 2026-10-23): what a taxonomy match is said to be. A match only
+ * in a business model or customer type the mandate names is named as
+ * that, never as a sector; how the company's own sector stands decides
+ * the sector reason. The score is the configured map's, unchanged.
+ * Snapshots made before `sectorOverlap` keep the configured code.
+ */
+function taxonomyReason(
+  featureId: string,
+  configured: RankingReasonCode,
+  provenance: Readonly<Record<string, unknown>> | undefined,
+): RankingReasonCode {
+  if (
+    featureId !== "declared_fit.taxonomy" ||
+    (configured !== "TAXONOMY_EXACT" && configured !== "TAXONOMY_RELATED")
+  ) {
+    return configured;
+  }
+  if (provenance === undefined) return configured;
+  const sector = provenance["sectorOverlap"];
+  if (sector === "EXACT") return "TAXONOMY_EXACT";
+  if (sector === "DESCENDANT") return "TAXONOMY_RELATED";
+  if (sector === undefined && !("vocabularyCode" in provenance)) {
+    return configured;
+  }
+  const vocabulary = provenance["vocabularyCode"];
+  if (vocabulary === "business_model") return "BUSINESS_MODEL_ALIGNED";
+  if (vocabulary === "customer_type") return "CUSTOMER_TYPE_ALIGNED";
+  return sector === undefined ? configured : "TAXONOMY_OTHER_ALIGNED";
+}
+
 export function normalizeFactorValue(
   normalization: Normalization,
   value: FeatureValue["value"],
@@ -178,7 +209,11 @@ export function scoreSnapshot(
       outcome: "SCORED",
       normalizedValue: mapped.normalized,
       polarity: mapped.polarity,
-      reasonCode: mapped.reasonCode,
+      reasonCode: taxonomyReason(
+        factor.featureId,
+        mapped.reasonCode,
+        value.provenance,
+      ),
     });
   }
 

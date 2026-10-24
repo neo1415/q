@@ -295,6 +295,11 @@ export function QSessionProvider({
     ambient: true,
   });
   const turns = turnsFrom(q.state, q.pending);
+  // Read when a line opens, never a reason to rebuild `talk`.
+  const hasTurns = useRef(false);
+  useEffect(() => {
+    hasTurns.current = turns.length > 0;
+  }, [turns.length]);
 
   // This tab's pointer, so the navigation's Q link and a fresh load come
   // back to this conversation. Written once an open has settled: one the
@@ -471,8 +476,13 @@ export function QSessionProvider({
     async (options?: { readonly greeting?: string }) => {
       const named = conversationIdOf(q.conversationId);
       const greeting = options?.greeting;
+      // F-41b (QA 2026-10-23): a line opened on a conversation already
+      // under way resumes it. It greeted again ("Hi Amara, you're up
+      // late") on every return to the page, as if the conversation had
+      // started over; the arrival briefing belongs to the first line only.
+      const ongoing = named !== undefined && hasTurns.current;
       await voice.talk({
-        ...(greeting === undefined ? {} : { resume: true }),
+        ...(greeting === undefined && !ongoing ? {} : { resume: true }),
         thread: {
           ...(companyId !== undefined
             ? { subjects: [{ kind: "COMPANY" as const, companyId }] }
@@ -499,7 +509,7 @@ export function QSessionProvider({
         // as a promise (speed lane 2026-10-20): the line is asked for at
         // once and only its first words wait for the briefing, which used
         // to hold the whole connection for up to 2.5 s.
-        firstMessage: greeting ?? callOpening(),
+        firstMessage: greeting ?? (ongoing ? undefined : callOpening()),
       });
     },
     [

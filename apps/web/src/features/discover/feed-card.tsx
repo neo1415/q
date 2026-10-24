@@ -130,6 +130,20 @@ function slateReasons(company: DiscoveredCompanyDto): DiscoveryReasonDto[] {
           detail: "Close to a category you named",
         });
         break;
+      // QO-11 (QA 2026-10-23): a business model or customer type the
+      // mandate names is not a sector, and the card never says it is.
+      case "BUSINESS_MODEL_ALIGNED":
+        reasons.push({
+          kind: "BUSINESS_MODEL_MATCH",
+          detail: "A business model you named",
+        });
+        break;
+      case "CUSTOMER_TYPE_ALIGNED":
+        reasons.push({
+          kind: "CUSTOMER_TYPE_MATCH",
+          detail: "A customer type you named",
+        });
+        break;
       default:
         break;
     }
