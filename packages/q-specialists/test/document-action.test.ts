@@ -318,6 +318,8 @@ function seam(options: {
 const ASK =
   "Generate a PDF pitch deck for Zino Aviation from what you can find publicly.";
 
+const BOARD_JOB = "4b1c2d3e-5f60-4a7b-8c9d-0e1f2a3b4c5d";
+
 describe("a document request is done, not described (CQ-QACT-002)", () => {
   it("researches the named company, composes the deck, files it privately, and replies briefly with it", async () => {
     const s = seam({
@@ -1451,6 +1453,8 @@ describe("board turns after other board turns", () => {
           working: items.filter((one) => itemIds.includes(one.id)),
           firstRead: null,
           waiting: [],
+          jobId: BOARD_JOB,
+          summary: "Research hiring a head of sales and write your plan.",
         });
       },
     };
@@ -1569,6 +1573,14 @@ describe("board turns after other board turns", () => {
     expect(s.stored[0]?.content).toBe(
       "I've started on “Hire a head of sales.”: it's in Doing, and moves to Done when the work finishes.",
     );
+    // Owner 2026-10-24: followed by the same live card as work asked in words.
+    expect(s.stored[0]?.blocks).toEqual([
+      {
+        kind: "WORK_IN_PROGRESS",
+        jobId: BOARD_JOB,
+        title: "Research hiring a head of sales and write your plan",
+      },
+    ]);
   });
 
   it("knows which open items 'work on …' means, from the board", () => {

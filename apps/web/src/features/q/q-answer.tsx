@@ -12,10 +12,7 @@ import { QMarkdown } from "./markdown";
 import { useMoveLine } from "./move-line";
 import { evidenceSummary, QEvidenceBody } from "./q-evidence";
 import { QResultBlocks } from "./q-result-blocks";
-import {
-  AnswerPdf,
-  ANSWER_PDF_MIN_CHARS,
-} from "@/features/documents/answer-pdf";
+import { AnswerPdf, answerPdfOffered } from "@/features/documents/answer-pdf";
 import { useT } from "@/features/i18n/language";
 import { StoryOffer } from "@/features/q-pitch/story/story-offer";
 
@@ -268,10 +265,17 @@ export function QAnswer({
           kinds={inline.map((block) => block.kind)}
         />
       ) : null}
-      {/* DOCS: any substantive answer, as a PDF. */}
+      {/* DOCS: an answer that is a document, as a PDF (answerPdfOffered). */}
       {!turn.streaming &&
       turn.runId !== undefined &&
-      turn.text.length >= ANSWER_PDF_MIN_CHARS ? (
+      answerPdfOffered({
+        text: turn.text,
+        blockKinds: [
+          ...turn.blocks.map((block) => block.kind),
+          // Its document's card is the earlier one, with its own PDF.
+          ...(turn.deliversDocument === true ? ["ARTIFACT_REFERENCE"] : []),
+        ],
+      }) ? (
         <AnswerPdf runId={turn.runId} messageId={turn.id} />
       ) : null}
       {chips.length > 0 ? (

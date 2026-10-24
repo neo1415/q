@@ -82,6 +82,12 @@ export type QTurn =
       readonly preview?: QArtifactPreview | undefined;
       /** PRESENCE: what Q's particles form for which sentence (closed set). */
       readonly gestures?: readonly QSentenceGesture[] | undefined;
+      /**
+       * Owner 2026-10-24: this message delivered a document whose card is
+       * the earlier one that followed the work (followWork), so it carries
+       * no card of its own but is still a document's delivery.
+       */
+      readonly deliversDocument?: true | undefined;
     };
 
 /**
@@ -349,6 +355,7 @@ export function followWork(turns: QTurn[]): void {
     const followed = work.some((block) => following.has(block.jobId));
     turns[index] = {
       ...turn,
+      ...(followed ? { deliversDocument: true as const } : {}),
       blocks: turn.blocks.filter(
         (block) =>
           block.kind !== "WORK_IN_PROGRESS" &&
