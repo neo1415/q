@@ -40,8 +40,6 @@ const FILTER_MAX = 8;
  * F-82: the whole network (463 live), never the first 200 by name.
  */
 export const CATALOG_FIT_SCAN_MAX = 1000;
-/** The most of the slate one unscoped fit ask reads (the answer shows <= 10). */
-const SLATE_TOP_MAX = 10;
 /** The Permissions context's own bound per evaluateMany (DISCLOSURE_BATCH_MAX). */
 const DISCLOSURE_BATCH = 200;
 
@@ -106,12 +104,6 @@ export const DiscoverCompaniesOutputSchema = z
       .max(LIMIT_MAX),
     /** The order the list is in, said to the person as the basis. */
     order: z.enum(["NAME", "FIT"]),
-    /**
-     * SLATE: an unscoped FIT ask answered from the investor's precomputed
-     * Discover ranking (owner 2026-10-24), not ranked here. Absent: the
-     * catalog's own matches.
-     */
-    basis: z.literal("SLATE").optional(),
     /**
      * How many companies matched and may be seen, when counted (FIT reads
      * them all); `totalAtLeast` when the scan's bound was reached.
@@ -234,51 +226,18 @@ export function createDiscoverCompaniesTool(
           truthClass: "USER_CLAIM" as const,
         };
       }
-      // Owner 2026-10-24 (egress incident): an investor's unscoped "best
-      // fit" is the precomputed slate's ranking (doc 19: precomputed
-      // slates plus a read projection), the same ranking Discover shows:
-      // a short page of it, nothing ranked here. The whole-network rank
-      // below is the fallback when they have no servable slate (the
-      // reader asks for a rebuild then).
-      const unscoped =
-        input.sectors.length === 0 &&
-        input.countries.length === 0 &&
-        input.stages.length === 0 &&
-        !input.raising;
-      const slate =
-        input.order === "FIT" && unscoped && ports.investorFeed !== undefined
-          ? await ports.investorFeed
-              .page(context.actor, Math.min(input.limit, SLATE_TOP_MAX))
-              .catch(() => null)
-          : null;
-      const fromSlate = slate !== null && slate.items.length > 0;
-      const byFit =
-        !fromSlate && input.order === "FIT" && ports.fit?.rank !== undefined;
-      const found = fromSlate
-        ? {
-            candidates: slate.items.map((item) => ({
-              companyId: item.companyId,
-              name: item.name,
-              stageCode: item.stageCode,
-              headquartersCountry: item.headquartersCountry,
-              shortDescription: item.shortDescription,
-              // As the catalog does for an unscoped ask: no sector asked.
-              sectors: [],
-            })),
-            sectors: [],
-            unknownSectors: [],
-          }
-        : await catalog.find(context.actor, {
-            sectors: input.sectors,
-            countries: input.countries.map((code) => code.toUpperCase()),
-            stages: input.stages,
-            // FIT reads every match it may score; NAME leaves room for the
-            // candidates disclosure turns away. Both bounded.
-            limit:
-              byFit || input.raising
-                ? CATALOG_FIT_SCAN_MAX
-                : Math.min(input.limit * 3, 60),
-          });
+      const byFit = input.order === "FIT" && ports.fit?.rank !== undefined;
+      const found = await catalog.find(context.actor, {
+        sectors: input.sectors,
+        countries: input.countries.map((code) => code.toUpperCase()),
+        stages: input.stages,
+        // FIT reads every match it may score; NAME leaves room for the
+        // candidates disclosure turns away. Both bounded.
+        limit:
+          byFit || input.raising
+            ? CATALOG_FIT_SCAN_MAX
+            : Math.min(input.limit * 3, 60),
+      });
       // F-82 (live 2026-10-24): disclosure decides at most
       // DISCLOSURE_BATCH more per call and throws past it; a scan of the
       // whole network is decided in batches, in order.
@@ -378,9 +337,7 @@ export function createDiscoverCompaniesTool(
               return one === undefined ? [] : [one];
             })
           : null;
-      // The slate is already best first, by the feed's ranking.
-      const ordered = fromSlate ? eligible : order;
-      const companies = (ordered ?? eligible)
+      const companies = (order ?? eligible)
         .slice(0, input.limit)
         .map((candidate) => ({
           companyId: candidate.companyId,
@@ -392,20 +349,13 @@ export function createDiscoverCompaniesTool(
         }));
       return {
         companies,
-        order: ordered === null ? ("NAME" as const) : ("FIT" as const),
-        ...(fromSlate ? { basis: "SLATE" as const } : {}),
-        ...(fromSlate
-          ? {
-              // How many they may discover, as the feed counts them.
-              total: Math.max(slate.discoverableCount ?? 0, eligible.length),
-              totalAtLeast: false,
-            }
-          : order === null && raisingFilter !== "APPLIED"
-            ? {}
-            : {
-                total: eligible.length,
-                totalAtLeast: found.candidates.length >= CATALOG_FIT_SCAN_MAX,
-              }),
+        order: order === null ? ("NAME" as const) : ("FIT" as const),
+        ...(order === null && raisingFilter !== "APPLIED"
+          ? {}
+          : {
+              total: eligible.length,
+              totalAtLeast: found.candidates.length >= CATALOG_FIT_SCAN_MAX,
+            }),
         ...(raisingFilter === null
           ? {}
           : { raising: { filter: raisingFilter, matched: visible.length } }),

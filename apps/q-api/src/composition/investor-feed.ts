@@ -57,7 +57,6 @@ export function createInvestorFeedPort(dependencies: {
           reasonCodes: [...item.reasonCodes],
         })),
         notes: [...page.notes],
-        discoverableCount: page.discoverableCount,
       };
     },
     decisions: async (actor: ActorContext, limit: number) => {

@@ -182,8 +182,6 @@ export type InvestorFeedPort = {
   ) => Promise<{
     readonly items: readonly InvestorFeedCompany[];
     readonly notes: readonly string[];
-    /** How many companies they may discover, when the feed counted them. */
-    readonly discoverableCount?: number | null | undefined;
   } | null>;
   /** Their own saved and passed companies, newest first, bounded, still visible to them. */
   readonly decisions: (

@@ -102,8 +102,6 @@ function tools(
     raises?: boolean;
     /** The fit service threw inside the catalog (live bbb4b6773). */
     rankFails?: boolean;
-    /** The catalog answered from the investor's slate (egress fix). */
-    slate?: boolean;
   } = {},
 ) {
   const rows = options.rows ?? CATALOG;
@@ -147,13 +145,10 @@ function tools(
                     shortDescription: `${row.name} does useful things.`,
                     sectors: [SECTOR_NAMES[row.sector] ?? row.sector],
                   })),
-            order: byFit || options.slate === true ? "FIT" : "NAME",
-            ...(options.slate === true ? { basis: "SLATE" } : {}),
-            ...(options.slate === true
-              ? { total: 463, totalAtLeast: false }
-              : byFit || filtering
-                ? { total: all.length, totalAtLeast: false }
-                : {}),
+            order: byFit ? "FIT" : "NAME",
+            ...(byFit || filtering
+              ? { total: all.length, totalAtLeast: false }
+              : {}),
             ...(filtering
               ? { raising: { filter: "APPLIED", matched: visible.length } }
               : {}),
@@ -545,30 +540,6 @@ describe("an investor's discovery ranks every match, not the first page by name 
       // Nothing was scored by name to stand in for the ranking.
       expect(fitCalls(port.asked)).toBe(0);
     }
-  });
-
-  it("from the slate: only the N shown are read in full, and it is said to be their Discover ranking", async () => {
-    const port = tools({ rows: many, slate: true });
-    const answer = await runCompanyDiscovery({
-      ask: ask({
-        text: "Show me the five companies that best fit my mandate",
-        count: 5,
-        sectors: [],
-        ranking: "FIT",
-        mandateRelevant: true,
-      }),
-      tools: port.port,
-      context: CONTEXT,
-      available: AVAILABLE,
-      investor: true,
-    });
-    if (answer === null || "rankUnavailable" in answer)
-      throw new Error("expected an answer");
-    // Five fit reads, one per card shown (about five times four queries).
-    expect(fitCalls(port.asked)).toBe(5);
-    expect(answer.text).toMatch(
-      /^Of the 463 companies you can see on Capital Q, these five lead your Discover ranking against your mandate: /u,
-    );
   });
 
   it("'top three' over thirty-seven: the strongest leads though it is last by name", async () => {
