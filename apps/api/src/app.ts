@@ -278,6 +278,9 @@ export type ApiModules = {
           DiscoveryRoutesDependencies["yourCompanies"] | undefined;
         /** The playback rule the row lists by. Absent: the row is empty. */
         readonly mayPlay?: DiscoveryRoutesDependencies["mayPlay"] | undefined;
+        /** QO-42. Absent: no investor carries a published fit. */
+        readonly founderFacts?:
+          DiscoveryRoutesDependencies["founderFacts"] | undefined;
         /** Explore (E1-E5, ADR 0055). Absent: no Explore route registers. */
         readonly explore?: ExploreRoutesDependencies["explore"] | undefined;
         readonly exploreCompanies?:
@@ -586,6 +589,7 @@ export function createApp(
       investorImages: modules.discovery.investorImages,
       yourCompanies: modules.discovery.yourCompanies,
       mayPlay: modules.discovery.mayPlay,
+      founderFacts: modules.discovery.founderFacts,
       namedPhotos: modules.namedPhotos,
       ...(modules.publicIdentity === undefined
         ? {}

@@ -2612,6 +2612,27 @@ const { app, logger } = createApp(config, security, {
     discovery,
     slates: slates.reader,
     interactions,
+    // QO-42: the reader's own company as GateQ qualifies it, beside what
+    // each investor publishes on their card (never their mandate).
+    founderFacts: async (actor) => {
+      if (actor.organisationId === undefined) return null;
+      const company = await companyQuery.findOrganisationCompany?.(
+        actor.tenantId,
+        actor.organisationId,
+      );
+      if (company == null) return null;
+      const projection = await gateqCompanyProjection.projectionFor({
+        tenantId: actor.tenantId,
+        companyId: company.id,
+      });
+      return projection === null
+        ? null
+        : {
+            stageCode: projection.currentStageCode,
+            headquartersCountry: projection.headquartersCountry,
+            classifications: projection.classifications,
+          };
+    },
     // The feed's one batched pitch read per page (CQ-MEDIA-012), through
     // the Media context's port: discovery never touches media tables.
     pitches: discoverablePitches,
