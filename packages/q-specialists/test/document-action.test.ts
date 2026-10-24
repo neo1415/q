@@ -25,6 +25,7 @@ import {
   boardItemsMeant,
   boardItemFromWords,
   mentionsOwnBoard,
+  nameInAsk,
   boardReadOut,
   createSpecialistQAnswer,
   type BoardKeeper,
@@ -1599,5 +1600,65 @@ describe("board turns after other board turns", () => {
       "b",
     ]);
     expect(boardItemsMeant("do something", items)).toEqual([]);
+  });
+});
+
+/** Live 6b05d53a4: a call prep about an investor, referenced but no card. */
+describe("a saved call prep about an investor Q referenced", () => {
+  it("is titled with the investor as they named them", async () => {
+    const added: { kind: string; title: string }[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items: [] }),
+      add: (_actor, request) => {
+        added.push(request);
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    const s = seam({
+      history: [
+        message(
+          "USER",
+          "Help me prepare for a call with Savanna Seed Partners",
+        ),
+        {
+          ...message(
+            "Q",
+            "Lead with your traction.\n\n1. Ask about their pacing.",
+          ),
+          blocks: [
+            {
+              kind: "INVESTOR_REFERENCE",
+              investorOrganisationId: "a1000000-0000-4000-8000-000000000001",
+            },
+          ],
+        },
+        message("USER", "Save that call prep to my board."),
+      ],
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        boardAsk: "SAVE",
+        namedOther: null,
+      },
+      board,
+    });
+    await s.run();
+    expect(added.map((one) => one.title)).toEqual([
+      "Call prep: Savanna Seed Partners",
+    ]);
+  });
+
+  it("reads the name from the ask, and nothing from a lowercase one", () => {
+    expect(
+      nameInAsk("Help me prepare for a call with Savanna Seed Partners"),
+    ).toBe("Savanna Seed Partners");
+    expect(nameInAsk("Write an IC memo for Bank of Kigali and")).toBe(
+      "Bank of Kigali",
+    );
+    expect(nameInAsk("help me prepare for a call with the top one")).toBeNull();
   });
 });

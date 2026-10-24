@@ -1190,6 +1190,20 @@ export function boardItemFromWords(words: string): string | null {
 }
 
 /**
+ * The proper name an ask is about, as they wrote it: "a call with Savanna
+ * Seed Partners" -> "Savanna Seed Partners". Used only beside the one
+ * record Q's answer referenced; null when the ask names none.
+ */
+export function nameInAsk(question: string): string | null {
+  const found =
+    /\b(?:with|for|about|meet(?:ing)?|call)\s+((?:\p{Lu}[\p{L}\d&'.-]*)(?:\s+(?:\p{Lu}[\p{L}\d&'.-]*|of|and|&))*)/u.exec(
+      question,
+    )?.[1];
+  const name = found?.replace(/\s+(?:of|and|&)$/u, "").trim();
+  return name === undefined || name.length < 2 ? null : name;
+}
+
+/**
  * Their own work board, by its words: "my board", "my work board", "my
  * to-dos", "mon tableau", "mi tablero". Offering and a guard only: it
  * names the board tool for a turn the reader left without a board ask
@@ -2417,6 +2431,22 @@ export function createSpecialistQAnswer(
       ),
     ];
     if (named.length === 1) return named[0] ?? null;
+    // Live 6b05d53a4: "Help me prepare for a call with Savanna Seed
+    // Partners" answered with the investor's reference, no card. One
+    // record referenced, and its name as they said it in the ask.
+    const referenced = new Set(
+      (answer?.blocks ?? []).flatMap((block) =>
+        block.kind === "COMPANY_REFERENCE"
+          ? [block.companyId]
+          : block.kind === "INVESTOR_REFERENCE"
+            ? [block.investorOrganisationId]
+            : [],
+      ),
+    );
+    if (referenced.size === 1) {
+      const asked = nameInAsk(question);
+      if (asked !== null) return asked;
+    }
     const own = await dependencies.ownRecords
       ?.read(request)
       .catch(() => NO_OWN_RECORDS);
