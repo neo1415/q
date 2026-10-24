@@ -479,7 +479,7 @@ export function createWorkforceModels(dependencies: {
         costUsd: result.costUsd,
         output: {
           facts: result.output.facts.slice(0, 12).map((fact) => ({
-            statement: fact.statement.slice(0, 400),
+            statement: prose(fact.statement, 400),
             figure: fact.figure === null ? null : fact.figure.slice(0, 80),
             asOf: fact.asOf === null ? null : fact.asOf.slice(0, 40),
             source: fact.source,
@@ -516,17 +516,17 @@ export function createWorkforceModels(dependencies: {
       return {
         costUsd: result.costUsd,
         output: {
-          title: draft.title.slice(0, 150),
-          summary: draft.summary.slice(0, 600),
+          title: prose(draft.title, 150),
+          summary: prose(draft.summary, 600),
           // Long bodies are kept whole: the filed document splits them.
           sections: sections.slice(0, 16).map((section) => ({
-            heading: section.heading.slice(0, 120),
+            heading: prose(section.heading, 120),
             body: section.body,
           })),
           topRecommendations: draft.topRecommendations
             .slice(0, 3)
-            .map((one) => one.slice(0, 300)),
-          gaps: draft.gaps.slice(0, 12).map((gap) => gap.slice(0, 300)),
+            .map((one) => prose(one, 300)),
+          gaps: draft.gaps.slice(0, 12).map((gap) => prose(gap, 300)),
         },
       };
     },
@@ -557,12 +557,12 @@ export function createWorkforceModels(dependencies: {
           issues: verdict.issues.slice(0, 10).map((issue) => ({
             kind: issue.kind,
             section: issue.section.slice(0, 120),
-            problem: issue.problem.slice(0, 400),
-            fix: issue.fix.slice(0, 400),
+            problem: prose(issue.problem, 400),
+            fix: prose(issue.fix, 400),
           })),
           strengths: verdict.strengths
             .slice(0, 3)
-            .map((one) => one.slice(0, 300)),
+            .map((one) => prose(one, 300)),
         },
       };
     },
@@ -596,4 +596,16 @@ export function createWorkforceModels(dependencies: {
       return result.questions.map((one) => one.question);
     },
   };
+}
+
+/**
+ * Prose a person reads, within its stored bound: cut at a word, with an
+ * ellipsis, never mid-word (live 2026-10-24: "…a month-12 decision, not a
+ * committed rollou").
+ */
+export function prose(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
