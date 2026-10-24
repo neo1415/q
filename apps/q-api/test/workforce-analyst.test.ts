@@ -40,6 +40,7 @@ import {
   isOwnAccountWork,
   planShape,
   sameWork,
+  type WaitingItem,
 } from "../src/composition/workforce/job-actions.js";
 import {
   createWorkforceJobs,
@@ -218,11 +219,7 @@ function world(
   options: {
     readonly outward?: boolean;
     /** What already waits for their approval (the Approval Engine's list). */
-    readonly waiting?: readonly {
-      summary: string;
-      actionType: string;
-      plan?: { outward: string[]; targets: string[] };
-    }[];
+    readonly waiting?: readonly WaitingItem[];
   } = {},
 ) {
   const store = createInMemoryWorkforceStore();
@@ -518,10 +515,11 @@ describe("own-account deep work starts with no approval card", () => {
       actionType: "q.workforce.job.start",
       plan: { outward: [], targets: [] },
     };
+    const kestrel = randomUUID();
     const sending = {
-      summary: "Reply to everyone who wrote",
+      summary: "Reply to Kestrel Heat",
       actionType: "q.workforce.job.start",
-      plan: { outward: ["chat.message.send"], targets: [] },
+      plan: { outward: ["chat.message.send"], targets: [`company:${kestrel}`] },
     };
     const own = world({ waiting: [savanna] });
     const started = await own.board.port.prepare(
@@ -531,9 +529,11 @@ describe("own-account deep work starts with no approval card", () => {
     );
     expect(started.status).toBe("STARTED");
 
-    // A plan that would itself be a card is held only by the same work:
-    // not by the unrelated research card, but by one sending messages too.
-    const unrelated = world({ outward: true, waiting: [savanna] });
+    // A plan that would itself be a card is held only by the same work --
+    // the same outward action on the same record: not by the unrelated
+    // research card, not by one sending messages about someone else, but by
+    // one sending messages about the same company.
+    const unrelated = world({ outward: true, waiting: [savanna, sending] });
     expect(
       (
         await unrelated.board.port.prepare(
@@ -547,13 +547,98 @@ describe("own-account deep work starts with no approval card", () => {
     const held = await same.board.port.prepare(
       actor,
       randomUUID(),
-      "Write me a short 12-month growth plan for my company",
+      "Write me a short 12-month growth plan and send it to Kestrel Heat",
+      { subjects: [{ kind: "COMPANY", companyId: kestrel }] } as never,
     );
     expect(held).toMatchObject({
       status: "ALREADY_WAITING",
-      about: "SAME_KIND",
-      waiting: ["Reply to everyone who wrote"],
+      waiting: ["Reply to Kestrel Heat"],
     });
+  });
+
+  // F-84, measured live on 550a2cbb9: three rows held by unrelated cards.
+  it("F-84: their own work is never held, whatever waits and whoever it names", async () => {
+    const ledgerfold = randomUUID();
+    const zino = randomUUID();
+    const waiting: WaitingItem[] = [
+      // A job card whose plan files founder questions, about nobody.
+      {
+        summary: "Research your warehouse and collateral controls",
+        actionType: "q.workforce.job.start",
+        plan: { outward: ["diligence.questions.prepare"], targets: [] },
+      },
+      {
+        summary: "Message Ledgerfold",
+        actionType: "chat.message.send",
+        targets: [{ kind: "COMPANY", companyId: ledgerfold }],
+      },
+      {
+        summary: "Accept Zino Aviation's interest",
+        actionType: "relationship.interest.accept",
+        targets: [
+          { kind: "INVESTOR_ORGANISATION", investorOrganisationId: zino },
+        ],
+      },
+    ];
+    const cases = [
+      {
+        goal: "Do some market research on West Africa logistics",
+        subjects: [],
+      },
+      {
+        goal: "Write me an IC memo on Ledgerfold",
+        subjects: [{ kind: "COMPANY", companyId: ledgerfold }],
+      },
+      {
+        goal: "Work on these items from my board: 1. Use the Zino Aviation meeting to test mandate fit",
+        subjects: [
+          { kind: "INVESTOR_ORGANISATION", investorOrganisationId: zino },
+        ],
+      },
+    ];
+    for (const one of cases) {
+      const { board } = world({ waiting });
+      const result = await board.port.prepare(actor, randomUUID(), one.goal, {
+        subjects: one.subjects,
+      } as never);
+      expect({ goal: one.goal, status: result.status }).toEqual({
+        goal: one.goal,
+        status: "STARTED",
+      });
+    }
+  });
+
+  it("F-84: an outward plan is held only by the same outward action on the same record", async () => {
+    const ledgerfold = randomUUID();
+    const message = {
+      summary: "Message Ledgerfold",
+      actionType: "chat.message.send",
+      targets: [{ kind: "COMPANY", companyId: ledgerfold }],
+    } as const;
+    // Sends messages, about Ledgerfold: the waiting message is the same work.
+    const held = await world({
+      outward: true,
+      waiting: [message],
+    }).board.port.prepare(
+      actor,
+      randomUUID(),
+      "Write an IC memo on Ledgerfold and send it to my co-founder",
+      { subjects: [{ kind: "COMPANY", companyId: ledgerfold }] } as never,
+    );
+    expect(held).toMatchObject({
+      status: "ALREADY_WAITING",
+      waiting: ["Message Ledgerfold"],
+    });
+    // The same action about nobody it names is not.
+    const free = await world({
+      outward: true,
+      waiting: [message],
+    }).board.port.prepare(
+      actor,
+      randomUUID(),
+      "Write a growth plan and send it to my co-founder",
+    );
+    expect(free.status).toBe("PREPARED");
   });
 
   it("keeps the card for work that reaches anyone else", async () => {
