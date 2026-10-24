@@ -9,7 +9,11 @@ import {
   type QResultBlock,
 } from "@capital-q/contracts";
 
-import type { ReadCompanyFigure, RunRead } from "./card-subjects.js";
+import {
+  containsCompanyName,
+  type ReadCompanyFigure,
+  type RunRead,
+} from "./card-subjects.js";
 import { cardRaiseWords, type RunFit } from "./fit-cards.js";
 
 /**
@@ -174,7 +178,23 @@ export function comparisonTableBlock(input: {
       .indexOf(nameOf(id).toLowerCase());
     return where < 0 ? Number.MAX_SAFE_INTEGER : where;
   };
-  const only = input.only ?? [];
+  // O-I6 (live 23 Oct): "Compare Ledgerline, Duplo and Anchor" showed
+  // Ledgerline vs Ledgerfold, a company the run read for another reason.
+  // When the question names two or more companies the run read, the table
+  // is those and only those.
+  const namedInQuestion = ids
+    .filter((id) => {
+      const name = nameOf(id);
+      return name !== "Company" && containsCompanyName(input.question, name);
+    })
+    // In the order the person named them.
+    .sort((a, b) => at(a) - at(b));
+  const only =
+    (input.only ?? []).length >= 2
+      ? (input.only ?? [])
+      : namedInQuestion.length >= 2
+        ? namedInQuestion
+        : [];
   const columns =
     only.length >= 2
       ? only.filter((id) => ids.includes(id))
@@ -365,7 +385,7 @@ export function comparisonFactStatement(block: QResultBlock): string | null {
         )
         .join(" | ")}`,
   );
-  return `COMPARED SIDE BY SIDE (Capital Q shows this table on their screen): ${names.join(" vs ")}. In words, give the two or three real differences between them (where they are, what they do, their traction numbers, how each fits the mandate), never what they share or the whole table. Company figures are company-stated, never verified.\n${lines.join("\n")}`.slice(
+  return `COMPARED SIDE BY SIDE (Capital Q shows this table on their screen): ${names.join(" vs ")}. In words, give the two or three real differences between them (where they are, what they do, their traction numbers, how each fits the mandate), never what they share or the whole table. Say the one or two key figures from the Traction row as numbers (for example each one's monthly revenue), never "self-reported figures" without them. Company figures are company-stated, never verified.\n${lines.join("\n")}`.slice(
     0,
     7_900,
   );
