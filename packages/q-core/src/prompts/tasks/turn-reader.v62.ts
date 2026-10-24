@@ -56,7 +56,7 @@ export const TURN_READER_V62: PromptDefinition<
 > = {
   ...TURN_READER_V61,
   version: 62,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "Analyst lane QO-07 2026-10-23: v61 plus DEEP WORK (analysis or strategy work ending in a document -- a plan of any kind, a market study, a competitive analysis, a written-up strategy -- is teamJob even as one document) and workFromEarlier (a yes or 'do that' handing over work asked for or offered in the last few turns; lenient); their work board as a screen is NAVIGATE BOARD and 'board' is never the readiness checklist; a founder's fundraising pipeline is the relationships pipeline; and compare {count, names} for companies put side by side (lane 8), never with fromShown. Read by meaning in any language.",
   effectiveFrom: "2026-10-24",

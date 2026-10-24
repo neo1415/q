@@ -148,6 +148,29 @@ describe("what an investor publishes", () => {
     expect(
       dimensionMatches(null, [{ kind: "GEOGRAPHY_MATCH", detail: "Kenya" }]),
     ).toEqual({ STAGE: "unk", SECTOR: "unk", GEOGRAPHY: "ok" });
+    // QO-42: what their card publishes, as the API compared it, answers a
+    // dimension the gate does not check; the gate still decides its own.
+    expect(
+      dimensionMatches(
+        gate([
+          {
+            label: "Seed",
+            requiredness: "REQUIRED",
+            dimension: "STAGE",
+            standing: "NOT_MET",
+          },
+        ]),
+        [],
+        { stage: "MET", sector: "MET", geography: "NOT_MET" },
+      ),
+    ).toEqual({ STAGE: "no", SECTOR: "ok", GEOGRAPHY: "no" });
+    expect(
+      dimensionMatches(null, [{ kind: "GEOGRAPHY_MATCH", detail: "Kenya" }], {
+        stage: "UNKNOWN",
+        sector: "UNKNOWN",
+        geography: "UNKNOWN",
+      }),
+    ).toEqual({ STAGE: "unk", SECTOR: "unk", GEOGRAPHY: "ok" });
   });
 
   it("takes the investor's own reach choice, with their gate first and closed above all", () => {

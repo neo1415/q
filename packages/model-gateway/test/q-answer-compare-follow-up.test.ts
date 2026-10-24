@@ -135,7 +135,7 @@ function outcome(proposal: QToolProposal): Omit<QToolCallOutcome, "callId"> {
           currentStageCode: profile["currentStageCode"],
           shortDescription: profile["shortDescription"],
           primaryDescription: null,
-          companyStatus: "ACTIVE",
+          companyStatus: "active",
           relationToYou: "SHARED",
           truthClass: "USER_CLAIM",
         },
@@ -175,8 +175,8 @@ function outcome(proposal: QToolProposal): Omit<QToolCallOutcome, "callId"> {
       companyId,
       PROFILES[companyId]?.["canonicalName"] ?? "?",
       companyId === MIZAN
-        ? { STAGE: "STRONG", SECTOR: "STRONG" }
-        : { STAGE: "PARTIAL", SECTOR: "STRONG" },
+        ? { STAGE: "STRONG", SECTOR: "STRONG", GEOGRAPHY: "STRONG" }
+        : { STAGE: "PARTIAL", SECTOR: "STRONG", GEOGRAPHY: "PARTIAL" },
     ),
   };
 }
@@ -200,6 +200,8 @@ function build(
   said: string,
   reading?: Readonly<Record<string, unknown>>,
   answer = "Mizan is in Cairo doing merchant payments at $42,000 MRR; Silo Credit is in Kano lending to agri-dealers at $9,000.",
+  /** Q showed no cards before this turn. */
+  noCards = false,
 ) {
   const alpha = createFakeModelProvider({
     code: "alpha",
@@ -244,7 +246,7 @@ function build(
       role: "Q",
       content: "Here are the five that fit your mandate best.",
       contentType: "TEXT",
-      blocks: [{ kind: "ANSWER_CARDS", cards }],
+      blocks: noCards ? [] : [{ kind: "ANSWER_CARDS", cards }],
       createdAt: at,
     },
     {
@@ -478,6 +480,38 @@ describe("compare the top two, right after a list of five", () => {
     expect(table?.columns.map((column) => column.label)).toEqual([
       "Mizan",
       "Silo Credit",
+    ]);
+  });
+
+  // Coordinator 24 Oct: "which is better, Anchor or Afyascan?" named two
+  // companies Q had not shown, and the answer gave two verdicts. They are
+  // found by exact name and read, and the one verdict comes from the fit.
+  it("names not on screen are found and compared, with one verdict from the fit", async () => {
+    const { seam, request, alpha, executed, stored } = build(
+      "Which is better, Silo Credit or Mizan?",
+      { compare: { count: null, names: ["Silo Credit", "Mizan"] } },
+      undefined,
+      true,
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(
+      executed
+        .filter((call) => call.callId.startsWith("q-compare-search-"))
+        .map(
+          (call) => Reflect.get(call.arguments as object, "query") as unknown,
+        ),
+    ).toEqual(["Silo Credit", "Mizan"]);
+    const sent = alpha.calls
+      .flatMap((call) => call.request.messages.map((m) => m.content))
+      .join("\n");
+    // Mizan's computed fit leads (STRONG stage and sector against PARTIAL).
+    expect(sent).toMatch(/VERDICT[^\n]*lead with exactly one, Mizan/u);
+    const table = (stored.at(-1)?.blocks ?? []).find(
+      (block) => Reflect.get(block as object, "kind") === "TABLE",
+    ) as { columns: { label: string }[] } | undefined;
+    expect(table?.columns.map((column) => column.label)).toEqual([
+      "Silo Credit",
+      "Mizan",
     ]);
   });
 

@@ -349,6 +349,33 @@ describe("a reply about a change's status says the engine's status", () => {
     );
   });
 
+  it("QA F-71: 'Show my pipeline' answered with what was asked gets no could-not line", async () => {
+    const answerText =
+      "Over the last 30 days, your pipeline recorded 10 interests expressed and 9 connections.";
+    const { seam, request, stored } = build(
+      { status: "SUCCEEDED", data: RELATIONSHIP_NONE },
+      undefined,
+      {
+        answer: answerText,
+        findings: [
+          {
+            statement: "10 interests expressed in the last 30 days.",
+            type: "FACT",
+            confidence: "HIGH",
+            truthClass: "VERIFIED",
+            evidenceStatus: "PLATFORM_VERIFIED",
+          },
+        ],
+      },
+      [],
+      { said: "Show my pipeline" },
+    );
+    await seam.answer({ ...request, turnKind: "TOOL_REQUEST" });
+    const reply = stored.at(-1) ?? "";
+    expect(reply).toContain(answerText);
+    expect(reply).not.toContain("I didn't get that done");
+  });
+
   it("run 5dd9bec5: a request answered with nothing but the status line says plainly what Q couldn't do", async () => {
     const said =
       "Ask Ledgerfold for their last 12 months of management accounts.";

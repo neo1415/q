@@ -457,6 +457,24 @@ export const DiscoveredCompanyDtoSchema = z
   .strict();
 export type DiscoveredCompanyDto = z.infer<typeof DiscoveredCompanyDtoSchema>;
 
+/**
+ * QO-42: how the founder's own declared company compares with what the
+ * investor PUBLISHES on their Q Card (as a signed-in participant reads
+ * it), per dimension. Never their mandate: only the stages, sectors and
+ * geographies the investor chose to put on the card. UNKNOWN is not a no:
+ * nothing published there, the founder has not declared it, or a name on
+ * the card is not one the taxonomy knows.
+ */
+export const PublishedFitStandingSchema = z.enum(["MET", "NOT_MET", "UNKNOWN"]);
+export const PublishedFitDtoSchema = z
+  .object({
+    stage: PublishedFitStandingSchema,
+    sector: PublishedFitStandingSchema,
+    geography: PublishedFitStandingSchema,
+  })
+  .strict();
+export type PublishedFitDto = z.infer<typeof PublishedFitDtoSchema>;
+
 export const DiscoveredInvestorDtoSchema = z
   .object({
     investorOrganisationId: UuidSchema,
@@ -482,6 +500,8 @@ export const DiscoveredInvestorDtoSchema = z
     photoUrl: z.string().url().nullable().optional(),
     coverUrl: z.string().url().nullable().optional(),
     reasons: z.array(DiscoveryReasonDtoSchema).max(8),
+    /** QO-42; absent for a reader with no company of their own, or an older API. */
+    publishedFit: PublishedFitDtoSchema.optional(),
   })
   .strict();
 export type DiscoveredInvestorDto = z.infer<typeof DiscoveredInvestorDtoSchema>;

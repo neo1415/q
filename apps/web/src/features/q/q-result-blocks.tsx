@@ -371,7 +371,10 @@ export function QResultCard({
     >
       <div className="flex flex-col gap-1">
         <span className="cq-label text-(--cq-text-tertiary)">{label}</span>
-        {title === undefined ? null : (
+        {/* A title that only repeats the label is said once (QA F-72:
+            "Side by side / Side by side" over the compare table). */}
+        {title === undefined ||
+        title.trim().toLowerCase() === label.trim().toLowerCase() ? null : (
           <p className="cq-body font-medium text-(--cq-text-primary)">
             {title}
           </p>

@@ -821,7 +821,10 @@ import {
 } from "@capital-q/platform-admin";
 import { withSuspension } from "./composition/suspension.js";
 import { createOwnCalls } from "./composition/own-calls.js";
-import { createOwnDiligence } from "./composition/own-diligence.js";
+import {
+  createDiligenceSummary,
+  createOwnDiligence,
+} from "./composition/own-diligence.js";
 import { createProfileMaterial } from "./composition/profile-material.js";
 import { createMaterialDocumentReads } from "./composition/material-documents.js";
 import { createAttachedDocumentReads } from "./composition/attached-documents.js";
@@ -2246,6 +2249,12 @@ const diligenceService = withRunCachedDiligenceViews(
     newCorrelationId: () => CorrelationIdSchema.parse(`cor_${randomUUID()}`),
   }),
 );
+// QO-15: what an investor asked companies for, said as their CRM opens.
+const investorDiligenceSummary = createDiligenceSummary({
+  interests: interestService,
+  diligence: diligenceService,
+  ownCompanyId: (actor) => runtimeDependencies.ownCompany(actor),
+});
 
 /**
  * R1 batching: the brief's batch readers over the chat and schedule
@@ -4327,6 +4336,8 @@ const qIntelligence = composeQIntelligence({
       ? null
       : pipelineSummaryLine(own.side, own.items);
   },
+  // QO-15: an investor's own data room requests, with each one's state.
+  diligenceSummary: (request) => investorDiligenceSummary(request.actor),
   // W4: a researched entity reachable by name (prepared seed or their own
   // research): "take me to Shadi Qishta" shows its identity card.
   knownEntities: preparedEntityMatcher(preparedEntities),

@@ -15,10 +15,10 @@ import type { OnboardingRecordResult } from "@capital-q/q-tools";
  */
 
 const LEADS = [
-  "Got it, saved",
-  "Thanks, that's on your record",
-  "Noted and saved",
-  "Great, saved",
+  "Got it, I've saved",
+  "Thanks, I've noted",
+  "Great, I've saved",
+  "Noted, I've saved",
 ] as const;
 
 /** The longest a recorded value is read back whole; longer text by its opening. */
@@ -161,10 +161,33 @@ export function acknowledgementParts(
   };
 }
 
-/** The English receipt line for one item. */
+/**
+ * The English receipt for one item, said as speech (QA QO-20, 23 Oct:
+ * "saved: stage: Seed; raising now: Yes…" read as a key:value dump). What
+ * was recorded comes first, its field after it in brackets: "Seed
+ * (stage)", "Yes, actively (raising now)"; a fact kept with their notes
+ * reads "first revenue only (in your notes on revenue)".
+ */
 export function acknowledgedLine(item: AcknowledgedItem): string {
-  if (item.kind === "KEPT") return item.text;
-  return `${item.label.toLowerCase()}: ${item.value}`;
+  if (item.kind === "KEPT") {
+    const kept = keptParts(item.text);
+    return kept === null
+      ? item.text
+      : `${kept.words} (in your notes on ${kept.label})`;
+  }
+  return `${item.value} (${item.label.toLowerCase()})`;
+}
+
+/** "a", "a and b", "a, b and c". */
+function spokenList(lines: readonly string[]): string {
+  if (lines.length <= 1) return lines[0] ?? "";
+  return `${lines.slice(0, -1).join(", ")} and ${lines.at(-1) ?? ""}`;
+}
+
+/** The English receipt sentence: the lead, then what was saved. */
+function receiptSentence(parts: AcknowledgementParts): string {
+  const said = spokenList(parts.items.map(acknowledgedLine));
+  return `${parts.lead} ${said}${endOf(said)}`;
 }
 
 export function quickAcknowledgement(
@@ -172,9 +195,8 @@ export function quickAcknowledgement(
 ): string | null {
   const parts = acknowledgementParts(input);
   if (parts === null) return null;
-  const said = parts.items.map(acknowledgedLine).join("; ");
   const aside = parts.aside === undefined ? "" : `${parts.aside} `;
-  return `${parts.lead}: ${said}${endOf(said)} ${aside}${parts.question}${parts.optional ? ` ${OPTIONAL_ACKNOWLEDGEMENT_TAIL}` : ""}`;
+  return `${receiptSentence(parts)} ${aside}${parts.question}${parts.optional ? ` ${OPTIONAL_ACKNOWLEDGEMENT_TAIL}` : ""}`;
 }
 
 /**
@@ -195,8 +217,7 @@ export function quickReceipt(
     next: { question: "-", optional: false },
   });
   if (parts === null) return null;
-  const said = parts.items.map(acknowledgedLine).join("; ");
-  return `${parts.lead}: ${said}${endOf(said)}`;
+  return receiptSentence(parts);
 }
 
 /**

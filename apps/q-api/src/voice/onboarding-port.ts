@@ -411,6 +411,26 @@ export function createOnboardingPort(input: {
    */
   let readAt: number | null = null;
   const written: string[] = [];
+  /** The steps this turn's answers are for, so a sibling in it counts. */
+  const turnSteps = new Set<string>();
+  /**
+   * Another step of the same concept family already answered, or answered
+   * in this turn: the concept is held there (one concept, one answer).
+   */
+  const familySiblingAnswered = (
+    stepKey: string,
+    view: OnboardingSessionView,
+  ): string | undefined => {
+    const families =
+      input.journeyType === "investor" ? INVESTOR_CONCEPT_FAMILIES : [];
+    const family = families.find((f) => f.stepKeys.includes(stepKey));
+    return family?.stepKeys.find(
+      (key) =>
+        key !== stepKey &&
+        (turnSteps.has(key) ||
+          view.responses.some((response) => response.stepKey === key)),
+    );
+  };
   const userId = input.ownerUserId as UserId;
   const store = input.recommendations;
   const pendingNow = async () =>
@@ -904,6 +924,26 @@ export function createOnboardingPort(input: {
             ? undefined
             : [...new Set(kept)].join("; ").slice(0, 200);
       } else if (unmatched.length > 0) {
+        // QA QO-28 (23 Oct): "We never invest in crypto, gambling or
+        // tobacco" saved its three red flags AND the raw sentence as
+        // "Sectors never shown". When the concept is already answered in
+        // its structured sibling (now or in this same turn), their words
+        // are not saved a second time as text.
+        const sibling = familySiblingAnswered(step.stepKey, await current());
+        if (sibling !== undefined) {
+          return {
+            ok: false,
+            result: {
+              stepKey: step.stepKey,
+              outcome: "CONFIRMED_AS_STATED",
+              recorded:
+                `Already covered by their answer to "${(SPOKEN_QUESTIONS[sibling] ?? steps.get(sibling)?.configuration.prompt ?? sibling).slice(0, 160)}"; nothing more to save here.`.slice(
+                  0,
+                  600,
+                ),
+            },
+          };
+        }
         // No category holds their words: kept as they said them, like
         // ticking "Other" and typing (owner 2026-10-16).
         return {
@@ -2898,6 +2938,8 @@ export function createOnboardingPort(input: {
     },
     record: async (answers) => {
       const results: OnboardingRecordResult[] = [];
+      turnSteps.clear();
+      for (const answer of answers) turnSteps.add(answer.stepKey);
       // One answer that cannot be processed never loses the others (bench
       // 2026-09-30: a category lookup's 400 threw out an investor's whole
       // ten-answer monologue as "the profile save didn't complete").

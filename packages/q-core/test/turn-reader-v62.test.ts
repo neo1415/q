@@ -20,9 +20,9 @@ import {
  * to work offered just before hands it over (workFromEarlier).
  */
 describe("TURN_READER v62", () => {
-  it("is the active reader, v61 kept whole plus two rules after TEAM JOB", () => {
+  it("v61 kept whole plus two rules after TEAM JOB (v63 is active)", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(62);
+    expect(active.definition.version).toBe(63);
     expect(TURN_READER_V61.status).toBe("DEPRECATED");
     const added = `${V62_DEEP_WORK}${V62_WORK_FROM_EARLIER}`;
     expect(TURN_READER_V62.template).toContain(`${V49_TEAM_JOB}${added}`);

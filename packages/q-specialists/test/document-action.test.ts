@@ -18,9 +18,10 @@ import type {
 } from "@capital-q/q-runtime";
 import { ActorContextSchema } from "@capital-q/security";
 
-import { composeAnswerDocument } from "../src/answer-document.js";
+import { composeAnswerDocument, workTitle } from "../src/answer-document.js";
 import {
   answerSteps,
+  boardItemFromWords,
   boardReadOut,
   createSpecialistQAnswer,
   type BoardKeeper,
@@ -876,7 +877,8 @@ describe("an answer as a document, deterministically", () => {
       answer: "Short answer with *emphasis* and a rule.\n\n---\n\nDone.",
       question: "  what   now? ",
     });
-    expect(document?.title).toBe("Q's answer: what now?");
+    // F-73: never "Q's answer: <the ask>"; the ask in a few words.
+    expect(document?.title).toBe("What now");
     expect(document?.content.sections).toEqual([
       {
         heading: "Answer",
@@ -1078,7 +1080,7 @@ describe("board asks about Q's last answer, continued", () => {
     ]);
   });
 
-  it("an item they dictate ('add \"Prep IC memo\" to my board') is the board tool's, not Q's last answer", async () => {
+  it("an item they dictate ('add \"Prep IC memo\" to my board') is a to-do with that title, not Q's last answer (F-72)", async () => {
     const added: unknown[] = [];
     const board: BoardKeeper = {
       list: () => Promise.resolve({ items: [] }),
@@ -1106,7 +1108,7 @@ describe("board asks about Q's last answer, continued", () => {
       board,
     });
     await s.run();
-    expect(added).toEqual([]);
+    expect(added).toEqual([{ kind: "TASK", title: "Prep IC memo" }]);
     expect(s.prepared).toHaveLength(0);
   });
 });
@@ -1136,5 +1138,167 @@ describe("answerSteps", () => {
         Array.from({ length: 20 }, (_v, i) => `- step ${String(i)}`).join("\n"),
       ),
     ).toHaveLength(12);
+  });
+});
+
+/**
+ * F-72 (QA 2026-10-24): "Add 'Prep data room for seed round' to my board"
+ * filed Q's previous answer as a document. A new item in their words is a
+ * to-do with that title, by code; "the top company" is the one the list
+ * Q just showed put first.
+ */
+describe("a new item they dictate goes on the board as a to-do", () => {
+  const ANCHOR_FIRST = {
+    kind: "ANSWER_CARDS",
+    shape: "RANKED",
+    title: "Fit against your mandate",
+    followUps: [],
+    cards: [{ name: "Anchor" }, { name: "Kliniqa" }],
+  } as unknown as QResultBlock;
+  const reading = (): QTurnReading => ({
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: null,
+    boardAsk: "SAVE",
+    namedOther: null,
+  });
+  function keeper() {
+    const added: { kind: string; title: string; refId?: string }[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items: [] }),
+      add: (_actor, request) => {
+        added.push(request);
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    return { board, added };
+  }
+
+  it("adds the title in their words, files nothing, and resolves 'the top company' from the list", async () => {
+    const { board, added } = keeper();
+    const s = seam({
+      history: [
+        message("USER", "Which companies fit my mandate best?"),
+        {
+          ...message("Q", "Anchor leads, then Kliniqa."),
+          blocks: [ANCHOR_FIRST],
+        },
+        message("USER", "Add 'Prep IC memo for the top company' to my board."),
+      ],
+      reading: reading(),
+      board,
+    });
+    await s.run();
+    expect(s.prepared).toHaveLength(0);
+    expect(added).toEqual([{ kind: "TASK", title: "Prep IC memo for Anchor" }]);
+    expect(s.stored[0]?.content).toBe(
+      "I've added “Prep IC memo for Anchor” to your board, in To do.",
+    );
+  });
+
+  it("reads the title from quotes, or from between 'add' and 'to my board'", () => {
+    expect(
+      boardItemFromWords("Add 'Prep data room for seed round' to my board"),
+    ).toBe("Prep data room for seed round");
+    expect(
+      boardItemFromWords("ajoute « relancer Savanna » à mon tableau"),
+    ).toBe("relancer Savanna");
+    expect(boardItemFromWords("Add Prep IC memo for Mizan to my board.")).toBe(
+      "Prep IC memo for Mizan",
+    );
+    expect(
+      boardItemFromWords("put a task to call Kestrel on Friday on my to-dos"),
+    ).toBe("call Kestrel on Friday");
+    // Keeping Q's answer is SAVE, not a title.
+    expect(boardItemFromWords("save that to my board")).toBeNull();
+    expect(boardItemFromWords("what's on my board?")).toBeNull();
+  });
+});
+
+/** F-73: saved work is titled by what it is and who it is about. */
+describe("workTitle", () => {
+  it("names the kind of work and its subject, never 'Q's answer'", () => {
+    expect(
+      workTitle({
+        heading: null,
+        question: "Help me prepare for a call with the founder of the top one",
+        subject: "Anchor",
+      }),
+    ).toBe("Call prep: Anchor");
+    expect(
+      workTitle({
+        heading: null,
+        question: "Write me a short 12-month growth plan for Maji Loop",
+        subject: "Maji Loop",
+      }),
+    ).toBe("12-month growth plan: Maji Loop");
+    expect(
+      workTitle({
+        heading: "Your 12-month plan",
+        question: "",
+        subject: "Maji Loop",
+      }),
+    ).toBe("Your 12-month plan: Maji Loop");
+    expect(
+      workTitle({
+        heading: "Anchor: what to ask",
+        question: "",
+        subject: "Anchor",
+      }),
+    ).toBe("Anchor: what to ask");
+    expect(
+      workTitle({ heading: null, question: "Tell me more", subject: null }),
+    ).toBe("Tell me more");
+  });
+
+  it("saving a call prep keeps it on the board as 'Call prep: <who>'", async () => {
+    const added: { kind: string; title: string }[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items: [] }),
+      add: (_actor, request) => {
+        added.push(request);
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    const s = seam({
+      history: [
+        message(
+          "USER",
+          "Help me prepare for a call with the founder of the top one",
+        ),
+        {
+          ...message(
+            "Q",
+            "Open with their traction.\n\n1. Ask about churn.\n2. Ask about the round.",
+          ),
+          blocks: [
+            {
+              kind: "ANSWER_CARDS",
+              shape: "SINGLE",
+              title: "Anchor",
+              followUps: [],
+              cards: [{ name: "Anchor" }],
+            } as unknown as QResultBlock,
+          ],
+        },
+        message("USER", "Save that to my board."),
+      ],
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        boardAsk: "SAVE",
+        namedOther: null,
+      },
+      board,
+    });
+    await s.run();
+    expect(added.map((one) => one.title)).toEqual(["Call prep: Anchor"]);
   });
 });

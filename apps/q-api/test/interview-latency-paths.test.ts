@@ -245,8 +245,8 @@ describe("the reply after a clean save is written by code", () => {
     }).turn({ ...turn(world, said), actor });
     expect(model.calls()).toBe(1);
     expect(outcome.reply).toMatch(/saved|on your record/i);
-    expect(outcome.reply).toContain("stage: Seed");
-    expect(outcome.reply).toContain("country: Kenya");
+    expect(outcome.reply).toContain("Seed (stage)");
+    expect(outcome.reply).toContain("Kenya (country)");
     expect(outcome.reply.trim().endsWith("?")).toBe(true);
     // Said only after the commit: both are on the record.
     expect(world.recordedValue("F1.stage")).toBeDefined();
@@ -375,11 +375,11 @@ describe("faster answers, with their stages shown (owner 2026-10-21)", () => {
       onSentence: (sentence) => sentences.push(sentence),
     });
     // The receipt is the first thing said, and the reply opens with it.
-    expect(sentences[0]).toMatch(/stage: Seed/);
-    expect(sentences[0]).toMatch(/country: Kenya/);
+    expect(sentences[0]).toMatch(/Seed \(stage\)/);
+    expect(sentences[0]).toMatch(/Kenya \(country\)/);
     expect(outcome.reply.startsWith(sentences[0] ?? "-")).toBe(true);
     expect(outcome.reply).toContain("The model's own reply.");
-    expect(outcome.reply.split("stage: Seed")).toHaveLength(2);
+    expect(outcome.reply.split("Seed (stage)")).toHaveLength(2);
   });
 });
 
@@ -622,7 +622,7 @@ describe("quickAcknowledgement", () => {
         turnIndex: 0,
       }),
     ).toBe(
-      "Got it, saved: stage: Seed; team size: 14. What does the company do?",
+      "Got it, I've saved Seed (stage) and 14 (team size). What does the company do?",
     );
   });
 
@@ -909,7 +909,7 @@ describe("the reply is in their language (ob1 live on AF)", () => {
       standing: standingIn("AUTO"),
     }).turn({ ...turn(world, "Seed stage, based in Kenya."), actor });
     expect(model.calls()).toBe(1);
-    expect(outcome.reply).toContain("stage: Seed");
+    expect(outcome.reply).toContain("Seed (stage)");
   });
 
   function answers() {

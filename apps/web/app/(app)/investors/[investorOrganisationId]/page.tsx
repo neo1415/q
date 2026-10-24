@@ -124,10 +124,10 @@ export default async function InvestorPage({
     founderFormContext().catch(() => null),
   ]);
   const gate = gateFor(gates, id);
-  const reasons =
-    slate?.items.find(
-      (item) => item.investorOrganisationId.toLowerCase() === id.toLowerCase(),
-    )?.reasons ?? [];
+  const listed = slate?.items.find(
+    (item) => item.investorOrganisationId.toLowerCase() === id.toLowerCase(),
+  );
+  const reasons = listed?.reasons ?? [];
   const record = (relationships ?? []).find(
     (item) =>
       item.counterpart.kind === "INVESTOR_ORGANISATION" &&
@@ -146,6 +146,7 @@ export default async function InvestorPage({
             card,
             gate,
             reasons,
+            publishedFit: listed?.publishedFit,
             record,
             prefill: form?.prefill ?? null,
           }}

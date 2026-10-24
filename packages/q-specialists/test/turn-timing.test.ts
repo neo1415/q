@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   PermittedContextPlanSchema,
@@ -44,9 +44,13 @@ import { createSpecialistQAnswer } from "../src/answer.js";
  * the conversational gateway answer and its tool loop (`model-gateway`
  * `q/index.ts`), the real model gateway with its routing -- with only the
  * providers replaced: models, the turn reader and skim, tools and the
- * public web reply after the latencies below. Times are scaled by
- * `CQ_TURN_TIMING_SCALE` (default 0.05, so the suite stays fast) and
- * reported back in real milliseconds.
+ * public web reply after the latencies below. The suite runs on a virtual
+ * clock (fake timers, `performance` and `Date` included), so the times it
+ * reports are the modelled ones exactly, however loaded the machine is:
+ * under a scaled real clock, 50 ms of event-loop lag in a parallel run
+ * read as a second and failed the targets (2026-10-24). Off the suite,
+ * `timeJourney` can still run on a real clock, scaled by
+ * `CQ_TURN_TIMING_SCALE`.
  *
  * Latencies and their sources (docs/ai-handoff/workstreams/
  * TURN-LATENCY-2026-10-20.md section 1 unless stated):
@@ -67,7 +71,7 @@ import { createSpecialistQAnswer } from "../src/answer.js";
  *   a database write/read   10 ms
  */
 
-const SCALE = Number(process.env["CQ_TURN_TIMING_SCALE"] ?? "0.05");
+const SCALE = Number(process.env["CQ_TURN_TIMING_SCALE"] ?? "1");
 const LATENCY = {
   skimMs: 850,
   readerMs: 1_200,
@@ -1024,13 +1028,55 @@ export async function timeJourney(
 const ms = (value: number | null): string =>
   value === null ? "-" : String(Math.round(value));
 
+/**
+ * Runs `work` on the virtual clock: each step fires the next timer and
+ * lets every promise it releases settle, until the work is done. Time
+ * passes only as the modelled latencies say, never with the machine.
+ */
+async function onVirtualClock<T>(work: () => Promise<T>): Promise<T> {
+  let settled = false;
+  const running = work().finally(() => {
+    settled = true;
+  });
+  for (let step = 0; !settled && step < 200_000; step += 1) {
+    if (vi.getTimerCount() > 0) {
+      await vi.advanceTimersToNextTimerAsync();
+    } else {
+      // Nothing scheduled: something waits on real I/O; let it run.
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+  return running;
+}
+
+const journeyTimed = (
+  journey: Journey,
+  options?: { readonly parallelExtras?: boolean },
+): Promise<Timing> => onVirtualClock(() => timeJourney(journey, options));
+
 describe("turn timing harness", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: [
+        "setTimeout",
+        "clearTimeout",
+        "setInterval",
+        "clearInterval",
+        "performance",
+        "Date",
+      ],
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("times each journey through the real answer path", async () => {
     // One pass untimed first: loading and compiling the code on first use
     // is not a turn's latency, and the time scale would magnify it.
-    for (const journey of JOURNEYS) await timeJourney(journey);
+    for (const journey of JOURNEYS) await journeyTimed(journey);
     const rows: Timing[] = [];
-    for (const journey of JOURNEYS) rows.push(await timeJourney(journey));
+    for (const journey of JOURNEYS) rows.push(await journeyTimed(journey));
     const table = [
       "| journey | first visible | first words | answer words all out | first finding | complete | model calls | reads | calls |",
       "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -1136,14 +1182,14 @@ describe("turn timing harness", () => {
       return found;
     });
     for (const journey of typed) {
-      await timeJourney(journey);
-      await timeJourney(journey, { parallelExtras: true });
+      await journeyTimed(journey);
+      await journeyTimed(journey, { parallelExtras: true });
     }
     const pairs: { one: Timing; two: Timing }[] = [];
     for (const journey of typed) {
       pairs.push({
-        one: await timeJourney(journey),
-        two: await timeJourney(journey, { parallelExtras: true }),
+        one: await journeyTimed(journey),
+        two: await journeyTimed(journey, { parallelExtras: true }),
       });
     }
     console.log(
@@ -1166,11 +1212,9 @@ describe("turn timing harness", () => {
       // Findings still arrive, and the turn is done sooner.
       expect(two.firstFindingMs).not.toBeNull();
       expect(two.completeMs).toBeLessThan(one.completeMs * 0.9);
-      // The first words are not delayed by the second writer. The margin
-      // is real time (40 ms of scheduling jitter under a loaded run),
-      // read on the harness's scaled clock.
+      // The first words are not delayed by the second writer.
       expect(two.firstWordsMs ?? Infinity).toBeLessThan(
-        (one.firstWordsMs ?? 0) + Math.max(300, 40 / SCALE),
+        (one.firstWordsMs ?? 0) + 300,
       );
     }
   }, 600_000);

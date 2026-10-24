@@ -844,6 +844,13 @@ export type SpecialistQAnswerDependencies = {
       ) => Promise<string | null>)
     | undefined;
   /**
+   * QO-15: an investor's own data room requests, as their relationships'
+   * Diligence tabs hold them, in one or two lines with each one's state.
+   * Null when none can be read.
+   */
+  readonly diligenceSummary?:
+    ((request: QAnswerRequest) => Promise<string | null>) | undefined;
+  /**
    * One app action's inputs from the person's words, against the tool's own
    * input schema (APP_ACTION_ARGUMENTS), for a reading that named the
    * action and gave no arguments. Null: their words don't give them.
@@ -1034,10 +1041,41 @@ export function boardReadOut(
 
 /**
  * A title they dictated ('add "Prep IC memo for Mizan" to my board'): a
- * new item in their words, the board tool's to add, never Q's last answer.
+ * new item in their words, never Q's last answer.
  */
 function dictatesItem(words: string): boolean {
   return /["“”'‘’«»][^"“”'‘’«»]{3,}["“”'‘’«»]/u.test(words);
+}
+
+/**
+ * The new item's title in their own words (reader v62 boardAsk ADD,
+ * F-72): what they put in quotes, else what sits between "add" and "to my
+ * board". Null when neither is there: the board tool reads it then.
+ */
+export function boardItemFromWords(words: string): string | null {
+  const quoted = /["“'‘«]([^"“”'‘’«»]{3,300})["”'’»]/u.exec(words)?.[1];
+  const said =
+    quoted ??
+    /^\s*(?:please\s+)?(?:add|put|pin|stick|create)\s+(?:a\s+(?:task|to-?do|card)\s+(?:to\s+|for\s+)?)?(.{3,300}?)\s+(?:to|on|onto|in)\s+(?:my\s+)?(?:work\s+)?(?:board|to-?dos?|to-?do list)\b/iu.exec(
+      words,
+    )?.[1];
+  const title = said
+    ?.replace(/\s+/gu, " ")
+    .replace(/[.,;:!?]+$/u, "")
+    .trim();
+  return title === undefined || title.length < 3 ? null : title;
+}
+
+/**
+ * "the top company" in an item they dictated, as the list Q just showed
+ * names it (F-72: "Prep IC memo for the top company" is Anchor's).
+ */
+function resolveTopOne(title: string, shownFirst: string | null): string {
+  if (shownFirst === null) return title;
+  return title.replace(
+    /\bthe (?:top|first|1st) (?:company|one|investor|fund|founder)\b/iu,
+    shownFirst,
+  );
 }
 
 /** A UUID (version 5 layout) for one change Q makes, stable on a retry. */
@@ -1153,6 +1191,14 @@ const DESTINATION_LINES: Readonly<Record<QNavigateDestination, string>> = {
   Q_PITCH: "Let me show you Capital Q.",
   BOARD: "Opening your board.",
 };
+
+/**
+ * A founder's own data room: never where an investor is taken (QO-15). The
+ * line said instead is about requests, so only this page is remapped.
+ */
+const FOUNDER_OWN_PAGES: ReadonlySet<QNavigateDestination> = new Set([
+  "OWN_DATA_ROOM",
+]);
 
 /** A real screen, as offered back to someone who named one that isn't. */
 const DESTINATION_NAMES: Readonly<Record<QNavigateDestination, string>> = {
@@ -1848,8 +1894,16 @@ export function createSpecialistQAnswer(
     preparation: ArtifactPreparation,
     answer: string,
     question: string | undefined,
+    history?: readonly QConversationMessage[],
   ): Promise<DocumentReply> {
-    const document = composeAnswerDocument({ answer, question });
+    const document = composeAnswerDocument({
+      answer,
+      question,
+      subject:
+        history === undefined
+          ? null
+          : await subjectOfAnswer(request, history, question ?? ""),
+    });
     if (document === null) {
       return {
         content:
@@ -1929,6 +1983,7 @@ export function createSpecialistQAnswer(
             artifacts,
             previous.answer,
             previous.question,
+            history,
           )
         : null;
     const document =
@@ -2025,6 +2080,73 @@ export function createSpecialistQAnswer(
       );
     }
     return recordAnswer(request, conversationId, boardReadOut(list.items));
+  }
+
+  /**
+   * Who Q's last answer is about (F-73), from records, never guessed: the
+   * one company or person its cards show, else their own company when the
+   * ask names it. Null: unknown, and the title says only what it is.
+   */
+  async function subjectOfAnswer(
+    request: QAnswerRequest,
+    history: readonly QConversationMessage[],
+    question: string,
+  ): Promise<string | null> {
+    const latestUser = history.findLastIndex((m) => m.role === "USER");
+    const before = latestUser < 0 ? history : history.slice(0, latestUser);
+    const answer = before.findLast((m) => m.role === "Q");
+    const named = [
+      ...new Set(
+        (answer === undefined ? [] : shownItems([answer]))
+          .filter((item) => item.kind === "NAMED")
+          .map((item) => item.name),
+      ),
+    ];
+    if (named.length === 1) return named[0] ?? null;
+    const own = await dependencies.ownRecords
+      ?.read(request)
+      .catch(() => NO_OWN_RECORDS);
+    const said = question.toLowerCase();
+    return (
+      own?.company?.names.find(
+        (name) => name.length > 1 && said.includes(name.toLowerCase()),
+      ) ?? null
+    );
+  }
+
+  /**
+   * "Add 'Prep IC memo for Mizan' to my board" (reader v62 ADD, F-72): a
+   * new to-do in their words, on their own board, by code. Null: no title
+   * in their words, or no board here; the board tool reads it then.
+   */
+  async function addItemToBoard(
+    request: QAnswerRequest,
+    conversationId: QConversationMessage["conversationId"],
+    words: string,
+    history: readonly QConversationMessage[],
+  ): Promise<QAnswerOutcome | null> {
+    const board = dependencies.board;
+    const said = boardItemFromWords(words);
+    if (board === undefined || said === null) return null;
+    const first =
+      shownItems(history).find((item) => item.kind === "NAMED")?.name ?? null;
+    const title = resolveTopOne(said, first);
+    const added = await board
+      .add(
+        request.actor,
+        { kind: "TASK", title },
+        { by: "Q", idempotencyKey: boardKeyOf(request.runId, `add:${title}`) },
+      )
+      .catch(() => ({ outcome: "REFUSED", code: "FAILED" }) as const);
+    return recordAnswer(
+      request,
+      conversationId,
+      added.outcome === "OK"
+        ? `I've added “${title}” to your board, in To do.`
+        : added.code === "FULL"
+          ? "Your board is full, so I couldn't add that. Take something off it first and ask me again."
+          : `I couldn't add “${title}” to your board just now. Ask me again in a moment.`,
+    );
   }
 
   /** The document card on Q's answer before this turn, when it made one. */
@@ -2146,7 +2268,13 @@ export function createSpecialistQAnswer(
             "I haven't answered anything in this conversation yet, so there's nothing to put in a document. Ask me what you want it to say and I'll write it and make the PDF.",
         };
       }
-      return fileAnswer(request, artifacts, previous.answer, previous.question);
+      return fileAnswer(
+        request,
+        artifacts,
+        previous.answer,
+        previous.question,
+        history,
+      );
     }
     // A Q_REPORT is written by the answer first (answerThenFile).
     if (tool.documentType === "Q_REPORT") return null;
@@ -2291,18 +2419,21 @@ export function createSpecialistQAnswer(
         { qRunId: request.runId, destination },
         "q is taking the person to a screen",
       );
-      const blocks: QResultBlock[] = [
-        { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } },
-      ];
+      const placed = forTheirSide(
+        request,
+        naturalPlaceLine(DESTINATION_LINES[destination], askedIn(history)),
+        [{ kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } }],
+      );
       return recordAnswer(
         request,
         conversationId,
         await withDestinationSummary(
           request,
-          naturalPlaceLine(DESTINATION_LINES[destination], askedIn(history)),
-          blocks,
+          placed.said,
+          placed.blocks,
+          placed.requests,
         ),
-        blocks,
+        placed.blocks,
       );
     }
     if (
@@ -2403,12 +2534,62 @@ export function createSpecialistQAnswer(
    * code from the person's own words (page-request.ts). Null when the
    * words are not such a request, or name a screen this run cannot open.
    */
+  /**
+   * QO-15 (QA 2026-10-23): an investor's "take me to my data room
+   * requests" opened a founder's page (a dead end) and Q said "Opened your
+   * data room". A founder's own pages are never an investor's: their
+   * requests live on each relationship's Diligence tab, so the CRM opens
+   * and Q says so, with the requests it can read.
+   */
+  const forTheirSide = (
+    request: QAnswerRequest,
+    said: string,
+    blocks: readonly QResultBlock[],
+  ): {
+    readonly said: string;
+    readonly blocks: readonly QResultBlock[];
+    readonly requests: boolean;
+  } => {
+    if (ownInvestorOrganisationIn(request.plan) === null) {
+      return { said, blocks, requests: false };
+    }
+    const moved = blocks.find(
+      (block) =>
+        block.kind === "UI_INTENT" &&
+        block.intent.kind === "NAVIGATE" &&
+        FOUNDER_OWN_PAGES.has(block.intent.destination),
+    );
+    if (moved === undefined) return { said, blocks, requests: false };
+    return {
+      said: "Your data room requests are on each company's Diligence tab in the CRM, so I've opened the CRM.",
+      blocks: blocks.map((block) =>
+        block === moved
+          ? {
+              kind: "UI_INTENT" as const,
+              intent: {
+                kind: "NAVIGATE" as const,
+                destination: "RELATIONSHIPS",
+              },
+            }
+          : block,
+      ),
+      requests: true,
+    };
+  };
+
   /** One line of what is there, before the move, when Q has it. */
   const withDestinationSummary = async (
     request: QAnswerRequest,
     said: string,
     blocks: readonly QResultBlock[],
+    requests = false,
   ): Promise<string> => {
+    if (requests) {
+      const listed = await (
+        dependencies.diligenceSummary?.(request) ?? Promise.resolve(null)
+      ).catch(() => null);
+      return listed === null ? said : `${listed} ${said}`;
+    }
     const moved = blocks.find(
       (block) => block.kind === "UI_INTENT" && block.intent.kind === "NAVIGATE",
     );
@@ -4000,11 +4181,17 @@ export function createSpecialistQAnswer(
         { qRunId: request.runId, page: paged.log },
         "q opened a page by name",
       );
+      const placed = forTheirSide(request, paged.said, paged.blocks);
       return recordAnswer(
         request,
         conversationId,
-        await withDestinationSummary(request, paged.said, paged.blocks),
-        paged.blocks,
+        await withDestinationSummary(
+          request,
+          placed.said,
+          placed.blocks,
+          placed.requests,
+        ),
+        placed.blocks,
       );
     }
     saidInRun.set(request.runId, latest.content);
@@ -4788,6 +4975,27 @@ export function createSpecialistQAnswer(
           reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
         );
         return listed;
+      }
+    }
+    // A new item in their words (v62 ADD; or SAVE of a title they put in
+    // quotes) is a to-do with that title, never Q's last answer (F-72).
+    if (
+      !writingDocument &&
+      (boardAsk === "ADD" ||
+        (boardAsk === "SAVE" && dictatesItem(latest.content)))
+    ) {
+      const added = await addItemToBoard(
+        request,
+        conversationId,
+        latest.content,
+        history,
+      );
+      if (added !== null) {
+        remember(
+          conversationId,
+          reduceConversation(state, { type: "SUCCEEDED", operation: "TOOL" }),
+        );
+        return added;
       }
     }
     if (

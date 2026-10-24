@@ -5,6 +5,7 @@ import type {
   ConnectionStatusDto,
   DiscoveredInvestorProfileDto,
   DiscoveryReasonDto,
+  PublishedFitDto,
   InvestorGateFitDto,
   PublicCardDto,
   RelationshipSummaryDto,
@@ -76,6 +77,8 @@ export type InvestorProfileReads = {
   readonly gate: InvestorGateFitDto | null;
   /** Discover's public-profile reasons for this investor. */
   readonly reasons: readonly DiscoveryReasonDto[];
+  /** QO-42: their card against the founder's own company; absent: not read. */
+  readonly publishedFit?: PublishedFitDto | undefined;
   /** The founder's own canonical relationship with them, if any. */
   readonly record:
     Pick<RelationshipSummaryDto, "state" | "nextStep"> | undefined;
@@ -94,7 +97,7 @@ export async function InvestorProfile({
   const { investor, status, card, gate, reasons, record, prefill } = reads;
   const id = investor.investorOrganisationId;
   const mandate = publishedMandate(card);
-  const matches = dimensionMatches(gate, reasons);
+  const matches = dimensionMatches(gate, reasons, reads.publishedFit);
   const cta = connectCta(record);
   const recordHref = `/relationships/investor/${encodeURIComponent(id)}`;
   const where = countryLabel(investor.hqCountry);

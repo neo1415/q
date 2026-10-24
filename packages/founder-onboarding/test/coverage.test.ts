@@ -302,3 +302,11 @@ describe("deriveOnboardingCoverage (founder)", () => {
     });
   });
 });
+
+describe("QA QO-31: the sector is essential", () => {
+  it("is asked before essentials are complete, since matching and Discover need it", () => {
+    expect(FOUNDER_COVERAGE_PROFILE.fields["F1.categories"]?.priority).toBe(
+      "ESSENTIAL",
+    );
+  });
+});

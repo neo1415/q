@@ -170,6 +170,7 @@ import {
   companyFactAskOf,
   companyNameCandidates,
   isCapitalQCompanyRead,
+  itemsOf,
   lowercaseNameCandidates,
   namesOnlyCompany,
   profileOf,
@@ -370,6 +371,7 @@ import {
   namedCardCompanyIds,
   previousCardCompanyIds,
   shownCardCompanyIds,
+  tieIsAsked,
   tieLine,
   withFitIntegrity,
 } from "./fit-integrity.js";
@@ -1220,7 +1222,8 @@ const RESEARCH_NOTE_BRIEF =
 // point comes from (~160 characters), about 100 tokens a turn.
 // 9,800 since 2026-10-23 (VIEWING_NOT_DISCLOSED_NOTE, ~340 characters):
 // a production-sized run would otherwise lose what Q can do again.
-export const ENVIRONMENT_NOTES_MAX_CHARS = 9_800;
+// 10,200 since 2026-10-24 (REMEMBER_FIRST_NOTE, ~370 characters).
+export const ENVIRONMENT_NOTES_MAX_CHARS = 10_200;
 
 /**
  * What Q can do, so it says so rather than claiming it cannot (founder
@@ -1392,6 +1395,17 @@ export const SAVE_NOT_VERIFY_NOTE =
  * founders; what a founder can see is interest and connection requests,
  * from their own relationships.
  */
+/**
+ * QA QO-35 (live 2026-10-24, investor): "Remember: I pass on consumer
+ * lending businesses." took 15 s through the mandate tools and answered
+ * that the mandate has no such category, never that Q will remember it.
+ * Remembering comes first and needs no tool; the declared mandate is
+ * separate and changed only by its own approval (Declared Mandate ≠
+ * Observed Behaviour ≠ Q Inference).
+ */
+export const REMEMBER_FIRST_NOTE =
+  "REMEMBER: when they ask you to remember something about themselves or how they work or invest ('remember: I pass on consumer lending'), say first, in one short sentence, that you will remember it; it is kept from what they say, no tool needed. Their declared mandate is separate: change it only when they ask, and otherwise you may offer that as one short question.";
+
 export const VIEWING_NOT_DISCLOSED_NOTE =
   "VIEWING IS NOT INTEREST: founders never see who viewed or played their pitch or profile, by design. Asked who looked, say so as how Capital Q works (never as a missing record), then give what they can see: investors who expressed interest or asked to connect, counted from list_incoming_interest or list_my_relationships, never estimated.";
 
@@ -1559,6 +1573,7 @@ export function environmentNoteParts(
     LIKELY_INTENT_NOTE,
     SAVE_NOT_VERIFY_NOTE,
     VIEWING_NOT_DISCLOSED_NOTE,
+    REMEMBER_FIRST_NOTE,
     OWN_DAY_NOTE,
     EXPRESSIVE_NOTE,
     statementsNote,
@@ -2943,13 +2958,48 @@ export function createModelGatewayQAnswer(
     let compareTable: QResultBlock | null = null;
     const compareRead = (async (): Promise<void> => {
       if (latest === undefined) return;
-      const targets = compareTargets(
+      const fromCards = compareTargets(
         latest.content,
         newestAnswerCards(earlier),
         request.compare,
       );
-      if (targets.length < 2) return;
+      const named = request.compare?.names ?? [];
+      if (fromCards.length < 2 && named.length < 2) return;
       const { names } = await prefetchToolsRead;
+      // Coordinator 24 Oct ("which is better, Anchor or Afyascan?"): the
+      // companies the reader heard named but Q did not show are found by
+      // their exact name, so they too are read and compared.
+      const targets =
+        fromCards.length >= 2 || !names.has("search_companies")
+          ? fromCards
+          : (
+              await Promise.all(
+                named.slice(0, 4).map(async (name, index) => {
+                  const found = await tools
+                    .execute(
+                      {
+                        callId: `q-compare-search-${String(index)}`,
+                        name: "search_companies",
+                        arguments: { query: name, limit: 5 },
+                      },
+                      toolContext,
+                    )
+                    .catch(() => null);
+                  const exact = (itemsOf(found) ?? []).filter(
+                    (item) =>
+                      item.canonicalName.trim().toLowerCase() ===
+                      name.trim().toLowerCase(),
+                  );
+                  return exact.length === 1
+                    ? (exact[0]?.companyId ?? null)
+                    : null;
+                }),
+              )
+            ).filter(
+              (id, index, all): id is string =>
+                id !== null && all.indexOf(id) === index,
+            );
+      if (targets.length < 2) return;
       const reads = targets.flatMap((companyId, index) =>
         [
           { name: "get_company", key: "profile" },
@@ -2980,7 +3030,10 @@ export function createModelGatewayQAnswer(
         only: targets,
         compareAsked: true,
       });
-      const statement = table === null ? null : comparisonFactStatement(table);
+      const statement =
+        table === null
+          ? null
+          : comparisonFactStatement(table, runFits.read(request.runId));
       if (statement === null) return;
       compareIds = targets;
       compareTable = table;
@@ -5807,7 +5860,12 @@ export function createModelGatewayQAnswer(
           (block): block is QAnswerCardsBlock =>
             block.kind === "ANSWER_CARDS" && block.shape === "RANKED",
         );
-        const tie = ranked === undefined ? null : tieLine(ranked);
+        // Only where they asked for fit or for companies (QA F-71, live
+        // 2026-10-24: "Show my pipeline" ended with "Ajopot and Maji Loop
+        // are tied on mandate fit at 7", about cards they had not asked to
+        // rank). Any other turn says the tie on its cards only.
+        const tie =
+          ranked === undefined || !tieIsAsked(request) ? null : tieLine(ranked);
         content =
           tie === null || /\btied\b/iu.test(content)
             ? content
@@ -8326,7 +8384,14 @@ export function createModelGatewayQAnswer(
           // الاكتشاف"). The checks above read English words only, so a
           // reply in another script is taken as its own account of what
           // happened, in the person's language.
-          !repliedInOtherScript(statusTalk?.text ?? guarded.text)
+          !repliedInOtherScript(statusTalk?.text ?? guarded.text) &&
+          // No action named and the turn answered with what was asked for
+          // (QA F-71: "Show my pipeline" answered with findings and cards,
+          // then "I didn't get that done…"): an answer, not a miss.
+          !(
+            parityGap === "NOT_IN_REGISTRY" &&
+            (analyst.findings.length > 0 || analyst.answerCards !== null)
+          )
             ? couldNotDoLine(parityGap)
             : null;
         if (couldNot !== null) {
