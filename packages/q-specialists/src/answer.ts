@@ -1265,7 +1265,9 @@ export function nameInAsk(question: string): string | null {
       question,
     )?.[1];
   const name = found?.replace(/\s+(?:of|and|&)$/u, "").trim();
-  return name === undefined || name.length < 2 ? null : name;
+  return name === undefined || (name.match(/\p{L}/gu)?.length ?? 0) < 3
+    ? null
+    : name;
 }
 
 /**
@@ -2501,6 +2503,8 @@ export function createSpecialistQAnswer(
           return "I couldn't turn that item into work I can carry out for you. Tell me what you want at the end of it (a memo, a list of questions, a short plan) and I'll start.";
         case "NOT_FOUND":
           return "That item isn't open on your board any more, so there's nothing to start. Ask me what's on your board to see what is.";
+        case "FAILED":
+          return "I couldn't plan that task: the planning step failed on my side, so nothing has started and the item stays in To do.";
         default:
           return "I couldn't start on that just now. Ask me again in a moment.";
       }
@@ -2559,7 +2563,10 @@ export function createSpecialistQAnswer(
             : [],
       ),
     );
-    if (referenced.size === 1) {
+    // Live 9ff4a1118: the call-prep answer carried no blocks at all, so
+    // the name they gave in the ask is the subject whenever the answer
+    // shows no one else (one record referenced, or none).
+    if (referenced.size <= 1 && named.length === 0) {
       const asked = nameInAsk(question);
       if (asked !== null) return asked;
     }
