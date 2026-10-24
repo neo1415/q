@@ -2248,6 +2248,20 @@
     gap: 8px;
     transform: translateY(-50%);
   }
+  /* QO-16 (QA 2026-10-24, phone): the sound controls start below the
+     Discover tabs, never in their row, and "Tap for sound" sits beside the
+     sound button it explains rather than stacked under the captions
+     toggle over the picture. */
+  @media (max-width: 1023px) {
+    .cq-feed-player-controls {
+      top: calc(56px + var(--cq-safe-top));
+    }
+    .cq-feed-player-controls [data-sound-blocked] {
+      position: absolute;
+      top: 8px;
+      inset-inline-start: 44px;
+    }
+  }
   /* On a phone the swipe is the move; the explicit Previous and Next stay
      reachable by keyboard and switch access, shown when focused. */
   @media (max-width: 1023px) {
