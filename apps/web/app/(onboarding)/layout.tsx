@@ -9,6 +9,7 @@ import { QControlRuntime } from "@/features/q/control/q-control-runtime";
 import { LanguageProvider } from "@/features/i18n/language";
 import { machineUiText } from "@/features/i18n/machine";
 import { uiLanguageOf } from "@/features/i18n/messages";
+import { deviceLanguages } from "@/features/i18n/server";
 
 // Session-bound HTML is rendered per request and never prerendered or
 // shared-cached (doc 15 s9.4).
@@ -35,7 +36,7 @@ export default async function OnboardingLayout({
   }
   // Outside the app shell: the same "fictional" names rule as inside it.
   // Any language: onboarding speaks their chosen language too.
-  const language = uiLanguageOf(standing?.language);
+  const language = uiLanguageOf(standing?.language, await deviceLanguages());
   const machine = await machineUiText(language);
   return (
     <LanguageProvider language={language} machine={machine}>

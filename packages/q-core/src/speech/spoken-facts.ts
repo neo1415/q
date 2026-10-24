@@ -894,7 +894,8 @@ export function spokenFactsOfAttention(report: QAttentionReport): SpokenFacts {
     });
     if (more > 0) {
       lines.push(
-        `${more === 1 ? "One more is" : `${sayNumber(more)} more are`} in the chat.`.replace(
+        // F-59 (QA 2026-10-23): the rest offered, never read out.
+        `${more === 1 ? "There's one more" : `There are ${sayNumber(more)} more`}; want me to go through them?`.replace(
           /^./u,
           (c) => c.toUpperCase(),
         ),

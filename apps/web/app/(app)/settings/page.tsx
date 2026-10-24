@@ -12,6 +12,7 @@ import { getSessionUser } from "@/auth/session";
 import { adminContext } from "@/features/admin/admin-context";
 import { machineUiText } from "@/features/i18n/machine";
 import { translate, uiLanguageOf } from "@/features/i18n/messages";
+import { deviceLanguages } from "@/features/i18n/server";
 import {
   loadProfileImages,
   loadProfilePage,
@@ -88,7 +89,10 @@ export default async function SettingsPage({
       : await loadProfileImages(billingSession, "PERSON", person.userId);
   const acting = mine.find((organisation) => organisation.active) ?? null;
   // Any language: this page in their chosen language.
-  const pageLanguage = uiLanguageOf(standing?.language);
+  const pageLanguage = uiLanguageOf(
+    standing?.language,
+    await deviceLanguages(),
+  );
   await machineUiText(pageLanguage);
   const t = (english: string) => translate(pageLanguage, english);
   const canBrand = admin?.can("flags.write") === true;

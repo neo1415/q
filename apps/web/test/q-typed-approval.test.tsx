@@ -28,6 +28,9 @@ let emit: ((event: QStreamEvent) => void) | null = null;
 
 vi.mock("../src/features/q/actions", () => ({
   readQConversationAction: vi.fn(),
+  pendingQApprovalsAction: () => Promise.resolve({ ok: true, value: [] }),
+  listQConversationsAction: () =>
+    Promise.resolve({ ok: true, value: { items: [] } }),
   askQAction: (...args: unknown[]) => askQAction(...args),
   continueQRunAction: (...args: unknown[]) => continueQRunAction(...args),
   cancelQRunAction: vi.fn(),
@@ -117,5 +120,35 @@ describe("typed approval while a change waits", () => {
     expect(continueQRunAction).not.toHaveBeenCalled();
     const reply = askQAction.mock.calls.find((call) => call[0] === "go ahead");
     expect(reply?.[1]).toBe(CONVERSATION);
+  });
+
+  it("stops 'working' when the run completes, even while the stream stays open (QO-34)", async () => {
+    emit = null;
+    render(<Home />);
+    await act(async () => {
+      await handle.ask?.("How is my pipeline?");
+    });
+    await waitFor(() => {
+      expect(emit).not.toBeNull();
+    });
+    act(() => {
+      emit?.(
+        event("q.run.started", {
+          capability: "ANSWER",
+          status: "RECEIVED",
+        }),
+      );
+    });
+    expect(screen.getByTestId("working").textContent).toBe("true");
+    // The fake stream never closes, as a held connection would not.
+    act(() => {
+      emit?.(
+        event("q.run.completed", {
+          status: "COMPLETED",
+          completedAt: "2026-09-27T10:00:05.000Z",
+        }),
+      );
+    });
+    expect(screen.getByTestId("working").textContent).toBe("false");
   });
 });

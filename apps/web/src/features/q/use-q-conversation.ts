@@ -287,6 +287,11 @@ export function useQConversation(
             setRunState((current) => reduceQStream(current, event));
             if (isTerminalQStreamEvent(event)) {
               finished.current = true;
+              // QO-34 (QA 2026-10-23): Q is done when the run is, not when
+              // the stream's connection closes (it stayed "working" for
+              // about four minutes after the answer). Late events on the
+              // stream are still read.
+              if (abort.current === controller) setStreaming(false);
               // A finished run may have named the conversation for the
               // first time; the list is read again either way.
               announceConversationsChanged();

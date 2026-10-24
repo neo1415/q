@@ -94,7 +94,10 @@ export function LanguageProvider({
         (event as CustomEvent<unknown>).detail,
       );
       if (!detail.success) return;
-      setAnnounced({ from: initial, to: uiLanguageOf(detail.data) });
+      setAnnounced({
+        from: initial,
+        to: uiLanguageOf(detail.data, window.navigator.languages),
+      });
       // Server-rendered words (Settings, page titles) follow on refresh.
       router.refresh();
     };
