@@ -15,11 +15,12 @@ import {
   DEFAULT_COMMUNICATION_PROFILE,
   DraftRedraftResultSchema,
   DraftReviewResultV2Schema,
-  AnalysisCritiqueResultSchema,
-  AnalysisDocumentResultSchema,
-  JobPlanResultV9Schema,
-  ResearchFactsResultSchema,
-  ResearchPlanResultSchema,
+  JobPlanResultV10Schema,
+  normalisePlanV10,
+  AnalysisCritiqueResultV3Schema,
+  AnalysisDocumentResultV3Schema,
+  ResearchFactsResultV2Schema,
+  ResearchPlanResultV2Schema,
   renderPrompt,
   type AnalysisCritiqueResult,
   type AnalysisCritiqueVariables,
@@ -29,6 +30,10 @@ import {
   type ResearchFactsVariables,
   type ResearchPlanResult,
   type ResearchPlanVariables,
+  type AnalysisCritiqueResultV3,
+  type AnalysisDocumentResultV3,
+  type ResearchFactsResultV2,
+  type ResearchPlanResultV2,
   SubstanceCritiqueResultSchema,
   type SubstanceCritiqueResult,
   type SubstanceCritiqueVariables,
@@ -44,7 +49,8 @@ import {
   type DraftReviewResultV2,
   type DraftReviewV2Variables,
   type EtiquettePurpose,
-  type JobPlanResultV9,
+  type JobPlanResultV9Input,
+  type JobPlanResultV10,
   type JobPlanVariablesV5,
   type ReplyReaderResult,
   type ReplyReaderVariables,
@@ -175,7 +181,7 @@ export type WorkforceModels = {
     trace: Trace,
     variables: PlanVariables,
     // The input shape: firstRead may be absent (an older plan, a fake).
-  ) => Promise<z.input<typeof JobPlanResultV9Schema> | null>;
+  ) => Promise<JobPlanResultV9Input | null>;
   readonly critique: (
     who: Who,
     trace: Trace,
@@ -258,6 +264,8 @@ export function createWorkforceModels(dependencies: {
       | DeepBudget;
     readonly environmentNotes: string;
     readonly etiquette: EtiquettePurpose | null;
+    /** A malformed element of a list costs that element alone (gateway DROP). */
+    readonly dropListItems?: boolean | undefined;
   };
 
   async function call<V, O>(input: CallInput<V, O>): Promise<O | null> {
@@ -304,7 +312,12 @@ export function createWorkforceModels(dependencies: {
                 : workforceCorrelationId(input.trace.jobId, input.trace.runId),
           },
         },
-        { schema: input.schema },
+        {
+          schema: input.schema,
+          ...(input.dropListItems === true
+            ? { invalidListItems: "DROP" as const }
+            : {}),
+        },
       );
       if (response.output.kind !== "STRUCTURED") return null;
       const parsed = input.schema.safeParse(
@@ -371,19 +384,26 @@ export function createWorkforceModels(dependencies: {
           "You are reading a message, not replying. Code acts only on what you report.",
         etiquette: null,
       }),
-    plan: (who, trace, variables) =>
-      call<PlanVariables, JobPlanResultV9>({
+    plan: async (who, trace, variables) => {
+      // v10's tolerant result, normalised back to v9's shape (keys and
+      // their references in the plan's key form, text clipped).
+      const plan = await call<PlanVariables, JobPlanResultV10>({
         task: "JOB_PLAN",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: JobPlanResultV9Schema,
+        schema: JobPlanResultV10Schema,
         budget: PLAN,
         environmentNotes:
           "You are planning, not acting. Code checks every step against what they allowed before anything happens.",
         etiquette: null,
-      }),
+        // A step with an unknown role is dropped; code then refuses what
+        // waited on it and replans, never runs a partial plan unchecked.
+        dropListItems: true,
+      });
+      return plan === null ? null : normalisePlanV10(plan);
+    },
     critique: (who, trace, variables) =>
       call<CritiqueVariables, SubstanceCritiqueResult>({
         task: "SUBSTANCE_CRITIQUE",
@@ -410,58 +430,138 @@ export function createWorkforceModels(dependencies: {
           "You are drafting questions for the person's approval. Nothing is sent until they approve.",
         etiquette: null,
       }),
-    planResearch: (who, trace, variables) =>
-      priced<ResearchPlanInput, ResearchPlanResult>({
+    // Live 2026-10-24 (batch 5): tolerant results, clipped here to the
+    // shapes code reads; a malformed list element costs that element.
+    planResearch: async (who, trace, variables) => {
+      const result = await priced<ResearchPlanInput, ResearchPlanResultV2>({
         task: "RESEARCH_PLAN",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: ResearchPlanResultSchema,
+        schema: ResearchPlanResultV2Schema,
         budget: RESEARCH_PLAN_BUDGET,
         environmentNotes:
           "You are planning searches, not running them. Code composes every query before anything leaves Capital Q.",
         etiquette: null,
-      }),
-    researchFacts: (who, trace, variables) =>
-      priced<ResearchFactsInput, ResearchFactsResult>({
+        dropListItems: true,
+      });
+      if (result === null) return null;
+      return {
+        costUsd: result.costUsd,
+        output: {
+          questions: result.output.questions.slice(0, 12).map((one) => ({
+            lane: one.lane.slice(0, 40),
+            query: one.query.slice(0, 160),
+            alsoQuery:
+              one.alsoQuery === null ? null : one.alsoQuery.slice(0, 160),
+            recent: one.recent,
+          })),
+        },
+      };
+    },
+    researchFacts: async (who, trace, variables) => {
+      const result = await priced<ResearchFactsInput, ResearchFactsResultV2>({
         task: "RESEARCH_FACTS",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: ResearchFactsResultSchema,
+        schema: ResearchFactsResultV2Schema,
         budget: RESEARCH_FACTS_BUDGET,
         environmentNotes:
           "You are reading public pages, not answering anyone. Code keeps a fact only when its numbers are on its page.",
         etiquette: null,
-      }),
-    writeAnalysis: (who, trace, variables) =>
-      priced<AnalysisWriteInput, AnalysisDocumentResult>({
-        task: "ANALYSIS_WRITE",
-        taskClass: "EVIDENCE_SYNTHESIS",
-        who,
-        trace,
-        variables,
-        schema: AnalysisDocumentResultSchema,
-        budget: ANALYSIS_WRITE_BUDGET,
-        environmentNotes:
-          "You are writing a document for the person's own team. A second analyst reviews it before it is filed; nothing is sent to anyone.",
-        etiquette: null,
-      }),
-    critiqueAnalysis: (who, trace, variables) =>
-      priced<AnalysisCritiqueInput, AnalysisCritiqueResult>({
+        dropListItems: true,
+      });
+      if (result === null) return null;
+      return {
+        costUsd: result.costUsd,
+        output: {
+          facts: result.output.facts.slice(0, 12).map((fact) => ({
+            statement: fact.statement.slice(0, 400),
+            figure: fact.figure === null ? null : fact.figure.slice(0, 80),
+            asOf: fact.asOf === null ? null : fact.asOf.slice(0, 40),
+            source: fact.source,
+            kind: fact.kind,
+          })),
+          followUps: result.output.followUps.slice(0, 3).map((one) => ({
+            lane: one.lane.slice(0, 40),
+            query: one.query.slice(0, 160),
+          })),
+        },
+      };
+    },
+    writeAnalysis: async (who, trace, variables) => {
+      const result = await priced<AnalysisWriteInput, AnalysisDocumentResultV3>(
+        {
+          task: "ANALYSIS_WRITE",
+          taskClass: "EVIDENCE_SYNTHESIS",
+          who,
+          trace,
+          variables,
+          schema: AnalysisDocumentResultV3Schema,
+          budget: ANALYSIS_WRITE_BUDGET,
+          environmentNotes:
+            "You are writing a document for the person's own team. A second analyst reviews it before it is filed; nothing is sent to anyone.",
+          etiquette: null,
+        },
+      );
+      if (result === null) return null;
+      const draft = result.output;
+      return {
+        costUsd: result.costUsd,
+        output: {
+          title: draft.title.slice(0, 150),
+          summary: draft.summary.slice(0, 600),
+          // Long bodies are kept whole: the filed document splits them.
+          sections: draft.sections.slice(0, 16).map((section) => ({
+            heading: section.heading.slice(0, 120),
+            body: section.body,
+          })),
+          topRecommendations: draft.topRecommendations
+            .slice(0, 3)
+            .map((one) => one.slice(0, 300)),
+          gaps: draft.gaps.slice(0, 12).map((gap) => gap.slice(0, 300)),
+        },
+      };
+    },
+    critiqueAnalysis: async (who, trace, variables) => {
+      const result = await priced<
+        AnalysisCritiqueInput,
+        AnalysisCritiqueResultV3
+      >({
         task: "ANALYSIS_CRITIQUE",
         taskClass: "STRUCTURED_EXTRACTION",
         who,
         trace,
         variables,
-        schema: AnalysisCritiqueResultSchema,
+        schema: AnalysisCritiqueResultV3Schema,
         budget: ANALYSIS_CRITIQUE_BUDGET,
         environmentNotes:
           "You are reviewing, not writing. Code decides from your verdict whether the document is revised again.",
         etiquette: null,
-      }),
+        dropListItems: true,
+      });
+      if (result === null) return null;
+      const verdict = result.output;
+      return {
+        costUsd: result.costUsd,
+        output: {
+          passes: verdict.passes,
+          score: Math.round(verdict.score),
+          issues: verdict.issues.slice(0, 10).map((issue) => ({
+            kind: issue.kind,
+            section: issue.section.slice(0, 120),
+            problem: issue.problem.slice(0, 400),
+            fix: issue.fix.slice(0, 400),
+          })),
+          strengths: verdict.strengths
+            .slice(0, 3)
+            .map((one) => one.slice(0, 300)),
+        },
+      };
+    },
     shortenDiligenceQuestions: async (who, trace, input) => {
       const count = input.questions.length;
       if (count < 1 || count > 5) return null;

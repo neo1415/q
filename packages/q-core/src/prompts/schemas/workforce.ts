@@ -632,6 +632,134 @@ export const JobPlanResultV9Schema = JobPlanResultV8Schema.extend({
     .catch(null),
 }).strict();
 export type JobPlanResultV9 = z.infer<typeof JobPlanResultV9Schema>;
+/** v9's input shape: firstRead may be absent (an older plan, a fake). */
+export type JobPlanResultV9Input = z.input<typeof JobPlanResultV9Schema>;
+
+/**
+ * v10 (live 2026-10-24, batch 5): the investor's plan was refused twice
+ * more as INVALID_MODEL_OUTPUT. Keys are any short text (code normalises
+ * them, and every reference to them, to the plan's key form), unknown keys
+ * are stripped at every level, and text runs longer (code clips what it
+ * stores). Roles stay a closed list: a step with an unknown role is dropped
+ * by the gateway and the plan replanned by code, never run.
+ */
+export const JOB_PLAN_V10_SCHEMA_VERSION = 10;
+const LooseKey = z.string().trim().min(1).max(60);
+const LooseRefs = z.array(z.string().trim().max(120)).max(12).catch([]);
+export const JobPlanResultV10Schema = z.object({
+  summary: z.string().trim().min(1).max(800),
+  outcome: z.string().trim().min(1).max(800),
+  steps: z
+    .array(
+      z.object({
+        key: LooseKey,
+        role: z.enum(PLAN_AGENT_ROLES_V2),
+        goal: z.string().trim().min(1).max(800),
+        tools: z.array(z.string().min(1).max(80)).max(12),
+        dependsOn: z.array(LooseKey).max(8).catch([]),
+        document:
+          JobPlanResultV8Schema.shape.steps.element.shape.document.catch(
+            undefined,
+          ),
+        why: z.string().trim().min(1).max(800),
+        evidence: LooseRefs,
+        fallbackFor: LooseKey.nullable().catch(null),
+      }),
+    )
+    .max(12),
+  prerequisites: z
+    .array(
+      z.object({
+        what: z.string().trim().min(1).max(600),
+        status: z.enum(["MET", "MISSING", "UNKNOWN"]),
+        blocking: z.boolean().catch(false),
+        evidence: LooseRefs,
+        resolvedBy: LooseKey.nullable().catch(null),
+      }),
+    )
+    .max(8)
+    .catch([]),
+  nextActions: z
+    .array(
+      z.object({
+        action: z.string().trim().min(1).max(600),
+        why: z.string().trim().min(1).max(600),
+        evidence: LooseRefs,
+        tool: z.string().max(80).nullable().catch(null),
+      }),
+    )
+    .max(6)
+    .catch([]),
+  cannot: z.array(z.string().trim().min(1).max(1_200)).max(5).catch([]),
+  firstRead: z
+    .string()
+    .trim()
+    .min(1)
+    .max(1_200)
+    .nullable()
+    .default(null)
+    .catch(null),
+});
+export type JobPlanResultV10 = z.infer<typeof JobPlanResultV10Schema>;
+
+/** A model's step key in the plan's own form (lowercase, underscores, ≤32). */
+export function planKey(raw: string): string {
+  const key = raw
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "_")
+    .replace(/^[^a-z]+/u, "")
+    .replace(/_+$/u, "")
+    .slice(0, 32);
+  return key.length === 0 ? "step" : key;
+}
+
+/**
+ * A v10 plan in v9's shape: keys and every reference to them normalised,
+ * text clipped to what v9 and the approved payload store.
+ */
+export function normalisePlanV10(plan: JobPlanResultV10): JobPlanResultV9 {
+  const clip = (text: string, max: number) => text.slice(0, max);
+  return {
+    summary: clip(plan.summary, 400),
+    outcome: clip(plan.outcome, 400),
+    cannot: plan.cannot.map((one) => clip(one, JOB_PLAN_CANNOT_MAX)),
+    firstRead: plan.firstRead === null ? null : clip(plan.firstRead, 1_200),
+    prerequisites: plan.prerequisites.map((one) => ({
+      what: clip(one.what, 300),
+      status: one.status,
+      blocking: one.blocking,
+      evidence: one.evidence,
+      resolvedBy: one.resolvedBy === null ? null : planKey(one.resolvedBy),
+    })),
+    nextActions: plan.nextActions.map((one) => ({
+      action: clip(one.action, 300),
+      why: clip(one.why, 300),
+      evidence: one.evidence,
+      tool: one.tool,
+    })),
+    steps: plan.steps.map((step) => ({
+      key: planKey(step.key),
+      role: step.role,
+      goal: clip(step.goal, 400),
+      tools: step.tools,
+      dependsOn: step.dependsOn.map(planKey),
+      ...(step.document === undefined
+        ? {}
+        : {
+            document:
+              step.document.operation === "CRITIQUE_AND_REVISE"
+                ? {
+                    ...step.document,
+                    sourceStep: planKey(step.document.sourceStep),
+                  }
+                : step.document,
+          }),
+      why: clip(step.why, 600),
+      evidence: step.evidence,
+      fallbackFor: step.fallbackFor === null ? null : planKey(step.fallbackFor),
+    })),
+  };
+}
 
 // SUBSTANCE_CRITIQUE (2026-10-12): a second specialist's critique of a
 // prepared document, against the evidence it was built from.

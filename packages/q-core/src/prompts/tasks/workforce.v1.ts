@@ -37,6 +37,9 @@ import {
   JobPlanResultV9Schema,
   JOB_PLAN_V9_SCHEMA_VERSION,
   type JobPlanResultV9,
+  JobPlanResultV10Schema,
+  JOB_PLAN_V10_SCHEMA_VERSION,
+  type JobPlanResultV10,
   JobPlanVariablesV5Schema,
   type JobPlanResultV5,
   type JobPlanVariablesV5,
@@ -694,7 +697,7 @@ export const JOB_PLAN_V9: PromptDefinition<
 > = {
   ...JOB_PLAN_V8,
   version: 9,
-  status: "ACTIVE",
+  status: "DEPRECATED",
   changeDescription:
     "QA 2026-10-24: summary written to the person in the second person ('Research your market and write your 12-month growth plan'), never 'the person' or 'their'; F-78: a malformed first read, document request, prerequisites or next actions costs that part, not the whole plan.",
   effectiveFrom: "2026-10-24",
@@ -708,6 +711,29 @@ export const JOB_PLAN_V9: PromptDefinition<
     "THINK IN THIS ORDER",
     'SPEAKING TO THEM: summary is one line said to them, in the second person, saying what you will do ("Research your market and write your 12-month growth plan"); never "the person", "the user" or "their" for them, and never a list of steps.\n\nTHINK IN THIS ORDER',
   ),
+};
+
+/**
+ * v10 (live 2026-10-24, batch 5): v9's template with a tolerant result
+ * (JobPlanResultV10Schema) -- the investor's plan was refused twice more.
+ * Code normalises keys and clips text back to v9's shape before bounding.
+ */
+export const JOB_PLAN_V10: PromptDefinition<
+  JobPlanVariablesV5,
+  JobPlanResultV10
+> = {
+  ...JOB_PLAN_V9,
+  version: 10,
+  status: "ACTIVE",
+  changeDescription:
+    "Live 2026-10-24: v9's template; a tolerant result -- any step key (code normalises it and its references), unused keys stripped at every level, longer text code clips; an unknown role still drops that step for code to replan.",
+  effectiveFrom: "2026-10-24",
+  output: {
+    kind: "STRUCTURED",
+    schemaName: JOB_PLAN_SCHEMA_NAME,
+    schemaVersion: JOB_PLAN_V10_SCHEMA_VERSION,
+    schema: JobPlanResultV10Schema,
+  },
 };
 
 const SUBSTANCE_CRITIQUE_TEMPLATE = `TASK: SUBSTANCE_CRITIQUE

@@ -23,7 +23,7 @@ describe("a decision stated with work attached", () => {
       V51_DECISION_WITH_WORK,
     );
     // v9 (2026-10-24) is built on v8 (ANALYSIS, first read), on v7.
-    expect(registry.getActive("JOB_PLAN").definition.version).toBe(9);
+    expect(registry.getActive("JOB_PLAN").definition.version).toBe(10);
     expect(TURN_READER_V51.template).toContain(V51_DECISION_WITH_WORK);
     expect(V51_DECISION_WITH_WORK).toMatch(/teamJob is true/u);
     expect(V51_DECISION_WITH_WORK).toMatch(
@@ -34,7 +34,7 @@ describe("a decision stated with work attached", () => {
   it("is carried by the lead as the first next action, never a step, and prerequisites are not step outputs", () => {
     expect(JOB_PLAN_V7.status).toBe("DEPRECATED");
     expect(JOB_PLAN_V8.status).toBe("DEPRECATED");
-    expect(JOB_PLAN_V9.status).toBe("ACTIVE");
+    expect(JOB_PLAN_V9.status).toBe("DEPRECATED");
     expect(JOB_PLAN_V9.template).toContain(
       "make it the first next action with tool relationship.outcome.change",
     );

@@ -267,3 +267,93 @@ export const AnalysisCritiqueResultSchema = z
 export type AnalysisCritiqueResult = z.infer<
   typeof AnalysisCritiqueResultSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Tolerant results (live 2026-10-24, batch 5): one model refused as
+// INVALID_MODEL_OUTPUT on most deep-work calls -- research facts, the
+// analysis draft, the investor's job plan -- never truncated. Same
+// templates; the results now strip keys they do not use, take longer text
+// that code clips to what it stores, and let a malformed list element cost
+// that element (the gateway's DROP). Nothing a model writes is trusted more:
+// code still admits every fact, bounds every field it files and checks every
+// figure's basis.
+// ---------------------------------------------------------------------------
+
+const LooseLane = z.string().trim().min(1).max(80);
+const LooseQuery = z.string().trim().min(3).max(240);
+
+export const RESEARCH_PLAN_V2_SCHEMA_VERSION = 2;
+export const ResearchPlanResultV2Schema = z.object({
+  questions: z
+    .array(
+      z.object({
+        lane: LooseLane,
+        query: LooseQuery,
+        alsoQuery: LooseQuery.nullable().catch(null),
+        recent: z.boolean().catch(false),
+      }),
+    )
+    .min(1)
+    .max(16),
+});
+export type ResearchPlanResultV2 = z.infer<typeof ResearchPlanResultV2Schema>;
+
+export const RESEARCH_FACTS_V2_SCHEMA_VERSION = 2;
+export const ResearchFactsResultV2Schema = z.object({
+  facts: z
+    .array(
+      z.object({
+        statement: z.string().trim().min(1).max(800),
+        figure: z.string().trim().min(1).max(200).nullable().catch(null),
+        asOf: z.string().trim().min(1).max(120).nullable().catch(null),
+        source: z.number().int().min(1).max(500),
+        kind: z.enum(RESEARCH_FACT_KINDS).catch("FACT"),
+      }),
+    )
+    .max(24),
+  followUps: z
+    .array(z.object({ lane: LooseLane, query: LooseQuery }))
+    .max(6)
+    .catch([]),
+});
+export type ResearchFactsResultV2 = z.infer<typeof ResearchFactsResultV2Schema>;
+
+export const ANALYSIS_WRITE_V3_SCHEMA_VERSION = 3;
+export const AnalysisDocumentResultV3Schema = z.object({
+  title: z.string().trim().min(1).max(400),
+  summary: z.string().trim().min(1).max(2_000),
+  sections: z
+    .array(
+      z.object({
+        heading: z.string().trim().min(1).max(300),
+        body: z.string().trim().min(1).max(16_000),
+      }),
+    )
+    .min(3)
+    .max(24),
+  topRecommendations: z.array(z.string().trim().min(1).max(800)).min(1).max(8),
+  gaps: z.array(z.string().trim().min(1).max(800)).max(30).catch([]),
+});
+export type AnalysisDocumentResultV3 = z.infer<
+  typeof AnalysisDocumentResultV3Schema
+>;
+
+export const ANALYSIS_CRITIQUE_V3_SCHEMA_VERSION = 3;
+export const AnalysisCritiqueResultV3Schema = z.object({
+  passes: z.boolean(),
+  score: z.number().min(0).max(100),
+  issues: z
+    .array(
+      z.object({
+        kind: z.enum(ANALYSIS_ISSUE_KINDS).catch("GENERIC"),
+        section: z.string().trim().min(1).max(300),
+        problem: z.string().trim().min(1).max(1_200),
+        fix: z.string().trim().min(1).max(1_200),
+      }),
+    )
+    .max(20),
+  strengths: z.array(z.string().trim().min(1).max(800)).max(8).catch([]),
+});
+export type AnalysisCritiqueResultV3 = z.infer<
+  typeof AnalysisCritiqueResultV3Schema
+>;
