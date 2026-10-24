@@ -909,7 +909,15 @@ export const TurnCompareSchema = z
   .strict();
 export type TurnCompare = z.infer<typeof TurnCompareSchema>;
 
+/**
+ * v62 board asks (coordinator and work-board lane, 2026-10-24): LIST, only
+ * asking what is on their own work board, and ADD, a new item in their own
+ * words. v61's asks keep their meaning and win over LIST.
+ */
+export const TURN_BOARD_ASKS_V62 = [...TURN_BOARD_ASKS, "LIST", "ADD"] as const;
+
 export const TurnReaderV62ResultSchema = TurnReaderV61ResultSchema.extend({
+  boardAsk: z.enum(TURN_BOARD_ASKS_V62).nullable().default(null).catch(null),
   workFromEarlier: z.boolean().default(false).catch(false),
   compare: TurnCompareSchema.nullable().default(null).catch(null),
 }).strict();

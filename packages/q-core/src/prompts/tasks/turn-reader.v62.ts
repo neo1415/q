@@ -33,6 +33,14 @@ export const V62_BOARD_SCREEN = `- Their own work board as a screen to open ("op
 `;
 
 /**
+ * Coordinator and work-board lane (QA live 2026-10-24): "What is on my
+ * board?" was answered from the readiness store and "Add ... to my board"
+ * added nothing: no reading named either. boardAsk gains LIST and ADD.
+ */
+export const V62_BOARD_LIST_ADD = `BOARD ASK, two more: LIST when they only ask what is on their own work board, in any words and any language ("what's on my board?", "show my work board", "what's in my to-dos", "qu'y a-t-il sur mon tableau ?"); ADD when they give a new item to put on it in their own words ("add 'Prep IC memo for Mizan' to my board", "put 'call Kestrel on Friday' on my to-dos", "ajoute « relancer Savanna » à mon tableau"). SAVE, BREAKDOWN and WORK win over LIST; keeping something you said or showed (your last answer, a document, a company) stays SAVE, not ADD. Opening the board page stays NAVIGATE BOARD.
+`;
+
+/**
  * Lane 8 (live run d5f01a73, 2026-10-23): "Compare the top two in a table"
  * after cards was read as fromShown and answered from the earlier turn in
  * prose. Companies put side by side are new work: compare.
@@ -58,7 +66,7 @@ export const TURN_READER_V62: PromptDefinition<
   version: 62,
   status: "ACTIVE",
   changeDescription:
-    "Analyst lane QO-07 2026-10-23: v61 plus DEEP WORK (analysis or strategy work ending in a document -- a plan of any kind, a market study, a competitive analysis, a written-up strategy -- is teamJob even as one document) and workFromEarlier (a yes or 'do that' handing over work asked for or offered in the last few turns; lenient); their work board as a screen is NAVIGATE BOARD and 'board' is never the readiness checklist; a founder's fundraising pipeline is the relationships pipeline; and compare {count, names} for companies put side by side (lane 8), never with fromShown. Read by meaning in any language.",
+    "Analyst lane QO-07 2026-10-23: v61 plus DEEP WORK (analysis or strategy work ending in a document -- a plan of any kind, a market study, a competitive analysis, a written-up strategy -- is teamJob even as one document) and workFromEarlier (a yes or 'do that' handing over work asked for or offered in the last few turns; lenient); their work board as a screen is NAVIGATE BOARD and 'board' is never the readiness checklist; a founder's fundraising pipeline is the relationships pipeline; and compare {count, names} for companies put side by side (lane 8), never with fromShown; boardAsk gains LIST and ADD. Read by meaning in any language.",
   effectiveFrom: "2026-10-24",
   output: {
     kind: "STRUCTURED",
@@ -73,6 +81,6 @@ export const TURN_READER_V62: PromptDefinition<
     )
     .replace(
       V61_BOARD_ASK,
-      `${V61_BOARD_ASK}${V62_BOARD_SCREEN}${V62_COMPARE}`,
+      `${V61_BOARD_ASK}${V62_BOARD_LIST_ADD}${V62_BOARD_SCREEN}${V62_COMPARE}`,
     ),
 };
