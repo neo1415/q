@@ -13,6 +13,13 @@ export const WORK_DESIGN_AR: Readonly<Record<string, string>> = {
   "Done today": "أُنجز اليوم",
   "Nothing done yet today.": "لم يُنجز شيء اليوم بعد.",
   "Earlier this week, {n}": "في وقت سابق من هذا الأسبوع، {n}",
+  // Approval choices (owner reference design, 24 Oct)
+  "Change it": "عدّله",
+  "Keep it with me": "احتفظ به عندي",
+  Drop: "تجاهله",
+  "I'd like to change it first.": "أودّ تعديله أولاً.",
+  "Kept for you: it waits in Work, under Needs you.":
+    "احتفظنا به لك: ينتظر في العمل، ضمن «يحتاجك».",
   // The switch and the track
   "How Q is handling it": "كيف يتولّى Q الأمر",
   "Cost, {name}": "التكلفة، {name}",

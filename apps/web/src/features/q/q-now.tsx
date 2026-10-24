@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { buttonClassName } from "@capital-q/ui/button";
 
 import { EmailDraftEditor } from "../integrations/email-draft-editor";
@@ -43,6 +45,8 @@ export function QNow({
   readonly onAct: (text: string) => void;
 }) {
   const t = useT();
+  // "Keep it with me": out of the way here, still waiting in Work.
+  const [kept, setKept] = useState<string | null>(null);
   const { q, turns, voice } = session;
   const approval = q.state.approval;
   const proposal =
@@ -92,7 +96,7 @@ export function QNow({
         </div>
       ) : null}
 
-      {approval !== null ? (
+      {approval !== null && kept !== approval.approvalId ? (
         // What Q has prepared and is waiting on (CQ-Q-008). The server's
         // own words for the exact payload the decision binds to; one yes
         // applies it, one no leaves everything as it was.
@@ -117,6 +121,8 @@ export function QNow({
               onRevised={() => q.revised()}
             />
           ) : null}
+          {/* The honest choices (owner reference design, 24 Oct): yes;
+              change it first; leave it waiting with me; or drop it. */}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -131,12 +137,31 @@ export function QNow({
             <button
               type="button"
               className="cq-stage-control"
+              onClick={() => onAct(t("I'd like to change it first."))}
+            >
+              {t("Change it")}
+            </button>
+            <button
+              type="button"
+              className="cq-stage-control"
+              onClick={() => setKept(approval.approvalId)}
+            >
+              {t("Keep it with me")}
+            </button>
+            <button
+              type="button"
+              className="cq-stage-control"
               onClick={() => void q.decline()}
             >
-              {t("Decline")}
+              {t("Drop")}
             </button>
           </div>
         </div>
+      ) : null}
+      {approval !== null && kept === approval.approvalId ? (
+        <p className="cq-caption text-(--cq-text-tertiary)" role="status">
+          {t("Kept for you: it waits in Work, under Needs you.")}
+        </p>
       ) : null}
 
       {questions.map((question) => (
