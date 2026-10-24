@@ -662,6 +662,28 @@ export function pendingQuestion(
   return text.length === 0 ? null : text;
 }
 
+/**
+ * The composer's hint. Q asked about something other than the form's
+ * current step, or about a step this screen cannot name (after a reload,
+ * `[]`): the step's own hint ("example.com") would contradict Q's question,
+ * so it stays neutral (live 24 Oct: "example.com" under "Are you deploying
+ * capital right now?").
+ */
+export function composerHint(
+  prompt: Pick<QPrompt, "stepKey" | "control" | "placeholder"> | null,
+  asking: readonly string[] | null,
+): string | undefined {
+  if (prompt === null) return undefined;
+  if (asking !== null && !asking.includes(prompt.stepKey)) {
+    return "Type your answer";
+  }
+  return prompt.control === "chips" ||
+    prompt.control === "multi_chips" ||
+    prompt.control === "confirm"
+    ? "Or say it in your own words"
+    : prompt.placeholder;
+}
+
 function joinNames(names: readonly string[]): string {
   if (names.length <= 1) {
     return names[0] ?? "";

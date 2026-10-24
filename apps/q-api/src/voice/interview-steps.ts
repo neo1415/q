@@ -530,7 +530,31 @@ export function toOpenStep(
           .filter((n): n is string => n !== undefined)
           .join(" "),
       };
-    case "document_upload":
+    case "document_upload": {
+      // QA F1/O1 (24 Oct): the panel said "11 to confirm" from their deck
+      // while Q said the deck had not been read and pointed to the upload
+      // button. Q reads the same state the panel shows: facts read from
+      // their own documents and waiting for them mean the material is in.
+      const fromTheirDocuments = view.pendingSuggestions.filter((suggestion) =>
+        // A document of theirs, or one version of it.
+        suggestion.sourceRefs.some(
+          (ref) =>
+            ref.sourceType === "EVIDENCE_DOCUMENT" ||
+            ref.sourceType === "EVIDENCE_DOCUMENT_VERSION",
+        ),
+      ).length;
+      if (fromTheirDocuments > 0) {
+        return {
+          ...base,
+          kind: "DOCUMENT",
+          note: [
+            base.note,
+            `Their material is already in and read: ${String(fromTheirDocuments)} ${fromTheirDocuments === 1 ? "fact" : "facts"} from it ${fromTheirDocuments === 1 ? "waits" : "wait"} on screen for their confirmation. Never say it has not been read and never ask them to upload it; if it comes up, point them to confirm what you found.`,
+          ]
+            .filter((n): n is string => n !== undefined)
+            .join(" "),
+        };
+      }
       return {
         ...base,
         kind: "DOCUMENT",
@@ -543,6 +567,7 @@ export function toOpenStep(
           .filter((n): n is string => n !== undefined)
           .join(" "),
       };
+    }
     case "reference_select": {
       if (c.resourceType === "TAXONOMY_NODE") {
         return { ...base, kind: "CATEGORIES", maxChoices: c.maxItems };
