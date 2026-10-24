@@ -16,6 +16,8 @@ import { createRunSubjects } from "../src/voice/run-subjects.js";
 
 const REACHABLE = "1b6f3a52-6c1e-4a59-9d1b-2f2b0c6a7e10";
 const UNREACHABLE = "9c2d4e61-7a3b-4c8d-8e2f-3a4b5c6d7e8f";
+const MET = "5e6f7a8b-1c2d-4e3f-8a9b-0c1d2e3f4a5b";
+const DEMO = "6f7a8b9c-2d3e-4f5a-9b0c-1d2e3f4a5b6c";
 const RUN = "run-1";
 const TENANT_A = "a0000000-0000-4000-8000-00000000000a";
 const actor = ActorContextSchema.parse({
@@ -60,6 +62,25 @@ const port: QToolPort = {
         result: {
           ok: true,
           data: { companyId: REACHABLE, canonicalName: "Ledgerline" },
+        },
+      } as unknown as QToolCallOutcome);
+    }
+    // A company met in passing (a search, a list), and a demo record's
+    // profile whose name carries its "(fictional)" marker.
+    if (proposal.name === "search_companies" || proposal.name === "get_demo") {
+      const demo = proposal.name === "get_demo";
+      return Promise.resolve({
+        ...base,
+        toolName: demo ? "company.get" : "company.search",
+        status: "SUCCEEDED",
+        failureCode: null,
+        sensitivity: "INTERNAL",
+        result: {
+          ok: true,
+          data: {
+            companyId: demo ? DEMO : MET,
+            canonicalName: demo ? "Harbourline Cargo (fictional)" : "Mizan",
+          },
         },
       } as unknown as QToolCallOutcome);
     }
@@ -130,6 +151,34 @@ describe("the wait's subject, from the run's own authorised tool calls (W4b)", (
     );
     await tools.execute(call("read_company_document", {}), context);
     expect(subjects.focusFor(RUN, actor)).toBeNull();
+  });
+
+  // QA F-88 (I19): the holding line named a company the run had only met.
+  it("never names a company only met in a search or list", async () => {
+    const subjects = createRunSubjects();
+    await subjects
+      .observe(port)
+      .execute(call("search_companies", { query: "credit" }), contextFor());
+    expect(subjects.focusFor(RUN, actor)).toBeNull();
+  });
+
+  it("names no one when the run read several profiles (a comparison)", async () => {
+    const subjects = createRunSubjects();
+    const tools = subjects.observe(port);
+    await tools.execute(
+      call("get_company", { companyId: REACHABLE }),
+      contextFor(),
+    );
+    await tools.execute(call("get_demo", {}), contextFor());
+    expect(subjects.focusFor(RUN, actor)).toBeNull();
+  });
+
+  it("says a demo record's name without its '(fictional)' marker (F-62)", async () => {
+    const subjects = createRunSubjects();
+    await subjects.observe(port).execute(call("get_demo", {}), contextFor());
+    expect(subjects.focusFor(RUN, actor)).toEqual({
+      name: "Harbourline Cargo",
+    });
   });
 
   it("is the run's own actor's only", async () => {

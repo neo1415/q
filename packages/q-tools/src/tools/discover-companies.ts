@@ -35,8 +35,11 @@ export const DISCOVER_COMPANIES = "discovery.companies" as const;
 
 const LIMIT_MAX = 24;
 const FILTER_MAX = 8;
-/** How many matches a FIT order scores (the fit service's own bound). */
-export const CATALOG_FIT_SCAN_MAX = 200;
+/**
+ * How many matches a FIT order scores (the fit service's own rank bound).
+ * F-82: the whole network (463 live), never the first 200 by name.
+ */
+export const CATALOG_FIT_SCAN_MAX = 1000;
 
 export const DiscoverCompaniesInputSchema = z
   .object({

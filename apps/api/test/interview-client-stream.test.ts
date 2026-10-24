@@ -160,3 +160,66 @@ describe("the api's streamed interview turn", () => {
     ).rejects.toBeInstanceOf(QInterviewUnavailableError);
   });
 });
+
+describe("a long streamed turn (QA F-67)", () => {
+  // A body that sends heartbeats every `everyMs` for `forMs`, then the
+  // result; it errors when the request is aborted, as fetch's body does.
+  const talking = (everyMs: number, forMs: number) =>
+    createQInterviewClient({
+      baseUrl: "http://q-api.test",
+      timeoutMs: 60,
+      streamMaxMs: 400,
+      fetch: (_input, init) => {
+        const encoder = new TextEncoder();
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            const started = Date.now();
+            const tick = setInterval(() => {
+              if (Date.now() - started >= forMs) {
+                clearInterval(tick);
+                controller.enqueue(encoder.encode(frame("result", TURN)));
+                controller.close();
+                return;
+              }
+              controller.enqueue(encoder.encode(": ping\n\n"));
+            }, everyMs);
+            init?.signal?.addEventListener("abort", () => {
+              clearInterval(tick);
+              controller.error(new Error("aborted"));
+            });
+          },
+        });
+        return Promise.resolve(
+          new Response(body, {
+            status: 200,
+            headers: { "content-type": "text/event-stream" },
+          }),
+        );
+      },
+    });
+  const run = (interview: ReturnType<typeof talking>) =>
+    interview.turnStream({
+      accessToken: "token",
+      request: REQUEST,
+      onSentence: () => undefined,
+    });
+
+  it("is never cut for being long while the interviewer keeps talking", async () => {
+    // 200 ms of heartbeats every 20 ms: over three times the 60 ms limit.
+    await expect(run(talking(20, 200))).resolves.toMatchObject({
+      reply: TURN.reply,
+    });
+  });
+
+  it("lets go of a stream that goes silent", async () => {
+    await expect(run(talking(150, 300))).rejects.toBeInstanceOf(
+      QInterviewUnavailableError,
+    );
+  });
+
+  it("lets go at the overall cap, heartbeats or not", async () => {
+    await expect(run(talking(20, 2_000))).rejects.toBeInstanceOf(
+      QInterviewUnavailableError,
+    );
+  });
+});

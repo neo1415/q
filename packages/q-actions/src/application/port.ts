@@ -69,8 +69,12 @@ export type QWaitingLines = {
 
 /** One line naming the cards still waiting beside a new one. */
 export function waitingLine(summaries: readonly string[]): string {
+  // A demo record's "(fictional)" marker is never said (QA F-62).
   const names = summaries.map((summary) =>
-    summary.trim().replace(/[.\s]+$/u, ""),
+    summary
+      .replace(/\s*\(fictional\)/giu, "")
+      .trim()
+      .replace(/[.\s]+$/u, ""),
   );
   const list =
     names.length <= 1

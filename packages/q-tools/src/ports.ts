@@ -1349,6 +1349,11 @@ export type DocumentEditPort = {
  * identity service authorises card.view again). Null: none made yet.
  */
 export type QCardReadPort = {
+  /**
+   * The public web origin ("https://…", no trailing slash): the card's
+   * address is given whole, so Q never writes a domain of its own (QA F-85).
+   */
+  readonly webOrigin: string;
   readonly getCard: (
     actor: ActorContext,
     subject: {

@@ -7,8 +7,12 @@ import { normalizeTaxonomyAlias } from "@capital-q/taxonomy";
 
 /** One knowledge page (KNOWLEDGE_DISCOVER_LIMIT_MAX). */
 const CATALOG_PAGE = 50;
-/** The most matches one catalog read takes, for a fit ranking over all. */
-export const CATALOG_SCAN_MAX = 200;
+/**
+ * The most matches one catalog read takes, for a fit ranking over all.
+ * F-82: past the whole network (463 live); at 200 the first 200 by name
+ * were all a fit ranking saw.
+ */
+export const CATALOG_SCAN_MAX = 1000;
 
 /**
  * K1 (founder brief 2026-10-09): companies on the network by declared

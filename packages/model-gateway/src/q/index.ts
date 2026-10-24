@@ -1093,9 +1093,38 @@ function heldOnRecord(read: RunRead, name: string): HeldIdentity | null {
     if (companyName.trim().toLowerCase() !== wanted) continue;
     const facts = read.companyFacts.get(companyId);
     if (facts === undefined) continue;
-    return { website: facts.website, country: facts.country, city: facts.city };
+    return {
+      website: facts.website,
+      country: facts.country,
+      city: facts.city,
+      about: facts.about,
+    };
   }
   return null;
+}
+
+/**
+ * The companies this run read from Capital Q that the person named, by the
+ * names their records carry (live 2026-10-24: "Who founded Duplo?" was
+ * searched by the model with no name to check pages against, and LEGO
+ * DUPLO, a chocolate bar and "Diplo Run Club" reached the answer).
+ */
+function heldNamedIn(
+  read: RunRead,
+  words: string,
+): readonly { readonly name: string; readonly held: HeldIdentity }[] {
+  const said = ` ${words.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ")} `;
+  const named: { name: string; held: HeldIdentity }[] = [];
+  for (const companyName of new Set(read.companyNames.values())) {
+    const wanted = companyName
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+    if (wanted.length < 2 || !said.includes(` ${wanted} `)) continue;
+    const held = heldOnRecord(read, companyName);
+    if (held !== null) named.push({ name: companyName, held });
+  }
+  return named;
 }
 
 /** A public search that ran and found no page (about them). */
@@ -2334,39 +2363,49 @@ export function createModelGatewayQAnswer(
     proposal: Parameters<QToolPort["execute"]>[0],
     runId: string,
     outcome: QToolCallOutcome,
+    /** The person's own words this turn, for whom a search without a name is about. */
+    words: string,
   ): QToolCallOutcome => {
     if (proposal.name !== PUBLIC_WEB_TOOL || !outcome.result.ok) {
       return outcome;
     }
+    const read = runCompanies.read(runId);
     const name = (proposal.arguments as { readonly entityName?: unknown })
       .entityName;
-    if (typeof name !== "string" || name.trim().length === 0) return outcome;
-    const held = heldOnRecord(runCompanies.read(runId), name);
-    if (held === null) return outcome;
+    const named = typeof name === "string" && name.trim().length > 0;
+    const held = named ? heldOnRecord(read, name) : null;
+    // Whom the pages must be about: the name searched, when Capital Q holds
+    // it; else the companies the run read that the person named.
+    const subjects =
+      named && held !== null
+        ? [{ name, held }]
+        : named
+          ? []
+          : heldNamedIn(read, words);
+    if (subjects.length === 0) return outcome;
     const data = outcome.result.data as {
       readonly sources?: readonly Record<string, unknown>[];
     };
     const sources = data.sources ?? [];
-    const kept = sources.filter((source) =>
-      pageAboutThem(
-        {
-          domain: typeof source["domain"] === "string" ? source["domain"] : "",
-          subjectMatch:
-            typeof source["subjectMatch"] === "string"
-              ? source["subjectMatch"]
-              : null,
-          countries: Array.isArray(source["mentionedCountries"])
-            ? source["mentionedCountries"].filter(
-                (country): country is string => typeof country === "string",
-              )
-            : [],
-          text:
-            typeof source["excerpt"] === "string" ? source["excerpt"] : null,
-        },
-        name,
-        held,
-      ),
-    );
+    const kept = sources.filter((source) => {
+      const evidence = {
+        domain: typeof source["domain"] === "string" ? source["domain"] : "",
+        subjectMatch:
+          typeof source["subjectMatch"] === "string"
+            ? source["subjectMatch"]
+            : null,
+        countries: Array.isArray(source["mentionedCountries"])
+          ? source["mentionedCountries"].filter(
+              (country): country is string => typeof country === "string",
+            )
+          : [],
+        text: typeof source["excerpt"] === "string" ? source["excerpt"] : null,
+        title: typeof source["title"] === "string" ? source["title"] : null,
+      };
+      return subjects.some((subject) =>
+        pageAboutThem(evidence, subject.name, subject.held),
+      );
+    });
     if (kept.length === sources.length) return outcome;
     logger?.info(
       {
@@ -2409,7 +2448,12 @@ export function createModelGatewayQAnswer(
         );
         runCompanies.note(toolContext.runId, kept);
         runFits.note(toolContext.runId, kept);
-        return aboutThemOnly(proposal, toolContext.runId, kept);
+        return aboutThemOnly(
+          proposal,
+          toolContext.runId,
+          kept,
+          toolContext.conversation?.latestUserText ?? "",
+        );
       }
       const outcome = await singleFlight.execute(
         toolContext.runId,
@@ -2433,7 +2477,12 @@ export function createModelGatewayQAnswer(
         // Something of theirs changed: what was read for them is not kept.
         readCache.forget(toolContext);
       }
-      return aboutThemOnly(proposal, toolContext.runId, outcome);
+      return aboutThemOnly(
+        proposal,
+        toolContext.runId,
+        outcome,
+        toolContext.conversation?.latestUserText ?? "",
+      );
     },
   };
   const sensitivityPolicy = dependencies.sensitivity ?? { kind: "FROM_PLAN" };
@@ -6967,6 +7016,7 @@ export function createModelGatewayQAnswer(
                   )
                 : [],
               text: typeof source.excerpt === "string" ? source.excerpt : null,
+              title: typeof source.title === "string" ? source.title : null,
             });
           }
           // Only a well-formed public source is presentable; anything else
@@ -7238,6 +7288,7 @@ export function createModelGatewayQAnswer(
             },
             request.runId,
             landed,
+            latest.content,
           );
           toolCalls.push({
             toolName: outcome.toolName,
@@ -7305,7 +7356,7 @@ export function createModelGatewayQAnswer(
               earlyWeb.claimed = true;
               const early = earlyWeb.call;
               return earlyWeb.outcome.then((outcome) => ({
-                ...aboutThemOnly(early, request.runId, outcome),
+                ...aboutThemOnly(early, request.runId, outcome, latest.content),
                 callId: call.callId,
               }));
             }
@@ -7722,12 +7773,25 @@ export function createModelGatewayQAnswer(
                 await stageWrite;
                 throw settled.error;
               }
-              const [outcome] = await Promise.all([
+              const [ran] = await Promise.all([
                 settled !== undefined
                   ? Promise.resolve(settled.outcome)
                   : runCall(call),
                 stageWrite,
               ]);
+              // A search beside the round's reads of their records is
+              // checked once those reads are in: its pages must be about
+              // whom the person named (live 2026-10-24, "Who founded
+              // Duplo?": LEGO DUPLO reached the answer).
+              if (call.name === PUBLIC_WEB_TOOL && early !== null) {
+                await Promise.all(
+                  early.flatMap((one) => (one === undefined ? [] : [one])),
+                );
+              }
+              const outcome =
+                call.name === PUBLIC_WEB_TOOL
+                  ? aboutThemOnly(call, request.runId, ran, latest.content)
+                  : ran;
               toolCalls.push({
                 toolName: outcome.toolName,
                 providerName: call.name,

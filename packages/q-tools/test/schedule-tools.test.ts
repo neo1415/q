@@ -76,6 +76,7 @@ function world(
     profileZone?: string | null;
     findSlots?: ScheduleIntelligencePort["findSlots"];
     relationshipBriefs?: ScheduleIntelligencePort["relationshipBriefs"];
+    relationships?: RelationshipIntelligencePort;
   } = {},
 ) {
   const prepared: { actionType: string; payload: unknown }[] = [];
@@ -158,7 +159,8 @@ function world(
         fakePorts({
           chat,
           schedule,
-          relationships: {} as RelationshipIntelligencePort,
+          relationships:
+            options.relationships ?? ({} as RelationshipIntelligencePort),
         }),
       ),
     ),
@@ -261,6 +263,75 @@ describe("schedule tools", () => {
       contextFor(actorA, relationshipPlan(base(actorA), RELATIONSHIP)),
     );
     expect(outcome.status).toBe("DENIED");
+  });
+
+  describe("F-92: a call with someone they are not connected with", () => {
+    const COMPANY = "88888888-0000-4000-8000-0000000000e1";
+    // An investor with no relationships at all (savanna-seed live).
+    const none: RelationshipIntelligencePort = {
+      ...({} as RelationshipIntelligencePort),
+      withCompany: () => Promise.resolve(null),
+      withInvestor: () => Promise.resolve(null),
+      ownRelationships: () =>
+        Promise.resolve({ side: "INVESTOR" as const, items: [] }),
+    };
+
+    it("a visible company with no relationship: not connected, the way to connect named, nothing prepared", async () => {
+      const { executor, prepared } = world({ relationships: none });
+      const outcome = await executor.execute(
+        {
+          callId: "n1",
+          name: "propose_meeting",
+          arguments: {
+            companyId: COMPANY,
+            purpose: "Intro",
+            when: { day: "tomorrow", time: "15:00" },
+          },
+        },
+        contextFor(actorA, base(actorA)),
+      );
+      expect(outcome.status).toBe("SUCCEEDED");
+      const data = (outcome.result as { data: Record<string, unknown> }).data;
+      expect(data["status"]).toBe("NOT_CONNECTED");
+      expect(String(data["awaitingApprovalOf"])).toContain(
+        "propose_express_interest",
+      );
+      expect(prepared).toEqual([]);
+    });
+
+    it("a name none of their relationships has: said so, with the same way to connect", async () => {
+      const { executor } = world({ relationships: none });
+      const outcome = await executor.execute(
+        {
+          callId: "n2",
+          name: "find_meeting_times",
+          arguments: { counterpartName: "Silo Credit" },
+        },
+        contextFor(actorA, base(actorA)),
+      );
+      expect(outcome.status).toBe("SUCCEEDED");
+      const data = (outcome.result as { data: Record<string, unknown> }).data;
+      expect(data["status"]).toBe("NOT_CONNECTED");
+      expect(data["slots"]).toEqual([]);
+      expect(String(data["guidance"])).toContain("propose_express_interest");
+    });
+
+    it("a company this run may not see stays refused", async () => {
+      const { executor } = world({ relationships: none });
+      const outcome = await executor.execute(
+        {
+          callId: "n3",
+          name: "propose_meeting",
+          arguments: {
+            companyId: COMPANY,
+            purpose: "Intro",
+            when: { day: "tomorrow", time: "15:00" },
+          },
+        },
+        contextFor(actorA, ownPlan(actorA)),
+      );
+      expect(outcome.status).toBe("DENIED");
+    });
   });
 
   it("prepares a personal reminder with no relationship, by email by default", async () => {

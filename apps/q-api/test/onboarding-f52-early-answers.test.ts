@@ -448,6 +448,84 @@ describe("QO-28: a never-invest sentence is saved once, as its red flags", () =>
 });
 
 describe("QO-27: stages are the ones they named", () => {
+  it("'seed and Series A' never saves Series B beside them", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: {
+        "I0.investor_type": "vc",
+        "I0.organisation_name": "Benali Atlas Capital",
+      },
+    });
+    const said = "Seed and Series A.";
+    const turnModel = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                {
+                  stepKey: "I2.stages",
+                  value: ["Seed", "Series A", "Series B"],
+                  quote: said,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted." },
+    ]);
+    await createInterviewAgent({
+      gateway: turnModel.gateway,
+      firewall: firewall(),
+      logger,
+    }).turn({ ...turn(world, said), actor });
+    expect(world.recordedValue("I2.stages")).toEqual({
+      type: "MULTI_SELECT",
+      optionKeys: ["seed", "series_a"],
+    });
+  });
+
+  it("'never crypto, gambling or tobacco' keeps Speculative crypto (live 24 Oct)", async () => {
+    const world = investorSession({
+      currentStepKey: "I7.hard_exclusions",
+      recorded: {
+        "I0.investor_type": "vc",
+        "I0.organisation_name": "Benali Atlas Capital",
+      },
+    });
+    const said = "We never invest in crypto, gambling or tobacco.";
+    const turnModel = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                {
+                  stepKey: "I7.hard_exclusions",
+                  value: ["Speculative crypto", "Gambling", "Tobacco"],
+                  quote: said,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted." },
+    ]);
+    await createInterviewAgent({
+      gateway: turnModel.gateway,
+      firewall: firewall(),
+      logger,
+    }).turn({ ...turn(world, said), actor });
+    const saved = world.recordedValue("I7.hard_exclusions");
+    expect(
+      saved?.type === "MULTI_SELECT" ? [...saved.optionKeys].sort() : [],
+    ).toEqual(["crypto_speculation", "gambling", "tobacco"]);
+  });
+
   it("'pre-seed and seed' never saves Series A beside them", async () => {
     const world = investorSession({
       currentStepKey: "I2.stages",
@@ -620,5 +698,53 @@ describe("QO-25: a role is their role now", () => {
     expect(
       await role("I lead product here.", () => Promise.resolve("YES")),
     ).toEqual({ type: "SINGLE_SELECT", optionKey: "cpo" });
+  });
+});
+
+describe("categories saved with their other words beside them (live 24 Oct)", () => {
+  it("the receipt names the categories saved, and their words as theirs", async () => {
+    const EGYPT = "c1000000-0000-4000-8000-0000000000e1";
+    const MOROCCO = "c1000000-0000-4000-8000-0000000000e2";
+    const world = investorSession({
+      currentStepKey: "I3.geography",
+      recorded: {
+        "I0.investor_type": "vc",
+        "I0.organisation_name": "Benali Atlas Capital",
+      },
+      // "the Gulf" names no single node: it is kept in their words.
+      taxonomy: { egypt: EGYPT, morocco: MOROCCO },
+    });
+    const said = "We invest in Egypt, Morocco and the Gulf.";
+    const turnModel = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                {
+                  stepKey: "I3.geography",
+                  value: ["Egypt", "Morocco", "the Gulf"],
+                  quote: said,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted." },
+    ]);
+    const outcome = await createInterviewAgent({
+      gateway: turnModel.gateway,
+      firewall: firewall(),
+      logger,
+      replyByCodeAfterCleanSave: true,
+    }).turn({ ...turn(world, said), actor });
+    const saved = world.recordedValue("I3.geography");
+    expect(
+      saved?.type === "RESOURCE_REFERENCE" ? saved.resourceIds : [],
+    ).toEqual([EGYPT, MOROCCO]);
+    expect(outcome.reply).toMatch(/Egypt, Morocco/u);
+    expect(outcome.reply).not.toMatch(/(?<!“)the Gulf \(geography\)/u);
   });
 });

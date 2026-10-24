@@ -364,6 +364,17 @@ const founderReview =
           onboarding.internal.recordInterviewQuestions(command as never),
         // Lane ob1: lane ov's pitch readings, proposed as the sections.
         pitchSections: createPitchSectionsPort(database.sql),
+        // F-74: the account holder's own name, so a role the deck gives
+        // someone else is never offered as theirs.
+        accountName: async (userId) => {
+          const rows = await database.sql<{ name: string | null }[]>`
+            select coalesce(
+                     nullif(btrim(concat_ws(' ', p.given_name, p.family_name)), ''),
+                     p.display_name) as name
+              from identity.user_profiles p
+             where p.id = ${userId}::uuid`;
+          return rows[0]?.name ?? null;
+        },
         extraction: createFounderExtraction({
           // The extraction declares the narrow slice of the gateway it uses
           // — one task class, one output shape — which is deliberately not

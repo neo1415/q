@@ -19,3 +19,16 @@ Harness: Playwright on `/opt/pw-browsers/chromium` through the agent proxy, type
 
 Fixed: F-69 and F-68 wording in #403 (wait for findings from this document, honest "reading", late findings handed to Q).
 Open from this run: turn latency 12 s; 45 s from upload to findings (target: seconds); QO-20 echo.
+
+## Run 5 — 24 Oct 13:20–15:05 UTC, investors `loop-f80-*`, `loop-i-f80-1458`, `loop-i-f66b-1504`
+
+| Check                                                          | Result                                                                                                                                                                                    |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F-80 on 18d7884c4 (API, after the firm's name)                 | `[I0.investor_type, I2.currency]` batch → **409 VERSION_CONFLICT** every time; type alone and `[type, deployment]` commit. QA session fe6bc5d7: every answer held, investor type included |
+| F-80 after the fix deployed (db45f2ae, API)                    | `[type, currency, cheque_min, stages]` → all COMMITTED, firm bound ✓                                                                                                                      |
+| One typed sentence (type + cheques + sectors + places + never) | **Essentials 6 of 9**, settled 14.6–18.2 s. Receipt: firm, VC fund, USD, $100,000 / $500,000, Seed, Fintech + Clean Energy, Gambling + Tobacco ✓                                          |
+| F-66 coverage panel                                            | "Minimum cheque: USD 100,000", "Geography: Egypt, Morocco" ✓                                                                                                                              |
+| Receipt vs record                                              | Receipt said "the Gulf (geography)"; record holds Egypt + Morocco with "the Gulf" in their words (it names no single node). Fixed in #433                                                 |
+| Not saved                                                      | "crypto" (never invest) → not mapped to Speculative crypto; left for a product call                                                                                                       |
+
+Fixed: F-80 in #428 (deferred stage/cheque update bound the firm against a stale session version). Open: "crypto" mapping; turn latency ~15 s.

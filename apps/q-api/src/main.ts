@@ -19,6 +19,7 @@ import { createOpenAIEmbeddingProvider } from "@capital-q/q-embeddings";
 
 import { qBackedRehearsalLivePrompt } from "./voice/live/prompt.js";
 import { createFounderStatedReader } from "./composition/founder-stated.js";
+import { webOriginFrom } from "./composition/web-origin.js";
 import { createWorkforceDiligence } from "./composition/workforce/diligence.js";
 import { workforceDeepResearch } from "./composition/workforce/deep-research.js";
 import { createOwnResearchSubject } from "./composition/workforce/own-subject.js";
@@ -853,6 +854,9 @@ await telemetry.start();
 // migration credential. Holding it is not authority; every route still passes
 // through ActorContext and the runtime's ownership checks.
 const database = createRequestDatabaseClient(loadDatabaseConfig());
+// QA F-85: every public link q-api writes (a Q Card's address) is built
+// from this origin, checked once here: an https URL, or q-api does not start.
+const webOrigin = webOriginFrom(process.env["CQ_WEB_ORIGIN"]);
 // ETIQUETTE block (ADR 0050): the business etiquette guides Q follows when
 // it writes or speaks for a person: the house guide and their own.
 const etiquetteAdmin = createEtiquetteGuideAdminStore({
@@ -2617,9 +2621,7 @@ const team = createTeamService({
     if (event.outcome === "SENT") logger.info(fields, "team email sent");
     else logger.warn(fields, "team email not sent");
   },
-  webOrigin:
-    process.env["CQ_WEB_ORIGIN"] ??
-    "https://capital-qweb-production.up.railway.app",
+  webOrigin,
 });
 // F4: the investor's GateQ inbox, for Q's tools and approved actions. GateQ
 // is composed here only for its gateway authority (who may see a gateway,
@@ -3321,6 +3323,7 @@ const qTools = createQTools({
     // Live test 2026-09-27 #4: "is my card saved?" -- the Q Card screen's
     // own read, authorised again by the service (card.view).
     qCards: {
+      webOrigin,
       getCard: async (actor, subject) => {
         const card = await publicIdentity.getCard({
           actor,
@@ -3758,6 +3761,7 @@ const qActionRegistry = createQActionRegistry([
   createReviewRequestAction({ reviews: humanReviews, logger }),
   // end ADMIN-3 block
   createHandleClaimAction({
+    webOrigin,
     publicIdentity,
     subjects: cardSubjects,
     authorization,

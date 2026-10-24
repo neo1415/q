@@ -229,8 +229,18 @@ function decisionsOf(
   return out.slice(0, 40);
 }
 
-/** QA F-49: their message only says a file was added (see the workspace). */
-const ANNOUNCES_UPLOAD = /^I've just (?:uploaded|added)\b/u;
+/**
+ * QA F-49: the workspace's own message about a file (written by the web
+ * client when a file is added, or when Q's reading of it lands; see the
+ * workspace), not anything the person typed. Nothing is "not saved" about
+ * it. QA O1 (24 Oct): "I've finished reading …" was missed, and the read-back
+ * opened with "I haven't saved that yet".
+ */
+export function announcesUpload(utterance: string): boolean {
+  return /^I've (?:just (?:uploaded|added)|finished reading)\b/u.test(
+    utterance,
+  );
+}
 
 /**
  * Steps a write was refused for this turn, other than an answer held for
@@ -2665,7 +2675,7 @@ export function createInterviewAgent(
       // is taken out and the model's reply speaks for itself. QA F-49: a
       // file they just added is being read (or waits for their company),
       // not "not saved": the claim goes, and nothing is said in its place.
-      codeSpeaksEnglish && !ANNOUNCES_UPLOAD.test(utterance) ? undefined : "",
+      codeSpeaksEnglish && !announcesUpload(utterance) ? undefined : "",
     );
     if (backedReply !== replyWritten) {
       logger.info({}, "interview reply claimed a save nothing backed; removed");

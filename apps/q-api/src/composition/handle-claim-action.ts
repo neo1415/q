@@ -18,6 +18,8 @@ import {
 import { defineQAction, type AnyQActionDefinition } from "@capital-q/q-actions";
 import type { AuthorizationService } from "@capital-q/security";
 
+import { qCardUrl } from "./web-origin.js";
+
 /**
  * `handle.claim` (BIZ-004): claim or change the organisation's public
  * handle, which also makes its Q Card the first time.
@@ -50,17 +52,22 @@ export const HandleClaimResultSchema = z
   .strict();
 export type HandleClaimResult = z.infer<typeof HandleClaimResultSchema>;
 
-export function describeHandleClaim(payload: HandleClaimPayload): {
+export function describeHandleClaim(
+  payload: HandleClaimPayload,
+  webOrigin: string,
+): {
   readonly summary: string;
   readonly preview: string;
 } {
   return {
-    summary: `Set your public handle to @${payload.handle}. Your Q Card will be at /@${payload.handle}.`,
+    summary: `Set your public handle to @${payload.handle}. Your Q Card will be at ${qCardUrl(webOrigin, payload.handle)}.`,
     preview: `Handle: @${payload.handle}`,
   };
 }
 
 export type HandleClaimActionDependencies = {
+  /** The public web origin (web-origin.ts): the card's link is absolute. */
+  readonly webOrigin: string;
   readonly publicIdentity: PublicIdentityService;
   readonly subjects: SubjectDirectory;
   readonly authorization: AuthorizationService;
@@ -70,7 +77,8 @@ export type HandleClaimActionDependencies = {
 export function createHandleClaimAction(
   dependencies: HandleClaimActionDependencies,
 ): AnyQActionDefinition {
-  const { publicIdentity, subjects, authorization, logger } = dependencies;
+  const { publicIdentity, subjects, authorization, logger, webOrigin } =
+    dependencies;
   return defineQAction<HandleClaimPayload, HandleClaimResult>({
     actionType: HANDLE_CLAIM,
     supersedes: true,
@@ -89,9 +97,9 @@ export function createHandleClaimAction(
             investorOrganisationId: payload.subjectId,
           },
     ],
-    describe: describeHandleClaim,
+    describe: (payload) => describeHandleClaim(payload, webOrigin),
     confirm: (payload) =>
-      `Done. Your handle is @${payload.handle}, and your Q Card is live at /@${payload.handle}.`,
+      `Done. Your handle is @${payload.handle}, and your Q Card is live at ${qCardUrl(webOrigin, payload.handle)}.`,
     authorize: async (payload, actor) => {
       if (actor.actorType !== "HUMAN") {
         return { outcome: "DENY", code: "NOT_A_PERSON" };

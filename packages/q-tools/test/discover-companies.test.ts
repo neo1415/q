@@ -190,7 +190,8 @@ describe("DISCOVER_COMPANIES order FIT (owner 2026-10-23: never the first by nam
     );
     // Every match was scored, and the catalog was asked for all of them.
     expect(scored.at(-1)).toHaveLength(30);
-    expect(seen.query?.limit).toBe(200);
+    // F-82: the whole network (463 live), never the first 200 by name.
+    expect(seen.query?.limit).toBeGreaterThanOrEqual(463);
   });
 
   it("name order stays name order, and a fit service that cannot rank falls back to it", async () => {
