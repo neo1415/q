@@ -12,6 +12,7 @@ import { ActorContextSchema } from "@capital-q/security";
 
 import { createHeldWritesStore } from "../src/voice/held-writes.js";
 import { createInterviewAgent } from "../src/voice/interview-agent.js";
+import { createOnboardingPort } from "../src/voice/onboarding-port.js";
 
 import { investorSession, turn } from "./interviewer-fixtures.js";
 
@@ -443,5 +444,181 @@ describe("QO-28: a never-invest sentence is saved once, as its red flags", () =>
       "MULTI_SELECT",
     );
     expect(world.recordedValue("I7.sector_exclusions")).toBeUndefined();
+  });
+});
+
+describe("QO-27: stages are the ones they named", () => {
+  it("'pre-seed and seed' never saves Series A beside them", async () => {
+    const world = investorSession({
+      currentStepKey: "I2.stages",
+      recorded: {
+        "I0.investor_type": "vc",
+        "I0.organisation_name": "Benali Atlas Capital",
+      },
+    });
+    const said = "Pre-seed and seed.";
+    const turnModel = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                {
+                  stepKey: "I2.stages",
+                  value: ["Pre-seed", "Seed", "Series A"],
+                  quote: said,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted." },
+    ]);
+    await createInterviewAgent({
+      gateway: turnModel.gateway,
+      firewall: firewall(),
+      logger,
+    }).turn({ ...turn(world, said), actor });
+    expect(world.recordedValue("I2.stages")).toEqual({
+      type: "MULTI_SELECT",
+      optionKeys: ["pre_seed", "seed"],
+    });
+  });
+});
+
+describe("QO-27: a geography said in two turns is both", () => {
+  const UK = "c1000000-0000-4000-8000-000000000001";
+  const WEST_AFRICA = "c1000000-0000-4000-8000-000000000002";
+  const geography = async (
+    wordsCheck?: () => Promise<"YES" | "NO" | "UNSURE" | null>,
+  ) => {
+    const world = investorSession({
+      currentStepKey: "I3.geography",
+      recorded: {
+        "I0.investor_type": "vc",
+        "I0.organisation_name": "Benali Atlas Capital",
+      },
+      taxonomy: { "the uk": UK, uk: UK, "west africa": WEST_AFRICA },
+    });
+    for (const [said, value] of [
+      ["We invest in the UK.", "the UK"],
+      ["And West Africa.", "West Africa"],
+    ] as const) {
+      const turnModel = model([
+        {
+          calls: [
+            {
+              name: "record_answers",
+              arguments: {
+                answers: [{ stepKey: "I3.geography", value, quote: said }],
+              },
+            },
+          ],
+        },
+        { reply: "Noted." },
+      ]);
+      await createInterviewAgent({
+        gateway: turnModel.gateway,
+        firewall: firewall(),
+        logger,
+        ...(wordsCheck === undefined ? {} : { wordsCheck }),
+      }).turn({ ...turn(world, said), actor });
+    }
+    const saved = world.recordedValue("I3.geography");
+    return saved?.type === "RESOURCE_REFERENCE" ? saved.resourceIds : [];
+  };
+
+  it("adds, unless their words replace it", async () => {
+    expect([...(await geography())].sort()).toEqual([UK, WEST_AFRICA].sort());
+    expect([...(await geography(() => Promise.resolve("NO")))].sort()).toEqual(
+      [UK, WEST_AFRICA].sort(),
+    );
+    // "Not the UK, West Africa": a correction, read by meaning.
+    expect(await geography(() => Promise.resolve("YES"))).toEqual([
+      WEST_AFRICA,
+    ]);
+  });
+});
+
+describe("QO-29: once the essentials are in, making the mandate live is asked next", () => {
+  it("puts the review first, as a confirmation (their yes, never assumed)", async () => {
+    const world = investorSession({
+      currentStepKey: "I4.business_models",
+      recorded: {
+        "I0.investor_type": "vc",
+        "I0.organisation_name": "Benali Atlas Capital",
+        "I1.deployment_status": "actively_investing",
+        "I2.stages": "pre_seed,seed",
+        "I2.currency": "usd",
+        "I3.geography": "c1000000-0000-4000-8000-000000000001",
+        "I3.sectors": "c1000000-0000-4000-8000-000000000003",
+        "I9.discovery_mode": "focused",
+        "I10.inbound_preference": "open",
+      },
+    });
+    const port = createOnboardingPort({
+      session: turn(world, "").session,
+      onboardingSessionId: turn(world, "").onboardingSessionId,
+      journeyType: "investor",
+      ownerUserId: actor.userId,
+      personTurns: [],
+    });
+    const state = await port.state();
+    expect(state.next?.[0]).toEqual({
+      stepKey: "I11.review",
+      reason: "CONFIRM_PROPOSAL",
+    });
+    expect(world.recordedValue("I11.review")).toBeUndefined();
+  });
+});
+
+describe("QO-25: a role is their role now", () => {
+  const role = async (
+    said: string,
+    check: () => Promise<"YES" | "NO" | "UNSURE" | null>,
+  ) => {
+    const world = investorSession({
+      journey: "founder",
+      currentStepKey: "F4.founder_role",
+      recorded: {
+        "F0.intent": "raising_now",
+        "F1.company_name": "Kiln Payroll (fictional)",
+      },
+    });
+    const turnModel = model([
+      {
+        calls: [
+          {
+            name: "record_answers",
+            arguments: {
+              answers: [
+                { stepKey: "F4.founder_role", value: "product", quote: said },
+              ],
+            },
+          },
+        ],
+      },
+      { reply: "Noted." },
+    ]);
+    await createInterviewAgent({
+      gateway: turnModel.gateway,
+      firewall: firewall(),
+      logger,
+      wordsCheck: check,
+    }).turn({ ...turn(world, said), actor });
+    return world.recordedValue("F4.founder_role");
+  };
+
+  it("a past job is not saved as their role; a current one is", async () => {
+    expect(
+      await role("I was a product lead at Paystack.", () =>
+        Promise.resolve("NO"),
+      ),
+    ).toBeUndefined();
+    expect(
+      await role("I lead product here.", () => Promise.resolve("YES")),
+    ).toEqual({ type: "SINGLE_SELECT", optionKey: "cpo" });
   });
 });

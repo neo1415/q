@@ -30,10 +30,13 @@ import {
 } from "../src/composition/workforce/delivery.js";
 import { createWorkforceDocuments } from "../src/composition/workforce/documents.js";
 import { createOwnContextReader } from "../src/composition/workforce/own-context.js";
+import { withWaitingPlans } from "../src/composition/workforce/waiting-plans.js";
 import {
   createOwnWorkStarter,
   createWorkforceJobBoard,
   isOwnAccountWork,
+  planShape,
+  sameWork,
 } from "../src/composition/workforce/job-actions.js";
 import {
   createWorkforceJobs,
@@ -207,7 +210,11 @@ function world(
   options: {
     readonly outward?: boolean;
     /** What already waits for their approval (the Approval Engine's list). */
-    readonly waiting?: readonly { summary: string; actionType: string }[];
+    readonly waiting?: readonly {
+      summary: string;
+      actionType: string;
+      plan?: { outward: string[]; targets: string[] };
+    }[];
   } = {},
 ) {
   const store = createInMemoryWorkforceStore();
@@ -347,9 +354,17 @@ describe("own-account deep work starts with no approval card", () => {
   });
 
   it("is never held by an unrelated card waiting for approval (live 2026-10-24)", async () => {
+    // The waiting card's own plan: research and a brief (no outward
+    // action), as live; and one that sends messages.
     const savanna = {
       summary: "Prepare for the first call with Savanna Seed Partners",
       actionType: "q.workforce.job.start",
+      plan: { outward: [], targets: [] },
+    };
+    const sending = {
+      summary: "Reply to everyone who wrote",
+      actionType: "q.workforce.job.start",
+      plan: { outward: ["chat.message.send"], targets: [] },
     };
     const own = world({ waiting: [savanna] });
     const started = await own.board.port.prepare(
@@ -359,14 +374,29 @@ describe("own-account deep work starts with no approval card", () => {
     );
     expect(started.status).toBe("STARTED");
 
-    // Work that would itself be a card is still checked against them.
-    const outward = world({ outward: true, waiting: [savanna] });
-    const held = await outward.board.port.prepare(
+    // A plan that would itself be a card is held only by the same work:
+    // not by the unrelated research card, but by one sending messages too.
+    const unrelated = world({ outward: true, waiting: [savanna] });
+    expect(
+      (
+        await unrelated.board.port.prepare(
+          actor,
+          randomUUID(),
+          "Write me a short 12-month growth plan for my company",
+        )
+      ).status,
+    ).toBe("PREPARED");
+    const same = world({ outward: true, waiting: [savanna, sending] });
+    const held = await same.board.port.prepare(
       actor,
       randomUUID(),
       "Write me a short 12-month growth plan for my company",
     );
-    expect(held.status).toBe("ALREADY_WAITING");
+    expect(held).toMatchObject({
+      status: "ALREADY_WAITING",
+      about: "SAME_KIND",
+      waiting: ["Reply to everyone who wrote"],
+    });
   });
 
   it("keeps the card for work that reaches anyone else", async () => {
@@ -1081,5 +1111,171 @@ describe("QO-07: an investor's plan is written for them", () => {
       "- Maji Loop (COMPANY): IN_DILIGENCE",
     );
     expect(world.filed[0]?.subject).toBeUndefined();
+  });
+});
+
+describe("same work, by structure (2026-10-24)", () => {
+  it("compares outward actions and records, never words", () => {
+    const companyId = randomUUID();
+    const shape = planShape(
+      {
+        permitted: ["public_web.search", "chat.message.send"],
+        steps: [
+          {
+            key: "brief",
+            role: "DOCUMENTS",
+            agentName: "Documents",
+            goal: "x",
+            tools: ["documents.own.prepare"],
+            dependsOn: [],
+            budgetUsd: "1.2",
+            spawned: false,
+            document: {
+              operation: "PREPARE",
+              kind: "ANALYSIS",
+              scope: "NAMED_COMPANY",
+              companyId,
+            },
+          },
+        ],
+      },
+      [],
+    );
+    expect(shape).toEqual({
+      outward: ["chat.message.send"],
+      targets: [`company:${companyId}`],
+    });
+    expect(
+      sameWork(shape, { outward: ["chat.message.send"], targets: [] }),
+    ).toBe(false);
+    expect(
+      sameWork(shape, {
+        outward: ["chat.message.send"],
+        targets: [`company:${companyId}`],
+      }),
+    ).toBe(true);
+    // Own work takes no outward action: never the same work as anything.
+    expect(
+      sameWork({ outward: [], targets: [] }, { outward: [], targets: [] }),
+    ).toBe(false);
+  });
+});
+
+describe("waiting cards' own plans (waiting-plans.ts)", () => {
+  const payload = (ownerUserId: string) => ({
+    ownerUserId,
+    goal: "Reply to everyone who wrote",
+    summary: "Reply to everyone who wrote",
+    steps: [
+      {
+        key: "reply",
+        role: "CONVERSATION",
+        agentName: "Conversation",
+        goal: "Reply",
+        tools: ["list_messages", "chat.message.send"],
+        dependsOn: [],
+        budgetUsd: "0.1",
+        spawned: false,
+      },
+    ],
+    permitted: ["list_messages", "chat.message.send"],
+    budgetUsd: "2.5",
+    cannot: [],
+  });
+
+  it("reads only the approver's own job cards, as shapes, never the payload", async () => {
+    const mine = randomUUID();
+    const notMine = randomUUID();
+    const queries: unknown[][] = [];
+    const sql = ((_strings: TemplateStringsArray, ...values: unknown[]) => {
+      queries.push(values);
+      return Promise.resolve([
+        { approval_id: mine, payload: payload(actor.userId) },
+        { approval_id: notMine, payload: payload(randomUUID()) },
+      ]);
+    }) as never;
+    const items = await withWaitingPlans(sql, actor, [
+      { approvalId: mine, summary: "a", actionType: "q.workforce.job.start" },
+      {
+        approvalId: notMine,
+        summary: "b",
+        actionType: "q.workforce.job.start",
+      },
+      { approvalId: randomUUID(), summary: "c", actionType: "message.send" },
+    ]);
+    expect(items[0]?.plan).toEqual({
+      outward: ["chat.message.send"],
+      targets: [],
+    });
+    expect(items[1]?.plan).toBeUndefined();
+    expect(items[2]?.plan).toBeUndefined();
+    expect(JSON.stringify(items)).not.toContain("Reply to everyone");
+    // Scoped to the approver in the query itself.
+    expect(queries[0]).toEqual(
+      expect.arrayContaining([actor.tenantId, actor.userId]),
+    );
+  });
+});
+
+describe("live 2026-10-24: research for 'my company' knows which company", () => {
+  it("plans with their own company's identity and lets its words travel, never figures", async () => {
+    const searched: string[] = [];
+    const provider = topicalProvider();
+    const service = createPublicWebResearchService({
+      provider: {
+        ...provider,
+        search: (request, context) => {
+          searched.push(request.query);
+          return provider.search(request, context);
+        },
+      },
+    });
+    const planInputs: { subject: string }[] = [];
+    const research = workforceDeepResearch({
+      service,
+      ownSubject: () =>
+        Promise.resolve({
+          name: "Maji Loop",
+          country: "KE",
+          sectors: ["Clean Energy"],
+          description:
+            "Kiosks with solar pumping and filtration sell clean water in Nairobi's informal settlements; 96 kiosks today.",
+        }),
+      models: {
+        planResearch: (_who, _trace, input) => {
+          planInputs.push({ subject: input.subject });
+          return Promise.resolve({
+            costUsd: 0.01,
+            output: {
+              questions: [
+                {
+                  lane: "MARKET_SIZE",
+                  query: "Kenya water kiosks market size 96",
+                  alsoQuery: null,
+                  recent: false,
+                },
+              ],
+            },
+          });
+        },
+        researchFacts: () =>
+          Promise.resolve({
+            costUsd: 0.01,
+            output: { facts: [], followUps: [] },
+          }),
+      },
+    });
+    const found = await research?.({
+      actor,
+      runId: randomUUID(),
+      request: "Write me a short 12-month growth plan for my company",
+      query: "Their market, competitors and context",
+    });
+    expect(found?.status).toBe("OK");
+    expect(planInputs[0]?.subject).toContain("Maji Loop (Kenya)");
+    expect(planInputs[0]?.subject).toContain("solar pumping");
+    // The company's own words travel; its figure never does.
+    expect(searched).toContain("kenya water kiosks market size");
+    expect(searched.join(" ")).not.toContain("96");
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   OnboardingContextRequiredError,
+  OnboardingSessionVersionConflictError,
   type OnboardingResponse,
   type OnboardingWriteContext,
 } from "@capital-q/onboarding";
@@ -79,6 +80,8 @@ function context(
   bound: string[],
   /** The person's own firm of this name, already set up (null: none). */
   ownFirm: string | null = null,
+  /** Another firm of this name on Capital Q, visible to the network. */
+  visibleFirm: string | null = null,
 ): OnboardingWriteContext {
   const session = {
     id: "a1000000-0000-4000-8000-000000000001",
@@ -90,8 +93,16 @@ function context(
   return {
     // The only read: the person's own firm workspace of this name.
     tx: {
-      sql: () =>
-        Promise.resolve(ownFirm === null ? [] : [{ organisation_id: ownFirm }]),
+      sql: (parts: TemplateStringsArray) =>
+        Promise.resolve(
+          parts.join("?").includes("marketplace_visibility")
+            ? visibleFirm === null
+              ? []
+              : [{ display_name: visibleFirm }]
+            : ownFirm === null
+              ? []
+              : [{ organisation_id: ownFirm }],
+        ),
     },
     actor: {
       userId: USER,
@@ -185,5 +196,107 @@ describe("one firm per person and name", () => {
     // (and here, as in a half-finished earlier session, created once).
     expect(calls).not.toContain("createOrganisation");
     expect(bound).toEqual([INVESTOR]);
+  });
+});
+
+describe("one firm per real firm", () => {
+  it("a firm already on Capital Q under that name is not set up again: they are told how to join", async () => {
+    const { services, calls } = fakes();
+    await expect(
+      target(INVESTOR_WRITE_TARGETS.deploymentStatus, services).apply(
+        context([NAME, TYPE], [], null, "Haddad Desert Ventures"),
+        DEPLOYING,
+      ),
+    ).rejects.toMatchObject({
+      issues: [expect.objectContaining({ code: "firm_already_on_capital_q" })],
+    });
+    expect(calls).not.toContain("createOrganisation");
+  });
+});
+
+describe("a stage or cheque answer that arrives with the firm's type (QA F-80)", () => {
+  // Live 24 Oct: "We're a VC ... USD 100k-500k seed cheques" after the
+  // firm's name was saved. The cheque's mandate update is deferred to the
+  // batch's end; it set the firm up there, binding the session against the
+  // version its own answer read, which later answers had moved on. The
+  // runtime's bind refuses that as a version conflict, the whole batch
+  // failed, and every answer was held.
+  it("sets the firm up in the answer's own commit; the deferred update never binds", async () => {
+    const { services, calls } = fakes();
+    const mandates: string[] = [];
+    Object.assign(services.investors, {
+      listInvestorMandates: () => Promise.resolve({ items: [] }),
+      createInvestorMandate: () => {
+        mandates.push("create");
+        return Promise.resolve({ id: "a2000000-0000-4000-8000-000000000001" });
+      },
+      getInvestorMandate: () =>
+        Promise.resolve({
+          id: "a2000000-0000-4000-8000-000000000001",
+          version: 1,
+          constraints: [],
+        }),
+      updateInvestorMandate: () => {
+        mandates.push("update");
+        return Promise.resolve({
+          id: "a2000000-0000-4000-8000-000000000001",
+          version: 2,
+          constraints: [],
+        });
+      },
+    });
+    const bound: string[] = [];
+    const base = context([NAME, TYPE], bound);
+    // As the runtime does: a bind is valid only during the answer's own
+    // commit; after it, the session has moved on.
+    let committing = true;
+    const deferred: ((tx: unknown) => Promise<void>)[] = [];
+    const ctx = {
+      ...base,
+      bindContext: (binding: { subject: { subjectId: string } }) =>
+        committing
+          ? base.bindContext(binding as never)
+          : Promise.reject(new OnboardingSessionVersionConflictError()),
+      defer: (_key: string, run: (tx: unknown) => Promise<void>) => {
+        deferred.push(run);
+      },
+    } as unknown as OnboardingWriteContext;
+    const CURRENCY = answer(INVESTOR_STEPS.currency, {
+      type: "SINGLE_SELECT",
+      optionKey: "usd",
+    } as never);
+    await target(INVESTOR_WRITE_TARGETS.stageCheque, services).apply(
+      ctx,
+      CURRENCY,
+    );
+    committing = false;
+    expect(calls).toEqual(["createOrganisation", "createInvestorOrganisation"]);
+    expect(bound).toEqual([INVESTOR]);
+    expect(deferred).toHaveLength(1);
+    await deferred[0]?.({ sql: () => Promise.resolve([]) });
+    expect(mandates).toEqual(["create", "update"]);
+    // Set up once, in the answer's own commit; never again at the end.
+    expect(bound).toEqual([INVESTOR]);
+  });
+
+  it("with no type yet, the deferred answer is refused now, to be held", async () => {
+    const { services } = fakes();
+    const deferred: unknown[] = [];
+    const ctx = {
+      ...context([NAME], []),
+      defer: (_key: string, run: unknown) => {
+        deferred.push(run);
+      },
+    } as unknown as OnboardingWriteContext;
+    await expect(
+      target(INVESTOR_WRITE_TARGETS.stageCheque, services).apply(
+        ctx,
+        answer(INVESTOR_STEPS.currency, {
+          type: "SINGLE_SELECT",
+          optionKey: "usd",
+        } as never),
+      ),
+    ).rejects.toBeInstanceOf(OnboardingContextRequiredError);
+    expect(deferred).toEqual([]);
   });
 });

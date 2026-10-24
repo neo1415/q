@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   JOB_PLAN_V7,
   JOB_PLAN_V8,
+  JOB_PLAN_V9,
   TURN_READER_V51,
   V51_DECISION_WITH_WORK,
   createDefaultPromptRegistry,
@@ -21,8 +22,8 @@ describe("a decision stated with work attached", () => {
     expect(registry.getActive("TURN_READER").definition.template).toContain(
       V51_DECISION_WITH_WORK,
     );
-    // v8 (owner 2026-10-23, ANALYSIS and first read) is built on v7.
-    expect(registry.getActive("JOB_PLAN").definition.version).toBe(8);
+    // v9 (2026-10-24) is built on v8 (ANALYSIS, first read), on v7.
+    expect(registry.getActive("JOB_PLAN").definition.version).toBe(9);
     expect(TURN_READER_V51.template).toContain(V51_DECISION_WITH_WORK);
     expect(V51_DECISION_WITH_WORK).toMatch(/teamJob is true/u);
     expect(V51_DECISION_WITH_WORK).toMatch(
@@ -32,8 +33,9 @@ describe("a decision stated with work attached", () => {
 
   it("is carried by the lead as the first next action, never a step, and prerequisites are not step outputs", () => {
     expect(JOB_PLAN_V7.status).toBe("DEPRECATED");
-    expect(JOB_PLAN_V8.status).toBe("ACTIVE");
-    expect(JOB_PLAN_V8.template).toContain(
+    expect(JOB_PLAN_V8.status).toBe("DEPRECATED");
+    expect(JOB_PLAN_V9.status).toBe("ACTIVE");
+    expect(JOB_PLAN_V9.template).toContain(
       "make it the first next action with tool relationship.outcome.change",
     );
     expect(JOB_PLAN_V7.template).toContain(

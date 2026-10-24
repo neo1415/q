@@ -583,7 +583,8 @@ describe("research feeds the flow", () => {
   const person: PresenceFound = {
     subjectType: "PERSON",
     name: "Aria Mustary",
-    statements: ["Harvard Ed.M."],
+    // QO-24: tied to them by naming their own company.
+    statements: ["Harvard Ed.M.", "Founder of Mai Soli Foundation"],
     domains: [],
   };
 
@@ -593,7 +594,22 @@ describe("research feeds the flow", () => {
     ).toEqual(["I found maisolifoundation.org — is that your website?"]);
     expect(
       confirmationsFromPresence(person, stuckView()).map((c) => c.line),
-    ).toEqual(["I found Aria Mustary, Harvard Ed.M. — is that you?"]);
+    ).toEqual([
+      "I found Aria Mustary, Founder of Mai Soli Foundation — is that you?",
+    ]);
+    // QA QO-24: a namesake (nothing found names their company) is never
+    // put to them: "Nem Okafor (transfermarkt) — is that you?".
+    expect(
+      confirmationsFromPresence(
+        {
+          subjectType: "PERSON",
+          name: "Aria Mustary",
+          statements: ["Midfielder, Lagos United"],
+          domains: ["transfermarkt.com"],
+        },
+        stuckView(),
+      ),
+    ).toEqual([]);
     // A website already on the record is not asked about.
     expect(
       confirmationsFromPresence(

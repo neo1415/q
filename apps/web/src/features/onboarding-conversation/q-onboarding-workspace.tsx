@@ -82,7 +82,6 @@ import {
   progressLines,
   promptFor,
   promptStepOf,
-  remainingCount,
   reviewLines,
   stillNeeded,
   taxonomyProposal,
@@ -493,7 +492,6 @@ export function QOnboardingWorkspace({
     view?.session.id,
     view?.session.version,
   );
-  const remaining = view === undefined ? 0 : remainingCount(view);
   // D7: words left in the composer last time come back with the interview.
   // Storage is the browser's: read once hydrated (the server renders an
   // empty composer), and the composer starts from it once per interview;
@@ -2286,12 +2284,12 @@ export function QOnboardingWorkspace({
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="cq-caption text-(--cq-text-secondary)">
+              {/* QA QO-22: one measure of progress. "31 questions to go"
+                  counted every optional question on their path, beside
+                  "Essentials 9 of 12 · about 1 min left". */}
               {gaps.length === 1
                 ? "1 thing left to settle"
                 : `${String(gaps.length)} things left to settle`}
-              {remaining > gaps.length
-                ? ` · ${String(remaining)} questions to go`
-                : ""}
             </span>
             <Button
               size="compact"

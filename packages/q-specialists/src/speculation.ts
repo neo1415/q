@@ -198,6 +198,8 @@ export function readingMisfit(
     readonly meetingPrep?: unknown;
     readonly appAction?: unknown;
     readonly askedAction?: string | null | undefined;
+    /** Their own work board (reader boardAsk): answered by its own branch. */
+    readonly boardAsk?: string | null | undefined;
     readonly reference?:
       | { readonly open: unknown; readonly retryLast: boolean }
       | null
@@ -221,6 +223,9 @@ export function readingMisfit(
     (read.meetingPrep ?? null) !== null ||
     (read.appAction ?? null) !== null ||
     (read.askedAction ?? null) !== null ||
+    // F-76: "what's on my board?" spoken got the approvals list from the
+    // speculative answer; the board branch answers it.
+    (read.boardAsk ?? null) !== null ||
     (read.reference?.open ?? null) !== null ||
     read.reference?.retryLast === true
   ) {

@@ -515,6 +515,52 @@ describe("compare the top two, right after a list of five", () => {
     ]);
   });
 
+  // Coordinator 24 Oct (live 11:29, run a86f114a): after the top-five
+  // cards, "Which is better, Anchor or Afyascan?" opened with Afyascan while
+  // Anchor led on fit, 7.6 to 7. Code decides the lead.
+  it("a 'which is better' answer leads with code's verdict, whatever the model wrote", async () => {
+    const { seam, request, stored } = build(
+      "Which is better, Mizan or Silo Credit?",
+      { compare: { count: null, names: ["Mizan", "Silo Credit"] } },
+      // The live answer's shape, the wrong company first.
+      "Silo Credit is the better-supported fit on the evidence currently available, but I wouldn't call it the better business yet. Mizan has a stronger recorded mandate fit. Mizan reports $42,000 of monthly revenue.",
+    );
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const said = stored.at(-1)?.content ?? "";
+    expect(said).toMatch(
+      /^On Capital Q's mandate fit, Mizan leads: [\d.]+ against Silo Credit's [\d.]+\./u,
+    );
+    expect(said).not.toContain("Silo Credit is the better-supported fit");
+    expect(said).toContain("Mizan reports $42,000 of monthly revenue.");
+  });
+
+  // Root cause, coordinator 24 Oct (third live miss, run 8605b721): the
+  // prepare is warmed before the turn is read, so it saw no `compare`;
+  // the answer that took it had no comparison fact, fits or verdict.
+  it("a prepare warmed before the reading still compares for the reading", async () => {
+    const { seam, request, alpha, stored } = build(
+      "Which is better, Mizan or Silo Credit?",
+      { compare: { count: null, names: ["Mizan", "Silo Credit"] } },
+      "Silo Credit is the better-supported fit on the evidence currently available. Mizan reports $42,000 of monthly revenue.",
+    );
+    // Warmed on the words alone, as the deployed path does.
+    const { compare: _read, ...unread } = request;
+    seam.warm?.(unread);
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    const sent = alpha.calls
+      .flatMap((call) => call.request.messages.map((m) => m.content))
+      .join("\n");
+    expect(sent).toContain("COMPARED SIDE BY SIDE");
+    expect(sent).toMatch(/VERDICT[^\n]*lead with exactly one, Mizan/u);
+    const table = (stored.at(-1)?.blocks ?? []).find(
+      (block) => Reflect.get(block as object, "kind") === "TABLE",
+    ) as { rows: { label: string }[] } | undefined;
+    expect(table?.rows.map((row) => row.label)).toContain("Mandate fit");
+    expect(stored.at(-1)?.content ?? "").toMatch(
+      /^On Capital Q's mandate fit, Mizan leads/u,
+    );
+  });
+
   it("an ordinary follow-up reads nothing extra", async () => {
     const { seam, request, executed } = build("Tell me more about Mizan");
     expect((await seam.answer(request)).kind).toBe("ANSWERED");

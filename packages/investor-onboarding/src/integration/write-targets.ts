@@ -51,6 +51,7 @@ import {
   type OrganisationId,
 } from "@capital-q/security";
 import {
+  existingVisibleFirm,
   findOwnFirmWorkspace,
   investorMayReuseWorkspace,
   readInvestorWorkspaceFacts,
@@ -845,6 +846,20 @@ async function bootstrapInvestor(
     if (actor.principal === undefined) {
       throw new OnboardingContextRequiredError();
     }
+    // One firm per real firm: a name already on Capital Q is joined, not
+    // set up a second time (the company journey's F3 rule, for firms).
+    const existing = await existingVisibleFirm(
+      context.tx.sql,
+      name,
+      actor.userId,
+    );
+    if (existing !== null) {
+      invalid(
+        "value.text",
+        "firm_already_on_capital_q",
+        `${existing} is already on Capital Q. If you work there, ask someone on its team to invite you instead of setting it up again. If yours is a different firm, add what sets its name apart.`,
+      );
+    }
     const membership = await services.organisations.createOrganisation({
       principal: actor.principal,
       input: parseContract(
@@ -918,16 +933,23 @@ async function bootstrapInvestor(
  * `boundInvestor`: a session with neither still refuses, and the answer is
  * held until the firm exists.
  */
+/** The session with the firm bound, setting the firm up when it can. */
+async function sessionWithFirm(
+  services: InvestorDomainServices,
+  context: OnboardingWriteContext,
+  values: ResponseValues,
+): Promise<OnboardingSession> {
+  return context.session.subject === null
+    ? ((await bootstrapInvestor(services, context, values)) ?? context.session)
+    : context.session;
+}
+
 async function boundOrBootstrapped(
   services: InvestorDomainServices,
   context: OnboardingWriteContext,
   values: ResponseValues,
 ): Promise<BoundInvestor> {
-  const session =
-    context.session.subject === null
-      ? ((await bootstrapInvestor(services, context, values)) ??
-        context.session)
-      : context.session;
+  const session = await sessionWithFirm(services, context, values);
   return boundInvestor(services, context.actor, session, context.requestMemo);
 }
 
@@ -1107,7 +1129,7 @@ export function createInvestorWriteTargets(
       }
     },
 
-    [INVESTOR_WRITE_TARGETS.stageCheque]: (services, context, values) => {
+    [INVESTOR_WRITE_TARGETS.stageCheque]: async (services, context, values) => {
       const update = (
         servicesNow: InvestorDomainServices,
         contextNow: OnboardingWriteContext,
@@ -1144,10 +1166,21 @@ export function createInvestorWriteTargets(
         },
         "The mandate details are not valid.",
       );
-      context.defer(INVESTOR_WRITE_TARGETS.stageCheque, (tx) =>
-        update(servicesFor(tx), { ...context, tx }),
+      // The firm is set up (or the answer refused, to be held) now, in this
+      // answer's own commit: binding the session is only valid against the
+      // version this answer read. Run at the batch's end, the bind met a
+      // session that later answers had moved on and the whole batch failed
+      // with a version conflict, holding every answer (QA F-80, 24 Oct).
+      const session = await sessionWithFirm(services, context, values);
+      await boundInvestor(
+        services,
+        context.actor,
+        session,
+        context.requestMemo,
       );
-      return Promise.resolve();
+      context.defer(INVESTOR_WRITE_TARGETS.stageCheque, (tx) =>
+        update(servicesFor(tx), { ...context, tx, session }),
+      );
     },
 
     [INVESTOR_WRITE_TARGETS.taxonomy]: (services, context, values) =>

@@ -1217,3 +1217,27 @@ Evidence stage: **merged into `speed/q-oct20` (1c2751ec3) and local gates passed
   - Root tsc: exit 0. q-api tsc: exit 0.
   - eslint and prettier: clean on the changed files.
 - **Not yet:** deployed and verified live (Q answering about Capital Q with its figures).
+
+## 2026-10-24 — Onboarding root fixes (Claude onboarding worker, session_01Lu7zuVFv4PFdSPNRy6RkV9)
+
+- **Merged and live (91d6361f9):**
+  - #392: F-52, F-49, F-51 and F-53. Lane 8's work, plus a follow-up: waiting writes held, no stale overwrite, a same-turn save, per-person firm reuse.
+  - #400: QO-23. Uploads are classified by content (DOCUMENT_KIND_READER) before `evidence.document.ready`.
+  - #402: QO-38/44/26. What a founder told Q in setup reads as "stated" in readiness and call prep. A raise amount said early is held until the step opens.
+  - #403: F-69. A deck is read back only once Q's findings from it exist.
+- **Verified live, run 4 (fresh fictional founder):** a deck dropped before naming, with "payroll" in its file name, was read by content and read back as proposals.
+- **Open, stacked in order:**
+  - #409 (green): QO-31 sector essential; QO-28 no duplicate text; QO-20 receipts as speech; F-66 money and names in coverage; F-67 SSE heartbeat.
+  - #414: QO-27a stages as named; QO-27b lists add by meaning; QO-29 live mandate asked once essentials are in.
+  - #415: F-48 greeting by first name; firm dedupe ("already on Capital Q").
+  - #421: QO-24 no namesakes; QO-25 role is current; QO-30 plain words; QO-22 one progress measure.
+  - #422: the deck read and the founder review run concurrently (about 45 s to findings before).
+- **Separate:** #418, the account-deletion spec draft (owner decisions A–F) and the Q Pitch FAQ fix.
+- **Waiting on owner decisions:**
+  - an investor website step (definition v2 plus a migration, or the approval-bound action);
+  - red-flag exclusions in Discover (taxonomy nodes, or an ADR 0020 amendment);
+  - account deletion.
+- **Loop evidence:** `docs/ai-handoff/evidence/onboarding-loop/RUN-LOG.md` (in #409). It always uses fresh fictional accounts; nothing is admin-deleted.
+- **Open measurements:**
+  - typed turns take 8–12 s;
+  - the time to findings needs re-measuring once #422 is live.

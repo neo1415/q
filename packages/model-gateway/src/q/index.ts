@@ -33,6 +33,7 @@ import {
 import {
   MODEL_TOOLS_MAX,
   isCalendarBlock,
+  MODEL_TOOL_CALLS_MAX,
   MODEL_TOOL_RESULT_MAX_CHARS,
   QClientActionToolResultSchema,
   QShowCalendarConnectIntentSchema,
@@ -347,6 +348,9 @@ import {
 import {
   asksToCompare,
   comparisonFactStatement,
+  comparisonVerdict,
+  ledByVerdict,
+  type ComparisonVerdict,
   comparisonSpokenLine,
   withoutCompareOffers,
   comparisonTableBlock,
@@ -1092,6 +1096,15 @@ function heldOnRecord(read: RunRead, name: string): HeldIdentity | null {
     return { website: facts.website, country: facts.country, city: facts.city };
   }
   return null;
+}
+
+/** A public search that ran and found no page (about them). */
+function webFoundNothing(outcome: QToolCallOutcome): boolean {
+  if (!outcome.result.ok) return false;
+  const sources = (
+    outcome.result.data as { readonly sources?: readonly unknown[] }
+  ).sources;
+  return Array.isArray(sources) && sources.length === 0;
 }
 
 /** How long a subject's empty public search stands for its conversation. */
@@ -2956,15 +2969,34 @@ export function createModelGatewayQAnswer(
      * adopted answer without it (live 23 Oct 21:49, run a19bae24).
      */
     let compareTable: QResultBlock | null = null;
-    const compareRead = (async (): Promise<void> => {
-      if (latest === undefined) return;
+    /** Who leads on Capital Q's fit, decided here by code (see ledByVerdict). */
+    let compareVerdict: ComparisonVerdict | null = null;
+    /**
+     * Root cause, coordinator 24 Oct (third live miss, run 8605b721): the
+     * prepare is warmed while the turn is still being read, so the request
+     * it sees carries no reader `compare`; "which is better, Anchor or
+     * Afyascan?" matched no words, nothing was read, and the answer that
+     * took the warmed prepare had no comparison fact, no fits and no
+     * verdict. The same reads run again for the turn's own reading
+     * (`compareLate`, below) when the warmed prepare built none.
+     */
+    type CompareOutcome = {
+      readonly facts: readonly AuthorisedFact[];
+      readonly ids: readonly string[];
+      readonly table: QResultBlock | null;
+      readonly verdict: ComparisonVerdict | null;
+    };
+    const compareFor = async (
+      reading: QAnswerRequest["compare"],
+    ): Promise<CompareOutcome | null> => {
+      if (latest === undefined) return null;
       const fromCards = compareTargets(
         latest.content,
         newestAnswerCards(earlier),
-        request.compare,
+        reading,
       );
-      const named = request.compare?.names ?? [];
-      if (fromCards.length < 2 && named.length < 2) return;
+      const named = reading?.names ?? [];
+      if (fromCards.length < 2 && named.length < 2) return null;
       const { names } = await prefetchToolsRead;
       // Coordinator 24 Oct ("which is better, Anchor or Afyascan?"): the
       // companies the reader heard named but Q did not show are found by
@@ -2999,7 +3031,7 @@ export function createModelGatewayQAnswer(
               (id, index, all): id is string =>
                 id !== null && all.indexOf(id) === index,
             );
-      if (targets.length < 2) return;
+      if (targets.length < 2) return null;
       const reads = targets.flatMap((companyId, index) =>
         [
           { name: "get_company", key: "profile" },
@@ -3020,7 +3052,7 @@ export function createModelGatewayQAnswer(
               .catch(() => null),
           ),
       );
-      if (reads.length === 0) return;
+      if (reads.length === 0) return null;
       stepStarts(request, "COMPARING_OPPORTUNITIES");
       await Promise.all(reads);
       const table = comparisonTableBlock({
@@ -3034,18 +3066,29 @@ export function createModelGatewayQAnswer(
         table === null
           ? null
           : comparisonFactStatement(table, runFits.read(request.runId));
-      if (statement === null) return;
-      compareIds = targets;
-      compareTable = table;
-      compareFacts = [
-        {
-          scope: "NETWORK_VISIBLE_DATA",
-          statement,
-          truthClass: "USER_CLAIM",
-          evidenceStatus: "SELF_REPORTED",
-          source: "Capital Q profiles, published figures and computed fit",
-        },
-      ];
+      if (statement === null || table === null) return null;
+      return {
+        ids: targets,
+        table,
+        verdict: comparisonVerdict(table, runFits.read(request.runId)),
+        facts: [
+          {
+            scope: "NETWORK_VISIBLE_DATA",
+            statement,
+            truthClass: "USER_CLAIM",
+            evidenceStatus: "SELF_REPORTED",
+            source: "Capital Q profiles, published figures and computed fit",
+          },
+        ],
+      };
+    };
+    const compareRead = (async (): Promise<void> => {
+      const outcome = await compareFor(request.compare);
+      if (outcome === null) return;
+      compareFacts = outcome.facts;
+      compareIds = outcome.ids;
+      compareTable = outcome.table;
+      compareVerdict = outcome.verdict;
     })();
     compareRead.catch(() => undefined);
     // QA F-28: "who can see my data room?" is read by code, as the asker,
@@ -4000,6 +4043,8 @@ export function createModelGatewayQAnswer(
       compareIds,
       dataRoomFacts,
       compareTable,
+      compareVerdict,
+      compareLate: compareFor,
       onScreenDocumentCall,
       onScreenPage,
       onScreenDossier,
@@ -4365,10 +4410,12 @@ export function createModelGatewayQAnswer(
         onScreenDocument,
         attachedDocuments,
         attachedTitles,
-        compareFacts,
-        compareIds,
+        compareFacts: preparedCompareFacts,
+        compareIds: preparedCompareIds,
         dataRoomFacts,
-        compareTable,
+        compareTable: preparedCompareTable,
+        compareVerdict: preparedCompareVerdict,
+        compareLate,
         onScreenDocumentCall,
         onScreenPage,
         onScreenDossier,
@@ -4392,6 +4439,16 @@ export function createModelGatewayQAnswer(
         attention,
         counterparty,
       } = prepared;
+      // The turn's own reading decides a comparison: a prepare warmed before
+      // the reading built none, so its reads run now (see compareFor).
+      const lateCompare =
+        preparedCompareTable === null && request.compare !== undefined
+          ? await compareLate(request.compare).catch(() => null)
+          : null;
+      const compareFacts = lateCompare?.facts ?? preparedCompareFacts;
+      const compareIds = lateCompare?.ids ?? preparedCompareIds;
+      const compareTable = lateCompare?.table ?? preparedCompareTable;
+      const compareVerdict = lateCompare?.verdict ?? preparedCompareVerdict;
       /** The selected company, for who "they" is in a research follow-up. */
       const selectedForResearch = (): SelectedCompany | null => {
         const subject = request.subjects.find(
@@ -5773,6 +5830,9 @@ export function createModelGatewayQAnswer(
        * those cards are not the set just shown, by design.
        */
       let rankedPastShown = false;
+      // The comparison's lead, decided by code (prepare's table, or the
+      // model path's own table below when the prepare built none).
+      let answerVerdict: ComparisonVerdict | null = compareVerdict;
       const persistAnswer = async (
         content: string,
         /**
@@ -5815,6 +5875,13 @@ export function createModelGatewayQAnswer(
         // QA F-44: other investors' interest is withheld, never denied.
         if (asksAboutOthersInterest(latest.content)) {
           content = withOthersInterestWithheld(content).slice(
+            0,
+            ANSWER_LIMIT_CHARS,
+          );
+        }
+        // Coordinator 24 Oct: code decides who a comparison leads with.
+        if (answerVerdict !== null) {
+          content = ledByVerdict(content, answerVerdict).slice(
             0,
             ANSWER_LIMIT_CHARS,
           );
@@ -7165,6 +7232,22 @@ export function createModelGatewayQAnswer(
             latencyMs: outcome.latencyMs,
           });
           collectSources(outcome);
+          // Owner 2026-10-24 ("Which is better, Anchor or Afyascan?" was
+          // answered with "the web search added nothing relevant about
+          // either company"): a search that found nothing about them, on a
+          // turn whose Capital Q records were read, is not put in front of
+          // the answer at all -- the records answer it, and nothing is said
+          // about the web. Recorded above, so it is not asked again.
+          if (
+            webFoundNothing(outcome) &&
+            runCompanies.read(request.runId).profiles.size > 0
+          ) {
+            logger?.info(
+              { qRunId: request.runId },
+              "q public search found nothing; answered from the records alone",
+            );
+            return;
+          }
           messages = [
             ...messages,
             fetchedForYouMessage(call.name, outcome),
@@ -7509,9 +7592,13 @@ export function createModelGatewayQAnswer(
             }
             rounds += 1;
             took(`round${String(rounds)}`);
+            // Also never more than one assistant message may carry: the
+            // round's own message goes back in the next request, and a
+            // ninth call made that request one the gateway refuses (QA
+            // 2026-10-24, "show my pipeline": 1 + 9 calls, run FAILED).
             const proposed = result.output.calls.slice(
               0,
-              Q_TOOL_LOOP_MAX_CALLS - calls,
+              Math.min(MODEL_TOOL_CALLS_MAX, Q_TOOL_LOOP_MAX_CALLS - calls),
             );
             const assistant: ModelMessage = {
               role: "ASSISTANT",
@@ -8366,6 +8453,11 @@ export function createModelGatewayQAnswer(
         // the could-not line, and the status of earlier changes never
         // stands in for it (lead 2026-10-03, run 9b4ef8d1: "…active and
         // shareable." plus "Nothing is waiting for your approval…").
+        // QA 2026-10-24: the confirmation of a remember ask is said by
+        // code, the same way every time ("You pass on tobacco
+        // businesses." was the model's whole reply on one run, "I'll
+        // remember that…" on the one before).
+        const rememberLine = rememberConfirmation(latest.content);
         const couldNot =
           parityGap !== null &&
           actedLines.length === 0 &&
@@ -8385,6 +8477,12 @@ export function createModelGatewayQAnswer(
           // reply in another script is taken as its own account of what
           // happened, in the person's language.
           !repliedInOtherScript(statusTalk?.text ?? guarded.text) &&
+          // QA 2026-10-24: "Remember: I pass on gambling businesses." was
+          // answered "I'll remember that…" and then "I didn't prepare
+          // that…": what they tell Q to remember is kept from their words
+          // (the memory write gate), with no tool to call: code says it
+          // will remember (below), and that is the whole answer.
+          rememberLine === null &&
           // No action named and the turn answered with what was asked for
           // (QA F-71: "Show my pipeline" answered with findings and cards,
           // then "I didn't get that done…"): an answer, not a miss.
@@ -8405,6 +8503,7 @@ export function createModelGatewayQAnswer(
             ? [...(approvalLine === null ? [] : [approvalLine]), gapsSaid.line]
             : [
                 ...(approvalLine === null ? [] : [approvalLine]),
+                ...(rememberLine === null ? [] : [rememberLine.line]),
                 // Code's opening lines for this answer, before the model's.
                 ...(leadLines === undefined ? [] : [leadLines]),
                 // Nothing was done: a model line that says it was is
@@ -8415,12 +8514,15 @@ export function createModelGatewayQAnswer(
                 claimsDone(statusTalk?.text ?? guarded.text)
                   ? []
                   : [
-                      leadLines === undefined
-                        ? (statusTalk?.text ?? guarded.text)
-                        : afterLeadLines(
-                            statusTalk?.text ?? guarded.text,
-                            leadLines,
-                          ),
+                      withoutRememberTalk(
+                        leadLines === undefined
+                          ? (statusTalk?.text ?? guarded.text)
+                          : afterLeadLines(
+                              statusTalk?.text ?? guarded.text,
+                              leadLines,
+                            ),
+                        rememberLine,
+                      ),
                     ]),
                 ...(couldNot === null ? [] : [couldNot]),
                 ...actedLines,
@@ -8441,6 +8543,8 @@ export function createModelGatewayQAnswer(
                   : [quietlyNoted(recordedStatements)]),
               ]
         )
+          // A part emptied by the guards above leaves no blank gap.
+          .filter((part) => part.trim().length > 0)
           .join("\n\n")
           .slice(0, ANSWER_LIMIT_CHARS)
           .trim();
@@ -8666,6 +8770,9 @@ export function createModelGatewayQAnswer(
               ...(compareIds.length >= 2 ? { only: compareIds } : {}),
               ...(request.compare === undefined ? {} : { compareAsked: true }),
             });
+        if (answerVerdict === null && comparedTable !== null) {
+          answerVerdict = comparisonVerdict(comparedTable, fitsRead);
+        }
         const codeBlocks = [
           ...(builtCards === null ? [] : [builtCards]),
           ...(comparedTable === null ? [] : [comparedTable]),
@@ -8965,6 +9072,109 @@ I've updated **${revisedArtifact.title}** — that's version ${String(revisedArt
 /** A reply written without Latin letters (Arabic, Amharic, Chinese...). */
 function repliedInOtherScript(text: string): boolean {
   return /\p{L}/u.test(text) && !/\p{Script=Latin}/u.test(text);
+}
+
+/**
+ * They asked Q to remember something about themselves or how they work
+ * ("Remember: I pass on gambling", "please remember that I…"), not to do
+ * something later ("remember to send…", which is a task).
+ */
+const REMEMBER_ASKED =
+  /^\s*(?:(?:hey|ok|okay)\s+)?(?:q[,:\s]+)?(?:please\s+)?(?:remember|keep\s+in\s+mind|don['’]t\s+forget)\b(?!\s+to\b)[\s:,-]*(?:that\b\s*)?/iu;
+/** A sentence of the reply that says it will remember. */
+const REMEMBER_SAID =
+  /\b(?:i['’]ll|i\s+will|i['’]ve|i\s+have)\s+(?:remember|noted|note|keep\s+(?:that|it)\s+in\s+mind)/iu;
+/** A sentence that only acknowledges ("Noted.", "Got it."). */
+const ACK_ONLY =
+  /^(?:noted|got it|understood|will do|of course|sure|okay|ok|done)$/u;
+/** Their words, said back to them: "I pass on" is "you pass on". */
+const SAID_BACK: readonly (readonly [RegExp, string])[] = [
+  [/\bI['’]m\b/gu, "you're"],
+  [/\bI\s+am\b/gu, "you are"],
+  [/\bI['’]ve\b/gu, "you've"],
+  [/\bI['’]d\b/gu, "you'd"],
+  [/\bI['’]ll\b/gu, "you'll"],
+  [/\bwe['’]re\b/giu, "you're"],
+  [/\bI\b/gu, "you"],
+  [/\bmyself\b/giu, "yourself"],
+  [/\bmine\b/giu, "yours"],
+  [/\bmy\b/giu, "your"],
+  [/\bme\b/giu, "you"],
+  [/\bours\b/giu, "yours"],
+  [/\bour\b/giu, "your"],
+  [/\bwe\b/giu, "you"],
+  [/\bus\b/giu, "you"],
+];
+
+/**
+ * The confirmation of a remember ask, from their own words: "I'll remember
+ * that you pass on tobacco businesses." Words that would not read back
+ * plainly (already "you", several sentences, too long) are confirmed
+ * without being repeated. Null when they did not ask Q to remember
+ * something, or asked a question.
+ */
+export function rememberConfirmation(
+  said: string,
+): { readonly line: string; readonly fact: string | null } | null {
+  const asked = REMEMBER_ASKED.exec(said);
+  // A question is answered, not remembered.
+  if (asked === null || said.includes("?")) return null;
+  const words = said
+    .slice(asked[0].length)
+    .trim()
+    .replace(/[.!\s]+$/u, "");
+  // "Remember what I said about Kestrel" asks Q to recall, not to keep.
+  if (
+    /^(?:what|when|where|who|whom|which|how|why|whether|if)\b/iu.test(words)
+  ) {
+    return null;
+  }
+  const plain =
+    words.length > 0 &&
+    words.length <= 200 &&
+    !/[;\n]|[.!]\s/u.test(words) &&
+    !/\b(?:you|your|yours|yourself)\b/iu.test(words);
+  if (!plain) return { line: "I'll remember that.", fact: null };
+  let fact = words;
+  for (const [pattern, swap] of SAID_BACK) fact = fact.replace(pattern, swap);
+  return { line: `I'll remember that ${fact}.`, fact };
+}
+
+/**
+ * The model's reply after code's confirmation: its own "I'll remember…"
+ * and a sentence that only says the fact back are not said twice.
+ */
+export function withoutRememberTalk(
+  text: string,
+  remember: { readonly fact: string | null } | null,
+): string {
+  if (remember === null) return text;
+  const bare = (sentence: string): string =>
+    sentence
+      .toLowerCase()
+      .replace(/’/gu, "'")
+      .replace(/[^\p{L}\p{N}' ]+/gu, " ")
+      .replace(/\s+/gu, " ")
+      .trim();
+  const fact = remember.fact === null ? null : bare(remember.fact);
+  const kept = (sentence: string): boolean =>
+    !REMEMBER_SAID.test(sentence) &&
+    !ACK_ONLY.test(bare(sentence)) &&
+    (fact === null || bare(sentence) !== fact);
+  // Line by line, so the reply's paragraphs and lists keep their shape.
+  return text
+    .split("\n")
+    .map((line) =>
+      line.trim().length === 0
+        ? line
+        : line
+            .split(/(?<=[.!?])[ \t]+/u)
+            .filter(kept)
+            .join(" "),
+    )
+    .join("\n")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
 }
 
 export function couldNotDoLine(gap: string): string {

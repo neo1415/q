@@ -21,7 +21,11 @@ import {
   createModelProviderRegistry,
   createStaticModelCatalog,
 } from "../src/index.js";
-import { claimsDone, createModelGatewayQAnswer } from "../src/q/index.js";
+import {
+  claimsDone,
+  createModelGatewayQAnswer,
+  rememberConfirmation,
+} from "../src/q/index.js";
 import { ownStandingFact } from "../src/q/own-standing.js";
 import { afterLeadLines, readinessLeadLines } from "../src/q/own-readiness.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
@@ -805,6 +809,77 @@ describe("what exists, and the parity gap", () => {
     expect(silent).toContain(
       "I couldn't do that from this conversation: that action isn't available to me here",
     );
+  });
+
+  it("confirms a remember ask in code's own words, with no could-not line (QA 2026-10-24)", async () => {
+    const asked = async (said: string, answer: string) => {
+      const { seam, request, persisted } = build(
+        { status: "SUCCEEDED", data: CONNECTED },
+        undefined,
+        {},
+        { said, answer },
+      );
+      // The reader named an offered action the model rightly did not call.
+      await seam.answer({
+        ...request,
+        turnKind: "TOOL_REQUEST",
+        askedAction: "get_q_daily",
+      });
+      return persisted.join("\n");
+    };
+    // Whatever the model said, the confirmation is the same, said once.
+    for (const answer of [
+      "You pass on tobacco businesses.",
+      "I'll remember that you pass on tobacco businesses.",
+      "Noted. I'll remember that.",
+    ]) {
+      const said = await asked(
+        "Remember: I pass on tobacco businesses.",
+        answer,
+      );
+      expect(said, answer).toBe(
+        "I'll remember that you pass on tobacco businesses.",
+      );
+    }
+    // The model's offer after it stays.
+    const offered = await asked(
+      "Remember: I pass on tobacco businesses.",
+      "You pass on tobacco businesses.\n\nWould you like me to add tobacco to your mandate's exclusions?",
+    );
+    expect(offered).toBe(
+      "I'll remember that you pass on tobacco businesses.\n\nWould you like me to add tobacco to your mandate's exclusions?",
+    );
+    // A task to do later is not a thing to remember about them.
+    const task = await asked(
+      "Remember to send Kestrel my deck tomorrow.",
+      "I'll remember to send it.",
+    );
+    expect(task).not.toContain("I'll remember that");
+    expect(task).toContain("I didn't prepare that, so nothing was changed.");
+  });
+
+  it("says their words back to them in a remember confirmation", () => {
+    expect(
+      rememberConfirmation("Remember that we only lead seed rounds.")?.line,
+    ).toBe("I'll remember that you only lead seed rounds.");
+    expect(
+      rememberConfirmation("please remember I'm based in Lagos")?.line,
+    ).toBe("I'll remember that you're based in Lagos.");
+    expect(
+      rememberConfirmation("Q, keep in mind my fund closes in March.")?.line,
+    ).toBe("I'll remember that your fund closes in March.");
+    // Not plain to say back: confirmed without repeating it.
+    expect(
+      rememberConfirmation("Remember: you should be shorter. Ask less.")?.line,
+    ).toBe("I'll remember that.");
+    for (const notAsked of [
+      "Remember to send Kestrel my deck",
+      "Remember what I said about Kestrel",
+      "Do you remember my mandate?",
+      "Note the call is tomorrow",
+    ]) {
+      expect(rememberConfirmation(notAsked), notAsked).toBeNull();
+    }
   });
 
   it("never says a change was made beside the line that says nothing was (Zino run 50159909)", async () => {

@@ -21,7 +21,11 @@ import { ActorContextSchema } from "@capital-q/security";
 import { composeAnswerDocument, workTitle } from "../src/answer-document.js";
 import {
   answerSteps,
+  asksWhatIsOnBoard,
+  boardItemsMeant,
   boardItemFromWords,
+  mentionsOwnBoard,
+  nameInAsk,
   boardReadOut,
   createSpecialistQAnswer,
   type BoardKeeper,
@@ -1300,5 +1304,392 @@ describe("workTitle", () => {
     });
     await s.run();
     expect(added.map((one) => one.title)).toEqual(["Call prep: Anchor"]);
+  });
+});
+
+/**
+ * Live 91d6361f9: the deployed reader carried no LIST or ADD, so "What's
+ * on my board?" read the readiness checklist and "Add 'Prep data room for
+ * seed round' to my board" found no tool. With no board ask read, their
+ * unmistakable words still reach the board by code, and the board tool is
+ * named whenever they speak of their own board.
+ */
+describe("board asks the reader left unread", () => {
+  const unread = (): QTurnReading => ({
+    kind: "QUESTION_TO_Q",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: null,
+    boardAsk: null,
+    namedOther: null,
+  });
+  function keeper(
+    items: { title: string; status: "TODO" | "DOING" | "DONE" }[] = [],
+  ) {
+    const added: { kind: string; title: string }[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items }),
+      add: (_actor, request) => {
+        added.push(request);
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    return { board, added };
+  }
+
+  it("'What's on my board?' is read from the work board, never readiness, with no model call", async () => {
+    const { board } = keeper([{ title: "Call prep: Anchor", status: "DOING" }]);
+    const s = seam({
+      history: [message("USER", "What's on my board?")],
+      reading: unread(),
+      board,
+    });
+    await s.run();
+    expect(s.delegated()).toBe(0);
+    expect(s.stored[0]?.content).toBe(
+      "Here's your board.\n\n**Doing** (1): Call prep: Anchor.",
+    );
+  });
+
+  it("'Add …' to my board adds the to-do in their words, quoted or not", async () => {
+    for (const words of [
+      "Add 'Prep data room for seed round' to my board",
+      "Add Prep IC memo for Mizan to my board.",
+    ]) {
+      const { board, added } = keeper();
+      const s = seam({
+        history: [message("USER", words)],
+        reading: unread(),
+        board,
+      });
+      await s.run();
+      expect(s.delegated(), words).toBe(0);
+      expect(
+        added.map((one) => one.kind),
+        words,
+      ).toEqual(["TASK"]);
+    }
+  });
+
+  it("knows their own board by its words, and only theirs", () => {
+    expect(mentionsOwnBoard("put this on my work board")).toBe(true);
+    expect(mentionsOwnBoard("ajoute ça à mon tableau")).toBe(true);
+    expect(mentionsOwnBoard("send it to the board of directors")).toBe(false);
+    expect(asksWhatIsOnBoard("What's on my board?")).toBe(true);
+    expect(asksWhatIsOnBoard("what is in my to-dos")).toBe(true);
+    expect(asksWhatIsOnBoard("show me my work board")).toBe(true);
+    expect(
+      asksWhatIsOnBoard("What's on my board? Also draft the memo for Anchor."),
+    ).toBe(false);
+    expect(asksWhatIsOnBoard("What's on the board meeting agenda?")).toBe(
+      false,
+    );
+  });
+});
+
+/**
+ * QA 2026-10-24 on the board: (1) "break it into tasks" split Q's own save
+ * confirmation; (2) a save while Q's deep work was under way filed only
+ * "On it. Starting now"; (3) "work on the first task" was declined.
+ */
+describe("board turns after other board turns", () => {
+  const SAVED = "11111111-2222-4333-8444-555555555555";
+  const PLAN =
+    "# Growth plan\n\n1. Hire a head of sales.\n2. Close the bridge round.";
+  const reading = (boardAsk: "SAVE" | "BREAKDOWN" | "WORK"): QTurnReading => ({
+    kind: "TOOL_REQUEST",
+    confidence: "HIGH",
+    transcript: "CLEAR",
+    question: null,
+    aboutNamedOther: false,
+    tool: null,
+    boardAsk,
+    namedOther: null,
+  });
+  type Item = {
+    id: string;
+    title: string;
+    status: "TODO" | "DOING" | "DONE";
+    createdBy: "PERSON" | "Q";
+    createdAt: string;
+  };
+  function keeper(items: Item[] = [], job: string | null = null) {
+    const added: { kind: string; title: string; refId?: string }[] = [];
+    const linked: [string, string][] = [];
+    const worked: string[][] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items }),
+      add: (_actor, request) => {
+        added.push(request);
+        return Promise.resolve({
+          outcome: "OK",
+          replayed: false,
+          value: { id: `item-${String(added.length)}` },
+        });
+      },
+      latestRunningJob: () =>
+        Promise.resolve(job === null ? null : { jobId: job }),
+      linkJob: (_actor, itemId, jobId) => {
+        linked.push([itemId, jobId]);
+        return Promise.resolve({ outcome: "OK" });
+      },
+      work: (_request, itemIds) => {
+        worked.push([...itemIds]);
+        return Promise.resolve({
+          status: "STARTED",
+          working: items.filter((one) => itemIds.includes(one.id)),
+          firstRead: null,
+          waiting: [],
+        });
+      },
+    };
+    return { board, added, linked, worked };
+  }
+
+  it("(1) breaking down after a save splits the plan, never Q's confirmation, and keeps one document", async () => {
+    const { board, added } = keeper();
+    const s = seam({
+      history: [
+        message("USER", "Write me a growth plan."),
+        message("Q", PLAN),
+        message("USER", "Save that plan to my board."),
+        {
+          ...message(
+            "Q",
+            "I've filed that as a document and put “Growth plan” on your board, in To do.",
+          ),
+          blocks: [
+            {
+              kind: "ARTIFACT_REFERENCE",
+              artifactId: QArtifactIdSchema.parse(SAVED),
+              type: "Q_REPORT",
+              status: "READY",
+              title: "Growth plan",
+            },
+          ],
+        },
+        message("USER", "Now break it into tasks."),
+      ],
+      reading: reading("BREAKDOWN"),
+      board,
+    });
+    await s.run();
+    expect(s.prepared).toHaveLength(0);
+    expect(added).toEqual([
+      { kind: "TASK", title: "Hire a head of sales." },
+      { kind: "TASK", title: "Close the bridge round." },
+    ]);
+  });
+
+  it("(2) a save while the work is under way keeps the job itself, linked, and files nothing", async () => {
+    const JOB = "99999999-2222-4333-8444-555555555555";
+    const { board, added, linked } = keeper([], JOB);
+    const s = seam({
+      history: [
+        message("USER", "Write me a 12-month growth plan for Maji Loop"),
+        message(
+          "Q",
+          "On it. Starting now: a 12-month growth plan. It will be ready in a few minutes.",
+        ),
+        message("USER", "Save that plan to my board."),
+      ],
+      reading: reading("SAVE"),
+      board,
+    });
+    await s.run();
+    expect(s.prepared).toHaveLength(0);
+    expect(added).toEqual([
+      expect.objectContaining({
+        kind: "WORK_JOB",
+        refId: JOB,
+        title: "12-month growth plan",
+      }),
+    ]);
+    expect(linked).toEqual([["item-1", JOB]]);
+    expect(s.stored[0]?.content).toMatch(
+      /in Doing; it moves to Done, with its document/u,
+    );
+  });
+
+  it("(2) with no job of theirs under way, it says so and files nothing", async () => {
+    const { board, added } = keeper([], null);
+    const s = seam({
+      history: [
+        message("USER", "Write me a growth plan"),
+        message("Q", "On it, starting now. It will be ready in a few minutes."),
+        message("USER", "Save it to my board."),
+      ],
+      reading: reading("SAVE"),
+      board,
+    });
+    await s.run();
+    expect(s.prepared).toHaveLength(0);
+    expect(added).toEqual([]);
+    expect(s.stored[0]?.content).toMatch(/^That work is still under way/u);
+  });
+
+  it("(3) 'work on the first task' starts Q's work on the first open item, by code", async () => {
+    const items: Item[] = [
+      {
+        id: "a",
+        title: "Hire a head of sales.",
+        status: "TODO",
+        createdBy: "Q",
+        createdAt: "2026-10-24T08:00:00Z",
+      },
+      {
+        id: "b",
+        title: "Close the bridge round.",
+        status: "TODO",
+        createdBy: "Q",
+        createdAt: "2026-10-24T08:00:01Z",
+      },
+    ];
+    const { board, worked } = keeper(items);
+    const s = seam({
+      history: [message("USER", "Work on the first task.")],
+      reading: reading("WORK"),
+      board,
+    });
+    await s.run();
+    expect(s.delegated()).toBe(0);
+    expect(worked).toEqual([["a"]]);
+    expect(s.stored[0]?.content).toBe(
+      "I've started on “Hire a head of sales.”: it's in Doing, and moves to Done when the work finishes.",
+    );
+  });
+
+  it("knows which open items 'work on …' means, from the board", () => {
+    const at = (minute: number) =>
+      `2026-10-24T08:${String(minute).padStart(2, "0")}:00Z`;
+    const items: Item[] = [
+      {
+        id: "old",
+        title: "Call Kestrel",
+        status: "TODO",
+        createdBy: "PERSON",
+        createdAt: at(0),
+      },
+      {
+        id: "a",
+        title: "Hire a head of sales",
+        status: "TODO",
+        createdBy: "Q",
+        createdAt: at(30),
+      },
+      {
+        id: "b",
+        title: "Close the bridge round",
+        status: "TODO",
+        createdBy: "Q",
+        createdAt: at(30),
+      },
+      {
+        id: "done",
+        title: "Ship it",
+        status: "DONE",
+        createdBy: "Q",
+        createdAt: at(30),
+      },
+    ];
+    expect(boardItemsMeant("work on the second one", items)).toEqual(["a"]);
+    expect(boardItemsMeant("get going on those", items)).toEqual(["a", "b"]);
+    expect(boardItemsMeant("start on close the bridge round", items)).toEqual([
+      "b",
+    ]);
+    expect(boardItemsMeant("do something", items)).toEqual([]);
+  });
+});
+
+/** Live 6b05d53a4: a call prep about an investor, referenced but no card. */
+describe("a saved call prep about an investor Q referenced", () => {
+  it("is titled with the investor as they named them", async () => {
+    const added: { kind: string; title: string }[] = [];
+    const board: BoardKeeper = {
+      list: () => Promise.resolve({ items: [] }),
+      add: (_actor, request) => {
+        added.push(request);
+        return Promise.resolve({ outcome: "OK", replayed: false });
+      },
+    };
+    const s = seam({
+      history: [
+        message(
+          "USER",
+          "Help me prepare for a call with Savanna Seed Partners",
+        ),
+        {
+          ...message(
+            "Q",
+            "Lead with your traction.\n\n1. Ask about their pacing.",
+          ),
+          blocks: [
+            {
+              kind: "INVESTOR_REFERENCE",
+              investorOrganisationId: "a1000000-0000-4000-8000-000000000001",
+            },
+          ],
+        },
+        message("USER", "Save that call prep to my board."),
+      ],
+      reading: {
+        kind: "TOOL_REQUEST",
+        confidence: "HIGH",
+        transcript: "CLEAR",
+        question: null,
+        aboutNamedOther: false,
+        tool: null,
+        boardAsk: "SAVE",
+        namedOther: null,
+      },
+      board,
+    });
+    await s.run();
+    expect(added.map((one) => one.title)).toEqual([
+      "Call prep: Savanna Seed Partners",
+    ]);
+  });
+
+  it("reads the name from the ask, and nothing from a lowercase one", () => {
+    expect(
+      nameInAsk("Help me prepare for a call with Savanna Seed Partners"),
+    ).toBe("Savanna Seed Partners");
+    expect(nameInAsk("Write an IC memo for Bank of Kigali and")).toBe(
+      "Bank of Kigali",
+    );
+    expect(nameInAsk("help me prepare for a call with the top one")).toBeNull();
+  });
+});
+
+/** Live 18d7884c4: "work on the first task" on a board led by saved documents. */
+describe("the first task is a task", () => {
+  it("skips saved documents when they ask for a task, but not when they ask for an item", () => {
+    const items = [
+      {
+        id: "doc",
+        kind: "DOCUMENT",
+        title: "Call prep: Anchor",
+        status: "TODO",
+      },
+      {
+        id: "t1",
+        kind: "TASK",
+        title: "Review Basketari repeat order data",
+        status: "TODO",
+      },
+      {
+        id: "t2",
+        kind: "TASK",
+        title: "Prep IC memo for Anchor",
+        status: "TODO",
+      },
+    ];
+    expect(
+      boardItemsMeant("Work on the first task on my board", items),
+    ).toEqual(["t1"]);
+    expect(boardItemsMeant("work on the second to-do", items)).toEqual(["t2"]);
+    expect(boardItemsMeant("work on the first item", items)).toEqual(["doc"]);
   });
 });

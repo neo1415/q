@@ -687,6 +687,32 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     ]);
   });
 
+  // QA 2026-10-24: an investor's "Show my pipeline" (no "me") was left to
+  // the reader and answered with their capital commitments. It is the same
+  // page request as "show me my pipeline", whatever the reading says.
+  it("'show my pipeline' opens their pipeline by code, with what is in it", async () => {
+    const asked: string[] = [];
+    const run = seam({
+      said: "Show my pipeline",
+      reading: null,
+      outcomes: [],
+      destinationSummary: (_request, destination) => {
+        asked.push(destination);
+        return Promise.resolve(
+          "2 companies: Ledgerfold and Mizan in diligence.",
+        );
+      },
+    });
+    expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+    expect(asked).toEqual(["CRM_PIPELINE"]);
+    expect(run.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+      },
+    ]);
+  });
+
   it("an investor's data room requests open the CRM, said where they are and what they asked (QO-15)", async () => {
     const ORG = "c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3";
     const subject = {

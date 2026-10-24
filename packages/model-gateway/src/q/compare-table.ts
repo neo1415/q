@@ -485,24 +485,79 @@ export function comparisonSpokenLine(block: QResultBlock): string | null {
  * mandate fit, and given to the answer as its one verdict; the condition
  * that would change it is the answer's own reading of the table.
  */
-function verdictLine(
-  block: Extract<QResultBlock, { kind: "TABLE" }>,
+export type ComparisonVerdict = {
+  readonly leader: string;
+  readonly other: string;
+  readonly leaderScore: string;
+  readonly otherScore: string;
+  readonly level: boolean;
+};
+
+/** Which company leads on Capital Q's computed mandate fit; null without two scores. */
+export function comparisonVerdict(
+  block: QResultBlock,
   fits: readonly RunFit[],
-): string {
+): ComparisonVerdict | null {
+  if (block.kind !== "TABLE") return null;
   const scored = block.columns.flatMap((column) => {
     const id =
       column.subject?.kind === "COMPANY" ? column.subject.companyId : null;
     const fit = fits.find((entry) => entry.companyId === id);
     const score = fit === undefined ? null : fitScoreOutOf10(fit.profile);
     const value = score === null ? Number.NaN : Number(score);
-    return Number.isFinite(value) ? [{ name: column.label, score, value }] : [];
+    return score !== null && Number.isFinite(value)
+      ? [{ name: column.label, score, value }]
+      : [];
   });
-  if (scored.length < 2) return "";
-  const ranked = [...scored].sort((a, b) => b.value - a.value);
-  const [first, second] = ranked;
-  if (first === undefined || second === undefined) return "";
-  if (first.value === second.value) {
-    return ` VERDICT, if they ask which is better or which to take forward: ${first.name} and ${second.name} are level on Capital Q's mandate fit (${String(first.score)} each). Say so once, then the one difference in the table that would separate them; never call either the better one.`;
+  if (scored.length < 2) return null;
+  const [first, second] = [...scored].sort((a, b) => b.value - a.value);
+  if (first === undefined || second === undefined) return null;
+  return {
+    leader: first.name,
+    other: second.name,
+    leaderScore: first.score,
+    otherScore: second.score,
+    level: first.value === second.value,
+  };
+}
+
+function verdictLine(
+  block: Extract<QResultBlock, { kind: "TABLE" }>,
+  fits: readonly RunFit[],
+): string {
+  const verdict = comparisonVerdict(block, fits);
+  if (verdict === null) return "";
+  if (verdict.level) {
+    return ` VERDICT, if they ask which is better or which to take forward: ${verdict.leader} and ${verdict.other} are level on Capital Q's mandate fit (${verdict.leaderScore} each). Say so once, then the one difference in the table that would separate them; never call either the better one.`;
   }
-  return ` VERDICT, if they ask which is better or which to take forward: lead with exactly one, ${first.name} (Capital Q mandate fit ${String(first.score)} against ${second.name}'s ${String(second.score)}), then the one condition in the table that would change it. Never name a different company as the better or first choice anywhere in the answer; mandate fit is not a judgement of quality.`;
+  return ` VERDICT, if they ask which is better or which to take forward: lead with exactly one, ${verdict.leader} (Capital Q mandate fit ${verdict.leaderScore} against ${verdict.other}'s ${verdict.otherScore}), then the one condition in the table that would change it. Never name a different company as the better or first choice anywhere in the answer; mandate fit is not a judgement of quality.`;
+}
+
+/** The verdict as Capital Q says it, first, in its own words. */
+export function verdictSentence(verdict: ComparisonVerdict): string {
+  return verdict.level
+    ? `${verdict.leader} and ${verdict.other} are level on Capital Q's mandate fit, at ${verdict.leaderScore} each.`
+    : `On Capital Q's mandate fit, ${verdict.leader} leads: ${verdict.leaderScore} against ${verdict.other}'s ${verdict.otherScore}.`;
+}
+
+/**
+ * Coordinator 24 Oct 2026 (live 11:29, run a86f114a): with the verdict in
+ * its facts, the model still opened "Afyascan is the better-supported
+ * fit" while Anchor led on fit, 7.6 to 7. Code decides the lead: the
+ * answer opens with Capital Q's verdict, and an opening sentence of the
+ * model's that names only the other company (its competing lead) gives way
+ * to it. What follows is the model's own reading.
+ */
+export function ledByVerdict(text: string, verdict: ComparisonVerdict): string {
+  const sentences = text.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/gu) ?? [text];
+  const [first, ...rest] = sentences;
+  const names = (sentence: string, name: string) =>
+    containsCompanyName(sentence, name);
+  const competing =
+    first !== undefined &&
+    names(first, verdict.other) &&
+    !names(first, verdict.leader);
+  const body = (competing ? rest : sentences).join("").trim();
+  const lead = verdictSentence(verdict);
+  return body.startsWith(lead) ? body : `${lead} ${body}`.trim();
 }

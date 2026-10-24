@@ -11,6 +11,7 @@ import {
   FOUNDER_PROFILE_SECTIONS,
   FOUNDER_STEPS,
 } from "@capital-q/founder-onboarding";
+import { INVESTOR_STEPS } from "@capital-q/investor-onboarding";
 import type { Logger } from "@capital-q/observability";
 import type { ActorContext } from "@capital-q/security";
 
@@ -271,6 +272,30 @@ function hostOf(domain: string): string {
 const NOT_OWN_SITE =
   /(^|\.)(linkedin|facebook|instagram|twitter|x|youtube|crunchbase|github|medium|wikipedia|tiktok|google|bloomberg|forbes|techcrunch|substack)\.[a-z.]+$/u;
 
+/** The company or firm their session names, from their own answers. */
+function organisationNameOf(view: OnboardingSessionView | null): string | null {
+  const answer = view?.responses.find(
+    (r) =>
+      r.stepKey === FOUNDER_STEPS.companyName ||
+      r.stepKey === INVESTOR_STEPS.organisationName,
+  )?.value;
+  const name = answer?.type === "TEXT" ? answer.text.trim() : "";
+  return name.length >= 2 ? name : null;
+}
+
+/** Whether a found statement names their organisation (its whole name). */
+function namesOrganisation(statement: string, organisation: string): boolean {
+  const flat = (text: string) =>
+    text
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/gu, "")
+      .replace(/[^a-z0-9]+/gu, " ")
+      .trim();
+  const wanted = flat(organisation);
+  return wanted.length >= 2 && ` ${flat(statement)} `.includes(` ${wanted} `);
+}
+
 /**
  * Confirmation questions from a presence build's findings. Code composes
  * them from what the Write Gate accepted (HELD as inference): nothing here
@@ -302,9 +327,20 @@ export function confirmationsFromPresence(
     }
     return out;
   }
+  // QA QO-24 (23 Oct): "Nem Okafor (transfermarkt) — is that you?" for a
+  // founder of a payroll company: a namesake. A person is put to them only
+  // when what was found names the company or firm they told us about; with
+  // nothing to tie it to them, nothing is asked (unknown stays unknown).
+  const organisation = organisationNameOf(view);
+  if (
+    organisation === null ||
+    !found.statements.some((s) => namesOrganisation(s, organisation))
+  ) {
+    return out;
+  }
   const statement = found.statements
     .map((s) => clip(s, MAX_STATEMENT))
-    .find((s) => s.length >= 8);
+    .find((s) => s.length >= 8 && namesOrganisation(s, organisation));
   const where = found.domains.map(hostOf).find((d) => d.length > 3);
   // As found: a statement often opens on a proper noun ("Harvard Ed.M.").
   const about = statement === undefined ? "" : `, ${statement}`;

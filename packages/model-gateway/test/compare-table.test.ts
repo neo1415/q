@@ -6,6 +6,7 @@ import { RunRead, createRunCompanies } from "../src/q/card-subjects.js";
 import {
   asksToCompare,
   comparisonFactStatement,
+  ledByVerdict,
   comparisonTableBlock,
   compareTargets,
   comparisonSpokenLine,
@@ -371,5 +372,41 @@ describe("one verdict, from Capital Q's fit", () => {
     const statement = comparisonFactStatement(block, fits) ?? "";
     expect(statement).toContain("are level on Capital Q's mandate fit");
     expect(statement).not.toContain("lead with exactly one");
+  });
+});
+
+describe("code decides who a comparison leads with", () => {
+  const verdict = {
+    leader: "Anchor",
+    other: "Afyascan",
+    leaderScore: "7.6",
+    otherScore: "7",
+    level: false,
+  };
+  it("replaces a competing lead, keeps the rest", () => {
+    expect(
+      ledByVerdict(
+        "Afyascan is the better-supported fit on the evidence. Anchor has the clearer fit.",
+        verdict,
+      ),
+    ).toBe(
+      "On Capital Q's mandate fit, Anchor leads: 7.6 against Afyascan's 7. Anchor has the clearer fit.",
+    );
+  });
+  it("keeps an opening that already names the leader", () => {
+    expect(ledByVerdict("Anchor fits best. Afyascan trails.", verdict)).toBe(
+      "On Capital Q's mandate fit, Anchor leads: 7.6 against Afyascan's 7. Anchor fits best. Afyascan trails.",
+    );
+  });
+  it("level fits are said as level", () => {
+    expect(
+      ledByVerdict("Both are close.", {
+        ...verdict,
+        otherScore: "7.6",
+        level: true,
+      }),
+    ).toBe(
+      "Anchor and Afyascan are level on Capital Q's mandate fit, at 7.6 each. Both are close.",
+    );
   });
 });
