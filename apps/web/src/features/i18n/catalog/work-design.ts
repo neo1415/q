@@ -6,6 +6,13 @@
  * `{date}` and `{n}`. Names, figures and amounts are never translated.
  */
 export const WORK_DESIGN_AR: Readonly<Record<string, string>> = {
+  // Status grammar (owner reference design, 24 Oct): Needs you, Moving,
+  // Done today; counts inline with their words.
+  "waiting on you": "بانتظارك",
+  Moving: "قيد التقدّم",
+  "Done today": "أُنجز اليوم",
+  "Nothing done yet today.": "لم يُنجز شيء اليوم بعد.",
+  "Earlier this week, {n}": "في وقت سابق من هذا الأسبوع، {n}",
   // The switch and the track
   "How Q is handling it": "كيف يتولّى Q الأمر",
   "Cost, {name}": "التكلفة، {name}",

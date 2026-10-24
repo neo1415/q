@@ -1873,6 +1873,22 @@
   .cq-feed-sound:active {
     transform: scale(0.94);
   }
+  /* The status dot breathes only while something is being worked on;
+     reduced motion holds it still (status-dot.tsx). */
+  @keyframes cq-status-breathe {
+    50% {
+      opacity: 0.35;
+      transform: scale(0.8);
+    }
+  }
+  .cq-status-breathe {
+    animation: cq-status-breathe 1.6s var(--cq-ease) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cq-status-breathe {
+      animation: none;
+    }
+  }
   .cq-feed-chip {
     border: none;
     cursor: pointer;

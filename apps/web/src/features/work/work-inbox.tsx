@@ -22,6 +22,8 @@ import type {
 } from "@capital-q/contracts";
 import { bodyDigest } from "@capital-q/q-core/speech";
 import { cx } from "@capital-q/ui";
+
+import { CountUp } from "@/components/status/count-up";
 import { CalendarDays, Check, Pause, Pencil, Play } from "@capital-q/ui/icons";
 import { Skeleton } from "@capital-q/ui/states";
 
@@ -349,7 +351,11 @@ export function WorkInbox({
   };
 
   const doneItems = done?.items ?? [];
-  const shownDone = allDone ? doneItems : doneItems.slice(0, DONE_PREVIEW);
+  // "Done today" leads; the rest of the week is one tap away.
+  const doneToday = doneItems.filter(
+    (item) => new Date(item.at).toDateString() === new Date(now).toDateString(),
+  );
+  const shownDone = allDone ? doneItems : doneToday.slice(0, DONE_PREVIEW);
   const rowButton = (row: Row, children: ReactNode) => (
     <button
       key={row.key}
@@ -376,8 +382,14 @@ export function WorkInbox({
               data-inbox-group="needs"
             >
               <h2 id="inbox-needs" className="cq-wk-qh m-0">
-                {t("Needs your yes")}
-                <span className="cq-wk-count">{needs.length}</span>
+                {t("Needs you")}
+                {needs.length === 0 ? null : (
+                  // Status grammar: the count inline with its words,
+                  // counting up to a new value, never a filled pill.
+                  <span className="cq-label font-normal text-(--cq-text-tertiary)">
+                    <CountUp value={needs.length} /> {t("waiting on you")}
+                  </span>
+                )}
               </h2>
               {approvalsFailed ? (
                 <p
@@ -446,9 +458,14 @@ export function WorkInbox({
                 aria-labelledby="inbox-suggests"
                 data-work-suggests
               >
-                <h2 id="inbox-suggests" className="cq-wk-qh m-0">
+                {/* Part of "Needs you", not a section of its own: the page
+                    reads as Needs you, Moving, Done today. */}
+                <h3
+                  id="inbox-suggests"
+                  className="m-0 px-2.5 cq-label font-normal text-(--cq-text-tertiary)"
+                >
                   {t("Q suggests")}
-                </h2>
+                </h3>
                 {suggestionsFailed ? (
                   <p
                     className="m-0 px-2.5 cq-body-sm text-(--cq-text-secondary)"
@@ -483,7 +500,7 @@ export function WorkInbox({
                 data-work-running
               >
                 <h2 id="inbox-running" className="cq-wk-qh m-0">
-                  {t("Running")}
+                  {t("Moving")}
                 </h2>
                 {workFailed ? (
                   <p
@@ -564,10 +581,10 @@ export function WorkInbox({
                 data-work-done
               >
                 <h2 id="inbox-done" className="cq-wk-qh m-0">
-                  {t("Done this week")}
-                  {done === null || done.thisWeek === 0 ? null : (
+                  {t("Done today")}
+                  {doneToday.length === 0 ? null : (
                     <span className="cq-label font-normal text-(--cq-text-tertiary)">
-                      {done.thisWeek}
+                      <CountUp value={doneToday.length} />
                     </span>
                   )}
                 </h2>
@@ -578,9 +595,9 @@ export function WorkInbox({
                   >
                     {t("What Q did couldn’t load.")}
                   </p>
-                ) : doneItems.length === 0 ? (
+                ) : shownDone.length === 0 ? (
                   <p className="m-0 px-2.5 cq-label font-normal text-(--cq-text-tertiary)">
-                    {t("Nothing yet this week.")}
+                    {t("Nothing done yet today.")}
                   </p>
                 ) : (
                   shownDone.map((item) => {
@@ -602,13 +619,15 @@ export function WorkInbox({
                     );
                   })
                 )}
-                {allDone || doneItems.length <= DONE_PREVIEW ? null : (
+                {allDone || doneItems.length <= shownDone.length ? null : (
                   <button
                     type="button"
                     className="inline-flex min-h-11 items-center px-2.5 cq-label text-(--cq-text-secondary) hover:text-(--cq-text-primary)"
                     onClick={() => setAllDone(true)}
                   >
-                    {t(`Show ${String(doneItems.length - DONE_PREVIEW)} more`)}
+                    {t(
+                      `Earlier this week, ${String(doneItems.length - shownDone.length)}`,
+                    )}
                   </button>
                 )}
               </section>
