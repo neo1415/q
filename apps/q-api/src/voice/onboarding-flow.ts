@@ -297,6 +297,35 @@ export function withoutUnbackedSaveClaims(
 }
 
 /**
+ * The model's sentences that say again what code's receipt already said
+ * (QA 24 Oct: "Got it, I've saved Haddad Gulf Partners (firm). Haddad Gulf
+ * Partners is noted."; "…Venture capital fund (how you invest). Venture
+ * capital fund is saved as how you invest."). A sentence that claims a save
+ * and names a value the receipt said is taken out; a sentence asking
+ * something is always kept. The values are the receipt's own, from code.
+ */
+export function withoutRepeatedReceipt(
+  reply: string,
+  receiptValues: readonly string[],
+): string {
+  const values = receiptValues
+    .map((value) => value.trim().toLowerCase())
+    .filter((value) => value.length >= 3);
+  if (values.length === 0) return reply;
+  const sentences = reply.match(/[^.?!]+[.?!]*/g) ?? [reply];
+  const kept = sentences.filter((sentence) => {
+    if (sentence.includes("?") || !SAVE_CLAIM.test(sentence)) return true;
+    const lower = sentence.toLowerCase();
+    return !values.some((value) => lower.includes(value));
+  });
+  if (kept.length === sentences.length) return reply;
+  return kept
+    .join("")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/**
  * A "saved" claim naming a field that is not on the record (live AG
  * 2026-10-16: "I've saved your ... geography, sectors" when neither was
  * written). Each sentence claiming a save that names such a field, by its

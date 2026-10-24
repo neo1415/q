@@ -86,6 +86,7 @@ import {
   stillNeeded,
   taxonomyProposal,
   pendingQuestion,
+  redrawnThread,
   welcomeBack,
   type JourneyVocabulary,
   type QPrompt,
@@ -691,7 +692,18 @@ export function QOnboardingWorkspace({
      */
     void onboardingThreadAction(sessionId)
       .then((kept) => {
-        const restored: Turn[] = kept.map((turn) => ({
+        // Q is still asking what it last said: that line is the question,
+        // and the interview is not opened a second time (see
+        // `pendingQuestion`). A reload redraws; it does not re-greet.
+        // Came for one section of their profile: Q opens on it, whatever
+        // it was last waiting on.
+        const pending =
+          focus === undefined ? pendingQuestion(kept, lastActivityAt) : null;
+        // The question on the table is shown as the question, not also as
+        // the thread's last line (QA F-50: Q's line twice after a reload),
+        // as it was before the reload.
+        const history = redrawnThread(kept, pending);
+        const restored: Turn[] = history.map((turn) => ({
           id: newId(),
           kind: turn.role === "Q" ? ("Q" as const) : ("PERSON" as const),
           text: turn.text,
@@ -715,13 +727,6 @@ export function QOnboardingWorkspace({
           // A turn typed while the thread loaded stays after it.
           setTurns((current) => [...restored, ...unsent, ...current]);
         }
-        // Q is still asking what it last said: that line is the question,
-        // and the interview is not opened a second time (see
-        // `pendingQuestion`). A reload redraws; it does not re-greet.
-        // Came for one section of their profile: Q opens on it, whatever
-        // it was last waiting on.
-        const pending =
-          focus === undefined ? pendingQuestion(kept, lastActivityAt) : null;
         if (pending !== null) {
           return pending;
         }

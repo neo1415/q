@@ -106,6 +106,7 @@ import {
   onboardingFlowFor,
   withNextQuestion,
   withoutUnbackedFieldClaims,
+  withoutRepeatedReceipt,
   withoutUnbackedSaveClaims,
   withoutAnsweredQuestions,
 } from "./onboarding-flow.js";
@@ -2283,6 +2284,8 @@ export function createInterviewAgent(
     };
     /** Step keys the receipt already said, so code never says them twice. */
     const receiptSaid = new Set<string>();
+    /** What the receipt said was saved, so the reply never says it again. */
+    const receiptValues: string[] = [];
     /**
      * What committed so far, said by code now as the reply's first
      * sentence, while a model round writes the rest (owner 2026-10-21:
@@ -2313,7 +2316,13 @@ export function createInterviewAgent(
       if (receipt === null) return;
       leadSaid = receipt;
       for (const item of results) {
-        if (item.outcome === "COMMITTED") receiptSaid.add(item.stepKey);
+        if (item.outcome !== "COMMITTED") continue;
+        receiptSaid.add(item.stepKey);
+        if (item.recorded !== undefined && item.recorded !== null) {
+          receiptValues.push(
+            item.recorded.replace(/\s*\(in their words\)$/u, ""),
+          );
+        }
       }
       try {
         input.onSentence(receipt);
@@ -2330,10 +2339,11 @@ export function createInterviewAgent(
       });
     };
     /** The reply as they saw it: the receipt said first, then the rest. */
-    const withLead = (reply: string): string =>
-      leadSaid === null || reply.startsWith(leadSaid)
-        ? reply
-        : `${leadSaid} ${reply}`;
+    const withLead = (reply: string): string => {
+      if (leadSaid === null || reply.startsWith(leadSaid)) return reply;
+      const rest = withoutRepeatedReceipt(reply, receiptValues);
+      return rest.length === 0 ? leadSaid : `${leadSaid} ${rest}`;
+    };
     try {
       // Their words are kept before the first round's model sees them
       // (already settled where the reader waited on it).

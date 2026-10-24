@@ -662,6 +662,21 @@ export function pendingQuestion(
   return text.length === 0 ? null : text;
 }
 
+/**
+ * The thread a reload redraws: what the server kept, less Q's last line
+ * when that line is still the question on the table, which the screen
+ * shows as the question, as it did before the reload (QA F-50: Q's line
+ * twice after a reload).
+ */
+export function redrawnThread<T extends { readonly role: "Q" | "PERSON" }>(
+  turns: readonly T[],
+  pending: string | null,
+): readonly T[] {
+  return pending === null || turns.at(-1)?.role !== "Q"
+    ? turns
+    : turns.slice(0, -1);
+}
+
 function joinNames(names: readonly string[]): string {
   if (names.length <= 1) {
     return names[0] ?? "";
