@@ -924,6 +924,16 @@ describe("the fit service authorises before it reads (Context Firewall)", () => 
     expect(JSON.stringify(result)).not.toContain(ID(30));
   });
 
+  it("rank (F-82): scores every company on a network past 200, never the first 200 by name", async () => {
+    // Live 2026-10-24: 463 companies listed; 198 sort before Ledgerfold.
+    const ids = Array.from({ length: 463 }, (_, i) => ID(i + 1));
+    const w = world({});
+    const result = await w.service.rank?.(actor, ids, 5);
+    expect(result?.kind).toBe("OK");
+    expect(w.evaluated).toEqual([ids]);
+    expect(w.read).toEqual([ids]);
+  });
+
   it("rank refuses a non-investor before reading anything", async () => {
     const w = world({ investor: false });
     expect(await w.service.rank?.(actor, [ID(1)], 3)).toEqual({

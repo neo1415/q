@@ -85,10 +85,16 @@ describe("company catalog paging (owner 2026-10-23)", () => {
     expect(pages).toEqual([50, 50, 50]);
   });
 
+  it("F-82: reads all 463 companies of the live network, not the first 200 by name", async () => {
+    const { found } = await find(463, CATALOG_SCAN_MAX);
+    expect(found.candidates).toHaveLength(463);
+    expect(found.candidates.at(-1)?.name).toBe("Company 463");
+  });
+
   it("stops at its bound, and a small limit reads one small page", async () => {
-    const capped = await find(500, 1000);
+    const capped = await find(CATALOG_SCAN_MAX + 37, CATALOG_SCAN_MAX * 2);
     expect(capped.found.candidates).toHaveLength(CATALOG_SCAN_MAX);
-    expect(capped.pages).toEqual([50, 50, 50, 50]);
+    expect(capped.pages).toHaveLength(CATALOG_SCAN_MAX / 50);
     const small = await find(500, 6);
     expect(small.found.candidates).toHaveLength(6);
     expect(small.pages).toEqual([6]);
