@@ -1,4 +1,5 @@
 import {
+  Q_ANSWER_CARDS_MAX,
   QAnswerCardsBlockSchema,
   type IdentityCard,
   type QAnswerCard,
@@ -41,8 +42,6 @@ type Found = {
 export type InvestorDiscoveryAnswer = {
   readonly text: string;
   readonly block: QAnswerCardsBlock | null;
-  /** Capital Q's own investors in that place and of that kind, first. */
-  readonly networkBlock?: QAnswerCardsBlock | null;
   readonly shown: number;
   readonly outcome: "FOUND" | "NONE" | "UNAVAILABLE";
   readonly webSearched: boolean;
@@ -155,6 +154,48 @@ export function investorDiscoveryText(
     "This is matched on place and what each is described as; none has said it is interested. Tell me which to look into further.",
   );
   return parts.join(" ");
+}
+
+/**
+ * One list of cards (coordinator 2026-10-24): Capital Q's own investors
+ * first, each tagged "On Capital Q", then the public finds, each tagged
+ * "Public, unconfirmed" -- where each came from is on the card itself.
+ */
+function oneList(
+  network: QAnswerCardsBlock | null,
+  found: QAnswerCardsBlock | null,
+  title: string,
+): QAnswerCardsBlock | null {
+  const tagged: QAnswerCard[] = [
+    ...(network?.cards ?? []).map((card) => ({
+      ...card,
+      view: `On Capital Q · ${card.view ?? "Likely fit"}`.slice(0, 120),
+    })),
+    ...(found?.cards ?? []).map((card) => ({
+      ...card,
+      view: (card.view === "Not a fund"
+        ? "Public, unconfirmed · Not a fund"
+        : "Public, unconfirmed"
+      ).slice(0, 120),
+    })),
+  ]
+    .slice(0, Q_ANSWER_CARDS_MAX)
+    .map((card, at) => ({
+      ...card,
+      key: `${String(at + 1)}-${card.key.replace(/^\d+-/u, "")}`.slice(0, 64),
+      hue: (at % 7) + 1,
+    }));
+  if (tagged.length === 0) return null;
+  const parsed = QAnswerCardsBlockSchema.safeParse({
+    kind: "ANSWER_CARDS",
+    shape: "RESEARCH",
+    title: title.slice(0, 120),
+    cards: tagged,
+    followUps: [...(found?.followUps ?? []), ...(network?.followUps ?? [])]
+      .filter((line, at, all) => all.indexOf(line) === at)
+      .slice(0, 3),
+  });
+  return parsed.success ? parsed.data : null;
 }
 
 /** One firm by its name, however it is written ("Doha Tech Angels LLC"). */
@@ -355,16 +396,20 @@ export async function runInvestorDiscovery(input: {
       : `On Capital Q, ${onCapitalQ.map((pick) => pick.name).join(", ")} ${onCapitalQ.length === 1 ? "is" : "are"} ${label === null ? "a likely fit" : `based where you asked`} from what ${onCapitalQ.length === 1 ? "it publishes" : "they publish"}, not interest shown. ${outside.length === 0 ? `Outside Capital Q, the public search found nobody else I could name.${short}` : `Outside Capital Q: ${investorDiscoveryText(outside, { regionWords, asked: Math.max(1, outside.filter((one) => one.role === "INVESTOR").length), outcome: status, aboutMyCompany: ask.aboutMyCompany, kinds: ask.kinds, sector: ask.sector })}${short}`}`;
   return {
     text,
-    block: investorCardsBlock(
-      outside,
+    block: oneList(
+      prospectCardsBlock(onCapitalQ),
+      investorCardsBlock(
+        outside,
+        label === null
+          ? "Investors who could fit"
+          : `${label} investors who could fit`,
+        // A founder is asking when they have a company of their own.
+        input.companyId !== null && input.companyId !== undefined,
+      ),
       label === null
         ? "Investors who could fit"
         : `${label} investors who could fit`,
-      // A founder is asking when they have a company of their own.
-      input.companyId !== null && input.companyId !== undefined,
     ),
-    networkBlock:
-      onCapitalQ.length === 0 ? null : prospectCardsBlock(onCapitalQ),
     shown: outside.length + onCapitalQ.length,
     outcome: onCapitalQ.length > 0 ? "FOUND" : status,
     webSearched: data.webSearched === true,

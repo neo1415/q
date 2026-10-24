@@ -156,7 +156,9 @@ describe("a discovery of investors reads Capital Q's own beside the public searc
     expect(answer?.text).toContain("On Capital Q, Doha Ventures");
     expect(answer?.text).not.toContain("Nairobi Angels");
     expect(answer?.text).toContain("not interest shown");
-    expect(JSON.stringify(answer?.networkBlock)).toContain("Doha Ventures");
+    // One list: the network firm first, tagged where it came from.
+    expect(answer?.block?.cards[0]?.name).toBe("Doha Ventures");
+    expect(answer?.block?.cards[0]?.view).toMatch(/^On Capital Q · /u);
     expect(answer?.outcome).toBe("FOUND");
   });
 
@@ -223,7 +225,12 @@ describe("a discovery of investors reads Capital Q's own beside the public searc
     expect(text).toContain("Outside Capital Q: From a public web search");
     expect(text).toContain("DVC");
     expect(text).toContain("That's two of the three you asked for.");
-    expect(JSON.stringify(answer?.block)).not.toContain("Doha Tech Angels");
+    // One list, network first, each card tagged where it came from
+    // (coordinator 2026-10-24); Doha Tech Angels once, as Capital Q's.
+    const cards = answer?.block?.cards ?? [];
+    expect(cards.map((card) => card.name)).toEqual(["Doha Tech Angels", "DVC"]);
+    expect(cards[0]?.view).toMatch(/^On Capital Q · /u);
+    expect(cards[1]?.view).toBe("Public, unconfirmed");
     expect(answer?.shown).toBe(2);
   });
 });

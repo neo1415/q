@@ -191,7 +191,7 @@ describe("investor discovery on the prepared Qatar five", () => {
     const agency = five?.block?.cards.find(
       (card) => card.name === "Invest Qatar",
     );
-    expect(agency?.view).toBe("Not a fund");
+    expect(agency?.view).toBe("Public, unconfirmed · Not a fund");
   });
 
   it("falls back (null) when the tool is not offered", async () => {
