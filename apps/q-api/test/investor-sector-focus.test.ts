@@ -86,7 +86,7 @@ describe("investor sector focus", () => {
         publishedFit: expect.objectContaining({
           stage: "UNKNOWN",
           geography: "UNKNOWN",
-        }),
+        }) as unknown,
       },
     ]);
     expect(cardForSubject).toHaveBeenCalledWith({
