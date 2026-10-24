@@ -5,6 +5,7 @@ import { QResultBlockSchema } from "@capital-q/contracts";
 import { RunRead, createRunCompanies } from "../src/q/card-subjects.js";
 import {
   asksToCompare,
+  comparisonFactStatement,
   comparisonTableBlock,
   compareTargets,
   comparisonSpokenLine,
@@ -317,5 +318,58 @@ describe("the reader's comparison decides, never the words", () => {
   });
   it("no comparison read: nothing, whatever the words", () => {
     expect(compareTargets("tell me about Kora", cards)).toEqual([]);
+  });
+});
+
+// Coordinator 24 Oct 2026: a "which is better" answer named both as the
+// better one. The verdict is decided by code, from the computed fit.
+describe("one verdict, from Capital Q's fit", () => {
+  it("leads with the higher mandate fit", () => {
+    const { read } = run();
+    const fits = [
+      ...fitsInOutcome(
+        fitFixture(MIZAN, "Mizan", {
+          STAGE: "STRONG",
+          SECTOR: "STRONG",
+          GEOGRAPHY: "STRONG",
+        }),
+      ),
+      ...fitsInOutcome(
+        fitFixture(SILO, "Silo Credit", {
+          STAGE: "PARTIAL",
+          SECTOR: "STRONG",
+          GEOGRAPHY: "PARTIAL",
+        }),
+      ),
+    ];
+    const block = comparisonTableBlock({
+      question: "Which is better, Silo Credit or Mizan?",
+      read,
+      fits,
+      // The reader read a comparison (TURN_READER v62).
+      compareAsked: true,
+    });
+    if (block === null) throw new Error("no table");
+    expect(comparisonFactStatement(block, fits)).toMatch(
+      /VERDICT[^\n]*lead with exactly one, Mizan \(Capital Q mandate fit [\d.]+ against Silo Credit's [\d.]+\)/u,
+    );
+  });
+
+  it("level fits are said as level, with no winner", () => {
+    const { read } = run();
+    const same = { STAGE: "STRONG", SECTOR: "STRONG", GEOGRAPHY: "PARTIAL" };
+    const fits = [
+      ...fitsInOutcome(fitFixture(MIZAN, "Mizan", same)),
+      ...fitsInOutcome(fitFixture(SILO, "Silo Credit", same)),
+    ];
+    const block = comparisonTableBlock({
+      question: "Compare Mizan and Silo Credit",
+      read,
+      fits,
+    });
+    if (block === null) throw new Error("no table");
+    const statement = comparisonFactStatement(block, fits) ?? "";
+    expect(statement).toContain("are level on Capital Q's mandate fit");
+    expect(statement).not.toContain("lead with exactly one");
   });
 });
