@@ -5,6 +5,7 @@ import {
 import { languageInfo, listSeparator } from "@capital-q/q-core/language";
 
 import { ANSWERS_AR } from "./catalog/answers";
+import { BOARD_AR } from "./catalog/board";
 import { ADMIN_AR } from "./catalog/admin";
 import { COMPANY_AR } from "./catalog/company";
 import { CORE_AR } from "./catalog/core";
@@ -63,6 +64,9 @@ const ARABIC: Readonly<Record<string, string>> = {
   // for the same words wins. The Work designs' short words ("Save",
   // "Share") only fill gaps.
   ...WORK_CHOSEN_AR,
+  // The work board (2026-10-23): first too, so an area's own word for a
+  // shared one ("Add", "Done", "Move") still wins.
+  ...BOARD_AR,
   // Organisation roles and activity (2026-10-21): first, so every area's
   // own word for a shared one ("Admin", "Team") still wins.
   ...ORGANISATION_AR,

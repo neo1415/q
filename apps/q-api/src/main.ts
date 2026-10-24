@@ -33,6 +33,7 @@ import {
   preparedEntityPrewarmLines,
   watchPreparedEntities,
 } from "./composition/prepared-entities.js";
+import { createQApiBoard } from "./composition/board.js";
 import { createAttentionSources } from "./composition/attention-sources.js";
 import {
   createArrivalSnapshots,
@@ -52,7 +53,10 @@ import {
   createPostgresGatewayRepository,
   createPostgresGatewayVersionRepository,
 } from "@capital-q/gateq";
-import { createCompanyClaims } from "@capital-q/companies";
+import {
+  createCompanyClaims,
+  createPostgresCompanyTeamProjection,
+} from "@capital-q/companies";
 import {
   createGateqInbox,
   createStartupAlerts,
@@ -453,6 +457,7 @@ import {
 import {
   createFitQViewer,
   createRecommendationNarrator,
+  pipelineSummaryLine,
 } from "@capital-q/q-specialists";
 import {
   actorPrincipal,
@@ -2088,6 +2093,41 @@ const permissionsService = createPermissionsService({
   resolvers: disclosureResolvers,
   relationshipParties,
 });
+/** ADR 0041's pitch rule: an investor whose active mandate admits the company. */
+const companyTeamProjection = createPostgresCompanyTeamProjection({
+  sql: database.sql,
+});
+const investorMayFind = async (
+  actor: ActorContext,
+  companyId: string,
+): Promise<boolean> => {
+  const investor =
+    await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
+      actor,
+    );
+  if (investor === null) return false;
+  const mandate = await slateRead.eligibilityPorts.mandates.activeMandate({
+    tenantId: actor.tenantId,
+    investorOrganisationId: investor.investorOrganisationId,
+    mandateId: null,
+  });
+  if (mandate.kind !== "FOUND" || mandate.mandate.status !== "ACTIVE")
+    return false;
+  const parsed = CompanyIdSchema.safeParse(companyId);
+  if (!parsed.success) return false;
+  const evaluation = await slateRead.eligibility.evaluate({
+    actor,
+    mode: "INVESTOR_DISCOVER",
+    purpose: "VIEW",
+    mandateId: mandate.mandate.mandateId,
+    companyIds: [parsed.data],
+  });
+  return evaluation.results.some(
+    (result) =>
+      result.companyId === parsed.data && result.decision === "ELIGIBLE",
+  );
+};
+
 /**
  * Overnight A3-A8: the profile's data room and pitch deck, for Q's tools and
  * approved actions, through the same services as the screens. Q never opens
@@ -2106,33 +2146,7 @@ const profileMaterial = createProfileMaterial({
   outbox: createOutboxWriter({ registry: createEventRegistry(NETWORK_EVENTS) }),
   investorOrganisationFor: (actor) =>
     slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(actor),
-  investorMayFind: async (actor, companyId) => {
-    const investor =
-      await slateRead.eligibilityPorts.investorSubject.investorOrganisationFor(
-        actor,
-      );
-    if (investor === null) return false;
-    const mandate = await slateRead.eligibilityPorts.mandates.activeMandate({
-      tenantId: actor.tenantId,
-      investorOrganisationId: investor.investorOrganisationId,
-      mandateId: null,
-    });
-    if (mandate.kind !== "FOUND" || mandate.mandate.status !== "ACTIVE")
-      return false;
-    const parsed = CompanyIdSchema.safeParse(companyId);
-    if (!parsed.success) return false;
-    const evaluation = await slateRead.eligibility.evaluate({
-      actor,
-      mode: "INVESTOR_DISCOVER",
-      purpose: "VIEW",
-      mandateId: mandate.mandate.mandateId,
-      companyIds: [parsed.data],
-    });
-    return evaluation.results.some(
-      (result) =>
-        result.companyId === parsed.data && result.decision === "ELIGIBLE",
-    );
-  },
+  investorMayFind,
   // 2026-10-08: a request opens the founder's inbox at that request; an
   // answer opens the investor's view of the company's data room.
   notify: (input) =>
@@ -2980,6 +2994,11 @@ const qTools = createQTools({
     work: workPort,
     // WORKFORCE block (J1, J4): a job the lead Q plans, one approval.
     jobs: workforceJobBoard.port,
+    // The work board (owner 2026-10-23): their own items, and Q's work on them.
+    board: createQApiBoard({
+      sql: database.sql,
+      transactions: database.transactions,
+    }),
     // RECOVERY B1: held drafts, stopped jobs, notices, data-room requests,
     // new matches and Q's activity, for "what needs me".
     attention: createAttentionSources({ sql: database.sql }),
@@ -3137,6 +3156,27 @@ const qTools = createQTools({
             visibilityScope: claim.visibilityScope,
             sensitivityClass: claim.sensitivityClass,
           }));
+      },
+    },
+    // QA F-16: the team as the company's page shows it, under the page's
+    // own rule (ADR 0041): the owning organisation, or an investor the
+    // pitch rule admits; anyone else reads no team.
+    companyTeam: {
+      teamFor: async (actor, company) => {
+        const owner =
+          actor.organisationId !== undefined &&
+          actor.tenantId === company.tenantId &&
+          actor.organisationId === company.organisationId;
+        if (
+          !owner &&
+          !(await investorMayFind(actor, company.companyId).catch(() => false))
+        ) {
+          return null;
+        }
+        return companyTeamProjection.teamForNetwork({
+          tenantId: company.tenantId,
+          companyId: company.companyId,
+        });
       },
     },
     // R18: what is said in the pitch around a moment, under the playback rule.
@@ -4263,6 +4303,19 @@ const qIntelligence = composeQIntelligence({
     ownRelationships: errandRelationships.ownRelationships,
     logger,
   }),
+  // Coordinator 23 Oct 2026: "show me my pipeline" says what is in it, in
+  // one line from their own relationships, as it opens it.
+  destinationSummary: async (request, destination) => {
+    if (destination !== "CRM_PIPELINE" && destination !== "RELATIONSHIPS") {
+      return null;
+    }
+    const own = await errandRelationships
+      .ownRelationships?.(request.actor)
+      .catch(() => null);
+    return own === null || own === undefined
+      ? null
+      : pipelineSummaryLine(own.side, own.items);
+  },
   // W4: a researched entity reachable by name (prepared seed or their own
   // research): "take me to Shadi Qishta" shows its identity card.
   knownEntities: preparedEntityMatcher(preparedEntities),

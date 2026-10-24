@@ -154,6 +154,7 @@ describe("held writes (ob1)", () => {
       applied: ["F1.stage", "F1.country"],
       refused: [],
       stillPending: ["F4.team_size", "F4.founder_role"],
+      waiting: [],
     });
   });
 

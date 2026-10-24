@@ -1,4 +1,5 @@
 import type { QWorkPagePort, WorkforceJobPort } from "@capital-q/app-actions";
+import type { BoardJobStatusPort } from "@capital-q/board";
 import {
   auditActorFromContext,
   AuditActionTypeSchema,
@@ -154,5 +155,24 @@ export function createWorkforceJobPort(
              and tenant_id = ${actor.tenantId} and status <> 'STOPPED'`;
         return true;
       }),
+  };
+}
+
+/**
+ * The work board (owner 2026-10-23): the status of the person's own Q jobs
+ * that work on their board items, so an item whose job is DONE moves to
+ * DONE. Every predicate is the person's own user and tenant; another
+ * person's job id reads as no job.
+ */
+export function createBoardJobStatusPort(
+  sql: DatabaseExecutor,
+): BoardJobStatusPort {
+  return async (actor, jobIds) => {
+    if (jobIds.length === 0) return new Map();
+    const rows = await sql<{ id: string; status: string }[]>`
+      select id, status from q_runtime.workforce_jobs
+       where id = any(${[...jobIds]}::uuid[]) and user_id = ${actor.userId}
+         and tenant_id = ${actor.tenantId}`;
+    return new Map(rows.map((row) => [row.id, row.status]));
   };
 }

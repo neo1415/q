@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readyToSendLine } from "@capital-q/app-actions";
 
 import {
   EmailAddressSchema,
@@ -134,6 +135,12 @@ export function createEmailSendAction(dependencies: {
       summary: `Email ${payload.toName} at ${payload.counterpartName}`,
       preview: `To: ${payload.toName} <${payload.to}>\nSubject: ${payload.subject}\n\n${payload.body}`,
     }),
+    // Outward: the email in full, ready to send (coordinator 2026-10-23).
+    proposed: (payload, summary) =>
+      readyToSendLine(
+        summary,
+        `Subject: ${payload.subject}\n\n${payload.body}`,
+      ),
     confirm: (payload, result) =>
       result.alreadySent
         ? `That email to ${payload.toName} had already gone; nothing was sent twice.`

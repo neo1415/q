@@ -1,3 +1,4 @@
+import type { BoardService } from "@capital-q/board";
 import type { CapitalRoundService, CapitalService } from "@capital-q/capital";
 import type {
   ChatSafetyService,
@@ -168,6 +169,8 @@ export type AppActionPorts = {
   readonly readiness?: ReadinessService | undefined;
   /** G1/G2: the person's company or firm as a team (invitations, roles). */
   readonly team?: TeamPort | undefined;
+  /** The work board (owner 2026-10-23): their own items. */
+  readonly board?: Pick<BoardService, "add" | "update" | "move"> | undefined;
   /** Settings: their notification switches, and whether push can work here. */
   readonly notificationSettings?:
     | (Pick<PushSubscriptionStore, "settings" | "saveSettings"> & {

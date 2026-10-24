@@ -340,4 +340,52 @@ describe("profile images", () => {
       "SUPERSEDED",
     ]);
   });
+
+  it("keeps a company logo whole on a clear margin; a person's photo still fills the frame", async () => {
+    // Owner QA 23 Oct: a wide wordmark was stored as its middle letters.
+    const { service, objects } = world();
+    const editor = actor(randomUUID(), orgId);
+    const upload = await service.requestUpload({
+      actor: editor,
+      subject: { subjectType: "COMPANY", subjectId: companyId },
+      kind: "AVATAR",
+      request: { contentType: "image/png", byteSize: 1000 },
+    });
+    objects.set(
+      upload.upload.url.split("/upload/")[1] ?? "",
+      new Uint8Array(
+        await sharp({
+          create: {
+            width: 1000,
+            height: 250,
+            channels: 4,
+            background: { r: 30, g: 30, b: 30, alpha: 1 },
+          },
+        })
+          .png()
+          .toBuffer(),
+      ),
+    );
+    const images = await service.completeUpload({
+      actor: editor,
+      uploadId: upload.uploadId,
+      correlationId,
+    });
+    expect(images.avatar).toMatchObject({ width: 512, height: 512 });
+    const stored = [...objects.entries()].find(([key]) =>
+      key.startsWith("img/"),
+    );
+    const { data, info } = await sharp(stored?.[1])
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const alphaAt = (x: number, y: number) =>
+      data[(y * info.width + x) * info.channels + 3];
+    // The logo's full width survives (both ends opaque on the middle row);
+    // above and below it is clear, never black.
+    expect(alphaAt(2, 256)).toBe(255);
+    expect(alphaAt(509, 256)).toBe(255);
+    expect(alphaAt(256, 4)).toBe(0);
+    expect(alphaAt(256, 507)).toBe(0);
+  });
 });

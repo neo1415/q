@@ -61,3 +61,34 @@ export async function readInvestorWorkspaceFacts(
         holdsCompany: row.holds_company,
       };
 }
+
+/**
+ * The person's own firm workspace already holding an investor profile of
+ * this name, when the request carries no active firm context (a second
+ * onboarding session, a context switched to their company). Only their own
+ * active memberships are read: nobody joins a firm by typing its name, so a
+ * firm another person set up under the same name is never returned here.
+ */
+export async function findOwnFirmWorkspace(
+  sql: TransactionContext["sql"],
+  userId: string,
+  firmName: string,
+): Promise<string | null> {
+  const rows = await sql<{ organisation_id: string }[]>`
+    select m.organisation_id
+      from identity.organisation_memberships m
+      join identity.organisations o
+        on o.id = m.organisation_id and o.tenant_id = m.tenant_id
+      join core.investor_organisations i
+        on i.organisation_id = o.id and i.tenant_id = o.tenant_id
+     where m.user_id = ${userId}::uuid
+       and m.membership_status = 'active'
+       and o.organisation_type <> 'company'
+       and not exists (
+         select 1 from core.companies c where c.organisation_id = o.id
+       )
+       and lower(btrim(i.display_name)) = lower(btrim(${firmName}))
+     order by m.created_at
+     limit 1`;
+  return rows[0]?.organisation_id ?? null;
+}

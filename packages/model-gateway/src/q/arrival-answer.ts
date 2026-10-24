@@ -338,14 +338,12 @@ export function arrivalFollowUpAnswer(
   const kind = arrivalFollowUpKind(text);
   if (kind === null) return null;
   const picked = target(text, snapshot, earlierUserText);
-  if (picked.kind === "NONE") return null;
-  if (picked.kind === "AMBIGUOUS") {
-    // Different counterparts: ask, never guess which one.
-    return {
-      itemKey: "ambiguous",
-      text: `Which one do you mean: ${picked.names.slice(0, 4).join(" or ")}?`,
-    };
-  }
+  // Several counterparts and none named: the turn may be about all of
+  // them (QA F-24, live 2026-10-23: "Who has shown interest in us, and what
+  // do they want?" was asked "Which one do you mean: A or B or C?"). Never
+  // ask and never guess: the answer path reads everyone who has shown
+  // interest, with their requests, through its own tools.
+  if (picked.kind !== "ONE") return null;
   return answerFor(kind, picked.item);
 }
 

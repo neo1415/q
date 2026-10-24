@@ -106,6 +106,7 @@ export {
   type ShowInput,
   findRecordByName,
   matchCounterpart,
+  namesOwnScreen,
   spokenNameScore,
   nameSimilarity,
   CONTROL_SCREEN,
@@ -144,6 +145,7 @@ export {
 } from "./tools/onboarding-reminders.js";
 export {
   createGetQCardTool,
+  handleFrom,
   GET_Q_CARD,
   GetQCardInputSchema,
   GetQCardOutputSchema,
@@ -797,3 +799,13 @@ export {
   type SetPreferenceLearningInput,
   type SetPreferenceLearningOutput,
 } from "./tools/preference-learning.js";
+
+// The work board (owner 2026-10-23).
+export {
+  BOARD_TOOL_BATCH_MAX,
+  boardKey,
+  createBoardTools,
+  createMyBoardTool,
+  MY_BOARD,
+} from "./tools/board.js";
+export type { QBoardOutcome, QBoardPort } from "./ports.js";

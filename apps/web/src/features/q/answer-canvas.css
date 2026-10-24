@@ -363,6 +363,11 @@
   height: 16px;
   color: var(--hue);
 }
+/* F-13: a caveat or an unknown is not drawn in the card's accent. */
+.cq-ac-why li[data-reason-level="CAVEAT"] svg,
+.cq-ac-why li[data-reason-level="UNKNOWN"] svg {
+  color: var(--cq-text-secondary);
+}
 .cq-ac-params {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -36,6 +36,7 @@ import { recoverStream, restartPitch, setStreamWarmth } from "./hls-source";
 import { hasBeenActive, onAudioUnlock } from "./sound-policy";
 import { usePitchPlayback } from "./use-pitch-playback";
 import { useT } from "@/features/i18n/language";
+import { useCaptionsChoice } from "../stage/captions-choice";
 
 /**
  * The pitch player (CQ-WEB-021; doc 20 §35-§36, §44-§50, §60; ADR-001).
@@ -275,7 +276,7 @@ export function PitchPlayer({
   const [requested, setRequested] = useState(!startOnRequest);
   /** A press that is waiting for its source to attach. */
   const pendingPlay = useRef(false);
-  const [captionsOn, setCaptionsOn] = useState(true);
+  const [captionsOn, setCaptionsOn] = useCaptionsChoice();
 
   const mediaAssetId = company.pitch?.mediaAssetId ?? null;
   const { intent, posterUrl, playbackUrl, failed, retry } = usePitchPlayback({

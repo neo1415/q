@@ -200,25 +200,20 @@ export function CompanyScores({
 
   if (variant === "minimal") {
     return (
-      // A tile is narrow (Explore on a phone is three across): the line may
-      // wrap rather than be cut mid-word, and Unicorn Potential appears only
-      // when it has a score -- "insufficient evidence" stays in the label
-      // and on the profile (owner QA 23 Oct: "Suit. 80 · Un" cut off).
       <p
-        className={cx("cq-caption whitespace-normal tabular-nums", className)}
+        className={cx("cq-caption tabular-nums", className)}
         aria-label={companyScoresLabel(scores)}
         title={companyScoresLabel(scores)}
         data-company-scores="minimal"
       >
+        {/* One clean signal on a small tile (QA F-42, live 23 Oct: three
+            abbreviated scores ran off every tile): the fit with this viewer
+            where there is one, else investability. The full sentence, all
+            three scores, stays the tile's name and tooltip. */}
         <span aria-hidden="true">
-          {`${t("Inv.")} ${inv.score === null ? "—" : String(inv.score)}`}
-          {suit === null
-            ? ""
-            : ` · ${t("Suit.")} ${suit.score === null ? "—" : String(suit.score)}`}
-          {scores.unicornPotential === undefined ||
-          scores.unicornPotential.overallScore === null
-            ? null
-            : ` · ${unicornPotentialLine(scores.unicornPotential)}`}
+          {suit !== null && suit.score !== null
+            ? `${t("Suitability")} ${String(suit.score)}`
+            : `${t("Investability")} ${inv.score === null ? "—" : String(inv.score)}`}
         </span>
       </p>
     );

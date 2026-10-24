@@ -23,14 +23,15 @@ export type CanvasLayout = {
 };
 
 /**
- * Desktop: up to five in a row (the focused one wide); six or more, the
- * focused card beside a grid of the rest. Phone: one column; from four
+ * Desktop: up to four in a row (the focused one wide); five or more, the
+ * focused card beside a grid of the rest (live 23 Oct: five in a row left
+ * the rest about 170px wide, names broke mid-word). Phone: one column; from four
  * cards, the rest become half-width tiles so the focused card is never
  * pushed off a 390px screen.
  */
 export function canvasLayout(count: number, wide: boolean): CanvasLayout {
   return {
-    layout: wide && count > 5 ? "grid" : "row",
+    layout: wide && count > 4 ? "grid" : "row",
     tiles: !wide && count >= 4,
   };
 }
@@ -148,6 +149,11 @@ export function fitExplanation(card: QAnswerCard): FitExplanation | null {
 
 const PROVENANCE_SAID =
   /^.{1,60}: mandate fit [\d.]+ out of 10, not a quality score\./u;
+/** Where the method starts in the stored line (fit-integrity.ts). */
+const METHOD_SAID =
+  /\s(?:Capital Q|Q's reading:) mandate fit [\d.]+ out of 10\b/u;
+/** A point scale is method, never a spoken line. */
+const SCALE_SAID = /\((?:Capital Q|Q's reading) scale:/u;
 
 /**
  * What Q says about a card in the walk-through. The stored line for a
@@ -158,12 +164,49 @@ const PROVENANCE_SAID =
  */
 export function spokenLine(card: QAnswerCard): string {
   const said = card.said;
-  if (said !== null && !PROVENANCE_SAID.test(said)) return said;
+  // F-11 (QA 2026-10-23): the stored line now leads with the card's
+  // insight, then the method ("Capital Q mandate fit 8.8 out of 10, ...;
+  // not a quality score. 2 sources. (Capital Q scale: ...)"). Q says the
+  // insight with the number, as a person would; the method and its scale
+  // stay behind "How this score is worked out".
+  const method = said === null ? -1 : said.search(METHOD_SAID);
+  if (said !== null && method > 0 && card.fit !== null) {
+    const lead = said.slice(0, method).trim();
+    const name = card.name.trim();
+    const insight = lead.startsWith(`${name} is `)
+      ? lead.slice(name.length + 4)
+      : lead.startsWith(`${name}: `)
+        ? lead.slice(name.length + 2)
+        : null;
+    if (insight !== null && insight.length > 0) {
+      return `${name}, ${card.fit.score.toFixed(1)} on mandate fit: ${insight}`;
+    }
+  }
+  if (
+    said !== null &&
+    method === -1 &&
+    !PROVENANCE_SAID.test(said) &&
+    !SCALE_SAID.test(said)
+  ) {
+    return said;
+  }
   const reason = card.reasons[0];
   if (card.fit !== null) {
     return `${card.name}, ${card.fit.score.toFixed(1)} on mandate fit${reason === undefined ? "." : `: ${reason}`}`;
   }
   return `${card.name}: ${reason ?? ""}`.trim();
+}
+
+/** The longest line shown under the cards in a text turn. */
+export const SHORT_LINE_MAX = 110;
+
+/**
+ * F-11 (QA 2026-10-23, phone): one short human line or none. A close too
+ * long for one line is not cut mid-thought: the thread already has it.
+ */
+export function shortLine(line: string): string {
+  const text = line.replace(/\s+/gu, " ").trim();
+  return text.length <= SHORT_LINE_MAX ? text : "";
 }
 
 /** "Tied with Ledgerfold on mandate fit (8.0)": said, never implied by order. */

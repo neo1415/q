@@ -7,7 +7,9 @@ import {
   asksToCompare,
   comparisonTableBlock,
   compareTargets,
+  comparisonSpokenLine,
   newestAnswerCards,
+  withoutCompareOffers,
 } from "../src/q/compare-table.js";
 import { fitsInOutcome } from "../src/q/fit-cards.js";
 
@@ -227,5 +229,36 @@ describe("which companies a compare follow-up means", () => {
         { role: "USER" },
       ]).map((card) => card.companyId),
     ).toEqual(["a", "b"]);
+  });
+});
+
+describe("a comparison asked for is done, never offered", () => {
+  it("removes the offer and keeps the rest", () => {
+    expect(
+      withoutCompareOffers(
+        "The top two are tied at 7.6. I can compare their stage, sector and round terms side by side. Want me to compare them on traction?",
+      ),
+    ).toBe("The top two are tied at 7.6.");
+    expect(withoutCompareOffers("Mizan is in Cairo.")).toBe(
+      "Mizan is in Cairo.",
+    );
+  });
+
+  it("says the real differences from the table's own cells", () => {
+    const { read, fits } = run();
+    const block = comparisonTableBlock({
+      question: "Compare the top two side by side",
+      read,
+      fits,
+    });
+    if (block === null) throw new Error("no table");
+    const line = comparisonSpokenLine(block) ?? "";
+    expect(line).toContain(
+      "Mizan: sharia-compliant savings for gig workers, based in Cairo, EG",
+    );
+    expect(line).toContain(
+      "Silo Credit: inventory credit for agri-dealers, based in KE",
+    );
+    expect(line).not.toContain("company-stated)");
   });
 });

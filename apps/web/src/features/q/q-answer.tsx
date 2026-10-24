@@ -58,6 +58,11 @@ export function replyParts(
         // Shown once, where it is decided (the approval, exact payload).
         break;
       case "ARTIFACT_REFERENCE":
+        // F-35 (QA 2026-10-23): a document Q made is drawn once. Where the
+        // stage draws the answer's objects, it is the stage's (and "Shown
+        // recently" brings it back); the thread names it in words.
+        if (picturesInline) inline.push(block);
+        break;
       case "UI_INTENT":
       case "COMPARISON":
       case "COMPARISON_CARDS":
@@ -173,7 +178,9 @@ export function QAnswer({
   const [streamedHere, setStreamedHere] = useState(turn.streaming);
   if (turn.streaming && !streamedHere) setStreamedHere(true);
   const [objectsRef, objectsFloor] = useNeverShrink(streamedHere);
-  const preview = turn.streaming ? turn.preview : undefined;
+  // QA 2026-10-23 (U2): where the stage draws the pictures it also draws
+  // the live preview; the thread drawing it too showed every frame twice.
+  const preview = turn.streaming && picturesInline ? turn.preview : undefined;
   const sources = evidenceSummary(turn, false);
   // R3: "Opening X…" until this tab's browser VERIFIED the move.
   const text = useMoveLine(turn.text, turn.blocks);

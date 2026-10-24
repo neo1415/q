@@ -31,6 +31,7 @@ import { useLongPress } from "./long-press";
 import { useOnline } from "./online";
 import { PitchOptionsSheet } from "./pitch-options";
 import { rateLabel, stepPlaybackRate, usePlaybackRate } from "./playback-rate";
+import { useCaptionsChoice } from "./captions-choice";
 import { PitchScrubber, SEEK_STEP_SECONDS, seekBy } from "./scrubber";
 import { useT } from "@/features/i18n/language";
 
@@ -384,7 +385,7 @@ export function PitchStage({
    */
   const [activeVideo, setActiveVideo] = useState<HTMLVideoElement | null>(null);
   const [rate, setRate] = usePlaybackRate();
-  const [captionsOn, setCaptionsOn] = useState(true);
+  const [captionsOn, setCaptionsOn] = useCaptionsChoice();
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [clearDisplay, setClearDisplay] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
@@ -549,6 +550,7 @@ export function PitchStage({
       rate,
       setRate,
       onExtraKey,
+      setCaptionsOn,
     ],
   );
 

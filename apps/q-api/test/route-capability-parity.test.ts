@@ -78,6 +78,10 @@ const ROUTE_COVERAGE: Readonly<Record<string, Coverage>> = {
   'api/app.ts GET "/health/live"': HEALTH,
   'api/app.ts GET "/health/ready"': HEALTH,
 
+  // The work board (owner 2026-10-23): read by Q's my_board (LIST); its
+  // writes are declared actions (board.item.*), generated routes.
+  "api/http/board.ts GET BOARD_PATH": cap("tool.my_board"),
+
   "api/http/capital-objectives.ts GET base": cap("tool.get_capital_objective"),
   "api/http/capital-objectives.ts GET `${base}${CAPITAL_OBJECTIVE_CURRENT_SEGMENT}`":
     cap("tool.get_capital_objective"),
@@ -1104,6 +1108,8 @@ const PAGE_COVERAGE: Readonly<Record<string, Coverage>> = {
   "/settings/plan": cap("tool.get_my_plan"),
   // AUTO (ADR 0030): Q's work; Q reads the same with list_q_work.
   "/work": cap("navigate.WORK"),
+  // The work board (owner 2026-10-23): a Work tab; Q reads it with my_board.
+  "/board": cap("tool.my_board"),
   "/work/[delegationId]": cap("tool.list_q_work"),
   "/work/[delegationId]/report/[laneId]": DOWNLOAD,
   // DOCS: their documents and brand kit.

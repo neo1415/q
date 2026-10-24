@@ -47,6 +47,23 @@ export const Q_ANSWER_CARDS_SHAPES = [
 export const QAnswerCardsShapeSchema = z.enum(Q_ANSWER_CARDS_SHAPES);
 export type QAnswerCardsShape = z.infer<typeof QAnswerCardsShapeSchema>;
 
+/**
+ * QA F-13 (23 Oct 2026): how much each reason on a card counts, so a
+ * caveat is never drawn as a tick. STRONG: within their mandate. PARTIAL:
+ * partly. CAVEAT: against it, or a concern. UNKNOWN: not known yet (never
+ * a mark against).
+ */
+export const Q_ANSWER_CARD_REASON_LEVELS = [
+  "STRONG",
+  "PARTIAL",
+  "CAVEAT",
+  "UNKNOWN",
+] as const;
+export const QAnswerCardReasonLevelSchema = z.enum(Q_ANSWER_CARD_REASON_LEVELS);
+export type QAnswerCardReasonLevel = z.infer<
+  typeof QAnswerCardReasonLevelSchema
+>;
+
 export const Q_ANSWER_CARDS_MAX = 10;
 export const Q_ANSWER_CARD_REASONS_MAX = 3;
 /**
@@ -146,6 +163,14 @@ export const QAnswerCardSchema = z
       .array(z.string().trim().min(1).max(160))
       .min(1)
       .max(Q_ANSWER_CARD_REASONS_MAX),
+    /**
+     * F-13: the level of each reason, by position. Absent (an older server,
+     * or a model-written card): the page shows the reasons without marks.
+     */
+    reasonLevels: z
+      .array(QAnswerCardReasonLevelSchema)
+      .max(Q_ANSWER_CARD_REASONS_MAX)
+      .optional(),
     measures: z.array(QAnswerCardMeasureSchema).max(Q_ANSWER_CARD_MEASURES_MAX),
     /** Q's view in a few words ("Meet: ask who leads"); null for none. */
     view: z.string().trim().max(120).nullable(),

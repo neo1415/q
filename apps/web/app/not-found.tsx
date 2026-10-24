@@ -19,7 +19,9 @@ export default function NotFound() {
       <StatusPage
         notice="ERROR:NOT_FOUND"
         title="This page isn't here."
-        description="The address may be mistyped, or the page may have moved. Nothing is wrong with your account."
+        // A signed-out visitor reached by a shared link has no account to
+        // reassure about (QA F-54), so the line speaks to everyone.
+        description="The address may be mistyped, or the page may have moved."
       >
         <Link href="/home" className={buttonClassName("primary")}>
           Go to Home

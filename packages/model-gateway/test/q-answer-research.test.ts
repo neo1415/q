@@ -186,6 +186,29 @@ function withMatch(
   };
 }
 
+/** A matched page about them on the picture's own site (QA QO-09 evidence). */
+function onSite(outcome: QToolCallOutcome, url: string): QToolCallOutcome {
+  const matched = withMatch(outcome, "MATCH");
+  if (!matched.result.ok) return matched;
+  const data = matched.result.data as {
+    readonly sources: readonly Record<string, unknown>[];
+  };
+  return {
+    ...matched,
+    result: {
+      ok: true,
+      data: {
+        ...data,
+        sources: data.sources.map((source) => ({
+          ...source,
+          url,
+          domain: new URL(url).hostname,
+        })),
+      },
+    },
+  };
+}
+
 function toolPort(
   offered: readonly QOfferedTool[],
   script: (proposal: QToolProposal) => QToolCallOutcome,
@@ -680,6 +703,7 @@ describe("answer seam: public-web research", () => {
     expect(modelCalls(tools.executed)[0]?.context.conversation).toEqual({
       latestUserText: "Which markets does the public web say we operate in?",
       earlierUserText: [],
+      earlierQText: [],
     });
     expect(stages).toEqual([
       "PREPARING_ANALYSIS",
@@ -2065,7 +2089,7 @@ describe("a subject the public web knows nothing about is searched and said once
   });
 });
 
-describe("someone they only pointed at is not searched for on the web (production 2026-10-23)", () => {
+describe("someone they point at is searched by the name Q showed them (owner 2026-10-23)", () => {
   const INVESTORS_LIST =
     "Here are the investors you're talking to: 1. Savanna Seed Partners, 2. Harbourline Capital, 3. Northwind Ventures.";
   const ABOUT_SAVANNA = {
@@ -2073,7 +2097,10 @@ describe("someone they only pointed at is not searched for on the web (productio
     namedOther: { name: "Savanna Seed Partners", kind: "COMPANY" },
   } as const;
 
-  async function ask(said: string) {
+  async function ask(
+    said: string,
+    about: Record<string, unknown> = ABOUT_SAVANNA,
+  ) {
     const spoken: string[] = [];
     const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
       researchOutcome(p, "Savanna Seed Partners backs pre-seed fintech."),
@@ -2101,9 +2128,7 @@ describe("someone they only pointed at is not searched for on the web (productio
       },
       said: spoken,
     });
-    expect((await seam.answer({ ...request, ...ABOUT_SAVANNA })).kind).toBe(
-      "ANSWERED",
-    );
+    expect((await seam.answer({ ...request, ...about })).kind).toBe("ANSWERED");
     return {
       searches: tools.executed.filter(
         (one) => one.proposal.name === "research_public_web",
@@ -2112,10 +2137,28 @@ describe("someone they only pointed at is not searched for on the web (productio
     };
   }
 
-  it('"Why might the top one pass on us?" after their investors list: answered from records, no web', async () => {
+  // Production 2026-10-23 searched "Why might the top one pass on us?"
+  // and narrated Wikipedia's "Mountain pass". "The top one" is the first
+  // investor Q listed: searched by that name, with the person's words.
+  it('"Why might the top one pass on us?" after their investors list: searched as Savanna Seed Partners', async () => {
     const turn = await ask("Why might the top one pass on us?");
+    expect(turn.searches).toHaveLength(1);
+    const call = turn.searches[0]?.proposal;
+    expect((call?.arguments as { entityName?: unknown }).entityName).toBe(
+      "Savanna Seed Partners",
+    );
+    // The name Q showed them may leave; the tool layer is told what Q said.
+    expect(turn.searches[0]?.context.conversation?.earlierQText).toEqual([
+      INVESTORS_LIST,
+    ]);
+  });
+
+  it("a name nobody in the conversation said is not looked up", async () => {
+    const turn = await ask("Why might the top one pass on us?", {
+      aboutNamedOther: true,
+      namedOther: { name: "Kilimanjaro Ventures", kind: "COMPANY" },
+    });
     expect(turn.searches).toEqual([]);
-    expect(turn.spoken.join(" ")).not.toContain("public");
   });
 
   it("named in their own words, the same question is searched by that name", async () => {
@@ -2178,10 +2221,235 @@ describe("pictures of who the turn names, from public pages (owner 2026-10-23)",
     ).toEqual([]);
   });
 
+  // Owner 2026-10-23: "if it's not sure, it can be like, I'm not sure, but
+  // I found this" -- pages that only may be them still show their picture,
+  // said to be uncertain.
+  it("shows a picture from pages that may be them, said to be uncertain", async () => {
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      withMatch(researchOutcome(p, "Zino Aviation, Accra."), "POSSIBLE"),
+    );
+    const { seam, request, answerBlocks } = build({
+      script: [
+        { kind: "JSON", value: analystResult("Maybe this Zino Aviation.") },
+      ],
+      tools: tools.port,
+      userText: "Who runs Zino Aviation?",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () =>
+          Promise.resolve([
+            {
+              imageUrl: "https://cdn.example.com/zino-accra.jpg",
+              pageUrl: "https://news.example.com/zino-aviation-accra",
+              domain: "news.example.com",
+              title: "Zino Aviation opens in Accra",
+            },
+          ]),
+      },
+    });
+    expect((await seam.answer({ ...request, ...ABOUT_ZINO })).kind).toBe(
+      "ANSWERED",
+    );
+    const pictures = answerBlocks.filter(
+      (block) => (block as { kind?: string }).kind === "PICTURE",
+    ) as { title?: string; alt?: string; caption?: string }[];
+    expect(pictures).toHaveLength(1);
+    expect(JSON.stringify(pictures[0])).toContain("Not sure this is them");
+  });
+
+  // QA QO-09 (owner's QA ~21:55 UTC): "Duplo" showed a LEGO DUPLO Peppa
+  // Pig listing on eBay while the answer said the results were unrelated.
+  it("Duplo: no picture from a site the turn's search never tied to them", async () => {
+    const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
+      onSite(
+        researchOutcome(p, "LEGO DUPLO bricks for toddlers."),
+        "https://www.lego.com/en-gb/themes/duplo",
+      ),
+    );
+    const { seam, request, answerBlocks } = build({
+      script: [
+        {
+          kind: "JSON",
+          value: analystResult(
+            "The public results were about LEGO's DUPLO line, not this Duplo.",
+          ),
+        },
+      ],
+      tools: tools.port,
+      userText: "Tell me about Duplo",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () =>
+          Promise.resolve([
+            {
+              imageUrl: "https://i.ebayimg.com/duplo-peppa.jpg",
+              pageUrl: "https://www.ebay.com/itm/lego-duplo-peppa-pig",
+              domain: "www.ebay.com",
+              title: "LEGO DUPLO Peppa Pig Bike Ride 10964",
+            },
+          ]),
+      },
+    });
+    expect(
+      (
+        await seam.answer({
+          ...request,
+          aboutNamedOther: true,
+          namedOther: { name: "Duplo", kind: "COMPANY" },
+        })
+      ).kind,
+    ).toBe("ANSWERED");
+    expect(
+      answerBlocks.filter(
+        (block) => (block as { kind?: string }).kind === "PICTURE",
+      ),
+    ).toEqual([]);
+  });
+
+  // QA QO-09, persisting (owner's QA, 2026-10-23): "Tell me about Duplo",
+  // Duplo being a company Capital Q holds, showed LEGO DUPLO Peppa Pig. The
+  // search matched LEGO's pages by name; Capital Q's record places Duplo in
+  // Lagos, and LEGO's pages do not.
+  it("Duplo on Capital Q: LEGO's pages name Duplo but do not place it where its record does, so LEGO's picture is not shown", async () => {
+    const DUPLO = "d0d0d0d0-0000-4000-8000-000000000001";
+    const port: QToolPort = {
+      offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
+      execute: (proposal) => {
+        if (proposal.name === "research_public_web") {
+          const lego = onSite(
+            researchOutcome(proposal, "LEGO DUPLO bricks for toddlers."),
+            "https://www.lego.com/en-gb/themes/duplo",
+          );
+          return Promise.resolve(
+            lego.result.ok
+              ? {
+                  ...lego,
+                  result: {
+                    ok: true,
+                    data: {
+                      ...(lego.result.data as object),
+                      sources: (
+                        lego.result.data as {
+                          readonly sources: readonly object[];
+                        }
+                      ).sources.map((source) => ({
+                        ...source,
+                        mentionedCountries: ["DK"],
+                      })),
+                    },
+                  },
+                }
+              : lego,
+          );
+        }
+        return Promise.resolve({
+          callId: proposal.callId,
+          toolName: "company.get",
+          toolVersion: 1,
+          classification: "READ_ONLY",
+          status: "SUCCEEDED",
+          failureCode: null,
+          sensitivity: "INTERNAL",
+          result: {
+            ok: true,
+            data: {
+              companyId: DUPLO,
+              canonicalName: "Duplo",
+              legalName: null,
+              websiteUrl: null,
+              foundedDate: null,
+              headquartersCountry: "NG",
+              headquartersCity: "Lagos",
+              currentStageCode: "SEED",
+              shortDescription: "B2B payments for African businesses.",
+              primaryDescription: null,
+              companyStatus: "active",
+              relationToYou: "SHARED",
+              truthClass: "USER_CLAIM",
+            },
+          },
+          latencyMs: 1,
+        } as QToolCallOutcome);
+      },
+    };
+    const { seam, request, answerBlocks } = build({
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "g1",
+              name: "get_company",
+              arguments: { companyId: DUPLO },
+            },
+          ],
+        },
+        {
+          kind: "JSON",
+          value: analystResult(
+            "Duplo is a Lagos B2B payments company; the public results were about LEGO's DUPLO.",
+          ),
+        },
+      ],
+      tools: port,
+      userText: "Tell me about Duplo",
+      subjects: [],
+      read: {
+        research: Promise.resolve({
+          mode: "EXPLICIT",
+          announceSourceChange: false,
+        }),
+        turnKind: "QUESTION_TO_Q",
+      },
+      publicPictures: {
+        find: () =>
+          Promise.resolve([
+            {
+              imageUrl: "https://www.lego.com/cdn/duplo-peppa.jpg",
+              pageUrl: "https://www.lego.com/en-gb/product/peppa-pig-bike-ride",
+              domain: "www.lego.com",
+              title: "LEGO DUPLO Peppa Pig Bike Ride 10964",
+            },
+          ]),
+      },
+    });
+    expect(
+      (
+        await seam.answer({
+          ...request,
+          aboutNamedOther: true,
+          namedOther: { name: "Duplo", kind: "COMPANY" },
+        })
+      ).kind,
+    ).toBe("ANSWERED");
+    expect(
+      answerBlocks.filter(
+        (block) => (block as { kind?: string }).kind === "PICTURE",
+      ),
+    ).toEqual([]);
+  });
+
   it("looks for them beside the web search and shows them after the words, credited to their pages", async () => {
     const asked: { name: string; userText: string }[] = [];
     const tools = toolPort([GET_COMPANY, RESEARCH], (p) =>
-      withMatch(researchOutcome(p, "Zino Aviation flies charter."), "MATCH"),
+      onSite(
+        researchOutcome(p, "Zino Aviation flies charter."),
+        "https://nairametrics.com/2024/05/interview/",
+      ),
     );
     const { seam, request, answerBlocks } = build({
       script: [
@@ -2451,12 +2719,19 @@ describe("the web lane lands within its budget or is dropped (owner 2026-10-23)"
 });
 
 describe("pictures whatever the research mode (live 2026-10-23)", () => {
-  it("looks for the named company's pictures on a turn read as their own records", async () => {
+  // QA QO-09: a picture search by name alone is no evidence; with no public
+  // page found about them this turn, none is shown.
+  it("looks for the named company's pictures on a turn read as their own records, and shows one only with evidence", async () => {
     const asked: string[] = [];
     const port: QToolPort = {
       offer: () => Promise.resolve([GET_COMPANY, RESEARCH]),
       execute: (proposal) =>
-        Promise.resolve(researchOutcome(proposal, "Zino Aviation.")),
+        Promise.resolve(
+          onSite(
+            researchOutcome(proposal, "Zino Aviation."),
+            "https://nairametrics.com/2026/07/19/zino-aviation-ceo/",
+          ),
+        ),
     };
     const { seam, request, answerBlocks } = build({
       script: [{ kind: "JSON", value: analystResult("From the records.") }],
@@ -2488,9 +2763,12 @@ describe("pictures whatever the research mode (live 2026-10-23)", () => {
       "ANSWERED",
     );
     expect(asked).toEqual(["Zino Aviation"]);
-    expect(answerBlocks).toContainEqual(
-      expect.objectContaining({ kind: "PICTURE", source: "PUBLIC_WEB" }),
-    );
+    // Records answered; no public search found a page about them.
+    expect(
+      answerBlocks.filter(
+        (block) => (block as { kind?: string }).kind === "PICTURE",
+      ),
+    ).toEqual([]);
   });
 });
 

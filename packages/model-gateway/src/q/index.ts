@@ -14,10 +14,14 @@ import {
   asksForComparison,
   asksForPipelineSummary,
   comparisonLead,
-  profileLead,
   researchLead,
   pipelineLead,
+  PIPELINE_NOTE,
 } from "./early-lead.js";
+import {
+  asksWhoCanSeeDataRoom,
+  dataRoomAccessStatement,
+} from "./data-room-access.js";
 import {
   companiesMapAskOf,
   mayDrawCompaniesMap,
@@ -132,6 +136,7 @@ import {
   containsCompanyName,
   namedCompanySubjects,
   withCardSubjects,
+  type RunRead,
 } from "./card-subjects.js";
 import { stageAbout, stageKey } from "./stage-subjects.js";
 import {
@@ -174,9 +179,20 @@ import {
 } from "./named-company-fact.js";
 import {
   FIRST_CONTACT_TOOL,
+  FIRST_CONTACT_REPLY,
   firstContactMessage,
   firstContactOf,
 } from "./first-contact.js";
+import {
+  Q_CARD_CLAIM_TOOL,
+  qCardOfferMessage,
+  qCardOfferOf,
+} from "./q-card-offer.js";
+import {
+  CHAT_INSTEAD_TOOL,
+  chatInsteadMessage,
+  chatInsteadOf,
+} from "./message-channel.js";
 import {
   CHAINED_FIGURES_TOOL,
   CHAINED_GET_TOOL,
@@ -190,6 +206,11 @@ import {
   extrasMessages,
   joinExtras,
 } from "./parallel-extras.js";
+import {
+  corroboratedPictures,
+  type HeldIdentity,
+  type SearchEvidence,
+} from "./picture-corroboration.js";
 import { asksForFresh, createReadCache, type ReadCache } from "./read-cache.js";
 export { outputSplitOf, type OutputSplit } from "./output-split.js";
 import { runPersonSearch, type PersonAsk } from "./person-search-answer.js";
@@ -315,7 +336,14 @@ import {
   attachedDocumentsWithin,
 } from "./attached-document-fact.js";
 import {
+  asksAboutOthersInterest,
+  OTHERS_INTEREST_NOTE,
+  withOthersInterestWithheld,
+} from "./others-interest.js";
+import {
   comparisonFactStatement,
+  comparisonSpokenLine,
+  withoutCompareOffers,
   comparisonTableBlock,
   compareTargets,
   newestAnswerCards,
@@ -1044,17 +1072,19 @@ const ALREADY_SEARCHED_NOTE: ModelMessage = {
 };
 
 /**
- * Whether a public-web outcome holds a page about whom it searched for
- * (QA F-17): a source the research service matched to the named subject.
+ * What Capital Q holds about a company of this name that the run read
+ * (get_company's own output): its website, country and city, against which
+ * a namesake's pages and pictures are told apart (QA QO-09).
  */
-function webMatchedSubject(outcome: QToolCallOutcome | null): boolean {
-  if (outcome === null || !outcome.result.ok) return false;
-  const sources = (
-    outcome.result.data as {
-      readonly sources?: readonly { readonly subjectMatch?: unknown }[];
-    }
-  ).sources;
-  return (sources ?? []).some((source) => source.subjectMatch === "MATCH");
+function heldOnRecord(read: RunRead, name: string): HeldIdentity | null {
+  const wanted = name.trim().toLowerCase();
+  for (const [companyId, companyName] of read.companyNames) {
+    if (companyName.trim().toLowerCase() !== wanted) continue;
+    const facts = read.companyFacts.get(companyId);
+    if (facts === undefined) continue;
+    return { website: facts.website, country: facts.country, city: facts.city };
+  }
+  return null;
 }
 
 /** How long a subject's empty public search stands for its conversation. */
@@ -2530,6 +2560,12 @@ export function createModelGatewayQAnswer(
           .filter((message) => message.role === "USER")
           .slice(-3)
           .map((message) => message.content),
+        // What Q said to them, from which only the name of whom they point
+        // at ("the top one") may be searched (owner 2026-10-23).
+        earlierQText: earlier
+          .filter((message) => message.role === "Q")
+          .slice(-3)
+          .map((message) => message.content),
       },
       // What the turn is about, read by code (lead 2026-10-02): the offer
       // narrows to it; absent, the purpose's list as before.
@@ -2836,6 +2872,12 @@ export function createModelGatewayQAnswer(
     let compareFacts: readonly AuthorisedFact[] = [];
     /** The companies compared, in order; the table holds only these. */
     let compareIds: readonly string[] = [];
+    /**
+     * The table itself, built once here from the prepare's own reads: a
+     * speculative answer that took the run's reads must not leave the
+     * adopted answer without it (live 23 Oct 21:49, run a19bae24).
+     */
+    let compareTable: QResultBlock | null = null;
     const compareRead = (async (): Promise<void> => {
       if (latest === undefined) return;
       const targets = compareTargets(
@@ -2876,6 +2918,7 @@ export function createModelGatewayQAnswer(
       const statement = table === null ? null : comparisonFactStatement(table);
       if (statement === null) return;
       compareIds = targets;
+      compareTable = table;
       compareFacts = [
         {
           scope: "NETWORK_VISIBLE_DATA",
@@ -2887,6 +2930,44 @@ export function createModelGatewayQAnswer(
       ];
     })();
     compareRead.catch(() => undefined);
+    // QA F-28: "who can see my data room?" is read by code, as the asker,
+    // from the access editor's own reads (data-room-access.ts).
+    let dataRoomFacts: readonly AuthorisedFact[] = [];
+    const dataRoomRead = (async (): Promise<void> => {
+      if (latest === undefined || !asksWhoCanSeeDataRoom(latest.content)) {
+        return;
+      }
+      const { names } = await prefetchToolsRead;
+      if (!names.has("read_my")) return;
+      const read = (kind: "access" | "requests") =>
+        tools
+          .execute(
+            {
+              callId: `q-data-room-${kind}`,
+              name: "read_my",
+              arguments: { kind },
+            },
+            toolContext,
+          )
+          .then((outcome) => (outcome.result.ok ? outcome.result.data : null))
+          .catch(() => null);
+      const [access, requests] = await Promise.all([
+        read("access"),
+        read("requests"),
+      ]);
+      const statement = dataRoomAccessStatement(access, requests);
+      if (statement === null) return;
+      dataRoomFacts = [
+        {
+          scope: "OWN_RECORDS",
+          statement,
+          truthClass: "VERIFIED",
+          evidenceStatus: "PLATFORM_VERIFIED",
+          source: "Their data room's access settings and requests",
+        },
+      ];
+    })();
+    dataRoomRead.catch(() => undefined);
     /**
      * Q room R1: the whole page on their screen (sections, tab, filters,
      * open windows), sent as ids only and read back here through the read
@@ -3642,6 +3723,7 @@ export function createModelGatewayQAnswer(
       timed("document", documentRead),
       timed("attachments", attachmentRead),
       timed("compare", compareRead),
+      timed("data-room", dataRoomRead),
       timed("page", pageRead),
     ]);
     prepareMs["reads"] = Date.now() - prepareStarted;
@@ -3717,6 +3799,8 @@ export function createModelGatewayQAnswer(
       attachedTitles,
       compareFacts,
       compareIds,
+      dataRoomFacts,
+      compareTable,
       onScreenDocumentCall,
       onScreenPage,
       onScreenDossier,
@@ -4084,6 +4168,8 @@ export function createModelGatewayQAnswer(
         attachedTitles,
         compareFacts,
         compareIds,
+        dataRoomFacts,
+        compareTable,
         onScreenDocumentCall,
         onScreenPage,
         onScreenDossier,
@@ -4197,12 +4283,12 @@ export function createModelGatewayQAnswer(
         earlier.some((message) => message.role === "Q"),
       );
       /**
-       * A turn about someone they did not name in their own words ("Why
-       * might the top one pass on us?", after Q listed their investors):
-       * the public web cannot be asked about them by name (only the
-       * person's words leave Capital Q), and their pointing words name no
-       * one -- production 2026-10-23 searched them and narrated Wikipedia's
-       * "Mountain pass". Capital Q's records answer it; no web this turn.
+       * A turn about someone nobody in this conversation named: neither the
+       * person nor Q said the name the reader gave. Someone they pointed at
+       * ("Why might the top one pass on us?", after Q listed their
+       * investors) is searched by the name Q showed them (owner 2026-10-23:
+       * "find out who the top one is, get the name, and pass that to the
+       * search"); a name nobody said is not looked up.
        */
       const pointedAtOnly =
         request.aboutNamedOther === true &&
@@ -4212,6 +4298,10 @@ export function createModelGatewayQAnswer(
           latest.content,
           ...earlier
             .filter((message) => message.role === "USER")
+            .slice(-3)
+            .map((message) => message.content),
+          ...earlier
+            .filter((message) => message.role === "Q")
             .slice(-3)
             .map((message) => message.content),
         ]);
@@ -4531,6 +4621,7 @@ export function createModelGatewayQAnswer(
                 userText: latest.content,
                 earlierUserText:
                   toolContext.conversation?.earlierUserText ?? [],
+                shownText: toolContext.conversation?.earlierQText ?? [],
                 signal: request.signal,
               })
               .catch(() => [])
@@ -4659,28 +4750,10 @@ export function createModelGatewayQAnswer(
             ? pipelineLead(outcome.result.data, latest.content)
             : null;
         }
-        if (!asksForComparison(latest.content)) {
-          // One company named, already read in full by this run: its own
-          // declared profile opens the answer (first word, owner 10-21).
-          const named = [...runCompanies.read(request.runId).profiles].filter(
-            ([, name]) => containsCompanyName(latest.content, name),
-          );
-          if (named.length !== 1) return null;
-          const [companyId] = named[0] ?? [];
-          if (companyId === undefined) return null;
-          const outcome = await tools
-            .execute(
-              {
-                callId: "q-early-lead-profile",
-                name: "get_company",
-                arguments: { companyId },
-              },
-              toolContext,
-            )
-            .catch(() => null);
-          const profile = profileOf(outcome);
-          return profile === null ? null : profileLead(profile);
-        }
+        // F-45 (QA 2026-10-23): a question about one company is not opened
+        // with a fixed line of its declared stage and place; the answer's
+        // own first sentence, written for this question, leads.
+        if (!asksForComparison(latest.content)) return null;
         // The named companies this run already read in full (prepare's
         // named-visible reads): read again from the run's own kept reads.
         const named = [...runCompanies.read(request.runId).profiles].filter(
@@ -4807,6 +4880,7 @@ export function createModelGatewayQAnswer(
           ...(onScreenDocument === null ? [] : [onScreenDocument]),
           ...attachedDocuments,
           ...compareFacts,
+          ...dataRoomFacts,
           ...onScreenPage,
           ...(w.ownDay === null ? [] : [w.ownDay]),
           ...(w.arrival === null ? [] : [w.arrival]),
@@ -4903,7 +4977,16 @@ export function createModelGatewayQAnswer(
             turn: [
               noteParts.turn,
               `This answer already opens with this line, said to them by code from their records: "${earlyLead}" Continue after it with the analysis; do not repeat it or restate its counts.`,
+              ...(asksForPipelineSummary(latest.content)
+                ? [PIPELINE_NOTE]
+                : []),
             ].join(" "),
+          };
+        }
+        if (asksAboutOthersInterest(latest.content)) {
+          noteParts = {
+            ...noteParts,
+            turn: [noteParts.turn, OTHERS_INTEREST_NOTE].join(" "),
           };
         }
         if (request.aboutNamedOther !== true && alreadyReadNote !== null) {
@@ -5476,6 +5559,12 @@ export function createModelGatewayQAnswer(
       // Public sources this run read, attached to the answer as structured
       // sources (CQ-Q-VOICE-001 R3; R23). Public fields only.
       const publicSources: PublicSourceLike[] = [];
+      /**
+       * Every page this turn's public searches read, with the research's
+       * verdict on whether it is about whom it searched for: the evidence a
+       * picture of them must stand on (QA QO-09).
+       */
+      const webEvidence: SearchEvidence[] = [];
       // C's receipts (UI acts and moves), read once for the whole turn.
       const screenReceipts: readonly string[] =
         dependencies.uiActReceipts?.(request.actor) ?? [];
@@ -5508,10 +5597,38 @@ export function createModelGatewayQAnswer(
         // INC-1: one card per canonical record across every block, exactly
         // the count asked for, "them" held to the set just shown, and every
         // score labelled mandate fit with how it was made.
+        // Live 23 Oct 2026 (three readings of "compare the top two side by
+        // side", three answer paths, no table): a comparison the prepare
+        // resolved goes out with its table whichever path answered, and is
+        // done, never offered.
+        const tableHere =
+          compareTable !== null &&
+          !(given ?? []).some((block) => block.kind === "TABLE");
+        // QA F-44: other investors' interest is withheld, never denied.
+        if (asksAboutOthersInterest(latest.content)) {
+          content = withOthersInterestWithheld(content).slice(
+            0,
+            ANSWER_LIMIT_CHARS,
+          );
+        }
+        if (compareTable !== null) {
+          const done = withoutCompareOffers(content);
+          const spoken = tableHere ? comparisonSpokenLine(compareTable) : null;
+          content = (
+            spoken === null
+              ? done.length === 0
+                ? content
+                : done
+              : done.length === 0
+                ? spoken
+                : `${spoken}\n\n${done}`
+          ).slice(0, ANSWER_LIMIT_CHARS);
+        }
         const carried = withoutUnaskedMoves(
           withFitIntegrity(
             [
               ...(given ?? []),
+              ...(tableHere && compareTable !== null ? [compareTable] : []),
               ...publicSources.map((source) => ({
                 kind: "PUBLIC_SOURCE" as const,
                 ...publicSourceBlockFields(source),
@@ -5815,6 +5932,7 @@ export function createModelGatewayQAnswer(
                   userText: latest.content,
                   earlierUserText:
                     toolContext.conversation?.earlierUserText ?? [],
+                  shownText: toolContext.conversation?.earlierQText ?? [],
                   signal: request.signal,
                 })
                 .catch(() => [])
@@ -5829,11 +5947,38 @@ export function createModelGatewayQAnswer(
           // QA F-17: pictures only of someone the lookup found.
           const foundThem =
             found.result.card !== null || found.result.candidates.length > 0;
+          const soleFound =
+            found.result.candidates.length === 1
+              ? found.result.candidates[0]
+              : undefined;
+          const placedAt = (
+            found.result.card?.subject.organization ??
+            soleFound?.organization ??
+            ""
+          ).trim();
+          // QA QO-09: only on a site the lookup found them on, or the own
+          // site of the organisation it placed them at.
+          const theirs = (
+            candidates: Parameters<typeof corroboratedPictures>[0],
+          ) =>
+            corroboratedPictures(candidates, {
+              name: askedName,
+              sources: [
+                ...webEvidence,
+                ...found.sources.map((source) => ({
+                  domain: source.domain,
+                  subjectMatch: "MATCH",
+                })),
+              ],
+              organisations: placedAt.length > 0 ? [placedAt] : [],
+            });
           let pictures =
             lanePictures === null || !foundThem
               ? []
               : publicPictureBlocks(
-                  (await settledWithin(lanePictures, PICTURE_WAIT_MS)) ?? [],
+                  theirs(
+                    (await settledWithin(lanePictures, PICTURE_WAIT_MS)) ?? [],
+                  ),
                   new Date().toISOString(),
                 );
           // A person's name alone often finds namesakes' pictures, which
@@ -5862,17 +6007,20 @@ export function createModelGatewayQAnswer(
             askedName.length > 0
           ) {
             pictures = publicPictureBlocks(
-              (await settledWithin(
-                dependencies.publicPictures.find({
-                  name: askedName,
-                  organisation,
-                  userText: latest.content,
-                  earlierUserText:
-                    toolContext.conversation?.earlierUserText ?? [],
-                  signal: request.signal,
-                }),
-                PICTURE_WAIT_MS,
-              )) ?? [],
+              theirs(
+                (await settledWithin(
+                  dependencies.publicPictures.find({
+                    name: askedName,
+                    organisation,
+                    userText: latest.content,
+                    earlierUserText:
+                      toolContext.conversation?.earlierUserText ?? [],
+                    shownText: toolContext.conversation?.earlierQText ?? [],
+                    signal: request.signal,
+                  }),
+                  PICTURE_WAIT_MS,
+                )) ?? [],
+              ),
               new Date().toISOString(),
             );
           }
@@ -6064,7 +6212,9 @@ export function createModelGatewayQAnswer(
           request.discoverCompanies.mandateRelevant) &&
         request.discoverCompanies.sectors.length === 0 &&
         request.discoverCompanies.countries.length === 0 &&
-        request.discoverCompanies.stages.length === 0;
+        request.discoverCompanies.stages.length === 0 &&
+        // F-10: "raising now" is a filter only the catalog applies.
+        request.discoverCompanies.raising !== true;
       // K1 (live 2026-10-09 15:57): companies of a kind are listed from
       // the catalog by code; the analyst is never asked to describe cards.
       // Null (no catalog here): the full path answers.
@@ -6419,9 +6569,28 @@ export function createModelGatewayQAnswer(
           return;
         }
         const data = outcome.result.data as {
-          sources?: readonly PublicSourceLike[];
+          sources?: readonly (PublicSourceLike & {
+            readonly subjectMatch?: unknown;
+            readonly mentionedCountries?: unknown;
+            readonly excerpt?: unknown;
+          })[];
         };
         for (const source of data.sources ?? []) {
+          if (typeof source.domain === "string") {
+            webEvidence.push({
+              domain: source.domain,
+              subjectMatch:
+                typeof source.subjectMatch === "string"
+                  ? source.subjectMatch
+                  : null,
+              countries: Array.isArray(source.mentionedCountries)
+                ? source.mentionedCountries.filter(
+                    (country): country is string => typeof country === "string",
+                  )
+                : [],
+              text: typeof source.excerpt === "string" ? source.excerpt : null,
+            });
+          }
           // Only a well-formed public source is presentable; anything else
           // stays in the tool transcript as data and is never cited.
           if (
@@ -6461,6 +6630,8 @@ export function createModelGatewayQAnswer(
        * 2026-10-03: one status per card per answer).
        */
       let preparedByTool = false;
+      /** Code prepared the first contact this run (QO-08): the reply is code's, not the model's. */
+      let firstContactPrepared = false;
       let gaps: { readonly status: string; readonly line: string } | null =
         null;
       // The order matters more than the words: a model handed tools and a
@@ -7083,6 +7254,13 @@ export function createModelGatewayQAnswer(
             // A first contact prepared by code this round (first-contact.ts).
             let firstContact: Promise<QToolCallOutcome> | null = null;
             let firstContactWithNote = false;
+            /** An email their mailbox could not send, as a Capital Q message instead (QA F-32). */
+            let chatInstead: Promise<QToolCallOutcome> | null = null;
+            /** Their Q Card, prepared for approval when none is made (QA F-34). */
+            let cardOffer: {
+              readonly handle: string;
+              readonly outcome: Promise<QToolCallOutcome>;
+            } | null = null;
             const chainedThisRound: {
               readonly name: string;
               readonly read: Promise<QToolCallOutcome>;
@@ -7169,6 +7347,43 @@ export function createModelGatewayQAnswer(
               // A message or email to a company they are not connected with:
               // the first contact, Express Interest, prepared now for their
               // approval, through its own authorize step (first-contact.ts).
+              const offer = qCardOfferOf(call, outcome);
+              if (
+                offer !== null &&
+                cardOffer === null &&
+                offeredByName.has(Q_CARD_CLAIM_TOOL) &&
+                !proposals.some((other) => other.name === Q_CARD_CLAIM_TOOL) &&
+                calls + chainedThisRound.length + 1 < Q_TOOL_LOOP_MAX_CALLS
+              ) {
+                cardOffer = {
+                  handle: offer.handle,
+                  outcome: callTool(
+                    {
+                      callId: "q-card-offer",
+                      name: Q_CARD_CLAIM_TOOL,
+                      arguments: offer,
+                    },
+                    toolContext,
+                  ),
+                };
+              }
+              const instead = chatInsteadOf(call, outcome);
+              if (
+                instead !== null &&
+                chatInstead === null &&
+                offeredByName.has(CHAT_INSTEAD_TOOL) &&
+                !proposals.some((other) => other.name === CHAT_INSTEAD_TOOL) &&
+                calls + chainedThisRound.length + 1 < Q_TOOL_LOOP_MAX_CALLS
+              ) {
+                chatInstead = callTool(
+                  {
+                    callId: "q-chat-instead",
+                    name: CHAT_INSTEAD_TOOL,
+                    arguments: instead,
+                  },
+                  toolContext,
+                );
+              }
               const contact = firstContactOf(call, outcome);
               if (
                 contact !== null &&
@@ -7335,6 +7550,37 @@ export function createModelGatewayQAnswer(
                 );
               }
             }
+            if (cardOffer !== null) {
+              const { handle } = cardOffer;
+              const outcome = await cardOffer.outcome.catch(() => null);
+              if (outcome !== null) {
+                calls += 1;
+                toolCalls.push({
+                  toolName: outcome.toolName,
+                  providerName: Q_CARD_CLAIM_TOOL,
+                  status: outcome.status,
+                  failureCode: outcome.failureCode,
+                  latencyMs: outcome.latencyMs,
+                });
+                const told = qCardOfferMessage(outcome, handle);
+                if (told !== null) chainedResults.push(told);
+              }
+            }
+            if (chatInstead !== null) {
+              const outcome = await chatInstead.catch(() => null);
+              if (outcome !== null) {
+                calls += 1;
+                toolCalls.push({
+                  toolName: outcome.toolName,
+                  providerName: CHAT_INSTEAD_TOOL,
+                  status: outcome.status,
+                  failureCode: outcome.failureCode,
+                  latencyMs: outcome.latencyMs,
+                });
+                const told = chatInsteadMessage(outcome);
+                if (told !== null) chainedResults.push(told);
+              }
+            }
             if (firstContact !== null) {
               const outcome = await firstContact.catch(() => null);
               if (outcome !== null) {
@@ -7347,7 +7593,10 @@ export function createModelGatewayQAnswer(
                   latencyMs: outcome.latencyMs,
                 });
                 const told = firstContactMessage(outcome, firstContactWithNote);
-                if (told !== null) chainedResults.push(told);
+                if (told !== null) {
+                  chainedResults.push(told);
+                  firstContactPrepared = true;
+                }
               }
             }
             messages = [...messages, assistant, ...results, ...chainedResults];
@@ -8036,23 +8285,36 @@ export function createModelGatewayQAnswer(
         // L-13: a picture only when the analyst asked for one, searched
         // with words composed from the person's own (never sent as the
         // model wrote them), and bounded so it cannot hold the turn.
-        // QA F-17 (2026-10-23): when the turn's web search found no page
-        // about them, no picture is theirs -- none at all, neither from
-        // public pages (reddit, a token's logo were shown) nor a stock
-        // illustration.
-        const webFoundThem =
-          earlyWeb === null ||
-          webMatchedSubject(await settledWithin(earlyWeb.outcome, 0));
+        // QA F-17 and QO-09 (2026-10-23): a picture of whom the turn is
+        // about only where evidence ties its site to them -- their website
+        // on Capital Q, or a site this turn's searches matched to them
+        // (said to be uncertain where those pages only may be them). A
+        // namesake's (LEGO DUPLO on eBay, a bus air-conditioning maker for
+        // "Spheros") never; and never a stock illustration in its place.
+        const namedSubject =
+          typeof namedForPictures === "string" ? namedForPictures : null;
+        const held =
+          namedSubject === null
+            ? null
+            : heldOnRecord(companiesRead, namedSubject);
         const fromPages =
-          webPictures === null || !webFoundThem
+          webPictures === null || namedSubject === null
             ? []
             : publicPictureBlocks(
-                (await settledWithin(webPictures, PICTURE_WAIT_MS)) ?? [],
+                corroboratedPictures(
+                  (await settledWithin(webPictures, PICTURE_WAIT_MS)) ?? [],
+                  {
+                    name: namedSubject,
+                    website: held?.website ?? null,
+                    held,
+                    sources: webEvidence,
+                  },
+                ),
                 new Date().toISOString(),
               );
-        // A stock illustration only where no public picture of them was found.
+        // A stock illustration only for a turn about no one in particular.
         const picture =
-          fromPages.length > 0 || !webFoundThem
+          fromPages.length > 0 || namedSubject !== null
             ? null
             : await pictureBlock({
                 result: analyst,
@@ -8128,8 +8390,15 @@ export function createModelGatewayQAnswer(
         const cardsShown = (analystBlocks ?? []).some(
           (block) => block.kind === "ANSWER_CARDS",
         );
-        const answerText =
-          builtCards !== null && hasOrphanListItems(artifactSafe.text)
+        // QO-08 (live 2026-10-23): with Express Interest prepared by code
+        // for founders they are not connected with, the model still wrote
+        // "this message tool only drafts notes to connected companies...
+        // want me to?" -- naming a tool and asking permission for what was
+        // asked and already prepared. The reply is code's own line; the
+        // card's line (the note in full, "Ready to send") follows it.
+        const answerText = firstContactPrepared
+          ? FIRST_CONTACT_REPLY
+          : builtCards !== null && hasOrphanListItems(artifactSafe.text)
             ? fitCardsSummary(builtCards)
             : request.spoken === true && cardsShown
               ? spokenBeforeCards(artifactSafe.text)

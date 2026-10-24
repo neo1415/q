@@ -7,7 +7,7 @@ import {
 } from "@capital-q/contracts/q";
 
 import { RESEARCH_BOUNDS, type PublicWebSearchHit } from "../contracts.js";
-import { composeEgressQuery } from "../domain/egress.js";
+import { composeEgressQuery, namesShown } from "../domain/egress.js";
 import {
   allSpellings,
   basicNameVariants,
@@ -130,6 +130,11 @@ export type PersonSearchCommand = {
   /** The member's own words; the only text a query may be built from. */
   readonly userText: string;
   readonly earlierUserText?: readonly string[] | undefined;
+  /**
+   * What Q said to them earlier in this conversation: a name in it of
+   * whom they pointed at may be searched (`namesShown`).
+   */
+  readonly shownText?: readonly string[] | undefined;
   /** Spellings to also look for (e.g. a transliteration the member typed). */
   readonly nameVariants?: readonly string[] | undefined;
   readonly signal?: AbortSignal | undefined;
@@ -335,6 +340,7 @@ export function createPersonSearch(dependencies: PersonSearchDependencies): {
             spec.name,
           ],
           publicIdentity: [],
+          shownNames: namesShown([spec.name], command.shownText),
         });
         return egress.ok
           ? [

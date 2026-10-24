@@ -138,6 +138,11 @@ function seam(options: {
   readonly teamJob?: QTeamJobPort;
   /** A call with one named counterpart, prepared in the answer (v58). */
   readonly callPrep?: QCallPrepPort;
+  /** A follow-up answered from what Q already showed (v54 fromShown). */
+  readonly conversationRecall?: (
+    request: QAnswerRequest,
+    input: { readonly said: string },
+  ) => Promise<string | null>;
   /** Readiness lead lines for "what should I do next?" (lead 2026-10-03). */
   readonly readinessLead?: (request: QAnswerRequest) => Promise<string | null>;
   /** Their profile's gaps filled by code (TURN_READER v27). */
@@ -146,6 +151,11 @@ function seam(options: {
   readonly appActions?: QAppActionPort;
   /** Their relationships' counterpart names (lead 2026-10-03). */
   readonly counterpartNames?: readonly string[];
+  /** One line of what a destination holds (coordinator 2026-10-23). */
+  readonly destinationSummary?: (
+    request: QAnswerRequest,
+    destination: string,
+  ) => Promise<string | null>;
   /** A recording logger (lead 2026-10-03: the route is observable). */
   readonly logger?: Logger;
   /** The quick first read (a model), faked. */
@@ -359,6 +369,9 @@ function seam(options: {
       : { delegation: options.delegation }),
     ...(options.teamJob === undefined ? {} : { teamJob: options.teamJob }),
     ...(options.callPrep === undefined ? {} : { callPrep: options.callPrep }),
+    ...(options.conversationRecall === undefined
+      ? {}
+      : { conversationRecall: options.conversationRecall }),
     ...(options.readinessLead === undefined
       ? {}
       : { readinessLead: options.readinessLead }),
@@ -371,6 +384,9 @@ function seam(options: {
     ...(options.appActionRouter === undefined
       ? {}
       : { appActionRouter: options.appActionRouter }),
+    ...(options.destinationSummary === undefined
+      ? {}
+      : { destinationSummary: options.destinationSummary }),
     ...(options.counterpartNames === undefined
       ? {}
       : {
@@ -505,6 +521,36 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     expect(yes.deltas.filter((d) => d.holding === true)).toEqual([]);
   });
 
+  it("says it is drafting the note, to whom the skim understood, at skim time (QA F-23)", async () => {
+    const turn = holding(
+      "Draft a note to the founders of the second company saying I'd like a call next week",
+      {
+        kind: "OTHER",
+        confidence: "HIGH",
+        subject: { name: "Silo Credit", kind: "COMPANY" },
+        writes: true,
+      },
+    );
+    await expect.poll(() => turn.deltas.length).toBeGreaterThan(0);
+    expect(turn.deltas).toEqual([
+      { text: "Drafting that note to Silo Credit now. ", holding: true },
+    ]);
+    turn.land();
+    await turn.answering;
+    // No one understood: still says it is drafting, naming no one.
+    const nameless = holding("draft a note for me", {
+      kind: "OTHER",
+      confidence: "HIGH",
+      writes: true,
+    });
+    await expect.poll(() => nameless.deltas.length).toBeGreaterThan(0);
+    expect(nameless.deltas).toEqual([
+      { text: "Drafting that now. ", holding: true },
+    ]);
+    nameless.land();
+    await nameless.answering;
+  });
+
   it('a "Yes" to an offer about Zino is named only as the skim understood it', async () => {
     const turn = holding("Yes", {
       kind: "OTHER",
@@ -543,6 +589,38 @@ describe("a request for one of Q's own hands (CQ-QACT-001)", () => {
     ]);
     expect(run.events.map((event) => event.type)).toEqual([
       "q.message.completed",
+    ]);
+  });
+
+  // Coordinator 23 Oct 2026: "Show me my fundraising pipeline" said only
+  // "Opening your pipeline…". The move says what is in it, then opens it.
+  it("a move to their pipeline says what is in it first", async () => {
+    const asked: string[] = [];
+    const run = seam({
+      said: "Show me my fundraising pipeline",
+      reading: toolReading({
+        kind: "NAVIGATE",
+        destination: "CRM_PIPELINE",
+        visibility: null,
+      }),
+      outcomes: [],
+      destinationSummary: (_request, destination) => {
+        asked.push(destination);
+        return Promise.resolve(
+          "3 investors: Savanna Seed Partners connected; Zino Aviation and Rift Valley waiting for your reply.",
+        );
+      },
+    });
+    expect((await run.answer.answer(request())).kind).toBe("ANSWERED");
+    expect(asked).toEqual(["CRM_PIPELINE"]);
+    expect(run.stored[0]?.content).toMatch(
+      /^3 investors: Savanna Seed Partners connected; Zino Aviation and Rift Valley waiting for your reply\. Opening your pipeline/u,
+    );
+    expect(run.stored[0]?.blocks).toEqual([
+      {
+        kind: "UI_INTENT",
+        intent: { kind: "NAVIGATE", destination: "CRM_PIPELINE" },
+      },
     ]);
   });
 
@@ -1964,6 +2042,50 @@ describe("a hand-over of a founder's connection request (live 2026-10-02, Zino)"
     );
     return { line: stored.at(-1)?.content, delegated: delegated() };
   };
+
+  it("a founder accepting an investor's waiting interest answers it, never an errand that waits for them (QA F-33)", async () => {
+    const asked: (string | null)[] = [];
+    const { value, errands } = port(() => null);
+    const handOver: QHandOverPort = {
+      ...value,
+      answerIncomingInterest: (_request, investor) => {
+        asked.push(investor);
+        return Promise.resolve({
+          status: "PREPARED",
+          awaitingApprovalOf: "Accept Rift Valley Seed Fund's interest",
+        });
+      },
+    };
+    const { answer, stored, delegated } = seam({
+      said: "Reply to Rift Valley Seed Fund: accept their interest and suggest a call next week.",
+      reading: reading("Rift Valley Seed Fund"),
+      outcomes: [],
+      handOver,
+    });
+    await answer.answer(request());
+    expect(asked).toEqual(["Rift Valley Seed Fund"]);
+    expect(errands).toEqual([]);
+    expect(delegated()).toBe(0);
+    const line = stored.at(-1)?.content ?? "";
+    expect(line).toContain("Accept Rift Valley Seed Fund's interest");
+    expect(line).not.toMatch(
+      /hasn't accepted your interest|nothing to accept/u,
+    );
+  });
+
+  it("falls through to the errand when no investor's interest waits on them", async () => {
+    const { value, errands } = port(() => null);
+    const handOver: QHandOverPort = {
+      ...value,
+      answerIncomingInterest: () =>
+        Promise.resolve({
+          status: "NO_PENDING_INTEREST",
+          awaitingApprovalOf: "No investor's interest is waiting.",
+        }),
+    };
+    await run(handOver, null, true);
+    expect(errands).toHaveLength(1);
+  });
 
   it("a request for research, a memo and diligence questions is never answered by accepting a waiting request (live 2026-10-12)", async () => {
     const { value, asked, errands } = port(() => ({
@@ -5031,6 +5153,62 @@ describe("getting ready for a call is prepared in the answer (owner 2026-10-23, 
       text.endsWith("Want to rehearse it? I'll play Savanna Seed Partners."),
     ).toBe(true);
     expect(text).not.toMatch(/Q['’]s team|\.\.|plan this one anyway/u);
+  });
+
+  it("live 20:31, the three-turn sequence: after a list of investors, the prep is not answered as a follow-up", async () => {
+    const recalled: string[] = [];
+    const asked: string[] = [];
+    const { answer, stored } = seam({
+      said,
+      earlier: [
+        { role: "USER", content: "Which investors should I talk to first" },
+        {
+          role: "Q",
+          content:
+            "Start with Savanna Seed Partners, then Baobab Seed Partners.",
+          blocks: [
+            {
+              kind: "ARTIFACT_REFERENCE",
+              artifactId: QArtifactIdSchema.parse(randomUUID()),
+              type: "Q_REPORT",
+              status: "READY",
+              title: "Investors to talk to first",
+            },
+          ],
+        },
+        { role: "USER", content: "Why might the top one pass on us?" },
+        {
+          role: "Q",
+          content: "Savanna may hesitate because kiosk economics are unproven.",
+        },
+      ],
+      reading: {
+        ...prepReading,
+        teamJob: false,
+        fromShown: { turn: 2, reshow: false },
+      } as unknown as TurnReaderResult,
+      outcomes: [],
+      conversationRecall: (_request, input) => {
+        recalled.push(input.said);
+        return Promise.resolve(
+          "A generic follow-up. Want me to draft the reply to Amara?",
+        );
+      },
+      callPrep: {
+        prepare: (_request, input) => {
+          asked.push(input.counterpart);
+          return Promise.resolve(prep());
+        },
+      },
+    });
+    await answer.answer(request());
+    expect(asked).toEqual(["Savanna Seed Partners"]);
+    expect(recalled).toEqual([]);
+    const text = stored.at(-1)?.content ?? "";
+    expect(text).toContain("**What they'll likely ask**");
+    expect(
+      text.endsWith("Want to rehearse it? I'll play Savanna Seed Partners."),
+    ).toBe(true);
   });
 
   it("work already waiting is one plain line; the prep is given anyway", async () => {

@@ -9,6 +9,7 @@ import {
 import { StrictMode } from "react";
 import { renderToString } from "react-dom/server";
 import userEvent from "@testing-library/user-event";
+import { resetCaptionsChoiceForTests } from "@/features/discover/stage/captions-choice";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -89,6 +90,9 @@ function videoIn(container: HTMLElement): HTMLVideoElement {
 let play = vi.fn<() => Promise<void>>();
 
 beforeEach(() => {
+  // The captions choice is remembered per device; each test starts fresh.
+  window.localStorage.removeItem("cq.discover.captions");
+  resetCaptionsChoiceForTests();
   // jsdom has no media pipeline; `play()` is not implemented at all.
   play = vi.fn<() => Promise<void>>(() => Promise.resolve());
   Object.defineProperty(HTMLMediaElement.prototype, "play", {

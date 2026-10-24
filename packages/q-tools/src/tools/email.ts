@@ -150,7 +150,7 @@ export function createProposeEmailTool(
     status: "ACTIVE",
     providerName: "propose_email",
     description:
-      "Drafts an email from the person to the other side of one of their relationships (a company's founders, or an investor organisation's people) for their own approval, when they ask for it or agree to Q's suggestion. It sends nothing: the person sees the exact email, may edit it, and approves it; it then goes from their own connected Gmail. Recipients can only be people on that relationship. Or, with inboundEmailId, a reply to an email that arrived at their Q address: it goes only to that email's sender, from Capital Q's own address on their behalf (not their mailbox), with replies coming back to their Q address.",
+      "Drafts an email from the person to the other side of one of their relationships (a company's founders, or an investor organisation's people) for their own approval, only when they ask for an email or agree to Q's suggestion of one; to send a note, reply or message to a relationship on Capital Q (\"send it to them\"), use propose_chat_message, its Capital Q conversation. It sends nothing: the person sees the exact email, may edit it, and approves it; it then goes from their own connected Gmail. Recipients can only be people on that relationship. Or, with inboundEmailId, a reply to an email that arrived at their Q address: it goes only to that email's sender, from Capital Q's own address on their behalf (not their mailbox), with replies coming back to their Q address.",
     classification: "SIDE_EFFECT",
     riskClass: "LOW_RISK_INTERNAL",
     requiredCapabilities: [],

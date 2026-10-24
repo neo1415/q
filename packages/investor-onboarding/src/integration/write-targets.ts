@@ -44,11 +44,13 @@ import {
   type ResponseValues,
 } from "@capital-q/onboarding";
 import {
+  OrganisationIdSchema,
   resolveHumanActorContext,
   type ActorContext,
   type OrganisationId,
 } from "@capital-q/security";
 import {
+  findOwnFirmWorkspace,
   investorMayReuseWorkspace,
   readInvestorWorkspaceFacts,
 } from "./workspace.js";
@@ -745,11 +747,20 @@ async function bootstrapInvestor(
   services: InvestorDomainServices,
   context: OnboardingWriteContext,
   values: ResponseValues,
-): Promise<void> {
+): Promise<OnboardingSession | null> {
   const { actor, session, correlationId } = context;
   const name = text(values, INVESTOR_STEPS.organisationName);
   const typeKey = singleSelect(values, INVESTOR_STEPS.investorType);
   const investorType = InvestorTypeSchema.safeParse(typeKey?.toUpperCase());
+  // QA F-52 (live 23 Oct: the firm named first, before how they invest):
+  // the firm is set up once both its name and its type are known, from
+  // whichever of the two steps lands second. The first is kept as it is,
+  // never refused; nothing is created from half of it.
+  if (session.subject === null) {
+    if (name === null || name.length === 0 || !investorType.success) {
+      return null;
+    }
+  }
   if (name === null || name.length === 0) {
     invalid("value.text", "organisation_name_required", "Name your firm.");
   }
@@ -789,7 +800,7 @@ async function bootstrapInvestor(
         correlationId,
       });
     }
-    return;
+    return null;
   }
 
   // Owner directive 2026-10-16: the active organisation is reused only when
@@ -806,11 +817,25 @@ async function bootstrapInvestor(
       ? actor.context
       : null;
 
+  // Their own firm of this name, set up before (another session, or a
+  // context now on their company), is the same firm, never a second one.
+  // Only their own memberships: nobody joins a firm by typing its name.
+  const ownFirm =
+    reusable === null && actor.principal !== undefined
+      ? await findOwnFirmWorkspace(context.tx.sql, actor.userId, name)
+      : null;
+
   let actorContext: ActorContext;
   if (reusable !== null) {
     // An existing member acts in their explicit active context. Nobody joins
     // an organisation by typing its name.
     actorContext = reusable;
+  } else if (ownFirm !== null) {
+    actorContext = await resolveInvestorContext(
+      services,
+      actor,
+      OrganisationIdSchema.parse(ownFirm),
+    );
   } else {
     if (actor.principal === undefined) {
       throw new OnboardingContextRequiredError();
@@ -871,7 +896,7 @@ async function bootstrapInvestor(
     ),
     correlationId,
   });
-  await context.bindContext({
+  return context.bindContext({
     tenantId: actorContext.tenantId,
     organisationId: actorContext.organisationId,
     subject: {
@@ -879,6 +904,26 @@ async function bootstrapInvestor(
       subjectId: investorOrganisationId,
     },
   });
+}
+
+/**
+ * QA F-52: the bound investor, setting the firm up first when the session
+ * already holds its name and type but no firm yet (the name came before the
+ * type, and the type's own step writes nothing). Otherwise exactly
+ * `boundInvestor`: a session with neither still refuses, and the answer is
+ * held until the firm exists.
+ */
+async function boundOrBootstrapped(
+  services: InvestorDomainServices,
+  context: OnboardingWriteContext,
+  values: ResponseValues,
+): Promise<BoundInvestor> {
+  const session =
+    context.session.subject === null
+      ? ((await bootstrapInvestor(services, context, values)) ??
+        context.session)
+      : context.session;
+  return boundInvestor(services, context.actor, session, context.requestMemo);
 }
 
 // ---------------------------------------------------------------------------
@@ -901,12 +946,7 @@ async function withMandate(
     | Omit<UpdateInvestorMandateRequest, "expectedVersion">
     | Promise<Omit<UpdateInvestorMandateRequest, "expectedVersion">>,
 ): Promise<void> {
-  const bound = await boundInvestor(
-    services,
-    context.actor,
-    context.session,
-    context.requestMemo,
-  );
+  const bound = await boundOrBootstrapped(services, context, values);
   const mandateId = await mandateInScope(services, bound, values, context);
   // The mandate as this request's own last update left it (live AM: each
   // of an investor's first answers read it again, ~270 ms an answer). The
@@ -936,19 +976,16 @@ export function createInvestorWriteTargets(
     ((tx: TransactionContext) => createInvestorDomainServices(tx, options));
 
   const handlers: Readonly<Record<string, Handler>> = {
-    [INVESTOR_WRITE_TARGETS.bootstrap]: bootstrapInvestor,
+    [INVESTOR_WRITE_TARGETS.bootstrap]: async (services, context, values) => {
+      await bootstrapInvestor(services, context, values);
+    },
 
     [INVESTOR_WRITE_TARGETS.representative]: async (
       services,
       context,
       values,
     ) => {
-      const bound = await boundInvestor(
-        services,
-        context.actor,
-        context.session,
-        context.requestMemo,
-      );
+      const bound = await boundOrBootstrapped(services, context, values);
       await services.investors.upsertMyInvestorRepresentative({
         actor: bound.context,
         investorOrganisationId: bound.investorOrganisationId,
@@ -966,12 +1003,7 @@ export function createInvestorWriteTargets(
       context,
       values,
     ) => {
-      const bound = await boundInvestor(
-        services,
-        context.actor,
-        context.session,
-        context.requestMemo,
-      );
+      const bound = await boundOrBootstrapped(services, context, values);
       const state = InvestorDeploymentStateSchema.safeParse(
         singleSelect(values, INVESTOR_STEPS.deploymentStatus)?.toUpperCase(),
       );
@@ -998,13 +1030,12 @@ export function createInvestorWriteTargets(
       });
     },
 
-    [INVESTOR_WRITE_TARGETS.mandateEnsure]: async (services, context) => {
-      const bound = await boundInvestor(
-        services,
-        context.actor,
-        context.session,
-        context.requestMemo,
-      );
+    [INVESTOR_WRITE_TARGETS.mandateEnsure]: async (
+      services,
+      context,
+      values,
+    ) => {
+      const bound = await boundOrBootstrapped(services, context, values);
       const page = await services.investors.listInvestorMandates({
         actor: bound.context,
         investorOrganisationId: bound.investorOrganisationId,
@@ -1022,12 +1053,7 @@ export function createInvestorWriteTargets(
       context,
       values,
     ) => {
-      const bound = await boundInvestor(
-        services,
-        context.actor,
-        context.session,
-        context.requestMemo,
-      );
+      const bound = await boundOrBootstrapped(services, context, values);
       const mandateId = selectedMandateId(values);
       let mandate: InvestorMandate;
       try {
@@ -1139,12 +1165,7 @@ export function createInvestorWriteTargets(
       })),
 
     [INVESTOR_WRITE_TARGETS.portfolio]: async (services, context, values) => {
-      const bound = await boundInvestor(
-        services,
-        context.actor,
-        context.session,
-        context.requestMemo,
-      );
+      const bound = await boundOrBootstrapped(services, context, values);
       const wanted = portfolioNames(text(values, INVESTOR_STEPS.portfolio));
       const current = await services.investors.listInvestorPortfolioReferences({
         actor: bound.context,
@@ -1196,12 +1217,7 @@ export function createInvestorWriteTargets(
       })),
 
     [INVESTOR_WRITE_TARGETS.confirm]: async (services, context, values) => {
-      const bound = await boundInvestor(
-        services,
-        context.actor,
-        context.session,
-        context.requestMemo,
-      );
+      const bound = await boundOrBootstrapped(services, context, values);
       // ADR 0023: how founders may reach this organisation becomes the
       // organisation's own setting when the investor confirms. The I10 step
       // predates the column and its published definition is hash-locked, so

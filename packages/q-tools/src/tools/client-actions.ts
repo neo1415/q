@@ -12,6 +12,7 @@ import {
   QClientActionToolResultSchema,
   QMotionChoiceSchema,
   DeckSectionCodeSchema,
+  Q_NAVIGATE_DESTINATIONS,
   Q_RECORD_PAGES,
   QRecordTabSchema,
   recordPageHasTab,
@@ -449,6 +450,19 @@ export function spokenNameScore(spoken: string, recordName: string): number {
   return Math.max(whole, leading * 0.9);
 }
 
+/** The platform's own screens, by their names (Q_NAVIGATE_DESTINATIONS). */
+const OWN_SCREEN_KEYS: ReadonlySet<string> = new Set(
+  Q_NAVIGATE_DESTINATIONS.flatMap((destination) => {
+    const key = nameKey(destination.replace(/_/gu, " "));
+    return [key, `${key}page`, `the${key}`, `the${key}page`];
+  }),
+);
+
+/** Whether a name is one of Capital Q's own screens ("Discover", "the Saved page"). */
+export function namesOwnScreen(name: string): boolean {
+  return OWN_SCREEN_KEYS.has(nameKey(name));
+}
+
 export function matchCounterpart(
   name: string,
   candidates: readonly { readonly id: string; readonly name: string }[],
@@ -686,6 +700,17 @@ export function createOpenPageTool(
         input.page === "RELATIONSHIP_COMPANY_MESSAGES";
       const kind = companySide ? "COMPANY" : "INVESTOR_ORGANISATION";
       let recordId = input.id?.toLowerCase() ?? null;
+      // A screen of Capital Q's own is never a record's name (QA F-36, live
+      // 2026-10-23: "open Discover" became open_page COMPANY "Discover",
+      // and the misheard-name match opened Umoja Cover). Not found here;
+      // the screen itself is opened by Capital Q's navigation.
+      if (
+        recordId === null &&
+        input.name !== undefined &&
+        namesOwnScreen(input.name)
+      ) {
+        return deny<QClientActionToolResult>("NOT_AVAILABLE");
+      }
       if (recordId === null && input.name !== undefined) {
         recordId = matchCounterpart(
           input.name,

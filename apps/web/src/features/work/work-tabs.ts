@@ -8,7 +8,8 @@ import type { HubSide } from "@/features/relationships/hub-view";
  * address, so Q's route table and voice destinations still open each one
  * directly, with no model call.
  */
-export type WorkView = "tasks" | "documents" | "pitch" | "rehearsals" | "daily";
+export type WorkView =
+  "tasks" | "board" | "documents" | "pitch" | "rehearsals" | "daily";
 
 export type WorkTab = {
   readonly view: WorkView;
@@ -25,6 +26,8 @@ export type WorkTab = {
 export function workTabs(side: HubSide = "NONE"): readonly WorkTab[] {
   return [
     { view: "tasks", label: "Tasks", href: "/work" },
+    // The work board (owner 2026-10-23): their own items, Q's too.
+    { view: "board", label: "Board", href: "/board" },
     { view: "documents", label: "Documents", href: "/documents" },
     ...(side === "COMPANY"
       ? [{ view: "pitch" as const, label: "Pitch", href: "/pitch" }]

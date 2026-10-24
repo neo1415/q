@@ -13,7 +13,11 @@ import {
   type ComparisonNote,
   type TemporalClass,
 } from "../domain/comparison.js";
-import { composeEgressQuery, searchPhrase } from "../domain/egress.js";
+import {
+  composeEgressQuery,
+  namesShown,
+  searchPhrase,
+} from "../domain/egress.js";
 import {
   boundExcerpt,
   type InstructionRiskCategory,
@@ -87,6 +91,12 @@ export type ResearchCommand = {
    */
   readonly earlierUserText?: readonly string[] | undefined;
   /**
+   * What Q said to the person earlier in this conversation (a few messages,
+   * most recent last). Only a name in it of whom the turn is about may leave
+   * (`namesShown`), when they point back at it; never Q's other words.
+   */
+  readonly shownText?: readonly string[] | undefined;
+  /**
    * Other phrasings of the same request the model proposes (web search
    * 2026-10-06: one query missed what a second wording found). Untrusted;
    * each is composed before egress exactly like `requestedQuery`.
@@ -95,7 +105,8 @@ export type ResearchCommand = {
   /**
    * The company or person being looked up by name, as the person named it,
    * when the subject is not a Capital Q record. Used only when every word
-   * of it is the person's own; it decides which pages are about them.
+   * of it is the person's own, or it is a name Q showed them in this
+   * conversation (`shownText`); it decides which pages are about them.
    */
   readonly entityName?: string | undefined;
   readonly subject: ResearchSubject | null;
@@ -368,6 +379,7 @@ function namedEntityOf(command: ResearchCommand): NamedEntity | null {
     userText: command.userText,
     earlierUserText: command.earlierUserText,
     publicIdentity: [],
+    shownNames: namesShown([named], command.shownText),
   });
   return composed.ok && composed.droppedTokens === 0
     ? { name: composed.query, domain: null, country: null }
@@ -594,6 +606,8 @@ export function createPublicWebResearchService(
       const leadWithSubject =
         !aboutSomeoneElse &&
         prependIdentityFor(command.subject, command.aboutThemselves === true);
+      // The one they pointed at ("the top one"), when Q showed its name.
+      const shownNames = namesShown([entity?.name], command.shownText);
       const compose = (requestedQuery: string, prepend = leadWithSubject) =>
         composeEgressQuery({
           requestedQuery,
@@ -601,6 +615,7 @@ export function createPublicWebResearchService(
           earlierUserText: command.earlierUserText,
           publicIdentity: identity,
           prependIdentity: prepend,
+          shownNames,
           publicTerms: command.publicTerms,
           researchVocabulary: command.researchVocabulary,
         });

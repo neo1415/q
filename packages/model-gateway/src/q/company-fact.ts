@@ -24,7 +24,46 @@ type CompanyRead = {
   readonly shortDescription?: unknown;
   readonly primaryDescription?: unknown;
   readonly relationToYou?: unknown;
+  readonly team?: unknown;
 };
+
+/**
+ * The team as the company's page shows it (QA F-16, live 2026-10-23: on
+ * Silo Credit's page, Team showing 4 members, Q said the team was not
+ * known). Present only when get_company could read it for them; said
+ * before the description so a long description never cuts it off.
+ */
+function teamLine(team: unknown): string | null {
+  if (!Array.isArray(team)) return null;
+  if (team.length === 0) return "No team members are recorded on its page.";
+  const members = team.slice(0, 8).flatMap((member: unknown) => {
+    if (typeof member !== "object" || member === null) return [];
+    const one = member as {
+      readonly name?: unknown;
+      readonly businessTitle?: unknown;
+      readonly isFounder?: unknown;
+      readonly shortBio?: unknown;
+    };
+    const name = text(one.name);
+    if (name === null) return [];
+    const roles = [
+      ...(text(one.businessTitle) === null ? [] : [text(one.businessTitle)]),
+      ...(one.isFounder === true ? ["founder"] : []),
+    ];
+    const bio = text(one.shortBio);
+    return [
+      `${name}${roles.length === 0 ? "" : ` (${roles.join(", ")})`}${
+        bio === null ? "" : `: ${bio.slice(0, 160)}`
+      }`,
+    ];
+  });
+  if (members.length === 0) return null;
+  const more =
+    team.length > members.length
+      ? `; and ${String(team.length - members.length)} more`
+      : "";
+  return `Team, as its page shows it (${String(team.length)}): ${members.join("; ")}${more}.`;
+}
 
 const text = (value: unknown): string | null =>
   typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -55,11 +94,12 @@ export function onScreenCompanyFact(
   const description =
     text(read.primaryDescription) ?? text(read.shortDescription);
   const own = read.relationToYou === "OWN";
+  const team = teamLine(read.team);
   return {
     scope: "COMPANY_PROFILE",
     statement: `${own ? "Their own company" : label}: ${name}${
       parts.length === 0 ? "" : ` -- ${parts.join("; ")}`
-    }.${description === null ? "" : ` As the company describes itself: ${description}`}`.slice(
+    }.${team === null ? "" : ` ${team}`}${description === null ? "" : ` As the company describes itself: ${description}`}`.slice(
       0,
       2_000,
     ),

@@ -60,6 +60,12 @@ export const GetQCardOutputSchema = z
     publicPath: z.string().max(80).nullable(),
     findableBySearchEngines: z.boolean().nullable(),
     updatedAt: UtcTimestampSchema.nullable(),
+    /**
+     * NOT_MADE only (QA F-34): a handle made from their organisation's own
+     * name, to offer the card right there; availability is checked when
+     * the claim is prepared. Absent when no usable name.
+     */
+    suggestedHandle: HandleSchema.nullable().optional(),
   })
   .strict();
 export type GetQCardOutput = z.infer<typeof GetQCardOutputSchema>;
@@ -117,6 +123,46 @@ export async function ownSubject(
   return owned.size === 1 && only !== undefined ? only : null;
 }
 
+/** Their own organisation's name, for a suggested handle. */
+async function ownName(
+  ports: Pick<QToolPorts, "companies" | "investors">,
+  grant: Grant,
+): Promise<string | null> {
+  if (grant.subjectType === "COMPANY") {
+    const id = CompanyIdSchema.safeParse(grant.subjectId);
+    if (!id.success) return null;
+    return (
+      (await ports.companies.findCanonicalCompanyProfile(id.data))
+        ?.canonicalName ?? null
+    );
+  }
+  const id = InvestorOrganisationIdSchema.safeParse(grant.subjectId);
+  if (!id.success) return null;
+  return (
+    (await ports.investors.findCanonicalInvestorOrganisation(id.data))
+      ?.displayName ?? null
+  );
+}
+
+/**
+ * A handle from a name, the card page's own shape: 3 to 30 lowercase
+ * letters, digits or single hyphens, no hyphen at either end. "(fictional)"
+ * and other bracketed notes are left out. Null when nothing usable is left.
+ */
+export function handleFrom(name: string): string | null {
+  const handle = name
+    .replace(/\([^)]*\)/gu, " ")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, "-")
+    .replace(/^-+|-+$/gu, "")
+    .slice(0, 30)
+    .replace(/-+$/gu, "");
+  const parsed = HandleSchema.safeParse(handle);
+  return parsed.success ? parsed.data : null;
+}
+
 export function createGetQCardTool(
   ports: Pick<QToolPorts, "companies" | "investors">,
   cards: QCardReadPort,
@@ -127,7 +173,7 @@ export function createGetQCardTool(
     status: "ACTIVE",
     providerName: "get_q_card",
     description:
-      "Reads their own Q Card: whether it has been made and saved, its handle, where it is shared from, and whether search engines may find it. Call it when they ask about their card or handle. NOT_MADE means no card yet; a handle waiting for their approval is not saved until they approve it.",
+      "Reads their own Q Card: whether it has been made and saved, its handle, where it is shared from, and whether search engines may find it. Call it when they ask about their card or handle. NOT_MADE means no card yet: offer to make it now (claim_q_card_handle with suggestedHandle, or the handle they want), never only say it has not been made; a handle waiting for their approval is not saved until they approve it.",
     classification: "READ_ONLY",
     riskClass: "SAFE_READ",
     // card.view on their own organisation, checked by the service.
@@ -149,12 +195,15 @@ export function createGetQCardTool(
     execute: async (_input, { actor }, grant) => {
       const card = await cards.getCard(actor, grant);
       if (card === null) {
+        const name = await ownName(ports, grant).catch(() => null);
+        const suggested = name === null ? null : handleFrom(name);
         return {
           status: "NOT_MADE",
           handle: null,
           publicPath: null,
           findableBySearchEngines: null,
           updatedAt: null,
+          ...(suggested === null ? {} : { suggestedHandle: suggested }),
         };
       }
       return {

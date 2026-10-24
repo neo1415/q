@@ -306,7 +306,9 @@ export function createQActionNarrator(dependencies: {
     const definition = registry.get(action.actionType);
     if (definition?.proposed === undefined) return null;
     const payload = definition.payload.safeParse(action.payload);
-    return payload.success ? definition.proposed(payload.data) : null;
+    return payload.success
+      ? definition.proposed(payload.data, action.summary)
+      : null;
   };
 
   return {

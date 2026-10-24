@@ -39,7 +39,7 @@ describe("the readiness lead's copy (lane ml)", () => {
 describe("TURN_READER v52: next steps read by meaning", () => {
   it("is the active reader and carries the nextSteps rule", () => {
     const active = createDefaultPromptRegistry().getActive("TURN_READER");
-    expect(active.definition.version).toBe(58);
+    expect(active.definition.version).toBe(61);
     expect(active.definition.template).toContain(V52_NEXT_STEPS);
     expect(V52_NEXT_STEPS).toMatch(/false for every other question/u);
     expect(V52_NEXT_STEPS).toMatch(/explain a SAFE/u);

@@ -93,6 +93,17 @@ describe("L-3: the live preview in the thread", () => {
     expect(container.querySelector("[data-q-preview]")).toBeNull();
     expect(container.querySelector("[data-q-table]")).not.toBeNull();
   });
+
+  it("is drawn once: where the stage draws the pictures, not in the thread too (U2)", () => {
+    const { container } = render(
+      <QAnswer
+        turn={turn({ streaming: true, preview: PREVIEW })}
+        mark={false}
+        picturesInline={false}
+      />,
+    );
+    expect(container.querySelector("[data-q-preview]")).toBeNull();
+  });
 });
 
 describe("L-11: what the thread has drawn", () => {

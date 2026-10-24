@@ -34,6 +34,8 @@ type Row = {
   readonly country: string;
   /** Fit band strength for the investor's mandate. */
   readonly strong: number;
+  /** States a current raise this reader may see. */
+  readonly raising?: boolean;
 };
 
 const CATALOG: readonly Row[] = [
@@ -93,7 +95,12 @@ function outcome(
 
 /** The catalog and fit tools as the tool port answers them. */
 function tools(
-  options: { mandate?: boolean; rows?: readonly Row[]; ranks?: boolean } = {},
+  options: {
+    mandate?: boolean;
+    rows?: readonly Row[];
+    ranks?: boolean;
+    raises?: boolean;
+  } = {},
 ) {
   const rows = options.rows ?? CATALOG;
   const asked: { name: string; args: Record<string, unknown> }[] = [];
@@ -108,12 +115,15 @@ function tools(
         // A catalog that ranks (`ranks`) scores every match on the
         // mandate and returns the best first, with how many matched.
         const byFit = options.ranks === true && args["order"] === "FIT";
-        const all = rows
-          .filter(
-            (row) =>
-              (sectors.length === 0 || sectors.includes(row.sector)) &&
-              (countries.length === 0 || countries.includes(row.country)),
-          )
+        const visible = rows.filter(
+          (row) =>
+            (sectors.length === 0 || sectors.includes(row.sector)) &&
+            (countries.length === 0 || countries.includes(row.country)),
+        );
+        // A catalog that reads raises keeps only those stating one.
+        const filtering = options.raises === true && args["raising"] === true;
+        const all = visible
+          .filter((row) => !filtering || row.raising === true)
           .sort((a, b) =>
             byFit
               ? b.strong - a.strong || a.name.localeCompare(b.name)
@@ -134,7 +144,12 @@ function tools(
                     sectors: [SECTOR_NAMES[row.sector] ?? row.sector],
                   })),
             order: byFit ? "FIT" : "NAME",
-            ...(byFit ? { total: all.length, totalAtLeast: false } : {}),
+            ...(byFit || filtering
+              ? { total: all.length, totalAtLeast: false }
+              : {}),
+            ...(filtering
+              ? { raising: { filter: "APPLIED", matched: visible.length } }
+              : {}),
             sectors: known.map((code) => ({
               code,
               name: SECTOR_NAMES[code] ?? code,
@@ -202,6 +217,7 @@ async function discover(
     investor?: boolean;
     rows?: readonly Row[];
     ranks?: boolean;
+    raises?: boolean;
   } = {},
 ) {
   const port = tools(options);
@@ -480,5 +496,65 @@ describe("an investor's discovery ranks every match, not the first page by name 
     expect(names(answer.block)).toHaveLength(3);
     expect(names(answer.block)[0]).toBe("Zenith Pay");
     expect(fitCalls(asked)).toBe(3);
+  });
+});
+
+describe("raising now (F-10): only the companies stating a current raise, labelled", () => {
+  const rows: readonly Row[] = CATALOG.map((row) =>
+    row.name === "Kora" || row.name === "Ajopot"
+      ? { ...row, raising: true }
+      : row,
+  );
+  const raisingAsk = ask({
+    text: "Any fintech companies raising now?",
+    count: null,
+    raising: true,
+  });
+
+  it("lists only those stating a raise, ranked, and says the rest are unknown", async () => {
+    const { answer, asked } = await discover(raisingAsk, {
+      rows,
+      ranks: true,
+      raises: true,
+    });
+    const catalogCall = asked.find(
+      (call) => call.name === "discover_companies",
+    );
+    expect(catalogCall?.args["raising"]).toBe(true);
+    expect(names(answer.block)).toEqual(["Kora", "Ajopot"]);
+    expect(answer.block?.title).toBe(
+      "Fintech companies stating a current raise: fit against your mandate",
+    );
+    expect(answer.text).toMatch(
+      /^Two fintech companies stating a current raise on Capital Q, ranked by fit with your mandate: Kora at [\d.]+ and Ajopot at [\d.]+\./u,
+    );
+    expect(answer.text).toMatch(
+      /haven't shared a raise with you, so whether they're raising is unknown\./u,
+    );
+    expect(answer.text).not.toMatch(/not raising|aren't raising/u);
+  });
+
+  it("none stating one: no cards, and unknown is never 'not raising'", async () => {
+    const { answer } = await discover(raisingAsk, {
+      ranks: true,
+      raises: true,
+    });
+    expect(answer.block).toBeNull();
+    expect(answer.text).toMatch(
+      /^None of the \w+ fintech companies you can see on Capital Q states a current raise/u,
+    );
+    expect(answer.text).toMatch(/That isn't the same as not raising/u);
+  });
+
+  it("a founder's raising list is filtered and labelled the same way, by name", async () => {
+    const { answer } = await discover(raisingAsk, {
+      rows,
+      raises: true,
+      investor: false,
+    });
+    expect(names(answer.block)).toEqual(["Ajopot", "Kora"]);
+    expect(answer.text).toMatch(
+      /^Capital Q has only two fintech companies stating a current raise: Ajopot and Kora\./u,
+    );
   });
 });

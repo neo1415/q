@@ -260,6 +260,38 @@ describe("public web research service", () => {
     expect(injected?.excerpt).toContain("Ignore all previous instructions");
   });
 
+  // Owner 2026-10-23: "if they say the top one, find out who the top one
+  // is, get the name, and pass that to the search". A name Q showed them
+  // may leave; one nobody said may not.
+  it("searches by the name Q showed them when they point at it, and never a name nobody said", async () => {
+    const ask = async (shownText: readonly string[] | undefined) => {
+      const provider = createFakeResearchProvider({ pages: PAGES });
+      const service = createPublicWebResearchService({
+        provider,
+        clock: () => NOW,
+      });
+      await service.research({
+        actor,
+        runId: "run-shown",
+        correlationId: CORRELATION,
+        requestedQuery: "Why might the top one pass on us?",
+        entityName: "Savanna Seed Partners",
+        userText: "Why might the top one pass on us?",
+        shownText,
+        subject: null,
+      });
+      return provider.searches.map((search) => search.query);
+    };
+    const shown = await ask([
+      "Here are the investors you're talking to: 1. Savanna Seed Partners, 2. Harbourline Capital.",
+    ]);
+    expect(shown).toContain("savanna seed partners");
+    // Never Q's other words.
+    expect(shown.join(" ")).not.toMatch(/harbourline|investors/iu);
+    const unsaid = await ask(undefined);
+    expect(unsaid.join(" ")).not.toMatch(/savanna/iu);
+  });
+
   it("refuses to search when nothing safe can leave, without calling the provider", async () => {
     const provider = createFakeResearchProvider({ pages: PAGES });
     const service = createPublicWebResearchService({

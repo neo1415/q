@@ -180,11 +180,10 @@ export function EntityAvatar({
     state.chain === chain ? state : { chain, at: 0, loaded: false };
   const source = sources[current.at] ?? null;
   const showImage = source !== null;
-  // A site's logo is drawn whole on the plain surface, never cropped.
-  const isLogo =
-    source !== null &&
-    companyId !== undefined &&
-    source === companyLogoPath(companyId);
+  // A logo is drawn whole on the plain surface, never cropped: a site's
+  // logo, and a company's own picture, which is its logo (live 23 Oct: a
+  // wordmark cropped to a circle read "lo C" for Silo Credit).
+  const isLogo = source !== null && kind === "company";
   // People are round; organisations are a rounded square, as on their
   // profile. A company keeps the round frame Discover already uses.
   const shape = kind === "investor" ? "rounded-md" : "rounded-full";

@@ -36,7 +36,10 @@ import {
   Q_TOOL_LOOP_MAX_ROUNDS,
   type QAuthorisedContextPort,
 } from "../src/q/index.js";
-import { firstContactOf } from "../src/q/first-contact.js";
+import { FIRST_CONTACT_REPLY, firstContactOf } from "../src/q/first-contact.js";
+import { onScreenCompanyFact } from "../src/q/company-fact.js";
+import { chatInsteadOf } from "../src/q/message-channel.js";
+import { qCardOfferOf } from "../src/q/q-card-offer.js";
 import { TENANT, testCatalog, USER } from "./fixtures.js";
 import { fitFixture } from "./fit-fixture.js";
 
@@ -1325,7 +1328,7 @@ describe("answer seam tool loop", () => {
               };
         },
       );
-      const { seam, alpha, request } = build({
+      const { seam, alpha, request, messages } = build({
         said: "Draft a short note to the founders of Anchor saying I'd like a call next week",
         script: [
           {
@@ -1346,6 +1349,7 @@ describe("answer seam tool loop", () => {
       return {
         executed: tools.executed.map((p) => [p.name, p.arguments]),
         second: JSON.stringify(alpha.calls[1]?.request.messages ?? []),
+        reply: messages.at(-1)?.content ?? "",
       };
     };
 
@@ -1360,6 +1364,15 @@ describe("answer seam tool loop", () => {
       expect(second).toContain("Express interest in Anchor");
       expect(second).toContain("The note they asked for goes with it");
       expect(second).toContain("Nothing is sent until they approve");
+    });
+
+    it("replies in code's own words: never names a tool or asks permission for what was asked (QO-08)", async () => {
+      const { reply } = await run({ chat: "NOT_CONNECTED" });
+      expect(reply).toBe(FIRST_CONTACT_REPLY);
+      expect(reply).not.toMatch(/tool|want me to|would you like/iu);
+      // Nothing prepared by code: the model's own answer stands.
+      const { reply: own } = await run({ chat: "PREPARED" });
+      expect(own).not.toBe(FIRST_CONTACT_REPLY);
     });
 
     it("never cuts a note longer than an interest note: the interest goes without it", () => {
@@ -2944,5 +2957,218 @@ describe("findings and cards written beside the answer (owner 2026-10-22)", () =
       inputTokens: 2000,
       outputTokens: 200,
     });
+  });
+});
+
+describe("a company's team reaches the answer as its page shows it (QA F-16)", () => {
+  it("says the team before the description, and says plainly when none is recorded", () => {
+    const fact = onScreenCompanyFact({
+      canonicalName: "Silo Credit",
+      relationToYou: "SHARED",
+      primaryDescription: "x".repeat(3_000),
+      team: [
+        {
+          name: "Amina Bello",
+          businessTitle: "CEO",
+          isFounder: true,
+          shortBio: "Ran grain trading at a Kano co-op.",
+        },
+        {
+          name: "Tunde Ade",
+          businessTitle: null,
+          isFounder: false,
+          shortBio: null,
+        },
+      ],
+    });
+    expect(fact?.statement).toContain(
+      "Team, as its page shows it (2): Amina Bello (CEO, founder): Ran grain trading at a Kano co-op.; Tunde Ade.",
+    );
+    expect(
+      onScreenCompanyFact({ canonicalName: "Silo Credit", team: [] })
+        ?.statement,
+    ).toContain("No team members are recorded on its page.");
+    // Not read for them: nothing said about a team at all.
+    expect(
+      onScreenCompanyFact({ canonicalName: "Silo Credit" })?.statement,
+    ).not.toContain("Team");
+  });
+});
+
+describe("an email their mailbox cannot send goes through the Capital Q conversation (QA F-32)", () => {
+  const tool = (name: string, toolName: string): QOfferedTool => ({
+    ...GET_COMPANY,
+    toolName,
+    classification: "SIDE_EFFECT",
+    definition: { ...GET_COMPANY.definition, name },
+  });
+  const EMAIL = tool("propose_email", "relationship.email.propose");
+  const CHAT = tool("propose_chat_message", "relationship.chat.propose");
+  const BODY = "Hello Amara, thank you for asking. Best, Wanjiru";
+
+  it("prepares the same words as a Capital Q message, and tells the model not to send them to Gmail", async () => {
+    const tools = toolPort([EMAIL, CHAT], (p) =>
+      p.name === "propose_email"
+        ? {
+            ...succeeded(p, {
+              status: "MAILBOX_NOT_CONNECTED",
+              awaitingApprovalOf:
+                "Connect Gmail in Settings, then I can prepare this email for you to approve.",
+            }),
+            toolName: "relationship.email.propose",
+          }
+        : {
+            ...succeeded(p, {
+              status: "PREPARED",
+              awaitingApprovalOf: "Send a message to Savanna Seed Partners",
+            }),
+            toolName: "relationship.chat.propose",
+          },
+    );
+    const { seam, alpha, request } = build({
+      said: "Send it to them.",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "e",
+              name: "propose_email",
+              arguments: {
+                counterpartName: "Savanna Seed Partners",
+                subject: "Kiosk economics",
+                body: BODY,
+              },
+            },
+          ],
+        },
+        { kind: "JSON", value: analystResult("prepared") },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(tools.executed.map((p) => [p.name, p.arguments])).toEqual([
+      [
+        "propose_email",
+        {
+          counterpartName: "Savanna Seed Partners",
+          subject: "Kiosk economics",
+          body: BODY,
+        },
+      ],
+      [
+        "propose_chat_message",
+        { counterpartName: "Savanna Seed Partners", body: BODY },
+      ],
+    ]);
+    const second = JSON.stringify(alpha.calls[1]?.request.messages ?? []);
+    expect(second).toContain("prepared the same words as a message");
+    expect(second).toContain("Do not tell them to connect Gmail");
+  });
+
+  it("leaves a prepared email alone, and a reply to an inbound email", () => {
+    const prepared = succeeded(
+      { callId: "e", name: "propose_email", arguments: {} },
+      { status: "PREPARED", awaitingApprovalOf: "Email them" },
+    );
+    expect(
+      chatInsteadOf(
+        { name: "propose_email", arguments: { companyId: "c", body: "Hi" } },
+        prepared,
+      ),
+    ).toBeNull();
+    const noMailbox = succeeded(
+      { callId: "e", name: "propose_email", arguments: {} },
+      { status: "MAILBOX_NOT_CONNECTED", awaitingApprovalOf: "Connect Gmail" },
+    );
+    expect(
+      chatInsteadOf(
+        {
+          name: "propose_email",
+          arguments: { inboundEmailId: "i", body: "Hi" },
+        },
+        noMailbox,
+      ),
+    ).toBeNull();
+    expect(
+      chatInsteadOf(
+        { name: "propose_email", arguments: { companyId: "c", body: " Hi " } },
+        noMailbox,
+      ),
+    ).toEqual({ companyId: "c", body: "Hi" });
+  });
+});
+
+describe("no Q Card yet: one is prepared right there for approval (QA F-34)", () => {
+  const tool = (name: string, toolName: string): QOfferedTool => ({
+    ...GET_COMPANY,
+    toolName,
+    definition: { ...GET_COMPANY.definition, name },
+  });
+  const READ = tool("get_q_card", "q_card.get");
+  const CLAIM = {
+    ...tool("claim_q_card_handle", "app.q_card.handle.claim"),
+    classification: "SIDE_EFFECT" as const,
+  };
+
+  it("prepares the claim with the suggested handle and tells the model not to ask what to take on", async () => {
+    const tools = toolPort([READ, CLAIM], (p) =>
+      p.name === "get_q_card"
+        ? {
+            ...succeeded(p, {
+              status: "NOT_MADE",
+              handle: null,
+              publicPath: null,
+              findableBySearchEngines: null,
+              updatedAt: null,
+              suggestedHandle: "maji-loop",
+            }),
+            toolName: "q_card.get",
+          }
+        : {
+            ...succeeded(p, { status: "PREPARED", says: "Claim @maji-loop" }),
+            toolName: "app.q_card.handle.claim",
+          },
+    );
+    const { seam, alpha, request } = build({
+      said: "Show my Q Card.",
+      script: [
+        {
+          kind: "TOOL_CALLS",
+          calls: [
+            {
+              callId: "q",
+              name: "get_q_card",
+              arguments: { subject: "COMPANY" },
+            },
+          ],
+        },
+        { kind: "JSON", value: analystResult("prepared") },
+      ],
+      tools,
+    });
+    expect((await seam.answer(request)).kind).toBe("ANSWERED");
+    expect(tools.executed.map((p) => [p.name, p.arguments])).toEqual([
+      ["get_q_card", { subject: "COMPANY" }],
+      ["claim_q_card_handle", { subject: "COMPANY", handle: "maji-loop" }],
+    ]);
+    const second = JSON.stringify(alpha.calls[1]?.request.messages ?? []);
+    expect(second).toContain(
+      "prepared one for their approval with the handle @maji-loop",
+    );
+    expect(second).toContain("Do not ask what to take on");
+  });
+
+  it("offers nothing for a card already made", () => {
+    const saved = succeeded(
+      { callId: "q", name: "get_q_card", arguments: {} },
+      { status: "SAVED", handle: "maji-loop" },
+    );
+    expect(
+      qCardOfferOf(
+        { name: "get_q_card", arguments: { subject: "COMPANY" } },
+        saved,
+      ),
+    ).toBeNull();
   });
 });

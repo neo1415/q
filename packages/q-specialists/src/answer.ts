@@ -825,6 +825,17 @@ export type SpecialistQAnswerDependencies = {
   readonly counterpartNames?:
     ((request: QAnswerRequest) => Promise<readonly string[]>) | undefined;
   /**
+   * Coordinator 23 Oct 2026: a move to their pipeline says what is in it
+   * first (pipeline-summary.ts), from their own relationships as their side
+   * may see them. Null or absent: the move is said alone.
+   */
+  readonly destinationSummary?:
+    | ((
+        request: QAnswerRequest,
+        destination: QNavigateDestination,
+      ) => Promise<string | null>)
+    | undefined;
+  /**
    * One app action's inputs from the person's words, against the tool's own
    * input schema (APP_ACTION_ARGUMENTS), for a reading that named the
    * action and gave no arguments. Null: their words don't give them.
@@ -2006,11 +2017,18 @@ export function createSpecialistQAnswer(
         { qRunId: request.runId, destination },
         "q is taking the person to a screen",
       );
+      const blocks: QResultBlock[] = [
+        { kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } },
+      ];
       return recordAnswer(
         request,
         conversationId,
-        naturalPlaceLine(DESTINATION_LINES[destination], askedIn(history)),
-        [{ kind: "UI_INTENT", intent: { kind: "NAVIGATE", destination } }],
+        await withDestinationSummary(
+          request,
+          naturalPlaceLine(DESTINATION_LINES[destination], askedIn(history)),
+          blocks,
+        ),
+        blocks,
       );
     }
     if (
@@ -2111,6 +2129,27 @@ export function createSpecialistQAnswer(
    * code from the person's own words (page-request.ts). Null when the
    * words are not such a request, or name a screen this run cannot open.
    */
+  /** One line of what is there, before the move, when Q has it. */
+  const withDestinationSummary = async (
+    request: QAnswerRequest,
+    said: string,
+    blocks: readonly QResultBlock[],
+  ): Promise<string> => {
+    const moved = blocks.find(
+      (block) => block.kind === "UI_INTENT" && block.intent.kind === "NAVIGATE",
+    );
+    const destination =
+      moved?.kind === "UI_INTENT" && moved.intent.kind === "NAVIGATE"
+        ? moved.intent.destination
+        : null;
+    if (destination === null || dependencies.destinationSummary === undefined)
+      return said;
+    const summary = await dependencies
+      .destinationSummary(request, destination)
+      .catch(() => null);
+    return summary === null ? said : `${summary} ${said}`;
+  };
+
   const pageAnswer = (
     text: string,
     history: readonly QConversationMessage[],
@@ -2779,16 +2818,23 @@ export function createSpecialistQAnswer(
    * way round.
    */
   const heldRuns = new Map<string, "HINT" | "NAMED">();
-  const sayHolding = (request: QAnswerRequest, name: string | null): void => {
+  const sayHolding = (
+    request: QAnswerRequest,
+    name: string | null,
+    /** v7 skim: they asked Q to write or send something (QA F-23). */
+    writes = false,
+  ): void => {
     const deltas = dependencies.deltas;
     if (deltas === undefined) return;
     const held = heldRuns.get(request.runId);
-    if (held === "NAMED" || (held === "HINT" && name === null)) return;
+    if (held === "NAMED" || (held === "HINT" && name === null && !writes)) {
+      return;
+    }
     if (request.writingDocument === true || request.askedAction !== undefined) {
       return;
     }
     if (request.plan.screen?.route === "ONBOARDING") return;
-    heldRuns.set(request.runId, name === null ? "HINT" : "NAMED");
+    heldRuns.set(request.runId, name === null && !writes ? "HINT" : "NAMED");
     while (heldRuns.size > PREREADS_MAX) {
       const oldest = heldRuns.keys().next().value;
       if (oldest === undefined) break;
@@ -2798,8 +2844,11 @@ export function createSpecialistQAnswer(
       runId: request.runId,
       tenantId: request.tenantId,
       messageId: QMessageIdSchema.parse(randomUUID()),
-      text:
-        name === null
+      text: writes
+        ? name === null
+          ? "Drafting that now. "
+          : `Drafting that note to ${name.slice(0, 60)} now. `
+        : name === null
           ? "Looking into that now. "
           : `Looking into ${name.slice(0, 60)} now. `,
       holding: true,
@@ -3670,7 +3719,12 @@ export function createSpecialistQAnswer(
         { qRunId: request.runId, page: paged.log },
         "q opened a page by name",
       );
-      return recordAnswer(request, conversationId, paged.said, paged.blocks);
+      return recordAnswer(
+        request,
+        conversationId,
+        await withDestinationSummary(request, paged.said, paged.blocks),
+        paged.blocks,
+      );
     }
     saidInRun.set(request.runId, latest.content);
     while (saidInRun.size > PREREADS_MAX) {
@@ -3847,8 +3901,11 @@ export function createSpecialistQAnswer(
           const name =
             skimmed?.subject?.name ??
             (skimmed?.kind === "PERSON_SEARCH" ? skimmed.person?.name : null);
+          const writes = skimmed?.writes === true;
           if (!readingLanded && typeof name === "string") {
-            sayHolding(request, name.trim().slice(0, 60));
+            sayHolding(request, name.trim().slice(0, 60), writes);
+          } else if (!readingLanded && writes) {
+            sayHolding(request, null, true);
           }
         },
         () => undefined,
@@ -3949,6 +4006,10 @@ export function createSpecialistQAnswer(
           earlierNotForQ: read.earlierNotForQ ?? false,
           research: (await research).mode,
           tool: read.tool?.kind ?? null,
+          teamJob: read.teamJob ?? false,
+          meetingPrep: read.meetingPrep != null,
+          namedOther: read.namedOther != null,
+          fromShown: read.fromShown?.turn ?? null,
         },
         "q turn read",
       );
@@ -4102,6 +4163,36 @@ export function createSpecialistQAnswer(
           };
     }
     unclearInARow.delete(conversationId);
+    // Getting ready for a call with one named counterpart (TURN_READER v58
+    // meetingPrep, by meaning) is prepared now, in the answer, ahead of
+    // any team job (owner 2026-10-23: Q offered to plan it instead) and of
+    // an answer from what Q already showed (live 20:31: after a list of
+    // investors, the prep was answered as a generic follow-up). When it
+    // cannot be prepared, the turn goes on as before.
+    const prepFor =
+      read === null || read.confidence === "LOW" || read.addressedToQ === false
+        ? null
+        : (read.meetingPrep?.counterpart ?? null);
+    if (dependencies.callPrep !== undefined && prepFor !== null) {
+      const startedAt = Date.now();
+      const prep = await dependencies.callPrep.prepare(request, {
+        counterpart: prepFor,
+        said: latest.content,
+      });
+      logger?.info(
+        {
+          qRunId: request.runId,
+          prepared: prep !== null,
+          waiting: prep?.waiting.length ?? 0,
+          prepMs: Date.now() - startedAt,
+        },
+        "q prepared a call",
+      );
+      if (prep !== null) {
+        speculative.current?.cancel("ACTED");
+        return recordAnswer(request, conversationId, callPrepLine(prep));
+      }
+    }
     // Owner live 2026-10-17 (conversation 971c5a53): the reader found the
     // turn answered by one of Q's own earlier turns here (v54 fromShown).
     // "Show me the cards again" shows that turn's own blocks -- the same
@@ -4242,7 +4333,15 @@ export function createSpecialistQAnswer(
       read !== null && read.confidence !== "LOW"
         ? (read.reference ?? null)
         : null;
-    if (reference !== null && reference.open !== null) {
+    // A question about a record is answered, never opened (QA F-41, live
+    // 2026-10-23: "Tell me more about the second one" opened its page and
+    // the conversation moved with it). The reading's own kind decides: a
+    // question to Q or a request to look something up is answered with
+    // the record bound as a note; the record opens only for a turn that
+    // asks Q to do something or answers Q.
+    const asksAboutIt =
+      read?.kind === "QUESTION_TO_Q" || read?.kind === "RESEARCH_REQUEST";
+    if (reference !== null && reference.open !== null && !asksAboutIt) {
       const opened = await openReferenced(
         request,
         conversationId,
@@ -4271,33 +4370,6 @@ export function createSpecialistQAnswer(
         reference.sameFor,
       );
       if (again !== null) return again;
-    }
-    // Getting ready for a call with one named counterpart (TURN_READER v58
-    // meetingPrep, by meaning) is prepared now, in the answer, ahead of
-    // any team job (owner 2026-10-23: Q offered to plan it instead). When
-    // it cannot be prepared, the turn goes on as before.
-    const prepFor =
-      read === null || read.confidence === "LOW" || read.addressedToQ === false
-        ? null
-        : (read.meetingPrep?.counterpart ?? null);
-    if (dependencies.callPrep !== undefined && prepFor !== null) {
-      const startedAt = Date.now();
-      const prep = await dependencies.callPrep.prepare(request, {
-        counterpart: prepFor,
-        said: latest.content,
-      });
-      logger?.info(
-        {
-          qRunId: request.runId,
-          prepared: prep !== null,
-          waiting: prep?.waiting.length ?? 0,
-          prepMs: Date.now() - startedAt,
-        },
-        "q prepared a call",
-      );
-      if (prep !== null) {
-        return recordAnswer(request, conversationId, callPrepLine(prep));
-      }
     }
     // Work handed to Q's team -- read from meaning (TURN_READER v49
     // teamJob), or a sentence naming three kinds of work as a fast path --

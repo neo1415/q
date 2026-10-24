@@ -28,6 +28,7 @@ import {
 
 import {
   defineAppAction,
+  readyToSendLine,
   portMissing,
   refusal,
   relationshipTarget,
@@ -496,6 +497,7 @@ const ACCEPT = defineAppAction<
         : `Accept this call time with ${names.counterpart}`,
     preview: `Time ${String(input.input.optionIndex + 1)} of those proposed. Accepting confirms it for both sides.`,
   }),
+  proposed: (_input, summary) => readyToSendLine(summary, null),
   succeeded: (out) => out.outcome === "OK",
   done: (out) =>
     out.outcome !== "OK"

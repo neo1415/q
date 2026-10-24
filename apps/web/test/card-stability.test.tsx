@@ -168,13 +168,11 @@ describe("INC-1: one run, one set, kept while Q speaks", () => {
       ]),
     );
     expect(onStageCards()).toEqual({ answer: "a1", n: 3 });
-    // Still one set in "Shown recently", not three.
-    await userEvent.click(
-      screen.getByRole("button", { name: /Shown recently/u }),
-    );
+    // One set, drawn once: on the stage, and not listed again beside it
+    // under "Shown recently" (F-35, QA 2026-10-23).
     expect(
-      screen.getAllByRole("button", { name: "Top three for your mandate" }),
-    ).toHaveLength(1);
+      screen.queryByRole("button", { name: /Shown recently/u }),
+    ).toBeNull();
   });
 
   it("a newer turn's 10 cards replace, never merge into, the 3; the 3 stay one tap away", async () => {
@@ -238,12 +236,11 @@ describe("INC-1: one run, one set, kept while Q speaks", () => {
     rerender(
       stage([answer("g1", "run-9", "Good evening, Zino. Good to see you.")]),
     );
+    // Kept on the stage, and so not listed again under "Shown recently"
+    // (F-35, QA 2026-10-23).
     expect(onStageCards()).toEqual({ answer: "a1", n: 3 });
-    await userEvent.click(
-      screen.getByRole("button", { name: /Shown recently/u }),
-    );
     expect(
-      screen.getByRole("button", { name: "Top three for your mandate" }),
-    ).toBeTruthy();
+      screen.queryByRole("button", { name: /Shown recently/u }),
+    ).toBeNull();
   });
 });

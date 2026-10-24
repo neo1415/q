@@ -2,7 +2,14 @@ import type { ProfileMaterialPort } from "./tools/profile-material.js";
 import type { OnboardingTranscriptPort } from "./tools/onboarding-transcript.js";
 import type { PreferenceLearningPort } from "./tools/preference-learning.js";
 import type { AttentionPort } from "./tools/attention.js";
-import type { InvestorGateFitDto } from "@capital-q/contracts";
+import type {
+  AddBoardItemRequest,
+  BoardItem,
+  BoardList,
+  InvestorGateFitDto,
+  MoveBoardItemRequest,
+  UpdateBoardItemRequest,
+} from "@capital-q/contracts";
 
 /** Q.05: published gates for the actor's own (founder) company. */
 export type InvestorGatesPort = {
@@ -437,6 +444,32 @@ export type CompanyFiguresPort = {
   ) => Promise<readonly CompanyFigure[]>;
 };
 
+/**
+ * A company's team as its page shows it (ADR 0041's allow-listed
+ * projection, QA F-16 2026-10-23). The composition applies the page's own
+ * rule: the owning organisation, or an investor the pitch rule admits;
+ * anyone else reads null, never an empty team.
+ */
+export type CompanyTeamPort = {
+  readonly teamFor: (
+    actor: ActorContext,
+    company: {
+      readonly tenantId: string;
+      readonly companyId: string;
+      readonly organisationId: string;
+    },
+  ) => Promise<
+    | readonly {
+        readonly name: string;
+        readonly relationshipType: string;
+        readonly businessTitle: string | null;
+        readonly isFounder: boolean;
+        readonly shortBio: string | null;
+      }[]
+    | null
+  >;
+};
+
 export type PitchMomentPort = {
   readonly momentAround: (
     actor: ActorContext,
@@ -606,6 +639,8 @@ export type QToolPorts = {
   readonly pitchMoments?: PitchMomentPort | undefined;
   /** A company's published figures (2026-10-23); absent means no read_company_figures. */
   readonly companyFigures?: CompanyFiguresPort | undefined;
+  /** A company's team as its page shows it (QA F-16); absent means get_company carries no team. */
+  readonly companyTeam?: CompanyTeamPort | undefined;
   /** Explore (ADR 0055): pitches like X and network search; absent means no Explore tools. */
   readonly explore?: ExploreToolPort | undefined;
   /** Who can see what (CQ-BIZ-003); absent means no visibility tool exists. */
@@ -677,6 +712,11 @@ export type QToolPorts = {
   readonly work?: QWorkIntelligencePort | undefined;
   /** WORKFORCE (J1, J4): a job the lead Q plans; absent means no job tool. */
   readonly jobs?: QJobPort | undefined;
+  /**
+   * The work board (owner 2026-10-23): the person's own items, through the
+   * same service the page calls. Absent: no board tool exists.
+   */
+  readonly board?: QBoardPort | undefined;
   // DAILY block: The Q Daily, read and set by the person's own Q.
   readonly daily?: QDailyToolPort | undefined;
   /**
@@ -1331,4 +1371,48 @@ export type ProfileChangePort = {
     readonly awaitingApprovalOf: string | null;
     readonly reason: string | null;
   }>;
+};
+
+/** A change to the person's own board, or why not (their own items only). */
+export type QBoardOutcome =
+  | {
+      readonly outcome: "OK";
+      readonly value: BoardItem;
+      readonly replayed: boolean;
+    }
+  | {
+      readonly outcome: "REFUSED";
+      readonly code: "NOT_FOUND" | "CONFLICT" | "FULL";
+    };
+
+/**
+ * The work board service as Q uses it, always as the signed-in person: Q's
+ * changes are recorded as Q's for them. The owner is the actor; no method
+ * takes a user or tenant id.
+ */
+export type QBoardPort = {
+  readonly list: (actor: ActorContext) => Promise<BoardList>;
+  readonly add: (
+    actor: ActorContext,
+    request: AddBoardItemRequest,
+    options: { readonly by: "Q"; readonly idempotencyKey: string },
+  ) => Promise<QBoardOutcome>;
+  readonly update: (
+    actor: ActorContext,
+    itemId: string,
+    request: UpdateBoardItemRequest,
+    options: { readonly by: "Q"; readonly idempotencyKey?: string | undefined },
+  ) => Promise<QBoardOutcome>;
+  readonly move: (
+    actor: ActorContext,
+    itemId: string,
+    request: MoveBoardItemRequest,
+    options: { readonly by: "Q"; readonly idempotencyKey: string },
+  ) => Promise<QBoardOutcome>;
+  readonly linkJob: (
+    actor: ActorContext,
+    itemId: string,
+    jobId: string,
+    options: { readonly idempotencyKey: string },
+  ) => Promise<QBoardOutcome>;
 };

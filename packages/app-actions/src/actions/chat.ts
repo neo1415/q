@@ -17,6 +17,7 @@ import {
 
 import {
   defineAppAction,
+  readyToSendLine,
   portMissing,
   relationshipTarget,
   type AnyAppAction,
@@ -96,6 +97,12 @@ const SEND = defineAppAction<
           ? (input.input.body ?? "An attachment, as written.")
           : "A voice note.",
   }),
+  // Outward: the words in full, ready to send (coordinator 2026-10-23).
+  proposed: (input, summary) =>
+    readyToSendLine(
+      summary,
+      input.input.kind === "VOICE_NOTE" ? null : (input.input.body ?? null),
+    ),
   done: () => "Sent.",
   http: {
     method: "POST",

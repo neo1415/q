@@ -122,9 +122,19 @@ export class OnboardingSessionStateError extends Error {
 }
 
 /** The operation needs a resolved organisation context the actor does not have. */
+/**
+ * QA F-52 (23 Oct 2026): the refusal code an answer carries when the firm or
+ * company it belongs to does not exist yet. Q holds such an answer and saves
+ * it once the firm or company is set up; it is never read out as "context".
+ */
+export const ONBOARDING_CONTEXT_REQUIRED_CODE = "onboarding_context_required";
+
 export class OnboardingContextRequiredError extends Error {
+  readonly code = ONBOARDING_CONTEXT_REQUIRED_CODE;
   constructor() {
-    super("An active organisation context is required for this action.");
+    super(
+      "This is kept and saved once the firm or company is set up; its name comes first.",
+    );
     this.name = "OnboardingContextRequiredError";
   }
 }

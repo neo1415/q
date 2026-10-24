@@ -87,6 +87,21 @@ export type QHandOverPort = {
     readonly awaitingApprovalOf: string;
   } | null>;
   /**
+   * A founder answering an investor's waiting interest (QA F-33, live
+   * 2026-10-23: "Reply to Rift Valley Seed Fund: accept their interest and
+   * suggest a call next week" was read as THEIR interest not yet accepted,
+   * and an errand was prepared). `investor` is who they named, or null.
+   * Null result: not a founder with interest waiting, or not composed.
+   * Absent: never tried.
+   */
+  readonly answerIncomingInterest?: (
+    request: QAnswerRequest,
+    investor: string | null,
+  ) => Promise<{
+    readonly status: string;
+    readonly awaitingApprovalOf: string;
+  } | null>;
+  /**
    * "Book a meeting with X" when they are already connected (action parity
    * 2026-10-02): a direct call proposal at their first free time, not an
    * errand. Null when it cannot be one (not connected, no calendar, no
@@ -258,6 +273,35 @@ export async function actOnHandOver(
         default:
           break;
       }
+    }
+  }
+  // An investor's interest waiting on this founder comes first, the same
+  // way (QA F-33): accepting it connects both sides, ONE approval, and an
+  // errand that waits for "them to accept" would be the wrong way round.
+  if (
+    port.answerIncomingInterest !== undefined &&
+    handOver.kind !== "MEETING" &&
+    (handOver.utterance === undefined ||
+      CONNECTING_WORDS.test(handOver.utterance))
+  ) {
+    const answered = await port.answerIncomingInterest(
+      request,
+      handOver.counterpartName,
+    );
+    if (answered?.status === "PREPARED") {
+      return {
+        kind: "PREPARED",
+        line: `${answered.awaitingApprovalOf}: once you approve, you're connected, and messages and calls with them open. Tell me when you'd like the call and I'll propose a time.`,
+      };
+    }
+    if (answered?.status === "ONE_PER_TURN") {
+      return {
+        kind: "PREPARED",
+        line: "Another change is already waiting for your approval in this answer; approve or decline it first, then I'll prepare this.",
+      };
+    }
+    if (answered?.status === "WHICH_ONE") {
+      return { kind: "ASK", line: answered.awaitingApprovalOf };
     }
   }
   // Their own relationships are read only when a name needs resolving or
@@ -551,6 +595,21 @@ export function createToolHandOverPort(dependencies: {
         decision: "ACCEPTED",
         openingMessage: null,
         withMessage: true,
+      });
+      if (data === null || typeof data !== "object") return null;
+      const record = data as Record<string, unknown>;
+      return typeof record["status"] === "string" &&
+        typeof record["awaitingApprovalOf"] === "string"
+        ? {
+            status: record["status"],
+            awaitingApprovalOf: record["awaitingApprovalOf"],
+          }
+        : null;
+    },
+    answerIncomingInterest: async (request, investor) => {
+      const data = await call(request, "propose_interest_answer", {
+        investor,
+        decision: "ACCEPTED",
       });
       if (data === null || typeof data !== "object") return null;
       const record = data as Record<string, unknown>;

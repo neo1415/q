@@ -428,7 +428,7 @@ describe("founder side: Tensorgate's instruction answers Zino (8 Oct)", () => {
     );
     const waiting = steps.find((step) => step.reasonCode === "REPLY_WAITING");
     expect(waiting?.words).toBe(
-      "Zino Aviation's message is waiting for a reply. I couldn't answer it on my own: they wrote to you first, and the message introduced you as if they hadn't (COLD_OPEN_IN_REPLY). Reply in the chat, or tell me what to say and I'll send it.",
+      "Zino Aviation's message is waiting for a reply. I couldn't answer it on my own: they wrote to you first, and the message introduced you as if they hadn't. Reply in the chat, or tell me what to say and I'll send it.",
     );
     expect(steps.some((step) => step.reasonCode === "NOTHING_TO_DO")).toBe(
       false,
@@ -491,13 +491,13 @@ describe("an empty plan with a reply waiting (second kick, 08:56)", () => {
     );
   });
 
-  it("empty again after the nudge: one nudge only, then the founder is told, with NO_REPLY_PLANNED", async () => {
+  it("empty again after the nudge: one nudge only, then the founder is told why, in words with no code", async () => {
     const { engine, row, planned, steps } = world([plan()]);
     await engine.fire(row.id, "sched-founder-7");
     expect(planned).toHaveLength(2);
     expect(
       steps.find((step) => step.reasonCode === "REPLY_WAITING")?.words,
-    ).toContain("my plan had no reply to them (NO_REPLY_PLANNED)");
+    ).toContain("my plan had no reply to them. Reply");
   });
 });
 
@@ -571,7 +571,7 @@ describe("a reply the reviewer holds just under the bar (11:01 kick, job 6a3fae2
     expect(steps[0]?.words).toContain("just under your bar");
   });
 
-  it("a plain hold still tells Daniel, with BELOW_THE_BAR", async () => {
+  it("a plain hold still tells Daniel why, in words, never the BELOW_THE_BAR code", async () => {
     const { engine, row, cards, steps } = world(
       [plan(reply(DRAFT_1, "MEETING"))],
       threadRead(),
@@ -579,9 +579,11 @@ describe("a reply the reviewer holds just under the bar (11:01 kick, job 6a3fae2
     );
     await engine.fire(row.id, "sched-founder-9");
     expect(cards).toHaveLength(0);
-    expect(
-      steps.find((step) => step.reasonCode === "REPLY_WAITING")?.words,
-    ).toContain("(BELOW_THE_BAR)");
+    const words = steps.find(
+      (step) => step.reasonCode === "REPLY_WAITING",
+    )?.words;
+    expect(words).toContain("didn't reach the bar for writing on your behalf");
+    expect(words).not.toContain("BELOW_THE_BAR");
   });
 });
 
