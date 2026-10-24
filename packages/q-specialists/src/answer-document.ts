@@ -81,11 +81,86 @@ function clip(text: string, max: number): string {
  * The document, or null when the answer holds no words to file (then the
  * caller says there is nothing to put in one).
  */
+/**
+ * What a piece of Q's work is, from the ask it answered: "Help me prepare
+ * for a call with the founder of Anchor" is call prep. A fixed list of the
+ * kinds Q writes, compared as words; nothing matched is null (the title
+ * then says only who it is about, or the ask itself, never "Q's answer").
+ */
+const WORK_KINDS: readonly (readonly [RegExp, string])[] = [
+  [/\b(prep(are|aring)?|ready)\b.*\bcall\b|\bcall prep\b/iu, "Call prep"],
+  [
+    /\b(prep(are|aring)?|ready)\b.*\bmeeting\b|\bmeeting prep\b/iu,
+    "Meeting prep",
+  ],
+  [
+    /\b(\d{1,2}[- ](month|year|week)\s+)?(growth|go[- ]to[- ]market|fundraising|hiring|business|action)?\s*plan\b/iu,
+    "Plan",
+  ],
+  [/\binvestment memo\b|\bic memo\b|\bmemo\b/iu, "Memo"],
+  [/\bcompar(e|ison)\b/iu, "Comparison"],
+  [/\bquestions?\b/iu, "Questions"],
+  [/\b(summary|summari[sz]e)\b/iu, "Summary"],
+  [/\b(outreach|intro(duction)?|email)\b/iu, "Outreach draft"],
+  [/\b(analysis|analy[sz]e|assessment|assess|diligence)\b/iu, "Analysis"],
+];
+
+/** "12-month growth plan" when the ask names one, else the kind's word. */
+function workKind(question: string): string | null {
+  for (const [pattern, kind] of WORK_KINDS) {
+    const found = pattern.exec(question);
+    if (found === null) continue;
+    if (kind === "Plan") {
+      const named = found[0].trim().replace(/\s+/gu, " ").toLowerCase();
+      return named.length > "plan".length
+        ? `${named.charAt(0).toUpperCase()}${named.slice(1)}`
+        : kind;
+    }
+    return kind;
+  }
+  return null;
+}
+
+/**
+ * F-73 (QA 2026-10-24): saved work is titled by what it is and who it is
+ * about -- "Call prep: Anchor", "12-month growth plan: Maji Loop" -- never
+ * "Q's answer: <the raw ask>". Q's own first heading names the piece when
+ * it gave one (with who it is about, when the heading does not say);
+ * otherwise the kind of work the ask was, with its subject; failing a
+ * kind, the subject or the ask in a few words.
+ */
+export function workTitle(input: {
+  readonly heading: string | null;
+  readonly question: string;
+  /** Who or what it is about, as resolved from records or cards; never guessed. */
+  readonly subject: string | null;
+}): string {
+  const subject = input.subject?.trim() ?? "";
+  const about = (title: string) =>
+    subject.length === 0 || title.toLowerCase().includes(subject.toLowerCase())
+      ? title
+      : `${title}: ${subject}`;
+  if (input.heading !== null && input.heading.length > 0) {
+    return about(input.heading);
+  }
+  const kind = workKind(input.question);
+  if (kind !== null) return about(kind);
+  if (subject.length > 0) return `Notes: ${subject}`;
+  const ask = input.question
+    .replace(/^(please\s+|can you\s+|could you\s+|help me\s+|i need\s+)+/iu, "")
+    .replace(/[?.!\s]+$/u, "")
+    .trim();
+  if (ask.length === 0) return "Notes from Q";
+  return `${ask.charAt(0).toUpperCase()}${ask.slice(1)}`;
+}
+
 export function composeAnswerDocument(input: {
   /** The answer, as Q wrote it (markdown). */
   readonly answer: string;
   /** What they asked, when known: the document says what it answers. */
   readonly question?: string | undefined;
+  /** Who or what the work is about, when the turn resolved it (F-73). */
+  readonly subject?: string | null | undefined;
 }): AnswerDocument | null {
   const lines = input.answer.replace(/\r\n?/g, "\n").split("\n");
   const sections: { heading: string; lines: string[] }[] = [];
@@ -118,11 +193,9 @@ export function composeAnswerDocument(input: {
   if (filed.length === 0) return null;
 
   const question = input.question?.trim().replace(/\s+/g, " ") ?? "";
-  // The first heading names the piece when Q gave it one; otherwise what
-  // was asked does, and failing both it is simply Q's answer.
-  const named = sections.find((s) => s.heading.length > 0)?.heading;
+  const named = sections.find((s) => s.heading.length > 0)?.heading ?? null;
   const title = clip(
-    named ?? (question.length > 0 ? `Q's answer: ${question}` : "Q's answer"),
+    workTitle({ heading: named, question, subject: input.subject ?? null }),
     Q_ARTIFACT_TITLE_MAX,
   );
   const summary = clip(

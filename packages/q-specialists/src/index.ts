@@ -105,6 +105,7 @@ export {
 
 export {
   answerSteps,
+  boardItemFromWords,
   createSpecialistQAnswer,
   type BoardKeeper,
   type SpecialistQAnswer,
