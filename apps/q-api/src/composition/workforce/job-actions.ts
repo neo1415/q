@@ -156,7 +156,13 @@ export function isOwnAccountWork(payload: WorkforceJobStartPayload): boolean {
 
 export type OwnWorkStart =
   | { readonly outcome: "STARTED"; readonly jobId: string }
-  | { readonly outcome: "NOT_ALLOWED" };
+  /** The plan's allowance for Q's work is used: its own plain sentence. */
+  | { readonly outcome: "NOT_ALLOWED"; readonly message: string | null };
+
+/** What the plan says about one more piece of work (billing's verdict). */
+export type OwnWorkAllowance =
+  | { readonly allowed: true }
+  | { readonly allowed: false; readonly message: string | null };
 
 /**
  * Starts the person's own deep work as durable, leased work -- the same
@@ -169,7 +175,17 @@ export function createOwnWorkStarter(dependencies: {
   readonly kick?: (() => void) | undefined;
   /** The plan's entitlement for agent work (consumed once per run). */
   readonly allowed?:
-    | ((actor: ActorContext, idempotencyKey: string) => Promise<boolean>)
+    | ((
+        actor: ActorContext,
+        idempotencyKey: string,
+      ) => Promise<OwnWorkAllowance>)
+    | undefined;
+  /**
+   * F-108: gives the unit back when the work could not be filed after it
+   * was counted -- a start that never happened does not use the allowance.
+   */
+  readonly release?:
+    | ((actor: ActorContext, idempotencyKey: string) => Promise<void>)
     | undefined;
   readonly logger?: Logger | undefined;
 }) {
@@ -184,30 +200,34 @@ export function createOwnWorkStarter(dependencies: {
       !isOwnAccountWork(payload)
     )
       return null;
-    if (
-      dependencies.allowed !== undefined &&
-      !(await dependencies.allowed(
-        actor,
-        `${WORKFORCE_JOB_START}:own:${runId}`,
-      ))
-    )
-      return { outcome: "NOT_ALLOWED" };
+    const unit = `${WORKFORCE_JOB_START}:own:${runId}`;
+    if (dependencies.allowed !== undefined) {
+      const allowance = await dependencies.allowed(actor, unit);
+      if (!allowance.allowed)
+        return { outcome: "NOT_ALLOWED", message: allowance.message };
+    }
     const owner: Owner = { tenantId: actor.tenantId, userId: actor.userId };
-    const filed = await dependencies.jobsFor(actor).file(owner, {
-      goal: payload.goal,
-      budgetUsd: Number(payload.budgetUsd),
-      source: { kind: "JOB", id: runId },
-    });
-    await dependencies.queue().enqueue(owner, {
-      jobId: filed.jobId,
-      plan: payload,
-      trace: {
-        // The runner files the job under this source again: the same job.
-        actionId: runId,
-        runId,
-        organisationId: actor.organisationId ?? undefined,
-      },
-    });
+    let filed: { readonly jobId: string };
+    try {
+      filed = await dependencies.jobsFor(actor).file(owner, {
+        goal: payload.goal,
+        budgetUsd: Number(payload.budgetUsd),
+        source: { kind: "JOB", id: runId },
+      });
+      await dependencies.queue().enqueue(owner, {
+        jobId: filed.jobId,
+        plan: payload,
+        trace: {
+          // The runner files the job under this source again: the same job.
+          actionId: runId,
+          runId,
+          organisationId: actor.organisationId ?? undefined,
+        },
+      });
+    } catch (error: unknown) {
+      await dependencies.release?.(actor, unit).catch(() => undefined);
+      throw error;
+    }
     dependencies.kick?.();
     dependencies.logger?.info(
       { jobId: filed.jobId, qRunId: runId, steps: payload.steps.length },
@@ -835,8 +855,10 @@ export function createWorkforceJobBoard(dependencies: {
           const started = await dependencies
             .startOwnWork(actor, runId, parsed.data)
             .catch(() => null);
+          // F-108: the plan's allowance, said in its own words -- never
+          // "the limit of work I can take on", which reads as Q's.
           if (started?.outcome === "NOT_ALLOWED")
-            return { status: "LIMIT_REACHED" };
+            return { status: "PLAN_LIMIT", message: started.message };
           if (started?.outcome === "STARTED") {
             prepared.set(runId, {
               tenantId: actor.tenantId,

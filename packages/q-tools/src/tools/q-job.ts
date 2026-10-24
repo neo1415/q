@@ -265,7 +265,13 @@ export type QJobPort = {
         readonly jobId?: string | undefined;
       }
     | { readonly status: "NOT_PLANNED" }
+    /** Their own monthly spending limit for Q's work is reached. */
     | { readonly status: "LIMIT_REACHED" }
+    /**
+     * F-108: their plan's allowance for Q's work this month is used; the
+     * plan's own plain sentence (counts, reset), or null.
+     */
+    | { readonly status: "PLAN_LIMIT"; readonly message: string | null }
     /**
      * Planning broke on Q's side (a model provider refused, a store was
      * unreachable): never NOT_PLANNED, which would blame their wording.
@@ -302,9 +308,12 @@ const ProposeQJobOutputSchema = z
       "ONE_PER_TURN",
       "NOT_PLANNED",
       "LIMIT_REACHED",
+      "PLAN_LIMIT",
       "ALREADY_WAITING",
       "FAILED",
     ]),
+    /** PLAN_LIMIT: the plan's own sentence (counts and reset). */
+    message: z.string().max(400).nullable().optional(),
     /** STARTED: Q's first read of the question, from what it knows. */
     firstRead: z.string().max(700).nullable().optional(),
     /** STARTED: the job, so the reply can follow it as it is made. */
@@ -405,6 +414,13 @@ export function createQJobTools(
             plan: null,
             waiting: prepared.waiting.slice(0, 5),
             about: prepared.about,
+          };
+        }
+        if (prepared.status === "PLAN_LIMIT") {
+          return {
+            status: prepared.status,
+            plan: null,
+            message: prepared.message?.slice(0, 400) ?? null,
           };
         }
         return {

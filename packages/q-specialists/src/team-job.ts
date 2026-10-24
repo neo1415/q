@@ -35,6 +35,11 @@ export type TeamJobOutcome =
     }
   | { readonly status: "ALREADY_WAITING"; readonly waiting: readonly string[] }
   | { readonly status: "NOT_PLANNED" | "LIMIT_REACHED" }
+  /**
+   * F-108: their plan's allowance for Q's work this month is used. The
+   * plan's own sentence (counts, reset), or null when it gave none.
+   */
+  | { readonly status: "PLAN_LIMIT"; readonly message: string | null }
   /** This run may not hand work to the team (not offered, or not authorised). */
   | { readonly status: "UNAVAILABLE" }
   /** Planning broke: an error, or output that did not validate. */
@@ -73,9 +78,11 @@ const ProposedSchema = z.object({
     "ONE_PER_TURN",
     "NOT_PLANNED",
     "LIMIT_REACHED",
+    "PLAN_LIMIT",
     "ALREADY_WAITING",
     "FAILED",
   ]),
+  message: z.string().max(400).nullable().optional(),
   plan: z
     .object({
       summary: z.string(),
@@ -130,6 +137,15 @@ export function createToolTeamJobPort(dependencies: {
             { qRunId: request.runId, code: outcome.failureCode },
             "a team job was not planned",
           );
+          // F-108 (live c8d45c628): the plan gate's refusal is the plan's
+          // allowance, said in the plan's own words -- never "isn't
+          // available on your account".
+          if (outcome.failureCode === "ENTITLEMENT_REQUIRED") {
+            return {
+              status: "PLAN_LIMIT",
+              message: outcome.result.error.safeMessage.slice(0, 400) || null,
+            };
+          }
           return {
             status: outcome.status === "DENIED" ? "UNAVAILABLE" : "FAILED",
           };
@@ -153,6 +169,9 @@ export function createToolTeamJobPort(dependencies: {
         }
         if (data.status === "ALREADY_WAITING") {
           return { status: "ALREADY_WAITING", waiting: data.waiting ?? [] };
+        }
+        if (data.status === "PLAN_LIMIT") {
+          return { status: "PLAN_LIMIT", message: data.message ?? null };
         }
         return data.status === "LIMIT_REACHED" || data.status === "FAILED"
           ? { status: data.status }
@@ -236,6 +255,10 @@ export function earlierRequestGoal(
   return null;
 }
 
+/** F-108: how a reply about the plan's allowance opens (read back below). */
+const PLAN_LIMIT_OPENING =
+  "Your plan's allowance for Q's work this month is used, so I haven't started this one.";
+
 const ANSWER_HERE =
   "I can answer it here from what Capital Q holds instead, if that helps.";
 
@@ -266,9 +289,10 @@ export function teamJobOutcomeOf(
   if (said.startsWith("I couldn't turn that into a plan I can carry out")) {
     return "NOT_PLANNED";
   }
-  if (said.startsWith("I've reached the limit of work I can take on")) {
+  if (said.startsWith("Your monthly limit for Q's work is reached")) {
     return "LIMIT_REACHED";
   }
+  if (said.startsWith(PLAN_LIMIT_OPENING)) return "PLAN_LIMIT";
   if (said.startsWith("Taking on work like this isn't available")) {
     return "UNAVAILABLE";
   }
@@ -290,8 +314,12 @@ export function teamJobLine(outcome: TeamJobOutcome): string {
     }
     case "NOT_PLANNED":
       return `I couldn't turn that into a plan I can carry out, so nothing has started. Tell me who it's about and what you want at the end (a memo, a growth plan, questions for the founder) and I'll plan it. ${ANSWER_HERE}`;
+    // F-108: whose limit it is, said plainly. Their own monthly spending
+    // limit for Q's work is theirs to raise; nothing is "running".
     case "LIMIT_REACHED":
-      return `I've reached the limit of work I can take on for you right now, so I haven't started this one. It can start once a running piece of work finishes. ${ANSWER_HERE}`;
+      return `Your monthly limit for Q's work is reached, so I haven't started this one. You can raise it in Settings. ${ANSWER_HERE}`;
+    case "PLAN_LIMIT":
+      return `${PLAN_LIMIT_OPENING}${outcome.message === null ? "" : ` ${outcome.message.trim()}`} ${ANSWER_HERE}`;
     case "UNAVAILABLE":
       return `Taking on work like this isn't available on your account here, so nothing has started. ${ANSWER_HERE}`;
     case "FAILED":
