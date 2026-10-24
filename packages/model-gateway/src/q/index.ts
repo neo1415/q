@@ -989,6 +989,23 @@ export const PREPARED_FOR_APPROVAL_LINE =
 const LANDED_CLAIM =
   /\b(?:I(?:'ve|’ve| have)\s+(?:now\s+)?(?:opened|moved|scrolled|switched|selected|taken you)|(?:it|that|the (?:page|tab|section))(?:'s|’s| is)\s+(?:now\s+)?(?:open|up|showing)|done on your screen)\b/iu;
 
+/** A sentence saying no open question matched ("There isn't a matching open … question"). */
+const NO_MATCHING_QUESTION =
+  /\b(?:no|isn['’]t|wasn['’]t|not|couldn['’]t find)\b[^.!?\n]*\bquestion\b/iu;
+
+/**
+ * The text with a leading "no question matched" sentence moved to the end
+ * (QA F13): the draft they asked for comes first. Unchanged when the first
+ * sentence is anything else or nothing else is left.
+ */
+export function noMatchLast(text: string): string {
+  const sentences = text.match(/[^.!?\n]+[.!?]*\s*/gu) ?? [text];
+  const first = sentences[0];
+  if (first === undefined || !NO_MATCHING_QUESTION.test(first)) return text;
+  const rest = sentences.slice(1).join("").trim();
+  return rest.length === 0 ? text : `${rest}\n\n${first.trim()}`;
+}
+
 /** A sentence reporting an action Q could not do ("I couldn't prepare the reply…"). */
 const COULD_NOT_ACT =
   /^\s*(?:sorry,?\s+)?i\s+(?:couldn['’]t|could\s+not|wasn['’]t\s+able\s+to|was\s+unable\s+to|was\s+not\s+able\s+to)\s+(?:prepare|send|draft|book|schedule|make|do|set\s+up|update|change|save|share|reply|message)\b/iu;
@@ -8615,7 +8632,18 @@ export function createModelGatewayQAnswer(
             "a failure this turn did not have was not said",
           );
         }
-        const promises = stripEmptyPromises(unfailed.text);
+        // QA F13 (re-score, 24 Oct): a founder's drafted answer opened
+        // "There isn't a matching open investor question to record this
+        // against." With the answer tool refused for that, the draft leads
+        // and the note about the question is said last.
+        const answerRefused = toolCalls.some(
+          (call) =>
+            call.providerName === "answer_investor_question" &&
+            call.status !== "SUCCEEDED",
+        );
+        const promises = stripEmptyPromises(
+          answerRefused ? noMatchLast(unfailed.text) : unfailed.text,
+        );
         if (promises.removed.length > 0) {
           logger?.warn(
             {

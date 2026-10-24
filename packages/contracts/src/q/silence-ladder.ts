@@ -184,10 +184,17 @@ function phraseFor(
               : `${possessive(name)} ${thing}`,
       };
     case "REVIEWING_COMPANY":
-      return {
-        verbs: ["looking at", "going through", "reading"],
-        object: theirs("profile"),
-      };
+      // QA F-88 (re-score, 24 Oct): with no one company named this said
+      // "Just going through profile…". No name is a neutral line.
+      return name === undefined
+        ? {
+            verbs: ["looking into", "working through", "looking at"],
+            object: "that",
+          }
+        : {
+            verbs: ["looking at", "going through", "reading"],
+            object: theirs("profile"),
+          };
     case "CHECKING_EVIDENCE":
       return {
         // The deck, data room and document reads show this stage (owner

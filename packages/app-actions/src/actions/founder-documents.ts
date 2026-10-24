@@ -838,7 +838,7 @@ const ANSWER_INVESTOR_QUESTION = defineAppAction<
   tool: {
     name: "answer_investor_question",
     description:
-      "For a founder: prepares, for their approval, their answer to an investor's open question (from their inbox), in THEIR words, optionally with one of their documents as support. It is recorded as their claim, never as verified. Nothing is sent until they approve exactly it.",
+      "For a founder: prepares, for their approval, their answer to an investor's open question (from their inbox), in THEIR words, optionally with one of their documents as support. It is recorded as their claim, never as verified. Nothing is sent until they approve exactly it. When no open question matches (NOT_AVAILABLE), still give them the drafted answer in your reply, offer to send it to that investor as a message or add it to their data room, and say only at the end, in a few words, that no open question in their inbox matched it.",
     input: AnswerTool,
     references: { document: "UPLOAD" },
     scopes: ["COMPANY_PROFILE"],
@@ -874,7 +874,11 @@ const ANSWER_INVESTOR_QUESTION = defineAppAction<
             ? questions[0]
             : undefined;
       if (chosen === undefined)
-        return refusal("There's no single open question matching that.");
+        // QA F13 (re-score, 24 Oct): a reply led with this; the draft is
+        // what they asked for, so this is said last, in a few words.
+        return refusal(
+          "No open question in their inbox matches it, so it is not recorded against one; give them the draft and offer to send it or file it in their data room, and say this last, briefly.",
+        );
       return {
         questionId: chosen.question.questionId,
         relationshipId: chosen.item.relationshipId,
