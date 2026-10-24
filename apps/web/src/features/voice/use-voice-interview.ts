@@ -119,6 +119,13 @@ export type VoiceInterview = {
 
 /** How often the stage asks what Q is asking, while talking. */
 const TURN_POLL_MS = 1_500;
+/**
+ * Egress review (2026-10-24): a hidden tab reads the board four times less
+ * often. It still reads: a hidden tab must learn that the person opened
+ * voice somewhere newer (G-D21) and let its own line go. Coming back into
+ * view reads at once.
+ */
+const TURN_POLL_HIDDEN_MS = 6_000;
 
 /**
  * Coming back after a dropped line.
@@ -778,8 +785,19 @@ export function useVoiceInterview(
       if (cancelled) return;
       const soon = again;
       again = false;
-      timer = setTimeout(() => void tick(), soon ? 0 : TURN_POLL_MS);
+      timer = setTimeout(
+        () => void tick(),
+        soon
+          ? 0
+          : document.visibilityState === "hidden"
+            ? TURN_POLL_HIDDEN_MS
+            : TURN_POLL_MS,
+      );
     };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") now();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     const readOnce = async () => {
       const screen = currentScreen();
       const viewing = currentViewing();
@@ -872,6 +890,7 @@ export function useVoiceInterview(
     void tick();
     return () => {
       window.removeEventListener(VOICE_TURN_NOW_EVENT, now);
+      document.removeEventListener("visibilitychange", onVisibility);
       cancelled = true;
       if (timer !== undefined) {
         clearTimeout(timer);

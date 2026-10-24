@@ -79,6 +79,10 @@ import {
   type MeetSound,
 } from "./meet-sounds";
 import { useT } from "@/features/i18n/language";
+import { startPacedPoll } from "@/features/polling/paced-poll";
+
+/** One look every five seconds between turns; it never speeds up or slows. */
+const IDLE_LOOK_PACE = { firstMs: 5_000, maxMs: 5_000, factor: 1 } as const;
 
 /**
  * The rehearsal room (REHEARSE, founder direction 2026-10-01): a video call
@@ -588,11 +592,15 @@ export function RehearsalRoom({
     }
   }
 
-  // Between turns, one look per idle period, only while they consent.
+  // Between turns, one look per idle period, only while they consent and
+  // the room is in view: a hidden tab sends no frames (egress review).
   useEffect(() => {
     if (!qSees || !camOn || ended) return;
-    const id = window.setInterval(() => void look("IDLE"), 5_000);
-    return () => window.clearInterval(id);
+    const poll = startPacedPoll(async () => {
+      await look("IDLE");
+      return "same";
+    }, IDLE_LOOK_PACE);
+    return poll.stop;
   }, [qSees, camOn, ended, look]);
 
   async function raiseHand() {
