@@ -166,3 +166,53 @@ describe("D2: a card's spoken line leads with the insight", () => {
     expect(line).toMatch(/Q's reading/u);
   });
 });
+
+describe("QA U2: no mandate fit or comparison table for things that are not records", () => {
+  // Live 24 Oct 2026, run ae00a0fa: a founder's two pitch videos.
+  const videos = () => {
+    const block = answerCardsBlock({
+      shape: "SIDE_BY_SIDE",
+      title: "Maji Loop pitch videos",
+      cards: ["Maji Loop pitch video", "Maji Loop: pitch summary"].map(
+        (name) => ({
+          name,
+          line: null,
+          reasons: ["Covers the product and the raise."],
+          measures: [
+            { label: "Investor access", level: "GOOD", value: null },
+            { label: "Story coverage", level: "GOOD", value: null },
+            { label: "Evidence depth", level: "PARTIAL", value: null },
+          ],
+          view: null,
+          said: null,
+          citations: [],
+        }),
+      ),
+      followUps: [],
+    });
+    if (block === null) throw new Error("no block");
+    return block;
+  };
+
+  it("a founder's pitch videos carry no mandate fit and are not the comparison table", () => {
+    const [out] = withFitIntegrity([videos()], {
+      asked: "How is my pitch video doing, and how can I make it better?",
+      previous: [],
+      mandate: false,
+    });
+    if (out?.kind !== "ANSWER_CARDS") throw new Error("no cards");
+    expect(out.cards.every((card) => card.fit === null)).toBe(true);
+    expect(out.title).not.toMatch(/mandate fit/iu);
+    expect(out.shape).toBe("RANKED");
+  });
+
+  it("an investor's comparison of companies they named stays the table", () => {
+    const [out] = withFitIntegrity([videos()], {
+      asked: "Compare Maji Loop pitch video and Maji Loop: pitch summary",
+      previous: [],
+      mandate: true,
+    });
+    if (out?.kind !== "ANSWER_CARDS") throw new Error("no cards");
+    expect(out.shape).toBe("SIDE_BY_SIDE");
+  });
+});

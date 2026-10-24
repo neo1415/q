@@ -305,7 +305,12 @@ export function tieLine(block: QAnswerCardsBlock): string | null {
  */
 export function withFitIntegrity(
   blocks: readonly QResultBlock[],
-  input: { readonly asked: string; readonly previous: readonly string[] },
+  input: {
+    readonly asked: string;
+    readonly previous: readonly string[];
+    /** False when the person has no mandate (a founder): no mandate fit. */
+    readonly mandate?: boolean | undefined;
+  },
 ): QResultBlock[] {
   const seen = new Set<string>();
   const referential = input.previous.length > 0 && refersToShown(input.asked);
@@ -332,9 +337,24 @@ export function withFitIntegrity(
       cards = cards.slice(0, count);
     }
     if (cards.length === 0) continue;
+    // QA U2 (24 Oct 2026, run ae00a0fa): a founder's two pitch videos were
+    // drawn "Side by side" under "Mandate fit", each "6.3 mandate fit". A
+    // mandate fit is the investor's own: asked by someone with no mandate,
+    // no card carries one. The comparison table is of records (a card on
+    // Capital Q, or companies the person named), never of loose things.
+    if (input.mandate === false) {
+      cards = cards.map((card) =>
+        card.fit === null ? card : { ...card, fit: null },
+      );
+    }
+    const ofRecords =
+      shaped !== block || cards.some((card) => card.subject !== null);
+    const shape =
+      shaped.shape === "SIDE_BY_SIDE" && !ofRecords ? "RANKED" : shaped.shape;
     const scored = cards.some((card) => card.fit !== null);
     out.push({
       ...shaped,
+      shape,
       title:
         scored && !MANDATE_WORD.test(block.title)
           ? `Mandate fit: ${block.title}`.slice(0, 120)
