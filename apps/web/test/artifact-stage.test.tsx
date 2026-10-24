@@ -3,7 +3,11 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { QPageManifestSchema, type QResultBlock } from "@capital-q/contracts";
+import {
+  QArtifactIdSchema,
+  QPageManifestSchema,
+  type QResultBlock,
+} from "@capital-q/contracts";
 
 import { demoTop } from "../src/features/q/answer-canvas-fixtures";
 import type { QTurn } from "../src/features/q/conversation";
@@ -215,7 +219,9 @@ describe("QA U2: a document on the stage is drawn once", () => {
       answer("a1", "Here's the brief for Maji Loop.", [
         {
           kind: "ARTIFACT_REFERENCE",
-          artifactId: "a0000000-0000-4000-8000-000000000002",
+          artifactId: QArtifactIdSchema.parse(
+            "a0000000-0000-4000-8000-000000000002",
+          ),
           type: "INVESTMENT_BRIEF",
           title: "Investment brief — Maji Loop",
           status: "READY",
